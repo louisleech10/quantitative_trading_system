@@ -1,0 +1,5 @@
+{
+  "python.pythonPath": "${workspaceFolder}/venv/bin/python",
+  "python.venvPath": "${workspaceFolder}/venv",
+  "python.terminal.activateEnvironment": true
+}
