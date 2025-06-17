@@ -687,7 +687,7 @@ class CaseSearchEngine:
     
     def _determine_market_phase(self, timestamp: datetime) -> str:
         """確定指定時間的市場階段"""
-        from Momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
+        from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
         
         # 使用MarketConfig的方法獲取市場階段
         return MarketConfig.get_market_phase(timestamp)

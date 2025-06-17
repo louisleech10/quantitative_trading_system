@@ -62,7 +62,7 @@ async def main():
                 condition_type="price",
                 parameter="price_change",
                 operator=">=",
-                value=0.1,  # 8%的價格漲幅（比標準的10%要低）
+                value=0.01,  # 8%的價格漲幅（比標準的10%要低）
                 description="K線漲幅 >= 8%"
             )
         )
@@ -98,7 +98,7 @@ async def main():
                 condition_type="price",
                 parameter="future_max_drawdown",
                 operator=">=",
-                value=-0.05,  # 最大回撤不超過5%
+                value=-0.5,  # 最大回撤不超過5%
                 description="未來最大回撤 >= -5%"
             )
         )
