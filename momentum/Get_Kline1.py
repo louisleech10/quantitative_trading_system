@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 import logging
 from typing import List, Dict, Tuple
 import numpy as np
-from src.data.data_loader_momentum import DataLoader
-from Momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
+from momentum.DataExtraction.data_loader_momentum import DataLoader
+from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
 
 logging.basicConfig(
     level=logging.INFO,

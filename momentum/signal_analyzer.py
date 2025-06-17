@@ -13,8 +13,8 @@ import json
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-from Momentum.Indicator.Advanced_MA import AdvancedMA, MAParams
-from Momentum.Indicator.Base_Indicator import BaseIndicator
+from momentum.Indicator.Advanced_MA import AdvancedMA, MAParams
+from momentum.Indicator.Base_Indicator import BaseIndicator
 
 logging.basicConfig(
     level=logging.INFO,

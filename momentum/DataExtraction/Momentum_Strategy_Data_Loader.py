@@ -22,8 +22,8 @@ from data_loader_momentum import DataLoader
 from case_search_engine import CaseSearchEngine, SearchConfiguration, FilterCondition
 
 # 保留相容性匯入
-from Momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
-from Momentum.DataExtraction.Momentum_classifier import MomentumClassifier
+from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
+from momentum.DataExtraction.Momentum_classifier import MomentumClassifier
 
 class MomentumDataLoader:
     """
