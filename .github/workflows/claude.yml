@@ -26,3 +26,5 @@ jobs:
       - uses: anthropics/claude-code-action@beta
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          CLAUDE_USE_GITHUB_TOKEN: "true"
