@@ -4,7 +4,7 @@ import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
 from momentum.signal_analyzer import SignalAnalyzer
-from momentum.Indicator.Advanced_MA import AdvancedMA, MAParams
+from momentum.Indicator.Advanced_MA_Reference import AdvancedMA, MAParams
 # 引入搜索配置和篩選條件類
 from momentum.DataExtraction.case_search_engine import SearchConfiguration, FilterCondition
 import logging

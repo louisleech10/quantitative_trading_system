@@ -6,7 +6,7 @@ from typing import Dict, List, Any
 import pandas as pd
 import numpy as np
 import pandas_ta as ta
-from momentum.Indicator.Base_Indicator import BaseIndicator, IndicatorParams
+from momentum.Indicator.Base_Indicator_Reference import BaseIndicator, IndicatorParams
 
 @dataclass
 class MAParams(IndicatorParams):
