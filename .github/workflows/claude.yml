@@ -1,22 +1,20 @@
 name: Claude
 on:
-  issues:
-    types: [opened]
   issue_comment:
     types: [created]
-  pull_request:
-    types: [opened, synchronize]
   pull_request_review_comment:
     types: [created]
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  id-token: write
+
 jobs:
   claude:
+    if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-      id-token: write
     steps:
       - uses: anthropics/claude-code-action@beta
         with:
