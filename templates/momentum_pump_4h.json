@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "name": "momentum_pump_4h",
+    "created_at": "2025-06-19T22:14:49.165531",
+    "version": "1.0"
+  },
+  "config": {
+    "name": "Momentum Pump Detection (4h)",
+    "description": "Detect momentum pumps in 4-hour timeframe",
+    "timeframe": "4h",
+    "start_date": "2022-01-01",
+    "end_date": "2022-12-31",
+    "lookback_periods": 100,
+    "forward_periods": 12,
+    "sample_limit": 500,
+    "min_volume": 500000,
+    "exclude_new_listing_days": 7,
+    "initial_conditions": [
+      {
+        "condition_type": "price",
+        "parameter": "price_change",
+        "operator": ">=",
+        "value": 0.08,
+        "description": "Price pump >= 8%"
+      }
+    ],
+    "advanced_conditions": [],
+    "negative_sampling": true,
+    "positive_negative_ratio": 1.5,
+    "is_default": true
+  }
+}
