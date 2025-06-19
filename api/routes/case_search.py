@@ -24,7 +24,8 @@ from api.models.responses import (
     ErrorResponse
 )
 #from api.services.search_service import search_service
-from api.services.temp_search_service import temp_search_service as search_service
+#from api.services.fixed_search_service import fixed_search_service as search_service
+from api.services.standalone_search_service import standalone_search_service as search_service
 
 # Create router
 router = APIRouter(prefix="/search", tags=["Case Search"])
@@ -272,11 +273,16 @@ async def search_health_check():
     Returns the current status of the search service and its components.
     """
     try:
-        # Check if search service is initialized (adapted for temp service)
-        is_healthy = hasattr(search_service, 'task_manager')
+        # Check if search service is initialized (adapted for fixed service)
+        is_real_service = getattr(search_service, 'is_real_service_available', lambda: False)()
+        has_data_loader = hasattr(search_service, 'data_loader') and search_service.data_loader is not None
+        has_search_engine = hasattr(search_service, 'search_engine') and search_service.search_engine is not None
         
+        is_healthy = hasattr(search_service, 'task_manager')
         active_searches = getattr(search_service, '_active_searches', 0)
         total_tasks = len(getattr(search_service.task_manager, 'tasks', {}))
+        
+        service_type = "real_momentum_service" if is_real_service else "temporary_mock_service"
         
         return JSONResponse({
             "success": True,
@@ -285,7 +291,12 @@ async def search_health_check():
                 "active_searches": active_searches,
                 "total_tasks": total_tasks,
                 "service_initialized": is_healthy,
-                "service_type": "temporary_mock_service"
+                "service_type": service_type,
+                "momentum_modules": {
+                    "data_loader_available": has_data_loader,
+                    "search_engine_available": has_search_engine,
+                    "real_service_available": is_real_service
+                }
             }
         })
         
