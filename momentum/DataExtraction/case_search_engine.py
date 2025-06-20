@@ -511,6 +511,12 @@ class CaseSearchEngine:
                 
                 # 提取數據
                 case_data = data.iloc[start_idx:end_idx+1].copy()
+
+                try:
+                    market_phase = self._determine_market_phase(timestamp)
+                except Exception as e:
+                    self.logger.warning(f"無法確定市場階段: {str(e)}")
+                    market_phase = "UNKNOWN"
                 
                 # 創建案例記錄
                 case = {
@@ -555,7 +561,12 @@ class CaseSearchEngine:
                             case[col] = None
                 
                 # 添加其他有用的統計信息
-                market_phase = self._determine_market_phase(timestamp)
+                try:
+                    market_phase = self._determine_market_phase(timestamp)
+                except Exception as e:
+                    self.logger.warning(f"無法確定市場階段: {str(e)}")
+                    market_phase = "UNKNOWN"
+
                 case['market_phase'] = market_phase
                 
                 results.append(case)
