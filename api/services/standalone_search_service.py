@@ -221,11 +221,22 @@ class StandaloneSearchService:
             # Generate price data that meets initial conditions
             base_price = 30000 + i * 5000  # Varying base prices
             price_change = 0.10 + (i * 0.02)  # Meet the >= 10% condition
+
+            open_price = base_price * (1 + (i % 5) * 0.005 - 0.01)  # 開盤價
+            high_price = max(open_price, base_price) * (1 + (i % 3) * 0.01)  # 最高價
+            low_price = min(open_price, base_price) * (1 - (i % 3) * 0.005)  # 最低價
+            close_price = base_price  # 收盤價
             
+            # 未來24小時數據
+            future24_close_price = close_price * (1 + future_2)  # 基於 future2 計算
+            future24_low_price = close_price * (1 + min(future_1, future_2) - 0.01)
+
             if request.initial_conditions:
                 for condition in request.initial_conditions:
                     if condition.parameter == "price_change" and condition.operator == ">=":
                         price_change = max(price_change, condition.value)
+            
+    
             
             # Generate volume data
             volume = max(request.min_volume, 1000000 + i * 200000)
@@ -251,6 +262,9 @@ class StandaloneSearchService:
                 symbol=symbol,
                 timestamp=case_time,
                 trigger_idx=95 + i,
+                open=open_price,                    # 新增
+                high=high_price,                    # 新增
+                low=low_price,                      # 新增
                 close=base_price,
                 volume=volume,
                 price_change=price_change,
@@ -261,6 +275,8 @@ class StandaloneSearchService:
                 future6_close_return=future_6,
                 future_max_return=max(future_1, future_2, future_4, future_6) + 0.02,
                 future_max_drawdown=min(-0.02, min(future_1, future_2, future_4, future_6) - 0.01),
+                future24_close=future24_close_price,      # 新增
+                future24_low=future24_low_price,          # 新增
                 prior_volatility=0.02 + (i % 3) * 0.01,
                 prior_range=0.05 + (i % 3) * 0.02,
                 prior_abs_change_sum=0.08 + (i % 3) * 0.03,
