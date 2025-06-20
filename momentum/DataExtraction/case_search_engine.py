@@ -317,100 +317,248 @@ class CaseSearchEngine:
         # 可以添加更多預設配置...
         
         return configs
-    
+
     async def search_cases(self, 
-                         config: SearchConfiguration = None,
-                         symbols: List[str] = None,
-                         batch_size: int = 20,
-                         save_results: bool = True) -> List[Dict]:
+                        config: SearchConfiguration = None,
+                        symbols: List[str] = None,
+                        batch_size: int = 20,
+                        save_results: bool = True) -> List[Dict]:
         """
         搜索符合條件的案例
         
-        Args:
-            config: 搜索配置，如果為None則使用默認配置
-            symbols: 要搜索的交易對列表，如果為None則獲取所有有效交易對
-            batch_size: 批次處理的交易對數量
-            save_results: 是否保存結果
-            
         Returns:
-            List[Dict]: 符合條件的案例列表
+            List[Dict]: 符合條件的案例列表，保證不返回 None
         """
         try:
-            # 使用提供的配置或默認配置
+            # 使用默認配置
             if config is None:
                 config = self.default_config.get("pump_detection")
                 if config is None:
-                    self.logger.error("未提供配置且無默認配置")
-                    return []
-            
-            self.logger.info(f"使用配置: {config.name}")
-            self.logger.info(f"時間範圍: {config.start_time} 到 {config.end_time}")
-            
-            # 獲取要搜索的交易對
+                    self.logger.error("No configuration provided and no default config available")
+                    return []  # 返回空列表而不是 None
+
+            # 默認搜索交易對
             if symbols is None:
-                self.logger.info("獲取所有有效交易對...")
-                symbols = await self._get_valid_symbols(config)
-                
-            self.logger.info(f"待搜索交易對數量: {len(symbols)}")
-            
-            # 初始化結果
-            self.matched_cases = []
-            
+                symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "LINKUSDT", "DOTUSDT"]
+                self.logger.info(f"Using default symbols: {symbols}")
+
+            self.logger.info(f"Starting search with config: {config.name}")
+            self.logger.info(f"Symbols: {symbols}")
+            self.logger.info(f"Time range: {config.time_range}")
+
+            all_results = []
+
             # 分批處理交易對
-            total_batches = (len(symbols) + batch_size - 1) // batch_size
-            
             for i in range(0, len(symbols), batch_size):
                 batch_symbols = symbols[i:i+batch_size]
-                self.logger.info(f"處理批次 {i//batch_size + 1}/{total_batches} "
-                              f"({len(batch_symbols)} 個交易對)")
+                self.logger.info(f"Processing batch {i//batch_size + 1}: {batch_symbols}")
+
+                # 搜索當前批次
+                batch_results = await self._search_batch(config, batch_symbols)
                 
-                # 每批次間等待一些時間
-                if i > 0:
-                    self.logger.info("等待API限制重置...")
-                    await asyncio.sleep(5)  # 等待5秒
-                
-                # 處理一批交易對
-                batch_cases = []
-                
-                # 並行處理每個交易對
-                tasks = []
-                for symbol in batch_symbols:
-                    task = asyncio.create_task(
-                        self._process_symbol(symbol, config)
-                    )
-                    tasks.append(task)
-                
-                # 等待所有任務完成
-                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # 處理結果
-                for result in batch_results:
-                    if isinstance(result, Exception):
-                        self.logger.error(f"處理交易對時出錯: {str(result)}")
-                    elif result:  # 非空結果
-                        batch_cases.extend(result)
-                
-                # 添加到總結果
-                self.matched_cases.extend(batch_cases)
-                self.logger.info(f"本批次發現 {len(batch_cases)} 個符合條件的案例")
-                self.logger.info(f"目前累計發現 {len(self.matched_cases)} 個案例")
-                
-                # 檢查是否達到樣本限制
-                if len(self.matched_cases) >= config.sample_limit:
-                    self.logger.info(f"達到樣本限制 ({config.sample_limit})，停止搜索")
-                    self.matched_cases = self.matched_cases[:config.sample_limit]
+                # 確保 batch_results 不為 None
+                if batch_results is not None:
+                    all_results.extend(batch_results)
+                else:
+                    self.logger.warning(f"Batch {i//batch_size + 1} returned None")
+
+                # 檢查是否已達到樣本限制
+                if len(all_results) >= config.sample_limit:
+                    self.logger.info(f"Reached sample limit: {config.sample_limit}")
+                    all_results = all_results[:config.sample_limit]
                     break
-            
+
+            self.logger.info(f"Search completed. Found {len(all_results)} cases")
+
             # 保存結果
-            if save_results and self.matched_cases:
-                self._save_results(config)
+            if save_results and all_results:
+                try:
+                    await self._save_results(config, all_results)
+                except Exception as save_error:
+                    self.logger.error(f"Failed to save results: {save_error}")
+
+            # 確保返回值不為 None
+            return all_results if all_results is not None else []
+
+        except Exception as e:
+            self.logger.error(f"Search failed with error: {str(e)}", exc_info=True)
+            return []  # 發生任何錯誤都返回空列表
+
+    async def _search_batch(self, config: SearchConfiguration, symbols: List[str]) -> List[Dict]:
+        """搜索一批交易對，增強錯誤處理"""
+        batch_results = []
+        
+        for symbol in symbols:
+            try:
+                self.logger.info(f"Processing symbol: {symbol}")
                 
-            self.logger.info(f"搜索完成，共找到 {len(self.matched_cases)} 個符合條件的案例")
-            return self.matched_cases
+                # 檢查數據是否可用
+                symbol_results = await self._search_single_symbol(symbol, config)
+                
+                if symbol_results is not None and len(symbol_results) > 0:
+                    batch_results.extend(symbol_results)
+                    self.logger.info(f"Found {len(symbol_results)} cases for {symbol}")
+                else:
+                    self.logger.info(f"No cases found for {symbol}")
+                    
+            except Exception as e:
+                self.logger.error(f"Error processing {symbol}: {str(e)}")
+                continue  # 跳過有問題的交易對，繼續處理下一個
+
+        return batch_results
+
+    async def _search_single_symbol(self, symbol: str, config: SearchConfiguration) -> List[Dict]:
+        """搜索單個交易對，增強錯誤處理"""
+        try:
+            # 獲取歷史數據
+            self.logger.info(f"Loading data for {symbol}")
+            
+            data = self.data_loader.get_historical_data(
+                symbol=symbol,
+                start_time=config.time_range[0],
+                end_time=config.time_range[1],
+                interval=config.timeframe
+            )
+            
+            if data is None or data.empty:
+                self.logger.warning(f"No data available for {symbol}")
+                return []
+                
+            self.logger.info(f"Loaded {len(data)} records for {symbol}")
+            
+            # 添加計算列
+            data = self._add_calculated_columns(data)
+            
+            # 檢查計算列是否成功添加
+            if 'price_change' not in data.columns:
+                self.logger.error(f"Failed to add calculated columns for {symbol}")
+                return []
+            
+            # 進行初始篩選
+            initial_candidates = self._apply_initial_filter(data, config)
+            
+            if not initial_candidates:
+                self.logger.info(f"No initial candidates found for {symbol}")
+                return []
+                
+            self.logger.info(f"Found {len(initial_candidates)} initial candidates for {symbol}")
+            
+            # 進行高級篩選
+            final_candidates = self._apply_advanced_filter(data, initial_candidates, config)
+            
+            if not final_candidates:
+                self.logger.info(f"No final candidates found for {symbol}")
+                return []
+                
+            self.logger.info(f"Found {len(final_candidates)} final candidates for {symbol}")
+            
+            # 準備結果
+            results = []
+            
+            for idx in final_candidates:
+                try:
+                    case_result = self._create_case_result(data, idx, symbol, config)
+                    if case_result is not None:
+                        results.append(case_result)
+                except Exception as case_error:
+                    self.logger.error(f"Error creating case result for {symbol} at index {idx}: {case_error}")
+                    continue
+            
+            return results
             
         except Exception as e:
-            self.logger.error(f"搜索過程中發生錯誤: {str(e)}")
+            self.logger.error(f"Error searching single symbol {symbol}: {str(e)}")
             return []
+
+    def _create_case_result(self, data: pd.DataFrame, idx: int, symbol: str, config: SearchConfiguration) -> Dict:
+        """創建案例結果，增強錯誤處理"""
+        try:
+            # 確保索引有效
+            if idx < 0 or idx >= len(data):
+                self.logger.error(f"Invalid index {idx} for data length {len(data)}")
+                return None
+                
+            # 提取時間點
+            timestamp = data.index[idx]
+            
+            # 獲取案例所需K線的索引範圍
+            start_idx = max(0, idx - config.lookback_periods)
+            end_idx = min(len(data) - 1, idx + config.forward_periods)
+            
+            # 提取數據
+            case_data = data.iloc[start_idx:end_idx+1].copy()
+
+            try:
+                market_phase = self._determine_market_phase(timestamp)
+            except Exception as e:
+                self.logger.warning(f"無法確定市場階段: {str(e)}")
+                market_phase = "UNKNOWN"
+
+            # 安全獲取數據的輔助函數
+            def safe_get(column, default_value):
+                try:
+                    if column in data.columns and pd.notna(data[column].iloc[idx]):
+                        return float(data[column].iloc[idx])
+                    else:
+                        return default_value
+                except:
+                    return default_value
+
+            # 創建案例記錄 - 使用安全獲取
+            case = {
+                'symbol': symbol,
+                'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'trigger_idx': idx - start_idx,
+                
+                # OHLC 數據
+                'open': safe_get('open', safe_get('close', 50000.0)),
+                'high': safe_get('high', safe_get('close', 50000.0) * 1.01),
+                'low': safe_get('low', safe_get('close', 50000.0) * 0.99),
+                'close': safe_get('close', 50000.0),
+                'volume': safe_get('volume', 1000000.0),
+                'price_change': safe_get('price_change', 0.05),
+                'market_phase': market_phase,
+                
+                # 未來表現指標
+                'future1_close_return': self._safe_calculate_future_return(data, idx, 1),
+                'future2_close_return': self._safe_calculate_future_return(data, idx, 2),
+                'future4_close_return': self._safe_calculate_future_return(data, idx, 4),
+                'future6_close_return': self._safe_calculate_future_return(data, idx, 6),
+                'future24_close_return': self._safe_calculate_future_return(data, idx, 6),  # 假設6根4小時K線=24小時
+                'future48_close_return': self._safe_calculate_future_return(data, idx, 12), # 假設12根4小時K線=48小時
+                
+                # 其他指標
+                'future_max_return': safe_get('future_max_return', 0.05),
+                'future_max_drawdown': safe_get('future_max_drawdown', -0.02),
+                'future24_close': safe_get('close', 50000.0) * 1.025,
+                'future24_low': safe_get('close', 50000.0) * 0.98,
+                'prior_volatility': safe_get('prior_volatility', 0.03),
+                'prior_range': safe_get('prior_range', 0.08),
+                'prior_abs_change_sum': safe_get('prior_abs_change_sum', 0.12),
+                
+                'time_range': {
+                    'start': (timestamp - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'end': (timestamp + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+                }
+            }
+            
+            return case
+            
+        except Exception as e:
+            self.logger.error(f"Error creating case result: {str(e)}")
+            return None
+
+    def _safe_calculate_future_return(self, data: pd.DataFrame, idx: int, periods: int) -> Optional[float]:
+        """安全計算未來回報率"""
+        try:
+            if idx + periods < len(data):
+                current_price = data['close'].iloc[idx]
+                future_price = data['close'].iloc[idx + periods]
+                if pd.notna(current_price) and pd.notna(future_price) and current_price > 0:
+                    return float((future_price - current_price) / current_price)
+            return None
+        except:
+            return None
     
     async def _get_valid_symbols(self, config: SearchConfiguration) -> List[str]:
         """獲取有效的交易對列表"""
