@@ -1280,3 +1280,37 @@ AttributeError: 'SearchConfiguration' object has no attribute 'time_range'
 2025-06-21 02:13:30 - api.request - [32mINFO[0m - GET /api/v1/search/task/7b1a9710-085f-48f9-8d2c-ad252f8cb83e/result - 200 - 0.001s
 2025-06-21 02:13:30 - api.middleware.request - [32mINFO[0m - [6ed49d9b] Completed GET /api/v1/search/task/7b1a9710-085f-48f9-8d2c-ad252f8cb83e/result - 200 - 0.001s
 2025-06-21 02:16:09 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-21 03:02:29 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-21 03:02:29 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-21 03:02:29 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-21 03:02:29 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-21 03:02:29 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-21 03:02:29 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-21 03:02:29 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-21 03:02:29 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-21 03:02:29 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-21 03:02:29 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-21 03:02:37 - api.middleware.request - [32mINFO[0m - [a53570aa] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-21 03:02:37 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.004s
+2025-06-21 03:02:37 - api.middleware.request - [32mINFO[0m - [a53570aa] Completed OPTIONS /api/v1/search/execute - 200 - 0.004s
+2025-06-21 03:02:37 - api.middleware.request - [32mINFO[0m - [cb286ead] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-21 03:02:37 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-21 03:02:37 - api.standalone_task_manager - [32mINFO[0m - Created task aa63b431-7479-43ae-831a-737991763f7a for config: Frontend_Test_Search
+2025-06-21 03:02:37 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-21 03:02:37 - api.standalone_task_manager - [32mINFO[0m - Updated task aa63b431-7479-43ae-831a-737991763f7a status to TaskStatusEnum.RUNNING
+2025-06-21 03:02:37 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-21 03:02:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: Frontend_Test_Search
+2025-06-21 03:02:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
+2025-06-21 03:02:37 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Search failed with error: 'SearchConfiguration' object has no attribute 'time_range'
+Traceback (most recent call last):
+  File "/Users/louis/Documents/量化交易/quantitative_trading_system/momentum/DataExtraction/case_search_engine.py", line 347, in search_cases
+    self.logger.info(f"Time range: {config.time_range}")
+                                    ^^^^^^^^^^^^^^^^^
+AttributeError: 'SearchConfiguration' object has no attribute 'time_range'
+2025-06-21 03:02:37 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
+2025-06-21 03:02:37 - api.standalone_task_manager - [32mINFO[0m - Updated task aa63b431-7479-43ae-831a-737991763f7a status to TaskStatusEnum.FAILED
+2025-06-21 03:02:37 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.022s
+2025-06-21 03:02:37 - api.middleware.request - [32mINFO[0m - [cb286ead] Completed POST /api/v1/search/execute - 200 - 0.022s
+2025-06-21 03:02:37 - api.middleware.request - [32mINFO[0m - [8b876501] Started GET /api/v1/search/task/aa63b431-7479-43ae-831a-737991763f7a from 127.0.0.1
+2025-06-21 03:02:37 - api.request - [32mINFO[0m - GET /api/v1/search/task/aa63b431-7479-43ae-831a-737991763f7a - 200 - 0.002s
+2025-06-21 03:02:37 - api.middleware.request - [32mINFO[0m - [8b876501] Completed GET /api/v1/search/task/aa63b431-7479-43ae-831a-737991763f7a - 200 - 0.002s

@@ -132,8 +132,8 @@ class StandaloneSearchService:
                 self.logger.info("Trying direct imports...")
                 
                 # Import DataLoader
-                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumStrategyDataLoader
-                self.data_loader = MomentumStrategyDataLoader()
+                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
+                self.data_loader = MomentumDataLoader()
                 self.logger.info("✅ DataLoader imported successfully")
                 
                 # Import SearchEngine
@@ -157,10 +157,10 @@ class StandaloneSearchService:
                 if str(full_path) not in sys.path:
                     sys.path.insert(0, str(full_path))
                 
-                from DataExtraction.Momentum_Strategy_Data_Loader import MomentumStrategyDataLoader
-                from DataExtraction.case_search_engine import CaseSearchEngine
+                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
+                from momentum.DataExtraction.case_search_engine import CaseSearchEngine
                 
-                self.data_loader = MomentumStrategyDataLoader()
+                self.data_loader = MomentumDataLoader()
                 self.search_engine = CaseSearchEngine(self.data_loader)
                 
                 self.momentum_available = True

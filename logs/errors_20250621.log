@@ -103,3 +103,9 @@ Traceback (most recent call last):
     self.logger.info(f"Time range: {config.time_range}")
                                     ^^^^^^^^^^^^^^^^^
 AttributeError: 'SearchConfiguration' object has no attribute 'time_range'
+2025-06-21 03:02:37 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Search failed with error: 'SearchConfiguration' object has no attribute 'time_range'
+Traceback (most recent call last):
+  File "/Users/louis/Documents/量化交易/quantitative_trading_system/momentum/DataExtraction/case_search_engine.py", line 347, in search_cases
+    self.logger.info(f"Time range: {config.time_range}")
+                                    ^^^^^^^^^^^^^^^^^
+AttributeError: 'SearchConfiguration' object has no attribute 'time_range'
