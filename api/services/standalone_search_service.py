@@ -218,25 +218,26 @@ class StandaloneSearchService:
             days_offset = i * (30 // case_count) if case_count > 0 else i * 3
             case_time = base_time + timedelta(days=days_offset, hours=i*6)
             
-            # Generate price data that meets initial conditions
-            base_price = 30000 + i * 5000  # Varying base prices
-            price_change = 0.10 + (i * 0.02)  # Meet the >= 10% condition
-
+            # Generate realistic price data
+            base_price = 30000 + i * 5000  # Varying base prices for different symbols
+            
+            # 生成完整的 OHLC 數據
             open_price = base_price * (1 + (i % 5) * 0.005 - 0.01)  # 開盤價
             high_price = max(open_price, base_price) * (1 + (i % 3) * 0.01)  # 最高價
             low_price = min(open_price, base_price) * (1 - (i % 3) * 0.005)  # 最低價
             close_price = base_price  # 收盤價
             
-            # 未來24小時數據
-            future24_close_price = close_price * (1 + future_2)  # 基於 future2 計算
-            future24_low_price = close_price * (1 + min(future_1, future_2) - 0.01)
-
+            # 計算價格變化
+            price_change = (close_price - open_price) / open_price
+            
+            # 如果有條件限制，調整價格變化
             if request.initial_conditions:
                 for condition in request.initial_conditions:
                     if condition.parameter == "price_change" and condition.operator == ">=":
-                        price_change = max(price_change, condition.value)
-            
-    
+                        if price_change < condition.value:
+                            # 調整收盤價以滿足條件
+                            close_price = open_price * (1 + condition.value + 0.01)
+                            price_change = condition.value + 0.01
             
             # Generate volume data
             volume = max(request.min_volume, 1000000 + i * 200000)
@@ -247,6 +248,14 @@ class StandaloneSearchService:
             future_4 = 0.06 + (i % 4) * 0.05 - 0.03  # -3% to 13%
             future_6 = 0.08 + (i % 4) * 0.06 - 0.04  # -4% to 16%
             
+            # 計算24小時和48小時回報
+            future_24h = 0.05 + (i % 4) * 0.04 - 0.02  # -2% to 10%
+            future_48h = 0.07 + (i % 4) * 0.05 - 0.03  # -3% to 13%
+            
+            # 未來24小時數據
+            future24_close_price = close_price * (1 + future_24h)
+            future24_low_price = close_price * (1 + min(future_1, future_2, future_24h) - 0.01)
+
             # Market phase based on time
             month = case_time.month
             if month in [1, 2, 3]:
@@ -262,24 +271,35 @@ class StandaloneSearchService:
                 symbol=symbol,
                 timestamp=case_time,
                 trigger_idx=95 + i,
-                open=open_price,                    # 新增
-                high=high_price,                    # 新增
-                low=low_price,                      # 新增
-                close=base_price,
+                
+                # 完整的 OHLC 數據 - 修復關鍵問題
+                open=open_price,
+                high=high_price,
+                low=low_price,
+                close=close_price,
                 volume=volume,
                 price_change=price_change,
                 market_phase=market_phase,
+                
+                # 未來表現指標
                 future1_close_return=future_1,
                 future2_close_return=future_2,
                 future4_close_return=future_4,
                 future6_close_return=future_6,
-                future_max_return=max(future_1, future_2, future_4, future_6) + 0.02,
-                future_max_drawdown=min(-0.02, min(future_1, future_2, future_4, future_6) - 0.01),
-                future24_close=future24_close_price,      # 新增
-                future24_low=future24_low_price,          # 新增
+                future24_close_return=future_24h,  # 修復24小時回報
+                future48_close_return=future_48h,  # 修復48小時回報
+                future_max_return=max(future_1, future_2, future_4, future_6, future_24h) + 0.02,
+                future_max_drawdown=min(-0.02, min(future_1, future_2, future_4, future_6, future_24h) - 0.01),
+                
+                # 未來價格數據
+                future24_close=future24_close_price,
+                future24_low=future24_low_price,
+                
+                # 前期技術指標
                 prior_volatility=0.02 + (i % 3) * 0.01,
                 prior_range=0.05 + (i % 3) * 0.02,
                 prior_abs_change_sum=0.08 + (i % 3) * 0.03,
+                
                 time_range={
                     "start": (case_time - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
                     "end": (case_time + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
@@ -287,8 +307,6 @@ class StandaloneSearchService:
             )
             mock_cases.append(case)
         
-        return mock_cases
-    
     async def execute_search(self, request: SearchConfigRequest, 
                            symbols: Optional[List[str]] = None) -> str:
         """Execute search asynchronously and return task ID"""

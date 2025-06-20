@@ -49,12 +49,15 @@ class TaskInfo(BaseModel):
 
 # 案例相關模型
 class CaseData(BaseModel):
-    """案例數據模型 - 基於真實搜索結果格式"""
+    """案例數據模型 - 修復版本，包含完整 OHLC 數據"""
     symbol: str = Field(..., description="交易對")
     timestamp: datetime = Field(..., description="觸發時間")
     trigger_idx: int = Field(..., description="觸發K線索引")
     
-    # 價格和成交量數據
+    # 完整的 OHLC 價格數據 - 新增這些欄位
+    open: float = Field(..., description="開盤價")
+    high: float = Field(..., description="最高價") 
+    low: float = Field(..., description="最低價")
     close: float = Field(..., description="收盤價")
     volume: float = Field(..., description="成交量")
     price_change: float = Field(..., description="價格變化百分比")
@@ -65,6 +68,8 @@ class CaseData(BaseModel):
     future2_close_return: Optional[float] = Field(None, description="未來2根K線回報")
     future4_close_return: Optional[float] = Field(None, description="未來4根K線回報")
     future6_close_return: Optional[float] = Field(None, description="未來6根K線回報")
+    future24_close_return: Optional[float] = Field(None, description="未來24小時回報")  # 新增
+    future48_close_return: Optional[float] = Field(None, description="未來48小時回報")  # 新增
     future_max_return: Optional[float] = Field(None, description="未來最大回報")
     future_max_drawdown: Optional[float] = Field(None, description="未來最大回撤")
     
@@ -79,7 +84,6 @@ class CaseData(BaseModel):
     
     # 時間範圍信息
     time_range: Dict[str, str] = Field(..., description="時間範圍")
-
 class CaseSummary(BaseModel):
     """案例摘要模型"""
     total_cases: int = Field(..., description="總案例數")
