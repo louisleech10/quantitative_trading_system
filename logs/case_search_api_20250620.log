@@ -1,0 +1,467 @@
+2025-06-20 19:34:55 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 19:34:55 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 19:34:55 - api.config_check - [33mWARNING[0m - 未設置幣安API憑證，某些功能可能無法使用
+2025-06-20 19:34:55 - api.config_check - [32mINFO[0m - 請設置環境變數: BINANCE_API_KEY 和 BINANCE_SECRET_KEY
+2025-06-20 19:34:55 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 19:34:55 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 19:34:55 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 19:34:55 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 19:34:55 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 19:34:55 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 19:34:55 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 20:03:34 - api.middleware.request - [32mINFO[0m - [64ac53c1] Started GET /health from 127.0.0.1
+2025-06-20 20:03:34 - api.request - [32mINFO[0m - GET /health - 200 - 0.014s
+2025-06-20 20:03:34 - api.middleware.request - [32mINFO[0m - [64ac53c1] Completed GET /health - 200 - 0.014s
+2025-06-20 20:03:34 - api.middleware.request - [32mINFO[0m - [a13a6281] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:03:34 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:03:34 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.012s
+2025-06-20 20:03:34 - api.middleware.request - [32mINFO[0m - [a13a6281] Completed GET /api/v1/config/templates - 200 - 0.012s
+2025-06-20 20:03:40 - api.middleware.request - [32mINFO[0m - [b7091d1d] Started GET /health from 127.0.0.1
+2025-06-20 20:03:40 - api.request - [32mINFO[0m - GET /health - 200 - 0.009s
+2025-06-20 20:03:40 - api.middleware.request - [32mINFO[0m - [b7091d1d] Completed GET /health - 200 - 0.009s
+2025-06-20 20:03:40 - api.middleware.request - [32mINFO[0m - [ebd14186] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:03:40 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:03:40 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.052s
+2025-06-20 20:03:40 - api.middleware.request - [32mINFO[0m - [ebd14186] Completed GET /api/v1/config/templates - 200 - 0.052s
+2025-06-20 20:03:57 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 20:04:01 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 20:04:01 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 20:04:01 - api.config_check - [33mWARNING[0m - 未設置幣安API憑證，某些功能可能無法使用
+2025-06-20 20:04:01 - api.config_check - [32mINFO[0m - 請設置環境變數: BINANCE_API_KEY 和 BINANCE_SECRET_KEY
+2025-06-20 20:04:01 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 20:04:01 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 20:04:01 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 20:04:01 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 20:04:01 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 20:04:01 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 20:04:01 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 20:04:07 - api.middleware.request - [32mINFO[0m - [5060327c] Started GET /health from 127.0.0.1
+2025-06-20 20:04:07 - api.request - [32mINFO[0m - GET /health - 200 - 0.012s
+2025-06-20 20:04:07 - api.middleware.request - [32mINFO[0m - [5060327c] Completed GET /health - 200 - 0.012s
+2025-06-20 20:04:07 - api.middleware.request - [32mINFO[0m - [54ab63de] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:04:07 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:04:07 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.017s
+2025-06-20 20:04:07 - api.middleware.request - [32mINFO[0m - [54ab63de] Completed GET /api/v1/config/templates - 200 - 0.017s
+2025-06-20 20:04:35 - api.middleware.request - [32mINFO[0m - [5040317d] Started GET /health from 127.0.0.1
+2025-06-20 20:04:35 - api.request - [32mINFO[0m - GET /health - 200 - 0.008s
+2025-06-20 20:04:35 - api.middleware.request - [32mINFO[0m - [5040317d] Completed GET /health - 200 - 0.008s
+2025-06-20 20:04:35 - api.middleware.request - [32mINFO[0m - [524b40e5] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:04:35 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:04:35 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.010s
+2025-06-20 20:04:35 - api.middleware.request - [32mINFO[0m - [524b40e5] Completed GET /api/v1/config/templates - 200 - 0.010s
+2025-06-20 20:06:16 - api.middleware.request - [32mINFO[0m - [b9e23fed] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:06:16 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:06:16 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.025s
+2025-06-20 20:06:16 - api.middleware.request - [32mINFO[0m - [b9e23fed] Completed GET /api/v1/config/templates - 200 - 0.025s
+2025-06-20 20:06:17 - api.middleware.request - [32mINFO[0m - [2c6ef043] Started GET /favicon.ico from 127.0.0.1
+2025-06-20 20:06:17 - api.request - [33mWARNING[0m - GET /favicon.ico - 404 - 0.002s
+2025-06-20 20:06:17 - api.middleware.request - [32mINFO[0m - [2c6ef043] Completed GET /favicon.ico - 404 - 0.002s
+2025-06-20 20:07:21 - api.middleware.request - [32mINFO[0m - [e86ea059] Started GET /health from 127.0.0.1
+2025-06-20 20:07:21 - api.request - [32mINFO[0m - GET /health - 200 - 0.021s
+2025-06-20 20:07:21 - api.middleware.request - [32mINFO[0m - [e86ea059] Completed GET /health - 200 - 0.021s
+2025-06-20 20:07:21 - api.middleware.request - [32mINFO[0m - [a3151bb1] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:07:21 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:07:21 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.014s
+2025-06-20 20:07:21 - api.middleware.request - [32mINFO[0m - [a3151bb1] Completed GET /api/v1/config/templates - 200 - 0.014s
+2025-06-20 20:10:28 - api.middleware.request - [32mINFO[0m - [006dbfc1] Started GET /health from 127.0.0.1
+2025-06-20 20:10:28 - api.request - [32mINFO[0m - GET /health - 200 - 0.088s
+2025-06-20 20:10:28 - api.middleware.request - [32mINFO[0m - [006dbfc1] Completed GET /health - 200 - 0.088s
+2025-06-20 20:10:29 - api.middleware.request - [32mINFO[0m - [40d58571] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:10:29 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:10:29 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.073s
+2025-06-20 20:10:29 - api.middleware.request - [32mINFO[0m - [40d58571] Completed GET /api/v1/config/templates - 200 - 0.073s
+2025-06-20 20:13:31 - api.middleware.request - [32mINFO[0m - [c0071337] Started GET /health from 127.0.0.1
+2025-06-20 20:13:31 - api.request - [32mINFO[0m - GET /health - 200 - 0.077s
+2025-06-20 20:13:31 - api.middleware.request - [32mINFO[0m - [c0071337] Completed GET /health - 200 - 0.077s
+2025-06-20 20:13:31 - api.middleware.request - [32mINFO[0m - [11a0f983] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:13:31 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:13:31 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.034s
+2025-06-20 20:13:31 - api.middleware.request - [32mINFO[0m - [11a0f983] Completed GET /api/v1/config/templates - 200 - 0.034s
+2025-06-20 20:14:04 - api.middleware.request - [32mINFO[0m - [f6e93cc3] Started GET /health from 127.0.0.1
+2025-06-20 20:14:04 - api.request - [32mINFO[0m - GET /health - 200 - 0.090s
+2025-06-20 20:14:04 - api.middleware.request - [32mINFO[0m - [f6e93cc3] Completed GET /health - 200 - 0.090s
+2025-06-20 20:14:04 - api.middleware.request - [32mINFO[0m - [43304d33] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:14:04 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:14:04 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.019s
+2025-06-20 20:14:04 - api.middleware.request - [32mINFO[0m - [43304d33] Completed GET /api/v1/config/templates - 200 - 0.019s
+2025-06-20 20:14:43 - api.middleware.request - [32mINFO[0m - [c5f764b4] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:14:43 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.007s
+2025-06-20 20:14:43 - api.middleware.request - [32mINFO[0m - [c5f764b4] Completed OPTIONS /api/v1/search/execute - 200 - 0.007s
+2025-06-20 20:14:43 - api.middleware.request - [32mINFO[0m - [42f48cf1] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:14:43 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config'), 'msg': 'Field required', 'input': {}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]
+2025-06-20 20:14:43 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.014s
+2025-06-20 20:14:43 - api.middleware.request - [32mINFO[0m - [42f48cf1] Completed POST /api/v1/search/execute - 422 - 0.014s
+2025-06-20 20:16:24 - api.middleware.request - [32mINFO[0m - [a8806871] Started GET /health from 127.0.0.1
+2025-06-20 20:16:24 - api.request - [32mINFO[0m - GET /health - 200 - 0.039s
+2025-06-20 20:16:24 - api.middleware.request - [32mINFO[0m - [a8806871] Completed GET /health - 200 - 0.039s
+2025-06-20 20:16:24 - api.middleware.request - [32mINFO[0m - [8ce58edc] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:16:24 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:16:24 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.074s
+2025-06-20 20:16:24 - api.middleware.request - [32mINFO[0m - [8ce58edc] Completed GET /api/v1/config/templates - 200 - 0.074s
+2025-06-20 20:17:06 - api.middleware.request - [32mINFO[0m - [d3522b84] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:17:06 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config'), 'msg': 'Field required', 'input': {}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]
+2025-06-20 20:17:06 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.008s
+2025-06-20 20:17:06 - api.middleware.request - [32mINFO[0m - [d3522b84] Completed POST /api/v1/search/execute - 422 - 0.008s
+2025-06-20 20:17:18 - api.middleware.request - [32mINFO[0m - [8bc66969] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:17:18 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config'), 'msg': 'Field required', 'input': {}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]
+2025-06-20 20:17:18 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.004s
+2025-06-20 20:17:18 - api.middleware.request - [32mINFO[0m - [8bc66969] Completed POST /api/v1/search/execute - 422 - 0.004s
+2025-06-20 20:17:27 - api.middleware.request - [32mINFO[0m - [2f39a407] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:17:27 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config'), 'msg': 'Field required', 'input': {}, 'url': 'https://errors.pydantic.dev/2.5/v/missing'}]
+2025-06-20 20:17:27 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.004s
+2025-06-20 20:17:27 - api.middleware.request - [32mINFO[0m - [2f39a407] Completed POST /api/v1/search/execute - 422 - 0.004s
+2025-06-20 20:19:07 - api.middleware.request - [32mINFO[0m - [d20281d9] Started GET /health from 127.0.0.1
+2025-06-20 20:19:07 - api.request - [32mINFO[0m - GET /health - 200 - 0.040s
+2025-06-20 20:19:07 - api.middleware.request - [32mINFO[0m - [d20281d9] Completed GET /health - 200 - 0.040s
+2025-06-20 20:19:07 - api.middleware.request - [32mINFO[0m - [f6ae85b0] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 20:19:07 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 20:19:07 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.030s
+2025-06-20 20:19:07 - api.middleware.request - [32mINFO[0m - [f6ae85b0] Completed GET /api/v1/config/templates - 200 - 0.030s
+2025-06-20 20:19:09 - api.middleware.request - [32mINFO[0m - [dda2b45e] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:19:09 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 20:19:09 - api.standalone_task_manager - [32mINFO[0m - Created task 29e84611-5e50-4c7d-8ee1-e4a67fc2b18a for config: Low Volatility Consolidation
+2025-06-20 20:19:09 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Low Volatility Consolidation', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '0'}
+2025-06-20 20:19:09 - api.standalone_task_manager - [32mINFO[0m - Updated task 29e84611-5e50-4c7d-8ee1-e4a67fc2b18a status to TaskStatusEnum.RUNNING
+2025-06-20 20:19:09 - api.standalone_search_service - [32mINFO[0m - Running real search for: Low Volatility Consolidation
+2025-06-20 20:19:09 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.024s
+2025-06-20 20:19:09 - api.middleware.request - [32mINFO[0m - [dda2b45e] Completed POST /api/v1/search/execute - 200 - 0.024s
+2025-06-20 20:19:13 - api.standalone_task_manager - [32mINFO[0m - Updated task 29e84611-5e50-4c7d-8ee1-e4a67fc2b18a status to TaskStatusEnum.COMPLETED
+2025-06-20 20:19:13 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Low Volatility Consolidation', 'cases_found': '20'} | Duration: 4.00s
+2025-06-20 20:19:50 - api.middleware.request - [32mINFO[0m - [066ff955] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 20:19:50 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 20:19:50 - api.standalone_task_manager - [32mINFO[0m - Created task a01a90ad-f2a6-4554-857e-8d7b15ad9e1d for config: Low Volatility Consolidation
+2025-06-20 20:19:50 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Low Volatility Consolidation', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '0'}
+2025-06-20 20:19:50 - api.standalone_task_manager - [32mINFO[0m - Updated task a01a90ad-f2a6-4554-857e-8d7b15ad9e1d status to TaskStatusEnum.RUNNING
+2025-06-20 20:19:50 - api.standalone_search_service - [32mINFO[0m - Running real search for: Low Volatility Consolidation
+2025-06-20 20:19:50 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.016s
+2025-06-20 20:19:50 - api.middleware.request - [32mINFO[0m - [066ff955] Completed POST /api/v1/search/execute - 200 - 0.016s
+2025-06-20 20:19:54 - api.standalone_task_manager - [32mINFO[0m - Updated task a01a90ad-f2a6-4554-857e-8d7b15ad9e1d status to TaskStatusEnum.COMPLETED
+2025-06-20 20:19:54 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Low Volatility Consolidation', 'cases_found': '20'} | Duration: 4.00s
+2025-06-20 21:59:04 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 21:59:06 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 21:59:06 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 21:59:06 - api.config_check - [33mWARNING[0m - 未設置幣安API憑證，某些功能可能無法使用
+2025-06-20 21:59:06 - api.config_check - [32mINFO[0m - 請設置環境變數: BINANCE_API_KEY 和 BINANCE_SECRET_KEY
+2025-06-20 21:59:06 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 21:59:06 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 21:59:06 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 21:59:06 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 21:59:06 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 21:59:06 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 21:59:06 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 21:59:16 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 23:20:13 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 23:20:13 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:20:13 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-20 23:20:13 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 23:20:13 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 23:20:13 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:20:13 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 23:20:13 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 23:20:13 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 23:20:13 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 23:21:00 - api.middleware.request - [32mINFO[0m - [75bee12e] Started GET /health from 127.0.0.1
+2025-06-20 23:21:00 - api.request - [32mINFO[0m - GET /health - 200 - 0.006s
+2025-06-20 23:21:00 - api.middleware.request - [32mINFO[0m - [75bee12e] Completed GET /health - 200 - 0.006s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [10ca11c7] Started GET /health from 127.0.0.1
+2025-06-20 23:23:08 - api.request - [32mINFO[0m - GET /health - 200 - 0.008s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [10ca11c7] Completed GET /health - 200 - 0.008s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [f4c9d02e] Started GET /health from 127.0.0.1
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [caf095ba] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 23:23:08 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 23:23:08 - api.request - [32mINFO[0m - GET /health - 200 - 0.014s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [f4c9d02e] Completed GET /health - 200 - 0.014s
+2025-06-20 23:23:08 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.013s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [caf095ba] Completed GET /api/v1/config/templates - 200 - 0.013s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [e2bae262] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 23:23:08 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 23:23:08 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.001s
+2025-06-20 23:23:08 - api.middleware.request - [32mINFO[0m - [e2bae262] Completed GET /api/v1/config/templates - 200 - 0.001s
+2025-06-20 23:23:13 - api.middleware.request - [32mINFO[0m - [d010c554] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:23:13 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.003s
+2025-06-20 23:23:13 - api.middleware.request - [32mINFO[0m - [d010c554] Completed OPTIONS /api/v1/search/execute - 200 - 0.003s
+2025-06-20 23:23:13 - api.middleware.request - [32mINFO[0m - [13e73ca9] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:23:13 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:23:13 - api.standalone_task_manager - [32mINFO[0m - Created task 2a7fdd9a-81bc-4a93-a9a0-cf9a7005ad47 for config: Low Volatility Consolidation
+2025-06-20 23:23:13 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Low Volatility Consolidation', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '0'}
+2025-06-20 23:23:13 - api.standalone_task_manager - [32mINFO[0m - Updated task 2a7fdd9a-81bc-4a93-a9a0-cf9a7005ad47 status to TaskStatusEnum.RUNNING
+2025-06-20 23:23:13 - api.standalone_search_service - [32mINFO[0m - Running real search for: Low Volatility Consolidation
+2025-06-20 23:23:13 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Low Volatility Consolidation
+2025-06-20 23:23:13 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2022-01-01 到 2022-12-31
+2025-06-20 23:23:13 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:23:13 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:23:14 - DataLoader - [32mINFO[0m - 更新緩存: BTCUSDT_4h, 總計 4374 行
+2025-06-20 23:23:15 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - BTCUSDT: 找到 15 個符合條件的案例
+2025-06-20 23:23:15 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 15 個符合條件的案例
+2025-06-20 23:23:15 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 15 個案例
+2025-06-20 23:23:15 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 15 個符合條件的案例
+2025-06-20 23:23:15 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 15 cases
+2025-06-20 23:23:15 - api.standalone_task_manager - [32mINFO[0m - Updated task 2a7fdd9a-81bc-4a93-a9a0-cf9a7005ad47 status to TaskStatusEnum.COMPLETED
+2025-06-20 23:23:15 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Low Volatility Consolidation', 'cases_found': '15'} | Duration: 2.09s
+2025-06-20 23:23:15 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 2.107s
+2025-06-20 23:23:15 - api.middleware.request - [32mINFO[0m - [13e73ca9] Completed POST /api/v1/search/execute - 200 - 2.107s
+2025-06-20 23:30:29 - api.middleware.request - [32mINFO[0m - [9a3657db] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:30:29 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:30:29 - api.standalone_task_manager - [32mINFO[0m - Created task 9462a501-86ef-4a13-b202-55b2b5e6ad75 for config: Frontend_Test_Search
+2025-06-20 23:30:29 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:30:29 - api.standalone_task_manager - [32mINFO[0m - Updated task 9462a501-86ef-4a13-b202-55b2b5e6ad75 status to TaskStatusEnum.RUNNING
+2025-06-20 23:30:29 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:30:29 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:30:29 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:30:29 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:30:29 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:30:30 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - BTCUSDT: 找到 3 個符合條件的案例
+2025-06-20 23:30:30 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 3 個符合條件的案例
+2025-06-20 23:30:30 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 3 個案例
+2025-06-20 23:30:30 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 3 個符合條件的案例
+2025-06-20 23:30:30 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 3 cases
+2025-06-20 23:30:30 - api.standalone_task_manager - [32mINFO[0m - Updated task 9462a501-86ef-4a13-b202-55b2b5e6ad75 status to TaskStatusEnum.COMPLETED
+2025-06-20 23:30:30 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '3'} | Duration: 0.32s
+2025-06-20 23:30:30 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.345s
+2025-06-20 23:30:30 - api.middleware.request - [32mINFO[0m - [9a3657db] Completed POST /api/v1/search/execute - 200 - 0.345s
+2025-06-20 23:30:30 - api.middleware.request - [32mINFO[0m - [b288cabe] Started GET /api/v1/search/task/9462a501-86ef-4a13-b202-55b2b5e6ad75 from 127.0.0.1
+2025-06-20 23:30:30 - api.request - [32mINFO[0m - GET /api/v1/search/task/9462a501-86ef-4a13-b202-55b2b5e6ad75 - 200 - 0.001s
+2025-06-20 23:30:30 - api.middleware.request - [32mINFO[0m - [b288cabe] Completed GET /api/v1/search/task/9462a501-86ef-4a13-b202-55b2b5e6ad75 - 200 - 0.001s
+2025-06-20 23:30:30 - api.middleware.request - [32mINFO[0m - [faf3e0f1] Started GET /api/v1/search/task/9462a501-86ef-4a13-b202-55b2b5e6ad75/result from 127.0.0.1
+2025-06-20 23:30:30 - api.request - [32mINFO[0m - GET /api/v1/search/task/9462a501-86ef-4a13-b202-55b2b5e6ad75/result - 200 - 0.001s
+2025-06-20 23:30:30 - api.middleware.request - [32mINFO[0m - [faf3e0f1] Completed GET /api/v1/search/task/9462a501-86ef-4a13-b202-55b2b5e6ad75/result - 200 - 0.001s
+2025-06-20 23:32:44 - api.middleware.request - [32mINFO[0m - [cbcb6dad] Started GET /health from 127.0.0.1
+2025-06-20 23:32:44 - api.request - [32mINFO[0m - GET /health - 200 - 0.019s
+2025-06-20 23:32:44 - api.middleware.request - [32mINFO[0m - [cbcb6dad] Completed GET /health - 200 - 0.019s
+2025-06-20 23:32:44 - api.middleware.request - [32mINFO[0m - [33957ab9] Started GET /health from 127.0.0.1
+2025-06-20 23:32:44 - api.middleware.request - [32mINFO[0m - [6297a310] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 23:32:45 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 23:32:45 - api.request - [32mINFO[0m - GET /health - 200 - 0.036s
+2025-06-20 23:32:45 - api.middleware.request - [32mINFO[0m - [33957ab9] Completed GET /health - 200 - 0.036s
+2025-06-20 23:32:45 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.036s
+2025-06-20 23:32:45 - api.middleware.request - [32mINFO[0m - [6297a310] Completed GET /api/v1/config/templates - 200 - 0.036s
+2025-06-20 23:32:45 - api.middleware.request - [32mINFO[0m - [bb7c5e83] Started GET /api/v1/config/templates from 127.0.0.1
+2025-06-20 23:32:45 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-06-20 23:32:45 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.001s
+2025-06-20 23:32:45 - api.middleware.request - [32mINFO[0m - [bb7c5e83] Completed GET /api/v1/config/templates - 200 - 0.001s
+2025-06-20 23:45:59 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 23:46:01 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 23:46:01 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:46:01 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-20 23:46:01 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 23:46:01 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 23:46:01 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:46:01 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 23:46:01 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 23:46:01 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 23:46:01 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 23:47:37 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 23:47:40 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 23:47:40 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:47:40 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-20 23:47:40 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 23:47:40 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 23:47:40 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:47:40 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 23:47:40 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 23:47:40 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 23:47:40 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 23:47:51 - api.middleware.request - [32mINFO[0m - [c2277584] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:47:51 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.002s
+2025-06-20 23:47:51 - api.middleware.request - [32mINFO[0m - [c2277584] Completed OPTIONS /api/v1/search/execute - 200 - 0.002s
+2025-06-20 23:47:51 - api.middleware.request - [32mINFO[0m - [1262e1b8] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:47:51 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:47:51 - api.standalone_task_manager - [32mINFO[0m - Created task 65ad12ff-e049-47c1-bed9-5280ff893b29 for config: Frontend_Test_Search
+2025-06-20 23:47:51 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:47:51 - api.standalone_task_manager - [32mINFO[0m - Updated task 65ad12ff-e049-47c1-bed9-5280ff893b29 status to TaskStatusEnum.RUNNING
+2025-06-20 23:47:51 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:47:51 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:47:51 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:47:51 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:47:51 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:47:52 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:47:52 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:47:52 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:47:52 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:47:52 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:47:52 - api.standalone_task_manager - [32mINFO[0m - Updated task 65ad12ff-e049-47c1-bed9-5280ff893b29 status to TaskStatusEnum.COMPLETED
+2025-06-20 23:47:52 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.76s
+2025-06-20 23:47:52 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.764s
+2025-06-20 23:47:52 - api.middleware.request - [32mINFO[0m - [1262e1b8] Completed POST /api/v1/search/execute - 200 - 0.764s
+2025-06-20 23:47:52 - api.middleware.request - [32mINFO[0m - [e0431ab6] Started GET /api/v1/search/task/65ad12ff-e049-47c1-bed9-5280ff893b29 from 127.0.0.1
+2025-06-20 23:47:52 - api.request - [32mINFO[0m - GET /api/v1/search/task/65ad12ff-e049-47c1-bed9-5280ff893b29 - 200 - 0.001s
+2025-06-20 23:47:52 - api.middleware.request - [32mINFO[0m - [e0431ab6] Completed GET /api/v1/search/task/65ad12ff-e049-47c1-bed9-5280ff893b29 - 200 - 0.001s
+2025-06-20 23:47:52 - api.middleware.request - [32mINFO[0m - [702b7d0a] Started GET /api/v1/search/task/65ad12ff-e049-47c1-bed9-5280ff893b29/result from 127.0.0.1
+2025-06-20 23:47:52 - api.request - [32mINFO[0m - GET /api/v1/search/task/65ad12ff-e049-47c1-bed9-5280ff893b29/result - 200 - 0.001s
+2025-06-20 23:47:52 - api.middleware.request - [32mINFO[0m - [702b7d0a] Completed GET /api/v1/search/task/65ad12ff-e049-47c1-bed9-5280ff893b29/result - 200 - 0.001s
+2025-06-20 23:48:25 - api.middleware.request - [32mINFO[0m - [519ad0d8] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:48:25 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:48:25 - api.standalone_task_manager - [32mINFO[0m - Created task 3ee113a2-6e7e-454c-8921-8a26d4720721 for config: Frontend_Test_Search
+2025-06-20 23:48:25 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:48:25 - api.standalone_task_manager - [32mINFO[0m - Updated task 3ee113a2-6e7e-454c-8921-8a26d4720721 status to TaskStatusEnum.RUNNING
+2025-06-20 23:48:25 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:48:25 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:48:25 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:48:25 - api.standalone_task_manager - [32mINFO[0m - Updated task 3ee113a2-6e7e-454c-8921-8a26d4720721 status to TaskStatusEnum.COMPLETED
+2025-06-20 23:48:25 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.28s
+2025-06-20 23:48:25 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.295s
+2025-06-20 23:48:25 - api.middleware.request - [32mINFO[0m - [519ad0d8] Completed POST /api/v1/search/execute - 200 - 0.295s
+2025-06-20 23:48:25 - api.middleware.request - [32mINFO[0m - [ff9e2b5b] Started GET /api/v1/search/task/3ee113a2-6e7e-454c-8921-8a26d4720721 from 127.0.0.1
+2025-06-20 23:48:25 - api.request - [32mINFO[0m - GET /api/v1/search/task/3ee113a2-6e7e-454c-8921-8a26d4720721 - 200 - 0.001s
+2025-06-20 23:48:25 - api.middleware.request - [32mINFO[0m - [ff9e2b5b] Completed GET /api/v1/search/task/3ee113a2-6e7e-454c-8921-8a26d4720721 - 200 - 0.001s
+2025-06-20 23:48:25 - api.middleware.request - [32mINFO[0m - [c0a43f6a] Started GET /api/v1/search/task/3ee113a2-6e7e-454c-8921-8a26d4720721/result from 127.0.0.1
+2025-06-20 23:48:25 - api.request - [32mINFO[0m - GET /api/v1/search/task/3ee113a2-6e7e-454c-8921-8a26d4720721/result - 200 - 0.001s
+2025-06-20 23:48:25 - api.middleware.request - [32mINFO[0m - [c0a43f6a] Completed GET /api/v1/search/task/3ee113a2-6e7e-454c-8921-8a26d4720721/result - 200 - 0.001s
+2025-06-20 23:48:45 - api.middleware.request - [32mINFO[0m - [0c4c8789] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:48:45 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:48:45 - api.standalone_task_manager - [32mINFO[0m - Created task 07640423-d2b2-42b8-8bda-a6a501c1aaea for config: Frontend_Test_Search
+2025-06-20 23:48:45 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:48:45 - api.standalone_task_manager - [32mINFO[0m - Updated task 07640423-d2b2-42b8-8bda-a6a501c1aaea status to TaskStatusEnum.RUNNING
+2025-06-20 23:48:45 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:48:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:48:45 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:48:45 - api.standalone_task_manager - [32mINFO[0m - Updated task 07640423-d2b2-42b8-8bda-a6a501c1aaea status to TaskStatusEnum.COMPLETED
+2025-06-20 23:48:45 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.23s
+2025-06-20 23:48:45 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.240s
+2025-06-20 23:48:45 - api.middleware.request - [32mINFO[0m - [0c4c8789] Completed POST /api/v1/search/execute - 200 - 0.240s
+2025-06-20 23:48:45 - api.middleware.request - [32mINFO[0m - [b1ba1523] Started GET /api/v1/search/task/07640423-d2b2-42b8-8bda-a6a501c1aaea from 127.0.0.1
+2025-06-20 23:48:45 - api.request - [32mINFO[0m - GET /api/v1/search/task/07640423-d2b2-42b8-8bda-a6a501c1aaea - 200 - 0.001s
+2025-06-20 23:48:45 - api.middleware.request - [32mINFO[0m - [b1ba1523] Completed GET /api/v1/search/task/07640423-d2b2-42b8-8bda-a6a501c1aaea - 200 - 0.001s
+2025-06-20 23:48:45 - api.middleware.request - [32mINFO[0m - [6c4cf034] Started GET /api/v1/search/task/07640423-d2b2-42b8-8bda-a6a501c1aaea/result from 127.0.0.1
+2025-06-20 23:48:45 - api.request - [32mINFO[0m - GET /api/v1/search/task/07640423-d2b2-42b8-8bda-a6a501c1aaea/result - 200 - 0.001s
+2025-06-20 23:48:45 - api.middleware.request - [32mINFO[0m - [6c4cf034] Completed GET /api/v1/search/task/07640423-d2b2-42b8-8bda-a6a501c1aaea/result - 200 - 0.001s
+2025-06-20 23:49:27 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 23:49:37 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 23:49:37 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:49:37 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-20 23:49:37 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 23:49:37 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 23:49:37 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:49:37 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 23:49:37 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 23:49:37 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 23:49:37 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 23:49:46 - api.middleware.request - [32mINFO[0m - [c4b01a50] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:49:46 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:49:46 - api.standalone_task_manager - [32mINFO[0m - Created task 7f557691-9e67-4421-873d-bbd14f58bebd for config: Frontend_Test_Search
+2025-06-20 23:49:46 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:49:46 - api.standalone_task_manager - [32mINFO[0m - Updated task 7f557691-9e67-4421-873d-bbd14f58bebd status to TaskStatusEnum.RUNNING
+2025-06-20 23:49:46 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:49:46 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:49:46 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:49:46 - api.standalone_task_manager - [32mINFO[0m - Updated task 7f557691-9e67-4421-873d-bbd14f58bebd status to TaskStatusEnum.COMPLETED
+2025-06-20 23:49:46 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.66s
+2025-06-20 23:49:46 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.669s
+2025-06-20 23:49:46 - api.middleware.request - [32mINFO[0m - [c4b01a50] Completed POST /api/v1/search/execute - 200 - 0.669s
+2025-06-20 23:49:46 - api.middleware.request - [32mINFO[0m - [9b45787e] Started GET /api/v1/search/task/7f557691-9e67-4421-873d-bbd14f58bebd from 127.0.0.1
+2025-06-20 23:49:46 - api.request - [32mINFO[0m - GET /api/v1/search/task/7f557691-9e67-4421-873d-bbd14f58bebd - 200 - 0.001s
+2025-06-20 23:49:46 - api.middleware.request - [32mINFO[0m - [9b45787e] Completed GET /api/v1/search/task/7f557691-9e67-4421-873d-bbd14f58bebd - 200 - 0.001s
+2025-06-20 23:49:46 - api.middleware.request - [32mINFO[0m - [513a095c] Started GET /api/v1/search/task/7f557691-9e67-4421-873d-bbd14f58bebd/result from 127.0.0.1
+2025-06-20 23:49:46 - api.request - [32mINFO[0m - GET /api/v1/search/task/7f557691-9e67-4421-873d-bbd14f58bebd/result - 200 - 0.001s
+2025-06-20 23:49:46 - api.middleware.request - [32mINFO[0m - [513a095c] Completed GET /api/v1/search/task/7f557691-9e67-4421-873d-bbd14f58bebd/result - 200 - 0.001s
+2025-06-20 23:52:44 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-20 23:52:47 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-20 23:52:47 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:52:47 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-20 23:52:47 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-20 23:52:47 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-20 23:52:47 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-20 23:52:47 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-20 23:52:47 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-20 23:52:47 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-20 23:52:47 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-20 23:53:16 - api.middleware.request - [32mINFO[0m - [2e747288] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:53:16 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:53:16 - api.standalone_task_manager - [32mINFO[0m - Created task 95ed899e-bde2-4229-ac09-1df5b24da106 for config: Frontend_Test_Search
+2025-06-20 23:53:16 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:53:16 - api.standalone_task_manager - [32mINFO[0m - Updated task 95ed899e-bde2-4229-ac09-1df5b24da106 status to TaskStatusEnum.RUNNING
+2025-06-20 23:53:16 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:53:16 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:53:16 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:53:16 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:53:16 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:53:17 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:53:17 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:53:17 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:53:17 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:53:17 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:53:17 - api.standalone_task_manager - [32mINFO[0m - Updated task 95ed899e-bde2-4229-ac09-1df5b24da106 status to TaskStatusEnum.COMPLETED
+2025-06-20 23:53:17 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.80s
+2025-06-20 23:53:17 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.821s
+2025-06-20 23:53:17 - api.middleware.request - [32mINFO[0m - [2e747288] Completed POST /api/v1/search/execute - 200 - 0.821s
+2025-06-20 23:53:17 - api.middleware.request - [32mINFO[0m - [d8826b4d] Started GET /api/v1/search/task/95ed899e-bde2-4229-ac09-1df5b24da106 from 127.0.0.1
+2025-06-20 23:53:17 - api.request - [32mINFO[0m - GET /api/v1/search/task/95ed899e-bde2-4229-ac09-1df5b24da106 - 200 - 0.001s
+2025-06-20 23:53:17 - api.middleware.request - [32mINFO[0m - [d8826b4d] Completed GET /api/v1/search/task/95ed899e-bde2-4229-ac09-1df5b24da106 - 200 - 0.001s
+2025-06-20 23:53:17 - api.middleware.request - [32mINFO[0m - [74804a23] Started GET /api/v1/search/task/95ed899e-bde2-4229-ac09-1df5b24da106/result from 127.0.0.1
+2025-06-20 23:53:17 - api.request - [32mINFO[0m - GET /api/v1/search/task/95ed899e-bde2-4229-ac09-1df5b24da106/result - 200 - 0.002s
+2025-06-20 23:53:17 - api.middleware.request - [32mINFO[0m - [74804a23] Completed GET /api/v1/search/task/95ed899e-bde2-4229-ac09-1df5b24da106/result - 200 - 0.002s
+2025-06-20 23:54:12 - api.middleware.request - [32mINFO[0m - [b4ee4367] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:54:12 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:54:12 - api.standalone_task_manager - [32mINFO[0m - Created task 96453383-59a0-4e3e-b532-9b950b1ee18c for config: Frontend_Test_Search
+2025-06-20 23:54:12 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:54:12 - api.standalone_task_manager - [32mINFO[0m - Updated task 96453383-59a0-4e3e-b532-9b950b1ee18c status to TaskStatusEnum.RUNNING
+2025-06-20 23:54:12 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-06-01 到 2024-12-01
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:54:12 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:54:12 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:54:12 - api.standalone_task_manager - [32mINFO[0m - Updated task 96453383-59a0-4e3e-b532-9b950b1ee18c status to TaskStatusEnum.COMPLETED
+2025-06-20 23:54:12 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.25s
+2025-06-20 23:54:12 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.278s
+2025-06-20 23:54:12 - api.middleware.request - [32mINFO[0m - [b4ee4367] Completed POST /api/v1/search/execute - 200 - 0.278s
+2025-06-20 23:54:12 - api.middleware.request - [32mINFO[0m - [64a9cbcf] Started GET /api/v1/search/task/96453383-59a0-4e3e-b532-9b950b1ee18c from 127.0.0.1
+2025-06-20 23:54:12 - api.request - [32mINFO[0m - GET /api/v1/search/task/96453383-59a0-4e3e-b532-9b950b1ee18c - 200 - 0.001s
+2025-06-20 23:54:12 - api.middleware.request - [32mINFO[0m - [64a9cbcf] Completed GET /api/v1/search/task/96453383-59a0-4e3e-b532-9b950b1ee18c - 200 - 0.001s
+2025-06-20 23:54:12 - api.middleware.request - [32mINFO[0m - [33cecefb] Started GET /api/v1/search/task/96453383-59a0-4e3e-b532-9b950b1ee18c/result from 127.0.0.1
+2025-06-20 23:54:12 - api.request - [32mINFO[0m - GET /api/v1/search/task/96453383-59a0-4e3e-b532-9b950b1ee18c/result - 200 - 0.009s
+2025-06-20 23:54:12 - api.middleware.request - [32mINFO[0m - [33cecefb] Completed GET /api/v1/search/task/96453383-59a0-4e3e-b532-9b950b1ee18c/result - 200 - 0.009s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [e055aebd] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:58:45 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.018s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [e055aebd] Completed OPTIONS /api/v1/search/execute - 200 - 0.018s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [8427b4c9] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-20 23:58:45 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-20 23:58:45 - api.standalone_task_manager - [32mINFO[0m - Created task 39d96b8b-07c2-47db-add5-a11951f3671f for config: Frontend_Test_Search
+2025-06-20 23:58:45 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-20 23:58:45 - api.standalone_task_manager - [32mINFO[0m - Updated task 39d96b8b-07c2-47db-add5-a11951f3671f status to TaskStatusEnum.RUNNING
+2025-06-20 23:58:45 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用配置: Frontend_Test_Search
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間範圍: 2024-01-01 到 2024-12-01
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 待搜索交易對數量: 1
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 處理批次 1/1 (1 個交易對)
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - 處理 BTCUSDT 時出錯: cannot access local variable 'market_phase' where it is not associated with a value
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 本批次發現 0 個符合條件的案例
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 目前累計發現 0 個案例
+2025-06-20 23:58:45 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 搜索完成，共找到 0 個符合條件的案例
+2025-06-20 23:58:45 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 0 cases
+2025-06-20 23:58:45 - api.standalone_task_manager - [32mINFO[0m - Updated task 39d96b8b-07c2-47db-add5-a11951f3671f status to TaskStatusEnum.COMPLETED
+2025-06-20 23:58:45 - api.function_call - [32mINFO[0m - Function: real_momentum_service_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '0'} | Duration: 0.36s
+2025-06-20 23:58:45 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.392s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [8427b4c9] Completed POST /api/v1/search/execute - 200 - 0.392s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [9dc28f22] Started GET /api/v1/search/task/39d96b8b-07c2-47db-add5-a11951f3671f from 127.0.0.1
+2025-06-20 23:58:45 - api.request - [32mINFO[0m - GET /api/v1/search/task/39d96b8b-07c2-47db-add5-a11951f3671f - 200 - 0.004s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [9dc28f22] Completed GET /api/v1/search/task/39d96b8b-07c2-47db-add5-a11951f3671f - 200 - 0.004s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [715d1c16] Started GET /api/v1/search/task/39d96b8b-07c2-47db-add5-a11951f3671f/result from 127.0.0.1
+2025-06-20 23:58:45 - api.request - [32mINFO[0m - GET /api/v1/search/task/39d96b8b-07c2-47db-add5-a11951f3671f/result - 200 - 0.004s
+2025-06-20 23:58:45 - api.middleware.request - [32mINFO[0m - [715d1c16] Completed GET /api/v1/search/task/39d96b8b-07c2-47db-add5-a11951f3671f/result - 200 - 0.004s
+2025-06-20 23:59:54 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...

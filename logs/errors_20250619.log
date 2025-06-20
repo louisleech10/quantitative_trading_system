@@ -1,0 +1,7 @@
+2025-06-19 22:21:23 - api.routes.case_search - [31mERROR[0m - Error in search health check: 'TempSearchService' object has no attribute 'data_loader'
+Traceback (most recent call last):
+  File "/Users/louis/Documents/量化交易/quantitative_trading_system/api/routes/case_search.py", line 277, in search_health_check
+    search_service.data_loader is not None and
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'TempSearchService' object has no attribute 'data_loader'
+2025-06-19 22:21:23 - api.request - [31mERROR[0m - GET /api/v1/search/health - 500 - 0.010s
