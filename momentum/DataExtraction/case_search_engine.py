@@ -517,15 +517,29 @@ class CaseSearchEngine:
                 except Exception as e:
                     self.logger.warning(f"無法確定市場階段: {str(e)}")
                     market_phase = "UNKNOWN"
+
+                # 調試：檢查數據
+                self.logger.info(f"調試數據 - 索引 {idx}")
+                self.logger.info(f"數據欄位: {data.columns.tolist()}")
+                if 'open' in data.columns:
+                    self.logger.info(f"Open 值: {data['open'].iloc[idx]}")
+                if 'high' in data.columns:
+                    self.logger.info(f"High 值: {data['high'].iloc[idx]}")
+                if 'low' in data.columns:
+                    self.logger.info(f"Low 值: {data['low'].iloc[idx]}")
+                self.logger.info(f"Close 值: {data['close'].iloc[idx]}")
                 
                 # 創建案例記錄
                 case = {
                     'symbol': symbol,
                     'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     'trigger_idx': idx - start_idx,  # 相對於提取數據的索引
-                    'open': float(data['open'].iloc[idx]),
-                    'high': float(data['high'].iloc[idx]),
-                    'low': float(data['low'].iloc[idx]),
+                    #'open': float(data['open'].iloc[idx]),
+                    #'high': float(data['high'].iloc[idx]),
+                    #'low': float(data['low'].iloc[idx]),
+                    'open': float(data['open'].iloc[idx]) if 'open' in data.columns and pd.notna(data['open'].iloc[idx]) else float(data['close'].iloc[idx]),
+                    'high': float(data['high'].iloc[idx]) if 'high' in data.columns and pd.notna(data['high'].iloc[idx]) else float(data['close'].iloc[idx]),
+                    'low': float(data['low'].iloc[idx]) if 'low' in data.columns and pd.notna(data['low'].iloc[idx]) else float(data['close'].iloc[idx]),
                     'close': float(data['close'].iloc[idx]),
                     'volume': float(data['volume'].iloc[idx]),
                     'price_change': float(data['price_change'].iloc[idx]),
