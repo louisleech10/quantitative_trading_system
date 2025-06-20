@@ -318,15 +318,62 @@ class StandaloneSearchService:
             
             if self.momentum_available and self.search_engine:
                 self.logger.info(f"Running real search for: {request.name}")
-                # TODO: Implement real search logic here
-                await asyncio.sleep(4)  # Simulate real work
-                mock_cases = self._create_enhanced_mock_cases(request)
-                service_type = "real_momentum_service"
+                
+                try:
+                    # 轉換請求為搜索配置
+                    search_config = self._convert_request_to_search_config(request)
+                    
+                    # 執行真實搜索
+                    real_cases_dict = await self.search_engine.search_cases(
+                        config=search_config,
+                        symbols=symbols or ["BTCUSDT"],  # 如果沒提供symbols，默認搜索BTCUSDT
+                        batch_size=1,
+                        save_results=False
+                    )
+                    
+                    # 轉換字典格式為 CaseData 對象
+                    real_cases = []
+                    for case_dict in real_cases_dict:
+                        case_data = CaseData(
+                            symbol=case_dict['symbol'],
+                            timestamp=datetime.strptime(case_dict['timestamp'], '%Y-%m-%d %H:%M:%S'),
+                            trigger_idx=case_dict['trigger_idx'],
+                            close=case_dict['close'],
+                            volume=case_dict['volume'],
+                            price_change=case_dict['price_change'],
+                            market_phase=case_dict['market_phase'],
+                            future1_close_return=case_dict.get('future1_close_return'),
+                            future2_close_return=case_dict.get('future2_close_return'),
+                            future4_close_return=case_dict.get('future4_close_return'),
+                            future6_close_return=case_dict.get('future6_close_return'),
+                            future_max_return=case_dict.get('future_max_return'),
+                            future_max_drawdown=case_dict.get('future_max_drawdown'),
+                            future24_close=case_dict.get('future24_close'),
+                            future24_low=case_dict.get('future24_low'),
+                            prior_volatility=case_dict.get('prior_volatility'),
+                            prior_range=case_dict.get('prior_range'),
+                            prior_abs_change_sum=case_dict.get('prior_abs_change_sum'),
+                            time_range=case_dict['time_range']
+                        )
+                        real_cases.append(case_data)
+                    
+                    service_type = "real_momentum_service"
+                    self.logger.info(f"Real search completed: found {len(real_cases)} cases")
+                    
+                except Exception as e:
+                    self.logger.error(f"Real search failed: {str(e)}, falling back to mock")
+                    # 如果真實搜索失敗，回退到模擬數據
+                    real_cases = self._create_enhanced_mock_cases(request)
+                    service_type = "fallback_mock_service"
+
             else:
                 self.logger.info(f"Running mock search for: {request.name}")
                 await asyncio.sleep(3)  # Simulate work
-                mock_cases = self._create_enhanced_mock_cases(request)
+                real_cases = self._create_enhanced_mock_cases(request)
                 service_type = "enhanced_mock_service"
+
+            # 將變數名從 mock_cases 改為 real_cases
+            mock_cases = real_cases  # 保持後續代碼兼容性
             
             # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -447,6 +494,55 @@ class StandaloneSearchService:
     def is_real_service_available(self) -> bool:
         """Check if real momentum modules are available"""
         return self.momentum_available
+    
+    # 在 api/services/standalone_search_service.py 中添加這個方法：
+
+    def _convert_request_to_search_config(self, request: SearchConfigRequest):
+        """將API請求轉換為搜索引擎配置"""
+        try:
+            # 動態導入搜索配置類
+            from momentum.DataExtraction.case_search_engine import SearchConfiguration, FilterCondition
+            
+            # 創建基本搜索配置
+            config = SearchConfiguration(
+                name=request.name,
+                description=request.description or f"{request.timeframe.value} timeframe search",
+                timeframe=request.timeframe.value,  # 轉換 enum 為字符串
+                lookback_periods=request.lookback_periods,
+                forward_periods=request.forward_periods,
+                time_range=(str(request.start_date), str(request.end_date)),
+                sample_limit=request.sample_limit,
+                min_volume=request.min_volume,
+                exclude_new_listing_days=request.exclude_new_listing_days
+            )
+            
+            # 添加初始條件
+            for condition_req in request.initial_conditions:
+                condition = FilterCondition(
+                    condition_type=condition_req.condition_type.value,
+                    parameter=condition_req.parameter,
+                    operator=condition_req.operator.value,
+                    value=condition_req.value,
+                    description=condition_req.description
+                )
+                config.add_initial_condition(condition)
+            
+            # 添加高級條件
+            for condition_req in request.advanced_conditions:
+                condition = FilterCondition(
+                    condition_type=condition_req.condition_type.value,
+                    parameter=condition_req.parameter,
+                    operator=condition_req.operator.value,
+                    value=condition_req.value,
+                    description=condition_req.description
+                )
+                config.add_advanced_condition(condition)
+            
+            return config
+            
+        except Exception as e:
+            self.logger.error(f"Failed to convert request to search config: {str(e)}")
+            raise
 
 # Global service instance
 standalone_search_service = StandaloneSearchService()

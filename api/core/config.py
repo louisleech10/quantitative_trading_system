@@ -53,6 +53,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "allow"  # 新增這行，允許額外欄位
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

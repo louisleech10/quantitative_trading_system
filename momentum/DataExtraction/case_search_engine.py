@@ -517,20 +517,42 @@ class CaseSearchEngine:
                     'symbol': symbol,
                     'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                     'trigger_idx': idx - start_idx,  # 相對於提取數據的索引
+                    'open': float(data['open'].iloc[idx]),
+                    'high': float(data['high'].iloc[idx]),
+                    'low': float(data['low'].iloc[idx]),
                     'close': float(data['close'].iloc[idx]),
                     'volume': float(data['volume'].iloc[idx]),
                     'price_change': float(data['price_change'].iloc[idx]),
+                    'market_phase': market_phase,
+                    'timeframe': config.timeframe,
                     'time_range': {
                         'start': data.index[start_idx].strftime('%Y-%m-%d %H:%M:%S'),
                         'end': data.index[end_idx].strftime('%Y-%m-%d %H:%M:%S')
                     }
                 }
+
+                # 添加所有可能的指標欄位
+                indicator_columns = [
+                    'future1_close_return', 'future2_close_return', 'future4_close_return', 'future6_close_return',
+                    'future24_close_return', 'future48_close_return',  # 新增
+                    'future_max_return', 'future72_max_return',        # 擴展
+                    'future_max_drawdown', 'future72_max_drawdown',    # 擴展
+                    'prior_volatility', 'prior_range', 'prior_abs_change_sum',
+                    'future24_close', 'future24_low',
+                    'signal_type', 'base_std'  # 新增
+                ]
                 
-                # 添加高級指標
-                for col in ['future1_close_return','future2_close_return','future4_close_return','future6_close_return','future_max_return', 
-                           'future_max_drawdown', 'prior_volatility', 'prior_range', 'prior_abs_change_sum', 'future24_close', 'future24_low']:
+                for col in indicator_columns:
                     if col in data.columns:
                         case[col] = float(data[col].iloc[idx])
+                    else:
+                        # 如果欄位不存在，可以設為 None 或計算默認值
+                        if col == 'signal_type':
+                            case[col] = 'MOMENTUM'  # 默認信號類型
+                        elif col == 'base_std':
+                            case[col] = 0.02  # 默認標準差
+                        else:
+                            case[col] = None
                 
                 # 添加其他有用的統計信息
                 market_phase = self._determine_market_phase(timestamp)

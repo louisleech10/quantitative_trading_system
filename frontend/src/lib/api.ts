@@ -1,7 +1,7 @@
 // frontend/src/lib/api.ts
 // API client for connecting to FastAPI backend
 
-import { ApiResponse, SearchResult, SearchTemplate, SearchRequest } from './types';
+import { ApiResponse, SearchResultData, SearchTemplate, SearchRequest, TaskInfo } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
@@ -30,7 +30,7 @@ class ApiClient {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error?.message || 'API request failed');
+        throw new Error(data.error?.message || `HTTP ${response.status}: Request failed`);
       }
 
       return data;
@@ -41,23 +41,23 @@ class ApiClient {
   }
 
   // Search operations
-  async executeSearch(request: SearchRequest): Promise<ApiResponse<{ task_id: string }>> {
+  async executeSearch(request: SearchRequest): Promise<ApiResponse<TaskInfo>> {
     return this.fetchApi('/search/execute', {
       method: 'POST',
       body: JSON.stringify(request),
     });
   }
 
-  async getTaskStatus(taskId: string): Promise<ApiResponse<SearchResult>> {
+  async getTaskStatus(taskId: string): Promise<ApiResponse<TaskInfo>> {
     return this.fetchApi(`/search/task/${taskId}`);
   }
 
-  async getTaskResult(taskId: string): Promise<ApiResponse<SearchResult>> {
+  async getTaskResult(taskId: string): Promise<ApiResponse<SearchResultData>> {
     return this.fetchApi(`/search/task/${taskId}/result`);
   }
 
   // Configuration operations
-  async getSearchTemplates(): Promise<ApiResponse<SearchTemplate[]>> {
+  async getSearchTemplates(): Promise<ApiResponse<{ templates: SearchTemplate[]; total: number }>> {
     return this.fetchApi('/config/templates');
   }
 
@@ -67,12 +67,30 @@ class ApiClient {
 
   // Health check
   async healthCheck(): Promise<ApiResponse<{ status: string }>> {
-    return fetch(`${API_BASE_URL}/health`)
-      .then(res => res.json())
-      .catch(error => ({
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`);
+      return await response.json();
+    } catch (error) {
+      return {
         success: false,
-        error: { code: 'CONNECTION_ERROR', message: 'Cannot connect to API server' }
-      }));
+        error: { 
+          code: 'CONNECTION_ERROR', 
+          message: 'Cannot connect to API server' 
+        },
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  // Preview search
+  async previewSearch(config: any, symbolsLimit: number = 10): Promise<ApiResponse<any>> {
+    return this.fetchApi('/search/preview', {
+      method: 'POST',
+      body: JSON.stringify({
+        config,
+        symbols_limit: symbolsLimit
+      }),
+    });
   }
 }
 
@@ -89,10 +107,17 @@ export const formatCurrency = (value: number): string => {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
+    maximumFractionDigits: 2,
   }).format(value);
 };
 
 export const formatPercentage = (value: number): string => {
   return `${(value * 100).toFixed(2)}%`;
+};
+
+export const formatNumber = (value: number, decimals: number = 2): string => {
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 };
