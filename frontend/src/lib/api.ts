@@ -1,4 +1,4 @@
-// frontend/src/lib/api.ts
+// frontend/src/lib/api.ts 
 // API client for connecting to FastAPI backend
 
 import { ApiResponse, SearchResultData, SearchTemplate, SearchRequest, TaskInfo } from './types';
