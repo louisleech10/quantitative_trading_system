@@ -196,116 +196,8 @@ class StandaloneSearchService:
             
         except Exception as e:
             self.logger.warning(f"Failed to load momentum modules: {e}")
-        
-        self.logger.info("Using mock implementation as fallback")
-        self.momentum_available = False
     
-    def _create_enhanced_mock_cases(self, request: SearchConfigRequest) -> List[CaseData]:
-        """Create enhanced mock case data that simulates real search results"""
-        mock_cases = []
-        
-        base_time = datetime.combine(request.start_date, datetime.min.time())
-        symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT", "LINKUSDT", "BNBUSDT"]
-        
-        # Create more realistic mock cases based on conditions
-        case_count = min(request.sample_limit, 20)  # Reasonable number for demo
-        
-        for i in range(case_count):
-            # Use different symbols
-            symbol = symbols[i % len(symbols)]
-            
-            # Generate time with proper separation
-            days_offset = i * (30 // case_count) if case_count > 0 else i * 3
-            case_time = base_time + timedelta(days=days_offset, hours=i*6)
-            
-            # Generate realistic price data
-            base_price = 30000 + i * 5000  # Varying base prices for different symbols
-            
-            # 生成完整的 OHLC 數據
-            open_price = base_price * (1 + (i % 5) * 0.005 - 0.01)  # 開盤價
-            high_price = max(open_price, base_price) * (1 + (i % 3) * 0.01)  # 最高價
-            low_price = min(open_price, base_price) * (1 - (i % 3) * 0.005)  # 最低價
-            close_price = base_price  # 收盤價
-            
-            # 計算價格變化
-            price_change = (close_price - open_price) / open_price
-            
-            # 如果有條件限制，調整價格變化
-            if request.initial_conditions:
-                for condition in request.initial_conditions:
-                    if condition.parameter == "price_change" and condition.operator == ">=":
-                        if price_change < condition.value:
-                            # 調整收盤價以滿足條件
-                            close_price = open_price * (1 + condition.value + 0.01)
-                            price_change = condition.value + 0.01
-            
-            # Generate volume data
-            volume = max(request.min_volume, 1000000 + i * 200000)
-            
-            # Generate future returns (some positive, some negative for realism)
-            future_1 = 0.02 + (i % 3) * 0.03 - 0.01  # -1% to 7%
-            future_2 = 0.04 + (i % 3) * 0.04 - 0.02  # -2% to 10%
-            future_4 = 0.06 + (i % 4) * 0.05 - 0.03  # -3% to 13%
-            future_6 = 0.08 + (i % 4) * 0.06 - 0.04  # -4% to 16%
-            
-            # 計算24小時和48小時回報
-            future_24h = 0.05 + (i % 4) * 0.04 - 0.02  # -2% to 10%
-            future_48h = 0.07 + (i % 4) * 0.05 - 0.03  # -3% to 13%
-            
-            # 未來24小時數據
-            future24_close_price = close_price * (1 + future_24h)
-            future24_low_price = close_price * (1 + min(future_1, future_2, future_24h) - 0.01)
-
-            # Market phase based on time
-            month = case_time.month
-            if month in [1, 2, 3]:
-                market_phase = "FEAR"
-            elif month in [4, 5, 6]:
-                market_phase = "NEUTRAL" 
-            elif month in [7, 8, 9]:
-                market_phase = "GREED"
-            else:
-                market_phase = "EXTREME_GREED"
-            
-            case = CaseData(
-                symbol=symbol,
-                timestamp=case_time,
-                trigger_idx=95 + i,
-                
-                # 完整的 OHLC 數據 - 修復關鍵問題
-                open=open_price,
-                high=high_price,
-                low=low_price,
-                close=close_price,
-                volume=volume,
-                price_change=price_change,
-                market_phase=market_phase,
-                
-                # 未來表現指標
-                future1_close_return=future_1,
-                future2_close_return=future_2,
-                future4_close_return=future_4,
-                future6_close_return=future_6,
-                future24_close_return=future_24h,  # 修復24小時回報
-                future48_close_return=future_48h,  # 修復48小時回報
-                future_max_return=max(future_1, future_2, future_4, future_6, future_24h) + 0.02,
-                future_max_drawdown=min(-0.02, min(future_1, future_2, future_4, future_6, future_24h) - 0.01),
-                
-                # 未來價格數據
-                future24_close=future24_close_price,
-                future24_low=future24_low_price,
-                
-                # 前期技術指標
-                prior_volatility=0.02 + (i % 3) * 0.01,
-                prior_range=0.05 + (i % 3) * 0.02,
-                prior_abs_change_sum=0.08 + (i % 3) * 0.03,
-                
-                time_range={
-                    "start": (case_time - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
-                    "end": (case_time + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
-                }
-            )
-            mock_cases.append(case)
+    
         
     async def execute_search(self, request: SearchConfigRequest, 
                            symbols: Optional[List[str]] = None) -> str:
@@ -349,94 +241,69 @@ class StandaloneSearchService:
                         save_results=False
                     )
                     
-                    # 關鍵修復：檢查返回值是否為 None 或空
-                    if real_cases_dict is None:
-                        self.logger.warning("Search engine returned None, using mock data")
-                        real_cases = self._create_enhanced_mock_cases(request)
-                        service_type = "fallback_mock_service"
-                    elif len(real_cases_dict) == 0:
-                        self.logger.warning("Search engine returned empty list, using mock data")
-                        real_cases = self._create_enhanced_mock_cases(request)
-                        service_type = "fallback_mock_service"
-                    else:
-                        # 轉換字典格式為 CaseData 對象
-                        real_cases = []
-                        for case_dict in real_cases_dict:
-                            try:
-                                # 確保必要欄位存在
-                                if not all(key in case_dict for key in ['symbol', 'timestamp', 'close']):
-                                    self.logger.warning(f"Case data missing required fields: {case_dict}")
-                                    continue
-                                    
-                                case_data = CaseData(
-                                    symbol=case_dict['symbol'],
-                                    timestamp=datetime.strptime(case_dict['timestamp'], '%Y-%m-%d %H:%M:%S'),
-                                    trigger_idx=case_dict.get('trigger_idx', 0),
-                                    
-                                    # 確保 OHLC 數據完整
-                                    open=case_dict.get('open', case_dict['close']),
-                                    high=case_dict.get('high', case_dict['close'] * 1.01),
-                                    low=case_dict.get('low', case_dict['close'] * 0.99),
-                                    close=case_dict['close'],
-                                    volume=case_dict.get('volume', 1000000),
-                                    price_change=case_dict.get('price_change', 0.05),
-                                    market_phase=case_dict.get('market_phase', 'NEUTRAL'),
-                                    
-                                    # 未來表現指標
-                                    future1_close_return=case_dict.get('future1_close_return'),
-                                    future2_close_return=case_dict.get('future2_close_return'),
-                                    future4_close_return=case_dict.get('future4_close_return'),
-                                    future6_close_return=case_dict.get('future6_close_return'),
-                                    future24_close_return=case_dict.get('future24_close_return'),
-                                    future48_close_return=case_dict.get('future48_close_return'),
-                                    future_max_return=case_dict.get('future_max_return'),
-                                    future_max_drawdown=case_dict.get('future_max_drawdown'),
-                                    
-                                    # 其他數據
-                                    future24_close=case_dict.get('future24_close'),
-                                    future24_low=case_dict.get('future24_low'),
-                                    prior_volatility=case_dict.get('prior_volatility'),
-                                    prior_range=case_dict.get('prior_range'),
-                                    prior_abs_change_sum=case_dict.get('prior_abs_change_sum'),
-                                    time_range=case_dict.get('time_range', {
-                                        'start': '2023-01-01 00:00:00',
-                                        'end': '2023-01-02 00:00:00'
-                                    })
-                                )
-                                real_cases.append(case_data)
-                                
-                            except Exception as case_error:
-                                self.logger.error(f"Error processing case data: {case_error}")
+                    real_cases = []
+                    for case_dict in real_cases_dict:
+                        try:
+                            # 確保必要欄位存在
+                            if not all(key in case_dict for key in ['symbol', 'timestamp', 'close']):
+                                self.logger.warning(f"Case data missing required fields: {case_dict}")
                                 continue
+                                
+                            case_data = CaseData(
+                                symbol=case_dict['symbol'],
+                                timestamp=datetime.strptime(case_dict['timestamp'], '%Y-%m-%d %H:%M:%S'),
+                                trigger_idx=case_dict.get('trigger_idx', 0),
+                                
+                                # 確保 OHLC 數據完整
+                                open=case_dict.get('open', case_dict['close']),
+                                high=case_dict.get('high', case_dict['close'] * 1.01),
+                                low=case_dict.get('low', case_dict['close'] * 0.99),
+                                close=case_dict['close'],
+                                volume=case_dict.get('volume', 1000000),
+                                price_change=case_dict.get('price_change', 0.05),
+                                market_phase=case_dict.get('market_phase', 'NEUTRAL'),
+                                
+                                # 未來表現指標
+                                future1_close_return=case_dict.get('future1_close_return'),
+                                future2_close_return=case_dict.get('future2_close_return'),
+                                future4_close_return=case_dict.get('future4_close_return'),
+                                future6_close_return=case_dict.get('future6_close_return'),
+                                future24_close_return=case_dict.get('future24_close_return'),
+                                future48_close_return=case_dict.get('future48_close_return'),
+                                future_max_return=case_dict.get('future_max_return'),
+                                future_max_drawdown=case_dict.get('future_max_drawdown'),
+                                
+                                # 其他數據
+                                future24_close=case_dict.get('future24_close'),
+                                future24_low=case_dict.get('future24_low'),
+                                prior_volatility=case_dict.get('prior_volatility'),
+                                prior_range=case_dict.get('prior_range'),
+                                prior_abs_change_sum=case_dict.get('prior_abs_change_sum'),
+                                time_range=case_dict.get('time_range', {
+                                    'start': '2023-01-01 00:00:00',
+                                    'end': '2023-01-02 00:00:00'
+                                })
+                            )
+                            real_cases.append(case_data)
+                            
+                        except Exception as case_error:
+                            self.logger.error(f"Error processing case data: {case_error}")
+                            continue
                         
                         if len(real_cases) == 0:
                             self.logger.warning("No valid cases after processing, using mock data")
-                            real_cases = self._create_enhanced_mock_cases(request)
-                            service_type = "fallback_mock_service"
                         else:
                             service_type = "real_momentum_service"
                             self.logger.info(f"Real search completed: found {len(real_cases)} cases")
                     
-                except Exception as e:
-                    self.logger.error(f"Real search failed: {str(e)}, falling back to mock")
-                    # 如果真實搜索失敗，回退到模擬數據
-                    real_cases = self._create_enhanced_mock_cases(request)
-                    service_type = "fallback_mock_service"
 
             else:
                 self.logger.info(f"Running mock search for: {request.name}")
                 await asyncio.sleep(3)  # Simulate work
                 real_cases = self._create_enhanced_mock_cases(request)
-                service_type = "enhanced_mock_service"
-
-            # 確保 real_cases 不為空
-            if not real_cases:
-                self.logger.warning("No cases generated, creating minimal mock data")
-                real_cases = self._create_minimal_mock_cases(request)
-                service_type = "minimal_mock_service"
 
             # 將變數名統一
-            mock_cases = real_cases  # 保持後續代碼兼容性
+            real_cases = []  # 只處理真實案例
             
             # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -468,8 +335,6 @@ class StandaloneSearchService:
                     time_separation_score=0.8 if len(mock_cases) > 5 else 0.6,
                     symbol_diversity_score=min(1.0, len(set(c.symbol for c in mock_cases)) / 10),
                     market_phase_balance=0.7 if len(phase_dist) > 1 else 0.4,
-                    overall_quality_score=0.75 if service_type == "real_momentum_service" else 0.65,
-                    warnings=[] if service_type == "real_momentum_service" else ["Using mock data for demonstration"]
                 ),
                 execution_time=execution_time,
                 cache_used=False
@@ -497,45 +362,6 @@ class StandaloneSearchService:
         finally:
             self._active_searches -= 1
 
-    def _create_minimal_mock_cases(self, request: SearchConfigRequest) -> List[CaseData]:
-        """創建最小化的模擬案例（最後的 fallback）"""
-        mock_cases = []
-        
-        base_time = datetime.combine(request.start_date, datetime.min.time())
-        
-        # 至少創建一個案例
-        case = CaseData(
-            symbol="BTCUSDT",
-            timestamp=base_time,
-            trigger_idx=100,
-            open=50000.0,
-            high=52000.0,
-            low=49000.0,
-            close=51000.0,
-            volume=1000000.0,
-            price_change=0.02,
-            market_phase="NEUTRAL",
-            future1_close_return=0.01,
-            future2_close_return=0.02,
-            future4_close_return=0.03,
-            future6_close_return=0.02,
-            future24_close_return=0.025,
-            future48_close_return=0.03,
-            future_max_return=0.05,
-            future_max_drawdown=-0.02,
-            future24_close=52275.0,
-            future24_low=50000.0,
-            prior_volatility=0.03,
-            prior_range=0.08,
-            prior_abs_change_sum=0.12,
-            time_range={
-                "start": base_time.strftime('%Y-%m-%d %H:%M:%S'),
-                "end": (base_time + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
-            }
-        )
-        mock_cases.append(case)
-        
-        return mock_cases
     
     async def preview_search(self, request: SearchConfigRequest,
                            symbols_limit: int = 10) -> Dict[str, Any]:
