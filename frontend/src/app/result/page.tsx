@@ -428,9 +428,15 @@ export default function ResultsPage() {
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{case_.symbol}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{case_.timestamp}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">${case_.open?.toLocaleString() || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">${case_.high?.toLocaleString() || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">${case_.low?.toLocaleString() || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        ${typeof case_.open === 'number' ? case_.open.toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        ${typeof case_.high === 'number' ? case_.high.toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        ${typeof case_.low === 'number' ? case_.low.toLocaleString() : 'N/A'}
+                      </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">${case_.close.toLocaleString()}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{case_.volume.toFixed(2)}</td>
                       <td className={`px-4 py-3 text-sm text-right font-medium ${case_.price_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>

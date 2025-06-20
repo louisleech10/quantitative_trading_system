@@ -5,6 +5,9 @@ export interface CaseData {
   symbol: string;
   timestamp: string;
   trigger_idx: number;
+  open: number;        // 確保這個存在
+  high: number;        // 確保這個存在  
+  low: number;         // 確保這個存在 
   close: number;
   volume: number;
   price_change: number;
