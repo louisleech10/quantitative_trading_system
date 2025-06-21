@@ -427,7 +427,7 @@ class CaseSearchEngine:
             self.logger.info(f"Loaded {len(data)} records for {symbol}")
             
             # 添加計算列
-            data = self._add_calculated_columns(data)
+            data = self._add_calculated_columns(data, config.timeframe)
             
             # 檢查計算列是否成功添加
             if 'price_change' not in data.columns:
@@ -546,18 +546,6 @@ class CaseSearchEngine:
             
         except Exception as e:
             self.logger.error(f"Error creating case result: {str(e)}")
-            return None
-
-    def _safe_calculate_future_return(self, data: pd.DataFrame, idx: int, periods: int) -> Optional[float]:
-        """安全計算未來回報率"""
-        try:
-            if idx + periods < len(data):
-                current_price = data['close'].iloc[idx]
-                future_price = data['close'].iloc[idx + periods]
-                if pd.notna(current_price) and pd.notna(future_price) and current_price > 0:
-                    return float((future_price - current_price) / current_price)
-            return None
-        except:
             return None
     
     async def _get_valid_symbols(self, config: SearchConfiguration) -> List[str]:
@@ -737,73 +725,128 @@ class CaseSearchEngine:
             self.logger.error(f"處理 {symbol} 時出錯: {str(e)}")
             return []
     
-    def _add_calculated_columns(self, data: pd.DataFrame) -> pd.DataFrame:
-        #添加計算列，如漲幅、未來回報等#
+    def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
+        """添加計算列，根據時間框架正確計算未來指標"""
         try:
             # 創建數據副本
             df = data.copy()
             
+            # 時間框架到小時的映射
+            timeframe_hours = {
+                '1h': 1, '2h': 2, '3h': 3, '4h': 4, '6h': 6, '8h': 8, '12h': 12, 
+                '1d': 24, '3d': 72, '1w': 168, '1M': 720
+            }
+            
+            # 獲取單根K線代表的小時數
+            hours_per_candle = timeframe_hours.get(timeframe, 4)  # 默認4小時
+            
+            # 計算不同時間段需要的K線數量
+            periods_24h = max(1, 24 // hours_per_candle)    # 24小時需要的K線數
+            periods_48h = max(1, 48 // hours_per_candle)    # 48小時需要的K線數
+            periods_72h = max(1, 72 // hours_per_candle)    # 72小時需要的K線數
+            
+            self.logger.info(f"時間框架: {timeframe}, 每根K線: {hours_per_candle}小時")
+            self.logger.info(f"計算週期 - 24h: {periods_24h}根, 48h: {periods_48h}根, 72h: {periods_72h}根")
+            
             # 計算當前K線漲幅 (close/previous_close - 1)
             df['price_change'] = df['close'].pct_change()
-            self.logger.debug(f"price_change NaN數量: {df['price_change'].isna().sum()}")
-
             
-            # 計算未來1根K線的收盤價回報
-            df['future1_close_return'] = (df['close'].shift(-1)-df['close']) / df['close']
+            # === 基本未來回報計算 ===
+            df['future1_close_return'] = (df['close'].shift(-1) - df['close']) / df['close']
+            df['future2_close_return'] = (df['close'].shift(-2) - df['close']) / df['close']
+            df['future4_close_return'] = (df['close'].shift(-4) - df['close']) / df['close']
+            df['future6_close_return'] = (df['close'].shift(-6) - df['close']) / df['close']
             
-            # 計算未來2根K線的收盤價回報
-            df['future2_close_return'] = (df['close'].shift(-2)-df['close']) / df['close']
+            # === 時間基礎的未來回報計算 ===
+            # 24小時回報
+            df['future24_close_return'] = (df['close'].shift(-periods_24h) - df['close']) / df['close']
             
-            # 計算未來4根K線的收盤價回報
-            df['future4_close_return'] = (df['close'].shift(-4)-df['close']) / df['close']
+            # 48小時回報
+            df['future48_close_return'] = (df['close'].shift(-periods_48h) - df['close']) / df['close']
             
-            # 計算未來6根K線的收盤價回報
-            df['future6_close_return'] = (df['close'].shift(-6)-df['close']) / df['close']
+            # 72小時回報
+            df['future72_close_return'] = (df['close'].shift(-periods_72h) - df['close']) / df['close']
             
-            # 未來24小時價格（假設是未來6根4小時K線）
-            df['future24_close'] = df['close'].shift(-2)
-            df['future24_low'] = df.iloc[:, df.columns.get_loc('low')].rolling(window=2, min_periods=1).min().shift(-2)
+            # === 未來價格數據 ===
+            df['future24_close'] = df['close'].shift(-periods_24h)
             
-            # 計算前期波動性 (前N根K線的價格變化標準差)
-            lookback_periods = 6  # 前6根K線（如果是12小時K線，相當於3天）
-
-            # 計算前N根K線的價格變動百分比的標準差
+            # 24小時內的最低價（在指定期間內的rolling min）
+            if periods_24h > 1:
+                df['future24_low'] = df['low'].rolling(window=periods_24h, min_periods=1).min().shift(-periods_24h)
+            else:
+                df['future24_low'] = df['low'].shift(-periods_24h)
+            
+            # === 前期技術指標計算 ===
+            lookback_periods = max(6, periods_24h)  # 至少看6根K線或24小時的數據
+            
+            # 前期波動性（價格變化的標準差）
             df['prior_volatility'] = df['price_change'].rolling(window=lookback_periods).std()
-            self.logger.debug(f"prior_volatility NaN數量: {df['prior_volatility'].isna().sum()}")
-            # 計算前N根K線的價格變動範圍（最高價/最低價 - 1）
-            df['prior_range'] = df['high'].rolling(window=lookback_periods).max() / df['low'].rolling(window=lookback_periods).min() - 1
             
-            # 計算前N根K線的絕對價格變化總和
+            # 前期價格範圍（最高價與最低價的比率）
+            df['prior_range'] = (
+                df['high'].rolling(window=lookback_periods).max() / 
+                df['low'].rolling(window=lookback_periods).min() - 1
+            )
+            
+            # 前期絕對價格變化總和
             df['prior_abs_change_sum'] = df['price_change'].abs().rolling(window=lookback_periods).sum()
-
-            # 計算未來K線中的最大回報和最大回撤
-            lookahead = 6  # 向前看的K線數
+            
+            # === 未來最大回報和最大回撤計算 ===
+            # 使用72小時作為標準分析期間
+            lookahead_periods = periods_72h
             
             # 初始化列
             df['future_max_return'] = np.nan
             df['future_max_drawdown'] = np.nan
+            df['future72_max_return'] = np.nan
+            df['future72_max_drawdown'] = np.nan
             
-            # 逐行計算
-            for i in range(len(df) - lookahead):
+            # 逐行計算（向量化會更快，但這樣更清晰）
+            for i in range(len(df) - lookahead_periods):
                 current_close = df['close'].iloc[i]
-                future_slice = df.iloc[i+1:i+lookahead+1]
                 
-                # 最大回報: 未來最高價/當前收盤價 - 1
-                max_high = future_slice['high'].max()
-                max_return = max_high / current_close - 1
-                df.loc[df.index[i], 'future_max_return'] = max_return
+                # 獲取未來72小時的數據切片
+                future_slice_72h = df.iloc[i+1:i+lookahead_periods+1]
                 
-                # 最大回撤: 未來最低價/當前收盤價 - 1
-                min_low = future_slice['low'].min()
-                max_drawdown = min_low / current_close - 1
-                df.loc[df.index[i], 'future_max_drawdown'] = max_drawdown
+                if len(future_slice_72h) > 0 and current_close > 0:
+                    # === 72小時最大回報和回撤 ===
+                    max_high_72h = future_slice_72h['high'].max()
+                    min_low_72h = future_slice_72h['low'].min()
+                    
+                    max_return_72h = (max_high_72h / current_close - 1) if pd.notna(max_high_72h) else np.nan
+                    max_drawdown_72h = (min_low_72h / current_close - 1) if pd.notna(min_low_72h) else np.nan
+                    
+                    df.loc[df.index[i], 'future72_max_return'] = max_return_72h
+                    df.loc[df.index[i], 'future72_max_drawdown'] = max_drawdown_72h
+                    
+                    # === 標準6根K線的最大回報和回撤（保持向後兼容） ===
+                    standard_lookahead = min(6, len(future_slice_72h))
+                    future_slice_standard = df.iloc[i+1:i+standard_lookahead+1]
+                    
+                    if len(future_slice_standard) > 0:
+                        max_high_std = future_slice_standard['high'].max()
+                        min_low_std = future_slice_standard['low'].min()
+                        
+                        max_return_std = (max_high_std / current_close - 1) if pd.notna(max_high_std) else np.nan
+                        max_drawdown_std = (min_low_std / current_close - 1) if pd.notna(min_low_std) else np.nan
+                        
+                        df.loc[df.index[i], 'future_max_return'] = max_return_std
+                        df.loc[df.index[i], 'future_max_drawdown'] = max_drawdown_std
+            
+            # === 數據質量檢查 ===
+            self.logger.info(f"計算完成統計:")
+            self.logger.info(f"  - price_change NaN數量: {df['price_change'].isna().sum()}")
+            self.logger.info(f"  - future24_close_return NaN數量: {df['future24_close_return'].isna().sum()}")
+            self.logger.info(f"  - future48_close_return NaN數量: {df['future48_close_return'].isna().sum()}")
+            self.logger.info(f"  - future72_max_return NaN數量: {df['future72_max_return'].isna().sum()}")
+            self.logger.info(f"  - prior_volatility NaN數量: {df['prior_volatility'].isna().sum()}")
             
             return df
             
         except Exception as e:
             self.logger.error(f"添加計算列時出錯: {str(e)}")
             return data
-    
+
         
     def _apply_initial_filter(self, 
                             data: pd.DataFrame, 
@@ -1152,3 +1195,40 @@ class CaseSearchEngine:
         except Exception as e:
             self.logger.error(f"生成負例時出錯: {str(e)}")
             return []
+        
+    def _safe_calculate_future_return(self, data: pd.DataFrame, idx: int, periods: int) -> Optional[float]:
+        """安全計算未來回報率，加強錯誤檢查"""
+        try:
+            if idx + periods >= len(data):
+                return None
+                
+            current_price = data['close'].iloc[idx]
+            future_price = data['close'].iloc[idx + periods]
+            
+            # 檢查數據有效性
+            if pd.isna(current_price) or pd.isna(future_price) or current_price <= 0:
+                return None
+                
+            return float((future_price - current_price) / current_price)
+            
+        except Exception as e:
+            self.logger.error(f"計算未來回報時出錯: {str(e)}")
+            return None
+
+    def _get_timeframe_periods(self, timeframe: str) -> dict:
+        """根據時間框架獲取標準化的期間數"""
+        timeframe_hours = {
+            '1h': 1, '2h': 2, '3h': 3, '4h': 4, '6h': 6, '8h': 8, '12h': 12, 
+            '1d': 24, '3d': 72, '1w': 168, '1M': 720
+        }
+        
+        hours_per_candle = timeframe_hours.get(timeframe, 4)
+        
+        return {
+            'hours_per_candle': hours_per_candle,
+            'periods_24h': max(1, 24 // hours_per_candle),
+            'periods_48h': max(1, 48 // hours_per_candle),
+            'periods_72h': max(1, 72 // hours_per_candle),
+            'periods_1w': max(1, 168 // hours_per_candle)
+        }
+    

@@ -1,1 +1,0 @@
-2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Error searching single symbol BTCUSDT: 'SearchConfiguration' object has no attribute 'time_range'
