@@ -1,35 +1,35 @@
-2025-06-21 21:24:34 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
-2025-06-21 21:24:34 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
-2025-06-21 21:24:34 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
-2025-06-21 21:24:34 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
-2025-06-21 21:24:34 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
-2025-06-21 21:24:34 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
-2025-06-21 21:24:34 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
-2025-06-21 21:24:34 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
-2025-06-21 21:24:34 - api.startup - [32mINFO[0m - 運行環境: Development
-2025-06-21 21:24:34 - api.startup - [32mINFO[0m - API 前綴: /api/v1
-2025-06-21 21:24:41 - api.middleware.request - [32mINFO[0m - [b35690df] Started OPTIONS /api/v1/search/execute from 127.0.0.1
-2025-06-21 21:24:41 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.003s
-2025-06-21 21:24:41 - api.middleware.request - [32mINFO[0m - [b35690df] Completed OPTIONS /api/v1/search/execute - 200 - 0.003s
-2025-06-21 21:24:41 - api.middleware.request - [32mINFO[0m - [cc8ff982] Started POST /api/v1/search/execute from 127.0.0.1
-2025-06-21 21:24:41 - api.routes.case_search - [32mINFO[0m - Starting search execution
-2025-06-21 21:24:41 - api.standalone_task_manager - [32mINFO[0m - Created task 135f285b-e4c9-47c9-a208-fb16cdc875d2 for config: Frontend_Test_Search
-2025-06-21 21:24:41 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
-2025-06-21 21:24:41 - api.standalone_task_manager - [32mINFO[0m - Updated task 135f285b-e4c9-47c9-a208-fb16cdc875d2 status to TaskStatusEnum.RUNNING
-2025-06-21 21:24:41 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: Frontend_Test_Search
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-06-21 to 2025-06-21
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Error searching single symbol BTCUSDT: 'MomentumDataLoader' object has no attribute 'get_historical_data'
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No cases found for BTCUSDT
-2025-06-21 21:24:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 0 cases
-2025-06-21 21:24:41 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
-2025-06-21 21:24:41 - api.standalone_task_manager - [32mINFO[0m - Updated task 135f285b-e4c9-47c9-a208-fb16cdc875d2 status to TaskStatusEnum.FAILED
-2025-06-21 21:24:41 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.007s
-2025-06-21 21:24:41 - api.middleware.request - [32mINFO[0m - [cc8ff982] Completed POST /api/v1/search/execute - 200 - 0.007s
-2025-06-21 21:24:41 - api.middleware.request - [32mINFO[0m - [6beb601d] Started GET /api/v1/search/task/135f285b-e4c9-47c9-a208-fb16cdc875d2 from 127.0.0.1
-2025-06-21 21:24:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/135f285b-e4c9-47c9-a208-fb16cdc875d2 - 200 - 0.002s
-2025-06-21 21:24:41 - api.middleware.request - [32mINFO[0m - [6beb601d] Completed GET /api/v1/search/task/135f285b-e4c9-47c9-a208-fb16cdc875d2 - 200 - 0.002s
+2025-06-21 21:48:01 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-21 21:48:01 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-21 21:48:01 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-21 21:48:01 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-21 21:48:01 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-21 21:48:01 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-21 21:48:01 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-21 21:48:01 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-21 21:48:01 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-21 21:48:01 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-21 21:48:06 - api.middleware.request - [32mINFO[0m - [f96724f3] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-21 21:48:06 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.002s
+2025-06-21 21:48:06 - api.middleware.request - [32mINFO[0m - [f96724f3] Completed OPTIONS /api/v1/search/execute - 200 - 0.002s
+2025-06-21 21:48:06 - api.middleware.request - [32mINFO[0m - [630b4552] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-21 21:48:06 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-21 21:48:06 - api.standalone_task_manager - [32mINFO[0m - Created task 995102d7-ef65-49de-a065-f8f6c6d8df7f for config: Frontend_Test_Search
+2025-06-21 21:48:06 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_4', 'symbols_count': '1'}
+2025-06-21 21:48:06 - api.standalone_task_manager - [32mINFO[0m - Updated task 995102d7-ef65-49de-a065-f8f6c6d8df7f status to TaskStatusEnum.RUNNING
+2025-06-21 21:48:06 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: Frontend_Test_Search
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-06-21 to 2025-06-21
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Error searching single symbol BTCUSDT: 'SearchConfiguration' object has no attribute 'time_range'
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No cases found for BTCUSDT
+2025-06-21 21:48:06 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 0 cases
+2025-06-21 21:48:06 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
+2025-06-21 21:48:06 - api.standalone_task_manager - [32mINFO[0m - Updated task 995102d7-ef65-49de-a065-f8f6c6d8df7f status to TaskStatusEnum.FAILED
+2025-06-21 21:48:06 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.003s
+2025-06-21 21:48:06 - api.middleware.request - [32mINFO[0m - [630b4552] Completed POST /api/v1/search/execute - 200 - 0.003s
+2025-06-21 21:48:06 - api.middleware.request - [32mINFO[0m - [0ad644dc] Started GET /api/v1/search/task/995102d7-ef65-49de-a065-f8f6c6d8df7f from 127.0.0.1
+2025-06-21 21:48:06 - api.request - [32mINFO[0m - GET /api/v1/search/task/995102d7-ef65-49de-a065-f8f6c6d8df7f - 200 - 0.001s
+2025-06-21 21:48:06 - api.middleware.request - [32mINFO[0m - [0ad644dc] Completed GET /api/v1/search/task/995102d7-ef65-49de-a065-f8f6c6d8df7f - 200 - 0.001s

@@ -97,6 +97,41 @@ class StandaloneTaskManager:
         if tasks_to_remove:
             self.logger.info(f"Cleaned up {len(tasks_to_remove)} old tasks")
 
+class MomentumDataLoaderWrapper:
+    """Wrapper class to provide the expected interface for the search engine"""
+    
+    def __init__(self, momentum_data_loader):
+        self.momentum_data_loader = momentum_data_loader
+        self.data_loader = momentum_data_loader.data_loader  # 內部的 DataLoader 實例
+        self.logger = get_logger("api.momentum_wrapper")
+    
+    def get_historical_data(self, symbol: str, start_time, end_time, interval: str = "4h"):
+        """Delegate to the internal DataLoader's get_historical_data method"""
+        try:
+            # 確保時間參數格式正確
+            if isinstance(start_time, datetime):
+                start_time = start_time.strftime('%Y-%m-%d')
+            if isinstance(end_time, datetime):
+                end_time = end_time.strftime('%Y-%m-%d')
+            
+            return self.data_loader.get_historical_data(
+                symbol=symbol,
+                start_time=start_time,
+                end_time=end_time,
+                interval=interval
+            )
+        except Exception as e:
+            self.logger.error(f"Error getting historical data for {symbol}: {str(e)}")
+            raise
+    
+    def get_symbols_list(self):
+        """Delegate to the internal DataLoader's get_symbols_list method"""
+        return self.data_loader.get_symbols_list()
+    
+    def get_symbol_info(self, symbol: str):
+        """Delegate to the internal DataLoader's get_symbol_info method"""
+        return self.data_loader.get_symbol_info(symbol)
+
 class StandaloneSearchService:
     """Standalone search service that loads momentum modules dynamically"""
     
@@ -131,10 +166,13 @@ class StandaloneSearchService:
             try:
                 self.logger.info("Trying direct imports...")
                 
-                # Import DataLoader
+                # Import the correct class name: MomentumDataLoader (not MomentumStrategyDataLoader)
                 from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-                self.data_loader = MomentumDataLoader()
-                self.logger.info("✅ DataLoader imported successfully")
+                momentum_loader = MomentumDataLoader()
+                
+                # Create a wrapper that provides the expected interface
+                self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
+                self.logger.info("✅ DataLoader imported and wrapped successfully")
                 
                 # Import SearchEngine
                 from momentum.DataExtraction.case_search_engine import CaseSearchEngine
@@ -157,10 +195,11 @@ class StandaloneSearchService:
                 if str(full_path) not in sys.path:
                     sys.path.insert(0, str(full_path))
                 
-                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-                from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+                from DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
+                from DataExtraction.case_search_engine import CaseSearchEngine
                 
-                self.data_loader = MomentumDataLoader()
+                momentum_loader = MomentumDataLoader()
+                self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
                 self.search_engine = CaseSearchEngine(self.data_loader)
                 
                 self.momentum_available = True
