@@ -224,6 +224,12 @@ class StandaloneSearchService:
             # 動態導入搜索配置類
             from momentum.DataExtraction.case_search_engine import SearchConfiguration, FilterCondition
             
+            # 準備時間範圍
+            time_range = (
+                request.start_date.strftime('%Y-%m-%d'),
+                request.end_date.strftime('%Y-%m-%d')
+            )
+            
             # 創建基本搜索配置
             config = SearchConfiguration(
                 name=request.name,
@@ -233,8 +239,12 @@ class StandaloneSearchService:
                 forward_periods=request.forward_periods,
                 sample_limit=request.sample_limit,
                 min_volume=request.min_volume,
-                exclude_new_listing_days=request.exclude_new_listing_days
+                exclude_new_listing_days=request.exclude_new_listing_days,
+                time_range=time_range  # 添加時間範圍參數
             )
+            
+            # 手動添加 time_range 屬性以確保兼容性
+            config.time_range = time_range
             
             # 添加初始條件
             for condition_req in request.initial_conditions:
