@@ -122,12 +122,12 @@ export default function ResultsPage() {
         config: {
           name: "Frontend_Test_Search",
           description: "測試前端展示的搜索",
-          timeframe: "12h",
+          timeframe: "1d",
           start_date: "2024-02-01",  // 擴大到整年
           end_date: "2025-05-31",    // 擴大到整年
           lookback_periods: 20,
           forward_periods: 10,
-          sample_limit: 10,
+          sample_limit: 100,
           min_volume: 1000,
           exclude_new_listing_days: 7,
           initial_conditions: [{
