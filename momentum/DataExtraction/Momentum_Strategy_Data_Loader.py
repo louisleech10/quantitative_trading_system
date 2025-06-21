@@ -168,14 +168,9 @@ class MomentumDataLoader:
                     'future24_close_return': float(case.get('future2_close_return', 0)),
                     'future48_close_return': float(case.get('future4_close_return', 0)),
                     'future72_max_return': float(case.get('future_max_return', 0)),
-                    'prior_volatility': float(case.get('prior_volatility', 0)),
-                    'prior_range': float(case.get('prior_range', 0)),
-                    'prior_abs_change_sum': float(case.get('prior_abs_change_sum', 0)),
                     'future72_max_drawdown': float(case.get('future_max_drawdown', 0)),
                     'future24_close': float(case.get('future24_close', 0)),
-                    'future24_low': float(case.get('future24_low', 0)),
-                    'signal_type': signal_type,
-                    'base_std': float(base_std)
+                    'future24_low': float(case.get('future24_low', 0))
                 }
                 
                 signals.append(signal)
@@ -399,20 +394,6 @@ class MomentumDataLoader:
             else:
                 df['future24_low'] = df['low'].shift(-periods_24h)
             
-            # === 前期技術指標計算 ===
-            lookback_periods = max(6, periods_24h)  # 至少看6根K線或24小時的數據
-            
-            # 前期波動性（價格變化的標準差）
-            df['prior_volatility'] = df['price_change'].rolling(window=lookback_periods).std()
-            
-            # 前期價格範圍（最高價與最低價的比率）
-            df['prior_range'] = (
-                df['high'].rolling(window=lookback_periods).max() / 
-                df['low'].rolling(window=lookback_periods).min() - 1
-            )
-            
-            # 前期絕對價格變化總和
-            df['prior_abs_change_sum'] = df['price_change'].abs().rolling(window=lookback_periods).sum()
             
             # === 未來最大回報和最大回撤計算 ===
             # 使用72小時作為標準分析期間
@@ -462,7 +443,6 @@ class MomentumDataLoader:
             self.logger.info(f"  - future24_close_return NaN數量: {df['future24_close_return'].isna().sum()}")
             self.logger.info(f"  - future48_close_return NaN數量: {df['future48_close_return'].isna().sum()}")
             self.logger.info(f"  - future72_max_return NaN數量: {df['future72_max_return'].isna().sum()}")
-            self.logger.info(f"  - prior_volatility NaN數量: {df['prior_volatility'].isna().sum()}")
             
             return df
             

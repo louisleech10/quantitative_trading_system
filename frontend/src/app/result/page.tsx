@@ -38,15 +38,6 @@ interface CaseData {
   future24_close?: number;
   future24_low?: number;
   
-  // 前期技術指標
-  prior_volatility?: number;
-  prior_range?: number;
-  prior_abs_change_sum?: number;
-  
-  // 信號相關
-  signal_type?: string;
-  base_std?: number;
-  
   // 時間範圍
   time_range: {
     start: string;
@@ -122,7 +113,7 @@ export default function ResultsPage() {
         config: {
           name: "Frontend_Test_Search",
           description: "測試前端展示的搜索",
-          timeframe: "1d",
+          timeframe: "12h",
           start_date: "2024-02-01",  // 擴大到整年
           end_date: "2025-05-31",    // 擴大到整年
           lookback_periods: 20,
@@ -269,10 +260,9 @@ export default function ResultsPage() {
 
     const headers = [
       'Symbol', 'Timestamp', 'Open', 'High', 'Low', 'Close', 'Volume', 
-      'Price Change (%)', 'Market Phase', 'Timeframe', 'Signal Type',
+      'Price Change (%)', 'Market Phase',
       'Future 24h Return (%)', 'Future 48h Return (%)', 'Future 72h Max Return (%)', 
-      'Future 72h Max Drawdown (%)', 'Future 24h Close', 'Future 24h Low',
-      'Prior Volatility', 'Prior Range', 'Prior Abs Change Sum', 'Base Std'
+      'Future 72h Max Drawdown (%)', 'Future 24h Close', 'Future 24h Low'
     ];
 
     const csvContent = [
@@ -287,18 +277,12 @@ export default function ResultsPage() {
         case_.volume,
         formatPercentage(case_.price_change),
         case_.market_phase,
-        case_.timeframe || '4h',
-        case_.signal_type || 'MOMENTUM',
         formatPercentage(case_.future24_close_return),
         formatPercentage(case_.future48_close_return),
         formatPercentage(case_.future72_max_return || case_.future_max_return),
         formatPercentage(case_.future72_max_drawdown || case_.future_max_drawdown),
         case_.future24_close,
-        case_.future24_low,
-        formatNumber(case_.prior_volatility),
-        formatNumber(case_.prior_range),
-        formatNumber(case_.prior_abs_change_sum),
-        formatNumber(case_.base_std)
+        case_.future24_low
       ].join(','))
     ].join('\n');
 
@@ -420,7 +404,6 @@ export default function ResultsPage() {
                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">48h回報</th>
                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">最大回報</th>
                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">最大回撤</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">信號類型</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -466,11 +449,6 @@ export default function ResultsPage() {
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">
                         {formatPercentage(case_.future72_max_drawdown || case_.future_max_drawdown)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-center">
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          {case_.signal_type || 'MOMENTUM'}
-                        </span>
                       </td>
                     </tr>
                   ))}

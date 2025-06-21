@@ -520,21 +520,21 @@ class CaseSearchEngine:
                 'market_phase': market_phase,
                 
                 # 未來表現指標
-                'future1_close_return': self._safe_calculate_future_return(data, idx, 1),
-                'future2_close_return': self._safe_calculate_future_return(data, idx, 2),
-                'future4_close_return': self._safe_calculate_future_return(data, idx, 4),
-                'future6_close_return': self._safe_calculate_future_return(data, idx, 6),
-                'future24_close_return': self._safe_calculate_future_return(data, idx, 6),  # 假設6根4小時K線=24小時
-                'future48_close_return': self._safe_calculate_future_return(data, idx, 12), # 假設12根4小時K線=48小時
+                'future1_close_return': safe_get('future1_close_return', None),
+                'future2_close_return': safe_get('future2_close_return', None),
+                'future4_close_return': safe_get('future4_close_return', None),
+                'future6_close_return': safe_get('future6_close_return', None),
+                'future24_close_return': safe_get('future24_close_return', None),  # ✅ 正確
+                'future48_close_return': safe_get('future48_close_return', None),  # ✅ 正確
+                'future72_close_return': safe_get('future72_close_return', None),  # ✅ 新增
                 
                 # 其他指標
-                'future_max_return': safe_get('future_max_return', 0.05),
-                'future_max_drawdown': safe_get('future_max_drawdown', -0.02),
-                'future24_close': safe_get('close', 50000.0) * 1.025,
-                'future24_low': safe_get('close', 50000.0) * 0.98,
-                'prior_volatility': safe_get('prior_volatility', 0.03),
-                'prior_range': safe_get('prior_range', 0.08),
-                'prior_abs_change_sum': safe_get('prior_abs_change_sum', 0.12),
+                'future_max_return': safe_get('future_max_return', None),
+                'future_max_drawdown': safe_get('future_max_drawdown', None),
+                'future72_max_return': safe_get('future72_max_return', None),      # ✅ 新增
+                'future72_max_drawdown': safe_get('future72_max_drawdown', None),  # ✅ 新增
+                'future24_close': safe_get('future24_close', None),               # ✅ 正確
+                'future24_low': safe_get('future24_low', None), 
                 
                 'time_range': {
                     'start': (timestamp - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
@@ -690,9 +690,7 @@ class CaseSearchEngine:
                     'future24_close_return', 'future48_close_return',  # 新增
                     'future_max_return', 'future72_max_return',        # 擴展
                     'future_max_drawdown', 'future72_max_drawdown',    # 擴展
-                    'prior_volatility', 'prior_range', 'prior_abs_change_sum',
-                    'future24_close', 'future24_low',
-                    'signal_type', 'base_std'  # 新增
+                    'future24_close', 'future24_low'
                 ]
                 
                 for col in indicator_columns:
@@ -776,20 +774,6 @@ class CaseSearchEngine:
             else:
                 df['future24_low'] = df['low'].shift(-periods_24h)
             
-            # === 前期技術指標計算 ===
-            lookback_periods = max(6, periods_24h)  # 至少看6根K線或24小時的數據
-            
-            # 前期波動性（價格變化的標準差）
-            df['prior_volatility'] = df['price_change'].rolling(window=lookback_periods).std()
-            
-            # 前期價格範圍（最高價與最低價的比率）
-            df['prior_range'] = (
-                df['high'].rolling(window=lookback_periods).max() / 
-                df['low'].rolling(window=lookback_periods).min() - 1
-            )
-            
-            # 前期絕對價格變化總和
-            df['prior_abs_change_sum'] = df['price_change'].abs().rolling(window=lookback_periods).sum()
             
             # === 未來最大回報和最大回撤計算 ===
             # 使用72小時作為標準分析期間
@@ -839,7 +823,6 @@ class CaseSearchEngine:
             self.logger.info(f"  - future24_close_return NaN數量: {df['future24_close_return'].isna().sum()}")
             self.logger.info(f"  - future48_close_return NaN數量: {df['future48_close_return'].isna().sum()}")
             self.logger.info(f"  - future72_max_return NaN數量: {df['future72_max_return'].isna().sum()}")
-            self.logger.info(f"  - prior_volatility NaN數量: {df['prior_volatility'].isna().sum()}")
             
             return df
             
