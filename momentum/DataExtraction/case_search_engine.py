@@ -344,7 +344,7 @@ class CaseSearchEngine:
 
             self.logger.info(f"Starting search with config: {config.name}")
             self.logger.info(f"Symbols: {symbols}")
-            self.logger.info(f"Time range: {config.time_range}")
+            self.logger.info(f"Time range: {config.start_time} to {config.end_time}")
 
             all_results = []
 
