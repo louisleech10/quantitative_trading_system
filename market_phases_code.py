@@ -1,11 +1,8 @@
 # 自動生成的市場階段定義，基於加密貨幣恐懼與貪婪指數
-# 生成時間: 2025-05-12 23:47:03
+# 生成時間: 2025-06-22 20:19:48
 
 MARKET_PHASES: Dict[str, MarketPhase] = {
-    'EXTREME_FEAR_20191118': MarketPhase('2019-11-18', '2019-11-24', 'EXTREME_FEAR'),
-    'FEAR_20191125': MarketPhase('2019-11-25', '2019-12-08', 'FEAR'),
-    'EXTREME_FEAR_20191209': MarketPhase('2019-12-09', '2019-12-22', 'EXTREME_FEAR'),
-    'FEAR_20191223': MarketPhase('2019-12-23', '2020-01-12', 'FEAR'),
+    'FEAR_20191230': MarketPhase('2019-12-30', '2020-01-12', 'FEAR'),
     'NEUTRAL_20200113': MarketPhase('2020-01-13', '2020-02-02', 'NEUTRAL'),
     'GREED_20200203': MarketPhase('2020-02-03', '2020-02-16', 'GREED'),
     'NEUTRAL_20200217': MarketPhase('2020-02-17', '2020-02-23', 'NEUTRAL'),
@@ -103,5 +100,6 @@ MARKET_PHASES: Dict[str, MarketPhase] = {
     'NEUTRAL_20250203': MarketPhase('2025-02-03', '2025-02-23', 'NEUTRAL'),
     'EXTREME_FEAR_20250224': MarketPhase('2025-02-24', '2025-03-02', 'EXTREME_FEAR'),
     'FEAR_20250303': MarketPhase('2025-03-03', '2025-04-20', 'FEAR'),
-    'GREED_20250421': MarketPhase('2025-04-21', '2025-05-18', 'GREED'),
+    'GREED_20250421': MarketPhase('2025-04-21', '2025-06-15', 'GREED'),
+    'NEUTRAL_20250616': MarketPhase('2025-06-16', '2025-06-22', 'NEUTRAL'),
 }
