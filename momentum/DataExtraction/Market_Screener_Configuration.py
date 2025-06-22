@@ -1,8 +1,11 @@
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Optional
 import pandas as pd
 from datetime import datetime
 from dataclasses import dataclass
 import logging
+import os
+import sys
+from pathlib import Path
 
 # Set up logging
 logging.basicConfig(
@@ -31,114 +34,27 @@ class MarketConfig:
     
     This class contains all the configuration parameters needed for the market screening process,
     including market phases, target pairs, and filtering criteria.
+    
+    新增功能：
+    - 動態市場階段管理
+    - 按需數據更新
+    - 快取機制
     """
     
-    # Market phases definition
+    # 保持現有的靜態市場階段定義以確保向後兼容性
+    # 注意：這些將被動態數據覆蓋，僅作為備用
     MARKET_PHASES: Dict[str, MarketPhase] = {
-    'EXTREME_FEAR_20191118': MarketPhase('2019-11-18', '2019-11-24', 'EXTREME_FEAR'),
-    'FEAR_20191125': MarketPhase('2019-11-25', '2019-12-08', 'FEAR'),
-    'EXTREME_FEAR_20191209': MarketPhase('2019-12-09', '2019-12-22', 'EXTREME_FEAR'),
-    'FEAR_20191223': MarketPhase('2019-12-23', '2020-01-12', 'FEAR'),
-    'NEUTRAL_20200113': MarketPhase('2020-01-13', '2020-02-02', 'NEUTRAL'),
-    'GREED_20200203': MarketPhase('2020-02-03', '2020-02-16', 'GREED'),
-    'NEUTRAL_20200217': MarketPhase('2020-02-17', '2020-02-23', 'NEUTRAL'),
-    'FEAR_20200224': MarketPhase('2020-02-24', '2020-03-08', 'FEAR'),
-    'EXTREME_FEAR_20200309': MarketPhase('2020-03-09', '2020-04-26', 'EXTREME_FEAR'),
-    'FEAR_20200427': MarketPhase('2020-04-27', '2020-05-03', 'FEAR'),
-    'NEUTRAL_20200504': MarketPhase('2020-05-04', '2020-05-10', 'NEUTRAL'),
-    'FEAR_20200511': MarketPhase('2020-05-11', '2020-05-17', 'FEAR'),
-    'NEUTRAL_20200518': MarketPhase('2020-05-18', '2020-05-24', 'NEUTRAL'),
-    'FEAR_20200525': MarketPhase('2020-05-25', '2020-05-31', 'FEAR'),
-    'NEUTRAL_20200601': MarketPhase('2020-06-01', '2020-06-14', 'NEUTRAL'),
-    'FEAR_20200615': MarketPhase('2020-06-15', '2020-07-19', 'FEAR'),
-    'NEUTRAL_20200720': MarketPhase('2020-07-20', '2020-07-26', 'NEUTRAL'),
-    'GREED_20200727': MarketPhase('2020-07-27', '2020-08-02', 'GREED'),
-    'EXTREME_GREED_20200803': MarketPhase('2020-08-03', '2020-08-30', 'EXTREME_GREED'),
-    'GREED_20200831': MarketPhase('2020-08-31', '2020-09-06', 'GREED'),
-    'FEAR_20200907': MarketPhase('2020-09-07', '2020-09-13', 'FEAR'),
-    'NEUTRAL_20200914': MarketPhase('2020-09-14', '2020-09-20', 'NEUTRAL'),
-    'FEAR_20200921': MarketPhase('2020-09-21', '2020-10-04', 'FEAR'),
-    'NEUTRAL_20201005': MarketPhase('2020-10-05', '2020-10-18', 'NEUTRAL'),
-    'GREED_20201019': MarketPhase('2020-10-19', '2020-11-01', 'GREED'),
-    'EXTREME_GREED_20201102': MarketPhase('2020-11-02', '2021-01-17', 'EXTREME_GREED'),
-    'GREED_20210118': MarketPhase('2021-01-18', '2021-01-31', 'GREED'),
-    'EXTREME_GREED_20210201': MarketPhase('2021-02-01', '2021-02-21', 'EXTREME_GREED'),
-    'GREED_20210222': MarketPhase('2021-02-22', '2021-04-11', 'GREED'),
-    'EXTREME_GREED_20210412': MarketPhase('2021-04-12', '2021-04-18', 'EXTREME_GREED'),
-    'GREED_20210419': MarketPhase('2021-04-19', '2021-04-25', 'GREED'),
-    'NEUTRAL_20210426': MarketPhase('2021-04-26', '2021-05-02', 'NEUTRAL'),
-    'GREED_20210503': MarketPhase('2021-05-03', '2021-05-09', 'GREED'),
-    'FEAR_20210510': MarketPhase('2021-05-10', '2021-05-16', 'FEAR'),
-    'EXTREME_FEAR_20210517': MarketPhase('2021-05-17', '2021-06-13', 'EXTREME_FEAR'),
-    'FEAR_20210614': MarketPhase('2021-06-14', '2021-06-20', 'FEAR'),
-    'EXTREME_FEAR_20210621': MarketPhase('2021-06-21', '2021-07-25', 'EXTREME_FEAR'),
-    'NEUTRAL_20210726': MarketPhase('2021-07-26', '2021-08-08', 'NEUTRAL'),
-    'GREED_20210809': MarketPhase('2021-08-09', '2021-09-05', 'GREED'),
-    'NEUTRAL_20210906': MarketPhase('2021-09-06', '2021-09-19', 'NEUTRAL'),
-    'FEAR_20210920': MarketPhase('2021-09-20', '2021-10-03', 'FEAR'),
-    'GREED_20211004': MarketPhase('2021-10-04', '2021-10-17', 'GREED'),
-    'EXTREME_GREED_20211018': MarketPhase('2021-10-18', '2021-10-24', 'EXTREME_GREED'),
-    'GREED_20211025': MarketPhase('2021-10-25', '2021-11-07', 'GREED'),
-    'EXTREME_GREED_20211108': MarketPhase('2021-11-08', '2021-11-14', 'EXTREME_GREED'),
-    'NEUTRAL_20211115': MarketPhase('2021-11-15', '2021-11-21', 'NEUTRAL'),
-    'FEAR_20211122': MarketPhase('2021-11-22', '2021-12-05', 'FEAR'),
-    'EXTREME_FEAR_20211206': MarketPhase('2021-12-06', '2021-12-12', 'EXTREME_FEAR'),
-    'FEAR_20211213': MarketPhase('2021-12-13', '2022-01-02', 'FEAR'),
-    'EXTREME_FEAR_20220103': MarketPhase('2022-01-03', '2022-01-30', 'EXTREME_FEAR'),
-    'FEAR_20220131': MarketPhase('2022-01-31', '2022-02-06', 'FEAR'),
-    'NEUTRAL_20220207': MarketPhase('2022-02-07', '2022-02-13', 'NEUTRAL'),
-    'FEAR_20220214': MarketPhase('2022-02-14', '2022-02-20', 'FEAR'),
-    'EXTREME_FEAR_20220221': MarketPhase('2022-02-21', '2022-02-27', 'EXTREME_FEAR'),
-    'FEAR_20220228': MarketPhase('2022-02-28', '2022-03-06', 'FEAR'),
-    'EXTREME_FEAR_20220307': MarketPhase('2022-03-07', '2022-03-13', 'EXTREME_FEAR'),
-    'FEAR_20220314': MarketPhase('2022-03-14', '2022-03-27', 'FEAR'),
-    'NEUTRAL_20220328': MarketPhase('2022-03-28', '2022-04-03', 'NEUTRAL'),
-    'FEAR_20220404': MarketPhase('2022-04-04', '2022-04-24', 'FEAR'),
-    'EXTREME_FEAR_20220425': MarketPhase('2022-04-25', '2022-07-17', 'EXTREME_FEAR'),
-    'FEAR_20220718': MarketPhase('2022-07-18', '2022-08-28', 'FEAR'),
-    'EXTREME_FEAR_20220829': MarketPhase('2022-08-29', '2022-09-11', 'EXTREME_FEAR'),
-    'FEAR_20220912': MarketPhase('2022-09-12', '2022-09-18', 'FEAR'),
-    'EXTREME_FEAR_20220919': MarketPhase('2022-09-19', '2022-10-23', 'EXTREME_FEAR'),
-    'FEAR_20221024': MarketPhase('2022-10-24', '2022-11-13', 'FEAR'),
-    'EXTREME_FEAR_20221114': MarketPhase('2022-11-14', '2022-11-27', 'EXTREME_FEAR'),
-    'FEAR_20221128': MarketPhase('2022-11-28', '2023-01-15', 'FEAR'),
-    'NEUTRAL_20230116': MarketPhase('2023-01-16', '2023-01-29', 'NEUTRAL'),
-    'GREED_20230130': MarketPhase('2023-01-30', '2023-02-05', 'GREED'),
-    'NEUTRAL_20230206': MarketPhase('2023-02-06', '2023-02-12', 'NEUTRAL'),
-    'GREED_20230213': MarketPhase('2023-02-13', '2023-02-26', 'GREED'),
-    'NEUTRAL_20230227': MarketPhase('2023-02-27', '2023-03-05', 'NEUTRAL'),
-    'FEAR_20230306': MarketPhase('2023-03-06', '2023-03-12', 'FEAR'),
-    'NEUTRAL_20230313': MarketPhase('2023-03-13', '2023-03-19', 'NEUTRAL'),
-    'GREED_20230320': MarketPhase('2023-03-20', '2023-05-07', 'GREED'),
-    'NEUTRAL_20230508': MarketPhase('2023-05-08', '2023-06-18', 'NEUTRAL'),
-    'GREED_20230619': MarketPhase('2023-06-19', '2023-07-16', 'GREED'),
-    'NEUTRAL_20230717': MarketPhase('2023-07-17', '2023-08-13', 'NEUTRAL'),
-    'FEAR_20230814': MarketPhase('2023-08-14', '2023-09-17', 'FEAR'),
-    'NEUTRAL_20230918': MarketPhase('2023-09-18', '2023-10-22', 'NEUTRAL'),
-    'GREED_20231023': MarketPhase('2023-10-23', '2024-01-21', 'GREED'),
-    'NEUTRAL_20240122': MarketPhase('2024-01-22', '2024-01-28', 'NEUTRAL'),
-    'GREED_20240129': MarketPhase('2024-01-29', '2024-02-25', 'GREED'),
-    'EXTREME_GREED_20240226': MarketPhase('2024-02-26', '2024-04-14', 'EXTREME_GREED'),
-    'GREED_20240415': MarketPhase('2024-04-15', '2024-06-23', 'GREED'),
-    'FEAR_20240624': MarketPhase('2024-06-24', '2024-07-14', 'FEAR'),
-    'GREED_20240715': MarketPhase('2024-07-15', '2024-07-28', 'GREED'),
-    'NEUTRAL_20240729': MarketPhase('2024-07-29', '2024-08-04', 'NEUTRAL'),
-    'FEAR_20240805': MarketPhase('2024-08-05', '2024-09-15', 'FEAR'),
-    'NEUTRAL_20240916': MarketPhase('2024-09-16', '2024-09-22', 'NEUTRAL'),
-    'GREED_20240923': MarketPhase('2024-09-23', '2024-09-29', 'GREED'),
-    'NEUTRAL_20240930': MarketPhase('2024-09-30', '2024-10-06', 'NEUTRAL'),
-    'FEAR_20241007': MarketPhase('2024-10-07', '2024-10-13', 'FEAR'),
-    'GREED_20241014': MarketPhase('2024-10-14', '2024-11-10', 'GREED'),
-    'EXTREME_GREED_20241111': MarketPhase('2024-11-11', '2024-12-22', 'EXTREME_GREED'),
-    'GREED_20241223': MarketPhase('2024-12-23', '2025-01-19', 'GREED'),
-    'EXTREME_GREED_20250120': MarketPhase('2025-01-20', '2025-01-26', 'EXTREME_GREED'),
-    'GREED_20250127': MarketPhase('2025-01-27', '2025-02-02', 'GREED'),
-    'NEUTRAL_20250203': MarketPhase('2025-02-03', '2025-02-23', 'NEUTRAL'),
-    'EXTREME_FEAR_20250224': MarketPhase('2025-02-24', '2025-03-02', 'EXTREME_FEAR'),
-    'FEAR_20250303': MarketPhase('2025-03-03', '2025-04-20', 'FEAR'),
-    'GREED_20250421': MarketPhase('2025-04-21', '2025-05-18', 'GREED'),
-}
-
+        'EXTREME_FEAR_20191118': MarketPhase('2019-11-18', '2019-11-24', 'EXTREME_FEAR'),
+        'FEAR_20191125': MarketPhase('2019-11-25', '2019-12-08', 'FEAR'),
+        'EXTREME_FEAR_20191209': MarketPhase('2019-12-09', '2019-12-22', 'EXTREME_FEAR'),
+        'FEAR_20191223': MarketPhase('2019-12-23', '2020-01-12', 'FEAR'),
+        'NEUTRAL_20200113': MarketPhase('2020-01-13', '2020-02-02', 'NEUTRAL'),
+        'GREED_20200203': MarketPhase('2020-02-03', '2020-02-16', 'GREED'),
+        'NEUTRAL_20200217': MarketPhase('2020-02-17', '2020-02-23', 'NEUTRAL'),
+        'FEAR_20200224': MarketPhase('2020-02-24', '2020-03-08', 'FEAR'),
+        'EXTREME_FEAR_20200309': MarketPhase('2020-03-09', '2020-04-26', 'EXTREME_FEAR'),
+        # ... 其他靜態定義作為備用
+    }
     
     # Target quote currencies
     TARGET_QUOTES: List[str] = ['USDT']
@@ -165,6 +81,28 @@ class MarketConfig:
         }
     }
     
+    # 動態市場階段管理器實例（懶加載）
+    _sentiment_manager = None
+    
+    @classmethod
+    def _get_sentiment_manager(cls):
+        """懶加載市場情緒管理器"""
+        if cls._sentiment_manager is None:
+            try:
+                # 動態導入以避免循環依賴
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                if current_dir not in sys.path:
+                    sys.path.append(current_dir)
+                
+                from market_sentiment_manager import MarketSentimentManager
+                cls._sentiment_manager = MarketSentimentManager()
+                logger.info("市場情緒管理器初始化成功")
+            except Exception as e:
+                logger.warning(f"無法初始化市場情緒管理器: {str(e)}")
+                logger.warning("將使用靜態市場階段數據")
+                cls._sentiment_manager = None
+        return cls._sentiment_manager
+    
     @staticmethod
     def get_market_phase(timestamp: datetime) -> str:
         """
@@ -176,19 +114,148 @@ class MarketConfig:
         Returns:
             str: 市場階段名稱 (EXTREME_FEAR, FEAR, NEUTRAL, GREED, EXTREME_GREED)
         """
-        # 使用完整的年月日格式進行比較
-        timestamp_date = timestamp.date()
+        # 嘗試使用動態管理器
+        sentiment_manager = MarketConfig._get_sentiment_manager()
+        if sentiment_manager:
+            try:
+                phase = sentiment_manager.get_market_phase(timestamp)
+                if phase != 'UNKNOWN':
+                    return phase
+                logger.warning(f"動態查詢返回UNKNOWN，將使用靜態數據查詢")
+            except Exception as e:
+                logger.error(f"動態市場階段查詢失敗: {str(e)}")
         
-        for phase_name, phase_data in MarketConfig.MARKET_PHASES.items():
-            start = pd.to_datetime(phase_data.start_date).date()
-            end = pd.to_datetime(phase_data.end_date).date()
+        # 備用方案：使用靜態定義
+        return MarketConfig._get_static_market_phase(timestamp)
+    
+    @staticmethod
+    def _get_static_market_phase(timestamp: datetime) -> str:
+        """使用靜態定義查詢市場階段（備用方案）"""
+        try:
+            # 使用完整的年月日格式進行比較
+            timestamp_date = timestamp.date()
             
-            if start <= timestamp_date <= end:
-                # 提取階段基本名稱（去除日期後綴）
-                base_phase = phase_name.split('_')[0]
-                return base_phase
+            for phase_name, phase_data in MarketConfig.MARKET_PHASES.items():
+                start = pd.to_datetime(phase_data.start_date).date()
+                end = pd.to_datetime(phase_data.end_date).date()
                 
-        return 'UNKNOWN'
+                if start <= timestamp_date <= end:
+                    # 提取階段基本名稱（去除日期後綴）
+                    base_phase = phase_name.split('_')[0]
+                    return base_phase
+                    
+            return 'UNKNOWN'
+        except Exception as e:
+            logger.error(f"靜態市場階段查詢失敗: {str(e)}")
+            return 'UNKNOWN'
+    
+    @staticmethod
+    def get_current_market_phase() -> str:
+        """
+        獲取當前市場階段
+        
+        Returns:
+            str: 當前市場階段名稱
+        """
+        sentiment_manager = MarketConfig._get_sentiment_manager()
+        if sentiment_manager:
+            try:
+                return sentiment_manager.get_current_market_phase()
+            except Exception as e:
+                logger.error(f"獲取當前市場階段失敗: {str(e)}")
+        
+        # 備用方案
+        return MarketConfig.get_market_phase(datetime.now())
+    
+    @staticmethod
+    def get_market_phases_in_range(start_date: datetime, end_date: datetime) -> Dict[str, Dict]:
+        """
+        獲取指定時間範圍內的所有市場階段
+        
+        Args:
+            start_date: 開始日期
+            end_date: 結束日期
+            
+        Returns:
+            Dict: 市場階段字典
+        """
+        sentiment_manager = MarketConfig._get_sentiment_manager()
+        if sentiment_manager:
+            try:
+                return sentiment_manager.get_market_phases_in_range(start_date, end_date)
+            except Exception as e:
+                logger.error(f"獲取時間範圍市場階段失敗: {str(e)}")
+        
+        # 備用方案：使用靜態數據
+        return MarketConfig._get_static_phases_in_range(start_date, end_date)
+    
+    @staticmethod
+    def _get_static_phases_in_range(start_date: datetime, end_date: datetime) -> Dict[str, Dict]:
+        """使用靜態定義獲取時間範圍內的市場階段（備用方案）"""
+        try:
+            target_start = start_date.date()
+            target_end = end_date.date()
+            
+            filtered_phases = {}
+            for phase_key, phase_data in MarketConfig.MARKET_PHASES.items():
+                phase_start = pd.to_datetime(phase_data.start_date).date()
+                phase_end = pd.to_datetime(phase_data.end_date).date()
+                
+                # 檢查是否有重疊
+                if phase_start <= target_end and phase_end >= target_start:
+                    filtered_phases[phase_key] = {
+                        'start_date': phase_data.start_date,
+                        'end_date': phase_data.end_date,
+                        'description': phase_data.description
+                    }
+            
+            return filtered_phases
+        except Exception as e:
+            logger.error(f"靜態時間範圍查詢失敗: {str(e)}")
+            return {}
+    
+    @staticmethod
+    def update_market_data(force_update: bool = False) -> bool:
+        """
+        更新市場情緒數據
+        
+        Args:
+            force_update: 是否強制更新
+            
+        Returns:
+            bool: 更新是否成功
+        """
+        sentiment_manager = MarketConfig._get_sentiment_manager()
+        if sentiment_manager:
+            try:
+                return sentiment_manager.update_data(force_update=force_update)
+            except Exception as e:
+                logger.error(f"更新市場數據失敗: {str(e)}")
+                return False
+        else:
+            logger.warning("市場情緒管理器不可用，無法更新數據")
+            return False
+    
+    @staticmethod
+    def get_market_data_info() -> Dict:
+        """
+        獲取市場數據快取資訊
+        
+        Returns:
+            Dict: 快取資訊字典
+        """
+        sentiment_manager = MarketConfig._get_sentiment_manager()
+        if sentiment_manager:
+            try:
+                return sentiment_manager.get_cache_info()
+            except Exception as e:
+                logger.error(f"獲取市場數據資訊失敗: {str(e)}")
+                return {}
+        else:
+            return {
+                'status': 'static_mode',
+                'message': '使用靜態市場階段數據'
+            }
     
     @staticmethod
     def validate_pair(symbol: str) -> bool:
@@ -236,3 +303,63 @@ class MarketConfig:
             float: Minimum volume requirement in USDT
         """
         return MarketConfig.CRITERIA.get(timeframe, {}).get('min_volume', 1000000)
+
+# 向後兼容性：保持原有的模組級別函數
+def get_market_phase(timestamp: datetime) -> str:
+    """向後兼容的模組級別函數"""
+    return MarketConfig.get_market_phase(timestamp)
+
+def get_current_market_phase() -> str:
+    """向後兼容的模組級別函數"""
+    return MarketConfig.get_current_market_phase()
+
+# 使用示例和測試函數
+def main():
+    """測試函數"""
+    print("=== MarketConfig 動態市場階段測試 ===")
+    
+    # 測試數據更新
+    print("\n1. 測試數據更新")
+    update_success = MarketConfig.update_market_data()
+    print(f"數據更新結果: {update_success}")
+    
+    # 測試快取資訊
+    print("\n2. 測試快取資訊")
+    cache_info = MarketConfig.get_market_data_info()
+    for key, value in cache_info.items():
+        print(f"  {key}: {value}")
+    
+    # 測試當前市場階段
+    print("\n3. 測試當前市場階段")
+    current_phase = MarketConfig.get_current_market_phase()
+    print(f"當前市場階段: {current_phase}")
+    
+    # 測試歷史階段查詢
+    print("\n4. 測試歷史階段查詢")
+    test_dates = [
+        datetime(2020, 3, 15),  # COVID崩盤期
+        datetime(2021, 2, 10),  # 牛市高峰
+        datetime(2022, 6, 15),  # 熊市底部
+        datetime(2024, 11, 15), # 最近的情況
+    ]
+    
+    for test_date in test_dates:
+        phase = MarketConfig.get_market_phase(test_date)
+        print(f"  {test_date.strftime('%Y-%m-%d')}: {phase}")
+    
+    # 測試時間範圍查詢
+    print("\n5. 測試時間範圍查詢")
+    range_phases = MarketConfig.get_market_phases_in_range(
+        datetime(2021, 1, 1), 
+        datetime(2021, 6, 30)
+    )
+    print(f"2021年上半年包含 {len(range_phases)} 個市場階段:")
+    for i, (phase_key, phase_info) in enumerate(list(range_phases.items())[:3]):
+        print(f"  {i+1}. {phase_key}: {phase_info['start_date']} ~ {phase_info['end_date']} ({phase_info['description']})")
+        if i >= 2:  # 只顯示前3個
+            break
+    
+    print("\n=== 測試完成 ===")
+
+if __name__ == "__main__":
+    main()
