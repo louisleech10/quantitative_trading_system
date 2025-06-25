@@ -52,7 +52,7 @@ class TaskInfo(BaseModel):
 
 # ===== 擴充的案例數據模型 =====
 class CaseData(BaseModel):
-    """案例數據模型 - 擴充版本，支援完整的20個新參數"""
+    """案例數據模型 - 擴充版本，支援完整的新參數"""
     symbol: str = Field(..., description="交易對")
     timestamp: datetime = Field(..., description="觸發時間")
     trigger_idx: int = Field(..., description="觸發K線索引")
@@ -68,9 +68,9 @@ class CaseData(BaseModel):
     
     # ===== 新增：基礎觸發條件參數 (5個新增) =====
     timeframe: Optional[str] = Field(None, description="時間框架")
-    closing_strength: Optional[float] = Field(None, description="收盤強度 = (close-low)/(high-low)")
-    price_position: Optional[float] = Field(None, description="價格位置 (在近期區間的位置)")
-    volume_multiplier: Optional[float] = Field(None, description="成交量倍數 (相對於近期平均)")
+    closing_strength: Optional[float] = Field(None, description="收盤強度")
+    price_position: Optional[float] = Field(None, description="價格位置")
+    volume_multiplier: Optional[float] = Field(None, description="成交量倍數")
     taker_buy_ratio: Optional[float] = Field(None, description="主動買入比例")
     
     # ===== 新增：未來收益參數 (1-12根K線) =====
@@ -101,40 +101,29 @@ class CaseData(BaseModel):
     future_11bar_max_drawdown: Optional[float] = Field(None, description="未來11根K線最大回撤")
     future_12bar_max_drawdown: Optional[float] = Field(None, description="未來12根K線最大回撤")
     
-    # ===== 新增：時間相關描述參數 =====
+    # ===== 新增：時間描述參數 =====
     hour_of_day: Optional[int] = Field(None, description="觸發時的小時 (0-23)")
-    day_of_week: Optional[int] = Field(None, description="觸發時的星期 (1-7, 1=Monday)")
+    day_of_week: Optional[int] = Field(None, description="觸發時的星期 (1-7)")
     
-    # ===== 新增：反例專用參數 =====
-    positive_negative_ratio: Optional[str] = Field(None, description="正負案例比例 (如 '1:2')")
-    time_separation_days: Optional[int] = Field(None, description="時間分離間隔天數")
-    case_type: Optional[str] = Field(None, description="案例類型 ('positive' 或 'negative')")
-    label: Optional[int] = Field(None, description="案例標籤 (1=正例, 0=負例)")
-    
-    # ===== 保持現有的向後兼容參數 =====
-    future1_close_return: Optional[float] = Field(None, description="未來1根K線回報")
-    future2_close_return: Optional[float] = Field(None, description="未來2根K線回報")
-    future4_close_return: Optional[float] = Field(None, description="未來4根K線回報")
-    future6_close_return: Optional[float] = Field(None, description="未來6根K線回報")
-    future24_close_return: Optional[float] = Field(None, description="未來24小時回報")
-    future48_close_return: Optional[float] = Field(None, description="未來48小時回報")
-    future72_close_return: Optional[float] = Field(None, description="未來72小時回報")
-    future_max_return: Optional[float] = Field(None, description="未來最大回報")
+    # ===== 向後兼容的現有參數 (保持不變) =====
+    future1_close_return: Optional[float] = Field(None, description="未來1根K線收盤價收益率")
+    future2_close_return: Optional[float] = Field(None, description="未來2根K線收盤價收益率")
+    future4_close_return: Optional[float] = Field(None, description="未來4根K線收盤價收益率")
+    future6_close_return: Optional[float] = Field(None, description="未來6根K線收盤價收益率")
+    future24_close_return: Optional[float] = Field(None, description="未來24小時收盤價收益率")
+    future48_close_return: Optional[float] = Field(None, description="未來48小時收盤價收益率")
+    future72_close_return: Optional[float] = Field(None, description="未來72小時收盤價收益率")
+    future_max_return: Optional[float] = Field(None, description="未來最大收益率")
     future_max_drawdown: Optional[float] = Field(None, description="未來最大回撤")
-    future72_max_return: Optional[float] = Field(None, description="未來72小時最大回報")
+    future72_max_return: Optional[float] = Field(None, description="未來72小時最大收益率")
     future72_max_drawdown: Optional[float] = Field(None, description="未來72小時最大回撤")
-    
-    # 未來價格數據 (保持現有)
     future24_close: Optional[float] = Field(None, description="未來24小時收盤價")
     future24_low: Optional[float] = Field(None, description="未來24小時最低價")
+    prior_volatility: Optional[float] = Field(None, description="過去波動率")
+    prior_range: Optional[float] = Field(None, description="過去價格範圍")
+    prior_abs_change_sum: Optional[float] = Field(None, description="過去絕對變化總和")
+    time_range: Optional[Dict[str, str]] = Field(None, description="時間範圍")
     
-    # 前期技術指標 (保持現有)
-    prior_volatility: Optional[float] = Field(None, description="前期波動率")
-    prior_range: Optional[float] = Field(None, description="前期價格範圍")
-    prior_abs_change_sum: Optional[float] = Field(None, description="前期絕對變化總和")
-    
-    # 時間範圍信息 (保持現有)
-    time_range: Dict[str, str] = Field(..., description="時間範圍")
 
 # ===== 新增：參數統計和驗證報告模型 =====
 

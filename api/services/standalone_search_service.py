@@ -352,36 +352,101 @@ class StandaloneSearchService:
                             self.logger.warning(f"Case data missing required fields: {missing_fields}")
                             continue
                         
+                        # 安全獲取數值的輔助函數
+                        def safe_float(value, default=None):
+                            if value is None or (isinstance(value, str) and value.lower() in ['n/a', 'null', 'none']):
+                                return default
+                            try:
+                                if isinstance(value, str) and value.endswith('%'):
+                                    return float(value[:-1]) / 100  # 轉換百分比字符串
+                                return float(value) if value is not None else default
+                            except (ValueError, TypeError):
+                                return default
+                        
+                        def safe_int(value, default=None):
+                            if value is None:
+                                return default
+                            try:
+                                return int(value)
+                            except (ValueError, TypeError):
+                                return default
+                        
+                        def safe_str(value, default=None):
+                            if value is None:
+                                return default
+                            return str(value)
+                        
+                        # 創建完整的 CaseData 對象，包含所有新參數
                         case_data = CaseData(
                             symbol=case_dict['symbol'],
                             timestamp=datetime.strptime(case_dict['timestamp'], '%Y-%m-%d %H:%M:%S'),
                             trigger_idx=case_dict.get('trigger_idx', 0),
                             
-                            # OHLC 數據 - 直接使用真實數據
+                            # OHLC 數據
                             open=case_dict['open'],
                             high=case_dict['high'],
                             low=case_dict['low'],
                             close=case_dict['close'],
                             volume=case_dict.get('volume', 1000000),
-                            price_change=case_dict.get('price_change', 0.05),
+                            price_change=safe_float(case_dict.get('price_change'), 0.05),
                             market_phase=case_dict.get('market_phase', 'NEUTRAL'),
                             
-                            # 未來表現指標
-                            future1_close_return=case_dict.get('future1_close_return'),
-                            future2_close_return=case_dict.get('future2_close_return'),
-                            future4_close_return=case_dict.get('future4_close_return'),
-                            future6_close_return=case_dict.get('future6_close_return'),
-                            future24_close_return=case_dict.get('future24_close_return'),
-                            future48_close_return=case_dict.get('future48_close_return'),
-                            future_max_return=case_dict.get('future_max_return'),
-                            future_max_drawdown=case_dict.get('future_max_drawdown'),
+                            # ===== 新增：基礎觸發條件參數 =====
+                            timeframe=safe_str(case_dict.get('timeframe')),
+                            closing_strength=safe_float(case_dict.get('closing_strength')),
+                            price_position=safe_float(case_dict.get('price_position')),
+                            volume_multiplier=safe_float(case_dict.get('volume_multiplier')),
+                            taker_buy_ratio=safe_float(case_dict.get('taker_buy_ratio')),
                             
-                            # 其他數據
-                            future24_close=case_dict.get('future24_close'),
-                            future24_low=case_dict.get('future24_low'),
-                            prior_volatility=case_dict.get('prior_volatility'),
-                            prior_range=case_dict.get('prior_range'),
-                            prior_abs_change_sum=case_dict.get('prior_abs_change_sum'),
+                            # ===== 新增：未來收益參數 (1-12根K線) =====
+                            future_1bar_return=safe_float(case_dict.get('future_1bar_return')),
+                            future_2bar_return=safe_float(case_dict.get('future_2bar_return')),
+                            future_3bar_return=safe_float(case_dict.get('future_3bar_return')),
+                            future_4bar_return=safe_float(case_dict.get('future_4bar_return')),
+                            future_5bar_return=safe_float(case_dict.get('future_5bar_return')),
+                            future_6bar_return=safe_float(case_dict.get('future_6bar_return')),
+                            future_7bar_return=safe_float(case_dict.get('future_7bar_return')),
+                            future_8bar_return=safe_float(case_dict.get('future_8bar_return')),
+                            future_9bar_return=safe_float(case_dict.get('future_9bar_return')),
+                            future_10bar_return=safe_float(case_dict.get('future_10bar_return')),
+                            future_11bar_return=safe_float(case_dict.get('future_11bar_return')),
+                            future_12bar_return=safe_float(case_dict.get('future_12bar_return')),
+                            
+                            # ===== 新增：未來回撤參數 (1-12根K線) =====
+                            future_1bar_max_drawdown=safe_float(case_dict.get('future_1bar_max_drawdown')),
+                            future_2bar_max_drawdown=safe_float(case_dict.get('future_2bar_max_drawdown')),
+                            future_3bar_max_drawdown=safe_float(case_dict.get('future_3bar_max_drawdown')),
+                            future_4bar_max_drawdown=safe_float(case_dict.get('future_4bar_max_drawdown')),
+                            future_5bar_max_drawdown=safe_float(case_dict.get('future_5bar_max_drawdown')),
+                            future_6bar_max_drawdown=safe_float(case_dict.get('future_6bar_max_drawdown')),
+                            future_7bar_max_drawdown=safe_float(case_dict.get('future_7bar_max_drawdown')),
+                            future_8bar_max_drawdown=safe_float(case_dict.get('future_8bar_max_drawdown')),
+                            future_9bar_max_drawdown=safe_float(case_dict.get('future_9bar_max_drawdown')),
+                            future_10bar_max_drawdown=safe_float(case_dict.get('future_10bar_max_drawdown')),
+                            future_11bar_max_drawdown=safe_float(case_dict.get('future_11bar_max_drawdown')),
+                            future_12bar_max_drawdown=safe_float(case_dict.get('future_12bar_max_drawdown')),
+                            
+                            # ===== 新增：時間描述參數 =====
+                            hour_of_day=safe_int(case_dict.get('hour_of_day')),
+                            day_of_week=safe_int(case_dict.get('day_of_week')),
+                            
+                            # ===== 向後兼容的現有參數 =====
+                            future1_close_return=safe_float(case_dict.get('future1_close_return')),
+                            future2_close_return=safe_float(case_dict.get('future2_close_return')),
+                            future4_close_return=safe_float(case_dict.get('future4_close_return')),
+                            future6_close_return=safe_float(case_dict.get('future6_close_return')),
+                            future24_close_return=safe_float(case_dict.get('future24_close_return')),
+                            future48_close_return=safe_float(case_dict.get('future48_close_return')),
+                            future72_close_return=safe_float(case_dict.get('future72_close_return')),
+                            future_max_return=safe_float(case_dict.get('future_max_return')),
+                            future_max_drawdown=safe_float(case_dict.get('future_max_drawdown')),
+                            future72_max_return=safe_float(case_dict.get('future72_max_return')),
+                            future72_max_drawdown=safe_float(case_dict.get('future72_max_drawdown')),
+                            future24_close=safe_float(case_dict.get('future24_close')),
+                            future24_low=safe_float(case_dict.get('future24_low')),
+                            prior_volatility=safe_float(case_dict.get('prior_volatility')),
+                            prior_range=safe_float(case_dict.get('prior_range')),
+                            prior_abs_change_sum=safe_float(case_dict.get('prior_abs_change_sum')),
                             time_range=case_dict.get('time_range', {
                                 'start': '2023-01-01 00:00:00',
                                 'end': '2023-01-02 00:00:00'
@@ -392,6 +457,7 @@ class StandaloneSearchService:
                     except Exception as case_error:
                         self.logger.error(f"Error processing case data: {case_error}")
                         continue
+                
                 
                 # 檢查處理後的案例數量
                 if len(real_cases) == 0:
