@@ -1,0 +1,22 @@
+2025-06-26 00:04:32 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-26 00:04:32 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-26 00:04:32 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-26 00:04:32 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-26 00:04:32 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-26 00:04:32 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-26 00:04:32 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-26 00:04:32 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-26 00:04:32 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-26 00:04:32 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-26 00:04:39 - api.middleware.request - [32mINFO[0m - [236ef1a3] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-26 00:04:39 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.004s
+2025-06-26 00:04:39 - api.middleware.request - [32mINFO[0m - [236ef1a3] Completed OPTIONS /api/v1/search/execute - 200 - 0.004s
+2025-06-26 00:04:39 - api.middleware.request - [32mINFO[0m - [8cc905ba] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-26 00:04:39 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-26 00:04:39 - api.standalone_search_service - [32mINFO[0m - Loading momentum modules on demand...
+2025-06-26 00:04:39 - numexpr.utils - [32mINFO[0m - NumExpr defaulting to 8 threads.
+2025-06-26 00:04:40 - api.standalone_search_service - [31mERROR[0m - Failed to load momentum modules: name 'Any' is not defined
+2025-06-26 00:04:40 - api.routes.case_search - [31mERROR[0m - Search execution error: Momentum modules could not be loaded
+2025-06-26 00:04:40 - api.exception_handler - [31mERROR[0m - HTTP 500: Momentum modules could not be loaded
+2025-06-26 00:04:40 - api.request - [31mERROR[0m - POST /api/v1/search/execute - 500 - 1.201s
+2025-06-26 00:04:40 - api.middleware.request - [32mINFO[0m - [8cc905ba] Completed POST /api/v1/search/execute - 500 - 1.201s
