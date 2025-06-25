@@ -685,12 +685,38 @@ class CaseSearchEngine:
                 }
 
                 # 添加所有可能的指標欄位
+                '''
                 indicator_columns = [
                     'future1_close_return', 'future2_close_return', 'future4_close_return', 'future6_close_return',
                     'future24_close_return', 'future48_close_return',  # 新增
                     'future_max_return', 'future72_max_return',        # 擴展
                     'future_max_drawdown', 'future72_max_drawdown',    # 擴展
                     'future24_close', 'future24_low'
+                ]
+                '''
+                indicator_columns = [
+                    # 現有參數
+                    'future1_close_return', 'future2_close_return', 'future4_close_return', 'future6_close_return',
+                    'future24_close_return', 'future48_close_return', 'future72_close_return',
+                    'future_max_return', 'future72_max_return',
+                    'future_max_drawdown', 'future72_max_drawdown',
+                    'future24_close', 'future24_low',
+                    
+                    # 新增的基礎觸發條件參數
+                    'closing_strength', 'price_position', 'volume_multiplier', 'taker_buy_ratio',
+                    
+                    # 新增的未來收益參數 (1-12根K線)
+                    'future_1bar_return', 'future_2bar_return', 'future_3bar_return', 'future_4bar_return',
+                    'future_5bar_return', 'future_6bar_return', 'future_7bar_return', 'future_8bar_return',
+                    'future_9bar_return', 'future_10bar_return', 'future_11bar_return', 'future_12bar_return',
+                    
+                    # 新增的未來回撤參數 (1-12根K線)
+                    'future_1bar_max_drawdown', 'future_2bar_max_drawdown', 'future_3bar_max_drawdown', 'future_4bar_max_drawdown',
+                    'future_5bar_max_drawdown', 'future_6bar_max_drawdown', 'future_7bar_max_drawdown', 'future_8bar_max_drawdown',
+                    'future_9bar_max_drawdown', 'future_10bar_max_drawdown', 'future_11bar_max_drawdown', 'future_12bar_max_drawdown',
+                    
+                    # 新增的時間描述參數
+                    'hour_of_day', 'day_of_week'
                 ]
                 
                 for col in indicator_columns:
@@ -723,9 +749,6 @@ class CaseSearchEngine:
             self.logger.error(f"處理 {symbol} 時出錯: {str(e)}")
             return []
     
-    # 完整的 _add_calculated_columns 方法擴充版本
-# 將此方法替換現有 momentum/DataExtraction/case_search_engine.py 中的 _add_calculated_columns 方法
-
     def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
         """
         添加計算列，擴充版本支援完整的20個參數
@@ -941,18 +964,8 @@ class CaseSearchEngine:
                     unique_count = df[param].nunique()
                     self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值, {unique_count} 唯一值")
             
-            # 向後兼容參數
-            compat_params = ['future24_close_return', 'future48_close_return', 'future72_close_return', 
-                            'future_max_return', 'future_max_drawdown', 'future24_close', 'future24_low']
-            self.logger.info("向後兼容參數:")
-            for param in compat_params:
-                if param in df.columns:
-                    nan_count = df[param].isna().sum()
-                    valid_count = len(df) - nan_count
-                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值")
-            
             # 總參數統計
-            total_new_params = len(basic_params) + 12 + 12 + len(time_params) + len(compat_params)
+            total_new_params = len(basic_params) + 12 + 12 + len(time_params)
             self.logger.info(f"=== 總計新增/更新了 {total_new_params} 個參數欄位 ===")
             
             return df
@@ -962,7 +975,6 @@ class CaseSearchEngine:
             import traceback
             traceback.print_exc()
             return data
-
 
     def _get_timeframe_periods(self, timeframe: str) -> dict:
         """根據時間框架獲取標準化的期間數"""

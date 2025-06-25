@@ -968,3 +968,485 @@
 2025-06-25 22:45:43 - api.middleware.request - [32mINFO[0m - [22295678] Started GET /api/v1/search/task/5beb0eb3-29cd-440a-a46d-cbabfccf18ae/result from 127.0.0.1
 2025-06-25 22:45:43 - api.request - [32mINFO[0m - GET /api/v1/search/task/5beb0eb3-29cd-440a-a46d-cbabfccf18ae/result - 200 - 0.004s
 2025-06-25 22:45:43 - api.middleware.request - [32mINFO[0m - [22295678] Completed GET /api/v1/search/task/5beb0eb3-29cd-440a-a46d-cbabfccf18ae/result - 200 - 0.004s
+2025-06-25 22:59:31 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-06-25 22:59:33 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-06-25 22:59:33 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-25 22:59:33 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-06-25 22:59:33 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/data_cache
+2025-06-25 22:59:33 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/search_results
+2025-06-25 22:59:33 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Documents/量化交易/quantitative_trading_system/logs
+2025-06-25 22:59:33 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Documents/量化交易/quantitative_trading_system/momentum
+2025-06-25 22:59:33 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-06-25 22:59:33 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-06-25 22:59:33 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-06-25 22:59:39 - api.middleware.request - [32mINFO[0m - [05a90d87] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-06-25 22:59:39 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.002s
+2025-06-25 22:59:39 - api.middleware.request - [32mINFO[0m - [05a90d87] Completed OPTIONS /api/v1/search/execute - 200 - 0.002s
+2025-06-25 22:59:39 - api.middleware.request - [32mINFO[0m - [7d1158eb] Started POST /api/v1/search/execute from 127.0.0.1
+2025-06-25 22:59:39 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-06-25 22:59:39 - api.standalone_task_manager - [32mINFO[0m - Created task aa378a48-71d1-4f35-9913-d715908d25b9 for config: Frontend_Test_Search
+2025-06-25 22:59:39 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'Frontend_Test_Search', 'timeframe': 'TimeframeEnum.HOUR_12', 'symbols_count': '1'}
+2025-06-25 22:59:39 - api.standalone_task_manager - [32mINFO[0m - Updated task aa378a48-71d1-4f35-9913-d715908d25b9 status to TaskStatusEnum.RUNNING
+2025-06-25 22:59:39 - api.standalone_search_service - [32mINFO[0m - Running real search for: Frontend_Test_Search
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: Frontend_Test_Search
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-02-01 to 2025-05-31
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
+2025-06-25 22:59:39 - DataLoader - [32mINFO[0m - 更新緩存: BTCUSDT_12h, 總計 1008 行
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 970 records for BTCUSDT
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
+2025-06-25 22:59:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 969/970 有效值 (1 NaN)
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 970/970 有效值 (0 NaN)
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 970/970 有效值 (0 NaN)
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 970/970 有效值 (0 NaN)
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 970/970 有效值 (0 NaN)
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 969/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 968/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 967/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 966/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 965/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 964/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 963/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 962/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 961/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 960/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 959/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 958/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 969/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 968/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 967/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 966/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 965/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 964/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 963/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 962/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 961/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 960/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 959/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 958/970 有效值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 970/970 有效值, 2 唯一值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 970/970 有效值, 7 唯一值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 970/970 有效值, 3 唯一值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 970/970 有效值, 1 唯一值
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 56 initial candidates for BTCUSDT
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 56 final candidates for BTCUSDT
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入快取元數據: 最後更新 2025-06-25T22:37:58.750859
+2025-06-25 22:59:41 - momentum.DataExtraction.Market_Screener_Configuration - [32mINFO[0m - 市場情緒管理器初始化成功
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-07 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-09 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-12 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-14 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-26 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-27 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-28 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-28 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-04 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-04 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-06 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-11 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-20 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-25 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-04-04 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-04-08 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-03 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-09 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-15 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-20 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-07-15 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-07-19 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-05 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-08 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-08 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-21 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-23 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-09-09 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-09-13 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-09-18 對應市場階段: NEUTRAL
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-10-14 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-06 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-10 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-11 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-13 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-21 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-05 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-20 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-24 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-13 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-15 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-20 對應市場階段: EXTREME_GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-27 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-03 對應市場階段: NEUTRAL
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-28 對應市場階段: EXTREME_FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-02 對應市場階段: EXTREME_FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-04 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-10 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-11 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-19 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-07 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-09 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-11 對應市場階段: FEAR
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-22 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-06 對應市場階段: GREED
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.4小時前更新)
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 101 個階段
+2025-06-25 22:59:41 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-08 對應市場階段: GREED
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 56 cases for BTCUSDT
+2025-06-25 22:59:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 56 cases
+2025-06-25 22:59:41 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 56 cases
+2025-06-25 22:59:41 - api.standalone_task_manager - [32mINFO[0m - Updated task aa378a48-71d1-4f35-9913-d715908d25b9 status to TaskStatusEnum.COMPLETED
+2025-06-25 22:59:41 - api.function_call - [32mINFO[0m - Function: real_search_execution | Params: {'config_name': 'Frontend_Test_Search', 'cases_found': '56'} | Duration: 2.83s
+2025-06-25 22:59:41 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 2.831s
+2025-06-25 22:59:41 - api.middleware.request - [32mINFO[0m - [7d1158eb] Completed POST /api/v1/search/execute - 200 - 2.831s
+2025-06-25 22:59:41 - api.middleware.request - [32mINFO[0m - [43d73af4] Started GET /api/v1/search/task/aa378a48-71d1-4f35-9913-d715908d25b9 from 127.0.0.1
+2025-06-25 22:59:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/aa378a48-71d1-4f35-9913-d715908d25b9 - 200 - 0.001s
+2025-06-25 22:59:41 - api.middleware.request - [32mINFO[0m - [43d73af4] Completed GET /api/v1/search/task/aa378a48-71d1-4f35-9913-d715908d25b9 - 200 - 0.001s
+2025-06-25 22:59:41 - api.middleware.request - [32mINFO[0m - [f7d6fdd7] Started GET /api/v1/search/task/aa378a48-71d1-4f35-9913-d715908d25b9/result from 127.0.0.1
+2025-06-25 22:59:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/aa378a48-71d1-4f35-9913-d715908d25b9/result - 200 - 0.004s
+2025-06-25 22:59:41 - api.middleware.request - [32mINFO[0m - [f7d6fdd7] Completed GET /api/v1/search/task/aa378a48-71d1-4f35-9913-d715908d25b9/result - 200 - 0.004s
