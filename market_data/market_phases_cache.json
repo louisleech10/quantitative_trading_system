@@ -498,5 +498,10 @@
     "start_date": "2025-06-16",
     "end_date": "2025-06-22",
     "description": "NEUTRAL"
+  },
+  "GREED_20250623": {
+    "start_date": "2025-06-23",
+    "end_date": "2025-06-29",
+    "description": "GREED"
   }
 }
