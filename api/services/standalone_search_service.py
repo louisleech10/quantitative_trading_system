@@ -28,9 +28,63 @@ class StandaloneTaskManager:
     """Standalone task management for search operations"""
     
     def __init__(self):
-        self.tasks: Dict[str, TaskInfo] = {}
-        self.task_results: Dict[str, Any] = {}
-        self.logger = get_logger("api.standalone_task_manager")
+        self.logger = get_logger("api.standalone_search_service")
+        self.task_manager = StandaloneTaskManager()
+        self._active_searches = 0
+        
+        # Initialize momentum modules status
+        self.momentum_available = False
+        self.data_loader = None
+        self.search_engine = None
+        
+        # 延遲加載：不在初始化時強制加載模塊
+        # 只在實際需要時才加載
+        self.logger.info("StandaloneSearchService initialized - momentum modules will be loaded on demand")
+    
+    def _ensure_momentum_loaded(self):
+        """Ensure momentum modules are loaded, load them if not already loaded"""
+        if self.momentum_available:
+            return True
+            
+        try:
+            self.logger.info("Loading momentum modules on demand...")
+            
+            # Add project root to path
+            project_root = Path(__file__).parent.parent.parent
+            momentum_paths = [
+                project_root / "momentum",
+                project_root / "momentum" / "DataExtraction",
+            ]
+            
+            for path in momentum_paths:
+                if str(path) not in sys.path:
+                    sys.path.insert(0, str(path))
+            
+            # Try to import momentum modules
+            from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
+            from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+            
+            # Create instances
+            momentum_loader = MomentumDataLoader()
+            self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
+            self.search_engine = CaseSearchEngine(self.data_loader)
+            
+            self.momentum_available = True
+            self.logger.info("✅ Momentum modules loaded successfully on demand")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load momentum modules: {str(e)}")
+            self.momentum_available = False
+            return False
+    
+    def is_real_service_available(self) -> bool:
+        """Check if real momentum service is available"""
+        # Try to load modules if not already loaded
+        if not self.momentum_available:
+            self._ensure_momentum_loaded()
+        
+        return self.momentum_available and self.data_loader is not None and self.search_engine is not None
     
     def create_task(self, config_name: str) -> str:
         """Create a new task and return task ID"""
@@ -195,8 +249,8 @@ class StandaloneSearchService:
                 if str(full_path) not in sys.path:
                     sys.path.insert(0, str(full_path))
                 
-                from DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-                from DataExtraction.case_search_engine import CaseSearchEngine
+                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
+                from momentum.DataExtraction.case_search_engine import CaseSearchEngine
                 
                 momentum_loader = MomentumDataLoader()
                 self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
@@ -277,6 +331,10 @@ class StandaloneSearchService:
     async def execute_search(self, request: SearchConfigRequest, 
                            symbols: Optional[List[str]] = None) -> str:
         """Execute search asynchronously and return task ID"""
+        # Ensure momentum modules are loaded before executing search
+        if not self._ensure_momentum_loaded():
+            raise SearchExecutionException("Momentum modules could not be loaded")
+        
         # Check concurrent search limit
         if self._active_searches >= settings.max_concurrent_searches:
             raise SearchExecutionException(
@@ -540,19 +598,15 @@ class StandaloneSearchService:
     async def preview_search(self, request: SearchConfigRequest,
                            symbols_limit: int = 10) -> Dict[str, Any]:
         """Preview search results without executing full search"""
-        try:
-            # Ensure data loader is available
-            if not self.momentum_available or not self.data_loader:
-                raise SearchExecutionException("Preview requires real data loader")
+        # Ensure momentum modules are loaded before preview
+        if not self._ensure_momentum_loaded():
+            raise SearchExecutionException("Momentum modules could not be loaded")
             
+        try:
             # Try to get real symbol list
-            try:
-                all_symbols = await asyncio.to_thread(self.data_loader.get_symbols_list)
-                valid_symbols = [s for s in all_symbols[:symbols_limit] if s.endswith('USDT')]
-                self.logger.info("Using real symbol list for preview")
-            except Exception as e:
-                self.logger.warning(f"Failed to get real symbols: {e}")
-                raise SearchExecutionException("Unable to access real symbol data for preview")
+            all_symbols = await asyncio.to_thread(self.data_loader.get_symbols_list)
+            valid_symbols = [s for s in all_symbols[:symbols_limit] if s.endswith('USDT')]
+            self.logger.info("Using real symbol list for preview")
             
             # Generate preview
             preview_data = {

@@ -470,8 +470,9 @@ class CaseSearchEngine:
             self.logger.error(f"Error searching single symbol {symbol}: {str(e)}")
             return []
 
+    # 改進的數據處理邏輯 - 避免虛擬數據污染
     def _create_case_result(self, data: pd.DataFrame, idx: int, symbol: str, config: SearchConfiguration) -> Dict:
-        """創建案例結果，包含所有擴充參數"""
+        """創建案例結果，改進的數據處理邏輯"""
         try:
             # 確保索引有效
             if idx < 0 or idx >= len(data):
@@ -481,21 +482,8 @@ class CaseSearchEngine:
             # 提取時間點
             timestamp = data.index[idx]
             
-            # 獲取案例所需K線的索引範圍
-            start_idx = max(0, idx - config.lookback_periods)
-            end_idx = min(len(data) - 1, idx + config.forward_periods)
-            
-            # 提取數據
-            case_data = data.iloc[start_idx:end_idx+1].copy()
-
-            try:
-                market_phase = self._determine_market_phase(timestamp)
-            except Exception as e:
-                self.logger.warning(f"無法確定市場階段: {str(e)}")
-                market_phase = "UNKNOWN"
-
-            # 安全獲取數據的輔助函數
-            def safe_get(column, default_value=None):
+            # 安全獲取數據的輔助函數 - 改進版本
+            def safe_get(column, default_value=None, require_valid=True):
                 try:
                     if column in data.columns and pd.notna(data[column].iloc[idx]):
                         value = data[column].iloc[idx]
@@ -504,28 +492,52 @@ class CaseSearchEngine:
                             return float(value[:-1]) / 100
                         return float(value) if not pd.isna(value) else default_value
                     else:
+                        if require_valid and default_value is None:
+                            # 如果要求有效數據但沒有，記錄警告並返回 None
+                            self.logger.warning(f"Missing required data: {column} for {symbol} at {timestamp}")
+                            return None
                         return default_value
                 except Exception as e:
                     self.logger.debug(f"Error getting {column}: {e}")
                     return default_value
 
-            # 創建完整的案例記錄，包含所有擴充參數
+            # 檢查基礎 OHLCV 數據的完整性
+            required_fields = ['open', 'high', 'low', 'close', 'volume']
+            missing_fields = []
+            
+            for field in required_fields:
+                if safe_get(field, require_valid=True) is None:
+                    missing_fields.append(field)
+            
+            # 如果缺少關鍵數據，直接跳過這個案例
+            if missing_fields:
+                self.logger.warning(f"Skipping case {symbol}@{timestamp}: missing critical data: {missing_fields}")
+                return None
+
+            # 獲取市場階段
+            try:
+                market_phase = self._determine_market_phase(timestamp)
+            except Exception as e:
+                self.logger.warning(f"無法確定市場階段: {str(e)}")
+                market_phase = "UNKNOWN"
+
+            # 創建案例記錄 - 只使用真實數據，不使用虛擬數據
             case = {
                 # ===== 基本識別資訊 =====
                 'symbol': symbol,
                 'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                'trigger_idx': idx - start_idx,
+                'trigger_idx': idx,
                 
-                # ===== OHLCV 基礎數據 =====
-                'open': safe_get('open', safe_get('close', 50000.0)),
-                'high': safe_get('high', safe_get('close', 50000.0) * 1.01),
-                'low': safe_get('low', safe_get('close', 50000.0) * 0.99),
-                'close': safe_get('close', 50000.0),
-                'volume': safe_get('volume', 1000000.0),
-                'price_change': safe_get('price_change', 0.05),
+                # ===== OHLCV 基礎數據 - 只使用真實數據 =====
+                'open': safe_get('open'),
+                'high': safe_get('high'),
+                'low': safe_get('low'),
+                'close': safe_get('close'),
+                'volume': safe_get('volume'),
+                'price_change': safe_get('price_change'),
                 'market_phase': market_phase,
                 
-                # ===== 基礎觸發條件參數 (6個) =====
+                # ===== 基礎觸發條件參數 =====
                 'timeframe': safe_get('timeframe', config.timeframe),
                 'closing_strength': safe_get('closing_strength'),
                 'price_position': safe_get('price_position'),
@@ -582,6 +594,14 @@ class CaseSearchEngine:
                 'prior_range': safe_get('prior_range'),
                 'prior_abs_change_sum': safe_get('prior_abs_change_sum'),
                 
+                # ===== 數據品質標記 =====
+                'data_quality': {
+                    'has_complete_ohlcv': all(safe_get(field) is not None for field in required_fields),
+                    'missing_fields': [field for field in required_fields if safe_get(field) is None],
+                    'data_source': 'binance_api',
+                    'data_timestamp': timestamp.isoformat()
+                },
+                
                 # ===== 時間範圍 =====
                 'time_range': {
                     'start': (timestamp - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
@@ -594,6 +614,36 @@ class CaseSearchEngine:
         except Exception as e:
             self.logger.error(f"Error creating case result for {symbol} at index {idx}: {str(e)}")
             return None
+
+    # 額外的數據驗證函數
+    def validate_case_data_quality(cases: List[Dict]) -> Dict[str, Any]:
+        """驗證案例數據品質"""
+        if not cases:
+            return {"total_cases": 0, "quality_score": 0, "issues": ["No cases found"]}
+        
+        total_cases = len(cases)
+        complete_cases = 0
+        missing_data_issues = []
+        
+        for case in cases:
+            if case.get('data_quality', {}).get('has_complete_ohlcv', False):
+                complete_cases += 1
+            else:
+                missing_fields = case.get('data_quality', {}).get('missing_fields', [])
+                if missing_fields:
+                    missing_data_issues.extend(missing_fields)
+        
+        quality_score = complete_cases / total_cases if total_cases > 0 else 0
+        
+        return {
+            "total_cases": total_cases,
+            "complete_cases": complete_cases,
+            "incomplete_cases": total_cases - complete_cases,
+            "quality_score": quality_score,
+            "completion_rate": f"{quality_score * 100:.1f}%",
+            "common_missing_fields": list(set(missing_data_issues)),
+            "issues": missing_data_issues if missing_data_issues else ["All cases have complete data"]
+        }
     
     async def _get_valid_symbols(self, config: SearchConfiguration) -> List[str]:
         """獲取有效的交易對列表"""
