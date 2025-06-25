@@ -251,7 +251,7 @@ export default function ResultsPage() {
     
     const pollStatus = async (): Promise<void> => {
       try {
-        const statusResponse = await fetch(`http://localhost:8000/api/v1/search/status/${taskId}`);
+        const statusResponse = await fetch(`http://localhost:8000/api/v1/search/task/${taskId}`);
         
         if (!statusResponse.ok) {
           throw new Error(`Failed to get task status: ${statusResponse.status}`);
@@ -289,7 +289,7 @@ export default function ResultsPage() {
 
   const fetchResults = async (taskId: string): Promise<void> => {
     try {
-      const resultResponse = await fetch(`http://localhost:8000/api/v1/search/result/${taskId}`);
+      const resultResponse = await fetch(`http://localhost:8000/api/v1/search/task/${taskId}/result`);
       
       if (!resultResponse.ok) {
         throw new Error(`Failed to fetch results: ${resultResponse.status}`);
