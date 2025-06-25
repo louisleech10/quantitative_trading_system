@@ -723,77 +723,161 @@ class CaseSearchEngine:
             self.logger.error(f"處理 {symbol} 時出錯: {str(e)}")
             return []
     
+    # 完整的 _add_calculated_columns 方法擴充版本
+# 將此方法替換現有 momentum/DataExtraction/case_search_engine.py 中的 _add_calculated_columns 方法
+
     def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
-        """添加計算列，根據時間框架正確計算未來指標"""
+        """
+        添加計算列，擴充版本支援完整的20個參數
+        
+        包含：
+        1. 基礎觸發條件參數 (6個)
+        2. 未來表現驗證參數 (12個) 
+        3. 時間和市場描述參數
+        """
         try:
-            # 創建數據副本
+            self.logger.info("開始添加擴充計算列...")
             df = data.copy()
             
-            # 時間框架到小時的映射
-            timeframe_hours = {
-                '1h': 1, '2h': 2, '3h': 3, '4h': 4, '6h': 6, '8h': 8, '12h': 12, 
-                '1d': 24, '3d': 72, '1w': 168, '1M': 720
-            }
-            
-            # 獲取單根K線代表的小時數
-            hours_per_candle = timeframe_hours.get(timeframe, 4)  # 默認4小時
-            
-            # 計算不同時間段需要的K線數量
-            periods_24h = max(1, 24 // hours_per_candle)    # 24小時需要的K線數
-            periods_48h = max(1, 48 // hours_per_candle)    # 48小時需要的K線數
-            periods_72h = max(1, 72 // hours_per_candle)    # 72小時需要的K線數
+            # ===== 時間框架配置 =====
+            periods_info = self._get_timeframe_periods(timeframe)
+            hours_per_candle = periods_info['hours_per_candle']
+            periods_24h = periods_info['periods_24h']
+            periods_48h = periods_info['periods_48h']
+            periods_72h = periods_info['periods_72h']
             
             self.logger.info(f"時間框架: {timeframe}, 每根K線: {hours_per_candle}小時")
             self.logger.info(f"計算週期 - 24h: {periods_24h}根, 48h: {periods_48h}根, 72h: {periods_72h}根")
             
-            # 計算當前K線漲幅 (close/previous_close - 1)
+            # ===== 1. 基礎觸發條件參數 (6個) =====
+            
+            # 1.1 timeframe (已有)
+            df['timeframe'] = timeframe
+            
+            # 1.2 price_change - 當前K線相對前一根的漲跌幅
             df['price_change'] = df['close'].pct_change()
             
-            # === 基本未來回報計算 ===
+            # 1.3 closing_strength - 收盤強度 = (close - low) / (high - low)
+            df['closing_strength'] = np.where(
+                (df['high'] - df['low']) != 0,
+                (df['close'] - df['low']) / (df['high'] - df['low']),
+                0.5  # 如果沒有價格變化，設為中性值
+            )
+            
+            # 1.4 price_position - 價格位置 (近期20根K線的位置)
+            lookback_periods = 20
+            df['recent_high'] = df['high'].rolling(window=lookback_periods, min_periods=1).max()
+            df['recent_low'] = df['low'].rolling(window=lookback_periods, min_periods=1).min()
+            df['price_position'] = np.where(
+                (df['recent_high'] - df['recent_low']) != 0,
+                (df['close'] - df['recent_low']) / (df['recent_high'] - df['recent_low']),
+                0.5  # 如果沒有範圍，設為中性值
+            )
+            
+            # 1.5 volume_multiplier - 成交量倍數 (相對於近期20根K線平均)
+            df['volume_avg_20'] = df['volume'].rolling(window=lookback_periods, min_periods=1).mean()
+            df['volume_multiplier'] = np.where(
+                df['volume_avg_20'] != 0,
+                df['volume'] / df['volume_avg_20'],
+                1.0  # 如果沒有歷史數據，設為1
+            )
+            
+            # 1.6 taker_buy_ratio - 主動買入比例
+            if 'taker_buy_volume' in df.columns:
+                df['taker_buy_ratio'] = np.where(
+                    df['volume'] != 0,
+                    df['taker_buy_volume'] / df['volume'],
+                    0.5  # 如果沒有成交量，設為中性值
+                )
+            else:
+                # 如果沒有 taker_buy_volume 數據，使用價格動量作為替代
+                df['taker_buy_ratio'] = np.where(
+                    df['price_change'] > 0, 0.6,  # 上漲時假設更多主動買入
+                    np.where(df['price_change'] < 0, 0.4, 0.5)  # 下跌時假設更多主動賣出
+                )
+                self.logger.warning("taker_buy_volume 數據不可用，使用價格動量替代")
+            
+            # ===== 2. 未來表現驗證參數 (12個) =====
+            
+            # 2.1 未來1-12根K線收益率
+            for bar in range(1, 13):
+                col_name = f'future_{bar}bar_return'
+                df[col_name] = (df['close'].shift(-bar) - df['close']) / df['close']
+            
+            # 2.2 未來1-12根K線最大回撤
+            self.logger.info("開始計算未來最大回撤...")
+            for bar in range(1, 13):
+                col_name = f'future_{bar}bar_max_drawdown'
+                df[col_name] = np.nan
+                
+                # 計算每個時間點的最大回撤
+                for i in range(len(df) - bar):
+                    current_close = df['close'].iloc[i]
+                    if current_close > 0:
+                        # 獲取未來 bar 根K線的最低價
+                        future_slice = df.iloc[i+1:i+bar+1]
+                        if len(future_slice) > 0:
+                            min_low = future_slice['low'].min()
+                            if pd.notna(min_low):
+                                max_drawdown = (min_low / current_close - 1)
+                                df.loc[df.index[i], col_name] = max_drawdown
+            
+            # ===== 3. 時間相關描述參數 =====
+            
+            # 3.1 hour_of_day - 觸發時的小時 (0-23)
+            df['hour_of_day'] = pd.to_datetime(df.index).hour
+            
+            # 3.2 day_of_week - 觸發時的星期 (1-7, 1=Monday)
+            df['day_of_week'] = pd.to_datetime(df.index).dayofweek + 1
+            
+            # ===== 4. 市場階段計算 =====
+            if 'market_phase' not in df.columns:
+                # 使用價格動量和波動率來估算市場階段
+                df['price_momentum'] = df['close'].pct_change(periods=5).rolling(window=5).mean()
+                df['volatility'] = df['close'].pct_change().rolling(window=20).std()
+                
+                # 根據動量和波動率分類市場階段
+                df['market_phase'] = np.where(
+                    (df['price_momentum'] > 0.02) & (df['volatility'] > 0.03), 'GREED',
+                    np.where(
+                        (df['price_momentum'] < -0.02) & (df['volatility'] > 0.03), 'FEAR',
+                        np.where(df['volatility'] > 0.05, 'EXTREME', 'NEUTRAL')
+                    )
+                )
+            
+            # ===== 5. 保持現有的標準化時間計算 (向後兼容) =====
+            
+            # 基本未來回報計算
             df['future1_close_return'] = (df['close'].shift(-1) - df['close']) / df['close']
             df['future2_close_return'] = (df['close'].shift(-2) - df['close']) / df['close']
             df['future4_close_return'] = (df['close'].shift(-4) - df['close']) / df['close']
             df['future6_close_return'] = (df['close'].shift(-6) - df['close']) / df['close']
             
-            # === 時間基礎的未來回報計算 ===
-            # 24小時回報
+            # 時間基礎的未來回報計算
             df['future24_close_return'] = (df['close'].shift(-periods_24h) - df['close']) / df['close']
-            
-            # 48小時回報
             df['future48_close_return'] = (df['close'].shift(-periods_48h) - df['close']) / df['close']
-            
-            # 72小時回報
             df['future72_close_return'] = (df['close'].shift(-periods_72h) - df['close']) / df['close']
             
-            # === 未來價格數據 ===
+            # 未來價格數據
             df['future24_close'] = df['close'].shift(-periods_24h)
-            
-            # 24小時內的最低價（在指定期間內的rolling min）
             if periods_24h > 1:
                 df['future24_low'] = df['low'].rolling(window=periods_24h, min_periods=1).min().shift(-periods_24h)
             else:
                 df['future24_low'] = df['low'].shift(-periods_24h)
             
-            
-            # === 未來最大回報和最大回撤計算 ===
-            # 使用72小時作為標準分析期間
+            # ===== 6. 72小時最大回報和回撤計算 (保持向後兼容) =====
             lookahead_periods = periods_72h
-            
-            # 初始化列
             df['future_max_return'] = np.nan
             df['future_max_drawdown'] = np.nan
             df['future72_max_return'] = np.nan
             df['future72_max_drawdown'] = np.nan
             
-            # 逐行計算（向量化會更快，但這樣更清晰）
+            self.logger.info("開始計算72小時最大回報和回撤...")
             for i in range(len(df) - lookahead_periods):
                 current_close = df['close'].iloc[i]
-                
-                # 獲取未來72小時的數據切片
                 future_slice_72h = df.iloc[i+1:i+lookahead_periods+1]
                 
                 if len(future_slice_72h) > 0 and current_close > 0:
-                    # === 72小時最大回報和回撤 ===
                     max_high_72h = future_slice_72h['high'].max()
                     min_low_72h = future_slice_72h['low'].min()
                     
@@ -803,7 +887,7 @@ class CaseSearchEngine:
                     df.loc[df.index[i], 'future72_max_return'] = max_return_72h
                     df.loc[df.index[i], 'future72_max_drawdown'] = max_drawdown_72h
                     
-                    # === 標準6根K線的最大回報和回撤（保持向後兼容） ===
+                    # 標準6根K線（保持向後兼容）
                     standard_lookahead = min(6, len(future_slice_72h))
                     future_slice_standard = df.iloc[i+1:i+standard_lookahead+1]
                     
@@ -817,18 +901,85 @@ class CaseSearchEngine:
                         df.loc[df.index[i], 'future_max_return'] = max_return_std
                         df.loc[df.index[i], 'future_max_drawdown'] = max_drawdown_std
             
-            # === 數據質量檢查 ===
-            self.logger.info(f"計算完成統計:")
-            self.logger.info(f"  - price_change NaN數量: {df['price_change'].isna().sum()}")
-            self.logger.info(f"  - future24_close_return NaN數量: {df['future24_close_return'].isna().sum()}")
-            self.logger.info(f"  - future48_close_return NaN數量: {df['future48_close_return'].isna().sum()}")
-            self.logger.info(f"  - future72_max_return NaN數量: {df['future72_max_return'].isna().sum()}")
+            # ===== 7. 數據質量報告 =====
+            self.logger.info("=== 擴充參數計算完成統計 ===")
+            
+            # 基礎觸發條件參數
+            basic_params = ['price_change', 'closing_strength', 'price_position', 'volume_multiplier', 'taker_buy_ratio']
+            self.logger.info("基礎觸發條件參數:")
+            for param in basic_params:
+                if param in df.columns:
+                    nan_count = df[param].isna().sum()
+                    valid_count = len(df) - nan_count
+                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值 ({nan_count} NaN)")
+            
+            # 未來收益參數
+            self.logger.info("未來收益參數 (1-12根K線):")
+            for bar in range(1, 13):
+                param = f'future_{bar}bar_return'
+                if param in df.columns:
+                    nan_count = df[param].isna().sum()
+                    valid_count = len(df) - nan_count
+                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值")
+            
+            # 未來回撤參數
+            self.logger.info("未來回撤參數 (1-12根K線):")
+            for bar in range(1, 13):
+                param = f'future_{bar}bar_max_drawdown'
+                if param in df.columns:
+                    nan_count = df[param].isna().sum()
+                    valid_count = len(df) - nan_count
+                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值")
+            
+            # 時間和市場參數
+            time_params = ['hour_of_day', 'day_of_week', 'market_phase', 'timeframe']
+            self.logger.info("時間和市場參數:")
+            for param in time_params:
+                if param in df.columns:
+                    nan_count = df[param].isna().sum()
+                    valid_count = len(df) - nan_count
+                    unique_count = df[param].nunique()
+                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值, {unique_count} 唯一值")
+            
+            # 向後兼容參數
+            compat_params = ['future24_close_return', 'future48_close_return', 'future72_close_return', 
+                            'future_max_return', 'future_max_drawdown', 'future24_close', 'future24_low']
+            self.logger.info("向後兼容參數:")
+            for param in compat_params:
+                if param in df.columns:
+                    nan_count = df[param].isna().sum()
+                    valid_count = len(df) - nan_count
+                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值")
+            
+            # 總參數統計
+            total_new_params = len(basic_params) + 12 + 12 + len(time_params) + len(compat_params)
+            self.logger.info(f"=== 總計新增/更新了 {total_new_params} 個參數欄位 ===")
             
             return df
             
         except Exception as e:
             self.logger.error(f"添加計算列時出錯: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return data
+
+
+    def _get_timeframe_periods(self, timeframe: str) -> dict:
+        """根據時間框架獲取標準化的期間數"""
+        timeframe_hours = {
+            '1h': 1, '2h': 2, '3h': 3, '4h': 4, '6h': 6, '8h': 8, '12h': 12, 
+            '1d': 24, '3d': 72, '1w': 168, '1M': 720
+        }
+        
+        hours_per_candle = timeframe_hours.get(timeframe, 4)
+        
+        return {
+            'hours_per_candle': hours_per_candle,
+            'periods_24h': max(1, 24 // hours_per_candle),
+            'periods_48h': max(1, 48 // hours_per_candle),
+            'periods_72h': max(1, 72 // hours_per_candle),
+            'periods_1w': max(1, 168 // hours_per_candle)
+        }
 
         
     def _apply_initial_filter(self, 
@@ -1198,20 +1349,4 @@ class CaseSearchEngine:
             self.logger.error(f"計算未來回報時出錯: {str(e)}")
             return None
 
-    def _get_timeframe_periods(self, timeframe: str) -> dict:
-        """根據時間框架獲取標準化的期間數"""
-        timeframe_hours = {
-            '1h': 1, '2h': 2, '3h': 3, '4h': 4, '6h': 6, '8h': 8, '12h': 12, 
-            '1d': 24, '3d': 72, '1w': 168, '1M': 720
-        }
-        
-        hours_per_candle = timeframe_hours.get(timeframe, 4)
-        
-        return {
-            'hours_per_candle': hours_per_candle,
-            'periods_24h': max(1, 24 // hours_per_candle),
-            'periods_48h': max(1, 48 // hours_per_candle),
-            'periods_72h': max(1, 72 // hours_per_candle),
-            'periods_1w': max(1, 168 // hours_per_candle)
-        }
     
