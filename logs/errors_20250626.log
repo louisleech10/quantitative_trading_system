@@ -2,3 +2,15 @@
 2025-06-26 00:04:40 - api.routes.case_search - [31mERROR[0m - Search execution error: Momentum modules could not be loaded
 2025-06-26 00:04:40 - api.exception_handler - [31mERROR[0m - HTTP 500: Momentum modules could not be loaded
 2025-06-26 00:04:40 - api.request - [31mERROR[0m - POST /api/v1/search/execute - 500 - 1.201s
+2025-06-26 00:10:40 - api.standalone_search_service - [31mERROR[0m - Failed to load momentum modules: name 'Any' is not defined
+2025-06-26 00:10:40 - api.routes.case_search - [31mERROR[0m - Search execution error: Momentum modules could not be loaded
+2025-06-26 00:10:40 - api.exception_handler - [31mERROR[0m - HTTP 500: Momentum modules could not be loaded
+2025-06-26 00:10:40 - api.request - [31mERROR[0m - POST /api/v1/search/execute - 500 - 1.172s
+2025-06-26 00:11:47 - api.standalone_search_service - [31mERROR[0m - Failed to load momentum modules: name 'Any' is not defined
+2025-06-26 00:11:47 - api.routes.case_search - [31mERROR[0m - Search execution error: Momentum modules could not be loaded
+2025-06-26 00:11:47 - api.exception_handler - [31mERROR[0m - HTTP 500: Momentum modules could not be loaded
+2025-06-26 00:11:47 - api.request - [31mERROR[0m - POST /api/v1/search/execute - 500 - 0.855s
+2025-06-26 00:12:10 - api.standalone_search_service - [31mERROR[0m - Failed to load momentum modules: name 'Any' is not defined
+2025-06-26 00:12:10 - api.routes.case_search - [31mERROR[0m - Search execution error: Momentum modules could not be loaded
+2025-06-26 00:12:10 - api.exception_handler - [31mERROR[0m - HTTP 500: Momentum modules could not be loaded
+2025-06-26 00:12:10 - api.request - [31mERROR[0m - POST /api/v1/search/execute - 500 - 0.901s

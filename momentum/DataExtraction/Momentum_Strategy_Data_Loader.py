@@ -3,7 +3,7 @@ import sys
 import os
 import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any, Union
 import pandas as pd
 from datetime import datetime, timedelta
 import logging
