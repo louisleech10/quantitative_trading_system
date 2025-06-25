@@ -471,7 +471,7 @@ class CaseSearchEngine:
             return []
 
     def _create_case_result(self, data: pd.DataFrame, idx: int, symbol: str, config: SearchConfiguration) -> Dict:
-        """創建案例結果，增強錯誤處理"""
+        """創建案例結果，包含所有擴充參數"""
         try:
             # 確保索引有效
             if idx < 0 or idx >= len(data):
@@ -495,22 +495,28 @@ class CaseSearchEngine:
                 market_phase = "UNKNOWN"
 
             # 安全獲取數據的輔助函數
-            def safe_get(column, default_value):
+            def safe_get(column, default_value=None):
                 try:
                     if column in data.columns and pd.notna(data[column].iloc[idx]):
-                        return float(data[column].iloc[idx])
+                        value = data[column].iloc[idx]
+                        # 如果是百分比字符串，轉換為數值
+                        if isinstance(value, str) and value.endswith('%'):
+                            return float(value[:-1]) / 100
+                        return float(value) if not pd.isna(value) else default_value
                     else:
                         return default_value
-                except:
+                except Exception as e:
+                    self.logger.debug(f"Error getting {column}: {e}")
                     return default_value
 
-            # 創建案例記錄 - 使用安全獲取
+            # 創建完整的案例記錄，包含所有擴充參數
             case = {
+                # ===== 基本識別資訊 =====
                 'symbol': symbol,
                 'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                 'trigger_idx': idx - start_idx,
                 
-                # OHLC 數據
+                # ===== OHLCV 基礎數據 =====
                 'open': safe_get('open', safe_get('close', 50000.0)),
                 'high': safe_get('high', safe_get('close', 50000.0) * 1.01),
                 'low': safe_get('low', safe_get('close', 50000.0) * 0.99),
@@ -519,23 +525,64 @@ class CaseSearchEngine:
                 'price_change': safe_get('price_change', 0.05),
                 'market_phase': market_phase,
                 
-                # 未來表現指標
-                'future1_close_return': safe_get('future1_close_return', None),
-                'future2_close_return': safe_get('future2_close_return', None),
-                'future4_close_return': safe_get('future4_close_return', None),
-                'future6_close_return': safe_get('future6_close_return', None),
-                'future24_close_return': safe_get('future24_close_return', None),  # ✅ 正確
-                'future48_close_return': safe_get('future48_close_return', None),  # ✅ 正確
-                'future72_close_return': safe_get('future72_close_return', None),  # ✅ 新增
+                # ===== 基礎觸發條件參數 (6個) =====
+                'timeframe': safe_get('timeframe', config.timeframe),
+                'closing_strength': safe_get('closing_strength'),
+                'price_position': safe_get('price_position'),
+                'volume_multiplier': safe_get('volume_multiplier'),
+                'taker_buy_ratio': safe_get('taker_buy_ratio'),
                 
-                # 其他指標
-                'future_max_return': safe_get('future_max_return', None),
-                'future_max_drawdown': safe_get('future_max_drawdown', None),
-                'future72_max_return': safe_get('future72_max_return', None),      # ✅ 新增
-                'future72_max_drawdown': safe_get('future72_max_drawdown', None),  # ✅ 新增
-                'future24_close': safe_get('future24_close', None),               # ✅ 正確
-                'future24_low': safe_get('future24_low', None), 
+                # ===== 未來收益參數 (1-12根K線) =====
+                'future_1bar_return': safe_get('future_1bar_return'),
+                'future_2bar_return': safe_get('future_2bar_return'),
+                'future_3bar_return': safe_get('future_3bar_return'),
+                'future_4bar_return': safe_get('future_4bar_return'),
+                'future_5bar_return': safe_get('future_5bar_return'),
+                'future_6bar_return': safe_get('future_6bar_return'),
+                'future_7bar_return': safe_get('future_7bar_return'),
+                'future_8bar_return': safe_get('future_8bar_return'),
+                'future_9bar_return': safe_get('future_9bar_return'),
+                'future_10bar_return': safe_get('future_10bar_return'),
+                'future_11bar_return': safe_get('future_11bar_return'),
+                'future_12bar_return': safe_get('future_12bar_return'),
                 
+                # ===== 未來回撤參數 (1-12根K線) =====
+                'future_1bar_max_drawdown': safe_get('future_1bar_max_drawdown'),
+                'future_2bar_max_drawdown': safe_get('future_2bar_max_drawdown'),
+                'future_3bar_max_drawdown': safe_get('future_3bar_max_drawdown'),
+                'future_4bar_max_drawdown': safe_get('future_4bar_max_drawdown'),
+                'future_5bar_max_drawdown': safe_get('future_5bar_max_drawdown'),
+                'future_6bar_max_drawdown': safe_get('future_6bar_max_drawdown'),
+                'future_7bar_max_drawdown': safe_get('future_7bar_max_drawdown'),
+                'future_8bar_max_drawdown': safe_get('future_8bar_max_drawdown'),
+                'future_9bar_max_drawdown': safe_get('future_9bar_max_drawdown'),
+                'future_10bar_max_drawdown': safe_get('future_10bar_max_drawdown'),
+                'future_11bar_max_drawdown': safe_get('future_11bar_max_drawdown'),
+                'future_12bar_max_drawdown': safe_get('future_12bar_max_drawdown'),
+                
+                # ===== 時間描述參數 =====
+                'hour_of_day': safe_get('hour_of_day'),
+                'day_of_week': safe_get('day_of_week'),
+                
+                # ===== 向後兼容的現有參數 =====
+                'future1_close_return': safe_get('future1_close_return'),
+                'future2_close_return': safe_get('future2_close_return'),
+                'future4_close_return': safe_get('future4_close_return'),
+                'future6_close_return': safe_get('future6_close_return'),
+                'future24_close_return': safe_get('future24_close_return'),
+                'future48_close_return': safe_get('future48_close_return'),
+                'future72_close_return': safe_get('future72_close_return'),
+                'future_max_return': safe_get('future_max_return'),
+                'future_max_drawdown': safe_get('future_max_drawdown'),
+                'future72_max_return': safe_get('future72_max_return'),
+                'future72_max_drawdown': safe_get('future72_max_drawdown'),
+                'future24_close': safe_get('future24_close'),
+                'future24_low': safe_get('future24_low'),
+                'prior_volatility': safe_get('prior_volatility'),
+                'prior_range': safe_get('prior_range'),
+                'prior_abs_change_sum': safe_get('prior_abs_change_sum'),
+                
+                # ===== 時間範圍 =====
                 'time_range': {
                     'start': (timestamp - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
                     'end': (timestamp + timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
@@ -545,7 +592,7 @@ class CaseSearchEngine:
             return case
             
         except Exception as e:
-            self.logger.error(f"Error creating case result: {str(e)}")
+            self.logger.error(f"Error creating case result for {symbol} at index {idx}: {str(e)}")
             return None
     
     async def _get_valid_symbols(self, config: SearchConfiguration) -> List[str]:
