@@ -188,7 +188,7 @@ export default function ResultsPage() {
         config: {
           name: "Frontend_Test_Search",
           description: "測試前端展示的搜索",
-          timeframe: "12h",
+          timeframe: "1d",
           start_date: "2024-02-01",
           end_date: "2025-05-31",
           lookback_periods: 20,
