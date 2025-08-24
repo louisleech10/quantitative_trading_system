@@ -1,0 +1,42 @@
+2025-08-24 14:32:54 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-08-24 14:32:54 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-08-24 14:32:54 - api.config_check - [33mWARNING[0m - 未設置幣安API憑證，某些功能可能無法使用
+2025-08-24 14:32:54 - api.config_check - [32mINFO[0m - 請設置環境變數: BINANCE_API_KEY 和 BINANCE_SECRET_KEY
+2025-08-24 14:32:54 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-08-24 14:32:54 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-08-24 14:32:54 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-08-24 14:32:54 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-08-24 14:32:54 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-08-24 14:32:54 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-08-24 14:32:54 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-08-24 14:35:44 - api.middleware.request - [32mINFO[0m - [d2652dae] Started GET / from 127.0.0.1
+2025-08-24 14:35:44 - api.request - [32mINFO[0m - GET / - 200 - 0.002s
+2025-08-24 14:35:44 - api.middleware.request - [32mINFO[0m - [d2652dae] Completed GET / - 200 - 0.002s
+2025-08-24 14:35:44 - api.middleware.request - [32mINFO[0m - [024e027b] Started GET /favicon.ico from 127.0.0.1
+2025-08-24 14:35:44 - api.request - [33mWARNING[0m - GET /favicon.ico - 404 - 0.001s
+2025-08-24 14:35:44 - api.middleware.request - [32mINFO[0m - [024e027b] Completed GET /favicon.ico - 404 - 0.001s
+2025-08-24 14:36:06 - api.middleware.request - [32mINFO[0m - [f2c92147] Started GET /api/v1/docs from 127.0.0.1
+2025-08-24 14:36:06 - api.request - [32mINFO[0m - GET /api/v1/docs - 200 - 0.002s
+2025-08-24 14:36:06 - api.middleware.request - [32mINFO[0m - [f2c92147] Completed GET /api/v1/docs - 200 - 0.002s
+2025-08-24 14:36:07 - api.middleware.request - [32mINFO[0m - [b31fd1f1] Started GET /api/v1/openapi.json from 127.0.0.1
+2025-08-24 14:36:07 - api.request - [32mINFO[0m - GET /api/v1/openapi.json - 200 - 0.036s
+2025-08-24 14:36:07 - api.middleware.request - [32mINFO[0m - [b31fd1f1] Completed GET /api/v1/openapi.json - 200 - 0.036s
+2025-08-24 14:43:20 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-08-24 14:43:20 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-08-24 14:43:20 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-08-24 14:43:20 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-08-24 14:43:20 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-08-24 14:43:20 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-08-24 14:43:20 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-08-24 14:43:20 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-08-24 14:43:20 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-08-24 14:43:20 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-08-24 14:43:31 - api.middleware.request - [32mINFO[0m - [6489f368] Started GET / from 127.0.0.1
+2025-08-24 14:43:31 - api.request - [32mINFO[0m - GET / - 200 - 0.002s
+2025-08-24 14:43:31 - api.middleware.request - [32mINFO[0m - [6489f368] Completed GET / - 200 - 0.002s
+2025-08-24 14:43:36 - api.middleware.request - [32mINFO[0m - [95728be8] Started GET /api/v1/docs from 127.0.0.1
+2025-08-24 14:43:36 - api.request - [32mINFO[0m - GET /api/v1/docs - 200 - 0.001s
+2025-08-24 14:43:36 - api.middleware.request - [32mINFO[0m - [95728be8] Completed GET /api/v1/docs - 200 - 0.001s
+2025-08-24 14:43:36 - api.middleware.request - [32mINFO[0m - [3ef5bc7d] Started GET /api/v1/openapi.json from 127.0.0.1
+2025-08-24 14:43:36 - api.request - [32mINFO[0m - GET /api/v1/openapi.json - 200 - 0.036s
+2025-08-24 14:43:36 - api.middleware.request - [32mINFO[0m - [3ef5bc7d] Completed GET /api/v1/openapi.json - 200 - 0.036s
