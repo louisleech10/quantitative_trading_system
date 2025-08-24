@@ -415,8 +415,8 @@ class CaseSearchEngine:
             
             data = self.data_loader.get_historical_data(
                 symbol=symbol,
-                start_time=config.time_range[0],
-                end_time=config.time_range[1],
+                start_time=config.time_range,
+                end_time=config.time_range,
                 interval=config.timeframe
             )
             

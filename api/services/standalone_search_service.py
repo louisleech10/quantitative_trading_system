@@ -110,11 +110,24 @@ class MomentumDataLoaderWrapper:
     def get_historical_data(self, symbol: str, start_time, end_time, interval: str = "4h"):
         """Delegate to the internal DataLoader's get_historical_data method"""
         try:
-            # 確保時間參數格式正確
-            if isinstance(start_time, datetime):
+            # 處理時間參數 - 修復 tuple 錯誤
+            if isinstance(start_time, tuple):
+                if len(start_time) >= 3:
+                    start_time = f"{start_time[0]:04d}-{start_time[1]:02d}-{start_time[2]:02d}"
+                else:
+                    start_time = "2022-01-01"  # 默認值
+            elif isinstance(start_time, datetime):
                 start_time = start_time.strftime('%Y-%m-%d')
-            if isinstance(end_time, datetime):
+            
+            if isinstance(end_time, tuple):
+                if len(end_time) >= 3:
+                    end_time = f"{end_time[0]:04d}-{end_time[1]:02d}-{end_time[2]:02d}"
+                else:
+                    end_time = "2022-12-31"  # 默認值
+            elif isinstance(end_time, datetime):
                 end_time = end_time.strftime('%Y-%m-%d')
+            
+            self.logger.info(f"Getting data for {symbol}: {start_time} to {end_time}")
             
             return self.data_loader.get_historical_data(
                 symbol=symbol,

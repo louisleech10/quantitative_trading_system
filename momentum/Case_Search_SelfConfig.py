@@ -37,7 +37,7 @@ async def main():
         
         # 設置搜索參數
         start_date = '2022-04-01'
-        end_date = '2022-04-20'
+        end_date = '2024-12-20'
         timeframe = '12h'
         batch_size = 200  # 每批處理的交易對數量
         
@@ -73,7 +73,7 @@ async def main():
                 condition_type="volume",
                 parameter="volume",
                 operator=">=",
-                value=500000,  # 50萬USDT的成交量（比標準的100萬要低）
+                value=50000,  # 50萬USDT的成交量（比標準的100萬要低）
                 description="成交量 >= 500,000 USDT"
             )
         )

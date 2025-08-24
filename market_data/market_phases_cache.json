@@ -1,26 +1,6 @@
 {
-  "FEAR_20191230": {
-    "start_date": "2019-12-30",
-    "end_date": "2020-01-12",
-    "description": "FEAR"
-  },
-  "NEUTRAL_20200113": {
-    "start_date": "2020-01-13",
-    "end_date": "2020-02-02",
-    "description": "NEUTRAL"
-  },
-  "GREED_20200203": {
-    "start_date": "2020-02-03",
-    "end_date": "2020-02-16",
-    "description": "GREED"
-  },
-  "NEUTRAL_20200217": {
-    "start_date": "2020-02-17",
-    "end_date": "2020-02-23",
-    "description": "NEUTRAL"
-  },
-  "FEAR_20200224": {
-    "start_date": "2020-02-24",
+  "FEAR_20200302": {
+    "start_date": "2020-03-02",
     "end_date": "2020-03-08",
     "description": "FEAR"
   },
@@ -501,7 +481,12 @@
   },
   "GREED_20250623": {
     "start_date": "2025-06-23",
-    "end_date": "2025-06-29",
+    "end_date": "2025-08-17",
     "description": "GREED"
+  },
+  "NEUTRAL_20250818": {
+    "start_date": "2025-08-18",
+    "end_date": "2025-08-24",
+    "description": "NEUTRAL"
   }
 }

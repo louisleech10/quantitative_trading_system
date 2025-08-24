@@ -29,7 +29,7 @@ export default function Home() {
             </div>
           </Link>
 
-          <Link href="/results" className="group">
+          <Link href="/result" className="group">
             <div className="bg-white rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow border border-gray-200 group-hover:border-green-300">
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
                 <Database className="w-6 h-6 text-green-600" />
@@ -93,7 +93,7 @@ export default function Home() {
           </p>
           <div className="flex justify-center">
             <Link 
-              href="/results"
+              href="/search"
               className="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               開始搜索案例
