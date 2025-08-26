@@ -1,0 +1,1 @@
+2025-08-26 20:21:04 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
