@@ -413,10 +413,16 @@ class CaseSearchEngine:
             # 獲取歷史數據
             self.logger.info(f"Loading data for {symbol}")
             
+            # 修正：正確傳遞時間範圍參數
+            if hasattr(config, 'time_range') and config.time_range:
+                start_time, end_time = config.time_range
+            else:
+                start_time, end_time = config.start_time, config.end_time
+                
             data = self.data_loader.get_historical_data(
                 symbol=symbol,
-                start_time=config.time_range,
-                end_time=config.time_range,
+                start_time=start_time,
+                end_time=end_time,
                 interval=config.timeframe
             )
             

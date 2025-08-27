@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Case Search2 參數驗證測試檔案
+Case Search 參數驗證測試檔案
 用於驗證搜索參數和計算結果的準確性
 
 使用方法：
@@ -271,6 +271,28 @@ async def main():
         
         # 創建搜索配置
         config = create_search_configuration()
+        
+        # 先測試直接調用數據加載器
+        print(f"\n🧪 測試數據加載...")
+        try:
+            # 直接測試數據獲取
+            test_data = data_loader.data_loader.get_historical_data(
+                symbol="BTCUSDT",
+                start_time=USER_CONFIG['start_date'],
+                end_time=USER_CONFIG['end_date'],
+                interval=USER_CONFIG['timeframe']
+            )
+            
+            if test_data is not None and not test_data.empty:
+                print(f"✅ 成功獲取 {len(test_data)} 條數據記錄")
+                print(f"   時間範圍: {test_data.index.min()} 到 {test_data.index.max()}")
+            else:
+                print("❌ 無法獲取數據")
+                return
+                
+        except Exception as e:
+            print(f"❌ 數據獲取測試失敗: {str(e)}")
+            return
         
         # 執行搜索
         print(f"\n🔍 開始搜索案例...")
