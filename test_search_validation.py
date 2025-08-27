@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Case Search 參數驗證測試檔案
+Case Search2 參數驗證測試檔案
 用於驗證搜索參數和計算結果的準確性
 
 使用方法：
