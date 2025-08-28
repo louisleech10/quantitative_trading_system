@@ -33,11 +33,11 @@ USER_CONFIG = {
     # 時間設定
     'start_date': '2024-02-01',    # 開始日期 (YYYY-MM-DD)
     'end_date': '2025-05-31',      # 結束日期 (YYYY-MM-DD)
-    'timeframe': '1d',             # 時間週期: '1h', '4h', '12h', '1d'
+    'timeframe': '12h',             # 時間週期: '1h', '4h', '12h', '1d'
     
     # K線參數
     'lookback_periods': 20,        # 回溯K線數量
-    'forward_periods': 10,         # 向前看K線數量
+    'forward_periods': 30,         # 向前看K線數量
     
     # 採樣參數
     'sample_limit': 100,           # 樣本數量限制
@@ -48,7 +48,7 @@ USER_CONFIG = {
     'price_change_threshold': 0.03,  # 價格變化閾值 (3% = 0.03)
     
     # 交易對設定
-    'symbols': ['BTCUSDT'],        # 要搜索的交易對列表
+    'symbols': ['BNBUSDT'],        # 要搜索的交易對列表
     
     # 批次處理
     'batch_size': 20,              # 每批處理的交易對數量

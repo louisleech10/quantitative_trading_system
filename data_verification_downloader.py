@@ -27,8 +27,8 @@ sys.path.append(parent_dir)
 
 # 要驗證的案例日期列表 - 您可以修改這些日期
 VERIFICATION_CASES = [
-    "2024-02-09",  # 從CSV中挑選的第1個案例
-    "2024-02-12",  # 從CSV中挑選的第2個案例
+    "2024-02-08",  # 從CSV中挑選的第1個案例
+    "2024-02-15",  # 從CSV中挑選的第2個案例
     "2024-02-14",  # 從CSV中挑選的第3個案例
     "2024-03-11",  # 從CSV中挑選的第4個案例
     "2024-07-15",  # 從CSV中挑選的第5個案例
@@ -36,10 +36,10 @@ VERIFICATION_CASES = [
 
 # 配置參數
 CONFIG = {
-    'symbol': 'BTCUSDT',
-    'interval': '1d',           # K線時間週期
+    'symbol': 'BNBUSDT',
+    'interval': '12h',           # K線時間週期
     'lookback_days': 25,        # 每個案例向前獲取的天數
-    'forward_days': 15,         # 每個案例向後獲取的天數
+    'forward_days': 10,         # 每個案例向後獲取的天數
     'output_dir': 'verification_data',  # 輸出目錄
 }
 
