@@ -1,0 +1,38 @@
+2025-09-01 21:16:04 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-01 21:16:04 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-01 21:16:04 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-01 21:16:04 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-01 21:16:04 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-01 21:16:04 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-01 21:16:04 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-01 21:16:04 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-01 21:16:04 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-01 21:16:04 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [8da75603] Started GET /health from 127.0.0.1
+2025-09-01 21:16:16 - api.request - [32mINFO[0m - GET /health - 200 - 0.002s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [8da75603] Completed GET /health - 200 - 0.002s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [517de3a4] Started GET /health from 127.0.0.1
+2025-09-01 21:16:16 - api.request - [32mINFO[0m - GET /health - 200 - 0.002s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [517de3a4] Completed GET /health - 200 - 0.002s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [f8d7a8fd] Started GET /api/v1/config/templates from 127.0.0.1
+2025-09-01 21:16:16 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-09-01 21:16:16 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.004s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [f8d7a8fd] Completed GET /api/v1/config/templates - 200 - 0.004s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [bbb9a394] Started GET /api/v1/config/templates from 127.0.0.1
+2025-09-01 21:16:16 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-09-01 21:16:16 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.008s
+2025-09-01 21:16:16 - api.middleware.request - [32mINFO[0m - [bbb9a394] Completed GET /api/v1/config/templates - 200 - 0.008s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [4ac29899] Started GET /health from 127.0.0.1
+2025-09-01 21:16:30 - api.request - [32mINFO[0m - GET /health - 200 - 0.001s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [4ac29899] Completed GET /health - 200 - 0.001s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [efad1571] Started GET /health from 127.0.0.1
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [7a103729] Started GET /api/v1/config/templates from 127.0.0.1
+2025-09-01 21:16:30 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-09-01 21:16:30 - api.request - [32mINFO[0m - GET /health - 200 - 0.002s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [efad1571] Completed GET /health - 200 - 0.002s
+2025-09-01 21:16:30 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.005s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [7a103729] Completed GET /api/v1/config/templates - 200 - 0.005s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [a8b1254c] Started GET /api/v1/config/templates from 127.0.0.1
+2025-09-01 21:16:30 - api.function_call - [32mINFO[0m - Function: get_search_templates | Params: {'include_default': 'True', 'template_count': '3'}
+2025-09-01 21:16:30 - api.request - [32mINFO[0m - GET /api/v1/config/templates - 200 - 0.002s
+2025-09-01 21:16:30 - api.middleware.request - [32mINFO[0m - [a8b1254c] Completed GET /api/v1/config/templates - 200 - 0.002s

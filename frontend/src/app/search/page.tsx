@@ -1,208 +1,367 @@
 // frontend/src/app/search/page.tsx
-// Diagnostic version with detailed API response logging
-
 'use client';
 
-import { useEffect, useState } from 'react';
-
-interface ApiStatus {
-  connected: boolean;
-  templates: any[];
-  error?: string;
-  rawResponse?: any;
-}
+import { useState } from 'react';
+import { Card } from '@/components/ui/Card';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export default function SearchPage() {
-  const [mounted, setMounted] = useState(false);
-  const [apiStatus, setApiStatus] = useState<ApiStatus>({
-    connected: false,
-    templates: []
-  });
-  const [isTestingConnection, setIsTestingConnection] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    testApiConnection();
-  }, []);
-
-  const testApiConnection = async () => {
-    setIsTestingConnection(true);
-    try {
-      console.log('Testing health endpoint...');
-      const healthResponse = await fetch('http://localhost:8000/health');
-      console.log('Health response status:', healthResponse.status);
-      
-      if (healthResponse.ok) {
-        console.log('Testing templates endpoint...');
-        const templatesResponse = await fetch('http://localhost:8000/api/v1/config/templates');
-        console.log('Templates response status:', templatesResponse.status);
-        
-        const templatesData = await templatesResponse.json();
-        console.log('Templates raw response:', templatesData);
-        
-        setApiStatus({
-          connected: true,
-          templates: templatesData.data?.templates || [],
-          error: undefined,
-          rawResponse: templatesData
-        });
-      } else {
-        throw new Error(`Health check failed with status: ${healthResponse.status}`);
-      }
-    } catch (error) {
-      console.error('API connection error:', error);
-      setApiStatus({
-        connected: false,
-        templates: [],
-        error: error instanceof Error ? error.message : 'Connection failed'
-      });
-    } finally {
-      setIsTestingConnection(false);
-    }
-  };
-
-  const executeSearch = async (template: any) => {
-    try {
-      console.log('Starting search with template:', template);
-      const response = await fetch('http://localhost:8000/api/v1/search/execute', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          config: template.config
-        }),
-      });
-
-      const result = await response.json();
-      console.log('Search result:', result);
-      
-      if (result.success) {
-        alert(`Search started! Task ID: ${result.data.task_id}`);
-      } else {
-        alert(`Search failed: ${result.error?.message}`);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      alert('Search request failed');
-    }
-  };
-
-  if (!mounted) {
-    return null;
-  }
+  const [isLoading, setIsLoading] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Case Search System
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Search and analyze cryptocurrency trading cases
+    <div className="h-full overflow-auto">
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* 頁面標題 */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">案例搜索</h1>
+          <p className="text-gray-600">
+            設定搜索條件，找出符合特定模式的交易案例
           </p>
         </div>
 
-        {/* Connection Status */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">System Status</h2>
-            <button
-              onClick={testApiConnection}
-              disabled={isTestingConnection}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-            >
-              {isTestingConnection ? 'Testing...' : 'Test Connection'}
-            </button>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* 左側參數設定區域 */}
+          <div className="xl:col-span-2 space-y-6">
+            
+            {/* 基本觸發條件 */}
+            <Card title="基本觸發條件">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    時間框架
+                  </label>
+                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="1h">1小時</option>
+                    <option value="4h">4小時</option>
+                    <option value="12h" defaultValue>12小時</option>
+                    <option value="1d">1天</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    價格變化 (%)
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="20" 
+                      defaultValue="7"
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <input 
+                      type="number" 
+                      defaultValue="7" 
+                      className="w-20 px-3 py-1 border border-gray-300 rounded text-center"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    成交量倍數
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="10" 
+                      step="0.5"
+                      defaultValue="2"
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      defaultValue="2" 
+                      className="w-20 px-3 py-1 border border-gray-300 rounded text-center"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    主動買入比例 (%)
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input 
+                      type="range" 
+                      min="50" 
+                      max="80" 
+                      defaultValue="65"
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <input 
+                      type="number" 
+                      min="50"
+                      max="80"
+                      defaultValue="65" 
+                      className="w-20 px-3 py-1 border border-gray-300 rounded text-center"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* 未來表現要求 */}
+            <Card title="未來表現要求">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    24小時後收益率要求 (%)
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input 
+                      type="range" 
+                      min="2" 
+                      max="15" 
+                      defaultValue="5"
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <input 
+                      type="number" 
+                      defaultValue="5" 
+                      className="w-20 px-3 py-1 border border-gray-300 rounded text-center"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    最大回撤容忍度 (%)
+                  </label>
+                  <div className="flex items-center space-x-4">
+                    <input 
+                      type="range" 
+                      min="5" 
+                      max="20" 
+                      defaultValue="10"
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <input 
+                      type="number" 
+                      defaultValue="10" 
+                      className="w-20 px-3 py-1 border border-gray-300 rounded text-center"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    觀察時間段
+                  </label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <label className="flex items-center space-x-2">
+                      <input type="checkbox" defaultChecked className="rounded border-gray-300" />
+                      <span className="text-sm">24小時</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input type="checkbox" defaultChecked className="rounded border-gray-300" />
+                      <span className="text-sm">48小時</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input type="checkbox" className="rounded border-gray-300" />
+                      <span className="text-sm">72小時</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* 篩選條件 */}
+            <Card title="篩選條件">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    時間範圍
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">開始日期</label>
+                      <input 
+                        type="date" 
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">結束日期</label>
+                      <input 
+                        type="date" 
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    交易對選擇
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-2">
+                      <input type="radio" name="symbol_selection" defaultChecked className="text-blue-600" />
+                      <span className="text-sm">單一交易對</span>
+                    </label>
+                    <div className="ml-6">
+                      <input 
+                        type="text" 
+                        placeholder="例：BTCUSDT" 
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <label className="flex items-center space-x-2">
+                      <input type="radio" name="symbol_selection" className="text-blue-600" />
+                      <span className="text-sm">多個交易對</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input type="radio" name="symbol_selection" className="text-blue-600" />
+                      <span className="text-sm">全市場掃描</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    排除條件
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center space-x-2">
+                      <input type="checkbox" defaultChecked className="rounded border-gray-300" />
+                      <span className="text-sm">排除新上市幣種 (7天內)</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input type="checkbox" className="rounded border-gray-300" />
+                      <span className="text-sm">排除穩定幣</span>
+                    </label>
+                    <label className="flex items-center space-x-2">
+                      <input type="checkbox" className="rounded border-gray-300" />
+                      <span className="text-sm">排除槓桿代幣</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-              <span>Frontend: Ready</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-3 ${
-                apiStatus.connected ? 'bg-green-500' : 'bg-red-500'
-              }`}></div>
-              <span>Backend API: {apiStatus.connected ? 'Connected' : 'Disconnected'}</span>
-              {apiStatus.error && (
-                <span className="ml-2 text-sm text-red-600">({apiStatus.error})</span>
-              )}
-            </div>
+
+          {/* 右側控制面板 */}
+          <div className="space-y-6">
+            
+            {/* 搜索控制 */}
+            <Card title="搜索控制">
+              <div className="space-y-4">
+                <button 
+                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                  disabled={isLoading}
+                  onClick={() => {
+                    setIsLoading(true);
+                    // 模擬搜索過程
+                    setTimeout(() => setIsLoading(false), 3000);
+                  }}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <LoadingSpinner size="small" />
+                      <span>搜索中...</span>
+                    </div>
+                  ) : (
+                    '開始搜索'
+                  )}
+                </button>
+
+                <button className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                  預覽結果數量
+                </button>
+
+                <button className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                  重置參數
+                </button>
+              </div>
+            </Card>
+
+            {/* 參數預設 */}
+            <Card title="參數預設">
+              <div className="space-y-3">
+                <button className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm transition-colors">
+                  動能突破模式
+                </button>
+                <button className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm transition-colors">
+                  成交量放大模式
+                </button>
+                <button className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm transition-colors">
+                  技術指標組合
+                </button>
+                <button className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm transition-colors">
+                  自定義配置
+                </button>
+              </div>
+            </Card>
+
+            {/* 預期結果 */}
+            <Card title="預期結果">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">預估案例數</span>
+                  <span className="text-sm font-medium">約 150-300</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">時間範圍</span>
+                  <span className="text-sm font-medium">6個月</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-600">預估用時</span>
+                  <span className="text-sm font-medium">2-5分鐘</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-600">結果品質</span>
+                  <span className="text-sm font-medium text-green-600">高</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* 搜索進度 */}
+            {isLoading && (
+              <Card title="搜索進度">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span>總體進度</span>
+                    <span>45%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: '45%' }}></div>
+                  </div>
+                  
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div>正在處理: BTCUSDT</div>
+                    <div>已完成: 450 / 1000 條記錄</div>
+                    <div>預計剩餘: 2分30秒</div>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         </div>
 
-        {/* Debug Information */}
-        {apiStatus.connected && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Debug Information</h2>
-            <div className="space-y-2 text-sm">
+        {/* 參數保存 */}
+        <div className="mt-8">
+          <Card title="參數管理">
+            <div className="flex items-center justify-between">
               <div>
-                <strong>Templates Array Length:</strong> {apiStatus.templates.length}
+                <h4 className="font-medium text-gray-900">保存當前配置</h4>
+                <p className="text-sm text-gray-600">將當前參數設定保存為模板，便於下次使用</p>
               </div>
-              <div>
-                <strong>Raw API Response:</strong>
-                <pre className="mt-2 bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40">
-                  {JSON.stringify(apiStatus.rawResponse, null, 2)}
-                </pre>
+              <div className="flex space-x-3">
+                <input 
+                  type="text" 
+                  placeholder="配置名稱" 
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                  保存配置
+                </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Templates Section */}
-        {apiStatus.connected && apiStatus.templates.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-4">Available Search Templates</h2>
-            <div className="grid gap-4">
-              {apiStatus.templates.map((template: any) => (
-                <div key={template.id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{template.name}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{template.description}</p>
-                      <div className="text-xs text-gray-500 mt-2">
-                        Timeframe: {template.config?.timeframe} | 
-                        Sample Limit: {template.config?.sample_limit} | 
-                        Period: {template.config?.start_date} to {template.config?.end_date}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => executeSearch(template)}
-                      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                    >
-                      Start Search
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Instructions */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-2">
-            Next Steps 📋
-          </h3>
-          <div className="text-blue-700">
-            {!apiStatus.connected ? (
-              <div>
-                <p className="mb-2">Please ensure your FastAPI backend is running:</p>
-                <code className="bg-blue-100 px-2 py-1 rounded text-sm">
-                  python run_api.py
-                </code>
-              </div>
-            ) : (
-              <div>
-                <p className="mb-2">✅ Backend connected! Check console (F12) for debug info.</p>
-                <p className="text-sm">If no templates show above, check the Debug Information section.</p>
-              </div>
-            )}
-          </div>
+          </Card>
         </div>
       </div>
     </div>
