@@ -1,0 +1,24 @@
+2025-09-02 21:34:21 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-02 21:34:21 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-02 21:34:21 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-02 21:34:21 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-02 21:34:21 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-02 21:34:21 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-02 21:34:21 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-02 21:34:21 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-02 21:34:21 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-02 21:34:21 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-02 21:47:46 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-09-02 21:47:47 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-02 21:47:47 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-02 21:47:47 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-02 21:47:47 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-02 21:47:47 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-02 21:47:47 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-02 21:47:47 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-02 21:47:47 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-02 21:47:47 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-02 21:47:47 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-02 21:55:15 - api.middleware.request - [32mINFO[0m - [f58d062f] Started GET /favicon.ico from 127.0.0.1
+2025-09-02 21:55:15 - api.request - [33mWARNING[0m - GET /favicon.ico - 404 - 0.001s
+2025-09-02 21:55:15 - api.middleware.request - [32mINFO[0m - [f58d062f] Completed GET /favicon.ico - 404 - 0.001s
