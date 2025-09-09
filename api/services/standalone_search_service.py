@@ -618,12 +618,10 @@ class StandaloneSearchService:
             
             # Generate preview
             preview_data = {
-                "estimated_symbols": len(valid_symbols),
                 "estimated_cases": min(request.sample_limit, len(valid_symbols) * 10),
-                "estimated_execution_time": f"{len(valid_symbols) * 2}-{len(valid_symbols) * 4} seconds",
-                "available_symbols": valid_symbols,
-                "warnings": [],
-                "data_quality": "real"
+                "estimated_execution_time": len(valid_symbols) * 2.5,  # 使用數字而不是字符串
+                "symbols_to_process": valid_symbols,  # 正確的欄位名
+                "potential_issues": []  # 正確的欄位名
             }
             
             return preview_data

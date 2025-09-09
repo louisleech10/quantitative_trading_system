@@ -1,0 +1,141 @@
+2025-09-09 20:39:25 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-09 20:45:33 - api.routes.case_search - [31mERROR[0m - Error generating search preview: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/routes/case_search.py", line 117, in preview_search
+    return SearchPreviewResponse(
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pydantic/main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:45:33 - api.exception_handler - [31mERROR[0m - HTTP 500: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:45:33 - api.request - [31mERROR[0m - POST /api/v1/search/preview - 500 - 0.311s
+2025-09-09 20:46:09 - api.routes.case_search - [31mERROR[0m - Error generating search preview: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/routes/case_search.py", line 117, in preview_search
+    return SearchPreviewResponse(
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pydantic/main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:46:09 - api.exception_handler - [31mERROR[0m - HTTP 500: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:46:09 - api.request - [31mERROR[0m - POST /api/v1/search/preview - 500 - 0.021s
+2025-09-09 20:48:19 - api.routes.case_search - [31mERROR[0m - Error generating search preview: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/routes/case_search.py", line 117, in preview_search
+    return SearchPreviewResponse(
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pydantic/main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:48:19 - api.exception_handler - [31mERROR[0m - HTTP 500: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:48:19 - api.request - [31mERROR[0m - POST /api/v1/search/preview - 500 - 0.028s
+2025-09-09 20:50:17 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-09 20:51:46 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-09 20:52:16 - api.routes.case_search - [31mERROR[0m - Error generating search preview: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/routes/case_search.py", line 117, in preview_search
+    return SearchPreviewResponse(
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pydantic/main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:52:16 - api.exception_handler - [31mERROR[0m - HTTP 500: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 20:52:16 - api.request - [31mERROR[0m - POST /api/v1/search/preview - 500 - 0.021s
+2025-09-09 20:54:40 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-09 21:00:38 - api.routes.case_search - [31mERROR[0m - Error generating search preview: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/routes/case_search.py", line 117, in preview_search
+    return SearchPreviewResponse(
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pydantic/main.py", line 253, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 21:00:38 - api.exception_handler - [31mERROR[0m - HTTP 500: 2 validation errors for SearchPreviewResponse
+data.estimated_execution_time
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='4-8 seconds', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.11/v/float_parsing
+data.symbols_to_process
+  Field required [type=missing, input_value={'estimated_symbols': 2, ... 'data_quality': 'real'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-09 21:00:38 - api.request - [31mERROR[0m - POST /api/v1/search/preview - 500 - 0.040s
+2025-09-09 21:12:15 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-09 21:13:11 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
