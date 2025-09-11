@@ -19,3 +19,26 @@
 2025-09-11 20:34:23 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
 2025-09-11 20:34:23 - api.startup - [32mINFO[0m - 運行環境: Development
 2025-09-11 20:34:23 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-11 20:38:28 - api.middleware.request - [32mINFO[0m - [4409e3ae] Started POST /api/v1/search/preview from 127.0.0.1
+2025-09-11 20:38:28 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config', 'start_date'), 'msg': 'Field required', 'input': {'name': 'test_preview', 'timeframe': '12h', 'initial_conditions': [], 'sample_limit': 50}}, {'type': 'missing', 'loc': ('body', 'config', 'end_date'), 'msg': 'Field required', 'input': {'name': 'test_preview', 'timeframe': '12h', 'initial_conditions': [], 'sample_limit': 50}}]
+2025-09-11 20:38:28 - api.request - [33mWARNING[0m - POST /api/v1/search/preview - 422 - 0.004s
+2025-09-11 20:38:28 - api.middleware.request - [32mINFO[0m - [4409e3ae] Completed POST /api/v1/search/preview - 422 - 0.004s
+2025-09-11 20:38:43 - api.middleware.request - [32mINFO[0m - [dffe9f7e] Started POST /api/v1/two-stage/positive from 127.0.0.1
+2025-09-11 20:38:43 - api.request - [33mWARNING[0m - POST /api/v1/two-stage/positive - 404 - 0.001s
+2025-09-11 20:38:43 - api.middleware.request - [32mINFO[0m - [dffe9f7e] Completed POST /api/v1/two-stage/positive - 404 - 0.001s
+2025-09-11 20:38:54 - api.middleware.request - [32mINFO[0m - [8b04f9dd] Started GET /api/v1/search/task/task_id from 127.0.0.1
+2025-09-11 20:38:54 - api.exception_handler - [33mWARNING[0m - HTTP 404: Task not found
+2025-09-11 20:38:54 - api.request - [33mWARNING[0m - GET /api/v1/search/task/task_id - 404 - 0.002s
+2025-09-11 20:38:54 - api.middleware.request - [32mINFO[0m - [8b04f9dd] Completed GET /api/v1/search/task/task_id - 404 - 0.002s
+2025-09-11 20:43:16 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-09-11 20:43:17 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-11 20:43:17 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-11 20:43:17 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-11 20:43:17 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-11 20:43:17 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-11 20:43:17 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-11 20:43:17 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-11 20:43:17 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-11 20:43:17 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-11 20:43:17 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-11 20:46:56 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...

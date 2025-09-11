@@ -154,6 +154,12 @@ def register_routes(app: FastAPI):
     """Register all API routes"""
     try:
         from api.routes import case_search, config
+        # 新增導入兩階段搜索路由
+        try:
+            from api.routes import two_stage_search
+            two_stage_available = True
+        except ImportError:
+            two_stage_available = False
         
         # Register search routes
         app.include_router(
@@ -168,6 +174,14 @@ def register_routes(app: FastAPI):
             prefix=settings.api_prefix,
             tags=["Configuration"]
         )
+        
+        # Register two-stage search routes if available
+        if two_stage_available:
+            app.include_router(
+                two_stage_search.router,
+                prefix=settings.api_prefix,
+                tags=["Two-Stage Search"]
+            )
         
         logger = get_logger("api.routes")
         logger.info("All API routes registered successfully")

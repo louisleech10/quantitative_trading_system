@@ -52,64 +52,90 @@ class FilterConditionRequest(BaseModel):
 
 class SearchConfigRequest(BaseModel):
     """搜索配置請求模型"""
-    name: str = Field(..., description="配置名稱", min_length=1, max_length=100)
-    description: Optional[str] = Field(None, description="配置描述", max_length=500)
+    name: str = Field(..., description="搜索配置名稱")
+    description: Optional[str] = Field(None, description="搜索描述")
+    timeframe: TimeframeEnum = Field(..., description="時間週期")
     
-    # 基本搜索參數
-    timeframe: TimeframeEnum = Field(TimeframeEnum.HOUR_12, description="時間週期")
-    start_date: Union[str, date] = Field(..., description="開始日期 (YYYY-MM-DD)")
-    end_date: Union[str, date] = Field(..., description="結束日期 (YYYY-MM-DD)")
+    # 時間範圍 - 設為可選，有預設值
+    start_date: Optional[str] = Field(None, description="開始日期 (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(None, description="結束日期 (YYYY-MM-DD)")
+    time_range: Optional[List[str]] = Field(None, description="時間範圍 [start, end]")
     
     # K線參數
-    lookback_periods: int = Field(100, description="回溯K線數量", ge=1, le=500)
-    forward_periods: int = Field(6, description="向前看K線數量", ge=1, le=50)
+    lookback_periods: int = Field(default=100, ge=1, le=1000, description="回看週期數")
+    forward_periods: int = Field(default=20, ge=1, le=100, description="前瞻週期數")
     
     # 採樣參數
-    sample_limit: int = Field(500, description="樣本數量限制", ge=1, le=5000)
-    min_volume: float = Field(0, description="最小成交量要求", ge=0)
-    exclude_new_listing_days: int = Field(7, description="排除新上市後天數", ge=0, le=365)
+    sample_limit: int = Field(default=500, ge=1, le=10000, description="樣本數量限制")
+    min_volume: float = Field(default=0, ge=0, description="最小成交量")
+    exclude_new_listing_days: int = Field(default=7, ge=0, le=365, description="排除新上市天數")
     
-    # 篩選條件
-    initial_conditions: List[FilterConditionRequest] = Field(
-        default_factory=list, 
-        description="初始篩選條件"
-    )
-    advanced_conditions: List[FilterConditionRequest] = Field(
-        default_factory=list,
-        description="高級篩選條件"
-    )
+    # 搜索條件
+    initial_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="初始條件")
+    advanced_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="高級條件")
     
-    # 正反例採樣配置
-    negative_sampling: bool = Field(True, description="是否生成負例")
-    positive_negative_ratio: float = Field(1.0, description="正負例比例", gt=0, le=10)
+    def __init__(self, **data):
+        super().__init__(**data)
+        
+        # 如果沒有提供時間範圍，設置預設值
+        if not self.start_date and not self.time_range:
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=90)  # 預設3個月
+            self.start_date = start_date.strftime('%Y-%m-%d')
+            self.end_date = end_date.strftime('%Y-%m-%d')
+        
+        # 同步 time_range 和 start_date/end_date
+        if self.start_date and self.end_date and not self.time_range:
+            self.time_range = [self.start_date, self.end_date]
+        elif self.time_range and len(self.time_range) == 2:
+            self.start_date = self.time_range[0]
+            self.end_date = self.time_range[1]
     
-    # 批次處理參數
-    batch_size: int = Field(20, description="批次處理大小", ge=1, le=100)
+    class Config:
+        schema_extra = {
+            "example": {
+                "name": "動能突破搜索",
+                "description": "尋找大漲前的動能訊號",
+                "timeframe": "12h",
+                "start_date": "2024-01-01",
+                "end_date": "2024-06-30",
+                "sample_limit": 100,
+                "min_volume": 1000000,
+                "initial_conditions": [
+                    {
+                        "condition_type": "price_change",
+                        "parameter": "price_change_pct",
+                        "operator": ">=",
+                        "value": 0.05,
+                        "description": "價格上漲5%以上"
+                    }
+                ]
+            }
+        }
+
+# 新增 NegativeCaseRequest 模型
+
+class NegativeCaseRequest(BaseModel):
+    """反例搜索請求模型"""
+    search_config: SearchConfigRequest = Field(..., description="反例搜索配置")
+    negative_ratio: float = Field(default=2.0, ge=1.0, le=5.0, description="反例與正例的比例")
+    time_separation_days: int = Field(default=7, ge=1, le=30, description="時間分離天數")
+    sampling_strategy: str = Field(default="time_separated", description="採樣策略")
     
-    @validator('start_date', 'end_date', pre=True)
-    def parse_date(cls, v):
-        """解析日期字串"""
-        if isinstance(v, str):
-            try:
-                return datetime.strptime(v, '%Y-%m-%d').date()
-            except ValueError:
-                raise ValueError("日期格式必須為 YYYY-MM-DD")
-        return v
-    
-    @validator('end_date')
-    def validate_date_range(cls, v, values):
-        """驗證日期範圍"""
-        start_date = values.get('start_date')
-        if start_date and v <= start_date:
-            raise ValueError("結束日期必須晚於開始日期")
-        return v
-    
-    @validator('initial_conditions', 'advanced_conditions')
-    def validate_conditions(cls, v):
-        """驗證條件列表"""
-        if len(v) > 20:  # 限制條件數量
-            raise ValueError("條件數量不能超過20個")
-        return v
+    class Config:
+        schema_extra = {
+            "example": {
+                "search_config": {
+                    "name": "negative_example_search",
+                    "timeframe": "12h",
+                    "initial_conditions": []
+                },
+                "negative_ratio": 2.0,
+                "time_separation_days": 7,
+                "sampling_strategy": "time_separated"
+            }
+        }
 
 class SearchPreviewRequest(BaseModel):
     """搜索預覽請求模型"""
