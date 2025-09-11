@@ -241,7 +241,7 @@ class NegativeCaseRequest(BaseModel):
     sampling_strategy: str = Field(default="time_separated", description="採樣策略")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "search_config": {
                     "name": "negative_example_search",

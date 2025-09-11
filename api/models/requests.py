@@ -74,9 +74,8 @@ class SearchConfigRequest(BaseModel):
     initial_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="初始條件")
     advanced_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="高級條件")
     
-    def __init__(self, **data):
-        super().__init__(**data)
-        
+    def model_post_init(self, __context):
+        """Pydantic V2 的 post-init 方法"""
         # 如果沒有提供時間範圍，設置預設值
         if not self.start_date and not self.time_range:
             from datetime import datetime, timedelta
@@ -92,8 +91,8 @@ class SearchConfigRequest(BaseModel):
             self.start_date = self.time_range[0]
             self.end_date = self.time_range[1]
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "name": "動能突破搜索",
                 "description": "尋找大漲前的動能訊號",
@@ -113,6 +112,7 @@ class SearchConfigRequest(BaseModel):
                 ]
             }
         }
+    }
 
 # 新增 NegativeCaseRequest 模型
 
@@ -124,7 +124,7 @@ class NegativeCaseRequest(BaseModel):
     sampling_strategy: str = Field(default="time_separated", description="採樣策略")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "search_config": {
                     "name": "negative_example_search",
