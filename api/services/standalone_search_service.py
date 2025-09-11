@@ -288,8 +288,8 @@ class StandaloneSearchService:
             
             # 準備時間範圍
             time_range = (
-                request.start_date.strftime('%Y-%m-%d'),
-                request.end_date.strftime('%Y-%m-%d')
+                request.start_date,
+                request.end_date
             )
             
             # 創建基本搜索配置
@@ -565,8 +565,8 @@ class StandaloneSearchService:
                     negative_cases=negative_cases,
                     unique_symbols=len(set(c.symbol for c in real_cases)),
                     time_range={
-                        "start": request.start_date.strftime('%Y-%m-%d'),
-                        "end": request.end_date.strftime('%Y-%m-%d')
+                        "start": request.start_date,
+                        "end": request.end_date
                     },
                     market_phase_distribution=phase_dist
                 ),
