@@ -604,7 +604,7 @@ class StandaloneSearchService:
             self._active_searches -= 1
     
     async def preview_search(self, request: SearchConfigRequest,
-                           symbols_limit: int = 10) -> Dict[str, Any]:
+                       symbols_limit: int = 10) -> Dict[str, Any]:
         """Preview search results without executing full search"""
         # Ensure momentum modules are loaded before preview
         if not self._ensure_momentum_loaded():
@@ -616,19 +616,60 @@ class StandaloneSearchService:
             valid_symbols = [s for s in all_symbols[:symbols_limit] if s.endswith('USDT')]
             self.logger.info("Using real symbol list for preview")
             
-            # Generate preview
+            # Calculate estimates more accurately
+            estimated_cases = min(request.sample_limit, len(valid_symbols) * 5)
+            estimated_time = max(2.0, len(valid_symbols) * 1.5)  # 至少2秒，每個symbol大約1.5秒
+            
+            # Generate preview data with correct format
             preview_data = {
-                "estimated_cases": min(request.sample_limit, len(valid_symbols) * 10),
-                "estimated_execution_time": len(valid_symbols) * 2.5,  # 使用數字而不是字符串
-                "symbols_to_process": valid_symbols,  # 正確的欄位名
-                "potential_issues": []  # 正確的欄位名
+                "estimated_cases": estimated_cases,
+                "estimated_execution_time": round(estimated_time, 1),  # 確保是數字
+                "symbols_to_process": valid_symbols[:10],  # 限制返回的symbol數量
+                "potential_issues": self._check_potential_issues(request, valid_symbols)
             }
             
             return preview_data
-            
         except Exception as e:
             self.logger.error(f"Preview failed: {str(e)}")
-            raise SearchExecutionException(f"Preview generation failed: {str(e)}")
+            # 如果無法獲取真實數據，返回預設值
+            return {
+                "estimated_cases": min(request.sample_limit, 50),
+                "estimated_execution_time": 10.0,  # 數字而不是字符串
+                "symbols_to_process": ["BTCUSDT", "ETHUSDT"],  # 預設值
+                "potential_issues": ["Unable to fetch real symbol list"]
+            }
+    def _check_potential_issues(self, request: SearchConfigRequest, 
+                           symbols: List[str]) -> List[str]:
+        """檢查潛在問題"""
+        issues = []
+        
+        # 檢查條件數量
+        if not request.initial_conditions:
+            issues.append("No initial conditions specified")
+        
+        if len(request.initial_conditions) > 5:
+            issues.append("Too many conditions may result in very few matches")
+        
+        # 檢查時間範圍
+        if request.time_range:
+            start_date = datetime.fromisoformat(request.time_range[0])
+            end_date = datetime.fromisoformat(request.time_range[1])
+            days_diff = (end_date - start_date).days
+            
+            if days_diff < 30:
+                issues.append("Short time range may limit results")
+            elif days_diff > 365:
+                issues.append("Long time range may slow down search")
+        
+        # 檢查symbol數量
+        if len(symbols) < 5:
+            issues.append("Few symbols available for search")
+        
+        # 檢查sample_limit
+        if request.sample_limit > 1000:
+            issues.append("Large sample limit may increase processing time")
+        
+        return issues
     
     def get_task_status(self, task_id: str) -> Optional[TaskInfo]:
         """Get task status"""

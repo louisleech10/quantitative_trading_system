@@ -105,18 +105,26 @@ async def preview_search(request: SearchPreviewRequest):
             symbols_limit=request.symbols_limit
         )
         
+        # Ensure data format is correct
+        validated_data = {
+            "estimated_cases": int(preview_data.get("estimated_cases", 0)),
+            "estimated_execution_time": float(preview_data.get("estimated_execution_time", 10.0)),
+            "symbols_to_process": preview_data.get("symbols_to_process", []),
+            "potential_issues": preview_data.get("potential_issues", [])
+        }
+        
         log_function_call(
             "preview_search",
             {
                 "config_name": request.config.name,
                 "timeframe": request.config.timeframe,
-                "estimated_cases": preview_data["estimated_cases"]
+                "estimated_cases": validated_data["estimated_cases"]
             }
         )
         
         return SearchPreviewResponse(
             success=True,
-            data=preview_data
+            data=validated_data
         )
         
     except Exception as e:
