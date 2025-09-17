@@ -44,7 +44,8 @@ async def start_positive_search(
 ):
     """開始正例搜索（第一階段）"""
     try:
-        task_id = await search_task_service.execute_positive_search(request, symbols)
+        from ..services.standalone_search_service import standalone_search_service
+        task_id = await standalone_search_service.execute_search(request, symbols)
         
         task_info = {
             "task_id": task_id,

@@ -1015,3 +1015,191 @@ data.config_name
 2025-09-17 20:35:36 - api.middleware.request - [32mINFO[0m - [ccaa7c68] Started POST /api/v1/two-stage/negative/69365bb0-8c63-4842-bbf2-e304bcb0e324 from 127.0.0.1
 2025-09-17 20:35:36 - api.request - [32mINFO[0m - POST /api/v1/two-stage/negative/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 200 - 0.004s
 2025-09-17 20:35:36 - api.middleware.request - [32mINFO[0m - [ccaa7c68] Completed POST /api/v1/two-stage/negative/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 200 - 0.004s
+2025-09-17 20:38:10 - api.middleware.request - [32mINFO[0m - [b977a096] Started GET /api/v1/search/task/69365bb0-8c63-4842-bbf2-e304bcb0e324 from 127.0.0.1
+2025-09-17 20:38:10 - api.exception_handler - [33mWARNING[0m - HTTP 404: Task not found
+2025-09-17 20:38:10 - api.request - [33mWARNING[0m - GET /api/v1/search/task/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 404 - 0.003s
+2025-09-17 20:38:10 - api.middleware.request - [32mINFO[0m - [b977a096] Completed GET /api/v1/search/task/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 404 - 0.003s
+2025-09-17 20:39:14 - api.middleware.request - [32mINFO[0m - [94515285] Started GET /api/v1/search/task/69365bb0-8c63-4842-bbf2-e304bcb0e324 from 127.0.0.1
+2025-09-17 20:39:14 - api.exception_handler - [33mWARNING[0m - HTTP 404: Task not found
+2025-09-17 20:39:14 - api.request - [33mWARNING[0m - GET /api/v1/search/task/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 404 - 0.001s
+2025-09-17 20:39:14 - api.middleware.request - [32mINFO[0m - [94515285] Completed GET /api/v1/search/task/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 404 - 0.001s
+2025-09-17 20:39:54 - api.middleware.request - [32mINFO[0m - [f4803f68] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-17 20:39:54 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config'), 'msg': 'Field required', 'input': {'name': 'basic_test', 'timeframe': '12h', 'initial_conditions': [], 'start_date': '2023-01-01', 'end_date': '2023-01-31'}}]
+2025-09-17 20:39:54 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.005s
+2025-09-17 20:39:54 - api.middleware.request - [32mINFO[0m - [f4803f68] Completed POST /api/v1/search/execute - 422 - 0.005s
+2025-09-17 20:40:27 - api.middleware.request - [32mINFO[0m - [efa38ab6] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-17 20:40:27 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-09-17 20:40:27 - api.routes.case_search - [33mWARNING[0m - Validation error in search execution: At least one initial condition is required
+2025-09-17 20:40:27 - api.exception_handler - [33mWARNING[0m - HTTP 422: At least one initial condition is required
+2025-09-17 20:40:27 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.002s
+2025-09-17 20:40:27 - api.middleware.request - [32mINFO[0m - [efa38ab6] Completed POST /api/v1/search/execute - 422 - 0.002s
+2025-09-17 20:40:56 - api.middleware.request - [32mINFO[0m - [97a90f76] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-17 20:40:56 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'missing', 'loc': ('body', 'config', 'initial_conditions', 0, 'condition_type'), 'msg': 'Field required', 'input': {'parameter': 'price_change', 'operator': '>=', 'value': 5.0}}]
+2025-09-17 20:40:56 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.006s
+2025-09-17 20:40:56 - api.middleware.request - [32mINFO[0m - [97a90f76] Completed POST /api/v1/search/execute - 422 - 0.006s
+2025-09-17 20:41:28 - api.middleware.request - [32mINFO[0m - [fe6d6cbd] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-17 20:41:28 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'enum', 'loc': ('body', 'config', 'initial_conditions', 0, 'condition_type'), 'msg': "Input should be 'price', 'volume' or 'pattern'", 'input': 'range', 'ctx': {'expected': "'price', 'volume' or 'pattern'"}}]
+2025-09-17 20:41:28 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.003s
+2025-09-17 20:41:28 - api.middleware.request - [32mINFO[0m - [fe6d6cbd] Completed POST /api/v1/search/execute - 422 - 0.003s
+2025-09-17 20:42:22 - api.middleware.request - [32mINFO[0m - [e6d3be71] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-17 20:42:22 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-09-17 20:42:22 - api.standalone_search_service - [32mINFO[0m - Loading momentum modules on demand...
+2025-09-17 20:42:26 - api.standalone_search_service - [32mINFO[0m - ✅ Momentum modules loaded successfully on demand
+2025-09-17 20:42:26 - api.standalone_task_manager - [32mINFO[0m - Created task 8f0e9a2b-ec78-4032-a52e-383cc15f0b55 for config: basic_test
+2025-09-17 20:42:26 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'basic_test', 'timeframe': 'TimeframeEnum.HOUR_12', 'symbols_count': '0'}
+2025-09-17 20:42:26 - api.standalone_task_manager - [32mINFO[0m - Updated task 8f0e9a2b-ec78-4032-a52e-383cc15f0b55 status to running
+2025-09-17 20:42:26 - api.standalone_search_service - [32mINFO[0m - Running real search for: basic_test
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: basic_test
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2023-01-01 to 2023-01-31
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
+2025-09-17 20:42:26 - api.momentum_wrapper - [32mINFO[0m - Getting data for BTCUSDT: 2023-01-01 to 2023-01-31
+2025-09-17 20:42:26 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 60 records for BTCUSDT
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
+2025-09-17 20:42:26 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 59/60 有效值 (1 NaN)
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 60/60 有效值 (0 NaN)
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 60/60 有效值 (0 NaN)
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 60/60 有效值 (0 NaN)
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 60/60 有效值 (0 NaN)
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 59/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 58/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 57/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 56/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 55/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 54/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 53/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 52/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 51/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 50/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 49/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 48/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 59/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 58/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 57/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 56/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 55/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 54/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 53/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 52/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 51/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 50/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 49/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 48/60 有效值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 60/60 有效值, 2 唯一值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 60/60 有效值, 7 唯一值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 60/60 有效值, 1 唯一值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 60/60 有效值, 1 唯一值
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No initial candidates found for BTCUSDT
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No cases found for BTCUSDT
+2025-09-17 20:42:27 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 0 cases
+2025-09-17 20:42:27 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
+2025-09-17 20:42:27 - api.standalone_task_manager - [32mINFO[0m - Updated task 8f0e9a2b-ec78-4032-a52e-383cc15f0b55 status to failed
+2025-09-17 20:42:27 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 4.950s
+2025-09-17 20:42:27 - api.middleware.request - [32mINFO[0m - [e6d3be71] Completed POST /api/v1/search/execute - 200 - 4.950s
+2025-09-17 20:43:13 - api.middleware.request - [32mINFO[0m - [eee75064] Started GET /api/v1/search/task/8f0e9a2b-ec78-4032-a52e-383cc15f0b55 from 127.0.0.1
+2025-09-17 20:43:13 - api.request - [32mINFO[0m - GET /api/v1/search/task/8f0e9a2b-ec78-4032-a52e-383cc15f0b55 - 200 - 0.002s
+2025-09-17 20:43:13 - api.middleware.request - [32mINFO[0m - [eee75064] Completed GET /api/v1/search/task/8f0e9a2b-ec78-4032-a52e-383cc15f0b55 - 200 - 0.002s
+2025-09-17 20:46:06 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-09-17 20:46:07 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-17 20:46:07 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-17 20:46:07 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-17 20:46:07 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-17 20:46:07 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-17 20:46:07 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-17 20:46:07 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-17 20:46:07 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-17 20:46:07 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-17 20:46:07 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-17 20:46:55 - api.middleware.request - [32mINFO[0m - [1fc2547a] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-17 20:46:55 - api.routes.case_search - [32mINFO[0m - Starting search execution
+2025-09-17 20:46:55 - api.standalone_search_service - [32mINFO[0m - Loading momentum modules on demand...
+2025-09-17 20:46:55 - api.standalone_search_service - [32mINFO[0m - ✅ Momentum modules loaded successfully on demand
+2025-09-17 20:46:55 - api.standalone_task_manager - [32mINFO[0m - Created task 08b4ab6e-78b1-4936-8782-b214dfd21461 for config: basic_test
+2025-09-17 20:46:55 - api.function_call - [32mINFO[0m - Function: execute_search | Params: {'config_name': 'basic_test', 'timeframe': 'TimeframeEnum.HOUR_12', 'symbols_count': '0'}
+2025-09-17 20:46:55 - api.standalone_task_manager - [32mINFO[0m - Updated task 08b4ab6e-78b1-4936-8782-b214dfd21461 status to running
+2025-09-17 20:46:55 - api.standalone_search_service - [32mINFO[0m - Running real search for: basic_test
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: basic_test
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2023-01-01 to 2023-01-31
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
+2025-09-17 20:46:55 - api.momentum_wrapper - [32mINFO[0m - Getting data for BTCUSDT: 2023-01-01 to 2023-01-31
+2025-09-17 20:46:55 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 60 records for BTCUSDT
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
+2025-09-17 20:46:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 59/60 有效值 (1 NaN)
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 60/60 有效值 (0 NaN)
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 60/60 有效值 (0 NaN)
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 60/60 有效值 (0 NaN)
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 60/60 有效值 (0 NaN)
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 59/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 58/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 57/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 56/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 55/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 54/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 53/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 52/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 51/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 50/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 49/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 48/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 59/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 58/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 57/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 56/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 55/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 54/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 53/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 52/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 51/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 50/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 49/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 48/60 有效值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 60/60 有效值, 2 唯一值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 60/60 有效值, 7 唯一值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 60/60 有效值, 1 唯一值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 60/60 有效值, 1 唯一值
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No initial candidates found for BTCUSDT
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No cases found for BTCUSDT
+2025-09-17 20:46:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 0 cases
+2025-09-17 20:46:56 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
+2025-09-17 20:46:56 - api.standalone_task_manager - [32mINFO[0m - Updated task 08b4ab6e-78b1-4936-8782-b214dfd21461 status to failed
+2025-09-17 20:46:56 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 1.095s
+2025-09-17 20:46:56 - api.middleware.request - [32mINFO[0m - [1fc2547a] Completed POST /api/v1/search/execute - 200 - 1.095s
+2025-09-17 20:47:48 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-17 20:47:48 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-17 20:47:48 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-17 20:47:48 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-17 20:47:48 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-17 20:47:48 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-17 20:47:48 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-17 20:47:48 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-17 20:47:48 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-17 20:47:48 - api.startup - [32mINFO[0m - API 前綴: /api/v1

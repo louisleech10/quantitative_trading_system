@@ -30,3 +30,5 @@ data.config_name
   Field required [type=missing, input_value={'task_id': '73859a13-7fb...4842-bbf2-e304bcb0e324'}, input_type=dict]
     For further information visit https://errors.pydantic.dev/2.11/v/missing
 2025-09-17 20:33:49 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/69365bb0-8c63-4842-bbf2-e304bcb0e324 - 500 - 0.006s
+2025-09-17 20:42:26 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-17 20:46:55 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
