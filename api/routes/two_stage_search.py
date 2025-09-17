@@ -77,6 +77,8 @@ async def start_negative_search(
             "task_id": negative_task_id,
             "status": "running",
             "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),  # 添加這個
+            "config_name": request.search_config.name,  # 添加這個
             "positive_task_id": positive_task_id
         }
         
