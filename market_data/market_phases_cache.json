@@ -1,6 +1,6 @@
 {
-  "EXTREME_FEAR_20200316": {
-    "start_date": "2020-03-16",
+  "EXTREME_FEAR_20200323": {
+    "start_date": "2020-03-23",
     "end_date": "2020-04-26",
     "description": "EXTREME_FEAR"
   },
@@ -481,7 +481,7 @@
   },
   "NEUTRAL_20250818": {
     "start_date": "2025-08-18",
-    "end_date": "2025-09-14",
+    "end_date": "2025-09-21",
     "description": "NEUTRAL"
   }
 }

@@ -50,7 +50,9 @@ async def start_positive_search(
             "task_id": task_id,
             "status": "running", 
             "created_at": datetime.now().isoformat(),
-            "name": request.name
+            "updated_at": datetime.now().isoformat(),  # 添加這個
+            "name": request.name,
+            "config_name": request.name  # 添加這個
         }
         
         return TaskStartResponse(success=True, data=task_info)
