@@ -1,6 +1,0 @@
-2025-06-29 14:47:22 - api.middleware.request - [32mINFO[0m - [1474cf69] Started GET /api/v1/docs from 127.0.0.1
-2025-06-29 14:47:22 - api.request - [32mINFO[0m - GET /api/v1/docs - 200 - 0.052s
-2025-06-29 14:47:22 - api.middleware.request - [32mINFO[0m - [1474cf69] Completed GET /api/v1/docs - 200 - 0.052s
-2025-06-29 14:47:23 - api.middleware.request - [32mINFO[0m - [29b74b2b] Started GET /api/v1/openapi.json from 127.0.0.1
-2025-06-29 14:47:23 - api.request - [32mINFO[0m - GET /api/v1/openapi.json - 200 - 0.147s
-2025-06-29 14:47:23 - api.middleware.request - [32mINFO[0m - [29b74b2b] Completed GET /api/v1/openapi.json - 200 - 0.147s
