@@ -38,56 +38,47 @@ async def execute_search(
 ):
     """
     Execute case search asynchronously
-    
-    This endpoint starts a search task and returns immediately with a task ID.
-    Use the task status endpoint to monitor progress and retrieve results.
+    現在統一使用SearchTaskService，支持兩階段搜索
     """
     try:
-        start_time = logger.info("Starting search execution")
+        # 導入SearchTaskService
+        from ..services.search_task_service import search_task_service
+        from ..models.requests import SearchConfigRequest
+        from datetime import datetime
         
-        # Validate request
-        if not request.config.initial_conditions:
-            raise ValidationException("At least one initial condition is required")
-        
-        # Execute search asynchronously
-        task_id = await search_service.execute_search(
-            request.config,
-            symbols=request.symbols
+        # 將CaseSearchRequest轉換為SearchConfigRequest
+        search_config = SearchConfigRequest(
+            name=request.config.name,
+            description=request.config.description or "",
+            timeframe=request.config.timeframe,
+            start_date=request.config.start_date,
+            end_date=request.config.end_date,
+            initial_conditions=request.config.initial_conditions,
+            advanced_conditions=getattr(request.config, 'advanced_conditions', [])
         )
         
-        # Get initial task info
-        task_info = search_service.get_task_status(task_id)
-        if not task_info:
-            raise SearchExecutionException("Failed to create search task")
-        
-        # Schedule cleanup task
-        background_tasks.add_task(search_service.cleanup_old_tasks)
-        
-        log_function_call(
-            "execute_search",
-            {
-                "config_name": request.config.name,
-                "timeframe": request.config.timeframe,
-                "symbols_count": len(request.symbols) if request.symbols else 0
-            }
+        # 使用SearchTaskService執行搜索
+        task_id = await search_task_service.execute_positive_search(
+            search_config, 
+            request.symbols
         )
         
-        return TaskStartResponse(
-            success=True,
-            data=task_info
-        )
+        # 構造返回信息
+        task_info = {
+            "task_id": task_id,
+            "status": "running",
+            "created_at": datetime.now().isoformat(),
+            "updated_at": datetime.now().isoformat(),
+            "config_name": request.config.name,
+            "progress": None,
+            "error_message": None
+        }
         
-    except ValidationException as e:
-        logger.warning(f"Validation error in search execution: {str(e)}")
-        raise HTTPException(status_code=422, detail=str(e))
-    
-    except SearchExecutionException as e:
-        logger.error(f"Search execution error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        return TaskStartResponse(success=True, data=task_info)
+        
     except Exception as e:
-        logger.error(f"Unexpected error in search execution: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"Search execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/preview", response_model=SearchPreviewResponse)
 async def preview_search(request: SearchPreviewRequest):

@@ -65,6 +65,9 @@ class CaseData(BaseModel):
     volume: float = Field(..., description="成交量")
     price_change: float = Field(..., description="價格變化百分比")
     market_phase: str = Field(..., description="市場階段")
+
+    # 新增：正反例標記字段
+    positive_case: Optional[bool] = Field(None, description="是否為正例（True=正例，False=反例，None=未標記）")
     
     # ===== 新增：基礎觸發條件參數 (5個新增) =====
     timeframe: Optional[str] = Field(None, description="時間框架")
