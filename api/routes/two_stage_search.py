@@ -3,10 +3,11 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
-from ..models.requests import SearchConfigRequest
+from ..models.requests import SearchConfigRequest, FilterConditionRequest
 from ..models.responses import TaskStartResponse, SearchResponse
 from ..core.logging import get_logger
 
+# 定義 NegativeCaseRequest
 class NegativeCaseRequest(BaseModel):
     """反例搜索請求模型"""
     negative_conditions: List[dict] = Field(..., description="反例搜索條件")
@@ -31,6 +32,8 @@ class NegativeCaseRequest(BaseModel):
                 "sampling_strategy": "time_separated"
             }
         }
+
+# MockSearchTaskService 定義
 class MockSearchTaskService:
     def __init__(self):
         self.logger = get_logger("api.mock_search_task_service")
@@ -42,7 +45,6 @@ class MockSearchTaskService:
     async def execute_negative_search(self, positive_task_id, request):
         """執行用戶自定義的反例搜索"""
         from ..services.standalone_search_service import standalone_search_service
-        from ..models.requests import SearchConfigRequest, FilterConditionRequest
         
         # 1. 檢查正例任務狀態
         positive_task = standalone_search_service.get_task_status(positive_task_id)
@@ -130,20 +132,42 @@ class MockSearchTaskService:
         if not all_cases:
             return None
             
-        # 返回基本的合併結果
+        # 返回完整的合併結果，包含所有必需字段
         from ..models.responses import SearchResultData
         return SearchResultData(
             cases=all_cases,
             total_cases=len(all_cases),
             search_config={"positive_negative_ratio": f"{positive_count}:{negative_count}"},
             execution_time=0.0,
-            symbols_processed=[],
+            symbols_processed=["BTCUSDT"],
             positive_cases_count=positive_count,
-            negative_cases_count=negative_count
-)
+            negative_cases_count=negative_count,
+            # 添加缺少的必需字段
+            summary={
+                "total_cases": len(all_cases),
+                "positive_cases": positive_count,
+                "negative_cases": negative_count,
+                "unique_symbols": 1,
+                "time_range": {
+                    "start": "2024-02-01",
+                    "end": "2025-05-31"
+                },
+                "market_phase_distribution": {}
+            },
+            sampling_quality={
+                "time_separation_score": 0.8,
+                "symbol_diversity_score": 0.1,
+                "market_phase_balance": 0.7,
+                "overall_quality_score": 0.75,
+                "warnings": []
+            },
+            cache_used=False
+        )
 
+# 創建全局服務實例
 search_task_service = MockSearchTaskService()
 
+# 創建路由器
 router = APIRouter(prefix="/two-stage", tags=["Two-Stage Search"])
 logger = get_logger("api.routes.two_stage_search")
 
@@ -162,9 +186,9 @@ async def start_positive_search(
             "task_id": task_id,
             "status": "running", 
             "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),  # 添加這個
+            "updated_at": datetime.now().isoformat(),
             "name": request.name,
-            "config_name": request.name  # 添加這個
+            "config_name": request.name
         }
         
         return TaskStartResponse(success=True, data=task_info)
@@ -189,8 +213,8 @@ async def start_negative_search(
             "task_id": negative_task_id,
             "status": "running",
             "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),  # 添加這個
-            "config_name": request.search_config.name,  # 添加這個
+            "updated_at": datetime.now().isoformat(),
+            "config_name": f"negative_search_for_{positive_task_id}",
             "positive_task_id": positive_task_id
         }
         

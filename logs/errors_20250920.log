@@ -22,3 +22,28 @@
 2025-09-20 14:15:57 - api.exception_handler - [31mERROR[0m - HTTP 500: 'NegativeCaseRequest' object has no attribute 'search_config'
 2025-09-20 14:15:57 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
 2025-09-20 14:16:00 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/a7960148-e71b-40fb-be7d-959832ac927b - 500 - 2.852s
+2025-09-20 14:21:09 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:22:32 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:25:51 - api.routes.two_stage_search - [31mERROR[0m - Error getting combined results: 3 validation errors for SearchResultData
+summary
+  Field required [type=missing, input_value={'cases': [{'symbol': 'BT...gative_cases_count': 46}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+sampling_quality
+  Field required [type=missing, input_value={'cases': [{'symbol': 'BT...gative_cases_count': 46}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+cache_used
+  Field required [type=missing, input_value={'cases': [{'symbol': 'BT...gative_cases_count': 46}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-20 14:25:51 - api.exception_handler - [31mERROR[0m - HTTP 500: 3 validation errors for SearchResultData
+summary
+  Field required [type=missing, input_value={'cases': [{'symbol': 'BT...gative_cases_count': 46}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+sampling_quality
+  Field required [type=missing, input_value={'cases': [{'symbol': 'BT...gative_cases_count': 46}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+cache_used
+  Field required [type=missing, input_value={'cases': [{'symbol': 'BT...gative_cases_count': 46}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+2025-09-20 14:25:51 - api.request - [31mERROR[0m - GET /api/v1/two-stage/combined/b173bd3d-a389-4965-aec9-f436c605b477/38616d01-694e-483b-8d07-17e3522e3287 - 500 - 0.027s
+2025-09-20 14:36:02 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:37:22 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
