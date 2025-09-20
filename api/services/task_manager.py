@@ -673,6 +673,22 @@ class CaseSearchIntegrationService:
             )
             config.add_advanced_condition(condition)
         
+        # 手動添加 time_range 屬性以確保兼容性（參照測試腳本）
+        if request.time_range:
+            config.time_range = request.time_range
+        
+        # 確保有預設條件（如果沒有提供任何條件的話）
+        if not request.initial_conditions and not request.advanced_conditions:
+            # 添加預設的價格變化條件（參照測試腳本）
+            default_condition = FilterCondition(
+                condition_type="price",
+                parameter="price_change", 
+                operator=">=",
+                value=0.03,  # 3%漲幅（與測試腳本一致）
+                description="預設價格漲幅條件"
+            )
+            config.add_initial_condition(default_condition)
+        
         return config
     
     async def _process_raw_cases(self, raw_cases: List[Dict], symbol: str) -> List[CaseData]:
