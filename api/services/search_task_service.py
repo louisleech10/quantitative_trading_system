@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
+from pydantic import BaseModel, Field
 from ..core.config import settings
 from ..core.logging import get_logger
 from ..models.requests import SearchConfigRequest, NegativeCaseRequest

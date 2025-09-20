@@ -47,3 +47,22 @@ cache_used
 2025-09-20 14:25:51 - api.request - [31mERROR[0m - GET /api/v1/two-stage/combined/b173bd3d-a389-4965-aec9-f436c605b477/38616d01-694e-483b-8d07-17e3522e3287 - 500 - 0.027s
 2025-09-20 14:36:02 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
 2025-09-20 14:37:22 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:02:12 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:03:25 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:20:09 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:21:45 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:22:57 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: Positive search results not found for task 47ce44f8-d695-42f9-8627-b51941ea67e6
+2025-09-20 22:22:57 - api.exception_handler - [31mERROR[0m - HTTP 500: Positive search results not found for task 47ce44f8-d695-42f9-8627-b51941ea67e6
+2025-09-20 22:22:57 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/47ce44f8-d695-42f9-8627-b51941ea67e6 - 500 - 0.006s
+2025-09-20 22:23:48 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: Positive search results not found for task 47ce44f8-d695-42f9-8627-b51941ea67e6
+2025-09-20 22:23:48 - api.exception_handler - [31mERROR[0m - HTTP 500: Positive search results not found for task 47ce44f8-d695-42f9-8627-b51941ea67e6
+2025-09-20 22:23:48 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/47ce44f8-d695-42f9-8627-b51941ea67e6 - 500 - 0.002s
+2025-09-20 22:29:17 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:31:05 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:33:03 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: Positive search results not found for task 92f29f07-6dc7-4876-9527-558dd5c600ca
+2025-09-20 22:33:03 - api.exception_handler - [31mERROR[0m - HTTP 500: Positive search results not found for task 92f29f07-6dc7-4876-9527-558dd5c600ca
+2025-09-20 22:33:03 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/92f29f07-6dc7-4876-9527-558dd5c600ca - 500 - 0.004s
+2025-09-20 22:34:23 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 22:35:49 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: Positive search results not found for task 51af3c57-68c1-424c-8b36-28a6369e9c75
+2025-09-20 22:35:49 - api.exception_handler - [31mERROR[0m - HTTP 500: Positive search results not found for task 51af3c57-68c1-424c-8b36-28a6369e9c75
+2025-09-20 22:35:49 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/51af3c57-68c1-424c-8b36-28a6369e9c75 - 500 - 0.006s

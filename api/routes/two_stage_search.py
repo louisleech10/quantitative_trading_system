@@ -165,7 +165,7 @@ class MockSearchTaskService:
         )
 
 # 創建全局服務實例
-search_task_service = MockSearchTaskService()
+from ..services.search_task_service import search_task_service
 
 # 創建路由器
 router = APIRouter(prefix="/two-stage", tags=["Two-Stage Search"])
@@ -179,8 +179,7 @@ async def start_positive_search(
 ):
     """開始正例搜索（第一階段）"""
     try:
-        from ..services.standalone_search_service import standalone_search_service
-        task_id = await standalone_search_service.execute_search(request, symbols)
+        task_id = await search_task_service.execute_positive_search(request, symbols)
         
         task_info = {
             "task_id": task_id,
