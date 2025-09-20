@@ -7,15 +7,30 @@ from ..models.requests import SearchConfigRequest
 from ..models.responses import TaskStartResponse, SearchResponse
 from ..core.logging import get_logger
 
-# 暫時定義 NegativeCaseRequest
 class NegativeCaseRequest(BaseModel):
     """反例搜索請求模型"""
-    search_config: SearchConfigRequest = Field(..., description="反例搜索配置")
+    negative_conditions: List[dict] = Field(..., description="反例搜索條件")
     negative_ratio: float = Field(default=2.0, ge=1.0, le=5.0, description="反例與正例的比例")
     time_separation_days: int = Field(default=7, ge=1, le=30, description="時間分離天數")
     sampling_strategy: str = Field(default="time_separated", description="採樣策略")
-
-# 暫時的 search_task_service 模擬實現
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "negative_conditions": [
+                    {
+                        "condition_type": "price",
+                        "parameter": "price_change",
+                        "operator": "<=",
+                        "value": -0.03,
+                        "description": "價格下跌3%以上"
+                    }
+                ],
+                "negative_ratio": 2.0,
+                "time_separation_days": 7,
+                "sampling_strategy": "time_separated"
+            }
+        }
 class MockSearchTaskService:
     def __init__(self):
         self.logger = get_logger("api.mock_search_task_service")
@@ -25,15 +40,61 @@ class MockSearchTaskService:
         return await standalone_search_service.execute_search(request, symbols)
     
     async def execute_negative_search(self, positive_task_id, request):
-        # 檢查正例搜索結果是否存在
+        """執行用戶自定義的反例搜索"""
         from ..services.standalone_search_service import standalone_search_service
+        from ..models.requests import SearchConfigRequest, FilterConditionRequest
         
+        # 1. 檢查正例任務狀態
         positive_task = standalone_search_service.get_task_status(positive_task_id)
         if not positive_task:
             raise HTTPException(status_code=404, detail=f"Positive task {positive_task_id} not found")
         
-        # 暫時先創建一個真實的搜索任務，後續我們會實現真正的反例邏輯
-        return await standalone_search_service.execute_search(request.search_config, None)
+        # 修復：使用屬性訪問而不是 .get() 方法
+        if hasattr(positive_task, 'status'):
+            task_status = positive_task.status
+        elif isinstance(positive_task, dict):
+            task_status = positive_task.get('status')
+        else:
+            task_status = getattr(positive_task, 'status', None)
+            
+        if task_status != 'completed':
+            raise HTTPException(status_code=400, detail=f"Positive task {positive_task_id} not completed yet (status: {task_status})")
+        
+        # 2. 獲取正例結果
+        try:
+            positive_result = standalone_search_service.get_task_result(positive_task_id)
+            if not positive_result:
+                raise HTTPException(status_code=404, detail=f"No positive result data found for task {positive_task_id}")
+        except Exception as e:
+            self.logger.error(f"Error getting positive result: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to get positive result: {str(e)}")
+        
+        # 3. 創建反例搜索配置
+        negative_config = SearchConfigRequest(
+            name=f"negative_search_for_{positive_task_id}",
+            description="用戶自定義反例搜索",
+            timeframe="12h",
+            initial_conditions=[],
+            advanced_conditions=[],
+            start_date="2024-02-01",
+            end_date="2025-05-31"
+        )
+        
+        # 4. 添加用戶自定義的反例條件
+        for condition_data in request.negative_conditions:
+            condition = FilterConditionRequest(
+                condition_type=condition_data["condition_type"],
+                parameter=condition_data["parameter"],
+                operator=condition_data["operator"],
+                value=condition_data["value"],
+                description=condition_data.get("description", "用戶自定義反例條件")
+            )
+            negative_config.initial_conditions.append(condition)
+        
+        # 5. 執行反例搜索
+        negative_task_id = await standalone_search_service.execute_search(negative_config, None)
+        
+        return negative_task_id
     
     def get_combined_results(self, positive_task_id, negative_task_id):
         from ..services.standalone_search_service import standalone_search_service

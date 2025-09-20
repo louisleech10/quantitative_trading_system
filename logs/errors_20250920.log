@@ -1,0 +1,24 @@
+2025-09-20 13:40:09 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 13:41:39 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 13:43:52 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 13:53:15 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:05:40 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: 404: No positive cases found for task 6d34441d-8a2d-469f-85a0-cccb42337946
+2025-09-20 14:05:40 - api.exception_handler - [31mERROR[0m - HTTP 500: 404: No positive cases found for task 6d34441d-8a2d-469f-85a0-cccb42337946
+2025-09-20 14:05:40 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/6d34441d-8a2d-469f-85a0-cccb42337946 - 500 - 0.004s
+2025-09-20 14:06:57 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:07:57 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: 'NegativeCaseRequest' object has no attribute 'search_config'
+2025-09-20 14:07:57 - api.exception_handler - [31mERROR[0m - HTTP 500: 'NegativeCaseRequest' object has no attribute 'search_config'
+2025-09-20 14:07:57 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:08:00 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/2814718c-4279-4dbe-9e20-383c9278a883 - 500 - 2.915s
+2025-09-20 14:10:15 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: 404: Positive task 2814718c-4279-4dbe-9e20-383c9278a883 not found
+2025-09-20 14:10:15 - api.exception_handler - [31mERROR[0m - HTTP 500: 404: Positive task 2814718c-4279-4dbe-9e20-383c9278a883 not found
+2025-09-20 14:10:15 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/2814718c-4279-4dbe-9e20-383c9278a883 - 500 - 0.003s
+2025-09-20 14:10:33 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:11:58 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: 'TaskInfo' object has no attribute 'get'
+2025-09-20 14:11:58 - api.exception_handler - [31mERROR[0m - HTTP 500: 'TaskInfo' object has no attribute 'get'
+2025-09-20 14:11:58 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/ce9bf801-28a6-462e-a8d0-3ad71392112b - 500 - 0.003s
+2025-09-20 14:14:40 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:15:57 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: 'NegativeCaseRequest' object has no attribute 'search_config'
+2025-09-20 14:15:57 - api.exception_handler - [31mERROR[0m - HTTP 500: 'NegativeCaseRequest' object has no attribute 'search_config'
+2025-09-20 14:15:57 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-20 14:16:00 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/a7960148-e71b-40fb-be7d-959832ac927b - 500 - 2.852s
