@@ -11,3 +11,12 @@
 2025-09-21 21:21:26 - api.momentum_wrapper - [31mERROR[0m - Error getting historical data for : APIError(code=-1105): Parameter 'symbol' was empty.
 2025-09-21 21:21:26 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Error searching single symbol : APIError(code=-1105): Parameter 'symbol' was empty.
 2025-09-21 21:22:02 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 22:30:26 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 22:35:50 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 22:38:42 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 23:16:47 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 23:17:20 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 23:20:32 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 23:20:47 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 23:21:03 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-21 23:22:00 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
