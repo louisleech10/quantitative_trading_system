@@ -8,3 +8,54 @@
 2025-09-21 14:58:07 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
 2025-09-21 14:58:07 - api.startup - [32mINFO[0m - 運行環境: Development
 2025-09-21 14:58:07 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-21 15:19:28 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-21 15:19:28 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-21 15:19:28 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-21 15:19:28 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-21 15:19:28 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-21 15:19:28 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-21 15:19:28 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-21 15:19:28 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-21 15:19:28 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-21 15:19:28 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-21 15:19:38 - api.middleware.request - [32mINFO[0m - [49b610c4] Started GET /docs from 127.0.0.1
+2025-09-21 15:19:38 - api.request - [33mWARNING[0m - GET /docs - 404 - 0.002s
+2025-09-21 15:19:38 - api.middleware.request - [32mINFO[0m - [49b610c4] Completed GET /docs - 404 - 0.002s
+2025-09-21 15:19:38 - api.middleware.request - [32mINFO[0m - [8b54e009] Started GET /favicon.ico from 127.0.0.1
+2025-09-21 15:19:38 - api.request - [33mWARNING[0m - GET /favicon.ico - 404 - 0.001s
+2025-09-21 15:19:38 - api.middleware.request - [32mINFO[0m - [8b54e009] Completed GET /favicon.ico - 404 - 0.001s
+2025-09-21 15:21:23 - api.middleware.request - [32mINFO[0m - [6e6690a7] Started GET /docs from 127.0.0.1
+2025-09-21 15:21:23 - api.request - [33mWARNING[0m - GET /docs - 404 - 0.003s
+2025-09-21 15:21:23 - api.middleware.request - [32mINFO[0m - [6e6690a7] Completed GET /docs - 404 - 0.003s
+2025-09-21 15:22:08 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-09-21 15:22:08 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-09-21 15:22:08 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-21 15:22:08 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-09-21 15:22:08 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-09-21 15:22:08 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-09-21 15:22:08 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-09-21 15:22:08 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-09-21 15:22:08 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-09-21 15:22:08 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-09-21 15:22:08 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-09-21 15:22:13 - api.middleware.request - [32mINFO[0m - [824fc204] Started GET /docs from 127.0.0.1
+2025-09-21 15:22:13 - api.request - [33mWARNING[0m - GET /docs - 404 - 0.001s
+2025-09-21 15:22:13 - api.middleware.request - [32mINFO[0m - [824fc204] Completed GET /docs - 404 - 0.001s
+2025-09-21 15:23:17 - api.middleware.request - [32mINFO[0m - [b60380dd] Started GET /api/v1/docs from 127.0.0.1
+2025-09-21 15:23:17 - api.request - [32mINFO[0m - GET /api/v1/docs - 200 - 0.005s
+2025-09-21 15:23:17 - api.middleware.request - [32mINFO[0m - [b60380dd] Completed GET /api/v1/docs - 200 - 0.005s
+2025-09-21 15:23:17 - api.middleware.request - [32mINFO[0m - [0ebc87fb] Started GET /api/v1/openapi.json from 127.0.0.1
+2025-09-21 15:23:17 - api.request - [32mINFO[0m - GET /api/v1/openapi.json - 200 - 0.041s
+2025-09-21 15:23:17 - api.middleware.request - [32mINFO[0m - [0ebc87fb] Completed GET /api/v1/openapi.json - 200 - 0.041s
+2025-09-21 15:24:21 - api.middleware.request - [32mINFO[0m - [2dbb5f57] Started GET / from 127.0.0.1
+2025-09-21 15:24:21 - api.request - [32mINFO[0m - GET / - 200 - 0.003s
+2025-09-21 15:24:21 - api.middleware.request - [32mINFO[0m - [2dbb5f57] Completed GET / - 200 - 0.003s
+2025-09-21 15:24:55 - api.middleware.request - [32mINFO[0m - [cc8017f4] Started GET /health from 127.0.0.1
+2025-09-21 15:24:55 - api.request - [32mINFO[0m - GET /health - 200 - 0.002s
+2025-09-21 15:24:55 - api.middleware.request - [32mINFO[0m - [cc8017f4] Completed GET /health - 200 - 0.002s
+2025-09-21 15:25:39 - api.middleware.request - [32mINFO[0m - [b679ca9f] Started GET /api/v1/docs from 127.0.0.1
+2025-09-21 15:25:39 - api.request - [32mINFO[0m - GET /api/v1/docs - 200 - 0.002s
+2025-09-21 15:25:39 - api.middleware.request - [32mINFO[0m - [b679ca9f] Completed GET /api/v1/docs - 200 - 0.002s
+2025-09-21 15:25:39 - api.middleware.request - [32mINFO[0m - [3a980b0f] Started GET /api/v1/openapi.json from 127.0.0.1
+2025-09-21 15:25:39 - api.request - [32mINFO[0m - GET /api/v1/openapi.json - 200 - 0.007s
+2025-09-21 15:25:39 - api.middleware.request - [32mINFO[0m - [3a980b0f] Completed GET /api/v1/openapi.json - 200 - 0.007s
