@@ -13,15 +13,31 @@ export default function SearchPage() {
   const [showNegativeCase, setShowNegativeCase] = useState(false);
   const [priceOperator, setPriceOperator] = useState('>=');
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setIsLoading(true);
-    // 模擬搜索過程
-    setTimeout(() => {
-      // 實際使用時，這裡會調用真實的API
-      // 現在先設置為null，等後端完成後再填入真實數據
-      setSearchResults(null);
+    try {
+      // 調用真實的API
+      const { apiClient } = await import('@/lib/api');
+      
+      const searchRequest = {
+        name: 'Frontend_Test_Search',
+        timeframe: '12h',
+        priceChange: 5,  // 5%價格變化
+        volumeMultiplier: 2,  // 2倍成交量
+        symbols: ['BTCUSDT'],
+        saveResults: false
+      };
+      
+      console.log('開始執行搜索:', searchRequest);
+      const result = await apiClient.executePositiveSearch(searchRequest);
+      console.log('搜索結果:', result);
+      
+      setSearchResults(result);
+    } catch (error) {
+      console.error('搜索錯誤:', error);
+    } finally {
       setIsLoading(false);
-    }, 3000);
+    }
   };
 
   const handleClearParams = () => {

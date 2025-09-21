@@ -138,9 +138,17 @@ class ApiClient {
     
     console.log('執行正例搜索，配置:', searchConfig);
     
+    // 包裝成後端期望的格式
+    const apiRequest = {
+      request: searchConfig,
+      symbols: request.symbols
+    };
+    
+    console.log('API請求格式:', apiRequest);
+    
     return this.fetchApi('/two-stage/positive', {
       method: 'POST',
-      body: JSON.stringify(searchConfig),
+      body: JSON.stringify(apiRequest),
     });
   }
 
@@ -185,7 +193,7 @@ class ApiClient {
 
   // 獲取任務狀態
   async getTaskStatus(taskId: string): Promise<ApiResponse<TaskInfo>> {
-    return this.fetchApi(`/search/task/${taskId}`);
+    return this.fetchApi(`/search/task/${taskId}/status`);
   }
 
   // 獲取任務結果（單一任務）
