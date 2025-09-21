@@ -1,4 +1,3 @@
-// frontend/src/app/search/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -6,29 +5,98 @@ import { Card } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Download, Trash2 } from 'lucide-react';
 
+// 搜索參數介面定義
+interface SearchParams {
+  // 基礎設定
+  timeframe: string;
+  symbols: string[];
+  startDate: string;
+  endDate: string;
+  
+  // 價格條件
+  priceChange: number | null;
+  priceOperator: string;
+  closingStrength: number | null;
+  pricePosition: number | null;
+  
+  // 成交量條件
+  volumeMultiplier: number | null;
+  takerBuyRatio: number | null;
+  
+  // 正反例設定
+  showPositiveCase: boolean;
+  showNegativeCase: boolean;
+  timeSeparationDays: number;
+  positiveNegativeRatio: string;
+  
+  // 配置管理
+  configName: string;
+}
+
 export default function SearchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<any>(null);
-  const [showPositiveCase, setShowPositiveCase] = useState(true);
-  const [showNegativeCase, setShowNegativeCase] = useState(false);
-  const [priceOperator, setPriceOperator] = useState('>=');
+  
+  // 所有搜索參數的狀態管理
+  const [searchParams, setSearchParams] = useState<SearchParams>({
+    // 基礎設定 - 使用真實預設值
+    timeframe: '12h',
+    symbols: ['BTCUSDT'], // 真實預設：幣安BTCUSDT交易對
+    startDate: '2024-06-01', // 真實預設：6個月前開始
+    endDate: new Date().toISOString().split('T')[0], // 真實預設：今天結束
+    
+    // 價格條件 - 使用真實預設值
+    priceChange: 1, // 真實預設：1%價格變化
+    priceOperator: '>=',
+    closingStrength: null, // 用戶未設定時為null
+    pricePosition: null,
+    
+    // 成交量條件 - 使用真實預設值
+    volumeMultiplier: 1.2, // 真實預設：1.2倍平均成交量
+    takerBuyRatio: null,
+    
+    // 正反例設定 - 使用真實預設值
+    showPositiveCase: true,
+    showNegativeCase: false,
+    timeSeparationDays: 7, // 真實預設：7天時間分離
+    positiveNegativeRatio: '1:2', // 真實預設：1:2比例
+    
+    // 配置管理
+    configName: ''
+  });
 
+  // 更新單個參數的輔助函數
+  const updateParam = <K extends keyof SearchParams>(
+    key: K, 
+    value: SearchParams[K]
+  ) => {
+    setSearchParams(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // 搜索執行函數 - 讀取真實UI數據
   const handleSearch = async () => {
     setIsLoading(true);
     try {
-      // 調用真實的API
       const { apiClient } = await import('@/lib/api');
       
+      // 構建真實的搜索請求 - 從UI狀態讀取
       const searchRequest = {
-        name: 'Frontend_Test_Search',
-        timeframe: '12h',
-        priceChange: 5,  // 5%價格變化
-        volumeMultiplier: 2,  // 2倍成交量
-        symbols: ['BTCUSDT'],
+        name: searchParams.configName || 'UI_Search_Request',
+        timeframe: searchParams.timeframe,
+        priceChange: searchParams.priceChange, // 從UI讀取真實值
+        volumeMultiplier: searchParams.volumeMultiplier, // 從UI讀取真實值
+        closingStrength: searchParams.closingStrength, // 從UI讀取真實值
+        takerBuyRatio: searchParams.takerBuyRatio, // 從UI讀取真實值
+        symbols: searchParams.symbols,
         saveResults: false
       };
       
-      console.log('開始執行搜索:', searchRequest);
+      console.log('UI搜索參數:', searchParams);
+      console.log('發送搜索請求:', searchRequest);
+      
       const result = await apiClient.executePositiveSearch(searchRequest);
       console.log('搜索結果:', result);
       
@@ -40,13 +108,31 @@ export default function SearchPage() {
     }
   };
 
+  // 清除參數函數 - 重置為真實預設值
   const handleClearParams = () => {
-    // 清除所有參數
-    console.log('清除參數');
+    setSearchParams({
+      timeframe: '12h',
+      symbols: ['BTCUSDT'],
+      startDate: '2024-06-01',
+      endDate: new Date().toISOString().split('T')[0],
+      priceChange: 1,
+      priceOperator: '>=',
+      closingStrength: null,
+      pricePosition: null,
+      volumeMultiplier: 1.2,
+      takerBuyRatio: null,
+      showPositiveCase: true,
+      showNegativeCase: false,
+      timeSeparationDays: 7,
+      positiveNegativeRatio: '1:2',
+      configName: ''
+    });
+    console.log('參數已重置為預設值');
   };
 
   const handleExportResults = () => {
-    console.log('導出結果');
+    console.log('導出結果:', searchResults);
+    // 真實導出邏輯將在後續實現
   };
 
   return (
@@ -66,164 +152,197 @@ export default function SearchPage() {
           {/* 左側主要參數設定 */}
           <div className="xl:col-span-3 space-y-4">
             
-            {/* 共同設定 - 緊湊設計 */}
-            <Card title="共同設定">
+            {/* 基礎設定 */}
+            <Card title="基礎設定">
               <div className="space-y-3">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">時間框架 *</label>
-                    <select className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white">
+                    <label className="block text-xs font-medium text-gray-800 mb-1">時間框架</label>
+                    <select 
+                      value={searchParams.timeframe}
+                      onChange={(e) => updateParam('timeframe', e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    >
                       <option value="1h">1小時</option>
                       <option value="4h">4小時</option>
-                      <option value="12h" defaultValue>12小時</option>
+                      <option value="12h">12小時</option>
                       <option value="1d">1天</option>
                     </select>
                   </div>
                   <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">交易對</label>
+                    <input 
+                      type="text" 
+                      value={searchParams.symbols[0] || ''}
+                      onChange={(e) => updateParam('symbols', [e.target.value])}
+                      placeholder="BTCUSDT" 
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-xs font-medium text-gray-800 mb-1">開始日期</label>
-                    <input type="date" defaultValue="2024-01-01" className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
+                    <input 
+                      type="date" 
+                      value={searchParams.startDate}
+                      onChange={(e) => updateParam('startDate', e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-800 mb-1">結束日期</label>
-                    <input type="date" defaultValue="2024-12-31" className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
+                    <input 
+                      type="date" 
+                      value={searchParams.endDate}
+                      onChange={(e) => updateParam('endDate', e.target.value)}
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">交易對</label>
-                    <input type="text" placeholder="BTCUSDT" defaultValue="BTCUSDT" className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-800 mb-1">選擇模式</label>
-                    <select className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white">
-                      <option value="single">單一交易對</option>
-                      <option value="multiple">全市場掃描</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3 text-sm">
-                  <label className="flex items-center space-x-1">
-                    <input type="checkbox" defaultChecked className="rounded border-gray-300" />
-                    <span className="text-gray-800">排除新上市（7天內）</span>
-                  </label>
-                  <label className="flex items-center space-x-1">
-                    <input type="checkbox" className="rounded border-gray-300" />
-                    <span className="text-gray-800">排除穩定幣</span>
-                  </label>
                 </div>
               </div>
             </Card>
 
-            {/* 搜索模式與條件整合 */}
-            <Card title="搜索條件設定">
-              {/* 模式選擇 - 上方一排 */}
-              <div className="mb-4 pb-3 border-b border-gray-200">
-                <div className="flex space-x-6">
-                  <label className="flex items-center space-x-2">
-                    <input 
-                      type="checkbox" 
-                      checked={showPositiveCase}
-                      onChange={(e) => setShowPositiveCase(e.target.checked)}
-                      className="rounded border-gray-300" 
-                    />
-                    <span className="text-sm font-medium text-gray-800">正向案例</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input 
-                      type="checkbox" 
-                      checked={showNegativeCase}
-                      onChange={(e) => setShowNegativeCase(e.target.checked)}
-                      className="rounded border-gray-300" 
-                    />
-                    <span className="text-sm font-medium text-gray-800">反向案例</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* 條件設定 - 左右分欄 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* 左下 - 正向案例條件 */}
-                {showPositiveCase && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900 text-sm">正向案例條件</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-800 mb-1">價格變化</label>
-                        <div className="space-y-2">
-                          <select 
-                            value={priceOperator}
-                            onChange={(e) => setPriceOperator(e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                          >
-                            <option value=">=">&gt;=</option>
-                            <option value="<=">&lt;=</option>
-                            <option value="=">=</option>
-                            <option value="between">介於</option>
-                          </select>
-                          <div>
-                            {priceOperator === 'between' ? (
-                              <div className="flex items-center space-x-2">
-                                <input type="number" placeholder="最小值" step="0.1" className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                                <span className="text-xs text-gray-600">到</span>
-                                <input type="number" placeholder="最大值" step="0.1" className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                                <span className="text-xs text-gray-600">%</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-2">
-                                <input type="number" defaultValue="7" step="0.1" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                                <span className="text-xs text-gray-600">%</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-800 mb-1">最小成交量</label>
-                        <div className="flex items-center space-x-2">
-                          <input type="number" defaultValue="1000000" className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                          <span className="text-xs text-gray-600">USDT</span>
-                        </div>
-                      </div>
+            {/* 價格條件 */}
+            <Card title="價格條件">
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">價格變化 (%)</label>
+                    <div className="flex items-center space-x-2">
+                      <select 
+                        value={searchParams.priceOperator}
+                        onChange={(e) => updateParam('priceOperator', e.target.value)}
+                        className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                      >
+                        <option value=">=">&gt;=</option>
+                        <option value="<=">&lt;=</option>
+                        <option value="=">=</option>
+                      </select>
+                      <input 
+                        type="number" 
+                        value={searchParams.priceChange || ''}
+                        onChange={(e) => updateParam('priceChange', e.target.value ? parseFloat(e.target.value) : null)}
+                        step="0.1"
+                        min="0"
+                        placeholder="1.0"
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                      />
                     </div>
                   </div>
-                )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">收盤強度</label>
+                    <input 
+                      type="number" 
+                      value={searchParams.closingStrength || ''}
+                      onChange={(e) => updateParam('closingStrength', e.target.value ? parseFloat(e.target.value) : null)}
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      placeholder="0.8"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">價格位置</label>
+                    <input 
+                      type="number" 
+                      value={searchParams.pricePosition || ''}
+                      onChange={(e) => updateParam('pricePosition', e.target.value ? parseFloat(e.target.value) : null)}
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      placeholder="0.9"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
 
-                {/* 右下 - 反向案例條件 */}
-                {showNegativeCase && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900 text-sm">反向案例條件</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-800 mb-1">觀察期間</label>
-                        <div className="flex items-center space-x-2">
-                          <input type="number" defaultValue="7" className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                          <span className="text-xs text-gray-600">根K線</span>
-                        </div>
+            {/* 成交量條件 */}
+            <Card title="成交量條件">
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">成交量倍數</label>
+                    <input 
+                      type="number" 
+                      value={searchParams.volumeMultiplier || ''}
+                      onChange={(e) => updateParam('volumeMultiplier', e.target.value ? parseFloat(e.target.value) : null)}
+                      step="0.1"
+                      min="0.1"
+                      placeholder="1.2"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-800 mb-1">主動買入比例</label>
+                    <input 
+                      type="number" 
+                      value={searchParams.takerBuyRatio || ''}
+                      onChange={(e) => updateParam('takerBuyRatio', e.target.value ? parseFloat(e.target.value) : null)}
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      placeholder="0.6"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* 正反例設定 */}
+            <Card title="正反例設定">
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 mb-3">
+                  <label className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      checked={searchParams.showPositiveCase}
+                      onChange={(e) => updateParam('showPositiveCase', e.target.checked)}
+                      className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-800">包含正例</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input 
+                      type="checkbox" 
+                      checked={searchParams.showNegativeCase}
+                      onChange={(e) => updateParam('showNegativeCase', e.target.checked)}
+                      className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-800">包含反例</span>
+                  </label>
+                </div>
+                
+                {searchParams.showNegativeCase && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-800 mb-1">時間分離間隔</label>
+                      <div className="flex items-center space-x-2">
+                        <input 
+                          type="number" 
+                          value={searchParams.timeSeparationDays}
+                          onChange={(e) => updateParam('timeSeparationDays', parseInt(e.target.value) || 7)}
+                          min="1"
+                          max="30"
+                          className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                        />
+                        <span className="text-xs text-gray-600">天</span>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-800 mb-1">價格變化範圍</label>
-                        <div className="flex items-center space-x-2">
-                          <input type="number" defaultValue="-5" step="0.1" className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                          <span className="text-xs text-gray-600">到</span>
-                          <input type="number" defaultValue="3" step="0.1" className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                          <span className="text-xs text-gray-600">%</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-800 mb-1">時間分離間隔</label>
-                        <div className="flex items-center space-x-2">
-                          <input type="number" defaultValue="7" className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900" />
-                          <span className="text-xs text-gray-600">根K線</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-800 mb-1">正反比例</label>
-                        <select className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900">
-                          <option value="1:1">1:1</option>
-                          <option value="1:2" defaultValue>1:2</option>
-                          <option value="1:3">1:3</option>
-                          <option value="1:4">1:4</option>
-                        </select>
-                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-800 mb-1">正反比例</label>
+                      <select 
+                        value={searchParams.positiveNegativeRatio}
+                        onChange={(e) => updateParam('positiveNegativeRatio', e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                      >
+                        <option value="1:1">1:1</option>
+                        <option value="1:2">1:2</option>
+                        <option value="1:3">1:3</option>
+                        <option value="1:4">1:4</option>
+                      </select>
                     </div>
                   </div>
                 )}
@@ -234,7 +353,7 @@ export default function SearchPage() {
           {/* 右側控制面板 */}
           <div className="space-y-4">
             
-            {/* 搜索控制 + 參數管理整合 */}
+            {/* 搜索控制 */}
             <Card title="搜索控制">
               <div className="space-y-3">
                 <button 
@@ -274,11 +393,13 @@ export default function SearchPage() {
                   </button>
                 )}
 
-                {/* 參數管理 - 整合到控制面板 */}
+                {/* 配置管理 */}
                 <hr className="my-3" />
                 <div className="space-y-2">
                   <input 
                     type="text" 
+                    value={searchParams.configName}
+                    onChange={(e) => updateParam('configName', e.target.value)}
                     placeholder="配置名稱" 
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
                   />
@@ -294,133 +415,51 @@ export default function SearchPage() {
               </div>
             </Card>
 
-            {/* 搜索進度 */}
-            {isLoading && (
-              <Card title="搜索進度">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span>總體進度</span>
-                    <span>45%</span>
+            {/* 參數預覽 */}
+            <Card title="當前參數">
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">時間框架:</span>
+                  <span className="font-medium">{searchParams.timeframe}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">交易對:</span>
+                  <span className="font-medium">{searchParams.symbols[0] || 'BTCUSDT'}</span>
+                </div>
+                {searchParams.priceChange && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">價格變化:</span>
+                    <span className="font-medium">{searchParams.priceOperator} {searchParams.priceChange}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{ width: '45%' }}></div>
+                )}
+                {searchParams.volumeMultiplier && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">成交量:</span>
+                    <span className="font-medium">{searchParams.volumeMultiplier}x</span>
                   </div>
-                  
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <div>正在處理: BTCUSDT</div>
-                    <div>已完成: 450 / 1000 條記錄</div>
-                    <div>預計剩餘: 2分30秒</div>
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* 搜索結果統計區域 */}
-        {searchResults && (
-          <div className="space-y-6">
-            
-            {/* 基本統計 - 移除假數據 */}
-            <Card title="搜索結果統計">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{searchResults.totalCases || 0}</div>
-                  <div className="text-sm text-gray-600">總案例數</div>
-                </div>
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{searchResults.positiveCases || 0}</div>
-                  <div className="text-sm text-gray-600">正例案例</div>
-                </div>
-                <div className="text-center p-4 bg-red-50 rounded-lg">
-                  <div className="text-2xl font-bold text-red-600">{searchResults.negativeCases || 0}</div>
-                  <div className="text-sm text-gray-600">反例案例</div>
-                </div>
-                <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">{searchResults.uniqueSymbols || 0}</div>
-                  <div className="text-sm text-gray-600">交易對數</div>
-                </div>
-                <div className="text-center p-4 bg-orange-50 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-600">{searchResults.executionTime || 0}s</div>
-                  <div className="text-sm text-gray-600">執行時間</div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">正反例:</span>
+                  <span className="font-medium">
+                    {searchParams.showPositiveCase ? '正例' : ''}
+                    {searchParams.showPositiveCase && searchParams.showNegativeCase ? '+' : ''}
+                    {searchParams.showNegativeCase ? '反例' : ''}
+                  </span>
                 </div>
               </div>
             </Card>
-
-            {/* 分布統計圖表 - 改為視覺化圖表 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* 星期分布圖表 */}
-              <Card title="星期分布">
-                <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <div className="text-center text-gray-500">
-                    <div className="text-sm mb-2 font-medium">雙軸圖表區域</div>
-                    <div className="text-xs space-y-1">
-                      <div>X軸: 週一~週日</div>
-                      <div>左Y軸: 百分比（直條圖）</div>
-                      <div>右Y軸: 數量（折線圖）</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* 小時分布圖表 - 全24小時 */}
-              <Card title="小時分布（24小時全覽）">
-                <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <div className="text-center text-gray-500">
-                    <div className="text-sm mb-2 font-medium">雙軸圖表區域</div>
-                    <div className="text-xs space-y-1">
-                      <div>X軸: 00:00~23:00</div>
-                      <div>左Y軸: 百分比（直條圖）</div>
-                      <div>右Y軸: 數量（折線圖）</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Market Phase 分布圖表 */}
-              <Card title="Market Phase 分布">
-                <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <div className="text-center text-gray-500">
-                    <div className="text-sm mb-2 font-medium">雙軸圖表區域</div>
-                    <div className="text-xs space-y-1">
-                      <div>X軸: FEAR/NEUTRAL/GREED</div>
-                      <div>左Y軸: 百分比（直條圖）</div>
-                      <div>右Y軸: 數量（折線圖）</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* 月份分布圖表 */}
-              <Card title="月份分布">
-                <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <div className="text-center text-gray-500">
-                    <div className="text-sm mb-2 font-medium">雙軸圖表區域</div>
-                    <div className="text-xs space-y-1">
-                      <div>X軸: 1月~12月</div>
-                      <div>左Y軸: 百分比（直條圖）</div>
-                      <div>右Y軸: 數量（折線圖）</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              {/* 日期分布圖表 - 全31天 */}
-              <Card title="每月日期分布（全31天）">
-                <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                  <div className="text-center text-gray-500">
-                    <div className="text-sm mb-2 font-medium">雙軸圖表區域</div>
-                    <div className="text-xs space-y-1">
-                      <div>X軸: 1日~31日</div>
-                      <div>左Y軸: 百分比（直條圖）</div>
-                      <div>右Y軸: 數量（折線圖）</div>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
           </div>
+        </div>
+
+        {/* 搜索結果預覽 */}
+        {searchResults && (
+          <Card title="搜索結果">
+            <div className="text-sm text-gray-600">
+              <pre className="bg-gray-50 p-4 rounded-lg overflow-auto max-h-40">
+                {JSON.stringify(searchResults, null, 2)}
+              </pre>
+            </div>
+          </Card>
         )}
       </div>
     </div>

@@ -70,19 +70,18 @@ class ApiClient {
   private convertToSearchConfig(request: SearchRequest): SearchConfigRequest {
     const conditions: FilterConditionRequest[] = [];
 
-    // 轉換價格變化條件
-    if (request.priceChange !== undefined) {
+    // 只有當用戶實際設定值時才添加條件（過濾null值）
+    if (request.priceChange !== null && request.priceChange !== undefined) {
       conditions.push({
-        condition_type: "price_change",
-        parameter: "price_change_percentage",
+        condition_type: "price",
+        parameter: "price_change",
         operator: ">=",
-        value: request.priceChange,
+        value: request.priceChange / 100,  // 轉換為小數形式
         description: `價格變化 >= ${request.priceChange}%`
       });
     }
 
-    // 轉換成交量條件
-    if (request.volumeMultiplier !== undefined) {
+    if (request.volumeMultiplier !== null && request.volumeMultiplier !== undefined) {
       conditions.push({
         condition_type: "volume",
         parameter: "volume_multiplier",
@@ -92,10 +91,9 @@ class ApiClient {
       });
     }
 
-    // 轉換收盤強度條件
-    if (request.closingStrength !== undefined) {
+    if (request.closingStrength !== null && request.closingStrength !== undefined) {
       conditions.push({
-        condition_type: "price_position",
+        condition_type: "price",
         parameter: "closing_strength",
         operator: ">=",
         value: request.closingStrength,
@@ -103,10 +101,9 @@ class ApiClient {
       });
     }
 
-    // 轉換主動買入比例條件
-    if (request.takerBuyRatio !== undefined) {
+    if (request.takerBuyRatio !== null && request.takerBuyRatio !== undefined) {
       conditions.push({
-        condition_type: "market_sentiment",
+        condition_type: "volume",
         parameter: "taker_buy_ratio",
         operator: ">=",
         value: request.takerBuyRatio,
