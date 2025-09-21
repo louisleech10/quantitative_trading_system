@@ -1,4 +1,0 @@
-2025-09-21 00:00:01 - api.middleware.request - [32mINFO[0m - [36ae132a] Started GET /api/v1/two-stage/combined/74378f8b-6a6e-49c0-a648-f051e53383b8/651d164a-6c09-4787-8508-2247686e0311 from 127.0.0.1
-2025-09-21 00:00:01 - api.request - [32mINFO[0m - GET /api/v1/two-stage/combined/74378f8b-6a6e-49c0-a648-f051e53383b8/651d164a-6c09-4787-8508-2247686e0311 - 200 - 0.014s
-2025-09-21 00:00:01 - api.middleware.request - [32mINFO[0m - [36ae132a] Completed GET /api/v1/two-stage/combined/74378f8b-6a6e-49c0-a648-f051e53383b8/651d164a-6c09-4787-8508-2247686e0311 - 200 - 0.014s
-2025-09-21 00:03:25 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
