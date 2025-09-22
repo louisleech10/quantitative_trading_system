@@ -107,6 +107,23 @@ class MockSearchTaskService:
         
         if not positive_result and not negative_result:
             return None
+        
+        # 新增：收集實際使用的交易對
+        actual_symbols = set()
+        if positive_result and positive_result.cases:
+            for case in positive_result.cases:
+                case_dict = case.dict() if hasattr(case, 'dict') else case.__dict__
+                if 'symbol' in case_dict:
+                    actual_symbols.add(case_dict['symbol'])
+        
+        if negative_result and negative_result.cases:
+            for case in negative_result.cases:
+                case_dict = case.dict() if hasattr(case, 'dict') else case.__dict__
+                if 'symbol' in case_dict:
+                    actual_symbols.add(case_dict['symbol'])
+        
+        # 轉換為列表，如果為空則使用預設值
+        symbols_list = list(actual_symbols) if actual_symbols else ["BTCUSDT"]
             
         # 暫時簡單合併，後續會實現完整的正反例標記邏輯
         all_cases = []
@@ -139,7 +156,7 @@ class MockSearchTaskService:
             total_cases=len(all_cases),
             search_config={"positive_negative_ratio": f"{positive_count}:{negative_count}"},
             execution_time=0.0,
-            symbols_processed=["BTCUSDT"],
+            symbols_processed=symbols_list,
             positive_cases_count=positive_count,
             negative_cases_count=negative_count,
             # 添加缺少的必需字段
@@ -147,7 +164,7 @@ class MockSearchTaskService:
                 "total_cases": len(all_cases),
                 "positive_cases": positive_count,
                 "negative_cases": negative_count,
-                "unique_symbols": 1,
+                "unique_symbols": len(symbols_list),
                 "time_range": {
                     "start": "2024-02-01",
                     "end": "2025-05-31"
