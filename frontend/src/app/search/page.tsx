@@ -131,19 +131,116 @@ export default function SearchPage() {
       console.log('反例參數:', negativeParams);
       
       // 準備API請求格式
+      // 準備API條件數組
+      const buildConditions = () => {
+        const conditions = [];
+
+        // 價格變化條件
+        if (operators.priceChange === 'BETWEEN' && rangeValues.priceChange.min !== null && rangeValues.priceChange.max !== null) {
+          conditions.push({
+            condition_type: "price",
+            parameter: "price_change",
+            operator: "between",
+            value: [rangeValues.priceChange.min / 100, rangeValues.priceChange.max / 100], // 轉換為小數
+            description: `價格變化介於 ${rangeValues.priceChange.min}% 到 ${rangeValues.priceChange.max}%`
+          });
+        } else if (searchParams.priceChange !== null) {
+          conditions.push({
+            condition_type: "price",
+            parameter: "price_change",
+            operator: operators.priceChange,
+            value: searchParams.priceChange / 100, // 轉換為小數
+            description: `價格變化 ${operators.priceChange} ${searchParams.priceChange}%`
+          });
+        }
+
+        // 成交量倍數條件
+        if (operators.volumeMultiplier === 'BETWEEN' && rangeValues.volumeMultiplier.min !== null && rangeValues.volumeMultiplier.max !== null) {
+          conditions.push({
+            condition_type: "volume",
+            parameter: "volume_multiplier",
+            operator: "between",
+            value: [rangeValues.volumeMultiplier.min, rangeValues.volumeMultiplier.max],
+            description: `成交量倍數介於 ${rangeValues.volumeMultiplier.min} 到 ${rangeValues.volumeMultiplier.max}`
+          });
+        } else if (searchParams.volumeMultiplier !== null) {
+          conditions.push({
+            condition_type: "volume",
+            parameter: "volume_multiplier",
+            operator: operators.volumeMultiplier,
+            value: searchParams.volumeMultiplier,
+            description: `成交量倍數 ${operators.volumeMultiplier} ${searchParams.volumeMultiplier}`
+          });
+        }
+
+        // 收盤強度條件
+        if (operators.closingStrength === 'BETWEEN' && rangeValues.closingStrength.min !== null && rangeValues.closingStrength.max !== null) {
+          conditions.push({
+            condition_type: "price",
+            parameter: "closing_strength",
+            operator: "between",
+            value: [rangeValues.closingStrength.min, rangeValues.closingStrength.max],
+            description: `收盤強度介於 ${rangeValues.closingStrength.min} 到 ${rangeValues.closingStrength.max}`
+          });
+        } else if (searchParams.closingStrength !== null) {
+          conditions.push({
+            condition_type: "price",
+            parameter: "closing_strength",
+            operator: operators.closingStrength,
+            value: searchParams.closingStrength,
+            description: `收盤強度 ${operators.closingStrength} ${searchParams.closingStrength}`
+          });
+        }
+
+        // 主動買入比例條件
+        if (operators.takerBuyRatio === 'BETWEEN' && rangeValues.takerBuyRatio.min !== null && rangeValues.takerBuyRatio.max !== null) {
+          conditions.push({
+            condition_type: "volume", 
+            parameter: "taker_buy_ratio",
+            operator: "between",
+            value: [rangeValues.takerBuyRatio.min, rangeValues.takerBuyRatio.max],
+            description: `主動買入比例介於 ${rangeValues.takerBuyRatio.min} 到 ${rangeValues.takerBuyRatio.max}`
+          });
+        } else if (searchParams.takerBuyRatio !== null) {
+          conditions.push({
+            condition_type: "volume",
+            parameter: "taker_buy_ratio", 
+            operator: operators.takerBuyRatio,
+            value: searchParams.takerBuyRatio,
+            description: `主動買入比例 ${operators.takerBuyRatio} ${searchParams.takerBuyRatio}`
+          });
+        }
+
+        // 價格位置條件
+        if (operators.pricePosition === 'BETWEEN' && rangeValues.pricePosition.min !== null && rangeValues.pricePosition.max !== null) {
+          conditions.push({
+            condition_type: "price",
+            parameter: "price_position",
+            operator: "between", 
+            value: [rangeValues.pricePosition.min, rangeValues.pricePosition.max],
+            description: `價格位置介於 ${rangeValues.pricePosition.min} 到 ${rangeValues.pricePosition.max}`
+          });
+        } else if (searchParams.pricePosition !== null) {
+          conditions.push({
+            condition_type: "price",
+            parameter: "price_position",
+            operator: operators.pricePosition,
+            value: searchParams.pricePosition,
+            description: `價格位置 ${operators.pricePosition} ${searchParams.pricePosition}`
+          });
+        }
+
+        return conditions;
+      };
+
       const apiRequest = {
         config: {
           name: searchParams.name,
           timeframe: searchParams.timeframe,
           start_date: timeParams.startDate || null,
           end_date: timeParams.endDate || null,
-          price_change_min: searchParams.priceChange || null,
-          volume_multiplier_min: searchParams.volumeMultiplier || null,
-          closing_strength_min: searchParams.closingStrength || null,
-          taker_buy_ratio_min: searchParams.takerBuyRatio || null,
-          price_position_min: searchParams.pricePosition || null,
-          volume_min: timeParams.volumeMin || null,
-          volume_max: timeParams.volumeMax || null,
+          initial_conditions: buildConditions(),
+          min_volume: timeParams.volumeMin || 100000,
           symbols: searchParams.symbols,
           save_results: searchParams.saveResults || false
         }

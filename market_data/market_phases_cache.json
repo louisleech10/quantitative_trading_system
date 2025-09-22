@@ -483,5 +483,10 @@
     "start_date": "2025-08-18",
     "end_date": "2025-09-21",
     "description": "NEUTRAL"
+  },
+  "FEAR_20250922": {
+    "start_date": "2025-09-22",
+    "end_date": "2025-09-28",
+    "description": "FEAR"
   }
 }
