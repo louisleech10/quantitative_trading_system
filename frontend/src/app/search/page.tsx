@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 
 // 搜索請求接口 (符合您的 api.ts 設計)
 interface SearchRequest {
@@ -118,12 +118,14 @@ export default function SearchPage() {
     }));
   };
 
+
   // 執行兩階段搜索 - 修正為真實API調用
   const executeTwoStageSearch = async () => {
     try {
       setIsLoading(true);
       setError(null);
       setSearchResults(null);
+
       
       console.log('開始執行搜索...');
       console.log('搜索參數:', searchParams);
@@ -233,6 +235,22 @@ export default function SearchPage() {
         return conditions;
       };
 
+      // 檢查是否有設定搜索條件
+      const hasConditions = buildConditions().length > 0;
+
+      // 如果有條件，必須提供必要參數
+      if (hasConditions) {
+        if (searchParams.symbols.length === 0) {
+          setError('設定搜索條件時必須選擇至少一個交易對');
+          return;
+        }
+        
+        if (!timeParams.startDate || !timeParams.endDate) {
+          setError('設定搜索條件時必須提供開始和結束日期');
+          return;
+        }
+      }
+
       const apiRequest = {
         config: {
           name: searchParams.name,
@@ -276,7 +294,23 @@ export default function SearchPage() {
       
     } catch (err) {
       console.error('階段搜索失敗:', err);
-      setError(err instanceof Error ? err.message : '搜索執行失敗');
+      
+      // 分析錯誤類型並提供友善訊息
+      let userFriendlyMessage = '';
+      
+      if (err.message.includes('未知錯誤') || err.message.includes('undefined')) {
+        userFriendlyMessage = '在指定條件和時間範圍內未找到符合的案例。建議：放寬搜索條件或擴大時間範圍';
+      } else if (err.message.includes('timeout')) {
+        userFriendlyMessage = '搜索超時，可能是數據量過大或條件複雜。建議：縮小時間範圍或簡化搜索條件';
+      } else if (err.message.includes('No cases found') || err.message.includes('沒有找到')) {
+        userFriendlyMessage = '未找到符合條件的案例。建議：調整價格變化閾值，或擴大時間範圍';
+      } else if (err.message.includes('422') || err.message.includes('參數驗證')) {
+        userFriendlyMessage = '搜索參數有誤。請檢查：交易對格式、日期範圍是否正確';
+      } else {
+        userFriendlyMessage = `搜索失敗：${err.message}`;
+      }
+      
+      setError(userFriendlyMessage);
     } finally {
       setIsLoading(false);
     }
@@ -324,7 +358,9 @@ export default function SearchPage() {
           return;
           
         } else if (status === 'FAILED' || status === 'ERROR') {
-          throw new Error(`搜索任務失敗: ${statusData.data.message}`);
+          console.log('完整錯誤回應:', statusData);
+          const errorMsg = statusData.data.message || statusData.data.error_message || statusData.message || '未知錯誤';
+          throw new Error(`搜索任務失敗: ${errorMsg}`);
         }
         
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -336,6 +372,117 @@ export default function SearchPage() {
           throw new Error(`任務狀態檢查超時: ${err instanceof Error ? err.message : '未知錯誤'}`);
         }
       }
+    }
+  };
+
+  // CSV導出函數
+  const exportSearchResultsToCSV = () => {
+    if (!searchResults || !searchResults.cases || searchResults.cases.length === 0) {
+      alert('沒有搜索結果可以導出');
+      return;
+    }
+
+    try {
+      // CSV標題行 - 包含所有20個參數
+      const headers = [
+        // 基本資訊
+        'Symbol', 'Timestamp', 'Trigger_Index', 'Open', 'High', 'Low', 'Close', 'Volume', 
+        'Price_Change_%', 'Market_Phase', 'Timeframe',
+        // 基礎觸發條件參數
+        'Closing_Strength', 'Price_Position', 'Volume_Multiplier', 'Taker_Buy_Ratio',
+        // 未來收益參數 (12個)
+        'Future_1Bar_Return_%', 'Future_2Bar_Return_%', 'Future_3Bar_Return_%', 'Future_4Bar_Return_%',
+        'Future_5Bar_Return_%', 'Future_6Bar_Return_%', 'Future_7Bar_Return_%', 'Future_8Bar_Return_%',
+        'Future_9Bar_Return_%', 'Future_10Bar_Return_%', 'Future_11Bar_Return_%', 'Future_12Bar_Return_%',
+        // 未來回撤參數 (12個)  
+        'Future_1Bar_Drawdown_%', 'Future_2Bar_Drawdown_%', 'Future_3Bar_Drawdown_%', 'Future_4Bar_Drawdown_%',
+        'Future_5Bar_Drawdown_%', 'Future_6Bar_Drawdown_%', 'Future_7Bar_Drawdown_%', 'Future_8Bar_Drawdown_%',
+        'Future_9Bar_Drawdown_%', 'Future_10Bar_Drawdown_%', 'Future_11Bar_Drawdown_%', 'Future_12Bar_Drawdown_%',
+        // 時間描述參數
+        'Hour_Of_Day', 'Day_Of_Week',
+        // 正反例標記
+        'Positive_Case'
+      ].join(',');
+
+      // 格式化函數
+      const formatNumber = (value: any, decimals: number = 4): string => {
+        if (value === null || value === undefined || isNaN(value)) return '';
+        return Number(value).toFixed(decimals);
+      };
+
+      const formatPercentage = (value: any): string => {
+        if (value === null || value === undefined || isNaN(value)) return '';
+        return (Number(value) * 100).toFixed(2);
+      };
+
+      // 生成CSV內容
+      const csvRows = searchResults.cases.map(case_ => [
+        // 基本資訊
+        case_.symbol || '',
+        case_.timestamp || '',
+        case_.trigger_idx || '',
+        formatNumber(case_.open),
+        formatNumber(case_.high), 
+        formatNumber(case_.low),
+        formatNumber(case_.close),
+        formatNumber(case_.volume),
+        formatPercentage(case_.price_change),
+        case_.market_phase || '',
+        case_.timeframe || '',
+        // 基礎觸發條件參數
+        formatNumber(case_.closing_strength),
+        formatNumber(case_.price_position),
+        formatNumber(case_.volume_multiplier),
+        formatNumber(case_.taker_buy_ratio),
+        // 未來收益參數
+        formatPercentage(case_.future_1bar_return),
+        formatPercentage(case_.future_2bar_return),
+        formatPercentage(case_.future_3bar_return),
+        formatPercentage(case_.future_4bar_return),
+        formatPercentage(case_.future_5bar_return),
+        formatPercentage(case_.future_6bar_return),
+        formatPercentage(case_.future_7bar_return),
+        formatPercentage(case_.future_8bar_return),
+        formatPercentage(case_.future_9bar_return),
+        formatPercentage(case_.future_10bar_return),
+        formatPercentage(case_.future_11bar_return),
+        formatPercentage(case_.future_12bar_return),
+        // 未來回撤參數
+        formatPercentage(case_.future_1bar_max_drawdown),
+        formatPercentage(case_.future_2bar_max_drawdown),
+        formatPercentage(case_.future_3bar_max_drawdown),
+        formatPercentage(case_.future_4bar_max_drawdown),
+        formatPercentage(case_.future_5bar_max_drawdown),
+        formatPercentage(case_.future_6bar_max_drawdown),
+        formatPercentage(case_.future_7bar_max_drawdown),
+        formatPercentage(case_.future_8bar_max_drawdown),
+        formatPercentage(case_.future_9bar_max_drawdown),
+        formatPercentage(case_.future_10bar_max_drawdown),
+        formatPercentage(case_.future_11bar_max_drawdown),
+        formatPercentage(case_.future_12bar_max_drawdown),
+        // 時間描述參數
+        case_.hour_of_day || '',
+        case_.day_of_week || '',
+        // 正反例標記
+        case_.positive_case !== undefined ? (case_.positive_case ? '1' : '0') : ''
+      ].join(','));
+
+      // 組合完整CSV內容
+      const csvContent = [headers, ...csvRows].join('\n');
+
+      // 創建並下載文件
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `case_search_results_${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      console.log(`CSV導出成功：${searchResults.cases.length} 個案例`);
+    } catch (error) {
+      console.error('CSV導出失敗:', error);
+      alert('CSV導出失敗，請查看控制台錯誤信息');
     }
   };
 
@@ -765,6 +912,17 @@ export default function SearchPage() {
             
             <div className="mt-4 text-sm text-gray-600">
               執行時間: {searchResults.execution_time} 秒
+            </div>
+
+            {/* CSV 導出按鈕 */}
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={exportSearchResultsToCSV}
+                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                導出完整CSV檔案 (含20個參數)
+              </button>
             </div>
           </div>
         )}
