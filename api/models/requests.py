@@ -58,6 +58,8 @@ class SearchConfigRequest(BaseModel):
 
     symbols: Optional[List[str]] = Field(None, description="交易對列表")
     
+    initial_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="初始條件")
+    
     # 時間範圍 - 設為可選，有預設值
     start_date: Optional[str] = Field(None, description="開始日期 (YYYY-MM-DD)")
     end_date: Optional[str] = Field(None, description="結束日期 (YYYY-MM-DD)")
