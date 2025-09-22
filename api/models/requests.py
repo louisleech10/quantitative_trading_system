@@ -55,6 +55,8 @@ class SearchConfigRequest(BaseModel):
     name: str = Field(..., description="搜索配置名稱")
     description: Optional[str] = Field(None, description="搜索描述")
     timeframe: TimeframeEnum = Field(..., description="時間週期")
+
+    symbols: Optional[List[str]] = Field(None, description="交易對列表")
     
     # 時間範圍 - 設為可選，有預設值
     start_date: Optional[str] = Field(None, description="開始日期 (YYYY-MM-DD)")

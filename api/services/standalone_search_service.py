@@ -385,7 +385,7 @@ class StandaloneSearchService:
                 # 執行真實搜索
                 real_cases_dict = await self.search_engine.search_cases(
                     config=search_config,
-                    symbols=symbols or ["BTCUSDT"],
+                    symbols=symbols or request.symbols or ["BTCUSDT"],
                     batch_size=1,
                     save_results=False
                 )
