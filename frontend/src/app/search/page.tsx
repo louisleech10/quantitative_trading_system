@@ -55,6 +55,8 @@ export default function SearchPage() {
     saveResults: false
   });
 
+  const [symbolsInput, setSymbolsInput] = useState('');
+
   // 運算符狀態
   const [operators, setOperators] = useState({
     priceChange: '>=',
@@ -258,10 +260,10 @@ export default function SearchPage() {
           start_date: timeParams.startDate || null,
           end_date: timeParams.endDate || null,
           initial_conditions: buildConditions(),
-          min_volume: timeParams.volumeMin || 100000,
-          symbols: searchParams.symbols,
-          save_results: searchParams.saveResults || false
-        }
+          min_volume: timeParams.volumeMin || 100000
+        },
+        symbols: searchParams.symbols,
+        save_results: searchParams.saveResults || false
       };
 
       console.log('發送API請求:', apiRequest);
@@ -612,6 +614,10 @@ export default function SearchPage() {
     );
   };
 
+  React.useEffect(() => {
+    setSymbolsInput(searchParams.symbols.join(', '));
+  }, []);
+
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -648,15 +654,19 @@ export default function SearchPage() {
                 交易對 (支援多個，用逗號分隔)
               </label>
               <input
-                type="text"
-                value={searchParams.symbols.join(', ')}
-                onChange={(e) => setSearchParams(prev => ({ 
-                  ...prev, 
-                  symbols: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                placeholder="例如: BTCUSDT, ETHUSDT 或 ALL_USDT (全部USDT) 或 ALL_STOCKS (全部股票)"
-              />
+              type="text"
+              value={symbolsInput}
+              onChange={(e) => {
+                setSymbolsInput(e.target.value);
+                const symbols = e.target.value.split(/[,，]/).map(s => s.trim()).filter(s => s);
+                setSearchParams(prev => ({ ...prev, symbols }));
+              }}
+              onBlur={() => {
+                setSymbolsInput(searchParams.symbols.join(', '));
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              placeholder="例如: BTCUSDT, ETHUSDT 或 ETHUSDT，BNBUSDT"
+            />
               <p className="text-sm text-gray-600 mt-1">
                 支援：加密貨幣 (USDT對), 股票代碼, 期貨合約, RWA 標的等
               </p>

@@ -385,8 +385,31 @@ class StandaloneSearchService:
                 # 添加調試LOG
                 self.logger.info(f"Debug - symbols parameter: {symbols}")
                 self.logger.info(f"Debug - request.symbols: {getattr(request, 'symbols', 'NOT_FOUND')}")
-                final_symbols = symbols or request.symbols or ["BTCUSDT"]
                 self.logger.info(f"Debug - final symbols: {final_symbols}")
+
+                def process_special_keywords(symbol_list):
+                    if not symbol_list:
+                        return ["BTCUSDT"]
+                    
+                    result = []
+                    for symbol in symbol_list:
+                        if symbol == "ALL_USDT":
+                            # 獲取所有USDT交易對
+                            try:
+                                all_symbols = self.data_loader.get_symbols_list()
+                                usdt_symbols = [s for s in all_symbols if s.endswith('USDT')]
+                                # 排除特殊代幣
+                                filtered = [s for s in usdt_symbols if not any(
+                                    bad in s for bad in ['UP', 'DOWN', 'BULL', 'BEAR', 'USDC', 'BUSD']
+                                )]
+                                result.extend(filtered[:50])  # 限制50個，避免太慢
+                            except:
+                                result.append("BTCUSDT")
+                        else:
+                            result.append(symbol)
+                    return result
+
+                final_symbols = process_special_keywords(symbols or request.symbols or ["BTCUSDT"])
                 
                 # 執行真實搜索
                 real_cases_dict = await self.search_engine.search_cases(
