@@ -402,7 +402,7 @@ class StandaloneSearchService:
                                 filtered = [s for s in usdt_symbols if not any(
                                     bad in s for bad in ['UP', 'DOWN', 'BULL', 'BEAR', 'USDC', 'BUSD']
                                 )]
-                                result.extend(filtered[:50])  # 限制50個，避免太慢
+                                result.extend(filtered[:50])  # 限制50個?，避免太慢
                             except:
                                 result.append("BTCUSDT")
                         else:
