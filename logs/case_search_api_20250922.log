@@ -1,407 +1,1270 @@
-2025-09-22 20:08:50 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
-2025-09-22 20:08:50 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
-2025-09-22 20:08:50 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
-2025-09-22 20:08:50 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
-2025-09-22 20:08:50 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
-2025-09-22 20:08:50 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
-2025-09-22 20:08:50 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
-2025-09-22 20:08:50 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
-2025-09-22 20:08:50 - api.startup - [32mINFO[0m - 運行環境: Development
-2025-09-22 20:08:50 - api.startup - [32mINFO[0m - API 前綴: /api/v1
-2025-09-22 20:09:30 - api.middleware.request - [32mINFO[0m - [9579e6d3] Started OPTIONS /api/v1/search/execute from 127.0.0.1
-2025-09-22 20:09:30 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.002s
-2025-09-22 20:09:30 - api.middleware.request - [32mINFO[0m - [9579e6d3] Completed OPTIONS /api/v1/search/execute - 200 - 0.002s
-2025-09-22 20:09:30 - api.middleware.request - [32mINFO[0m - [81557b8d] Started POST /api/v1/search/execute from 127.0.0.1
-2025-09-22 20:09:30 - api.exception_handler - [33mWARNING[0m - Validation error: [{'type': 'float_type', 'loc': ('body', 'config', 'min_volume'), 'msg': 'Input should be a valid number', 'input': None}]
-2025-09-22 20:09:30 - api.request - [33mWARNING[0m - POST /api/v1/search/execute - 422 - 0.007s
-2025-09-22 20:09:30 - api.middleware.request - [32mINFO[0m - [81557b8d] Completed POST /api/v1/search/execute - 422 - 0.007s
-2025-09-22 20:21:31 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
-2025-09-22 20:21:31 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
-2025-09-22 20:21:31 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
-2025-09-22 20:21:31 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
-2025-09-22 20:21:31 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
-2025-09-22 20:21:31 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
-2025-09-22 20:21:31 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
-2025-09-22 20:21:31 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
-2025-09-22 20:21:31 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
-2025-09-22 20:21:31 - api.startup - [32mINFO[0m - 運行環境: Development
-2025-09-22 20:21:31 - api.startup - [32mINFO[0m - API 前綴: /api/v1
-2025-09-22 20:21:54 - api.middleware.request - [32mINFO[0m - [c8ee9ba8] Started OPTIONS /api/v1/search/execute from 127.0.0.1
-2025-09-22 20:21:54 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.001s
-2025-09-22 20:21:54 - api.middleware.request - [32mINFO[0m - [c8ee9ba8] Completed OPTIONS /api/v1/search/execute - 200 - 0.001s
-2025-09-22 20:21:54 - api.middleware.request - [32mINFO[0m - [339a4604] Started POST /api/v1/search/execute from 127.0.0.1
-2025-09-22 20:21:54 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
-2025-09-22 20:21:54 - api.standalone_search_service - [32mINFO[0m - Loading momentum modules on demand...
-2025-09-22 20:21:55 - api.standalone_search_service - [32mINFO[0m - ✅ Momentum modules loaded successfully on demand
-2025-09-22 20:21:55 - api.standalone_task_manager - [32mINFO[0m - Created task 96c56790-3b3f-47b7-a256-8a99fd54b54f for config: 兩階段搜索測試
-2025-09-22 20:21:55 - api.standalone_task_manager - [32mINFO[0m - Updated task 96c56790-3b3f-47b7-a256-8a99fd54b54f status to running
-2025-09-22 20:21:55 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: 兩階段搜索測試
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2025-06-24 to 2025-09-22
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
-2025-09-22 20:21:55 - api.momentum_wrapper - [32mINFO[0m - Getting data for BTCUSDT: 2025-06-24 to 2025-09-22
-2025-09-22 20:21:55 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 180 records for BTCUSDT
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
-2025-09-22 20:21:55 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 179/180 有效值 (1 NaN)
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 180/180 有效值 (0 NaN)
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 180/180 有效值 (0 NaN)
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 180/180 有效值 (0 NaN)
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 180/180 有效值 (0 NaN)
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 179/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 178/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 177/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 176/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 175/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 174/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 173/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 172/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 171/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 170/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 169/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 168/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 179/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 178/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 177/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 176/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 175/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 174/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 173/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 172/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 171/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 170/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 169/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 168/180 有效值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 180/180 有效值, 2 唯一值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 180/180 有效值, 7 唯一值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 180/180 有效值, 1 唯一值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 180/180 有效值, 1 唯一值
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No initial candidates found for BTCUSDT
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No cases found for BTCUSDT
-2025-09-22 20:21:56 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 0 cases
-2025-09-22 20:21:56 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
-2025-09-22 20:21:56 - api.standalone_task_manager - [32mINFO[0m - Updated task 96c56790-3b3f-47b7-a256-8a99fd54b54f status to failed
-2025-09-22 20:21:56 - api.search_task_service - [33mWARNING[0m - Positive search 96c56790-3b3f-47b7-a256-8a99fd54b54f ended with status: failed
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 1.628s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [339a4604] Completed POST /api/v1/search/execute - 200 - 1.628s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [15ce4484] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [15ce4484] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [66eca88a] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [66eca88a] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [44bc04d1] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [44bc04d1] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [438aae6f] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [438aae6f] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [1dcb7a49] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [1dcb7a49] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [4fc0d2ef] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [4fc0d2ef] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [472d06fd] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [472d06fd] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [2cdb0b50] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [2cdb0b50] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [2240b998] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [2240b998] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [1218c64b] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [1218c64b] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [3b65cedd] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [3b65cedd] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [deace06e] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.004s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [deace06e] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.004s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [e356ffc6] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.013s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [e356ffc6] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.013s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [2fe9655f] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [2fe9655f] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [0063c236] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [0063c236] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [e6e7ea26] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [e6e7ea26] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [b739f827] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [b739f827] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [216f0950] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [216f0950] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [47481de6] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [47481de6] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [6774bac7] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [6774bac7] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [6b6c22eb] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [6b6c22eb] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [1b20102a] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [1b20102a] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [6f387d3a] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [6f387d3a] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [010e3cc1] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [010e3cc1] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [4ffb3665] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [4ffb3665] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.003s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [ede12df3] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [ede12df3] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [7e5da455] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [7e5da455] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [a340deba] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [a340deba] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.002s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [3459d02a] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [3459d02a] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [da1154d2] Started GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f from 127.0.0.1
-2025-09-22 20:21:56 - api.request - [32mINFO[0m - GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:21:56 - api.middleware.request - [32mINFO[0m - [da1154d2] Completed GET /api/v1/search/task/96c56790-3b3f-47b7-a256-8a99fd54b54f - 200 - 0.001s
-2025-09-22 20:24:36 - api.middleware.request - [32mINFO[0m - [e30b7a20] Started POST /api/v1/search/execute from 127.0.0.1
-2025-09-22 20:24:36 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
-2025-09-22 20:24:36 - api.standalone_task_manager - [32mINFO[0m - Created task c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 for config: 兩階段搜索測試
-2025-09-22 20:24:36 - api.standalone_task_manager - [32mINFO[0m - Updated task c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 status to running
-2025-09-22 20:24:36 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: 兩階段搜索測試
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BTCUSDT']
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-01-01 to 2024-11-22
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BTCUSDT']
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BTCUSDT
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BTCUSDT
-2025-09-22 20:24:36 - api.momentum_wrapper - [32mINFO[0m - Getting data for BTCUSDT: 2024-01-01 to 2024-11-22
-2025-09-22 20:24:36 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 652 records for BTCUSDT
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
-2025-09-22 20:24:36 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
-2025-09-22 20:24:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 651/652 有效值 (1 NaN)
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 652/652 有效值 (0 NaN)
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 652/652 有效值 (0 NaN)
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 652/652 有效值 (0 NaN)
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 652/652 有效值 (0 NaN)
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 651/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 650/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 649/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 648/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 647/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 646/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 645/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 644/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 643/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 642/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 641/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 640/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 651/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 650/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 649/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 648/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 647/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 646/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 645/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 644/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 643/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 642/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 641/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 640/652 有效值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 652/652 有效值, 2 唯一值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 652/652 有效值, 7 唯一值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 652/652 有效值, 3 唯一值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 652/652 有效值, 1 唯一值
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 13 initial candidates for BTCUSDT
-2025-09-22 20:24:38 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 13 final candidates for BTCUSDT
-2025-09-22 20:24:38 - market_sentiment_manager - [32mINFO[0m - 載入快取元數據: 最後更新 2025-09-21T16:02:50.249772
-2025-09-22 20:24:38 - momentum.DataExtraction.Market_Screener_Configuration - [32mINFO[0m - 市場情緒管理器初始化成功
-2025-09-22 20:24:38 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:38 - market_sentiment_manager - [32mINFO[0m - 快取已過期 (28.4小時，超過24小時限制)
-2025-09-22 20:24:38 - market_sentiment_manager - [32mINFO[0m - 開始更新市場情緒數據...
-2025-09-22 20:24:38 - crypto_sentiment_collector - [32mINFO[0m - 正在請求最近2000天的恐懼與貪婪指數數據
-2025-09-22 20:24:40 - crypto_sentiment_collector - [32mINFO[0m - API回應的數據結構: dict_keys(['value', 'value_classification', 'timestamp', 'time_until_update'])
-2025-09-22 20:24:40 - crypto_sentiment_collector - [32mINFO[0m - 成功獲取2000筆恐懼與貪婪指數數據
-2025-09-22 20:24:40 - crypto_sentiment_collector - [32mINFO[0m - 將2000筆數據聚合為287筆週級別數據
-2025-09-22 20:24:40 - crypto_sentiment_collector - [32mINFO[0m - 識別出98個連續市場階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日級別數據已快取: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 週級別數據已快取: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 市場階段數據已快取: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取元數據已更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 市場情緒數據更新完成
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-01-08 對應市場階段: GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-01-08 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-01-08 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-01-08 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-26 對應市場階段: EXTREME_GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-02-26 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-02-26 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-02-26 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-28 對應市場階段: EXTREME_GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-02-28 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-02-28 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-02-28 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-06 對應市場階段: EXTREME_GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-03-06 00:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-03-06 00:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-03-06 00:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-20 對應市場階段: EXTREME_GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-03-20 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-03-20 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-03-20 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-03 對應市場階段: GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-05-03 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-05-03 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-05-03 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-15 對應市場階段: GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-05-15 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-05-15 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-05-15 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-20 對應市場階段: GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-05-20 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-05-20 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-05-20 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-05 對應市場階段: FEAR
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-08-05 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-08-05 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-08-05 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-08 對應市場階段: FEAR
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-08-08 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-08-08 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-08-08 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-23 對應市場階段: FEAR
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-08-23 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-08-23 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-08-23 12:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-06 對應市場階段: GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-11-06 00:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-11-06 00:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-11-06 00:00:00
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
-2025-09-22 20:24:40 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-11 對應市場階段: EXTREME_GREED
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BTCUSDT at 2024-11-11 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BTCUSDT at 2024-11-11 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BTCUSDT at 2024-11-11 12:00:00
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 13 cases for BTCUSDT
-2025-09-22 20:24:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 13 cases
-2025-09-22 20:24:40 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 13 cases
-2025-09-22 20:24:40 - api.standalone_task_manager - [32mINFO[0m - Updated task c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 status to completed
-2025-09-22 20:24:40 - api.function_call - [32mINFO[0m - Function: real_search_execution | Params: {'config_name': '兩階段搜索測試', 'cases_found': '13'} | Duration: 4.11s
-2025-09-22 20:24:40 - api.search_task_service - [32mINFO[0m - Positive search c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 completed with 13 cases
-2025-09-22 20:24:40 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 4.121s
-2025-09-22 20:24:40 - api.middleware.request - [32mINFO[0m - [e30b7a20] Completed POST /api/v1/search/execute - 200 - 4.121s
-2025-09-22 20:24:40 - api.middleware.request - [32mINFO[0m - [2539b295] Started GET /api/v1/search/task/c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 from 127.0.0.1
-2025-09-22 20:24:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 - 200 - 0.001s
-2025-09-22 20:24:40 - api.middleware.request - [32mINFO[0m - [2539b295] Completed GET /api/v1/search/task/c8028625-5f2d-41fe-b545-bfc8ca6f7ee4 - 200 - 0.001s
-2025-09-22 20:24:40 - api.middleware.request - [32mINFO[0m - [bf67f89e] Started GET /api/v1/search/task/c8028625-5f2d-41fe-b545-bfc8ca6f7ee4/result from 127.0.0.1
-2025-09-22 20:24:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/c8028625-5f2d-41fe-b545-bfc8ca6f7ee4/result - 200 - 0.003s
-2025-09-22 20:24:40 - api.middleware.request - [32mINFO[0m - [bf67f89e] Completed GET /api/v1/search/task/c8028625-5f2d-41fe-b545-bfc8ca6f7ee4/result - 200 - 0.003s
+2025-09-23 20:34:36 - api.middleware.request - [32mINFO[0m - [92922eaf] Started OPTIONS /api/v1/search/execute from 127.0.0.1
+2025-09-23 20:34:36 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/execute - 200 - 0.008s
+2025-09-23 20:34:36 - api.middleware.request - [32mINFO[0m - [92922eaf] Completed OPTIONS /api/v1/search/execute - 200 - 0.008s
+2025-09-23 20:34:36 - api.middleware.request - [32mINFO[0m - [30ccd5c7] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-23 20:34:36 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
+2025-09-23 20:34:36 - api.standalone_search_service - [32mINFO[0m - Loading momentum modules on demand...
+2025-09-23 20:34:37 - api.standalone_search_service - [32mINFO[0m - ✅ Momentum modules loaded successfully on demand
+2025-09-23 20:34:37 - api.standalone_task_manager - [32mINFO[0m - Created task 89d16f42-f72e-4af0-ac67-2662c25e8dc5 for config: 兩階段搜索測試
+2025-09-23 20:34:37 - api.standalone_task_manager - [32mINFO[0m - Updated task 89d16f42-f72e-4af0-ac67-2662c25e8dc5 status to running
+2025-09-23 20:34:37 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
+2025-09-23 20:34:37 - api.standalone_search_service - [32mINFO[0m - Debug - symbols parameter: ['ETHUSDT']
+2025-09-23 20:34:37 - api.standalone_search_service - [32mINFO[0m - Debug - request.symbols: None
+2025-09-23 20:34:37 - api.standalone_search_service - [32mINFO[0m - Debug - final symbols: ['ETHUSDT']
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: 兩階段搜索測試
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['ETHUSDT']
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-01-23 to 2025-09-01
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['ETHUSDT']
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: ETHUSDT
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for ETHUSDT
+2025-09-23 20:34:37 - api.momentum_wrapper - [32mINFO[0m - Getting data for ETHUSDT: 2024-01-23 to 2025-09-01
+2025-09-23 20:34:37 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 1175 records for ETHUSDT
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
+2025-09-23 20:34:37 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
+2025-09-23 20:34:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 1174/1175 有效值 (1 NaN)
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 1174/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 1173/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 1172/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 1171/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 1170/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 1169/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 1168/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 1167/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 1166/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 1165/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 1164/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 1163/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 1174/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 1173/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 1172/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 1171/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 1170/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 1169/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 1168/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 1167/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 1166/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 1165/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 1164/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 1163/1175 有效值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 1175/1175 有效值, 2 唯一值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 1175/1175 有效值, 7 唯一值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 1175/1175 有效值, 4 唯一值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 1175/1175 有效值, 1 唯一值
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 61 initial candidates for ETHUSDT
+2025-09-23 20:34:41 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 61 final candidates for ETHUSDT
+2025-09-23 20:34:41 - market_sentiment_manager - [32mINFO[0m - 載入快取元數據: 最後更新 2025-09-22T20:24:40.229446
+2025-09-23 20:34:41 - momentum.DataExtraction.Market_Screener_Configuration - [32mINFO[0m - 市場情緒管理器初始化成功
+2025-09-23 20:34:41 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:41 - market_sentiment_manager - [32mINFO[0m - 快取已過期 (24.2小時，超過24小時限制)
+2025-09-23 20:34:41 - market_sentiment_manager - [32mINFO[0m - 開始更新市場情緒數據...
+2025-09-23 20:34:41 - crypto_sentiment_collector - [32mINFO[0m - 正在請求最近2000天的恐懼與貪婪指數數據
+2025-09-23 20:34:43 - crypto_sentiment_collector - [32mINFO[0m - API回應的數據結構: dict_keys(['value', 'value_classification', 'timestamp', 'time_until_update'])
+2025-09-23 20:34:43 - crypto_sentiment_collector - [32mINFO[0m - 成功獲取2000筆恐懼與貪婪指數數據
+2025-09-23 20:34:43 - crypto_sentiment_collector - [32mINFO[0m - 將2000筆數據聚合為287筆週級別數據
+2025-09-23 20:34:43 - crypto_sentiment_collector - [32mINFO[0m - 識別出98個連續市場階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日級別數據已快取: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 週級別數據已快取: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 市場階段數據已快取: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取元數據已更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 市場情緒數據更新完成
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-12 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-02-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-02-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-02-12 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-14 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-02-14 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-02-14 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-02-14 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-06 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-03-06 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-03-06 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-03-06 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-11 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-03-11 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-03-11 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-03-11 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-03-20 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-03-20 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-03-20 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-03-20 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-03-20 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-03-20 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-25 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-03-25 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-03-25 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-03-25 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-04-08 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-04-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-04-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-04-08 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-04-14 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-04-14 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-04-14 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-04-14 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-04-27 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-04-27 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-04-27 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-04-27 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-03 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-05-03 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-05-03 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-05-03 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-15 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-05-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-05-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-05-15 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-20 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-05-20 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-05-20 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-05-20 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-23 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-05-23 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-05-23 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-05-23 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-07-08 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-07-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-07-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-07-08 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-07-15 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-07-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-07-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-07-15 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-05 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-08-05 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-08-05 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-08-05 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-08 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-08-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-08-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-08-08 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-08 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-08-08 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-08-08 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-08-08 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-12 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-08-12 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-08-12 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-08-12 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-23 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-08-23 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-08-23 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-08-23 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-06 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-11-06 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-11-06 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-11-06 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-11 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-11-11 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-11-11 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-11-11 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-18 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-11-18 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-11-18 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-11-18 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-21 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-11-21 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-11-21 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-11-21 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-27 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-11-27 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-11-27 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-11-27 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-27 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-11-27 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-11-27 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-11-27 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2024-12-20 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2024-12-20 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2024-12-20 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-03 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-01-03 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-01-03 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-01-03 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-15 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-01-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-01-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-01-15 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-01-20 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-01-20 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-01-20 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-27 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-01-27 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-01-27 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-01-27 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-03 對應市場階段: NEUTRAL
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-02-03 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-02-03 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-02-03 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-12 對應市場階段: NEUTRAL
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-02-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-02-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-02-12 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-28 對應市場階段: EXTREME_FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-02-28 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-02-28 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-02-28 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-02 對應市場階段: EXTREME_FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-03-02 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-03-02 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-03-02 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-10 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-03-10 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-03-10 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-03-10 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-19 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-03-19 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-03-19 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-03-19 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-24 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-03-24 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-03-24 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-03-24 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-07 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-04-07 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-04-07 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-04-07 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-09 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-04-09 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-04-09 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-04-09 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-14 對應市場階段: FEAR
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-04-14 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-04-14 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-04-14 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-22 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-04-22 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-04-22 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-04-22 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-08 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-05-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-05-08 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-05-08 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-08 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-05-08 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-05-08 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-05-08 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-09 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-05-09 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-05-09 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-05-09 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-10 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-05-10 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-05-10 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-05-10 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-13 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-05-13 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-05-13 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-05-13 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-19 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-05-19 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-05-19 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-05-19 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-06-02 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-06-02 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-06-02 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-06-02 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-06-09 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-06-09 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-06-09 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-06-09 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-06-23 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-06-23 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-06-23 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-06-23 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-02 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-07-02 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-07-02 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-07-02 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-09 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-07-09 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-07-09 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-07-09 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-10 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-07-10 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-07-10 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-07-10 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-15 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-07-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-07-15 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-07-15 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-16 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-07-16 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-07-16 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-07-16 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-20 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-07-20 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-07-20 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-07-20 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-08-04 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-08-04 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-08-04 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-08-04 12:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-08-09 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-08-09 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-08-09 00:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-08-09 00:00:00
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:34:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-08-12 對應市場階段: GREED
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for ETHUSDT at 2025-08-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for ETHUSDT at 2025-08-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for ETHUSDT at 2025-08-12 12:00:00
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 61 cases for ETHUSDT
+2025-09-23 20:34:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 61 cases
+2025-09-23 20:34:43 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 61 cases
+2025-09-23 20:34:43 - api.standalone_task_manager - [32mINFO[0m - Updated task 89d16f42-f72e-4af0-ac67-2662c25e8dc5 status to completed
+2025-09-23 20:34:43 - api.function_call - [32mINFO[0m - Function: real_search_execution | Params: {'config_name': '兩階段搜索測試', 'cases_found': '61'} | Duration: 6.09s
+2025-09-23 20:34:43 - api.search_task_service - [32mINFO[0m - Positive search 89d16f42-f72e-4af0-ac67-2662c25e8dc5 completed with 61 cases
+2025-09-23 20:34:43 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 7.145s
+2025-09-23 20:34:43 - api.middleware.request - [32mINFO[0m - [30ccd5c7] Completed POST /api/v1/search/execute - 200 - 7.145s
+2025-09-23 20:34:43 - api.middleware.request - [32mINFO[0m - [93e71705] Started GET /api/v1/search/task/89d16f42-f72e-4af0-ac67-2662c25e8dc5 from 127.0.0.1
+2025-09-23 20:34:43 - api.request - [32mINFO[0m - GET /api/v1/search/task/89d16f42-f72e-4af0-ac67-2662c25e8dc5 - 200 - 0.001s
+2025-09-23 20:34:43 - api.middleware.request - [32mINFO[0m - [93e71705] Completed GET /api/v1/search/task/89d16f42-f72e-4af0-ac67-2662c25e8dc5 - 200 - 0.001s
+2025-09-23 20:34:43 - api.middleware.request - [32mINFO[0m - [7ef79dce] Started GET /api/v1/search/task/89d16f42-f72e-4af0-ac67-2662c25e8dc5/result from 127.0.0.1
+2025-09-23 20:34:43 - api.request - [32mINFO[0m - GET /api/v1/search/task/89d16f42-f72e-4af0-ac67-2662c25e8dc5/result - 200 - 0.009s
+2025-09-23 20:34:43 - api.middleware.request - [32mINFO[0m - [7ef79dce] Completed GET /api/v1/search/task/89d16f42-f72e-4af0-ac67-2662c25e8dc5/result - 200 - 0.009s
+2025-09-23 20:35:39 - api.middleware.request - [32mINFO[0m - [738d0c11] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-23 20:35:39 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
+2025-09-23 20:35:39 - api.standalone_task_manager - [32mINFO[0m - Created task c59c6693-a614-46c7-9289-142708634316 for config: 兩階段搜索測試
+2025-09-23 20:35:39 - api.standalone_task_manager - [32mINFO[0m - Updated task c59c6693-a614-46c7-9289-142708634316 status to running
+2025-09-23 20:35:39 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
+2025-09-23 20:35:39 - api.standalone_search_service - [32mINFO[0m - Debug - symbols parameter: ['BNBUSDT']
+2025-09-23 20:35:39 - api.standalone_search_service - [32mINFO[0m - Debug - request.symbols: None
+2025-09-23 20:35:39 - api.standalone_search_service - [32mINFO[0m - Debug - final symbols: ['BNBUSDT']
+2025-09-23 20:35:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: 兩階段搜索測試
+2025-09-23 20:35:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BNBUSDT']
+2025-09-23 20:35:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-01-23 to 2025-09-01
+2025-09-23 20:35:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BNBUSDT']
+2025-09-23 20:35:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BNBUSDT
+2025-09-23 20:35:39 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BNBUSDT
+2025-09-23 20:35:39 - api.momentum_wrapper - [32mINFO[0m - Getting data for BNBUSDT: 2024-01-23 to 2025-09-01
+2025-09-23 20:35:40 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
+2025-09-23 20:35:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 1175 records for BNBUSDT
+2025-09-23 20:35:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始添加擴充計算列...
+2025-09-23 20:35:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-09-23 20:35:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-09-23 20:35:40 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - taker_buy_volume 數據不可用，使用價格動量替代
+2025-09-23 20:35:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤...
+2025-09-23 20:35:42 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤...
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 1174/1175 有效值 (1 NaN)
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 1175/1175 有效值 (0 NaN)
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 1174/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 1173/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 1172/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 1171/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 1170/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 1169/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 1168/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 1167/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 1166/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 1165/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 1164/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 1163/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 1174/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 1173/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 1172/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 1171/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 1170/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 1169/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 1168/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 1167/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 1166/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 1165/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 1164/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 1163/1175 有效值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 1175/1175 有效值, 2 唯一值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 1175/1175 有效值, 7 唯一值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 1175/1175 有效值, 3 唯一值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 1175/1175 有效值, 1 唯一值
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 33 個參數欄位 ===
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 37 initial candidates for BNBUSDT
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 37 final candidates for BNBUSDT
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-02-21 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-02-21 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-02-21 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-02-21 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-06 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-06 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-06 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-06 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-07 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-07 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-07 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-07 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-10 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-10 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-10 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-10 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-13 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-13 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-13 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-13 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-13 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-13 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-13 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-13 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-15 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-15 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-15 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-15 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-20 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-20 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-20 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-20 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-03-29 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-03-29 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-03-29 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-03-29 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-04-04 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-04-04 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-04-04 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-04-04 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-03 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-05-03 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-05-03 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-05-03 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-05-20 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-05-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-05-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-05-20 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-06-03 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-06-03 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-06-03 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-06-03 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-06-04 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-06-04 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-06-04 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-06-04 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-07-08 對應市場階段: FEAR
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-07-08 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-07-08 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-07-08 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-07-15 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-07-15 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-07-15 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-07-15 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-05 對應市場階段: FEAR
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-08-05 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-08-05 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-08-05 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-08-08 對應市場階段: FEAR
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-08-08 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-08-08 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-08-08 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-09 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-11-09 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-11-09 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-11-09 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-11 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-11-11 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-11-11 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-11-11 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-11-23 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-11-23 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-11-23 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-11-23 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-03 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-12-03 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-12-03 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-12-03 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-04 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-12-04 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-12-04 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-12-04 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2024-12-20 對應市場階段: EXTREME_GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2024-12-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2024-12-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2024-12-20 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-13 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-01-13 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-01-13 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-01-13 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-01-27 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-01-27 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-01-27 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-01-27 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-03 對應市場階段: NEUTRAL
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-02-03 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-02-03 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-02-03 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-08 對應市場階段: NEUTRAL
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-02-08 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-02-08 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-02-08 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-11 對應市場階段: NEUTRAL
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-02-11 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-02-11 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-02-11 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-02-12 對應市場階段: NEUTRAL
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-02-12 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-02-12 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-02-12 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-03-17 對應市場階段: FEAR
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-03-17 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-03-17 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-03-17 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-04-09 對應市場階段: FEAR
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-04-09 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-04-09 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-04-09 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-09 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-05-09 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-05-09 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-05-09 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-05-12 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-05-12 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-05-12 00:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-05-12 00:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-07-27 對應市場階段: GREED
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-07-27 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-07-27 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-07-27 12:00:00
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 所有快取檔案存在
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取仍然有效 (0.0小時前更新)
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 快取有效，跳過更新
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入日級別快取數據: 2000 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入週級別快取數據: 287 筆記錄
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 載入市場階段快取數據: 98 個階段
+2025-09-23 20:35:43 - market_sentiment_manager - [32mINFO[0m - 日期 2025-08-20 對應市場階段: NEUTRAL
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_volatility for BNBUSDT at 2025-08-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_range for BNBUSDT at 2025-08-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [33mWARNING[0m - Missing required data: prior_abs_change_sum for BNBUSDT at 2025-08-20 12:00:00
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Found 37 cases for BNBUSDT
+2025-09-23 20:35:43 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 37 cases
+2025-09-23 20:35:43 - api.standalone_search_service - [32mINFO[0m - Real search completed: found 37 cases
+2025-09-23 20:35:43 - api.standalone_task_manager - [32mINFO[0m - Updated task c59c6693-a614-46c7-9289-142708634316 status to completed
+2025-09-23 20:35:43 - api.function_call - [32mINFO[0m - Function: real_search_execution | Params: {'config_name': '兩階段搜索測試', 'cases_found': '37'} | Duration: 3.94s
+2025-09-23 20:35:43 - api.search_task_service - [32mINFO[0m - Positive search c59c6693-a614-46c7-9289-142708634316 completed with 37 cases
+2025-09-23 20:35:43 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 3.960s
+2025-09-23 20:35:43 - api.middleware.request - [32mINFO[0m - [738d0c11] Completed POST /api/v1/search/execute - 200 - 3.960s
+2025-09-23 20:35:43 - api.middleware.request - [32mINFO[0m - [af067007] Started GET /api/v1/search/task/c59c6693-a614-46c7-9289-142708634316 from 127.0.0.1
+2025-09-23 20:35:43 - api.request - [32mINFO[0m - GET /api/v1/search/task/c59c6693-a614-46c7-9289-142708634316 - 200 - 0.001s
+2025-09-23 20:35:43 - api.middleware.request - [32mINFO[0m - [af067007] Completed GET /api/v1/search/task/c59c6693-a614-46c7-9289-142708634316 - 200 - 0.001s
+2025-09-23 20:35:43 - api.middleware.request - [32mINFO[0m - [c473e4c4] Started GET /api/v1/search/task/c59c6693-a614-46c7-9289-142708634316/result from 127.0.0.1
+2025-09-23 20:35:43 - api.request - [32mINFO[0m - GET /api/v1/search/task/c59c6693-a614-46c7-9289-142708634316/result - 200 - 0.008s
+2025-09-23 20:35:43 - api.middleware.request - [32mINFO[0m - [c473e4c4] Completed GET /api/v1/search/task/c59c6693-a614-46c7-9289-142708634316/result - 200 - 0.008s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [4f9219b3] Started POST /api/v1/search/execute from 127.0.0.1
+2025-09-23 20:36:40 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
+2025-09-23 20:36:40 - api.standalone_task_manager - [32mINFO[0m - Created task 6e9e0871-1c56-4dfc-861d-0f944f67131c for config: 兩階段搜索測試
+2025-09-23 20:36:40 - api.standalone_task_manager - [32mINFO[0m - Updated task 6e9e0871-1c56-4dfc-861d-0f944f67131c status to running
+2025-09-23 20:36:40 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
+2025-09-23 20:36:40 - api.standalone_search_service - [32mINFO[0m - Debug - symbols parameter: ['BNBUSD，ETHUSDT，ADAUSDT']
+2025-09-23 20:36:40 - api.standalone_search_service - [32mINFO[0m - Debug - request.symbols: None
+2025-09-23 20:36:40 - api.standalone_search_service - [32mINFO[0m - Debug - final symbols: ['BNBUSD，ETHUSDT，ADAUSDT']
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Starting search with config: 兩階段搜索測試
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Symbols: ['BNBUSD，ETHUSDT，ADAUSDT']
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Time range: 2024-01-23 to 2025-09-01
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing batch 1: ['BNBUSD，ETHUSDT，ADAUSDT']
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Processing symbol: BNBUSD，ETHUSDT，ADAUSDT
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loading data for BNBUSD，ETHUSDT，ADAUSDT
+2025-09-23 20:36:40 - api.momentum_wrapper - [32mINFO[0m - Getting data for BNBUSD，ETHUSDT，ADAUSDT: 2024-01-23 to 2025-09-01
+2025-09-23 20:36:40 - DataLoader - [31mERROR[0m - 請求錯誤（不重試）: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
+2025-09-23 20:36:40 - DataLoader - [31mERROR[0m - 獲取歷史K線時出錯: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
+2025-09-23 20:36:40 - api.momentum_wrapper - [31mERROR[0m - Error getting historical data for BNBUSD，ETHUSDT，ADAUSDT: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Error searching single symbol BNBUSD，ETHUSDT，ADAUSDT: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No cases found for BNBUSD，ETHUSDT，ADAUSDT
+2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search completed. Found 0 cases
+2025-09-23 20:36:40 - api.standalone_search_service - [33mWARNING[0m - No cases found matching the specified criteria
+2025-09-23 20:36:40 - api.standalone_task_manager - [32mINFO[0m - Updated task 6e9e0871-1c56-4dfc-861d-0f944f67131c status to failed
+2025-09-23 20:36:40 - api.search_task_service - [33mWARNING[0m - Positive search 6e9e0871-1c56-4dfc-861d-0f944f67131c ended with status: failed
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - POST /api/v1/search/execute - 200 - 0.160s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [4f9219b3] Completed POST /api/v1/search/execute - 200 - 0.160s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [4272962d] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.004s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [4272962d] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.004s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [12e26590] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [12e26590] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [2ae53ffa] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [2ae53ffa] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [0a767b08] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [0a767b08] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [5ecfa1e6] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [5ecfa1e6] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [a9a4637d] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [a9a4637d] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [0d90fedd] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [0d90fedd] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [268ef1bd] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.005s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [268ef1bd] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.005s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [2e8735ff] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [2e8735ff] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [952134ad] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [952134ad] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [fcbcc7f6] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [fcbcc7f6] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [a48e5942] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [a48e5942] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [401607e9] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [401607e9] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [1608ed9a] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:40 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:40 - api.middleware.request - [32mINFO[0m - [1608ed9a] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [b091db98] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [b091db98] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [29065e94] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [29065e94] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [46619f29] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [46619f29] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [d81ed329] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [d81ed329] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [9bc7276b] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [9bc7276b] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [1fbc1a22] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [1fbc1a22] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [f00c7c10] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [f00c7c10] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [e6e52ff7] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [e6e52ff7] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [a53a0192] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.004s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [a53a0192] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.004s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [f2c1bb6e] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.005s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [f2c1bb6e] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.005s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [b9b4cde8] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [b9b4cde8] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [26173fa4] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [26173fa4] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.002s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [d6769214] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [d6769214] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [4d789b85] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [4d789b85] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [21517fe9] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [21517fe9] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.003s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [552f1bb3] Started GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c from 127.0.0.1
+2025-09-23 20:36:41 - api.request - [32mINFO[0m - GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:36:41 - api.middleware.request - [32mINFO[0m - [552f1bb3] Completed GET /api/v1/search/task/6e9e0871-1c56-4dfc-861d-0f944f67131c - 200 - 0.001s
+2025-09-23 20:43:10 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
