@@ -1,6 +1,0 @@
-2025-09-23 20:34:37 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
-2025-09-23 20:35:40 - DataLoader - [31mERROR[0m - 保存緩存失敗: Missing optional dependency 'pytables'.  Use pip or conda to install pytables.
-2025-09-23 20:36:40 - DataLoader - [31mERROR[0m - 請求錯誤（不重試）: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
-2025-09-23 20:36:40 - DataLoader - [31mERROR[0m - 獲取歷史K線時出錯: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
-2025-09-23 20:36:40 - api.momentum_wrapper - [31mERROR[0m - Error getting historical data for BNBUSD，ETHUSDT，ADAUSDT: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
-2025-09-23 20:36:40 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - Error searching single symbol BNBUSD，ETHUSDT，ADAUSDT: APIError(code=-1100): Illegal characters found in parameter 'symbol'; legal range is '^[A-Z0-9-_.]{1,20}$'.
