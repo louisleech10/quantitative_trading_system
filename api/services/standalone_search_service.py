@@ -385,7 +385,6 @@ class StandaloneSearchService:
                 # 添加調試LOG
                 self.logger.info(f"Debug - symbols parameter: {symbols}")
                 self.logger.info(f"Debug - request.symbols: {getattr(request, 'symbols', 'NOT_FOUND')}")
-                self.logger.info(f"Debug - final symbols: {final_symbols}")
 
                 def process_special_keywords(symbol_list):
                     if not symbol_list:
@@ -402,7 +401,7 @@ class StandaloneSearchService:
                                 filtered = [s for s in usdt_symbols if not any(
                                     bad in s for bad in ['UP', 'DOWN', 'BULL', 'BEAR', 'USDC', 'BUSD']
                                 )]
-                                result.extend(filtered[:50])  # 限制50個???，避免太慢
+                                result.extend(filtered)
                             except:
                                 result.append("BTCUSDT")
                         else:
@@ -410,11 +409,12 @@ class StandaloneSearchService:
                     return result
 
                 final_symbols = process_special_keywords(symbols or request.symbols or ["BTCUSDT"])
+                self.logger.info(f"Debug - final symbols: {final_symbols}")
                 
                 # 執行真實搜索
                 real_cases_dict = await self.search_engine.search_cases(
                     config=search_config,
-                    symbols=symbols or request.symbols or ["BTCUSDT"],
+                    symbols=final_symbols,
                     batch_size=1,
                     save_results=False
                 )

@@ -131,7 +131,7 @@ class SearchConfiguration:
                 forward_periods: int = 20,
                 initial_conditions: List[FilterCondition] = None,
                 advanced_conditions: List[FilterCondition] = None,
-                sample_limit: int = 500,
+                sample_limit: int = 999999,
                 min_volume: float = 0,
                 exclude_new_listing_days: int = 7,
                 time_range: Tuple[str, str] = None):
@@ -363,10 +363,10 @@ class CaseSearchEngine:
                     self.logger.warning(f"Batch {i//batch_size + 1} returned None")
 
                 # 檢查是否已達到樣本限制
-                if len(all_results) >= config.sample_limit:
-                    self.logger.info(f"Reached sample limit: {config.sample_limit}")
-                    all_results = all_results[:config.sample_limit]
-                    break
+                #if len(all_results) >= config.sample_limit:
+                #    self.logger.info(f"Reached sample limit: {config.sample_limit}")
+                #    all_results = all_results[:config.sample_limit]
+                #    break
 
             self.logger.info(f"Search completed. Found {len(all_results)} cases")
 
