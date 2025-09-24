@@ -706,7 +706,18 @@ class StandaloneSearchService:
     
     def get_task_result(self, task_id: str) -> Optional[SearchResultData]:
         """Get task result"""
-        return self.task_manager.get_task_result(task_id)
+        result_data = self.task_manager.get_task_result(task_id)
+        
+        # 為正例搜索結果自動添加 positive_case 標記
+        if result_data and result_data.cases:
+            for case in result_data.cases:
+                # 處理不同的案例數據格式
+                if hasattr(case, '__dict__'):
+                    case.__dict__['positive_case'] = 1
+                elif isinstance(case, dict):
+                    case['positive_case'] = 1
+        
+        return result_data
     
     def cancel_task(self, task_id: str) -> bool:
         """Cancel a running task"""
