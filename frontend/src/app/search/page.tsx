@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import { api } from '@/lib/api';
 
 // 搜索請求接口 (符合您的 api.ts 設計)
 interface SearchRequest {
@@ -269,30 +270,66 @@ export default function SearchPage() {
       console.log('發送API請求:', apiRequest);
       
       // 調用真實後端API
-      setCurrentStage('正例搜索中...');
-      const response = await fetch('http://localhost:8000/api/v1/search/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiRequest)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`搜索執行失敗: ${response.status} - ${errorText}`);
+      // 根據使用者是否勾選反例搜索來決定調用哪個API
+      if (negativeParams.enabled) {
+        // 執行完整的兩階段搜索
+        console.log('啟用反例搜索，執行兩階段搜索');
+        const result = await api.executeTwoStageSearch(
+          {
+            name: apiRequest.config.name,
+            timeframe: apiRequest.config.timeframe,
+            startDate: apiRequest.config.start_date,
+            endDate: apiRequest.config.end_date,
+            priceChange: apiRequest.config.initial_conditions.find(c => c.parameter === 'price_change')?.value,
+            volumeMultiplier: apiRequest.config.initial_conditions.find(c => c.parameter === 'volume_multiplier')?.value,
+            takerBuyRatio: apiRequest.config.initial_conditions.find(c => c.parameter === 'taker_buy_ratio')?.value,
+            closingStrength: apiRequest.config.initial_conditions.find(c => c.parameter === 'closing_strength')?.value,
+            symbols: apiRequest.symbols,
+            saveResults: apiRequest.save_results
+          },
+          negativeParams.ratio,
+          negativeParams.timeSeparationDays,
+          (stage, taskId) => {
+            setCurrentStage(stage);
+            console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
+          }
+        );
+        
+        // 直接設定搜索結果
+        setSearchResult(result);
+        console.log('兩階段搜索完成，結果:', result);
+        return; // 提前返回，不執行下面的單一搜索邏輯
+        
+      } else {
+        // 執行單一正例搜索（原有邏輯）
+        console.log('未啟用反例搜索，執行單一正例搜索');
+        setCurrentStage('正例搜索中...');
+        
+        const response = await api.executeSearch({
+          name: apiRequest.config.name,
+          timeframe: apiRequest.config.timeframe,
+          startDate: apiRequest.config.start_date,
+          endDate: apiRequest.config.end_date,
+          priceChange: apiRequest.config.initial_conditions.find(c => c.parameter === 'price_change')?.value,
+          volumeMultiplier: apiRequest.config.initial_conditions.find(c => c.parameter === 'volume_multiplier')?.value,
+          takerBuyRatio: apiRequest.config.initial_conditions.find(c => c.parameter === 'taker_buy_ratio')?.value,
+          closingStrength: apiRequest.config.initial_conditions.find(c => c.parameter === 'closing_strength')?.value,
+          symbols: apiRequest.symbols,
+          saveResults: apiRequest.save_results
+        });
+        
+        if (!response.success || !response.data) {
+          throw new Error(`搜索任務啟動失敗: ${response.error?.message || '未知錯誤'}`);
+        }
+        
+        const taskId = response.data.task_id;
+        console.log('單一搜索任務啟動成功，任務ID:', taskId);
+        
+        // 等待搜索完成
+        setCurrentStage('等待搜索完成...');
+        await waitForTaskCompletion(taskId);
       }
-
-      const data = await response.json();
       
-      if (!data.success || !data.data) {
-        throw new Error(`搜索任務啟動失敗: ${data.error?.message || '未知錯誤'}`);
-      }
-
-      const taskId = data.data.task_id;
-      console.log('搜索任務啟動成功，任務ID:', taskId);
-      
-      // 等待搜索完成
-      setCurrentStage('等待搜索完成...');
-      await waitForTaskCompletion(taskId);
       
     } catch (err) {
       console.error('階段搜索失敗:', err);
