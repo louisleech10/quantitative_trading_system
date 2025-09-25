@@ -158,18 +158,16 @@ class ApiClient {
   ): Promise<ApiResponse<TaskInfo>> {
     
     console.log('執行反例搜索，正例任務ID:', positiveTaskId);
-    
+    console.log('傳入的反例條件:', customConditions); // 新增日誌
+  
     const negativeRequest: NegativeCaseRequest = {
-      search_config: {
-        name: `negative_search_${positiveTaskId}`,
-        timeframe: "12h",
-        initial_conditions: []
-      },
+      negative_conditions: customConditions,  // ✅ 將條件放在正確的位置
       negative_ratio: negativeRatio,
       time_separation_days: timeSeparationDays,
-      sampling_strategy: "time_separated",
-      negative_conditions: customConditions
+      sampling_strategy: "time_separated"
     };
+
+  console.log('發送到後端的反例請求:', negativeRequest); // 新增日誌
 
     return this.fetchApi(`/two-stage/negative/${positiveTaskId}`, {
       method: 'POST',
