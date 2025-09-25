@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
-import { api } from '@/lib/api';
+import { apiClient } from '@/lib/api';
+
 
 // 搜索請求接口 (符合您的 api.ts 設計)
 interface SearchRequest {
@@ -274,7 +275,7 @@ export default function SearchPage() {
       if (negativeParams.enabled) {
         // 執行完整的兩階段搜索
         console.log('啟用反例搜索，執行兩階段搜索');
-        const result = await api.executeTwoStageSearch(
+        const result = await apiClient.executeTwoStageSearch(
           {
             name: apiRequest.config.name,
             timeframe: apiRequest.config.timeframe,
@@ -296,7 +297,7 @@ export default function SearchPage() {
         );
         
         // 直接設定搜索結果
-        setSearchResult(result);
+        setSearchResults(result);
         console.log('兩階段搜索完成，結果:', result);
         return; // 提前返回，不執行下面的單一搜索邏輯
         
@@ -305,7 +306,7 @@ export default function SearchPage() {
         console.log('未啟用反例搜索，執行單一正例搜索');
         setCurrentStage('正例搜索中...');
         
-        const response = await api.executeSearch({
+        const response = await apiClient.executeSearch({
           name: apiRequest.config.name,
           timeframe: apiRequest.config.timeframe,
           startDate: apiRequest.config.start_date,

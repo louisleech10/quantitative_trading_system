@@ -190,7 +190,7 @@ class ApiClient {
 
   // 獲取任務狀態
   async getTaskStatus(taskId: string): Promise<ApiResponse<TaskInfo>> {
-    return this.fetchApi(`/search/task/${taskId}/status`);
+    return this.fetchApi(`/search/task/${taskId}`);  
   }
 
   // 獲取任務結果（單一任務）
@@ -320,8 +320,11 @@ class ApiClient {
       onProgress?.('反例搜索中...', negativeTaskId);
       
       // 等待反例搜索完成
-      await this.waitForTaskCompletion(negativeTaskId);
-      
+      // 暫時跳過反例狀態輪詢，使用延遲等待
+      console.log('反例搜索已啟動，等待完成中...');
+      onProgress?.('等待反例搜索完成...');
+      await new Promise(resolve => setTimeout(resolve, 15000)); // 等待15秒
+
       // 階段3：獲取合併結果
       onProgress?.('合併結果中...');
       const combinedResponse = await this.getCombinedResults(positiveTaskId, negativeTaskId);

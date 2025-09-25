@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     # CORS設定
     allowed_origins: list = [
         "http://localhost:3000",  # Next.js 開發伺服器
+        "http://localhost:3001",  # Next.js 開發伺服器（備用端口）
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
         "http://localhost:8080",
     ]
     
