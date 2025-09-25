@@ -184,6 +184,15 @@ class ApiClient {
   ): Promise<ApiResponse<SearchResultData>> {
     
     console.log('獲取合併結果:', { positiveTaskId, negativeTaskId });
+
+    try {
+      const result = await this.fetchApi(`/two-stage/combined/${positiveTaskId}/${negativeTaskId}`);
+      console.log('合併結果API響應:', result);
+      return result;
+    } catch (error) {
+      console.error('獲取合併結果失敗:', error);
+      throw error;
+    }
     
     return this.fetchApi(`/two-stage/combined/${positiveTaskId}/${negativeTaskId}`);
   }
