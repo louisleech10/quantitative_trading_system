@@ -275,6 +275,73 @@ export default function SearchPage() {
       if (negativeParams.enabled) {
         // 執行完整的兩階段搜索
         console.log('啟用反例搜索，執行兩階段搜索');
+        // 新增：構建反例條件
+        const buildNegativeConditions = () => {
+          const conditions = [];
+
+          // 處理價格變化條件
+          if (negativeParams.priceChange !== null && negativeParams.priceChange !== undefined) {
+            conditions.push({
+              condition_type: "price",
+              parameter: "price_change",
+              operator: negativeOperators.priceChange,
+              value: negativeParams.priceChange / 100, // 轉換為小數
+              description: `價格變化 ${negativeOperators.priceChange} ${negativeParams.priceChange}%`
+            });
+          }
+
+          // 處理成交量倍數條件
+          if (negativeParams.volumeMultiplier !== null && negativeParams.volumeMultiplier !== undefined) {
+            conditions.push({
+              condition_type: "volume",
+              parameter: "volume_multiplier",
+              operator: negativeOperators.volumeMultiplier,
+              value: negativeParams.volumeMultiplier,
+              description: `成交量倍數 ${negativeOperators.volumeMultiplier} ${negativeParams.volumeMultiplier}`
+            });
+          }
+
+          // 處理收盤強度條件
+          if (negativeParams.closingStrength !== null && negativeParams.closingStrength !== undefined) {
+            conditions.push({
+              condition_type: "price",
+              parameter: "closing_strength",
+              operator: negativeOperators.closingStrength,
+              value: negativeParams.closingStrength,
+              description: `收盤強度 ${negativeOperators.closingStrength} ${negativeParams.closingStrength}`
+            });
+          }
+
+          // 處理主動買入比例條件
+          if (negativeParams.takerBuyRatio !== null && negativeParams.takerBuyRatio !== undefined) {
+            conditions.push({
+              condition_type: "volume",
+              parameter: "taker_buy_ratio",
+              operator: negativeOperators.takerBuyRatio,
+              value: negativeParams.takerBuyRatio,
+              description: `主動買入比例 ${negativeOperators.takerBuyRatio} ${negativeParams.takerBuyRatio}`
+            });
+          }
+
+          // 處理價格位置條件
+          if (negativeParams.pricePosition !== null && negativeParams.pricePosition !== undefined) {
+            conditions.push({
+              condition_type: "price",
+              parameter: "price_position",
+              operator: negativeOperators.pricePosition,
+              value: negativeParams.pricePosition,
+              description: `價格位置 ${negativeOperators.pricePosition} ${negativeParams.pricePosition}`
+            });
+          }
+
+          console.log('構建的反例條件:', conditions);
+          return conditions;
+        };
+
+        // 構建反例條件
+        const negativeConditions = buildNegativeConditions();
+        console.log('即將傳遞的反例條件:', negativeConditions);
+
         const result = await apiClient.executeTwoStageSearch(
           {
             name: apiRequest.config.name,
@@ -293,7 +360,8 @@ export default function SearchPage() {
           (stage, taskId) => {
             setCurrentStage(stage);
             console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
-          }
+          },
+          negativeConditions  // ← 新增這個參數
         );
         
         // 直接設定搜索結果

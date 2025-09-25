@@ -295,7 +295,8 @@ class ApiClient {
     request: SearchRequest,
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
-    onProgress?: (stage: string, taskId?: string) => void
+    onProgress?: (stage: string, taskId?: string) => void,
+    customNegativeConditions: any[] = []
   ): Promise<SearchResultData> {
     
     try {
@@ -318,7 +319,8 @@ class ApiClient {
       const negativeResponse = await this.executeNegativeSearch(
         positiveTaskId, 
         negativeRatio, 
-        timeSeparationDays
+        timeSeparationDays,
+        customNegativeConditions
       );
       
       if (!negativeResponse.success || !negativeResponse.data) {
