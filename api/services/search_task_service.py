@@ -81,6 +81,15 @@ class SearchTaskService:
             raise SearchExecutionException("No positive cases found to generate negative examples")
         
         self.logger.info(f"Starting negative search based on {len(positive_cases)} positive cases")
+        self.logger.info(f"Negative request type: {type(negative_request)}")
+        
+        # 檢查用戶條件
+        if hasattr(negative_request, 'negative_conditions') and negative_request.negative_conditions:
+            self.logger.info(f"用戶設定了 {len(negative_request.negative_conditions)} 個反例條件")
+            for i, condition in enumerate(negative_request.negative_conditions):
+                self.logger.info(f"條件 {i+1}: {condition}")
+        else:
+            self.logger.info("沒有用戶設定的反例條件，將使用時間分離策略")
         
         # 生成新的task_id給反例搜索
         negative_task_id = str(uuid.uuid4())
@@ -93,8 +102,8 @@ class SearchTaskService:
         return negative_task_id
     
     async def _run_negative_search(self, task_id: str, positive_cases: List[CaseData],
-                                 request: NegativeCaseRequest):
-        """執行反例搜索邏輯"""
+                             request: NegativeCaseRequest):
+        """執行反例搜索邏輯 - 修復版本"""
         try:
             # 更新任務狀態為執行中
             standalone_search_service.task_manager.create_task(f"negative_search_{task_id}")
@@ -104,32 +113,43 @@ class SearchTaskService:
             
             # 提取正例的symbol列表
             positive_symbols = list(set(case.symbol for case in positive_cases))
+            self.logger.info(f"開始執行用戶自定義條件的反例搜索，交易對: {positive_symbols}")
             
-            # 根據策略生成反例
-            negative_cases = await self._generate_negative_cases(
-                positive_cases, positive_symbols, request
-            )
+            # 檢查是否有用戶設定的條件
+            if hasattr(request, 'negative_conditions') and request.negative_conditions:
+                self.logger.info(f"使用用戶設定的反例條件，條件數量: {len(request.negative_conditions)}")
+                
+                # 使用用戶條件進行真實搜索
+                negative_cases = await self._search_with_user_conditions(
+                    positive_symbols, request
+                )
+            else:
+                self.logger.info("沒有用戶條件，使用時間分離策略")
+                # 沒有用戶條件時才使用時間分離
+                negative_cases = await self._generate_negative_cases(
+                    positive_cases, positive_symbols, request
+                )
             
             if negative_cases:
                 self.negative_results[task_id] = negative_cases
+                self.logger.info(f"反例搜索完成，找到 {len(negative_cases)} 個案例")
                 
                 # 更新任務為完成
                 result_data = SearchResultData(
                     cases=negative_cases,
                     total_cases=len(negative_cases),
-                    search_config=request.search_config.__dict__,
-                    execution_time=5.0,  # 暫時固定值
+                    search_config={}, # 移除對 search_config 的引用
+                    execution_time=5.0,
                     symbols_processed=positive_symbols
                 )
                 
                 standalone_search_service.task_manager.update_task_status(
-                    task_id, "completed", result=result_data
+                    task_id, "completed", result_data=result_data
                 )
-                
-                self.logger.info(f"Negative search completed with {len(negative_cases)} cases")
             else:
+                self.logger.warning("反例搜索沒有找到任何案例")
                 standalone_search_service.task_manager.update_task_status(
-                    task_id, "failed", error_message="No negative cases generated"
+                    task_id, "failed", error_message="No negative cases found"
                 )
                 
         except Exception as e:
@@ -137,6 +157,79 @@ class SearchTaskService:
             standalone_search_service.task_manager.update_task_status(
                 task_id, "failed", error_message=str(e)
             )
+    
+    async def _search_with_user_conditions(self, symbols: List[str], 
+                                     request: NegativeCaseRequest) -> List[CaseData]:
+        """基於用戶設定條件執行反例搜索"""
+        try:
+            from ..models.requests import SearchConfigRequest, FilterConditionRequest
+            
+            self.logger.info("構建反例搜索配置...")
+            
+            # 創建搜索配置
+            negative_config = SearchConfigRequest(
+                name=f"user_negative_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                description="基於用戶條件的反例搜索",
+                timeframe="12h",
+                initial_conditions=[],
+                advanced_conditions=[],
+                start_date="2024-02-01",
+                end_date="2025-05-31"
+            )
+            
+            # 添加用戶設定的條件
+            for condition_data in request.negative_conditions:
+                self.logger.info(f"添加條件: {condition_data['parameter']} {condition_data['operator']} {condition_data['value']}")
+                
+                condition = FilterConditionRequest(
+                    condition_type=condition_data["condition_type"],
+                    parameter=condition_data["parameter"],
+                    operator=condition_data["operator"],
+                    value=condition_data["value"],
+                    description=condition_data.get("description", "用戶自定義反例條件")
+                )
+                negative_config.initial_conditions.append(condition)
+            
+            # 執行真實搜索
+            self.logger.info("執行基於條件的反例搜索...")
+            negative_task_id = await standalone_search_service.execute_search(negative_config, symbols)
+            
+            # 等待搜索完成
+            max_wait_time = 60  # 60秒超時
+            start_time = datetime.now()
+            
+            while (datetime.now() - start_time).seconds < max_wait_time:
+                task_info = standalone_search_service.get_task_status(negative_task_id)
+                if task_info and task_info.status.value == "completed":
+                    # 獲取搜索結果
+                    result_data = standalone_search_service.get_task_result(negative_task_id)
+                    if result_data and result_data.cases:
+                        # 為反例添加標記
+                        negative_cases = []
+                        for case in result_data.cases:
+                            # 處理不同的案例數據格式
+                            if hasattr(case, '__dict__'):
+                                case.__dict__['positive_case'] = 0  # 反例標記為0
+                                negative_cases.append(case)
+                            elif isinstance(case, dict):
+                                case['positive_case'] = 0
+                                negative_cases.append(case)
+                        
+                        self.logger.info(f"用戶條件搜索完成，找到 {len(negative_cases)} 個反例")
+                        return negative_cases
+                    break
+                elif task_info and task_info.status.value in ["failed", "cancelled"]:
+                    self.logger.error("反例搜索失敗或被取消")
+                    break
+                
+                await asyncio.sleep(2)  # 等待2秒後重試
+            
+            self.logger.warning("反例搜索超時或失敗")
+            return []
+            
+        except Exception as e:
+            self.logger.error(f"用戶條件搜索失敗: {str(e)}")
+            return []
     
     async def _generate_negative_cases(self, positive_cases: List[CaseData],
                                  symbols: List[str],
