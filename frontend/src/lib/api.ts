@@ -25,11 +25,10 @@ interface FilterConditionRequest {
 
 // 反例搜索請求格式
 interface NegativeCaseRequest {
-  search_config: SearchConfigRequest;
+  negative_conditions: any[];
   negative_ratio: number;
   time_separation_days: number;
   sampling_strategy: string;
-  negative_conditions?: any[];
 }
 
 class ApiClient {
