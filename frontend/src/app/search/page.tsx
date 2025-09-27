@@ -74,6 +74,11 @@ export default function SearchPage() {
     pricePosition: { min: null as number | null, max: null as number | null }
   });
 
+  // 反例範圍值狀態 (用於反例 BETWEEN 運算符)
+  const [negativeRangeValues, setNegativeRangeValues] = useState({
+    priceChange: { min: null as number | null, max: null as number | null }
+  }); 
+
   // 時間日期和交易量限制狀態
   const [timeParams, setTimeParams] = useState({
     startDate: '',
@@ -277,7 +282,19 @@ export default function SearchPage() {
           const conditions = [];
 
           // 處理價格變化條件
-          if (negativeParams.priceChange !== null && negativeParams.priceChange !== undefined) {
+          if (negativeOperators.priceChange === 'BETWEEN' && 
+              negativeRangeValues.priceChange.min !== null && 
+              negativeRangeValues.priceChange.max !== null) {
+            // BETWEEN 條件
+            conditions.push({
+              condition_type: "price",
+              parameter: "price_change",
+              operator: "between",
+              value: [negativeRangeValues.priceChange.min / 100, negativeRangeValues.priceChange.max / 100], // 轉換為小數
+              description: `價格變化介於 ${negativeRangeValues.priceChange.min}% 到 ${negativeRangeValues.priceChange.max}%`
+            });
+          } else if (negativeParams.priceChange !== null && negativeParams.priceChange !== undefined) {
+            // 單值條件
             conditions.push({
               condition_type: "price",
               parameter: "price_change",
@@ -352,6 +369,8 @@ export default function SearchPage() {
             symbols: apiRequest.symbols,
             saveResults: apiRequest.save_results
           },
+          operators,
+          rangeValues,
           negativeParams.ratio,
           negativeParams.timeSeparationDays,
           (stage, taskId) => {
@@ -702,16 +721,47 @@ export default function SearchPage() {
           </select>
           
           {/* 數值輸入 */}
-          <input
-            type="number"
-            value={fieldValue || ''}
-            onChange={(e) => setNegativeParams(prev => ({
-              ...prev,
-              [fieldKey]: e.target.value ? parseFloat(e.target.value) : null
-            }))}
-            className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
-            placeholder={placeholder}
-          />
+          {operator === 'BETWEEN' ? (
+            <>
+              <input
+                type="number"
+                value={negativeRangeValues[fieldKey]?.min || ''}
+                onChange={(e) => setNegativeRangeValues(prev => ({
+                  ...prev,
+                  [fieldKey]: { 
+                    ...prev[fieldKey], 
+                    min: e.target.value ? parseFloat(e.target.value) : null 
+                  }
+                }))}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                placeholder="最小值"
+              />
+              <input
+                type="number"
+                value={negativeRangeValues[fieldKey]?.max || ''}
+                onChange={(e) => setNegativeRangeValues(prev => ({
+                  ...prev,
+                  [fieldKey]: { 
+                    ...prev[fieldKey], 
+                    max: e.target.value ? parseFloat(e.target.value) : null 
+                  }
+                }))}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                placeholder="最大值"
+              />
+            </>
+          ) : (
+            <input
+              type="number"
+              value={fieldValue || ''}
+              onChange={(e) => setNegativeParams(prev => ({
+                ...prev,
+                [fieldKey]: e.target.value ? parseFloat(e.target.value) : null
+              }))}
+              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+              placeholder={placeholder}
+            />
+          )}
         </div>
       </div>
     );
@@ -949,11 +999,8 @@ export default function SearchPage() {
                     {renderNegativeFieldInput('priceChange', '價格變化 (%)', '例如: -2.0')}
                   </div>
 
-                  <div className="mt-4 p-4 bg-red-50 rounded-lg">
-                    <p className="text-sm text-red-800">
-                      <strong>說明：</strong>反例搜索只需設定價格變化條件，建議設定與正例相反的條件（如正例>=5%，反例則設<=-2%）
-                    </p>
-                    </div>
+                  
+
                 </div>
               )}
             </div>

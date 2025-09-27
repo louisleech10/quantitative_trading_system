@@ -66,19 +66,35 @@ class ApiClient {
   }
 
   // 轉換前端搜索請求為後端格式
-  private convertToSearchConfig(request: SearchRequest): SearchConfigRequest {
+  private convertToSearchConfig(
+    request: SearchRequest,
+    operators: { priceChange: string },
+    rangeValues: { priceChange: { min: number | null, max: number | null } }
+  ): SearchConfigRequest {
     const conditions: FilterConditionRequest[] = [];
 
     // 只有當用戶實際設定值時才添加條件（過濾null值）
-    if (request.priceChange !== null && request.priceChange !== undefined) {
-      conditions.push({
-        condition_type: "price",
-        parameter: "price_change",
-        operator: ">=",
-        value: request.priceChange / 100,  // 轉換為小數形式
-        description: `價格變化 >= ${request.priceChange}%`
-      });
-    }
+    if (operators.priceChange === 'BETWEEN' && 
+    rangeValues.priceChange.min !== null && 
+    rangeValues.priceChange.max !== null) {
+    // BETWEEN 條件
+    conditions.push({
+      condition_type: "price",
+      parameter: "price_change",
+      operator: "between",
+      value: [rangeValues.priceChange.min / 100, rangeValues.priceChange.max / 100],
+      description: `價格變化介於 ${rangeValues.priceChange.min}% 到 ${rangeValues.priceChange.max}%`
+    });
+  } else if (request.priceChange !== null && request.priceChange !== undefined) {
+    // 單值條件
+    conditions.push({
+      condition_type: "price",
+      parameter: "price_change",
+      operator: operators.priceChange,  // 使用動態運算符
+      value: request.priceChange / 100,
+      description: `價格變化 ${operators.priceChange} ${request.priceChange}%`
+    });
+  }
 
     if (request.volumeMultiplier !== null && request.volumeMultiplier !== undefined) {
       conditions.push({
