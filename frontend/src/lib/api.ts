@@ -145,9 +145,13 @@ class ApiClient {
   }
 
   // 兩階段搜索 - 步驟1：執行正例搜索
-  async executePositiveSearch(request: SearchRequest): Promise<ApiResponse<TaskInfo>> {
-    const searchConfig = this.convertToSearchConfig(request);
-    
+  async executePositiveSearch(
+    request: SearchRequest,
+    operators: any,
+    rangeValues: any
+  ): Promise<ApiResponse<TaskInfo>> {
+    const searchConfig = this.convertToSearchConfig(request, operators, rangeValues);
+
     console.log('執行正例搜索，配置:', searchConfig);
     
     // 包裝成後端期望的格式
@@ -169,7 +173,7 @@ class ApiClient {
     positiveTaskId: string, 
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
-    customConditions: any[] = []
+    customConditions: any[] = [],
   ): Promise<ApiResponse<TaskInfo>> {
     
     console.log('執行反例搜索，正例任務ID:', positiveTaskId);
@@ -309,13 +313,15 @@ class ApiClient {
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
     onProgress?: (stage: string, taskId?: string) => void,
-    customNegativeConditions: any[] = []
+    customNegativeConditions: any[] = [],
+    operators: any,
+    rangeValues: any,
   ): Promise<SearchResultData> {
     
     try {
       // 階段1：執行正例搜索
       onProgress?.('正例搜索中...');
-      const positiveResponse = await this.executePositiveSearch(request);
+      const positiveResponse = await this.executePositiveSearch(request, operators, rangeValues);
       
       if (!positiveResponse.success || !positiveResponse.data) {
         throw new Error('正例搜索啟動失敗');

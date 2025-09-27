@@ -357,6 +357,7 @@ export default function SearchPage() {
         console.log('即將傳遞的反例條件:', negativeConditions);
 
         const result = await apiClient.executeTwoStageSearch(
+          // 參數1：SearchRequest 對象
           {
             name: apiRequest.config.name,
             timeframe: apiRequest.config.timeframe,
@@ -369,15 +370,21 @@ export default function SearchPage() {
             symbols: apiRequest.symbols,
             saveResults: apiRequest.save_results
           },
-          operators,
-          rangeValues,
+          // 參數2：negativeRatio (number)
           negativeParams.ratio,
+          // 參數3：timeSeparationDays (number)
           negativeParams.timeSeparationDays,
-          (stage, taskId) => {
-            setCurrentStage(stage);
+          // 參數4：onProgress (function)
+          (stage: string, taskId?: string) => {
+            setCurrentStage(`${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
             console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
           },
-          negativeConditions  // ← 新增這個參數
+          // 參數5：customNegativeConditions (array)
+          negativeConditions,
+          // 參數6：operators (object) - 新增
+          operators,
+          // 參數7：rangeValues (object) - 新增
+          rangeValues
         );
         
         // 直接設定搜索結果
