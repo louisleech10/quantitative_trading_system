@@ -121,7 +121,7 @@ class SearchTaskService:
                 
                 # 使用用戶條件進行真實搜索
                 negative_cases = await self._search_with_user_conditions(
-                    positive_symbols, request
+                    positive_symbols, request, positive_cases
                 )
             else:
                 self.logger.info("沒有用戶條件，使用時間分離策略")
@@ -159,22 +159,63 @@ class SearchTaskService:
             )
     
     async def _search_with_user_conditions(self, symbols: List[str], 
-                                     request: NegativeCaseRequest) -> List[CaseData]:
-        """基於用戶設定條件執行反例搜索"""
+                                     request: NegativeCaseRequest,
+                                     positive_cases: List[CaseData]) -> List[CaseData]:
+        """基於用戶設定條件執行反例搜索 - 修復版本"""
         try:
             from ..models.requests import SearchConfigRequest, FilterConditionRequest
             
             self.logger.info("構建反例搜索配置...")
             
-            # 創建搜索配置
+            # === 修復1：從正例案例中提取時間範圍 ===
+            if not positive_cases:
+                self.logger.error("沒有正例案例，無法確定搜索時間範圍")
+                return []
+            
+            # 找出正例的時間範圍
+            positive_timestamps = []
+            for case in positive_cases:
+                if hasattr(case, 'timestamp'):
+                    positive_timestamps.append(case.timestamp)
+                elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
+                    positive_timestamps.append(case.__dict__['timestamp'])
+            
+            if not positive_timestamps:
+                self.logger.error("無法從正例案例中提取時間戳")
+                return []
+            
+            # 轉換為datetime對象並找出範圍
+            from datetime import datetime, timedelta
+            positive_times = []
+            for ts in positive_timestamps:
+                if isinstance(ts, str):
+                    if 'T' in ts:
+                        positive_times.append(datetime.fromisoformat(ts.replace('Z', '')))
+                    else:
+                        positive_times.append(datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'))
+                elif isinstance(ts, datetime):
+                    positive_times.append(ts)
+            
+            # 設定搜索的時間範圍（比正例範圍稍大一些）
+            min_time = min(positive_times)
+            max_time = max(positive_times)
+            
+            # 擴展時間範圍以包含更多潛在反例
+            search_start = min_time - timedelta(days=30)
+            search_end = max_time + timedelta(days=30)
+            
+            self.logger.info(f"正例時間範圍: {min_time} 到 {max_time}")
+            self.logger.info(f"反例搜索範圍: {search_start} 到 {search_end}")
+            
+            # === 創建搜索配置 ===
             negative_config = SearchConfigRequest(
                 name=f"user_negative_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
                 description="基於用戶條件的反例搜索",
                 timeframe="12h",
                 initial_conditions=[],
                 advanced_conditions=[],
-                start_date="2024-02-01",
-                end_date="2025-05-31"
+                start_date=search_start.strftime('%Y-%m-%d'),
+                end_date=search_end.strftime('%Y-%m-%d')
             )
             
             # 添加用戶設定的條件
@@ -195,7 +236,7 @@ class SearchTaskService:
             negative_task_id = await standalone_search_service.execute_search(negative_config, symbols)
             
             # 等待搜索完成
-            max_wait_time = 60  # 60秒超時
+            max_wait_time = 60
             start_time = datetime.now()
             
             while (datetime.now() - start_time).seconds < max_wait_time:
@@ -204,25 +245,23 @@ class SearchTaskService:
                     # 獲取搜索結果
                     result_data = standalone_search_service.get_task_result(negative_task_id)
                     if result_data and result_data.cases:
-                        # 為反例添加標記
-                        negative_cases = []
-                        for case in result_data.cases:
-                            # 處理不同的案例數據格式
-                            if hasattr(case, '__dict__'):
-                                case.__dict__['positive_case'] = 0  # 反例標記為0
-                                negative_cases.append(case)
-                            elif isinstance(case, dict):
-                                case['positive_case'] = 0
-                                negative_cases.append(case)
+                        self.logger.info(f"條件搜索完成，找到 {len(result_data.cases)} 個候選反例")
                         
-                        self.logger.info(f"用戶條件搜索完成，找到 {len(negative_cases)} 個反例")
-                        return negative_cases
+                        # === 修復2和3：應用時間分離和比例控制 ===
+                        filtered_cases = await self._apply_time_separation_and_ratio(
+                            result_data.cases, 
+                            positive_cases,
+                            request.time_separation_days if hasattr(request, 'time_separation_days') else 7,
+                            request.negative_ratio if hasattr(request, 'negative_ratio') else 2.0
+                        )
+                        
+                        return filtered_cases
                     break
                 elif task_info and task_info.status.value in ["failed", "cancelled"]:
                     self.logger.error("反例搜索失敗或被取消")
                     break
                 
-                await asyncio.sleep(2)  # 等待2秒後重試
+                await asyncio.sleep(2)
             
             self.logger.warning("反例搜索超時或失敗")
             return []
@@ -230,6 +269,99 @@ class SearchTaskService:
         except Exception as e:
             self.logger.error(f"用戶條件搜索失敗: {str(e)}")
             return []
+        
+    async def _apply_time_separation_and_ratio(self, candidate_cases: List[CaseData],
+                                         positive_cases: List[CaseData],
+                                         separation_days: int,
+                                         ratio: float) -> List[CaseData]:
+        """應用時間分離和比例控制"""
+        try:
+            from datetime import datetime, timedelta
+            
+            # 獲取正例時間戳
+            positive_times = []
+            for case in positive_cases:
+                if hasattr(case, 'timestamp'):
+                    ts = case.timestamp
+                elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
+                    ts = case.__dict__['timestamp']
+                else:
+                    continue
+                
+                if isinstance(ts, str):
+                    if 'T' in ts:
+                        positive_times.append(datetime.fromisoformat(ts.replace('Z', '')))
+                    else:
+                        positive_times.append(datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'))
+                elif isinstance(ts, datetime):
+                    positive_times.append(ts)
+            
+            # 過濾掉與正例時間太接近的候選案例
+            separation_delta = timedelta(days=separation_days)
+            filtered_candidates = []
+            
+            for case in candidate_cases:
+                if hasattr(case, 'timestamp'):
+                    ts = case.timestamp
+                elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
+                    ts = case.__dict__['timestamp']
+                else:
+                    continue
+                
+                if isinstance(ts, str):
+                    if 'T' in ts:
+                        case_time = datetime.fromisoformat(ts.replace('Z', ''))
+                    else:
+                        case_time = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                elif isinstance(ts, datetime):
+                    case_time = ts
+                else:
+                    continue
+                
+                # 檢查與所有正例時間的距離
+                is_separated = True
+                for pos_time in positive_times:
+                    if abs((case_time - pos_time)) < separation_delta:
+                        is_separated = False
+                        break
+                
+                if is_separated:
+                    filtered_candidates.append(case)
+            
+            self.logger.info(f"時間分離後剩餘候選反例: {len(filtered_candidates)}")
+            
+            # 計算目標反例數量
+            target_count = int(len(positive_cases) * ratio)
+            self.logger.info(f"目標反例數量: {target_count} (正例: {len(positive_cases)}, 比例: {ratio})")
+            
+            # 如果候選案例數量超過目標，隨機選擇
+            if len(filtered_candidates) > target_count:
+                import random
+                selected_cases = random.sample(filtered_candidates, target_count)
+                self.logger.info(f"從 {len(filtered_candidates)} 個候選中隨機選擇了 {len(selected_cases)} 個反例")
+            else:
+                selected_cases = filtered_candidates
+                if len(selected_cases) < target_count:
+                    self.logger.warning(f"反例數量不足: 找到 {len(selected_cases)}, 目標 {target_count}")
+            
+            # 為反例添加標記
+            final_cases = []
+            for case in selected_cases:
+                if hasattr(case, '__dict__'):
+                    case.__dict__['positive_case'] = 0
+                    final_cases.append(case)
+                elif isinstance(case, dict):
+                    case['positive_case'] = 0
+                    final_cases.append(case)
+                else:
+                    final_cases.append(case)
+            
+            self.logger.info(f"最終生成反例數量: {len(final_cases)}")
+            return final_cases
+            
+        except Exception as e:
+            self.logger.error(f"時間分離和比例控制失敗: {str(e)}")
+            return candidate_cases[:int(len(positive_cases) * ratio)]  # 降級處理
     
     async def _generate_negative_cases(self, positive_cases: List[CaseData],
                                  symbols: List[str],
