@@ -22,9 +22,6 @@ interface SearchRequest {
 const OPERATORS = [
   { value: '>=', label: '大於等於 (≥)' },
   { value: '<=', label: '小於等於 (≤)' },
-  { value: '=', label: '等於 (=)' },
-  { value: '>', label: '大於 (>)' },
-  { value: '<', label: '小於 (<)' },
   { value: 'BETWEEN', label: '介於範圍' }
 ];
 
@@ -822,33 +819,24 @@ export default function SearchPage() {
             </div>
           </div>
           
-          {/* 交易量限制 */}
+          {/* 最小交易量 */}
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-900 mb-2">
-              交易量限制 (USDT)
+              最小交易量 (USDT)
             </label>
-            <div className="grid grid-cols-2 gap-4">
-              <input
-                type="number"
-                value={timeParams.volumeMin || ''}
-                onChange={(e) => setTimeParams(prev => ({ 
-                  ...prev, 
-                  volumeMin: e.target.value ? parseFloat(e.target.value) : null 
-                }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                placeholder="最小交易量"
-              />
-              <input
-                type="number"
-                value={timeParams.volumeMax || ''}
-                onChange={(e) => setTimeParams(prev => ({ 
-                  ...prev, 
-                  volumeMax: e.target.value ? parseFloat(e.target.value) : null 
-                }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                placeholder="最大交易量"
-              />
-            </div>
+            <input
+              type="number"
+              value={timeParams.volumeMin || ''}
+              onChange={(e) => setTimeParams(prev => ({ 
+                ...prev, 
+                volumeMin: e.target.value ? parseFloat(e.target.value) : null 
+              }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              placeholder="留空 = 不限制，例如: 100000"
+            />
+            <p className="text-sm text-gray-600 mt-1">
+              留空表示不對交易量設限制，輸入數值則過濾小於該值的案例
+            </p>
           </div>
         </div>
 
@@ -863,13 +851,15 @@ export default function SearchPage() {
           </div>
           
           {expandedSections.positive && (
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6">
+              <div className="max-w-md">
                 {renderFieldInput('priceChange', '價格變化 (%)', '例如: 5.0')}
-                {renderFieldInput('volumeMultiplier', '成交量倍數', '例如: 2.0')}
-                {renderFieldInput('closingStrength', '收盤強度', '例如: 0.8')}
-                {renderFieldInput('takerBuyRatio', '主動買入比例', '例如: 0.6')}
-                {renderFieldInput('pricePosition', '價格位置', '例如: 0.7')}
+              </div>
+              
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>說明：</strong>正例搜索只需設定價格變化條件，其他30個參數會自動計算並輸出到CSV中供您後續分析使用。
+                </p>
               </div>
             </div>
           )}
@@ -955,13 +945,15 @@ export default function SearchPage() {
                     設定反例的具體條件，通常與正例條件相反。留空則由系統自動生成。
                   </p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="max-w-md">
                     {renderNegativeFieldInput('priceChange', '價格變化 (%)', '例如: -2.0')}
-                    {renderNegativeFieldInput('volumeMultiplier', '成交量倍數', '例如: 0.5')}
-                    {renderNegativeFieldInput('closingStrength', '收盤強度', '例如: 0.3')}
-                    {renderNegativeFieldInput('takerBuyRatio', '主動買入比例', '例如: 0.4')}
-                    {renderNegativeFieldInput('pricePosition', '價格位置', '例如: 0.2')}
                   </div>
+
+                  <div className="mt-4 p-4 bg-red-50 rounded-lg">
+                    <p className="text-sm text-red-800">
+                      <strong>說明：</strong>反例搜索只需設定價格變化條件，建議設定與正例相反的條件（如正例>=5%，反例則設<=-2%）
+                    </p>
+                    </div>
                 </div>
               )}
             </div>
