@@ -909,19 +909,27 @@ class CaseSearchEngine:
             )
             
             # 1.6 taker_buy_ratio - 主動買入比例
-            if 'taker_buy_volume' in df.columns:
+            if 'taker_buy_base_asset_volume' in df.columns:
+                # 使用真實的taker buy volume數據
+                df['taker_buy_ratio'] = np.where(
+                    df['volume'] != 0,
+                    df['taker_buy_base_asset_volume'] / df['volume'],
+                    np.nan  # 成交量為0時設為NaN
+                )
+                self.logger.info("使用真實的 taker_buy_base_asset_volume 數據計算taker_buy_ratio")
+            elif 'taker_buy_volume' in df.columns:
+                # 兼容其他可能的欄位名稱
                 df['taker_buy_ratio'] = np.where(
                     df['volume'] != 0,
                     df['taker_buy_volume'] / df['volume'],
-                    0.5  # 如果沒有成交量，設為中性值
+                    np.nan  # 成交量為0時設為NaN
                 )
+                self.logger.info("使用 taker_buy_volume 數據計算taker_buy_ratio")
             else:
-                # 如果沒有 taker_buy_volume 數據，使用價格動量作為替代
-                df['taker_buy_ratio'] = np.where(
-                    df['price_change'] > 0, 0.6,  # 上漲時假設更多主動買入
-                    np.where(df['price_change'] < 0, 0.4, 0.5)  # 下跌時假設更多主動賣出
-                )
-                self.logger.warning("taker_buy_volume 數據不可用，使用價格動量替代")
+                # 完全沒有taker volume數據時設為NaN
+                df['taker_buy_ratio'] = np.nan
+                self.logger.warning("缺少 taker buy volume 數據，taker_buy_ratio 設為 NaN")
+            
             
             # ===== 2. 未來表現驗證參數 (12個) =====
             
