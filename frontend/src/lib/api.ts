@@ -237,7 +237,7 @@ class ApiClient {
     positiveTaskId: string, 
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
-    negativeRequest: SearchRequest,     // 新增：改為接收 SearchRequest
+    negativeRequest: SimpleSearchRequest,     // 新增：改為接收 SimpleSearchRequest
     negativeOperators: any,             // 新增：反例運算符
     negativeRangeValues: any            // 新增：反例範圍值
   ): Promise<ApiResponse<TaskInfo>> {
@@ -265,7 +265,7 @@ class ApiClient {
 
     return this.fetchApi(`/two-stage/negative/${positiveTaskId}`, {
       method: 'POST',
-      body: JSON.stringify(negativeRequest),
+      body: JSON.stringify(negativeApiRequest),
     });
   }
 
@@ -384,11 +384,11 @@ class ApiClient {
 
   // 新增：完整的兩階段搜索流程
   async executeTwoStageSearch(
-    request: SearchRequest,
+    request: SimpleSearchRequest,
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
     onProgress?: (stage: string, taskId?: string) => void,
-    negativeRequest: SearchRequest,     // 新增：反例搜索請求
+    negativeRequest: SimpleSearchRequest,     // 新增：反例搜索請求
     negativeOperators: any,             // 新增：反例運算符
     negativeRangeValues: any,           // 新增：反例範圍值
     operators: any,                     // 正例運算符
