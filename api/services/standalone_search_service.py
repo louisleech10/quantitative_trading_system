@@ -476,6 +476,8 @@ class StandaloneSearchService:
                             symbol=case_dict['symbol'],
                             timestamp=datetime.strptime(case_dict['timestamp'], '%Y-%m-%d %H:%M:%S'),
                             trigger_idx=case_dict.get('trigger_idx', 0),
+                            # 單一正例搜索：明確標記為正例
+                            positive_case=True,
                             
                             # OHLC 數據
                             open=case_dict['open'],
