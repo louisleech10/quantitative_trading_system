@@ -68,61 +68,125 @@ class ApiClient {
   // 轉換前端搜索請求為後端格式
   private convertToSearchConfig(
     request: SearchRequest,
-    operators: { priceChange: string },
-    rangeValues: { priceChange: { min: number | null, max: number | null } }
+    operators: { 
+      priceChange: string;
+      volumeMultiplier: string;
+      closingStrength: string;
+      takerBuyRatio: string;
+      pricePosition: string;
+    },
+    rangeValues: { 
+      priceChange: { min: number | null, max: number | null };
+      volumeMultiplier: { min: number | null, max: number | null };
+      closingStrength: { min: number | null, max: number | null };
+      takerBuyRatio: { min: number | null, max: number | null };
+      pricePosition: { min: number | null, max: number | null };
+    }
   ): SearchConfigRequest {
     const conditions: FilterConditionRequest[] = [];
 
-    // 只有當用戶實際設定值時才添加條件（過濾null值）
+    // 1. 價格變化條件 (已修復)
     if (operators.priceChange === 'BETWEEN' && 
-    rangeValues.priceChange.min !== null && 
-    rangeValues.priceChange.max !== null) {
-    // BETWEEN 條件
-    conditions.push({
-      condition_type: "price",
-      parameter: "price_change",
-      operator: "between",
-      value: [rangeValues.priceChange.min / 100, rangeValues.priceChange.max / 100],
-      description: `價格變化介於 ${rangeValues.priceChange.min}% 到 ${rangeValues.priceChange.max}%`
-    });
-  } else if (request.priceChange !== null && request.priceChange !== undefined) {
-    // 單值條件
-    conditions.push({
-      condition_type: "price",
-      parameter: "price_change",
-      operator: operators.priceChange,  // 使用動態運算符
-      value: request.priceChange / 100,
-      description: `價格變化 ${operators.priceChange} ${request.priceChange}%`
-    });
-  }
+        rangeValues.priceChange.min !== null && 
+        rangeValues.priceChange.max !== null) {
+      conditions.push({
+        condition_type: "price",
+        parameter: "price_change",
+        operator: "between",
+        value: [rangeValues.priceChange.min / 100, rangeValues.priceChange.max / 100],
+        description: `價格變化介於 ${rangeValues.priceChange.min}% 到 ${rangeValues.priceChange.max}%`
+      });
+    } else if (request.priceChange !== null && request.priceChange !== undefined) {
+      conditions.push({
+        condition_type: "price",
+        parameter: "price_change",
+        operator: operators.priceChange,  // 動態運算符
+        value: request.priceChange / 100,
+        description: `價格變化 ${operators.priceChange} ${request.priceChange}%`
+      });
+    }
 
-    if (request.volumeMultiplier !== null && request.volumeMultiplier !== undefined) {
+    // 2. 成交量倍數條件 (新修復)
+    if (operators.volumeMultiplier === 'BETWEEN' && 
+        rangeValues.volumeMultiplier.min !== null && 
+        rangeValues.volumeMultiplier.max !== null) {
       conditions.push({
         condition_type: "volume",
         parameter: "volume_multiplier",
-        operator: ">=",
+        operator: "between",
+        value: [rangeValues.volumeMultiplier.min, rangeValues.volumeMultiplier.max],
+        description: `成交量倍數介於 ${rangeValues.volumeMultiplier.min} 到 ${rangeValues.volumeMultiplier.max}`
+      });
+    } else if (request.volumeMultiplier !== null && request.volumeMultiplier !== undefined) {
+      conditions.push({
+        condition_type: "volume",
+        parameter: "volume_multiplier",
+        operator: operators.volumeMultiplier,  // 修復：使用動態運算符
         value: request.volumeMultiplier,
-        description: `成交量倍數 >= ${request.volumeMultiplier}`
+        description: `成交量倍數 ${operators.volumeMultiplier} ${request.volumeMultiplier}`
       });
     }
 
-    if (request.closingStrength !== null && request.closingStrength !== undefined) {
+    // 3. 收盤強度條件 (新修復)
+    if (operators.closingStrength === 'BETWEEN' && 
+        rangeValues.closingStrength.min !== null && 
+        rangeValues.closingStrength.max !== null) {
       conditions.push({
         condition_type: "price",
         parameter: "closing_strength",
-        operator: ">=",
+        operator: "between",
+        value: [rangeValues.closingStrength.min, rangeValues.closingStrength.max],
+        description: `收盤強度介於 ${rangeValues.closingStrength.min} 到 ${rangeValues.closingStrength.max}`
+      });
+    } else if (request.closingStrength !== null && request.closingStrength !== undefined) {
+      conditions.push({
+        condition_type: "price",
+        parameter: "closing_strength",
+        operator: operators.closingStrength,  // 修復：使用動態運算符
         value: request.closingStrength,
-        description: `收盤強度 >= ${request.closingStrength}`
+        description: `收盤強度 ${operators.closingStrength} ${request.closingStrength}`
       });
     }
 
-    if (request.takerBuyRatio !== null && request.takerBuyRatio !== undefined) {
+    // 4. 主動買入比例條件 (新修復)
+    if (operators.takerBuyRatio === 'BETWEEN' && 
+        rangeValues.takerBuyRatio.min !== null && 
+        rangeValues.takerBuyRatio.max !== null) {
       conditions.push({
         condition_type: "volume",
         parameter: "taker_buy_ratio",
-        operator: ">=",
+        operator: "between",
+        value: [rangeValues.takerBuyRatio.min, rangeValues.takerBuyRatio.max],
+        description: `主動買入比例介於 ${rangeValues.takerBuyRatio.min} 到 ${rangeValues.takerBuyRatio.max}`
+      });
+    } else if (request.takerBuyRatio !== null && request.takerBuyRatio !== undefined) {
+      conditions.push({
+        condition_type: "volume",
+        parameter: "taker_buy_ratio",
+        operator: operators.takerBuyRatio,  // 修復：使用動態運算符
         value: request.takerBuyRatio,
-        description: `主動買入比例 >= ${request.takerBuyRatio}`
+        description: `主動買入比例 ${operators.takerBuyRatio} ${request.takerBuyRatio}`
+      });
+    }
+
+    // 5. 價格位置條件 (新修復)
+    if (operators.pricePosition === 'BETWEEN' && 
+        rangeValues.pricePosition.min !== null && 
+        rangeValues.pricePosition.max !== null) {
+      conditions.push({
+        condition_type: "price",
+        parameter: "price_position",
+        operator: "between",
+        value: [rangeValues.pricePosition.min, rangeValues.pricePosition.max],
+        description: `價格位置介於 ${rangeValues.pricePosition.min} 到 ${rangeValues.pricePosition.max}`
+      });
+    } else if (request.pricePosition !== null && request.pricePosition !== undefined) {
+      conditions.push({
+        condition_type: "price",
+        parameter: "price_position",
+        operator: operators.pricePosition,  // 修復：使用動態運算符
+        value: request.pricePosition,
+        description: `價格位置 ${operators.pricePosition} ${request.pricePosition}`
       });
     }
 
@@ -173,20 +237,31 @@ class ApiClient {
     positiveTaskId: string, 
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
-    customConditions: any[] = [],
+    negativeRequest: SearchRequest,     // 新增：改為接收 SearchRequest
+    negativeOperators: any,             // 新增：反例運算符
+    negativeRangeValues: any            // 新增：反例範圍值
   ): Promise<ApiResponse<TaskInfo>> {
     
     console.log('執行反例搜索，正例任務ID:', positiveTaskId);
-    console.log('傳入的反例條件:', customConditions); // 新增日誌
+    //console.log('傳入的反例條件:', customConditions); // 新增日誌
   
-    const negativeRequest: NegativeCaseRequest = {
-      negative_conditions: customConditions,  // ✅ 將條件放在正確的位置
+    const negativeConditions = this.convertToSearchConfig(
+      negativeRequest, 
+      negativeOperators, 
+      negativeRangeValues
+    ).initial_conditions;
+
+    console.log('使用統一轉換函數生成的反例條件:', negativeConditions);
+
+    const negativeApiRequest: NegativeCaseRequest = {
+      negative_conditions: negativeConditions,  // 使用轉換後的條件
       negative_ratio: negativeRatio,
       time_separation_days: timeSeparationDays,
       sampling_strategy: "time_separated"
     };
 
-  console.log('發送到後端的反例請求:', negativeRequest); // 新增日誌
+    console.log('發送到後端的反例請求:', negativeApiRequest);
+
 
     return this.fetchApi(`/two-stage/negative/${positiveTaskId}`, {
       method: 'POST',
@@ -313,9 +388,11 @@ class ApiClient {
     negativeRatio: number = 2.0,
     timeSeparationDays: number = 7,
     onProgress?: (stage: string, taskId?: string) => void,
-    customNegativeConditions: any[] = [],
-    operators: any,
-    rangeValues: any,
+    negativeRequest: SearchRequest,     // 新增：反例搜索請求
+    negativeOperators: any,             // 新增：反例運算符
+    negativeRangeValues: any,           // 新增：反例範圍值
+    operators: any,                     // 正例運算符
+    rangeValues: any                    // 正例範圍值
   ): Promise<SearchResultData> {
     
     try {
@@ -339,7 +416,9 @@ class ApiClient {
         positiveTaskId, 
         negativeRatio, 
         timeSeparationDays,
-        customNegativeConditions
+        negativeRequest,      // 傳遞反例搜索請求
+        negativeOperators,    // 傳遞反例運算符
+        negativeRangeValues   // 傳遞反例範圍值
       );
       
       if (!negativeResponse.success || !negativeResponse.data) {

@@ -272,89 +272,68 @@ export default function SearchPage() {
 
       console.log('發送API請求:', apiRequest);
       
-      // 調用真實後端API
-      // 根據使用者是否勾選反例搜索來決定調用哪個API
       if (negativeParams.enabled) {
         // 執行完整的兩階段搜索
         console.log('啟用反例搜索，執行兩階段搜索');
-        // 新增：構建反例條件
-        const buildNegativeConditions = () => {
-          const conditions = [];
-
-          // 處理價格變化條件
-          if (negativeOperators.priceChange === 'BETWEEN' && 
-              negativeRangeValues.priceChange.min !== null && 
-              negativeRangeValues.priceChange.max !== null) {
-            // BETWEEN 條件
-            conditions.push({
-              condition_type: "price",
-              parameter: "price_change",
-              operator: "between",
-              value: [negativeRangeValues.priceChange.min / 100, negativeRangeValues.priceChange.max / 100], // 轉換為小數
-              description: `價格變化介於 ${negativeRangeValues.priceChange.min}% 到 ${negativeRangeValues.priceChange.max}%`
-            });
-          } else if (negativeParams.priceChange !== null && negativeParams.priceChange !== undefined) {
-            // 單值條件
-            conditions.push({
-              condition_type: "price",
-              parameter: "price_change",
-              operator: negativeOperators.priceChange,
-              value: negativeParams.priceChange / 100, // 轉換為小數
-              description: `價格變化 ${negativeOperators.priceChange} ${negativeParams.priceChange}%`
-            });
-          }
-
-          // 處理成交量倍數條件
-          if (negativeParams.volumeMultiplier !== null && negativeParams.volumeMultiplier !== undefined) {
-            conditions.push({
-              condition_type: "volume",
-              parameter: "volume_multiplier",
-              operator: negativeOperators.volumeMultiplier,
-              value: negativeParams.volumeMultiplier,
-              description: `成交量倍數 ${negativeOperators.volumeMultiplier} ${negativeParams.volumeMultiplier}`
-            });
-          }
-
-          // 處理收盤強度條件
-          if (negativeParams.closingStrength !== null && negativeParams.closingStrength !== undefined) {
-            conditions.push({
-              condition_type: "price",
-              parameter: "closing_strength",
-              operator: negativeOperators.closingStrength,
-              value: negativeParams.closingStrength,
-              description: `收盤強度 ${negativeOperators.closingStrength} ${negativeParams.closingStrength}`
-            });
-          }
-
-          // 處理主動買入比例條件
-          if (negativeParams.takerBuyRatio !== null && negativeParams.takerBuyRatio !== undefined) {
-            conditions.push({
-              condition_type: "volume",
-              parameter: "taker_buy_ratio",
-              operator: negativeOperators.takerBuyRatio,
-              value: negativeParams.takerBuyRatio,
-              description: `主動買入比例 ${negativeOperators.takerBuyRatio} ${negativeParams.takerBuyRatio}`
-            });
-          }
-
-          // 處理價格位置條件
-          if (negativeParams.pricePosition !== null && negativeParams.pricePosition !== undefined) {
-            conditions.push({
-              condition_type: "price",
-              parameter: "price_position",
-              operator: negativeOperators.pricePosition,
-              value: negativeParams.pricePosition,
-              description: `價格位置 ${negativeOperators.pricePosition} ${negativeParams.pricePosition}`
-            });
-          }
-
-          console.log('構建的反例條件:', conditions);
-          return conditions;
+        
+        // ✅ 新增：使用統一架構 - 構建反例搜索請求對象
+        const negativeSearchRequest: SearchRequest = {
+          name: '反例搜索',
+          symbols: searchParams.symbols,  // 使用相同的交易對
+          timeframe: searchParams.timeframe,  // 使用相同的時間框架
+          priceChange: negativeParams.priceChange,
+          volumeMultiplier: negativeParams.volumeMultiplier,
+          closingStrength: negativeParams.closingStrength,
+          takerBuyRatio: negativeParams.takerBuyRatio,
+          pricePosition: negativeParams.pricePosition,
+          saveResults: false
         };
+        
+        console.log('反例搜索請求對象:', negativeSearchRequest);
+        console.log('反例運算符:', negativeOperators);
+        console.log('反例範圍值:', negativeRangeValues);
 
-        // 構建反例條件
-        const negativeConditions = buildNegativeConditions();
-        console.log('即將傳遞的反例條件:', negativeConditions);
+        // ✅ 修改：API調用 - 注意參數順序已改變
+        const result = await apiClient.executeTwoStageSearch(
+          // 參數1：正例 SearchRequest 對象
+          {
+            name: apiRequest.config.name,
+            timeframe: apiRequest.config.timeframe,
+            startDate: apiRequest.config.start_date,
+            endDate: apiRequest.config.end_date,
+            priceChange: searchParams.priceChange,
+            volumeMultiplier: searchParams.volumeMultiplier,
+            takerBuyRatio: searchParams.takerBuyRatio,
+            closingStrength: searchParams.closingStrength,
+            symbols: apiRequest.symbols,
+            saveResults: apiRequest.save_results
+          },
+          // 參數2：negativeRatio (number)
+          negativeParams.ratio,
+          // 參數3：timeSeparationDays (number)
+          negativeParams.timeSeparationDays,
+          // 參數4：onProgress (function)
+          (stage: string, taskId?: string) => {
+            setCurrentStage(`${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
+            console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
+          },
+          // 參數5：negativeRequest (SearchRequest) - 🔥 新的統一架構
+          negativeSearchRequest,
+          // 參數6：negativeOperators (object) - 🔥 新的統一架構  
+          negativeOperators,
+          // 參數7：negativeRangeValues (object) - 🔥 新的統一架構
+          negativeRangeValues,
+          // 參數8：operators (object) - 正例運算符
+          operators,
+          // 參數9：rangeValues (object) - 正例範圍值
+          rangeValues
+        );
+
+        // 直接設定搜索結果
+        setSearchResults(result);
+        console.log('兩階段搜索完成，結果:', result);
+        return; // 提前返回，不執行下面的單一搜索邏輯
+      }
 
         const result = await apiClient.executeTwoStageSearch(
           // 參數1：SearchRequest 對象
@@ -379,12 +358,11 @@ export default function SearchPage() {
             setCurrentStage(`${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
             console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
           },
-          // 參數5：customNegativeConditions (array)
-          negativeConditions,
-          // 參數6：operators (object) - 新增
-          operators,
-          // 參數7：rangeValues (object) - 新增
-          rangeValues
+          negativeSearchRequest,    // 🔥 新增
+          negativeOperators,        // 🔥 新增
+          negativeRangeValues,      // 🔥 新增
+          operators,                // 🔥 新增
+          rangeValues              // 🔥 新增
         );
         
         // 直接設定搜索結果
