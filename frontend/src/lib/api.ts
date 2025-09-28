@@ -209,10 +209,18 @@ class ApiClient {
     const searchConfig = this.convertToSearchConfig(request, operators, rangeValues);
     
     console.log('單一搜索配置:', searchConfig);
-    
+
+    // ✅ 修復：使用與 executePositiveSearch 相同的包裝格式
+    const apiRequest = {
+      request: searchConfig,    // 包裝在 request 字段中
+      symbols: request.symbols  // 添加 symbols 字段
+    };
+
+    console.log('單一搜索API請求格式:', apiRequest);
+
     return this.fetchApi('/search/execute', {
       method: 'POST',
-      body: JSON.stringify(searchConfig),
+      body: JSON.stringify(apiRequest),
     });
   }
 
