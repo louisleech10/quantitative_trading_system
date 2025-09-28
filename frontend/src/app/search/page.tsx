@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api';
+import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics } from '@/lib/searchResultUtils';
 
 
 
@@ -155,7 +156,7 @@ export default function SearchPage() {
             value: [rangeValues.priceChange.min / 100, rangeValues.priceChange.max / 100], // 轉換為小數
             description: `價格變化介於 ${rangeValues.priceChange.min}% 到 ${rangeValues.priceChange.max}%`
           });
-        } else if (searchParams.priceChange !== null) {
+        } else if (searchParams.priceChange !== null && searchParams.priceChange !== undefined) {
           conditions.push({
             condition_type: "price",
             parameter: "price_change",
@@ -381,17 +382,18 @@ export default function SearchPage() {
       
       // 分析錯誤類型並提供友善訊息
       let userFriendlyMessage = '';
+      const errorMessage = err instanceof Error ? err.message : String(err);
       
-      if (err.message.includes('未知錯誤') || err.message.includes('undefined')) {
+      if (errorMessage.includes('未知錯誤') || errorMessage.includes('undefined')) {
         userFriendlyMessage = '在指定條件和時間範圍內未找到符合的案例。建議：放寬搜索條件或擴大時間範圍';
-      } else if (err.message.includes('timeout')) {
+      } else if (errorMessage.includes('timeout')) {
         userFriendlyMessage = '搜索超時，可能是數據量過大或條件複雜。建議：縮小時間範圍或簡化搜索條件';
-      } else if (err.message.includes('No cases found') || err.message.includes('沒有找到')) {
+      } else if (errorMessage.includes('No cases found') || errorMessage.includes('沒有找到')) {
         userFriendlyMessage = '未找到符合條件的案例。建議：調整價格變化閾值，或擴大時間範圍';
-      } else if (err.message.includes('422') || err.message.includes('參數驗證')) {
+      } else if (errorMessage.includes('422') || errorMessage.includes('參數驗證')) {
         userFriendlyMessage = '搜索參數有誤。請檢查：交易對格式、日期範圍是否正確';
       } else {
-        userFriendlyMessage = `搜索失敗：${err.message}`;
+        userFriendlyMessage = `搜索失敗：${errorMessage}`;
       }
       
       setError(userFriendlyMessage);
@@ -500,7 +502,7 @@ export default function SearchPage() {
       };
 
       // 生成CSV內容
-      const csvRows = searchResults.cases.map(case_ => [
+      const csvRows = searchResults.cases.map((case_: any) => [
         // 基本資訊
         case_.symbol || '',
         case_.timestamp || '',
@@ -571,7 +573,7 @@ export default function SearchPage() {
   };
 
   // 渲染正例欄位輸入框
-  const renderFieldInput = (fieldKey: keyof SearchRequest, label: string, placeholder: string) => {
+  const renderFieldInput = (fieldKey: keyof SimpleSearchRequest, label: string, placeholder: string) => {
     const operator = operators[fieldKey as keyof typeof operators];
     const fieldValue = searchParams[fieldKey] as number | null;
     const range = rangeValues[fieldKey as keyof typeof rangeValues];
@@ -647,8 +649,8 @@ export default function SearchPage() {
   };
 
   // 渲染反例欄位輸入框
-  const renderNegativeFieldInput = (fieldKey: keyof typeof negativeParams, label: string, placeholder: string) => {
-    const operator = negativeOperators[fieldKey as keyof typeof negativeOperators];
+  const renderNegativeFieldInput = (fieldKey: 'priceChange', label: string, placeholder: string) => {
+    const operator = negativeOperators[fieldKey];
     const fieldValue = negativeParams[fieldKey] as number | null;
 
     return (
@@ -685,11 +687,11 @@ export default function SearchPage() {
             <>
               <input
                 type="number"
-                value={negativeRangeValues[fieldKey]?.min || ''}
+                value={negativeRangeValues.priceChange?.min || ''}
                 onChange={(e) => setNegativeRangeValues(prev => ({
                   ...prev,
-                  [fieldKey]: { 
-                    ...prev[fieldKey], 
+                  priceChange: { 
+                    ...prev.priceChange, 
                     min: e.target.value ? parseFloat(e.target.value) : null 
                   }
                 }))}
@@ -698,11 +700,11 @@ export default function SearchPage() {
               />
               <input
                 type="number"
-                value={negativeRangeValues[fieldKey]?.max || ''}
+                value={negativeRangeValues.priceChange?.max || ''}
                 onChange={(e) => setNegativeRangeValues(prev => ({
                   ...prev,
-                  [fieldKey]: { 
-                    ...prev[fieldKey], 
+                  priceChange: { 
+                    ...prev.priceChange, 
                     max: e.target.value ? parseFloat(e.target.value) : null 
                   }
                 }))}
@@ -1007,28 +1009,106 @@ export default function SearchPage() {
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">搜索結果</h3>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{searchResults.summary.total_cases}</div>
-                <div className="text-sm text-gray-600">總案例數</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{searchResults.summary.positive_cases}</div>
-                <div className="text-sm text-gray-600">正例案例</div>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{searchResults.summary.negative_cases}</div>
-                <div className="text-sm text-gray-600">反例案例</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">{searchResults.summary.unique_symbols}</div>
-                <div className="text-sm text-gray-600">交易對數</div>
-              </div>
-            </div>
-            
-            <div className="mt-4 text-sm text-gray-600">
-              執行時間: {searchResults.execution_time} 秒
-            </div>
+            {(() => {
+              // 計算實際統計數據
+              const actualStats = calculateActualStatistics(searchResults.cases);
+              
+              // 驗證後端統計數據與實際數據的一致性
+              const validation = validateBackendStatistics(actualStats, searchResults.summary);
+              
+              return (
+                <>
+                  {/* 統計卡片 */}
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{actualStats.totalCases}</div>
+                      <div className="text-sm text-gray-600">總案例數</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">{actualStats.positiveCases}</div>
+                      <div className="text-sm text-gray-600">正例案例</div>
+                      <div className="text-xs text-gray-500 mt-1">positive_case=1</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-red-50 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600">{actualStats.negativeCases}</div>
+                      <div className="text-sm text-gray-600">反例案例</div>
+                      <div className="text-xs text-gray-500 mt-1">positive_case=0</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-purple-50 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">{actualStats.uniqueSymbols}</div>
+                      <div className="text-sm text-gray-600">交易對數</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-orange-50 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">{searchResults.execution_time?.toFixed(1) || 'N/A'}s</div>
+                      <div className="text-sm text-gray-600">執行時間</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                      <div className="text-2xl font-bold text-yellow-600">{actualStats.positiveRatio}</div>
+                      <div className="text-sm text-gray-600">正負比例</div>
+                    </div>
+                  </div>
+
+                  {/* 交易對詳情 */}
+                  {actualStats.symbolsList.length > 0 && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        包含的交易對 ({actualStats.uniqueSymbols} 個)：
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {actualStats.symbolsList.map(symbol => (
+                          <span key={symbol} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                            {symbol}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 統計摘要 */}
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="text-sm text-blue-800">
+                      📊 {getStatisticsSummary(actualStats)}
+                    </div>
+                  </div>
+
+                  {/* 數據一致性驗證 */}
+                  {!validation.isConsistent && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="text-sm text-yellow-800">
+                        <div className="font-medium mb-2">⚠️ 數據一致性警告：</div>
+                        <ul className="list-disc list-inside space-y-1">
+                          {validation.differences.map((diff, index) => (
+                            <li key={index}>{diff}</li>
+                          ))}
+                        </ul>
+                        <div className="mt-2 text-xs">
+                          建議：使用實際統計數據（上方顯示）而非後端 summary 數據
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 市場階段分布 */}
+                  {Object.keys(actualStats.marketPhases).length > 0 && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">市場階段分布：</div>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(actualStats.marketPhases).map(([phase, count]) => (
+                          <span key={phase} className="px-2 py-1 bg-gray-200 text-gray-800 text-xs rounded">
+                            {phase}: {count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {/* CSV 導出按鈕 */}
             <div className="mt-6 flex justify-center">
