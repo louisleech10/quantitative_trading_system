@@ -18,7 +18,11 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+frontend/src/lib/*.js
+frontend/src/lib/*.js.map
+frontend/src/lib/*.d.ts
+frontend/node_modules/
+!frontend/src/lib/*.ts  # 保留 TypeScript 源文件
 lib64/
 parts/
 sdist/
