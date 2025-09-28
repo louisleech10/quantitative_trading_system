@@ -12,6 +12,15 @@ export interface ActualStatistics {
     end: string | null;
   };
   marketPhases: Record<string, number>;
+  // 新增：分離統計
+  positiveMarketPhases: Record<string, number>;
+  negativeMarketPhases: Record<string, number>;
+  hourDistribution: Record<number, number>;
+  dayOfWeekDistribution: Record<number, number>;
+  positiveHourDistribution: Record<number, number>;
+  negativeHourDistribution: Record<number, number>;
+  positiveDayOfWeekDistribution: Record<number, number>;
+  negativeDayOfWeekDistribution: Record<number, number>;
 }
 
 /**
@@ -28,7 +37,15 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
       symbolsList: [],
       positiveRatio: 'N/A',
       timeRange: { start: null, end: null },
-      marketPhases: {}
+      marketPhases: {},
+      positiveMarketPhases: {},
+      negativeMarketPhases: {},
+      hourDistribution: {},
+      dayOfWeekDistribution: {},
+      positiveHourDistribution: {},
+      negativeHourDistribution: {},
+      positiveDayOfWeekDistribution: {},
+      negativeDayOfWeekDistribution: {}
     };
   }
 
@@ -36,6 +53,14 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
   let negativeCases = 0;
   const symbolsSet = new Set<string>();
   const marketPhasesCount: Record<string, number> = {};
+  const positiveMarketPhasesCount: Record<string, number> = {};
+  const negativeMarketPhasesCount: Record<string, number> = {};
+  const hourDistribution: Record<number, number> = {};
+  const dayOfWeekDistribution: Record<number, number> = {};
+  const positiveHourDistribution: Record<number, number> = {};
+  const negativeHourDistribution: Record<number, number> = {};
+  const positiveDayOfWeekDistribution: Record<number, number> = {};
+  const negativeDayOfWeekDistribution: Record<number, number> = {};
   let earliestTime: Date | null = null;
   let latestTime: Date | null = null;
 
@@ -61,6 +86,42 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
     // ✅ 統計市場階段
     if (caseItem.market_phase) {
       marketPhasesCount[caseItem.market_phase] = (marketPhasesCount[caseItem.market_phase] || 0) + 1;
+      
+      // 分離統計正例和反例的市場階段
+      if (isPositive) {
+        positiveMarketPhasesCount[caseItem.market_phase] = (positiveMarketPhasesCount[caseItem.market_phase] || 0) + 1;
+      } else {
+        negativeMarketPhasesCount[caseItem.market_phase] = (negativeMarketPhasesCount[caseItem.market_phase] || 0) + 1;
+      }
+    }
+
+    // ✅ 統計時間分布
+    if (caseItem.hour_of_day !== undefined && caseItem.hour_of_day !== null) {
+      const hour = Number(caseItem.hour_of_day);
+      if (!isNaN(hour)) {
+        hourDistribution[hour] = (hourDistribution[hour] || 0) + 1;
+        
+        // 分離統計正例和反例的小時分布
+        if (isPositive) {
+          positiveHourDistribution[hour] = (positiveHourDistribution[hour] || 0) + 1;
+        } else {
+          negativeHourDistribution[hour] = (negativeHourDistribution[hour] || 0) + 1;
+        }
+      }
+    }
+
+    if (caseItem.day_of_week !== undefined && caseItem.day_of_week !== null) {
+      const dayOfWeek = Number(caseItem.day_of_week);
+      if (!isNaN(dayOfWeek)) {
+        dayOfWeekDistribution[dayOfWeek] = (dayOfWeekDistribution[dayOfWeek] || 0) + 1;
+        
+        // 分離統計正例和反例的星期分布
+        if (isPositive) {
+          positiveDayOfWeekDistribution[dayOfWeek] = (positiveDayOfWeekDistribution[dayOfWeek] || 0) + 1;
+        } else {
+          negativeDayOfWeekDistribution[dayOfWeek] = (negativeDayOfWeekDistribution[dayOfWeek] || 0) + 1;
+        }
+      }
     }
 
     // ✅ 計算時間範圍
@@ -99,8 +160,34 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
       start: earliestTime?.toISOString() || null,
       end: latestTime?.toISOString() || null
     },
-    marketPhases: marketPhasesCount
+    marketPhases: marketPhasesCount,
+    positiveMarketPhases: positiveMarketPhasesCount,
+    negativeMarketPhases: negativeMarketPhasesCount,
+    hourDistribution,
+    dayOfWeekDistribution,
+    positiveHourDistribution,
+    negativeHourDistribution,
+    positiveDayOfWeekDistribution,
+    negativeDayOfWeekDistribution
   };
+};
+
+/**
+ * 格式化時間戳，修復 00:00:00 顯示為空格的問題
+ */
+export const formatTimestamp = (timestamp: string): string => {
+  if (!timestamp) return '';
+  
+  try {
+    const date = new Date(timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    
+    return `${hours}:${minutes}:${seconds}`;
+  } catch (e) {
+    return timestamp;
+  }
 };
 
 /**

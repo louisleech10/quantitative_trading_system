@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api';
-import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics } from '@/lib/searchResultUtils';
+import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics, formatTimestamp } from '@/lib/searchResultUtils';
+import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart } from '@/components/ui/PieChart';
 
 
 
@@ -547,8 +548,8 @@ export default function SearchPage() {
         formatPercentage(case_.future_11bar_max_drawdown),
         formatPercentage(case_.future_12bar_max_drawdown),
         // 時間描述參數
-        case_.hour_of_day || '',
-        case_.day_of_week || '',
+        case_.hour_of_day !== undefined && case_.hour_of_day !== null ? case_.hour_of_day : '',
+        case_.day_of_week !== undefined && case_.day_of_week !== null ? case_.day_of_week : '',
         // 正反例標記
         case_.positive_case !== undefined ? (case_.positive_case ? '1' : '0') : ''
       ].join(','));
@@ -1093,17 +1094,154 @@ export default function SearchPage() {
                     </div>
                   )}
 
-                  {/* 市場階段分布 */}
-                  {Object.keys(actualStats.marketPhases).length > 0 && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm font-medium text-gray-700 mb-2">市場階段分布：</div>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(actualStats.marketPhases).map(([phase, count]) => (
-                          <span key={phase} className="px-2 py-1 bg-gray-200 text-gray-800 text-xs rounded">
-                            {phase}: {count}
-                          </span>
-                        ))}
+                  {/* 市場階段分布 - 圓餅圖顯示 */}
+                  {(Object.keys(actualStats.positiveMarketPhases).length > 0 || Object.keys(actualStats.negativeMarketPhases).length > 0) && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border">
+                      <div className="text-lg font-semibold text-gray-800 mb-4">市場階段分布</div>
+                      
+                      {/* 圓餅圖 */}
+                      <MarketPhasePieChart 
+                        positiveData={actualStats.positiveMarketPhases}
+                        negativeData={actualStats.negativeMarketPhases}
+                      />
+                      
+                      {/* 詳細數據標籤 */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 正例市場階段分布 */}
+                        {Object.keys(actualStats.positiveMarketPhases).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-green-700 mb-2">正例市場階段：</div>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(actualStats.positiveMarketPhases).map(([phase, count]) => (
+                                <span key={`pos-${phase}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                  {phase}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 反例市場階段分布 */}
+                        {Object.keys(actualStats.negativeMarketPhases).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-red-700 mb-2">反例市場階段：</div>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(actualStats.negativeMarketPhases).map(([phase, count]) => (
+                                <span key={`neg-${phase}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                  {phase}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* 時間分布 - 圓餅圖顯示 */}
+                  {(Object.keys(actualStats.hourDistribution).length > 0 || Object.keys(actualStats.dayOfWeekDistribution).length > 0) && (
+                    <div className="mt-4 space-y-6">
+                      {/* 小時分布圓餅圖 */}
+                      {Object.keys(actualStats.hourDistribution).length > 0 && (
+                        <div className="p-4 bg-white rounded-lg border">
+                          <div className="text-lg font-semibold text-gray-800 mb-4">小時分布 (Hour of Day)</div>
+                          
+                          {/* 圓餅圖 */}
+                          <HourDistributionPieChart 
+                            positiveData={actualStats.positiveHourDistribution}
+                            negativeData={actualStats.negativeHourDistribution}
+                          />
+                          
+                          {/* 詳細數據標籤 */}
+                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* 正例小時分布 */}
+                            {Object.keys(actualStats.positiveHourDistribution).length > 0 && (
+                              <div>
+                                <div className="text-sm font-medium text-green-700 mb-2">正例：</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(actualStats.positiveHourDistribution)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([hour, count]) => (
+                                      <span key={`pos-hour-${hour}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                        {hour}:00 ({count})
+                                      </span>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* 反例小時分布 */}
+                            {Object.keys(actualStats.negativeHourDistribution).length > 0 && (
+                              <div>
+                                <div className="text-sm font-medium text-red-700 mb-2">反例：</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(actualStats.negativeHourDistribution)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([hour, count]) => (
+                                      <span key={`neg-hour-${hour}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                        {hour}:00 ({count})
+                                      </span>
+                                    ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 星期分布圓餅圖 */}
+                      {Object.keys(actualStats.dayOfWeekDistribution).length > 0 && (
+                        <div className="p-4 bg-white rounded-lg border">
+                          <div className="text-lg font-semibold text-gray-800 mb-4">星期分布 (Day of Week)</div>
+                          
+                          {/* 圓餅圖 */}
+                          <DayOfWeekPieChart 
+                            positiveData={actualStats.positiveDayOfWeekDistribution}
+                            negativeData={actualStats.negativeDayOfWeekDistribution}
+                          />
+                          
+                          {/* 詳細數據標籤 */}
+                          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* 正例星期分布 */}
+                            {Object.keys(actualStats.positiveDayOfWeekDistribution).length > 0 && (
+                              <div>
+                                <div className="text-sm font-medium text-green-700 mb-2">正例：</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(actualStats.positiveDayOfWeekDistribution)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([day, count]) => {
+                                      const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+                                      return (
+                                        <span key={`pos-day-${day}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                          {dayNames[Number(day)]} ({count})
+                                        </span>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* 反例星期分布 */}
+                            {Object.keys(actualStats.negativeDayOfWeekDistribution).length > 0 && (
+                              <div>
+                                <div className="text-sm font-medium text-red-700 mb-2">反例：</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(actualStats.negativeDayOfWeekDistribution)
+                                    .sort(([a], [b]) => Number(a) - Number(b))
+                                    .map(([day, count]) => {
+                                      const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+                                      return (
+                                        <span key={`neg-day-${day}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                          {dayNames[Number(day)]} ({count})
+                                        </span>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
