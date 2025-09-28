@@ -5,6 +5,7 @@ import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, 
 import { apiClient } from '@/lib/api';
 
 
+
 // 搜索請求接口 (符合您的 api.ts 設計)
 interface SimpleSearchRequest {
   name: string;

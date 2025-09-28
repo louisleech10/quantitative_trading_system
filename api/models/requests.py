@@ -12,13 +12,10 @@ class TimeframeEnum(str, Enum):
 
 class OperatorEnum(str, Enum):
     """支援的運算符"""
-    GREATER_THAN = ">"
-    LESS_THAN = "<"
     GREATER_EQUAL = ">="
     LESS_EQUAL = "<="
-    EQUAL = "=="
-    NOT_EQUAL = "!="
     BETWEEN = "between"
+
 
 class ConditionTypeEnum(str, Enum):
     """條件類型"""
@@ -26,6 +23,7 @@ class ConditionTypeEnum(str, Enum):
     VOLUME = "volume"
     PATTERN = "pattern"
 
+# 修復 FilterConditionRequest 驗證邏輯
 class FilterConditionRequest(BaseModel):
     """篩選條件請求模型"""
     condition_type: ConditionTypeEnum = Field(..., description="條件類型")
@@ -33,6 +31,17 @@ class FilterConditionRequest(BaseModel):
     operator: OperatorEnum = Field(..., description="運算符")
     value: Union[float, int, List[Union[float, int]]] = Field(..., description="閾值")
     description: Optional[str] = Field(None, description="條件描述")
+    
+    @validator('parameter')
+    def validate_parameter_for_filtering(cls, v):
+        """驗證參數是否可用於篩選"""
+        # 只允許 price_change 用於篩選
+        allowed_filtering_params = {'price_change'}
+        
+        if v not in allowed_filtering_params:
+            raise ValueError(f"參數 '{v}' 不可用於篩選。僅支援篩選參數: {allowed_filtering_params}")
+        
+        return v
     
     @validator('value')
     def validate_value(cls, v, values):
