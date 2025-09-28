@@ -887,7 +887,7 @@ class CaseSearchEngine:
             df['closing_strength'] = np.where(
                 (df['high'] - df['low']) != 0,
                 (df['close'] - df['low']) / (df['high'] - df['low']),
-                0.5  # 如果沒有價格變化，設為中性值
+                np.nan  # 如果沒有價格變化，設為中性值
             )
             
             # 1.4 price_position - 價格位置 (近期20根K線的位置)
@@ -897,7 +897,7 @@ class CaseSearchEngine:
             df['price_position'] = np.where(
                 (df['recent_high'] - df['recent_low']) != 0,
                 (df['close'] - df['recent_low']) / (df['recent_high'] - df['recent_low']),
-                0.5  # 如果沒有範圍，設為中性值
+                np.nan  # 如果沒有範圍，設為中性值
             )
             
             # 1.5 volume_multiplier - 成交量倍數 (相對於近期20根K線平均)
@@ -905,7 +905,7 @@ class CaseSearchEngine:
             df['volume_multiplier'] = np.where(
                 df['volume_avg_20'] != 0,
                 df['volume'] / df['volume_avg_20'],
-                1.0  # 如果沒有歷史數據，設為1
+                np.nan  # 如果沒有歷史數據，設為1
             )
             
             # 1.6 taker_buy_ratio - 主動買入比例

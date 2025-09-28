@@ -333,43 +333,7 @@ export default function SearchPage() {
         setSearchResults(result);
         console.log('兩階段搜索完成，結果:', result);
         return; // 提前返回，不執行下面的單一搜索邏輯
-      }
-
-        const result = await apiClient.executeTwoStageSearch(
-          // 參數1：SearchRequest 對象
-          {
-            name: apiRequest.config.name,
-            timeframe: apiRequest.config.timeframe,
-            startDate: apiRequest.config.start_date,
-            endDate: apiRequest.config.end_date,
-            priceChange: searchParams.priceChange,
-            volumeMultiplier: searchParams.volumeMultiplier,
-            takerBuyRatio: searchParams.takerBuyRatio,
-            closingStrength: searchParams.closingStrength,
-            symbols: apiRequest.symbols,
-            saveResults: apiRequest.save_results
-          },
-          // 參數2：negativeRatio (number)
-          negativeParams.ratio,
-          // 參數3：timeSeparationDays (number)
-          negativeParams.timeSeparationDays,
-          // 參數4：onProgress (function)
-          (stage: string, taskId?: string) => {
-            setCurrentStage(`${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
-            console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
-          },
-          negativeSearchRequest,    // 🔥 新增
-          negativeOperators,        // 🔥 新增
-          negativeRangeValues,      // 🔥 新增
-          operators,                // 🔥 新增
-          rangeValues              // 🔥 新增
-        );
-        
-        // 直接設定搜索結果
-        setSearchResults(result);
-        console.log('兩階段搜索完成，結果:', result);
-        return; // 提前返回，不執行下面的單一搜索邏輯
-        
+      
       } else {
         // 執行單一正例搜索（原有邏輯）
         console.log('未啟用反例搜索，執行單一正例搜索');
