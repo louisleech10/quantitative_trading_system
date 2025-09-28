@@ -10,18 +10,21 @@ interface SearchState {
   templates: SearchTemplate[];
   currentResult: SearchResult | null;
   searchHistory: SearchResult[];
-  
+
   // UI State
   isLoading: boolean;
   error: string | null;
   selectedTemplate: SearchTemplate | null;
-  
+
   // Actions
   loadTemplates: () => Promise<void>;
   executeSearch: (templateId: string) => Promise<void>;
   pollTaskStatus: (taskId: string) => Promise<void>;
   clearError: () => void;
   setSelectedTemplate: (template: SearchTemplate | null) => void;
+  setSearchResult: (result: any) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
 }
 
 export const useSearchStore = create<SearchState>((set, get) => ({
@@ -141,5 +144,20 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   // Set selected template
   setSelectedTemplate: (template: SearchTemplate | null) => {
     set({ selectedTemplate: template });
+  },
+
+  // Set search result
+  setSearchResult: (result: any) => {
+    set({ currentResult: result });
+  },
+
+  // Set loading state
+  setLoading: (loading: boolean) => {
+    set({ isLoading: loading });
+  },
+
+  // Set error state
+  setError: (error: string | null) => {
+    set({ error });
   },
 }));

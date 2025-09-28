@@ -5,6 +5,7 @@ import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, 
 import { apiClient } from '@/lib/api';
 import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics, formatTimestamp } from '@/lib/searchResultUtils';
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart } from '@/components/ui/PieChart';
+import { useSearchStore } from '@/store/searchStore';
 
 
 
@@ -40,11 +41,11 @@ const FIELD_DESCRIPTIONS = {
 };
 
 export default function SearchPage() {
+  // 使用全局狀態管理
+  const { currentResult, isLoading, error, setSearchResult, setLoading, setError } = useSearchStore();
+
   // 基礎狀態
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [currentStage, setCurrentStage] = useState<string>('');
-  const [searchResults, setSearchResults] = useState<any>(null);
   
   // 搜索參數狀態
   const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
@@ -133,9 +134,9 @@ export default function SearchPage() {
   // 執行兩階段搜索 - 修正為真實API調用
   const executeTwoStageSearch = async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       setError(null);
-      setSearchResults(null);
+      setSearchResult(null);
 
       
       console.log('開始執行搜索...');
@@ -335,7 +336,7 @@ export default function SearchPage() {
         );
 
         // 直接設定搜索結果
-        setSearchResults(result);
+        setSearchResult(result);
         console.log('兩階段搜索完成，結果:', result);
         return; // 提前返回，不執行下面的單一搜索邏輯
       
@@ -399,7 +400,7 @@ export default function SearchPage() {
       
       setError(userFriendlyMessage);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -440,7 +441,7 @@ export default function SearchPage() {
             throw new Error(`結果獲取失敗: ${resultData.error?.message || '未知錯誤'}`);
           }
           
-          setSearchResults(resultData.data);
+          setSearchResult(resultData.data);
           setCurrentStage(`搜索完成！找到 ${resultData.data.summary.total_cases} 個案例`);
           return;
           
@@ -464,7 +465,7 @@ export default function SearchPage() {
 
   // CSV導出函數
   const exportSearchResultsToCSV = () => {
-    if (!searchResults || !searchResults.cases || searchResults.cases.length === 0) {
+    if (!currentResult || !currentResult.cases || currentResult.cases.length === 0) {
       alert('沒有搜索結果可以導出');
       return;
     }
@@ -503,7 +504,7 @@ export default function SearchPage() {
       };
 
       // 生成CSV內容
-      const csvRows = searchResults.cases.map((case_: any) => [
+      const csvRows = currentResult.cases.map((case_: any) => [
         // 基本資訊
         case_.symbol || '',
         case_.timestamp || '',
@@ -566,7 +567,7 @@ export default function SearchPage() {
       link.click();
       window.URL.revokeObjectURL(url);
 
-      console.log(`CSV導出成功：${searchResults.cases.length} 個案例`);
+      console.log(`CSV導出成功：${currentResult.cases.length} 個案例`);
     } catch (error) {
       console.error('CSV導出失敗:', error);
       alert('CSV導出失敗，請查看控制台錯誤信息');
@@ -1006,16 +1007,16 @@ export default function SearchPage() {
         )}
 
         {/* 搜索結果 */}
-        {searchResults && (
+        {currentResult && (
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">搜索結果</h3>
-            
+
             {(() => {
               // 計算實際統計數據
-              const actualStats = calculateActualStatistics(searchResults.cases);
+              const actualStats = calculateActualStatistics(currentResult.cases);
               
               // 驗證後端統計數據與實際數據的一致性
-              const validation = validateBackendStatistics(actualStats, searchResults.summary);
+              const validation = validateBackendStatistics(actualStats, currentResult.summary);
               
               return (
                 <>
@@ -1044,7 +1045,7 @@ export default function SearchPage() {
                     </div>
                     
                     <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">{searchResults.execution_time?.toFixed(1) || 'N/A'}s</div>
+                      <div className="text-2xl font-bold text-orange-600">{currentResult.execution_time?.toFixed(1) || 'N/A'}s</div>
                       <div className="text-sm text-gray-600">執行時間</div>
                     </div>
                     
