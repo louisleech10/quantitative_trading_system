@@ -56,6 +56,13 @@ class SearchTaskService:
                 # 獲取結果並儲存
                 result_data = standalone_search_service.get_task_result(task_id)
                 if result_data and result_data.cases:
+                    # 確保正例案例被正確標記
+                    for case in result_data.cases:
+                        if hasattr(case, '__dict__'):
+                            case.__dict__['positive_case'] = True
+                        elif isinstance(case, dict):
+                            case['positive_case'] = True
+                    
                     self.positive_results[task_id] = result_data.cases
                     self.logger.info(f"Positive search {task_id} completed with {len(result_data.cases)} cases")
                 break
@@ -563,6 +570,55 @@ class SearchTaskService:
                 "total_cases": len(all_cases),
                 "positive_cases": len(positive_cases),
                 "negative_cases": len(negative_cases),
+                "unique_symbols": len(symbols_processed),
+                "time_range": {"start": "2024-02-01", "end": "2025-05-31"},
+                "market_phase_distribution": {}
+            },
+            sampling_quality={
+                "time_separation_score": 0.8,
+                "symbol_diversity_score": 0.1,
+                "market_phase_balance": 0.7,
+                "overall_quality_score": 0.75,
+                "warnings": []
+            },
+            cache_used=False
+        )
+    
+    def get_positive_search_result(self, positive_task_id: str) -> Optional[SearchResultData]:
+        """獲取單一正例搜索結果"""
+        positive_cases = self.positive_results.get(positive_task_id, [])
+        
+        if not positive_cases:
+            return None
+        
+        # 確保所有案例都被標記為正例
+        for case in positive_cases:
+            if hasattr(case, '__dict__'):
+                case.__dict__['positive_case'] = True
+            elif isinstance(case, dict):
+                case['positive_case'] = True
+        
+        # 收集交易對
+        symbols_processed = []
+        for case in positive_cases:
+            if isinstance(case, dict) and 'symbol' in case:
+                symbols_processed.append(case['symbol'])
+            elif hasattr(case, 'symbol'):
+                symbols_processed.append(case.symbol)
+        symbols_processed = list(set(symbols_processed))
+        
+        return SearchResultData(
+            cases=positive_cases,
+            total_cases=len(positive_cases),
+            search_config={},
+            execution_time=10.0,
+            symbols_processed=symbols_processed,
+            positive_cases_count=len(positive_cases),
+            negative_cases_count=0,  # 單一搜索沒有反例
+            summary={
+                "total_cases": len(positive_cases),
+                "positive_cases": len(positive_cases),
+                "negative_cases": 0,  # 單一搜索沒有反例
                 "unique_symbols": len(symbols_processed),
                 "time_range": {"start": "2024-02-01", "end": "2025-05-31"},
                 "market_phase_distribution": {}

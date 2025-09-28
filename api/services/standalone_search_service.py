@@ -578,8 +578,8 @@ class StandaloneSearchService:
             # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds()
             
-            # Generate summary
-            positive_cases = len([c for c in real_cases if getattr(c, 'future4_close_return', 0) and c.future4_close_return > 0])
+            # Generate summary - 使用 positive_case 標記而不是 future4_close_return
+            positive_cases = len([c for c in real_cases if getattr(c, 'positive_case', False) is True])
             negative_cases = len(real_cases) - positive_cases
             
             # Market phase distribution
@@ -715,9 +715,9 @@ class StandaloneSearchService:
             for case in result_data.cases:
                 # 處理不同的案例數據格式
                 if hasattr(case, '__dict__'):
-                    case.__dict__['positive_case'] = 1
+                    case.__dict__['positive_case'] = True
                 elif isinstance(case, dict):
-                    case['positive_case'] = 1
+                    case['positive_case'] = True
         
         return result_data
     
