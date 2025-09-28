@@ -218,7 +218,7 @@ class ApiClient {
 
     console.log('單一搜索API請求格式:', apiRequest);
 
-    return this.fetchApi('/search/execute', {
+    return this.fetchApi('/two-stage/positive', {
       method: 'POST',
       body: JSON.stringify(apiRequest),
     });

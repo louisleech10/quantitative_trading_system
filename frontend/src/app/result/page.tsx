@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { Search, Download, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics } from '@/lib/searchResultUtils';
 
 // ===== 擴充現有的類型定義 =====
 interface CaseData {
@@ -510,36 +511,79 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* ===== 保持現有的搜索結果摘要 ===== */}
+        {/* ===== 基於實際數據的搜索結果摘要 ===== */}
         {searchResults && (
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">搜索結果摘要</h3>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{searchResults.summary.total_cases}</div>
-                <div className="text-sm text-gray-600">總案例數</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{searchResults.summary.positive_cases}</div>
-                <div className="text-sm text-gray-600">正例案例</div>
-              </div>
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{searchResults.summary.negative_cases}</div>
-                <div className="text-sm text-gray-600">負例案例</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">{searchResults.summary.unique_symbols}</div>
-                <div className="text-sm text-gray-600">交易對數</div>
-              </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">{searchResults.execution_time.toFixed(1)}s</div>
-                <div className="text-sm text-gray-600">執行時間</div>
-              </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">{(searchResults.sampling_quality.overall_quality_score * 100).toFixed(0)}%</div>
-                <div className="text-sm text-gray-600">採樣品質</div>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">搜索結果摘要</h3>
+              <span className="text-sm text-green-600 font-medium">✓ 基於實際案例數據</span>
             </div>
+            
+            {(() => {
+              // 計算實際統計數據
+              const actualStats = calculateActualStatistics(searchResults.cases);
+              
+              return (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                    <div className="text-center p-4 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{actualStats.totalCases}</div>
+                      <div className="text-sm text-gray-600">總案例數</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">{actualStats.positiveCases}</div>
+                      <div className="text-sm text-gray-600">正例案例</div>
+                      <div className="text-xs text-gray-500 mt-1">positive_case=1</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-red-50 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600">{actualStats.negativeCases}</div>
+                      <div className="text-sm text-gray-600">反例案例</div>
+                      <div className="text-xs text-gray-500 mt-1">positive_case=0</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-purple-50 rounded-lg">
+                      <div className="text-2xl font-bold text-purple-600">{actualStats.uniqueSymbols}</div>
+                      <div className="text-sm text-gray-600">交易對數</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-orange-50 rounded-lg">
+                      <div className="text-2xl font-bold text-orange-600">{searchResults.execution_time?.toFixed(1) || 'N/A'}s</div>
+                      <div className="text-sm text-gray-600">執行時間</div>
+                    </div>
+                    
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                      <div className="text-2xl font-bold text-yellow-600">{actualStats.positiveRatio}</div>
+                      <div className="text-sm text-gray-600">正負比例</div>
+                    </div>
+                  </div>
+
+                  {/* 交易對詳情 */}
+                  {actualStats.symbolsList.length > 0 && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        包含的交易對 ({actualStats.uniqueSymbols} 個)：
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {actualStats.symbolsList.map(symbol => (
+                          <span key={symbol} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                            {symbol}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 統計摘要 */}
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="text-sm text-blue-800">
+                      📊 {getStatisticsSummary(actualStats)}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 
