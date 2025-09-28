@@ -31,8 +31,8 @@ export const PieChart: React.FC<PieChartProps> = ({
 }) => {
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center" style={{ width, height }}>
-        <p className="text-gray-500 text-sm">無數據</p>
+      <div className="flex items-center justify-center" style={{ width: width * 0.9, height: height * 0.9 }}>
+        <p className="text-gray-500 text-xs">無數據</p>
       </div>
     );
   }
@@ -44,19 +44,20 @@ export const PieChart: React.FC<PieChartProps> = ({
   }));
 
   return (
-    <div className="w-full">
-      <h4 className="text-sm font-medium text-gray-700 mb-2 text-center">{title}</h4>
-      <ResponsiveContainer width="100%" height={height}>
+    <div className="w-full" style={{ width: width * 0.9, height: height * 0.9 }}>
+      <h4 className="text-xs font-medium text-gray-700 mb-1 text-center">{title}</h4>
+      <ResponsiveContainer width="100%" height={height * 0.8}>
         <RechartsPieChart>
           <Pie
             data={dataWithColors}
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-            outerRadius={80}
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+            outerRadius={60}
             fill="#8884d8"
             dataKey="value"
+            fontSize={10}
           >
             {dataWithColors.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -67,8 +68,12 @@ export const PieChart: React.FC<PieChartProps> = ({
               `${value} 個案例`, 
               name
             ]}
+            contentStyle={{ fontSize: '10px' }}
           />
-          <Legend />
+          <Legend 
+            fontSize={10}
+            wrapperStyle={{ fontSize: '10px' }}
+          />
         </RechartsPieChart>
       </ResponsiveContainer>
     </div>
@@ -98,16 +103,16 @@ export const MarketPhasePieChart: React.FC<{
         <PieChart 
           data={positiveChartData} 
           title="正例市場階段分布" 
-          width={300} 
-          height={250}
+          width={270} 
+          height={225}
         />
       )}
       {negativeChartData.length > 0 && (
         <PieChart 
           data={negativeChartData} 
           title="反例市場階段分布" 
-          width={300} 
-          height={250}
+          width={270} 
+          height={225}
         />
       )}
     </div>
@@ -141,16 +146,16 @@ export const HourDistributionPieChart: React.FC<{
         <PieChart 
           data={positiveChartData} 
           title="正例小時分布" 
-          width={300} 
-          height={250}
+          width={270} 
+          height={225}
         />
       )}
       {negativeChartData.length > 0 && (
         <PieChart 
           data={negativeChartData} 
           title="反例小時分布" 
-          width={300} 
-          height={250}
+          width={270} 
+          height={225}
         />
       )}
     </div>
@@ -164,21 +169,32 @@ export const DayOfWeekPieChart: React.FC<{
 }> = ({ positiveData, negativeData }) => {
   const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
   
+  // 處理星期數，將 7 轉換為 0（週日）
+  const normalizeDayOfWeek = (day: number): number => {
+    return day === 7 ? 0 : day;
+  };
+  
   const positiveChartData: PieChartData[] = Object.entries(positiveData)
     .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([day, count], index) => ({
-      name: dayNames[Number(day)],
-      value: count,
-      color: COLORS[index % COLORS.length]
-    }));
+    .map(([day, count], index) => {
+      const normalizedDay = normalizeDayOfWeek(Number(day));
+      return {
+        name: dayNames[normalizedDay] || `星期${day}`,
+        value: count,
+        color: COLORS[index % COLORS.length]
+      };
+    });
 
   const negativeChartData: PieChartData[] = Object.entries(negativeData)
     .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([day, count], index) => ({
-      name: dayNames[Number(day)],
-      value: count,
-      color: COLORS[index % COLORS.length]
-    }));
+    .map(([day, count], index) => {
+      const normalizedDay = normalizeDayOfWeek(Number(day));
+      return {
+        name: dayNames[normalizedDay] || `星期${day}`,
+        value: count,
+        color: COLORS[index % COLORS.length]
+      };
+    });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -186,16 +202,16 @@ export const DayOfWeekPieChart: React.FC<{
         <PieChart 
           data={positiveChartData} 
           title="正例星期分布" 
-          width={300} 
-          height={250}
+          width={270} 
+          height={225}
         />
       )}
       {negativeChartData.length > 0 && (
         <PieChart 
           data={negativeChartData} 
           title="反例星期分布" 
-          width={300} 
-          height={250}
+          width={270} 
+          height={225}
         />
       )}
     </div>

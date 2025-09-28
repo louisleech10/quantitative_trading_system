@@ -1211,9 +1211,10 @@ export default function SearchPage() {
                                     .sort(([a], [b]) => Number(a) - Number(b))
                                     .map(([day, count]) => {
                                       const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+                                      const normalizedDay = Number(day) === 7 ? 0 : Number(day);
                                       return (
                                         <span key={`pos-day-${day}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                                          {dayNames[Number(day)]} ({count})
+                                          {dayNames[normalizedDay] || `星期${day}`} ({count})
                                         </span>
                                       );
                                     })}
@@ -1230,9 +1231,10 @@ export default function SearchPage() {
                                     .sort(([a], [b]) => Number(a) - Number(b))
                                     .map(([day, count]) => {
                                       const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+                                      const normalizedDay = Number(day) === 7 ? 0 : Number(day);
                                       return (
                                         <span key={`neg-day-${day}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
-                                          {dayNames[Number(day)]} ({count})
+                                          {dayNames[normalizedDay] || `星期${day}`} ({count})
                                         </span>
                                       );
                                     })}
