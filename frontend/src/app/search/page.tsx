@@ -6,10 +6,12 @@ import { apiClient } from '@/lib/api';
 
 
 // 搜索請求接口 (符合您的 api.ts 設計)
-interface SearchRequest {
+interface SimpleSearchRequest {
   name: string;
   symbols: string[];
   timeframe: string;
+  startDate?: string | null;     // 新增：開始日期
+  endDate?: string | null;       // 新增：結束日期
   priceChange?: number | null;
   volumeMultiplier?: number | null;
   closingStrength?: number | null;
@@ -42,7 +44,7 @@ export default function SearchPage() {
   const [searchResults, setSearchResults] = useState<any>(null);
   
   // 搜索參數狀態
-  const [searchParams, setSearchParams] = useState<SearchRequest>({
+  const [searchParams, setSearchParams] = useState<SimpleSearchRequest>({
     name: '兩階段搜索測試',
     symbols: [],
     timeframe: '12h',
@@ -277,7 +279,7 @@ export default function SearchPage() {
         console.log('啟用反例搜索，執行兩階段搜索');
         
         // ✅ 新增：使用統一架構 - 構建反例搜索請求對象
-        const negativeSearchRequest: SearchRequest = {
+        const negativeSearchRequest: SimpleSearchRequest = {
           name: '反例搜索',
           symbols: searchParams.symbols,  // 使用相同的交易對
           timeframe: searchParams.timeframe,  // 使用相同的時間框架
@@ -339,18 +341,26 @@ export default function SearchPage() {
         console.log('未啟用反例搜索，執行單一正例搜索');
         setCurrentStage('正例搜索中...');
         
-        const response = await apiClient.executeSearch({
-          name: apiRequest.config.name,
-          timeframe: apiRequest.config.timeframe,
-          startDate: apiRequest.config.start_date,
-          endDate: apiRequest.config.end_date,
-          priceChange: apiRequest.config.initial_conditions.find(c => c.parameter === 'price_change')?.value,
-          volumeMultiplier: apiRequest.config.initial_conditions.find(c => c.parameter === 'volume_multiplier')?.value,
-          takerBuyRatio: apiRequest.config.initial_conditions.find(c => c.parameter === 'taker_buy_ratio')?.value,
-          closingStrength: apiRequest.config.initial_conditions.find(c => c.parameter === 'closing_strength')?.value,
-          symbols: apiRequest.symbols,
-          saveResults: apiRequest.save_results
-        });
+        const response = await apiClient.executeSearch(
+          // 參數1：搜索請求對象（使用簡化的格式）
+          {
+            name: apiRequest.config.name,
+            timeframe: apiRequest.config.timeframe,
+            startDate: apiRequest.config.start_date,
+            endDate: apiRequest.config.end_date,
+            priceChange: searchParams.priceChange,
+            volumeMultiplier: searchParams.volumeMultiplier,
+            takerBuyRatio: searchParams.takerBuyRatio,
+            closingStrength: searchParams.closingStrength,
+            pricePosition: searchParams.pricePosition,  // 新增：確保包含所有欄位
+            symbols: apiRequest.symbols,
+            saveResults: apiRequest.save_results
+          },
+          // 參數2：operators - 正例運算符
+          operators,
+          // 參數3：rangeValues - 正例範圍值
+          rangeValues
+        );
         
         if (!response.success || !response.data) {
           throw new Error(`搜索任務啟動失敗: ${response.error?.message || '未知錯誤'}`);

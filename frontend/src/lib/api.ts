@@ -200,8 +200,16 @@ class ApiClient {
   }
 
   // 原有的單一搜索方法（向後兼容）
-  async executeSearch(request: SearchRequest): Promise<ApiResponse<TaskInfo>> {
-    const searchConfig = this.convertToSearchConfig(request);
+  async executeSearch(
+    request: SimpleSearchRequest,  // 使用正確的類型
+    operators: any,                // 新增：運算符參數
+    rangeValues: any              // 新增：範圍值參數
+  ): Promise<ApiResponse<TaskInfo>> {
+    // 使用統一的轉換函數
+    const searchConfig = this.convertToSearchConfig(request, operators, rangeValues);
+    
+    console.log('單一搜索配置:', searchConfig);
+    
     return this.fetchApi('/search/execute', {
       method: 'POST',
       body: JSON.stringify(searchConfig),
