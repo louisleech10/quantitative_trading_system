@@ -902,7 +902,8 @@ export default function SearchPage() {
                     }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
                     placeholder="2.0"
-                    step="0.1"
+                    step="1"
+                    min="1"
                   />
                   <p className="text-sm text-gray-600 mt-1">反例數量 = 正例數量 × 比例</p>
                 </div>
@@ -918,7 +919,7 @@ export default function SearchPage() {
                       ...prev, 
                       timeSeparationDays: parseInt(e.target.value) || 7 
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
                     placeholder="7"
                   />
                   <p className="text-sm text-gray-600 mt-1">與正例時間的最小間隔</p>
