@@ -126,42 +126,38 @@ class SearchTaskService:
             if hasattr(request, 'negative_conditions') and request.negative_conditions:
                 self.logger.info(f"使用用戶設定的反例條件，條件數量: {len(request.negative_conditions)}")
                 
-                # ✅ 調用搜索並獲得 task_id
-                negative_search_task_id = await self._search_with_user_conditions(
+                # ✅ 調用搜索並獲得完整的 SearchResultData
+                result_data = await self._search_with_user_conditions(
                     positive_symbols, request, positive_cases
                 )
                 
-                # ✅ 等待反例搜索完成
-                self.logger.info(f"等待反例搜索任務完成: {negative_search_task_id}")
-                max_wait_time = 300  # 5分鐘超時
-                start_time = datetime.now()
-                
-                while (datetime.now() - start_time).seconds < max_wait_time:
-                    task_info = standalone_search_service.get_task_status(negative_search_task_id)
-                    
-                    if not task_info:
-                        self.logger.error(f"反例任務 {negative_search_task_id} 未找到")
-                        raise SearchExecutionException("Negative search task not found")
-                    
-                    if task_info.status.value == "completed":
-                        self.logger.info("反例搜索任務已完成")
-                        break
-                    elif task_info.status.value in ["failed", "cancelled"]:
-                        error_msg = f"反例搜索失敗: {task_info.error_message}"
-                        self.logger.error(error_msg)
-                        raise SearchExecutionException(error_msg)
-                    
-                    await asyncio.sleep(2)
-                
-                # ✅ 獲取完整的 SearchResultData（已經包含所有必需字段）
-                result_data = standalone_search_service.get_task_result(negative_search_task_id)
-                
+                # 檢查結果是否有效
                 if not result_data or not result_data.cases:
                     self.logger.warning("反例搜索沒有找到任何案例")
                     standalone_search_service.task_manager.update_task_status(
                         task_id, "failed", error_message="No negative cases found"
                     )
                     return
+
+                # 獲取反例案例列表
+                negative_cases = result_data.cases
+
+                # 標記為反例
+                for case in negative_cases:
+                    if hasattr(case, '__dict__'):
+                        case.__dict__['positive_case'] = False
+                    elif isinstance(case, dict):
+                        case['positive_case'] = False
+
+                # 存儲反例結果
+                self.negative_results[task_id] = negative_cases
+                self.logger.info(f"反例搜索完成，找到 {len(negative_cases)} 個案例")
+
+                # 直接使用完整的 result_data
+                standalone_search_service.task_manager.update_task_status(
+                    task_id, "completed", result_data=result_data
+                )
+                
                 
                 # ✅ 標記為反例
                 negative_cases = result_data.cases
@@ -178,9 +174,9 @@ class SearchTaskService:
                 self.logger.info(f"條件搜索完成，找到 {len(negative_cases)} 個候選反例")
                 
                 # ✅ 直接使用完整的 result_data，不需要手動創建
-                standalone_search_service.task_manager.update_task_status(
-                    task_id, "completed", result_data=result_data
-                )
+                standalone_search_service.task_manager.set_task_result(task_id, result_data)
+                standalone_search_service.task_manager.update_task_status(task_id, "completed")
+                
             else:
                 self.logger.info("沒有用戶條件，使用時間分離策略")
                 # 時間分離策略的處理...
