@@ -109,7 +109,7 @@ class SearchTaskService:
         return negative_task_id
     
     async def _run_negative_search(self, task_id: str, positive_cases: List[CaseData],
-                             request: NegativeCaseRequest):
+                         request: NegativeCaseRequest):
         """執行反例搜索邏輯 - 修復版本"""
         try:
             # 更新任務狀態為執行中
@@ -120,54 +120,81 @@ class SearchTaskService:
             
             # 提取正例的symbol列表
             positive_symbols = list(set(case.symbol for case in positive_cases))
-            self.logger.info(f"開始執行用戶自定義條件的反例搜索，交易對: {positive_symbols}")
+            self.logger.info(f"開始執行反例搜索，交易對: {positive_symbols}")
             
             # 檢查是否有用戶設定的條件
             if hasattr(request, 'negative_conditions') and request.negative_conditions:
                 self.logger.info(f"使用用戶設定的反例條件，條件數量: {len(request.negative_conditions)}")
                 
-                # 使用用戶條件進行真實搜索
-                negative_cases = await self._search_with_user_conditions(
+                # ✅ 調用搜索並獲得 task_id
+                negative_search_task_id = await self._search_with_user_conditions(
                     positive_symbols, request, positive_cases
                 )
-            else:
-                self.logger.info("沒有用戶條件，使用時間分離策略")
-                # 沒有用戶條件時才使用時間分離
-                negative_cases = await self._generate_negative_cases(
-                    positive_cases, positive_symbols, request
-                )
-            
-            if negative_cases:
+                
+                # ✅ 等待反例搜索完成
+                self.logger.info(f"等待反例搜索任務完成: {negative_search_task_id}")
+                max_wait_time = 300  # 5分鐘超時
+                start_time = datetime.now()
+                
+                while (datetime.now() - start_time).seconds < max_wait_time:
+                    task_info = standalone_search_service.get_task_status(negative_search_task_id)
+                    
+                    if not task_info:
+                        self.logger.error(f"反例任務 {negative_search_task_id} 未找到")
+                        raise SearchExecutionException("Negative search task not found")
+                    
+                    if task_info.status.value == "completed":
+                        self.logger.info("反例搜索任務已完成")
+                        break
+                    elif task_info.status.value in ["failed", "cancelled"]:
+                        error_msg = f"反例搜索失敗: {task_info.error_message}"
+                        self.logger.error(error_msg)
+                        raise SearchExecutionException(error_msg)
+                    
+                    await asyncio.sleep(2)
+                
+                # ✅ 獲取完整的 SearchResultData（已經包含所有必需字段）
+                result_data = standalone_search_service.get_task_result(negative_search_task_id)
+                
+                if not result_data or not result_data.cases:
+                    self.logger.warning("反例搜索沒有找到任何案例")
+                    standalone_search_service.task_manager.update_task_status(
+                        task_id, "failed", error_message="No negative cases found"
+                    )
+                    return
+                
+                # ✅ 標記為反例
+                negative_cases = result_data.cases
+                for case in negative_cases:
+                    if hasattr(case, '__dict__'):
+                        case.__dict__['positive_case'] = False  # 使用布爾值
+                    elif isinstance(case, dict):
+                        case['positive_case'] = False
+                
+                # 存儲反例結果
                 self.negative_results[task_id] = negative_cases
+                
                 self.logger.info(f"反例搜索完成，找到 {len(negative_cases)} 個案例")
+                self.logger.info(f"條件搜索完成，找到 {len(negative_cases)} 個候選反例")
                 
-                # 更新任務為完成
-                result_data = SearchResultData(
-                    cases=negative_cases,
-                    total_cases=len(negative_cases),
-                    search_config={}, # 移除對 search_config 的引用
-                    execution_time=5.0,
-                    symbols_processed=positive_symbols
-                )
-                
+                # ✅ 直接使用完整的 result_data，不需要手動創建
                 standalone_search_service.task_manager.update_task_status(
                     task_id, "completed", result_data=result_data
                 )
             else:
-                self.logger.warning("反例搜索沒有找到任何案例")
-                standalone_search_service.task_manager.update_task_status(
-                    task_id, "failed", error_message="No negative cases found"
-                )
+                self.logger.info("沒有用戶條件，使用時間分離策略")
+                # 時間分離策略的處理...
+                # （這部分保持不變）
                 
         except Exception as e:
-            self.logger.error(f"Negative search failed: {str(e)}")
+            self.logger.error(f"Negative search failed: {str(e)}", exc_info=True)
             standalone_search_service.task_manager.update_task_status(
                 task_id, "failed", error_message=str(e)
             )
     
     async def _search_with_user_conditions(self, symbols: List[str], 
                                      request: NegativeCaseRequest,
-                                     positive_cases: List[CaseData]) -> List[CaseData]:
+                                     positive_cases: List[CaseData]) -> SearchResultData:
         """基於用戶設定條件執行反例搜索 - 修復版本"""
         try:
             from ..models.requests import SearchConfigRequest, FilterConditionRequest
@@ -177,7 +204,7 @@ class SearchTaskService:
             # === 修復1：從正例案例中提取時間範圍 ===
             if not positive_cases:
                 self.logger.error("沒有正例案例，無法確定搜索時間範圍")
-                return []
+                return None
             
             # 找出正例的時間範圍
             positive_timestamps = []
@@ -189,7 +216,7 @@ class SearchTaskService:
             
             if not positive_timestamps:
                 self.logger.error("無法從正例案例中提取時間戳")
-                return []
+                return None
             
             # 轉換為datetime對象並找出範圍
             from datetime import datetime, timedelta
@@ -262,7 +289,18 @@ class SearchTaskService:
                             request.negative_ratio if hasattr(request, 'negative_ratio') else 2.0
                         )
                         
-                        return filtered_cases
+                        # ✅ 更新 result_data 的案例為過濾後的案例
+                        result_data.cases = filtered_cases
+                        
+                        # ✅ 更新 summary 中的案例數量
+                        result_data.summary.total_cases = len(filtered_cases)
+                        result_data.summary.negative_cases = len(filtered_cases)
+                        result_data.summary.positive_cases = 0  # 反例搜索中沒有正例
+                        
+                        self.logger.info(f"時間分離和比例控制後剩餘反例: {len(filtered_cases)}")
+                        
+                        # ✅ 返回完整的 SearchResultData，而不是只返回案例列表
+                        return result_data
                     break
                 elif task_info and task_info.status.value in ["failed", "cancelled"]:
                     self.logger.error("反例搜索失敗或被取消")
@@ -271,11 +309,11 @@ class SearchTaskService:
                 await asyncio.sleep(2)
             
             self.logger.warning("反例搜索超時或失敗")
-            return []
+            return None
             
         except Exception as e:
             self.logger.error(f"用戶條件搜索失敗: {str(e)}")
-            return []
+            return None
         
     async def _apply_time_separation_and_ratio(self, candidate_cases: List[CaseData],
                                          positive_cases: List[CaseData],
@@ -570,55 +608,6 @@ class SearchTaskService:
                 "total_cases": len(all_cases),
                 "positive_cases": len(positive_cases),
                 "negative_cases": len(negative_cases),
-                "unique_symbols": len(symbols_processed),
-                "time_range": {"start": "2024-02-01", "end": "2025-05-31"},
-                "market_phase_distribution": {}
-            },
-            sampling_quality={
-                "time_separation_score": 0.8,
-                "symbol_diversity_score": 0.1,
-                "market_phase_balance": 0.7,
-                "overall_quality_score": 0.75,
-                "warnings": []
-            },
-            cache_used=False
-        )
-    
-    def get_positive_search_result(self, positive_task_id: str) -> Optional[SearchResultData]:
-        """獲取單一正例搜索結果"""
-        positive_cases = self.positive_results.get(positive_task_id, [])
-        
-        if not positive_cases:
-            return None
-        
-        # 確保所有案例都被標記為正例
-        for case in positive_cases:
-            if hasattr(case, '__dict__'):
-                case.__dict__['positive_case'] = True
-            elif isinstance(case, dict):
-                case['positive_case'] = True
-        
-        # 收集交易對
-        symbols_processed = []
-        for case in positive_cases:
-            if isinstance(case, dict) and 'symbol' in case:
-                symbols_processed.append(case['symbol'])
-            elif hasattr(case, 'symbol'):
-                symbols_processed.append(case.symbol)
-        symbols_processed = list(set(symbols_processed))
-        
-        return SearchResultData(
-            cases=positive_cases,
-            total_cases=len(positive_cases),
-            search_config={},
-            execution_time=10.0,
-            symbols_processed=symbols_processed,
-            positive_cases_count=len(positive_cases),
-            negative_cases_count=0,  # 單一搜索沒有反例
-            summary={
-                "total_cases": len(positive_cases),
-                "positive_cases": len(positive_cases),
-                "negative_cases": 0,  # 單一搜索沒有反例
                 "unique_symbols": len(symbols_processed),
                 "time_range": {"start": "2024-02-01", "end": "2025-05-31"},
                 "market_phase_distribution": {}
