@@ -71,11 +71,36 @@ class MockSearchTaskService:
             self.logger.error(f"Error getting positive result: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to get positive result: {str(e)}")
         
+        # 3. 獲取正例搜索的timeframe（使用與SearchTaskService相同的邏輯）
+        positive_timeframe = "12h"  # 默認值
+
+        # 嘗試從SearchTaskService中獲取存儲的配置
+        from ..services.search_task_service import search_task_service
+        if positive_task_id in search_task_service.positive_configs:
+            positive_timeframe = search_task_service.positive_configs[positive_task_id].timeframe
+            self.logger.info(f"從SearchTaskService存儲的配置中獲取timeframe: {positive_timeframe}")
+        else:
+            # 備用方案：從搜索結果中獲取
+            try:
+                positive_result = standalone_search_service.get_task_result(positive_task_id)
+                if positive_result and hasattr(positive_result, 'search_config') and positive_result.search_config:
+                    if isinstance(positive_result.search_config, dict) and 'timeframe' in positive_result.search_config:
+                        positive_timeframe = positive_result.search_config['timeframe']
+                        self.logger.info(f"從正例搜索結果中獲取timeframe: {positive_timeframe}")
+                    else:
+                        self.logger.warning(f"正例搜索結果中的search_config格式不正確，使用默認值: {positive_timeframe}")
+                else:
+                    self.logger.warning(f"無法從正例搜索結果中獲取search_config，使用默認值: {positive_timeframe}")
+            except Exception as e:
+                self.logger.warning(f"無法獲取正例timeframe，使用默認值: {str(e)}")
+
+        self.logger.info(f"反例搜索將使用timeframe: {positive_timeframe}")
+
         # 3. 創建反例搜索配置
         negative_config = SearchConfigRequest(
             name=f"negative_search_for_{positive_task_id}",
             description="用戶自定義反例搜索",
-            timeframe="12h",
+            timeframe=positive_timeframe,  # 使用正例搜索相同的timeframe
             initial_conditions=[],
             advanced_conditions=[],
             start_date="2024-02-01",

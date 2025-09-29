@@ -195,7 +195,14 @@ class SearchResultData(BaseModel):
     sampling_quality: SamplingQuality = Field(..., description="採樣品質")
     execution_time: float = Field(..., description="執行時間（秒）")
     cache_used: bool = Field(..., description="是否使用了緩存")
-    
+
+    # ===== 新增：搜索配置信息 =====
+    search_config: Optional[Dict[str, Any]] = Field(None, description="搜索配置信息，包含timeframe等參數")
+    symbols_processed: Optional[List[str]] = Field(None, description="處理的交易對列表")
+    total_cases: Optional[int] = Field(None, description="總案例數")
+    positive_cases_count: Optional[int] = Field(None, description="正例數量")
+    negative_cases_count: Optional[int] = Field(None, description="反例數量")
+
     # ===== 新增：參數統計摘要 =====
     parameter_statistics: Optional[ParameterStatistics] = Field(None, description="參數統計摘要")
     validation_report: Optional[ParameterValidationReport] = Field(None, description="參數驗證報告")

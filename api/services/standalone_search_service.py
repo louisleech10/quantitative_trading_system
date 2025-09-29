@@ -609,7 +609,19 @@ class StandaloneSearchService:
                     warnings=[]
                 ),
                 execution_time=execution_time,
-                cache_used=False
+                cache_used=False,
+                # 添加搜索配置信息，包含timeframe
+                search_config={
+                    "timeframe": request.timeframe,
+                    "name": request.name,
+                    "description": request.description,
+                    "start_date": request.start_date,
+                    "end_date": request.end_date
+                },
+                symbols_processed=symbols,
+                total_cases=len(real_cases),
+                positive_cases_count=positive_cases,
+                negative_cases_count=negative_cases
             )
             
             # Store result and update task status
