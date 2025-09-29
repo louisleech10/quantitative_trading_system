@@ -206,45 +206,37 @@ class SearchTaskService:
             
             self.logger.info("構建反例搜索配置...")
             
-            # === 修復1：從正例案例中提取時間範圍 ===
-            if not positive_cases:
-                self.logger.error("沒有正例案例，無法確定搜索時間範圍")
-                return None
-            
-            # 找出正例的時間範圍
-            positive_timestamps = []
-            for case in positive_cases:
-                if hasattr(case, 'timestamp'):
-                    positive_timestamps.append(case.timestamp)
-                elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
-                    positive_timestamps.append(case.__dict__['timestamp'])
-            
-            if not positive_timestamps:
-                self.logger.error("無法從正例案例中提取時間戳")
-                return None
-            
-            # 轉換為datetime對象並找出範圍
-            from datetime import datetime, timedelta
-            positive_times = []
-            for ts in positive_timestamps:
-                if isinstance(ts, str):
-                    if 'T' in ts:
-                        positive_times.append(datetime.fromisoformat(ts.replace('Z', '')))
-                    else:
-                        positive_times.append(datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'))
-                elif isinstance(ts, datetime):
-                    positive_times.append(ts)
-            
-            # 設定搜索的時間範圍（比正例範圍稍大一些）
-            min_time = min(positive_times)
-            max_time = max(positive_times)
-            
-            # 擴展時間範圍以包含更多潛在反例
-            search_start = min_time - timedelta(days=30)
-            search_end = max_time + timedelta(days=30)
-            
-            self.logger.info(f"正例時間範圍: {min_time} 到 {max_time}")
-            self.logger.info(f"反例搜索範圍: {search_start} 到 {search_end}")
+            # === 修復1：使用正例搜索的相同時間範圍，而不是從案例時間戳推斷 ===
+            # 優先從正例搜索配置中獲取時間範圍
+            search_start_date = "2024-02-01"  # 默認值
+            search_end_date = "2025-05-31"    # 默認值
+
+            # 從存儲的正例配置中獲取
+            positive_task_id = None
+            for task_id, cases in self.positive_results.items():
+                if cases == positive_cases:
+                    positive_task_id = task_id
+                    break
+
+            if positive_task_id and positive_task_id in self.positive_configs:
+                positive_config = self.positive_configs[positive_task_id]
+                search_start_date = positive_config.start_date
+                search_end_date = positive_config.end_date
+                self.logger.info(f"從正例配置獲取時間範圍: {search_start_date} 到 {search_end_date}")
+            else:
+                self.logger.warning(f"無法從正例配置獲取時間範圍，使用默認值: {search_start_date} 到 {search_end_date}")
+
+            # 轉換為datetime對象以便處理
+            try:
+                search_start = datetime.strptime(search_start_date, '%Y-%m-%d')
+                search_end = datetime.strptime(search_end_date, '%Y-%m-%d')
+            except ValueError:
+                # 如果日期格式有問題，使用默認範圍
+                search_start = datetime.strptime("2024-02-01", '%Y-%m-%d')
+                search_end = datetime.strptime("2025-05-31", '%Y-%m-%d')
+                self.logger.warning("日期格式錯誤，使用默認時間範圍")
+
+            self.logger.info(f"反例搜索將使用與正例相同的時間範圍: {search_start.date()} 到 {search_end.date()}")
             
             # === 創建搜索配置 ===
             negative_config = SearchConfigRequest(
@@ -253,8 +245,8 @@ class SearchTaskService:
                 timeframe=timeframe,  # 使用正例搜索相同的timeframe
                 initial_conditions=[],
                 advanced_conditions=[],
-                start_date=search_start.strftime('%Y-%m-%d'),
-                end_date=search_end.strftime('%Y-%m-%d')
+                start_date=search_start_date,  # 使用正例搜索相同的開始日期
+                end_date=search_end_date       # 使用正例搜索相同的結束日期
             )
             
             # 添加用戶設定的條件
@@ -615,7 +607,10 @@ class SearchTaskService:
                 "positive_cases": len(positive_cases),
                 "negative_cases": len(negative_cases),
                 "unique_symbols": len(symbols_processed),
-                "time_range": {"start": "2024-02-01", "end": "2025-05-31"},
+                "time_range": {
+                    "start": positive_cases[0].__dict__.get('time_range', {}).get('start', '2024-02-01') if positive_cases else '2024-02-01',
+                    "end": positive_cases[0].__dict__.get('time_range', {}).get('end', '2025-05-31') if positive_cases else '2025-05-31'
+                },
                 "market_phase_distribution": {}
             },
             sampling_quality={

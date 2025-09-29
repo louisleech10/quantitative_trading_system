@@ -66,52 +66,66 @@ class SearchConfigRequest(BaseModel):
     timeframe: TimeframeEnum = Field(..., description="時間週期")
 
     symbols: Optional[List[str]] = Field(None, description="交易對列表")
-    
-    initial_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="初始條件")
-    
-    # 時間範圍 - 設為可選，有預設值
-    start_date: Optional[str] = Field(None, description="開始日期 (YYYY-MM-DD)")
-    end_date: Optional[str] = Field(None, description="結束日期 (YYYY-MM-DD)")
-    time_range: Optional[List[str]] = Field(None, description="時間範圍 [start, end]")
-    
+
+    # 時間範圍 - 設為可選，有預設值，支持駝峰格式別名
+    start_date: Optional[str] = Field(None, alias="startDate", description="開始日期 (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(None, alias="endDate", description="結束日期 (YYYY-MM-DD)")
+    time_range: Optional[List[str]] = Field(None, alias="timeRange", description="時間範圍 [start, end]")
+
     # K線參數
     lookback_periods: int = Field(default=100, ge=1, le=1000, description="回看週期數")
     forward_periods: int = Field(default=20, ge=1, le=100, description="前瞻週期數")
-    
+
     # 採樣參數
     sample_limit: int = Field(default=500, ge=1, le=10000, description="樣本數量限制")
     min_volume: float = Field(default=0, ge=0, description="最小成交量")
     exclude_new_listing_days: int = Field(default=7, ge=0, le=365, description="排除新上市天數")
-    
+
     # 搜索條件
     initial_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="初始條件")
     advanced_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="高級條件")
     
     def model_post_init(self, __context):
         """Pydantic V2 的 post-init 方法"""
-        # 如果沒有提供時間範圍，設置預設值
-        if not self.start_date and not self.time_range:
+        # DEBUG LOG - 需要debug時取消註釋
+        # from api.core.logging import get_logger
+        # logger = get_logger("api.models.requests")
+        # logger.info(f"=== SearchConfigRequest model_post_init ===")
+        # logger.info(f"Original start_date: {self.start_date}")
+        # logger.info(f"Original end_date: {self.end_date}")
+        # logger.info(f"Original time_range: {self.time_range}")
+
+        # 只有在所有時間字段都為空時才設置預設值
+        if not self.start_date and not self.end_date and not self.time_range:
             from datetime import datetime, timedelta
             end_date = datetime.now()
             start_date = end_date - timedelta(days=90)  # 預設3個月
             self.start_date = start_date.strftime('%Y-%m-%d')
             self.end_date = end_date.strftime('%Y-%m-%d')
-        
-        # 同步 time_range 和 start_date/end_date
+            # logger.info(f"設置了預設時間範圍: {self.start_date} 到 {self.end_date}")
+
+        # 同步 time_range 和 start_date/end_date (但不覆蓋現有值)
         if self.start_date and self.end_date and not self.time_range:
             self.time_range = [self.start_date, self.end_date]
-        elif self.time_range and len(self.time_range) == 2:
+            # logger.info(f"從start_date/end_date同步到time_range: {self.time_range}")
+        elif self.time_range and len(self.time_range) == 2 and not self.start_date:
             self.start_date = self.time_range[0]
             self.end_date = self.time_range[1]
+            # logger.info(f"從time_range同步到start_date/end_date: {self.start_date} 到 {self.end_date}")
+
+        # logger.info(f"Final start_date: {self.start_date}")
+        # logger.info(f"Final end_date: {self.end_date}")
+        # logger.info(f"Final time_range: {self.time_range}")
     
     model_config = {
+        "populate_by_name": True,  # 允許使用字段名或別名
         "json_schema_extra": {
             "example": {
                 "name": "動能突破搜索",
                 "description": "尋找大漲前的動能訊號",
                 "timeframe": "12h",
-                "start_date": "2024-01-01",
-                "end_date": "2024-06-30",
+                "startDate": "2024-01-01",  # 使用駝峰格式
+                "endDate": "2024-06-30",    # 使用駝峰格式
                 "sample_limit": 100,
                 "min_volume": 1000000,
                 "initial_conditions": [

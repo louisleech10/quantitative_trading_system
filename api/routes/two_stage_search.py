@@ -96,6 +96,28 @@ class MockSearchTaskService:
 
         self.logger.info(f"反例搜索將使用timeframe: {positive_timeframe}")
 
+        # 3. 獲取正例搜索的時間範圍
+        positive_start_date = "2024-02-01"  # 默認值
+        positive_end_date = "2025-05-31"    # 默認值
+
+        # 嘗試從存儲的配置中獲取時間範圍
+        if positive_task_id in search_task_service.positive_configs:
+            positive_config = search_task_service.positive_configs[positive_task_id]
+            positive_start_date = positive_config.start_date
+            positive_end_date = positive_config.end_date
+            self.logger.info(f"從SearchTaskService獲取時間範圍: {positive_start_date} 到 {positive_end_date}")
+        else:
+            # 備用方案：從搜索結果中獲取
+            try:
+                positive_result = standalone_search_service.get_task_result(positive_task_id)
+                if positive_result and hasattr(positive_result, 'search_config') and positive_result.search_config:
+                    if isinstance(positive_result.search_config, dict):
+                        positive_start_date = positive_result.search_config.get('start_date', positive_start_date)
+                        positive_end_date = positive_result.search_config.get('end_date', positive_end_date)
+                        self.logger.info(f"從搜索結果獲取時間範圍: {positive_start_date} 到 {positive_end_date}")
+            except Exception as e:
+                self.logger.warning(f"無法獲取正例時間範圍，使用默認值: {str(e)}")
+
         # 3. 創建反例搜索配置
         negative_config = SearchConfigRequest(
             name=f"negative_search_for_{positive_task_id}",
@@ -103,8 +125,8 @@ class MockSearchTaskService:
             timeframe=positive_timeframe,  # 使用正例搜索相同的timeframe
             initial_conditions=[],
             advanced_conditions=[],
-            start_date="2024-02-01",
-            end_date="2025-05-31"
+            start_date=positive_start_date,  # 使用正例搜索相同的開始日期
+            end_date=positive_end_date      # 使用正例搜索相同的結束日期
         )
         
         # 4. 添加用戶自定義的反例條件
@@ -221,6 +243,18 @@ async def start_positive_search(
 ):
     """開始正例搜索（第一階段）"""
     try:
+        # 簡化的請求確認log（生產環境可移除）
+        logger.info(f"Positive search request: {request.name}, timeframe: {request.timeframe}, dates: {request.start_date} to {request.end_date}")
+        # DEBUG LOG - 需要debug時取消註釋
+        # logger.info(f"=== 接收到正例搜索請求 ===")
+        # logger.info(f"Request name: {request.name}")
+        # logger.info(f"Request timeframe: {request.timeframe}")
+        # logger.info(f"Request start_date: {request.start_date}")
+        # logger.info(f"Request end_date: {request.end_date}")
+        # logger.info(f"Request time_range: {request.time_range}")
+        # logger.info(f"Request symbols: {request.symbols}")
+        # logger.info(f"Function symbols param: {symbols}")
+
         task_id = await search_task_service.execute_positive_search(request, symbols)
         
         task_info = {

@@ -13,6 +13,9 @@ interface SearchConfigRequest {
   initial_conditions: FilterConditionRequest[];
   symbols?: string[];
   save_results?: boolean;
+  // ✅ 修復：添加時間範圍字段
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 interface FilterConditionRequest {
@@ -68,14 +71,14 @@ class ApiClient {
   // 轉換前端搜索請求為後端格式
   private convertToSearchConfig(
     request: SearchRequest,
-    operators: { 
+    operators: {
       priceChange: string;
       volumeMultiplier: string;
       closingStrength: string;
       takerBuyRatio: string;
       pricePosition: string;
     },
-    rangeValues: { 
+    rangeValues: {
       priceChange: { min: number | null, max: number | null };
       volumeMultiplier: { min: number | null, max: number | null };
       closingStrength: { min: number | null, max: number | null };
@@ -190,12 +193,20 @@ class ApiClient {
       });
     }
 
+    // 添加debug log來確認時間數據
+    console.log('convertToSearchConfig 接收到的request:', request);
+    console.log('  - startDate:', request.startDate);
+    console.log('  - endDate:', request.endDate);
+
     return {
       name: request.name || `搜索_${new Date().toISOString().slice(0, 19)}`,
       timeframe: request.timeframe || "12h",
       initial_conditions: conditions,
       symbols: request.symbols,
-      save_results: request.saveResults || false
+      save_results: request.saveResults || false,
+      // ✅ 修復：添加時間範圍字段
+      startDate: request.startDate || null,
+      endDate: request.endDate || null
     };
   }
 
