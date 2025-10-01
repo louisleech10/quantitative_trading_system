@@ -197,14 +197,14 @@ IDE: VS Code
 #### 核心業務邏輯
 - **文件**: `momentum/DataExtraction/case_search_engine.py`
 - **功能**:
-  - 20個參數框架（6個觸發條件 + 12個未來表現 + 2個反例參數）
+  - 30個參數框架（6個觸發條件 + 24個未來表現 + 2個反例參數）
   - 標的內部採樣策略
   - 時間分離驗證
   - 批量搜索優化
 
 #### 數據模型
 ```python
-# 搜索參數（20個）
+# 搜索參數（32個）
 基礎觸發條件 (6個):
   - timeframe: 時間框架
   - price_change: 觸發漲跌幅
@@ -213,7 +213,7 @@ IDE: VS Code
   - volume_multiplier: 成交量倍數
   - taker_buy_ratio: 主動買入比例
 
-未來表現驗證 (12個):
+未來表現驗證 (24個):
   - future_1bar_return ~ future_12bar_return
   - future_1bar_max_drawdown ~ future_12bar_max_drawdown
 
@@ -304,6 +304,10 @@ IDE: VS Code
 - 動量指標（RSI, MACD）
 - 波動率指標（ATR, Bollinger Bands）
 - 成交量指標
+- 鏈上數據
+- 持續擴充
+
+
 
 ---
 
