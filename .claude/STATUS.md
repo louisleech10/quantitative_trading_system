@@ -53,8 +53,9 @@
 2. 創建TradingChart組件結構
 3. 實現Price K線圖（OHLC）
 4. 實現Volume柱狀圖
-5. 實現Taker_Ratio線圖
+5. 實現Taker_Ratio柱狀圖
 6. 基礎樣式設計
+7. Lightweight Charts圖表顯示位置討論
 
 ---
 

@@ -15,7 +15,7 @@
   cd frontend
   npm install lightweight-charts
   ```
-
+- [ ] Lightweight Charts圖表顯示位置討論
 - [ ] 創建TradingChart組件結構
   - [ ] 文件：`frontend/src/components/charts/TradingChart.tsx`
   - [ ] 定義Props接口（symbol, caseId, dateRange）
