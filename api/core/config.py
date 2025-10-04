@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # 快取設定
     enable_cache: bool = Field(default=True, env="ENABLE_CACHE")
     cache_ttl_seconds: int = Field(default=3600, env="CACHE_TTL")  # 1小時
+
+    # Phase 0: HDF5緩存配置
+    enable_hdf5_cache: bool = Field(default=True, env="ENABLE_HDF5_CACHE")
+    hdf5_cache_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache" / "hdf5_cache")
+    hdf5_cache_compression: str = Field(default="blosc", env="HDF5_CACHE_COMPRESSION")
     
     # 資料庫設定（未來擴展用）
     database_url: Optional[str] = Field(default=None, env="DATABASE_URL")
