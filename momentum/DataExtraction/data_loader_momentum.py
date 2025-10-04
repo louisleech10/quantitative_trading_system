@@ -53,14 +53,15 @@ class DataLoader(DataProviderBase):
     """
     幣安市場數據加載器，實現了數據提供者抽象基類
     """
-    def __init__(self, cache_dir: str = "data_cache", api_key: str = None, api_secret: str = None):
+    def __init__(self, cache_dir: str = "data_cache", api_key: str = None, api_secret: str = None, enable_hdf5_cache: bool = True):
         """
         初始化數據加載器
-        
+
         Args:
             cache_dir: 緩存目錄路徑
             api_key: 幣安API密鑰，如果為None則使用環境變量
             api_secret: 幣安API密鑰，如果為None則使用環境變量
+            enable_hdf5_cache: 是否啟用HDF5緩存（Phase 0），默認True
         """
         super().__init__()
         self.client = Client(
@@ -69,7 +70,21 @@ class DataLoader(DataProviderBase):
         )
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
-        
+
+        # Phase 0: HDF5緩存管理器（新增）
+        self.enable_hdf5_cache = enable_hdf5_cache
+        self.hdf5_cache_manager = None
+
+        if self.enable_hdf5_cache:
+            try:
+                from data_cache_manager import DataCacheManager
+                hdf5_cache_dir = self.cache_dir / "hdf5_cache"
+                self.hdf5_cache_manager = DataCacheManager(cache_dir=hdf5_cache_dir)
+                self.logger.info("HDF5緩存管理器已啟用")
+            except Exception as e:
+                self.logger.warning(f"無法啟用HDF5緩存: {e}，將使用原有緩存")
+                self.hdf5_cache_manager = None
+
         # 內存緩存
         self._symbol_data_cache = {}
         self._memory_cache_size = 0
@@ -79,12 +94,12 @@ class DataLoader(DataProviderBase):
         self.request_weight = 0
         self.last_request_time = time.time()
         self.max_requests_per_minute = 1200  # 幣安API限制
-        
+
         # 交易對信息緩存
         self._symbols_info_cache = {}
         self._exchange_info_timestamp = 0
         self._exchange_info_cache = None
-        
+
         # 時間間隔映射
         self.interval_map = {
             '1m': Client.KLINE_INTERVAL_1MINUTE,
@@ -202,12 +217,30 @@ class DataLoader(DataProviderBase):
                 end_dt = datetime.now()
             
             self.logger.debug(f"獲取 {symbol} 的 {interval} 數據，從 {start_dt} 到 {end_dt}")
-            
-            # 嘗試從緩存獲取
+
+            # Phase 0: 優先嘗試從HDF5緩存獲取（極快）
+            if self.hdf5_cache_manager:
+                try:
+                    hdf5_data = self.hdf5_cache_manager.get_cached_klines(
+                        symbol, start_dt, end_dt, interval
+                    )
+                    if hdf5_data is not None and not hdf5_data.empty:
+                        self.logger.debug(f"HDF5緩存命中: {symbol} {interval}")
+                        return hdf5_data
+                except Exception as e:
+                    self.logger.warning(f"HDF5緩存讀取失敗: {e}，嘗試原有緩存")
+
+            # 嘗試從原有緩存獲取（兼容性保留）
             cached_data = self._get_from_cache(symbol, start_dt, end_dt, interval)
             if cached_data is not None and not cached_data.empty:
+                # 如果原有緩存命中，也更新到HDF5緩存
+                if self.hdf5_cache_manager:
+                    try:
+                        self.hdf5_cache_manager.save_to_cache(symbol, cached_data, interval)
+                    except Exception as e:
+                        self.logger.debug(f"更新HDF5緩存失敗: {e}")
                 return cached_data
-            
+
             # 計算時間範圍大小以決定是否分批獲取
             time_range = (end_dt - start_dt).total_seconds()
             max_single_request = 1000  # 幣安單次請求最大K線數
@@ -269,11 +302,19 @@ class DataLoader(DataProviderBase):
                 
             # 創建DataFrame
             df = self._process_klines_to_dataframe(all_klines)
-            
-            # 緩存數據
+
+            # 緩存數據（更新到兩個緩存系統）
             if not df.empty:
+                # 原有緩存
                 self._save_to_cache(symbol, df, interval)
-                
+
+                # Phase 0: HDF5緩存
+                if self.hdf5_cache_manager:
+                    try:
+                        self.hdf5_cache_manager.save_to_cache(symbol, df, interval)
+                    except Exception as e:
+                        self.logger.warning(f"保存到HDF5緩存失敗: {e}")
+
             return df
             
         except Exception as e:
@@ -704,20 +745,35 @@ class DataLoader(DataProviderBase):
             self.logger.error(f"獲取市場深度失敗: {str(e)}")
             return {}
     
-    def export_data_to_csv(self, 
-                         data: pd.DataFrame, 
-                         symbol: str, 
+    def get_cache_stats(self) -> dict:
+        """
+        獲取HDF5緩存統計信息（Phase 0）
+
+        Returns:
+            dict: 緩存統計數據，如果HDF5緩存未啟用則返回空字典
+        """
+        if self.hdf5_cache_manager:
+            return self.hdf5_cache_manager.get_cache_stats()
+        else:
+            return {
+                'hdf5_cache_enabled': False,
+                'message': 'HDF5緩存未啟用'
+            }
+
+    def export_data_to_csv(self,
+                         data: pd.DataFrame,
+                         symbol: str,
                          interval: str,
                          output_dir: str = "exported_data") -> str:
         """
         將數據導出為CSV文件
-        
+
         Args:
             data: 要導出的數據
             symbol: 交易對符號
             interval: 時間間隔
             output_dir: 輸出目錄
-            
+
         Returns:
             str: CSV文件路徑
         """
@@ -725,23 +781,23 @@ class DataLoader(DataProviderBase):
             if data.empty:
                 self.logger.warning("沒有數據可導出")
                 return ""
-                
+
             # 創建輸出目錄
             output_path = Path(output_dir)
             output_path.mkdir(exist_ok=True)
-            
+
             # 生成文件名
             start_date = data.index.min().strftime('%Y%m%d')
             end_date = data.index.max().strftime('%Y%m%d')
             filename = f"{symbol}_{interval}_{start_date}_{end_date}.csv"
             file_path = output_path / filename
-            
+
             # 將數據保存為CSV
             data.to_csv(file_path)
             self.logger.info(f"數據已導出到: {file_path}")
-            
+
             return str(file_path)
-            
+
         except Exception as e:
             self.logger.error(f"導出數據失敗: {str(e)}")
             return ""
