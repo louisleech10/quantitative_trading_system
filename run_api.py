@@ -35,5 +35,19 @@ def main():
         print(f"啟動失敗: {e}")
         sys.exit(1)
 
+def show_hardware_info():
+    """啟動時顯示硬體配置"""
+    cpu_count = multiprocessing.cpu_count()
+    memory_gb = psutil.virtual_memory().total / (1024**3)
+    optimal_workers = get_optimal_workers()
+    
+    print("="*50)
+    print("硬體配置檢測")
+    print(f"CPU核心：{cpu_count}")
+    print(f"總內存：{memory_gb:.1f} GB")
+    print(f"優化worker數：{optimal_workers}")
+    print(f"預估性能：{'標準' if cpu_count == 8 else f'{cpu_count/8:.1f}x'}")
+    print("="*50)
+
 if __name__ == "__main__": #test
     main()

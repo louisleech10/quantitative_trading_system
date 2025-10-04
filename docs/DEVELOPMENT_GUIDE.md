@@ -28,6 +28,8 @@
 
 ## 核心原則
 
+### 0. 一切都要從First Principle開始思考
+
 ### 1. 數據真實性第一
 ```
 ⚠️ 嚴禁使用假數據、虛擬數據、硬編碼
@@ -1212,6 +1214,278 @@ def analyze_line_by_line():
     pass
 ```
 
+## 長時間任務開發規範
+
+### 何時需要實現進度追蹤
+
+**規則**: 所有預計執行時間超過30秒的操作必須實現進度追蹤
+
+**必須追蹤進度的場景**:
+- 批量數據處理（處理10個以上symbol）
+- 大量API調用（調用次數>50次）
+- 複雜計算任務（多層循環嵌套）
+- 文件IO操作（讀寫大於10MB）
+
+### 進度更新實現方式
+```python
+# ✅ 正確的進度更新方式
+async def process_large_dataset(task_id, symbols):
+    total = len(symbols)
+    update_interval = max(1, total // 20)  # 動態調整更新頻率
+    
+    for idx, symbol in enumerate(symbols):
+        # 處理邏輯...
+        
+        # 定期更新進度
+        if (idx + 1) % update_interval == 0 or (idx + 1) == total:
+            task_manager.update_task_progress(
+                task_id=task_id,
+                current=idx + 1,
+                total=total,
+                description=f"處理中... ({idx+1}/{total})",
+                symbol=symbol
+            )
+前端輪詢最佳實踐
+規則: 長時間任務必須使用輪詢而非直接等待HTTP響應
+typescript// ✅ 正確的輪詢實現
+useEffect(() => {
+  if (!taskId) return;
+  
+  const pollInterval = setInterval(async () => {
+    const status = await apiClient.getTaskStatus(taskId);
+    
+    if (status.data.status === 'completed') {
+      clearInterval(pollInterval);
+      // 獲取結果...
+    } else if (status.data.progress) {
+      setProgress(status.data.progress);
+    }
+  }, 2000);
+  
+  // ✅ 清理函數防止內存洩漏
+  return () => clearInterval(pollInterval);
+}, [taskId]);
+常見錯誤和避免方法
+❌ 錯誤1: 前端直接等待長時間響應
+typescript// 錯誤：會超時
+const result = await apiClient.longRunningTask();
+✅ 正確: 啟動任務→輪詢狀態→獲取結果
+typescript// 正確：異步追蹤
+const { task_id } = await apiClient.startTask();
+await pollUntilComplete(task_id);
+const result = await apiClient.getResult(task_id);
+❌ 錯誤2: 固定的進度更新頻率
+python# 錯誤：不管有多少symbol都是每10個更新
+if (idx + 1) % 10 == 0:
+    update_progress()
+✅ 正確: 動態調整頻率
+python# 正確：根據總數動態調整
+update_interval = max(1, total // 20)
+if (idx + 1) % update_interval == 0:
+    update_progress()
+❌ 錯誤3: 忘記清理interval
+typescript// 錯誤：可能造成內存洩漏
+setInterval(checkStatus, 2000);
+✅ 正確: 使用cleanup函數
+typescript// 正確：確保清理
+useEffect(() => {
+  const id = setInterval(checkStatus, 2000);
+  return () => clearInterval(id);
+}, []);
+
+
+---
+
+### 📄 docs/API_SPECIFICATION.md
+
+**位置3**: 在任務狀態查詢API章節補充
+
+找到這一段（大約在第400行附近）：
+```markdown
+## GET /api/v1/search/task/{task_id}
+
+### Response
+```json
+{
+  "success": true,
+  "data": {
+    "task_id": "...",
+    "status": "running",
+    ...
+  }
+}
+
+**在這個Response之後補充**：
+```markdown
+### TaskProgress詳細結構
+
+任務進度信息包含以下欄位：
+```json
+{
+  "progress": {
+    "current_step": 15,              // 當前處理到第幾步
+    "total_steps": 200,              // 總共需要處理多少步
+    "percentage": 7.5,               // 完成百分比
+    "step_description": "處理交易對中...",  // 當前步驟描述
+    "current_symbol": "BTCUSDT",     // 當前處理的symbol
+    "processed_symbols": [           // 已處理的symbol列表
+      "ETHUSDT",
+      "ADAUSDT",
+      ...
+    ],
+    "estimated_remaining_seconds": 1200,  // 預估剩餘時間（秒）
+    "errors": [],                    // 錯誤列表
+    "warnings": []                   // 警告列表
+  }
+}
+前端輪詢建議
+輪詢參數:
+
+輪詢間隔: 2-3秒
+超時設定: 600秒（10分鐘）
+錯誤重試: 最多3次，間隔3秒
+
+輪詢流程:
+1. 啟動任務獲取task_id
+2. 每2秒查詢一次狀態
+3. 如果status=completed，停止輪詢並獲取結果
+4. 如果status=failed，顯示錯誤並停止
+5. 如果超過10分鐘，顯示超時警告
+示例代碼:
+typescriptasync function waitForTaskCompletion(taskId: string) {
+  const maxWaitTime = 600000;  // 10分鐘
+  const pollInterval = 2000;   // 2秒
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < maxWaitTime) {
+    const response = await apiClient.getTaskStatus(taskId);
+    
+    if (response.data.status === 'completed') {
+      return await apiClient.getTaskResult(taskId);
+    } else if (response.data.status === 'failed') {
+      throw new Error(response.data.error_message);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+  
+  throw new Error('Task timeout');
+}
+
+---
+
+### 📄 新建文檔：docs/LONG_SEARCH_OPTIMIZATION.md
+
+**位置**: 在`docs/`目錄下創建新文件
+
+**完整內容**請參考我之前提供的LONG_SEARCH_OPTIMIZATION.md文檔。
+
+---
+
+### 📄 .claude/TASK_LONG_SEARCH_FIX.md
+
+**位置**: 在`.claude/`目錄下創建新文件
+
+**重要修正**：之前的任務文檔需要補充以下章節：
+```markdown
+## ⚠️ 重要提醒
+
+### 修改前必做
+1. ✅ Git commit當前代碼: `git commit -am "Backup before long search fix"`
+2. ✅ 創建備份分支: `git checkout -b backup-before-fix`
+3. ✅ 切回主分支: `git checkout main`
+
+### 修改原則
+- 每次只改一個文件
+- 改完立即測試
+- 測試通過才commit
+- 出問題立即回退: `git checkout -- <file>`
+
+### 測試順序（必須遵守）
+1. 先測試4個symbol（快速驗證基本功能）
+2. 再測試20個symbol（驗證進度更新）
+3. 最後測試ALL_USDT（完整壓力測試）
+
+### 回退方案
+如果出問題：
+```bash
+# 方案1：回退單個文件
+git checkout HEAD -- api/services/standalone_search_service.py
+
+# 方案2：回退所有修改
+git reset --hard HEAD
+
+# 方案3：切換到備份分支
+git checkout backup-before-fix
+
+---
+
+## 4. 整體程式碼優化和混亂問題
+
+您提到的擔憂非常合理。我重新分析了現有程式碼，發現**確實存在混亂和重複**。
+
+### 🔍 我發現的程式碼架構問題
+
+#### 問題1：任務管理器重複
+api/services/task_manager.py              ← EnhancedTaskManager (4000行)
+api/services/standalone_task_manager.py   ← StandaloneTaskManager (200行)
+
+**分析**：
+- `EnhancedTaskManager`: 功能完整但複雜
+- `StandaloneTaskManager`: 簡化版本
+- **衝突**：兩個都在使用，功能重疊
+
+**建議**：
+- ✅ **保留**：`standalone_task_manager.py`（簡單夠用）
+- ⚠️ **暫時保留但不使用**：`task_manager.py`（可能未來需要）
+- 📝 **不修改**：避免破壞現有功能
+
+#### 問題2：搜索服務多版本並存
+api/services/standalone_search_service.py  ← 當前使用
+api/services/fixed_search_service.py       ← 過時？
+api/services/search_service.py             ← 可能是最早版本
+
+**分析**：
+- 從import看，`standalone_search_service`是當前主要使用的
+- 其他兩個可能是歷史遺留
+
+**建議**：
+- ✅ **保留使用**：`standalone_search_service.py`
+- ⚠️ **改名存檔**：`fixed_search_service.py` → `_deprecated_fixed_search_service.py`
+- ⚠️ **改名存檔**：`search_service.py` → `_deprecated_search_service.py`
+- 📝 **原則**：改名不刪除，加`_deprecated_`前綴
+
+#### 問題3：搜索引擎的調用鏈過長
+page.tsx
+→ api.ts
+→ two_stage_search.py
+→ search_task_service.py
+→ standalone_search_service.py
+→ case_search_engine.py
+
+**分析**：6層調用，過於複雜
+
+**建議**：
+- ✅ **當前不動**：調用鏈雖長但能工作
+- 📋 **未來優化**：考慮合併`search_task_service`和`standalone_search_service`
+- ⚠️ **風險高**：現在改動可能引入bug
+
+### 📋 最小必要改動清單（安全版）
+
+根據"能少動就少動"原則，我重新整理：
+
+#### 階段0：準備工作（必做）
+```bash
+# 1. 完整備份
+git commit -am "Backup before optimization $(date +%Y%m%d)"
+git checkout -b backup-$(date +%Y%m%d)
+git checkout main
+
+# 2. 標記過時文件（不刪除）
+git mv api/services/fixed_search_service.py api/services/_deprecated_fixed_search_service.py
+git mv api/services/search_service.py api/services/_deprecated_search_service.py
+git commit -m "Mark deprecated files"
+
 ---
 
 ## Python開發規範
@@ -2178,6 +2452,29 @@ npm run lint
 # 構建生產版本
 npm run build
 ```
+
+## 硬體自適應開發規範
+
+### 禁止硬編碼資源數量
+
+❌ 錯誤：
+```python
+workers = 8  # 假設所有人都用M1
+✅ 正確：
+pythonworkers = get_optimal_workers()  # 動態偵測
+必須考慮資源限制
+所有並行處理必須：
+
+檢查可用CPU
+檢查可用內存
+動態調整worker數量
+為系統保留資源
+
+性能測試基準
+
+基準硬體：M1 8核/16GB
+其他硬體：按核心數線性推算
+內存不足時：自動降級到串行處理
 
 ---
 
