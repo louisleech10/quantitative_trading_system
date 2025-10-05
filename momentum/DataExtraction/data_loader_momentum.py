@@ -20,7 +20,10 @@ parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
-from data_provider_base import DataProviderBase
+try:
+    from momentum.DataExtraction.data_provider_base import DataProviderBase
+except ImportError:
+    from data_provider_base import DataProviderBase
 
 # 設置日誌
 logging.basicConfig(
@@ -77,7 +80,13 @@ class DataLoader(DataProviderBase):
 
         if self.enable_hdf5_cache:
             try:
-                from data_cache_manager import DataCacheManager
+                # 嘗試相對導入
+                try:
+                    from .data_cache_manager import DataCacheManager
+                except ImportError:
+                    # fallback到完整路徑導入
+                    from momentum.DataExtraction.data_cache_manager import DataCacheManager
+
                 hdf5_cache_dir = self.cache_dir / "hdf5_cache"
                 self.hdf5_cache_manager = DataCacheManager(cache_dir=hdf5_cache_dir)
                 self.logger.info("HDF5緩存管理器已啟用")
