@@ -237,13 +237,14 @@ class SearchConfiguration:
 class CaseSearchEngine:
     """案例搜索引擎類"""
     
-    def __init__(self, data_loader, enable_parallel: bool = True):
+    def __init__(self, data_loader, enable_parallel: bool = True, num_workers: Optional[int] = None):
         """
         初始化搜索引擎
 
         Args:
             data_loader: 數據加載器實例
             enable_parallel: 是否啟用並行處理（默認True，利用多核加速）
+            num_workers: 並行worker數量（None=自動偵測，可手動指定以覆蓋自動偵測）
         """
         self.data_loader = data_loader
         self.logger = logging.getLogger(__name__)
@@ -265,7 +266,8 @@ class CaseSearchEngine:
                 from momentum.DataExtraction.parallel_search_engine import ParallelSearchEngine
                 self.parallel_engine = ParallelSearchEngine(
                     case_search_engine=self,
-                    enable_parallel=True
+                    enable_parallel=True,
+                    num_workers=num_workers  # ✅ 傳遞 num_workers 參數
                 )
                 self.logger.info("並行搜索引擎已啟用")
             except ImportError as e:
