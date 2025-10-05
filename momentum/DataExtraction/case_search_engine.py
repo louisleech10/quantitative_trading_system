@@ -237,25 +237,44 @@ class SearchConfiguration:
 class CaseSearchEngine:
     """案例搜索引擎類"""
     
-    def __init__(self, data_loader):
+    def __init__(self, data_loader, enable_parallel: bool = True):
         """
         初始化搜索引擎
-        
+
         Args:
             data_loader: 數據加載器實例
+            enable_parallel: 是否啟用並行處理（默認True，利用多核加速）
         """
         self.data_loader = data_loader
         self.logger = logging.getLogger(__name__)
-        
+
         # 默認配置
         self.default_config = self._create_default_configs()
-        
+
         # 結果保存目錄
         self.results_dir = Path("search_results")
         self.results_dir.mkdir(exist_ok=True)
-        
+
         # 符合條件的案例
         self.matched_cases = []
+
+        # 並行處理引擎（Phase 1優化）
+        self.enable_parallel = enable_parallel
+        if enable_parallel:
+            try:
+                from momentum.DataExtraction.parallel_search_engine import ParallelSearchEngine
+                self.parallel_engine = ParallelSearchEngine(
+                    case_search_engine=self,
+                    enable_parallel=True
+                )
+                self.logger.info("並行搜索引擎已啟用")
+            except ImportError as e:
+                self.logger.warning(f"無法導入並行引擎，退回串行模式: {e}")
+                self.parallel_engine = None
+                self.enable_parallel = False
+        else:
+            self.parallel_engine = None
+            self.logger.info("並行處理已禁用，使用串行模式")
         
     def _create_default_configs(self) -> Dict[str, SearchConfiguration]:
         """創建默認搜索配置"""
@@ -318,14 +337,20 @@ class CaseSearchEngine:
         
         return configs
 
-    async def search_cases(self, 
+    async def search_cases(self,
                         config: SearchConfiguration = None,
                         symbols: List[str] = None,
                         batch_size: int = 20,
                         save_results: bool = True) -> List[Dict]:
         """
         搜索符合條件的案例
-        
+
+        Args:
+            config: 搜索配置
+            symbols: 交易對列表
+            batch_size: 批次大小（並行模式下此參數被忽略）
+            save_results: 是否保存結果
+
         Returns:
             List[Dict]: 符合條件的案例列表，保證不返回 None
         """
@@ -346,6 +371,18 @@ class CaseSearchEngine:
             self.logger.info(f"Symbols: {symbols}")
             self.logger.info(f"Time range: {config.start_time} to {config.end_time}")
 
+            # Phase 1優化：使用並行處理引擎（如果啟用）
+            if self.enable_parallel and self.parallel_engine is not None:
+                self.logger.info("使用並行處理模式")
+                all_results = await self.parallel_engine.search_cases_parallel(
+                    config=config,
+                    symbols=symbols,
+                    save_results=save_results
+                )
+                return all_results if all_results is not None else []
+
+            # 串行處理模式（原有邏輯）
+            self.logger.info("使用串行處理模式")
             all_results = []
 
             # 分批處理交易對
@@ -355,27 +392,22 @@ class CaseSearchEngine:
 
                 # 搜索當前批次
                 batch_results = await self._search_batch(config, batch_symbols)
-                
+
                 # 確保 batch_results 不為 None
                 if batch_results is not None:
                     all_results.extend(batch_results)
                 else:
                     self.logger.warning(f"Batch {i//batch_size + 1} returned None")
 
-                # 檢查是否已達到樣本限制
-                #if len(all_results) >= config.sample_limit:
-                #    self.logger.info(f"Reached sample limit: {config.sample_limit}")
-                #    all_results = all_results[:config.sample_limit]
-                #    break
-
             self.logger.info(f"Search completed. Found {len(all_results)} cases")
 
             # 保存結果
             if save_results and all_results:
                 try:
-                    await self._save_results(config, all_results)
+                    self.matched_cases = all_results
+                    self._save_results(config)
                 except Exception as save_error:
-                    self.logger.error(f"Failed to save results: {save_error}")
+                    self.logger.error(f"Failed to save results: {save_error}", exc_info=True)
 
             # 確保返回值不為 None
             return all_results if all_results is not None else []
