@@ -77,10 +77,21 @@ class StandaloneTaskManager:
     def set_task_result(self, task_id: str, result: Any):
         """Set task result"""
         self.task_results[task_id] = result
+        # ✅ 添加日誌確認結果存儲
+        if result and hasattr(result, 'cases'):
+            self.logger.info(f"[DEBUG] 存儲任務結果: task_id={task_id}, cases數量={len(result.cases) if result.cases else 0}")
+        else:
+            self.logger.info(f"[DEBUG] 存儲任務結果: task_id={task_id}, result類型={type(result)}")
     
     def get_task_result(self, task_id: str) -> Optional[Any]:
         """Get task result"""
-        return self.task_results.get(task_id)
+        result = self.task_results.get(task_id)
+        # ✅ 添加日誌確認結果讀取
+        if result and hasattr(result, 'cases'):
+            self.logger.info(f"[DEBUG] 讀取任務結果: task_id={task_id}, cases數量={len(result.cases) if result.cases else 0}")
+        else:
+            self.logger.info(f"[DEBUG] 讀取任務結果: task_id={task_id}, result存在={result is not None}")
+        return result
     
     def cleanup_old_tasks(self, hours: int = 24):
         """Clean up tasks older than specified hours"""
@@ -189,7 +200,11 @@ class StandaloneSearchService:
             # Create instances
             momentum_loader = MomentumDataLoader()
             self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
-            self.search_engine = CaseSearchEngine(self.data_loader)
+            self.search_engine = CaseSearchEngine(
+                self.data_loader,
+                enable_parallel=True,
+                num_workers=7  # M1 Mac: 8核CPU - 1核給系統
+            )
             
             self.momentum_available = True
             self.logger.info("✅ Momentum modules loaded successfully on demand")
@@ -235,10 +250,14 @@ class StandaloneSearchService:
                 # Create a wrapper that provides the expected interface
                 self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
                 self.logger.info("✅ DataLoader imported and wrapped successfully")
-                
+
                 # Import SearchEngine
                 from momentum.DataExtraction.case_search_engine import CaseSearchEngine
-                self.search_engine = CaseSearchEngine(self.data_loader)
+                self.search_engine = CaseSearchEngine(
+                    self.data_loader,
+                    enable_parallel=True,
+                    num_workers=7  # M1 Mac: 8核CPU - 1核給系統
+                )
                 self.logger.info("✅ SearchEngine imported successfully")
                 
                 self.momentum_available = True
@@ -259,10 +278,14 @@ class StandaloneSearchService:
                 
                 from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
                 from momentum.DataExtraction.case_search_engine import CaseSearchEngine
-                
+
                 momentum_loader = MomentumDataLoader()
                 self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
-                self.search_engine = CaseSearchEngine(self.data_loader)
+                self.search_engine = CaseSearchEngine(
+                    self.data_loader,
+                    enable_parallel=True,
+                    num_workers=7  # M1 Mac: 8核CPU - 1核給系統
+                )
                 
                 self.momentum_available = True
                 self.logger.info("✅ Momentum modules loaded via alternative path")
