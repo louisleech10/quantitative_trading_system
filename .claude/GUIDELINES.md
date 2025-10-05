@@ -38,7 +38,7 @@ return calculate_real_metrics(trade_history)
 ```
 步驟 1: 生成初版代碼
         ↓
-步驟 2: 自我審查 + 列出優化 To-do List
+步驟 2: 自我審查步驟1生成的代碼是否有錯誤和可優化之處(必做)+ 列出優化 To-do List
         ↓
 步驟 3: 根據 To-do List 生成最終優化版本
 ```
