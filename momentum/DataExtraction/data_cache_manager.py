@@ -1,5 +1,5 @@
 """
-數據緩存管理器 - Phase 0
+數據緩存管理器 - Phase 0 + 錯誤處理增強
 使用HDF5格式實現高速K線數據緩存
 
 核心功能：
@@ -7,12 +7,15 @@
 2. 從HDF5快速讀取K線（< 0.05秒）
 3. 增量更新（只下載缺失數據）
 4. 元數據管理
+5. 智能錯誤處理和重試（新增）
+6. 詳細失敗報告（新增）
 
 設計原則：
 - 只加速，不改邏輯
 - 方法簽名與現有API保持一致
 - 完整錯誤處理，單點故障不影響整體
 - 向後兼容，可隨時禁用
+- 失敗透明化（不靜默丟棄）
 """
 
 import pandas as pd
@@ -20,6 +23,8 @@ import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Union
+from dataclasses import dataclass, asdict
+from enum import Enum
 import logging
 import json
 import h5py
@@ -28,6 +33,134 @@ from binance.client import Client
 import os
 
 logger = logging.getLogger(__name__)
+
+
+class CacheFailureType(Enum):
+    """緩存錯誤類型分類"""
+    NETWORK_ERROR = "network_error"
+    API_LIMIT = "api_limit"
+    DATA_NOT_FOUND = "data_not_found"
+    HDF5_ERROR = "hdf5_error"
+    INVALID_SYMBOL = "invalid_symbol"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class CacheFailureRecord:
+    """緩存失敗記錄結構"""
+    symbol: str
+    error_type: str
+    error_message: str
+    error_trace: str = ""
+    severity: str = "transient"  # transient, permanent, critical
+    retry_count: int = 0
+    first_failed_at: str = ""
+    last_retry_at: str = ""
+    operation: str = ""  # 'download', 'save', 'read'
+    is_recoverable: bool = True
+
+    def to_dict(self) -> Dict:
+        """轉換為字典"""
+        return asdict(self)
+
+
+# 緩存操作重試配置
+CACHE_RETRY_CONFIG = {
+    CacheFailureType.NETWORK_ERROR: {
+        'max_retries': 3,
+        'backoff_base': 1,
+        'description': '網絡問題，將重試'
+    },
+    CacheFailureType.API_LIMIT: {
+        'max_retries': 2,
+        'backoff_base': 5,
+        'description': 'API限流，等待後重試'
+    },
+    CacheFailureType.DATA_NOT_FOUND: {
+        'max_retries': 0,
+        'description': '數據不存在，跳過'
+    },
+    CacheFailureType.HDF5_ERROR: {
+        'max_retries': 1,
+        'backoff_base': 0.5,
+        'description': 'HDF5錯誤，嘗試重建'
+    },
+    CacheFailureType.INVALID_SYMBOL: {
+        'max_retries': 0,
+        'description': '無效symbol，跳過'
+    },
+    CacheFailureType.UNKNOWN: {
+        'max_retries': 1,
+        'backoff_base': 2,
+        'description': '未知錯誤，嘗試重試一次'
+    }
+}
+
+
+def classify_cache_error(error: Exception) -> CacheFailureType:
+    """
+    錯誤分類函數
+
+    Args:
+        error: 異常對象
+
+    Returns:
+        CacheFailureType: 錯誤類型
+    """
+    error_msg = str(error).lower()
+    error_type_name = type(error).__name__.lower()
+
+    # 網絡錯誤
+    if any(keyword in error_msg for keyword in ['timeout', 'connection', 'network', 'unreachable']):
+        return CacheFailureType.NETWORK_ERROR
+
+    if any(keyword in error_type_name for keyword in ['timeout', 'connection']):
+        return CacheFailureType.NETWORK_ERROR
+
+    # API限流
+    if any(keyword in error_msg for keyword in ['rate limit', 'too many requests', '429', '418']):
+        return CacheFailureType.API_LIMIT
+
+    # 無效symbol（優先於數據不存在，因為關鍵字更具體）
+    if any(keyword in error_msg for keyword in ['invalid symbol', 'symbol not found', 'unknown symbol']):
+        return CacheFailureType.INVALID_SYMBOL
+
+    # 數據不存在
+    if any(keyword in error_msg for keyword in ['no data', 'not found', 'empty', 'missing']):
+        return CacheFailureType.DATA_NOT_FOUND
+
+    # HDF5錯誤
+    if any(keyword in error_msg for keyword in ['hdf5', 'h5py', 'corrupt', 'invalid hdf5']):
+        return CacheFailureType.HDF5_ERROR
+
+    # 未知錯誤
+    return CacheFailureType.UNKNOWN
+
+
+def calculate_cache_backoff_delay(error_type: CacheFailureType, attempt: int) -> float:
+    """
+    計算重試延遲時間
+
+    Args:
+        error_type: 錯誤類型
+        attempt: 當前嘗試次數（0-based）
+
+    Returns:
+        float: 延遲秒數
+    """
+    config = CACHE_RETRY_CONFIG[error_type]
+
+    if 'backoff_base' not in config:
+        return 0
+
+    base = config['backoff_base']
+
+    # API限流使用固定延遲
+    if error_type == CacheFailureType.API_LIMIT:
+        return base
+
+    # 其他使用指數退避: base * 2^attempt
+    return base * (2 ** attempt)
 
 
 class DataCacheManager:
@@ -192,7 +325,7 @@ class DataCacheManager:
         interval: str
     ) -> Dict[str, int]:
         """
-        確保數據已緩存，缺失則下載（同步版本）
+        確保數據已緩存，缺失則下載（同步版本，含智能重試和失敗追蹤）
 
         Args:
             symbols: 交易對列表
@@ -201,7 +334,13 @@ class DataCacheManager:
             interval: 時間間隔
 
         Returns:
-            Dict: 統計信息 {'cached': 已緩存數, 'downloaded': 下載數, 'failed': 失敗數}
+            Dict: 統計信息 {
+                'cached': 已緩存數,
+                'downloaded': 下載數,
+                'failed': 失敗數,
+                'failed_records': 失敗記錄列表,
+                'retry_stats': 重試統計
+            }
         """
         try:
             start_dt = self._normalize_time(start_time)
@@ -210,51 +349,159 @@ class DataCacheManager:
             total_symbols = len(symbols)
             cached_count = 0
             downloaded_count = 0
-            failed_count = 0
+
+            # 失敗追蹤
+            failed_records = []
+            retry_stats = {
+                'total_retries': 0,
+                'successful_retries': 0,
+                'failed_retries': 0
+            }
 
             logger.info(f"開始檢查緩存: {total_symbols}個標的")
 
             for idx, symbol in enumerate(symbols, 1):
-                try:
-                    # 檢查緩存覆蓋率
-                    cached_range, missing_ranges = self._check_cache_coverage(
-                        symbol, start_dt, end_dt, interval
+                first_failed_at = None
+                symbol_success = False
+
+                # 智能重試循環（最多10次總嘗試）
+                for attempt in range(10):
+                    try:
+                        # 檢查緩存覆蓋率
+                        cached_range, missing_ranges = self._check_cache_coverage(
+                            symbol, start_dt, end_dt, interval
+                        )
+
+                        if missing_ranges:
+                            if attempt == 0:
+                                logger.info(
+                                    f"[{idx}/{total_symbols}] {symbol}: "
+                                    f"需下載 {len(missing_ranges)} 個缺失時間段"
+                                )
+
+                            # 下載缺失數據（同步）
+                            success = self._download_missing_data_sync(
+                                symbol, missing_ranges, interval
+                            )
+
+                            if success:
+                                downloaded_count += 1
+                                symbol_success = True
+
+                                # 如果之前失敗過，記錄重試成功
+                                if attempt > 0:
+                                    retry_stats['successful_retries'] += 1
+                                    logger.info(f"{symbol} 第{attempt+1}次嘗試成功")
+
+                                break  # 成功，跳出重試循環
+                            else:
+                                # 下載失敗，拋出異常進入重試邏輯
+                                raise Exception("下載失敗")
+                        else:
+                            # 緩存完整
+                            cached_count += 1
+                            symbol_success = True
+                            logger.debug(f"[{idx}/{total_symbols}] {symbol}: 緩存完整")
+                            break
+
+                    except Exception as e:
+                        # 記錄首次失敗時間
+                        if first_failed_at is None:
+                            first_failed_at = datetime.now().isoformat()
+
+                        # 錯誤分類
+                        error_type = classify_cache_error(e)
+                        retry_config = CACHE_RETRY_CONFIG[error_type]
+                        max_retries = retry_config.get('max_retries', 0)
+
+                        # 判斷是否應該重試
+                        if attempt < max_retries:
+                            # 計算延遲
+                            delay = calculate_cache_backoff_delay(error_type, attempt)
+                            retry_stats['total_retries'] += 1
+
+                            logger.warning(
+                                f"[{idx}/{total_symbols}] {symbol} 失敗 "
+                                f"({error_type.value}), "
+                                f"第{attempt+1}次嘗試失敗，"
+                                f"{delay}秒後重試（最多{max_retries}次）: {e}"
+                            )
+
+                            time.sleep(delay)
+                            continue  # 重試
+
+                        else:
+                            # 最終失敗，記錄失敗
+                            retry_stats['failed_retries'] += 1
+
+                            failure = self._create_cache_failure_record(
+                                symbol=symbol,
+                                error=e,
+                                error_type=error_type,
+                                retry_count=attempt + 1,
+                                first_failed_at=first_failed_at,
+                                operation='download'
+                            )
+
+                            failed_records.append(failure.to_dict())
+
+                            logger.error(
+                                f"[{idx}/{total_symbols}] {symbol} "
+                                f"重試{attempt+1}次後最終失敗 ({error_type.value}): {e}",
+                                exc_info=True
+                            )
+
+                            break  # 不再重試
+
+            # 輸出終端總結
+            logger.info("="*60)
+            logger.info("緩存下載完成總結")
+            logger.info("="*60)
+            logger.info(
+                f"✅ 成功: {cached_count + downloaded_count}/{total_symbols} "
+                f"(已緩存{cached_count}, 新下載{downloaded_count})"
+            )
+            logger.info(f"❌ 失敗: {len(failed_records)}/{total_symbols}")
+            logger.info(
+                f"🔄 重試: {retry_stats['total_retries']}次 "
+                f"(成功{retry_stats['successful_retries']}次, "
+                f"失敗{retry_stats['failed_retries']}次)"
+            )
+
+            # 如果有失敗，輸出失敗詳情
+            if failed_records:
+                logger.warning("="*60)
+                logger.warning("失敗詳情 (前5個):")
+                logger.warning("="*60)
+
+                for i, failure in enumerate(failed_records[:5], 1):
+                    logger.warning(
+                        f"{i}. {failure['symbol']} [{failure['error_type']}]\n"
+                        f"   錯誤: {failure['error_message']}\n"
+                        f"   重試: {failure['retry_count']}次\n"
+                        f"   嚴重性: {failure['severity']}"
                     )
 
-                    if missing_ranges:
-                        logger.info(
-                            f"[{idx}/{total_symbols}] {symbol}: "
-                            f"需下載 {len(missing_ranges)} 個缺失時間段"
-                        )
+                if len(failed_records) > 5:
+                    logger.warning(f"... 還有 {len(failed_records)-5} 個失敗")
 
-                        # 下載缺失數據（同步）
-                        success = self._download_missing_data_sync(
-                            symbol, missing_ranges, interval
-                        )
-
-                        if success:
-                            downloaded_count += 1
-                        else:
-                            failed_count += 1
-                    else:
-                        cached_count += 1
-                        logger.debug(f"[{idx}/{total_symbols}] {symbol}: 緩存完整")
-
-                except Exception as e:
-                    failed_count += 1
-                    logger.error(f"處理 {symbol} 時出錯: {e}", exc_info=True)
-                    continue
-
-            # 輸出統計信息
-            logger.info(
-                f"緩存檢查完成: "
-                f"已緩存={cached_count}, 下載={downloaded_count}, 失敗={failed_count}"
-            )
+                # 保存失敗報告
+                try:
+                    report_path = self._save_cache_failure_report(
+                        failed_records,
+                        retry_stats,
+                        symbols
+                    )
+                    logger.warning(f"\n📄 完整失敗報告已保存: {report_path}")
+                except Exception as report_error:
+                    logger.error(f"保存失敗報告時出錯: {report_error}", exc_info=True)
 
             return {
                 'cached': cached_count,
                 'downloaded': downloaded_count,
-                'failed': failed_count
+                'failed': len(failed_records),
+                'failed_records': failed_records,
+                'retry_stats': retry_stats
             }
 
         except Exception as e:
@@ -623,3 +870,165 @@ class DataCacheManager:
 
         except Exception as e:
             logger.error(f"清理緩存失敗: {e}")
+
+    def _create_cache_failure_record(
+        self,
+        symbol: str,
+        error: Exception,
+        error_type: CacheFailureType,
+        retry_count: int,
+        first_failed_at: str,
+        operation: str
+    ) -> CacheFailureRecord:
+        """
+        創建緩存失敗記錄
+
+        Args:
+            symbol: 交易對符號
+            error: 異常對象
+            error_type: 錯誤類型
+            retry_count: 重試次數
+            first_failed_at: 首次失敗時間
+            operation: 操作類型 ('download', 'save', 'read')
+
+        Returns:
+            CacheFailureRecord: 失敗記錄
+        """
+        import traceback
+
+        # 判斷嚴重性和可恢復性
+        severity = "transient"
+        is_recoverable = True
+
+        if error_type == CacheFailureType.INVALID_SYMBOL:
+            severity = "permanent"
+            is_recoverable = False
+        elif error_type == CacheFailureType.DATA_NOT_FOUND:
+            severity = "permanent"
+            is_recoverable = False
+        elif error_type in [CacheFailureType.NETWORK_ERROR, CacheFailureType.API_LIMIT]:
+            severity = "transient"
+            is_recoverable = True
+        elif error_type == CacheFailureType.HDF5_ERROR:
+            severity = "transient"
+            is_recoverable = True
+
+        return CacheFailureRecord(
+            symbol=symbol,
+            error_type=error_type.value,
+            error_message=str(error),
+            error_trace=traceback.format_exc(),
+            severity=severity,
+            retry_count=retry_count,
+            first_failed_at=first_failed_at,
+            last_retry_at=datetime.now().isoformat(),
+            operation=operation,
+            is_recoverable=is_recoverable
+        )
+
+    def _save_cache_failure_report(
+        self,
+        failed_records: List[Dict],
+        retry_stats: Dict,
+        total_symbols: List[str]
+    ) -> str:
+        """
+        保存失敗報告到JSON文件
+
+        Args:
+            failed_records: 失敗記錄列表
+            retry_stats: 重試統計
+            total_symbols: 總symbol列表
+
+        Returns:
+            str: 保存的文件路徑
+        """
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        # 創建報告目錄
+        report_dir = Path("data_cache") / "failure_reports"
+        report_dir.mkdir(parents=True, exist_ok=True)
+
+        # 報告文件路徑
+        report_file = report_dir / f"cache_failure_{timestamp}.json"
+
+        # 統計錯誤類型
+        error_types = {}
+        for failure in failed_records:
+            error_type = failure['error_type']
+            error_types[error_type] = error_types.get(error_type, 0) + 1
+
+        # 生成建議
+        recommendations = []
+
+        if error_types.get(CacheFailureType.NETWORK_ERROR.value, 0) > 0:
+            count = error_types[CacheFailureType.NETWORK_ERROR.value]
+            recommendations.append(
+                f"⚠️  {count}個symbols因網絡問題失敗，建議檢查網絡後重試"
+            )
+
+        if error_types.get(CacheFailureType.API_LIMIT.value, 0) > 0:
+            count = error_types[CacheFailureType.API_LIMIT.value]
+            recommendations.append(
+                f"⏱️  {count}個symbols因API限流失敗，建議稍後重試或降低並發"
+            )
+
+        if error_types.get(CacheFailureType.DATA_NOT_FOUND.value, 0) > 0:
+            count = error_types[CacheFailureType.DATA_NOT_FOUND.value]
+            recommendations.append(
+                f"💡 {count}個symbols數據不存在，建議調整時間範圍或排除這些symbols"
+            )
+
+        if error_types.get(CacheFailureType.HDF5_ERROR.value, 0) > 0:
+            count = error_types[CacheFailureType.HDF5_ERROR.value]
+            recommendations.append(
+                f"🔧 {count}個symbols因HDF5錯誤失敗，建議清理緩存後重試"
+            )
+
+        if error_types.get(CacheFailureType.INVALID_SYMBOL.value, 0) > 0:
+            count = error_types[CacheFailureType.INVALID_SYMBOL.value]
+            recommendations.append(
+                f"❌ {count}個symbols無效，建議從列表中排除"
+            )
+
+        # 創建報告數據
+        report_data = {
+            'metadata': {
+                'timestamp': timestamp,
+                'total_symbols': len(total_symbols),
+                'operation': 'cache_download'
+            },
+            'summary': {
+                'success_count': len(total_symbols) - len(failed_records),
+                'failed_count': len(failed_records),
+                'retry_total': retry_stats['total_retries'],
+                'retry_successful': retry_stats['successful_retries'],
+                'retry_failed': retry_stats['failed_retries']
+            },
+            'failure_breakdown': error_types,
+            'failed_symbols': failed_records,
+            'recommendations': recommendations
+        }
+
+        # 保存到文件
+        with open(report_file, 'w', encoding='utf-8') as f:
+            json.dump(report_data, f, indent=2, ensure_ascii=False)
+
+        # 同時保存失敗symbols列表（方便重試）
+        failed_symbols_file = report_dir / f"failed_symbols_{timestamp}.json"
+        failed_symbols_data = {
+            'failed_symbols': [f['symbol'] for f in failed_records],
+            'recoverable_symbols': [
+                f['symbol'] for f in failed_records if f['is_recoverable']
+            ],
+            'permanent_failed_symbols': [
+                f['symbol'] for f in failed_records if not f['is_recoverable']
+            ]
+        }
+
+        with open(failed_symbols_file, 'w', encoding='utf-8') as f:
+            json.dump(failed_symbols_data, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"失敗symbols列表已保存: {failed_symbols_file}")
+
+        return str(report_file)
