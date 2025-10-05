@@ -970,23 +970,37 @@ class CaseSearchEngine:
                 col_name = f'future_{bar}bar_return'
                 df[col_name] = (df['close'].shift(-bar) - df['close']) / df['close']
             
-            # 2.2 未來1-12根K線最大回撤
-            self.logger.info("開始計算未來最大回撤...")
+            # 2.2 未來1-12根K線最大回撤（向量化版本 - Phase 2優化）
+            self.logger.info("開始計算未來最大回撤（向量化）...")
             for bar in range(1, 13):
                 col_name = f'future_{bar}bar_max_drawdown'
-                df[col_name] = np.nan
-                
-                # 計算每個時間點的最大回撤
-                for i in range(len(df) - bar):
-                    current_close = df['close'].iloc[i]
-                    if current_close > 0:
-                        # 獲取未來 bar 根K線的最低價
-                        future_slice = df.iloc[i+1:i+bar+1]
-                        if len(future_slice) > 0:
-                            min_low = future_slice['low'].min()
-                            if pd.notna(min_low):
-                                max_drawdown = (min_low / current_close - 1)
-                                df.loc[df.index[i], col_name] = max_drawdown
+
+                # 向量化計算：使用 expanding() + shift() 實現正向未來窗口
+                #
+                # 原循環邏輯：對於位置i，計算 df.iloc[i+1:i+bar+1]['low'].min()
+                # 向量化方法：
+                # 1. 反轉數據（這樣 rolling 就變成往未來看）
+                # 2. 應用 rolling().min()
+                # 3. 再反轉回來
+
+                # 更簡單的方法：直接使用 shift + min
+                # 對每個 bar，創建一個 bar 長度的窗口
+                min_values = []
+                for offset in range(1, bar + 1):
+                    min_values.append(df['low'].shift(-offset))
+
+                # 取所有offset的最小值（逐元素）
+                if min_values:
+                    future_min_low = pd.concat(min_values, axis=1).min(axis=1)
+                else:
+                    future_min_low = pd.Series(np.nan, index=df.index)
+
+                # 計算最大回撤（向量化）
+                df[col_name] = np.where(
+                    df['close'] > 0,  # 避免除以0
+                    (future_min_low / df['close'] - 1),
+                    np.nan
+                )
             
             # ===== 3. 時間相關描述參數 =====
             
@@ -1031,41 +1045,58 @@ class CaseSearchEngine:
             else:
                 df['future24_low'] = df['low'].shift(-periods_24h)
             
-            # ===== 6. 72小時最大回報和回撤計算 (保持向後兼容) =====
+            # ===== 6. 72小時最大回報和回撤計算（向量化版本 - Phase 2優化）=====
             lookahead_periods = periods_72h
-            df['future_max_return'] = np.nan
-            df['future_max_drawdown'] = np.nan
-            df['future72_max_return'] = np.nan
-            df['future72_max_drawdown'] = np.nan
-            
-            self.logger.info("開始計算72小時最大回報和回撤...")
-            for i in range(len(df) - lookahead_periods):
-                current_close = df['close'].iloc[i]
-                future_slice_72h = df.iloc[i+1:i+lookahead_periods+1]
-                
-                if len(future_slice_72h) > 0 and current_close > 0:
-                    max_high_72h = future_slice_72h['high'].max()
-                    min_low_72h = future_slice_72h['low'].min()
-                    
-                    max_return_72h = (max_high_72h / current_close - 1) if pd.notna(max_high_72h) else np.nan
-                    max_drawdown_72h = (min_low_72h / current_close - 1) if pd.notna(min_low_72h) else np.nan
-                    
-                    df.loc[df.index[i], 'future72_max_return'] = max_return_72h
-                    df.loc[df.index[i], 'future72_max_drawdown'] = max_drawdown_72h
-                    
-                    # 標準6根K線（保持向後兼容）
-                    standard_lookahead = min(6, len(future_slice_72h))
-                    future_slice_standard = df.iloc[i+1:i+standard_lookahead+1]
-                    
-                    if len(future_slice_standard) > 0:
-                        max_high_std = future_slice_standard['high'].max()
-                        min_low_std = future_slice_standard['low'].min()
-                        
-                        max_return_std = (max_high_std / current_close - 1) if pd.notna(max_high_std) else np.nan
-                        max_drawdown_std = (min_low_std / current_close - 1) if pd.notna(min_low_std) else np.nan
-                        
-                        df.loc[df.index[i], 'future_max_return'] = max_return_std
-                        df.loc[df.index[i], 'future_max_drawdown'] = max_drawdown_std
+
+            self.logger.info("開始計算72小時最大回報和回撤（向量化）...")
+
+            # 72小時窗口：向量化計算（使用 shift + min/max）
+            # 計算未來窗口內的最高價和最低價
+            high_values_72h = []
+            low_values_72h = []
+            for offset in range(1, lookahead_periods + 1):
+                high_values_72h.append(df['high'].shift(-offset))
+                low_values_72h.append(df['low'].shift(-offset))
+
+            future_max_high_72h = pd.concat(high_values_72h, axis=1).max(axis=1) if high_values_72h else pd.Series(np.nan, index=df.index)
+            future_min_low_72h = pd.concat(low_values_72h, axis=1).min(axis=1) if low_values_72h else pd.Series(np.nan, index=df.index)
+
+            # 計算72小時最大回報和回撤（向量化）
+            df['future72_max_return'] = np.where(
+                df['close'] > 0,
+                (future_max_high_72h / df['close'] - 1),
+                np.nan
+            )
+
+            df['future72_max_drawdown'] = np.where(
+                df['close'] > 0,
+                (future_min_low_72h / df['close'] - 1),
+                np.nan
+            )
+
+            # 標準6根K線窗口：向量化計算（保持向後兼容）
+            standard_lookahead = 6
+
+            high_values_std = []
+            low_values_std = []
+            for offset in range(1, standard_lookahead + 1):
+                high_values_std.append(df['high'].shift(-offset))
+                low_values_std.append(df['low'].shift(-offset))
+
+            future_max_high_std = pd.concat(high_values_std, axis=1).max(axis=1) if high_values_std else pd.Series(np.nan, index=df.index)
+            future_min_low_std = pd.concat(low_values_std, axis=1).min(axis=1) if low_values_std else pd.Series(np.nan, index=df.index)
+
+            df['future_max_return'] = np.where(
+                df['close'] > 0,
+                (future_max_high_std / df['close'] - 1),
+                np.nan
+            )
+
+            df['future_max_drawdown'] = np.where(
+                df['close'] > 0,
+                (future_min_low_std / df['close'] - 1),
+                np.nan
+            )
             
             # ===== 7. 數據質量報告 =====
             self.logger.info("=== 擴充參數計算完成統計 ===")
