@@ -280,20 +280,28 @@ class SearchTaskService:
                         
                         # === 修復2和3：應用時間分離和比例控制 ===
                         filtered_cases = await self._apply_time_separation_and_ratio(
-                            result_data.cases, 
+                            result_data.cases,
                             positive_cases,
-                            request.time_separation_days if hasattr(request, 'time_separation_days') else 7,
+                            request.time_separation_days if hasattr(request, 'time_separation_days') else 3,  # 從7改為3天
                             request.negative_ratio if hasattr(request, 'negative_ratio') else 2.0
                         )
                         
+                        # ✅ 保底邏輯：如果過濾後沒有反例，返回部分候選案例
+                        if not filtered_cases and result_data.cases:
+                            target_count = int(len(positive_cases) * (request.negative_ratio if hasattr(request, 'negative_ratio') else 2.0))
+                            self.logger.warning(
+                                f"時間分離後無反例，跳過時間分離，直接取前{target_count}個候選案例"
+                            )
+                            filtered_cases = result_data.cases[:target_count]
+
                         # ✅ 更新 result_data 的案例為過濾後的案例
                         result_data.cases = filtered_cases
-                        
+
                         # ✅ 更新 summary 中的案例數量
                         result_data.summary.total_cases = len(filtered_cases)
                         result_data.summary.negative_cases = len(filtered_cases)
                         result_data.summary.positive_cases = 0  # 反例搜索中沒有正例
-                        
+
                         self.logger.info(f"時間分離和比例控制後剩餘反例: {len(filtered_cases)}")
                         
                         # ✅ 返回完整的 SearchResultData，而不是只返回案例列表

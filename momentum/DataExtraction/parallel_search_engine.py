@@ -223,7 +223,7 @@ class ParallelSearchEngine:
     DEFAULT_WORKER_COUNT = None  # None = 自動偵測
     MIN_WORKERS = 1
     MAX_WORKERS = None  # None = CPU核心數
-    MEMORY_PER_WORKER_GB = 2.0  # 每個worker預估需要的內存
+    MEMORY_PER_WORKER_GB = 0.5  # 每個worker預估需要的內存（M1 Mac優化：從2.0改為0.5GB）
 
     def __init__(self,
                  case_search_engine,
