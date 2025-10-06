@@ -266,17 +266,34 @@ class SearchTaskService:
             self.logger.info("執行基於條件的反例搜索...")
             negative_task_id = await standalone_search_service.execute_search(negative_config, symbols)
             
-            # 等待搜索完成
-            max_wait_time = 60
+            # 等待搜索完成 - 基於任務狀態的智能等待
+            CHECK_INTERVAL = 2  # 每2秒檢查一次
+            IDLE_TIMEOUT = 300  # 異常狀態5分鐘超時
+
             start_time = datetime.now()
-            
-            while (datetime.now() - start_time).seconds < max_wait_time:
+            last_status = None
+
+            while True:
+                elapsed = (datetime.now() - start_time).total_seconds()  # ✅ 修復：使用total_seconds而非seconds
                 task_info = standalone_search_service.get_task_status(negative_task_id)
-                if task_info and task_info.status.value == "completed":
-                    # 獲取搜索結果
+
+                # 任務不存在
+                if not task_info:
+                    self.logger.error(f"任務不存在: {negative_task_id}")
+                    break
+
+                current_status = task_info.status.value
+
+                # 狀態變化時記錄
+                if current_status != last_status:
+                    self.logger.info(f"反例搜索任務狀態: {current_status} (已等待{elapsed:.0f}秒)")
+                    last_status = current_status
+
+                # ✅ 任務完成 - 處理結果
+                if current_status == "completed":
                     result_data = standalone_search_service.get_task_result(negative_task_id)
 
-                    # ✅ 添加詳細日誌追蹤結果傳遞
+                    # DEBUG日誌追蹤結果傳遞
                     self.logger.info(f"[DEBUG] 獲取任務結果: task_id={negative_task_id}")
                     self.logger.info(f"[DEBUG] result_data is None: {result_data is None}")
                     if result_data:
@@ -286,18 +303,24 @@ class SearchTaskService:
 
                     if result_data and result_data.cases:
                         self.logger.info(f"條件搜索完成，找到 {len(result_data.cases)} 個候選反例")
-                        
-                        # === 修復2和3：應用時間分離和比例控制 ===
+
+                        # ✅ 統一時間分離預設值為7天（與API Model一致）
+                        separation_days = getattr(request, 'time_separation_days', 7)
+                        negative_ratio = getattr(request, 'negative_ratio', 2.0)
+
+                        self.logger.info(f"時間分離配置: {separation_days}天, 反例比例: {negative_ratio}")
+
+                        # 應用時間分離和比例控制
                         filtered_cases = await self._apply_time_separation_and_ratio(
                             result_data.cases,
                             positive_cases,
-                            request.time_separation_days if hasattr(request, 'time_separation_days') else 3,  # 從7改為3天
-                            request.negative_ratio if hasattr(request, 'negative_ratio') else 2.0
+                            separation_days,
+                            negative_ratio
                         )
-                        
+
                         # ✅ 保底邏輯：如果過濾後沒有反例，返回部分候選案例
                         if not filtered_cases and result_data.cases:
-                            target_count = int(len(positive_cases) * (request.negative_ratio if hasattr(request, 'negative_ratio') else 2.0))
+                            target_count = int(len(positive_cases) * negative_ratio)
                             self.logger.warning(
                                 f"時間分離後無反例，跳過時間分離，直接取前{target_count}個候選案例"
                             )
@@ -312,16 +335,35 @@ class SearchTaskService:
                         result_data.summary.positive_cases = 0  # 反例搜索中沒有正例
 
                         self.logger.info(f"時間分離和比例控制後剩餘反例: {len(filtered_cases)}")
-                        
-                        # ✅ 返回完整的 SearchResultData，而不是只返回案例列表
+
+                        # ✅ 返回完整的 SearchResultData
                         return result_data
                     break
-                elif task_info and task_info.status.value in ["failed", "cancelled"]:
-                    self.logger.error("反例搜索失敗或被取消")
+
+                # ❌ 任務失敗或取消
+                elif current_status in ["failed", "cancelled"]:
+                    self.logger.error(f"反例搜索{current_status}")
                     break
-                
-                await asyncio.sleep(2)
-            
+
+                # ⏳ 任務正在執行 - 繼續等待（無時間限制）
+                elif current_status == "running":
+                    # 每60秒記錄一次進度
+                    if int(elapsed) % 60 == 0 and elapsed > 0:
+                        self.logger.info(f"反例搜索進行中... 已等待{elapsed:.0f}秒")
+                    await asyncio.sleep(CHECK_INTERVAL)
+                    continue
+
+                # ⚠️ 異常狀態(pending超時等) - 超時保護
+                if elapsed > IDLE_TIMEOUT:
+                    self.logger.error(
+                        f"任務異常超時: 狀態={current_status}, "
+                        f"等待{elapsed:.0f}秒, task_id={negative_task_id}"
+                    )
+                    break
+
+                await asyncio.sleep(CHECK_INTERVAL)
+
+            # 執行到這裡表示失敗
             self.logger.warning("反例搜索超時或失敗")
             return None
             
@@ -336,7 +378,10 @@ class SearchTaskService:
         """應用時間分離和比例控制"""
         try:
             from datetime import datetime, timedelta
-            
+
+            # ✅ 詳細日誌：時間分離配置
+            self.logger.info(f"開始時間分離過濾: 候選反例{len(candidate_cases)}個, 正例{len(positive_cases)}個, 分離{separation_days}天")
+
             # 獲取正例時間戳
             positive_times = []
             for case in positive_cases:
@@ -346,7 +391,7 @@ class SearchTaskService:
                     ts = case.__dict__['timestamp']
                 else:
                     continue
-                
+
                 if isinstance(ts, str):
                     if 'T' in ts:
                         positive_times.append(datetime.fromisoformat(ts.replace('Z', '')))
@@ -354,11 +399,12 @@ class SearchTaskService:
                         positive_times.append(datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'))
                 elif isinstance(ts, datetime):
                     positive_times.append(ts)
-            
+
             # 過濾掉與正例時間太接近的候選案例
             separation_delta = timedelta(days=separation_days)
             filtered_candidates = []
-            
+            too_close_count = 0  # ✅ 統計被過濾的數量
+
             for case in candidate_cases:
                 if hasattr(case, 'timestamp'):
                     ts = case.timestamp
@@ -366,7 +412,7 @@ class SearchTaskService:
                     ts = case.__dict__['timestamp']
                 else:
                     continue
-                
+
                 if isinstance(ts, str):
                     if 'T' in ts:
                         case_time = datetime.fromisoformat(ts.replace('Z', ''))
@@ -376,18 +422,23 @@ class SearchTaskService:
                     case_time = ts
                 else:
                     continue
-                
+
                 # 檢查與所有正例時間的距離
                 is_separated = True
                 for pos_time in positive_times:
                     if abs((case_time - pos_time)) < separation_delta:
                         is_separated = False
+                        too_close_count += 1  # ✅ 統計過於接近的案例
                         break
-                
+
                 if is_separated:
                     filtered_candidates.append(case)
-            
-            self.logger.info(f"時間分離後剩餘候選反例: {len(filtered_candidates)}")
+
+            # ✅ 詳細日誌：時間分離結果
+            self.logger.info(
+                f"時間分離結果: 保留{len(filtered_candidates)}個, "
+                f"過濾{too_close_count}個 (在{separation_days}天窗口內)"
+            )
             
             # 計算目標反例數量
             target_count = int(len(positive_cases) * ratio)
