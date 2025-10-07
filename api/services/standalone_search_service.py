@@ -203,7 +203,7 @@ class StandaloneSearchService:
             self.search_engine = CaseSearchEngine(
                 self.data_loader,
                 enable_parallel=True,
-                num_workers=7  # M1 Mac: 8核CPU - 1核給系統
+                num_workers=None  # 使用自動偵測（根據CPU核心數和可用內存）
             )
             
             self.momentum_available = True
@@ -256,7 +256,7 @@ class StandaloneSearchService:
                 self.search_engine = CaseSearchEngine(
                     self.data_loader,
                     enable_parallel=True,
-                    num_workers=7  # M1 Mac: 8核CPU - 1核給系統
+                    num_workers=None  # 使用自動偵測（根據CPU核心數和可用內存）
                 )
                 self.logger.info("✅ SearchEngine imported successfully")
                 
@@ -284,7 +284,7 @@ class StandaloneSearchService:
                 self.search_engine = CaseSearchEngine(
                     self.data_loader,
                     enable_parallel=True,
-                    num_workers=7  # M1 Mac: 8核CPU - 1核給系統
+                    num_workers=None  # 使用自動偵測（根據CPU核心數和可用內存）
                 )
                 
                 self.momentum_available = True
