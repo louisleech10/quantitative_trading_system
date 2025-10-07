@@ -147,9 +147,18 @@ class NegativeCaseRequest(BaseModel):
     """反例搜索請求模型"""
     search_config: SearchConfigRequest = Field(..., description="反例搜索配置")
     negative_ratio: float = Field(default=2.0, ge=1.0, le=5.0, description="反例與正例的比例")
-    time_separation_days: int = Field(default=7, ge=1, le=30, description="時間分離天數")
+    enable_time_separation: bool = Field(
+        default=True,
+        description="是否啟用時間分離（防止反例與正例時間過近，按Symbol獨立計算）"
+    )
+    time_separation_days: int = Field(
+        default=3,
+        ge=0,
+        le=30,
+        description="時間分離天數（0=關閉，按Symbol獨立過濾）"
+    )
     sampling_strategy: str = Field(default="time_separated", description="採樣策略")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -159,7 +168,8 @@ class NegativeCaseRequest(BaseModel):
                     "initial_conditions": []
                 },
                 "negative_ratio": 2.0,
-                "time_separation_days": 7,
+                "enable_time_separation": True,
+                "time_separation_days": 3,
                 "sampling_strategy": "time_separated"
             }
         }

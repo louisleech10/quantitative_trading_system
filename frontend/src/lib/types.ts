@@ -290,6 +290,7 @@ export const DESCRIPTIVE_PARAMETERS = [
 // 反例專用參數列表
 export const NEGATIVE_SAMPLING_PARAMETERS = [
   'positive_negative_ratio',
+  'enable_time_separation',
   'time_separation_days'
 ] as const;
 

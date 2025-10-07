@@ -97,7 +97,8 @@ export default function SearchPage() {
   const [negativeParams, setNegativeParams] = useState({
     enabled: true,
     ratio: 2.0,
-    timeSeparationDays: 7,
+    enableTimeSeparation: true,
+    timeSeparationDays: 3,
     priceChange: null as number | null,
     volumeMultiplier: null as number | null,
     closingStrength: null as number | null,
@@ -316,22 +317,24 @@ export default function SearchPage() {
           },
           // 參數2：negativeRatio (number)
           negativeParams.ratio,
-          // 參數3：timeSeparationDays (number)
+          // 參數3：enableTimeSeparation (boolean)
+          negativeParams.enableTimeSeparation,
+          // 參數4：timeSeparationDays (number)
           negativeParams.timeSeparationDays,
-          // 參數4：onProgress (function)
+          // 參數5：onProgress (function)
           (stage: string, taskId?: string) => {
             setCurrentStage(`${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
             console.log(`搜索階段: ${stage}${taskId ? `, 任務ID: ${taskId}` : ''}`);
           },
-          // 參數5：negativeRequest (SearchRequest) - 🔥 新的統一架構
+          // 參數6：negativeRequest (SearchRequest) - 🔥 新的統一架構
           negativeSearchRequest,
-          // 參數6：negativeOperators (object) - 🔥 新的統一架構  
+          // 參數7：negativeOperators (object) - 🔥 新的統一架構
           negativeOperators,
-          // 參數7：negativeRangeValues (object) - 🔥 新的統一架構
+          // 參數8：negativeRangeValues (object) - 🔥 新的統一架構
           negativeRangeValues,
-          // 參數8：operators (object) - 正例運算符
+          // 參數9：operators (object) - 正例運算符
           operators,
-          // 參數9：rangeValues (object) - 正例範圍值
+          // 參數10：rangeValues (object) - 正例範圍值
           rangeValues
         );
 
@@ -913,20 +916,46 @@ export default function SearchPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    時間分離天數
+                  <label className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      checked={negativeParams.enableTimeSeparation}
+                      onChange={(e) => setNegativeParams(prev => ({
+                        ...prev,
+                        enableTimeSeparation: e.target.checked
+                      }))}
+                      className="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-900">
+                      啟用時間分離
+                    </span>
                   </label>
-                  <input
-                    type="number"
-                    value={negativeParams.timeSeparationDays}
-                    onChange={(e) => setNegativeParams(prev => ({ 
-                      ...prev, 
-                      timeSeparationDays: parseInt(e.target.value) || 7 
-                    }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
-                    placeholder="7"
-                  />
-                  <p className="text-sm text-gray-600 mt-1">與正例時間的最小間隔</p>
+                  <p className="text-sm text-gray-600 mb-2">
+                    防止反例與正例在時間上過於接近（按Symbol獨立計算）
+                  </p>
+
+                  {negativeParams.enableTimeSeparation && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        時間分離天數
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={negativeParams.timeSeparationDays}
+                        onChange={(e) => setNegativeParams(prev => ({
+                          ...prev,
+                          timeSeparationDays: parseInt(e.target.value) || 3
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                        placeholder="3"
+                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        反例將排除在同symbol正例前後N天內的案例（預設3天，0=關閉）
+                      </p>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex items-center space-y-2">

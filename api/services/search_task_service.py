@@ -304,18 +304,20 @@ class SearchTaskService:
                     if result_data and result_data.cases:
                         self.logger.info(f"條件搜索完成，找到 {len(result_data.cases)} 個候選反例")
 
-                        # ✅ 統一時間分離預設值為7天（與API Model一致）
-                        separation_days = getattr(request, 'time_separation_days', 7)
+                        # ✅ 統一時間分離預設值為3天（與API Model一致）
+                        enable_separation = getattr(request, 'enable_time_separation', True)
+                        separation_days = getattr(request, 'time_separation_days', 3)
                         negative_ratio = getattr(request, 'negative_ratio', 2.0)
 
-                        self.logger.info(f"時間分離配置: {separation_days}天, 反例比例: {negative_ratio}")
+                        self.logger.info(f"時間分離配置: 啟用={enable_separation}, {separation_days}天, 反例比例: {negative_ratio}")
 
                         # 應用時間分離和比例控制
                         filtered_cases = await self._apply_time_separation_and_ratio(
                             result_data.cases,
                             positive_cases,
                             separation_days,
-                            negative_ratio
+                            negative_ratio,
+                            enable_separation
                         )
 
                         # ✅ 保底邏輯：如果過濾後沒有反例，返回部分候選案例
@@ -371,80 +373,142 @@ class SearchTaskService:
             self.logger.error(f"用戶條件搜索失敗: {str(e)}")
             return None
         
-    async def _apply_time_separation_and_ratio(self, candidate_cases: List[CaseData],
-                                         positive_cases: List[CaseData],
-                                         separation_days: int,
-                                         ratio: float) -> List[CaseData]:
-        """應用時間分離和比例控制"""
+    async def _apply_time_separation_and_ratio(
+        self,
+        candidate_cases: List[CaseData],
+        positive_cases: List[CaseData],
+        separation_days: int,
+        ratio: float,
+        enable_separation: bool = True
+    ) -> List[CaseData]:
+        """
+        應用時間分離和比例控制
+
+        新邏輯：按Symbol獨立過濾，避免跨Symbol過濾導致100%過濾率
+        """
         try:
             from datetime import datetime, timedelta
+            from collections import defaultdict
 
-            # ✅ 詳細日誌：時間分離配置
-            self.logger.info(f"開始時間分離過濾: 候選反例{len(candidate_cases)}個, 正例{len(positive_cases)}個, 分離{separation_days}天")
-
-            # 獲取正例時間戳
-            positive_times = []
-            for case in positive_cases:
-                if hasattr(case, 'timestamp'):
-                    ts = case.timestamp
-                elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
-                    ts = case.__dict__['timestamp']
-                else:
-                    continue
-
-                if isinstance(ts, str):
-                    if 'T' in ts:
-                        positive_times.append(datetime.fromisoformat(ts.replace('Z', '')))
-                    else:
-                        positive_times.append(datetime.strptime(ts, '%Y-%m-%d %H:%M:%S'))
-                elif isinstance(ts, datetime):
-                    positive_times.append(ts)
-
-            # 過濾掉與正例時間太接近的候選案例
-            separation_delta = timedelta(days=separation_days)
-            filtered_candidates = []
-            too_close_count = 0  # ✅ 統計被過濾的數量
-
-            for case in candidate_cases:
-                if hasattr(case, 'timestamp'):
-                    ts = case.timestamp
-                elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
-                    ts = case.__dict__['timestamp']
-                else:
-                    continue
-
-                if isinstance(ts, str):
-                    if 'T' in ts:
-                        case_time = datetime.fromisoformat(ts.replace('Z', ''))
-                    else:
-                        case_time = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
-                elif isinstance(ts, datetime):
-                    case_time = ts
-                else:
-                    continue
-
-                # 檢查與所有正例時間的距離
-                is_separated = True
-                for pos_time in positive_times:
-                    if abs((case_time - pos_time)) < separation_delta:
-                        is_separated = False
-                        too_close_count += 1  # ✅ 統計過於接近的案例
-                        break
-
-                if is_separated:
-                    filtered_candidates.append(case)
-
-            # ✅ 詳細日誌：時間分離結果
             self.logger.info(
-                f"時間分離結果: 保留{len(filtered_candidates)}個, "
-                f"過濾{too_close_count}個 (在{separation_days}天窗口內)"
+                f"開始時間分離過濾: 候選反例{len(candidate_cases)}個, "
+                f"正例{len(positive_cases)}個, 分離{separation_days}天, 啟用={enable_separation}"
             )
-            
-            # 計算目標反例數量
+
+            # Step 1: 如果時間分離被關閉，直接跳過過濾
+            if not enable_separation or separation_days == 0:
+                self.logger.info(f"時間分離已關閉，候選反例: {len(candidate_cases)}個")
+                filtered_candidates = candidate_cases
+            else:
+                # Step 2: 按Symbol分組正例的時間戳
+                positive_times_by_symbol = defaultdict(list)
+
+                for case in positive_cases:
+                    # 獲取symbol
+                    symbol = getattr(case, 'symbol', None)
+                    if not symbol:
+                        continue
+
+                    # 獲取timestamp
+                    if hasattr(case, 'timestamp'):
+                        ts = case.timestamp
+                    elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
+                        ts = case.__dict__['timestamp']
+                    else:
+                        continue
+
+                    # 轉換為datetime
+                    if isinstance(ts, str):
+                        if 'T' in ts:
+                            pos_time = datetime.fromisoformat(ts.replace('Z', ''))
+                        else:
+                            pos_time = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                    elif isinstance(ts, datetime):
+                        pos_time = ts
+                    else:
+                        continue
+
+                    positive_times_by_symbol[symbol].append(pos_time)
+
+                # Step 3: 按Symbol過濾候選案例
+                separation_delta = timedelta(days=separation_days)
+                filtered_candidates = []
+                symbol_stats = defaultdict(lambda: {
+                    'pos_count': 0,
+                    'candidates': 0,
+                    'kept': 0,
+                    'filtered': 0
+                })
+
+                for case in candidate_cases:
+                    # 獲取symbol
+                    symbol = getattr(case, 'symbol', None)
+                    if not symbol:
+                        continue
+
+                    symbol_stats[symbol]['candidates'] += 1
+
+                    # 獲取該Symbol的正例時間列表
+                    same_symbol_positives = positive_times_by_symbol.get(symbol, [])
+
+                    # 獲取候選案例的時間
+                    if hasattr(case, 'timestamp'):
+                        ts = case.timestamp
+                    elif hasattr(case, '__dict__') and 'timestamp' in case.__dict__:
+                        ts = case.__dict__['timestamp']
+                    else:
+                        continue
+
+                    if isinstance(ts, str):
+                        if 'T' in ts:
+                            case_time = datetime.fromisoformat(ts.replace('Z', ''))
+                        else:
+                            case_time = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                    elif isinstance(ts, datetime):
+                        case_time = ts
+                    else:
+                        continue
+
+                    # 僅檢查與同Symbol正例的時間距離
+                    is_separated = True
+                    for pos_time in same_symbol_positives:
+                        if abs((case_time - pos_time)) < separation_delta:
+                            is_separated = False
+                            symbol_stats[symbol]['filtered'] += 1
+                            break
+
+                    if is_separated:
+                        filtered_candidates.append(case)
+                        symbol_stats[symbol]['kept'] += 1
+
+                # 記錄每個Symbol的正例數量
+                for symbol, times in positive_times_by_symbol.items():
+                    symbol_stats[symbol]['pos_count'] = len(times)
+
+                # Step 4: 詳細日誌 - 按Symbol顯示統計（前10個Symbol）
+                self.logger.info(f"時間分離統計（按Symbol獨立計算）:")
+                sorted_symbols = sorted(symbol_stats.keys())[:10]  # 只顯示前10個
+                for symbol in sorted_symbols:
+                    stats = symbol_stats[symbol]
+                    self.logger.info(
+                        f"  {symbol}: 正例{stats['pos_count']}個, "
+                        f"候選{stats['candidates']}個 → "
+                        f"保留{stats['kept']}個, 過濾{stats['filtered']}個"
+                    )
+
+                if len(symbol_stats) > 10:
+                    self.logger.info(f"  ... 還有 {len(symbol_stats) - 10} 個Symbol未顯示")
+
+                total_filtered = sum(s['filtered'] for s in symbol_stats.values())
+                self.logger.info(
+                    f"總計: 保留{len(filtered_candidates)}個, "
+                    f"過濾{total_filtered}個 (在{separation_days}天窗口內)"
+                )
+
+            # Step 5: 應用比例控制
             target_count = int(len(positive_cases) * ratio)
             self.logger.info(f"目標反例數量: {target_count} (正例: {len(positive_cases)}, 比例: {ratio})")
-            
-            # 如果候選案例數量超過目標，隨機選擇
+
             if len(filtered_candidates) > target_count:
                 import random
                 selected_cases = random.sample(filtered_candidates, target_count)
@@ -453,8 +517,8 @@ class SearchTaskService:
                 selected_cases = filtered_candidates
                 if len(selected_cases) < target_count:
                     self.logger.warning(f"反例數量不足: 找到 {len(selected_cases)}, 目標 {target_count}")
-            
-            # 為反例添加標記
+
+            # Step 6: 為反例添加標記
             final_cases = []
             for case in selected_cases:
                 if hasattr(case, '__dict__'):
@@ -465,10 +529,10 @@ class SearchTaskService:
                     final_cases.append(case)
                 else:
                     final_cases.append(case)
-            
+
             self.logger.info(f"最終生成反例數量: {len(final_cases)}")
             return final_cases
-            
+
         except Exception as e:
             self.logger.error(f"時間分離和比例控制失敗: {str(e)}")
             return candidate_cases[:int(len(positive_cases) * ratio)]  # 降級處理
@@ -700,9 +764,18 @@ class NegativeCaseRequest(BaseModel):
     """反例搜索請求模型"""
     search_config: SearchConfigRequest = Field(..., description="反例搜索配置")
     negative_ratio: float = Field(default=2.0, ge=1.0, le=5.0, description="反例與正例的比例")
-    time_separation_days: int = Field(default=7, ge=1, le=30, description="時間分離天數")
+    enable_time_separation: bool = Field(
+        default=True,
+        description="是否啟用時間分離（防止反例與正例時間過近，按Symbol獨立計算）"
+    )
+    time_separation_days: int = Field(
+        default=3,
+        ge=0,
+        le=30,
+        description="時間分離天數（0=關閉，按Symbol獨立過濾）"
+    )
     sampling_strategy: str = Field(default="time_separated", description="採樣策略")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -712,7 +785,8 @@ class NegativeCaseRequest(BaseModel):
                     "initial_conditions": []
                 },
                 "negative_ratio": 2.0,
-                "time_separation_days": 7,
+                "enable_time_separation": True,
+                "time_separation_days": 3,
                 "sampling_strategy": "time_separated"
             }
         }

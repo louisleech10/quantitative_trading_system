@@ -30,6 +30,7 @@ interface FilterConditionRequest {
 interface NegativeCaseRequest {
   negative_conditions: any[];
   negative_ratio: number;
+  enable_time_separation: boolean;
   time_separation_days: number;
   sampling_strategy: string;
 }
@@ -261,20 +262,21 @@ class ApiClient {
 
   // 兩階段搜索 - 步驟2：執行反例搜索
   async executeNegativeSearch(
-    positiveTaskId: string, 
+    positiveTaskId: string,
     negativeRatio: number = 2.0,
-    timeSeparationDays: number = 7,
+    enableTimeSeparation: boolean = true,
+    timeSeparationDays: number = 3,
     negativeRequest: SimpleSearchRequest,     // 新增：改為接收 SimpleSearchRequest
     negativeOperators: any,             // 新增：反例運算符
     negativeRangeValues: any            // 新增：反例範圍值
   ): Promise<ApiResponse<TaskInfo>> {
-    
+
     console.log('執行反例搜索，正例任務ID:', positiveTaskId);
     //console.log('傳入的反例條件:', customConditions); // 新增日誌
-  
+
     const negativeConditions = this.convertToSearchConfig(
-      negativeRequest, 
-      negativeOperators, 
+      negativeRequest,
+      negativeOperators,
       negativeRangeValues
     ).initial_conditions;
 
@@ -283,6 +285,7 @@ class ApiClient {
     const negativeApiRequest: NegativeCaseRequest = {
       negative_conditions: negativeConditions,  // 使用轉換後的條件
       negative_ratio: negativeRatio,
+      enable_time_separation: enableTimeSeparation,
       time_separation_days: timeSeparationDays,
       sampling_strategy: "time_separated"
     };
@@ -413,7 +416,8 @@ class ApiClient {
   async executeTwoStageSearch(
     request: SimpleSearchRequest,
     negativeRatio: number = 2.0,
-    timeSeparationDays: number = 7,
+    enableTimeSeparation: boolean = true,
+    timeSeparationDays: number = 3,
     onProgress?: (stage: string, taskId?: string) => void,
     negativeRequest: SimpleSearchRequest,     // 新增：反例搜索請求
     negativeOperators: any,             // 新增：反例運算符
@@ -421,27 +425,28 @@ class ApiClient {
     operators: any,                     // 正例運算符
     rangeValues: any                    // 正例範圍值
   ): Promise<SearchResultData> {
-    
+
     try {
       // 階段1：執行正例搜索
       onProgress?.('正例搜索中...');
       const positiveResponse = await this.executePositiveSearch(request, operators, rangeValues);
-      
+
       if (!positiveResponse.success || !positiveResponse.data) {
         throw new Error('正例搜索啟動失敗');
       }
-      
+
       const positiveTaskId = positiveResponse.data.task_id;
       onProgress?.('正例搜索中...', positiveTaskId);
-      
+
       // 等待正例搜索完成
       await this.waitForTaskCompletion(positiveTaskId);
-      
+
       // 階段2：執行反例搜索
       onProgress?.('反例搜索中...');
       const negativeResponse = await this.executeNegativeSearch(
-        positiveTaskId, 
-        negativeRatio, 
+        positiveTaskId,
+        negativeRatio,
+        enableTimeSeparation,
         timeSeparationDays,
         negativeRequest,      // 傳遞反例搜索請求
         negativeOperators,    // 傳遞反例運算符
