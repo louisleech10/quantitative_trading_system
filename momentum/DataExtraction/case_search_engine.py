@@ -633,7 +633,46 @@ class CaseSearchEngine:
                 'prior_volatility': safe_get('prior_volatility'),
                 'prior_range': safe_get('prior_range'),
                 'prior_abs_change_sum': safe_get('prior_abs_change_sum'),
-                
+
+                # ===== 未來收益參數 (1-12根K線) =====
+                'future_1bar_return': safe_get('future_1bar_return'),
+                'future_2bar_return': safe_get('future_2bar_return'),
+                'future_3bar_return': safe_get('future_3bar_return'),
+                'future_4bar_return': safe_get('future_4bar_return'),
+                'future_5bar_return': safe_get('future_5bar_return'),
+                'future_6bar_return': safe_get('future_6bar_return'),
+                'future_7bar_return': safe_get('future_7bar_return'),
+                'future_8bar_return': safe_get('future_8bar_return'),
+                'future_9bar_return': safe_get('future_9bar_return'),
+                'future_10bar_return': safe_get('future_10bar_return'),
+                'future_11bar_return': safe_get('future_11bar_return'),
+                'future_12bar_return': safe_get('future_12bar_return'),
+
+                # ===== 未來回撤參數 (1-12根K線) =====
+                'future_1bar_max_drawdown': safe_get('future_1bar_max_drawdown'),
+                'future_2bar_max_drawdown': safe_get('future_2bar_max_drawdown'),
+                'future_3bar_max_drawdown': safe_get('future_3bar_max_drawdown'),
+                'future_4bar_max_drawdown': safe_get('future_4bar_max_drawdown'),
+                'future_5bar_max_drawdown': safe_get('future_5bar_max_drawdown'),
+                'future_6bar_max_drawdown': safe_get('future_6bar_max_drawdown'),
+                'future_7bar_max_drawdown': safe_get('future_7bar_max_drawdown'),
+                'future_8bar_max_drawdown': safe_get('future_8bar_max_drawdown'),
+                'future_9bar_max_drawdown': safe_get('future_9bar_max_drawdown'),
+                'future_10bar_max_drawdown': safe_get('future_10bar_max_drawdown'),
+                'future_11bar_max_drawdown': safe_get('future_11bar_max_drawdown'),
+                'future_12bar_max_drawdown': safe_get('future_12bar_max_drawdown'),
+
+                # ===== 時間描述參數 =====
+                'hour_of_day': safe_get('hour_of_day'),
+                'day_of_week': safe_get('day_of_week'),
+
+                # ===== 歷史穩定度參數 (5個) =====
+                'past_24hr_max_single_move': safe_get('past_24hr_max_single_move'),
+                'past_48hr_price_range': safe_get('past_48hr_price_range'),
+                'past_72hr_avg_bar_volatility': safe_get('past_72hr_avg_bar_volatility'),
+                'past_48hr_directional_movement': safe_get('past_48hr_directional_movement'),
+                'past_24hr_volume_stability': safe_get('past_24hr_volume_stability'),
+
                 # ===== 數據品質標記 =====
                 'data_quality': {
                     'has_complete_ohlcv': all(safe_get(field) is not None for field in required_fields),
