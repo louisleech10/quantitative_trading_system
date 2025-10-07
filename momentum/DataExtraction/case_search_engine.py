@@ -853,9 +853,13 @@ class CaseSearchEngine:
                     'future_9bar_max_drawdown', 'future_10bar_max_drawdown', 'future_11bar_max_drawdown', 'future_12bar_max_drawdown',
                     
                     # 新增的時間描述參數
-                    'hour_of_day', 'day_of_week'
+                    'hour_of_day', 'day_of_week',
+
+                    # 新增的歷史穩定度參數 (5個)
+                    'past_24hr_max_single_move', 'past_48hr_price_range', 'past_72hr_avg_bar_volatility',
+                    'past_48hr_directional_movement', 'past_24hr_volume_stability'
                 ]
-                
+
                 for col in indicator_columns:
                     if col in data.columns:
                         case[col] = float(data[col].iloc[idx])
@@ -885,7 +889,134 @@ class CaseSearchEngine:
         except Exception as e:
             self.logger.error(f"處理 {symbol} 時出錯: {str(e)}")
             return []
-    
+
+    def _calculate_past_stability_features(
+        self,
+        df: pd.DataFrame,
+        periods_24hr: int,
+        periods_48hr: int,
+        periods_72hr: int
+    ) -> pd.DataFrame:
+        """
+        一次性計算5個歷史穩定度特徵參數（向量化）
+
+        目的：檢查T時刻之前的歷史穩定度，確保：
+        - 反向案例：T之前一段時間真正平穩（無大幅波動、無趨勢）
+        - 正向案例：可選過濾掉趨勢末端的假突破
+
+        Args:
+            df: 包含OHLCV數據的DataFrame，必須包含 open, high, low, close, volume 列
+            periods_24hr: 24小時對應的bar數量（如12h timeframe = 2根bar）
+            periods_48hr: 48小時對應的bar數量（如12h timeframe = 4根bar）
+            periods_72hr: 72小時對應的bar數量（如12h timeframe = 6根bar）
+
+        Returns:
+            添加了5個新列的DataFrame:
+            - past_24hr_max_single_move: 過去24hr內單根bar最大絕對漲跌幅
+            - past_48hr_price_range: 過去48hr最高價與最低價差距百分比
+            - past_72hr_avg_bar_volatility: 過去72hr平均bar波動率
+            - past_48hr_directional_movement: 48hr方向性指標（0=震盪，1=單向趨勢）
+            - past_24hr_volume_stability: 24hr成交量變異係數
+
+        注意：
+            - 使用100%向量化操作，無Python循環
+            - 前N根bar會產生NaN（因為沒有足夠歷史數據），這是正常且預期的
+            - 所有除法操作都有除零保護（+ 1e-10）
+        """
+        try:
+            # 確保 bar_return 列存在（當前bar的漲跌幅）
+            # 定義：(close - open) / open （單位：小數，如0.05代表5%）
+            if 'bar_return' not in df.columns:
+                df['bar_return'] = np.where(
+                    df['open'] != 0,
+                    (df['close'] - df['open']) / df['open'],
+                    0.0
+                )
+                self.logger.debug("已計算 'bar_return' 列（當前bar漲跌幅）")
+
+            # ===== 參數1: past_24hr_max_single_move =====
+            # 過去24hr內，所有單根bar中絕對漲跌幅最大值
+            df['past_24hr_max_single_move'] = df['bar_return'].abs().rolling(
+                window=periods_24hr,
+                min_periods=max(1, periods_24hr // 2)  # 至少需要一半數據
+            ).max()
+
+            # ===== 參數2: past_48hr_price_range =====
+            # 過去48hr內的最高價與最低價差距，標準化為百分比（單位：%）
+            high_48hr = df['high'].rolling(
+                window=periods_48hr,
+                min_periods=max(1, periods_48hr // 2)
+            ).max()
+            low_48hr = df['low'].rolling(
+                window=periods_48hr,
+                min_periods=max(1, periods_48hr // 2)
+            ).min()
+            df['past_48hr_price_range'] = np.where(
+                df['close'] > 0,
+                (high_48hr - low_48hr) / df['close'] * 100,
+                np.nan
+            )
+
+            # ===== 參數3: past_72hr_avg_bar_volatility =====
+            # 過去72hr內，每根bar漲跌幅的絕對值平均
+            df['past_72hr_avg_bar_volatility'] = df['bar_return'].abs().rolling(
+                window=periods_72hr,
+                min_periods=max(1, periods_72hr // 2)
+            ).mean()
+
+            # ===== 參數4: past_48hr_directional_movement =====
+            # 區分「單向趨勢」vs「來回震盪」
+            # 公式：累積漲跌幅絕對值 / 各bar漲跌幅絕對值總和
+            # 數值含義：接近1.0=單向移動（趨勢），接近0.0=來回震盪（盤整）
+            sum_directional = df['bar_return'].rolling(
+                window=periods_48hr,
+                min_periods=max(1, periods_48hr // 2)
+            ).sum().abs()
+            sum_volatility = df['bar_return'].abs().rolling(
+                window=periods_48hr,
+                min_periods=max(1, periods_48hr // 2)
+            ).sum()
+            df['past_48hr_directional_movement'] = np.where(
+                sum_volatility > 0,
+                sum_directional / (sum_volatility + 1e-10),
+                np.nan
+            )
+
+            # ===== 參數5: past_24hr_volume_stability =====
+            # 過去24hr成交量的變異係數 (CV = std / mean)
+            # 數值含義：<0.5=穩定，>1.0=異常波動
+            volume_mean = df['volume'].rolling(
+                window=periods_24hr,
+                min_periods=max(1, periods_24hr // 2)
+            ).mean()
+            volume_std = df['volume'].rolling(
+                window=periods_24hr,
+                min_periods=max(1, periods_24hr // 2)
+            ).std()
+            df['past_24hr_volume_stability'] = np.where(
+                volume_mean > 0,
+                volume_std / (volume_mean + 1e-10),
+                np.nan
+            )
+
+            self.logger.info("5個歷史穩定度參數計算完成（向量化）")
+
+            return df
+
+        except Exception as e:
+            self.logger.error(f"計算歷史穩定度特徵時出錯: {str(e)}", exc_info=True)
+            # 發生錯誤時，添加空列避免後續處理失敗
+            for param in [
+                'past_24hr_max_single_move',
+                'past_48hr_price_range',
+                'past_72hr_avg_bar_volatility',
+                'past_48hr_directional_movement',
+                'past_24hr_volume_stability'
+            ]:
+                if param not in df.columns:
+                    df[param] = np.nan
+            return df
+
     def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
         """
         添加計算列，擴充版本支援完整的20個參數
@@ -1099,7 +1230,11 @@ class CaseSearchEngine:
                 (future_min_low_std / df['close'] - 1),
                 np.nan
             )
-            
+
+            # ===== 6. 歷史穩定度特徵參數 (5個) =====
+            self.logger.info("開始計算歷史穩定度特徵參數...")
+            df = self._calculate_past_stability_features(df, periods_24h, periods_48h, periods_72h)
+
             # ===== 7. 數據質量報告 =====
             self.logger.info("=== 擴充參數計算完成統計 ===")
             
@@ -1139,9 +1274,24 @@ class CaseSearchEngine:
                     valid_count = len(df) - nan_count
                     unique_count = df[param].nunique()
                     self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值, {unique_count} 唯一值")
-            
+
+            # 歷史穩定度參數
+            past_params = [
+                'past_24hr_max_single_move',
+                'past_48hr_price_range',
+                'past_72hr_avg_bar_volatility',
+                'past_48hr_directional_movement',
+                'past_24hr_volume_stability'
+            ]
+            self.logger.info("歷史穩定度參數:")
+            for param in past_params:
+                if param in df.columns:
+                    nan_count = df[param].isna().sum()
+                    valid_count = len(df) - nan_count
+                    self.logger.info(f"  - {param}: {valid_count}/{len(df)} 有效值 ({nan_count} NaN)")
+
             # 總參數統計
-            total_new_params = len(basic_params) + 12 + 12 + len(time_params)
+            total_new_params = len(basic_params) + 12 + 12 + len(time_params) + len(past_params)
             self.logger.info(f"=== 總計新增/更新了 {total_new_params} 個參數欄位 ===")
             
             return df

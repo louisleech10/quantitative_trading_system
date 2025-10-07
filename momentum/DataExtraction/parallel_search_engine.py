@@ -223,7 +223,7 @@ class ParallelSearchEngine:
     DEFAULT_WORKER_COUNT = None  # None = 自動偵測
     MIN_WORKERS = 1
     MAX_WORKERS = None  # None = CPU核心數
-    MEMORY_PER_WORKER_GB = 0.5  # 每個worker預估需要的內存（M1 Mac優化：從2.0改為0.5GB）
+    MEMORY_PER_WORKER_GB = 0.2  # 每個worker預估需要的內存（Phase 0+1+2優化後：從0.5改為0.2GB）
 
     def __init__(self,
                  case_search_engine,
@@ -304,6 +304,54 @@ class ParallelSearchEngine:
         except Exception as e:
             logger.warning(f"無法自動偵測worker數，使用默認值2: {e}")
             return 2
+
+    async def _serial_search_fallback(
+        self,
+        config,  # SearchConfiguration
+        symbols: List[str],
+        save_results: bool = False
+    ) -> List[Dict]:
+        """
+        串行處理 fallback 邏輯（避免遞歸調用）
+
+        當以下情況時使用：
+        1. enable_parallel=False
+        2. symbols 數量 < workers 數量
+
+        直接調用 engine._search_batch() 進行逐個symbol處理，
+        避免重新進入 search_cases() 的並行判斷邏輯。
+
+        Args:
+            config: 搜索配置
+            symbols: symbol列表
+            save_results: 是否保存結果
+
+        Returns:
+            搜索結果列表
+        """
+        logger.info(f"執行串行 fallback 處理: {len(symbols)} 個 symbols")
+        all_results = []
+
+        for i, symbol in enumerate(symbols, 1):
+            try:
+                logger.debug(f"處理 symbol {i}/{len(symbols)}: {symbol}")
+                batch_results = await self.engine._search_batch(config, [symbol])
+                if batch_results:
+                    all_results.extend(batch_results)
+                    logger.debug(f"{symbol}: 找到 {len(batch_results)} 個案例")
+            except Exception as e:
+                logger.error(f"Symbol {symbol} 處理失敗: {e}", exc_info=True)
+
+        # 保存結果（如果需要）
+        if save_results and all_results:
+            try:
+                self.engine.matched_cases = all_results
+                self.engine._save_results(config)
+            except Exception as save_error:
+                logger.error(f"保存結果失敗: {save_error}", exc_info=True)
+
+        logger.info(f"串行 fallback 完成: {len(all_results)} 個案例")
+        return all_results
 
     def _chunk_symbols(self, symbols: List[str], num_chunks: int) -> List[List[str]]:
         """
@@ -463,26 +511,18 @@ class ParallelSearchEngine:
             - 單個symbol失敗不會影響整體處理
         """
         try:
-            # 如果禁用並行，退回原引擎
+            # 如果禁用並行，使用串行 fallback（避免遞歸）
             if not self.enable_parallel:
-                logger.info("並行處理已禁用，使用串行模式")
-                return await self.engine.search_cases(
-                    config=config,
-                    symbols=symbols,
-                    save_results=save_results
-                )
+                logger.info("並行處理已禁用，使用串行模式（直接處理）")
+                return await self._serial_search_fallback(config, symbols, save_results)
 
-            # 如果symbol數量太少，不值得並行
+            # 如果symbol數量太少，使用串行 fallback（避免遞歸）
             if len(symbols) < self.num_workers:
                 logger.info(
                     f"Symbol數量({len(symbols)})小於worker數({self.num_workers})，"
-                    f"使用串行模式"
+                    f"使用串行模式（直接處理，避免遞歸）"
                 )
-                return await self.engine.search_cases(
-                    config=config,
-                    symbols=symbols,
-                    save_results=save_results
-                )
+                return await self._serial_search_fallback(config, symbols, save_results)
 
             logger.info(
                 f"開始並行搜索: {len(symbols)}個symbols, "

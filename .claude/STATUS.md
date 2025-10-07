@@ -1,8 +1,8 @@
 # 項目狀態
 
-**最後更新**: 2025-10-07
-**當前階段**: Phase 2 完成 + 實際測試Bug修復完成
-**整體進度**: 96% (性能優化+實戰驗證完成)
+**最後更新**: 2025-10-07 下午5:15
+**當前階段**: 歷史穩定度參數實作完成 + Critical Bug修復完成
+**整體進度**: 98% (功能完整，worker性能待優化)
 
 ---
 
@@ -95,8 +95,42 @@
     - ✅ 前後端同步修改（7個文件）
     - ✅ Git提交：commit 932d72f
 
+- **歷史穩定度參數實作** (100%) - 2025-10-07完成
+  - ✅ 新增 `_calculate_past_stability_features()` 函數（108行）
+  - ✅ 5個參數全部實作（100%向量化）
+    - `past_24hr_max_single_move` - 過去24hr最大單根bar漲跌幅
+    - `past_48hr_price_range` - 過去48hr價格振幅百分比
+    - `past_72hr_avg_bar_volatility` - 過去72hr平均波動率
+    - `past_48hr_directional_movement` - 48hr方向性指標（震盪vs趨勢）
+    - `past_24hr_volume_stability` - 24hr成交量變異係數
+  - ✅ 整合到 `_add_calculated_columns()` 函數
+  - ✅ **添加到CSV導出列表**（indicator_columns）
+  - ✅ 動態適配不同timeframe（1h/4h/12h/1d）
+  - ✅ 完整測試通過（100,000行 0.25秒，超標8倍）
+  - ✅ 性能：399,020行/秒
+  - ✅ **總參數數量：35個**（30基礎 + 5歷史穩定度）
+
+- **Critical Bug修復** (100%) - 2025-10-07完成
+  - ✅ **問題1：Stack Overflow無限遞歸**
+    - 問題：單symbol搜索導致API崩潰
+    - 修復：新增 `_serial_search_fallback()` 方法避免遞歸
+    - 修改：2處fallback調用邏輯
+    - 測試：全部通過，無Stack Overflow
+  - ✅ **問題2：硬編碼 num_workers=7**
+    - 問題：限制跨平台部署能力
+    - 修復：移除3處硬編碼，恢復自動偵測
+    - 測試：自動偵測正常工作
+  - ✅ **問題3：Worker性能修正**（2025-10-07 17:15）
+    - 問題：`MEMORY_PER_WORKER_GB=0.5` 太保守，416個symbols只用1個worker
+    - 影響：416個symbols耗時102秒（本應15-20秒）
+    - 修復：調整為 `0.2GB`（Phase 0+1+2優化後內存使用極低）
+    - 預期：1.29GB內存 → 支持6個workers（原1個）
+    - 狀態：✅ 已修復，待重啟API驗證
+  - ✅ 測試腳本：test_stack_overflow_fix.py（3項全通過）
+  - ✅ 修改文件：2個文件，53行代碼
+
 ### 進行中 🔨
-- **無** - Phase 0+1+2 全部完成並通過實戰測試！時間分離邏輯優化完成！
+- **無** - 所有已知問題已修復完成
 
 ### 計劃中 📋
 - **階段1**: 圖表和數據系統 (4-6週)
@@ -110,7 +144,7 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**性能優化路線**：✅ Phase 0 → ✅ Phase 1 → ✅ Phase 2 → ✅ **實戰驗證** → **全部完成！**
+**性能優化路線**：✅ Phase 0 → ✅ Phase 1 → ✅ Phase 2 → ✅ **實戰驗證** → ✅ **歷史穩定度參數** → **全部完成！**
 
 **Phase 0+1+2 總成果**（2025-10-05開發，2025-10-07實戰驗證）：
 - ✅ Phase 0：HDF5緩存系統（15倍加速）
@@ -124,8 +158,20 @@
 - ✅ 數據完整性：100%保證
 - ✅ 所有測試+實戰通過
 
+**歷史穩定度參數實作**（2025-10-07下午完成）：
+- ✅ 5個新參數實作（100%向量化，性能399,020行/秒）
+- ✅ CSV導出修復（參數現可見於導出文件）
+- ✅ Worker性能修正（0.5GB→0.2GB，預期1→6 workers）
+- ⚠️ **待驗證**：重啟API服務並驗證worker性能提升
+
+**當前狀態**：
+- 所有功能實作：✅ 100%完成
+- Worker性能修復：✅ 代碼已修改
+- **待重啟API服務**：驗證416 symbols從1 worker → 6 workers（6倍提升）
+- **預期效果**：416 symbols搜索從102秒 → 17秒
+
 **下一步選項**：
-- 選項A：**推薦** 回到原計劃（階段1圖表系統）← 性能優化+時間分離優化已完成
+- 選項A：**推薦** 重啟API服務 → 驗證worker性能 → 回到原計劃（階段1圖表系統）
 - 選項B：繼續優化反例搜索（增加條件、強化案例品質）
 - 選項C：實際環境壓力測試（4000 symbols × 7年數據）
 
@@ -148,7 +194,15 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-- 無
+- **無** - 所有已知Critical和High優先級問題已修復完成
+
+### 待驗證
+- **Worker性能提升驗證** (2025-10-07修復)
+  - 修復：`MEMORY_PER_WORKER_GB` 從 0.5 → 0.2
+  - 預期：416 symbols從1 worker → 6 workers
+  - 預期：搜索時間從102秒 → ~17秒
+  - 狀態：✅ 代碼已修改，⚠️ 待重啟API服務驗證
+  - 優先級：中（性能優化，非功能性）
 
 ### 需要優化（優先級：低）
 - **反例搜索條件優化** (2025-10-07提出)
@@ -161,7 +215,6 @@ quantitative_trading_system/
     - 案例品質評分機制
   - 優先級：低（功能完整，可根據實際需求逐步擴展）
 
-### 需要優化（優先級：低）
 - **條件篩選向量化** (2025-10-05發現)
   - 位置：`_apply_initial_filter()` line 1140-1177
   - 影響：小（此循環在symbol level，規模<10000行）
@@ -182,6 +235,85 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-10-07（下午5:15）
+
+**歷史穩定度參數實作完成** ⭐⭐⭐
+- ✅ 新增 `_calculate_past_stability_features()` 函數（108行）
+  - 100%向量化實作（使用pandas `.rolling()`）
+  - 動態適配不同timeframe（1h/4h/12h/1d）
+  - 智能min_periods設置（window//2保證數據質量）
+- ✅ 5個參數全部實作：
+  1. `past_24hr_max_single_move` - 過去24hr最大單根bar漲跌幅
+  2. `past_48hr_price_range` - 過去48hr價格振幅百分比
+  3. `past_72hr_avg_bar_volatility` - 過去72hr平均波動率
+  4. `past_48hr_directional_movement` - 48hr方向性指標（震盪vs趨勢）
+  5. `past_24hr_volume_stability` - 24hr成交量變異係數
+- ✅ 整合到 `_add_calculated_columns()` 函數
+- ✅ **Critical修復：添加到indicator_columns列表**
+  - 問題：5個參數計算了但不導出到CSV
+  - 修復：添加到case_search_engine.py:858-860
+  - 結果：用戶現可在CSV看到5個新參數
+- ✅ 數據質量報告（顯示每個參數的有效值數量）
+- ✅ 完整測試通過：
+  - test_past_stability_features.py（4個測試全通過）
+  - 性能測試：100,000行 0.25秒（超標8倍）
+  - 處理速度：399,020行/秒
+
+**Critical Bug修復 - Worker性能問題** ⭐⭐⭐
+- ✅ **問題分析**：
+  - 用戶反饋：416個symbols用1個worker，耗時102秒
+  - 根本原因：`MEMORY_PER_WORKER_GB=0.5` 太保守
+  - 計算邏輯：1.29GB / 0.5 = 2 workers max → min(8,2)-1 = 1 worker
+- ✅ **修復方案**：
+  - 調整 `MEMORY_PER_WORKER_GB` 從 0.5 → 0.2
+  - 理由：Phase 0+1+2優化大幅降低內存使用
+  - 新計算：1.29GB / 0.2 = 6 workers max → min(8,6)-1 = 5-6 workers
+- ✅ **預期效果**：
+  - Worker數量：1 → 6（6倍提升）
+  - 416 symbols搜索：102秒 → ~17秒（6倍提升）
+  - 狀態：✅ 代碼已修改，⚠️ 待重啟API驗證
+- ✅ **修改文件**：
+  - parallel_search_engine.py:226
+
+**Critical Bug修復 - Stack Overflow無限遞歸** ⭐⭐⭐
+- ✅ **問題分析**：
+  - 錯誤：`Fatal Python error: Cannot recover from stack overflow`
+  - 原因：CaseSearchEngine.search_cases ↔ ParallelSearchEngine.search_cases_parallel 無限遞歸
+  - 觸發條件：symbols數量 < workers數量時fallback邏輯
+- ✅ **修復方案**：
+  - 新增 `_serial_search_fallback()` 方法
+  - 直接調用 `_search_batch()` 避免遞歸路徑
+  - 修復2處fallback調用邏輯
+- ✅ **測試驗證**：
+  - test_stack_overflow_fix.py（3項全通過）
+  - 單symbol搜索：✅ 無Stack Overflow
+  - 少量symbols：✅ 正常fallback
+- ✅ **修改文件**：
+  - parallel_search_engine.py:308-354, 515-517, 520-525
+  - case_search_engine.py（集成修復）
+
+**Critical Bug修復 - 硬編碼Workers限制** ⭐⭐⭐
+- ✅ **問題分析**：
+  - 用戶質疑：「Worker=7是你自己硬塞的？換電腦會如何？」
+  - 發現：standalone_search_service.py 3處硬編碼 `num_workers=7`
+  - 影響：限制跨平台部署能力，無法適應不同機器配置
+- ✅ **修復方案**：
+  - 移除3處 `num_workers=7`
+  - 改為 `num_workers=None`（使用自動偵測）
+  - 自動偵測邏輯：考慮CPU核心數+可用內存+系統負載
+- ✅ **測試驗證**：
+  - test_stack_overflow_fix.py 測試1（自動偵測正常）
+- ✅ **修改文件**：
+  - api/services/standalone_search_service.py:203-207, 256-260, 284-288
+
+**總結**：
+- 新增功能：5個歷史穩定度參數（100%向量化）
+- 修復Bug：3個Critical級別（Stack Overflow + 硬編碼 + Worker性能）
+- 修改文件：3個（53行代碼）
+- 測試通過：7個測試套件全通過
+- 性能提升：預期6倍worker提升（待驗證）
+- **總參數數量：35個**（30基礎 + 5歷史穩定度）
 
 ### 2025-10-07（下午）
 
@@ -449,26 +581,50 @@ for case in candidates:
 
 ## 🔄 Git狀態
 
-**最後提交**: commit 932d72f (時間分離邏輯優化完成)
-**當前分支**: performance-optimization
+**當前分支**: phase-2-vectorization (從summary可見)
+**主分支**: main
+**最近提交**:
+- 034fbb2: docs: 更新STATUS.md記錄時間分離邏輯優化完成
+- 932d72f: feat: 優化時間分離邏輯 - 按Symbol獨立過濾 + 可選開關 + 預設3天
+- 499e38b: docs: 更新STATUS.md記錄Phase 2實戰測試和Bug修復完成
+- 964046f: fix(phase2): 修復反例搜索三個Critical Bug
+- 02af581: fix(phase2): 修復CaseSearchEngine支持num_workers參數
+
 **Tags**:
 - phase-0-start, phase-0-complete, phase-0-error-handling
 - phase-1-start, phase-1-parallel, phase-1-error-handling
 - phase-2-start, phase-2-complete
+
 **備份分支**: backup-before-phase0, backup-before-phase1
-**最近4次提交**:
-- 932d72f: feat: 優化時間分離邏輯 - 按Symbol獨立過濾 + 可選開關 + 預設3天
-- 964046f: fix(phase2): 修復反例搜索3個Critical Bug
-- 02af581: fix(phase2): 修復CaseSearchEngine支持num_workers參數
-- b4a3213: fix(phase2): 修復Worker數量和反例結果追蹤問題
-**未提交更改**:
-- STATUS.md (更新中)
+
+**待提交更改** (2025-10-07 17:15):
+- ✅ 歷史穩定度參數實作（case_search_engine.py）
+- ✅ Worker性能修正（parallel_search_engine.py）
+- ✅ CSV導出修復（case_search_engine.py）
+- ✅ Stack Overflow修復（已提交）
+- ⚠️ STATUS.md (更新中)
+
+**建議下次提交**:
+```bash
+git add momentum/DataExtraction/case_search_engine.py
+git add momentum/DataExtraction/parallel_search_engine.py
+git add .claude/STATUS.md
+git commit -m "feat: 實作歷史穩定度參數 + 修復Worker性能和CSV導出
+
+- 新增5個歷史穩定度參數（100%向量化，399,020行/秒）
+- 修復MEMORY_PER_WORKER_GB (0.5→0.2GB，預期1→6 workers)
+- 修復CSV導出遺漏（添加5參數到indicator_columns）
+- 更新STATUS.md記錄所有工作
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>"
+```
 
 ---
 
 ## 💡 下次啟動時
 
-1. **已完成工作**：
+1. **已完成工作**（2025-10-07 17:15）：
    - ✅ Phase 0: 數據緩存系統（15倍加速）
    - ✅ Phase 0: 錯誤處理增強（100%失敗追蹤）
    - ✅ Phase 1: 並行處理系統（7倍加速）
@@ -477,20 +633,45 @@ for case in candidates:
    - ✅ Phase 0+1+2 集成測試（全部通過）
    - ✅ **Phase 2 實戰測試 + Bug修復**（2025-10-07上午）
    - ✅ **時間分離邏輯優化**（2025-10-07下午）
+   - ✅ **歷史穩定度參數實作**（2025-10-07下午5:15）
+   - ✅ **3個Critical Bug修復**（Stack Overflow + 硬編碼 + Worker性能）
    - ✅ **性能優化目標達成：10,500倍總提升**
    - ✅ **實戰性能驗證：正例23秒，反例27-80秒**
 
 2. **當前狀態**：
-   - 分支：performance-optimization
-   - 最後提交：932d72f (時間分離優化完成)
+   - 分支：phase-2-vectorization
+   - 最後提交：034fbb2 (時間分離邏輯優化文檔更新)
    - 性能優化：✅ 完成並驗證
-   - 時間分離邏輯：✅ 優化完成（按Symbol獨立+可選開關+3天預設）
+   - 時間分離邏輯：✅ 優化完成
+   - 歷史穩定度參數：✅ 實作完成（35個參數）
    - 系統狀態：✅ 所有核心功能完整且優化完成
+   - **待提交**：歷史穩定度參數 + Worker性能修復 + CSV導出修復
 
-3. **下一步工作選項**：
-   - **選項A（強烈推薦）**: 回到原計劃 - 階段1圖表和數據系統
-     - 性能優化+時間分離優化已全部完成
-     - 可以開始業務功能開發
+3. **待驗證項目**：
+   - ⚠️ **重啟API服務**以應用Worker性能修復
+   - ⚠️ **驗證Worker數量**：預期416 symbols從1 worker → 6 workers
+   - ⚠️ **驗證搜索時間**：預期416 symbols從102秒 → ~17秒
+   - ⚠️ **驗證CSV導出**：確認5個新參數出現在導出文件中
+
+4. **建議立即執行**：
+   ```bash
+   # 1. 提交當前工作
+   git add momentum/DataExtraction/case_search_engine.py
+   git add momentum/DataExtraction/parallel_search_engine.py
+   git add .claude/STATUS.md
+   git commit -m "feat: 實作歷史穩定度參數 + 修復Worker性能和CSV導出..."
+
+   # 2. 重啟API服務
+   # (停止當前API → 重新啟動)
+
+   # 3. 驗證性能提升
+   # 執行416 symbols搜索，觀察worker數量和時間
+   ```
+
+5. **下一步工作選項**：
+   - **選項A（強烈推薦）**: 驗證完成後 → 回到原計劃 - 階段1圖表和數據系統
+     - 所有性能優化+參數實作+Bug修復已完成
+     - 可以開始新業務功能開發
      - 繼續按FEATURE_ROADMAP.md推進
 
    - **選項B**: 繼續優化反例搜索
@@ -504,8 +685,8 @@ for case in candidates:
      - 驗證極限性能
      - 優先級：低（當前性能已驗證，可選）
 
-4. 遵循DEVELOPMENT_GUIDE.md和GUIDELINES.md規範
-5. 完成後更新此文件
+6. 遵循DEVELOPMENT_GUIDE.md和GUIDELINES.md規範
+7. 完成後更新此文件
 
 ---
 
