@@ -444,6 +444,9 @@ class CaseSearchEngine:
     async def _search_single_symbol(self, symbol: str, config: SearchConfiguration) -> List[Dict]:
         """搜索單個交易對，增強錯誤處理"""
         try:
+            # DEBUG: 確認此函數被調用
+            self.logger.warning(f"🔍 DEBUG: _search_single_symbol 被調用 - symbol={symbol}, timeframe={config.timeframe}")
+
             # 獲取歷史數據
             self.logger.info(f"Loading data for {symbol}")
             
@@ -514,6 +517,15 @@ class CaseSearchEngine:
     def _create_case_result(self, data: pd.DataFrame, idx: int, symbol: str, config: SearchConfiguration) -> Dict:
         """創建案例結果，改進的數據處理邏輯"""
         try:
+            # DEBUG: 確認此函數被調用並檢查參數是否在columns中
+            past_params = ['past_24hr_max_single_move', 'past_48hr_price_range', 'past_72hr_avg_bar_volatility',
+                          'past_48hr_directional_movement', 'past_24hr_volume_stability']
+            missing_params = [p for p in past_params if p not in data.columns]
+            if missing_params:
+                self.logger.error(f"🔍 DEBUG: _create_case_result - 缺少參數: {missing_params}")
+            else:
+                self.logger.warning(f"🔍 DEBUG: _create_case_result - 所有歷史穩定度參數都在columns中")
+
             # 確保索引有效
             if idx < 0 or idx >= len(data):
                 self.logger.error(f"Invalid index {idx} for data length {len(data)}")
@@ -1062,12 +1074,15 @@ class CaseSearchEngine:
     def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
         """
         添加計算列，擴充版本支援完整的20個參數
-        
-        包含：
+
+        包含:
         1. 基礎觸發條件參數 (6個)
         2. 未來表現驗證參數 (12個) 
         3. 時間和市場描述參數
         """
+        # DEBUG: 確認此函數被調用
+        self.logger.warning(f"🔍 DEBUG: _add_calculated_columns 被調用 - timeframe={timeframe}, rows={len(data)}")
+
         try:
             self.logger.info("開始添加擴充計算列...")
             df = data.copy()
