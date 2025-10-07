@@ -66,7 +66,14 @@ export interface CaseData {
   // ===== 新增：時間相關描述參數 =====
   hour_of_day?: number;           // 觸發時的小時 (0-23)
   day_of_week?: number;           // 觸發時的星期 (1-7)
-  
+
+  // ===== 新增：歷史穩定度參數 (5個) =====
+  past_24hr_max_single_move?: number;      // 過去24hr最大單根bar漲跌幅
+  past_48hr_price_range?: number;          // 過去48hr價格振幅百分比
+  past_72hr_avg_bar_volatility?: number;   // 過去72hr平均波動率
+  past_48hr_directional_movement?: number; // 48hr方向性指標
+  past_24hr_volume_stability?: number;     // 24hr成交量變異係數
+
   // ===== 新增：標準化時間回報 (向後兼容) =====
   future24_close_return?: number;
   future48_close_return?: number;

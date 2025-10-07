@@ -348,6 +348,9 @@ export default function ResultsPage() {
       'Future 9Bar Drawdown (%)', 'Future 10Bar Drawdown (%)', 'Future 11Bar Drawdown (%)', 'Future 12Bar Drawdown (%)',
       // 時間描述參數
       'Hour Of Day', 'Day Of Week',
+      // 歷史穩定度參數 (5個)
+      'Past 24hr Max Single Move', 'Past 48hr Price Range', 'Past 72hr Avg Bar Volatility',
+      'Past 48hr Directional Movement', 'Past 24hr Volume Stability',
       // 向後兼容參數
       'Future 24h Return (%)', 'Future 48h Return (%)', 'Future 72h Max Return (%)', 
       'Future 72h Max Drawdown (%)', 'Future 24h Close', 'Future 24h Low'
@@ -400,6 +403,12 @@ export default function ResultsPage() {
         // 時間描述參數
         formatInteger(case_.hour_of_day),
         formatInteger(case_.day_of_week),
+        // 歷史穩定度參數
+        formatNumber(case_.past_24hr_max_single_move),
+        formatNumber(case_.past_48hr_price_range),
+        formatNumber(case_.past_72hr_avg_bar_volatility),
+        formatNumber(case_.past_48hr_directional_movement),
+        formatNumber(case_.past_24hr_volume_stability),
         // 向後兼容參數
         formatPercentage(case_.future24_close_return),
         formatPercentage(case_.future48_close_return),
