@@ -107,7 +107,14 @@ class CaseData(BaseModel):
     # ===== 新增：時間描述參數 =====
     hour_of_day: Optional[int] = Field(None, description="觸發時的小時 (0-23)")
     day_of_week: Optional[int] = Field(None, description="觸發時的星期 (1-7)")
-    
+
+    # ===== 新增：歷史穩定度特徵參數 (5個) =====
+    past_24hr_max_single_move: Optional[float] = Field(None, description="過去24hr內單根bar最大絕對漲跌幅")
+    past_48hr_price_range: Optional[float] = Field(None, description="過去48hr最高價與最低價差距百分比")
+    past_72hr_avg_bar_volatility: Optional[float] = Field(None, description="過去72hr平均bar波動率")
+    past_48hr_directional_movement: Optional[float] = Field(None, description="48hr方向性指標（0=震盪，1=單向趨勢）")
+    past_24hr_volume_stability: Optional[float] = Field(None, description="24hr成交量變異係數")
+
     # ===== 向後兼容的現有參數 (保持不變) =====
     future1_close_return: Optional[float] = Field(None, description="未來1根K線收盤價收益率")
     future2_close_return: Optional[float] = Field(None, description="未來2根K線收盤價收益率")
