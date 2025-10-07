@@ -57,7 +57,14 @@ class EnhancedCaseData(BaseModel):
     hour_of_day: Optional[int] = None
     day_of_week: Optional[int] = None
     market_phase: Optional[str] = None
-    
+
+    # ===== 歷史穩定度特徵參數 (5個) =====
+    past_24hr_max_single_move: Optional[float] = None
+    past_48hr_price_range: Optional[float] = None
+    past_72hr_avg_bar_volatility: Optional[float] = None
+    past_48hr_directional_movement: Optional[float] = None
+    past_24hr_volume_stability: Optional[float] = None
+
     # ===== 反例專用參數 (2個) =====
     positive_negative_ratio: Optional[str] = None
     time_separation_days: Optional[int] = None

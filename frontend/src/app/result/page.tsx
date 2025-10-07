@@ -75,7 +75,14 @@ interface CaseData {
   // ===== 新增：時間描述參數 =====
   hour_of_day?: number;
   day_of_week?: number;
-  
+
+  // ===== 新增：歷史穩定度參數 (5個) =====
+  past_24hr_max_single_move?: number;
+  past_48hr_price_range?: number;
+  past_72hr_avg_bar_volatility?: number;
+  past_48hr_directional_movement?: number;
+  past_24hr_volume_stability?: number;
+
   // 時間範圍
   time_range: {
     start: string;
