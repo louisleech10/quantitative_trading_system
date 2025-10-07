@@ -544,6 +544,11 @@ class CaseSearchEngine:
                             return float(value[:-1]) / 100
                         return float(value) if not pd.isna(value) else default_value
                     else:
+                        # DEBUG: 記錄歷史穩定度參數的NaN情況
+                        if 'past_' in column and column in data.columns:
+                            actual_value = data[column].iloc[idx]
+                            self.logger.error(f"🔍 DEBUG: {column} 值是NaN - actual_value={actual_value}, type={type(actual_value)}")
+
                         if require_valid and default_value is None:
                             # 如果要求有效數據但沒有，記錄警告並返回 None
                             self.logger.warning(f"Missing required data: {column} for {symbol} at {timestamp}")
@@ -679,11 +684,11 @@ class CaseSearchEngine:
                 'day_of_week': safe_get('day_of_week'),
 
                 # ===== 歷史穩定度參數 (5個) =====
-                'past_24hr_max_single_move': safe_get('past_24hr_max_single_move'),
-                'past_48hr_price_range': safe_get('past_48hr_price_range'),
-                'past_72hr_avg_bar_volatility': safe_get('past_72hr_avg_bar_volatility'),
-                'past_48hr_directional_movement': safe_get('past_48hr_directional_movement'),
-                'past_24hr_volume_stability': safe_get('past_24hr_volume_stability'),
+                'past_24hr_max_single_move': safe_get('past_24hr_max_single_move', default_value=0.0, require_valid=False),
+                'past_48hr_price_range': safe_get('past_48hr_price_range', default_value=0.0, require_valid=False),
+                'past_72hr_avg_bar_volatility': safe_get('past_72hr_avg_bar_volatility', default_value=0.0, require_valid=False),
+                'past_48hr_directional_movement': safe_get('past_48hr_directional_movement', default_value=0.0, require_valid=False),
+                'past_24hr_volume_stability': safe_get('past_24hr_volume_stability', default_value=0.0, require_valid=False),
 
                 # ===== 數據品質標記 =====
                 'data_quality': {
