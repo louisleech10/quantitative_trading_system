@@ -753,8 +753,8 @@ class CaseSearchEngine:
                 return []
                 
             # 添加計算列
-            data = self._add_calculated_columns(data)
-            
+            data = self._add_calculated_columns(data, config.timeframe)
+
             # 進行初始篩選
             initial_candidates = self._apply_initial_filter(data, config)
             
@@ -871,6 +871,9 @@ class CaseSearchEngine:
                             case[col] = 0.02  # 默認標準差
                         else:
                             case[col] = None
+                            # Debug: 記錄缺失的歷史穩定度參數
+                            if 'past_' in col:
+                                self.logger.warning(f"歷史穩定度參數 '{col}' 不在 data.columns 中")
                 
                 # 添加其他有用的統計信息
                 try:
