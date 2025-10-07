@@ -35,8 +35,10 @@ class Settings(BaseSettings):
     allowed_origins: list = [
         "http://localhost:3000",  # Next.js 開發伺服器
         "http://localhost:3001",  # Next.js 開發伺服器（備用端口）
+        "http://localhost:3003",  # Next.js 開發伺服器（備用端口2）
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
+        "http://127.0.0.1:3003",
         "http://localhost:8080",
     ]
     
