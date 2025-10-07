@@ -87,9 +87,16 @@
     - ✅ 修復反例搜索3個Critical Bug
     - ✅ 實際性能驗證：正例23秒，反例27-80秒
     - ✅ Git提交：3個commits
+  - ✅ **時間分離邏輯優化**（2025-10-07完成）
+    - ✅ 按Symbol獨立過濾（解決100%過濾率問題）
+    - ✅ 添加時間分離可選開關（enable_time_separation）
+    - ✅ 調整預設值：7天 → 3天
+    - ✅ 詳細per-symbol日誌統計
+    - ✅ 前後端同步修改（7個文件）
+    - ✅ Git提交：commit 932d72f
 
 ### 進行中 🔨
-- **無** - Phase 0+1+2 全部完成並通過實戰測試！
+- **無** - Phase 0+1+2 全部完成並通過實戰測試！時間分離邏輯優化完成！
 
 ### 計劃中 📋
 - **階段1**: 圖表和數據系統 (4-6週)
@@ -118,8 +125,8 @@
 - ✅ 所有測試+實戰通過
 
 **下一步選項**：
-- 選項A：**推薦** 回到原計劃（階段1圖表系統）← 性能優化已完成並驗證
-- 選項B：優化時間分離邏輯（當前7天過濾率過高）
+- 選項A：**推薦** 回到原計劃（階段1圖表系統）← 性能優化+時間分離優化已完成
+- 選項B：繼續優化反例搜索（增加條件、強化案例品質）
 - 選項C：實際環境壓力測試（4000 symbols × 7年數據）
 
 ---
@@ -143,16 +150,16 @@ quantitative_trading_system/
 ### 需要修復
 - 無
 
-### 需要優化（優先級：中-低）
-- **時間分離邏輯優化** (2025-10-07發現)
-  - 位置：`_apply_time_separation_and_ratio()` in search_task_service.py
-  - 問題：7天分離過濾率過高（4819個→0個，30119個→X個）
-  - 影響：中（用戶需要手動調整參數或跳過時間分離）
+### 需要優化（優先級：低）
+- **反例搜索條件優化** (2025-10-07提出)
+  - 位置：用戶自定義反例條件邏輯
+  - 目標：增加更多條件以強化案例品質
+  - 影響：低（當前功能正常，擴展性改進）
   - 待討論方案：
-    - 動態調整（7天→3天→1天→關閉）
-    - 按symbol獨立過濾（避免跨symbol誤過濾）
-    - 改為可選功能（預設關閉）
-  - 優先級：中（功能可用，但體驗待改進）
+    - 增加更多篩選維度（成交量、波動率等）
+    - 多條件組合邏輯
+    - 案例品質評分機制
+  - 優先級：低（功能完整，可根據實際需求逐步擴展）
 
 ### 需要優化（優先級：低）
 - **條件篩選向量化** (2025-10-05發現)
@@ -176,7 +183,55 @@ quantitative_trading_system/
 
 ## 📝 最近完成的工作
 
-### 2025-10-07
+### 2025-10-07（下午）
+
+**時間分離邏輯優化完成** ⭐⭐⭐
+- ✅ 按Symbol獨立過濾（解決100%過濾率問題）
+  - **舊邏輯**：全局過濾，BTCUSDT反例被ETHUSDT正例過濾
+  - **新邏輯**：按Symbol獨立計算，只比較同Symbol正反例
+  - **預期效果**：過濾率從100%降至~15%，保留案例從0→~25,600個
+- ✅ 添加時間分離可選開關
+  - 新增 `enable_time_separation` 參數（前後端）
+  - 用戶可完全關閉時間分離功能
+  - 關閉時直接跳過過濾邏輯
+- ✅ 調整預設值為3天
+  - **舊預設**：7天（窗口覆蓋14天）
+  - **新預設**：3天（窗口覆蓋6天）
+  - 減少過度過濾，平衡時間分離效果
+- ✅ 詳細per-symbol日誌統計
+  - 按Symbol顯示統計（正例數、候選數、保留數、過濾數）
+  - 顯示前10個Symbol的詳細統計
+  - 總計顯示過濾率和保留數量
+
+**修改文件**（7個）：
+- Backend (4個):
+  - api/routes/two_stage_search.py
+  - api/models/requests.py
+  - api/services/search_task_service.py (重寫核心函數)
+- Frontend (3個):
+  - frontend/src/lib/types.ts
+  - frontend/src/lib/api.ts
+  - frontend/src/app/search/page.tsx (新增UI checkbox)
+
+**核心改進**：
+```python
+# 舊邏輯：全局過濾
+for case_time in candidate_times:
+    for pos_time in all_positive_times:  # 所有Symbol的正例
+        if too_close: filter_out
+
+# 新邏輯：按Symbol獨立
+positive_times_by_symbol = defaultdict(list)  # 按Symbol分組
+for case in candidates:
+    same_symbol_positives = positive_times_by_symbol[case.symbol]
+    for pos_time in same_symbol_positives:  # 只比較同Symbol
+        if too_close: filter_out
+```
+
+**Git提交**：
+- commit 932d72f: feat: 優化時間分離邏輯 - 按Symbol獨立過濾 + 可選開關 + 預設3天
+
+### 2025-10-07（上午）
 
 **Phase 2 實戰測試Bug修復** ⭐⭐⭐
 - ✅ 修復Worker數量問題（2→7 workers）
@@ -394,14 +449,15 @@ quantitative_trading_system/
 
 ## 🔄 Git狀態
 
-**最後提交**: commit 964046f (Phase 2 Bug修復完成)
-**當前分支**: phase-2-vectorization
+**最後提交**: commit 932d72f (時間分離邏輯優化完成)
+**當前分支**: performance-optimization
 **Tags**:
 - phase-0-start, phase-0-complete, phase-0-error-handling
 - phase-1-start, phase-1-parallel, phase-1-error-handling
 - phase-2-start, phase-2-complete
 **備份分支**: backup-before-phase0, backup-before-phase1
-**最近3次提交**:
+**最近4次提交**:
+- 932d72f: feat: 優化時間分離邏輯 - 按Symbol獨立過濾 + 可選開關 + 預設3天
 - 964046f: fix(phase2): 修復反例搜索3個Critical Bug
 - 02af581: fix(phase2): 修復CaseSearchEngine支持num_workers參數
 - b4a3213: fix(phase2): 修復Worker數量和反例結果追蹤問題
@@ -419,29 +475,34 @@ quantitative_trading_system/
    - ✅ Phase 1: 錯誤處理增強（100%失敗追蹤）
    - ✅ Phase 2: 向量化計算優化（60-430倍加速）
    - ✅ Phase 0+1+2 集成測試（全部通過）
-   - ✅ **Phase 2 實戰測試 + Bug修復**（2025-10-07）
+   - ✅ **Phase 2 實戰測試 + Bug修復**（2025-10-07上午）
+   - ✅ **時間分離邏輯優化**（2025-10-07下午）
    - ✅ **性能優化目標達成：10,500倍總提升**
    - ✅ **實戰性能驗證：正例23秒，反例27-80秒**
 
 2. **當前狀態**：
-   - 分支：phase-2-vectorization
-   - 最後提交：964046f (Bug修復完成)
+   - 分支：performance-optimization
+   - 最後提交：932d72f (時間分離優化完成)
    - 性能優化：✅ 完成並驗證
-   - 已知問題：時間分離邏輯待優化（功能正常，體驗待改進）
+   - 時間分離邏輯：✅ 優化完成（按Symbol獨立+可選開關+3天預設）
+   - 系統狀態：✅ 所有核心功能完整且優化完成
 
 3. **下一步工作選項**：
-   - **選項A（推薦）**: 回到原計劃 - 階段1圖表和數據系統
-     - 性能優化已完成並通過實戰驗證
+   - **選項A（強烈推薦）**: 回到原計劃 - 階段1圖表和數據系統
+     - 性能優化+時間分離優化已全部完成
      - 可以開始業務功能開發
+     - 繼續按FEATURE_ROADMAP.md推進
 
-   - **選項B**: 優化時間分離邏輯
-     - 降低過濾率（當前7天過濾過於嚴格）
-     - 改進用戶體驗
-     - 優先級：中（可選）
+   - **選項B**: 繼續優化反例搜索
+     - 增加更多篩選條件以強化案例品質
+     - 多條件組合邏輯
+     - 案例品質評分機制
+     - 優先級：低（功能完整，可根據實際需求逐步擴展）
 
    - **選項C**: 實際環境壓力測試
      - 4000 symbols × 7年數據
      - 驗證極限性能
+     - 優先級：低（當前性能已驗證，可選）
 
 4. 遵循DEVELOPMENT_GUIDE.md和GUIDELINES.md規範
 5. 完成後更新此文件
