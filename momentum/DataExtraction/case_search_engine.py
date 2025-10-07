@@ -952,9 +952,9 @@ class CaseSearchEngine:
     def _calculate_past_stability_features(
         self,
         df: pd.DataFrame,
-        periods_24hr: int,
-        periods_48hr: int,
-        periods_72hr: int
+        periods_24h: int,
+        periods_48h: int,
+        periods_72h: int
     ) -> pd.DataFrame:
         """
         一次性計算5個歷史穩定度特徵參數（向量化）
@@ -965,9 +965,9 @@ class CaseSearchEngine:
 
         Args:
             df: 包含OHLCV數據的DataFrame，必須包含 open, high, low, close, volume 列
-            periods_24hr: 24小時對應的bar數量（如12h timeframe = 2根bar）
-            periods_48hr: 48小時對應的bar數量（如12h timeframe = 4根bar）
-            periods_72hr: 72小時對應的bar數量（如12h timeframe = 6根bar）
+            periods_24h: 24小時對應的bar數量（如12h timeframe = 2根bar）
+            periods_48h: 48小時對應的bar數量（如12h timeframe = 4根bar）
+            periods_72h: 72小時對應的bar數量（如12h timeframe = 6根bar）
 
         Returns:
             添加了5個新列的DataFrame:
@@ -996,19 +996,19 @@ class CaseSearchEngine:
             # ===== 參數1: past_24hr_max_single_move =====
             # 過去24hr內，所有單根bar中絕對漲跌幅最大值
             df['past_24hr_max_single_move'] = df['bar_return'].abs().rolling(
-                window=periods_24hr,
-                min_periods=max(1, periods_24hr // 2)  # 至少需要一半數據
+                window=periods_24h,
+                min_periods=max(1, periods_24h // 2)  # 至少需要一半數據
             ).max()
 
             # ===== 參數2: past_48hr_price_range =====
             # 過去48hr內的最高價與最低價差距，標準化為百分比（單位：%）
             high_48hr = df['high'].rolling(
-                window=periods_48hr,
-                min_periods=max(1, periods_48hr // 2)
+                window=periods_48h,
+                min_periods=max(1, periods_48h // 2)
             ).max()
             low_48hr = df['low'].rolling(
-                window=periods_48hr,
-                min_periods=max(1, periods_48hr // 2)
+                window=periods_48h,
+                min_periods=max(1, periods_48h // 2)
             ).min()
             df['past_48hr_price_range'] = np.where(
                 df['close'] > 0,
@@ -1019,8 +1019,8 @@ class CaseSearchEngine:
             # ===== 參數3: past_72hr_avg_bar_volatility =====
             # 過去72hr內，每根bar漲跌幅的絕對值平均
             df['past_72hr_avg_bar_volatility'] = df['bar_return'].abs().rolling(
-                window=periods_72hr,
-                min_periods=max(1, periods_72hr // 2)
+                window=periods_72h,
+                min_periods=max(1, periods_72h // 2)
             ).mean()
 
             # ===== 參數4: past_48hr_directional_movement =====
@@ -1028,12 +1028,12 @@ class CaseSearchEngine:
             # 公式：累積漲跌幅絕對值 / 各bar漲跌幅絕對值總和
             # 數值含義：接近1.0=單向移動（趨勢），接近0.0=來回震盪（盤整）
             sum_directional = df['bar_return'].rolling(
-                window=periods_48hr,
-                min_periods=max(1, periods_48hr // 2)
+                window=periods_48h,
+                min_periods=max(1, periods_48h // 2)
             ).sum().abs()
             sum_volatility = df['bar_return'].abs().rolling(
-                window=periods_48hr,
-                min_periods=max(1, periods_48hr // 2)
+                window=periods_48h,
+                min_periods=max(1, periods_48h // 2)
             ).sum()
             df['past_48hr_directional_movement'] = np.where(
                 sum_volatility > 0,
@@ -1045,12 +1045,12 @@ class CaseSearchEngine:
             # 過去24hr成交量的變異係數 (CV = std / mean)
             # 數值含義：<0.5=穩定，>1.0=異常波動
             volume_mean = df['volume'].rolling(
-                window=periods_24hr,
-                min_periods=max(1, periods_24hr // 2)
+                window=periods_24h,
+                min_periods=max(1, periods_24h // 2)
             ).mean()
             volume_std = df['volume'].rolling(
-                window=periods_24hr,
-                min_periods=max(1, periods_24hr // 2)
+                window=periods_24h,
+                min_periods=max(1, periods_24h // 2)
             ).std()
             df['past_24hr_volume_stability'] = np.where(
                 volume_mean > 0,
