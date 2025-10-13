@@ -1,8 +1,8 @@
 # 項目狀態
 
-**最後更新**: 2025-10-07 下午5:15
-**當前階段**: 歷史穩定度參數實作完成 + Critical Bug修復完成
-**整體進度**: 98% (功能完整，worker性能待優化)
+**最後更新**: 2025-10-13
+**當前階段**: 歷史穩定度參數實作完成 + CSV導出Bug修復完成 + Critical Bug修復完成
+**整體進度**: 99% (功能完整，worker性能待優化，LOG待優化)
 
 ---
 
@@ -110,6 +110,16 @@
   - ✅ 性能：399,020行/秒
   - ✅ **總參數數量：35個**（30基礎 + 5歷史穩定度）
 
+- **歷史穩定度參數CSV導出Bug修復** (100%) - 2025-10-13完成
+  - ✅ 問題診斷：Step-by-step追蹤數據流（計算→API→前端→CSV）
+  - ✅ 根本原因：API層CaseData模型創建時遺漏5個參數映射
+  - ✅ 修復standalone_search_service.py（添加5個參數到CaseData創建）
+  - ✅ 修復responses.py convert_case_dict_to_model（添加5個參數映射）
+  - ✅ 驗證成功：CSV現可正確導出5個歷史穩定度參數數值
+  - ✅ 數據流完整：計算→字典→API模型→前端→CSV全鏈路打通
+  - ✅ LOG追蹤：確認參數數值正確傳遞（0.0248, 5.2428等）
+  - ✅ Git提交：5個commits（diagnostic + fix）
+
 - **Critical Bug修復** (100%) - 2025-10-07完成
   - ✅ **問題1：Stack Overflow無限遞歸**
     - 問題：單symbol搜索導致API崩潰
@@ -158,20 +168,24 @@
 - ✅ 數據完整性：100%保證
 - ✅ 所有測試+實戰通過
 
-**歷史穩定度參數實作**（2025-10-07下午完成）：
+**歷史穩定度參數實作與CSV導出修復**（2025-10-07 + 2025-10-13完成）：
 - ✅ 5個新參數實作（100%向量化，性能399,020行/秒）
-- ✅ CSV導出修復（參數現可見於導出文件）
+- ✅ CSV導出Bug修復（2025-10-13完成）
+  - 問題：API層CaseData創建遺漏5個參數映射
+  - 修復：standalone_search_service.py + responses.py
+  - 結果：參數現可正確導出到CSV
 - ✅ Worker性能修正（0.5GB→0.2GB，預期1→6 workers）
 - ⚠️ **待驗證**：重啟API服務並驗證worker性能提升
 
 **當前狀態**：
 - 所有功能實作：✅ 100%完成
-- Worker性能修復：✅ 代碼已修改
+- 歷史穩定度參數：✅ 實作 + CSV導出 全部完成（2025-10-13）
+- Worker性能修復：✅ 代碼已修改（待驗證）
 - **待重啟API服務**：驗證416 symbols從1 worker → 6 workers（6倍提升）
 - **預期效果**：416 symbols搜索從102秒 → 17秒
 
 **下一步選項**：
-- 選項A：**推薦** 重啟API服務 → 驗證worker性能 → 回到原計劃（階段1圖表系統）
+- 選項A：**推薦** 重啟API服務 → 驗證worker性能 → 全面LOG review → 回到原計劃（階段1圖表系統）
 - 選項B：繼續優化反例搜索（增加條件、強化案例品質）
 - 選項C：實際環境壓力測試（4000 symbols × 7年數據）
 
@@ -205,6 +219,22 @@ quantitative_trading_system/
   - 優先級：中（性能優化，非功能性）
 
 ### 需要優化（優先級：低）
+- **調試LOG性能影響** (2025-10-13發現)
+  - 位置：case_search_engine.py 的 _create_case_result 方法
+  - 影響：每個案例輸出11條DEBUG LOG（1條檢查 + 10條TRACE）
+  - 性能影響：
+    - 小量案例（< 100）：< 1秒，可忽略
+    - 中量案例（100-500）：1-3秒，輕微
+    - 大量案例（> 1000）：5-10秒，建議優化
+  - LOG位置：
+    - 第521-527行：參數檢查LOG（每案例1次）
+    - 第544-545行：raw_value TRACE（每參數1次）
+    - 第554-555行：final_value TRACE（每參數1次）
+    - 第560-562行：NaN情況LOG（按需）
+  - 當前狀態：保留現狀，用於數據流驗證
+  - 優化方案：條件式調試（環境變數 DEBUG_PAST_PARAMS 控制）
+  - 優先級：低（當前案例量下影響可忽略，待全面LOG review時處理）
+
 - **反例搜索條件優化** (2025-10-07提出)
   - 位置：用戶自定義反例條件邏輯
   - 目標：增加更多條件以強化案例品質
@@ -235,6 +265,66 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-10-13
+
+**歷史穩定度參數CSV導出Bug修復** ⭐⭐⭐
+- ✅ **問題報告**：
+  - 用戶反饋：CSV導出的5個歷史穩定度參數只有欄位名，沒有數值
+  - 影響文件：case_search_results_2025-10-07 (14).csv
+  - 症狀：Past_24hr_Max_Single_Move等5個欄位為空白
+
+- ✅ **數據流追蹤分析**（Step-by-step）：
+  1. **後端計算**：✅ case_search_engine.py:699 正確計算並存入case字典
+  2. **API轉換**：❌ standalone_search_service.py:498-574 創建CaseData時遺漏5個參數
+  3. **API轉換函數**：❌ responses.py:317-437 convert_case_dict_to_model 遺漏5個參數
+  4. **前端接收**：❌ JSON響應缺少這5個欄位
+  5. **CSV導出**：❌ 前端嘗試讀取但數據為空
+
+- ✅ **根本原因定位**：
+  - **問題1**：standalone_search_service.py 在創建CaseData對象時
+    - 第551行（day_of_week）之後直接跳到第560行（向後兼容參數）
+    - 完全跳過了5個歷史穩定度參數的映射
+  - **問題2**：responses.py 的 convert_case_dict_to_model 函數
+    - 第406行（day_of_week）之後直接跳到第415行（反例參數）
+    - 同樣遺漏了5個參數的提取邏輯
+
+- ✅ **修復方案**：
+  - **文件1**：api/services/standalone_search_service.py:553-558
+    - 在時間描述參數和向後兼容參數之間
+    - 添加5個歷史穩定度參數的映射（使用safe_float提取）
+  - **文件2**：api/models/responses.py:408-413
+    - 在時間描述參數和反例參數之間
+    - 添加5個歷史穩定度參數的映射（使用safe_float提取）
+
+- ✅ **驗證結果**：
+  - 數據流完整性：✅ 計算→字典→API模型→JSON→前端→CSV 全鏈路打通
+  - CSV導出測試：✅ 5個參數現在有正確的數值
+  - LOG追蹤顯示：✅ 參數數值正確傳遞（0.0248, 5.2428, 0.0126, 0.0973, 0.0046）
+
+- ✅ **技術總結**：
+  - Bug類型：數據流中斷（API層映射遺漏）
+  - 診斷方法：對比Future_1Bar_Return_%（正常）與Past_24hr_Max_Single_Move（失敗）的完整數據流
+  - 修復複雜度：低（添加14行參數映射代碼）
+  - 影響範圍：所有使用/search API的CSV導出功能
+
+- ✅ **附帶發現**：
+  - 調試LOG性能影響分析（詳見「需要優化」章節）
+  - 建議未來採用條件式調試（環境變數控制）
+  - 當前保留LOG用於驗證，待全面review時優化
+
+**修改文件**（2個）：
+- api/services/standalone_search_service.py（+7行）
+- api/models/responses.py（+7行）
+
+**Git提交**（已完成）：
+- de82332: fix: 在responses.py的CaseData中添加5個歷史穩定度參數（關鍵修復）
+- 96eaa03: fix: 在API response model和前端interface中添加5個歷史穩定度參數定義
+- f933e2a: debug: 添加歷史穩定度參數詳細TRACE log追蹤數據流
+- fce202b: fix: 修復歷史穩定度參數函數參數名不匹配導致CSV輸出空值
+- d69c7ff: fix: 修改歷史穩定度參數safe_get調用參數（關鍵修復）
+
+---
 
 ### 2025-10-07（下午5:15）
 
@@ -581,14 +671,14 @@ for case in candidates:
 
 ## 🔄 Git狀態
 
-**當前分支**: phase-2-vectorization (從summary可見)
+**當前分支**: phase-2-vectorization
 **主分支**: main
-**最近提交**:
-- 034fbb2: docs: 更新STATUS.md記錄時間分離邏輯優化完成
-- 932d72f: feat: 優化時間分離邏輯 - 按Symbol獨立過濾 + 可選開關 + 預設3天
-- 499e38b: docs: 更新STATUS.md記錄Phase 2實戰測試和Bug修復完成
-- 964046f: fix(phase2): 修復反例搜索三個Critical Bug
-- 02af581: fix(phase2): 修復CaseSearchEngine支持num_workers參數
+**最近提交** (2025-10-13):
+- de82332: fix: 在responses.py的CaseData中添加5個歷史穩定度參數（關鍵修復）
+- 96eaa03: fix: 在API response model和前端interface中添加5個歷史穩定度參數定義
+- f933e2a: debug: 添加歷史穩定度參數詳細TRACE log追蹤數據流
+- fce202b: fix: 修復歷史穩定度參數函數參數名不匹配導致CSV輸出空值
+- d69c7ff: fix: 修改歷史穩定度參數safe_get調用參數（關鍵修復）
 
 **Tags**:
 - phase-0-start, phase-0-complete, phase-0-error-handling
@@ -597,24 +687,20 @@ for case in candidates:
 
 **備份分支**: backup-before-phase0, backup-before-phase1
 
-**待提交更改** (2025-10-07 17:15):
-- ✅ 歷史穩定度參數實作（case_search_engine.py）
-- ✅ Worker性能修正（parallel_search_engine.py）
-- ✅ CSV導出修復（case_search_engine.py）
-- ✅ Stack Overflow修復（已提交）
-- ⚠️ STATUS.md (更新中)
+**待提交更改** (2025-10-13):
+- M .claude/STATUS.md（本次更新）
+- M api/models/responses.py（已提交）
+- M api/services/standalone_search_service.py（已提交）
 
 **建議下次提交**:
 ```bash
-git add momentum/DataExtraction/case_search_engine.py
-git add momentum/DataExtraction/parallel_search_engine.py
 git add .claude/STATUS.md
-git commit -m "feat: 實作歷史穩定度參數 + 修復Worker性能和CSV導出
+git commit -m "docs: 更新STATUS.md記錄歷史穩定度參數CSV導出Bug修復完成
 
-- 新增5個歷史穩定度參數（100%向量化，399,020行/秒）
-- 修復MEMORY_PER_WORKER_GB (0.5→0.2GB，預期1→6 workers)
-- 修復CSV導出遺漏（添加5參數到indicator_columns）
-- 更新STATUS.md記錄所有工作
+- 記錄2025-10-13 CSV導出Bug修復工作
+- 更新已完成項目、最近完成的工作、Git狀態
+- 添加調試LOG性能影響到需要優化清單
+- 更新下一步工作建議
 
 🤖 Generated with Claude Code
 Co-Authored-By: Claude <noreply@anthropic.com>"
@@ -624,53 +710,58 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-10-07 17:15）：
-   - ✅ Phase 0: 數據緩存系統（15倍加速）
-   - ✅ Phase 0: 錯誤處理增強（100%失敗追蹤）
-   - ✅ Phase 1: 並行處理系統（7倍加速）
-   - ✅ Phase 1: 錯誤處理增強（100%失敗追蹤）
-   - ✅ Phase 2: 向量化計算優化（60-430倍加速）
-   - ✅ Phase 0+1+2 集成測試（全部通過）
-   - ✅ **Phase 2 實戰測試 + Bug修復**（2025-10-07上午）
-   - ✅ **時間分離邏輯優化**（2025-10-07下午）
-   - ✅ **歷史穩定度參數實作**（2025-10-07下午5:15）
-   - ✅ **3個Critical Bug修復**（Stack Overflow + 硬編碼 + Worker性能）
-   - ✅ **性能優化目標達成：10,500倍總提升**
-   - ✅ **實戰性能驗證：正例23秒，反例27-80秒**
+1. **已完成工作**（2025-10-13）：
+   - ✅ Phase 0-2: 所有性能優化（10,500倍總提升）
+   - ✅ 歷史穩定度參數實作（5個參數，100%向量化）
+   - ✅ 3個Critical Bug修復（Stack Overflow + 硬編碼 + Worker性能）
+   - ✅ **歷史穩定度參數CSV導出Bug修復**（2025-10-13完成）
+     - 修復API層CaseData模型創建遺漏
+     - 數據流全鏈路打通（計算→API→前端→CSV）
+     - CSV現可正確導出5個參數數值
+     - 附帶發現調試LOG性能影響
 
 2. **當前狀態**：
    - 分支：phase-2-vectorization
-   - 最後提交：034fbb2 (時間分離邏輯優化文檔更新)
+   - 最後提交：de82332（歷史穩定度參數CSV導出修復）
    - 性能優化：✅ 完成並驗證
-   - 時間分離邏輯：✅ 優化完成
-   - 歷史穩定度參數：✅ 實作完成（35個參數）
+   - 歷史穩定度參數：✅ 實作 + CSV導出 全部完成（2025-10-13）
    - 系統狀態：✅ 所有核心功能完整且優化完成
-   - **待提交**：歷史穩定度參數 + Worker性能修復 + CSV導出修復
+   - 待提交：.claude/STATUS.md（本次更新）
 
 3. **待驗證項目**：
-   - ⚠️ **重啟API服務**以應用Worker性能修復
+   - ✅ **CSV導出驗證**：已確認5個參數正確導出（2025-10-13完成）
+   - ⚠️ **重啟API服務**：應用Worker性能修復
    - ⚠️ **驗證Worker數量**：預期416 symbols從1 worker → 6 workers
    - ⚠️ **驗證搜索時間**：預期416 symbols從102秒 → ~17秒
-   - ⚠️ **驗證CSV導出**：確認5個新參數出現在導出文件中
 
 4. **建議立即執行**：
    ```bash
    # 1. 提交當前工作
-   git add momentum/DataExtraction/case_search_engine.py
-   git add momentum/DataExtraction/parallel_search_engine.py
    git add .claude/STATUS.md
-   git commit -m "feat: 實作歷史穩定度參數 + 修復Worker性能和CSV導出..."
+   git commit -m "docs: 更新STATUS.md記錄歷史穩定度參數CSV導出Bug修復完成
 
-   # 2. 重啟API服務
+   - 記錄2025-10-13 CSV導出Bug修復工作
+   - 更新已完成項目、最近完成的工作、Git狀態
+   - 添加調試LOG性能影響到需要優化清單
+   - 更新下一步工作建議
+
+   🤖 Generated with Claude Code
+   Co-Authored-By: Claude <noreply@anthropic.com>"
+
+   # 2. 重啟API服務（驗證Worker性能修復）
    # (停止當前API → 重新啟動)
 
    # 3. 驗證性能提升
    # 執行416 symbols搜索，觀察worker數量和時間
+
+   # 4. LOG優化決策
+   # 決定是否實施條件式調試LOG（環境變數控制）
    ```
 
 5. **下一步工作選項**：
-   - **選項A（強烈推薦）**: 驗證完成後 → 回到原計劃 - 階段1圖表和數據系統
+   - **選項A（強烈推薦）**: 重啟API驗證Worker性能 → 全面LOG review → 回到原計劃（階段1圖表系統）
      - 所有性能優化+參數實作+Bug修復已完成
+     - CSV導出已驗證成功
      - 可以開始新業務功能開發
      - 繼續按FEATURE_ROADMAP.md推進
 

@@ -549,7 +549,14 @@ class StandaloneSearchService:
                             # ===== 新增：時間描述參數 =====
                             hour_of_day=safe_int(case_dict.get('hour_of_day')),
                             day_of_week=safe_int(case_dict.get('day_of_week')),
-                            
+
+                            # ===== 新增：歷史穩定度參數 (5個) =====
+                            past_24hr_max_single_move=safe_float(case_dict.get('past_24hr_max_single_move')),
+                            past_48hr_price_range=safe_float(case_dict.get('past_48hr_price_range')),
+                            past_72hr_avg_bar_volatility=safe_float(case_dict.get('past_72hr_avg_bar_volatility')),
+                            past_48hr_directional_movement=safe_float(case_dict.get('past_48hr_directional_movement')),
+                            past_24hr_volume_stability=safe_float(case_dict.get('past_24hr_volume_stability')),
+
                             # ===== 向後兼容的現有參數 =====
                             future1_close_return=safe_float(case_dict.get('future1_close_return')),
                             future2_close_return=safe_float(case_dict.get('future2_close_return')),
