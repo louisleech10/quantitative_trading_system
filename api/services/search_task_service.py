@@ -513,11 +513,11 @@ class SearchTaskService:
 
             # Step 5: 應用比例控制（可選隨機取樣）
             target_count = int(len(positive_cases) * ratio)
-            self.logger.info(f"目標反例數量: {target_count} (正例: {len(positive_cases)}, 比例: {ratio})")
 
             # ===== 新增：根據enable_random_sampling決定是否隨機取樣 =====
             if enable_random_sampling:
                 # 啟用隨機取樣：從候選中隨機選擇目標數量的反例
+                self.logger.info(f"[隨機取樣開啟] 目標反例數量: {target_count} (正例: {len(positive_cases)}, 比例: {ratio})")
                 if len(filtered_candidates) > target_count:
                     import random
                     selected_cases = random.sample(filtered_candidates, target_count)
@@ -525,11 +525,13 @@ class SearchTaskService:
                 else:
                     selected_cases = filtered_candidates
                     if len(selected_cases) < target_count:
-                        self.logger.warning(f"反例數量不足: 找到 {len(selected_cases)}, 目標 {target_count}")
+                        self.logger.warning(f"[隨機取樣] 反例數量不足: 找到 {len(selected_cases)}, 目標 {target_count}")
+                    else:
+                        self.logger.info(f"[隨機取樣] 候選數量({len(filtered_candidates)})等於目標數量({target_count})，返回全部候選")
             else:
-                # 關閉隨機取樣：返回所有符合條件的反例
+                # 關閉隨機取樣：返回所有符合條件的反例（忽略比例限制）
                 selected_cases = filtered_candidates
-                self.logger.info(f"[關閉隨機取樣] 返回所有 {len(filtered_candidates)} 個符合條件的反例（忽略目標數量{target_count}）")
+                self.logger.info(f"[隨機取樣關閉] 返回所有 {len(filtered_candidates)} 個符合條件的反例（忽略目標數量{target_count}，正例{len(positive_cases)}個）")
 
             # Step 6: 為反例添加標記
             final_cases = []
