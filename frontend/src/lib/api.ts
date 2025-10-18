@@ -268,7 +268,8 @@ class ApiClient {
     timeSeparationDays: number = 3,
     negativeRequest: SimpleSearchRequest,     // 新增：改為接收 SimpleSearchRequest
     negativeOperators: any,             // 新增：反例運算符
-    negativeRangeValues: any            // 新增：反例範圍值
+    negativeRangeValues: any,           // 新增：反例範圍值
+    enableRandomSampling: boolean = true  // ===== 新增：隨機取樣開關 =====
   ): Promise<ApiResponse<TaskInfo>> {
 
     console.log('執行反例搜索，正例任務ID:', positiveTaskId);
@@ -287,7 +288,8 @@ class ApiClient {
       negative_ratio: negativeRatio,
       enable_time_separation: enableTimeSeparation,
       time_separation_days: timeSeparationDays,
-      sampling_strategy: "time_separated"
+      sampling_strategy: "time_separated",
+      enable_random_sampling: enableRandomSampling  // ===== 新增：隨機取樣開關 =====
     };
 
     console.log('發送到後端的反例請求:', negativeApiRequest);
@@ -423,7 +425,8 @@ class ApiClient {
     negativeOperators: any,             // 新增：反例運算符
     negativeRangeValues: any,           // 新增：反例範圍值
     operators: any,                     // 正例運算符
-    rangeValues: any                    // 正例範圍值
+    rangeValues: any,                   // 正例範圍值
+    enableRandomSampling: boolean = true  // ===== 新增：隨機取樣開關 =====
   ): Promise<SearchResultData> {
 
     try {
@@ -450,7 +453,8 @@ class ApiClient {
         timeSeparationDays,
         negativeRequest,      // 傳遞反例搜索請求
         negativeOperators,    // 傳遞反例運算符
-        negativeRangeValues   // 傳遞反例範圍值
+        negativeRangeValues,  // 傳遞反例範圍值
+        enableRandomSampling  // ===== 新增：傳遞隨機取樣開關 =====
       );
       
       if (!negativeResponse.success || !negativeResponse.data) {

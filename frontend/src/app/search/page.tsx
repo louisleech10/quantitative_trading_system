@@ -99,6 +99,7 @@ export default function SearchPage() {
     ratio: 2.0,
     enableTimeSeparation: true,
     timeSeparationDays: 3,
+    enableRandomSampling: true,  // ===== 新增：隨機取樣開關 =====
     priceChange: null as number | null,
     volumeMultiplier: null as number | null,
     closingStrength: null as number | null,
@@ -335,7 +336,9 @@ export default function SearchPage() {
           // 參數9：operators (object) - 正例運算符
           operators,
           // 參數10：rangeValues (object) - 正例範圍值
-          rangeValues
+          rangeValues,
+          // 參數11：enableRandomSampling (boolean) - ===== 新增：隨機取樣開關 =====
+          negativeParams.enableRandomSampling
         );
 
         // 直接設定搜索結果
@@ -966,15 +969,36 @@ export default function SearchPage() {
                     </div>
                   )}
                 </div>
-                
+
+                {/* ===== 新增：隨機取樣開關 ===== */}
+                <div>
+                  <label className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      checked={negativeParams.enableRandomSampling}
+                      onChange={(e) => setNegativeParams(prev => ({
+                        ...prev,
+                        enableRandomSampling: e.target.checked
+                      }))}
+                      className="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    />
+                    <span className="text-sm font-medium text-gray-900">
+                      啟用隨機取樣
+                    </span>
+                  </label>
+                  <p className="text-sm text-gray-600">
+                    啟用時根據比例隨機選擇反例；關閉時返回所有符合條件的反例
+                  </p>
+                </div>
+
                 <div className="flex items-center space-y-2">
                   <div>
                     <label className="flex items-center">
                       <input
                         type="checkbox"
                         checked={negativeParams.enabled}
-                        onChange={(e) => setNegativeParams(prev => ({ 
-                          ...prev, 
+                        onChange={(e) => setNegativeParams(prev => ({
+                          ...prev,
                           enabled: e.target.checked 
                         }))}
                         className="mr-2 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
