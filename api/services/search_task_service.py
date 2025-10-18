@@ -308,8 +308,9 @@ class SearchTaskService:
                         enable_separation = getattr(request, 'enable_time_separation', True)
                         separation_days = getattr(request, 'time_separation_days', 3)
                         negative_ratio = getattr(request, 'negative_ratio', 2.0)
+                        enable_random_sampling = getattr(request, 'enable_random_sampling', True)  # ===== 新增 =====
 
-                        self.logger.info(f"時間分離配置: 啟用={enable_separation}, {separation_days}天, 反例比例: {negative_ratio}")
+                        self.logger.info(f"時間分離配置: 啟用={enable_separation}, {separation_days}天, 反例比例: {negative_ratio}, 隨機取樣: {enable_random_sampling}")
 
                         # 應用時間分離和比例控制
                         filtered_cases = await self._apply_time_separation_and_ratio(
@@ -317,7 +318,8 @@ class SearchTaskService:
                             positive_cases,
                             separation_days,
                             negative_ratio,
-                            enable_separation
+                            enable_separation,
+                            enable_random_sampling  # ===== 新增 =====
                         )
 
                         # ✅ 保底邏輯：如果過濾後沒有反例，返回部分候選案例
@@ -379,12 +381,16 @@ class SearchTaskService:
         positive_cases: List[CaseData],
         separation_days: int,
         ratio: float,
-        enable_separation: bool = True
+        enable_separation: bool = True,
+        enable_random_sampling: bool = True  # ===== 新增參數 =====
     ) -> List[CaseData]:
         """
         應用時間分離和比例控制
 
         新邏輯：按Symbol獨立過濾，避免跨Symbol過濾導致100%過濾率
+
+        Args:
+            enable_random_sampling: 是否啟用隨機取樣（True=啟用，False=返回所有符合條件的反例）
         """
         try:
             from datetime import datetime, timedelta
@@ -505,18 +511,25 @@ class SearchTaskService:
                     f"過濾{total_filtered}個 (在{separation_days}天窗口內)"
                 )
 
-            # Step 5: 應用比例控制
+            # Step 5: 應用比例控制（可選隨機取樣）
             target_count = int(len(positive_cases) * ratio)
             self.logger.info(f"目標反例數量: {target_count} (正例: {len(positive_cases)}, 比例: {ratio})")
 
-            if len(filtered_candidates) > target_count:
-                import random
-                selected_cases = random.sample(filtered_candidates, target_count)
-                self.logger.info(f"從 {len(filtered_candidates)} 個候選中隨機選擇了 {len(selected_cases)} 個反例")
+            # ===== 新增：根據enable_random_sampling決定是否隨機取樣 =====
+            if enable_random_sampling:
+                # 啟用隨機取樣：從候選中隨機選擇目標數量的反例
+                if len(filtered_candidates) > target_count:
+                    import random
+                    selected_cases = random.sample(filtered_candidates, target_count)
+                    self.logger.info(f"[隨機取樣] 從 {len(filtered_candidates)} 個候選中隨機選擇了 {len(selected_cases)} 個反例")
+                else:
+                    selected_cases = filtered_candidates
+                    if len(selected_cases) < target_count:
+                        self.logger.warning(f"反例數量不足: 找到 {len(selected_cases)}, 目標 {target_count}")
             else:
+                # 關閉隨機取樣：返回所有符合條件的反例
                 selected_cases = filtered_candidates
-                if len(selected_cases) < target_count:
-                    self.logger.warning(f"反例數量不足: 找到 {len(selected_cases)}, 目標 {target_count}")
+                self.logger.info(f"[關閉隨機取樣] 返回所有 {len(filtered_candidates)} 個符合條件的反例（忽略目標數量{target_count}）")
 
             # Step 6: 為反例添加標記
             final_cases = []
