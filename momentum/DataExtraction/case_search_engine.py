@@ -518,13 +518,14 @@ class CaseSearchEngine:
         """創建案例結果，改進的數據處理邏輯"""
         try:
             # DEBUG: 確認此函數被調用並檢查參數是否在columns中
-            past_params = ['past_24hr_max_single_move', 'past_48hr_price_range', 'past_72hr_avg_bar_volatility',
-                          'past_48hr_directional_movement', 'past_24hr_volume_stability']
+            past_params = ['past_3day_max_volatility', 'past_3day_direction', 'past_3day_volume_cv',
+                          'volatility_class', 'direction_class', 'volume_class',
+                          'market_class', 'market_class_name', 'difficulty_level']
             missing_params = [p for p in past_params if p not in data.columns]
             if missing_params:
-                self.logger.error(f"🔍 DEBUG: _create_case_result - 缺少參數: {missing_params}")
+                self.logger.error(f"🔍 DEBUG: _create_case_result - 缺少分類特徵參數: {missing_params}")
             else:
-                self.logger.warning(f"🔍 DEBUG: _create_case_result - 所有歷史穩定度參數都在columns中")
+                self.logger.warning(f"🔍 DEBUG: _create_case_result - 所有9個分類特徵參數都在columns中")
 
             # 確保索引有效
             if idx < 0 or idx >= len(data):
@@ -695,12 +696,18 @@ class CaseSearchEngine:
                 'hour_of_day': safe_get('hour_of_day'),
                 'day_of_week': safe_get('day_of_week'),
 
-                # ===== 歷史穩定度參數 (5個) =====
-                'past_24hr_max_single_move': safe_get('past_24hr_max_single_move', default_value=0.0, require_valid=False),
-                'past_48hr_price_range': safe_get('past_48hr_price_range', default_value=0.0, require_valid=False),
-                'past_72hr_avg_bar_volatility': safe_get('past_72hr_avg_bar_volatility', default_value=0.0, require_valid=False),
-                'past_48hr_directional_movement': safe_get('past_48hr_directional_movement', default_value=0.0, require_valid=False),
-                'past_24hr_volume_stability': safe_get('past_24hr_volume_stability', default_value=0.0, require_valid=False),
+                # ===== 改寫：分類特徵參數 (9個) =====
+                # 數值參數 (3個)
+                'past_3day_max_volatility': safe_get('past_3day_max_volatility', default_value=0.0, require_valid=False),
+                'past_3day_direction': safe_get('past_3day_direction', default_value=0.0, require_valid=False),
+                'past_3day_volume_cv': safe_get('past_3day_volume_cv', default_value=0.0, require_valid=False),
+                # 分類參數 (6個)
+                'volatility_class': safe_get('volatility_class', default_value='', require_valid=False),
+                'direction_class': safe_get('direction_class', default_value='', require_valid=False),
+                'volume_class': safe_get('volume_class', default_value='', require_valid=False),
+                'market_class': safe_get('market_class', default_value='', require_valid=False),
+                'market_class_name': safe_get('market_class_name', default_value='', require_valid=False),
+                'difficulty_level': safe_get('difficulty_level', default_value='', require_valid=False),
 
                 # ===== 數據品質標記 =====
                 'data_quality': {

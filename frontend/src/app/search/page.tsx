@@ -494,9 +494,12 @@ export default function SearchPage() {
         'Future_9Bar_Drawdown_%', 'Future_10Bar_Drawdown_%', 'Future_11Bar_Drawdown_%', 'Future_12Bar_Drawdown_%',
         // 時間描述參數
         'Hour_Of_Day', 'Day_Of_Week',
-        // 歷史穩定度參數 (5個)
-        'Past_24hr_Max_Single_Move', 'Past_48hr_Price_Range', 'Past_72hr_Avg_Bar_Volatility',
-        'Past_48hr_Directional_Movement', 'Past_24hr_Volume_Stability',
+        // ===== 改寫：分類特徵參數 (9個) =====
+        // 數值參數 (3個)
+        'Past_3Day_Max_Volatility_%', 'Past_3Day_Direction_%', 'Past_3Day_Volume_CV',
+        // 分類參數 (6個)
+        'Volatility_Class', 'Direction_Class', 'Volume_Class',
+        'Market_Class', 'Market_Class_Name', 'Difficulty_Level',
         // 正反例標記
         'Positive_Case'
       ].join(',');
@@ -560,12 +563,18 @@ export default function SearchPage() {
         // 時間描述參數
         case_.hour_of_day !== undefined && case_.hour_of_day !== null ? case_.hour_of_day : '',
         case_.day_of_week !== undefined && case_.day_of_week !== null ? case_.day_of_week : '',
-        // 歷史穩定度參數
-        formatNumber(case_.past_24hr_max_single_move),
-        formatNumber(case_.past_48hr_price_range),
-        formatNumber(case_.past_72hr_avg_bar_volatility),
-        formatNumber(case_.past_48hr_directional_movement),
-        formatNumber(case_.past_24hr_volume_stability),
+        // ===== 改寫：分類特徵參數 (9個) =====
+        // 數值參數 (3個)
+        formatNumber(case_.past_3day_max_volatility, 2),
+        formatNumber(case_.past_3day_direction, 2),
+        formatNumber(case_.past_3day_volume_cv, 4),
+        // 分類參數 (6個)
+        case_.volatility_class || '',
+        case_.direction_class || '',
+        case_.volume_class || '',
+        case_.market_class || '',
+        case_.market_class_name || '',
+        case_.difficulty_level || '',
         // 正反例標記
         case_.positive_case !== undefined ? (case_.positive_case ? '1' : '0') : ''
       ].join(','));
