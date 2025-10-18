@@ -550,12 +550,19 @@ class StandaloneSearchService:
                             hour_of_day=safe_int(case_dict.get('hour_of_day')),
                             day_of_week=safe_int(case_dict.get('day_of_week')),
 
-                            # ===== 新增：歷史穩定度參數 (5個) =====
-                            past_24hr_max_single_move=safe_float(case_dict.get('past_24hr_max_single_move')),
-                            past_48hr_price_range=safe_float(case_dict.get('past_48hr_price_range')),
-                            past_72hr_avg_bar_volatility=safe_float(case_dict.get('past_72hr_avg_bar_volatility')),
-                            past_48hr_directional_movement=safe_float(case_dict.get('past_48hr_directional_movement')),
-                            past_24hr_volume_stability=safe_float(case_dict.get('past_24hr_volume_stability')),
+                            # ===== 改寫：分類特徵參數 (9個) =====
+                            # 數值參數（3個）
+                            past_3day_max_volatility=safe_float(case_dict.get('past_3day_max_volatility')),
+                            past_3day_direction=safe_float(case_dict.get('past_3day_direction')),
+                            past_3day_volume_cv=safe_float(case_dict.get('past_3day_volume_cv')),
+
+                            # 分類參數（6個）
+                            volatility_class=safe_str(case_dict.get('volatility_class')),
+                            direction_class=safe_str(case_dict.get('direction_class')),
+                            volume_class=safe_str(case_dict.get('volume_class')),
+                            market_class=safe_str(case_dict.get('market_class')),
+                            market_class_name=safe_str(case_dict.get('market_class_name')),
+                            difficulty_level=safe_str(case_dict.get('difficulty_level')),
 
                             # ===== 向後兼容的現有參數 =====
                             future1_close_return=safe_float(case_dict.get('future1_close_return')),

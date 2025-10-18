@@ -108,12 +108,19 @@ class CaseData(BaseModel):
     hour_of_day: Optional[int] = Field(None, description="觸發時的小時 (0-23)")
     day_of_week: Optional[int] = Field(None, description="觸發時的星期 (1-7)")
 
-    # ===== 新增：歷史穩定度特徵參數 (5個) =====
-    past_24hr_max_single_move: Optional[float] = Field(None, description="過去24hr內單根bar最大絕對漲跌幅")
-    past_48hr_price_range: Optional[float] = Field(None, description="過去48hr最高價與最低價差距百分比")
-    past_72hr_avg_bar_volatility: Optional[float] = Field(None, description="過去72hr平均bar波動率")
-    past_48hr_directional_movement: Optional[float] = Field(None, description="48hr方向性指標（0=震盪，1=單向趨勢）")
-    past_24hr_volume_stability: Optional[float] = Field(None, description="24hr成交量變異係數")
+    # ===== 改寫：分類特徵參數 (9個) =====
+    # 數值參數（3個）
+    past_3day_max_volatility: Optional[float] = Field(None, description="過去3天最大波動度(%)")
+    past_3day_direction: Optional[float] = Field(None, description="過去3天方向性(%)")
+    past_3day_volume_cv: Optional[float] = Field(None, description="過去3天量能變異係數")
+
+    # 分類參數（6個）
+    volatility_class: Optional[str] = Field(None, description="波動度分類 L/M/H/X")
+    direction_class: Optional[str] = Field(None, description="方向性分類 D/S/U/V")
+    volume_class: Optional[str] = Field(None, description="量能分類 A/B/C")
+    market_class: Optional[str] = Field(None, description="市場分類 C1-C12")
+    market_class_name: Optional[str] = Field(None, description="市場分類名稱")
+    difficulty_level: Optional[str] = Field(None, description="難度等級")
 
     # ===== 向後兼容的現有參數 (保持不變) =====
     future1_close_return: Optional[float] = Field(None, description="未來1根K線收盤價收益率")
@@ -405,12 +412,19 @@ def convert_case_dict_to_model(case_dict: Dict[str, Any]) -> CaseData:
         hour_of_day=safe_int(case_dict.get('hour_of_day')),
         day_of_week=safe_int(case_dict.get('day_of_week')),
 
-        # 歷史穩定度參數 (5個)
-        past_24hr_max_single_move=safe_float(case_dict.get('past_24hr_max_single_move')),
-        past_48hr_price_range=safe_float(case_dict.get('past_48hr_price_range')),
-        past_72hr_avg_bar_volatility=safe_float(case_dict.get('past_72hr_avg_bar_volatility')),
-        past_48hr_directional_movement=safe_float(case_dict.get('past_48hr_directional_movement')),
-        past_24hr_volume_stability=safe_float(case_dict.get('past_24hr_volume_stability')),
+        # ===== 改寫：分類特徵參數 (9個) =====
+        # 數值參數（3個）
+        past_3day_max_volatility=safe_float(case_dict.get('past_3day_max_volatility')),
+        past_3day_direction=safe_float(case_dict.get('past_3day_direction')),
+        past_3day_volume_cv=safe_float(case_dict.get('past_3day_volume_cv')),
+
+        # 分類參數（6個）
+        volatility_class=safe_str(case_dict.get('volatility_class')),
+        direction_class=safe_str(case_dict.get('direction_class')),
+        volume_class=safe_str(case_dict.get('volume_class')),
+        market_class=safe_str(case_dict.get('market_class')),
+        market_class_name=safe_str(case_dict.get('market_class_name')),
+        difficulty_level=safe_str(case_dict.get('difficulty_level')),
 
         # 反例專用參數
         positive_negative_ratio=safe_str(case_dict.get('positive_negative_ratio')),

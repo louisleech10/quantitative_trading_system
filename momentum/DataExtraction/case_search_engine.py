@@ -906,26 +906,36 @@ class CaseSearchEngine:
                     'future_max_return', 'future72_max_return',
                     'future_max_drawdown', 'future72_max_drawdown',
                     'future24_close', 'future24_low',
-                    
+
                     # 新增的基礎觸發條件參數
                     'closing_strength', 'price_position', 'volume_multiplier', 'taker_buy_ratio',
-                    
+
                     # 新增的未來收益參數 (1-12根K線)
                     'future_1bar_return', 'future_2bar_return', 'future_3bar_return', 'future_4bar_return',
                     'future_5bar_return', 'future_6bar_return', 'future_7bar_return', 'future_8bar_return',
                     'future_9bar_return', 'future_10bar_return', 'future_11bar_return', 'future_12bar_return',
-                    
+
                     # 新增的未來回撤參數 (1-12根K線)
                     'future_1bar_max_drawdown', 'future_2bar_max_drawdown', 'future_3bar_max_drawdown', 'future_4bar_max_drawdown',
                     'future_5bar_max_drawdown', 'future_6bar_max_drawdown', 'future_7bar_max_drawdown', 'future_8bar_max_drawdown',
                     'future_9bar_max_drawdown', 'future_10bar_max_drawdown', 'future_11bar_max_drawdown', 'future_12bar_max_drawdown',
-                    
+
                     # 新增的時間描述參數
                     'hour_of_day', 'day_of_week',
 
-                    # 新增的歷史穩定度參數 (5個)
-                    'past_24hr_max_single_move', 'past_48hr_price_range', 'past_72hr_avg_bar_volatility',
-                    'past_48hr_directional_movement', 'past_24hr_volume_stability'
+                    # ===== 改寫：分類特徵參數 (9個) =====
+                    # 數值參數（3個）
+                    'past_3day_max_volatility',   # 過去3天最大波動度(%)
+                    'past_3day_direction',         # 過去3天方向性(%)
+                    'past_3day_volume_cv',         # 過去3天量能CV
+
+                    # 分類參數（6個）
+                    'volatility_class',    # L/M/H/X
+                    'direction_class',     # D/S/U/V
+                    'volume_class',        # A/B/C
+                    'market_class',        # C1-C12
+                    'market_class_name',   # 平靜橫盤等
+                    'difficulty_level'     # 簡單/中等/困難
                 ]
 
                 for col in indicator_columns:
@@ -969,123 +979,180 @@ class CaseSearchEngine:
         periods_72h: int
     ) -> pd.DataFrame:
         """
-        一次性計算5個歷史穩定度特徵參數（向量化）
+        計算分類特徵（完全改寫版本）
 
-        目的：檢查T時刻之前的歷史穩定度，確保：
-        - 反向案例：T之前一段時間真正平穩（無大幅波動、無趨勢）
-        - 正向案例：可選過濾掉趨勢末端的假突破
+        ⚠️ 重要：從T-1 bar開始往前看3天，不包含T
 
         Args:
             df: 包含OHLCV數據的DataFrame，必須包含 open, high, low, close, volume 列
-            periods_24h: 24小時對應的bar數量（如12h timeframe = 2根bar）
-            periods_48h: 48小時對應的bar數量（如12h timeframe = 4根bar）
-            periods_72h: 72小時對應的bar數量（如12h timeframe = 6根bar）
+            periods_24h: 24小時對應的bar數量（保留參數，向後兼容）
+            periods_48h: 48小時對應的bar數量（保留參數，向後兼容）
+            periods_72h: 72小時對應的bar數量（用於3天lookback）
 
         Returns:
-            添加了5個新列的DataFrame:
-            - past_24hr_max_single_move: 過去24hr內單根bar最大絕對漲跌幅
-            - past_48hr_price_range: 過去48hr最高價與最低價差距百分比
-            - past_72hr_avg_bar_volatility: 過去72hr平均bar波動率
-            - past_48hr_directional_movement: 48hr方向性指標（0=震盪，1=單向趨勢）
-            - past_24hr_volume_stability: 24hr成交量變異係數
+            添加9個新列的DataFrame:
+
+            【3個數值參數】
+            - past_3day_max_volatility: 過去3天最大波動度(%)
+            - past_3day_direction: 過去3天方向性(%)
+            - past_3day_volume_cv: 過去3天量能變異係數
+
+            【6個分類參數】
+            - volatility_class: L/M/H/X
+            - direction_class: D/S/U/V
+            - volume_class: A/B/C
+            - market_class: C1-C12
+            - market_class_name: 平靜橫盤等
+            - difficulty_level: 簡單/中等/困難
 
         注意：
-            - 使用100%向量化操作，無Python循環
-            - 前N根bar會產生NaN（因為沒有足夠歷史數據），這是正常且預期的
+            - 100%向量化操作（使用np.select避免.apply）
+            - 從T-1開始往前看（使用 .shift(1)）
+            - 前N根bar會產生NaN（正常且預期）
             - 所有除法操作都有除零保護（+ 1e-10）
         """
         try:
-            # 確保 bar_return 列存在（當前bar的漲跌幅）
-            # 定義：(close - open) / open （單位：小數，如0.05代表5%）
-            if 'bar_return' not in df.columns:
-                df['bar_return'] = np.where(
-                    df['open'] != 0,
-                    (df['close'] - df['open']) / df['open'],
-                    0.0
-                )
-                self.logger.debug("已計算 'bar_return' 列（當前bar漲跌幅）")
+            lookback_bars = periods_72h  # 3天
 
-            # ===== 參數1: past_24hr_max_single_move =====
-            # 過去24hr內，所有單根bar中絕對漲跌幅最大值
-            df['past_24hr_max_single_move'] = df['bar_return'].abs().rolling(
-                window=periods_24h,
-                min_periods=max(1, periods_24h // 2)  # 至少需要一半數據
-            ).max()
+            # ===== 參數1: past_3day_max_volatility =====
+            # 計算每根bar的波動度：(High - Low) / Open * 100
+            bar_volatility = np.where(
+                df['open'] > 0,
+                (df['high'] - df['low']) / df['open'],
+                0.0
+            )
 
-            # ===== 參數2: past_48hr_price_range =====
-            # 過去48hr內的最高價與最低價差距，標準化為百分比（單位：%）
-            high_48hr = df['high'].rolling(
-                window=periods_48h,
-                min_periods=max(1, periods_48h // 2)
-            ).max()
-            low_48hr = df['low'].rolling(
-                window=periods_48h,
-                min_periods=max(1, periods_48h // 2)
-            ).min()
-            df['past_48hr_price_range'] = np.where(
-                df['close'] > 0,
-                (high_48hr - low_48hr) / df['close'] * 100,
+            # 從T-1往前看lookback_bars根（不包含T）
+            # 使用 .shift(1) 將數據向下移1位，再取.rolling()
+            bar_volatility_shifted = pd.Series(bar_volatility, index=df.index).shift(1)
+            past_volatility = bar_volatility_shifted.rolling(
+                window=lookback_bars,
+                min_periods=max(1, lookback_bars // 2)
+            ).max() * 100  # 轉為百分比
+
+            df['past_3day_max_volatility'] = past_volatility
+
+            # 波動度分類 L/M/H/X（向量化版本）
+            conditions_vol = [
+                past_volatility < 2,
+                (past_volatility >= 2) & (past_volatility < 5),
+                (past_volatility >= 5) & (past_volatility < 10)
+            ]
+            choices_vol = ['L', 'M', 'H']
+            df['volatility_class'] = np.select(conditions_vol, choices_vol, default='X')
+
+            # ===== 參數2: past_3day_direction =====
+            # 從T-1的close到T-1-lookback_bars的close的變化百分比
+            close_shifted = df['close'].shift(1)  # T-1的close
+            close_start = df['close'].shift(lookback_bars + 1)  # T-1-lookback_bars的close
+
+            direction_pct = np.where(
+                close_start > 0,
+                (close_shifted - close_start) / close_start * 100,
                 np.nan
             )
 
-            # ===== 參數3: past_72hr_avg_bar_volatility =====
-            # 過去72hr內，每根bar漲跌幅的絕對值平均
-            df['past_72hr_avg_bar_volatility'] = df['bar_return'].abs().rolling(
-                window=periods_72h,
-                min_periods=max(1, periods_72h // 2)
+            df['past_3day_direction'] = direction_pct
+
+            # 方向性分類 D/S/U/V（向量化版本）
+            conditions_dir = [
+                direction_pct < -3,
+                (direction_pct >= -3) & (direction_pct < 3),
+                (direction_pct >= 3) & (direction_pct < 8)
+            ]
+            choices_dir = ['D', 'S', 'U']
+            df['direction_class'] = np.select(conditions_dir, choices_dir, default='V')
+
+            # ===== 參數3: past_3day_volume_cv =====
+            # 變異係數 = std / mean（從T-1往前看）
+            volume_shifted = df['volume'].shift(1)
+
+            volume_mean = volume_shifted.rolling(
+                window=lookback_bars,
+                min_periods=max(1, lookback_bars // 2)
             ).mean()
 
-            # ===== 參數4: past_48hr_directional_movement =====
-            # 區分「單向趨勢」vs「來回震盪」
-            # 公式：累積漲跌幅絕對值 / 各bar漲跌幅絕對值總和
-            # 數值含義：接近1.0=單向移動（趨勢），接近0.0=來回震盪（盤整）
-            sum_directional = df['bar_return'].rolling(
-                window=periods_48h,
-                min_periods=max(1, periods_48h // 2)
-            ).sum().abs()
-            sum_volatility = df['bar_return'].abs().rolling(
-                window=periods_48h,
-                min_periods=max(1, periods_48h // 2)
-            ).sum()
-            df['past_48hr_directional_movement'] = np.where(
-                sum_volatility > 0,
-                sum_directional / (sum_volatility + 1e-10),
-                np.nan
-            )
-
-            # ===== 參數5: past_24hr_volume_stability =====
-            # 過去24hr成交量的變異係數 (CV = std / mean)
-            # 數值含義：<0.5=穩定，>1.0=異常波動
-            volume_mean = df['volume'].rolling(
-                window=periods_24h,
-                min_periods=max(1, periods_24h // 2)
-            ).mean()
-            volume_std = df['volume'].rolling(
-                window=periods_24h,
-                min_periods=max(1, periods_24h // 2)
+            volume_std = volume_shifted.rolling(
+                window=lookback_bars,
+                min_periods=max(1, lookback_bars // 2)
             ).std()
-            df['past_24hr_volume_stability'] = np.where(
+
+            volume_cv = np.where(
                 volume_mean > 0,
                 volume_std / (volume_mean + 1e-10),
                 np.nan
             )
 
-            self.logger.info("5個歷史穩定度參數計算完成（向量化）")
+            df['past_3day_volume_cv'] = volume_cv
+
+            # 量能分類 A/B/C（向量化版本）
+            conditions_vol_cls = [
+                volume_cv < 0.5,
+                (volume_cv >= 0.5) & (volume_cv < 1.0)
+            ]
+            choices_vol_cls = ['A', 'B']
+            df['volume_class'] = np.select(conditions_vol_cls, choices_vol_cls, default='C')
+
+            # ===== 應用市場分類（向量化版本）=====
+            # 初始化為C11（預設）
+            df['market_class'] = 'C11'
+            df['market_class_name'] = '其他組合'
+            df['difficulty_level'] = '混合'
+
+            # 按優先順序應用規則（使用布林遮罩）
+            # C1: 平靜橫盤
+            mask_c1 = (df['volatility_class'] == 'L') & (df['direction_class'] == 'S') & (df['volume_class'] == 'A')
+            df.loc[mask_c1, ['market_class', 'market_class_name', 'difficulty_level']] = ['C1', '平靜橫盤', '中等']
+
+            # C8: 縮量橫盤
+            mask_c8 = (df['volatility_class'] == 'L') & (df['direction_class'] == 'S') & (df['volume_class'] == 'C')
+            df.loc[mask_c8, ['market_class', 'market_class_name', 'difficulty_level']] = ['C8', '縮量橫盤', '中等']
+
+            # C2: 正常橫盤
+            mask_c2 = (df['volatility_class'].isin(['L', 'M'])) & (df['direction_class'] == 'S') & (df['volume_class'] == 'B')
+            df.loc[mask_c2, ['market_class', 'market_class_name', 'difficulty_level']] = ['C2', '正常橫盤', '中等']
+
+            # C6: 極端波動
+            mask_c6 = df['volatility_class'].isin(['H', 'X'])
+            df.loc[mask_c6, ['market_class', 'market_class_name', 'difficulty_level']] = ['C6', '極端波動', '簡單']
+
+            # C9: 恐慌下跌
+            mask_c9 = (df['volatility_class'].isin(['H', 'X'])) & (df['direction_class'] == 'D') & (df['volume_class'] == 'C')
+            df.loc[mask_c9, ['market_class', 'market_class_name', 'difficulty_level']] = ['C9', '恐慌下跌', '簡單']
+
+            # C3: 下跌趨勢
+            mask_c3 = (df['volatility_class'].isin(['M', 'H'])) & (df['direction_class'] == 'D')
+            df.loc[mask_c3, ['market_class', 'market_class_name', 'difficulty_level']] = ['C3', '下跌趨勢', '簡單']
+
+            # C5: 假突破
+            mask_c5 = (df['volatility_class'] == 'M') & (df['direction_class'] == 'U') & (df['volume_class'] == 'C')
+            df.loc[mask_c5, ['market_class', 'market_class_name', 'difficulty_level']] = ['C5', '假突破', '困難']
+
+            # C7: 溫和上漲中
+            mask_c7 = (df['volatility_class'] == 'M') & (df['direction_class'] == 'U') & (df['volume_class'].isin(['A', 'B']))
+            df.loc[mask_c7, ['market_class', 'market_class_name', 'difficulty_level']] = ['C7', '溫和上漲中', '困難']
+
+            # C4: 高位震盪
+            mask_c4 = (df['volatility_class'].isin(['M', 'H'])) & (df['direction_class'].isin(['U', 'V'])) & (df['volume_class'].isin(['B', 'C']))
+            df.loc[mask_c4, ['market_class', 'market_class_name', 'difficulty_level']] = ['C4', '高位震盪', '中等']
+
+            # C10: 放量震盪
+            mask_c10 = (df['volatility_class'].isin(['M', 'H'])) & (df['direction_class'] == 'S') & (df['volume_class'] == 'C')
+            df.loc[mask_c10, ['market_class', 'market_class_name', 'difficulty_level']] = ['C10', '放量震盪', '中等']
+
+            self.logger.info("分類特徵計算完成（9個參數，100%向量化）")
 
             return df
 
         except Exception as e:
-            self.logger.error(f"計算歷史穩定度特徵時出錯: {str(e)}", exc_info=True)
-            # 發生錯誤時，添加空列避免後續處理失敗
-            for param in [
-                'past_24hr_max_single_move',
-                'past_48hr_price_range',
-                'past_72hr_avg_bar_volatility',
-                'past_48hr_directional_movement',
-                'past_24hr_volume_stability'
-            ]:
-                if param not in df.columns:
-                    df[param] = np.nan
+            self.logger.error(f"計算分類特徵時出錯: {str(e)}", exc_info=True)
+            # 確保欄位存在（避免後續處理失敗）
+            for col in ['past_3day_max_volatility', 'past_3day_direction',
+                        'past_3day_volume_cv', 'volatility_class',
+                        'direction_class', 'volume_class', 'market_class',
+                        'market_class_name', 'difficulty_level']:
+                if col not in df.columns:
+                    df[col] = np.nan
             return df
 
     def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
