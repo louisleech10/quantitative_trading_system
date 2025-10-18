@@ -31,8 +31,9 @@ return calculate_real_metrics(trade_history)
 
 ---
 
-### 2. Ultra Think 三步驟
+### 2. First Principle思考和Ultra Think 三步驟
 
+**思考邏輯要遵守First Principle**
 **所有代碼生成必須遵循**：
 
 ```

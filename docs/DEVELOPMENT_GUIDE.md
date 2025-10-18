@@ -58,9 +58,10 @@ Claude Code CLI：生成實現 + 修復bug
 
 ---
 
-## Ultra Think三步驟流程
+## First Principle思考和Ultra Think三步驟流程
 
 ### 概述
+**所有思考要基於First Princple為思考原則**
 **所有程式碼生成必須遵循Ultra Think三步驟流程，確保代碼質量**
 
 ### 步驟1：初始生成
