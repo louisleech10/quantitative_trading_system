@@ -208,12 +208,12 @@ export const DayOfWeekPieChart: React.FC<{
   negativeData: Record<number, number>;
 }> = ({ positiveData, negativeData }) => {
   const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-  
+
   // 處理星期數，將 7 轉換為 0（週日）
   const normalizeDayOfWeek = (day: number): number => {
     return day === 7 ? 0 : day;
   };
-  
+
   const positiveChartData: PieChartData[] = Object.entries(positiveData)
     .sort(([a], [b]) => Number(a) - Number(b))
     .map(([day, count], index) => {
@@ -239,18 +239,104 @@ export const DayOfWeekPieChart: React.FC<{
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {positiveChartData.length > 0 && (
-        <PieChart 
-          data={positiveChartData} 
-          title="正例星期分布" 
-          width={350} 
+        <PieChart
+          data={positiveChartData}
+          title="正例星期分布"
+          width={350}
           height={300}
         />
       )}
       {negativeChartData.length > 0 && (
-        <PieChart 
-          data={negativeChartData} 
-          title="反例星期分布" 
-          width={350} 
+        <PieChart
+          data={negativeChartData}
+          title="反例星期分布"
+          width={350}
+          height={300}
+        />
+      )}
+    </div>
+  );
+};
+
+// ===== 新增：市場分類分布圓餅圖組件 =====
+export const MarketClassPieChart: React.FC<{
+  positiveData: Record<string, number>;
+  negativeData: Record<string, number>;
+}> = ({ positiveData, negativeData }) => {
+  const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([marketClass, count], index) => ({
+    name: marketClass,
+    value: count,
+    color: COLORS[index % COLORS.length]
+  }));
+
+  const negativeChartData: PieChartData[] = Object.entries(negativeData).map(([marketClass, count], index) => ({
+    name: marketClass,
+    value: count,
+    color: COLORS[index % COLORS.length]
+  }));
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {positiveChartData.length > 0 && (
+        <PieChart
+          data={positiveChartData}
+          title="正例市場分類分布"
+          width={350}
+          height={300}
+        />
+      )}
+      {negativeChartData.length > 0 && (
+        <PieChart
+          data={negativeChartData}
+          title="反例市場分類分布"
+          width={350}
+          height={300}
+        />
+      )}
+    </div>
+  );
+};
+
+// ===== 新增：難度分布圓餅圖組件 =====
+export const DifficultyPieChart: React.FC<{
+  positiveData: Record<string, number>;
+  negativeData: Record<string, number>;
+}> = ({ positiveData, negativeData }) => {
+  // 定義難度顏色映射
+  const difficultyColors: Record<string, string> = {
+    '簡單': '#82ca9d',  // 綠色
+    '中等': '#ffc658',  // 橙色
+    '困難': '#ff7300',  // 深橙色
+    '混合': '#d1d5db'   // 灰色
+  };
+
+  const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([difficulty, count]) => ({
+    name: difficulty,
+    value: count,
+    color: difficultyColors[difficulty] || COLORS[0]
+  }));
+
+  const negativeChartData: PieChartData[] = Object.entries(negativeData).map(([difficulty, count]) => ({
+    name: difficulty,
+    value: count,
+    color: difficultyColors[difficulty] || COLORS[0]
+  }));
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {positiveChartData.length > 0 && (
+        <PieChart
+          data={positiveChartData}
+          title="正例難度分布"
+          width={350}
+          height={300}
+        />
+      )}
+      {negativeChartData.length > 0 && (
+        <PieChart
+          data={negativeChartData}
+          title="反例難度分布"
+          width={350}
           height={300}
         />
       )}

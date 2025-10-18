@@ -21,6 +21,13 @@ export interface ActualStatistics {
   negativeHourDistribution: Record<number, number>;
   positiveDayOfWeekDistribution: Record<number, number>;
   negativeDayOfWeekDistribution: Record<number, number>;
+  // ===== 新增：市場分類和難度分布統計 =====
+  marketClassDistribution: Record<string, number>;
+  positiveMarketClassDistribution: Record<string, number>;
+  negativeMarketClassDistribution: Record<string, number>;
+  difficultyDistribution: Record<string, number>;
+  positiveDifficultyDistribution: Record<string, number>;
+  negativeDifficultyDistribution: Record<string, number>;
 }
 
 /**
@@ -45,7 +52,13 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
       positiveHourDistribution: {},
       negativeHourDistribution: {},
       positiveDayOfWeekDistribution: {},
-      negativeDayOfWeekDistribution: {}
+      negativeDayOfWeekDistribution: {},
+      marketClassDistribution: {},
+      positiveMarketClassDistribution: {},
+      negativeMarketClassDistribution: {},
+      difficultyDistribution: {},
+      positiveDifficultyDistribution: {},
+      negativeDifficultyDistribution: {}
     };
   }
 
@@ -61,6 +74,13 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
   const negativeHourDistribution: Record<number, number> = {};
   const positiveDayOfWeekDistribution: Record<number, number> = {};
   const negativeDayOfWeekDistribution: Record<number, number> = {};
+  // ===== 新增：市場分類和難度分布統計 =====
+  const marketClassCount: Record<string, number> = {};
+  const positiveMarketClassCount: Record<string, number> = {};
+  const negativeMarketClassCount: Record<string, number> = {};
+  const difficultyCount: Record<string, number> = {};
+  const positiveDifficultyCount: Record<string, number> = {};
+  const negativeDifficultyCount: Record<string, number> = {};
   let earliestTime: Date | null = null;
   let latestTime: Date | null = null;
 
@@ -114,13 +134,39 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
       const dayOfWeek = Number(caseItem.day_of_week);
       if (!isNaN(dayOfWeek)) {
         dayOfWeekDistribution[dayOfWeek] = (dayOfWeekDistribution[dayOfWeek] || 0) + 1;
-        
+
         // 分離統計正例和反例的星期分布
         if (isPositive) {
           positiveDayOfWeekDistribution[dayOfWeek] = (positiveDayOfWeekDistribution[dayOfWeek] || 0) + 1;
         } else {
           negativeDayOfWeekDistribution[dayOfWeek] = (negativeDayOfWeekDistribution[dayOfWeek] || 0) + 1;
         }
+      }
+    }
+
+    // ✅ 統計市場分類分布
+    if (caseItem.market_class_name) {
+      const marketClassName = caseItem.market_class_name;
+      marketClassCount[marketClassName] = (marketClassCount[marketClassName] || 0) + 1;
+
+      // 分離統計正例和反例的市場分類
+      if (isPositive) {
+        positiveMarketClassCount[marketClassName] = (positiveMarketClassCount[marketClassName] || 0) + 1;
+      } else {
+        negativeMarketClassCount[marketClassName] = (negativeMarketClassCount[marketClassName] || 0) + 1;
+      }
+    }
+
+    // ✅ 統計難度分布
+    if (caseItem.difficulty_level) {
+      const difficulty = caseItem.difficulty_level;
+      difficultyCount[difficulty] = (difficultyCount[difficulty] || 0) + 1;
+
+      // 分離統計正例和反例的難度分布
+      if (isPositive) {
+        positiveDifficultyCount[difficulty] = (positiveDifficultyCount[difficulty] || 0) + 1;
+      } else {
+        negativeDifficultyCount[difficulty] = (negativeDifficultyCount[difficulty] || 0) + 1;
       }
     }
 
@@ -168,7 +214,13 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
     positiveHourDistribution,
     negativeHourDistribution,
     positiveDayOfWeekDistribution,
-    negativeDayOfWeekDistribution
+    negativeDayOfWeekDistribution,
+    marketClassDistribution: marketClassCount,
+    positiveMarketClassDistribution: positiveMarketClassCount,
+    negativeMarketClassDistribution: negativeMarketClassCount,
+    difficultyDistribution: difficultyCount,
+    positiveDifficultyDistribution: positiveDifficultyCount,
+    negativeDifficultyDistribution: negativeDifficultyCount
   };
 };
 

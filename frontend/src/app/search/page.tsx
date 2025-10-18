@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics, formatTimestamp } from '@/lib/searchResultUtils';
-import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart } from '@/components/ui/PieChart';
+import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
 
 
@@ -1283,6 +1283,94 @@ export default function SearchPage() {
                           </div>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* ===== 新增：市場分類分布 - 圓餅圖顯示 ===== */}
+                  {(Object.keys(actualStats.positiveMarketClassDistribution).length > 0 || Object.keys(actualStats.negativeMarketClassDistribution).length > 0) && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border">
+                      <div className="text-lg font-semibold text-gray-800 mb-4">市場分類分布</div>
+
+                      {/* 圓餅圖 */}
+                      <MarketClassPieChart
+                        positiveData={actualStats.positiveMarketClassDistribution}
+                        negativeData={actualStats.negativeMarketClassDistribution}
+                      />
+
+                      {/* 詳細數據標籤 */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 正例市場分類分布 */}
+                        {Object.keys(actualStats.positiveMarketClassDistribution).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-green-700 mb-2">正例市場分類：</div>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(actualStats.positiveMarketClassDistribution).map(([marketClass, count]) => (
+                                <span key={`pos-market-${marketClass}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                  {marketClass}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 反例市場分類分布 */}
+                        {Object.keys(actualStats.negativeMarketClassDistribution).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-red-700 mb-2">反例市場分類：</div>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(actualStats.negativeMarketClassDistribution).map(([marketClass, count]) => (
+                                <span key={`neg-market-${marketClass}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                  {marketClass}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== 新增：難度分布 - 圓餅圖顯示 ===== */}
+                  {(Object.keys(actualStats.positiveDifficultyDistribution).length > 0 || Object.keys(actualStats.negativeDifficultyDistribution).length > 0) && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border">
+                      <div className="text-lg font-semibold text-gray-800 mb-4">難度分布</div>
+
+                      {/* 圓餅圖 */}
+                      <DifficultyPieChart
+                        positiveData={actualStats.positiveDifficultyDistribution}
+                        negativeData={actualStats.negativeDifficultyDistribution}
+                      />
+
+                      {/* 詳細數據標籤 */}
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 正例難度分布 */}
+                        {Object.keys(actualStats.positiveDifficultyDistribution).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-green-700 mb-2">正例難度：</div>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(actualStats.positiveDifficultyDistribution).map(([difficulty, count]) => (
+                                <span key={`pos-difficulty-${difficulty}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                  {difficulty}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 反例難度分布 */}
+                        {Object.keys(actualStats.negativeDifficultyDistribution).length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-red-700 mb-2">反例難度：</div>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(actualStats.negativeDifficultyDistribution).map(([difficulty, count]) => (
+                                <span key={`neg-difficulty-${difficulty}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                  {difficulty}: {count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
