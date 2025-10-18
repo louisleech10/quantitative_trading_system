@@ -290,6 +290,15 @@ async def start_negative_search(
 ):
     """開始反例搜索（第二階段）"""
     try:
+        # ===== DEBUG: 記錄接收到的請求參數 =====
+        logger.info(f"🔍 接收到反例搜索請求:")
+        logger.info(f"  - positive_task_id: {positive_task_id}")
+        logger.info(f"  - negative_ratio: {request.negative_ratio}")
+        logger.info(f"  - enable_time_separation: {request.enable_time_separation}")
+        logger.info(f"  - time_separation_days: {request.time_separation_days}")
+        logger.info(f"  - enable_random_sampling: {request.enable_random_sampling}")
+        logger.info(f"  - sampling_strategy: {request.sampling_strategy}")
+
         negative_task_id = await search_task_service.execute_negative_search(
             positive_task_id, request
         )

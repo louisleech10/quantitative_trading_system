@@ -535,30 +535,36 @@ class CaseSearchEngine:
             # 提取時間點
             timestamp = data.index[idx]
             
-            # 安全獲取數據的輔助函數 - 改進版本
+            # 安全獲取數據的輔助函數 - 改進版本（支持字符串和數值）
             def safe_get(column, default_value=None, require_valid=True):
                 try:
                     if column in data.columns and pd.notna(data[column].iloc[idx]):
                         value = data[column].iloc[idx]
 
-                        # DEBUG: 追蹤5個歷史穩定度參數的實際值
-                        if 'past_' in column:
+                        # DEBUG: 追蹤分類特徵參數的實際值
+                        if 'past_' in column or '_class' in column or 'difficulty' in column:
                             self.logger.error(f"🔍 TRACE: {column} - raw_value={value}, type={type(value)}, is_nan={pd.isna(value)}")
 
                         # 如果是百分比字符串，轉換為數值
                         if isinstance(value, str) and value.endswith('%'):
                             return float(value[:-1]) / 100
 
-                        final_value = float(value) if not pd.isna(value) else default_value
+                        # ===== 修復：根據 default_value 類型決定如何處理 =====
+                        # 如果 default_value 是字符串或 column 是分類參數，直接返回字符串
+                        if isinstance(default_value, str) or '_class' in column or 'difficulty' in column or 'market_class_name' in column:
+                            final_value = str(value) if not pd.isna(value) else default_value
+                        else:
+                            # 其他情況轉換為 float
+                            final_value = float(value) if not pd.isna(value) else default_value
 
                         # DEBUG: 追蹤最終返回值
-                        if 'past_' in column:
-                            self.logger.error(f"🔍 TRACE: {column} - final_value={final_value}, returning to case dict")
+                        if 'past_' in column or '_class' in column or 'difficulty' in column:
+                            self.logger.error(f"🔍 TRACE: {column} - final_value={final_value}, type={type(final_value)}, returning to case dict")
 
                         return final_value
                     else:
-                        # DEBUG: 記錄歷史穩定度參數的NaN情況
-                        if 'past_' in column and column in data.columns:
+                        # DEBUG: 記錄分類特徵參數的NaN情況
+                        if ('past_' in column or '_class' in column or 'difficulty' in column) and column in data.columns:
                             actual_value = data[column].iloc[idx]
                             self.logger.error(f"🔍 DEBUG: {column} 值是NaN - actual_value={actual_value}, type={type(actual_value)}")
 
@@ -568,7 +574,7 @@ class CaseSearchEngine:
                             return None
                         return default_value
                 except Exception as e:
-                    self.logger.debug(f"Error getting {column}: {e}")
+                    self.logger.error(f"Error getting {column}: {e}, returning default_value={default_value}")
                     return default_value
 
             # 檢查基礎 OHLCV 數據的完整性
