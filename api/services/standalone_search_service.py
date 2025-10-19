@@ -445,7 +445,7 @@ class StandaloneSearchService:
                 
                 # 檢查搜索結果
                 if real_cases_dict is None:
-                    error_msg = "Search engine returned None - no data available"
+                    error_msg = "[DATA_UNAVAILABLE] Search engine returned no data - check symbol validity and date range"
                     self.logger.error(error_msg)
                     self.task_manager.update_task_status(
                         task_id, TaskStatusEnum.FAILED, error_message=error_msg
@@ -453,7 +453,7 @@ class StandaloneSearchService:
                     return
                 
                 if len(real_cases_dict) == 0:
-                    error_msg = "No cases found matching the specified criteria"
+                    error_msg = f"[NO_RESULTS] No cases found for {len(final_symbols)} symbols with given criteria"
                     self.logger.warning(error_msg)
                     self.task_manager.update_task_status(
                         task_id, TaskStatusEnum.FAILED, error_message=error_msg
@@ -596,7 +596,7 @@ class StandaloneSearchService:
                 
                 # 檢查處理後的案例數量
                 if len(real_cases) == 0:
-                    error_msg = "No valid cases after data processing"
+                    error_msg = "[NO_VALID_CASES] No valid cases after data processing - all cases filtered out"
                     self.logger.error(error_msg)
                     self.task_manager.update_task_status(
                         task_id, TaskStatusEnum.FAILED, error_message=error_msg

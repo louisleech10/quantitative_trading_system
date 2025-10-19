@@ -361,7 +361,7 @@ class CaseSearchEngine:
             if config is None:
                 config = self.default_config.get("pump_detection")
                 if config is None:
-                    self.logger.error("No configuration provided and no default config available")
+                    self.logger.error("[CONFIG_MISSING] No configuration provided and no default config available")
                     return []  # 返回空列表而不是 None
 
             # 默認搜索交易對
@@ -409,13 +409,13 @@ class CaseSearchEngine:
                     self.matched_cases = all_results
                     self._save_results(config)
                 except Exception as save_error:
-                    self.logger.error(f"Failed to save results: {save_error}", exc_info=True)
+                    self.logger.error(f"[SAVE_FAILED] Failed to save search results: {type(save_error).__name__}: {str(save_error)}", exc_info=True)
 
             # 確保返回值不為 None
             return all_results if all_results is not None else []
 
         except Exception as e:
-            self.logger.error(f"Search failed with error: {str(e)}", exc_info=True)
+            self.logger.error(f"[SEARCH_FAILED] Search execution error: {type(e).__name__}: {str(e)}", exc_info=True)
             return []  # 發生任何錯誤都返回空列表
 
     async def _search_batch(self, config: SearchConfiguration, symbols: List[str]) -> List[Dict]:
@@ -436,7 +436,7 @@ class CaseSearchEngine:
                     self.logger.info(f"No cases found for {symbol}")
                     
             except Exception as e:
-                self.logger.error(f"Error processing {symbol}: {str(e)}")
+                self.logger.error(f"[PROCESS_FAILED] Symbol: {symbol} | Error: {type(e).__name__}: {str(e)}")
                 continue  # 跳過有問題的交易對，繼續處理下一個
 
         return batch_results
@@ -474,7 +474,7 @@ class CaseSearchEngine:
             
             # 檢查計算列是否成功添加
             if 'price_change' not in data.columns:
-                self.logger.error(f"Failed to add calculated columns for {symbol}")
+                self.logger.error(f"[CALC_FAILED] Symbol: {symbol} | Failed to add calculated columns")
                 return []
             
             # 進行初始篩選
@@ -504,13 +504,13 @@ class CaseSearchEngine:
                     if case_result is not None:
                         results.append(case_result)
                 except Exception as case_error:
-                    self.logger.error(f"Error creating case result for {symbol} at index {idx}: {case_error}")
+                    self.logger.error(f"[CASE_CREATE_FAILED] Symbol: {symbol} at index {idx} | Error: {type(case_error).__name__}: {str(case_error)}")
                     continue
             
             return results
             
         except Exception as e:
-            self.logger.error(f"Error searching single symbol {symbol}: {str(e)}")
+            self.logger.error(f"[SEARCH_FAILED] Symbol: {symbol} | Error: {type(e).__name__}: {str(e)}")
             return []
 
     # 改進的數據處理邏輯 - 避免虛擬數據污染
