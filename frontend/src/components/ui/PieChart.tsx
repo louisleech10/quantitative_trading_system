@@ -39,31 +39,12 @@ export const PieChart: React.FC<PieChartProps> = ({
 
   // 計算總值用於百分比計算
   const totalValue = data.reduce((sum, item) => sum + item.value, 0);
-  
-  // 過濾數據：只顯示佔比大於3%的數據，其餘合併為"其他"
-  const threshold = totalValue * 0.03; // 3%閾值
-  const significantData: PieChartData[] = [];
-  let otherValue = 0;
-  
-  data.forEach((item, index) => {
-    if (item.value >= threshold) {
-      significantData.push({
-        ...item,
-        color: item.color || COLORS[index % COLORS.length]
-      });
-    } else {
-      otherValue += item.value;
-    }
-  });
-  
-  // 如果有小比例數據，添加"其他"類別
-  if (otherValue > 0) {
-    significantData.push({
-      name: '其他',
-      value: otherValue,
-      color: '#d1d5db' // 灰色
-    });
-  }
+
+  // 顯示所有數據，不進行過濾
+  const significantData: PieChartData[] = data.map((item, index) => ({
+    ...item,
+    color: item.color || COLORS[index % COLORS.length]
+  }));
 
   return (
     <div className="w-full" style={{ width, height }}>
