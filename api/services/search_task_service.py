@@ -24,6 +24,8 @@ class SearchTaskService:
         self.positive_results: Dict[str, List[CaseData]] = {}  # 儲存正例結果
         self.negative_results: Dict[str, List[CaseData]] = {}  # 儲存反例結果
         self.positive_configs: Dict[str, SearchConfigRequest] = {}  # 儲存正例搜索配置
+        self.positive_execution_times: Dict[str, float] = {}  # 儲存正例執行時間
+        self.negative_execution_times: Dict[str, float] = {}  # 儲存反例執行時間
         
     async def execute_positive_search(self, request: SearchConfigRequest, 
                                     symbols: Optional[List[str]] = None) -> str:
@@ -67,8 +69,11 @@ class SearchTaskService:
                             case.__dict__['positive_case'] = True
                         elif isinstance(case, dict):
                             case['positive_case'] = True
-                    
+
                     self.positive_results[task_id] = result_data.cases
+                    # 儲存執行時間
+                    if hasattr(result_data, 'execution_time'):
+                        self.positive_execution_times[task_id] = result_data.execution_time
                     self.logger.info(f"Positive search {task_id} completed with {len(result_data.cases)} cases")
                 break
                 
@@ -180,6 +185,9 @@ class SearchTaskService:
 
                 # 存儲反例結果
                 self.negative_results[task_id] = negative_cases
+                # 儲存執行時間
+                if hasattr(result_data, 'execution_time'):
+                    self.negative_execution_times[task_id] = result_data.execution_time
                 self.logger.info(f"反例搜索完成，找到 {len(negative_cases)} 個案例")
 
                 # ✅ 直接使用完整的 result_data，不需要手動創建
@@ -703,14 +711,19 @@ class SearchTaskService:
         
         return negative_timestamps[:target_count]
     
-    def get_combined_results(self, positive_task_id: str, 
+    def get_combined_results(self, positive_task_id: str,
                            negative_task_id: str) -> Optional[SearchResultData]:
         """獲取正反例合併結果"""
         positive_cases = self.positive_results.get(positive_task_id, [])
         negative_cases = self.negative_results.get(negative_task_id, [])
-        
+
         if not positive_cases and not negative_cases:
             return None
+
+        # 計算總執行時間
+        total_execution_time = 0.0
+        total_execution_time += self.positive_execution_times.get(positive_task_id, 0.0)
+        total_execution_time += self.negative_execution_times.get(negative_task_id, 0.0)
         
         all_cases = []
 
@@ -745,7 +758,7 @@ class SearchTaskService:
             cases=all_cases,
             total_cases=len(all_cases),
             search_config={},
-            execution_time=10.0,
+            execution_time=total_execution_time,
             symbols_processed=symbols_processed,
             positive_cases_count=len(positive_cases),
             negative_cases_count=len(negative_cases),
