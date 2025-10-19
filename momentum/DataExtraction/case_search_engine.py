@@ -662,9 +662,9 @@ class CaseSearchEngine:
                 'future72_max_drawdown': safe_get('future72_max_drawdown'),
                 'future24_close': safe_get('future24_close'),
                 'future24_low': safe_get('future24_low'),
-                'prior_volatility': safe_get('prior_volatility'),
-                'prior_range': safe_get('prior_range'),
-                'prior_abs_change_sum': safe_get('prior_abs_change_sum'),
+                'prior_volatility': safe_get('prior_volatility', default_value=None, require_valid=False),
+                'prior_range': safe_get('prior_range', default_value=None, require_valid=False),
+                'prior_abs_change_sum': safe_get('prior_abs_change_sum', default_value=None, require_valid=False),
 
                 # ===== 未來收益參數 (1-12根K線) =====
                 'future_1bar_return': safe_get('future_1bar_return'),
