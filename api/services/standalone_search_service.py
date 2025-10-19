@@ -456,10 +456,31 @@ class StandaloneSearchService:
                     info_msg = f"Search completed: No cases found for {len(final_symbols)} symbols with given criteria"
                     self.logger.info(info_msg)
                     # 沒有結果不是失敗，而是成功完成但結果為空
+                    from ..models.responses import CaseSummary, SamplingQuality
+
+                    empty_summary = CaseSummary(
+                        total_cases=0,
+                        positive_cases=0,
+                        negative_cases=0,
+                        unique_symbols=len(final_symbols),
+                        time_range={"start": "N/A", "end": "N/A"},
+                        market_phase_distribution={}
+                    )
+
+                    empty_quality = SamplingQuality(
+                        time_separation_score=0.0,
+                        symbol_diversity_score=0.0,
+                        market_phase_balance=0.0,
+                        overall_quality_score=0.0,
+                        warnings=["No cases found"]
+                    )
+
                     result_data = SearchResultData(
                         cases=[],
-                        total_count=0,
+                        summary=empty_summary,
+                        sampling_quality=empty_quality,
                         execution_time=0.0,
+                        cache_used=False,
                         search_config=None
                     )
                     self.task_manager.set_task_result(task_id, result_data)
@@ -605,10 +626,31 @@ class StandaloneSearchService:
                     info_msg = "Search completed: All cases filtered out during data validation"
                     self.logger.info(info_msg)
                     # 所有案例被過濾也不是失敗，而是成功完成但結果為空
+                    from ..models.responses import CaseSummary, SamplingQuality
+
+                    empty_summary = CaseSummary(
+                        total_cases=0,
+                        positive_cases=0,
+                        negative_cases=0,
+                        unique_symbols=len(final_symbols),
+                        time_range={"start": "N/A", "end": "N/A"},
+                        market_phase_distribution={}
+                    )
+
+                    empty_quality = SamplingQuality(
+                        time_separation_score=0.0,
+                        symbol_diversity_score=0.0,
+                        market_phase_balance=0.0,
+                        overall_quality_score=0.0,
+                        warnings=["All cases filtered out"]
+                    )
+
                     result_data = SearchResultData(
                         cases=[],
-                        total_count=0,
+                        summary=empty_summary,
+                        sampling_quality=empty_quality,
                         execution_time=0.0,
+                        cache_used=False,
                         search_config=None
                     )
                     self.task_manager.set_task_result(task_id, result_data)
