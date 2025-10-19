@@ -145,8 +145,8 @@ class SearchTaskService:
                          request: NegativeCaseRequest, positive_timeframe: str = "12h"):
         """執行反例搜索邏輯 - 修復版本"""
         try:
-            # 更新任務狀態為執行中
-            standalone_search_service.task_manager.create_task(f"negative_search_{task_id}")
+            # 創建並更新任務狀態為執行中
+            standalone_search_service.task_manager.create_task(task_id)
             standalone_search_service.task_manager.update_task_status(
                 task_id, "running"
             )
