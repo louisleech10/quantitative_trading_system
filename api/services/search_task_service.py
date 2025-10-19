@@ -305,12 +305,12 @@ class SearchTaskService:
                     result_data = standalone_search_service.get_task_result(negative_task_id)
 
                     # DEBUG日誌追蹤結果傳遞
-                    self.logger.info(f"[DEBUG] 獲取任務結果: task_id={negative_task_id}")
-                    self.logger.info(f"[DEBUG] result_data is None: {result_data is None}")
+                    self.logger.debug(f"Retrieved negative task result: task_id={negative_task_id}")
+                    self.logger.debug(f"Result data is None: {result_data is None}")
                     if result_data:
-                        self.logger.info(f"[DEBUG] result_data.cases is None: {result_data.cases is None}")
+                        self.logger.debug(f"Result data cases is None: {result_data.cases is None}")
                         if result_data.cases is not None:
-                            self.logger.info(f"[DEBUG] result_data.cases 長度: {len(result_data.cases)}")
+                            self.logger.debug(f"Result data cases length: {len(result_data.cases)}")
 
                     if result_data and result_data.cases:
                         self.logger.info(f"條件搜索完成，找到 {len(result_data.cases)} 個候選反例")
