@@ -215,9 +215,31 @@ class MockSearchTaskService:
                 case_dict['positive_case'] = False
                 all_cases.append(case_dict)
                 negative_count += 1
-            
+
+        # 即使沒有案例，也返回完整的空結果結構，而不是 None
         if not all_cases:
-            return None
+            from ..models.responses import SearchResultData, CaseSummary, SamplingQuality
+            return SearchResultData(
+                cases=[],
+                summary=CaseSummary(
+                    total_cases=0,
+                    positive_cases=0,
+                    negative_cases=0,
+                    unique_symbols=len(symbols_list) if symbols_list != ["BTCUSDT"] else 0,
+                    time_range={"start": "N/A", "end": "N/A"},
+                    market_phase_distribution={}
+                ),
+                sampling_quality=SamplingQuality(
+                    time_separation_score=0.0,
+                    symbol_diversity_score=0.0,
+                    market_phase_balance=0.0,
+                    overall_quality_score=0.0,
+                    warnings=["No cases found in both positive and negative search"]
+                ),
+                execution_time=total_execution_time,
+                cache_used=False,
+                search_config={"positive_negative_ratio": "0:0"}
+            )
             
         # 返回完整的合併結果，包含所有必需字段
         from ..models.responses import SearchResultData
