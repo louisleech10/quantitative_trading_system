@@ -456,8 +456,6 @@ class StandaloneSearchService:
                     info_msg = f"Search completed: No cases found for {len(final_symbols)} symbols with given criteria"
                     self.logger.info(info_msg)
                     # 沒有結果不是失敗，而是成功完成但結果為空
-                    from ..models.responses import CaseSummary, SamplingQuality
-
                     empty_summary = CaseSummary(
                         total_cases=0,
                         positive_cases=0,
@@ -626,8 +624,6 @@ class StandaloneSearchService:
                     info_msg = "Search completed: All cases filtered out during data validation"
                     self.logger.info(info_msg)
                     # 所有案例被過濾也不是失敗，而是成功完成但結果為空
-                    from ..models.responses import CaseSummary, SamplingQuality
-
                     empty_summary = CaseSummary(
                         total_cases=0,
                         positive_cases=0,
