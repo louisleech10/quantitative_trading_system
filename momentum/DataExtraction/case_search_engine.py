@@ -1047,9 +1047,9 @@ class CaseSearchEngine:
 
             # 波動度分類 L/M/H/X（向量化版本）
             conditions_vol = [
-                past_volatility < 2,
-                (past_volatility >= 2) & (past_volatility < 5),
-                (past_volatility >= 5) & (past_volatility < 10)
+                past_volatility < 3,
+                (past_volatility >= 3) & (past_volatility < 6),
+                (past_volatility >= 6) & (past_volatility < 8)
             ]
             choices_vol = ['L', 'M', 'H']
             df['volatility_class'] = np.select(conditions_vol, choices_vol, default='X')
@@ -1069,9 +1069,9 @@ class CaseSearchEngine:
 
             # 方向性分類 D/S/U/V（向量化版本）
             conditions_dir = [
-                direction_pct < -3,
-                (direction_pct >= -3) & (direction_pct < 3),
-                (direction_pct >= 3) & (direction_pct < 8)
+                direction_pct < -5,
+                (direction_pct >= -5) & (direction_pct < 1),
+                (direction_pct >= 1) & (direction_pct < 5)
             ]
             choices_dir = ['D', 'S', 'U']
             df['direction_class'] = np.select(conditions_dir, choices_dir, default='V')
@@ -1100,58 +1100,66 @@ class CaseSearchEngine:
 
             # 量能分類 A/B/C（向量化版本）
             conditions_vol_cls = [
-                volume_cv < 0.5,
-                (volume_cv >= 0.5) & (volume_cv < 1.0)
+                volume_cv < 0.3,
+                (volume_cv >= 0.3) & (volume_cv < 0.6)
             ]
             choices_vol_cls = ['A', 'B']
             df['volume_class'] = np.select(conditions_vol_cls, choices_vol_cls, default='C')
 
             # ===== 應用市場分類（向量化版本）=====
             # 初始化為C11（預設）
-            df['market_class'] = 'C11'
+            df['market_class'] = 'C13'
             df['market_class_name'] = '其他組合'
             df['difficulty_level'] = '混合'
 
             # 按優先順序應用規則（使用布林遮罩）
-            # C1: 平靜橫盤
+            # C1: 低位盤整
             mask_c1 = (df['volatility_class'] == 'L') & (df['direction_class'] == 'S') & (df['volume_class'] == 'A')
-            df.loc[mask_c1, ['market_class', 'market_class_name', 'difficulty_level']] = ['C1', '平靜橫盤', '中等']
+            df.loc[mask_c1, ['market_class', 'market_class_name', 'difficulty_level']] = ['C1', '低位盤整', '簡單']
 
-            # C8: 縮量橫盤
-            mask_c8 = (df['volatility_class'] == 'L') & (df['direction_class'] == 'S') & (df['volume_class'] == 'C')
-            df.loc[mask_c8, ['market_class', 'market_class_name', 'difficulty_level']] = ['C8', '縮量橫盤', '中等']
+            # C2: 穩定震盪
+            mask_c2 = (df['volatility_class']== 'L') & (df['direction_class'] == 'S') & (df['volume_class'] == 'B')
+            df.loc[mask_c2, ['market_class', 'market_class_name', 'difficulty_level']] = ['C2', '穩定震盪', '簡單']
 
-            # C2: 正常橫盤
-            mask_c2 = (df['volatility_class'].isin(['L', 'M'])) & (df['direction_class'] == 'S') & (df['volume_class'] == 'B')
-            df.loc[mask_c2, ['market_class', 'market_class_name', 'difficulty_level']] = ['C2', '正常橫盤', '中等']
-
-            # C6: 極端波動
-            mask_c6 = df['volatility_class'].isin(['H', 'X'])
-            df.loc[mask_c6, ['market_class', 'market_class_name', 'difficulty_level']] = ['C6', '極端波動', '簡單']
-
-            # C9: 恐慌下跌
-            mask_c9 = (df['volatility_class'].isin(['H', 'X'])) & (df['direction_class'] == 'D') & (df['volume_class'] == 'C')
-            df.loc[mask_c9, ['market_class', 'market_class_name', 'difficulty_level']] = ['C9', '恐慌下跌', '簡單']
-
-            # C3: 下跌趨勢
-            mask_c3 = (df['volatility_class'].isin(['M', 'H'])) & (df['direction_class'] == 'D')
-            df.loc[mask_c3, ['market_class', 'market_class_name', 'difficulty_level']] = ['C3', '下跌趨勢', '簡單']
-
-            # C5: 假突破
-            mask_c5 = (df['volatility_class'] == 'M') & (df['direction_class'] == 'U') & (df['volume_class'] == 'C')
-            df.loc[mask_c5, ['market_class', 'market_class_name', 'difficulty_level']] = ['C5', '假突破', '困難']
-
-            # C7: 溫和上漲中
-            mask_c7 = (df['volatility_class'] == 'M') & (df['direction_class'] == 'U') & (df['volume_class'].isin(['A', 'B']))
-            df.loc[mask_c7, ['market_class', 'market_class_name', 'difficulty_level']] = ['C7', '溫和上漲中', '困難']
+            # C3: 溫和上漲
+            mask_c3 = (df['volatility_class']== 'L') & (df['direction_class'] == 'U') & (df['volume_class'] == 'A')
+            df.loc[mask_c3, ['market_class', 'market_class_name', 'difficulty_level']] = ['C3', '溫和上漲', '中等']
 
             # C4: 高位震盪
-            mask_c4 = (df['volatility_class'].isin(['M', 'H'])) & (df['direction_class'].isin(['U', 'V'])) & (df['volume_class'].isin(['B', 'C']))
+            mask_c4 = (df['volatility_class']== 'M') & (df['direction_class'] == 'S') & (df['volume_class'] == 'A')
             df.loc[mask_c4, ['market_class', 'market_class_name', 'difficulty_level']] = ['C4', '高位震盪', '中等']
 
-            # C10: 放量震盪
-            mask_c10 = (df['volatility_class'].isin(['M', 'H'])) & (df['direction_class'] == 'S') & (df['volume_class'] == 'C')
-            df.loc[mask_c10, ['market_class', 'market_class_name', 'difficulty_level']] = ['C10', '放量震盪', '中等']
+            # C5: 標準盤整
+            mask_c5 = (df['volatility_class']== 'M') & (df['direction_class'] == 'S') & (df['volume_class'] == 'B')
+            df.loc[mask_c5, ['market_class', 'market_class_name', 'difficulty_level']] = ['C5', '標準盤整', '中等']
+
+            # C6: 標準上漲
+            mask_c6 = (df['volatility_class']== 'M') & (df['direction_class'] == 'U') & (df['volume_class'] == 'A')
+            df.loc[mask_c6, ['market_class', 'market_class_name', 'difficulty_level']] = ['C6', '標準上漲', '中等']
+
+            # C7: 溫躍上漲
+            mask_c7 = (df['volatility_class']== 'M') & (df['direction_class'] == 'U') & (df['volume_class'] == 'B')
+            df.loc[mask_c7, ['market_class', 'market_class_name', 'difficulty_level']] = ['C7', '躍上漲', '中等']
+
+            # C8: 劇烈震盪
+            mask_c8 = (df['volatility_class'] == 'H') & (df['direction_class'] == 'S') & (df['volume_class'] == 'A')
+            df.loc[mask_c8, ['market_class', 'market_class_name', 'difficulty_level']] = ['C8', '劇烈震盪', '困難']
+
+            # C9: 高位震盪
+            mask_c9 = (df['volatility_class']== 'H') & (df['direction_class'] == 'S') & (df['volume_class'] == 'B')
+            df.loc[mask_c9, ['market_class', 'market_class_name', 'difficulty_level']] = ['C9', '高位震盪', '困難']
+
+            # C10: 強勁上漲
+            mask_c10 = (df['volatility_class']== 'H') & (df['direction_class'] == 'U') & (df['volume_class'] == 'B')
+            df.loc[mask_c10, ['market_class', 'market_class_name', 'difficulty_level']] = ['C10', '放量震盪', '困難']
+
+            # C11: 強勁下跌
+            mask_c11 = (df['volatility_class']== 'H') & (df['direction_class'] == 'D') & (df['volume_class'] == 'B')
+            df.loc[mask_c10, ['market_class', 'market_class_name', 'difficulty_level']] = ['C10', '強勁下跌', '困難']
+
+            # C12: 極端波動
+            mask_c12 = (df['volatility_class']== 'H') & (df['direction_class'] == 'V') & (df['volume_class'] == 'V')
+            df.loc[mask_c10, ['market_class', 'market_class_name', 'difficulty_level']] = ['C10', '極端波動', '困難']
 
             self.logger.info("分類特徵計算完成（9個參數，100%向量化）")
 
