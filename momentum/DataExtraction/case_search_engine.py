@@ -441,10 +441,10 @@ class CaseSearchEngine:
         """搜索單個交易對，增強錯誤處理"""
         try:
             # DEBUG: 確認此函數被調用
-            self.logger.warning(f"🔍 DEBUG: _search_single_symbol 被調用 - symbol={symbol}, timeframe={config.timeframe}")
+            self.logger.debug(f"Searching symbol: {symbol}, timeframe={config.timeframe}")
 
             # 獲取歷史數據
-            self.logger.info(f"Loading data for {symbol}")
+            self.logger.debug(f"Loading data for {symbol}")
             
             # 修正：正確傳遞時間範圍參數
             if hasattr(config, 'time_range') and config.time_range:
@@ -521,7 +521,7 @@ class CaseSearchEngine:
             if missing_params:
                 self.logger.debug(f"Missing classification params: {missing_params}")
             else:
-                self.logger.warning(f"🔍 DEBUG: _create_case_result - 所有9個分類特徵參數都在columns中")
+                self.logger.debug(f"All 9 classification parameters present in columns")
 
             # 確保索引有效
             if idx < 0 or idx >= len(data):
@@ -1182,7 +1182,7 @@ class CaseSearchEngine:
         3. 時間和市場描述參數
         """
         # DEBUG: 確認此函數被調用
-        self.logger.warning(f"🔍 DEBUG: _add_calculated_columns 被調用 - timeframe={timeframe}, rows={len(data)}")
+        self.logger.debug(f"Adding calculated columns: timeframe={timeframe}, rows={len(data)}")
 
         try:
             self.logger.info("開始添加擴充計算列...")

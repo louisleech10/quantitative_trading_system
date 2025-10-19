@@ -120,8 +120,8 @@ class SearchTaskService:
                 self.logger.error(f"獲取正例timeframe時出錯: {str(e)}，使用默認值: {positive_timeframe}")
 
         self.logger.info(f"Starting negative search based on {len(positive_cases)} positive cases")
-        self.logger.info(f"Using timeframe from positive search: {positive_timeframe}")
-        self.logger.info(f"Negative request type: {type(negative_request)}")
+        self.logger.debug(f"Using timeframe from positive search: {positive_timeframe}")
+        self.logger.debug(f"Negative request type: {type(negative_request)}")
 
         # 檢查用戶條件
         if hasattr(negative_request, 'negative_conditions') and negative_request.negative_conditions:
@@ -156,12 +156,12 @@ class SearchTaskService:
 
             # 提取正例的symbol列表
             positive_symbols = list(set(case.symbol for case in positive_cases))
-            self.logger.info(f"開始執行反例搜索，交易對: {positive_symbols}")
-            self.logger.info(f"使用正例的timeframe: {positive_timeframe}")
+            self.logger.debug(f"開始執行反例搜索，交易對: {positive_symbols}")
+            self.logger.debug(f"使用正例的timeframe: {positive_timeframe}")
 
             # 檢查是否有用戶設定的條件
             if hasattr(request, 'negative_conditions') and request.negative_conditions:
-                self.logger.info(f"使用用戶設定的反例條件，條件數量: {len(request.negative_conditions)}")
+                self.logger.debug(f"使用用戶設定的反例條件，條件數量: {len(request.negative_conditions)}")
 
                 # ✅ 調用搜索並獲得完整的 SearchResultData，傳遞正例的timeframe
                 result_data = await self._search_with_user_conditions(
@@ -215,7 +215,7 @@ class SearchTaskService:
         try:
             from ..models.requests import SearchConfigRequest, FilterConditionRequest
             
-            self.logger.info("構建反例搜索配置...")
+            self.logger.debug("構建反例搜索配置...")
             
             # === 修復1：使用正例搜索的相同時間範圍，而不是從案例時間戳推斷 ===
             # 優先從正例搜索配置中獲取時間範圍
@@ -233,7 +233,7 @@ class SearchTaskService:
                 positive_config = self.positive_configs[positive_task_id]
                 search_start_date = positive_config.start_date
                 search_end_date = positive_config.end_date
-                self.logger.info(f"從正例配置獲取時間範圍: {search_start_date} 到 {search_end_date}")
+                self.logger.debug(f"從正例配置獲取時間範圍: {search_start_date} 到 {search_end_date}")
             else:
                 self.logger.warning(f"無法從正例配置獲取時間範圍，使用默認值: {search_start_date} 到 {search_end_date}")
 
@@ -247,7 +247,7 @@ class SearchTaskService:
                 search_end = datetime.strptime("2025-05-31", '%Y-%m-%d')
                 self.logger.warning("日期格式錯誤，使用默認時間範圍")
 
-            self.logger.info(f"反例搜索將使用與正例相同的時間範圍: {search_start.date()} 到 {search_end.date()}")
+            self.logger.debug(f"反例搜索將使用與正例相同的時間範圍: {search_start.date()} 到 {search_end.date()}")
             
             # === 創建搜索配置 ===
             negative_config = SearchConfigRequest(
@@ -262,7 +262,7 @@ class SearchTaskService:
             
             # 添加用戶設定的條件
             for condition_data in request.negative_conditions:
-                self.logger.info(f"添加條件: {condition_data['parameter']} {condition_data['operator']} {condition_data['value']}")
+                self.logger.debug(f"添加條件: {condition_data['parameter']} {condition_data['operator']} {condition_data['value']}")
                 
                 condition = FilterConditionRequest(
                     condition_type=condition_data["condition_type"],
@@ -274,7 +274,7 @@ class SearchTaskService:
                 negative_config.initial_conditions.append(condition)
             
             # 執行真實搜索
-            self.logger.info("執行基於條件的反例搜索...")
+            self.logger.debug("執行基於條件的反例搜索...")
             negative_task_id = await standalone_search_service.execute_search(negative_config, symbols)
             
             # 等待搜索完成 - 基於任務狀態的智能等待
@@ -321,7 +321,7 @@ class SearchTaskService:
                         negative_ratio = getattr(request, 'negative_ratio', 2.0)
                         enable_random_sampling = getattr(request, 'enable_random_sampling', True)  # ===== 新增 =====
 
-                        self.logger.info(f"時間分離配置: 啟用={enable_separation}, {separation_days}天, 反例比例: {negative_ratio}, 隨機取樣: {enable_random_sampling}")
+                        self.logger.debug(f"時間分離配置: 啟用={enable_separation}, {separation_days}天, 反例比例: {negative_ratio}, 隨機取樣: {enable_random_sampling}")
 
                         # 應用時間分離和比例控制
                         filtered_cases = await self._apply_time_separation_and_ratio(
@@ -407,14 +407,14 @@ class SearchTaskService:
             from datetime import datetime, timedelta
             from collections import defaultdict
 
-            self.logger.info(
+            self.logger.debug(
                 f"開始時間分離過濾: 候選反例{len(candidate_cases)}個, "
                 f"正例{len(positive_cases)}個, 分離{separation_days}天, 啟用={enable_separation}"
             )
 
             # Step 1: 如果時間分離被關閉，直接跳過過濾
             if not enable_separation or separation_days == 0:
-                self.logger.info(f"時間分離已關閉，候選反例: {len(candidate_cases)}個")
+                self.logger.debug(f"時間分離已關閉，候選反例: {len(candidate_cases)}個")
                 filtered_candidates = candidate_cases
             else:
                 # Step 2: 按Symbol分組正例的時間戳
@@ -503,21 +503,21 @@ class SearchTaskService:
                     symbol_stats[symbol]['pos_count'] = len(times)
 
                 # Step 4: 詳細日誌 - 按Symbol顯示統計（前10個Symbol）
-                self.logger.info(f"時間分離統計（按Symbol獨立計算）:")
+                self.logger.debug(f"時間分離統計（按Symbol獨立計算）:")
                 sorted_symbols = sorted(symbol_stats.keys())[:10]  # 只顯示前10個
                 for symbol in sorted_symbols:
                     stats = symbol_stats[symbol]
-                    self.logger.info(
+                    self.logger.debug(
                         f"  {symbol}: 正例{stats['pos_count']}個, "
                         f"候選{stats['candidates']}個 → "
                         f"保留{stats['kept']}個, 過濾{stats['filtered']}個"
                     )
 
                 if len(symbol_stats) > 10:
-                    self.logger.info(f"  ... 還有 {len(symbol_stats) - 10} 個Symbol未顯示")
+                    self.logger.debug(f"  ... 還有 {len(symbol_stats) - 10} 個Symbol未顯示")
 
                 total_filtered = sum(s['filtered'] for s in symbol_stats.values())
-                self.logger.info(
+                self.logger.debug(
                     f"總計: 保留{len(filtered_candidates)}個, "
                     f"過濾{total_filtered}個 (在{separation_days}天窗口內)"
                 )

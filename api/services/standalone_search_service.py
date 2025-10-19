@@ -407,8 +407,8 @@ class StandaloneSearchService:
                 search_config = self._convert_request_to_search_config(request)
 
                 # 添加調試LOG
-                self.logger.info(f"Debug - symbols parameter: {symbols}")
-                self.logger.info(f"Debug - request.symbols: {getattr(request, 'symbols', 'NOT_FOUND')}")
+                self.logger.debug(f"Symbols parameter: {symbols}")
+                self.logger.debug(f"Request symbols: {getattr(request, 'symbols', 'NOT_FOUND')}")
 
                 def process_special_keywords(symbol_list):
                     if not symbol_list:
@@ -433,7 +433,7 @@ class StandaloneSearchService:
                     return result
 
                 final_symbols = process_special_keywords(symbols or request.symbols or ["BTCUSDT"])
-                self.logger.info(f"Debug - final symbols: {final_symbols}")
+                self.logger.debug(f"Final symbols: {final_symbols}")
                 
                 # 執行真實搜索
                 real_cases_dict = await self.search_engine.search_cases(
