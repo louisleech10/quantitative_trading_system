@@ -146,7 +146,10 @@ class SearchTaskService:
         """執行反例搜索邏輯 - 修復版本"""
         try:
             # 創建並更新任務狀態為執行中
-            standalone_search_service.task_manager.create_task(task_id)
+            standalone_search_service.task_manager.create_task(
+                config_name="negative_search",
+                task_id=task_id
+            )
             standalone_search_service.task_manager.update_task_status(
                 task_id, "running"
             )

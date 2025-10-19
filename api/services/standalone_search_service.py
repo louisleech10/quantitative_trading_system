@@ -34,11 +34,12 @@ class StandaloneTaskManager:
     
     
     
-    def create_task(self, config_name: str) -> str:
+    def create_task(self, config_name: str, task_id: Optional[str] = None) -> str:
         """Create a new task and return task ID"""
-        task_id = str(uuid.uuid4())
+        if task_id is None:
+            task_id = str(uuid.uuid4())
         now = datetime.now()
-        
+
         task_info = TaskInfo(
             task_id=task_id,
             status=TaskStatusEnum.PENDING,
@@ -46,7 +47,7 @@ class StandaloneTaskManager:
             updated_at=now,
             config_name=config_name
         )
-        
+
         self.tasks[task_id] = task_info
         self.logger.info(f"Created task {task_id} for config: {config_name}")
         return task_id
