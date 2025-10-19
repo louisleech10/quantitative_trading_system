@@ -62,15 +62,17 @@ class SearchTaskService:
             if task_info.status.value == "completed":
                 # 獲取結果並儲存
                 result_data = standalone_search_service.get_task_result(task_id)
-                if result_data and result_data.cases:
-                    # 確保正例案例被正確標記
-                    for case in result_data.cases:
-                        if hasattr(case, '__dict__'):
-                            case.__dict__['positive_case'] = True
-                        elif isinstance(case, dict):
-                            case['positive_case'] = True
+                if result_data:
+                    # 確保正例案例被正確標記（即使為空列表也要處理）
+                    if result_data.cases:
+                        for case in result_data.cases:
+                            if hasattr(case, '__dict__'):
+                                case.__dict__['positive_case'] = True
+                            elif isinstance(case, dict):
+                                case['positive_case'] = True
 
-                    self.positive_results[task_id] = result_data.cases
+                    # 即使 cases 為空列表，也要保存結果！
+                    self.positive_results[task_id] = result_data.cases if result_data.cases else []
                     # 儲存執行時間
                     if hasattr(result_data, 'execution_time'):
                         self.positive_execution_times[task_id] = result_data.execution_time
