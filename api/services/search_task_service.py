@@ -790,6 +790,11 @@ class NegativeCaseRequest(BaseModel):
         description="時間分離天數（0=關閉，按Symbol獨立過濾）"
     )
     sampling_strategy: str = Field(default="time_separated", description="採樣策略")
+    # ===== 新增：隨機取樣開關 =====
+    enable_random_sampling: bool = Field(
+        default=True,
+        description="是否啟用隨機取樣（True=啟用，False=返回所有符合條件的反例）"
+    )
 
     class Config:
         json_schema_extra = {
@@ -802,7 +807,8 @@ class NegativeCaseRequest(BaseModel):
                 "negative_ratio": 2.0,
                 "enable_time_separation": True,
                 "time_separation_days": 3,
-                "sampling_strategy": "time_separated"
+                "sampling_strategy": "time_separated",
+                "enable_random_sampling": True
             }
         }
 
