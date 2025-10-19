@@ -1,0 +1,3 @@
+2025-10-19 20:36:03 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: name 'TaskStatusEnum' is not defined
+2025-10-19 20:36:03 - api.exception_handler - [31mERROR[0m - HTTP 500: name 'TaskStatusEnum' is not defined
+2025-10-19 20:36:03 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 - 500 - 0.008s

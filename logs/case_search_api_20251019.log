@@ -1,0 +1,195 @@
+2025-10-19 20:33:46 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-10-19 20:33:46 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-19 20:33:46 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-10-19 20:33:46 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-10-19 20:33:46 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-10-19 20:33:46 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-19 20:33:46 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-10-19 20:33:46 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-10-19 20:33:46 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-10-19 20:33:46 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-10-19 20:33:55 - api.middleware.request - [32mINFO[0m - [6271c29e] Started POST /api/v1/two-stage/positive from 127.0.0.1
+2025-10-19 20:33:55 - api.routes.two_stage_search - [32mINFO[0m - Positive search request: 兩階段搜索測試, timeframe: 12h, dates: 2025-01-01 to 2025-10-02
+2025-10-19 20:33:55 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
+2025-10-19 20:33:55 - api.standalone_search_service - [32mINFO[0m - Loading momentum modules on demand...
+2025-10-19 20:33:55 - numexpr.utils - [32mINFO[0m - NumExpr defaulting to 8 threads.
+2025-10-19 20:33:56 - momentum.DataExtraction.data_cache_manager - [32mINFO[0m - 緩存管理器已初始化，緩存目錄: data_cache/hdf5_cache
+2025-10-19 20:33:56 - DataLoader - [32mINFO[0m - HDF5緩存管理器已啟用
+2025-10-19 20:33:56 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 自動偵測最佳worker數: 6
+2025-10-19 20:33:56 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 並行搜索引擎已初始化: workers=6, parallel=True
+2025-10-19 20:33:56 - case_search_engine - [32mINFO[0m - 並行搜索引擎已啟用
+2025-10-19 20:33:57 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 自動偵測最佳worker數: 6
+2025-10-19 20:33:57 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 並行搜索引擎已初始化: workers=6, parallel=True
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 並行搜索引擎已啟用
+2025-10-19 20:33:57 - api.standalone_search_service - [32mINFO[0m - ✅ Momentum modules loaded successfully on demand
+2025-10-19 20:33:57 - api.standalone_task_manager - [32mINFO[0m - Created task 899e70ac-0a57-4c4a-9011-6ce9bba004b8 for config: 兩階段搜索測試
+2025-10-19 20:33:57 - api.search_task_service - [32mINFO[0m - 儲存正例搜索配置，timeframe: 12h
+2025-10-19 20:33:57 - api.standalone_task_manager - [32mINFO[0m - Updated task 899e70ac-0a57-4c4a-9011-6ce9bba004b8 status to running
+2025-10-19 20:33:57 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search started: 1 symbols, 2025-01-01 to 2025-10-02
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用並行處理模式
+2025-10-19 20:33:57 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - Symbol數量(1)小於worker數(6)，使用串行模式（直接處理，避免遞歸）
+2025-10-19 20:33:57 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 執行串行 fallback 處理: 1 個 symbols
+2025-10-19 20:33:57 - api.momentum_wrapper - [32mINFO[0m - Getting data for BNBUSDT: 2025-01-01 to 2025-10-02
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 549 records for BNBUSDT
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用真實的 taker_buy_base_asset_volume 數據計算taker_buy_ratio
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤（向量化）...
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤（向量化）...
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算歷史穩定度特徵參數...
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 分類特徵計算完成（9個參數，100%向量化）
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 548/549 有效值 (1 NaN)
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 549/549 有效值 (0 NaN)
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 549/549 有效值 (0 NaN)
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 549/549 有效值 (0 NaN)
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 549/549 有效值 (0 NaN)
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 547/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 546/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 545/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 544/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 543/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 542/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 541/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 540/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 539/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 538/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 537/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 548/549 有效值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 549/549 有效值, 2 唯一值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 549/549 有效值, 7 唯一值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 549/549 有效值, 3 唯一值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 549/549 有效值, 1 唯一值
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 歷史穩定度參數:
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 38 個參數欄位 ===
+2025-10-19 20:33:57 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No initial candidates found for BNBUSDT
+2025-10-19 20:33:57 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 串行 fallback 完成: 0 個案例
+2025-10-19 20:33:57 - api.standalone_search_service - [32mINFO[0m - Search completed: No cases found for 1 symbols with given criteria
+2025-10-19 20:33:57 - api.standalone_task_manager - [32mINFO[0m - Updated task 899e70ac-0a57-4c4a-9011-6ce9bba004b8 status to completed
+2025-10-19 20:33:57 - api.search_task_service - [32mINFO[0m - Positive search 899e70ac-0a57-4c4a-9011-6ce9bba004b8 completed with 0 cases
+2025-10-19 20:33:57 - api.request - [32mINFO[0m - POST /api/v1/two-stage/positive - 200 - 2.220s
+2025-10-19 20:33:57 - api.middleware.request - [32mINFO[0m - [6271c29e] Completed POST /api/v1/two-stage/positive - 200 - 2.220s
+2025-10-19 20:33:57 - api.middleware.request - [32mINFO[0m - [fe95e43e] Started GET /api/v1/search/task/899e70ac-0a57-4c4a-9011-6ce9bba004b8 from 127.0.0.1
+2025-10-19 20:33:57 - api.request - [32mINFO[0m - GET /api/v1/search/task/899e70ac-0a57-4c4a-9011-6ce9bba004b8 - 200 - 0.001s
+2025-10-19 20:33:57 - api.middleware.request - [32mINFO[0m - [fe95e43e] Completed GET /api/v1/search/task/899e70ac-0a57-4c4a-9011-6ce9bba004b8 - 200 - 0.001s
+2025-10-19 20:33:57 - api.middleware.request - [32mINFO[0m - [21adc79d] Started GET /api/v1/search/task/899e70ac-0a57-4c4a-9011-6ce9bba004b8/result from 127.0.0.1
+2025-10-19 20:33:57 - api.request - [32mINFO[0m - GET /api/v1/search/task/899e70ac-0a57-4c4a-9011-6ce9bba004b8/result - 200 - 0.001s
+2025-10-19 20:33:57 - api.middleware.request - [32mINFO[0m - [21adc79d] Completed GET /api/v1/search/task/899e70ac-0a57-4c4a-9011-6ce9bba004b8/result - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [bd89508c] Started POST /api/v1/two-stage/positive from 127.0.0.1
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m - Positive search request: 兩階段搜索測試, timeframe: 12h, dates: 2025-01-01 to 2025-10-02
+2025-10-19 20:36:03 - api.search_task_service - [32mINFO[0m - Starting positive search: 兩階段搜索測試
+2025-10-19 20:36:03 - api.standalone_task_manager - [32mINFO[0m - Created task 446109f5-1658-4117-b9dc-9ac557687da1 for config: 兩階段搜索測試
+2025-10-19 20:36:03 - api.search_task_service - [32mINFO[0m - 儲存正例搜索配置，timeframe: 12h
+2025-10-19 20:36:03 - api.standalone_task_manager - [32mINFO[0m - Updated task 446109f5-1658-4117-b9dc-9ac557687da1 status to running
+2025-10-19 20:36:03 - api.standalone_search_service - [32mINFO[0m - Running real search for: 兩階段搜索測試
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Search started: 1 symbols, 2025-01-01 to 2025-10-02
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用並行處理模式
+2025-10-19 20:36:03 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - Symbol數量(1)小於worker數(6)，使用串行模式（直接處理，避免遞歸）
+2025-10-19 20:36:03 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 執行串行 fallback 處理: 1 個 symbols
+2025-10-19 20:36:03 - api.momentum_wrapper - [32mINFO[0m - Getting data for BNBUSDT: 2025-01-01 to 2025-10-02
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - Loaded 549 records for BNBUSDT
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間框架: 12h, 每根K線: 12小時
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 計算週期 - 24h: 2根, 48h: 4根, 72h: 6根
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 使用真實的 taker_buy_base_asset_volume 數據計算taker_buy_ratio
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算未來最大回撤（向量化）...
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算72小時最大回報和回撤（向量化）...
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 開始計算歷史穩定度特徵參數...
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 分類特徵計算完成（9個參數，100%向量化）
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 擴充參數計算完成統計 ===
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 基礎觸發條件參數:
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_change: 548/549 有效值 (1 NaN)
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - closing_strength: 549/549 有效值 (0 NaN)
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - price_position: 549/549 有效值 (0 NaN)
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - volume_multiplier: 549/549 有效值 (0 NaN)
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - taker_buy_ratio: 549/549 有效值 (0 NaN)
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來收益參數 (1-12根K線):
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_return: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_return: 547/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_return: 546/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_return: 545/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_return: 544/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_return: 543/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_return: 542/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_return: 541/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_return: 540/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_return: 539/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_return: 538/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_return: 537/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 未來回撤參數 (1-12根K線):
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_1bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_2bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_3bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_4bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_5bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_6bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_7bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_8bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_9bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_10bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_11bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - future_12bar_max_drawdown: 548/549 有效值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 時間和市場參數:
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - hour_of_day: 549/549 有效值, 2 唯一值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - day_of_week: 549/549 有效值, 7 唯一值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - market_phase: 549/549 有效值, 3 唯一值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m -   - timeframe: 549/549 有效值, 1 唯一值
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - 歷史穩定度參數:
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - === 總計新增/更新了 38 個參數欄位 ===
+2025-10-19 20:36:03 - momentum.DataExtraction.case_search_engine - [32mINFO[0m - No initial candidates found for BNBUSDT
+2025-10-19 20:36:03 - momentum.DataExtraction.parallel_search_engine - [32mINFO[0m - 串行 fallback 完成: 0 個案例
+2025-10-19 20:36:03 - api.standalone_search_service - [32mINFO[0m - Search completed: No cases found for 1 symbols with given criteria
+2025-10-19 20:36:03 - api.standalone_task_manager - [32mINFO[0m - Updated task 446109f5-1658-4117-b9dc-9ac557687da1 status to completed
+2025-10-19 20:36:03 - api.search_task_service - [32mINFO[0m - Positive search 446109f5-1658-4117-b9dc-9ac557687da1 completed with 0 cases
+2025-10-19 20:36:03 - api.request - [32mINFO[0m - POST /api/v1/two-stage/positive - 200 - 0.177s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [bd89508c] Completed POST /api/v1/two-stage/positive - 200 - 0.177s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [cb6e4188] Started OPTIONS /api/v1/search/task/446109f5-1658-4117-b9dc-9ac557687da1 from 127.0.0.1
+2025-10-19 20:36:03 - api.request - [32mINFO[0m - OPTIONS /api/v1/search/task/446109f5-1658-4117-b9dc-9ac557687da1 - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [cb6e4188] Completed OPTIONS /api/v1/search/task/446109f5-1658-4117-b9dc-9ac557687da1 - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [016bd2f9] Started GET /api/v1/search/task/446109f5-1658-4117-b9dc-9ac557687da1 from 127.0.0.1
+2025-10-19 20:36:03 - api.request - [32mINFO[0m - GET /api/v1/search/task/446109f5-1658-4117-b9dc-9ac557687da1 - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [016bd2f9] Completed GET /api/v1/search/task/446109f5-1658-4117-b9dc-9ac557687da1 - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [0b017ced] Started OPTIONS /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 from 127.0.0.1
+2025-10-19 20:36:03 - api.request - [32mINFO[0m - OPTIONS /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [0b017ced] Completed OPTIONS /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 - 200 - 0.001s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [306f572a] Started POST /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 from 127.0.0.1
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m - 🔍 接收到反例搜索請求:
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m -   - positive_task_id: 446109f5-1658-4117-b9dc-9ac557687da1
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m -   - negative_ratio: 2.0
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m -   - enable_time_separation: True
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m -   - time_separation_days: 3
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m -   - enable_random_sampling: True
+2025-10-19 20:36:03 - api.routes.two_stage_search - [32mINFO[0m -   - sampling_strategy: time_separated
+2025-10-19 20:36:03 - api.search_task_service - [32mINFO[0m - No positive cases found, returning empty negative search result
+2025-10-19 20:36:03 - api.standalone_task_manager - [32mINFO[0m - Created task d55e33a7-7406-46ca-ba92-2acc664c88d2 for config: negative_search_empty
+2025-10-19 20:36:03 - api.routes.two_stage_search - [31mERROR[0m - Error starting negative search: name 'TaskStatusEnum' is not defined
+2025-10-19 20:36:03 - api.exception_handler - [31mERROR[0m - HTTP 500: name 'TaskStatusEnum' is not defined
+2025-10-19 20:36:03 - api.request - [31mERROR[0m - POST /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 - 500 - 0.008s
+2025-10-19 20:36:03 - api.middleware.request - [32mINFO[0m - [306f572a] Completed POST /api/v1/two-stage/negative/446109f5-1658-4117-b9dc-9ac557687da1 - 500 - 0.008s
+2025-10-19 20:39:25 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-10-19 20:39:25 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-10-19 20:39:25 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-19 20:39:25 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-10-19 20:39:25 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-10-19 20:39:25 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-10-19 20:39:25 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-19 20:39:25 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-10-19 20:39:25 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-10-19 20:39:25 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-10-19 20:39:25 - api.startup - [32mINFO[0m - API 前綴: /api/v1
