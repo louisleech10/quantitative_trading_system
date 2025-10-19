@@ -1137,9 +1137,9 @@ class CaseSearchEngine:
             mask_c6 = (df['volatility_class']== 'M') & (df['direction_class'] == 'U') & (df['volume_class'] == 'A')
             df.loc[mask_c6, ['market_class', 'market_class_name', 'difficulty_level']] = ['C6', '標準上漲', '中等']
 
-            # C7: 溫躍上漲
+            # C7: 活躍上漲
             mask_c7 = (df['volatility_class']== 'M') & (df['direction_class'] == 'U') & (df['volume_class'] == 'B')
-            df.loc[mask_c7, ['market_class', 'market_class_name', 'difficulty_level']] = ['C7', '躍上漲', '中等']
+            df.loc[mask_c7, ['market_class', 'market_class_name', 'difficulty_level']] = ['C7', '活躍上漲', '中等']
 
             # C8: 劇烈震盪
             mask_c8 = (df['volatility_class'] == 'H') & (df['direction_class'] == 'S') & (df['volume_class'] == 'A')
