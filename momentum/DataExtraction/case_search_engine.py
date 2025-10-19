@@ -422,8 +422,6 @@ class CaseSearchEngine:
         
         for symbol in symbols:
             try:
-                self.logger.info(f"Processing symbol: {symbol}")
-                
                 # 檢查數據是否可用
                 symbol_results = await self._search_single_symbol(symbol, config)
                 
