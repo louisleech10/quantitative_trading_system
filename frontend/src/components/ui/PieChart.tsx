@@ -295,20 +295,21 @@ export const MarketClassPieChart: React.FC<{
   positiveData: Record<string, number>;
   negativeData: Record<string, number>;
 }> = ({ positiveData, negativeData }) => {
-  // 定義市場分類顏色映射 (C1-C12)
+  // 定義市場分類顏色映射 (使用中文名稱)
   const marketClassColors: Record<string, string> = {
-    'C1': '#dc2626',   // 深紅色 (低波動+下降+異常低量)
-    'C2': '#ef4444',   // 紅色 (低波動+下降+正常量)
-    'C3': '#f87171',   // 淺紅色 (低波動+下降+異常高量)
-    'C4': '#fbbf24',   // 黃色 (低波動+橫盤)
-    'C5': '#84cc16',   // 淺綠色 (低波動+上升+異常低量)
-    'C6': '#22c55e',   // 綠色 (低波動+上升+正常量)
-    'C7': '#10b981',   // 深綠色 (低波動+上升+異常高量)
-    'C8': '#f97316',   // 橙色 (高波動+劇烈波動+異常低量)
-    'C9': '#fb923c',   // 淺橙色 (高波動+劇烈波動+正常量)
-    'C10': '#fdba74',  // 極淺橙色 (高波動+劇烈波動+異常高量)
-    'C11': '#8b5cf6',  // 紫色 (中波動組合)
-    'C12': '#a78bfa'   // 淺紫色 (其他組合)
+    '低位盤整': '#dc2626',   // C1 - 深紅色
+    '穩定震盪': '#ef4444',   // C2 - 紅色
+    '溫和上漲': '#84cc16',   // C3 - 淺綠色
+    '高位震盪': '#fbbf24',   // C4/C9 - 黃色
+    '標準盤整': '#8b5cf6',   // C5 - 紫色
+    '標準上漲': '#22c55e',   // C6 - 綠色
+    '活躍上漲': '#10b981',   // C7 - 深綠色
+    '劇烈震盪': '#f97316',   // C8 - 橙色
+    '強勁上漲': '#fb923c',   // C10 - 淺橙色
+    '強勁下跌': '#b91c1c',   // C11 - 極深紅色
+    '極端波動': '#7c2d12',   // C12 - 棕紅色
+    '其他組合': '#d1d5db',   // C13 - 灰色
+    '混合': '#9ca3af'        // 預設 - 深灰色
   };
 
   const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([marketClass, count]) => ({
