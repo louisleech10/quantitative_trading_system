@@ -371,8 +371,17 @@ async def get_combined_results(positive_task_id: str, negative_task_id: str):
         combined_results = search_task_service.get_combined_results(
             positive_task_id, negative_task_id
         )
-        
+
+        logger.info(f"🔍 Route combined_results DEBUG:")
+        logger.info(f"  - combined_results is None: {combined_results is None}")
+        logger.info(f"  - combined_results type: {type(combined_results)}")
+        if combined_results:
+            logger.info(f"  - has cases attr: {hasattr(combined_results, 'cases')}")
+            if hasattr(combined_results, 'cases'):
+                logger.info(f"  - cases length: {len(combined_results.cases) if combined_results.cases else 0}")
+
         if not combined_results:
+            logger.warning(f"combined_results evaluated as falsy, raising 404")
             raise HTTPException(status_code=404, detail="No results found")
         
         return SearchResponse(success=True, data=combined_results)

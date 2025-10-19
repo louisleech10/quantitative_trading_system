@@ -770,8 +770,34 @@ class SearchTaskService:
         positive_cases = self.positive_results.get(positive_task_id, [])
         negative_cases = self.negative_results.get(negative_task_id, [])
 
+        self.logger.info(f"🔍 get_combined_results in SearchTaskService:")
+        self.logger.info(f"  - positive_cases: {len(positive_cases)} cases")
+        self.logger.info(f"  - negative_cases: {len(negative_cases)} cases")
+
+        # 即使兩個都是空列表，也返回完整的空結果結構
         if not positive_cases and not negative_cases:
-            return None
+            self.logger.info("Both positive and negative cases are empty, returning empty SearchResultData")
+            return SearchResultData(
+                cases=[],
+                summary=CaseSummary(
+                    total_cases=0,
+                    positive_cases=0,
+                    negative_cases=0,
+                    unique_symbols=0,
+                    time_range={"start": "N/A", "end": "N/A"},
+                    market_phase_distribution={}
+                ),
+                sampling_quality=SamplingQuality(
+                    time_separation_score=0.0,
+                    symbol_diversity_score=0.0,
+                    market_phase_balance=0.0,
+                    overall_quality_score=0.0,
+                    warnings=["No cases found in both positive and negative search"]
+                ),
+                execution_time=0.0,
+                cache_used=False,
+                search_config={"positive_negative_ratio": "0:0"}
+            )
 
         # 計算總執行時間
         total_execution_time = 0.0
