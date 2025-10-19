@@ -165,15 +165,8 @@ async def get_task_result(task_id: str):
                 detail=f"Task is not completed. Current status: {task_info.status.value}"
             )
         
-        # Get results - 優先使用 SearchTaskService 的結果
-        from ..services.search_task_service import search_task_service
-        
-        # 先嘗試從 SearchTaskService 獲取結果
-        result_data = search_task_service.get_positive_search_result(task_id)
-        
-        # 如果 SearchTaskService 沒有結果，則使用 StandaloneSearchService
-        if not result_data:
-            result_data = search_service.get_task_result(task_id)
+        # Get results - 使用 StandaloneSearchService
+        result_data = search_service.get_task_result(task_id)
         
         if not result_data:
             raise HTTPException(status_code=404, detail="Task results not found")
