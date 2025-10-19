@@ -94,8 +94,56 @@ class SearchTaskService:
             raise SearchExecutionException(f"Positive search results not found for task {positive_task_id}")
 
         positive_cases = self.positive_results[positive_task_id]
+
+        # 如果正例為空，直接返回空的反例結果，不視為錯誤
         if not positive_cases:
-            raise SearchExecutionException("No positive cases found to generate negative examples")
+            self.logger.info("No positive cases found, returning empty negative search result")
+
+            # 創建空的反例任務ID
+            negative_task_id = str(uuid.uuid4())
+
+            # 直接設置空結果並標記為完成
+            from ..models.responses import SearchResultData, CaseSummary, SamplingQuality
+
+            empty_summary = CaseSummary(
+                total_cases=0,
+                positive_cases=0,
+                negative_cases=0,
+                unique_symbols=0,
+                time_range={"start": "N/A", "end": "N/A"},
+                market_phase_distribution={}
+            )
+
+            empty_quality = SamplingQuality(
+                time_separation_score=0.0,
+                symbol_diversity_score=0.0,
+                market_phase_balance=0.0,
+                overall_quality_score=0.0,
+                warnings=["No positive cases to generate negatives"]
+            )
+
+            empty_result = SearchResultData(
+                cases=[],
+                summary=empty_summary,
+                sampling_quality=empty_quality,
+                execution_time=0.0,
+                cache_used=False,
+                search_config=None
+            )
+
+            # 使用 standalone_search_service 的 task_manager
+            from .standalone_search_service import standalone_search_service
+            standalone_search_service.task_manager.create_task(
+                config_name="negative_search_empty",
+                task_id=negative_task_id
+            )
+            standalone_search_service.task_manager.set_task_result(negative_task_id, empty_result)
+            standalone_search_service.task_manager.update_task_status(
+                negative_task_id,
+                TaskStatusEnum.COMPLETED
+            )
+
+            return negative_task_id
 
         # 獲取正例搜索的timeframe配置
         positive_timeframe = "12h"  # 默認值
