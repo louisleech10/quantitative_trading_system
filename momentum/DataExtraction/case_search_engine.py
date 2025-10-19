@@ -1185,7 +1185,7 @@ class CaseSearchEngine:
         self.logger.debug(f"Adding calculated columns: timeframe={timeframe}, rows={len(data)}")
 
         try:
-            self.logger.info("開始添加擴充計算列...")
+            self.logger.debug("開始添加擴充計算列...")
             df = data.copy()
             
             # ===== 時間框架配置 =====
