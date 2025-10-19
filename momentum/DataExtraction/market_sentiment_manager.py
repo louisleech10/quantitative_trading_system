@@ -81,9 +81,9 @@ class MarketSentimentManager:
             is_stale = age_hours > max_age_hours
             
             if is_stale:
-                logger.info(f"快取已過期 ({age_hours:.1f}小時，超過{max_age_hours}小時限制)")
+                logger.debug(f"快取已過期 ({age_hours:.1f}小時，超過{max_age_hours}小時限制)")
             else:
-                logger.info(f"快取仍然有效 ({age_hours:.1f}小時前更新)")
+                logger.debug(f"快取仍然有效 ({age_hours:.1f}小時前更新)")
                 
             return is_stale
         except Exception as e:
@@ -101,9 +101,9 @@ class MarketSentimentManager:
         exists = all(f.exists() for f in required_files)
         if not exists:
             missing = [f.name for f in required_files if not f.exists()]
-            logger.info(f"缺少快取檔案: {missing}")
+            logger.debug(f"缺少快取檔案: {missing}")
         else:
-            logger.info("所有快取檔案存在")
+            logger.debug("所有快取檔案存在")
             
         return exists
     
@@ -114,20 +114,20 @@ class MarketSentimentManager:
             daily_data = None
             if self.daily_cache_path.exists():
                 daily_data = pd.read_csv(self.daily_cache_path, index_col='date', parse_dates=True)
-                logger.info(f"載入日級別快取數據: {len(daily_data)} 筆記錄")
-            
+                logger.debug(f"載入日級別快取數據: {len(daily_data)} 筆記錄")
+
             # 載入週級別數據
             weekly_data = None
             if self.weekly_cache_path.exists():
                 weekly_data = pd.read_csv(self.weekly_cache_path, index_col='week_start', parse_dates=True)
-                logger.info(f"載入週級別快取數據: {len(weekly_data)} 筆記錄")
-            
+                logger.debug(f"載入週級別快取數據: {len(weekly_data)} 筆記錄")
+
             # 載入市場階段數據
             phases_data = None
             if self.phases_cache_path.exists():
                 with open(self.phases_cache_path, 'r', encoding='utf-8') as f:
                     phases_data = json.load(f)
-                logger.info(f"載入市場階段快取數據: {len(phases_data)} 個階段")
+                logger.debug(f"載入市場階段快取數據: {len(phases_data)} 個階段")
             
             return daily_data, weekly_data, phases_data
             
@@ -168,7 +168,7 @@ class MarketSentimentManager:
         try:
             # 檢查是否需要更新
             if not force_update and self._cache_exists() and not self._is_cache_stale():
-                logger.info("快取有效，跳過更新")
+                logger.debug("快取有效，跳過更新")
                 return True
             
             logger.info("開始更新市場情緒數據...")
@@ -232,7 +232,7 @@ class MarketSentimentManager:
                 
                 if start_date <= target_date <= end_date:
                     phase_name = phase_info['description']
-                    logger.info(f"日期 {target_date} 對應市場階段: {phase_name}")
+                    logger.debug(f"日期 {target_date} 對應市場階段: {phase_name}")
                     return phase_name
             
             logger.warning(f"未找到日期 {target_date} 對應的市場階段")
