@@ -369,9 +369,7 @@ class CaseSearchEngine:
                 symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "LINKUSDT", "DOTUSDT"]
                 self.logger.info(f"Using default symbols: {symbols}")
 
-            self.logger.info(f"Starting search with config: {config.name}")
-            self.logger.info(f"Symbols: {symbols}")
-            self.logger.info(f"Time range: {config.start_time} to {config.end_time}")
+            self.logger.info(f"Search started: {len(symbols)} symbols, {config.start_time} to {config.end_time}")
 
             # Phase 1優化：使用並行處理引擎（如果啟用）
             if self.enable_parallel and self.parallel_engine is not None:
@@ -401,7 +399,7 @@ class CaseSearchEngine:
                 else:
                     self.logger.warning(f"Batch {i//batch_size + 1} returned None")
 
-            self.logger.info(f"Search completed. Found {len(all_results)} cases")
+            self.logger.info(f"Search completed: {len(all_results)} cases found")
 
             # 保存結果
             if save_results and all_results:
@@ -431,9 +429,9 @@ class CaseSearchEngine:
                 
                 if symbol_results is not None and len(symbol_results) > 0:
                     batch_results.extend(symbol_results)
-                    self.logger.info(f"Found {len(symbol_results)} cases for {symbol}")
+                    self.logger.debug(f"Processing {symbol}: {len(symbol_results)} cases found")
                 else:
-                    self.logger.info(f"No cases found for {symbol}")
+                    self.logger.debug(f"Processing {symbol}: no cases found")
                     
             except Exception as e:
                 self.logger.error(f"[PROCESS_FAILED] Symbol: {symbol} | Error: {type(e).__name__}: {str(e)}")
