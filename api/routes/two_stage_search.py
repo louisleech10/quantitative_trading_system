@@ -163,13 +163,20 @@ class MockSearchTaskService:
     
     def get_combined_results(self, positive_task_id, negative_task_id):
         from ..services.standalone_search_service import standalone_search_service
-        
+
         # 獲取正例結果
         positive_result = standalone_search_service.get_task_result(positive_task_id)
         negative_result = standalone_search_service.get_task_result(negative_task_id)
-        
+
         if not positive_result and not negative_result:
             return None
+
+        # 計算總執行時間（正例 + 反例）
+        total_execution_time = 0.0
+        if positive_result and hasattr(positive_result, 'execution_time'):
+            total_execution_time += positive_result.execution_time
+        if negative_result and hasattr(negative_result, 'execution_time'):
+            total_execution_time += negative_result.execution_time
         
         # 新增：收集實際使用的交易對
         actual_symbols = set()
@@ -218,7 +225,7 @@ class MockSearchTaskService:
             cases=all_cases,
             total_cases=len(all_cases),
             search_config={"positive_negative_ratio": f"{positive_count}:{negative_count}"},
-            execution_time=0.0,
+            execution_time=total_execution_time,
             symbols_processed=symbols_list,
             positive_cases_count=positive_count,
             negative_cases_count=negative_count,

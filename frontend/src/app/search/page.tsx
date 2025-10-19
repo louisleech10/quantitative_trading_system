@@ -1417,7 +1417,7 @@ export default function SearchPage() {
                 className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
               >
                 <Download className="w-5 h-5" />
-                導出完整CSV檔案 (含20個參數)
+                導出CSV檔案
               </button>
             </div>
           </div>
