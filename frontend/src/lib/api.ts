@@ -463,12 +463,11 @@ class ApiClient {
       
       const negativeTaskId = negativeResponse.data.task_id;
       onProgress?.('反例搜索中...', negativeTaskId);
-      
+
       // 等待反例搜索完成
-      // 暫時跳過反例狀態輪詢，使用延遲等待
       console.log('反例搜索已啟動，等待完成中...');
       onProgress?.('等待反例搜索完成...');
-      await new Promise(resolve => setTimeout(resolve, 15000)); // 等待15秒
+      await this.waitForTaskCompletion(negativeTaskId);
 
       // 階段3：獲取合併結果
       onProgress?.('合併結果中...');
