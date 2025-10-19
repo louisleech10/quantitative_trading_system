@@ -523,7 +523,7 @@ class CaseSearchEngine:
                           'market_class', 'market_class_name', 'difficulty_level']
             missing_params = [p for p in past_params if p not in data.columns]
             if missing_params:
-                self.logger.error(f"🔍 DEBUG: _create_case_result - 缺少分類特徵參數: {missing_params}")
+                self.logger.debug(f"Missing classification params: {missing_params}")
             else:
                 self.logger.warning(f"🔍 DEBUG: _create_case_result - 所有9個分類特徵參數都在columns中")
 
@@ -543,7 +543,7 @@ class CaseSearchEngine:
 
                         # DEBUG: 追蹤分類特徵參數的實際值
                         if 'past_' in column or '_class' in column or 'difficulty' in column:
-                            self.logger.error(f"🔍 TRACE: {column} - raw_value={value}, type={type(value)}, is_nan={pd.isna(value)}")
+                            self.logger.debug(f"Column '{column}' raw value: {value} (type={type(value).__name__})")
 
                         # 如果是百分比字符串，轉換為數值
                         if isinstance(value, str) and value.endswith('%'):
@@ -559,14 +559,14 @@ class CaseSearchEngine:
 
                         # DEBUG: 追蹤最終返回值
                         if 'past_' in column or '_class' in column or 'difficulty' in column:
-                            self.logger.error(f"🔍 TRACE: {column} - final_value={final_value}, type={type(final_value)}, returning to case dict")
+                            self.logger.debug(f"Column '{column}' final value: {final_value}")
 
                         return final_value
                     else:
                         # DEBUG: 記錄分類特徵參數的NaN情況
                         if ('past_' in column or '_class' in column or 'difficulty' in column) and column in data.columns:
                             actual_value = data[column].iloc[idx]
-                            self.logger.error(f"🔍 DEBUG: {column} 值是NaN - actual_value={actual_value}, type={type(actual_value)}")
+                            self.logger.debug(f"Column '{column}' is NaN, skipped")
 
                         if require_valid and default_value is None:
                             # 如果要求有效數據但沒有，記錄警告並返回 None
