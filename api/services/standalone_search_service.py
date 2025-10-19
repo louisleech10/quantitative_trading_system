@@ -453,11 +453,17 @@ class StandaloneSearchService:
                     return
                 
                 if len(real_cases_dict) == 0:
-                    error_msg = f"[NO_RESULTS] No cases found for {len(final_symbols)} symbols with given criteria"
-                    self.logger.warning(error_msg)
-                    self.task_manager.update_task_status(
-                        task_id, TaskStatusEnum.FAILED, error_message=error_msg
+                    info_msg = f"Search completed: No cases found for {len(final_symbols)} symbols with given criteria"
+                    self.logger.info(info_msg)
+                    # 沒有結果不是失敗，而是成功完成但結果為空
+                    result_data = SearchResultData(
+                        cases=[],
+                        total_count=0,
+                        execution_time=0.0,
+                        search_config=None
                     )
+                    self.task_manager.set_task_result(task_id, result_data)
+                    self.task_manager.update_task_status(task_id, TaskStatusEnum.COMPLETED)
                     return
                 
                 # 轉換字典格式為 CaseData 對象
@@ -596,11 +602,17 @@ class StandaloneSearchService:
                 
                 # 檢查處理後的案例數量
                 if len(real_cases) == 0:
-                    error_msg = "[NO_VALID_CASES] No valid cases after data processing - all cases filtered out"
-                    self.logger.error(error_msg)
-                    self.task_manager.update_task_status(
-                        task_id, TaskStatusEnum.FAILED, error_message=error_msg
+                    info_msg = "Search completed: All cases filtered out during data validation"
+                    self.logger.info(info_msg)
+                    # 所有案例被過濾也不是失敗，而是成功完成但結果為空
+                    result_data = SearchResultData(
+                        cases=[],
+                        total_count=0,
+                        execution_time=0.0,
+                        search_config=None
                     )
+                    self.task_manager.set_task_result(task_id, result_data)
+                    self.task_manager.update_task_status(task_id, TaskStatusEnum.COMPLETED)
                     return
                 
                 self.logger.info(f"Real search completed: found {len(real_cases)} cases")
