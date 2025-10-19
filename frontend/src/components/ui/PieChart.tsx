@@ -125,16 +125,25 @@ export const MarketPhasePieChart: React.FC<{
   positiveData: Record<string, number>;
   negativeData: Record<string, number>;
 }> = ({ positiveData, negativeData }) => {
-  const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([phase, count], index) => ({
+  // 定義市場階段顏色映射
+  const marketPhaseColors: Record<string, string> = {
+    'EXTREME_FEAR': '#dc2626',  // 深紅色
+    'FEAR': '#ef4444',          // 紅色
+    'NEUTRAL': '#ffc658',       // 黃色
+    'GREED': '#82ca9d',         // 綠色
+    'EXTREME_GREED': '#22c55e'  // 深綠色
+  };
+
+  const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([phase, count]) => ({
     name: phase,
     value: count,
-    color: COLORS[index % COLORS.length]
+    color: marketPhaseColors[phase] || COLORS[0]
   }));
 
-  const negativeChartData: PieChartData[] = Object.entries(negativeData).map(([phase, count], index) => ({
+  const negativeChartData: PieChartData[] = Object.entries(negativeData).map(([phase, count]) => ({
     name: phase,
     value: count,
-    color: COLORS[index % COLORS.length]
+    color: marketPhaseColors[phase] || COLORS[0]
   }));
 
   return (
@@ -164,20 +173,30 @@ export const HourDistributionPieChart: React.FC<{
   positiveData: Record<number, number>;
   negativeData: Record<number, number>;
 }> = ({ positiveData, negativeData }) => {
+  // 定義24小時顏色映射（使用漸變色）
+  const hourColors: Record<number, string> = {
+    0: '#1e3a8a', 1: '#1e40af', 2: '#1d4ed8', 3: '#2563eb',
+    4: '#3b82f6', 5: '#60a5fa', 6: '#93c5fd', 7: '#dbeafe',
+    8: '#fef3c7', 9: '#fde68a', 10: '#fcd34d', 11: '#fbbf24',
+    12: '#f59e0b', 13: '#f97316', 14: '#fb923c', 15: '#fdba74',
+    16: '#fed7aa', 17: '#ffedd5', 18: '#fce7f3', 19: '#fbcfe8',
+    20: '#f9a8d4', 21: '#f472b6', 22: '#ec4899', 23: '#db2777'
+  };
+
   const positiveChartData: PieChartData[] = Object.entries(positiveData)
     .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([hour, count], index) => ({
+    .map(([hour, count]) => ({
       name: `${hour}:00`,
       value: count,
-      color: COLORS[index % COLORS.length]
+      color: hourColors[Number(hour)] || COLORS[0]
     }));
 
   const negativeChartData: PieChartData[] = Object.entries(negativeData)
     .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([hour, count], index) => ({
+    .map(([hour, count]) => ({
       name: `${hour}:00`,
       value: count,
-      color: COLORS[index % COLORS.length]
+      color: hourColors[Number(hour)] || COLORS[0]
     }));
 
   return (
@@ -209,6 +228,17 @@ export const DayOfWeekPieChart: React.FC<{
 }> = ({ positiveData, negativeData }) => {
   const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
+  // 定義星期顏色映射
+  const dayColors: Record<string, string> = {
+    '週日': '#ef4444',  // 紅色
+    '週一': '#f97316',  // 橙色
+    '週二': '#f59e0b',  // 琥珀色
+    '週三': '#84cc16',  // 萊姆色
+    '週四': '#22c55e',  // 綠色
+    '週五': '#06b6d4',  // 青色
+    '週六': '#8b5cf6'   // 紫色
+  };
+
   // 處理星期數，將 7 轉換為 0（週日）
   const normalizeDayOfWeek = (day: number): number => {
     return day === 7 ? 0 : day;
@@ -216,23 +246,25 @@ export const DayOfWeekPieChart: React.FC<{
 
   const positiveChartData: PieChartData[] = Object.entries(positiveData)
     .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([day, count], index) => {
+    .map(([day, count]) => {
       const normalizedDay = normalizeDayOfWeek(Number(day));
+      const dayName = dayNames[normalizedDay] || `星期${day}`;
       return {
-        name: dayNames[normalizedDay] || `星期${day}`,
+        name: dayName,
         value: count,
-        color: COLORS[index % COLORS.length]
+        color: dayColors[dayName] || COLORS[0]
       };
     });
 
   const negativeChartData: PieChartData[] = Object.entries(negativeData)
     .sort(([a], [b]) => Number(a) - Number(b))
-    .map(([day, count], index) => {
+    .map(([day, count]) => {
       const normalizedDay = normalizeDayOfWeek(Number(day));
+      const dayName = dayNames[normalizedDay] || `星期${day}`;
       return {
-        name: dayNames[normalizedDay] || `星期${day}`,
+        name: dayName,
         value: count,
-        color: COLORS[index % COLORS.length]
+        color: dayColors[dayName] || COLORS[0]
       };
     });
 
@@ -263,16 +295,32 @@ export const MarketClassPieChart: React.FC<{
   positiveData: Record<string, number>;
   negativeData: Record<string, number>;
 }> = ({ positiveData, negativeData }) => {
-  const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([marketClass, count], index) => ({
+  // 定義市場分類顏色映射 (C1-C12)
+  const marketClassColors: Record<string, string> = {
+    'C1': '#dc2626',   // 深紅色 (低波動+下降+異常低量)
+    'C2': '#ef4444',   // 紅色 (低波動+下降+正常量)
+    'C3': '#f87171',   // 淺紅色 (低波動+下降+異常高量)
+    'C4': '#fbbf24',   // 黃色 (低波動+橫盤)
+    'C5': '#84cc16',   // 淺綠色 (低波動+上升+異常低量)
+    'C6': '#22c55e',   // 綠色 (低波動+上升+正常量)
+    'C7': '#10b981',   // 深綠色 (低波動+上升+異常高量)
+    'C8': '#f97316',   // 橙色 (高波動+劇烈波動+異常低量)
+    'C9': '#fb923c',   // 淺橙色 (高波動+劇烈波動+正常量)
+    'C10': '#fdba74',  // 極淺橙色 (高波動+劇烈波動+異常高量)
+    'C11': '#8b5cf6',  // 紫色 (中波動組合)
+    'C12': '#a78bfa'   // 淺紫色 (其他組合)
+  };
+
+  const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([marketClass, count]) => ({
     name: marketClass,
     value: count,
-    color: COLORS[index % COLORS.length]
+    color: marketClassColors[marketClass] || COLORS[0]
   }));
 
-  const negativeChartData: PieChartData[] = Object.entries(negativeData).map(([marketClass, count], index) => ({
+  const negativeChartData: PieChartData[] = Object.entries(negativeData).map(([marketClass, count]) => ({
     name: marketClass,
     value: count,
-    color: COLORS[index % COLORS.length]
+    color: marketClassColors[marketClass] || COLORS[0]
   }));
 
   return (
