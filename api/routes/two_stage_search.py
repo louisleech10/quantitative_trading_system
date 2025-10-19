@@ -163,12 +163,23 @@ class MockSearchTaskService:
     
     def get_combined_results(self, positive_task_id, negative_task_id):
         from ..services.standalone_search_service import standalone_search_service
+        from ..core.logging import get_logger
+        logger = get_logger("api.routes.two_stage_search.combined")
 
         # 獲取正例結果
         positive_result = standalone_search_service.get_task_result(positive_task_id)
         negative_result = standalone_search_service.get_task_result(negative_task_id)
 
+        logger.info(f"🔍 get_combined_results DEBUG:")
+        logger.info(f"  - positive_result: {positive_result is not None}")
+        logger.info(f"  - negative_result: {negative_result is not None}")
+        if positive_result:
+            logger.info(f"  - positive_result.cases: {len(positive_result.cases) if hasattr(positive_result, 'cases') else 'N/A'}")
+        if negative_result:
+            logger.info(f"  - negative_result.cases: {len(negative_result.cases) if hasattr(negative_result, 'cases') else 'N/A'}")
+
         if not positive_result and not negative_result:
+            logger.warning("Both positive_result and negative_result are None, returning None")
             return None
 
         # 計算總執行時間（正例 + 反例）

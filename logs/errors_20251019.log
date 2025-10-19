@@ -1,5 +1,0 @@
-2025-10-19 20:45:08 - api.standalone_search_service - [31mERROR[0m - Search execution failed: local variable 'CaseSummary' referenced before assignment
-Traceback (most recent call last):
-  File "/Users/louis/Desktop/quantitative_trading_system/api/services/standalone_search_service.py", line 685, in _run_search_task
-    summary=CaseSummary(
-UnboundLocalError: local variable 'CaseSummary' referenced before assignment
