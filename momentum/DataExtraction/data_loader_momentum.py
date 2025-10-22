@@ -56,7 +56,7 @@ class DataLoader(DataProviderBase):
     """
     幣安市場數據加載器，實現了數據提供者抽象基類
     """
-    def __init__(self, cache_dir: str = "data_cache", api_key: str = None, api_secret: str = None, enable_hdf5_cache: bool = True):
+    def __init__(self, cache_dir: str = "data_cache", api_key: str = None, api_secret: str = None, enable_hdf5_cache: bool = True, enable_chart_downloader: bool = True):
         """
         初始化數據加載器
 
@@ -65,12 +65,17 @@ class DataLoader(DataProviderBase):
             api_key: 幣安API密鑰，如果為None則使用環境變量
             api_secret: 幣安API密鑰，如果為None則使用環境變量
             enable_hdf5_cache: 是否啟用HDF5緩存（Phase 0），默認True
+            enable_chart_downloader: 是否啟用圖表專用下載服務（任務1.2），默認True
         """
         super().__init__()
         self.client = Client(
             api_key or os.getenv('BINANCE_API_KEY'),
             api_secret or os.getenv('BINANCE_SECRET_KEY')
         )
+
+        # 保存API credentials for chart downloader
+        self._api_key = api_key
+        self._api_secret = api_secret
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
 
@@ -93,6 +98,52 @@ class DataLoader(DataProviderBase):
             except Exception as e:
                 self.logger.warning(f"無法啟用HDF5緩存: {e}，將使用原有緩存")
                 self.hdf5_cache_manager = None
+
+        # 任務1.2: 圖表專用下載服務（新增）
+        self.chart_downloader = None
+
+        if enable_chart_downloader:
+            try:
+                # 導入KlineStorageManager（任務1.1）
+                try:
+                    from .kline_storage import KlineStorageManager
+                except ImportError:
+                    from momentum.DataExtraction.kline_storage import KlineStorageManager
+
+                # 導入下載服務（任務1.2）
+                try:
+                    from .kline_download_service import KlineDownloadService
+                    from .providers.binance_provider import BinanceProvider
+                except ImportError:
+                    from momentum.DataExtraction.kline_download_service import KlineDownloadService
+                    from momentum.DataExtraction.providers.binance_provider import BinanceProvider
+
+                # 初始化KlineStorageManager
+                kline_storage_dir = self.cache_dir / "kline_storage"
+                kline_storage_manager = KlineStorageManager(cache_dir=str(kline_storage_dir))
+
+                # 初始化下載服務
+                self.chart_downloader = KlineDownloadService(
+                    storage_manager=kline_storage_manager
+                )
+
+                # 註冊幣安Provider
+                binance_provider = BinanceProvider(
+                    api_key=self._api_key,
+                    api_secret=self._api_secret
+                )
+                self.chart_downloader.registry.register('binance', binance_provider)
+
+                self.logger.info(
+                    "Chart downloader enabled with Binance provider "
+                    "(rate_limit=1000 req/min)"
+                )
+
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to enable chart downloader: {e}，將使用原有下載方式"
+                )
+                self.chart_downloader = None
 
         # 內存緩存
         self._symbol_data_cache = {}

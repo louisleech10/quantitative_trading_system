@@ -73,31 +73,50 @@ Phase 5: 整合與優化        (Week 7, 5天)
 
 ### 任務1.2：幣安K線下載服務 🔥🔥🔥
 
-**描述**：實作從幣安API下載K線數據的服務
+**描述**：實作從幣安API下載K線數據的服務（含通用架構支援未來擴展）
 
 **涉及模組**：
-- 新增：`momentum/DataExtraction/binance_kline_downloader.py`
+- 新增：`momentum/DataExtraction/kline_provider_base.py`（抽象基類）
+- 新增：`momentum/DataExtraction/kline_download_service.py`（統一服務）
+- 新增：`momentum/DataExtraction/providers/binance_provider.py`（幣安適配器）
 - 修改：`momentum/DataExtraction/data_loader_momentum.py`（整合）
 
 **子任務**：
-- [ ] 實作單symbol單timeframe下載方法
-- [ ] 實作批量下載方法（多symbol）
-- [ ] 實作速率限制控制（避免超過API限制）
-- [ ] 實作錯誤處理和重試邏輯（3次重試）
-- [ ] 實作進度追蹤機制
-- [ ] 計算taker_ratio（從API返回數據）
+- [x] 實作單symbol單timeframe下載方法
+- [x] 實作批量下載方法（多symbol）
+- [x] 實作速率限制控制（Token Bucket算法，1000 req/min）
+- [x] 實作錯誤處理和重試邏輯（指數退避，根據錯誤類型）
+- [x] 實作進度追蹤機制（百分比+batch進度）
+- [x] 計算taker_ratio（向量化計算，處理volume=0）
+- [x] 設計Provider抽象層（支援未來OKX/鏈上/台美股期）
+- [x] 整合HDF5存儲（任務1.1）
 
 **驗收標準**：
-- ✅ 可成功下載ETHUSDT的1h K線數據
-- ✅ 下載的數據格式正確（OHLCV + taker_ratio）
-- ✅ 速率限制生效（不觸發API封鎖）
-- ✅ 錯誤時正確重試
-- ✅ 進度可追蹤（LOG輸出百分比）
+- ✅ 可成功下載ETHUSDT的1h K線數據（100根，0.12秒）
+- ✅ 下載的數據格式正確（8個必需欄位 + 2個可選欄位）
+- ✅ 速率限制生效（Token Bucket，不觸發API 429）
+- ✅ 錯誤時正確重試（5種錯誤分類，智能重試）
+- ✅ 進度可追蹤（LOG輸出 [百分比%] Batch X/Y）
+- ✅ 支援多數據源擴展（Provider註冊機制）
+- ✅ HDF5自動存儲（save_to_storage=True）
 
 **測試場景**：
-- 下載ETHUSDT, 1h, 最近100根
-- 下載BTCUSDT, 4h, 最近50根
-- 模擬API失敗（重試機制）
+- ✅ 測試1：下載ETHUSDT, 1h, 100根（單次請求）
+- ✅ 測試2：下載BTCUSDT, 4h, 50根（不同timeframe）
+- ✅ 測試3：批量下載5個symbols（BTCUSDT/ETHUSDT/BNBUSDT/ADAUSDT/SOLUSDT）
+- ✅ 測試4：HDF5存儲整合（下載+保存+讀取一致性）
+- ✅ 測試5：Provider註冊和健康檢查
+- ✅ 測試6：錯誤處理（無效symbol/timeframe/未註冊source）
+
+**完成狀態**：✅ **已完成** (2025-10-22)
+- 已創建 [kline_provider_base.py](momentum/DataExtraction/kline_provider_base.py) (335行，抽象基類)
+- 已創建 [kline_download_service.py](momentum/DataExtraction/kline_download_service.py) (457行，統一服務)
+- 已創建 [binance_provider.py](momentum/DataExtraction/providers/binance_provider.py) (583行，幣安適配器)
+- 已修改 [data_loader_momentum.py](momentum/DataExtraction/data_loader_momentum.py) (+47行，整合新服務)
+- 已創建 [test_kline_downloader.py](test_kline_downloader.py) (485行，6個驗收測試)
+- 所有測試通過（6/6），所有驗收標準達成
+- 已遵循Ultra Think三步驟（生成→審查12問題→修復P0-P1）
+- 架構支援未來擴展（OKX/鏈上/台美股期只需3步驟：實作→註冊→使用）
 
 ---
 
