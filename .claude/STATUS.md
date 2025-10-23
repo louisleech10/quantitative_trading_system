@@ -1,8 +1,8 @@
 # 項目狀態
 
-**最後更新**: 2025-10-22
-**當前階段**: 階段1圖表系統開發中 - 任務1.3完成
-**整體進度**: 階段1: 3/5任務完成 (60%)
+**最後更新**: 2025-10-24
+**當前階段**: 階段1圖表系統開發 - 任務1.4和1.5完成
+**整體進度**: 階段1: 5/5任務完成 (100%) ✅
 
 ---
 
@@ -209,6 +209,64 @@
     - 完整測試：6/6測試通過，所有驗收標準達成
   - ✅ Git提交：待推送
 
+- **階段1：圖表系統開發 - 任務1.4 案例CSV導入** (100%) - 2025-10-24完成
+  - ✅ **後端實作**（5個文件）
+    - case_models.py（數據模型，CaseRecord/CaseImportRequest/Response）
+    - case_import_service.py（CSV/Excel解析服務）
+      - 多格式支持（CSV/Excel）
+      - 多編碼支持（UTF-8/GBK/Big5）
+      - 列名標準化（Symbol→symbol，Positive_Case→Positive_case）
+      - CSV注入防護（檢測=,+,-,@等危險字符）
+      - 時間戳標準化（Unix/ISO/Excel自動識別）
+    - case_storage.py（內存存儲管理，修復use_persistent變量bug）
+    - case.py（FastAPI路由）
+    - main.py（路由註冊）
+  - ✅ **前端實作**（4個文件）
+    - CaseImportForm.tsx（上傳表單，白色背景+深色文字）
+    - data-preparation/page.tsx（主頁面，標註Phase 1/2）
+    - next.config.ts（API代理配置）
+    - .env.local（環境變數NEXT_PUBLIC_API_URL）
+  - ✅ **UI優化**
+    - 白色背景+深色文字（text-gray-900, bg-white）
+    - 左側導航更新（添加"數據準備"，移除"搜索結果"，標註Phase 2）
+    - 響應式設計，清晰可讀
+
+- **階段1：圖表系統開發 - 任務1.5 批量K線下載API** (100%) - 2025-10-24完成
+  - ✅ **後端實作**（1個文件）
+    - batch_download_service.py（批量下載服務，~540行）
+      - 並行下載（asyncio.gather + Semaphore，最多5個並發）
+      - 時間範圍合併（TimeRange類，減少API調用）
+      - 進度追蹤（內存Dict，實時更新）
+      - 預估時間計算（avg_time_per_case × remaining_cases）
+      - HDF5案例存儲（/cases/{case_id}/data）
+      - BinanceProvider註冊
+  - ✅ **前端實作**（1個文件）
+    - BatchDownloadPanel.tsx（批量下載面板）
+      - 數字輸入框修復（可直接輸入，移除過度限制）
+      - 動態輪詢（1秒→3秒漸進式間隔）
+      - 預設值修改（Lookback 100根，Forward 48根）
+      - 實時進度顯示（進度條、預估時間、成功/失敗統計）
+  - ✅ **Ultra Think三步驟完成**
+    - Step 1：生成14個文件（後端9個 + 前端5個）
+    - Step 2：自我審查識別15個問題（P0: 5個，P1: 6個，P2: 4個）
+    - Step 3：修復優化（P0全部 + P1部分，9/11完成）
+      - P0-1: _save_case_klines()實作（HDF5存儲）✅
+      - P0-2: BinanceProvider註冊✅
+      - P0-3: 路由註冊✅
+      - P0-4: 前端API路徑配置✅
+      - P0-5: BackgroundTasks使用正確✅
+      - P1-1: 並行下載（asyncio.gather）✅
+      - P1-2: CSV注入防護✅
+      - P1-4: 時間估算✅
+      - P1-6: 輪詢優化✅
+      - P1-3: SQLite持久化（未實作，記為優化項）
+      - P1-5: Excel日期轉換（未優化，記為優化項）
+  - ✅ **架構特色**
+    - 記憶體優先設計（快速原型）
+    - 可選SQLite持久化（P1-3未來實作）
+    - FastAPI BackgroundTasks異步執行
+    - 時間範圍智能合併（減少重複下載）
+
   - ✅ **階段1：後端計算改寫**（2025-10-18完成）
     - 完全改寫 `_calculate_past_stability_features()` 函數
     - 移除5個舊參數（Past_24hr_Max_Single_Move等）
@@ -268,11 +326,11 @@
   - ✅ 修改文件：2個文件，53行代碼
 
 ### 進行中 🔨
-- **無** - 任務1.3完成，等待Phase 2完整測試
+- **階段1完整測試** - 任務1.4-1.5完成，等待用戶測試驗證
 
 ### 計劃中 📋
-- **下一步**: 階段1任務1.4 - 案例CSV導入 🔥🔥
-- **階段1**: 圖表和數據系統 (3/5任務完成，60%)
+- **下一步**: 階段1完整測試或階段2圖表視覺化 🔥🔥
+- **階段1**: ✅ 圖表和數據系統 (5/5任務完成，100%)
 - **階段2**: 指標測試系統 (4-5週)
 - **階段3**: ML訓練系統 (4-6週)
 - **階段4**: Pattern發現 (2-3週)
@@ -283,16 +341,19 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**✅ 任務1.3完成**：K線數據整合服務（2025-10-22）
-**🎯 下一個任務**：任務1.4 - 案例CSV導入
+**✅ 任務1.4-1.5完成**：案例CSV導入與批量K線下載（2025-10-24）
+**🎯 下一個任務**：階段1完整測試或階段2圖表視覺化
 
-**當前狀態**（2025-10-22）：
+**當前狀態**（2025-10-24）：
 - ✅ Case Search系統：100%完成（Phase 0-2優化）
 - ✅ 階段1任務1.1：100%完成（HDF5存儲）
 - ✅ 階段1任務1.2：100%完成（K線下載）
 - ✅ 階段1任務1.3：100%完成（數據整合）
-- 🎯 階段1整體進度：3/5任務完成 (60%)
-- 📋 下一步：任務1.4 案例CSV導入
+- ✅ 階段1任務1.4：100%完成（案例CSV導入）
+- ✅ 階段1任務1.5：100%完成（批量K線下載API）
+- ✅ 階段1整體進度：5/5任務完成 (100%) 🎉
+- ⚠️ 待測試：所有任務1.4-1.5功能需用戶實際測試
+- 📋 下一步：階段1完整測試或開始階段2
 
 ---
 
@@ -313,15 +374,32 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-- **無** - 所有已知問題已修復
+- **任務1.4-1.5功能未測試**（優先級：高）⚠️
+  - 影響：所有新功能未經實際測試驗證
+  - 範圍：CSV導入、批量下載、前端UI、數據存儲
+  - 測試項目：
+    1. CSV導入（列名標準化、時間戳轉換、CSV注入防護）
+    2. 數字輸入框（可否直接輸入）
+    3. 批量下載（並行下載、進度追蹤、HDF5存儲）
+    4. UI配色（文字可讀性、白色背景）
+    5. 左側導航（順序正確、Phase 2標註）
+  - 下一步：按照測試計劃逐項測試
 
 ### 需要優化
-- **Phase 2完整測試和優化**（優先級：中）
-  - 時機：任務1.3-1.5完成後
+- **任務1.4-1.5優化項目**（優先級：中）
+  - P1-3: SQLite持久化存儲（目前僅內存）
+  - P1-5: Excel日期轉換精度改善
+  - P2-1: 完整類型標註（TypeScript/Python）
+  - P2-2: API文檔（Swagger/OpenAPI）
+  - P2-3: 日誌等級優化（DEBUG/INFO分離）
+  - P2-4: 前端ErrorBoundary錯誤處理
+
+- **Phase 1完整測試和優化**（優先級：中）
+  - 時機：任務1.4-1.5測試通過後
   - 範圍：任務1.1-1.5端到端整合測試
-  - 目標：驗證完整數據流（下載→存儲→整合→視覺化）
+  - 目標：驗證完整數據流（CSV→下載→存儲→整合）
   - 內容：性能基準測試、錯誤處理驗證、並發場景測試
-  - 狀態：等待Phase 2完成
+  - 狀態：等待基本功能測試完成
 
 ### 需要優化（優先級：低）
 - **測試腳本清理** (2025-10-21)
@@ -368,6 +446,71 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-10-24
+
+**階段1任務1.4-1.5：案例CSV導入與批量K線下載完成** ⭐⭐⭐
+
+**任務1.4：案例CSV導入**
+- ✅ **後端實作**（5個文件，~1400行）
+  - case_models.py: 數據模型（CaseRecord, CaseImportRequest/Response等）
+  - case_import_service.py: CSV/Excel解析服務（~380行）
+    - 列名標準化（Symbol→symbol, Positive_Case→Positive_case）
+    - 多編碼支持（UTF-8, GBK, Big5）
+    - CSV注入防護（檢測=,+,-,@等危險字符）
+    - 時間戳自動標準化（Unix/ISO/Excel格式）
+  - case_storage.py: 內存存儲管理（~200行，修復use_persistent bug）
+  - case.py: FastAPI路由（POST/GET/DELETE端點）
+  - main.py: 路由註冊整合
+
+- ✅ **前端實作**（4個文件，~600行）
+  - CaseImportForm.tsx: CSV上傳表單（文件選擇、timeframe、驗證）
+  - data-preparation/page.tsx: 主頁面（兩欄布局、Phase標註）
+  - next.config.ts: API代理配置
+  - .env.local: 環境變數NEXT_PUBLIC_API_URL
+
+**任務1.5：批量K線下載API**
+- ✅ **後端實作**（1個文件，~540行）
+  - batch_download_service.py: 批量下載服務
+    - 並行下載（asyncio.gather + Semaphore，5個並發）
+    - 時間範圍合併（TimeRange類，減少API調用）
+    - 進度追蹤（內存Dict，實時更新）
+    - 預估時間計算（avg_time_per_case × remaining_cases）
+    - HDF5案例存儲（/cases/{case_id}/data）
+    - BinanceProvider自動註冊
+
+- ✅ **前端實作**（1個文件，~270行）
+  - BatchDownloadPanel.tsx: 批量下載面板
+    - 數字輸入框修復（移除onKeyDown限制）
+    - 動態輪詢（1秒→3秒漸進式間隔）
+    - 預設值：Lookback 100根，Forward 48根
+    - 實時進度顯示（進度條、預估時間、成功/失敗）
+
+**UI優化完成**
+- ✅ 配色改善：白色背景 + 深色文字（text-gray-900, bg-white）
+- ✅ 左側導航更新：
+  - 順序調整：首頁→案例搜索→數據準備→圖表分析→系統設定
+  - 移除"搜索結果"
+  - 標註"圖表分析（Phase 2）"
+- ✅ 數字輸入框：可直接鍵盤輸入
+- ✅ Phase 1/2分離說明
+
+**Ultra Think三步驟完成**
+- Step 1: 生成14個文件（後端9個 + 前端5個）
+- Step 2: 自我審查識別15個問題（P0: 5, P1: 6, P2: 4）
+- Step 3: 修復優化9/11完成
+  - P0全部修復：_save_case_klines、BinanceProvider註冊、路由註冊等
+  - P1部分修復：並行下載、CSV注入防護、時間估算、輪詢優化
+  - P1未完成：SQLite持久化、Excel日期精度（記為優化項）
+  - P2全部未完成（記為未來優化）
+
+**技術總結**：
+- 文件數量：14個（後端9 + 前端5）
+- 代碼行數：~2810行
+- 測試狀態：⚠️ 未測試（等待用戶驗證）
+- 架構模式：內存優先、FastAPI BackgroundTasks、並行下載
+- 數據流：CSV→內存→批量下載→HDF5案例存儲
+- 階段1進度：5/5任務完成 (100%) 🎉
 
 ### 2025-10-22 (下午)
 
@@ -1148,12 +1291,23 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**最近提交** (2025-10-22):
-- **待推送**: 任務1.3 K線數據整合服務完成
-  - 新增 api/services/kline_data_service.py (670行)
-  - 新增 test_kline_data_service.py (568行)
-  - 更新 .claude/CHART_DEVELOPMENT_TODO.md（標記任務1.3完成）
-  - 更新 .claude/STATUS.md（記錄任務1.3完成）
+**最近提交** (2025-10-24):
+- **待推送**: 任務1.4-1.5 案例CSV導入與批量K線下載完成
+  - 新增後端文件（9個）：
+    - api/models/case_models.py
+    - api/routes/case.py
+    - api/services/batch_download_service.py
+    - api/services/case_import_service.py
+    - api/utils/case_storage.py
+  - 新增前端文件（5個）：
+    - frontend/src/app/data-preparation/
+    - frontend/src/components/case/
+    - frontend/.env.local
+  - 修改文件（3個）：
+    - api/main.py（路由註冊）
+    - frontend/next.config.ts（API代理）
+    - frontend/src/components/layout/MainLayout.tsx（導航更新）
+  - 更新 .claude/STATUS.md（記錄任務1.4-1.5完成）
 
 **Tags**:
 - phase-0-start, phase-0-complete, phase-0-error-handling
@@ -1161,41 +1315,38 @@ for case in candidates:
 - phase-2-start, phase-2-complete
 - chart-phase1-task1.1-complete
 - chart-phase1-task1.2-complete
-- 🔖 建議新增：chart-phase1-task1.3-complete
+- chart-phase1-task1.3-complete
+- 🔖 建議新增：chart-phase1-task1.4-1.5-complete, chart-phase1-complete
 
 **備份分支**: backup-before-phase0, backup-before-phase1
 
 **當前狀態**:
-- 任務1.3：✅ 完成，待推送
-- 測試狀態：✅ 5/5測試通過
-- 待提交文件：4個（2新增 + 2更新）
+- 任務1.4-1.5：✅ 完成，待推送
+- 測試狀態：⚠️ 未測試（等待用戶驗證）
+- 待提交文件：14個新增 + 3個修改 + 1個STATUS.md
 
 ---
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-10-22）：
-   - ✅ **任務1.3：K線數據整合服務**（100%完成）
-     - 核心服務：kline_data_service.py (670行)
-     - 測試腳本：test_kline_data_service.py (568行)
-     - Ultra Think三步驟完成（識別9問題，全部修復）
-     - 5個測試100%通過
-     - 3種智能決策邏輯（完全缺失/完全命中/部分命中）
-     - 性能達標：72.82ms < 100ms目標
+1. **已完成工作**（2025-10-24）：
+   - ✅ **任務1.4和1.5：案例CSV導入與批量K線下載API**（100%完成）
+     - 後端：6個新模組（case_models, case_import_service, case_storage, batch_download_service, case router）
+     - 前端：3個新頁面組件（CaseImportForm, BatchDownloadPanel, data-preparation page）
+     - Ultra Think三步驟完成（識別15問題，修復P0-P1關鍵問題）
+     - 功能：CSV導入、大小寫不敏感列名匹配、並行下載(最多5併發)、進度追蹤
+     - UI：響應式設計、動態輪詢、時間估算
 
 2. **當前狀態**：
    - 分支：main
-   - 階段1進度：3/5任務完成 (60%)
-   - 待提交：4個文件（2新增 + 2更新）
-   - 系統狀態：✅ 任務1.3完成，已推送到GitHub
+   - 階段1進度：5/5任務完成 (100%) ✅
+   - 待提交：14個新增 + 3個修改 + 1個STATUS.md
+   - 測試狀態：⚠️ 代碼完成但未實測，等待用戶驗證
 
 3. **下一步工作**：
-   按 CHART_DEVELOPMENT_TODO.md 開始**任務1.4：案例CSV導入** 🔥🔥
-   - 實作CSV/Excel解析（pandas）
-   - 驗證必要欄位（symbol, timeframe, timestamp, Positive_case）
-   - 時間格式標準化（轉為Unix timestamp）
-   - 儲存案例到資料庫或內存
-   - 前端上傳UI（file input + 進度條）
+   - **優先**：階段1完整功能測試（CSV導入、批量下載、UI交互）
+   - **備選**：開始階段2（圖表視覺化與技術分析）
+   - 參考：CHART_DEVELOPMENT_TODO.md 階段2任務
 
 4. 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範
 5. 完成後更新此文件

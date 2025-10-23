@@ -32,16 +32,16 @@ const navigationItems = [
     description: '設定條件搜索交易案例'
   },
   {
-    name: '搜索結果',
-    href: '/result',
+    name: '數據準備',
+    href: '/data-preparation',
     icon: Database,
-    description: '查看和分析搜索結果'
+    description: '上傳案例CSV並批量下載K線'
   },
   {
-    name: '數據儀表板',
+    name: '圖表分析',
     href: '/dashboard',
     icon: BarChart3,
-    description: '數據統計和視覺化'
+    description: '圖表視覺化和技術分析（Phase 2）'
   },
   {
     name: '系統設定',
