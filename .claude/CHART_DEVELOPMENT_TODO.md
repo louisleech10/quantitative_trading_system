@@ -397,26 +397,27 @@ Phase 5: 整合與優化        (Week 7, 5天)
 **子任務**：
 
 **PriceChart（K線圖）**：
-- [ ] 創建PriceChart組件
-- [ ] 實作K線數據渲染（CandlestickSeries）
-- [ ] 實作紅綠配色（漲綠跌紅）
-- [ ] 實作時間軸格式化
-- [ ] 實作價格軸格式化
-- [ ] 實作懸停資訊框（顯示OHLCV）
+- [x] 創建PriceChart組件
+- [x] 實作K線數據渲染（CandlestickSeries）
+- [x] 實作紅綠配色（漲綠跌紅）
+- [x] 實作時間軸格式化
+- [x] 實作價格軸格式化
+- [x] 實作TO/TC雙標記（藍色TO↑，橙色TC↑）
+- [x] 實作懸停資訊框（顯示OHLCV）
 
 **VolumeChart（柱狀圖）**：
-- [ ] 創建VolumeChart組件
-- [ ] 實作柱狀圖渲染（HistogramSeries）
-- [ ] 實作顏色邏輯（跟隨價格漲跌）
-- [ ] 調整高度比例（約為Price圖的30%）
-- [ ] 實作懸停資訊
+- [x] 創建VolumeChart組件
+- [x] 實作柱狀圖渲染（HistogramSeries）
+- [x] 實作顏色邏輯（跟隨價格漲跌）
+- [x] 調整高度比例（約為Price圖的30%）
+- [x] 實作懸停資訊
 
 **TakerRatioChart（線圖）**：
-- [ ] 創建TakerRatioChart組件
-- [ ] 實作線圖渲染（LineSeries）
-- [ ] 實作0.5參考線（中性線，虛線）
-- [ ] 實作Y軸範圍（0-1固定）
-- [ ] 實作背景色區域（>0.5偏綠，<0.5偏紅）
+- [x] 創建TakerRatioChart組件
+- [x] 實作線圖渲染（LineSeries）
+- [x] 實作0.5參考線（中性線，虛線）
+- [x] 實作Y軸範圍（0-1固定）
+- [x] 實作背景色區域（>0.5偏綠，<0.5偏紅）
 
 **驗收標準**：
 - ✅ K線正確顯示
@@ -433,7 +434,57 @@ Phase 5: 整合與優化        (Week 7, 5天)
 - ✅ 視覺意義明確
 - ✅ 三個圖表獨立渲染流暢（60fps）
 
-**測試數據**：ETHUSDT, 1h, 100根K線
+**測試數據**：DOGEUSDT/ETHUSDT, 1h/12h, 100根K線
+
+**完成狀態**：✅ **已完成** (2025-10-25)
+- 已創建 [PriceChart.tsx](frontend/src/components/charts/PriceChart.tsx) (~350行，K線圖 + TO/TC雙標記)
+  - CandlestickSeries渲染
+  - 紅綠配色（漲紅跌綠）
+  - TO標記：藍色向上箭頭（↑）
+  - TC標記：橙色向上箭頭（↑）
+  - 時間戳數據流對齊（toTimestamp, tcTimestamp props）
+- 已創建 [VolumeChart.tsx](frontend/src/components/charts/VolumeChart.tsx) (~250行，成交量柱狀圖)
+  - HistogramSeries渲染
+  - 顏色跟隨價格漲跌
+  - 高度比例適中
+- 已創建 [TakerRatioChart.tsx](frontend/src/components/charts/TakerRatioChart.tsx) (~200行，Taker比率線圖)
+  - LineSeries渲染
+  - 0.5基準線（買賣平衡點）
+  - Y軸固定0-1範圍
+- **後端時區修復** [case_import_service.py](api/services/case_import_service.py):448-454
+  - CSV導入強制UTC時區（`dt.replace(tzinfo=timezone.utc)`）
+  - 解決8小時時間偏移問題
+- **後端HDF5並發修復** [batch_download_service.py](api/services/batch_download_service.py):585-665
+  - 3次重試機制，指數退避（100ms, 200ms, 400ms）
+  - 解決"file is already open"錯誤
+- **後端Legacy Cache導入** [kline_storage.py](momentum/DataExtraction/kline_storage.py):324-463
+  - _ensure_dataset()方法：自動檢測缺失數據集
+  - _import_from_legacy_cache()方法：從data_cache/*.h5導入舊緩存
+  - 向後兼容設計
+- **前端頁面整合** [page.tsx](frontend/src/app/chart/page.tsx)
+  - 數據流對齊（aligned_case_timestamp, aligned_tc_timestamp）
+  - 三圖表組件整合
+- **測試驗證**：
+  - ✅ DOGEUSDT 12 cases CSV導入成功
+  - ✅ TO標記正確位置（2025-01-03 12:00 UTC，index 109）
+  - ✅ TC標記正確位置（TO + case_bars，index 120）
+  - ✅ 時區問題完全解決（無8小時偏移）
+  - ✅ HDF5並發問題解決（12/12 cases下載成功）
+  - ✅ 響應式設計驗證通過（多螢幕尺寸）
+- **已遵循Ultra Think三步驟**：
+  - Step 1: 實作三圖表組件
+  - Step 2: 診斷時區和並發問題
+  - Step 3: 修復、驗證、優化
+- **UX優化項**（延後至Phase 2.3+）：
+  - 三圖表縮放同步（預計2-3小時）
+  - Volume Y軸auto-scaling（預計1-2小時）
+  - Crosshair同步（預計2-4小時）
+- **Documentation**：
+  - [SESSION_Phase2.2.md](/.claude/sessions/SESSION_Phase2.2_ARCHIVED.md)：完整session記錄（已歸檔）
+  - [SESSION_GUIDELINES.md](/.claude/SESSION_GUIDELINES.md)：Session使用規範（新建）
+  - [SESSION_TEMPLATE.md](/.claude/SESSION_TEMPLATE.md)：標準模板（新建）
+  - [copilot-instructions.md](/.github/copilot-instructions.md)：Copilot快速指南（新建）
+- Git提交：commit f832067（Phase 2.2核心功能）+ commit 108f67c（文檔歸檔）
 
 ---
 
