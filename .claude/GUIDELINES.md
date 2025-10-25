@@ -363,6 +363,7 @@ claude --project
 
 **記住**：
 - 數據真實性永遠第一優先
+- 要從FIRST Principle思考
 - Ultra Think 三步驟不能跳過
 - 錯誤處理和日誌記錄很重要
 - 性能優化要有實際測量數據支撐

@@ -1,0 +1,4 @@
+case_id,symbol,timeframe,timestamp,positive_case
+test_001,ETHUSDT,12h,1710800000,true
+test_002,ETHUSDT,12h,1708000000,false
+test_003,ETHUSDT,12h,1713000000,true

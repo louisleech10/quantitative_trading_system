@@ -20,7 +20,7 @@ sys.path.insert(0, str(project_root))
 
 from api.core.logging import get_logger
 from api.models.case_models import CaseRecord, CaseImportResponse
-from api.utils.case_storage import CaseStorageManager
+from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
 
 logger = get_logger("api.case_import_service")
 
@@ -526,7 +526,9 @@ def get_case_import_service() -> CaseImportService:
     global _case_import_service
 
     if _case_import_service is None:
-        _case_import_service = CaseImportService()
-        logger.info("Created global CaseImportService instance")
+        # 使用全局單例的storage manager
+        storage_manager = get_case_storage_manager()
+        _case_import_service = CaseImportService(storage_manager=storage_manager)
+        logger.info("Created global CaseImportService instance with shared storage")
 
     return _case_import_service

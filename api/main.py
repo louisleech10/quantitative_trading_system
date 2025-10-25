@@ -153,7 +153,7 @@ def setup_basic_routes(app: FastAPI):
 def register_routes(app: FastAPI):
     """Register all API routes"""
     try:
-        from api.routes import case_search, config, case
+        from api.routes import case_search, config, case, chart
         # 新增導入兩階段搜索路由
         try:
             from api.routes import two_stage_search
@@ -179,6 +179,12 @@ def register_routes(app: FastAPI):
         app.include_router(
             case.router,
             tags=["Case Management"]
+        )
+
+        # Register chart routes (Phase 2 Task 2.1)
+        app.include_router(
+            chart.router,
+            tags=["Chart Data"]
         )
 
         # Register two-stage search routes if available

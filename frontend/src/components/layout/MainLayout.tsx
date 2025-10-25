@@ -4,14 +4,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Search, 
-  BarChart3, 
-  Settings, 
-  Database, 
-  Menu, 
+import {
+  Search,
+  BarChart3,
+  Settings,
+  Database,
+  Menu,
   X,
-  Home
+  Home,
+  LineChart
 } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -36,6 +37,12 @@ const navigationItems = [
     href: '/data-preparation',
     icon: Database,
     description: '上傳案例CSV並批量下載K線'
+  },
+  {
+    name: '圖表查看',
+    href: '/chart',
+    icon: LineChart,
+    description: '查看案例K線圖表和技術指標'
   },
   {
     name: '圖表分析',

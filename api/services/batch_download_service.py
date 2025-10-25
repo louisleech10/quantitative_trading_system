@@ -24,7 +24,7 @@ from api.models.case_models import (
     DownloadResult,
     TaskStatus
 )
-from api.utils.case_storage import CaseStorageManager
+from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.DataExtraction.kline_download_service import KlineDownloadService
 
@@ -296,11 +296,12 @@ class BatchDownloadService:
                             )
 
                             # 從已下載數據中讀取案例範圍的K線
+                            # 注意：KlineStorageManager.read_klines() 期望整數時間戳，不是datetime對象
                             case_df = self.kline_storage.read_klines(
                                 symbol,
                                 timeframe,
-                                case_start,
-                                case_end
+                                int(case_start.timestamp()),
+                                int(case_end.timestamp())
                             )
 
                             if case_df is None or case_df.empty:
@@ -634,7 +635,9 @@ def get_batch_download_service() -> BatchDownloadService:
     global _batch_download_service
 
     if _batch_download_service is None:
-        _batch_download_service = BatchDownloadService()
-        logger.info("Created global BatchDownloadService instance")
+        # 使用全局單例的 case_storage manager
+        case_storage = get_case_storage_manager()
+        _batch_download_service = BatchDownloadService(case_storage=case_storage)
+        logger.info("Created global BatchDownloadService instance with shared storage")
 
     return _batch_download_service

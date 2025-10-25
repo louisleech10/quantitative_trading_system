@@ -194,16 +194,20 @@ async def clear_all_cases():
     清空所有案例（謹慎使用）
 
     Returns:
-        dict: {"message": str}
+        dict: {"success": bool, "cleared_count": int, "message": str}
     """
     logger.warning("Clearing all cases from storage")
 
     try:
-        case_storage.clear_all()
+        cleared_count = case_storage.clear_all()
 
-        logger.info("All cases cleared successfully")
+        logger.info(f"All cases cleared successfully: {cleared_count} cases")
 
-        return {"message": "All cases cleared successfully"}
+        return {
+            "success": True,
+            "cleared_count": cleared_count,
+            "message": f"Successfully cleared {cleared_count} cases"
+        }
 
     except Exception as e:
         logger.error(f"Failed to clear cases: {e}", exc_info=True)

@@ -195,13 +195,19 @@ class CaseStorageManager:
             return False
 
 
-    def clear_all(self):
-        """清空所有案例"""
+    def clear_all(self) -> int:
+        """
+        清空所有案例
+
+        Returns:
+            int: 清空的案例數量
+        """
         count = len(self.cases)
         self.cases.clear()
         self.symbol_index.clear()
         self.timeframe_index.clear()
         logger.info(f"Cleared all {count} cases from storage")
+        return count
 
 
     def get_statistics(self) -> CaseListResponse:

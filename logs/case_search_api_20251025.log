@@ -1,0 +1,1141 @@
+2025-10-25 08:30:03 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-10-25 08:30:03 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-25 08:30:03 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-10-25 08:30:03 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-10-25 08:30:03 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-10-25 08:30:03 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-25 08:30:03 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-10-25 08:30:03 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-10-25 08:30:03 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-10-25 08:30:03 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-10-25 08:30:16 - api.middleware.request - [32mINFO[0m - [6800f95b] Started POST /api/v1/case/import from 127.0.0.1
+2025-10-25 08:30:16 - api.routes.case - [32mINFO[0m - Receiving case import request: case_search_test.csv (default_timeframe=1h, validate_only=False)
+2025-10-25 08:30:16 - api.case_import_service - [32mINFO[0m - Importing cases from file: case_search_test.csv (size: 4816 bytes, validate_only=False)
+2025-10-25 08:30:16 - api.case_import_service - [32mINFO[0m - Parsed 12 rows from file
+2025-10-25 08:30:16 - api.case_import_service - [32mINFO[0m - Normalized 4 column names
+2025-10-25 08:30:16 - api.case_import_service - [32mINFO[0m - Created 12 CaseRecords from DataFrame
+2025-10-25 08:30:16 - api.case_storage - [32mINFO[0m - Saved 12/12 cases to storage
+2025-10-25 08:30:16 - api.case_import_service - [32mINFO[0m - Saved 12 cases to storage
+2025-10-25 08:30:16 - api.case_import_service - [32mINFO[0m - Import completed: 12/12 valid, 12 imported, 0 errors
+2025-10-25 08:30:16 - api.routes.case - [32mINFO[0m - Case import completed: 12/12 imported, 0 errors
+2025-10-25 08:30:16 - api.request - [32mINFO[0m - POST /api/v1/case/import - 200 - 0.131s
+2025-10-25 08:30:16 - api.middleware.request - [32mINFO[0m - [6800f95b] Completed POST /api/v1/case/import - 200 - 0.131s
+2025-10-25 08:30:19 - api.middleware.request - [32mINFO[0m - [b44995ee] Started POST /api/v1/kline/batch-download from 127.0.0.1
+2025-10-25 08:30:19 - api.routes.case - [32mINFO[0m - Starting batch download: case_ids=None, lookback=100, forward=48
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Created download task batch_download_20251025_003019_2a697f77 for 12 cases (lookback=100, forward=48)
+2025-10-25 08:30:19 - api.routes.case - [32mINFO[0m - Batch download task batch_download_20251025_003019_2a697f77 created and queued
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Starting batch download task: batch_download_20251025_003019_2a697f77
+2025-10-25 08:30:19 - api.request - [32mINFO[0m - POST /api/v1/kline/batch-download - 200 - 0.005s
+2025-10-25 08:30:19 - api.middleware.request - [32mINFO[0m - [b44995ee] Completed POST /api/v1/kline/batch-download - 200 - 0.005s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Processing 6 cases for ADAUSDT/12h
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Merged 6 ranges into 1 for ADAUSDT/12h
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.007s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Processing 6 cases for DOGEUSDT/12h
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Merged 6 ranges into 1 for DOGEUSDT/12h
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1735833600_1 to HDF5 at /cases/ADAUSDT_1735833600_1/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1735876800_1 to HDF5 at /cases/DOGEUSDT_1735876800_1/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.005s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1737302400_1 to HDF5 at /cases/ADAUSDT_1737302400_1/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736913600_1 to HDF5 at /cases/DOGEUSDT_1736913600_1/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736092800_0 to HDF5 at /cases/ADAUSDT_1736092800_0/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:30:19 - api.middleware.request - [32mINFO[0m - [6aa31f31] Started GET /api/v1/kline/download-status/batch_download_20251025_003019_2a697f77 from 127.0.0.1
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1737043200_1 to HDF5 at /cases/DOGEUSDT_1737043200_1/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736136000_0 to HDF5 at /cases/ADAUSDT_1736136000_0/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736136000_0 to HDF5 at /cases/DOGEUSDT_1736136000_0/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736265600_0 to HDF5 at /cases/ADAUSDT_1736265600_0/
+2025-10-25 08:30:19 - api.request - [32mINFO[0m - GET /api/v1/kline/download-status/batch_download_20251025_003019_2a697f77 - 200 - 0.020s
+2025-10-25 08:30:19 - api.middleware.request - [32mINFO[0m - [6aa31f31] Completed GET /api/v1/kline/download-status/batch_download_20251025_003019_2a697f77 - 200 - 0.020s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736179200_0 to HDF5 at /cases/DOGEUSDT_1736179200_0/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736395200_0 to HDF5 at /cases/ADAUSDT_1736395200_0/
+2025-10-25 08:30:19 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736265600_0 to HDF5 at /cases/DOGEUSDT_1736265600_0/
+2025-10-25 08:30:19 - api.batch_download_service - [32mINFO[0m - Batch download task batch_download_20251025_003019_2a697f77 completed: 12 success, 0 failed, 12 skipped, 0.10s
+2025-10-25 08:30:20 - api.middleware.request - [32mINFO[0m - [5cbd8b69] Started GET /api/v1/kline/download-status/batch_download_20251025_003019_2a697f77 from 127.0.0.1
+2025-10-25 08:30:20 - api.request - [32mINFO[0m - GET /api/v1/kline/download-status/batch_download_20251025_003019_2a697f77 - 200 - 0.003s
+2025-10-25 08:30:20 - api.middleware.request - [32mINFO[0m - [5cbd8b69] Completed GET /api/v1/kline/download-status/batch_download_20251025_003019_2a697f77 - 200 - 0.003s
+2025-10-25 08:30:35 - api.middleware.request - [32mINFO[0m - [7032cdbb] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:30:35 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:30:35 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:30:35 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:30:35 - api.middleware.request - [32mINFO[0m - [7032cdbb] Completed GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:30:35 - api.middleware.request - [32mINFO[0m - [aaf6e189] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:30:35 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:30:35 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:30:35 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.008s
+2025-10-25 08:30:35 - api.middleware.request - [32mINFO[0m - [aaf6e189] Completed GET /api/v1/case/list - 200 - 0.008s
+2025-10-25 08:30:35 - api.middleware.request - [32mINFO[0m - [d40916d6] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:30:35 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:30:35 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:30:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.026s
+2025-10-25 08:30:36 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:30:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:30:36 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:30:36 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:30:36 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:30:36 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.054s
+2025-10-25 08:30:36 - api.middleware.request - [32mINFO[0m - [d40916d6] Completed GET /api/v1/chart/data - 200 - 0.054s
+2025-10-25 08:30:36 - api.middleware.request - [32mINFO[0m - [5539c09b] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:30:36 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:30:36 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:30:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:30:36 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:30:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:30:36 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:30:36 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:30:36 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:30:36 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:30:36 - api.middleware.request - [32mINFO[0m - [5539c09b] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:30:45 - api.middleware.request - [32mINFO[0m - [6d470492] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:30:45 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:30:45 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:30:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.010s
+2025-10-25 08:30:45 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:30:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 200 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:30:45 - api.kline_storage_service - [32mINFO[0m - Read 200 klines around 1735833600, center_index=99
+2025-10-25 08:30:45 - api.chart_data_service - [32mINFO[0m - Successfully fetched 200 klines for DOGEUSDT/12h, center_index=99
+2025-10-25 08:30:45 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 200 klines, center_index=99
+2025-10-25 08:30:45 - api.middleware.request - [32mINFO[0m - [f7145656] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:30:45 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.037s
+2025-10-25 08:30:45 - api.middleware.request - [32mINFO[0m - [6d470492] Completed GET /api/v1/chart/data - 200 - 0.037s
+2025-10-25 08:30:45 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:30:45 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:30:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:30:45 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:30:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:30:45 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:30:45 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:30:45 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:30:45 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.031s
+2025-10-25 08:30:45 - api.middleware.request - [32mINFO[0m - [f7145656] Completed GET /api/v1/chart/data - 200 - 0.031s
+2025-10-25 08:30:59 - api.middleware.request - [32mINFO[0m - [da9cb9f5] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:30:59 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1736913600, timeframe=12h, max_bars=200
+2025-10-25 08:30:59 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1736913600, max_bars=200
+2025-10-25 08:30:59 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.007s
+2025-10-25 08:30:59 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736899200
+2025-10-25 08:30:59 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736913600 (100 before, 100 after)
+2025-10-25 08:30:59 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736913600, center_index=100
+2025-10-25 08:30:59 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:30:59 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:30:59 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.022s
+2025-10-25 08:30:59 - api.middleware.request - [32mINFO[0m - [da9cb9f5] Completed GET /api/v1/chart/data - 200 - 0.022s
+2025-10-25 08:32:26 - api.middleware.request - [32mINFO[0m - [86d096f2] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:32:26 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:32:26 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:32:26 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.010s
+2025-10-25 08:32:26 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:32:26 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:32:26 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:32:26 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:32:26 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:32:26 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.037s
+2025-10-25 08:32:26 - api.middleware.request - [32mINFO[0m - [86d096f2] Completed GET /api/v1/chart/data - 200 - 0.037s
+2025-10-25 08:32:32 - api.middleware.request - [32mINFO[0m - [5b323ddd] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:32:32 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1736913600, timeframe=12h, max_bars=200
+2025-10-25 08:32:32 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1736913600, max_bars=200
+2025-10-25 08:32:32 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.024s
+2025-10-25 08:32:32 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736899200
+2025-10-25 08:32:32 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736913600 (100 before, 100 after)
+2025-10-25 08:32:32 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736913600, center_index=100
+2025-10-25 08:32:32 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:32:32 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:32:32 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.048s
+2025-10-25 08:32:32 - api.middleware.request - [32mINFO[0m - [5b323ddd] Completed GET /api/v1/chart/data - 200 - 0.048s
+2025-10-25 08:32:34 - api.middleware.request - [32mINFO[0m - [6c9999a1] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:32:34 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1737043200, timeframe=12h, max_bars=200
+2025-10-25 08:32:34 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1737043200, max_bars=200
+2025-10-25 08:32:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:32:34 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1737028800
+2025-10-25 08:32:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1737043200 (100 before, 100 after)
+2025-10-25 08:32:34 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1737043200, center_index=100
+2025-10-25 08:32:34 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:32:34 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:32:34 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:32:34 - api.middleware.request - [32mINFO[0m - [6c9999a1] Completed GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:32:48 - api.middleware.request - [32mINFO[0m - [38186e3c] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:32:48 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:32:48 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:32:48 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:32:48 - api.middleware.request - [32mINFO[0m - [38186e3c] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:32:48 - api.middleware.request - [32mINFO[0m - [ed8f47ec] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:32:48 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:32:48 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:32:48 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:32:48 - api.middleware.request - [32mINFO[0m - [ed8f47ec] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:32:53 - api.middleware.request - [32mINFO[0m - [05e1583f] Started DELETE /api/v1/case/clear-all from 127.0.0.1
+2025-10-25 08:32:53 - api.routes.case - [33mWARNING[0m - Clearing all cases from storage
+2025-10-25 08:32:53 - api.case_storage - [32mINFO[0m - Cleared all 12 cases from storage
+2025-10-25 08:32:53 - api.routes.case - [32mINFO[0m - All cases cleared successfully
+2025-10-25 08:32:53 - api.request - [32mINFO[0m - DELETE /api/v1/case/clear-all - 200 - 0.002s
+2025-10-25 08:32:53 - api.middleware.request - [32mINFO[0m - [05e1583f] Completed DELETE /api/v1/case/clear-all - 200 - 0.002s
+2025-10-25 08:33:36 - api.middleware.request - [32mINFO[0m - [7dc3903d] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:33:36 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:33:36 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:33:36 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:33:36 - api.middleware.request - [32mINFO[0m - [7dc3903d] Completed GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:33:36 - api.middleware.request - [32mINFO[0m - [94457587] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:33:36 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:33:36 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:33:36 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:36 - api.middleware.request - [32mINFO[0m - [94457587] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:38 - api.middleware.request - [32mINFO[0m - [dbfe953e] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:33:38 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:33:38 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:33:38 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:38 - api.middleware.request - [32mINFO[0m - [dbfe953e] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:38 - api.middleware.request - [32mINFO[0m - [d206ae5b] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:33:38 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:33:38 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:33:38 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:33:38 - api.middleware.request - [32mINFO[0m - [d206ae5b] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:33:44 - api.middleware.request - [32mINFO[0m - [b9a30efb] Started POST /api/v1/case/import from 127.0.0.1
+2025-10-25 08:33:44 - api.routes.case - [32mINFO[0m - Receiving case import request: case_search_test.csv (default_timeframe=1h, validate_only=False)
+2025-10-25 08:33:44 - api.case_import_service - [32mINFO[0m - Importing cases from file: case_search_test.csv (size: 4816 bytes, validate_only=False)
+2025-10-25 08:33:44 - api.case_import_service - [32mINFO[0m - Parsed 12 rows from file
+2025-10-25 08:33:44 - api.case_import_service - [32mINFO[0m - Normalized 4 column names
+2025-10-25 08:33:44 - api.case_import_service - [32mINFO[0m - Created 12 CaseRecords from DataFrame
+2025-10-25 08:33:44 - api.case_storage - [32mINFO[0m - Saved 12/12 cases to storage
+2025-10-25 08:33:44 - api.case_import_service - [32mINFO[0m - Saved 12 cases to storage
+2025-10-25 08:33:44 - api.case_import_service - [32mINFO[0m - Import completed: 12/12 valid, 12 imported, 0 errors
+2025-10-25 08:33:44 - api.routes.case - [32mINFO[0m - Case import completed: 12/12 imported, 0 errors
+2025-10-25 08:33:44 - api.request - [32mINFO[0m - POST /api/v1/case/import - 200 - 0.023s
+2025-10-25 08:33:44 - api.middleware.request - [32mINFO[0m - [b9a30efb] Completed POST /api/v1/case/import - 200 - 0.023s
+2025-10-25 08:33:45 - api.middleware.request - [32mINFO[0m - [db4043f0] Started POST /api/v1/kline/batch-download from 127.0.0.1
+2025-10-25 08:33:45 - api.routes.case - [32mINFO[0m - Starting batch download: case_ids=None, lookback=100, forward=48
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Created download task batch_download_20251025_003345_71de1b12 for 12 cases (lookback=100, forward=48)
+2025-10-25 08:33:45 - api.routes.case - [32mINFO[0m - Batch download task batch_download_20251025_003345_71de1b12 created and queued
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Starting batch download task: batch_download_20251025_003345_71de1b12
+2025-10-25 08:33:45 - api.request - [32mINFO[0m - POST /api/v1/kline/batch-download - 200 - 0.003s
+2025-10-25 08:33:45 - api.middleware.request - [32mINFO[0m - [db4043f0] Completed POST /api/v1/kline/batch-download - 200 - 0.003s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Processing 6 cases for ADAUSDT/12h
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Merged 6 ranges into 1 for ADAUSDT/12h
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.005s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Processing 6 cases for DOGEUSDT/12h
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Merged 6 ranges into 1 for DOGEUSDT/12h
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1735833600_1 to HDF5 at /cases/ADAUSDT_1735833600_1/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1735876800_1 to HDF5 at /cases/DOGEUSDT_1735876800_1/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1737302400_1 to HDF5 at /cases/ADAUSDT_1737302400_1/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736913600_1 to HDF5 at /cases/DOGEUSDT_1736913600_1/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.002s
+2025-10-25 08:33:45 - api.middleware.request - [32mINFO[0m - [f791d55f] Started GET /api/v1/kline/download-status/batch_download_20251025_003345_71de1b12 from 127.0.0.1
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736092800_0 to HDF5 at /cases/ADAUSDT_1736092800_0/
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1737043200_1 to HDF5 at /cases/DOGEUSDT_1737043200_1/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:33:45 - api.request - [32mINFO[0m - GET /api/v1/kline/download-status/batch_download_20251025_003345_71de1b12 - 200 - 0.007s
+2025-10-25 08:33:45 - api.middleware.request - [32mINFO[0m - [f791d55f] Completed GET /api/v1/kline/download-status/batch_download_20251025_003345_71de1b12 - 200 - 0.007s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736136000_0 to HDF5 at /cases/ADAUSDT_1736136000_0/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736136000_0 to HDF5 at /cases/DOGEUSDT_1736136000_0/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736265600_0 to HDF5 at /cases/ADAUSDT_1736265600_0/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736179200_0 to HDF5 at /cases/DOGEUSDT_1736179200_0/
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.005s
+2025-10-25 08:33:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736395200_0 to HDF5 at /cases/ADAUSDT_1736395200_0/
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736265600_0 to HDF5 at /cases/DOGEUSDT_1736265600_0/
+2025-10-25 08:33:45 - api.batch_download_service - [32mINFO[0m - Batch download task batch_download_20251025_003345_71de1b12 completed: 12 success, 0 failed, 12 skipped, 0.07s
+2025-10-25 08:33:46 - api.middleware.request - [32mINFO[0m - [3e4b0b33] Started GET /api/v1/kline/download-status/batch_download_20251025_003345_71de1b12 from 127.0.0.1
+2025-10-25 08:33:46 - api.request - [32mINFO[0m - GET /api/v1/kline/download-status/batch_download_20251025_003345_71de1b12 - 200 - 0.001s
+2025-10-25 08:33:46 - api.middleware.request - [32mINFO[0m - [3e4b0b33] Completed GET /api/v1/kline/download-status/batch_download_20251025_003345_71de1b12 - 200 - 0.001s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [e32678ac] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:33:49 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:33:49 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:33:49 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [e32678ac] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [7bbcaee6] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:33:49 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:33:49 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:33:49 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [7bbcaee6] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [d7ab33ef] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:33:49 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:33:49 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:33:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.021s
+2025-10-25 08:33:49 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:33:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:33:49 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:33:49 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:33:49 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:33:49 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.038s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [d7ab33ef] Completed GET /api/v1/chart/data - 200 - 0.038s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [123bf231] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:33:49 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:33:49 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:33:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.005s
+2025-10-25 08:33:49 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:33:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:33:49 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:33:49 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:33:49 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:33:49 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:33:49 - api.middleware.request - [32mINFO[0m - [123bf231] Completed GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:33:52 - api.middleware.request - [32mINFO[0m - [1fa7dee5] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:33:52 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:33:52 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:33:52 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.009s
+2025-10-25 08:33:52 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:33:52 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 200 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:33:52 - api.kline_storage_service - [32mINFO[0m - Read 200 klines around 1735833600, center_index=99
+2025-10-25 08:33:52 - api.chart_data_service - [32mINFO[0m - Successfully fetched 200 klines for DOGEUSDT/12h, center_index=99
+2025-10-25 08:33:52 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 200 klines, center_index=99
+2025-10-25 08:33:52 - api.middleware.request - [32mINFO[0m - [d57d69fd] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:33:52 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.031s
+2025-10-25 08:33:52 - api.middleware.request - [32mINFO[0m - [1fa7dee5] Completed GET /api/v1/chart/data - 200 - 0.031s
+2025-10-25 08:33:52 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:33:52 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:33:52 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.005s
+2025-10-25 08:33:52 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:33:52 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:33:52 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:33:52 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:33:52 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:33:52 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.026s
+2025-10-25 08:33:52 - api.middleware.request - [32mINFO[0m - [d57d69fd] Completed GET /api/v1/chart/data - 200 - 0.026s
+2025-10-25 08:33:57 - api.middleware.request - [32mINFO[0m - [d78ad2a9] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:33:57 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:33:57 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:33:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:33:57 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:33:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:33:57 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:33:57 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:33:57 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:33:57 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:33:57 - api.middleware.request - [32mINFO[0m - [d78ad2a9] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:33:57 - api.middleware.request - [32mINFO[0m - [b9563436] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:33:57 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:33:57 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:33:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:33:57 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:33:57 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:33:57 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:33:57 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:33:57 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:33:57 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:33:57 - api.middleware.request - [32mINFO[0m - [b9563436] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:34:06 - api.middleware.request - [32mINFO[0m - [b49e4c32] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:06 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736092800, timeframe=12h, max_bars=200
+2025-10-25 08:34:06 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736092800, max_bars=200
+2025-10-25 08:34:06 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:34:06 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736078400
+2025-10-25 08:34:06 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736092800 (100 before, 100 after)
+2025-10-25 08:34:06 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736092800, center_index=100
+2025-10-25 08:34:06 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:06 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:06 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:34:06 - api.middleware.request - [32mINFO[0m - [b49e4c32] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:34:11 - api.middleware.request - [32mINFO[0m - [944297b4] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:11 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736136000, timeframe=12h, max_bars=200
+2025-10-25 08:34:11 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736136000, max_bars=200
+2025-10-25 08:34:11 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:34:11 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736121600
+2025-10-25 08:34:11 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736136000 (100 before, 100 after)
+2025-10-25 08:34:11 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736136000, center_index=100
+2025-10-25 08:34:11 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:11 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:11 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.017s
+2025-10-25 08:34:11 - api.middleware.request - [32mINFO[0m - [944297b4] Completed GET /api/v1/chart/data - 200 - 0.017s
+2025-10-25 08:34:24 - api.middleware.request - [32mINFO[0m - [170339b6] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:24 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736092800, timeframe=12h, max_bars=200
+2025-10-25 08:34:24 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736092800, max_bars=200
+2025-10-25 08:34:24 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.006s
+2025-10-25 08:34:24 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736078400
+2025-10-25 08:34:24 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736092800 (100 before, 100 after)
+2025-10-25 08:34:24 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736092800, center_index=100
+2025-10-25 08:34:24 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:24 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:24 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.030s
+2025-10-25 08:34:24 - api.middleware.request - [32mINFO[0m - [170339b6] Completed GET /api/v1/chart/data - 200 - 0.030s
+2025-10-25 08:34:27 - api.middleware.request - [32mINFO[0m - [76e2765a] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:27 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736136000, timeframe=12h, max_bars=200
+2025-10-25 08:34:27 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736136000, max_bars=200
+2025-10-25 08:34:27 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:34:27 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736121600
+2025-10-25 08:34:27 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736136000 (100 before, 100 after)
+2025-10-25 08:34:27 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736136000, center_index=100
+2025-10-25 08:34:27 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:27 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:27 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:34:27 - api.middleware.request - [32mINFO[0m - [76e2765a] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:34:30 - api.middleware.request - [32mINFO[0m - [3431f0d9] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:30 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736265600, timeframe=12h, max_bars=200
+2025-10-25 08:34:30 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736265600, max_bars=200
+2025-10-25 08:34:30 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.006s
+2025-10-25 08:34:30 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736251200
+2025-10-25 08:34:30 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736265600 (100 before, 100 after)
+2025-10-25 08:34:30 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736265600, center_index=100
+2025-10-25 08:34:30 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:30 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:30 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.021s
+2025-10-25 08:34:30 - api.middleware.request - [32mINFO[0m - [3431f0d9] Completed GET /api/v1/chart/data - 200 - 0.021s
+2025-10-25 08:34:33 - api.middleware.request - [32mINFO[0m - [d18f130d] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:33 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736092800, timeframe=12h, max_bars=200
+2025-10-25 08:34:33 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736092800, max_bars=200
+2025-10-25 08:34:33 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.005s
+2025-10-25 08:34:33 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736078400
+2025-10-25 08:34:33 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736092800 (100 before, 100 after)
+2025-10-25 08:34:33 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736092800, center_index=100
+2025-10-25 08:34:33 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:33 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:33 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.023s
+2025-10-25 08:34:33 - api.middleware.request - [32mINFO[0m - [d18f130d] Completed GET /api/v1/chart/data - 200 - 0.023s
+2025-10-25 08:34:36 - api.middleware.request - [32mINFO[0m - [3f53af9d] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:36 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736136000, timeframe=12h, max_bars=200
+2025-10-25 08:34:36 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736136000, max_bars=200
+2025-10-25 08:34:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:34:36 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736121600
+2025-10-25 08:34:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736136000 (100 before, 100 after)
+2025-10-25 08:34:36 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736136000, center_index=100
+2025-10-25 08:34:36 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:36 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:36 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.014s
+2025-10-25 08:34:36 - api.middleware.request - [32mINFO[0m - [3f53af9d] Completed GET /api/v1/chart/data - 200 - 0.014s
+2025-10-25 08:34:38 - api.middleware.request - [32mINFO[0m - [8e85f141] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:38 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736265600, timeframe=12h, max_bars=200
+2025-10-25 08:34:38 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736265600, max_bars=200
+2025-10-25 08:34:38 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:34:38 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736251200
+2025-10-25 08:34:38 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736265600 (100 before, 100 after)
+2025-10-25 08:34:38 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736265600, center_index=100
+2025-10-25 08:34:38 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:38 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:38 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.023s
+2025-10-25 08:34:38 - api.middleware.request - [32mINFO[0m - [8e85f141] Completed GET /api/v1/chart/data - 200 - 0.023s
+2025-10-25 08:34:48 - api.middleware.request - [32mINFO[0m - [bb5bd144] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:48 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:34:48 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:34:48 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.009s
+2025-10-25 08:34:48 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:34:48 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:34:48 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:34:48 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:48 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:48 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.028s
+2025-10-25 08:34:48 - api.middleware.request - [32mINFO[0m - [bb5bd144] Completed GET /api/v1/chart/data - 200 - 0.028s
+2025-10-25 08:34:54 - api.middleware.request - [32mINFO[0m - [a1c1ff3c] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:34:54 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1737302400, timeframe=12h, max_bars=200
+2025-10-25 08:34:54 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1737302400, max_bars=200
+2025-10-25 08:34:54 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:34:54 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1737288000
+2025-10-25 08:34:54 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1737302400 (100 before, 100 after)
+2025-10-25 08:34:54 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1737302400, center_index=100
+2025-10-25 08:34:54 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:34:54 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:34:54 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.013s
+2025-10-25 08:34:54 - api.middleware.request - [32mINFO[0m - [a1c1ff3c] Completed GET /api/v1/chart/data - 200 - 0.013s
+2025-10-25 08:35:30 - api.middleware.request - [32mINFO[0m - [8ff0579b] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:35:30 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736092800, timeframe=12h, max_bars=200
+2025-10-25 08:35:30 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736092800, max_bars=200
+2025-10-25 08:35:30 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:35:30 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736078400
+2025-10-25 08:35:30 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736092800 (100 before, 100 after)
+2025-10-25 08:35:30 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736092800, center_index=100
+2025-10-25 08:35:30 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:35:30 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:35:30 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:35:30 - api.middleware.request - [32mINFO[0m - [8ff0579b] Completed GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:36:35 - api.middleware.request - [32mINFO[0m - [6e5645d3] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:35 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:35 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:35 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:36:35 - api.middleware.request - [32mINFO[0m - [6e5645d3] Completed GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:36:35 - api.middleware.request - [32mINFO[0m - [805db4f1] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:35 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:35 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:35 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:35 - api.middleware.request - [32mINFO[0m - [805db4f1] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [928d4c36] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:36 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:36 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:36 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [928d4c36] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [9e2f3160] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:36 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:36 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:36 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [9e2f3160] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [481efe3c] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:36 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:36 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.042s
+2025-10-25 08:36:36 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:36 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:36:36 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:36:36 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:36 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.086s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [481efe3c] Completed GET /api/v1/chart/data - 200 - 0.086s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [5ea9e6ad] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:36 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:36 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:36:36 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:36 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:36 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:36:36 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:36:36 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:36 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:36:36 - api.middleware.request - [32mINFO[0m - [5ea9e6ad] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:36:39 - api.middleware.request - [32mINFO[0m - [b6367620] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:39 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:39 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:39 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:39 - api.middleware.request - [32mINFO[0m - [b6367620] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:39 - api.middleware.request - [32mINFO[0m - [7032a1fa] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:39 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:39 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:39 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:39 - api.middleware.request - [32mINFO[0m - [7032a1fa] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [c15d5a92] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:41 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:41 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:41 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [c15d5a92] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [ca4d48ad] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:41 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:41 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:41 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [ca4d48ad] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [df704dda] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:41 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:41 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.008s
+2025-10-25 08:36:41 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:41 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:36:41 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:36:41 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:41 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.030s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [df704dda] Completed GET /api/v1/chart/data - 200 - 0.030s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [0f064b84] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:41 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:41 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:36:41 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:41 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:36:41 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:36:41 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:41 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.018s
+2025-10-25 08:36:41 - api.middleware.request - [32mINFO[0m - [0f064b84] Completed GET /api/v1/chart/data - 200 - 0.018s
+2025-10-25 08:36:47 - api.middleware.request - [32mINFO[0m - [4b9b52aa] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:47 - api.middleware.request - [32mINFO[0m - [c19aae6f] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:47 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:47 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:47 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.005s
+2025-10-25 08:36:47 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:47 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 200 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:47 - api.kline_storage_service - [32mINFO[0m - Read 200 klines around 1735833600, center_index=99
+2025-10-25 08:36:47 - api.chart_data_service - [32mINFO[0m - Successfully fetched 200 klines for DOGEUSDT/12h, center_index=99
+2025-10-25 08:36:47 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 200 klines, center_index=99
+2025-10-25 08:36:47 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:36:47 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:36:47 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:36:47 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:36:47 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:36:47 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:36:47 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:36:47 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:47 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.040s
+2025-10-25 08:36:47 - api.middleware.request - [32mINFO[0m - [4b9b52aa] Completed GET /api/v1/chart/data - 200 - 0.040s
+2025-10-25 08:36:47 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.040s
+2025-10-25 08:36:47 - api.middleware.request - [32mINFO[0m - [c19aae6f] Completed GET /api/v1/chart/data - 200 - 0.040s
+2025-10-25 08:36:48 - api.middleware.request - [32mINFO[0m - [88643e17] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:48 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:48 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:48 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:48 - api.middleware.request - [32mINFO[0m - [88643e17] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:48 - api.middleware.request - [32mINFO[0m - [b144ec8f] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:48 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:48 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:48 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:36:48 - api.middleware.request - [32mINFO[0m - [b144ec8f] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [242b39aa] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:49 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:49 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:49 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [242b39aa] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [91f80898] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:36:49 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:36:49 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:36:49 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [91f80898] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [3ddd228b] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:49 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:49 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:36:49 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:49 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:36:49 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:36:49 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:49 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.024s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [3ddd228b] Completed GET /api/v1/chart/data - 200 - 0.024s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [3e2cee5a] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:36:49 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:36:49 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:36:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:36:49 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:36:49 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:36:49 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:36:49 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:36:49 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:36:49 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.020s
+2025-10-25 08:36:49 - api.middleware.request - [32mINFO[0m - [3e2cee5a] Completed GET /api/v1/chart/data - 200 - 0.020s
+2025-10-25 08:38:08 - api.middleware.request - [32mINFO[0m - [caccb82a] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:08 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:38:08 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:38:08 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.008s
+2025-10-25 08:38:08 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:38:08 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 200 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:38:08 - api.kline_storage_service - [32mINFO[0m - Read 200 klines around 1735833600, center_index=99
+2025-10-25 08:38:08 - api.chart_data_service - [32mINFO[0m - Successfully fetched 200 klines for DOGEUSDT/12h, center_index=99
+2025-10-25 08:38:08 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 200 klines, center_index=99
+2025-10-25 08:38:08 - api.middleware.request - [32mINFO[0m - [b64297c6] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:08 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:38:08 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:38:08 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:38:08 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:38:08 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:38:08 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:38:08 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:38:08 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:38:08 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.047s
+2025-10-25 08:38:08 - api.middleware.request - [32mINFO[0m - [caccb82a] Completed GET /api/v1/chart/data - 200 - 0.047s
+2025-10-25 08:38:08 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.025s
+2025-10-25 08:38:08 - api.middleware.request - [32mINFO[0m - [b64297c6] Completed GET /api/v1/chart/data - 200 - 0.025s
+2025-10-25 08:38:16 - api.middleware.request - [32mINFO[0m - [f80f9a20] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:16 - api.middleware.request - [32mINFO[0m - [13f225cc] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:16 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:38:16 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:38:16 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:38:16 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:38:16 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:38:16 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:38:16 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:38:16 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:38:16 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:38:16 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:38:16 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:38:16 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:38:16 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:38:16 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:38:16 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:38:16 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:38:16 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.027s
+2025-10-25 08:38:16 - api.middleware.request - [32mINFO[0m - [f80f9a20] Completed GET /api/v1/chart/data - 200 - 0.027s
+2025-10-25 08:38:16 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.027s
+2025-10-25 08:38:16 - api.middleware.request - [32mINFO[0m - [13f225cc] Completed GET /api/v1/chart/data - 200 - 0.027s
+2025-10-25 08:38:27 - api.middleware.request - [32mINFO[0m - [b2ac73ee] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:27 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736265600, timeframe=12h, max_bars=200
+2025-10-25 08:38:27 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736265600, max_bars=200
+2025-10-25 08:38:27 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:38:27 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736251200
+2025-10-25 08:38:27 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736265600 (100 before, 100 after)
+2025-10-25 08:38:27 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736265600, center_index=100
+2025-10-25 08:38:27 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:38:27 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:38:27 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:38:27 - api.middleware.request - [32mINFO[0m - [b2ac73ee] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:38:41 - api.middleware.request - [32mINFO[0m - [a8e4b898] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:41 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1736136000, timeframe=12h, max_bars=200
+2025-10-25 08:38:41 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1736136000, max_bars=200
+2025-10-25 08:38:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:38:41 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736121600
+2025-10-25 08:38:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736136000 (100 before, 100 after)
+2025-10-25 08:38:41 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736136000, center_index=100
+2025-10-25 08:38:41 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:38:41 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:38:41 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:38:41 - api.middleware.request - [32mINFO[0m - [a8e4b898] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:38:54 - api.middleware.request - [32mINFO[0m - [3b85bcad] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:38:54 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:38:54 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:38:54 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:38:54 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:38:54 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:38:54 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:38:54 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:38:54 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:38:54 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:38:54 - api.middleware.request - [32mINFO[0m - [3b85bcad] Completed GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:39:00 - api.middleware.request - [32mINFO[0m - [2b204ab3] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:39:00 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1737302400, timeframe=12h, max_bars=200
+2025-10-25 08:39:00 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1737302400, max_bars=200
+2025-10-25 08:39:00 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:39:00 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1737288000
+2025-10-25 08:39:00 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1737302400 (100 before, 100 after)
+2025-10-25 08:39:00 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1737302400, center_index=100
+2025-10-25 08:39:00 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:39:00 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:39:00 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:39:00 - api.middleware.request - [32mINFO[0m - [2b204ab3] Completed GET /api/v1/chart/data - 200 - 0.016s
+2025-10-25 08:39:10 - api.middleware.request - [32mINFO[0m - [d2f30725] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:39:10 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:39:10 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:39:10 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.044s
+2025-10-25 08:39:10 - api.middleware.request - [32mINFO[0m - [d2f30725] Completed GET /api/v1/case/list - 200 - 0.044s
+2025-10-25 08:39:10 - api.middleware.request - [32mINFO[0m - [6ae3b965] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:39:10 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:39:10 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:39:10 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.006s
+2025-10-25 08:39:10 - api.middleware.request - [32mINFO[0m - [6ae3b965] Completed GET /api/v1/case/list - 200 - 0.006s
+2025-10-25 08:39:11 - api.middleware.request - [32mINFO[0m - [fe052797] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:39:11 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:39:11 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:39:11 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:39:11 - api.middleware.request - [32mINFO[0m - [fe052797] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:39:11 - api.middleware.request - [32mINFO[0m - [d0dcfed8] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:39:11 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:39:11 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:39:11 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:39:11 - api.middleware.request - [32mINFO[0m - [d0dcfed8] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:39:11 - api.middleware.request - [32mINFO[0m - [fe3f5a92] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:39:11 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:39:11 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:39:11 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.017s
+2025-10-25 08:39:12 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:39:12 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:39:12 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:39:12 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:39:12 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:39:12 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.101s
+2025-10-25 08:39:12 - api.middleware.request - [32mINFO[0m - [fe3f5a92] Completed GET /api/v1/chart/data - 200 - 0.101s
+2025-10-25 08:39:12 - api.middleware.request - [32mINFO[0m - [06b3ce6a] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:39:12 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:39:12 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:39:12 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:39:12 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:39:12 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:39:12 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:39:12 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:39:12 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:39:12 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:39:12 - api.middleware.request - [32mINFO[0m - [06b3ce6a] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:39:39 - api.middleware.request - [32mINFO[0m - [453f9728] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:39:39 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:39:39 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:39:39 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.006s
+2025-10-25 08:39:39 - api.middleware.request - [32mINFO[0m - [453f9728] Completed GET /api/v1/case/list - 200 - 0.006s
+2025-10-25 08:39:39 - api.middleware.request - [32mINFO[0m - [6e90545f] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:39:39 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:39:39 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:39:39 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:39:39 - api.middleware.request - [32mINFO[0m - [6e90545f] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [363fb9aa] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:40:01 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:40:01 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:40:01 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [363fb9aa] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [f22da6ba] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:40:01 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:40:01 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:40:01 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [f22da6ba] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [fda90e08] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:01 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:40:01 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:40:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.053s
+2025-10-25 08:40:01 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:40:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:40:01 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:40:01 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:40:01 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:01 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.090s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [fda90e08] Completed GET /api/v1/chart/data - 200 - 0.090s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [89e03bf5] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:01 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:40:01 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:40:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:40:01 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:40:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:40:01 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:40:01 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:40:01 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:01 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.019s
+2025-10-25 08:40:01 - api.middleware.request - [32mINFO[0m - [89e03bf5] Completed GET /api/v1/chart/data - 200 - 0.019s
+2025-10-25 08:40:20 - api.middleware.request - [32mINFO[0m - [75c6cb38] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:20 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:40:20 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:40:20 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:40:20 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:40:20 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 200 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:40:20 - api.kline_storage_service - [32mINFO[0m - Read 200 klines around 1735833600, center_index=99
+2025-10-25 08:40:20 - api.chart_data_service - [32mINFO[0m - Successfully fetched 200 klines for DOGEUSDT/12h, center_index=99
+2025-10-25 08:40:20 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 200 klines, center_index=99
+2025-10-25 08:40:20 - api.middleware.request - [32mINFO[0m - [11f07af0] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:20 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.017s
+2025-10-25 08:40:20 - api.middleware.request - [32mINFO[0m - [75c6cb38] Completed GET /api/v1/chart/data - 200 - 0.017s
+2025-10-25 08:40:20 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:40:20 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:40:20 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.002s
+2025-10-25 08:40:20 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:40:20 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:40:20 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:40:20 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:40:20 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:20 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:40:20 - api.middleware.request - [32mINFO[0m - [11f07af0] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:40:29 - api.middleware.request - [32mINFO[0m - [b7b8bb23] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:29 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:40:29 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:40:29 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.007s
+2025-10-25 08:40:29 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:40:29 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:40:29 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:40:29 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:40:29 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:29 - api.middleware.request - [32mINFO[0m - [915cdb1f] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:29 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.035s
+2025-10-25 08:40:29 - api.middleware.request - [32mINFO[0m - [b7b8bb23] Completed GET /api/v1/chart/data - 200 - 0.035s
+2025-10-25 08:40:29 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:40:29 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:40:29 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:40:29 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:40:29 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:40:29 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:40:29 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:40:29 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:29 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.020s
+2025-10-25 08:40:29 - api.middleware.request - [32mINFO[0m - [915cdb1f] Completed GET /api/v1/chart/data - 200 - 0.020s
+2025-10-25 08:40:38 - api.middleware.request - [32mINFO[0m - [c2a40a76] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:38 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1737302400, timeframe=12h, max_bars=200
+2025-10-25 08:40:38 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1737302400, max_bars=200
+2025-10-25 08:40:38 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.005s
+2025-10-25 08:40:38 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1737288000
+2025-10-25 08:40:38 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1737302400 (100 before, 100 after)
+2025-10-25 08:40:38 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1737302400, center_index=100
+2025-10-25 08:40:38 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:40:38 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:38 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.021s
+2025-10-25 08:40:38 - api.middleware.request - [32mINFO[0m - [c2a40a76] Completed GET /api/v1/chart/data - 200 - 0.021s
+2025-10-25 08:40:44 - api.middleware.request - [32mINFO[0m - [fac9114f] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:44 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1737302400, timeframe=12h, max_bars=200
+2025-10-25 08:40:44 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1737302400, max_bars=200
+2025-10-25 08:40:44 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.006s
+2025-10-25 08:40:44 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1737288000
+2025-10-25 08:40:44 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1737302400 (100 before, 100 after)
+2025-10-25 08:40:44 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1737302400, center_index=100
+2025-10-25 08:40:44 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:40:44 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:44 - api.middleware.request - [32mINFO[0m - [c31010aa] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:44 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.032s
+2025-10-25 08:40:44 - api.middleware.request - [32mINFO[0m - [fac9114f] Completed GET /api/v1/chart/data - 200 - 0.032s
+2025-10-25 08:40:44 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:40:44 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:40:44 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.002s
+2025-10-25 08:40:44 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:40:44 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:40:44 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:40:44 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:40:44 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:44 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.018s
+2025-10-25 08:40:44 - api.middleware.request - [32mINFO[0m - [c31010aa] Completed GET /api/v1/chart/data - 200 - 0.018s
+2025-10-25 08:40:47 - api.middleware.request - [32mINFO[0m - [90359092] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:40:47 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1736136000, timeframe=12h, max_bars=200
+2025-10-25 08:40:47 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1736136000, max_bars=200
+2025-10-25 08:40:47 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:40:47 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1736121600
+2025-10-25 08:40:47 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1736136000 (100 before, 100 after)
+2025-10-25 08:40:47 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1736136000, center_index=100
+2025-10-25 08:40:47 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:40:47 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:40:47 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.020s
+2025-10-25 08:40:47 - api.middleware.request - [32mINFO[0m - [90359092] Completed GET /api/v1/chart/data - 200 - 0.020s
+2025-10-25 08:42:40 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-10-25 08:42:42 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-10-25 08:42:42 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-25 08:42:42 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-10-25 08:42:42 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-10-25 08:42:42 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-10-25 08:42:42 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-25 08:42:42 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-10-25 08:42:42 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-10-25 08:42:42 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-10-25 08:42:42 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-10-25 08:42:52 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2025-10-25 08:42:53 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2025-10-25 08:42:53 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-25 08:42:53 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2025-10-25 08:42:53 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2025-10-25 08:42:53 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2025-10-25 08:42:53 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2025-10-25 08:42:53 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2025-10-25 08:42:53 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2025-10-25 08:42:53 - api.startup - [32mINFO[0m - 運行環境: Development
+2025-10-25 08:42:53 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2025-10-25 08:44:16 - api.middleware.request - [32mINFO[0m - [245531c8] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:16 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:16 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:44:16 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.005s
+2025-10-25 08:44:16 - api.middleware.request - [32mINFO[0m - [245531c8] Completed GET /api/v1/case/list - 200 - 0.005s
+2025-10-25 08:44:16 - api.middleware.request - [32mINFO[0m - [612e249c] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:16 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:16 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:44:16 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:44:16 - api.middleware.request - [32mINFO[0m - [612e249c] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:44:26 - api.middleware.request - [32mINFO[0m - [e4af8884] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:26 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:26 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:44:26 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:26 - api.middleware.request - [32mINFO[0m - [e4af8884] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:26 - api.middleware.request - [32mINFO[0m - [aaf653bb] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:26 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:26 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:44:26 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:44:26 - api.middleware.request - [32mINFO[0m - [aaf653bb] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:44:27 - api.middleware.request - [32mINFO[0m - [9d84c6a4] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:27 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:27 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:44:27 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:44:27 - api.middleware.request - [32mINFO[0m - [9d84c6a4] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:44:27 - api.middleware.request - [32mINFO[0m - [a01e45f6] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:27 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:27 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:44:27 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:44:27 - api.middleware.request - [32mINFO[0m - [a01e45f6] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:44:32 - api.middleware.request - [32mINFO[0m - [e321813c] Started POST /api/v1/case/import from 127.0.0.1
+2025-10-25 08:44:32 - api.routes.case - [32mINFO[0m - Receiving case import request: case_search_test.csv (default_timeframe=1h, validate_only=False)
+2025-10-25 08:44:32 - api.case_import_service - [32mINFO[0m - Importing cases from file: case_search_test.csv (size: 4816 bytes, validate_only=False)
+2025-10-25 08:44:32 - api.case_import_service - [32mINFO[0m - Parsed 12 rows from file
+2025-10-25 08:44:32 - api.case_import_service - [32mINFO[0m - Normalized 4 column names
+2025-10-25 08:44:32 - api.case_import_service - [32mINFO[0m - Created 12 CaseRecords from DataFrame
+2025-10-25 08:44:32 - api.case_storage - [32mINFO[0m - Saved 12/12 cases to storage
+2025-10-25 08:44:32 - api.case_import_service - [32mINFO[0m - Saved 12 cases to storage
+2025-10-25 08:44:32 - api.case_import_service - [32mINFO[0m - Import completed: 12/12 valid, 12 imported, 0 errors
+2025-10-25 08:44:32 - api.routes.case - [32mINFO[0m - Case import completed: 12/12 imported, 0 errors
+2025-10-25 08:44:32 - api.request - [32mINFO[0m - POST /api/v1/case/import - 200 - 0.045s
+2025-10-25 08:44:32 - api.middleware.request - [32mINFO[0m - [e321813c] Completed POST /api/v1/case/import - 200 - 0.045s
+2025-10-25 08:44:34 - api.middleware.request - [32mINFO[0m - [5ea195bd] Started POST /api/v1/kline/batch-download from 127.0.0.1
+2025-10-25 08:44:34 - api.routes.case - [32mINFO[0m - Starting batch download: case_ids=None, lookback=100, forward=48
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Created download task batch_download_20251025_004434_5999baef for 12 cases (lookback=100, forward=48)
+2025-10-25 08:44:34 - api.routes.case - [32mINFO[0m - Batch download task batch_download_20251025_004434_5999baef created and queued
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Starting batch download task: batch_download_20251025_004434_5999baef
+2025-10-25 08:44:34 - api.request - [32mINFO[0m - POST /api/v1/kline/batch-download - 200 - 0.006s
+2025-10-25 08:44:34 - api.middleware.request - [32mINFO[0m - [5ea195bd] Completed POST /api/v1/kline/batch-download - 200 - 0.006s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Processing 6 cases for ADAUSDT/12h
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Merged 6 ranges into 1 for ADAUSDT/12h
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.007s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Processing 6 cases for DOGEUSDT/12h
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Merged 6 ranges into 1 for DOGEUSDT/12h
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1735833600_1 to HDF5 at /cases/ADAUSDT_1735833600_1/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1735876800_1 to HDF5 at /cases/DOGEUSDT_1735876800_1/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1737302400_1 to HDF5 at /cases/ADAUSDT_1737302400_1/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736913600_1 to HDF5 at /cases/DOGEUSDT_1736913600_1/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736092800_0 to HDF5 at /cases/ADAUSDT_1736092800_0/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:44:34 - api.middleware.request - [32mINFO[0m - [9a0f6ac2] Started GET /api/v1/kline/download-status/batch_download_20251025_004434_5999baef from 127.0.0.1
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1737043200_1 to HDF5 at /cases/DOGEUSDT_1737043200_1/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736136000_0 to HDF5 at /cases/ADAUSDT_1736136000_0/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.005s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736136000_0 to HDF5 at /cases/DOGEUSDT_1736136000_0/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.003s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736265600_0 to HDF5 at /cases/ADAUSDT_1736265600_0/
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736179200_0 to HDF5 at /cases/DOGEUSDT_1736179200_0/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from ADAUSDT/12h in 0.004s
+2025-10-25 08:44:34 - api.request - [32mINFO[0m - GET /api/v1/kline/download-status/batch_download_20251025_004434_5999baef - 200 - 0.027s
+2025-10-25 08:44:34 - api.middleware.request - [32mINFO[0m - [9a0f6ac2] Completed GET /api/v1/kline/download-status/batch_download_20251025_004434_5999baef - 200 - 0.027s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case ADAUSDT_1736395200_0 to HDF5 at /cases/ADAUSDT_1736395200_0/
+2025-10-25 08:44:34 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 148 klines from DOGEUSDT/12h in 0.004s
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Saved 148 klines for case DOGEUSDT_1736265600_0 to HDF5 at /cases/DOGEUSDT_1736265600_0/
+2025-10-25 08:44:34 - api.batch_download_service - [32mINFO[0m - Batch download task batch_download_20251025_004434_5999baef completed: 12 success, 0 failed, 12 skipped, 0.09s
+2025-10-25 08:44:35 - api.middleware.request - [32mINFO[0m - [0365f32f] Started GET /api/v1/kline/download-status/batch_download_20251025_004434_5999baef from 127.0.0.1
+2025-10-25 08:44:35 - api.request - [32mINFO[0m - GET /api/v1/kline/download-status/batch_download_20251025_004434_5999baef - 200 - 0.003s
+2025-10-25 08:44:35 - api.middleware.request - [32mINFO[0m - [0365f32f] Completed GET /api/v1/kline/download-status/batch_download_20251025_004434_5999baef - 200 - 0.003s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [f869309e] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:37 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:37 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:37 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [f869309e] Completed GET /api/v1/case/list - 200 - 0.004s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [4a7668d3] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:37 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:37 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:37 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [4a7668d3] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [91fa0ba9] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:37 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:44:37 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:44:37 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.018s
+2025-10-25 08:44:37 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:44:37 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:44:37 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:44:37 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:44:37 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:44:37 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.048s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [91fa0ba9] Completed GET /api/v1/chart/data - 200 - 0.048s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [f1bd7d3e] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:37 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:44:37 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:44:37 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:44:37 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:44:37 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:44:37 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:44:37 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:44:37 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:44:37 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.017s
+2025-10-25 08:44:37 - api.middleware.request - [32mINFO[0m - [f1bd7d3e] Completed GET /api/v1/chart/data - 200 - 0.017s
+2025-10-25 08:44:40 - api.middleware.request - [32mINFO[0m - [63c889cd] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:40 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:40 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:40 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:40 - api.middleware.request - [32mINFO[0m - [63c889cd] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:40 - api.middleware.request - [32mINFO[0m - [b33e96a7] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:40 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:40 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:40 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:44:40 - api.middleware.request - [32mINFO[0m - [b33e96a7] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [fcd7bf89] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:45 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:45 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:45 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [fcd7bf89] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [4231dfec] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:45 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:45 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:45 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [4231dfec] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [ca1aee56] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:45 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:44:45 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:44:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:44:45 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:44:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:44:45 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:44:45 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:44:45 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:44:45 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.024s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [ca1aee56] Completed GET /api/v1/chart/data - 200 - 0.024s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [82b65acc] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:45 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:44:45 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:44:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.002s
+2025-10-25 08:44:45 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:44:45 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:44:45 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:44:45 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:44:45 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:44:45 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:44:45 - api.middleware.request - [32mINFO[0m - [82b65acc] Completed GET /api/v1/chart/data - 200 - 0.015s
+2025-10-25 08:44:50 - api.middleware.request - [32mINFO[0m - [915980bd] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:50 - api.middleware.request - [32mINFO[0m - [2318d353] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:50 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:44:50 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:44:50 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.005s
+2025-10-25 08:44:50 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:44:50 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 200 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:44:50 - api.kline_storage_service - [32mINFO[0m - Read 200 klines around 1735833600, center_index=99
+2025-10-25 08:44:50 - api.chart_data_service - [32mINFO[0m - Successfully fetched 200 klines for DOGEUSDT/12h, center_index=99
+2025-10-25 08:44:50 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 200 klines, center_index=99
+2025-10-25 08:44:50 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1735876800, timeframe=12h, max_bars=200
+2025-10-25 08:44:50 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1735876800, max_bars=200
+2025-10-25 08:44:50 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.002s
+2025-10-25 08:44:50 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735862400
+2025-10-25 08:44:50 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735876800 (100 before, 100 after)
+2025-10-25 08:44:50 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735876800, center_index=100
+2025-10-25 08:44:50 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:44:50 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:44:50 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.035s
+2025-10-25 08:44:50 - api.middleware.request - [32mINFO[0m - [915980bd] Completed GET /api/v1/chart/data - 200 - 0.035s
+2025-10-25 08:44:50 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.037s
+2025-10-25 08:44:50 - api.middleware.request - [32mINFO[0m - [2318d353] Completed GET /api/v1/chart/data - 200 - 0.037s
+2025-10-25 08:44:54 - api.middleware.request - [32mINFO[0m - [a655d418] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:44:54 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=DOGEUSDT, case_timestamp=1737043200, timeframe=12h, max_bars=200
+2025-10-25 08:44:54 - api.chart_data_service - [32mINFO[0m - Fetching chart data: DOGEUSDT/12h, T=1737043200, max_bars=200
+2025-10-25 08:44:54 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 669 klines from DOGEUSDT/12h in 0.002s
+2025-10-25 08:44:54 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1737028800
+2025-10-25 08:44:54 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1737043200 (100 before, 100 after)
+2025-10-25 08:44:54 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1737043200, center_index=100
+2025-10-25 08:44:54 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for DOGEUSDT/12h, center_index=100
+2025-10-25 08:44:54 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:44:54 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.014s
+2025-10-25 08:44:54 - api.middleware.request - [32mINFO[0m - [a655d418] Completed GET /api/v1/chart/data - 200 - 0.014s
+2025-10-25 08:44:59 - api.middleware.request - [32mINFO[0m - [a1eff56a] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:59 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:59 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:59 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:59 - api.middleware.request - [32mINFO[0m - [a1eff56a] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:59 - api.middleware.request - [32mINFO[0m - [a6645902] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:44:59 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:44:59 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:44:59 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:44:59 - api.middleware.request - [32mINFO[0m - [a6645902] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:45:00 - api.middleware.request - [32mINFO[0m - [e7a6f71d] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:45:00 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:45:00 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:45:00 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:45:00 - api.middleware.request - [32mINFO[0m - [e7a6f71d] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:45:00 - api.middleware.request - [32mINFO[0m - [4b047b1a] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:45:00 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:45:00 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:45:00 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:45:00 - api.middleware.request - [32mINFO[0m - [4b047b1a] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:45:00 - api.middleware.request - [32mINFO[0m - [f5207427] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:45:00 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:45:00 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:45:00 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.003s
+2025-10-25 08:45:01 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:45:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:45:01 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:45:01 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:45:01 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:45:01 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.022s
+2025-10-25 08:45:01 - api.middleware.request - [32mINFO[0m - [f5207427] Completed GET /api/v1/chart/data - 200 - 0.022s
+2025-10-25 08:45:01 - api.middleware.request - [32mINFO[0m - [afd4b8e7] Started GET /api/v1/chart/data from 127.0.0.1
+2025-10-25 08:45:01 - api.routes.chart - [32mINFO[0m - GET /api/v1/chart/data: symbol=ADAUSDT, case_timestamp=1735833600, timeframe=12h, max_bars=200
+2025-10-25 08:45:01 - api.chart_data_service - [32mINFO[0m - Fetching chart data: ADAUSDT/12h, T=1735833600, max_bars=200
+2025-10-25 08:45:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 671 klines from ADAUSDT/12h in 0.008s
+2025-10-25 08:45:01 - momentum.DataExtraction.kline_storage - [33mWARNING[0m - Exact timestamp not found, using closest: 1735819200
+2025-10-25 08:45:01 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 201 klines around timestamp 1735833600 (100 before, 100 after)
+2025-10-25 08:45:01 - api.kline_storage_service - [32mINFO[0m - Read 201 klines around 1735833600, center_index=100
+2025-10-25 08:45:01 - api.chart_data_service - [32mINFO[0m - Successfully fetched 201 klines for ADAUSDT/12h, center_index=100
+2025-10-25 08:45:01 - api.routes.chart - [32mINFO[0m - Chart data fetched successfully: 201 klines, center_index=100
+2025-10-25 08:45:01 - api.request - [32mINFO[0m - GET /api/v1/chart/data - 200 - 0.021s
+2025-10-25 08:45:01 - api.middleware.request - [32mINFO[0m - [afd4b8e7] Completed GET /api/v1/chart/data - 200 - 0.021s
+2025-10-25 08:45:20 - api.middleware.request - [32mINFO[0m - [523dbea7] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:45:20 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:45:20 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:45:20 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:45:20 - api.middleware.request - [32mINFO[0m - [523dbea7] Completed GET /api/v1/case/list - 200 - 0.002s
+2025-10-25 08:45:20 - api.middleware.request - [32mINFO[0m - [bb44d333] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:45:20 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:45:20 - api.routes.case - [32mINFO[0m - Retrieved 12 cases
+2025-10-25 08:45:20 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:45:20 - api.middleware.request - [32mINFO[0m - [bb44d333] Completed GET /api/v1/case/list - 200 - 0.001s
+2025-10-25 08:45:27 - api.middleware.request - [32mINFO[0m - [94b4721c] Started OPTIONS /api/v1/case/clear-all from 127.0.0.1
+2025-10-25 08:45:27 - api.request - [32mINFO[0m - OPTIONS /api/v1/case/clear-all - 200 - 0.002s
+2025-10-25 08:45:27 - api.middleware.request - [32mINFO[0m - [94b4721c] Completed OPTIONS /api/v1/case/clear-all - 200 - 0.002s
+2025-10-25 08:45:27 - api.middleware.request - [32mINFO[0m - [a3ac74f3] Started DELETE /api/v1/case/clear-all from 127.0.0.1
+2025-10-25 08:45:27 - api.routes.case - [33mWARNING[0m - Clearing all cases from storage
+2025-10-25 08:45:27 - api.case_storage - [32mINFO[0m - Cleared all 12 cases from storage
+2025-10-25 08:45:27 - api.routes.case - [32mINFO[0m - All cases cleared successfully: 12 cases
+2025-10-25 08:45:27 - api.request - [32mINFO[0m - DELETE /api/v1/case/clear-all - 200 - 0.004s
+2025-10-25 08:45:27 - api.middleware.request - [32mINFO[0m - [a3ac74f3] Completed DELETE /api/v1/case/clear-all - 200 - 0.004s
+2025-10-25 08:45:28 - api.middleware.request - [32mINFO[0m - [656dd149] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:45:28 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:45:28 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:45:28 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:45:28 - api.middleware.request - [32mINFO[0m - [656dd149] Completed GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:45:29 - api.middleware.request - [32mINFO[0m - [db18f93b] Started GET /api/v1/case/list from 127.0.0.1
+2025-10-25 08:45:29 - api.routes.case - [32mINFO[0m - Retrieving case list
+2025-10-25 08:45:29 - api.routes.case - [32mINFO[0m - Retrieved 0 cases
+2025-10-25 08:45:29 - api.request - [32mINFO[0m - GET /api/v1/case/list - 200 - 0.003s
+2025-10-25 08:45:29 - api.middleware.request - [32mINFO[0m - [db18f93b] Completed GET /api/v1/case/list - 200 - 0.003s

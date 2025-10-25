@@ -1,12 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CaseImportForm from "@/components/case/CaseImportForm";
 import BatchDownloadPanel from "@/components/case/BatchDownloadPanel";
 
 export default function DataPreparationPage() {
   const [totalCases, setTotalCases] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isClearing, setIsClearing] = useState(false);
+
+  // 頁面加載時獲取當前案例數
+  useEffect(() => {
+    const fetchCaseCount = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/v1/case/list');
+        if (response.ok) {
+          const result = await response.json();
+          setTotalCases(result.total || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch case count:', error);
+      }
+    };
+
+    fetchCaseCount();
+  }, [refreshKey]);
 
   const handleImportSuccess = (result: any) => {
     // 更新案例總數
@@ -18,17 +36,61 @@ export default function DataPreparationPage() {
     console.log("Download completed");
   };
 
+  const handleClearAll = async () => {
+    if (!confirm('確定要清空所有案例嗎？此操作無法撤銷。')) {
+      return;
+    }
+
+    try {
+      setIsClearing(true);
+      const response = await fetch('http://localhost:8000/api/v1/case/clear-all', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`清空失敗: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`成功清空 ${result.cleared_count || 0} 個案例`);
+        setTotalCases(0);
+        setRefreshKey(prev => prev + 1); // 觸發子組件刷新
+        window.location.reload(); // 刷新整個頁面以確保狀態一致
+      } else {
+        throw new Error(result.error?.message || '清空失敗');
+      }
+    } catch (error) {
+      console.error('Clear all cases error:', error);
+      alert(error instanceof Error ? error.message : '清空案例時發生錯誤');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <div className="bg-white shadow-md border-b-2 border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            數據準備
-          </h1>
-          <p className="mt-2 text-sm font-medium text-gray-700">
-            上傳案例CSV文件並批量下載K線數據
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                數據準備
+              </h1>
+              <p className="mt-2 text-sm font-medium text-gray-700">
+                上傳案例CSV文件並批量下載K線數據
+              </p>
+            </div>
+            <button
+              onClick={handleClearAll}
+              disabled={isClearing}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium shadow-md"
+            >
+              {isClearing ? '清空中...' : '清空所有案例'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -71,7 +133,7 @@ export default function DataPreparationPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column: CSV Import */}
           <div>
-            <CaseImportForm onImportSuccess={handleImportSuccess} />
+            <CaseImportForm key={refreshKey} onImportSuccess={handleImportSuccess} />
 
             {/* Cases Summary */}
             {totalCases > 0 && (
@@ -88,6 +150,7 @@ export default function DataPreparationPage() {
           {/* Right Column: Batch Download */}
           <div>
             <BatchDownloadPanel
+              key={refreshKey}
               totalCases={totalCases}
               onDownloadComplete={handleDownloadComplete}
             />
