@@ -68,6 +68,7 @@ class CaseStorageManager:
             List[str]: 保存的案例ID列表
         """
         saved_ids = []
+        failed_cases = []
 
         for case in cases:
             try:
@@ -84,11 +85,18 @@ class CaseStorageManager:
                 saved_ids.append(case.case_id)
 
             except Exception as e:
+                failed_cases.append(case.case_id)
                 logger.error(
                     f"Failed to save case {case.case_id}: {e}",
                     exc_info=True
                 )
                 continue
+
+        if failed_cases:
+            logger.warning(
+                f"Failed to save {len(failed_cases)} cases: {', '.join(failed_cases[:5])}"
+                + (f" ...and {len(failed_cases) - 5} more" if len(failed_cases) > 5 else "")
+            )
 
         logger.info(
             f"Saved {len(saved_ids)}/{len(cases)} cases to storage"

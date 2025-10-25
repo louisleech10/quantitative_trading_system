@@ -575,6 +575,7 @@ class BatchDownloadService:
         try:
             import h5py
             import numpy as np
+            import time
 
             hdf5_path = self.kline_storage.hdf5_path
 
@@ -582,54 +583,86 @@ class BatchDownloadService:
             if not hdf5_path.exists():
                 self.kline_storage._create_hdf5_structure()
 
-            with h5py.File(hdf5_path, 'a') as f:
-                # 創建或獲取cases組
-                if 'cases' not in f:
-                    cases_group = f.create_group('cases')
-                else:
-                    cases_group = f['cases']
+            # 重試機制：避免並發文件鎖定問題
+            max_retries = 3
+            retry_delay = 0.1  # 100ms
+            last_error = None
+            
+            for attempt in range(max_retries):
+                try:
+                    with h5py.File(hdf5_path, 'a') as f:
+                        # 創建或獲取cases組
+                        if 'cases' not in f:
+                            cases_group = f.create_group('cases')
+                        else:
+                            cases_group = f['cases']
 
-                # 創建或獲取case_id組
-                case_id_str = str(case.case_id)
-                if case_id_str in cases_group:
-                    case_group = cases_group[case_id_str]
-                    # 如果data已存在，刪除舊的
-                    if 'data' in case_group:
-                        del case_group['data']
-                else:
-                    case_group = cases_group.create_group(case_id_str)
+                        # 創建或獲取case_id組
+                        case_id_str = str(case.case_id)
+                        if case_id_str in cases_group:
+                            case_group = cases_group[case_id_str]
+                            # 如果data已存在，刪除舊的
+                            if 'data' in case_group:
+                                del case_group['data']
+                        else:
+                            case_group = cases_group.create_group(case_id_str)
 
-                # 將DataFrame轉為結構化數組並寫入
-                dtype_list = [(col, str(klines_df[col].dtype)) for col in klines_df.columns]
-                structured_array = np.array(
-                    [tuple(row) for row in klines_df.values],
-                    dtype=dtype_list
-                )
+                        # 將DataFrame轉為結構化數組並寫入
+                        dtype_list = [(col, str(klines_df[col].dtype)) for col in klines_df.columns]
+                        structured_array = np.array(
+                            [tuple(row) for row in klines_df.values],
+                            dtype=dtype_list
+                        )
 
-                # 創建dataset with compression
-                dataset = case_group.create_dataset(
-                    'data',
-                    data=structured_array,
-                    compression='gzip',
-                    compression_opts=self.kline_storage.COMPRESSION_LEVEL
-                )
+                        # 創建dataset with compression
+                        dataset = case_group.create_dataset(
+                            'data',
+                            data=structured_array,
+                            compression='gzip',
+                            compression_opts=self.kline_storage.COMPRESSION_LEVEL
+                        )
 
-                # 存儲metadata
-                case_group.attrs['case_id'] = case_id_str
-                case_group.attrs['symbol'] = case.symbol
-                case_group.attrs['timeframe'] = case.timeframe
-                case_group.attrs['case_timestamp'] = case.timestamp
-                case_group.attrs['positive_case'] = case.positive_case
-                case_group.attrs['lookback_bars'] = request.lookback_bars
-                case_group.attrs['forward_bars'] = request.forward_bars
-                case_group.attrs['total_bars'] = len(klines_df)
-                case_group.attrs['time_range_start'] = int(klines_df['timestamp'].min())
-                case_group.attrs['time_range_end'] = int(klines_df['timestamp'].max())
-                case_group.attrs['saved_at'] = datetime.utcnow().isoformat()
-
-            logger.info(
-                f"Saved {len(klines_df)} klines for case {case.case_id} to HDF5 at /cases/{case_id_str}/"
-            )
+                        # 存儲metadata
+                        case_group.attrs['case_id'] = case_id_str
+                        case_group.attrs['symbol'] = case.symbol
+                        case_group.attrs['timeframe'] = case.timeframe
+                        case_group.attrs['case_timestamp'] = case.timestamp
+                        case_group.attrs['positive_case'] = case.positive_case
+                        case_group.attrs['lookback_bars'] = request.lookback_bars
+                        case_group.attrs['forward_bars'] = request.forward_bars
+                        case_group.attrs['total_bars'] = len(klines_df)
+                        case_group.attrs['time_range_start'] = int(klines_df['timestamp'].min())
+                        case_group.attrs['time_range_end'] = int(klines_df['timestamp'].max())
+                        case_group.attrs['saved_at'] = datetime.utcnow().isoformat()
+                    
+                    # 成功，跳出重試循環
+                    logger.info(
+                        f"Saved {len(klines_df)} klines for case {case.case_id} to HDF5 at /cases/{case_id_str}/"
+                    )
+                    return
+                    
+                except OSError as e:
+                    # HDF5 文件鎖定錯誤
+                    if "Unable to synchronously open file" in str(e) or "file is already open" in str(e):
+                        last_error = e
+                        if attempt < max_retries - 1:
+                            logger.warning(
+                                f"HDF5 file lock conflict for case {case.case_id}, "
+                                f"retrying ({attempt + 1}/{max_retries})..."
+                            )
+                            time.sleep(retry_delay)
+                            retry_delay *= 2  # 指數退避
+                            continue
+                        else:
+                            # 最後一次重試也失敗
+                            logger.error(
+                                f"Failed to save case {case.case_id} after {max_retries} retries: {e}",
+                                exc_info=True
+                            )
+                            raise
+                    else:
+                        # 其他 OSError，直接拋出
+                        raise
 
         except Exception as e:
             logger.error(

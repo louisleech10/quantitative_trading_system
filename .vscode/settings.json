@@ -1,5 +1,6 @@
 {
   "workbench.editor.enablePreview": false,
   "workbench.editor.enablePreviewFromQuickOpen": false,
-  "workbench.editor.enablePreviewFromCodeNavigation": false
+  "workbench.editor.enablePreviewFromCodeNavigation": false,
+  "chat.agent.maxRequests": 1000
 }

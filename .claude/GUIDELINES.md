@@ -238,6 +238,75 @@ momentum/     # 核心業務邏輯
 
 ---
 
+## 📝 Session Status 管理
+
+### 什麼是 Session Status？
+
+Session Status 是**細粒度的會話追蹤系統**，用於：
+- **跨對話追蹤**：同一任務可能跨多個對話串
+- **跨 AI 協作**：在 Claude 和 Copilot 間無縫切換
+- **PLAN 執行追蹤**：每個 PLAN 從提出到完成的完整記錄
+- **問題可追溯**：debug 過程和決策理由完整保存
+
+### 核心原則
+
+```
+⚠️ 強制規則：每次提出 PLAN 前，必須先更新 Session Status
+⚠️ 強制規則：開始執行、完成、遇到阻塞時，必須更新 Session Status
+⚠️ 強制規則：切換 AI 前，必須記錄切換點和原因
+```
+
+### 檔案命名
+
+```
+SESSION_Phase[X].[Y].md
+```
+
+**範例**:
+- `SESSION_Phase2.3.md` - Phase 2 任務 2.3（當前進行中）
+- `sessions/SESSION_Phase2.1_ARCHIVED.md` - 已完成並歸檔
+
+### 六大更新時機
+
+| 時機 | 必須動作 | 範例 |
+|------|----------|------|
+| **1. 提出 PLAN** | 記錄到計劃列表（PLANNED） | 新增「實作縮放功能」 |
+| **2. 開始執行** | PLANNED → IN_PROGRESS | 標記「正在實作縮放」 |
+| **3. 完成任務** | IN_PROGRESS → COMPLETED + DoD 檢查 | 標記「縮放功能完成」 |
+| **4. 遇到阻塞** | IN_PROGRESS → BLOCKED + 原因 | 「Token limit reached」 |
+| **5. 切換 AI** | 記錄切換點 + 更新負責 AI | Claude → Copilot |
+| **6. Debug** | DEBUG_START/END + 問題追蹤 | 記錄 Bug 和解決方案 |
+
+### 狀態機
+
+```
+PLANNED → IN_PROGRESS → COMPLETED
+              ↓
+           BLOCKED (可恢復)
+```
+
+### 快速開始
+
+```bash
+# 1. 創建新 Session
+> 複製 .claude/SESSION_TEMPLATE.md 為 SESSION_Phase2.3.md
+
+# 2. 開始工作時讀取
+> 讀取 .claude/SESSION_Phase2.3.md 和 SESSION_GUIDELINES.md
+
+# 3. 提出 PLAN 前更新
+> 在 Session Status 記錄這個 PLAN
+
+# 4. 完成後歸檔
+> 移動到 .claude/sessions/ 並更新 STATUS.md
+```
+
+### 詳細規範
+
+完整的使用規範請參閱：[SESSION_GUIDELINES.md](SESSION_GUIDELINES.md)
+
+---
+
 ## ⚠️ 常見陷阱
 
 ### 1. 過度優化（Overfitting）
@@ -279,8 +348,12 @@ momentum/     # 核心業務邏輯
 
 提交前必須檢查：
 
+- [ ] 是否從First Principle開始思考
 - [ ] 沒有假數據/硬編碼
 - [ ] 遵循 Ultra Think 三步驟
+- [ ] 遵循 Ultra Think步驟 1: 生成初版代碼
+- [ ] 遵循 Ultra Think步驟 2: 自我審查步驟1生成的代碼是否有錯誤和可優化之處(必做)+ 列出優化 To-do List
+- [ ] 遵循 Ultra Think步驟 3: 根據 To-do List 生成最終優化版本
 - [ ] 完整的錯誤處理
 - [ ] 適當的日誌記錄
 - [ ] 類型提示完整
@@ -289,6 +362,7 @@ momentum/     # 核心業務邏輯
 - [ ] 沒有重複代碼
 - [ ] 性能合理（避免明顯瓶頸）
 - [ ] Git commit message 符合規範
+- [ ] Session Status 已更新（如適用）
 
 ---
 

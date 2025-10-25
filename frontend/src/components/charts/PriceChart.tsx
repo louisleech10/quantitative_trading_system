@@ -73,6 +73,16 @@ export interface PriceChartProps {
    * 是否顯示案例標記
    */
   showCaseMarker?: boolean;
+
+  /**
+   * TO時間戳（對齊後的案例開始時間）
+   */
+  toTimestamp?: number;
+
+  /**
+   * TC時間戳（對齊後的案例結束時間）
+   */
+  tcTimestamp?: number;
 }
 
 /**
@@ -84,7 +94,9 @@ export function PriceChart({
   klines,
   caseTimestamp,
   height = 400,
-  showCaseMarker = true
+  showCaseMarker = true,
+  toTimestamp,
+  tcTimestamp
 }: PriceChartProps) {
   const { chartContainerRef, chartInstance, isReady } = useChart();
 
@@ -121,22 +133,59 @@ export function PriceChart({
       // 設置K線數據
       candlestickSeries.setData(formattedKlines);
 
-      // 標記T點（案例時間點）
+      // 標記TO和TC點（如果提供了對齊後的時間戳）
       if (showCaseMarker) {
-        const tMarker = {
-          time: caseTimestamp as any,
-          position: 'aboveBar' as const,
-          color: chartColors.caseMarkerColor,
-          shape: 'arrowDown' as const,
-          text: 'T',
-        };
-        candlestickSeries.setMarkers([tMarker]);
+        const markers = [];
+
+        if (toTimestamp && tcTimestamp) {
+          // 新邏輯：標記TO和TC兩個點
+          markers.push({
+            time: toTimestamp as any,
+            position: 'aboveBar' as const,
+            color: '#2196F3',  // 藍色 - TO
+            shape: 'arrowDown' as const,
+            text: 'TO',
+          });
+          markers.push({
+            time: tcTimestamp as any,
+            position: 'aboveBar' as const,
+            color: '#FF9800',  // 橙色 - TC
+            shape: 'arrowDown' as const,
+            text: 'TC',
+          });
+        } else {
+          // 舊邏輯：只標記一個T點（向後兼容）
+          markers.push({
+            time: caseTimestamp as any,
+            position: 'aboveBar' as const,
+            color: chartColors.caseMarkerColor,
+            shape: 'arrowDown' as const,
+            text: 'T',
+          });
+        }
+
+        candlestickSeries.setMarkers(markers);
       }
 
-      // 自動縮放到適合的範圍
-      chartInstance.timeScale().fitContent();
+      // 設置可見範圍為所有K線（確保TO/TC位置正確）
+      if (formattedKlines.length > 0) {
+        const firstTime = formattedKlines[0].time;
+        const lastTime = formattedKlines[formattedKlines.length - 1].time;
+        chartInstance.timeScale().setVisibleRange({
+          from: firstTime as any,
+          to: lastTime as any,
+        });
+      }
 
       console.log(`[PriceChart] Rendered ${formattedKlines.length} klines for ${symbol}`);
+      console.log(`[PriceChart] Markers:`, {
+        showCaseMarker,
+        toTimestamp,
+        tcTimestamp,
+        caseTimestamp,
+        firstKlineTime: formattedKlines[0]?.time,
+        lastKlineTime: formattedKlines[formattedKlines.length - 1]?.time,
+      });
 
       // 訂閱懸停事件（用於顯示OHLCV資訊）
       const handleCrosshairMove = (param: any) => {
@@ -168,7 +217,7 @@ export function PriceChart({
       console.error('[PriceChart] Failed to render chart:', err);
       setError(err instanceof Error ? err.message : 'Failed to render chart');
     }
-  }, [chartInstance, isReady, klines, caseTimestamp, showCaseMarker, symbol]);
+  }, [chartInstance, isReady, klines, caseTimestamp, showCaseMarker, symbol, toTimestamp, tcTimestamp]);
 
   return (
     <div className="w-full flex flex-col bg-white" style={{ height: `${height}px` }}>

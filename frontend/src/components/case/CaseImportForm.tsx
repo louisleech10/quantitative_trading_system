@@ -56,8 +56,23 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Upload failed");
+        let errorMessage = "Upload failed";
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            errorMessage = errorData.detail || JSON.stringify(errorData);
+          } else {
+            const text = await response.text();
+            if (text) {
+              errorMessage = text;
+            }
+          }
+        } catch (parseError) {
+          // 無法解析為JSON或文字時保留預設錯誤訊息
+          console.warn("Failed to parse error response", parseError);
+        }
+        throw new Error(errorMessage);
       }
 
       const data: ImportResult = await response.json();

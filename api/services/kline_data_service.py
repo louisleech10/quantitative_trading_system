@@ -305,7 +305,9 @@ class KlineDataService:
         symbol: str,
         timeframe: str,
         start_time: datetime,
-        end_time: datetime
+        end_time: datetime,
+        *,
+        save_to_storage: bool = True
     ) -> pd.DataFrame:
         """
         下載K線數據並存入緩存
@@ -331,7 +333,7 @@ class KlineDataService:
                 start_time=start_time,
                 end_time=end_time,
                 timeframe=timeframe,
-                save_to_storage=True  # 自動存入HDF5
+                save_to_storage=save_to_storage  # 保存與否由呼叫端決定
             )
 
             if df.empty:
@@ -420,11 +422,23 @@ class KlineDataService:
 
             try:
                 df_before = self._download_and_cache(
-                    source, symbol, timeframe, start_time, gap_before_end
+                    source,
+                    symbol,
+                    timeframe,
+                    start_time,
+                    gap_before_end,
+                    save_to_storage=False
                 )
                 if not df_before.empty:
                     dfs_to_merge.append(df_before)
                     logger.debug(f"Gap_before: added {len(df_before)} klines")
+                    if self.storage_manager is not None:
+                        try:
+                            self.storage_manager.append_klines(symbol, timeframe, df_before)
+                        except Exception as storage_error:
+                            logger.warning(
+                                f"Failed to append gap_before data for {symbol}/{timeframe}: {storage_error}"
+                            )
             except Exception as e:
                 logger.error(f"Failed to download gap_before: {e}", exc_info=True)
                 # 繼續嘗試其他分段
@@ -443,7 +457,7 @@ class KlineDataService:
                 df_cached = self.storage_manager.read_klines(
                     symbol, timeframe, cache_overlap_start, cache_overlap_end
                 )
-                if not df_cached.empty:
+                if df_cached is not None and not df_cached.empty:
                     dfs_to_merge.append(df_cached)
                     logger.debug(f"Cached data: added {len(df_cached)} klines")
                 else:
@@ -465,11 +479,23 @@ class KlineDataService:
 
             try:
                 df_after = self._download_and_cache(
-                    source, symbol, timeframe, gap_after_start, end_time
+                    source,
+                    symbol,
+                    timeframe,
+                    gap_after_start,
+                    end_time,
+                    save_to_storage=False
                 )
                 if not df_after.empty:
                     dfs_to_merge.append(df_after)
                     logger.debug(f"Gap_after: added {len(df_after)} klines")
+                    if self.storage_manager is not None:
+                        try:
+                            self.storage_manager.append_klines(symbol, timeframe, df_after)
+                        except Exception as storage_error:
+                            logger.warning(
+                                f"Failed to append gap_after data for {symbol}/{timeframe}: {storage_error}"
+                            )
             except Exception as e:
                 logger.error(f"Failed to download gap_after: {e}", exc_info=True)
                 # 繼續嘗試其他分段

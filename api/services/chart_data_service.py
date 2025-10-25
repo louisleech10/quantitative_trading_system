@@ -25,6 +25,11 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from api.services.kline_storage_service import KlineStorageService
+from api.services.kline_data_service import (
+    KlineDataService,
+    get_kline_data_service
+)
+from momentum.DataExtraction.kline_storage import KlineStorageManager
 from api.core.logging import get_logger
 
 logger = get_logger("api.chart_data_service")
@@ -37,7 +42,11 @@ class ChartDataService:
     為前端圖表提供K線數據，支援以案例時間點T為中心的數據裁切
     """
 
-    def __init__(self, cache_dir: Optional[str] = None):
+    def __init__(
+        self,
+        cache_dir: Optional[str] = None,
+        kline_data_service: Optional[KlineDataService] = None
+    ):
         """
         初始化圖表數據服務
 
@@ -45,6 +54,7 @@ class ChartDataService:
             cache_dir: K線緩存目錄路徑
         """
         self.storage_service = KlineStorageService(cache_dir=cache_dir)
+        self.kline_data_service = kline_data_service or get_kline_data_service(cache_dir=cache_dir)
         logger.info(f"ChartDataService initialized")
 
 
@@ -110,6 +120,16 @@ class ChartDataService:
                 f"TO={case_timestamp}, case_tf={case_timeframe}, max_bars={max_bars}"
             )
 
+            # 確保緩存覆蓋需求區間
+            self._ensure_data_coverage(
+                symbol=symbol,
+                case_timestamp=case_timestamp,
+                timeframe=timeframe,
+                lookback=bars_before,
+                forward=bars_after,
+                case_timeframe=case_timeframe
+            )
+
             # 從storage讀取數據
             result = self.storage_service.read_klines_around_timestamp(
                 symbol=symbol,
@@ -150,6 +170,35 @@ class ChartDataService:
                 to_index = result.get("to_index", -1)
                 tc_index = result.get("tc_index", -1)
                 case_bars = result.get("case_bars", 1)
+                resolved_case_timestamp = result.get("to_timestamp")
+                resolved_tc_timestamp = result.get("tc_timestamp")
+
+                expected_total = bars_before + case_bars + bars_after
+                actual_total = len(klines_data)
+
+                if actual_total < expected_total or to_index != bars_before:
+                    logger.warning(
+                        "Incomplete kline coverage for %s/%s: expected %d bars (lookback=%d, case=%d, forward=%d) "
+                        "but got %d bars with TO index %d",
+                        symbol,
+                        timeframe,
+                        expected_total,
+                        bars_before,
+                        case_bars,
+                        bars_after,
+                        actual_total,
+                        to_index
+                    )
+                    return {
+                        "success": False,
+                        "error": {
+                            "code": "DATA_INCOMPLETE",
+                            "message": (
+                                f"{symbol}/{timeframe} 的緩存不足，無法提供案例所需的K線範圍。"
+                                "請先下載缺失的歷史資料後再重試。"
+                            )
+                        }
+                    }
 
                 # 格式化響應數據（新邏輯）
                 response_data = self._format_response(
@@ -160,7 +209,9 @@ class ChartDataService:
                     to_index=to_index,
                     tc_index=tc_index,
                     case_bars=case_bars,
-                    case_timeframe=case_timeframe
+                    case_timeframe=case_timeframe,
+                    resolved_case_timestamp=resolved_case_timestamp,
+                    resolved_tc_timestamp=resolved_tc_timestamp
                 )
 
                 logger.info(
@@ -200,6 +251,67 @@ class ChartDataService:
                     "message": f"系統錯誤: {str(e)}"
                 }
             }
+
+
+    def _ensure_data_coverage(
+        self,
+        symbol: str,
+        case_timestamp: int,
+        timeframe: str,
+        lookback: int,
+        forward: int,
+        case_timeframe: Optional[str]
+    ) -> None:
+        """確保指定案例時間點附近的K線數據已下載/緩存。"""
+        if self.kline_data_service is None:
+            return
+
+        try:
+            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(timeframe)
+            if timeframe_seconds is None:
+                logger.debug(f"Timeframe {timeframe} not managed for automatic download")
+                return
+
+            case_bars = 1
+            if case_timeframe:
+                case_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(case_timeframe)
+                if case_seconds:
+                    case_bars = max(1, case_seconds // timeframe_seconds)
+
+            start_ts = case_timestamp - lookback * timeframe_seconds
+            # 包含案例區間與forward範圍
+            end_ts = case_timestamp + ((case_bars - 1) + forward) * timeframe_seconds
+
+            # 避免無效時間範圍
+            if end_ts <= start_ts:
+                end_ts = start_ts + timeframe_seconds
+
+            start_dt = datetime.utcfromtimestamp(max(start_ts, 0))
+            end_dt = datetime.utcfromtimestamp(max(end_ts, start_ts + timeframe_seconds))
+
+            # 避免請求未來資料
+            now_utc = datetime.utcnow()
+            if end_dt > now_utc:
+                end_dt = now_utc
+
+            if end_dt <= start_dt:
+                logger.debug(
+                    f"Skip ensure coverage for {symbol}/{timeframe}: invalid time window {start_dt} - {end_dt}"
+                )
+                return
+
+            self.kline_data_service.get_kline_data(
+                symbol=symbol,
+                timeframe=timeframe,
+                start_time=start_dt,
+                end_time=end_dt,
+                validate_integrity=False
+            )
+
+        except Exception as e:
+            logger.warning(
+                f"Failed to ensure data coverage for {symbol}/{timeframe} at {case_timestamp}: {e}"
+            )
 
 
     def _validate_parameters(self,
@@ -281,7 +393,9 @@ class ChartDataService:
                         to_index: Optional[int] = None,
                         tc_index: Optional[int] = None,
                         case_bars: Optional[int] = None,
-                        case_timeframe: Optional[str] = None) -> Dict:
+                        case_timeframe: Optional[str] = None,
+                        resolved_case_timestamp: Optional[int] = None,
+                        resolved_tc_timestamp: Optional[int] = None) -> Dict:
         """
         格式化響應數據（符合API規範）
 
@@ -352,6 +466,10 @@ class ChartDataService:
             response["tc_index"] = tc_index
             response["case_bars"] = case_bars
             response["metadata"]["case_timeframe"] = case_timeframe
+            if resolved_case_timestamp is not None:
+                response["aligned_case_timestamp"] = int(resolved_case_timestamp)
+            if resolved_tc_timestamp is not None:
+                response["aligned_tc_timestamp"] = int(resolved_tc_timestamp)
         else:
             # 舊邏輯
             response["center_index"] = center_index if center_index is not None else -1

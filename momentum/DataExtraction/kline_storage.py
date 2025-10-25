@@ -227,6 +227,11 @@ class KlineStorageManager:
         self.cache_dir = Path(cache_dir) if cache_dir else Path(self.DEFAULT_CACHE_DIR)
         self.hdf5_path = self.cache_dir / self.HDF5_FILENAME
 
+        # 兼容舊版數據緩存目錄（data_cache/*.h5）
+        legacy_dir_env = os.environ.get("LEGACY_KLINE_CACHE_DIR")
+        self.legacy_cache_dir = Path(legacy_dir_env) if legacy_dir_env else Path("data_cache")
+        self._legacy_import_status: Dict[Tuple[str, str], bool] = {}
+
         # 確保目錄存在
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -316,6 +321,147 @@ class KlineStorageManager:
             str: HDF5路徑（如 "ETHUSDT/1h/data"）
         """
         return f"{symbol}/{timeframe}/data"
+
+
+    def _ensure_dataset(self, symbol: str, timeframe: str) -> bool:
+        """確保指定symbol/timeframe數據集存在，必要時從舊版緩存導入。"""
+        key = (symbol, timeframe)
+
+        if not self.hdf5_path.exists():
+            self._create_hdf5_structure()
+
+        needs_import = False
+        try:
+            with h5py.File(self.hdf5_path, 'r') as f:
+                if symbol not in f or timeframe not in f[symbol] or 'data' not in f[symbol][timeframe]:
+                    needs_import = True
+        except Exception as e:
+            logger.error(f"Failed to inspect dataset {symbol}/{timeframe}: {e}")
+            needs_import = True
+
+        if not needs_import:
+            self._legacy_import_status[key] = True
+            return True
+
+        # 避免重複嘗試導入
+        if key in self._legacy_import_status and not self._legacy_import_status[key]:
+            logger.warning(f"Dataset {symbol}/{timeframe} missing and previous legacy import failed")
+            return False
+
+        imported = self._import_from_legacy_cache(symbol, timeframe)
+        self._legacy_import_status[key] = imported
+
+        if not imported:
+            logger.warning(f"Dataset {symbol}/{timeframe} not available in storage or legacy cache")
+            return False
+
+        return True
+
+
+    def _import_from_legacy_cache(self, symbol: str, timeframe: str) -> bool:
+        """嘗試從舊版data_cache結構導入K線數據。"""
+        legacy_files = [
+            self.legacy_cache_dir / f"{symbol}_{timeframe}.h5",
+            self.legacy_cache_dir / "hdf5_cache" / f"{symbol}_{timeframe}.h5"
+        ]
+
+        legacy_file = next((path for path in legacy_files if path.exists()), None)
+
+        if legacy_file is None:
+            logger.debug(f"Legacy cache not found for {symbol}/{timeframe} in {self.legacy_cache_dir}")
+            return False
+
+        try:
+            df = pd.read_hdf(legacy_file, key='data')
+        except Exception as e:
+            logger.error(f"Failed to read legacy cache {legacy_file}: {e}")
+            return False
+
+        try:
+            df = df.reset_index()
+            if 'timestamp' not in df.columns:
+                logger.error(f"Legacy cache {legacy_file} missing timestamp column")
+                return False
+
+            df['timestamp'] = (df['timestamp'].astype('int64') // 1_000_000_000).astype('int64')
+
+            volume_col = 'volume'
+            taker_buy_col = 'taker_buy_base_asset_volume'
+            quote_col = 'quote_asset_volume'
+            trades_col = 'number_of_trades'
+
+            if taker_buy_col not in df.columns or volume_col not in df.columns:
+                logger.error(f"Legacy cache {legacy_file} missing taker/volume columns")
+                return False
+
+            df['taker_buy_volume'] = df[taker_buy_col].astype('float64')
+            df['volume'] = df[volume_col].astype('float64')
+
+            # 避免除以0
+            with np.errstate(divide='ignore', invalid='ignore'):
+                ratio = np.where(df['volume'] > 0, df['taker_buy_volume'] / df['volume'], 0.5)
+            df['taker_ratio'] = np.clip(ratio, 0, 1).astype('float32')
+
+            if quote_col in df.columns:
+                df['quote_volume'] = df[quote_col].astype('float64')
+            else:
+                df['quote_volume'] = np.nan
+
+            if trades_col in df.columns:
+                df['number_of_trades'] = df[trades_col].astype('int64')
+            else:
+                df['number_of_trades'] = 0
+
+            df['open'] = df['open'].astype('float64')
+            df['high'] = df['high'].astype('float64')
+            df['low'] = df['low'].astype('float64')
+            df['close'] = df['close'].astype('float64')
+
+            df_formatted = df[
+                ['timestamp', 'open', 'high', 'low', 'close', 'volume',
+                 'taker_buy_volume', 'taker_ratio', 'quote_volume', 'number_of_trades']
+            ].copy()
+
+            df_formatted = df_formatted.astype({
+                'timestamp': 'int64',
+                'open': 'float32',
+                'high': 'float32',
+                'low': 'float32',
+                'close': 'float32',
+                'volume': 'float32',
+                'taker_buy_volume': 'float32',
+                'taker_ratio': 'float32',
+                'quote_volume': 'float32',
+                'number_of_trades': 'int32'
+            })
+
+            if df_formatted.empty:
+                logger.warning(f"Legacy cache {legacy_file} produced empty dataframe")
+                return False
+
+            write_success = self.write_klines(
+                symbol=symbol,
+                timeframe=timeframe,
+                df=df_formatted,
+                data_source="legacy_cache"
+            )
+
+            if write_success:
+                logger.info(
+                    f"Imported {len(df_formatted)} legacy klines into storage for {symbol}/{timeframe}"
+                )
+            else:
+                logger.error(f"Failed to write legacy klines for {symbol}/{timeframe}")
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(
+                f"Exception while importing legacy cache for {symbol}/{timeframe}: {e}",
+                exc_info=True
+            )
+            return False
 
 
     # ==================== 數據驗證 ====================
@@ -535,21 +681,10 @@ class KlineStorageManager:
 
             start_read = time.time()
 
+            if not self._ensure_dataset(symbol, timeframe):
+                return None
+
             with h5py.File(self.hdf5_path, 'r') as f:
-                # 檢查路徑是否存在
-                if symbol not in f:
-                    logger.warning(f"Symbol {symbol} not found in HDF5")
-                    return None
-
-                if timeframe not in f[symbol]:
-                    logger.warning(f"Timeframe {timeframe} not found for {symbol}")
-                    return None
-
-                if 'data' not in f[symbol][timeframe]:
-                    logger.warning(f"Data not found for {symbol}/{timeframe}")
-                    return None
-
-                # 讀取結構化數組
                 dataset = f[symbol][timeframe]['data']
                 structured_array = dataset[()]
 
@@ -562,12 +697,20 @@ class KlineStorageManager:
                         df[col] = df[col].astype(dtype_str)
 
             # 應用時間範圍過濾（在內存中進行）
-            if start_time is not None and end_time is not None:
-                df = df[(df['timestamp'] >= start_time) & (df['timestamp'] <= end_time)]
-            elif start_time is not None:
-                df = df[df['timestamp'] >= start_time]
-            elif end_time is not None:
-                df = df[df['timestamp'] <= end_time]
+            start_value = None
+            end_value = None
+
+            if start_time is not None:
+                start_value = int(start_time.timestamp()) if isinstance(start_time, datetime) else int(start_time)
+            if end_time is not None:
+                end_value = int(end_time.timestamp()) if isinstance(end_time, datetime) else int(end_time)
+
+            if start_value is not None and end_value is not None:
+                df = df[(df['timestamp'] >= start_value) & (df['timestamp'] <= end_value)]
+            elif start_value is not None:
+                df = df[df['timestamp'] >= start_value]
+            elif end_value is not None:
+                df = df[df['timestamp'] <= end_value]
 
             # 重置索引
             df = df.reset_index(drop=True)
@@ -649,12 +792,18 @@ class KlineStorageManager:
 
                 # 計算TO和TC在result_df中的位置
                 to_index_in_result = to_idx - start_idx
-                tc_index_in_result = to_index_in_result + case_bars - 1
+                tc_index_in_result = min(len(result_df) - 1, to_index_in_result + case_bars - 1)
+
+                # 對齊後的實際K線時間戳
+                resolved_to_timestamp = int(df.iloc[to_idx]['timestamp'])
+                resolved_tc_timestamp = int(df.iloc[min(to_idx + case_bars - 1, len(df) - 1)]['timestamp'])
 
                 # 將metadata存儲在DataFrame的attrs中（pandas>=1.0支持）
                 result_df.attrs['to_index'] = int(to_index_in_result)
                 result_df.attrs['tc_index'] = int(tc_index_in_result)
                 result_df.attrs['case_bars'] = int(case_bars)
+                result_df.attrs['to_timestamp'] = resolved_to_timestamp
+                result_df.attrs['tc_timestamp'] = resolved_tc_timestamp
 
                 logger.info(
                     f"Read {len(result_df)} klines for case {symbol}/{timeframe} "

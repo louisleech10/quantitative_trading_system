@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil import parser as date_parser
 import io
 import logging
@@ -122,7 +122,15 @@ class CaseImportService:
             try:
                 cases = self._create_case_records(df_cleaned, filename)
                 imported_case_ids = self.storage.save_cases(cases)
-                logger.info(f"Saved {len(imported_case_ids)} cases to storage")
+                
+                # 檢查是否有案例存儲失敗
+                failed_count = len(cases) - len(imported_case_ids)
+                if failed_count > 0:
+                    all_errors.append(
+                        f"Storage: {failed_count} cases failed to save (check logs for details)"
+                    )
+                
+                logger.info(f"Saved {len(imported_case_ids)}/{len(cases)} cases to storage")
             except Exception as e:
                 logger.error(f"Failed to save cases: {e}", exc_info=True)
                 all_errors.append(f"Storage error: {str(e)}")
@@ -445,8 +453,11 @@ class CaseImportService:
 
                 # 情況3：字串格式
                 if isinstance(ts, str):
-                    # 嘗試解析為datetime
+                    # 嘗試解析為datetime（視為UTC時間）
                     dt = date_parser.parse(ts)
+                    # 如果沒有時區信息，視為UTC
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
                     normalized[idx] = int(dt.timestamp())
                     continue
 

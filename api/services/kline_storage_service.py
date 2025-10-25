@@ -268,6 +268,8 @@ class KlineStorageService:
                 to_index = df.attrs.get('to_index', -1)
                 tc_index = df.attrs.get('tc_index', -1)
                 case_bars = df.attrs.get('case_bars', 1)
+                to_timestamp = df.attrs.get('to_timestamp')
+                tc_timestamp = df.attrs.get('tc_timestamp')
 
                 logger.info(
                     f"Read {len(klines_list)} klines for case {symbol}/{timeframe} "
@@ -280,6 +282,8 @@ class KlineStorageService:
                     "to_index": to_index,
                     "tc_index": tc_index,
                     "case_bars": case_bars,
+                    "to_timestamp": int(to_timestamp) if to_timestamp is not None else None,
+                    "tc_timestamp": int(tc_timestamp) if tc_timestamp is not None else None,
                 }
             else:
                 # 舊邏輯：返回 center_index（向後兼容）

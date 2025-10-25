@@ -1,0 +1,191 @@
+2025-10-25 13:08:21 - DataLoader - [31mERROR[0m - 請求錯誤（不重試）: APIError(code=-1121): Invalid symbol.
+2025-10-25 13:08:21 - DataLoader - [31mERROR[0m - 獲取歷史K線時出錯: APIError(code=-1121): Invalid symbol.
+2025-10-25 13:08:21 - api.momentum_wrapper - [31mERROR[0m - Error getting historical data for DOGEESDT: APIError(code=-1121): Invalid symbol.
+2025-10-25 13:08:21 - momentum.DataExtraction.case_search_engine - [31mERROR[0m - [SEARCH_FAILED] Symbol: DOGEESDT | Error: BinanceAPIException: APIError(code=-1121): Invalid symbol.
+2025-10-25 13:10:25 - momentum.DataExtraction.kline_storage - [31mERROR[0m - Failed to update cache index: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 13:10:25 - api.batch_download_service - [31mERROR[0m - Failed to save case klines for DOGEUSDT_1737043200_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 574, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 13:10:25 - api.batch_download_service - [31mERROR[0m - Failed to process case DOGEUSDT_1737043200_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 321, in download_group
+    await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 574, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 14:25:58 - api.batch_download_service - [31mERROR[0m - Failed to save case klines for DOGEUSDT_1736913600_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 14:25:58 - api.batch_download_service - [31mERROR[0m - Failed to process case DOGEUSDT_1736913600_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 321, in download_group
+    await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 17:37:03 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:03 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:03 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.246s
+2025-10-25 17:37:03 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:03 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:03 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.073s
+2025-10-25 17:37:22 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:22 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:22 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.088s
+2025-10-25 17:37:22 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:22 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:22 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.070s
+2025-10-25 17:37:27 - api.routes.chart - [31mERROR[0m - System error: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:27 - api.exception_handler - [31mERROR[0m - HTTP 500: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:37:27 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.076s
+2025-10-25 17:43:37 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:43:37 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:43:37 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.177s
+2025-10-25 17:43:37 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:43:37 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:43:37 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.065s
+2025-10-25 17:43:40 - api.routes.chart - [31mERROR[0m - System error: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:43:40 - api.exception_handler - [31mERROR[0m - HTTP 500: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 17:43:40 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.075s
+2025-10-25 18:28:05 - api.batch_download_service - [31mERROR[0m - Failed to save case klines for ADAUSDT_1736164800_0: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 18:28:05 - api.batch_download_service - [31mERROR[0m - Failed to process case ADAUSDT_1736164800_0: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 321, in download_group
+    await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 18:29:10 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:10 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:10 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.146s
+2025-10-25 18:29:10 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:10 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:10 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.069s
+2025-10-25 18:29:25 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:25 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:25 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.096s
+2025-10-25 18:29:25 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:25 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 18:29:25 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.074s
+2025-10-25 18:36:06 - api.batch_download_service - [31mERROR[0m - Failed to save case klines for ADAUSDT_1735862400_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 18:36:06 - api.batch_download_service - [31mERROR[0m - Failed to process case ADAUSDT_1735862400_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 321, in download_group
+    await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 18:42:57 - api.batch_download_service - [31mERROR[0m - Failed to save case klines for ADAUSDT_1735862400_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 18:42:57 - api.batch_download_service - [31mERROR[0m - Failed to process case ADAUSDT_1735862400_1: Unable to synchronously open file (file is already open for read-only)
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 321, in download_group
+    await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/batch_download_service.py", line 585, in _save_case_klines
+    with h5py.File(hdf5_path, 'a') as f:
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 564, in __init__
+    fid = make_fid(name, mode, userblock_size, fapl, fcpl, swmr=swmr)
+  File "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/h5py/_hl/files.py", line 250, in make_fid
+    fid = h5f.open(name, h5f.ACC_RDWR, fapl=fapl)
+  File "h5py/_objects.pyx", line 56, in h5py._objects.with_phil.wrapper
+  File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
+  File "h5py/h5f.pyx", line 102, in h5py.h5f.open
+OSError: Unable to synchronously open file (file is already open for read-only)

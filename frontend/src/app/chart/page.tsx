@@ -74,6 +74,8 @@ export default function ChartPage() {
   const [klineData, setKlineData] = useState<any[]>([]);
   const [loadingKlines, setLoadingKlines] = useState(false);
   const [klineError, setKlineError] = useState<string | null>(null);
+  const [alignedCaseTimestamp, setAlignedCaseTimestamp] = useState<number | null>(null);
+  const [alignedTcTimestamp, setAlignedTcTimestamp] = useState<number | null>(null);
 
   /**
    * 加載案例列表數據
@@ -175,6 +177,8 @@ export default function ChartPage() {
       try {
         setLoadingKlines(true);
         setKlineError(null);
+        setAlignedCaseTimestamp(null);
+        setAlignedTcTimestamp(null);
 
         // 添加 case_timeframe 參數（從當前案例獲取）
         const caseTimeframe = currentCase.timeframe;
@@ -196,16 +200,25 @@ export default function ChartPage() {
 
         setKlineData(result.data.klines);
 
+        const resolvedCaseTimestamp = result.data.aligned_case_timestamp ?? selectedTimestamp;
+        const resolvedTcTimestamp = result.data.aligned_tc_timestamp ?? null;
+        setAlignedCaseTimestamp(resolvedCaseTimestamp ?? null);
+        setAlignedTcTimestamp(resolvedTcTimestamp);
+
         console.log(
           `[ChartPage] Loaded ${result.data.klines.length} klines, ` +
           `TO at ${result.data.to_index}, TC at ${result.data.tc_index}, ` +
-          `case_bars=${result.data.case_bars}`
+          `case_bars=${result.data.case_bars}, ` +
+          `aligned_to=${resolvedCaseTimestamp}, ` +
+          `aligned_tc=${resolvedTcTimestamp}`
         );
 
       } catch (err) {
         console.error('Failed to fetch kline data:', err);
         setKlineError(err instanceof Error ? err.message : '獲取K線數據時發生錯誤');
         setKlineData([]);
+        setAlignedCaseTimestamp(null);
+        setAlignedTcTimestamp(null);
       } finally {
         setLoadingKlines(false);
       }
@@ -416,7 +429,9 @@ export default function ChartPage() {
                 symbol={selectedSymbol}
                 timeframe={selectedTimeframe}
                 klines={klineData}
-                caseTimestamp={selectedTimestamp}
+                caseTimestamp={alignedCaseTimestamp ?? selectedTimestamp ?? 0}
+                toTimestamp={alignedCaseTimestamp ?? undefined}
+                tcTimestamp={alignedTcTimestamp ?? undefined}
                 height={400}
                 showCaseMarker={true}
               />
