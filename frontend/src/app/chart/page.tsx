@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TestChart } from '@/components/charts/TestChart';
+import { PriceChart } from '@/components/charts/PriceChart';
+import { VolumeChart } from '@/components/charts/VolumeChart';
+import { TakerRatioChart } from '@/components/charts/TakerRatioChart';
 
 /**
  * 案例數據結構
@@ -65,6 +67,11 @@ export default function ChartPage() {
 
   // 當前選擇案例的詳細信息
   const [currentCase, setCurrentCase] = useState<CaseRecord | null>(null);
+
+  // K線數據（用於三個圖表組件）
+  const [klineData, setKlineData] = useState<any[]>([]);
+  const [loadingKlines, setLoadingKlines] = useState(false);
+  const [klineError, setKlineError] = useState<string | null>(null);
 
   /**
    * 加載案例列表數據
@@ -154,6 +161,47 @@ export default function ChartPage() {
       setCurrentCase(foundCase || null);
     }
   }, [selectedTimestamp, filteredCases]);
+
+  /**
+   * 獲取K線數據（當symbol/timestamp/timeframe改變時）
+   */
+  useEffect(() => {
+    if (!selectedSymbol || selectedTimestamp === null || !selectedTimeframe) {
+      return;
+    }
+
+    const fetchKlineData = async () => {
+      try {
+        setLoadingKlines(true);
+        setKlineError(null);
+
+        const url = `http://localhost:8000/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&max_bars=200`;
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success || !result.data) {
+          throw new Error(result.error?.message || '獲取K線數據失敗');
+        }
+
+        setKlineData(result.data.klines);
+        console.log(`[ChartPage] Loaded ${result.data.klines.length} klines for ${selectedSymbol}`);
+
+      } catch (err) {
+        console.error('Failed to fetch kline data:', err);
+        setKlineError(err instanceof Error ? err.message : '獲取K線數據時發生錯誤');
+        setKlineData([]);
+      } finally {
+        setLoadingKlines(false);
+      }
+    };
+
+    fetchKlineData();
+  }, [selectedSymbol, selectedTimestamp, selectedTimeframe]);
 
   /**
    * 格式化時間戳為可讀格式
@@ -332,15 +380,60 @@ export default function ChartPage() {
         )}
       </div>
 
-      {/* 圖表區域 */}
+      {/* 圖表區域 - 三個圖表垂直堆疊 */}
       {selectedTimestamp !== null ? (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <TestChart
-            symbol={selectedSymbol}
-            caseTimestamp={selectedTimestamp}
-            timeframe={selectedTimeframe}
-            maxBars={200}
-          />
+        <div className="space-y-0">
+          {/* K線價格圖 */}
+          <div className="bg-white rounded-t-lg shadow-md overflow-hidden">
+            {loadingKlines ? (
+              <div className="flex items-center justify-center" style={{ height: '400px' }}>
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <p className="text-gray-600 text-sm">載入K線數據中...</p>
+                </div>
+              </div>
+            ) : klineError ? (
+              <div className="flex items-center justify-center" style={{ height: '400px' }}>
+                <div className="text-center">
+                  <div className="text-red-500 text-2xl mb-2">⚠️</div>
+                  <p className="text-red-600 text-sm">{klineError}</p>
+                </div>
+              </div>
+            ) : (
+              <PriceChart
+                symbol={selectedSymbol}
+                timeframe={selectedTimeframe}
+                klines={klineData}
+                caseTimestamp={selectedTimestamp}
+                height={400}
+                showCaseMarker={true}
+              />
+            )}
+          </div>
+
+          {/* 成交量圖 */}
+          {!loadingKlines && !klineError && klineData.length > 0 && (
+            <div className="bg-white shadow-md overflow-hidden">
+              <VolumeChart
+                symbol={selectedSymbol}
+                timeframe={selectedTimeframe}
+                klines={klineData}
+                height={120}
+              />
+            </div>
+          )}
+
+          {/* Taker Ratio圖 */}
+          {!loadingKlines && !klineError && klineData.length > 0 && (
+            <div className="bg-white rounded-b-lg shadow-md overflow-hidden">
+              <TakerRatioChart
+                symbol={selectedSymbol}
+                timeframe={selectedTimeframe}
+                klines={klineData}
+                height={120}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
