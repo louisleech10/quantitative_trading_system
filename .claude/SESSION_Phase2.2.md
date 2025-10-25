@@ -77,8 +77,23 @@
 > 按時間順序記錄所有執行動作，格式：`[時間] [AI] [狀態] - 描述`
 
 ```
-[2025-10-25 當前] [Claude] PLANNED - 創建SESSION_Phase2.2.md文件
-[2025-10-25 當前] [Claude] IN_PROGRESS - 正在寫入SESSION_Phase2.2.md內容
+[2025-10-25 初次對話] [Claude] PLANNED - 創建SESSION_Phase2.2.md文件
+[2025-10-25 初次對話] [Claude] COMPLETED - SESSION_Phase2.2.md文件創建完成
+[2025-10-25 初次對話] [Claude] COMPLETED - 生成初版PriceChart.tsx組件
+[2025-10-25 初次對話] [Claude] COMPLETED - 生成初版VolumeChart.tsx組件
+[2025-10-25 初次對話] [Claude] COMPLETED - 生成初版TakerRatioChart.tsx組件
+[2025-10-25 初次對話] [Claude] COMPLETED - 自我審查三個組件，列出P0/P1/P2問題
+[2025-10-25 初次對話] [Claude] COMPLETED - 修復P0/P1問題（5個修復）
+[2025-10-25 初次對話] [Claude] COMPLETED - 整合三個圖表到chart/page.tsx
+[2025-10-25 初次對話] [Claude] COMPLETED - Git提交（兩次commit）
+[2025-10-25 接續對話] [Claude] IN_PROGRESS - 調查用戶反饋的兩個問題
+[2025-10-25 接續對話] [Claude] COMPLETED - 深入調查問題#2，理解時間框架獨立性
+[2025-10-25 接續對話] [Claude] COMPLETED - 修復問題#1：添加text-gray-900到4個select
+[2025-10-25 接續對話] [Claude] COMPLETED - 修復問題#2a：BatchDownloadRequest添加timeframe參數
+[2025-10-25 接續對話] [Claude] COMPLETED - 修復問題#2b：修改batch_download_service.py分組邏輯
+[2025-10-25 接續對話] [Claude] COMPLETED - 修復問題#2c：BatchDownloadPanel添加時間框架選擇器
+[2025-10-25 接續對話] [Claude] COMPLETED - 修復問題#2d：chart/page.tsx改用固定時間框架列表
+[2025-10-25 接續對話] [Claude] IN_PROGRESS - 更新SESSION_Phase2.2.md記錄問題和修復
 ```
 
 ---
@@ -106,7 +121,49 @@
 
 ## 🐛 問題追蹤
 
-無（尚未開始編碼）
+### #1 Select 輸入框字體顏色太淡
+- **發現時間**: 2025-10-25（任務2.2完成後，用戶反饋）
+- **發現者**: User
+- **嚴重度**: 🟢 Medium
+- **狀態**: ✅ 已解決
+- **影響範圍**: frontend/src/app/chart/page.tsx
+- **重現步驟**:
+  1. 訪問圖表頁面
+  2. 查看4個下拉選擇器（交易對、案例類型、時間框架、案例時間點）
+  3. 字體顏色過淡，難以閱讀
+- **根本原因**: Select 元素缺少 `text-gray-900` class
+- **解決方案**: 在所有4個 select 元素添加 `text-gray-900` class
+- **臨時方案**: 無
+- **測試驗證**: 檢查網頁渲染，確認字體顏色變深
+
+### #2 K線下載/查看時間框架與案例時間框架混淆
+- **發現時間**: 2025-10-25（任務2.2完成後，用戶反饋）
+- **發現者**: User
+- **嚴重度**: 🟡 High
+- **狀態**: ✅ 已解決
+- **影響範圍**:
+  - frontend/src/components/case/BatchDownloadPanel.tsx
+  - frontend/src/app/chart/page.tsx
+  - api/models/case_models.py
+  - api/services/batch_download_service.py
+- **重現步驟**:
+  1. 導入CSV案例（案例搜尋時間框架為12h）
+  2. 批量K線下載
+  3. K線時間框架也是12h（應該可以選擇1h用於ML訓練）
+  4. 圖表查看時間框架也只有12h（應該可以選擇任意支援的時間框架）
+- **根本原因**:
+  - BatchDownloadRequest 沒有 timeframe 參數，使用案例的 timeframe
+  - Chart page 的 availableTimeframes 從案例列表獲取，而非固定列表
+- **解決方案**:
+  1. 後端：添加 `BatchDownloadRequest.timeframe` 參數（預設 "1h"）
+  2. 後端：修改 `_group_cases_by_symbol_timeframe` → `_group_cases_by_symbol`
+  3. 前端：BatchDownloadPanel 添加時間框架選擇器
+  4. 前端：chart/page.tsx 使用固定時間框架列表
+- **臨時方案**: 無
+- **測試驗證**:
+  - 下載K線時選擇1h時間框架
+  - 圖表查看時可選所有支援的時間框架（1m/5m/15m/30m/1h/4h/12h/1d）
+  - CSV案例保持12h時間框架（不受影響）
 
 ---
 
@@ -220,6 +277,12 @@
 - 三個組件將復用useChart Hook和chartConfig配置
 - TakerRatioChart的背景色區域實作可能需要額外研究Lightweight Charts的API
 - 需要注意Lightweight Charts的時間戳格式（Unix秒）與timestamp字段的對應
+
+**用戶反饋問題的重要發現**:
+- 案例搜尋時間框架（CSV中的timeframe）與K線下載/查看時間框架是**完全獨立**的概念
+- 案例可以在12h時間框架搜尋，但K線可以用1h下載（用於ML訓練）
+- 圖表查看時應該可以選擇任意支援的時間框架，不受案例時間框架限制
+- 這個架構設計更符合實際使用場景：案例搜尋用粗時間框架，模型訓練用細時間框架
 
 ---
 

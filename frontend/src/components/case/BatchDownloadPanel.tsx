@@ -26,6 +26,7 @@ export default function BatchDownloadPanel({
 }: BatchDownloadPanelProps) {
   const [lookbackBars, setLookbackBars] = useState(100);
   const [forwardBars, setForwardBars] = useState(48);
+  const [downloadTimeframe, setDownloadTimeframe] = useState("1h"); // 新增：K線下載時間框架（預設1h）
   const [downloading, setDownloading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
@@ -102,6 +103,7 @@ export default function BatchDownloadPanel({
           lookback_bars: lookbackBars,
           forward_bars: forwardBars,
           force_redownload: false,
+          timeframe: downloadTimeframe, // 新增：K線下載時間框架
         }),
       });
 
@@ -131,7 +133,32 @@ export default function BatchDownloadPanel({
       )}
 
       {/* Configuration */}
-      <div className="mb-4 grid grid-cols-2 gap-4">
+      <div className="mb-4 grid grid-cols-3 gap-4">
+        {/* K線時間框架選擇器 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            K線時間框架
+          </label>
+          <select
+            value={downloadTimeframe}
+            onChange={(e) => setDownloadTimeframe(e.target.value)}
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            disabled={downloading}
+          >
+            <option value="1m">1 分鐘</option>
+            <option value="5m">5 分鐘</option>
+            <option value="15m">15 分鐘</option>
+            <option value="30m">30 分鐘</option>
+            <option value="1h">1 小時 (預設)</option>
+            <option value="4h">4 小時</option>
+            <option value="12h">12 小時</option>
+            <option value="1d">1 天</option>
+          </select>
+          <p className="text-xs text-gray-600 mt-1">
+            用於ML訓練（與案例搜尋時間框架獨立）
+          </p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             往前K線根數 (Lookback)
@@ -187,6 +214,7 @@ export default function BatchDownloadPanel({
       <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded">
         <p className="text-sm font-medium text-blue-900">
           將下載 {totalCases} 個案例的K線數據<br />
+          時間框架: <span className="font-bold">{downloadTimeframe}</span> |
           每個案例: {lookbackBars} 根前 + 案例時間點 + {forwardBars} 根後
         </p>
       </div>

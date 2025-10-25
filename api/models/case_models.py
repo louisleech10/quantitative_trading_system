@@ -104,11 +104,15 @@ class CaseImportResponse(BaseModel):
 class BatchDownloadRequest(BaseModel):
     """
     批量K線下載請求模型
+
+    NOTE: timeframe參數用於指定K線下載的時間框架，與案例的timeframe獨立。
+    例如：案例可能是12h時間框架搜尋的，但K線下載可以用1h（用於ML訓練）。
     """
     case_ids: Optional[List[str]] = Field(None, description="要下載的案例ID列表（None=全部）")
     lookback_bars: int = Field(240, description="往前K線根數", ge=1, le=1000)
     forward_bars: int = Field(96, description="往後K線根數", ge=1, le=500)
     force_redownload: bool = Field(False, description="強制重新下載（覆蓋已有數據）")
+    timeframe: str = Field("1h", description="K線時間框架（預設1h用於ML訓練，可選1m/5m/15m/30m/1h/4h/12h/1d）")
 
     @validator('lookback_bars')
     def validate_lookback(cls, v):
@@ -124,13 +128,22 @@ class BatchDownloadRequest(BaseModel):
             raise ValueError("forward_bars must be between 1 and 500")
         return v
 
+    @validator('timeframe')
+    def validate_timeframe(cls, v):
+        """驗證timeframe有效性"""
+        valid_timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '12h', '1d']
+        if v not in valid_timeframes:
+            raise ValueError(f"timeframe must be one of {valid_timeframes}")
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
                 "case_ids": None,
                 "lookback_bars": 240,
                 "forward_bars": 96,
-                "force_redownload": False
+                "force_redownload": False,
+                "timeframe": "1h"
             }
         }
 

@@ -193,8 +193,8 @@ class BatchDownloadService:
         else:
             cases = self.case_storage.get_cases()
 
-        # 按symbol和timeframe分組
-        grouped_cases = self._group_cases_by_symbol_timeframe(cases)
+        # 按symbol分組（使用request.timeframe作為K線下載時間框架）
+        grouped_cases = self._group_cases_by_symbol(cases)
 
         # 初始化結果統計
         downloaded_case_ids = []
@@ -212,13 +212,17 @@ class BatchDownloadService:
         max_concurrent_downloads = 5
         semaphore = asyncio.Semaphore(max_concurrent_downloads)
 
-        async def download_group(symbol: str, timeframe: str, group_cases: List[CaseRecord]):
+        async def download_group(symbol: str, group_cases: List[CaseRecord]):
             """下載單個分組（支援並行）"""
             nonlocal downloaded_case_ids, failed_case_ids, error_details, skipped_cases, total_bars
 
+            # 使用request.timeframe作為K線下載時間框架（與案例的timeframe獨立）
+            timeframe = request.timeframe
+
             async with semaphore:  # 限制並發數
                 logger.info(
-                    f"Processing {len(group_cases)} cases for {symbol}/{timeframe}"
+                    f"Processing {len(group_cases)} cases for {symbol}/{timeframe} "
+                    f"(download timeframe={request.timeframe}, cases may have different timeframes)"
                 )
 
                 try:
@@ -363,8 +367,8 @@ class BatchDownloadService:
 
         # 創建所有下載任務並並行執行
         download_tasks = [
-            download_group(symbol, timeframe, group_cases)
-            for (symbol, timeframe), group_cases in grouped_cases.items()
+            download_group(symbol, group_cases)
+            for symbol, group_cases in grouped_cases.items()
         ]
 
         # 並行執行所有下載任務
@@ -417,26 +421,29 @@ class BatchDownloadService:
         return self.tasks.get(task_id)
 
 
-    def _group_cases_by_symbol_timeframe(
+    def _group_cases_by_symbol(
         self,
         cases: List[CaseRecord]
-    ) -> Dict[Tuple[str, str], List[CaseRecord]]:
+    ) -> Dict[str, List[CaseRecord]]:
         """
-        按symbol和timeframe分組案例
+        按symbol分組案例
+
+        NOTE: 只按symbol分組，不按timeframe分組。
+        K線下載的timeframe由BatchDownloadRequest指定，與案例的timeframe獨立。
 
         Args:
             cases: 案例列表
 
         Returns:
-            Dict[Tuple[str, str], List[CaseRecord]]: (symbol, timeframe) → 案例列表
+            Dict[str, List[CaseRecord]]: symbol → 案例列表
         """
         grouped = defaultdict(list)
 
         for case in cases:
-            key = (case.symbol, case.timeframe)
+            key = case.symbol
             grouped[key].append(case)
 
-        logger.debug(f"Grouped {len(cases)} cases into {len(grouped)} groups")
+        logger.debug(f"Grouped {len(cases)} cases into {len(grouped)} groups by symbol")
         return dict(grouped)
 
 

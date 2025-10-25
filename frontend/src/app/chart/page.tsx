@@ -57,12 +57,14 @@ export default function ChartPage() {
   // 案例數據
   const [caseList, setCaseList] = useState<CaseRecord[]>([]);
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
-  const [availableTimeframes, setAvailableTimeframes] = useState<string[]>([]);
+
+  // 所有支援的時間框架（固定列表，與案例時間框架獨立）
+  const availableTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '12h', '1d'];
 
   // 用戶選擇
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [selectedTimestamp, setSelectedTimestamp] = useState<number | null>(null);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h'); // 預設1h
   const [caseTypeFilter, setCaseTypeFilter] = useState<CaseTypeFilter>('all');
 
   // 當前選擇案例的詳細信息
@@ -94,17 +96,16 @@ export default function ChartPage() {
         // 設置案例數據
         setCaseList(result.cases);
         setAvailableSymbols(result.symbols);
-        setAvailableTimeframes(result.timeframes);
+
+        // NOTE: 不再從案例列表獲取timeframes，使用固定的所有支援時間框架
+        // availableTimeframes 已在上方定義為常量
 
         // 自動選擇第一個symbol
         if (result.symbols.length > 0) {
           setSelectedSymbol(result.symbols[0]);
         }
 
-        // 自動選擇第一個timeframe（如果有）
-        if (result.timeframes.length > 0) {
-          setSelectedTimeframe(result.timeframes[0]);
-        }
+        // selectedTimeframe 已預設為 '1h'，不需要從案例設定
 
       } catch (err) {
         console.error('Failed to fetch case list:', err);
@@ -289,7 +290,7 @@ export default function ChartPage() {
             <select
               value={selectedSymbol}
               onChange={(e) => setSelectedSymbol(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {availableSymbols.map(symbol => (
                 <option key={symbol} value={symbol}>{symbol}</option>
@@ -305,7 +306,7 @@ export default function ChartPage() {
             <select
               value={caseTypeFilter}
               onChange={(e) => setCaseTypeFilter(e.target.value as CaseTypeFilter)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">全部</option>
               <option value="positive">正例</option>
@@ -316,17 +317,18 @@ export default function ChartPage() {
           {/* 時間框架選擇器 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              時間框架
+              時間框架（查看用）
             </label>
             <select
               value={selectedTimeframe}
               onChange={(e) => setSelectedTimeframe(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {availableTimeframes.map(tf => (
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
+            <p className="text-xs text-gray-500 mt-1">與案例搜尋時間框架獨立</p>
           </div>
 
           {/* 時間戳選擇器 */}
@@ -337,7 +339,7 @@ export default function ChartPage() {
             <select
               value={selectedTimestamp || ''}
               onChange={(e) => setSelectedTimestamp(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={filteredCases.length === 0}
             >
               {filteredCases.map(c => (
