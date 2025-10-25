@@ -165,6 +165,51 @@
   - 圖表查看時可選所有支援的時間框架（1m/5m/15m/30m/1h/4h/12h/1d）
   - CSV案例保持12h時間框架（不受影響）
 
+### #3 K線數據範圍計算邏輯錯誤 - 應以TO為起點而非中心
+- **發現時間**: 2025-10-25（任務2.2完成後，用戶反饋）
+- **發現者**: User
+- **嚴重度**: 🔴 Critical
+- **狀態**: ⬜ 進行中
+- **影響範圍**:
+  - momentum/DataExtraction/kline_storage.py
+  - api/services/kline_storage_service.py
+  - api/services/chart_data_service.py
+  - api/routes/chart.py
+  - api/services/batch_download_service.py
+  - frontend/src/app/chart/page.tsx
+  - frontend/src/components/charts/PriceChart.tsx (及其他圖表組件)
+- **重現步驟**:
+  1. 導入12h案例（如 2025/01/03 12:00:00）
+  2. 批量下載：1h timeframe, lookback=100, forward=48
+  3. 查看圖表：實際147根（T往前83 + T的12 + 往後52），T在第74根（中間）
+  4. 預期應該是：160根（往前100 + 案例12 + 往後48），TO在第100根
+- **當前錯誤邏輯**:
+  - 以 case_timestamp 為**中心點**
+  - 往前 lookback 根，往後 forward 根
+  - center_index 指向中間位置
+  - kline_storage.py:626-627: `start_idx = center_idx - lookback`, `end_idx = center_idx + forward + 1`
+- **正確邏輯**:
+  - case_timestamp = **TO (Target Open)** = 案例開始時間
+  - TC (Target Close) = TO + 案例timeframe長度
+  - 例如12h案例在1h圖：TO=12:00, TC=23:00（共12根1h K線）
+  - K線範圍：TO往前lookback根 + 案例區間 + TC往後forward根
+  - TO標記在 lookback_bars 位置（不是中間）
+  - TC標記在 lookback_bars + 案例K線數 - 1 位置
+- **TO-DO清單**:
+  - ✅ 1. 修改 momentum/DataExtraction/kline_storage.py
+  - ✅ 2. 修改 api/services/kline_storage_service.py
+  - ✅ 3. 修改 api/services/chart_data_service.py
+  - ✅ 4. 修改 api/routes/chart.py
+  - ✅ 5. 修改 api/services/batch_download_service.py
+  - ✅ 6. 修改 frontend/src/app/chart/page.tsx
+  - ✅ 7. 修改 frontend/src/components/charts/PriceChart.tsx (後端邏輯完成，TO/TC視覺標記待實現)
+  - ⬜ 8. Git提交
+- **測試驗證**:
+  - 12h案例在1h圖：lookback=100, forward=48 → 160根K線
+  - TO標記在第100根（綠色，K線下方）
+  - TC標記在第111根（紅色，K線上方）
+  - 驗證其他timeframe組合
+
 ---
 
 ## ✅ 測試驗證記錄

@@ -52,15 +52,26 @@ class ChartDataService:
                       symbol: str,
                       case_timestamp: int,
                       timeframe: str,
-                      max_bars: int = 200) -> Dict:
+                      max_bars: int = 200,
+                      case_timeframe: Optional[str] = None) -> Dict:
         """
-        獲取圖表數據（以T為中心）
+        獲取圖表數據
+
+        **新邏輯（如果提供case_timeframe）**：
+        - case_timestamp = TO (Target Open)
+        - K線範圍：TO往前lookback + 案例區間 + TC往後forward
+        - 返回 to_index, tc_index, case_bars
+
+        **舊邏輯（不提供case_timeframe，向後兼容）**：
+        - case_timestamp 為中心點
+        - 返回 center_index
 
         Args:
             symbol: 交易對（如ETHUSDT）
-            case_timestamp: 案例時間點T（Unix秒）
-            timeframe: 時間框架（如1h, 4h）
+            case_timestamp: 案例時間點T/TO（Unix秒）
+            timeframe: 時間框架（查看用，如1h, 4h）
             max_bars: 最大返回根數（預設200）
+            case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
 
         Returns:
             Dict: 符合API規範的響應格式
@@ -69,21 +80,11 @@ class ChartDataService:
                 "data": {
                     "case_timestamp": int,
                     "klines": List[Dict],
-                    "center_index": int,
-                    "metadata": {
-                        "symbol": str,
-                        "timeframe": str,
-                        "total_bars": int,
-                        "time_range": {
-                            "start": int,
-                            "end": int
-                        }
-                    }
+                    "center_index": int (舊) 或
+                    "to_index": int, "tc_index": int, "case_bars": int (新),
+                    "metadata": {...}
                 },
-                "error": {
-                    "code": str,
-                    "message": str
-                } (僅錯誤時)
+                "error": {...} (僅錯誤時)
             }
         """
         try:
@@ -94,13 +95,19 @@ class ChartDataService:
             if validation_error:
                 return validation_error
 
-            # 計算前後根數（以T為中心，均分max_bars）
-            bars_before = max_bars // 2
-            bars_after = max_bars - bars_before
+            # 計算前後根數
+            if case_timeframe:
+                # 新邏輯：預設往前100根，往後48根（可被max_bars覆蓋）
+                bars_before = 100
+                bars_after = 48
+            else:
+                # 舊邏輯：以T為中心，均分max_bars
+                bars_before = max_bars // 2
+                bars_after = max_bars - bars_before
 
             logger.info(
                 f"Fetching chart data: {symbol}/{timeframe}, "
-                f"T={case_timestamp}, max_bars={max_bars}"
+                f"TO={case_timestamp}, case_tf={case_timeframe}, max_bars={max_bars}"
             )
 
             # 從storage讀取數據
@@ -109,7 +116,8 @@ class ChartDataService:
                 timeframe=timeframe,
                 center_timestamp=case_timestamp,
                 lookback=bars_before,
-                forward=bars_after
+                forward=bars_after,
+                case_timeframe=case_timeframe
             )
 
             # 檢查讀取是否成功
@@ -136,21 +144,46 @@ class ChartDataService:
                     }
                 }
 
-            center_index = result.get("center_index", -1)
+            # 獲取index信息（新/舊邏輯）
+            if case_timeframe and "to_index" in result:
+                # 新邏輯
+                to_index = result.get("to_index", -1)
+                tc_index = result.get("tc_index", -1)
+                case_bars = result.get("case_bars", 1)
 
-            # 格式化響應數據
-            response_data = self._format_response(
-                case_timestamp=case_timestamp,
-                klines=klines_data,
-                center_index=center_index,
-                symbol=symbol,
-                timeframe=timeframe
-            )
+                # 格式化響應數據（新邏輯）
+                response_data = self._format_response(
+                    case_timestamp=case_timestamp,
+                    klines=klines_data,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    to_index=to_index,
+                    tc_index=tc_index,
+                    case_bars=case_bars,
+                    case_timeframe=case_timeframe
+                )
 
-            logger.info(
-                f"Successfully fetched {len(klines_data)} klines for {symbol}/{timeframe}, "
-                f"center_index={center_index}"
-            )
+                logger.info(
+                    f"Successfully fetched {len(klines_data)} klines for {symbol}/{timeframe} "
+                    f"(case_tf={case_timeframe}), TO at {to_index}, TC at {tc_index}"
+                )
+            else:
+                # 舊邏輯
+                center_index = result.get("center_index", -1)
+
+                # 格式化響應數據（舊邏輯）
+                response_data = self._format_response(
+                    case_timestamp=case_timestamp,
+                    klines=klines_data,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    center_index=center_index
+                )
+
+                logger.info(
+                    f"Successfully fetched {len(klines_data)} klines for {symbol}/{timeframe}, "
+                    f"center_index={center_index}"
+                )
 
             return {
                 "success": True,
@@ -242,18 +275,30 @@ class ChartDataService:
     def _format_response(self,
                         case_timestamp: int,
                         klines: List[Dict],
-                        center_index: int,
                         symbol: str,
-                        timeframe: str) -> Dict:
+                        timeframe: str,
+                        center_index: Optional[int] = None,
+                        to_index: Optional[int] = None,
+                        tc_index: Optional[int] = None,
+                        case_bars: Optional[int] = None,
+                        case_timeframe: Optional[str] = None) -> Dict:
         """
         格式化響應數據（符合API規範）
+
+        支持兩種模式：
+        1. 舊邏輯：提供 center_index
+        2. 新邏輯：提供 to_index, tc_index, case_bars, case_timeframe
 
         Args:
             case_timestamp: 案例時間戳
             klines: K線數據列表
-            center_index: T在陣列中的位置
             symbol: 交易對
             timeframe: 時間框架
+            center_index: T在陣列中的位置（舊邏輯）
+            to_index: TO在陣列中的位置（新邏輯）
+            tc_index: TC在陣列中的位置（新邏輯）
+            case_bars: 案例K線根數（新邏輯）
+            case_timeframe: 案例時間框架（新邏輯）
 
         Returns:
             Dict: 格式化的響應數據
@@ -285,10 +330,10 @@ class ChartDataService:
         time_range_start = formatted_klines[0]["timestamp"] if len(formatted_klines) > 0 else case_timestamp
         time_range_end = formatted_klines[-1]["timestamp"] if len(formatted_klines) > 0 else case_timestamp
 
-        return {
+        # 基礎響應
+        response = {
             "case_timestamp": case_timestamp,
             "klines": formatted_klines,
-            "center_index": center_index,
             "metadata": {
                 "symbol": symbol,
                 "timeframe": timeframe,
@@ -299,6 +344,19 @@ class ChartDataService:
                 }
             }
         }
+
+        # 添加index信息（新/舊邏輯）
+        if to_index is not None and tc_index is not None:
+            # 新邏輯
+            response["to_index"] = to_index
+            response["tc_index"] = tc_index
+            response["case_bars"] = case_bars
+            response["metadata"]["case_timeframe"] = case_timeframe
+        else:
+            # 舊邏輯
+            response["center_index"] = center_index if center_index is not None else -1
+
+        return response
 
 
 # 全局實例（單例模式）

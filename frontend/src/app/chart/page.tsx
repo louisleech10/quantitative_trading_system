@@ -167,7 +167,7 @@ export default function ChartPage() {
    * 獲取K線數據（當symbol/timestamp/timeframe改變時）
    */
   useEffect(() => {
-    if (!selectedSymbol || selectedTimestamp === null || !selectedTimeframe) {
+    if (!selectedSymbol || selectedTimestamp === null || !selectedTimeframe || !currentCase) {
       return;
     }
 
@@ -176,7 +176,12 @@ export default function ChartPage() {
         setLoadingKlines(true);
         setKlineError(null);
 
-        const url = `http://localhost:8000/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&max_bars=200`;
+        // 添加 case_timeframe 參數（從當前案例獲取）
+        const caseTimeframe = currentCase.timeframe;
+        const url = `http://localhost:8000/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&case_timeframe=${caseTimeframe}&max_bars=200`;
+
+        console.log(`[ChartPage] Fetching klines: case_tf=${caseTimeframe}, view_tf=${selectedTimeframe}`);
+
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -190,7 +195,12 @@ export default function ChartPage() {
         }
 
         setKlineData(result.data.klines);
-        console.log(`[ChartPage] Loaded ${result.data.klines.length} klines for ${selectedSymbol}`);
+
+        console.log(
+          `[ChartPage] Loaded ${result.data.klines.length} klines, ` +
+          `TO at ${result.data.to_index}, TC at ${result.data.tc_index}, ` +
+          `case_bars=${result.data.case_bars}`
+        );
 
       } catch (err) {
         console.error('Failed to fetch kline data:', err);
@@ -202,7 +212,7 @@ export default function ChartPage() {
     };
 
     fetchKlineData();
-  }, [selectedSymbol, selectedTimestamp, selectedTimeframe]);
+  }, [selectedSymbol, selectedTimestamp, selectedTimeframe, currentCase]);
 
   /**
    * 格式化時間戳為可讀格式

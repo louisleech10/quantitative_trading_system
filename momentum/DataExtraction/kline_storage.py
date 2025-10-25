@@ -589,19 +589,32 @@ class KlineStorageManager:
     def read_klines_around_timestamp(self, symbol: str, timeframe: str,
                                      center_timestamp: int,
                                      lookback: int = 240,
-                                     forward: int = 96) -> Optional[pd.DataFrame]:
+                                     forward: int = 96,
+                                     case_timeframe: Optional[str] = None) -> Optional[pd.DataFrame]:
         """
         讀取案例時間點前後N根K線（圖表專用）
 
+        **新邏輯（如果提供case_timeframe）**：
+        - center_timestamp = TO (Target Open) = 案例開始時間
+        - 計算案例在當前timeframe的K線數（case_bars）
+        - K線範圍：TO往前lookback根 + 案例case_bars根 + TC往後forward根
+        - TO位置：lookback（不是中間）
+        - TC位置：lookback + case_bars - 1
+
+        **舊邏輯（如果不提供case_timeframe，向後兼容）**：
+        - center_timestamp 為中心點
+        - 往前lookback根，往後forward根
+
         Args:
             symbol: 交易對symbol
-            timeframe: 時間框架
-            center_timestamp: 中心時間戳（案例時間點T）
+            timeframe: 時間框架（查看用）
+            center_timestamp: 案例時間戳（TO時間）
             lookback: 往前讀取根數（預設240）
             forward: 往後讀取根數（預設96）
+            case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
 
         Returns:
-            pd.DataFrame or None
+            pd.DataFrame or None (包含metadata: to_index, tc_index, case_bars)
         """
         try:
             # 先讀取全部數據
@@ -610,26 +623,53 @@ class KlineStorageManager:
             if df is None or len(df) == 0:
                 return None
 
-            # 找到中心時間點的索引
-            center_idx = df[df['timestamp'] == center_timestamp].index
+            # 找到TO時間點的索引（原center_timestamp）
+            to_idx = df[df['timestamp'] == center_timestamp].index
 
-            if len(center_idx) == 0:
+            if len(to_idx) == 0:
                 # 如果找不到精確時間點，找最接近的
                 df['time_diff'] = (df['timestamp'] - center_timestamp).abs()
-                center_idx = df['time_diff'].idxmin()
-                logger.warning(f"Exact timestamp not found, using closest: {df.loc[center_idx, 'timestamp']}")
+                to_idx = df['time_diff'].idxmin()
+                logger.warning(f"Exact timestamp not found, using closest: {df.loc[to_idx, 'timestamp']}")
                 df = df.drop('time_diff', axis=1)
             else:
-                center_idx = center_idx[0]
+                to_idx = to_idx[0]
 
             # 計算切片範圍
-            start_idx = max(0, center_idx - lookback)
-            end_idx = min(len(df), center_idx + forward + 1)
+            if case_timeframe:
+                # **新邏輯**：以TO為起點，包含案例區間
+                case_tf_seconds = self.TIMEFRAME_SECONDS.get(case_timeframe, 3600)
+                view_tf_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+                case_bars = max(1, case_tf_seconds // view_tf_seconds)
 
-            result_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+                start_idx = max(0, to_idx - lookback)
+                end_idx = min(len(df), to_idx + case_bars + forward)
 
-            logger.info(f"Read {len(result_df)} klines around timestamp {center_timestamp} "
-                       f"({lookback} before, {forward} after)")
+                result_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+
+                # 計算TO和TC在result_df中的位置
+                to_index_in_result = to_idx - start_idx
+                tc_index_in_result = to_index_in_result + case_bars - 1
+
+                # 將metadata存儲在DataFrame的attrs中（pandas>=1.0支持）
+                result_df.attrs['to_index'] = int(to_index_in_result)
+                result_df.attrs['tc_index'] = int(tc_index_in_result)
+                result_df.attrs['case_bars'] = int(case_bars)
+
+                logger.info(
+                    f"Read {len(result_df)} klines for case {symbol}/{timeframe} "
+                    f"(case_tf={case_timeframe}, lookback={lookback}, case_bars={case_bars}, forward={forward}), "
+                    f"TO at idx {to_index_in_result}, TC at idx {tc_index_in_result}"
+                )
+            else:
+                # **舊邏輯**：以center為中心（向後兼容）
+                start_idx = max(0, to_idx - lookback)
+                end_idx = min(len(df), to_idx + forward + 1)
+
+                result_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
+
+                logger.info(f"Read {len(result_df)} klines around timestamp {center_timestamp} "
+                           f"({lookback} before, {forward} after)")
 
             return result_df
 

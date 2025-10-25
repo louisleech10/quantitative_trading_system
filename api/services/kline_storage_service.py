@@ -215,23 +215,38 @@ class KlineStorageService:
     def read_klines_around_timestamp(self, symbol: str, timeframe: str,
                                      center_timestamp: int,
                                      lookback: int = 240,
-                                     forward: int = 96) -> Dict:
+                                     forward: int = 96,
+                                     case_timeframe: Optional[str] = None) -> Dict:
         """
         讀取案例時間點前後N根K線（圖表專用）
 
+        **新邏輯（如果提供case_timeframe）**：
+        - center_timestamp = TO (Target Open)
+        - 返回 to_index, tc_index, case_bars
+
+        **舊邏輯（向後兼容）**：
+        - 返回 center_index
+
         Args:
             symbol: 交易對symbol
-            timeframe: 時間框架
-            center_timestamp: 中心時間戳
+            timeframe: 時間框架（查看用）
+            center_timestamp: 案例時間戳（TO時間）
             lookback: 往前根數
             forward: 往後根數
+            case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
 
         Returns:
-            Dict: {"success": bool, "data": List[Dict], "center_index": int}
+            Dict: {
+                "success": bool,
+                "data": List[Dict],
+                "center_index": int (舊邏輯) 或
+                "to_index": int, "tc_index": int, "case_bars": int (新邏輯)
+            }
         """
         try:
             df = self.storage_manager.read_klines_around_timestamp(
-                symbol, timeframe, center_timestamp, lookback, forward
+                symbol, timeframe, center_timestamp, lookback, forward,
+                case_timeframe=case_timeframe
             )
 
             if df is None or len(df) == 0:
@@ -244,27 +259,47 @@ class KlineStorageService:
                     "message": "No data found"
                 }
 
-            # 找到center_index
-            center_index = df[df['timestamp'] == center_timestamp].index
-            if len(center_index) > 0:
-                center_index = int(center_index[0])
-            else:
-                # 找最接近的
-                df['time_diff'] = (df['timestamp'] - center_timestamp).abs()
-                center_index = int(df['time_diff'].idxmin())
-                df = df.drop('time_diff', axis=1)
-
             # 轉換為dict列表
             klines_list = df.to_dict('records')
 
-            logger.info(f"Read {len(klines_list)} klines around {center_timestamp}, center_index={center_index}")
-            return {
-                "success": True,
-                "data": klines_list,
-                "count": len(klines_list),
-                "center_index": center_index,
-                "center_timestamp": center_timestamp
-            }
+            # 檢查是否使用新邏輯（有metadata）
+            if case_timeframe and hasattr(df, 'attrs') and 'to_index' in df.attrs:
+                # 新邏輯：返回 to_index, tc_index, case_bars
+                to_index = df.attrs.get('to_index', -1)
+                tc_index = df.attrs.get('tc_index', -1)
+                case_bars = df.attrs.get('case_bars', 1)
+
+                logger.info(
+                    f"Read {len(klines_list)} klines for case {symbol}/{timeframe} "
+                    f"(case_tf={case_timeframe}), TO at {to_index}, TC at {tc_index}"
+                )
+                return {
+                    "success": True,
+                    "data": klines_list,
+                    "count": len(klines_list),
+                    "to_index": to_index,
+                    "tc_index": tc_index,
+                    "case_bars": case_bars,
+                }
+            else:
+                # 舊邏輯：返回 center_index（向後兼容）
+                center_index = df[df['timestamp'] == center_timestamp].index
+                if len(center_index) > 0:
+                    center_index = int(center_index[0])
+                else:
+                    # 找最接近的
+                    df['time_diff'] = (df['timestamp'] - center_timestamp).abs()
+                    center_index = int(df['time_diff'].idxmin())
+                    df = df.drop('time_diff', axis=1)
+
+                logger.info(f"Read {len(klines_list)} klines around {center_timestamp}, center_index={center_index}")
+                return {
+                    "success": True,
+                    "data": klines_list,
+                    "count": len(klines_list),
+                    "center_index": center_index,
+                    "center_timestamp": center_timestamp
+                }
 
         except Exception as e:
             error_msg = f"Exception while reading klines around timestamp: {str(e)}"

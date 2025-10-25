@@ -457,28 +457,39 @@ class BatchDownloadService:
         """
         計算時間範圍列表
 
+        **新邏輯（使用TO/TC概念）**：
+        - case.timestamp = TO (Target Open)
+        - 計算案例在下載timeframe的K線數（case_bars）
+        - start_time = TO - lookback_bars * timeframe_seconds
+        - end_time = TO + (case_bars + forward_bars) * timeframe_seconds
+
         Args:
             cases: 案例列表
-            timeframe: 時間框架
+            timeframe: 時間框架（下載用，如1h）
             lookback_bars: 往前K線根數
             forward_bars: 往後K線根數
 
         Returns:
             List[TimeRange]: 時間範圍列表
         """
-        timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+        download_tf_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
         ranges = []
 
         for case in cases:
-            # 計算開始和結束時間
-            case_time = datetime.utcfromtimestamp(case.timestamp)
-            start_time = case_time - timedelta(seconds=lookback_bars * timeframe_seconds)
-            end_time = case_time + timedelta(seconds=forward_bars * timeframe_seconds)
+            # 計算案例在下載timeframe的K線數
+            case_tf_seconds = self.TIMEFRAME_SECONDS.get(case.timeframe, 43200)
+            case_bars = max(1, case_tf_seconds // download_tf_seconds)
+
+            # 計算開始和結束時間（以TO為起點）
+            case_time = datetime.utcfromtimestamp(case.timestamp)  # TO
+            start_time = case_time - timedelta(seconds=lookback_bars * download_tf_seconds)
+            end_time = case_time + timedelta(seconds=(case_bars + forward_bars) * download_tf_seconds)
 
             ranges.append(TimeRange(start_time, end_time))
 
         logger.debug(
-            f"Calculated {len(ranges)} time ranges for {len(cases)} cases"
+            f"Calculated {len(ranges)} time ranges for {len(cases)} cases "
+            f"(download_tf={timeframe})"
         )
         return ranges
 

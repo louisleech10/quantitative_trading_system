@@ -21,20 +21,30 @@ chart_data_service = get_chart_data_service()
 @router.get("/data")
 async def get_chart_data(
     symbol: str = Query(..., description="交易對（如ETHUSDT）"),
-    case_timestamp: int = Query(..., description="案例時間點T（Unix秒）"),
-    timeframe: str = Query(..., description="時間框架（1h/4h/1d等）"),
-    max_bars: int = Query(200, description="最大返回根數（預設200）", ge=1, le=1000)
+    case_timestamp: int = Query(..., description="案例時間點T/TO（Unix秒）"),
+    timeframe: str = Query(..., description="時間框架（查看用，1h/4h/1d等）"),
+    max_bars: int = Query(200, description="最大返回根數（預設200）", ge=1, le=1000),
+    case_timeframe: Optional[str] = Query(None, description="案例時間框架（如12h），提供則使用TO/TC邏輯")
 ):
     """
-    獲取圖表數據（以T為中心的K線數據）
+    獲取圖表數據
 
-    用於前端圖表顯示，返回以案例時間點T為中心的K線數據。
+    **新邏輯（如果提供case_timeframe）**：
+    - case_timestamp = TO (Target Open)
+    - 返回 to_index, tc_index, case_bars
+    - K線範圍：TO往前100根 + 案例區間 + TC往後48根
+
+    **舊邏輯（不提供case_timeframe，向後兼容）**：
+    - case_timestamp 為中心點
+    - 返回 center_index
+    - K線範圍：中心點±max_bars/2
 
     Args:
         symbol: 交易對（如ETHUSDT）
-        case_timestamp: 案例時間點T（Unix秒）
-        timeframe: 時間框架（1h, 4h, 1d等）
+        case_timestamp: 案例時間點T/TO（Unix秒）
+        timeframe: 時間框架（查看用，1h, 4h, 1d等）
         max_bars: 最大返回根數（預設200，範圍1-1000）
+        case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
 
     Returns:
         Dict: 圖表數據
@@ -43,16 +53,9 @@ async def get_chart_data(
             "data": {
                 "case_timestamp": int,
                 "klines": List[Dict],
-                "center_index": int,
-                "metadata": {
-                    "symbol": str,
-                    "timeframe": str,
-                    "total_bars": int,
-                    "time_range": {
-                        "start": int,
-                        "end": int
-                    }
-                }
+                "center_index": int (舊) 或
+                "to_index": int, "tc_index": int, "case_bars": int (新),
+                "metadata": {...}
             }
         }
 
@@ -64,7 +67,7 @@ async def get_chart_data(
     """
     logger.info(
         f"GET /api/v1/chart/data: symbol={symbol}, case_timestamp={case_timestamp}, "
-        f"timeframe={timeframe}, max_bars={max_bars}"
+        f"timeframe={timeframe}, case_timeframe={case_timeframe}, max_bars={max_bars}"
     )
 
     try:
@@ -73,7 +76,8 @@ async def get_chart_data(
             symbol=symbol,
             case_timestamp=case_timestamp,
             timeframe=timeframe,
-            max_bars=max_bars
+            max_bars=max_bars,
+            case_timeframe=case_timeframe
         )
 
         # 檢查結果
@@ -93,10 +97,18 @@ async def get_chart_data(
                 logger.error(f"System error: {error_message}")
                 raise HTTPException(status_code=500, detail=error_message)
 
-        logger.info(
-            f"Chart data fetched successfully: {len(result['data']['klines'])} klines, "
-            f"center_index={result['data']['center_index']}"
-        )
+        # 日誌輸出（新/舊邏輯）
+        data = result['data']
+        if 'to_index' in data:
+            logger.info(
+                f"Chart data fetched successfully: {len(data['klines'])} klines, "
+                f"TO at {data['to_index']}, TC at {data['tc_index']}"
+            )
+        else:
+            logger.info(
+                f"Chart data fetched successfully: {len(data['klines'])} klines, "
+                f"center_index={data.get('center_index', -1)}"
+            )
 
         return result
 
