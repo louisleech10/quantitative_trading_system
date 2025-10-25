@@ -397,19 +397,18 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-- **任務1.4-1.5功能未測試**（優先級：高）⚠️
-  - 影響：所有新功能未經實際測試驗證
-  - 範圍：CSV導入、批量下載、前端UI、數據存儲
-  - 測試項目：
-    1. CSV導入（列名標準化、時間戳轉換、CSV注入防護）
-    2. 數字輸入框（可否直接輸入）
-    3. 批量下載（並行下載、進度追蹤、HDF5存儲）
-    4. UI配色（文字可讀性、白色背景）
-    5. 左側導航（順序正確、Phase 2標註）
-  - 下一步：按照測試計劃逐項測試
+- **無Critical問題**（2025-10-25）✅
+  - Phase 1 → Phase 2.1 完整流程已打通
+  - 所有已知Bug已修復
 
 ### 需要優化
-- **任務1.4-1.5優化項目**（優先級：中）
+- **Chart頁面狀態保存**（優先級：低）
+  - 問題：切換頁面後無法保持用戶選擇的案例
+  - 影響：用戶體驗（功能正常）
+  - 建議方案：URL參數或localStorage
+  - 計劃：Phase 2.4整合時一起處理
+
+- **Phase 1遺留優化項**（優先級：低）
   - P1-3: SQLite持久化存儲（目前僅內存）
   - P1-5: Excel日期轉換精度改善
   - P2-1: 完整類型標註（TypeScript/Python）
@@ -1385,23 +1384,25 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**最近提交** (2025-10-24):
-- **待推送**: 任務1.4-1.5 案例CSV導入與批量K線下載完成
-  - 新增後端文件（9個）：
-    - api/models/case_models.py
-    - api/routes/case.py
-    - api/services/batch_download_service.py
-    - api/services/case_import_service.py
-    - api/utils/case_storage.py
-  - 新增前端文件（5個）：
-    - frontend/src/app/data-preparation/
-    - frontend/src/components/case/
-    - frontend/.env.local
-  - 修改文件（3個）：
-    - api/main.py（路由註冊）
-    - frontend/next.config.ts（API代理）
-    - frontend/src/components/layout/MainLayout.tsx（導航更新）
-  - 更新 .claude/STATUS.md（記錄任務1.4-1.5完成）
+**最近提交** (2025-10-25):
+- ✅ **已推送**: Phase 2任務2.1 - 基礎設施與圖表數據API完成（Commit: 2276b77）
+  - 新增後端文件（2個）：
+    - api/routes/chart.py（圖表數據API）
+    - api/services/chart_data_service.py（圖表數據服務）
+  - 新增前端文件（4個）：
+    - frontend/src/app/chart/page.tsx（圖表頁面）
+    - frontend/src/components/charts/TestChart.tsx（測試圖表）
+    - frontend/src/hooks/useChart.ts（圖表Hook）
+    - frontend/src/utils/chartConfig.ts（圖表配置）
+  - 修復Bug（5個文件）：
+    - api/services/batch_download_service.py（類型不匹配）
+    - api/routes/case.py（清空API格式）
+    - api/utils/case_storage.py（clear_all返回值）
+    - frontend/src/app/data-preparation/page.tsx（頁面刷新+清空按鈕）
+    - frontend/src/app/chart/page.tsx（API格式不匹配）
+  - 更新文檔（2個）：
+    - .claude/STATUS.md（Phase 2.1完成記錄）
+    - .claude/CHART_DEVELOPMENT_TODO.md（任務2.1標記完成）
 
 **Tags**:
 - phase-0-start, phase-0-complete, phase-0-error-handling
@@ -1423,24 +1424,27 @@ for case in candidates:
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-10-24）：
-   - ✅ **任務1.4和1.5：案例CSV導入與批量K線下載API**（100%完成）
-     - 後端：6個新模組（case_models, case_import_service, case_storage, batch_download_service, case router）
-     - 前端：3個新頁面組件（CaseImportForm, BatchDownloadPanel, data-preparation page）
-     - Ultra Think三步驟完成（識別15問題，修復P0-P1關鍵問題）
-     - 功能：CSV導入、大小寫不敏感列名匹配、並行下載(最多5併發)、進度追蹤
-     - UI：響應式設計、動態輪詢、時間估算
+1. **已完成工作**（2025-10-25）：
+   - ✅ **Phase 2 任務2.1：基礎設施與圖表數據API**（100%完成）
+     - 後端：2個新模組（chart.py, chart_data_service.py）
+     - 前端：4個新文件（chart/page.tsx, TestChart.tsx, useChart.ts, chartConfig.ts）
+     - Bug修復：5個關鍵問題全部解決
+     - 完整流程打通：CSV導入 → 批量下載 → 圖表顯示 ✅
+     - 測試驗證：12個案例成功，用戶確認正常運作
 
-2. **當前狀態**：
-   - 分支：main
-   - 階段1進度：5/5任務完成 (100%) ✅
-   - 待提交：14個新增 + 3個修改 + 1個STATUS.md
-   - 測試狀態：⚠️ 代碼完成但未實測，等待用戶驗證
+2. **當前狀態**（2025-10-25）：
+   - 分支：main（已推送，Commit: 2276b77）
+   - Phase 1 進度：5/5任務完成 (100%) ✅
+   - Phase 2 進度：1/4任務完成 (25%) 🔨
+   - Git狀態：✅ 所有變更已提交並推送
+   - 文檔狀態：✅ STATUS.md 和 CHART_DEVELOPMENT_TODO.md 已同步
 
 3. **下一步工作**：
-   - **優先**：階段1完整功能測試（CSV導入、批量下載、UI交互）
-   - **備選**：開始階段2（圖表視覺化與技術分析）
-   - 參考：CHART_DEVELOPMENT_TODO.md 階段2任務
+   - **Phase 2 任務2.2：三個圖表組件**（建議新對話串）
+     - PriceChart（K線圖）
+     - VolumeChart（柱狀圖）
+     - TakerRatioChart（線圖）
+   - 參考：CHART_DEVELOPMENT_TODO.md 任務2.2詳細規格
 
 4. 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範
 5. 完成後更新此文件
