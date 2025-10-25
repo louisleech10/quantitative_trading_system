@@ -1540,8 +1540,13 @@ for case in candidates:
      - 建議時機：完成Phase 3或Phase 4後回來優化
    - 參考：SESSION_Phase2.2_ARCHIVED.md備註與想法章節
 
-4. 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範
-5. 完成後更新此文件
+4. **開發工作流程**：
+   - 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範
+   - 使用 `replace_string_in_file` 改程式碼（不需approve）
+   - 必要時用 `run_in_terminal` 執行命令（自動執行）
+   - 完成後自動更新此文件（勿需手動提醒）
+
+5. 開始工作時無需額外提示，直接執行
 
 ---
 
