@@ -62,7 +62,20 @@ Phase 5: 整合與優化        (Week 7, 5天)
 
 **測試數據**：使用ETHUSDT, 1h, 100根K線
 
-**完成狀態**：✅ **已完成** (2025-10-21)
+**完成狀態**：✅ **已完成** (2025-10-25)
+- 已創建 [PriceChart.tsx](frontend/src/components/charts/PriceChart.tsx)（K線圖 + TO/TC雙標記）
+- 已創建 [VolumeChart.tsx](frontend/src/components/charts/VolumeChart.tsx)（成交量柱狀圖）
+- 已創建 [TakerRatioChart.tsx](frontend/src/components/charts/TakerRatioChart.tsx)（Taker比率線圖）
+- 後端時區修復：api/services/case_import_service.py（強制UTC）
+- 後端並發修復：api/services/batch_download_service.py（HDF5重試機制）
+- 後端Legacy導入：momentum/DataExtraction/kline_storage.py（自動導入舊緩存）
+- 前端頁面整合：frontend/src/app/chart/page.tsx（數據流對齊）
+- 所有測試通過（DOGEUSDT 12 cases），時間戳正確，響應式設計驗證通過
+- 已遵循Ultra Think三步驟，完成實作、診斷、修復、驗證
+- **UX優化項**（延後至Phase 2.3+）：
+  - 三圖表縮放同步
+  - Volume Y軸auto-scaling
+  - Crosshair同步
 - 已創建 [kline_storage.py](momentum/DataExtraction/kline_storage.py) (1059行)
 - 已創建 [kline_storage_service.py](api/services/kline_storage_service.py) (561行)
 - 已創建 [test_kline_storage.py](test_kline_storage.py) (485行)
