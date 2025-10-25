@@ -110,19 +110,22 @@ export const candlestickSeriesOptions = {
 };
 
 /**
- * 時間格式化函數
+ * 時間格式化函數（UTC時間）
  *
  * @param timestamp - Unix時間戳（秒）
- * @returns 格式化的時間字符串
+ * @returns 格式化的UTC時間字符串
+ *
+ * 注意：使用UTC時間與後端API保持一致，避免時區轉換混淆
  */
 export function formatTime(timestamp: number): string {
   const date = new Date(timestamp * 1000);
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
+  // 使用 UTC 時間方法，與後端 API 的 timestamp 保持一致
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
 
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }

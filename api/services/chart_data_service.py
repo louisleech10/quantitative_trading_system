@@ -262,7 +262,11 @@ class ChartDataService:
         forward: int,
         case_timeframe: Optional[str]
     ) -> None:
-        """確保指定案例時間點附近的K線數據已下載/緩存。"""
+        """
+        確保指定案例時間點附近的K線數據已下載/緩存。
+        
+        智能下載：只下載缺失的部分，避開已有數據以防止無效的重複下載。
+        """
         if self.kline_data_service is None:
             return
 
@@ -278,35 +282,97 @@ class ChartDataService:
                 if case_seconds:
                     case_bars = max(1, case_seconds // timeframe_seconds)
 
-            start_ts = case_timestamp - lookback * timeframe_seconds
+            # 計算需要的完整時間範圍
+            required_start_ts = case_timestamp - lookback * timeframe_seconds
             # 包含案例區間與forward範圍
-            end_ts = case_timestamp + ((case_bars - 1) + forward) * timeframe_seconds
-
-            # 避免無效時間範圍
-            if end_ts <= start_ts:
-                end_ts = start_ts + timeframe_seconds
-
-            start_dt = datetime.utcfromtimestamp(max(start_ts, 0))
-            end_dt = datetime.utcfromtimestamp(max(end_ts, start_ts + timeframe_seconds))
+            required_end_ts = case_timestamp + ((case_bars - 1) + forward) * timeframe_seconds
 
             # 避免請求未來資料
             now_utc = datetime.utcnow()
-            if end_dt > now_utc:
-                end_dt = now_utc
+            required_end_dt = datetime.utcfromtimestamp(max(required_end_ts, required_start_ts + timeframe_seconds))
+            if required_end_dt > now_utc:
+                required_end_dt = now_utc
+                required_end_ts = int(required_end_dt.timestamp())
 
-            if end_dt <= start_dt:
-                logger.debug(
-                    f"Skip ensure coverage for {symbol}/{timeframe}: invalid time window {start_dt} - {end_dt}"
+            # 檢查現有數據範圍
+            try:
+                # 直接從底層 storage manager 讀取 metadata
+                storage_manager = self.storage_service.storage_manager
+                metadata = storage_manager.get_metadata(symbol, timeframe)
+                existing_start = metadata.get('time_range_start') if metadata else None
+                existing_end = metadata.get('time_range_end') if metadata else None
+                
+                logger.info(
+                    f"DEBUG metadata: existing_start={existing_start}, existing_end={existing_end}, "
+                    f"required_start={required_start_ts}, required_end={required_end_ts}"
                 )
-                return
-
-            self.kline_data_service.get_kline_data(
-                symbol=symbol,
-                timeframe=timeframe,
-                start_time=start_dt,
-                end_time=end_dt,
-                validate_integrity=False
-            )
+            except Exception as meta_err:
+                logger.warning(f"Failed to get metadata for {symbol}/{timeframe}: {meta_err}", exc_info=True)
+                existing_start = None
+                existing_end = None
+            
+            if existing_start and existing_end:
+                logger.debug(
+                    f"Existing data: {datetime.utcfromtimestamp(existing_start)} to {datetime.utcfromtimestamp(existing_end)}, "
+                    f"Required: {datetime.utcfromtimestamp(required_start_ts)} to {datetime.utcfromtimestamp(required_end_ts)}"
+                )
+                
+                # 計算需要下載的缺口
+                gaps = []
+                
+                # 缺口1: 需要的開始時間 < 現有開始時間（往前補）
+                if required_start_ts < existing_start:
+                    gap_start = datetime.utcfromtimestamp(max(required_start_ts, 0))
+                    gap_end = datetime.utcfromtimestamp(existing_start)
+                    gaps.append(("gap_before", gap_start, gap_end))
+                
+                # 缺口2: 需要的結束時間 > 現有結束時間（往後補）
+                if required_end_ts > existing_end:
+                    # CRITICAL: 從現有數據的下一根K線開始，避免重複下載
+                    next_timestamp = existing_end + timeframe_seconds
+                    gap_start = datetime.utcfromtimestamp(next_timestamp)
+                    gap_end = datetime.utcfromtimestamp(required_end_ts)
+                    
+                    logger.info(
+                        f"DEBUG gap_after: existing_end={existing_end} ({datetime.utcfromtimestamp(existing_end)}), "
+                        f"next_timestamp={next_timestamp} ({gap_start}), "
+                        f"gap_start={gap_start}, gap_end={gap_end}"
+                    )
+                    
+                    # 確保 gap_start 不超過 now_utc
+                    if gap_start <= now_utc:
+                        gaps.append(("gap_after", gap_start, min(gap_end, now_utc)))
+                
+                # 下載所有缺口
+                for gap_type, start_dt, end_dt in gaps:
+                    if end_dt <= start_dt:
+                        continue
+                        
+                    logger.info(f"Downloading {gap_type}: {start_dt} to {end_dt}")
+                    self.kline_data_service.get_kline_data(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        start_time=start_dt,
+                        end_time=end_dt,
+                        validate_integrity=False
+                    )
+            else:
+                # 沒有現有數據，下載完整範圍
+                start_dt = datetime.utcfromtimestamp(max(required_start_ts, 0))
+                end_dt = datetime.utcfromtimestamp(required_end_ts)
+                
+                if end_dt > now_utc:
+                    end_dt = now_utc
+                
+                if end_dt > start_dt:
+                    logger.info(f"Downloading full range: {start_dt} to {end_dt}")
+                    self.kline_data_service.get_kline_data(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        start_time=start_dt,
+                        end_time=end_dt,
+                        validate_integrity=False
+                    )
 
         except Exception as e:
             logger.warning(

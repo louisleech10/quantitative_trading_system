@@ -189,3 +189,130 @@ Traceback (most recent call last):
   File "h5py/_objects.pyx", line 57, in h5py._objects.with_phil.wrapper
   File "h5py/h5f.pyx", line 102, in h5py.h5f.open
 OSError: Unable to synchronously open file (file is already open for read-only)
+2025-10-25 20:40:57 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:40:57 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:40:57 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.137s
+2025-10-25 20:40:57 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:40:57 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:40:57 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.072s
+2025-10-25 20:41:02 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:02 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:02 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.096s
+2025-10-25 20:41:02 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:02 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:02 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.068s
+2025-10-25 20:41:26 - api.routes.chart - [31mERROR[0m - System error: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:26 - api.exception_handler - [31mERROR[0m - HTTP 500: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:26 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.127s
+2025-10-25 20:41:39 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:39 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:39 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.103s
+2025-10-25 20:41:39 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:39 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:39 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.064s
+2025-10-25 20:41:54 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:54 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:54 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.140s
+2025-10-25 20:41:54 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:54 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:54 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.068s
+2025-10-25 20:41:57 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:57 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:57 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.080s
+2025-10-25 20:41:58 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:58 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:41:58 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.063s
+2025-10-25 20:42:08 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:42:08 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:42:08 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.085s
+2025-10-25 20:42:08 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:42:08 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:42:08 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.068s
+2025-10-25 20:44:44 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:44:44 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:44:44 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.099s
+2025-10-25 20:44:44 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:44:44 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:44:44 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.064s
+2025-10-25 20:50:06 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:06 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:06 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.156s
+2025-10-25 20:50:06 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:06 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:06 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.065s
+2025-10-25 20:50:13 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:13 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:13 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.084s
+2025-10-25 20:50:13 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:13 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:13 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.071s
+2025-10-25 20:50:30 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:30 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:30 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.096s
+2025-10-25 20:50:30 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:30 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:30 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.073s
+2025-10-25 20:50:32 - api.routes.chart - [31mERROR[0m - System error: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:32 - api.exception_handler - [31mERROR[0m - HTTP 500: DOGEUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:50:32 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.154s
+2025-10-25 20:52:55 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:52:55 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:52:55 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.120s
+2025-10-25 20:52:55 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:52:55 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 20:52:55 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.072s
+2025-10-25 21:01:05 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:01:05 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:01:05 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.151s
+2025-10-25 21:01:05 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:01:05 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:01:05 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.064s
+2025-10-25 21:23:14 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:23:14 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:23:14 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.134s
+2025-10-25 21:23:53 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:23:53 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:23:53 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.113s
+2025-10-25 21:26:41 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:26:41 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:26:41 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.125s
+2025-10-25 21:26:41 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:26:41 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:26:41 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.063s
+2025-10-25 21:33:39 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:33:39 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:33:39 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.153s
+2025-10-25 21:33:39 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:33:39 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/4h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:33:39 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.063s
+2025-10-25 21:38:04 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:38:04 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:38:04 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.025s
+2025-10-25 21:38:42 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:38:42 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:38:42 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.121s
+2025-10-25 21:39:16 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:39:16 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:39:16 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.124s
+2025-10-25 21:39:37 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:39:37 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:39:37 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.130s
+2025-10-25 21:40:21 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:40:21 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:40:21 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.125s
+2025-10-25 21:42:28 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:42:28 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:42:28 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.153s
+2025-10-25 21:52:30 - api.kline_data_service - [31mERROR[0m - Failed to get kline data for ADAUSDT/1h: name 'start_ts' is not defined
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/kline_data_service.py", line 215, in get_kline_data
+    df = self._handle_partial_cache(
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/kline_data_service.py", line 450, in _handle_partial_cache
+    cache_overlap_start_ts = max(start_ts, cache_start_ts)
+NameError: name 'start_ts' is not defined
+2025-10-25 21:52:30 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:52:30 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:52:30 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.013s
+2025-10-25 21:53:13 - api.routes.chart - [31mERROR[0m - System error: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:53:13 - api.exception_handler - [31mERROR[0m - HTTP 500: ADAUSDT/1h 的緩存不足，無法提供案例所需的K線範圍。請先下載缺失的歷史資料後再重試。
+2025-10-25 21:53:13 - api.request - [31mERROR[0m - GET /api/v1/chart/data - 500 - 0.127s

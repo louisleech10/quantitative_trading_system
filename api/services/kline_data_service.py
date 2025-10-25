@@ -168,10 +168,15 @@ class KlineDataService:
         )
 
         try:
-            # Step 1: 檢查HDF5緩存覆蓋情況
-            has_cache, cache_start, cache_end = self._check_cache_coverage(
+            # Step 1: 檢查HDF5緩存覆蓋情況（返回timestamp）
+            has_cache, cache_start_ts, cache_end_ts = self._check_cache_coverage(
                 symbol, timeframe
             )
+
+            # 將請求時間轉為timestamp（使用calendar.timegm避免timezone問題）
+            import calendar
+            start_ts = calendar.timegm(start_time.timetuple())
+            end_ts = calendar.timegm(end_time.timetuple())
 
             # Step 2: 決策邏輯（3種情況）
             if not has_cache:
@@ -183,7 +188,7 @@ class KlineDataService:
                     source, symbol, timeframe, start_time, end_time
                 )
 
-            elif cache_start <= start_time and end_time <= cache_end:
+            elif cache_start_ts <= start_ts and end_ts <= cache_end_ts:
                 # 情況A：完全命中 → 直接讀取
                 logger.info(
                     f"Cache HIT (full): reading {symbol}/{timeframe} from storage"
@@ -204,12 +209,12 @@ class KlineDataService:
             else:
                 # 情況C：部分命中 → 增量下載
                 logger.info(
-                    f"Cache PARTIAL (cache: {cache_start} to {cache_end}, "
-                    f"request: {start_time} to {end_time})"
+                    f"Cache PARTIAL (cache: {cache_start_ts} to {cache_end_ts}, "
+                    f"request: {start_ts} to {end_ts})"
                 )
                 df = self._handle_partial_cache(
-                    source, symbol, timeframe, start_time, end_time,
-                    cache_start, cache_end
+                    source, symbol, timeframe, start_ts, end_ts,
+                    cache_start_ts, cache_end_ts
                 )
 
             # Step 3: 數據完整性驗證
@@ -249,7 +254,7 @@ class KlineDataService:
         self,
         symbol: str,
         timeframe: str
-    ) -> Tuple[bool, Optional[datetime], Optional[datetime]]:
+    ) -> Tuple[bool, Optional[int], Optional[int]]:
         """
         檢查HDF5緩存覆蓋情況
 
@@ -258,10 +263,10 @@ class KlineDataService:
             timeframe: 時間框架
 
         Returns:
-            Tuple[bool, Optional[datetime], Optional[datetime]]:
+            Tuple[bool, Optional[int], Optional[int]]:
                 - has_data: 是否有緩存數據
-                - cache_start: 緩存開始時間（若無則None）
-                - cache_end: 緩存結束時間（若無則None）
+                - cache_start_ts: 緩存開始時間戳（Unix秒，若無則None）
+                - cache_end_ts: 緩存結束時間戳（Unix秒，若無則None）
         """
         try:
             metadata = self.storage_manager.get_metadata(symbol, timeframe)
@@ -270,7 +275,7 @@ class KlineDataService:
                 logger.debug(f"No metadata for {symbol}/{timeframe}")
                 return False, None, None
 
-            # 從metadata提取時間範圍
+            # 從metadata提取時間範圍（已經是Unix timestamp）
             time_range_start = metadata.get('time_range_start')
             time_range_end = metadata.get('time_range_end')
 
@@ -280,17 +285,15 @@ class KlineDataService:
                 )
                 return False, None, None
 
-            # P1-1 fix: 轉換為datetime（使用UTC時區）
-            cache_start = datetime.utcfromtimestamp(time_range_start)
-            cache_end = datetime.utcfromtimestamp(time_range_end)
-
+            # 直接返回timestamp（不轉datetime，避免timezone問題）
             logger.debug(
                 f"Cache coverage for {symbol}/{timeframe}: "
-                f"{cache_start.strftime('%Y-%m-%d %H:%M')} to "
-                f"{cache_end.strftime('%Y-%m-%d %H:%M')}"
+                f"{datetime.utcfromtimestamp(time_range_start).strftime('%Y-%m-%d %H:%M')} to "
+                f"{datetime.utcfromtimestamp(time_range_end).strftime('%Y-%m-%d %H:%M')} "
+                f"(timestamps: {time_range_start} - {time_range_end})"
             )
 
-            return True, cache_start, cache_end
+            return True, time_range_start, time_range_end
 
         except Exception as e:
             logger.warning(
@@ -382,10 +385,10 @@ class KlineDataService:
         source: str,
         symbol: str,
         timeframe: str,
-        start_time: datetime,
-        end_time: datetime,
-        cache_start: datetime,
-        cache_end: datetime
+        start_ts: int,
+        end_ts: int,
+        cache_start_ts: int,
+        cache_end_ts: int
     ) -> pd.DataFrame:
         """
         處理部分命中緩存的情況（增量下載）
@@ -401,10 +404,10 @@ class KlineDataService:
             source: 數據源
             symbol: 交易對symbol
             timeframe: 時間框架
-            start_time: 請求開始時間
-            end_time: 請求結束時間
-            cache_start: 緩存開始時間
-            cache_end: 緩存結束時間
+            start_ts: 請求開始時間戳（Unix秒）
+            end_ts: 請求結束時間戳（Unix秒）
+            cache_start_ts: 緩存開始時間戳（Unix秒）
+            cache_end_ts: 緩存結束時間戳（Unix秒）
 
         Returns:
             pd.DataFrame: 合併後的完整K線數據
@@ -412,12 +415,13 @@ class KlineDataService:
         dfs_to_merge = []
 
         # 1. 計算並下載前段缺失（gap_before）
-        if start_time < cache_start:
-            # P0-1 fix: gap_before應該下載到cache_start為止，不要用min
-            gap_before_end = cache_start
+        if start_ts < cache_start_ts:
+            gap_before_start = datetime.utcfromtimestamp(start_ts)
+            gap_before_end = datetime.utcfromtimestamp(cache_start_ts)
             logger.info(
-                f"Downloading gap_before: {start_time.strftime('%Y-%m-%d %H:%M')} "
-                f"to {gap_before_end.strftime('%Y-%m-%d %H:%M')}"
+                f"Downloading gap_before: {gap_before_start.strftime('%Y-%m-%d %H:%M')} "
+                f"to {gap_before_end.strftime('%Y-%m-%d %H:%M')} "
+                f"(timestamps: {start_ts} - {cache_start_ts})"
             )
 
             try:
@@ -425,7 +429,7 @@ class KlineDataService:
                     source,
                     symbol,
                     timeframe,
-                    start_time,
+                    gap_before_start,
                     gap_before_end,
                     save_to_storage=False
                 )
@@ -444,13 +448,16 @@ class KlineDataService:
                 # 繼續嘗試其他分段
 
         # 2. 讀取緩存部分（cache_overlap）
-        cache_overlap_start = max(start_time, cache_start)
-        cache_overlap_end = min(end_time, cache_end)
+        cache_overlap_start_ts = max(start_ts, cache_start_ts)
+        cache_overlap_end_ts = min(end_ts, cache_end_ts)
 
-        if cache_overlap_start < cache_overlap_end:
+        if cache_overlap_start_ts < cache_overlap_end_ts:
+            cache_overlap_start = datetime.utcfromtimestamp(cache_overlap_start_ts)
+            cache_overlap_end = datetime.utcfromtimestamp(cache_overlap_end_ts)
             logger.info(
                 f"Reading cached data: {cache_overlap_start.strftime('%Y-%m-%d %H:%M')} "
-                f"to {cache_overlap_end.strftime('%Y-%m-%d %H:%M')}"
+                f"to {cache_overlap_end.strftime('%Y-%m-%d %H:%M')} "
+                f"(timestamps: {cache_overlap_start_ts} - {cache_overlap_end_ts})"
             )
 
             try:
@@ -469,12 +476,20 @@ class KlineDataService:
                 # 繼續嘗試其他分段
 
         # 3. 計算並下載後段缺失（gap_after）
-        if end_time > cache_end:
-            # P0-2 fix: gap_after應該從cache_end開始下載，不要用max
-            gap_after_start = cache_end
+        if end_ts > cache_end_ts:
+            # CRITICAL FIX: gap_after應該從cache_end的**下一根K線**開始，避免重複下載
+            # cache_end_ts 是最後一根K線的開盤時間戳，下一根應該是 cache_end_ts + timeframe_seconds
+            timeframe_seconds = self._get_timeframe_seconds(timeframe)
+            gap_after_start_ts = cache_end_ts + timeframe_seconds
+            
+            # 轉為datetime供download使用
+            gap_after_start = datetime.utcfromtimestamp(gap_after_start_ts)
+            gap_after_end = datetime.utcfromtimestamp(end_ts)
+            
             logger.info(
                 f"Downloading gap_after: {gap_after_start.strftime('%Y-%m-%d %H:%M')} "
-                f"to {end_time.strftime('%Y-%m-%d %H:%M')}"
+                f"to {gap_after_end.strftime('%Y-%m-%d %H:%M')} "
+                f"(timestamps: {gap_after_start_ts} - {end_ts}, +{timeframe_seconds}s from cache_end)"
             )
 
             try:
@@ -483,7 +498,7 @@ class KlineDataService:
                     symbol,
                     timeframe,
                     gap_after_start,
-                    end_time,
+                    gap_after_end,
                     save_to_storage=False
                 )
                 if not df_after.empty:

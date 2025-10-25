@@ -378,7 +378,7 @@ class KlineStorageManager:
             return False
 
         try:
-            df = df.reset_index()
+            df = df.reset_index(drop=True)  # 避免保留舊索引為欄位
             if 'timestamp' not in df.columns:
                 logger.error(f"Legacy cache {legacy_file} missing timestamp column")
                 return False
@@ -520,6 +520,13 @@ class KlineStorageManager:
         # 檢查timestamp重複
         if df['timestamp'].duplicated().any():
             return False, "Duplicate timestamps found"
+
+        # 檢查索引連續性（CLASS INVARIANT: 所有DataFrame必須是RangeIndex(0, n)）
+        if not isinstance(df.index, pd.RangeIndex):
+            return False, f"Index must be RangeIndex, got {type(df.index).__name__}"
+        
+        if df.index.start != 0 or df.index.step != 1:
+            return False, f"Index must be continuous starting from 0, got start={df.index.start}, step={df.index.step}"
 
         return True, ""
 
@@ -712,7 +719,8 @@ class KlineStorageManager:
             elif end_value is not None:
                 df = df[df['timestamp'] <= end_value]
 
-            # 重置索引
+            # CRITICAL: 重置索引確保 RangeIndex(0, n)，這是本類別的不變性保證
+            # 所有下游方法（特別是 read_klines_around_timestamp）依賴此保證進行位置計算
             df = df.reset_index(drop=True)
 
             read_time = time.time() - start_read
@@ -766,37 +774,43 @@ class KlineStorageManager:
             if df is None or len(df) == 0:
                 return None
 
-            # 找到TO時間點的索引（原center_timestamp）
-            to_idx = df[df['timestamp'] == center_timestamp].index
+            # 找到TO時間點的位置索引（CRITICAL: 必須使用位置索引而非標籤索引）
+            # 由於 read_klines() 保證回傳 RangeIndex(0, n)，這裡使用 numpy 確保純位置操作
+            to_position_array = np.where(df['timestamp'].values == center_timestamp)[0]
 
-            if len(to_idx) == 0:
-                # 如果找不到精確時間點，找最接近的
-                df['time_diff'] = (df['timestamp'] - center_timestamp).abs()
-                to_idx = df['time_diff'].idxmin()
-                logger.warning(f"Exact timestamp not found, using closest: {df.loc[to_idx, 'timestamp']}")
-                df = df.drop('time_diff', axis=1)
+            if len(to_position_array) == 0:
+                # 如果找不到精確時間點，找最接近的位置
+                time_diff = np.abs(df['timestamp'].values - center_timestamp)
+                to_position = int(np.argmin(time_diff))
+                logger.warning(
+                    f"Exact timestamp {center_timestamp} not found for {symbol}/{timeframe}, "
+                    f"using closest: {df.iloc[to_position]['timestamp']} at position {to_position}"
+                )
             else:
-                to_idx = to_idx[0]
+                to_position = int(to_position_array[0])
 
-            # 計算切片範圍
+            # DEBUG: 記錄位置索引值
+            logger.info(f"DEBUG: to_position={to_position}, len(df)={len(df)}, lookback={lookback}, forward={forward}")
+
+            # 計算切片範圍（現在 to_position 保證是位置索引）
             if case_timeframe:
                 # **新邏輯**：以TO為起點，包含案例區間
                 case_tf_seconds = self.TIMEFRAME_SECONDS.get(case_timeframe, 3600)
                 view_tf_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
                 case_bars = max(1, case_tf_seconds // view_tf_seconds)
 
-                start_idx = max(0, to_idx - lookback)
-                end_idx = min(len(df), to_idx + case_bars + forward)
+                start_idx = max(0, to_position - lookback)
+                end_idx = min(len(df), to_position + case_bars + forward)
 
                 result_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
 
                 # 計算TO和TC在result_df中的位置
-                to_index_in_result = to_idx - start_idx
+                to_index_in_result = to_position - start_idx
                 tc_index_in_result = min(len(result_df) - 1, to_index_in_result + case_bars - 1)
 
                 # 對齊後的實際K線時間戳
-                resolved_to_timestamp = int(df.iloc[to_idx]['timestamp'])
-                resolved_tc_timestamp = int(df.iloc[min(to_idx + case_bars - 1, len(df) - 1)]['timestamp'])
+                resolved_to_timestamp = int(df.iloc[to_position]['timestamp'])
+                resolved_tc_timestamp = int(df.iloc[min(to_position + case_bars - 1, len(df) - 1)]['timestamp'])
 
                 # 將metadata存儲在DataFrame的attrs中（pandas>=1.0支持）
                 result_df.attrs['to_index'] = int(to_index_in_result)
@@ -812,8 +826,8 @@ class KlineStorageManager:
                 )
             else:
                 # **舊邏輯**：以center為中心（向後兼容）
-                start_idx = max(0, to_idx - lookback)
-                end_idx = min(len(df), to_idx + forward + 1)
+                start_idx = max(0, to_position - lookback)
+                end_idx = min(len(df), to_position + forward + 1)
 
                 result_df = df.iloc[start_idx:end_idx].reset_index(drop=True)
 

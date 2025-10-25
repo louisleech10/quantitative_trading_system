@@ -228,19 +228,19 @@ export default function ChartPage() {
   }, [selectedSymbol, selectedTimestamp, selectedTimeframe, currentCase]);
 
   /**
-   * 格式化時間戳為可讀格式
+   * 格式化時間戳為可讀格式（UTC時間）
+   * 注意：顯示UTC時間以與API數據保持一致，避免時區轉換混淆
    */
   const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp * 1000);
-    return date.toLocaleString('zh-TW', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
+    // 使用 UTC 時間格式，與後端 API 的 timestamp 保持一致
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
   };
 
   /**
@@ -371,6 +371,7 @@ export default function ChartPage() {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-500 mt-1">💡 顯示UTC時間（與API數據一致），非本地時區</p>
           </div>
         </div>
 

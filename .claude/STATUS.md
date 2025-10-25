@@ -356,6 +356,27 @@
     - .claude/SESSION_TEMPLATE.md：標準模板（新建）
     - .github/copilot-instructions.md：Copilot快速指南（新建）
 
+- **Timezone統一修復** (100%) - 2025-10-25完成
+  - ✅ **問題根源**：Python `datetime.timestamp()` 對naive datetime使用本地時區
+    - macOS UTC+8環境下造成8小時偏移
+    - 導致gap_after下載錯誤時間範圍（20:00而非04:00）
+  - ✅ **後端修復**（3個文件）
+    - kline_data_service.py: 全程使用timestamp（int），避免datetime轉換
+      - `_check_cache_coverage`: 返回timestamp而非datetime
+      - `_handle_partial_cache`: 參數改為timestamp，gap計算用整數運算
+      - 使用`calendar.timegm()`將naive UTC datetime轉為UTC timestamp
+    - binance_provider.py: API調用使用`calendar.timegm()`
+  - ✅ **前端修復**（2個文件）
+    - chart/page.tsx: `formatTimestamp`使用`getUTC*`方法，添加" UTC"後綴
+    - chartConfig.ts: `formatTime`使用`getUTC*`方法
+    - 添加"💡 顯示UTC時間（與API數據一致），非本地時區"提示
+  - ✅ **核心原則**：全程使用幣安API的Unix timestamp，避免timezone轉換
+  - ✅ **驗證結果**：
+    - HTTP 200 ✅ (之前500)
+    - HDF5從152→160 bars ✅
+    - 時間顯示統一為UTC ✅
+
+
 - **Critical Bug修復** (100%) - 2025-10-07完成
   - ✅ **問題1：Stack Overflow無限遞歸**
     - 問題：單symbol搜索導致API崩潰

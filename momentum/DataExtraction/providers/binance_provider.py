@@ -26,6 +26,7 @@ from binance.exceptions import BinanceAPIException, BinanceRequestException
 import pandas as pd
 import numpy as np
 import time
+import calendar
 import threading
 import os
 import logging
@@ -354,11 +355,16 @@ class BinanceProvider(KlineProviderBase):
         while True:
             try:
                 # 調用幣安API
+                # FIX: start/end 是 naive UTC datetime，不能用.timestamp()（會用local timezone）
+                # 使用calendar.timegm轉UTC timestamp
+                start_ms = int(calendar.timegm(start.timetuple()) * 1000)
+                end_ms = int(calendar.timegm(end.timetuple()) * 1000)
+                
                 klines = self.client.get_klines(
                     symbol=symbol,
                     interval=interval,
-                    startTime=int(start.timestamp() * 1000),
-                    endTime=int(end.timestamp() * 1000),
+                    startTime=start_ms,
+                    endTime=end_ms,
                     limit=1000
                 )
 
