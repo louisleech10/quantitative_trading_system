@@ -1,14 +1,23 @@
 # 項目狀態
 
-**最後更新**: 2025-10-25
-**當前階段**: Phase 2 圖表視覺化開發 - 任務2.1完成
-**整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 1/4任務完成 (25%)
+**最後更新**: 2025-10-25 20:15
+**當前階段**: Phase 2 圖表視覺化開發 - 任務2.2完成 + Timezone統一修復
+**整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 2/4任務完成 (50%)
 
 ---
 
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Timezone統一修復** (100%) - 2025-10-25完成
+  - ✅ 後端：使用calendar.timegm()確保UTC轉換 | 前端：使用getUTC*()方法
+  - ✅ CSV導入：強制視為UTC時間 | HDF5並發重試：3次指數退避
+  - ✅ 驗證結果：HTTP 200✅ | HDF5 160根✅ | 時間UTC顯示✅
+
+- **Phase 2 任務2.2：三個圖表組件** (100%) - 2025-10-25完成
+  - ✅ PriceChart/VolumeChart/TakerRatioChart完全實作
+  - ✅ TO/TC雙標記系統 | 完整流程驗證 | 用戶測試確認
+
 - **文檔系統** (100%)
   - ✅ README.md - 項目入口
   - ✅ ARCHITECTURE.md - 系統架構
@@ -397,7 +406,8 @@
   - ✅ 修改文件：2個文件，53行代碼
 
 ### 計劃中 📋
-- **下一步**: Phase 2 任務2.3（圖表容器整合與互動）🔥
+- **下一步**: Phase 2 任務2.3（圖表互動優化：同步縮放、Y軸調整、十字線同步）
+- **備註**: 任務2.2核心功能100%完成，UX優化優先級P2，延後至Phase 2.3+實現
 - **Phase 1**: ✅ 數據基礎層 (5/5任務完成，100%)
 - **Phase 2**: ✅ 圖表視覺化 (2/4任務完成，50%)
   - ✅ 任務2.1：基礎設施與圖表數據API
@@ -414,22 +424,18 @@
 
 ### 下一步工作
 **✅ Phase 2 任務2.1完成**：基礎設施與圖表數據API（2025-10-25）
-**🎯 下一個任務**：Phase 2 任務2.2 - 三個圖表組件
+**✅ Phase 2 任務2.2完成**：三個圖表組件 + 時區修復 + HDF5並發重試（2025-10-25）
+**🎯 下一個任務**：Phase 2 任務2.3 - 圖表互動優化
 
-**當前狀態**（2025-10-25）：
+**當前狀態**（2025-10-25 20:15）：
 - ✅ Case Search系統：100%完成（Phase 0-2優化）
 - ✅ Phase 1 數據基礎層：5/5任務完成 (100%) 🎉
-  - ✅ 任務1.1：HDF5存儲結構
-  - ✅ 任務1.2：K線下載服務
-  - ✅ 任務1.3：數據整合服務
-  - ✅ 任務1.4：案例CSV導入
-  - ✅ 任務1.5：批量K線下載API
 - ✅ Phase 2 圖表視覺化：2/4任務完成 (50%) 🎉
-  - ✅ 任務2.1：基礎設施與圖表數據API（含5個Bug修復）
-  - ✅ 任務2.2：三個圖表組件（Price/Volume/TakerRatio + TO/TC雙標記）
-  - 📋 任務2.3：圖表容器整合與互動
+  - ✅ 任務2.1：基礎設施與圖表數據API
+  - ✅ 任務2.2：三個圖表組件（核心功能100%完成）
+  - 📋 任務2.3：圖表互動優化（優先級P2，複雜度M）
   - 📋 任務2.4：動態數據加載（可選）
-- 📋 下一步：開始 Phase 2 任務2.3
+- 📋 下一步：開始 Phase 2 任務2.3（建議新對話串）
 
 ---
 
@@ -451,13 +457,20 @@ quantitative_trading_system/
 
 ### 需要修復
 - **無Critical問題**（2025-10-25）✅
-  - Phase 1 → Phase 2.1 完整流程已打通
-  - 所有已知Bug已修復
+  - Phase 2.2核心功能100%完成
+  - Timezone問題已根治（Calendar.timegm + UTC強制）
+  - HDF5並發衝突已解決（重試機制）
+  - CSV完整流程已打通
 
 ### 需要優化
+- **Phase 2.3圖表互動優化**（優先級：P2，複雜度M，2-4小時/項）
+  - a. 三圖表同步縮放對齊（Lightweight Charts timeScale同步）
+  - b. Volume圖Y軸自動縮放（動態計算成交量範圍）
+  - c. 十字虛線跨圖表同步（crosshairMove事件監聽）
+  - 建議時機：完成Phase 3或Phase 4後回來優化
+
 - **Chart頁面狀態保存**（優先級：低）
   - 問題：切換頁面後無法保持用戶選擇的案例
-  - 影響：用戶體驗（功能正常）
   - 建議方案：URL參數或localStorage
   - 計劃：Phase 2.4整合時一起處理
 
@@ -521,6 +534,32 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-10-25（下午20:15）
+
+**Phase 2 任務2.2完成 + Timezone關鍵修復** ⭐⭐⭐
+
+**三個圖表組件實作完成**（100%）
+- ✅ PriceChart（K線圖）- Lightweight Charts整合，TO/TC雙標記
+- ✅ VolumeChart（成交量柱狀圖）- Histogram Series，漲綠/跌紅
+- ✅ TakerRatioChart（Taker比率線圖）- Line Series，0.5基準線
+
+**Timezone統一修復 - Critical Bug解決**
+- ✅ 問題根源：Python `datetime.timestamp()` 對naive datetime使用本地時區（UTC+8）
+- ✅ 後端修復：使用calendar.timegm() + CSV導入強制UTC
+- ✅ 前端修復：所有時間使用getUTC*()方法 + 添加" UTC"後綴
+- ✅ 驗證結果：HTTP 200✅, HDF5 160根✅, 時間UTC顯示✅
+
+**HDF5並發重試機制 - High優先級修復**
+- ✅ 問題：批量下載多case共享HDF5，唯讀/寫入衝突
+- ✅ 解決：3次重試機制，指數退避（100ms, 200ms, 400ms）
+- ✅ 結果：成功率提升至100%（12/12穩定）
+
+**測試驗證完成**
+- ✅ DOGEUSDT 12 cases CSV導入成功
+- ✅ TO標記正確位置（第109根，UTC 12:00）
+- ✅ TC標記正確位置（TO + 12根）
+- ✅ 響應式設計多螢幕驗證通過
 
 ### 2025-10-25
 
@@ -1438,7 +1477,7 @@ for case in candidates:
 **當前分支**: main
 **主分支**: main
 **最近提交** (2025-10-25):
-- ✅ **已推送**: Phase 2任務2.1 - 基礎設施與圖表數據API完成（Commit: 2276b77）
+- ✅ **已推送**: Timezone統一修復 - 全程使用UTC timestamp避免本地時區轉換（Commit: d9047b0）
   - 新增後端文件（2個）：
     - api/routes/chart.py（圖表數據API）
     - api/services/chart_data_service.py（圖表數據服務）
@@ -1461,43 +1500,45 @@ for case in candidates:
 - phase-0-start, phase-0-complete, phase-0-error-handling
 - phase-1-start, phase-1-parallel, phase-1-error-handling
 - phase-2-start, phase-2-complete
-- chart-phase1-task1.1-complete
-- chart-phase1-task1.2-complete
-- chart-phase1-task1.3-complete
-- 🔖 建議新增：chart-phase1-task1.4-1.5-complete, chart-phase1-complete
+- chart-phase1-complete (Phase 1: 5/5任務完成 100%)
+- chart-phase2-task2.1-complete
+- chart-phase2-task2.2-complete
+- timezone-unified-fix (Timezone統一修復)
 
 **備份分支**: backup-before-phase0, backup-before-phase1
 
 **當前狀態**:
-- 任務1.4-1.5：✅ 完成，待推送
-- 測試狀態：⚠️ 未測試（等待用戶驗證）
-- 待提交文件：14個新增 + 3個修改 + 1個STATUS.md
+- ✅ Phase 1全部任務：完成並推送
+- ✅ Phase 2.1-2.2：完成並推送
+- ✅ Timezone修復：完成並推送
+- ✅ 工作區狀態：清空，所有變更已提交推送
 
 ---
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-10-25）：
+1. **已完成工作**（2025-10-25 20:15）：
    - ✅ **Phase 2 任務2.1：基礎設施與圖表數據API**（100%完成）
-     - 後端：2個新模組（chart.py, chart_data_service.py）
-     - 前端：4個新文件（chart/page.tsx, TestChart.tsx, useChart.ts, chartConfig.ts）
-     - Bug修復：5個關鍵問題全部解決
-     - 完整流程打通：CSV導入 → 批量下載 → 圖表顯示 ✅
-     - 測試驗證：12個案例成功，用戶確認正常運作
+   - ✅ **Phase 2 任務2.2：三個圖表組件 + Timezone修復 + HDF5並發修復**（100%完成）
+     - 核心功能：PriceChart、VolumeChart、TakerRatioChart完全實作
+     - Timezone統一修復：Calendar.timegm + UTC強制
+     - HDF5並發重試：3次重試機制，成功率100%
+     - 測試驗證：DOGEUSDT 12 cases完全通過
 
-2. **當前狀態**（2025-10-25）：
-   - 分支：main（已推送，Commit: 2276b77）
+2. **當前狀態**（2025-10-25 20:15）：
+   - 分支：main（已推送，Commit: d9047b0）
    - Phase 1 進度：5/5任務完成 (100%) ✅
-   - Phase 2 進度：1/4任務完成 (25%) 🔨
-   - Git狀態：✅ 所有變更已提交並推送
-   - 文檔狀態：✅ STATUS.md 和 CHART_DEVELOPMENT_TODO.md 已同步
+   - Phase 2 進度：2/4任務完成 (50%) ✅
+   - Git狀態：✅ 工作區清空，所有變更已提交推送
+   - 文檔狀態：✅ STATUS.md已同步
 
 3. **下一步工作**：
-   - **Phase 2 任務2.2：三個圖表組件**（建議新對話串）
-     - PriceChart（K線圖）
-     - VolumeChart（柱狀圖）
-     - TakerRatioChart（線圖）
-   - 參考：CHART_DEVELOPMENT_TODO.md 任務2.2詳細規格
+   - **Phase 2 任務2.3：圖表互動優化**（建議新對話串）
+     - 優先級：P2（非關鍵阻塞）
+     - 複雜度：M（2-4小時/項）
+     - 內容：三圖表同步縮放、Y軸自動調整、十字線同步
+     - 建議時機：完成Phase 3或Phase 4後回來優化
+   - 參考：SESSION_Phase2.2_ARCHIVED.md備註與想法章節
 
 4. 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範
 5. 完成後更新此文件
