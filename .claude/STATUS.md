@@ -18,6 +18,12 @@
   - ✅ PriceChart/VolumeChart/TakerRatioChart完全實作
   - ✅ TO/TC雙標記系統 | 完整流程驗證 | 用戶測試確認
 
+- **Phase 2 任務2.3：圖表容器整合與交互** (100%) - 2025-10-26完成
+  - ✅ 三圖表同步機制（拖曳/縮放/十字線）
+  - ✅ 雙擊重置到TO中心 | LogicalRange對齊系統
+  - ✅ 額外優化3項：Volume Y軸拖曳 + 柱狀圖高度 + Taker Ratio顯示
+  - ✅ 8次迭代修復 + 完整架構文檔
+
 - **文檔系統** (100%)
   - ✅ README.md - 項目入口
   - ✅ ARCHITECTURE.md - 系統架構
@@ -406,13 +412,11 @@
   - ✅ 修改文件：2個文件，53行代碼
 
 ### 計劃中 📋
-- **下一步**: Phase 2 任務2.3（圖表互動優化：同步縮放、Y軸調整、十字線同步）
-- **備註**: 任務2.2核心功能100%完成，UX優化優先級P2，延後至Phase 2.3+實現
 - **Phase 1**: ✅ 數據基礎層 (5/5任務完成，100%)
-- **Phase 2**: ✅ 圖表視覺化 (2/4任務完成，50%)
+- **Phase 2**: ✅ 圖表視覺化 (3/4任務完成，75%)
   - ✅ 任務2.1：基礎設施與圖表數據API
   - ✅ 任務2.2：三個圖表組件（Price/Volume/TakerRatio + TO/TC雙標記）
-  - 📋 任務2.3：圖表容器整合與互動
+  - ✅ 任務2.3：圖表容器整合與交互（8次迭代 + 3項優化）
   - 📋 任務2.4：動態數據加載（可選）
 - **Phase 3**: 策略信號系統 (預計4-5週)
 - **Phase 4**: ML配置與特徵提取 (預計4-6週)
@@ -423,19 +427,18 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**✅ Phase 2 任務2.1完成**：基礎設施與圖表數據API（2025-10-25）
-**✅ Phase 2 任務2.2完成**：三個圖表組件 + 時區修復 + HDF5並發重試（2025-10-25）
-**🎯 下一個任務**：Phase 2 任務2.3 - 圖表互動優化
+**✅ Phase 2 任務2.3完成**：圖表容器整合與交互（2025-10-26）
+**🎯 下一個任務**：Phase 3.1 - 策略信號系統 或 Phase 2 任務2.4（可選）
 
-**當前狀態**（2025-10-25 20:15）：
+**當前狀態**（2025-10-26）：
 - ✅ Case Search系統：100%完成（Phase 0-2優化）
 - ✅ Phase 1 數據基礎層：5/5任務完成 (100%) 🎉
-- ✅ Phase 2 圖表視覺化：2/4任務完成 (50%) 🎉
+- ✅ Phase 2 圖表視覺化：3/4任務完成 (75%) 🎉
   - ✅ 任務2.1：基礎設施與圖表數據API
   - ✅ 任務2.2：三個圖表組件（核心功能100%完成）
-  - 📋 任務2.3：圖表互動優化（優先級P2，複雜度M）
-  - 📋 任務2.4：動態數據加載（可選）
-- 📋 下一步：開始 Phase 2 任務2.3（建議新對話串）
+  - ✅ 任務2.3：圖表容器整合與交互（8次迭代 + 3項優化）
+  - 📋 任務2.4：動態數據加載（可選，優先級低）
+- 📋 下一步：開始 Phase 3.1（策略信號系統）或 Phase 4（ML配置）
 
 ---
 
@@ -456,18 +459,19 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-- **無Critical問題**（2025-10-25）✅
-  - Phase 2.2核心功能100%完成
-  - Timezone問題已根治（Calendar.timegm + UTC強制）
-  - HDF5並發衝突已解決（重試機制）
-  - CSV完整流程已打通
+- **無Critical問題**（2025-10-26）✅
+  - Phase 2.3 圖表同步完美運作
+  - 8次迭代修復所有同步問題
+  - LogicalRange 對齊系統穩定
+  - 額外優化3項全部完成
 
 ### 需要優化
-- **Phase 2.3圖表互動優化**（優先級：P2，複雜度M，2-4小時/項）
-  - a. 三圖表同步縮放對齊（Lightweight Charts timeScale同步）
-  - b. Volume圖Y軸自動縮放（動態計算成交量範圍）
-  - c. 十字虛線跨圖表同步（crosshairMove事件監聽）
-  - 建議時機：完成Phase 3或Phase 4後回來優化
+- **Phase 2.4 進階交互功能**（優先級：低，可選）
+  - 區間選擇（Shift+拖曳時間範圍）
+  - 鍵盤快捷鍵（Space拖曳、← → 移動）
+  - 迷你地圖（Overview Chart）
+  - 價格線拖動（止損/止盈線）
+  - 建議時機：Phase 3-4 完成後考慮
 
 - **Chart頁面狀態保存**（優先級：低）
   - 問題：切換頁面後無法保持用戶選擇的案例
@@ -534,6 +538,55 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-10-26
+
+**Phase 2 任務2.3：圖表容器整合與交互完成** ⭐⭐⭐
+
+**核心功能實作**（8次迭代修復）
+- ✅ TimeAxisContext：訂閱者模式 + RAF節流
+- ✅ useChartSync Hook：圖表同步邏輯封裝
+- ✅ TradingChartContainer：三圖表容器整合
+- ✅ 時間軸同步：LogicalRange 解決縮放對齊
+- ✅ 十字線同步：貫穿三圖表 + 數值顯示
+- ✅ 雙擊重置：自動回到 TO 中心
+
+**額外優化3項**（v1.1）
+1. ✅ Volume Y軸拖曳縮放
+   - 移除自定義 priceScaleId，啟用默認拖曳功能
+   - 修改：VolumeChart.tsx, useChartSync.ts
+2. ✅ Volume柱狀圖高度優化
+   - scaleMargins 從 {top:0.8} → {top:0.1, bottom:0.1}
+   - 柱狀圖高度從 20% → 80%
+3. ✅ PriceChart Taker Ratio 顯示
+   - 懸停資訊新增 Taker Ratio（≥50%綠色，<50%紅色）
+   - 修改：PriceChart.tsx
+
+**重大修復記錄**
+- 修復1-3：無限重渲染（useEffect 依賴問題）
+- 修復4：十字線消失（防循環鎖過早）
+- 修復5：縮放不對齊（TimeRange → LogicalRange）
+- 修復6：連鎖廣播失敗（移除 Context 全局鎖）
+- 修復7：雙擊後佈局崩潰（timeout cleanup）
+- 修復8：刷新後佈局消失（Container 初始化）
+
+**架構決策**
+- 使用 LogicalRange 而非 TimeRange（縮放錨點穩定）
+- 移除 Context 全局鎖，各圖表獨立防循環
+- Ref 追蹤 timeout，確保 cleanup 正確
+- RAF 節流優化性能
+
+**文件統計**（v1.1）
+- 新增：TimeAxisContext (317行), useChartSync (310行), TradingChartContainer (262行)
+- 修改：PriceChart (+23行), VolumeChart (+43行), TakerRatioChart (+28行)
+- 總代碼：~987行淨增
+
+**Documentation**
+- .claude/SESSION_Phase2.3.md：完整session記錄（490行）
+- .claude/CHART_DEVELOPMENT_TODO.md：任務2.3標記完成
+- .claude/STATUS.md：項目狀態同步更新
+
+---
 
 ### 2025-10-25（下午20:15）
 
@@ -1476,25 +1529,21 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**最近提交** (2025-10-25):
-- ✅ **已推送**: Timezone統一修復 - 全程使用UTC timestamp避免本地時區轉換（Commit: d9047b0）
-  - 新增後端文件（2個）：
-    - api/routes/chart.py（圖表數據API）
-    - api/services/chart_data_service.py（圖表數據服務）
-  - 新增前端文件（4個）：
-    - frontend/src/app/chart/page.tsx（圖表頁面）
-    - frontend/src/components/charts/TestChart.tsx（測試圖表）
-    - frontend/src/hooks/useChart.ts（圖表Hook）
-    - frontend/src/utils/chartConfig.ts（圖表配置）
-  - 修復Bug（5個文件）：
-    - api/services/batch_download_service.py（類型不匹配）
-    - api/routes/case.py（清空API格式）
-    - api/utils/case_storage.py（clear_all返回值）
-    - frontend/src/app/data-preparation/page.tsx（頁面刷新+清空按鈕）
-    - frontend/src/app/chart/page.tsx（API格式不匹配）
-  - 更新文檔（2個）：
-    - .claude/STATUS.md（Phase 2.1完成記錄）
-    - .claude/CHART_DEVELOPMENT_TODO.md（任務2.1標記完成）
+**最近提交** (2025-10-26):
+- ⏳ **待推送**: Phase 2.3 完成 - 圖表容器整合與交互（8次迭代 + 3項優化）
+  - 新增文件（3個）：
+    - frontend/src/contexts/TimeAxisContext.tsx（訂閱者模式同步）
+    - frontend/src/hooks/useChartSync.ts（圖表同步Hook）
+    - frontend/src/components/charts/TradingChartContainer.tsx（三圖表容器）
+  - 修改文件（4個）：
+    - frontend/src/components/charts/PriceChart.tsx（+23行，Taker Ratio顯示）
+    - frontend/src/components/charts/VolumeChart.tsx（+43行，Y軸優化）
+    - frontend/src/components/charts/TakerRatioChart.tsx（+28行）
+    - frontend/src/app/chart/page.tsx（-50行，簡化為容器調用）
+  - 更新文檔（3個）：
+    - .claude/SESSION_Phase2.3.md（完整session記錄490行）
+    - .claude/CHART_DEVELOPMENT_TODO.md（任務2.3標記完成）
+    - .claude/STATUS.md（項目狀態更新）
 
 **Tags**:
 - phase-0-start, phase-0-complete, phase-0-error-handling
@@ -1503,6 +1552,7 @@ for case in candidates:
 - chart-phase1-complete (Phase 1: 5/5任務完成 100%)
 - chart-phase2-task2.1-complete
 - chart-phase2-task2.2-complete
+- chart-phase2-task2.3-complete (待推送)
 - timezone-unified-fix (Timezone統一修復)
 
 **備份分支**: backup-before-phase0, backup-before-phase1
@@ -1510,35 +1560,38 @@ for case in candidates:
 **當前狀態**:
 - ✅ Phase 1全部任務：完成並推送
 - ✅ Phase 2.1-2.2：完成並推送
-- ✅ Timezone修復：完成並推送
-- ✅ 工作區狀態：清空，所有變更已提交推送
+- ✅ Phase 2.3：完成，待推送
+- ⏳ 工作區狀態：有變更待提交（7個文件）
 
 ---
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-10-25 20:15）：
-   - ✅ **Phase 2 任務2.1：基礎設施與圖表數據API**（100%完成）
-   - ✅ **Phase 2 任務2.2：三個圖表組件 + Timezone修復 + HDF5並發修復**（100%完成）
-     - 核心功能：PriceChart、VolumeChart、TakerRatioChart完全實作
-     - Timezone統一修復：Calendar.timegm + UTC強制
-     - HDF5並發重試：3次重試機制，成功率100%
-     - 測試驗證：DOGEUSDT 12 cases完全通過
+1. **已完成工作**（2025-10-26）：
+   - ✅ **Phase 2 任務2.3：圖表容器整合與交互**（100%完成）
+     - 核心同步：拖曳/縮放/十字線完美對齊
+     - 8次迭代修復：LogicalRange系統、防循環機制
+     - 額外優化3項：Volume Y軸拖曳、柱狀圖高度、Taker Ratio顯示
+     - 架構文檔：SESSION_Phase2.3.md 490行完整記錄
 
-2. **當前狀態**（2025-10-25 20:15）：
-   - 分支：main（已推送，Commit: d9047b0）
+2. **當前狀態**（2025-10-26）：
+   - 分支：main（待推送）
    - Phase 1 進度：5/5任務完成 (100%) ✅
-   - Phase 2 進度：2/4任務完成 (50%) ✅
-   - Git狀態：✅ 工作區清空，所有變更已提交推送
-   - 文檔狀態：✅ STATUS.md已同步
+   - Phase 2 進度：3/4任務完成 (75%) ✅
+   - Git狀態：⏳ 7個文件待提交推送（新增3+修改4）
+   - 文檔狀態：✅ STATUS.md、SESSION、TODO已同步
 
 3. **下一步工作**：
-   - **Phase 2 任務2.3：圖表互動優化**（建議新對話串）
-     - 優先級：P2（非關鍵阻塞）
-     - 複雜度：M（2-4小時/項）
-     - 內容：三圖表同步縮放、Y軸自動調整、十字線同步
-     - 建議時機：完成Phase 3或Phase 4後回來優化
-   - 參考：SESSION_Phase2.2_ARCHIVED.md備註與想法章節
+   - **優先選項A：Phase 3.1 策略信號系統**
+     - 策略計算引擎（EMA、RSI、MACD）
+     - 信號箭頭渲染（買入/賣出標記）
+     - 預設策略庫（5+策略）
+   - **優先選項B：Phase 4.1 ML配置系統**
+     - YAML配置系統
+     - 特徵提取引擎
+     - Timeframe轉換邏輯
+   - **可選：Phase 2.4 進階交互**（優先級低）
+     - 區間選擇、鍵盤快捷鍵、迷你地圖
 
 4. **開發工作流程**：
    - 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範

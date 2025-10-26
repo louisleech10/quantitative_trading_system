@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useChart } from './useChart';
 import { useTimeAxis, TimeRange } from '../contexts/TimeAxisContext';
-import { MouseEventParams } from 'lightweight-charts';
+import { MouseEventParams, DeepPartial, ChartOptions } from 'lightweight-charts';
 
 /**
  * useChartSync Hook 參數（擴展 useChart）
@@ -41,6 +41,11 @@ export interface UseChartSyncOptions {
    * 是否啟用調試日誌
    */
   debug?: boolean;
+
+  /**
+   * 自定義圖表選項（會與預設選項合併）
+   */
+  chartOptions?: DeepPartial<ChartOptions>;
 }
 
 /**
@@ -50,10 +55,11 @@ export function useChartSync({
   chartId,
   toTimestamp,
   enableSync = true,
-  debug = false
+  debug = false,
+  chartOptions
 }: UseChartSyncOptions) {
-  // 使用基礎 useChart
-  const { chartContainerRef, chartInstance, isReady } = useChart();
+  // 使用基礎 useChart，傳遞 chartOptions
+  const { chartContainerRef, chartInstance, isReady } = useChart({ chartOptions });
 
   // 使用 TimeAxisContext
   const {

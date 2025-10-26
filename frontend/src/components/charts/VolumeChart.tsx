@@ -124,22 +124,23 @@ export function VolumeChart({
     }
 
     try {
-      // 添加柱狀圖系列
+      // 添加柱狀圖系列（使用默認的 right price scale）
       const volumeSeries = chartInstance.addHistogramSeries({
         color: chartColors.upColor,
         priceFormat: {
           type: 'volume',
         },
-        priceScaleId: 'volume',
+        // 移除 priceScaleId，使用默認的 'right'，這樣可以啟用 Y 軸拖曳縮放
       });
       volumeSeriesRef.current = volumeSeries;
 
-      // 配置Volume的price scale（修復P1-4）
-      chartInstance.priceScale('volume').applyOptions({
+      // 配置 right price scale 的顯示範圍和啟用拖曳
+      chartInstance.priceScale('right').applyOptions({
         scaleMargins: {
-          top: 0.8,    // Volume圖在下方20%
-          bottom: 0,
+          top: 0.1,    // 上方留 10% 空間
+          bottom: 0.1, // 下方留 10% 空間（讓柱狀圖使用中間 80% 的高度）
         },
+        // 預設已啟用拖曳和滾輪縮放（visible: true）
       });
 
       // 轉換數據格式並計算顏色

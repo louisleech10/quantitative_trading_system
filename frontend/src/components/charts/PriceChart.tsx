@@ -267,6 +267,13 @@ export function PriceChart({
               {((hoveredData.close - hoveredData.open) / hoveredData.open * 100).toFixed(2)}%)
             </span>
             <span>V：{formatVolume(hoveredData.volume)}</span>
+            {hoveredData.taker_ratio !== undefined && (
+              <span
+                className={hoveredData.taker_ratio >= 0.5 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}
+              >
+                Taker：{(hoveredData.taker_ratio * 100).toFixed(2)}%
+              </span>
+            )}
           </div>
         )}
       </div>

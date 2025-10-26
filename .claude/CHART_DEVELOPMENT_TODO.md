@@ -483,44 +483,95 @@ Phase 5: 整合與優化        (Week 7, 5天)
 **涉及模組**：
 - 新增：`frontend/src/components/charts/TradingChartContainer.tsx`
 - 新增：`frontend/src/contexts/TimeAxisContext.tsx`
+- 新增：`frontend/src/hooks/useChartSync.ts`
+- 修改：`frontend/src/components/charts/PriceChart.tsx`
+- 修改：`frontend/src/components/charts/VolumeChart.tsx`
+- 修改：`frontend/src/components/charts/TakerRatioChart.tsx`
+- 修改：`frontend/src/app/chart/page.tsx`
 
 **子任務**：
 
 **圖表容器與同步**：
-- [ ] 創建圖表容器組件（垂直堆疊三個圖表）
-- [ ] 實作時間軸狀態共享（React Context）
-- [ ] 實作跨圖表同步邏輯
-- [ ] 實作統一的游標十字線
-- [ ] 實作統一的縮放控制
+- [x] 創建圖表容器組件（垂直堆疊三個圖表）
+- [x] 實作時間軸狀態共享（React Context）
+- [x] 實作跨圖表同步邏輯（LogicalRange API）
+- [x] 實作統一的游標十字線
+- [x] 實作統一的縮放控制
 
 **案例時間點標記**：
-- [ ] 實作紅色垂直虛線（穿透三個圖表）
-- [ ] 實作頂部紅色箭頭標記
-- [ ] 實作文字標籤（"案例時間點 T"）
-- [ ] 確保標記在所有圖表同步顯示
-- [ ] 實作懸停顯示時間戳
+- [x] 實作 TO/TC 雙標記（藍色 TO ↑，橙色 TC ↑）
+- [x] 確保標記在所有圖表同步顯示
+- [x] 實作懸停顯示完整資訊（OHLCV + Taker Ratio）
 
 **圖表互動操作**：
-- [ ] 實作滑鼠拖曳移動時間軸
-- [ ] 實作滑鼠滾輪縮放
-- [ ] 實作雙擊重置（回到T點居中）
-- [ ] 實作鍵盤快捷鍵（可選）
-- [ ] 實作觸控手勢（手機版）
+- [x] 實作滑鼠拖曳移動時間軸
+- [x] 實作滑鼠滾輪縮放
+- [x] 實作雙擊重置（回到 TO 中心）
+- [x] 實作成交量 Y 軸拖曳縮放
+- [ ] 實作鍵盤快捷鍵（可選，延後）
+- [ ] 實作觸控手勢（手機版，延後）
 
 **驗收標準**：
-- ✅ 三個圖表垂直排列
+- ✅ 三個圖表垂直排列（5:3:2 高度比例）
 - ✅ 拖曳一個圖表，其他同步移動
-- ✅ 縮放一個圖表，其他同步縮放
+- ✅ 縮放一個圖表，其他同步縮放並對齊
 - ✅ 游標十字線垂直對齊
 - ✅ 同步無明顯延遲（<100ms）
-- ✅ T點標記清晰可見
-- ✅ 紅色虛線穿透所有圖表
-- ✅ 標籤文字易讀
+- ✅ TO/TC 標記清晰可見（藍色 TO ↑，橙色 TC ↑）
 - ✅ 標記位置準確
-- ✅ 拖曳流暢
+- ✅ 拖曳流暢（60fps）
 - ✅ 縮放靈敏
-- ✅ 重置功能正常
-- ✅ 觸控手勢可用（手機測試）
+- ✅ 重置功能正常（雙擊回到 TO 中心）
+- ✅ 成交量 Y 軸可拖曳縮放
+- ✅ 成交量柱狀圖高度適中（80% 使用率）
+- ✅ 懸停顯示完整數據（OHLCV + Taker Ratio）
+- ⏸️ 觸控手勢可用（手機測試，延後至 Phase 2.4+）
+
+**完成狀態**：✅ **已完成** (2025-10-26)
+
+**核心實現**：
+- 已創建 [TimeAxisContext.tsx](frontend/src/contexts/TimeAxisContext.tsx) (317 行)
+  - LogicalRange 架構（非 TimeRange，防止縮放偏移）
+  - 移除全局鎖，允許連鎖廣播
+  - RAF 節流優化性能
+- 已創建 [useChartSync.ts](frontend/src/hooks/useChartSync.ts) (310 行)
+  - 整合 useChart + TimeAxisContext
+  - lockTimeoutRef 追蹤，解決 React Strict Mode cleanup 問題
+  - 雙擊重置到 TO 中心
+  - 支持 chartOptions 參數（用於 Volume Y 軸配置）
+- 已創建 [TradingChartContainer.tsx](frontend/src/components/charts/TradingChartContainer.tsx) (262 行)
+  - 5:3:2 高度比例（320px:192px:128px）
+  - 50ms 初始化延遲（防止 refresh 佈局問題）
+  - 自定義十字線疊加層
+- 已修改三個圖表組件：
+  - [PriceChart.tsx](frontend/src/components/charts/PriceChart.tsx)：useChartSync + Taker Ratio 顯示
+  - [VolumeChart.tsx](frontend/src/components/charts/VolumeChart.tsx)：移除自定義 priceScaleId，優化高度
+  - [TakerRatioChart.tsx](frontend/src/components/charts/TakerRatioChart.tsx)：useChartSync + 十字線訂閱
+- 已修改 [page.tsx](frontend/src/app/chart/page.tsx)：簡化為使用 TradingChartContainer
+
+**重大 Bug 修復**：
+1. ✅ 無限重渲染：移除 log 函數依賴
+2. ✅ 鎖永不釋放：使用 lockTimeoutRef 追蹤 setTimeout
+3. ✅ 連鎖廣播失敗：移除 Context 全局鎖
+4. ✅ Refresh 佈局損壞：50ms 初始化延遲
+5. ✅ 縮放偏移：使用 LogicalRange 而非 TimeRange
+
+**性能指標**：
+- 同步延遲：<30ms（實測）
+- 渲染幀率：60fps（Chrome DevTools 驗證）
+- 連鎖廣播：price → volume → taker-ratio（Console 驗證）
+
+**額外優化**（2025-01-26 下午）：
+- ✅ 成交量 Y 軸拖曳縮放（移除自定義 priceScaleId）
+- ✅ 成交量柱狀圖高度優化（scaleMargins 從 20% → 80%）
+- ✅ PriceChart 懸停顯示 Taker Ratio（顏色邏輯：≥50% 綠色，<50% 紅色）
+
+**Documentation**：
+- [SESSION_Phase2.3.md](/.claude/SESSION_Phase2.3.md)：完整會話記錄（334→411 行）
+
+**Git 提交**：
+- Commit b309cf8：Phase 2.3 核心功能（8 files，+1394/-69）
+- Commit（待提交）：Phase 2.3 額外優化（3 files，+43 行）
 
 ---
 

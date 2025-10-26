@@ -307,20 +307,137 @@ useEffect(() => {
 
 ### 新增文件
 1. `frontend/src/contexts/TimeAxisContext.tsx` (317 行)
-2. `frontend/src/hooks/useChartSync.ts` (294 行)
+2. `frontend/src/hooks/useChartSync.ts` (310 行，v1.1 新增 chartOptions)
 3. `frontend/src/components/charts/TradingChartContainer.tsx` (262 行)
 
 ### 修改文件
-1. `frontend/src/components/charts/PriceChart.tsx` (+15 行)
-2. `frontend/src/components/charts/VolumeChart.tsx` (+28 行)
+1. `frontend/src/components/charts/PriceChart.tsx` (+23 行，含 Taker Ratio 顯示)
+2. `frontend/src/components/charts/VolumeChart.tsx` (+43 行，含 Y 軸優化)
 3. `frontend/src/components/charts/TakerRatioChart.tsx` (+28 行)
 4. `frontend/src/app/chart/page.tsx` (-50 行，簡化)
 
 ### 總代碼量
-- **新增**: ~900 行
-- **修改**: ~20 行
+- **新增**: ~943 行（v1.1）
+- **修改**: ~94 行（v1.1）
 - **刪除**: ~50 行（舊的分離圖表邏輯）
-- **淨增**: ~870 行
+- **淨增**: ~987 行（v1.1）
+
+---
+
+## Phase 2.3 額外優化（2025-01-26 下午）
+
+### 🎯 優化目標
+完善圖表交互體驗，提升數據可視化效果
+
+### ✅ 優化項目
+
+#### 1. 成交量 Y 軸拖曳縮放支持
+**問題**：成交量圖表 Y 軸無法手動拖曳縮放，與 Price 圖表體驗不一致
+
+**原因分析**：
+- VolumeChart 使用自定義 `priceScaleId: 'volume'`
+- Lightweight Charts 的 Y 軸拖曳功能**僅對默認 price scale**（`right` 或 `left`）生效
+- 自定義 scale 無此功能
+
+**解決方案**：
+```typescript
+// ❌ 原代碼（無法拖曳）
+const volumeSeries = chartInstance.addHistogramSeries({
+  priceScaleId: 'volume',  // 自定義 scale
+});
+
+// ✅ 修改後（支持拖曳）
+const volumeSeries = chartInstance.addHistogramSeries({
+  // 使用默認 'right' scale
+});
+chartInstance.priceScale('right').applyOptions({
+  scaleMargins: { top: 0.1, bottom: 0.1 },
+});
+```
+
+**修改文件**：
+- `frontend/src/components/charts/VolumeChart.tsx`：移除自定義 priceScaleId
+- `frontend/src/hooks/useChartSync.ts`：新增 `chartOptions` 參數支持
+
+**效果**：✅ 成交量圖表現在支持左鍵拖曳和滾輪縮放 Y 軸
+
+---
+
+#### 2. 成交量柱狀圖高度優化
+**問題**：成交量柱狀圖被壓得很矮，最高的柱子不到圖表四分之一高度
+
+**原因**：`scaleMargins.top: 0.8` 表示成交量只能使用下方 20% 空間
+
+**解決方案**：
+```typescript
+// ❌ 原配置（柱子太矮）
+scaleMargins: {
+  top: 0.8,    // 上方 80% 空白
+  bottom: 0,
+}
+
+// ✅ 新配置（柱子適中）
+scaleMargins: {
+  top: 0.1,    // 上方留 10%
+  bottom: 0.1, // 下方留 10%
+}
+```
+
+**修改文件**：
+- `frontend/src/components/charts/VolumeChart.tsx`：調整 scaleMargins
+
+**效果**：✅ 成交量柱狀圖使用 80% 高度，視覺效果大幅改善
+
+---
+
+#### 3. PriceChart 懸停資訊增強 - Taker Ratio 顯示
+**需求**：在 Price 圖表懸停資訊中顯示同一時間點的 Taker Ratio
+
+**實現**：
+```tsx
+{hoveredData && (
+  <div className="flex items-center gap-4 text-xs text-gray-700">
+    <span>時間：{formatTime(hoveredData.timestamp)}</span>
+    <span>O：{formatPrice(hoveredData.open)}</span>
+    <span>H：{formatPrice(hoveredData.high)}</span>
+    <span>L：{formatPrice(hoveredData.low)}</span>
+    <span>C：{formatPrice(hoveredData.close)}</span>
+    <span>V：{formatVolume(hoveredData.volume)}</span>
+    {/* 新增 Taker Ratio */}
+    {hoveredData.taker_ratio !== undefined && (
+      <span className={hoveredData.taker_ratio >= 0.5 ? 'text-green-600' : 'text-red-600'}>
+        Taker：{(hoveredData.taker_ratio * 100).toFixed(2)}%
+      </span>
+    )}
+  </div>
+)}
+```
+
+**顏色邏輯**：
+- Taker Ratio ≥ 50%：**綠色**（買盤強勢）
+- Taker Ratio < 50%：**紅色**（賣盤強勢）
+
+**修改文件**：
+- `frontend/src/components/charts/PriceChart.tsx`：新增 Taker Ratio 顯示邏輯
+
+**效果**：✅ 懸停時同時顯示 OHLCV + Taker Ratio，數據完整性提升
+
+---
+
+### 📊 優化總結
+
+**修改文件**：
+- `frontend/src/hooks/useChartSync.ts`（+20 行）
+- `frontend/src/components/charts/VolumeChart.tsx`（修改 15 行）
+- `frontend/src/components/charts/PriceChart.tsx`（+8 行）
+
+**功能提升**：
+1. ✅ 成交量 Y 軸交互體驗與 Price 圖表一致
+2. ✅ 成交量視覺效果優化（柱狀圖高度從 20% → 80%）
+3. ✅ 價格圖表數據完整性提升（OHLCV + Taker Ratio）
+
+**用戶反饋**：
+- "OK，那這樣 Phase 2.3 應該是都完成了吧?" - 確認所有功能符合預期
 
 ---
 
@@ -341,17 +458,32 @@ useEffect(() => {
 
 ## 結論
 
-✅ **Phase 2.3 成功完成**！
+✅ **Phase 2.3 成功完成**（含額外優化）！
 
-經過 8 次重大迭代修復，最終實現了完全同步的三圖表系統：
+經過 8 次重大迭代修復 + 3 項額外優化，最終實現了完全同步且體驗完善的三圖表系統：
+
+**核心功能**：
 1. ✅ 拖曳/縮放完美同步且對齊
 2. ✅ 十字線貫穿與數值同步
 3. ✅ 刷新佈局穩定
 4. ✅ 雙擊重置功能
 
+**額外優化**（v1.1）：
+5. ✅ 成交量 Y 軸拖曳縮放
+6. ✅ 成交量柱狀圖高度優化（20% → 80%）
+7. ✅ PriceChart 顯示 Taker Ratio
+
 **關鍵突破**：
 - 使用 **LogicalRange** 解決縮放對齊問題
 - **移除 Context 全局鎖** 實現連鎖廣播
 - **Ref 追蹤 timeout** 確保鎖正確釋放
+- **移除自定義 priceScaleId** 啟用 Y 軸拖曳
 
 代碼已就緒，可推送到 Git 保存進度！🚀
+
+---
+
+*會話記錄版本：1.1*  
+*創建時間：2025-01-26*  
+*最後更新：2025-01-26 下午*  
+*維護者：開發團隊*
