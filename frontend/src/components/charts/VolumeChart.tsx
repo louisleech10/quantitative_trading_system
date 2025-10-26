@@ -13,7 +13,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useChart } from '../../hooks/useChart';
+import { useChartSync } from '../../hooks/useChartSync';
+import { useTimeAxis } from '@/contexts/TimeAxisContext';
 import {
   formatVolume,
   chartColors
@@ -57,13 +58,28 @@ export interface VolumeChartProps {
    * 圖表高度（像素），預設120px（約為400px的30%）
    */
   height?: number;
+
+  /**
+   * 圖表唯一ID（用於同步）
+   */
+  chartId?: string;
+
+  /**
+   * 是否啟用同步
+   */
+  enableSync?: boolean;
+
+  /**
+   * TO時間戳（用於初始可見範圍）
+   */
+  toTimestamp?: number;
 }
 
 /**
  * 成交量柱狀圖數據格式
  */
 interface VolumeBarData {
-  time: number;
+  time: any;  // Lightweight Charts Time type
   value: number;
   color: string;
 }
@@ -75,9 +91,20 @@ export function VolumeChart({
   symbol,
   timeframe,
   klines,
-  height = 120
+  height = 120,
+  chartId = 'volume-chart',
+  enableSync = false,
+  toTimestamp
 }: VolumeChartProps) {
-  const { chartContainerRef, chartInstance, isReady } = useChart();
+  console.log('[VolumeChart] Initializing with:', { chartId, enableSync, toTimestamp });
+  
+  const { chartContainerRef, chartInstance, isReady } = useChartSync({
+    chartId,
+    toTimestamp: toTimestamp || (klines.length > 0 ? klines[0].timestamp : Date.now() / 1000),
+    enableSync,
+    debug: true
+  });
+  const { subscribeCrosshairChange } = useTimeAxis();
 
   // 狀態管理
   const [error, setError] = useState<string | null>(null);
@@ -149,10 +176,21 @@ export function VolumeChart({
 
       chartInstance.subscribeCrosshairMove(handleCrosshairMove);
 
+      // 訂閱 Context 十字線時間變化（修復數值同步問題）
+      const unsubscribeCrosshair = subscribeCrosshairChange(chartId, (time) => {
+        if (time !== null) {
+          const hoveredKline = klines.find(k => k.timestamp === time);
+          setHoveredVolume(hoveredKline?.volume ?? null);
+        } else {
+          setHoveredVolume(null);
+        }
+      });
+
       // cleanup函數：移除series和事件訂閱（修復P0-1）
       return () => {
         try {
           chartInstance.unsubscribeCrosshairMove(handleCrosshairMove);
+          unsubscribeCrosshair();
           if (volumeSeries) {
             chartInstance.removeSeries(volumeSeries);
           }

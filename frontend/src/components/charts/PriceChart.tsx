@@ -14,7 +14,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useChart } from '../../hooks/useChart';
+import { useChartSync } from '../../hooks/useChartSync';
 import {
   candlestickSeriesOptions,
   formatTime,
@@ -83,6 +83,16 @@ export interface PriceChartProps {
    * TC時間戳（對齊後的案例結束時間）
    */
   tcTimestamp?: number;
+
+  /**
+   * 圖表唯一ID（用於同步）
+   */
+  chartId?: string;
+
+  /**
+   * 是否啟用同步
+   */
+  enableSync?: boolean;
 }
 
 /**
@@ -96,9 +106,18 @@ export function PriceChart({
   height = 400,
   showCaseMarker = true,
   toTimestamp,
-  tcTimestamp
+  tcTimestamp,
+  chartId = 'price-chart',
+  enableSync = false
 }: PriceChartProps) {
-  const { chartContainerRef, chartInstance, isReady } = useChart();
+  console.log('[PriceChart] Initializing with:', { chartId, enableSync, toTimestamp: toTimestamp || caseTimestamp });
+  
+  const { chartContainerRef, chartInstance, isReady } = useChartSync({
+    chartId,
+    toTimestamp: toTimestamp || caseTimestamp,
+    enableSync,
+    debug: true
+  });
 
   // 狀態管理
   const [error, setError] = useState<string | null>(null);

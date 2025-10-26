@@ -15,7 +15,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useChart } from '../../hooks/useChart';
+import { useChartSync } from '../../hooks/useChartSync';
+import { useTimeAxis } from '@/contexts/TimeAxisContext';
 import {
   formatPercentage,
   chartColors
@@ -46,6 +47,21 @@ export interface TakerRatioChartProps {
    * 圖表高度（像素），預設120px
    */
   height?: number;
+
+  /**
+   * 圖表唯一ID（用於同步）
+   */
+  chartId?: string;
+
+  /**
+   * 是否啟用同步
+   */
+  enableSync?: boolean;
+
+  /**
+   * TO時間戳（用於初始可見範圍）
+   */
+  toTimestamp?: number;
 }
 
 /**
@@ -55,9 +71,20 @@ export function TakerRatioChart({
   symbol,
   timeframe,
   klines,
-  height = 120
+  height = 120,
+  chartId = 'taker-ratio-chart',
+  enableSync = false,
+  toTimestamp
 }: TakerRatioChartProps) {
-  const { chartContainerRef, chartInstance, isReady } = useChart();
+  console.log('[TakerRatioChart] Initializing with:', { chartId, enableSync, toTimestamp });
+  
+  const { chartContainerRef, chartInstance, isReady } = useChartSync({
+    chartId,
+    toTimestamp: toTimestamp || (klines.length > 0 ? klines[0].timestamp : Date.now() / 1000),
+    enableSync,
+    debug: true
+  });
+  const { subscribeCrosshairChange } = useTimeAxis();
 
   // 狀態管理
   const [error, setError] = useState<string | null>(null);
@@ -163,8 +190,6 @@ export function TakerRatioChart({
         },
         mode: 1,  // Logarithmic模式改為Percentage模式
         autoScale: false,
-        // 明確設置範圍
-        minMove: 0.01,
       });
 
       // 自動縮放時間軸
@@ -186,10 +211,21 @@ export function TakerRatioChart({
 
       chartInstance.subscribeCrosshairMove(handleCrosshairMove);
 
+      // 訂閱 Context 十字線時間變化（修復數值同步問題）
+      const unsubscribeCrosshair = subscribeCrosshairChange(chartId, (time) => {
+        if (time !== null) {
+          const hoveredKline = klines.find(k => k.timestamp === time);
+          setHoveredRatio(hoveredKline?.taker_ratio ?? null);
+        } else {
+          setHoveredRatio(null);
+        }
+      });
+
       // 修復P0-6: 正確cleanup三個series
       return () => {
         try {
           chartInstance.unsubscribeCrosshairMove(handleCrosshairMove);
+          unsubscribeCrosshair();
 
           if (lineSeries) {
             chartInstance.removeSeries(lineSeries);

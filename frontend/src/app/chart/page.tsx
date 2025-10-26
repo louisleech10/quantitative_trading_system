@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PriceChart } from '@/components/charts/PriceChart';
-import { VolumeChart } from '@/components/charts/VolumeChart';
-import { TakerRatioChart } from '@/components/charts/TakerRatioChart';
+import { TradingChartContainer } from '@/components/charts/TradingChartContainer';
 
 /**
  * 案例數據結構
@@ -406,63 +404,37 @@ export default function ChartPage() {
         )}
       </div>
 
-      {/* 圖表區域 - 三個圖表垂直堆疊 */}
+      {/* 圖表區域 - 使用 TradingChartContainer（自帶同步功能） */}
       {selectedTimestamp !== null ? (
-        <div className="space-y-0">
-          {/* K線價格圖 */}
-          <div className="bg-white rounded-t-lg shadow-md overflow-hidden">
-            {loadingKlines ? (
-              <div className="flex items-center justify-center" style={{ height: '400px' }}>
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                  <p className="text-gray-600 text-sm">載入K線數據中...</p>
-                </div>
-              </div>
-            ) : klineError ? (
-              <div className="flex items-center justify-center" style={{ height: '400px' }}>
-                <div className="text-center">
-                  <div className="text-red-500 text-2xl mb-2">⚠️</div>
-                  <p className="text-red-600 text-sm">{klineError}</p>
-                </div>
-              </div>
-            ) : (
-              <PriceChart
-                symbol={selectedSymbol}
-                timeframe={selectedTimeframe}
-                klines={klineData}
-                caseTimestamp={alignedCaseTimestamp ?? selectedTimestamp ?? 0}
-                toTimestamp={alignedCaseTimestamp ?? undefined}
-                tcTimestamp={alignedTcTimestamp ?? undefined}
-                height={400}
-                showCaseMarker={true}
-              />
-            )}
+        loadingKlines ? (
+          <div className="flex items-center justify-center bg-white rounded-lg shadow-md" style={{ height: '640px' }}>
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+              <p className="text-gray-600 text-sm">載入K線數據中...</p>
+            </div>
           </div>
-
-          {/* 成交量圖 */}
-          {!loadingKlines && !klineError && klineData.length > 0 && (
-            <div className="bg-white shadow-md overflow-hidden">
-              <VolumeChart
-                symbol={selectedSymbol}
-                timeframe={selectedTimeframe}
-                klines={klineData}
-                height={120}
-              />
+        ) : klineError ? (
+          <div className="flex items-center justify-center bg-white rounded-lg shadow-md" style={{ height: '640px' }}>
+            <div className="text-center">
+              <div className="text-red-500 text-2xl mb-2">⚠️</div>
+              <p className="text-red-600 text-sm">{klineError}</p>
             </div>
-          )}
-
-          {/* Taker Ratio圖 */}
-          {!loadingKlines && !klineError && klineData.length > 0 && (
-            <div className="bg-white rounded-b-lg shadow-md overflow-hidden">
-              <TakerRatioChart
-                symbol={selectedSymbol}
-                timeframe={selectedTimeframe}
-                klines={klineData}
-                height={120}
-              />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : klineData.length > 0 ? (
+          <TradingChartContainer
+            symbol={selectedSymbol}
+            timeframe={selectedTimeframe}
+            klines={klineData}
+            toTimestamp={alignedCaseTimestamp ?? selectedTimestamp ?? 0}
+            tcTimestamp={alignedTcTimestamp ?? undefined}
+            totalHeight={640}
+            showToMarker={true}
+          />
+        ) : (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
+            <p className="text-gray-600 text-lg">無K線數據</p>
+          </div>
+        )
       ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
           <p className="text-gray-600 text-lg">請選擇案例以查看圖表</p>
