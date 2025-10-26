@@ -546,22 +546,46 @@ HDF5存儲結構:
     - DEMA (Double EMA)
     - TEMA (Triple EMA)
     - WMA (Weighted Moving Average)
+    - HMA (Hull Moving Average)
+    
   
   動量類:
     - RSI (Relative Strength Index)
     - MACD (Moving Average Convergence Divergence)
     - Stochastic (KD指標)
     - CCI (Commodity Channel Index)
+    - MFI (Money Flow Index)
   
   波動率類:
     - ATR (Average True Range)
     - Bollinger Bands
     - Keltner Channel
+    - Standard Deviation
   
   成交量類:
     - OBV (On Balance Volume)
     - VWAP (Volume Weighted Average Price)
     - MFI (Money Flow Index)
+    - Accumulation/Distribution Line
+
+  其他:
+    - Ichimoku Cloud
+    - Parabolic SAR
+    - Zigzag Indicator
+    - SuperTrend
+    - TSI (True Strength Index)
+    - DPO (Detrended Price Oscillator)
+    - ADX/DMI
+    - Chande Momentum Oscillator
+    - Williams %R
+    - Price Pivots
+    - VWMA (Volume Weighted Moving Average)
+    - CMF (Chaikin Money Flow)
+    - EMV (Ease of Movement)
+    - KVO (Klinger Volume Oscillator)
+    - MFI (Money Flow Index)
+    - Historical Volatility
+    - Chaikin Volatility
 
 代碼結構:
   class IndicatorCalculator:
