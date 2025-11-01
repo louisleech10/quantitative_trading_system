@@ -514,3 +514,176 @@ export const formatNumber = (value: number, decimals: number = 2): string => {
     maximumFractionDigits: decimals,
   });
 };
+
+// ===== Phase 3.2: 信號密度分析 API =====
+
+import type {
+  SignalDensityRequest,
+  SignalDensityResponse,
+  TrainingWindowConfig,
+  TrainingWindowPreview
+} from './types';
+
+/**
+ * 計算信號密度分析
+ *
+ * @param request 信號密度分析請求
+ * @returns 信號密度分析響應
+ * @throws Error 當API調用失敗時
+ *
+ * @example
+ * ```typescript
+ * const result = await calculateSignalDensity({
+ *   strategy_config: {
+ *     data_source: "close",
+ *     indicator_type: "ema",
+ *     strategy_logic: "three_line",
+ *     params: { ema_short: 5, ema_mid: 10, ema_long: 20 }
+ *   },
+ *   training_window: {
+ *     reference_point: "TO",
+ *     lookback_bars: 24,
+ *     lookforward_bars: 0,
+ *     mode: "relative"
+ *   },
+ *   positive_cases: ["case1", "case2"],
+ *   negative_cases: ["case3", "case4"]
+ * });
+ *
+ * console.log(`Separation: ${result.separation.toFixed(4)}`);
+ * console.log(`P-value: ${result.p_value.toFixed(6)}`);
+ * ```
+ */
+export async function calculateSignalDensity(
+  request: SignalDensityRequest
+): Promise<SignalDensityResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/signal-analysis/density`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 信號密度計算失敗`);
+    }
+
+    const data: SignalDensityResponse = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('計算信號密度失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 預覽訓練窗口 (Debug用)
+ *
+ * 返回指定案例的訓練窗口K線數據範圍和數量,不執行實際分析。
+ * 用於驗證訓練窗口配置是否正確。
+ *
+ * @param caseId 案例ID
+ * @param windowConfig 訓練窗口配置
+ * @returns 訓練窗口預覽信息
+ * @throws Error 當API調用失敗時
+ *
+ * @example
+ * ```typescript
+ * const preview = await previewTrainingWindow("BTCUSDT_1736942400_1", {
+ *   reference_point: "TO",
+ *   lookback_bars: 24,
+ *   lookforward_bars: 0,
+ *   mode: "relative"
+ * });
+ *
+ * console.log(`Actual bars: ${preview.actual_bars}`);
+ * console.log(`Time range: ${preview.timestamp_range.start} - ${preview.timestamp_range.end}`);
+ * ```
+ */
+export async function previewTrainingWindow(
+  caseId: string,
+  windowConfig: TrainingWindowConfig
+): Promise<TrainingWindowPreview> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/signal-analysis/preview-window`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        case_id: caseId,
+        window_config: windowConfig,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 預覽訓練窗口失敗`);
+    }
+
+    const data: TrainingWindowPreview = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('預覽訓練窗口失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 評估策略質量
+ *
+ * 根據separation, p_value, cohens_d判斷策略質量
+ *
+ * @param result 信號密度分析結果
+ * @returns 策略質量評級 "excellent" | "good" | "weak"
+ */
+export function evaluateStrategyQuality(
+  result: SignalDensityResponse
+): "excellent" | "good" | "weak" {
+  const { separation, p_value, cohens_d } = result;
+
+  // 優秀策略
+  if (separation > 0.3 && p_value < 0.05 && cohens_d > 0.5) {
+    return "excellent";
+  }
+
+  // 中等策略
+  if (separation > 0.2 && p_value < 0.10) {
+    return "good";
+  }
+
+  // 較弱策略
+  return "weak";
+}
+
+/**
+ * 格式化信號密度分析結果為可讀字串
+ *
+ * @param result 信號密度分析結果
+ * @returns 格式化的結果字串
+ */
+export function formatSignalDensityResult(
+  result: SignalDensityResponse
+): string {
+  const quality = evaluateStrategyQuality(result);
+  const qualityEmoji = quality === "excellent" ? "✅" : quality === "good" ? "⚠️" : "❌";
+
+  return `
+${qualityEmoji} 策略質量: ${quality === "excellent" ? "優秀" : quality === "good" ? "中等" : "較弱"}
+
+核心指標:
+  • Separation: ${result.separation.toFixed(4)} (${result.separation > 0 ? "正例較高" : "反例較高"})
+  • P-value: ${result.p_value.toFixed(6)} (${result.p_value < 0.05 ? "統計顯著" : "不顯著"})
+  • Cohen's d: ${result.cohens_d.toFixed(2)} (${result.cohens_d > 0.5 ? "中/大效果" : "小效果"})
+  • 穩定性 CV: ${result.stability_cv.toFixed(3)} (${result.stability_cv < 0.3 ? "穩定" : "不穩定"})
+
+信號密度:
+  • 正例: ${(result.positive_avg_density * 100).toFixed(2)}% ± ${(result.positive_std * 100).toFixed(2)}% (n=${result.positive_sample_size})
+  • 反例: ${(result.negative_avg_density * 100).toFixed(2)}% ± ${(result.negative_std * 100).toFixed(2)}% (n=${result.negative_sample_size})
+  `.trim();
+}

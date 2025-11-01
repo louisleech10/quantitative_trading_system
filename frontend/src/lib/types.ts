@@ -378,3 +378,109 @@ export interface ParameterUIConfig {
   validator: ParameterValidator;
   category: keyof typeof PARAMETER_CATEGORIES;
 }
+
+// ===== Phase 3.2: 信號密度分析類型定義 =====
+
+/**
+ * 訓練窗口配置
+ * 定義從哪個參考點開始,往前/往後看多少根K線作為訓練窗口
+ */
+export interface TrainingWindowConfig {
+  /** 參考點類型: TO(開單點)/TC(平倉點)/custom(自定義時間戳) */
+  reference_point: "TO" | "TC" | "custom";
+  /** 從參考點往前看N根K線(1~1000) */
+  lookback_bars: number;
+  /** 從參考點往後看M根K線(0~100,預設0避免未來函數洩漏) */
+  lookforward_bars: number;
+  /** 窗口模式: relative(嚴格N根)/full_range(使用全部可用K線) */
+  mode: "relative" | "full_range";
+  /** 自定義時間戳(僅當reference_point='custom'時使用) */
+  custom_timestamp?: number;
+}
+
+/**
+ * 策略配置
+ * 定義策略使用的指標類型、數據源、策略邏輯和參數
+ */
+export interface StrategyConfig {
+  /** 數據源(close/open/high/low/volume/taker_buy_volume/taker_ratio/quote_volume) */
+  data_source: string;
+  /** 指標類型(ema/sma/rsi等,必須已在IndicatorEngine中註冊) */
+  indicator_type: string;
+  /** 策略邏輯類型(three_line/crossover/threshold/ma_distance等) */
+  strategy_logic: string;
+  /** 策略參數字典,包含指標參數(如period)和策略參數(如閾值) */
+  params: Record<string, any>;
+}
+
+/**
+ * 信號密度分析請求
+ */
+export interface SignalDensityRequest {
+  /** 策略配置 */
+  strategy_config: StrategyConfig;
+  /** 訓練窗口配置 */
+  training_window: TrainingWindowConfig;
+  /** 正例案例ID列表(建議≥10個) */
+  positive_cases: string[];
+  /** 反例案例ID列表(建議≥10個) */
+  negative_cases: string[];
+}
+
+/**
+ * 信號密度分析響應
+ *
+ * 判斷標準:
+ * - 優秀策略: separation>0.3 AND p_value<0.05 AND cohens_d>0.5
+ * - 中等策略: separation>0.2 AND p_value<0.10
+ * - 較弱策略: separation<0.2 OR p_value>0.10
+ */
+export interface SignalDensityResponse {
+  /** 正例平均信號密度(0.0~1.0) */
+  positive_avg_density: number;
+  /** 反例平均信號密度(0.0~1.0) */
+  negative_avg_density: number;
+  /** 密度差異(positive - negative),Optuna優化目標,範圍-1.0~1.0 */
+  separation: number;
+  /** 統計顯著性p-value(獨立t-test),<0.05為顯著,<0.01為高度顯著 */
+  p_value: number;
+  /** Cohen's d效果量,>0.2小效果,>0.5中效果,>0.8大效果 */
+  cohens_d: number;
+  /** 穩定性係數(按月分組CV),<0.3穩定,<0.5可接受,>0.5不穩定 */
+  stability_cv: number;
+  /** 正例信號密度標準差 */
+  positive_std: number;
+  /** 反例信號密度標準差 */
+  negative_std: number;
+  /** 正例樣本數量 */
+  positive_sample_size: number;
+  /** 反例樣本數量 */
+  negative_sample_size: number;
+  /** 每個案例的信號密度字典(case_id → density) */
+  case_level_densities: Record<string, number>;
+}
+
+/**
+ * 訓練窗口預覽響應(Debug用)
+ */
+export interface TrainingWindowPreview {
+  /** 案例ID */
+  case_id: string;
+  /** 交易對 */
+  symbol: string;
+  /** 時間框架 */
+  timeframe: string;
+  /** 參考點類型 */
+  reference_point: string;
+  /** 往前看根數 */
+  lookback_bars: number;
+  /** 往後看根數 */
+  lookforward_bars: number;
+  /** 實際K線數量 */
+  actual_bars: number;
+  /** 時間戳範圍 */
+  timestamp_range: {
+    start: number | null;
+    end: number | null;
+  };
+}
