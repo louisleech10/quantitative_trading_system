@@ -1,0 +1,226 @@
+# Ultra Think 最終優化版本
+# 指標配置文件 - 定義所有可用指標的元信息、參數和計算配置
+#
+# 設計原則：
+# 1. 清晰的結構 - 元信息、參數、範圍分離
+# 2. 易於擴展 - 新增指標只需複製範本
+# 3. 支援優化 - param_ranges 用於 Optuna (Phase 3.5)
+# 4. 完整驗證 - 定義參數約束和驗證規則
+
+# ==================== 全局配置 ====================
+version: "1.0.0"
+config_schema: "indicator_config_v1"
+
+# 全局設定
+global:
+  # 緩存配置
+  cache:
+    enabled: true
+    max_size: 100  # 最多緩存 100 個 DataFrame
+
+  # 日誌配置
+  logging:
+    level: INFO
+    performance_tracking: true
+
+  # 計算配置
+  computation:
+    parallel: false  # 暫不啟用並行計算
+    max_workers: 4
+
+
+# ==================== 指標類別定義 ====================
+categories:
+  trend:
+    name: "趨勢指標"
+    description: "用於識別價格趨勢方向和強度"
+
+  momentum:
+    name: "動量指標"
+    description: "用於測量價格變化速度"
+
+  volatility:
+    name: "波動率指標"
+    description: "用於測量價格波動程度"
+
+  volume:
+    name: "成交量指標"
+    description: "基於成交量的市場力量分析"
+
+
+# ==================== 指標定義 ====================
+indicators:
+  # EMA (指數移動平均線)
+  ema:
+    # 基本信息
+    class_name: EMAIndicator
+    module: momentum.Indicators.ema_indicator
+    description: "指數移動平均線 (Exponential Moving Average) - 對近期價格賦予更高權重"
+    category: trend
+
+    # 默認參數
+    default_params:
+      period: 20
+
+    # 參數範圍 (用於 Optuna 優化)
+    param_ranges:
+      period:
+        type: int
+        min: 2
+        max: 200
+        step: 1
+        description: "EMA 週期，數值越大越平滑"
+
+    # 支援的數據源
+    supported_data_sources:
+      - close
+      - open
+      - high
+      - low
+      - volume
+      - taker_buy_volume
+      - taker_ratio
+      - quote_volume
+
+    # 計算要求
+    requirements:
+      min_periods: "period"  # 最小數據量等於 period 參數
+      data_constraints:
+        - "no_nan"  # 不允許 NaN 值
+        - "positive_period"  # period 必須為正數
+
+    # 性能配置
+    performance:
+      cache_result: true
+      estimated_time_ms: 5  # 100 根 K 線預估 5ms
+
+
+  # ==================== 未來擴展範本 ====================
+
+  # SMA (簡單移動平均線) - 範例
+  # sma:
+  #   class_name: SMAIndicator
+  #   module: momentum.Indicators.sma_indicator
+  #   description: "簡單移動平均線 (Simple Moving Average) - 所有數據點權重相同"
+  #   category: trend
+  #
+  #   default_params:
+  #     period: 20
+  #
+  #   param_ranges:
+  #     period:
+  #       type: int
+  #       min: 2
+  #       max: 200
+  #       step: 1
+  #
+  #   supported_data_sources:
+  #     - close
+  #     - open
+  #     - high
+  #     - low
+  #     - volume
+  #
+  #   requirements:
+  #     min_periods: "period"
+  #     data_constraints:
+  #       - "no_nan"
+  #
+  #   performance:
+  #     cache_result: true
+  #     estimated_time_ms: 3
+
+  # RSI (相對強弱指標) - 範例
+  # rsi:
+  #   class_name: RSIIndicator
+  #   module: momentum.Indicators.rsi_indicator
+  #   description: "相對強弱指標 (Relative Strength Index) - 測量超買超賣"
+  #   category: momentum
+  #
+  #   default_params:
+  #     period: 14
+  #
+  #   param_ranges:
+  #     period:
+  #       type: int
+  #       min: 2
+  #       max: 50
+  #       step: 1
+  #
+  #   supported_data_sources:
+  #     - close
+  #
+  #   requirements:
+  #     min_periods: "period + 1"
+  #     data_constraints:
+  #       - "no_nan"
+  #
+  #   performance:
+  #     cache_result: true
+  #     estimated_time_ms: 8
+
+
+# ==================== 批量計算配置範例 ====================
+# 這些配置可以直接傳遞給 IndicatorEngine.calculate_indicators()
+
+calculation_presets:
+  # 預設 1: 多週期 EMA（收盤價）
+  ema_multi_period:
+    description: "計算 20/50/100 週期 EMA (收盤價)"
+    configs:
+      - indicator: ema
+        data_source: close
+        params:
+          period: 20
+        output_name: ema_20
+
+      - indicator: ema
+        data_source: close
+        params:
+          period: 50
+        output_name: ema_50
+
+      - indicator: ema
+        data_source: close
+        params:
+          period: 100
+        output_name: ema_100
+
+  # 預設 2: EMA 多數據源
+  ema_multi_source:
+    description: "計算 EMA 在不同數據源上的表現"
+    configs:
+      - indicator: ema
+        data_source: close
+        params:
+          period: 20
+        output_name: ema_close_20
+
+      - indicator: ema
+        data_source: volume
+        params:
+          period: 20
+        output_name: ema_volume_20
+
+      - indicator: ema
+        data_source: taker_ratio
+        params:
+          period: 20
+        output_name: ema_taker_ratio_20
+
+  # 預設 3: 完整指標集（用於信號密度分析）
+  full_indicator_set:
+    description: "完整指標集 - 用於 Phase 3.2 信號密度分析"
+    configs:
+      - indicator: ema
+        data_source: close
+        params:
+          period: 20
+        output_name: ema_20
+
+      # 未來添加更多指標
+      # - indicator: sma
+      #   data_source: close
+      #   params:
+      #     period: 20
+      #   output_name: sma_20
