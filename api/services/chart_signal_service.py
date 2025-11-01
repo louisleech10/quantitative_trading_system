@@ -1,0 +1,583 @@
+"""
+圖表信號計算服務層 - Ultra Think 初版
+
+提供圖表信號箭頭系統的服務層封裝 (Task 3.4)。
+根據策略配置計算每根K線的信號狀態,用於在圖表上渲染藍色箭頭標記。
+
+Ultra Think 記錄:
+- 步驟 1: 初版代碼 - 基本服務層架構和核心邏輯
+- 步驟 2: 審查優化 - (待執行)
+- 步驟 3: 最終優化 - (待執行)
+
+設計原則:
+1. 複用 Task 3.1 的 IndicatorEngine 計算指標
+2. 向量化策略評估,避免 Python 循環
+3. 智能採樣限制標記數量 (最多500個)
+4. 統一錯誤處理和日誌記錄
+
+Author: Claude (Phase 3.3+3.4)
+Date: 2025-11-01
+"""
+
+import logging
+import time
+import numpy as np
+import pandas as pd
+from typing import List, Dict, Any, Optional
+from fastapi import HTTPException
+
+from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.Indicators import IndicatorEngine
+from momentum.Indicators.types import DataSourceEnum
+from api.models.strategy_test_models import (
+    ChartSignalCalculationRequest,
+    ChartSignalCalculationResponse,
+    SignalPoint
+)
+
+
+class ChartSignalService:
+    """
+    圖表信號計算服務 (全局單例)
+
+    提供圖表信號箭頭的服務層接口,整合:
+    - KlineStorageManager (讀取K線數據)
+    - IndicatorEngine (計算指標)
+    - 向量化策略評估邏輯
+
+    核心方法:
+    - calculate_chart_signals: 計算圖表信號點
+    - _evaluate_strategy_logic: 評估策略邏輯(向量化)
+    - _sample_signals: 智能採樣限制標記數量
+    """
+
+    _instance = None
+
+    def __new__(cls):
+        """單例模式"""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        """初始化服務(僅執行一次)"""
+        if self._initialized:
+            return
+
+        # 依賴注入
+        self.kline_storage = KlineStorageManager()
+        self.indicator_engine = IndicatorEngine()
+
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("ChartSignalService initialized")
+
+        # 配置常量
+        self.MAX_SIGNAL_POINTS = 500  # 最多返回500個標記點
+
+        self._initialized = True
+
+    async def calculate_chart_signals(
+        self,
+        request: ChartSignalCalculationRequest
+    ) -> ChartSignalCalculationResponse:
+        """
+        計算圖表信號點
+
+        主服務方法,執行完整的圖表信號計算流程。
+
+        流程:
+        1. 從 HDF5 讀取 K線數據
+        2. 調用 IndicatorEngine 計算指標
+        3. 向量化評估每根K線是否符合策略
+        4. 生成 SignalPoint 列表
+        5. 若超過500個,進行智能採樣
+
+        Args:
+            request: 圖表信號計算請求
+
+        Returns:
+            ChartSignalCalculationResponse
+
+        Raises:
+            HTTPException:
+                - 400: 參數驗證失敗
+                - 404: K線數據不存在
+                - 500: 內部服務錯誤
+
+        Example:
+            >>> service = ChartSignalService()
+            >>> request = ChartSignalCalculationRequest(
+            ...     symbol="BTCUSDT",
+            ...     timeframe="1h",
+            ...     start_time=1704067200000,
+            ...     end_time=1704153600000,
+            ...     strategy_config=StrategyConfig(...)
+            ... )
+            >>> result = await service.calculate_chart_signals(request)
+            >>> print(len(result.signal_points))
+            45
+        """
+        start_time = time.time()
+
+        try:
+            # 1. 驗證請求
+            self._validate_request(request)
+
+            # 2. 讀取 K線數據
+            self.logger.info(
+                f"開始計算圖表信號: {request.symbol} {request.timeframe}, "
+                f"時間範圍: {request.start_time} ~ {request.end_time}"
+            )
+
+            klines = self._load_klines(
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+                start_time=request.start_time,
+                end_time=request.end_time
+            )
+
+            if len(klines) == 0:
+                raise ValueError(
+                    f"指定時間範圍內無K線數據: {request.symbol} {request.timeframe}"
+                )
+
+            total_bars = len(klines)
+            self.logger.info(f"成功讀取 {total_bars} 根K線")
+
+            # 3. 計算指標
+            indicator_results = self._calculate_indicators(
+                klines=klines,
+                strategy_config=request.strategy_config
+            )
+
+            # 4. 評估策略邏輯 (向量化)
+            signal_mask = self._evaluate_strategy_logic(
+                indicator_results=indicator_results,
+                strategy_config=request.strategy_config
+            )
+
+            # 5. 生成信號點列表
+            signal_points = self._generate_signal_points(
+                klines=klines,
+                indicator_results=indicator_results,
+                signal_mask=signal_mask
+            )
+
+            signal_count = len(signal_points)
+            signal_density = signal_count / total_bars if total_bars > 0 else 0.0
+
+            # 6. 智能採樣 (若超過限制)
+            is_sampled = False
+            if len(signal_points) > self.MAX_SIGNAL_POINTS:
+                self.logger.warning(
+                    f"信號點數量({len(signal_points)})超過限制({self.MAX_SIGNAL_POINTS}),進行採樣"
+                )
+                signal_points = self._sample_signals(signal_points, self.MAX_SIGNAL_POINTS)
+                is_sampled = True
+
+            # 7. 生成策略名稱
+            strategy_name = self._generate_strategy_name(request.strategy_config)
+
+            # 記錄性能
+            elapsed_time = time.time() - start_time
+            self.logger.info(
+                f"圖表信號計算完成: "
+                f"total_bars={total_bars}, "
+                f"signal_count={signal_count}, "
+                f"density={signal_density:.2%}, "
+                f"sampled={is_sampled}, "
+                f"耗時={elapsed_time:.3f}秒"
+            )
+
+            return ChartSignalCalculationResponse(
+                signal_points=signal_points,
+                total_bars=total_bars,
+                signal_count=signal_count,
+                signal_density=signal_density,
+                is_sampled=is_sampled,
+                strategy_name=strategy_name
+            )
+
+        except ValueError as e:
+            # 參數驗證失敗(400 Bad Request)
+            self.logger.error(f"參數驗證失敗: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+
+        except FileNotFoundError as e:
+            # 數據不存在(404 Not Found)
+            self.logger.error(f"K線數據不存在: {e}")
+            raise HTTPException(status_code=404, detail=str(e))
+
+        except Exception as e:
+            # 內部錯誤(500 Internal Server Error)
+            elapsed_time = time.time() - start_time
+            self.logger.error(
+                f"圖表信號計算失敗: {e}, 耗時={elapsed_time:.3f}秒",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"內部服務錯誤: {str(e)}"
+            )
+
+    def _validate_request(self, request: ChartSignalCalculationRequest):
+        """
+        驗證請求參數
+
+        Args:
+            request: 圖表信號計算請求
+
+        Raises:
+            ValueError: 當參數驗證失敗時
+        """
+        # 檢查時間範圍
+        if request.end_time <= request.start_time:
+            raise ValueError("end_time 必須大於 start_time")
+
+        # 檢查指標是否已註冊
+        available_indicators = self.indicator_engine.get_available_indicators()
+        if request.strategy_config.indicator_type not in available_indicators:
+            raise ValueError(
+                f"未知的指標類型: {request.strategy_config.indicator_type}. "
+                f"可用指標: {', '.join(available_indicators)}"
+            )
+
+        # 檢查策略邏輯類型
+        supported_logics = ["three_line", "short_long_cross", "mid_long_cross"]
+        if request.strategy_config.strategy_logic not in supported_logics:
+            raise ValueError(
+                f"不支持的策略邏輯: {request.strategy_config.strategy_logic}. "
+                f"支持的邏輯: {', '.join(supported_logics)}"
+            )
+
+        self.logger.debug("請求驗證通過")
+
+    def _load_klines(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_time: int,
+        end_time: int
+    ) -> pd.DataFrame:
+        """
+        從 HDF5 讀取 K線數據
+
+        Args:
+            symbol: 交易對
+            timeframe: 時間週期
+            start_time: 開始時間戳(毫秒)
+            end_time: 結束時間戳(毫秒)
+
+        Returns:
+            K線數據 DataFrame
+
+        Raises:
+            FileNotFoundError: K線數據不存在
+        """
+        try:
+            klines = self.kline_storage.load_klines(
+                symbol=symbol,
+                interval=timeframe,
+                start_time=start_time,
+                end_time=end_time
+            )
+
+            if klines is None or len(klines) == 0:
+                raise FileNotFoundError(
+                    f"K線數據不存在或為空: {symbol} {timeframe}"
+                )
+
+            return klines
+
+        except Exception as e:
+            self.logger.error(f"讀取K線數據失敗: {e}", exc_info=True)
+            raise
+
+    def _calculate_indicators(
+        self,
+        klines: pd.DataFrame,
+        strategy_config: Any
+    ) -> Dict[str, np.ndarray]:
+        """
+        計算指標
+
+        調用 Task 3.1 的 IndicatorEngine 計算指標值。
+
+        Args:
+            klines: K線數據
+            strategy_config: 策略配置
+
+        Returns:
+            指標結果字典 (indicator_name → np.ndarray)
+
+        Raises:
+            ValueError: 指標計算失敗
+
+        Note:
+            對於 EMA 三線策略,返回:
+            {
+                "ema_short": np.array([...]),
+                "ema_mid": np.array([...]),
+                "ema_long": np.array([...])
+            }
+        """
+        try:
+            # 根據策略邏輯確定需要計算的指標
+            strategy_logic = strategy_config.strategy_logic
+            params = strategy_config.params
+            data_source = strategy_config.data_source
+            indicator_type = strategy_config.indicator_type
+
+            results = {}
+
+            if strategy_logic == "three_line":
+                # EMA 三線排列:需要計算 short, mid, long 三條 EMA
+                for period_name in ["ema_short", "ema_mid", "ema_long"]:
+                    if period_name not in params:
+                        raise ValueError(f"策略參數缺少 {period_name}")
+
+                    period = params[period_name]
+
+                    # 調用 IndicatorEngine
+                    indicator_result = self.indicator_engine.calculate(
+                        klines=klines,
+                        indicator_type=indicator_type,
+                        data_source=DataSourceEnum(data_source),
+                        params={"period": period}
+                    )
+
+                    results[period_name] = indicator_result["values"]
+
+            elif strategy_logic in ["short_long_cross", "mid_long_cross"]:
+                # 雙線交叉:需要計算兩條 EMA
+                if strategy_logic == "short_long_cross":
+                    period_names = ["ema_short", "ema_long"]
+                else:  # mid_long_cross
+                    period_names = ["ema_mid", "ema_long"]
+
+                for period_name in period_names:
+                    if period_name not in params:
+                        raise ValueError(f"策略參數缺少 {period_name}")
+
+                    period = params[period_name]
+
+                    indicator_result = self.indicator_engine.calculate(
+                        klines=klines,
+                        indicator_type=indicator_type,
+                        data_source=DataSourceEnum(data_source),
+                        params={"period": period}
+                    )
+
+                    results[period_name] = indicator_result["values"]
+
+            return results
+
+        except Exception as e:
+            self.logger.error(f"指標計算失敗: {e}", exc_info=True)
+            raise ValueError(f"指標計算失敗: {e}")
+
+    def _evaluate_strategy_logic(
+        self,
+        indicator_results: Dict[str, np.ndarray],
+        strategy_config: Any
+    ) -> np.ndarray:
+        """
+        評估策略邏輯 (向量化)
+
+        使用向量化運算判斷每根K線是否符合策略條件。
+
+        Args:
+            indicator_results: 指標結果字典
+            strategy_config: 策略配置
+
+        Returns:
+            布林數組 (True表示符合策略)
+
+        Note:
+            策略邏輯:
+            - three_line: ema_short > ema_mid > ema_long
+            - short_long_cross: ema_short > ema_long
+            - mid_long_cross: ema_mid > ema_long
+        """
+        strategy_logic = strategy_config.strategy_logic
+
+        if strategy_logic == "three_line":
+            # EMA 三線排列: short > mid > long
+            ema_short = indicator_results["ema_short"]
+            ema_mid = indicator_results["ema_mid"]
+            ema_long = indicator_results["ema_long"]
+
+            # 向量化布林運算
+            mask = (ema_short > ema_mid) & (ema_mid > ema_long)
+
+        elif strategy_logic == "short_long_cross":
+            # 短長交叉: short > long
+            ema_short = indicator_results["ema_short"]
+            ema_long = indicator_results["ema_long"]
+
+            mask = ema_short > ema_long
+
+        elif strategy_logic == "mid_long_cross":
+            # 中長交叉: mid > long
+            ema_mid = indicator_results["ema_mid"]
+            ema_long = indicator_results["ema_long"]
+
+            mask = ema_mid > ema_long
+
+        else:
+            raise ValueError(f"不支持的策略邏輯: {strategy_logic}")
+
+        # 處理 NaN 值 (指標計算初期可能為 NaN)
+        mask = np.nan_to_num(mask, nan=False)
+
+        return mask
+
+    def _generate_signal_points(
+        self,
+        klines: pd.DataFrame,
+        indicator_results: Dict[str, np.ndarray],
+        signal_mask: np.ndarray
+    ) -> List[SignalPoint]:
+        """
+        生成信號點列表
+
+        根據信號掩碼生成 SignalPoint 對象列表。
+
+        Args:
+            klines: K線數據
+            indicator_results: 指標結果字典
+            signal_mask: 信號布林掩碼
+
+        Returns:
+            SignalPoint 列表
+        """
+        signal_points = []
+
+        # 找出所有符合策略的索引
+        signal_indices = np.where(signal_mask)[0]
+
+        for idx in signal_indices:
+            # 提取時間戳
+            timestamp = int(klines.iloc[idx]["timestamp"])
+
+            # 提取指標值
+            indicator_values = {}
+            for indicator_name, values in indicator_results.items():
+                indicator_values[indicator_name] = float(values[idx])
+
+            # 創建 SignalPoint
+            signal_point = SignalPoint(
+                timestamp=timestamp,
+                indicator_values=indicator_values,
+                signal_density=None  # 暫時不計算單點密度
+            )
+
+            signal_points.append(signal_point)
+
+        return signal_points
+
+    def _sample_signals(
+        self,
+        signal_points: List[SignalPoint],
+        max_points: int
+    ) -> List[SignalPoint]:
+        """
+        智能採樣信號點
+
+        當信號點數量超過限制時,進行均勻採樣。
+
+        Args:
+            signal_points: 原始信號點列表
+            max_points: 最大點數
+
+        Returns:
+            採樣後的信號點列表
+
+        Note:
+            採樣策略:
+            - 使用均勻採樣 (等間隔選取)
+            - 保證首尾信號點一定被選中
+            - 未來可改進為保留高密度區域
+        """
+        if len(signal_points) <= max_points:
+            return signal_points
+
+        # 計算採樣間隔
+        step = len(signal_points) / max_points
+
+        # 均勻採樣
+        sampled_indices = [int(i * step) for i in range(max_points)]
+
+        # 確保最後一個點被包含
+        if sampled_indices[-1] != len(signal_points) - 1:
+            sampled_indices[-1] = len(signal_points) - 1
+
+        sampled_points = [signal_points[i] for i in sampled_indices]
+
+        self.logger.info(
+            f"採樣完成: {len(signal_points)} → {len(sampled_points)}"
+        )
+
+        return sampled_points
+
+    def _generate_strategy_name(self, strategy_config: Any) -> str:
+        """
+        生成策略名稱
+
+        根據策略配置自動生成易讀的策略名稱。
+
+        Args:
+            strategy_config: 策略配置
+
+        Returns:
+            策略名稱字符串
+
+        Example:
+            >>> config = StrategyConfig(
+            ...     data_source="close",
+            ...     indicator_type="ema",
+            ...     strategy_logic="three_line",
+            ...     params={"ema_short": 7, "ema_mid": 18, "ema_long": 35}
+            ... )
+            >>> name = self._generate_strategy_name(config)
+            >>> print(name)
+            "EMA(7,18,35)三線排列 - 收盤價"
+        """
+        indicator_type = strategy_config.indicator_type.upper()
+        strategy_logic = strategy_config.strategy_logic
+        params = strategy_config.params
+        data_source = strategy_config.data_source
+
+        # 策略邏輯中文名稱
+        logic_names = {
+            "three_line": "三線排列",
+            "short_long_cross": "短長交叉",
+            "mid_long_cross": "中長交叉"
+        }
+        logic_name = logic_names.get(strategy_logic, strategy_logic)
+
+        # 數據源中文名稱
+        source_names = {
+            "close": "收盤價",
+            "open": "開盤價",
+            "high": "最高價",
+            "low": "最低價",
+            "volume": "成交量",
+            "taker_buy_volume": "主動買入量",
+            "taker_ratio": "主動買入比例",
+            "quote_volume": "成交額"
+        }
+        source_name = source_names.get(data_source, data_source)
+
+        # 提取參數
+        if strategy_logic == "three_line":
+            param_str = f"({params.get('ema_short')},{params.get('ema_mid')},{params.get('ema_long')})"
+        elif strategy_logic == "short_long_cross":
+            param_str = f"({params.get('ema_short')},{params.get('ema_long')})"
+        elif strategy_logic == "mid_long_cross":
+            param_str = f"({params.get('ema_mid')},{params.get('ema_long')})"
+        else:
+            param_str = ""
+
+        return f"{indicator_type}{param_str}{logic_name} - {source_name}"
