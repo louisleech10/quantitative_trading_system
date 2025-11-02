@@ -32,7 +32,7 @@ from api.models.training_window_config import (
     StrategyConfig,
     SignalDensityResponse
 )
-from api.services.case_storage import CaseStorage, CaseRecord
+from api.services.case_storage import CaseStorage
 
 
 class SignalDensityAnalyzer:
@@ -65,7 +65,7 @@ class SignalDensityAnalyzer:
 
     def extract_training_window(
         self,
-        case: CaseRecord,
+        case: Dict[str, Any],
         window_config: TrainingWindowConfig
     ) -> pd.DataFrame:
         """
@@ -346,7 +346,7 @@ class SignalDensityAnalyzer:
     def stability_analysis_by_month(
         self,
         case_densities: Dict[str, float],
-        cases: List[CaseRecord]
+        cases: List[Dict[str, Any]]
     ) -> float:
         """
         穩定性分析(按月分組計算變異係數)
@@ -391,8 +391,8 @@ class SignalDensityAnalyzer:
 
     def analyze_signal_density(
         self,
-        positive_cases: List[CaseRecord],
-        negative_cases: List[CaseRecord],
+        positive_cases: List[Dict[str, Any]],
+        negative_cases: List[Dict[str, Any]],
         strategy_config: StrategyConfig,
         window_config: TrainingWindowConfig
     ) -> SignalDensityResponse:
