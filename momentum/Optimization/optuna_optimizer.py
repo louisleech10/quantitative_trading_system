@@ -4,22 +4,35 @@ Optuna參數優化引擎 - Ultra Think 最終優化版本
 核心功能:
 1. 自動搜索最佳EMA策略參數組合
 2. 優化目標: 最大化正反例信號密度差異(separation)
-3. 支援多種優化器(TPE/CmaEs/Random)
-4. 斷點續跑機制(SQLite持久化)
-5. 並行多進程優化
+3. 支援多種優化器(TPE/CmaEs/Random/GP/NSGA-II)
+4. 多目標優化(separation + stability,Pareto前沿)
+5. 斷點續跑機制(SQLite持久化)
+6. 並行多進程優化
 
 Ultra Think 記錄:
-- 步驟 1: 初版代碼 - 核心優化邏輯和目標函數
-- 步驟 2: 審查優化 - 發現6個優化點(async/event loop、數據驗證、錯誤處理等)
-- 步驟 3: 最終優化 - 修復所有P0/P1問題,添加參數範圍配置和詳細日誌
+- Day 1 步驟1: 初版代碼 - 核心優化邏輯和目標函數(TPE/CmaEs/Random)
+- Day 1 步驟2: 審查優化 - 發現6個優化點(async/event loop、數據驗證、錯誤處理等)
+- Day 1 步驟3: 最終優化 - 修復所有P0/P1問題,添加參數範圍配置和詳細日誌
+- Day 2 步驟1: 進階優化器 - 新增GP/NSGA-II兩種Sampler
+- Day 2 步驟2: 多目標優化 - 實作multi_objective_function(separation + stability)
+- Day 2 步驟3: Pareto分析 - 整合ParetoAnalyzer,提供get_pareto_analysis()方法
 
 優化內容:
+Day 1:
 - ✅ 修復async/event loop衝突(使用run_in_executor)
 - ✅ 添加數據驗證(確保案例ID真實存在)
 - ✅ 細化錯誤處理(區分可重試/不可重試/致命錯誤)
 - ✅ 支援參數範圍配置(從外部傳入,無硬編碼)
 - ✅ 增強日誌記錄(階段性進度日誌)
 - ✅ 完善類型提示(pandas.DataFrame等)
+
+Day 2:
+- ✅ 新增GPSampler(貝葉斯優化,適合昂貴目標函數)
+- ✅ 新增NSGAIISampler(遺傳算法,多目標優化)
+- ✅ 實作multi_objective_function(同時優化separation和stability)
+- ✅ 支援多目標Study創建(directions=["maximize", "maximize"])
+- ✅ 整合ParetoAnalyzer(識別Pareto前沿,推薦膝點)
+- ✅ 新增get_pareto_analysis()方法(便捷獲取Pareto分析結果)
 
 Author: Claude (Phase 3.5)
 Date: 2025-11-02
@@ -28,7 +41,7 @@ Date: 2025-11-02
 import logging
 import optuna
 from optuna import Trial, Study
-from optuna.samplers import TPESampler, CmaEsSampler, RandomSampler
+from optuna.samplers import TPESampler, CmaEsSampler, RandomSampler, GPSampler, NSGAIISampler
 from optuna.pruners import MedianPruner, PercentilePruner, NopPruner
 from typing import Dict, Any, Optional, List, Callable, Tuple
 import asyncio
@@ -164,7 +177,8 @@ class OptunaOptimizer:
         n_jobs: int = 1,
         timeout: Optional[int] = None,
         random_seed: Optional[int] = 42,
-        parameter_ranges: Optional[ParameterRanges] = None
+        parameter_ranges: Optional[ParameterRanges] = None,
+        use_multi_objective: bool = False
     ):
         """
         初始化Optuna優化器
@@ -172,13 +186,14 @@ class OptunaOptimizer:
         Args:
             study_name: Study名稱(用於SQLite存儲和續跑)
             storage: SQLite數據庫路徑
-            sampler_type: 優化器類型(TPE/CmaEs/Random)
+            sampler_type: 優化器類型(TPE/CmaEs/Random/GP/NSGA-II)
             pruner_type: 剪枝器類型(Median/Percentile/None)
             n_trials: 試驗次數
             n_jobs: 並行核心數(1=串行,>1=並行)
             timeout: 總優化超時(秒,None=無限制)
             random_seed: 隨機種子(可重現性)
             parameter_ranges: 參數搜索範圍(None使用預設)
+            use_multi_objective: 是否使用多目標優化(separation + stability)
         """
         self.study_name = study_name
         self.storage = storage
@@ -189,6 +204,7 @@ class OptunaOptimizer:
         self.timeout = timeout
         self.random_seed = random_seed
         self.parameter_ranges = parameter_ranges or ParameterRanges()
+        self.use_multi_objective = use_multi_objective
 
         # 依賴服務
         self.signal_service = SignalAnalysisService()
@@ -222,6 +238,8 @@ class OptunaOptimizer:
         - TPE: Tree-structured Parzen Estimator(預設,推薦)
         - CmaEs: 協方差矩陣自適應演化策略
         - Random: 隨機搜索(基準對比)
+        - GP: Gaussian Process(貝葉斯優化,適合昂貴目標函數)
+        - NSGA-II: 遺傳算法(多目標優化,返回Pareto前沿)
 
         Returns:
             Sampler對象
@@ -242,10 +260,27 @@ class OptunaOptimizer:
             )
         elif self.sampler_type == 'Random':
             return RandomSampler(seed=self.random_seed)
+        elif self.sampler_type == 'GP':
+            # Gaussian Process Sampler
+            # 適用場景: 單次試驗耗時長(>10秒),試驗次數少(<100)
+            return GPSampler(
+                seed=self.random_seed,
+                n_startup_trials=10,  # GP前期使用Random採樣
+                independent_sampler=RandomSampler(seed=self.random_seed)
+            )
+        elif self.sampler_type == 'NSGA-II':
+            # 多目標優化遺傳算法
+            # 返回Pareto前沿解集(多個非支配解)
+            return NSGAIISampler(
+                population_size=50,     # 種群大小
+                mutation_prob=0.1,      # 變異概率
+                crossover_prob=0.9,     # 交叉概率
+                seed=self.random_seed
+            )
         else:
             raise ValueError(
                 f"Unknown sampler type: {self.sampler_type}. "
-                f"Supported: TPE, CmaEs, Random"
+                f"Supported: TPE, CmaEs, Random, GP, NSGA-II"
             )
 
     def _create_pruner(self) -> optuna.pruners.BasePruner:
@@ -295,25 +330,41 @@ class OptunaOptimizer:
             Optuna Study對象
 
         Design Note:
-        - direction="maximize": 最大化separation(正例密度 - 反例密度)
+        - direction="maximize"(單目標): 最大化separation(正例密度 - 反例密度)
+        - directions=["maximize", "maximize"](多目標): separation和stability
         - load_if_exists=True: 支援斷點續跑
         """
         sampler = self._create_sampler()
         pruner = self._create_pruner()
 
-        study = optuna.create_study(
-            study_name=self.study_name,
-            storage=self.storage,
-            sampler=sampler,
-            pruner=pruner,
-            direction="maximize",  # 最大化separation
-            load_if_exists=True    # 支援斷點續跑
-        )
-
-        self.logger.info(
-            f"Study created/loaded: {self.study_name}, "
-            f"previous trials: {len(study.trials)}"
-        )
+        # 多目標優化: separation + stability
+        if self.use_multi_objective:
+            study = optuna.create_study(
+                study_name=self.study_name,
+                storage=self.storage,
+                sampler=sampler,
+                pruner=pruner,
+                directions=["maximize", "maximize"],  # [separation, stability]
+                load_if_exists=True
+            )
+            self.logger.info(
+                f"Multi-objective study created/loaded: {self.study_name}, "
+                f"previous trials: {len(study.trials)}"
+            )
+        # 單目標優化: separation only
+        else:
+            study = optuna.create_study(
+                study_name=self.study_name,
+                storage=self.storage,
+                sampler=sampler,
+                pruner=pruner,
+                direction="maximize",  # 最大化separation
+                load_if_exists=True
+            )
+            self.logger.info(
+                f"Study created/loaded: {self.study_name}, "
+                f"previous trials: {len(study.trials)}"
+            )
 
         self.study = study
         return study
@@ -450,6 +501,155 @@ class OptunaOptimizer:
             )
             return -999.0  # 極差值,確保不會被選為最佳
 
+    async def _multi_objective_function(self, trial: Trial) -> Tuple[float, float]:
+        """
+        多目標優化函數
+
+        同時優化兩個目標:
+        1. separation: 最大化正反例信號密度差異
+        2. stability_score: 最大化穩定性(最小化變異係數)
+
+        Args:
+            trial: Optuna Trial對象
+
+        Returns:
+            (separation, stability_score) 元組
+
+        Raises:
+            optuna.TrialPruned: 參數不合法時剪枝
+
+        Design Note:
+        - 穩定性計算: stability_score = 1.0 - min(cv, 1.0)
+        - cv = std_separation / mean_separation (變異係數)
+        - Pareto前沿: NSGA-II會返回多個非支配解
+        """
+        try:
+            # 步驟1-4: 與單目標相同,獲取separation
+            # (復用參數採樣、驗證、調用分析邏輯)
+            data_source = trial.suggest_categorical(
+                'data_source',
+                self.parameter_ranges.data_sources
+            )
+
+            strategy_logic = trial.suggest_categorical(
+                'strategy_logic',
+                self.parameter_ranges.strategy_logics
+            )
+
+            ema_short = trial.suggest_int(
+                'ema_short',
+                self.parameter_ranges.ema_short_range[0],
+                self.parameter_ranges.ema_short_range[1]
+            )
+            ema_long = trial.suggest_int(
+                'ema_long',
+                self.parameter_ranges.ema_long_range[0],
+                self.parameter_ranges.ema_long_range[1]
+            )
+
+            if strategy_logic == 'three_line':
+                ema_mid = trial.suggest_int(
+                    'ema_mid',
+                    self.parameter_ranges.ema_mid_range[0],
+                    self.parameter_ranges.ema_mid_range[1]
+                )
+            else:
+                ema_mid = None
+
+            # 參數驗證
+            if strategy_logic == 'three_line':
+                if not (ema_short < ema_mid < ema_long):
+                    self.logger.debug(
+                        f"Trial {trial.number} pruned: "
+                        f"Invalid EMA order: {ema_short} < {ema_mid} < {ema_long}"
+                    )
+                    raise optuna.TrialPruned()
+            else:
+                if not (ema_short < ema_long):
+                    self.logger.debug(
+                        f"Trial {trial.number} pruned: "
+                        f"Invalid EMA order: {ema_short} < {ema_long}"
+                    )
+                    raise optuna.TrialPruned()
+
+            # 組裝策略配置
+            strategy_config = StrategyConfig(
+                data_source=data_source,
+                indicator_type="ema",
+                strategy_logic=strategy_logic,
+                params={
+                    "ema_short": ema_short,
+                    "ema_mid": ema_mid,
+                    "ema_long": ema_long
+                }
+            )
+
+            # 調用信號密度分析
+            request = SignalDensityRequest(
+                strategy_config=strategy_config,
+                training_window=self.training_window,
+                positive_cases=self.positive_cases,
+                negative_cases=self.negative_cases
+            )
+
+            response: SignalDensityResponse = await self.signal_service.analyze_signal_density(request)
+
+            # 目標1: separation
+            separation = response.positive_avg_density - response.negative_avg_density
+
+            # 目標2: stability_score
+            # 計算變異係數(Coefficient of Variation): cv = std / mean
+            # 變異係數越小,穩定性越高
+            # 轉換為最大化問題: stability_score = 1.0 - min(cv, 1.0)
+
+            # 從正例和反例的密度列表計算標準差
+            # (假設response中有per_case_densities,若無則使用近似計算)
+            # 近似方法: 使用positive_std和negative_std的平均作為整體穩定性指標
+
+            if hasattr(response, 'positive_std_density') and hasattr(response, 'negative_std_density'):
+                # 使用標準差的平均值作為穩定性指標
+                avg_std = (response.positive_std_density + response.negative_std_density) / 2.0
+                mean_density = (response.positive_avg_density + response.negative_avg_density) / 2.0
+
+                if mean_density > 0:
+                    cv = avg_std / mean_density
+                else:
+                    cv = 1.0  # 密度為0時,視為不穩定
+            else:
+                # 若無標準差數據,使用density差異作為穩定性近似
+                cv = abs(response.positive_avg_density - response.negative_avg_density) / max(response.positive_avg_density, 0.01)
+
+            stability_score = 1.0 - min(cv, 1.0)  # 限制在[0, 1]
+
+            # 日誌記錄
+            self.logger.info(
+                f"Trial {trial.number}: separation={separation:.4f}, "
+                f"stability={stability_score:.4f}, params={trial.params}"
+            )
+
+            return (separation, stability_score)
+
+        except optuna.TrialPruned:
+            raise
+        except (ConnectionError, TimeoutError) as e:
+            self.logger.warning(
+                f"Trial {trial.number} encountered retryable error: {e}. "
+                f"Returning poor values (-500.0, 0.0)"
+            )
+            return (-500.0, 0.0)
+        except (ValueError, KeyError, TypeError) as e:
+            self.logger.error(
+                f"Trial {trial.number} encountered non-retryable error: {e}",
+                exc_info=True
+            )
+            raise optuna.TrialPruned()
+        except Exception as e:
+            self.logger.error(
+                f"Trial {trial.number} failed with unknown error: {e}",
+                exc_info=True
+            )
+            return (-999.0, 0.0)
+
     async def optimize(
         self,
         positive_cases: List[str],
@@ -544,18 +744,33 @@ class OptunaOptimizer:
             # 修復async event loop問題: 使用run_in_executor在獨立線程中運行
             loop = asyncio.get_event_loop()
 
-            def sync_objective(trial: Trial) -> float:
-                """
-                同步包裝器,在獨立線程中運行async目標函數
+            # 根據use_multi_objective選擇目標函數
+            if self.use_multi_objective:
+                def sync_objective(trial: Trial) -> Tuple[float, float]:
+                    """
+                    多目標同步包裝器
 
-                修復: 不使用asyncio.run()避免event loop衝突
-                """
-                # 在當前event loop中運行async函數
-                future = asyncio.run_coroutine_threadsafe(
-                    self._objective_function(trial),
-                    loop
-                )
-                return future.result()
+                    Returns:
+                        (separation, stability_score) 元組
+                    """
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._multi_objective_function(trial),
+                        loop
+                    )
+                    return future.result()
+            else:
+                def sync_objective(trial: Trial) -> float:
+                    """
+                    單目標同步包裝器
+
+                    Returns:
+                        separation值
+                    """
+                    future = asyncio.run_coroutine_threadsafe(
+                        self._objective_function(trial),
+                        loop
+                    )
+                    return future.result()
 
             # 在ThreadPoolExecutor中運行Optuna優化(避免阻塞event loop)
             await loop.run_in_executor(
@@ -649,6 +864,42 @@ class OptunaOptimizer:
             raise ValueError("Study not created yet. Call create_study() first.")
 
         return self.study.trials_dataframe()
+
+    def get_pareto_analysis(self, n_recommendations: int = 3) -> Dict[str, Any]:
+        """
+        獲取Pareto前沿分析結果(僅適用於多目標優化)
+
+        Args:
+            n_recommendations: 推薦膝點數量(default: 3)
+
+        Returns:
+            Pareto分析結果字典:
+            {
+                'pareto_solutions': List[ParetoSolution],
+                'recommended_solutions': List[ParetoSolution],
+                'summary': Dict[str, Any],
+                'visualization_data': Dict[str, Any]
+            }
+
+        Raises:
+            ValueError: Study尚未創建或非多目標優化
+        """
+        if self.study is None:
+            raise ValueError("Study not created yet. Call create_study() first.")
+
+        if not self.use_multi_objective:
+            raise ValueError(
+                "Pareto analysis is only available for multi-objective optimization. "
+                "Set use_multi_objective=True when initializing OptunaOptimizer."
+            )
+
+        # 延遲導入避免循環依賴
+        from momentum.Analysis.pareto_analyzer import ParetoAnalyzer
+
+        analyzer = ParetoAnalyzer()
+        trials_df = self.get_trials_dataframe()
+
+        return analyzer.analyze_pareto_front(trials_df, n_recommendations)
 
     def __del__(self):
         """清理資源"""
