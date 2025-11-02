@@ -12,7 +12,10 @@ import {
   Menu,
   X,
   Home,
-  LineChart
+  LineChart,
+  Target,
+  TrendingUp,
+  Sparkles
 } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -43,6 +46,24 @@ const navigationItems = [
     href: '/chart',
     icon: LineChart,
     description: '查看案例K線圖表和技術指標'
+  },
+  {
+    name: '策略測試',
+    href: '/strategy-test',
+    icon: Target,
+    description: '配置策略參數並進行回測（Phase 3.3）'
+  },
+  {
+    name: '策略演示',
+    href: '/strategy-demo',
+    icon: Sparkles,
+    description: '策略信號標記演示（Phase 3.4）'
+  },
+  {
+    name: '優化結果',
+    href: '/optimization-result',
+    icon: TrendingUp,
+    description: '查看參數優化結果（Phase 3.6）'
   },
   {
     name: '圖表分析',
