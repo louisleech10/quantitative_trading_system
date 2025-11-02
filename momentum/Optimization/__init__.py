@@ -13,6 +13,15 @@ Author: Claude (Phase 3.5)
 Date: 2025-11-02
 """
 
-from .optuna_optimizer import OptunaOptimizer
+from .optuna_optimizer import OptunaOptimizer, ParameterRanges, OptimizationResult
+from .checkpoint_manager import CheckpointManager
+from .error_handler import OptimizationErrorHandler, ErrorType
 
-__all__ = ['OptunaOptimizer']
+__all__ = [
+    'OptunaOptimizer',
+    'ParameterRanges',
+    'OptimizationResult',
+    'CheckpointManager',
+    'OptimizationErrorHandler',
+    'ErrorType'
+]

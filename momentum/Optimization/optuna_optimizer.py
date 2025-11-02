@@ -16,6 +16,9 @@ Ultra Think 記錄:
 - Day 2 步驟1: 進階優化器 - 新增GP/NSGA-II兩種Sampler
 - Day 2 步驟2: 多目標優化 - 實作multi_objective_function(separation + stability)
 - Day 2 步驟3: Pareto分析 - 整合ParetoAnalyzer,提供get_pareto_analysis()方法
+- Day 3 步驟1: CheckpointManager - 手動檢查點保存機制(每50次試驗,pickle格式)
+- Day 3 步驟2: ErrorHandler - 錯誤分類與重試機制(exponential backoff)
+- Day 3 步驟3: 整合 - 包裝器模式整合重試邏輯,callback整合檢查點保存
 
 優化內容:
 Day 1:
@@ -33,6 +36,14 @@ Day 2:
 - ✅ 支援多目標Study創建(directions=["maximize", "maximize"])
 - ✅ 整合ParetoAnalyzer(識別Pareto前沿,推薦膝點)
 - ✅ 新增get_pareto_analysis()方法(便捷獲取Pareto分析結果)
+
+Day 3:
+- ✅ CheckpointManager整合(__init__添加checkpoint_manager實例)
+- ✅ ErrorHandler整合(__init__添加error_handler實例)
+- ✅ 重試包裝器(_objective_function_with_retry,_multi_objective_function_with_retry)
+- ✅ 檢查點保存(optimize()的callback每50次試驗自動保存)
+- ✅ 錯誤統計(檢查點包含error_statistics數據)
+- ✅ 參數配置(checkpoint_dir,checkpoint_interval,max_retries,retry_base_delay)
 
 Author: Claude (Phase 3.5)
 Date: 2025-11-02
@@ -59,6 +70,10 @@ from api.models.training_window_config import (
 from api.models.strategy_test_models import ParameterRange
 from api.services.signal_analysis_service import SignalAnalysisService
 from api.services.case_storage import CaseStorage
+
+# 導入新增的容錯機制
+from momentum.Optimization.checkpoint_manager import CheckpointManager
+from momentum.Optimization.error_handler import OptimizationErrorHandler, ErrorType
 
 
 # ==================== 錯誤分類定義 ====================
@@ -178,7 +193,11 @@ class OptunaOptimizer:
         timeout: Optional[int] = None,
         random_seed: Optional[int] = 42,
         parameter_ranges: Optional[ParameterRanges] = None,
-        use_multi_objective: bool = False
+        use_multi_objective: bool = False,
+        checkpoint_dir: str = "data/checkpoints",
+        checkpoint_interval: int = 50,
+        max_retries: int = 3,
+        retry_base_delay: float = 1.0
     ):
         """
         初始化Optuna優化器
@@ -194,6 +213,10 @@ class OptunaOptimizer:
             random_seed: 隨機種子(可重現性)
             parameter_ranges: 參數搜索範圍(None使用預設)
             use_multi_objective: 是否使用多目標優化(separation + stability)
+            checkpoint_dir: 檢查點保存目錄(default: data/checkpoints)
+            checkpoint_interval: 檢查點保存間隔(每N次試驗,default: 50)
+            max_retries: 錯誤最大重試次數(default: 3)
+            retry_base_delay: 重試基礎延遲(秒,default: 1.0)
         """
         self.study_name = study_name
         self.storage = storage
@@ -224,10 +247,25 @@ class OptunaOptimizer:
         # ThreadPoolExecutor for async compatibility
         self._executor = ThreadPoolExecutor(max_workers=1)
 
+        # Day 3: 新增容錯機制
+        # CheckpointManager: 手動檢查點保存(每50次試驗)
+        self.checkpoint_manager = CheckpointManager(
+            checkpoint_dir=checkpoint_dir,
+            save_interval=checkpoint_interval,
+            max_checkpoints=10
+        )
+
+        # OptimizationErrorHandler: 錯誤分類與重試機制
+        self.error_handler = OptimizationErrorHandler(
+            max_retries=max_retries,
+            base_delay=retry_base_delay
+        )
+
         self.logger.info(
             f"OptunaOptimizer initialized: study_name={study_name}, "
             f"sampler={sampler_type}, n_trials={n_trials}, "
-            f"param_ranges={self.parameter_ranges}"
+            f"param_ranges={self.parameter_ranges}, "
+            f"checkpoint_interval={checkpoint_interval}, max_retries={max_retries}"
         )
 
     def _create_sampler(self) -> optuna.samplers.BaseSampler:
@@ -369,9 +407,68 @@ class OptunaOptimizer:
         self.study = study
         return study
 
-    async def _objective_function(self, trial: Trial) -> float:
+    async def _objective_function_with_retry(self, trial: Trial) -> float:
         """
-        Optuna目標函數
+        帶重試機制的目標函數包裝器
+
+        功能:
+        1. 調用_objective_function_core執行實際計算
+        2. 捕獲異常並使用ErrorHandler分類錯誤
+        3. 根據錯誤類型決定是否重試(exponential backoff)
+        4. 記錄錯誤統計
+
+        Args:
+            trial: Optuna Trial對象
+
+        Returns:
+            separation(密度差異)
+        """
+        attempt = 1
+
+        while attempt <= self.error_handler.max_retries + 1:  # +1 for initial attempt
+            try:
+                return await self._objective_function_core(trial)
+
+            except optuna.TrialPruned:
+                # 參數不合法,直接剪枝(不重試)
+                raise
+
+            except Exception as e:
+                # 使用ErrorHandler處理錯誤
+                should_retry, delay = self.error_handler.handle_trial_error(
+                    trial_number=trial.number,
+                    exception=e,
+                    attempt=attempt
+                )
+
+                if should_retry and delay is not None:
+                    # 等待後重試
+                    await asyncio.sleep(delay)
+                    attempt += 1
+                else:
+                    # 不重試,返回極差值或剪枝
+                    error_type = self.error_handler.classify_error(e)
+                    if error_type == ErrorType.FATAL:
+                        # 致命錯誤: 返回極差值並警告
+                        self.logger.critical(
+                            f"Trial {trial.number} encountered FATAL error, "
+                            f"returning worst value (-999.0)"
+                        )
+                        return -999.0
+                    elif error_type == ErrorType.NON_RETRYABLE:
+                        # 不可重試錯誤: 剪枝此試驗
+                        raise optuna.TrialPruned()
+                    else:
+                        # 其他情況: 返回較差值
+                        return -500.0
+
+        # 超過最大重試次數
+        self.logger.error(f"Trial {trial.number} exceeded max retries ({self.error_handler.max_retries})")
+        return -999.0
+
+    async def _objective_function_core(self, trial: Trial) -> float:
+        """
+        Optuna目標函數核心實作(不含重試邏輯)
 
         核心算法:
         1. 參數採樣: 從搜索空間採樣參數組合
@@ -388,6 +485,7 @@ class OptunaOptimizer:
 
         Raises:
             optuna.TrialPruned: 參數不合法時剪枝
+            Exception: 其他錯誤由_objective_function_with_retry處理
 
         Design Note:
         - 優化目標: 最大化正反例信號密度差異(而非Win Rate)
@@ -477,33 +575,66 @@ class OptunaOptimizer:
             return separation
 
         except optuna.TrialPruned:
-            # 參數不合法,重新拋出
+            # 參數不合法,重新拋出(由包裝器處理)
             raise
-        except (ConnectionError, TimeoutError) as e:
-            # 可重試錯誤: 網絡相關錯誤
-            self.logger.warning(
-                f"Trial {trial.number} encountered retryable error: {e}. "
-                f"Returning poor value (-500.0)"
-            )
-            return -500.0  # 較差值,但允許後續試驗繼續
-        except (ValueError, KeyError, TypeError) as e:
-            # 不可重試錯誤: 數據/參數問題
-            self.logger.error(
-                f"Trial {trial.number} encountered non-retryable error: {e}",
-                exc_info=True
-            )
-            raise optuna.TrialPruned()  # 剪枝此試驗
-        except Exception as e:
-            # 未知錯誤: 記錄詳細日誌
-            self.logger.error(
-                f"Trial {trial.number} failed with unknown error: {e}",
-                exc_info=True
-            )
-            return -999.0  # 極差值,確保不會被選為最佳
+        except Exception:
+            # 所有其他錯誤由_objective_function_with_retry的重試邏輯處理
+            raise
 
-    async def _multi_objective_function(self, trial: Trial) -> Tuple[float, float]:
+    async def _multi_objective_function_with_retry(self, trial: Trial) -> Tuple[float, float]:
         """
-        多目標優化函數
+        帶重試機制的多目標函數包裝器
+
+        功能:
+        1. 調用_multi_objective_function_core執行實際計算
+        2. 捕獲異常並使用ErrorHandler分類錯誤
+        3. 根據錯誤類型決定是否重試(exponential backoff)
+        4. 記錄錯誤統計
+
+        Args:
+            trial: Optuna Trial對象
+
+        Returns:
+            (separation, stability_score) 元組
+        """
+        attempt = 1
+
+        while attempt <= self.error_handler.max_retries + 1:
+            try:
+                return await self._multi_objective_function_core(trial)
+
+            except optuna.TrialPruned:
+                raise
+
+            except Exception as e:
+                should_retry, delay = self.error_handler.handle_trial_error(
+                    trial_number=trial.number,
+                    exception=e,
+                    attempt=attempt
+                )
+
+                if should_retry and delay is not None:
+                    await asyncio.sleep(delay)
+                    attempt += 1
+                else:
+                    error_type = self.error_handler.classify_error(e)
+                    if error_type == ErrorType.FATAL:
+                        self.logger.critical(
+                            f"Trial {trial.number} encountered FATAL error, "
+                            f"returning worst values (-999.0, 0.0)"
+                        )
+                        return (-999.0, 0.0)
+                    elif error_type == ErrorType.NON_RETRYABLE:
+                        raise optuna.TrialPruned()
+                    else:
+                        return (-500.0, 0.0)
+
+        self.logger.error(f"Trial {trial.number} exceeded max retries ({self.error_handler.max_retries})")
+        return (-999.0, 0.0)
+
+    async def _multi_objective_function_core(self, trial: Trial) -> Tuple[float, float]:
+        """
+        多目標優化函數核心實作(不含重試邏輯)
 
         同時優化兩個目標:
         1. separation: 最大化正反例信號密度差異
@@ -517,6 +648,7 @@ class OptunaOptimizer:
 
         Raises:
             optuna.TrialPruned: 參數不合法時剪枝
+            Exception: 其他錯誤由_multi_objective_function_with_retry處理
 
         Design Note:
         - 穩定性計算: stability_score = 1.0 - min(cv, 1.0)
@@ -630,25 +762,11 @@ class OptunaOptimizer:
             return (separation, stability_score)
 
         except optuna.TrialPruned:
+            # 參數不合法,重新拋出(由包裝器處理)
             raise
-        except (ConnectionError, TimeoutError) as e:
-            self.logger.warning(
-                f"Trial {trial.number} encountered retryable error: {e}. "
-                f"Returning poor values (-500.0, 0.0)"
-            )
-            return (-500.0, 0.0)
-        except (ValueError, KeyError, TypeError) as e:
-            self.logger.error(
-                f"Trial {trial.number} encountered non-retryable error: {e}",
-                exc_info=True
-            )
-            raise optuna.TrialPruned()
-        except Exception as e:
-            self.logger.error(
-                f"Trial {trial.number} failed with unknown error: {e}",
-                exc_info=True
-            )
-            return (-999.0, 0.0)
+        except Exception:
+            # 所有其他錯誤由_multi_objective_function_with_retry的重試邏輯處理
+            raise
 
     async def optimize(
         self,
@@ -728,10 +846,17 @@ class OptunaOptimizer:
         last_log_trial = [0]  # 使用列表保持可變性
 
         def callback(study: Study, trial: optuna.trial.FrozenTrial):
-            """每完成一次試驗的回調,用於階段性日誌"""
+            """
+            每完成一次試驗的回調
+
+            功能:
+            1. 階段性日誌記錄(每100次試驗)
+            2. 手動檢查點保存(每50次試驗,通過CheckpointManager)
+            3. 錯誤統計(通過ErrorHandler)
+            """
             completed_trials = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
 
-            # 每100次試驗記錄一次
+            # 每100次試驗記錄一次進度日誌
             if completed_trials % 100 == 0 and completed_trials > last_log_trial[0]:
                 self.logger.info(
                     f"Progress: {completed_trials} trials completed, "
@@ -739,35 +864,60 @@ class OptunaOptimizer:
                 )
                 last_log_trial[0] = completed_trials
 
+            # Day 3: 檢查點保存(每checkpoint_interval次試驗)
+            if self.checkpoint_manager.should_save_checkpoint(completed_trials):
+                try:
+                    # 收集額外統計數據
+                    error_stats = self.error_handler.get_error_statistics()
+                    additional_data = {
+                        'error_statistics': error_stats,
+                        'optimization_config': {
+                            'positive_cases': self.positive_cases,
+                            'negative_cases': self.negative_cases,
+                            'sampler_type': self.sampler_type,
+                            'n_trials': self.n_trials
+                        }
+                    }
+
+                    checkpoint_path = self.checkpoint_manager.save_checkpoint(
+                        study=study,
+                        trial_number=completed_trials,
+                        additional_data=additional_data
+                    )
+                    self.logger.info(f"Checkpoint saved at trial {completed_trials}: {checkpoint_path}")
+
+                except Exception as e:
+                    self.logger.error(f"Failed to save checkpoint at trial {completed_trials}: {e}")
+
         try:
             # 步驟6: 執行優化
             # 修復async event loop問題: 使用run_in_executor在獨立線程中運行
             loop = asyncio.get_event_loop()
 
-            # 根據use_multi_objective選擇目標函數
+            # 根據use_multi_objective選擇目標函數(使用帶重試版本)
             if self.use_multi_objective:
                 def sync_objective(trial: Trial) -> Tuple[float, float]:
                     """
-                    多目標同步包裝器
+                    多目標同步包裝器(帶重試機制)
 
                     Returns:
                         (separation, stability_score) 元組
                     """
                     future = asyncio.run_coroutine_threadsafe(
-                        self._multi_objective_function(trial),
+                        self._multi_objective_function_with_retry(trial),
                         loop
                     )
                     return future.result()
             else:
                 def sync_objective(trial: Trial) -> float:
                     """
-                    單目標同步包裝器
+                    單目標同步包裝器(帶重試機制)
 
                     Returns:
                         separation值
                     """
                     future = asyncio.run_coroutine_threadsafe(
-                        self._objective_function(trial),
+                        self._objective_function_with_retry(trial),
                         loop
                     )
                     return future.result()
