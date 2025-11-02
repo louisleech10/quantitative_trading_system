@@ -156,3 +156,54 @@ export interface TaskListResponse {
   data: OptimizationTaskInfo[]
   total: number
 }
+
+// ==================== Analysis Types ====================
+
+export interface ParameterImportance {
+  parameter_name: string
+  importance: number
+  rank: number // 1 = most important
+}
+
+export interface ImportanceAnalysisResponse {
+  success: boolean
+  task_id: string
+  study_name: string
+  n_trials: number
+  importances: ParameterImportance[]
+  evaluator: string // fanova, mean_decrease_impurity
+  message?: string
+}
+
+export interface OptimizationHistoryPoint {
+  trial_number: number
+  value: number
+  best_value_so_far: number
+  datetime: string
+  params: Record<string, any>
+  state: string // COMPLETE, PRUNED, FAIL
+}
+
+export interface OptimizationHistoryResponse {
+  success: boolean
+  task_id: string
+  study_name: string
+  history: OptimizationHistoryPoint[]
+  total_trials: number
+}
+
+export interface ParamSpacePoint {
+  trial_number: number
+  value: number
+  params: Record<string, any>
+  state: string
+}
+
+export interface ParamSpaceResponse {
+  success: boolean
+  task_id: string
+  study_name: string
+  points: ParamSpacePoint[]
+  param_names: string[]
+  total_trials: number
+}

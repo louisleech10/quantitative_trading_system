@@ -503,6 +503,27 @@ class OptimizationTaskService:
 
         self.logger.debug(f"Notification callback registered for task: {task_id}")
 
+    def _get_storage_for_study(self, study_name: str) -> str:
+        """
+        獲取指定study的storage路徑
+
+        Args:
+            study_name: Study名稱
+
+        Returns:
+            SQLite storage路徑
+        """
+        # 查找對應的task_id
+        with self.tasks_lock:
+            for task_id, task_info in self.tasks.items():
+                if task_info.study_name == study_name:
+                    # 從optimizer獲取storage
+                    if task_id in self.optimizers:
+                        return self.optimizers[task_id].storage
+
+        # 如果沒找到，使用預設storage路徑
+        return "sqlite:///data/optuna_study.db"
+
     def unregister_notification_callback(self, task_id: str):
         """
         取消註冊WebSocket通知回調
