@@ -45,17 +45,23 @@ class ApiClient {
   // Generic fetch wrapper with error handling
   private async fetchApi<T>(
     endpoint: string, 
-    options: RequestInit = {}
+    options: RequestInit = {},
+    timeout: number = 30000  // 30秒超時
   ): Promise<ApiResponse<T>> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
         },
-        ...options,
       });
 
+      clearTimeout(timeoutId);
       const data = await response.json();
 
       if (!response.ok) {
@@ -63,7 +69,13 @@ class ApiClient {
       }
 
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        throw new Error('請求超時，請檢查網路連接');
+      }
+      
       console.error('API Error:', error);
       throw error;
     }
@@ -686,4 +698,245 @@ ${qualityEmoji} 策略質量: ${quality === "excellent" ? "優秀" : quality ===
   • 正例: ${(result.positive_avg_density * 100).toFixed(2)}% ± ${(result.positive_std * 100).toFixed(2)}% (n=${result.positive_sample_size})
   • 反例: ${(result.negative_avg_density * 100).toFixed(2)}% ± ${(result.negative_std * 100).toFixed(2)}% (n=${result.negative_sample_size})
   `.trim();
+}
+// ===== Phase 3.6: 優化結果展示UI API =====
+
+import type {
+  OptimizationResult,
+  ImportanceAnalysisResponse,
+  OptimizationHistoryResponse,
+  ParamSpaceResponse,
+  StabilityAnalysis,
+  ComparisonResult
+} from './types';
+
+/**
+ * 獲取優化任務結果
+ */
+export async function fetchOptimizationResult(
+  taskId: string
+): Promise<OptimizationResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 獲取優化結果失敗`);
+    }
+
+    const data: OptimizationResult = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('獲取優化結果失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 獲取參數重要性分析
+ */
+export async function fetchParameterImportance(
+  taskId: string
+): Promise<ImportanceAnalysisResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/importance`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 獲取參數重要性失敗`);
+    }
+
+    const data: ImportanceAnalysisResponse = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('獲取參數重要性失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 獲取優化歷史數據
+ */
+export async function fetchOptimizationHistory(
+  taskId: string
+): Promise<OptimizationHistoryResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/history`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 獲取優化歷史失敗`);
+    }
+
+    const data: OptimizationHistoryResponse = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('獲取優化歷史失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 獲取參數空間探索數據
+ */
+export async function fetchParamSpace(
+  taskId: string
+): Promise<ParamSpaceResponse> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/param-space`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 獲取參數空間失敗`);
+    }
+
+    const data: ParamSpaceResponse = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('獲取參數空間失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 獲取穩定性分析
+ */
+export async function fetchStabilityAnalysis(
+  taskId: string
+): Promise<StabilityAnalysis> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/stability`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 獲取穩定性分析失敗`);
+    }
+
+    const data: StabilityAnalysis = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('獲取穩定性分析失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 對比多個優化結果
+ */
+export async function compareOptimizationResults(
+  taskIds: string[]
+): Promise<ComparisonResult> {
+  // 數量驗證
+  if (taskIds.length < 2 || taskIds.length > 5) {
+    throw new Error('對比任務數量必須在2-5之間');
+  }
+  
+  // ID 有效性驗證
+  if (taskIds.some(id => !id || id.trim() === '')) {
+    throw new Error('任務ID不能為空');
+  }
+  
+  // 重複驗證
+  if (new Set(taskIds).size !== taskIds.length) {
+    throw new Error('任務ID不能重複');
+  }
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/optimization/compare`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ task_ids: taskIds }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `HTTP ${response.status}: 對比優化結果失敗`);
+    }
+
+    const data: ComparisonResult = await response.json();
+    return data;
+
+  } catch (error) {
+    console.error('對比優化結果失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 匯出試驗歷史CSV
+ */
+export async function exportTrialsCSV(taskId: string): Promise<Blob> {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/export/csv`,
+      {
+        method: 'GET',
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: 匯出CSV失敗`);
+    }
+
+    const blob = await response.blob();
+    return blob;
+
+  } catch (error) {
+    console.error('匯出CSV失敗:', error);
+    throw error;
+  }
+}
+
+/**
+ * 匯出PDF報告（暫緩實作）
+ */
+export async function exportPdfReport(taskId: string): Promise<Blob> {
+  throw new Error('PDF報告匯出功能已暫緩至Phase 4實作');
 }

@@ -484,3 +484,421 @@ export interface TrainingWindowPreview {
     end: number | null;
   };
 }
+
+// ===== Phase 3.6: 優化結果展示UI 類型定義 =====
+
+/**
+ * 策略參數
+ * 定義策略的完整參數組合
+ */
+export interface StrategyParameters {
+  /** 數據源 (close/open/high/low/volume/taker_ratio) */
+  data_source: string;
+  /** 指標類型 (ema/sma/rsi等) */
+  indicator_type: string;
+  /** 策略邏輯 (three_line/short_long_cross/mid_long_cross) */
+  strategy_logic: string;
+  /** EMA短週期參數 */
+  ema_short?: number;
+  /** EMA中週期參數 */
+  ema_mid?: number;
+  /** EMA長週期參數 */
+  ema_long?: number;
+  /** 其他動態參數 */
+  [key: string]: any;
+}
+
+/**
+ * 試驗摘要
+ * 單個Optuna試驗的完整信息
+ */
+export interface TrialSummary {
+  /** 試驗編號 */
+  trial_number: number;
+  /** 參數組合 */
+  params: StrategyParameters;
+  /** 目標值 (separation) */
+  value: number;
+  /** 試驗狀態 */
+  state: 'COMPLETE' | 'PRUNED' | 'FAIL';
+  /** 完成時間 */
+  datetime_complete: string;
+  /** 中間值（用於剪枝分析） */
+  intermediate_values?: number[];
+  /** 試驗持續時間（單位：秒） */
+  duration?: number;
+}
+
+/**
+ * 參數重要性
+ * Optuna計算的參數影響力分析
+ */
+export interface ParamImportance {
+  /** 參數名稱 */
+  parameter_name: string;
+  /** 重要性得分 (範圍 0-1, 1=最重要) */
+  importance: number;
+  /** 排名 (1=最重要) */
+  rank: number;
+}
+
+/**
+ * Trial - 單次優化試驗記錄
+ * 對應 OptimizationHistoryPoint
+ */
+export interface Trial {
+  /** 試驗編號 */
+  trial_number: number;
+  /** 目標值 (separation) */
+  value: number;
+  /** 截至當前的最佳值 */
+  best_value_so_far: number;
+  /** 完成時間 */
+  datetime: string;
+  /** 參數組合 */
+  params: Record<string, any>;
+  /** 試驗狀態 */
+  state: 'COMPLETE' | 'PRUNED' | 'FAIL';
+}
+
+/**
+ * 月度數據
+ * 按月分組的穩定性分析數據
+ */
+export interface MonthlyData {
+  /** 月份 (YYYY-MM) */
+  month: string;
+  /** 該月的separation值 */
+  separation: number;
+  /** 該月的正例平均密度 */
+  positive_density: number;
+  /** 該月的反例平均密度 */
+  negative_density: number;
+  /** 該月的案例數量 */
+  case_count: number;
+}
+
+/**
+ * 穩定性分析
+ * 策略在不同時期的表現穩定性評估
+ */
+export interface StabilityAnalysis {
+  /** 月度separation數據 */
+  monthly_separations: MonthlyData[];
+  /** 平均separation */
+  mean_separation: number;
+  /** separation標準差 */
+  std_separation: number;
+  /** 變異係數 (CV = std / mean) */
+  cv: number;
+  /** separation > 0的月份占比 */
+  positive_ratio: number;
+  /** 表現最差的月份 */
+  worst_month: MonthlyData;
+  /** 表現最好的月份 */
+  best_month: MonthlyData;
+}
+
+/**
+ * Pareto前沿解
+ * 多目標優化中的非支配解
+ */
+export interface ParetoSolution {
+  /** 試驗編號 */
+  trial_number: number;
+  /** 參數組合 */
+  params: StrategyParameters;
+  /** 目標1: separation */
+  separation: number;
+  /** 目標2: 穩定性得分 (1 - CV) */
+  stability_score: number;
+  /** 是否為推薦解 */
+  is_recommended: boolean;
+}
+
+/**
+ * 優化結果
+ * 完整的Optuna優化結果數據
+ */
+export interface OptimizationResult {
+  /** 任務ID */
+  task_id: string;
+  /** 最佳目標值 (最佳separation) */
+  best_value: number;
+  /** 最佳參數組合 */
+  best_params: StrategyParameters;
+  /** 最佳試驗編號 */
+  best_trial_number: number;
+  /** 總試驗次數 */
+  total_trials: number;
+  /** 優化總耗時（秒） */
+  optimization_time: number;
+  /** 收斂歷史（每次試驗的當前最佳值） */
+  convergence_history: number[];
+  /** 所有試驗摘要 */
+  trials_summary: TrialSummary[];
+  /** 參數重要性分析 */
+  param_importances?: ParamImportance[];
+  /** 信號密度分析結果 */
+  density_analysis: SignalDensityResponse;
+  /** 穩定性分析 */
+  stability_analysis?: StabilityAnalysis;
+  /** Pareto前沿數據（多目標優化） */
+  pareto_front?: ParetoSolution[];
+  /** 創建時間 */
+  created_at: string;
+  /** 完成時間 */
+  completed_at?: string;
+}
+
+/**
+ * 參數重要性分析響應
+ * 後端API返回的參數重要性數據
+ */
+export interface ImportanceAnalysisResponse {
+  /** 任務ID */
+  task_id: string;
+  /** 參數重要性列表 */
+  importances: ParamImportance[];
+  /** 分析方法 (fanova/permutation) */
+  method: string;
+  /** 計算時間戳 */
+  computed_at: string;
+}
+
+/**
+ * 優化歷史響應
+ * 後端API返回的優化歷程數據
+ */
+export interface OptimizationHistoryResponse {
+  /** 任務ID */
+  task_id: string;
+  /** 收斂歷史（累積最佳值） */
+  convergence_history: number[];
+  /** 所有試驗的目標值 */
+  trial_values: number[];
+  /** 試驗編號列表 */
+  trial_numbers: number[];
+  /** 試驗狀態列表 */
+  trial_states: string[];
+  /** 總試驗次數 */
+  total_trials: number;
+  /** 完成試驗次數 */
+  completed_trials: number;
+  /** 剪枝試驗次數 */
+  pruned_trials: number;
+  /** 失敗試驗次數 */
+  failed_trials: number;
+}
+
+/**
+ * 參數空間響應
+ * 後端API返回的參數空間探索數據
+ */
+export interface ParamSpaceResponse {
+  /** 任務ID */
+  task_id: string;
+  /** 所有試驗數據 */
+  trials: {
+    /** 試驗編號 */
+    number: number;
+    /** 參數字典 */
+    params: Record<string, any>;
+    /** 目標值 */
+    value: number;
+    /** 狀態 */
+    state: string;
+  }[];
+  /** 參數名稱列表 */
+  param_names: string[];
+  /** 參數範圍 */
+  param_ranges: Record<string, { min: number; max: number }>;
+}
+
+/**
+ * 策略對比結果
+ * 多個策略的並列對比數據
+ */
+export interface ComparisonResult {
+  /** 對比的策略列表 */
+  strategies: {
+    /** 任務ID */
+    task_id: string;
+    /** 策略名稱 */
+    name: string;
+    /** 核心指標 */
+    metrics: {
+      separation: number;
+      p_value: number;
+      cohens_d: number;
+      cv: number;
+      positive_density: number;
+      negative_density: number;
+    };
+    /** 最佳參數 */
+    best_params: StrategyParameters;
+  }[];
+  /** 對比時間戳 */
+  compared_at: string;
+}
+
+/**
+ * 匯出格式類型
+ */
+export type ExportFormat = 'csv' | 'png' | 'pdf';
+
+/**
+ * 圖表類型
+ */
+export type ChartType = 
+  | 'box_plot'           // 箱型圖
+  | 'histogram'          // 直方圖
+  | 'violin_plot'        // 小提琴圖
+  | 'convergence'        // 收斂曲線
+  | 'param_importance'   // 參數重要性
+  | 'stability'          // 穩定性時間序列
+  | 'param_space_2d'     // 2D參數空間
+  | 'param_space_3d'     // 3D參數空間
+  | 'pareto_front';      // Pareto前沿
+
+/**
+ * 圖表配置
+ */
+export interface ChartConfig {
+  /** 圖表類型 */
+  type: ChartType;
+  /** 圖表標題 */
+  title: string;
+  /** 圖表寬度 */
+  width?: number;
+  /** 圖表高度 */
+  height?: number;
+  /** 是否顯示圖例 */
+  showLegend?: boolean;
+  /** 自定義顏色方案 */
+  colors?: string[];
+}
+
+/**
+ * 統計顯著性等級
+ */
+export type SignificanceLevel = 'highly_significant' | 'significant' | 'not_significant';
+
+/**
+ * 效果量等級
+ */
+export type EffectSizeLevel = 'large' | 'medium' | 'small' | 'negligible';
+
+/**
+ * 穩定性等級
+ */
+export type StabilityLevel = 'stable' | 'moderate' | 'unstable';
+
+/**
+ * 策略質量評估
+ */
+export interface StrategyQualityAssessment {
+  /** 整體評級 (excellent/good/weak) */
+  overall_rating: 'excellent' | 'good' | 'weak';
+  /** 統計顯著性等級 */
+  significance: SignificanceLevel;
+  /** 效果量等級 */
+  effect_size: EffectSizeLevel;
+  /** 穩定性等級 */
+  stability: StabilityLevel;
+  /** 警告信息 */
+  warnings: string[];
+  /** 建議信息 */
+  recommendations: string[];
+}
+
+/**
+ * 獲取統計顯著性等級
+ */
+export function getSignificanceLevel(pValue: number): SignificanceLevel {
+  if (pValue < 0.01) return 'highly_significant';
+  if (pValue < 0.05) return 'significant';
+  return 'not_significant';
+}
+
+/**
+ * 獲取效果量等級
+ */
+export function getEffectSizeLevel(cohensD: number): EffectSizeLevel {
+  const absD = Math.abs(cohensD);
+  if (absD >= 0.8) return 'large';
+  if (absD >= 0.5) return 'medium';
+  if (absD >= 0.2) return 'small';
+  return 'negligible';
+}
+
+/**
+ * 獲取穩定性等級
+ */
+export function getStabilityLevel(cv: number): StabilityLevel {
+  if (cv < 0.3) return 'stable';
+  if (cv < 0.5) return 'moderate';
+  return 'unstable';
+}
+
+/**
+ * 評估策略質量
+ */
+export function assessStrategyQuality(
+  result: OptimizationResult
+): StrategyQualityAssessment {
+  const { separation, p_value, cohens_d, stability_cv } = result.density_analysis;
+  
+  // NaN 檢查：數據包含無效值時返回弱評級
+  if (isNaN(separation) || isNaN(p_value) || isNaN(cohens_d) || isNaN(stability_cv)) {
+    return {
+      overall_rating: 'weak',
+      significance: 'not_significant',
+      effect_size: 'negligible',
+      stability: 'unstable',
+      warnings: ['數據包含無效值 (NaN)，無法進行質量評估'],
+      recommendations: ['請檢查輸入數據的完整性']
+    };
+  }
+  
+  const significance = getSignificanceLevel(p_value);
+  const effectSize = getEffectSizeLevel(cohens_d);
+  const stability = getStabilityLevel(stability_cv);
+  
+  const warnings: string[] = [];
+  const recommendations: string[] = [];
+  
+  // 判斷整體評級
+  let overallRating: 'excellent' | 'good' | 'weak' = 'weak';
+  
+  if (separation > 0.3 && p_value < 0.05 && cohens_d > 0.5 && stability_cv < 0.5) {
+    overallRating = 'excellent';
+  } else if (separation > 0.2 && p_value < 0.10) {
+    overallRating = 'good';
+  }
+  
+  // 生成警告
+  if (p_value >= 0.05) {
+    warnings.push(`統計顯著性不足 (p-value = ${p_value.toFixed(4)})`);
+    recommendations.push('建議增加樣本數量或調整策略參數');
+  }
+  
+  if (cohens_d < 0.2) {
+    warnings.push(`效果量較小 (Cohen's d = ${cohens_d.toFixed(2)})`);
+    recommendations.push('策略區分能力較弱，可能需要優化參數範圍');
+  }
+  
+  if (stability_cv > 0.5) {
+    warnings.push(`穩定性較差 (CV = ${stability_cv.toFixed(2)})`);
+    recommendations.push('策略在不同時期表現波動大，需謹慎使用');
+  }
+  
+  return {
+    overall_rating: overallRating,
+    significance,
+    effect_size: effectSize,
+    stability,
+    warnings,
+    recommendations,
+  };
+}
