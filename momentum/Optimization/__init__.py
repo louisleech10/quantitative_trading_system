@@ -16,6 +16,7 @@ Date: 2025-11-02
 from .optuna_optimizer import OptunaOptimizer, ParameterRanges, OptimizationResult
 from .checkpoint_manager import CheckpointManager
 from .error_handler import OptimizationErrorHandler, ErrorType
+from .progress_monitor import ProgressMonitor, ProgressStats
 
 __all__ = [
     'OptunaOptimizer',
@@ -23,5 +24,7 @@ __all__ = [
     'OptimizationResult',
     'CheckpointManager',
     'OptimizationErrorHandler',
-    'ErrorType'
+    'ErrorType',
+    'ProgressMonitor',
+    'ProgressStats'
 ]

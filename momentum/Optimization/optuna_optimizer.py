@@ -19,6 +19,8 @@ Ultra Think 記錄:
 - Day 3 步驟1: CheckpointManager - 手動檢查點保存機制(每50次試驗,pickle格式)
 - Day 3 步驟2: ErrorHandler - 錯誤分類與重試機制(exponential backoff)
 - Day 3 步驟3: 整合 - 包裝器模式整合重試邏輯,callback整合檢查點保存
+- Day 4 步驟1: ProgressMonitor - 進度追蹤與實時通知(里程碑、ETA、試驗速度)
+- Day 4 步驟2: 整合 - callback整合進度監控,檢查點包含progress_statistics
 
 優化內容:
 Day 1:
@@ -44,6 +46,14 @@ Day 3:
 - ✅ 檢查點保存(optimize()的callback每50次試驗自動保存)
 - ✅ 錯誤統計(檢查點包含error_statistics數據)
 - ✅ 參數配置(checkpoint_dir,checkpoint_interval,max_retries,retry_base_delay)
+
+Day 4:
+- ✅ ProgressMonitor整合(__init__添加enable_progress_monitor,progress_notification_callback)
+- ✅ optimize()創建ProgressMonitor實例(total_trials,notification_callback)
+- ✅ callback整合進度監控(on_trial_complete自動調用)
+- ✅ 檢查點包含progress_statistics(completion_percentage,ETA,trials_per_hour等)
+- ✅ 優化完成調用finish()(發送optimization_finished通知)
+- ✅ 里程碑通知(25%/50%/75%),新最佳值通知,實時進度更新
 
 Author: Claude (Phase 3.5)
 Date: 2025-11-02
@@ -74,6 +84,7 @@ from api.services.case_storage import CaseStorage
 # 導入新增的容錯機制
 from momentum.Optimization.checkpoint_manager import CheckpointManager
 from momentum.Optimization.error_handler import OptimizationErrorHandler, ErrorType
+from momentum.Optimization.progress_monitor import ProgressMonitor, ProgressStats
 
 
 # ==================== 錯誤分類定義 ====================
@@ -197,7 +208,9 @@ class OptunaOptimizer:
         checkpoint_dir: str = "data/checkpoints",
         checkpoint_interval: int = 50,
         max_retries: int = 3,
-        retry_base_delay: float = 1.0
+        retry_base_delay: float = 1.0,
+        enable_progress_monitor: bool = True,
+        progress_notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
     ):
         """
         初始化Optuna優化器
@@ -217,6 +230,8 @@ class OptunaOptimizer:
             checkpoint_interval: 檢查點保存間隔(每N次試驗,default: 50)
             max_retries: 錯誤最大重試次數(default: 3)
             retry_base_delay: 重試基礎延遲(秒,default: 1.0)
+            enable_progress_monitor: 是否啟用進度監控(default: True)
+            progress_notification_callback: 進度通知回調函數(event_type, data)
         """
         self.study_name = study_name
         self.storage = storage
@@ -228,6 +243,8 @@ class OptunaOptimizer:
         self.random_seed = random_seed
         self.parameter_ranges = parameter_ranges or ParameterRanges()
         self.use_multi_objective = use_multi_objective
+        self.enable_progress_monitor = enable_progress_monitor
+        self.progress_notification_callback = progress_notification_callback
 
         # 依賴服務
         self.signal_service = SignalAnalysisService()
@@ -260,6 +277,9 @@ class OptunaOptimizer:
             max_retries=max_retries,
             base_delay=retry_base_delay
         )
+
+        # Day 4: ProgressMonitor (在optimize()時初始化,因為需要n_trials)
+        self.progress_monitor: Optional[ProgressMonitor] = None
 
         self.logger.info(
             f"OptunaOptimizer initialized: study_name={study_name}, "
@@ -842,6 +862,17 @@ class OptunaOptimizer:
             f"n_jobs={self.n_jobs}, existing trials={initial_trials}"
         )
 
+        # Day 4: 初始化ProgressMonitor
+        if self.enable_progress_monitor:
+            self.progress_monitor = ProgressMonitor(
+                total_trials=self.n_trials,
+                notification_callback=self.progress_notification_callback,
+                milestone_percentages=[25, 50, 75],
+                log_interval=100
+            )
+            self.progress_monitor.start()
+            self.logger.info("ProgressMonitor started")
+
         # 步驟5: 定義callback追蹤進度
         last_log_trial = [0]  # 使用列表保持可變性
 
@@ -850,18 +881,20 @@ class OptunaOptimizer:
             每完成一次試驗的回調
 
             功能:
-            1. 階段性日誌記錄(每100次試驗)
-            2. 手動檢查點保存(每50次試驗,通過CheckpointManager)
-            3. 錯誤統計(通過ErrorHandler)
+            1. ProgressMonitor進度追蹤(Day 4)
+            2. 階段性日誌記錄(每100次試驗)
+            3. 手動檢查點保存(每50次試驗,通過CheckpointManager)
+            4. 錯誤統計(通過ErrorHandler)
             """
+            # Day 4: ProgressMonitor更新
+            if self.progress_monitor:
+                self.progress_monitor.on_trial_complete(study, trial)
+
             completed_trials = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
 
-            # 每100次試驗記錄一次進度日誌
+            # 每100次試驗記錄一次進度日誌(ProgressMonitor已處理,此處可簡化或移除)
+            # ProgressMonitor會自動記錄,這裡保留作為備援
             if completed_trials % 100 == 0 and completed_trials > last_log_trial[0]:
-                self.logger.info(
-                    f"Progress: {completed_trials} trials completed, "
-                    f"current best: {study.best_value:.4f}"
-                )
                 last_log_trial[0] = completed_trials
 
             # Day 3: 檢查點保存(每checkpoint_interval次試驗)
@@ -869,8 +902,22 @@ class OptunaOptimizer:
                 try:
                     # 收集額外統計數據
                     error_stats = self.error_handler.get_error_statistics()
+
+                    # Day 4: 添加進度統計到檢查點
+                    progress_stats = None
+                    if self.progress_monitor:
+                        stats = self.progress_monitor.get_progress_stats(study)
+                        progress_stats = {
+                            'completion_percentage': stats.completion_percentage,
+                            'elapsed_time': stats.elapsed_time,
+                            'estimated_remaining_time': stats.estimated_remaining_time,
+                            'trials_per_hour': stats.trials_per_hour,
+                            'avg_trial_duration': stats.avg_trial_duration
+                        }
+
                     additional_data = {
                         'error_statistics': error_stats,
+                        'progress_statistics': progress_stats,
                         'optimization_config': {
                             'positive_cases': self.positive_cases,
                             'negative_cases': self.negative_cases,
@@ -937,6 +984,10 @@ class OptunaOptimizer:
 
         except KeyboardInterrupt:
             self.logger.warning("Optimization interrupted by user")
+
+        # Day 4: 完成ProgressMonitor
+        if self.progress_monitor:
+            self.progress_monitor.finish(self.study)
 
         # 收集結果
         end_time = time.time()
