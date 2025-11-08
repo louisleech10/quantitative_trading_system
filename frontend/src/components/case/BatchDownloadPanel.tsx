@@ -170,13 +170,7 @@ export default function BatchDownloadPanel({
           <input
             type="number"
             value={lookbackBars}
-            onChange={(e) => {
-              const value = e.target.value;
-              // 允許空值（用戶正在輸入）或數字
-              if (value === '' || !isNaN(Number(value))) {
-                setLookbackBars(value === '' ? 0 : Number(value));
-              }
-            }}
+            onChange={(e) => setLookbackBars(Number(e.target.value))}
             min={1}
             max={1000}
             className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -195,13 +189,7 @@ export default function BatchDownloadPanel({
           <input
             type="number"
             value={forwardBars}
-            onChange={(e) => {
-              const value = e.target.value;
-              // 允許空值（用戶正在輸入）或數字
-              if (value === '' || !isNaN(Number(value))) {
-                setForwardBars(value === '' ? 0 : Number(value));
-              }
-            }}
+            onChange={(e) => setForwardBars(Number(e.target.value))}
             min={1}
             max={500}
             className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"

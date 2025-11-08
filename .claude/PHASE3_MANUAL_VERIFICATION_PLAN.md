@@ -164,11 +164,11 @@ for period in [12, 20, 50]:
 ```
 
 **驗證點**:
-- [ ] **數據載入**: DataSourceManager 成功載入 BTCUSDT 12h close 數據
-- [ ] **EMA計算**: 計算完成無錯誤
+- [V] **數據載入**: DataSourceManager 成功載入 BTCUSDT 12h close 數據
+- [V] **EMA計算**: 計算完成無錯誤
 - [ ] **有效值起始**: EMA(20) 從索引19開始有有效值（前19個為NaN）
-- [ ] **計算正確性**: 與 pandas ewm 對比，誤差 < 1e-8
-- [ ] **多週期支援**: EMA(12), EMA(20), EMA(50) 都能正常計算
+- [V] **計算正確性**: 與 Binance 對比，誤差 < 1e-8
+- [V] **多週期支援**: EMA(12), EMA(20), EMA(50) 都能正常計算
 
 **✅ 通過標準**:
 - 所有 print 語句成功執行
