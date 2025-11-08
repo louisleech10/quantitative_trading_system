@@ -108,4 +108,4 @@ temp/
 
 # Backup files
 *.bak
-*.backup
+*.backuplogs/
