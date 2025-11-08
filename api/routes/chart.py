@@ -24,7 +24,9 @@ async def get_chart_data(
     case_timestamp: int = Query(..., description="案例時間點T/TO（Unix秒）"),
     timeframe: str = Query(..., description="時間框架（查看用，1h/4h/1d等）"),
     max_bars: int = Query(200, description="最大返回根數（預設200）", ge=1, le=1000),
-    case_timeframe: Optional[str] = Query(None, description="案例時間框架（如12h），提供則使用TO/TC邏輯")
+    case_timeframe: Optional[str] = Query(None, description="案例時間框架（如12h），提供則使用TO/TC邏輯"),
+    lookback_bars: Optional[int] = Query(None, description="往前K線根數（預設100）", ge=1, le=1000),
+    forward_bars: Optional[int] = Query(None, description="往後K線根數（預設48）", ge=1, le=1000)
 ):
     """
     獲取圖表數據
@@ -67,7 +69,8 @@ async def get_chart_data(
     """
     logger.info(
         f"GET /api/v1/chart/data: symbol={symbol}, case_timestamp={case_timestamp}, "
-        f"timeframe={timeframe}, case_timeframe={case_timeframe}, max_bars={max_bars}"
+        f"timeframe={timeframe}, case_timeframe={case_timeframe}, max_bars={max_bars}, "
+        f"lookback_bars={lookback_bars}, forward_bars={forward_bars}"
     )
 
     try:
@@ -77,7 +80,9 @@ async def get_chart_data(
             case_timestamp=case_timestamp,
             timeframe=timeframe,
             max_bars=max_bars,
-            case_timeframe=case_timeframe
+            case_timeframe=case_timeframe,
+            lookback_bars=lookback_bars,
+            forward_bars=forward_bars
         )
 
         # 檢查結果

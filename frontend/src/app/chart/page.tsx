@@ -180,9 +180,14 @@ export default function ChartPage() {
 
         // 添加 case_timeframe 參數（從當前案例獲取）
         const caseTimeframe = currentCase.timeframe;
-        const url = `http://localhost:8000/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&case_timeframe=${caseTimeframe}&max_bars=200`;
 
-        console.log(`[ChartPage] Fetching klines: case_tf=${caseTimeframe}, view_tf=${selectedTimeframe}`);
+        // 從localStorage讀取lookback/forward參數（批量下載時保存的值）
+        const lookbackBars = localStorage.getItem('kline_lookback_bars') || '100';
+        const forwardBars = localStorage.getItem('kline_forward_bars') || '48';
+
+        const url = `http://localhost:8000/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&case_timeframe=${caseTimeframe}&max_bars=200&lookback_bars=${lookbackBars}&forward_bars=${forwardBars}`;
+
+        console.log(`[ChartPage] Fetching klines: case_tf=${caseTimeframe}, view_tf=${selectedTimeframe}, lookback=${lookbackBars}, forward=${forwardBars}`);
 
         const response = await fetch(url);
 

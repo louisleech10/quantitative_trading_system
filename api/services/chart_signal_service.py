@@ -118,22 +118,60 @@ class ChartSignalService:
             >>> print(len(result.signal_points))
             45
         """
-        start_time = time.time()
+        start_time_calc = time.time()
 
         try:
             # 1. 驗證請求
             self._validate_request(request)
 
-            # 2. 讀取 K線數據
+            # 2. 計算暖機期需求並擴展時間範圍
+            strategy_logic = request.strategy_config.strategy_logic
+            params = request.strategy_config.params
+            
+            # 計算最大 EMA 週期
+            max_period = 0
+            if strategy_logic == "three_line":
+                max_period = max(
+                    params.get("ema_short", 0),
+                    params.get("ema_mid", 0),
+                    params.get("ema_long", 0)
+                )
+            elif strategy_logic == "short_long_cross":
+                max_period = max(
+                    params.get("ema_short", 0),
+                    params.get("ema_long", 0)
+                )
+            elif strategy_logic == "mid_long_cross":
+                max_period = max(
+                    params.get("ema_mid", 0),
+                    params.get("ema_long", 0)
+                )
+            
+            # 計算暖機期（3× 最大週期）
+            warmup_bars = max_period * 3
+            
+            # 獲取 timeframe 的秒數
+            from momentum.DataExtraction.kline_storage import KlineStorageManager
+            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(request.timeframe)
+            if timeframe_seconds is None:
+                raise ValueError(f"不支援的 timeframe: {request.timeframe}")
+            
+            # 擴展時間範圍（往前擴展暖機期）
+            warmup_ms = warmup_bars * timeframe_seconds * 1000
+            extended_start_time = request.start_time - warmup_ms
+            
             self.logger.info(
                 f"開始計算圖表信號: {request.symbol} {request.timeframe}, "
-                f"時間範圍: {request.start_time} ~ {request.end_time}"
+                f"用戶請求範圍: {request.start_time} ~ {request.end_time}, "
+                f"最大EMA週期: {max_period}, 暖機需求: {warmup_bars} 根K線, "
+                f"擴展後範圍: {extended_start_time} ~ {request.end_time}"
             )
 
+            # 3. 讀取 K線數據（包含暖機期）
             klines = self._load_klines(
                 symbol=request.symbol,
                 timeframe=request.timeframe,
-                start_time=request.start_time,
+                start_time=extended_start_time,
                 end_time=request.end_time
             )
 
@@ -143,31 +181,34 @@ class ChartSignalService:
                 )
 
             total_bars = len(klines)
-            self.logger.info(f"成功讀取 {total_bars} 根K線")
+            self.logger.info(f"成功讀取 {total_bars} 根K線（包含 {warmup_bars} 根暖機數據）")
 
-            # 3. 計算指標
+            # 4. 計算指標（會自動檢查暖機充足性）
             indicator_results = self._calculate_indicators(
                 klines=klines,
                 strategy_config=request.strategy_config
             )
 
-            # 4. 評估策略邏輯 (向量化)
+            # 5. 評估策略邏輯 (向量化)
             signal_mask = self._evaluate_strategy_logic(
                 indicator_results=indicator_results,
                 strategy_config=request.strategy_config
             )
 
-            # 5. 生成信號點列表
+            # 6. 生成信號點列表（過濾掉暖機期的信號點）
             signal_points = self._generate_signal_points(
                 klines=klines,
                 indicator_results=indicator_results,
-                signal_mask=signal_mask
+                signal_mask=signal_mask,
+                user_start_time=request.start_time  # 只返回用戶請求範圍內的信號
             )
 
             signal_count = len(signal_points)
-            signal_density = signal_count / total_bars if total_bars > 0 else 0.0
+            # 計算密度時使用實際信號範圍的K線數
+            signal_range_bars = total_bars - warmup_bars
+            signal_density = signal_count / signal_range_bars if signal_range_bars > 0 else 0.0
 
-            # 6. 智能採樣 (若超過限制)
+            # 7. 智能採樣 (若超過限制)
             is_sampled = False
             if len(signal_points) > self.MAX_SIGNAL_POINTS:
                 self.logger.warning(
@@ -176,14 +217,14 @@ class ChartSignalService:
                 signal_points = self._sample_signals(signal_points, self.MAX_SIGNAL_POINTS)
                 is_sampled = True
 
-            # 7. 生成策略名稱
+            # 8. 生成策略名稱
             strategy_name = self._generate_strategy_name(request.strategy_config)
 
             # 記錄性能
-            elapsed_time = time.time() - start_time
+            elapsed_time = time.time() - start_time_calc
             self.logger.info(
                 f"圖表信號計算完成: "
-                f"total_bars={total_bars}, "
+                f"total_bars={total_bars} (包含暖機 {warmup_bars}), "
                 f"signal_count={signal_count}, "
                 f"density={signal_density:.2%}, "
                 f"sampled={is_sampled}, "
@@ -262,6 +303,8 @@ class ChartSignalService:
     ) -> pd.DataFrame:
         """
         從 HDF5 讀取 K線數據
+        
+        注意：start_time 和 end_time 應該已經包含暖機期的擴展
 
         Args:
             symbol: 交易對
@@ -274,13 +317,20 @@ class ChartSignalService:
 
         Raises:
             FileNotFoundError: K線數據不存在
+            ValueError: 數據不連續
         """
         try:
-            klines = self.kline_storage.load_klines(
+            # 將毫秒轉換為秒
+            start_ts_sec = start_time // 1000
+            end_ts_sec = end_time // 1000
+            
+            # 讀取K線數據（會自動進行連續性檢查）
+            klines = self.kline_storage.read_klines(
                 symbol=symbol,
-                interval=timeframe,
-                start_time=start_time,
-                end_time=end_time
+                timeframe=timeframe,
+                start_time=start_ts_sec,
+                end_time=end_ts_sec,
+                validate_continuity=True  # 零容忍連續性檢查
             )
 
             if klines is None or len(klines) == 0:
@@ -290,6 +340,10 @@ class ChartSignalService:
 
             return klines
 
+        except ValueError as e:
+            # 連續性檢查失敗，向上傳播
+            self.logger.error(f"數據連續性檢查失敗: {e}")
+            raise
         except Exception as e:
             self.logger.error(f"讀取K線數據失敗: {e}", exc_info=True)
             raise
@@ -312,7 +366,7 @@ class ChartSignalService:
             指標結果字典 (indicator_name → np.ndarray)
 
         Raises:
-            ValueError: 指標計算失敗
+            ValueError: 指標計算失敗或暖機數據不足
 
         Note:
             對於 EMA 三線策略,返回:
@@ -328,6 +382,48 @@ class ChartSignalService:
             params = strategy_config.params
             data_source = strategy_config.data_source
             indicator_type = strategy_config.indicator_type
+
+            # 計算最大 EMA 週期（用於暖機檢查）
+            max_period = 0
+            if strategy_logic == "three_line":
+                max_period = max(
+                    params.get("ema_short", 0),
+                    params.get("ema_mid", 0),
+                    params.get("ema_long", 0)
+                )
+            elif strategy_logic == "short_long_cross":
+                max_period = max(
+                    params.get("ema_short", 0),
+                    params.get("ema_long", 0)
+                )
+            elif strategy_logic == "mid_long_cross":
+                max_period = max(
+                    params.get("ema_mid", 0),
+                    params.get("ema_long", 0)
+                )
+            
+            # 暖機充足性檢查（3× 最大週期）
+            required_warmup_bars = max_period * 3
+            available_bars = len(klines)
+            
+            if available_bars < required_warmup_bars:
+                first_ts = int(klines.iloc[0]['timestamp']) if len(klines) > 0 else 0
+                last_ts = int(klines.iloc[-1]['timestamp']) if len(klines) > 0 else 0
+                
+                error_detail = {
+                    "code": "INSUFFICIENT_WARMUP",
+                    "message": f"暖機數據不足: 最大 EMA 週期為 {max_period}，需要 {required_warmup_bars} 根K線（3× 週期），實際只有 {available_bars} 根",
+                    "max_ema_period": max_period,
+                    "required_bars": required_warmup_bars,
+                    "available_bars": available_bars,
+                    "missing_bars": required_warmup_bars - available_bars,
+                    "available_start_timestamp": first_ts,
+                    "available_end_timestamp": last_ts,
+                    "suggested_action": f"請擴大時間範圍或下載更多歷史數據，至少需要 {required_warmup_bars} 根K線才能準確計算 EMA{max_period}"
+                }
+                
+                self.logger.error(f"暖機數據不足: {error_detail}")
+                raise ValueError(error_detail["message"])
 
             results = {}
 
@@ -437,7 +533,8 @@ class ChartSignalService:
         self,
         klines: pd.DataFrame,
         indicator_results: Dict[str, np.ndarray],
-        signal_mask: np.ndarray
+        signal_mask: np.ndarray,
+        user_start_time: Optional[int] = None
     ) -> List[SignalPoint]:
         """
         生成信號點列表
@@ -448,6 +545,7 @@ class ChartSignalService:
             klines: K線數據
             indicator_results: 指標結果字典
             signal_mask: 信號布林掩碼
+            user_start_time: 用戶請求的起始時間戳（毫秒），如提供則過濾掉暖機期的信號點
 
         Returns:
             SignalPoint 列表
@@ -458,17 +556,22 @@ class ChartSignalService:
         signal_indices = np.where(signal_mask)[0]
 
         for idx in signal_indices:
-            # 提取時間戳
-            timestamp = int(klines.iloc[idx]["timestamp"])
+            # 提取時間戳（秒）
+            timestamp_sec = int(klines.iloc[idx]["timestamp"])
+            timestamp_ms = timestamp_sec * 1000
+            
+            # 如果指定了用戶起始時間，過濾掉暖機期的信號點
+            if user_start_time is not None and timestamp_ms < user_start_time:
+                continue
 
             # 提取指標值
             indicator_values = {}
             for indicator_name, values in indicator_results.items():
                 indicator_values[indicator_name] = float(values[idx])
 
-            # 創建 SignalPoint
+            # 創建 SignalPoint（timestamp 使用秒）
             signal_point = SignalPoint(
-                timestamp=timestamp,
+                timestamp=timestamp_ms,  # API 模型期望毫秒
                 indicator_values=indicator_values,
                 signal_density=None  # 暫時不計算單點密度
             )

@@ -92,6 +92,10 @@ export default function BatchDownloadPanel({
     setError(null);
     setProgress(null);
 
+    // 保存lookback/forward設定到localStorage，供圖表頁面使用
+    localStorage.setItem('kline_lookback_bars', lookbackBars.toString());
+    localStorage.setItem('kline_forward_bars', forwardBars.toString());
+
     try {
       const response = await fetch("/api/v1/kline/batch-download", {
         method: "POST",

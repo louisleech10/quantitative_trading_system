@@ -63,7 +63,9 @@ class ChartDataService:
                       case_timestamp: int,
                       timeframe: str,
                       max_bars: int = 200,
-                      case_timeframe: Optional[str] = None) -> Dict:
+                      case_timeframe: Optional[str] = None,
+                      lookback_bars: Optional[int] = None,
+                      forward_bars: Optional[int] = None) -> Dict:
         """
         獲取圖表數據
 
@@ -82,6 +84,8 @@ class ChartDataService:
             timeframe: 時間框架（查看用，如1h, 4h）
             max_bars: 最大返回根數（預設200）
             case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
+            lookback_bars: 往前K線根數（預設100，僅當case_timeframe提供時使用）
+            forward_bars: 往後K線根數（預設48，僅當case_timeframe提供時使用）
 
         Returns:
             Dict: 符合API規範的響應格式
@@ -107,9 +111,9 @@ class ChartDataService:
 
             # 計算前後根數
             if case_timeframe:
-                # 新邏輯：預設往前100根，往後48根（可被max_bars覆蓋）
-                bars_before = 100
-                bars_after = 48
+                # 新邏輯：使用提供的lookback_bars和forward_bars，或使用預設值
+                bars_before = lookback_bars if lookback_bars is not None else 100
+                bars_after = forward_bars if forward_bars is not None else 48
             else:
                 # 舊邏輯：以T為中心，均分max_bars
                 bars_before = max_bars // 2
@@ -117,7 +121,8 @@ class ChartDataService:
 
             logger.info(
                 f"Fetching chart data: {symbol}/{timeframe}, "
-                f"TO={case_timestamp}, case_tf={case_timeframe}, max_bars={max_bars}"
+                f"TO={case_timestamp}, case_tf={case_timeframe}, max_bars={max_bars}, "
+                f"lookback={bars_before}, forward={bars_after}"
             )
 
             # 確保緩存覆蓋需求區間
