@@ -19,7 +19,7 @@ K線數據提供者抽象基類
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import logging
@@ -129,16 +129,25 @@ class KlineProviderBase(ABC):
     可選方法（可覆寫）：
     4. get_supported_timeframes(): 返回支援的timeframe列表
     5. ping(): 健康檢查
+    6. _calculate_next_batch_start(): 計算下一批次起始時間（用於多批次下載）
+    
+    批次下載規範：
+    - 子類必須設置 batch_size 屬性（每批次最大K線數量）
+    - 如需分批下載，應實現 _calculate_next_batch_start() 方法
+    - 批次邊界計算必須使用計畫時間，不可依賴實際返回數據
+    - 確保批次連續無縫，避免重疊或缺口
     """
 
-    def __init__(self, name: str = "UnknownProvider"):
+    def __init__(self, name: str = "UnknownProvider", batch_size: int = 1000):
         """
         初始化Provider
 
         Args:
             name: Provider名稱（用於日誌和錯誤追蹤）
+            batch_size: 單批次最大K線數量（默認1000，子類可覆寫）
         """
         self.name = name
+        self.batch_size = batch_size
         self.logger = logging.getLogger(f"{__name__}.{name}")
 
     @abstractmethod
@@ -234,6 +243,30 @@ class KlineProviderBase(ABC):
         except Exception as e:
             self.logger.warning(f"Ping failed for {self.name}: {e}")
             return False
+    
+    def _calculate_next_batch_start(self, 
+                                    batch_end: datetime, 
+                                    timeframe_seconds: int) -> datetime:
+        """
+        計算下一批次的起始時間（用於多批次下載）
+        
+        ⚠️ 關鍵設計原則：
+        - 必須使用計畫的 batch_end，不可使用實際返回數據的最後時間戳
+        - 確保批次連續：next_start = batch_end + 1*timeframe
+        - 避免重疊或缺口
+        
+        Args:
+            batch_end: 當前批次計畫結束時間
+            timeframe_seconds: 時間框架秒數
+            
+        Returns:
+            datetime: 下一批次起始時間
+            
+        Note:
+            默認實現：batch_end + timeframe_seconds
+            子類可根據API特性覆寫（如某些API的 startTime 為 exclusive）
+        """
+        return batch_end + timedelta(seconds=timeframe_seconds)
 
     def _validate_dataframe(self, df: pd.DataFrame) -> None:
         """

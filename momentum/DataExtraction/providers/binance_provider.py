@@ -299,16 +299,26 @@ class BinanceProvider(KlineProviderBase):
 
             if batch_klines:
                 all_klines.extend(batch_klines)
-                self.logger.info(
-                    f"[{progress_pct}%] Batch {batch_count}: downloaded {len(batch_klines)} klines, "
-                    f"total: {len(all_klines)}"
-                )
-
-                # 更新下一批次開始時間（使用最後一根K線的時間+1）
-                last_open_time = batch_klines[-1][0]
-                current_start = datetime.fromtimestamp(last_open_time / 1000) + timedelta(
+                
+                # ⚠️ 重要：使用 utcfromtimestamp 保持 UTC 時區一致性
+                last_kline_time = datetime.utcfromtimestamp(batch_klines[-1][0] / 1000)
+                
+                # 使用實際返回的最後一根K線計算下一批次起點
+                # 注意：幣安 startTime 是 inclusive，所以下一批從 last_open_time + timeframe 開始
+                last_open_time_ms = batch_klines[-1][0]
+                next_start = datetime.utcfromtimestamp(last_open_time_ms / 1000) + timedelta(
                     seconds=timeframe_seconds
                 )
+                
+                self.logger.info(
+                    f"[{progress_pct}%] Batch {batch_count}: downloaded {len(batch_klines)} klines, "
+                    f"total: {len(all_klines)} | "
+                    f"最後K線(UTC): {last_kline_time.strftime('%Y-%m-%d %H:%M')}, "
+                    f"下一批次(UTC): {next_start.strftime('%Y-%m-%d %H:%M')}"
+                )
+
+                # 更新下一批次開始時間
+                current_start = next_start
             else:
                 # 沒有更多數據
                 self.logger.info(f"Batch {batch_count}: no more data available")
