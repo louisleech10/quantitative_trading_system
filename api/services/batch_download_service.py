@@ -79,6 +79,18 @@ class BatchDownloadService:
         '1d': 86400,
         '1w': 604800,
     }
+    
+    # Binance API 已知的歷史數據缺口（無法下載的時間段）
+    # 這些是 Binance 平台級別的數據缺失，所有交易對都受影響
+    KNOWN_DATA_GAPS = [
+        {
+            'start': datetime(2023, 3, 24, 13, 0, 0),  # 2023-03-24 13:00:00 UTC
+            'end': datetime(2023, 3, 24, 14, 0, 0),    # 2023-03-24 14:00:00 UTC (不含)
+            'reason': 'Binance 系統維護/數據缺口',
+            'affects': 'all',  # 影響所有交易對
+        },
+        # 未來如發現其他缺口，可以在此添加
+    ]
 
     def __init__(
         self,
@@ -263,17 +275,36 @@ class BatchDownloadService:
 
                                         # 檢查現有數據是否完全覆蓋請求範圍
                                         if meta_start <= requested_start and meta_end >= requested_end:
-                                            # ✅ 現有數據完全覆蓋請求範圍 - 安全跳過
-                                            logger.warning(
-                                                f"⏭️  SKIPPING download for {symbol}/{timeframe} (force_redownload=False)\n"
-                                                f"   Existing data range: {meta_start} to {meta_end}\n"
-                                                f"   Requested range: {requested_start} to {requested_end}\n"
-                                                f"   ✅ Requested range is FULLY COVERED by existing data\n"
-                                                f"   Affected cases: {len(group_cases)} cases will read from existing HDF5"
-                                            )
-                                            async with stats_lock:
-                                                skipped_cases += len(group_cases)
-                                            continue
+                                            # 時間範圍覆蓋，但還需要驗證數據連續性
+                                            try:
+                                                # 讀取數據並驗證連續性（避免有缺口的數據被誤判為完整）
+                                                existing_df = await asyncio.to_thread(
+                                                    self.kline_storage.read_klines,
+                                                    symbol,
+                                                    timeframe,
+                                                    validate_continuity=True  # 啟用零容忍連續性驗證
+                                                )
+                                                # 如果沒有拋出異常，說明數據連續完整
+                                                logger.warning(
+                                                    f"⏭️  SKIPPING download for {symbol}/{timeframe} (force_redownload=False)\n"
+                                                    f"   Existing data range: {meta_start} to {meta_end}\n"
+                                                    f"   Requested range: {requested_start} to {requested_end}\n"
+                                                    f"   ✅ Requested range is FULLY COVERED by existing data\n"
+                                                    f"   ✅ Data continuity verified: {len(existing_df)} bars with no gaps\n"
+                                                    f"   Affected cases: {len(group_cases)} cases will read from existing HDF5"
+                                                )
+                                                async with stats_lock:
+                                                    skipped_cases += len(group_cases)
+                                                continue
+                                            except ValueError as e:
+                                                # 連續性驗證失敗 - 數據有缺口，需要重新下載
+                                                logger.warning(
+                                                    f"⚠️  Existing data for {symbol}/{timeframe} has GAPS - forcing redownload\n"
+                                                    f"   Existing range: {meta_start} to {meta_end}\n"
+                                                    f"   Continuity error: {str(e)}\n"
+                                                    f"   🔄 Will redownload to ensure data integrity"
+                                                )
+                                                # 不 continue，讓代碼繼續執行下載流程
                                         else:
                                             # ❌ 現有數據不覆蓋請求範圍 - 必須下載
                                             logger.warning(
@@ -354,12 +385,29 @@ class BatchDownloadService:
                     # Step 4: 為每個案例創建HDF5存儲（按案例組織）
                     for case in group_cases:
                         try:
-                            # 計算案例的具體時間範圍
+                            # 計算案例所需的時間範圍
                             case_start, case_end = self._calculate_case_time_range(
                                 case,
                                 request.lookback_bars,
                                 request.forward_bars
                             )
+                            
+                            # 檢查時間範圍是否包含已知的數據缺口
+                            has_gaps, gaps = self._check_timerange_has_known_gaps(case_start, case_end)
+                            
+                            if has_gaps:
+                                # 跳過包含已知缺口的案例
+                                gap_info = gaps[0]  # 顯示第一個缺口
+                                logger.warning(
+                                    f"⚠️  SKIPPING case {case.case_id} due to known data gap\n"
+                                    f"   Case time range: {case_start} to {case_end}\n"
+                                    f"   Known gap: {gap_info['start']} to {gap_info['end']}\n"
+                                    f"   Reason: {gap_info['reason']}\n"
+                                    f"   這是 Binance API 級別的數據缺失，無法下載補齊"
+                                )
+                                async with stats_lock:
+                                    skipped_cases += 1
+                                continue
 
                             # 從已下載數據中讀取案例範圍的K線
                             # 注意：KlineStorageManager.read_klines() 期望整數時間戳，不是datetime對象
@@ -771,6 +819,27 @@ class BatchDownloadService:
                 exc_info=True
             )
             raise
+
+
+    def _check_timerange_has_known_gaps(self, start: datetime, end: datetime) -> Tuple[bool, List[Dict]]:
+        """
+        檢查時間範圍是否包含已知的數據缺口
+        
+        Args:
+            start: 開始時間
+            end: 結束時間
+            
+        Returns:
+            Tuple[bool, List[Dict]]: (是否有缺口, 缺口列表)
+        """
+        found_gaps = []
+        
+        for gap in self.KNOWN_DATA_GAPS:
+            # 檢查時間範圍是否與已知缺口重疊
+            if gap['start'] < end and gap['end'] > start:
+                found_gaps.append(gap)
+        
+        return (len(found_gaps) > 0, found_gaps)
 
 
 # 創建全局實例

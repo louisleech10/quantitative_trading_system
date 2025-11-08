@@ -44,6 +44,7 @@ class StorageFailureType(Enum):
     SYMBOL_NOT_FOUND = "symbol_not_found"
     TIMEFRAME_NOT_FOUND = "timeframe_not_found"
     FILE_NOT_FOUND = "file_not_found"
+    DATA_DISCONTINUOUS = "data_discontinuous"
     UNKNOWN = "unknown"
 
 
@@ -99,6 +100,10 @@ def classify_storage_error(error: Exception) -> StorageFailureType:
     if 'file not found' in error_msg or 'no such file' in error_msg:
         return StorageFailureType.FILE_NOT_FOUND
 
+    # 數據不連續
+    if 'discontinuous' in error_msg or 'missing bars' in error_msg or 'data gap' in error_msg:
+        return StorageFailureType.DATA_DISCONTINUOUS
+
     # 未知錯誤
     return StorageFailureType.UNKNOWN
 
@@ -126,6 +131,10 @@ STORAGE_RETRY_CONFIG = {
         'max_retries': 1,
         'backoff_base': 0.2,
         'description': '檔案不存在，嘗試重建'
+    },
+    StorageFailureType.DATA_DISCONTINUOUS: {
+        'max_retries': 0,
+        'description': '數據不連續，零容忍，不重試'
     },
     StorageFailureType.UNKNOWN: {
         'max_retries': 1,
@@ -708,15 +717,24 @@ class KlineStorageManager:
         temp_dataset_name = None
 
         try:
-            # === 階段1: 前置驗證 ===
+            # === 階段1: 前置處理 ===
+            # 去重：防止批次下載重疊導致的重複數據（必須在驗證前執行）
+            original_count = len(df)
+            df = df.drop_duplicates(subset=['timestamp'], keep='last')
+            if len(df) < original_count:
+                logger.warning(
+                    f"Removed {original_count - len(df)} duplicate timestamps for {symbol}/{timeframe}"
+                )
+
+            # 確保timestamp排序
+            df = df.sort_values('timestamp').reset_index(drop=True)
+            
+            # 數據驗證
             is_valid, error_msg = self._validate_kline_dataframe(df)
             if not is_valid:
                 logger.error(f"Data validation failed for {symbol}/{timeframe}: {error_msg}")
                 self.stats['errors'] += 1
                 return False
-
-            # 確保timestamp排序
-            df = df.sort_values('timestamp').reset_index(drop=True)
 
             # 計算數據checksum（用於後寫驗證）
             data_checksum = self._calculate_dataframe_checksum(df)
@@ -870,9 +888,22 @@ class KlineStorageManager:
                 combined_df = combined_df.sort_values('timestamp').reset_index(drop=True)
 
                 # 寫入合併後的數據
-                return self.write_klines(symbol, timeframe, combined_df)
+                write_success = self.write_klines(symbol, timeframe, combined_df)
+                
+                # 寫入成功後進行連續性驗證
+                if write_success:
+                    try:
+                        self._validate_continuity(combined_df, symbol, timeframe)
+                        logger.info(f"✅ Continuity validation passed for {symbol}/{timeframe}")
+                    except ValueError as e:
+                        logger.error(f"❌ Continuity validation failed after append: {e}")
+                        # 數據不連續視為寫入失敗（但數據已寫入，需要人工檢查）
+                        self.stats['errors'] += 1
+                        return False
+                
+                return write_success
             else:
-                # 沒有現有數據，直接寫入
+                # 沒有現有數據，直接寫入（單批次數據通常連續）
                 return self.write_klines(symbol, timeframe, df)
 
         except Exception as e:
@@ -884,9 +915,86 @@ class KlineStorageManager:
 
     # ==================== 數據讀取 ====================
 
+    def _validate_continuity(self, df: pd.DataFrame, symbol: str, timeframe: str) -> None:
+        """
+        驗證K線數據的時間戳連續性（零容忍）
+        
+        檢查相鄰K線的時間間隔是否等於 timeframe，若有任何缺口立即拋出異常。
+        
+        量化交易系統需要完整的數據：
+        - 單根K線缺失會導致技術指標計算錯誤
+        - 影響回測結果的準確性
+        - 可能產生錯誤的交易信號
+        
+        Args:
+            df: K線數據 DataFrame（必須包含 timestamp 欄位）
+            symbol: 交易對symbol（用於錯誤訊息）
+            timeframe: 時間框架（用於計算預期間隔）
+            
+        Raises:
+            ValueError: 當數據不連續時，包含缺失時間戳的詳細列表
+        """
+        if len(df) <= 1:
+            # 只有 0 或 1 根K線，無法檢查連續性
+            return
+        
+        # 獲取時間框架的秒數
+        timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe)
+        if timeframe_seconds is None:
+            logger.warning(f"Unknown timeframe {timeframe}, skipping continuity check")
+            return
+        
+        # 計算相鄰K線的時間差
+        time_diffs = df['timestamp'].diff().dropna()
+        
+        # 檢查是否所有時間差都等於 timeframe_seconds
+        discontinuous_indices = time_diffs[time_diffs != timeframe_seconds].index.tolist()
+        
+        if len(discontinuous_indices) > 0:
+            # 找出所有缺失的時間戳
+            missing_bars = []
+            
+            for idx in discontinuous_indices:
+                prev_ts = df.loc[idx - 1, 'timestamp']
+                curr_ts = df.loc[idx, 'timestamp']
+                actual_gap = curr_ts - prev_ts
+                expected_gap = timeframe_seconds
+                missing_count = int((actual_gap - expected_gap) / timeframe_seconds)
+                
+                # 記錄缺失的時間戳
+                for i in range(1, missing_count + 1):
+                    missing_ts = prev_ts + i * timeframe_seconds
+                    missing_dt = datetime.utcfromtimestamp(missing_ts).strftime('%Y-%m-%d %H:%M:%S UTC')
+                    missing_bars.append({
+                        'timestamp': missing_ts,
+                        'datetime': missing_dt
+                    })
+            
+            # 限制錯誤訊息中顯示的缺失時間戳數量（最多顯示前10個）
+            display_count = min(10, len(missing_bars))
+            missing_bars_display = missing_bars[:display_count]
+            
+            error_msg = (
+                f"數據不連續: {symbol}/{timeframe} 發現 {len(discontinuous_indices)} 處缺口，"
+                f"缺少 {len(missing_bars)} 根K線。"
+            )
+            
+            if display_count > 0:
+                missing_list = ', '.join([bar['datetime'] for bar in missing_bars_display])
+                error_msg += f" 缺失時間點（前{display_count}個）: {missing_list}"
+            if len(missing_bars) > display_count:
+                error_msg += f" ...等共 {len(missing_bars)} 根"
+            
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        logger.debug(f"Continuity check passed for {symbol}/{timeframe}: {len(df)} bars are continuous")
+
+
     def read_klines(self, symbol: str, timeframe: str,
                     start_time: Optional[int] = None,
-                    end_time: Optional[int] = None) -> Optional[pd.DataFrame]:
+                    end_time: Optional[int] = None,
+                    validate_continuity: bool = True) -> Optional[pd.DataFrame]:
         """
         讀取K線數據（支援時間範圍切片）
 
@@ -895,9 +1003,13 @@ class KlineStorageManager:
             timeframe: 時間框架
             start_time: 起始時間戳（秒，可選）
             end_time: 結束時間戳（秒，可選）
+            validate_continuity: 是否驗證數據連續性（預設True，零容忍）
 
         Returns:
             pd.DataFrame or None
+            
+        Raises:
+            ValueError: 當 validate_continuity=True 且數據不連續時
         """
         try:
             if not self.hdf5_path.exists():
@@ -940,6 +1052,10 @@ class KlineStorageManager:
             # CRITICAL: 重置索引確保 RangeIndex(0, n)，這是本類別的不變性保證
             # 所有下游方法（特別是 read_klines_around_timestamp）依賴此保證進行位置計算
             df = df.reset_index(drop=True)
+            
+            # 零容忍連續性檢查
+            if validate_continuity and len(df) > 1:
+                self._validate_continuity(df, symbol, timeframe)
 
             read_time = time.time() - start_read
             self.stats['reads'] += 1
@@ -948,6 +1064,9 @@ class KlineStorageManager:
 
             return df
 
+        except ValueError as e:
+            # 連續性檢查失敗，直接向上傳播
+            raise
         except Exception as e:
             error_type = classify_storage_error(e)
             logger.error(f"Failed to read klines for {symbol}/{timeframe}: {e} (type: {error_type})")
