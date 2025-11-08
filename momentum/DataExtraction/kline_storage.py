@@ -324,17 +324,35 @@ class KlineStorageManager:
 
 
     def _ensure_dataset(self, symbol: str, timeframe: str) -> bool:
-        """確保指定symbol/timeframe數據集存在，必要時從舊版緩存導入。"""
+        """
+        確保指定symbol/timeframe數據集存在且有效，必要時從舊版緩存導入。
+
+        **關鍵改進**：檢查數據實際存在，不只是metadata結構
+        """
         key = (symbol, timeframe)
 
         if not self.hdf5_path.exists():
             self._create_hdf5_structure()
 
         needs_import = False
+        dataset_exists_but_empty = False
+
         try:
             with h5py.File(self.hdf5_path, 'r') as f:
                 if symbol not in f or timeframe not in f[symbol] or 'data' not in f[symbol][timeframe]:
                     needs_import = True
+                else:
+                    # **CRITICAL FIX**: 檢查dataset是否真的包含數據
+                    dataset = f[symbol][timeframe]['data']
+                    dataset_size = dataset.shape[0] if hasattr(dataset, 'shape') else len(dataset)
+
+                    if dataset_size == 0:
+                        logger.warning(
+                            f"Dataset {symbol}/{timeframe} exists but contains 0 rows - "
+                            f"will attempt reimport"
+                        )
+                        dataset_exists_but_empty = True
+                        needs_import = True
         except Exception as e:
             logger.error(f"Failed to inspect dataset {symbol}/{timeframe}: {e}")
             needs_import = True
@@ -343,7 +361,14 @@ class KlineStorageManager:
             self._legacy_import_status[key] = True
             return True
 
-        # 避免重複嘗試導入
+        # **CRITICAL FIX**: 如果dataset存在但為空，允許重新嘗試導入
+        if dataset_exists_but_empty:
+            logger.info(f"Clearing failed import status for {symbol}/{timeframe} to allow retry")
+            # 清除之前的失敗狀態，允許重新嘗試
+            if key in self._legacy_import_status:
+                del self._legacy_import_status[key]
+
+        # 避免重複嘗試導入（除非是空數據集情況）
         if key in self._legacy_import_status and not self._legacy_import_status[key]:
             logger.warning(f"Dataset {symbol}/{timeframe} missing and previous legacy import failed")
             return False
@@ -378,12 +403,37 @@ class KlineStorageManager:
             return False
 
         try:
-            df = df.reset_index(drop=True)  # 避免保留舊索引為欄位
-            if 'timestamp' not in df.columns:
-                logger.error(f"Legacy cache {legacy_file} missing timestamp column")
-                return False
+            # 檢查是否使用 DatetimeIndex（新格式）
+            if isinstance(df.index, pd.DatetimeIndex):
+                # 新格式：使用 DatetimeIndex
+                logger.info(f"Legacy cache {legacy_file} uses DatetimeIndex format")
+                df = df.reset_index()  # 將 index 轉為 'index' 或 'timestamp' 欄位
 
-            df['timestamp'] = (df['timestamp'].astype('int64') // 1_000_000_000).astype('int64')
+                # 確定時間欄位名稱
+                time_col = None
+                for col_name in ['timestamp', 'index', 'open_time', 'date']:
+                    if col_name in df.columns and pd.api.types.is_datetime64_any_dtype(df[col_name]):
+                        time_col = col_name
+                        break
+
+                if time_col is None:
+                    logger.error(f"Legacy cache {legacy_file} has DatetimeIndex but cannot find datetime column after reset_index")
+                    return False
+
+                # 轉換為 Unix timestamp（秒）
+                df['timestamp'] = (df[time_col].astype('int64') // 1_000_000_000).astype('int64')
+
+                # 如果時間欄位不叫 timestamp，刪除原欄位
+                if time_col != 'timestamp':
+                    df = df.drop(columns=[time_col])
+            else:
+                # 舊格式：timestamp 作為欄位
+                df = df.reset_index(drop=True)  # 避免保留舊索引為欄位
+                if 'timestamp' not in df.columns:
+                    logger.error(f"Legacy cache {legacy_file} missing timestamp column")
+                    return False
+
+                df['timestamp'] = (df['timestamp'].astype('int64') // 1_000_000_000).astype('int64')
 
             volume_col = 'volume'
             taker_buy_col = 'taker_buy_base_asset_volume'
@@ -531,12 +581,120 @@ class KlineStorageManager:
         return True, ""
 
 
+    def _calculate_dataframe_checksum(self, df: pd.DataFrame) -> str:
+        """
+        計算DataFrame的checksum（用於完整性驗證）
+
+        Args:
+            df: K線DataFrame
+
+        Returns:
+            str: SHA256 checksum
+        """
+        import hashlib
+
+        # 使用timestamp和關鍵欄位計算checksum
+        # 不使用所有欄位以提高性能，但確保包含關鍵數據
+        key_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+
+        # 將關鍵欄位轉為bytes
+        data_bytes = b''
+        for col in key_columns:
+            if col in df.columns:
+                data_bytes += df[col].to_numpy().tobytes()
+
+        # 計算SHA256
+        checksum = hashlib.sha256(data_bytes).hexdigest()
+        return checksum
+
+
+    def _verify_written_data(self, symbol: str, timeframe: str,
+                            expected_checksum: str,
+                            expected_row_count: int,
+                            expected_time_range: Tuple[int, int]) -> bool:
+        """
+        後寫驗證：確保數據正確寫入並可讀
+
+        Args:
+            symbol: 交易對symbol
+            timeframe: 時間框架
+            expected_checksum: 預期checksum
+            expected_row_count: 預期行數
+            expected_time_range: 預期時間範圍 (start, end)
+
+        Returns:
+            bool: 驗證是否通過
+        """
+        try:
+            # 讀回數據
+            df_readback = self.read_klines(symbol, timeframe)
+
+            if df_readback is None:
+                logger.error(f"Verification failed: Cannot read back data for {symbol}/{timeframe}")
+                return False
+
+            # 驗證1: 行數
+            if len(df_readback) != expected_row_count:
+                logger.error(
+                    f"Verification failed: Row count mismatch for {symbol}/{timeframe} "
+                    f"(expected {expected_row_count}, got {len(df_readback)})"
+                )
+                return False
+
+            # 驗證2: 時間範圍
+            actual_time_range = (int(df_readback['timestamp'].min()), int(df_readback['timestamp'].max()))
+            if actual_time_range != expected_time_range:
+                logger.error(
+                    f"Verification failed: Time range mismatch for {symbol}/{timeframe} "
+                    f"(expected {expected_time_range}, got {actual_time_range})"
+                )
+                return False
+
+            # 驗證3: Checksum
+            actual_checksum = self._calculate_dataframe_checksum(df_readback)
+            if actual_checksum != expected_checksum:
+                logger.error(
+                    f"Verification failed: Checksum mismatch for {symbol}/{timeframe} "
+                    f"(expected {expected_checksum[:8]}..., got {actual_checksum[:8]}...)"
+                )
+                return False
+
+            # 驗證4: Metadata一致性
+            metadata = self.get_metadata(symbol, timeframe)
+            if metadata:
+                if metadata.get('total_bars') != expected_row_count:
+                    logger.error(
+                        f"Verification failed: Metadata row count mismatch for {symbol}/{timeframe}"
+                    )
+                    return False
+
+                if metadata.get('time_range_start') != expected_time_range[0] or \
+                   metadata.get('time_range_end') != expected_time_range[1]:
+                    logger.error(
+                        f"Verification failed: Metadata time range mismatch for {symbol}/{timeframe}"
+                    )
+                    return False
+
+            logger.debug(f"✓ Verification passed for {symbol}/{timeframe}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Verification failed with exception for {symbol}/{timeframe}: {e}")
+            return False
+
+
     # ==================== 數據寫入 ====================
 
     def write_klines(self, symbol: str, timeframe: str, df: pd.DataFrame,
                      data_source: str = "binance") -> bool:
         """
-        寫入K線數據（覆寫模式）
+        寫入K線數據（覆寫模式）- 帶有事務性保證和後寫驗證
+
+        實現ACID原則：
+        1. Atomicity: 使用臨時dataset，成功後原子性swap
+        2. Consistency: 驗證數據格式和完整性
+        3. Isolation: HDF5文件鎖保證隔離
+        4. Durability: 寫入後立即驗證數據可讀
 
         Args:
             symbol: 交易對symbol
@@ -547,8 +705,10 @@ class KlineStorageManager:
         Returns:
             bool: 是否成功
         """
+        temp_dataset_name = None
+
         try:
-            # 驗證數據
+            # === 階段1: 前置驗證 ===
             is_valid, error_msg = self._validate_kline_dataframe(df)
             if not is_valid:
                 logger.error(f"Data validation failed for {symbol}/{timeframe}: {error_msg}")
@@ -558,11 +718,16 @@ class KlineStorageManager:
             # 確保timestamp排序
             df = df.sort_values('timestamp').reset_index(drop=True)
 
+            # 計算數據checksum（用於後寫驗證）
+            data_checksum = self._calculate_dataframe_checksum(df)
+            expected_row_count = len(df)
+            expected_time_range = (int(df['timestamp'].min()), int(df['timestamp'].max()))
+
             # 確保HDF5結構存在
             if not self.hdf5_path.exists():
                 self._create_hdf5_structure()
 
-            # 使用h5py寫入數據
+            # === 階段2: 事務性寫入（使用臨時dataset模式）===
             with h5py.File(self.hdf5_path, 'a') as f:
                 # 創建或獲取symbol組
                 if symbol not in f:
@@ -575,40 +740,93 @@ class KlineStorageManager:
                     tf_group = symbol_group.create_group(timeframe)
                 else:
                     tf_group = symbol_group[timeframe]
-                    # 如果data已存在，刪除舊的
-                    if 'data' in tf_group:
-                        del tf_group['data']
 
-                # 將DataFrame轉為結構化數組並寫入
-                # 使用結構化數組保持列名和數據類型
-                dtype_list = [(col, str(df[col].dtype)) for col in df.columns]
-                structured_array = np.array(
-                    [tuple(row) for row in df.values],
-                    dtype=dtype_list
-                )
+                # 生成臨時dataset名稱（確保唯一性）
+                import uuid
+                temp_dataset_name = f"data_temp_{uuid.uuid4().hex[:8]}"
 
-                # 創建dataset with compression
-                dataset = tf_group.create_dataset(
-                    'data',
-                    data=structured_array,
-                    compression='gzip',
-                    compression_opts=self.COMPRESSION_LEVEL
-                )
+                # 保存舊數據名稱（如果存在）用於回滾
+                old_data_exists = 'data' in tf_group
+                old_dataset_backup_name = None
+                if old_data_exists:
+                    old_dataset_backup_name = f"data_backup_{uuid.uuid4().hex[:8]}"
+                    # 重命名舊數據為備份
+                    tf_group.move('data', old_dataset_backup_name)
+                    logger.debug(f"Backed up old dataset to {old_dataset_backup_name}")
 
-                # 更新metadata (在同一個h5py會話中)
-                tf_group.attrs['time_range_start'] = int(df['timestamp'].min())
-                tf_group.attrs['time_range_end'] = int(df['timestamp'].max())
-                tf_group.attrs['total_bars'] = len(df)
-                tf_group.attrs['data_source'] = data_source
-                tf_group.attrs['timeframe'] = timeframe
-                tf_group.attrs['is_complete'] = True
-                tf_group.attrs['last_updated'] = datetime.now().isoformat()
+                try:
+                    # 將DataFrame轉為結構化數組並寫入臨時dataset
+                    dtype_list = [(col, str(df[col].dtype)) for col in df.columns]
+                    structured_array = np.array(
+                        [tuple(row) for row in df.values],
+                        dtype=dtype_list
+                    )
 
-            # 更新全局索引
+                    # 創建臨時dataset with compression
+                    temp_dataset = tf_group.create_dataset(
+                        temp_dataset_name,
+                        data=structured_array,
+                        compression='gzip',
+                        compression_opts=self.COMPRESSION_LEVEL
+                    )
+
+                    # 原子性重命名: temp → data
+                    tf_group.move(temp_dataset_name, 'data')
+                    temp_dataset_name = None  # 標記已成功移動
+                    logger.debug(f"Atomically renamed temp dataset to 'data'")
+
+                    # 更新metadata (在同一個h5py會話中，確保原子性)
+                    tf_group.attrs['time_range_start'] = expected_time_range[0]
+                    tf_group.attrs['time_range_end'] = expected_time_range[1]
+                    tf_group.attrs['total_bars'] = expected_row_count
+                    tf_group.attrs['data_source'] = data_source
+                    tf_group.attrs['timeframe'] = timeframe
+                    tf_group.attrs['is_complete'] = True
+                    tf_group.attrs['data_checksum'] = data_checksum
+                    tf_group.attrs['last_updated'] = datetime.now().isoformat()
+
+                    # 刪除備份（事務成功）
+                    if old_dataset_backup_name and old_dataset_backup_name in tf_group:
+                        del tf_group[old_dataset_backup_name]
+                        logger.debug(f"Deleted backup dataset {old_dataset_backup_name}")
+
+                except Exception as write_error:
+                    # 回滾：恢復舊數據
+                    logger.error(f"Write failed, rolling back: {write_error}")
+
+                    # 清理臨時dataset（如果存在）
+                    if temp_dataset_name and temp_dataset_name in tf_group:
+                        del tf_group[temp_dataset_name]
+
+                    # 恢復舊數據（如果有備份）
+                    if old_dataset_backup_name and old_dataset_backup_name in tf_group:
+                        if 'data' in tf_group:
+                            del tf_group['data']
+                        tf_group.move(old_dataset_backup_name, 'data')
+                        logger.info(f"Rolled back to previous dataset")
+
+                    raise  # 重新拋出異常
+
+            # === 階段3: 後寫驗證（Write Verification）===
+            verification_passed = self._verify_written_data(
+                symbol=symbol,
+                timeframe=timeframe,
+                expected_checksum=data_checksum,
+                expected_row_count=expected_row_count,
+                expected_time_range=expected_time_range
+            )
+
+            if not verification_passed:
+                logger.error(f"❌ POST-WRITE VERIFICATION FAILED for {symbol}/{timeframe}")
+                logger.error(f"   Data was written but verification failed - data may be corrupted!")
+                self.stats['errors'] += 1
+                return False
+
+            # === 階段4: 更新全局索引 ===
             self.update_cache_index(symbol, timeframe, operation='add')
 
             self.stats['writes'] += 1
-            logger.info(f"Successfully wrote {len(df)} klines to {symbol}/{timeframe}")
+            logger.info(f"✅ Successfully wrote {len(df)} klines to {symbol}/{timeframe} (verified)")
 
             return True
 
