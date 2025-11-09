@@ -878,8 +878,8 @@ class KlineStorageManager:
             # 確保timestamp排序
             df = df.sort_values('timestamp').reset_index(drop=True)
 
-            # 讀取現有數據
-            existing_df = self.read_klines(symbol, timeframe)
+            # 讀取現有數據（不驗證連續性，避免在合併前拋出異常）
+            existing_df = self.read_klines(symbol, timeframe, validate_continuity=False)
 
             if existing_df is not None and len(existing_df) > 0:
                 # 合併數據並去重
@@ -890,7 +890,7 @@ class KlineStorageManager:
                 # 寫入合併後的數據
                 write_success = self.write_klines(symbol, timeframe, combined_df)
                 
-                # 寫入成功後進行連續性驗證
+                # 寫入成功後進行連續性驗證（嚴格模式）
                 if write_success:
                     try:
                         self._validate_continuity(combined_df, symbol, timeframe)

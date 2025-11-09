@@ -266,10 +266,10 @@ class KlineDownloadService:
             # 5. 驗證數據格式
             provider._validate_dataframe(df)
 
-            # 6. 自動保存到HDF5
+            # 6. 自動保存到HDF5（使用append模式避免覆蓋已有數據）
             if save_to_storage and not df.empty and self.storage:
                 try:
-                    self.storage.write_klines(symbol, timeframe, df)
+                    self.storage.append_klines(symbol, timeframe, df)
                     self.logger.info(
                         f"Saved {len(df)} klines to storage "
                         f"(symbol={symbol}, timeframe={timeframe})"

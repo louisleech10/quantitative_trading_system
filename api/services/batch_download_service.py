@@ -17,6 +17,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from api.core.logging import get_logger
+from api.core.config import settings
 from api.models.case_models import (
     CaseRecord,
     BatchDownloadRequest,
@@ -107,7 +108,10 @@ class BatchDownloadService:
             download_service: K線下載服務
         """
         self.case_storage = case_storage or CaseStorageManager()
-        self.kline_storage = kline_storage or KlineStorageManager()
+        # 使用配置的 data_cache 路徑，確保所有下載使用同一存儲位置
+        self.kline_storage = kline_storage or KlineStorageManager(
+            cache_dir=str(settings.data_cache_path)
+        )
 
         if download_service:
             self.download_service = download_service
