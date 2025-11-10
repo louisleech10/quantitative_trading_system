@@ -24,6 +24,7 @@ export default function BatchDownloadPanel({
   totalCases,
   onDownloadComplete,
 }: BatchDownloadPanelProps) {
+  const [warmupBars, setWarmupBars] = useState(150); // 新增：Warmup期K線數
   const [lookbackBars, setLookbackBars] = useState(100);
   const [forwardBars, setForwardBars] = useState(48);
   const [downloadTimeframe, setDownloadTimeframe] = useState("1h"); // 新增：K線下載時間框架（預設1h）
@@ -92,7 +93,11 @@ export default function BatchDownloadPanel({
     setError(null);
     setProgress(null);
 
+    // 計算總lookback（warmup + 有效K線）
+    const totalLookbackBars = warmupBars + lookbackBars;
+
     // 保存lookback/forward設定到localStorage，供圖表頁面使用
+    localStorage.setItem('kline_warmup_bars', warmupBars.toString());
     localStorage.setItem('kline_lookback_bars', lookbackBars.toString());
     localStorage.setItem('kline_forward_bars', forwardBars.toString());
 
@@ -104,7 +109,7 @@ export default function BatchDownloadPanel({
         },
         body: JSON.stringify({
           case_ids: null, // 下載全部案例
-          lookback_bars: lookbackBars,
+          lookback_bars: totalLookbackBars, // 傳加總後的值
           forward_bars: forwardBars,
           force_redownload: false,
           timeframe: downloadTimeframe, // 新增：K線下載時間框架
@@ -137,7 +142,7 @@ export default function BatchDownloadPanel({
       )}
 
       {/* Configuration */}
-      <div className="mb-4 grid grid-cols-3 gap-4">
+      <div className="mb-4 grid grid-cols-2 gap-4">
         {/* K線時間框架選擇器 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -146,7 +151,7 @@ export default function BatchDownloadPanel({
           <select
             value={downloadTimeframe}
             onChange={(e) => setDownloadTimeframe(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             disabled={downloading}
           >
             <option value="1m">1 分鐘</option>
@@ -158,14 +163,34 @@ export default function BatchDownloadPanel({
             <option value="12h">12 小時</option>
             <option value="1d">1 天</option>
           </select>
-          <p className="text-xs text-gray-600 mt-1">
+          <p className="text-xs text-gray-600 mt-1 font-medium">
             用於ML訓練（與案例搜尋時間框架獨立）
+          </p>
+        </div>
+
+        {/* 新增：Warmup期輸入框 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Warmup期K線數
+          </label>
+          <input
+            type="number"
+            value={warmupBars}
+            onChange={(e) => setWarmupBars(Number(e.target.value))}
+            min={0}
+            max={500}
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            disabled={downloading}
+            placeholder="150"
+          />
+          <p className="text-xs text-gray-500 mt-1 font-medium">
+            建議：最長EMA週期×3 (例如：EMA50 → 150)
           </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            往前K線根數 (Lookback)
+            TO前有效K線數（不含Warmup）
           </label>
           <input
             type="number"
@@ -173,12 +198,12 @@ export default function BatchDownloadPanel({
             onChange={(e) => setLookbackBars(Number(e.target.value))}
             min={1}
             max={1000}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             disabled={downloading}
             placeholder="100"
           />
-          <p className="text-xs text-gray-600 mt-1">
-            範圍: 1-1000（預設: 100）
+          <p className="text-xs text-blue-600 mt-1 font-medium">
+            密度計算基數（實際有效K線數）
           </p>
         </div>
 
@@ -192,11 +217,11 @@ export default function BatchDownloadPanel({
             onChange={(e) => setForwardBars(Number(e.target.value))}
             min={1}
             max={500}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             disabled={downloading}
             placeholder="48"
           />
-          <p className="text-xs text-gray-600 mt-1">
+          <p className="text-xs text-gray-600 mt-1 font-medium">
             範圍: 1-500（預設: 48）
           </p>
         </div>
@@ -204,10 +229,26 @@ export default function BatchDownloadPanel({
 
       {/* Download Info */}
       <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded">
-        <p className="text-sm font-medium text-blue-900">
-          將下載 {totalCases} 個案例的K線數據<br />
-          時間框架: <span className="font-bold">{downloadTimeframe}</span> |
-          每個案例: {lookbackBars} 根前 + 案例時間點 + {forwardBars} 根後
+        <p className="text-sm font-bold text-blue-900 mb-2">
+          下載配置
+        </p>
+        <p className="text-sm font-medium text-gray-700 mb-1">
+          案例數量：<span className="font-bold text-blue-700">{totalCases}</span> 個
+        </p>
+        <p className="text-sm font-medium text-gray-700 mb-1">
+          時間框架：<span className="font-bold text-blue-700">{downloadTimeframe}</span>
+        </p>
+        <p className="text-sm font-bold text-gray-900 mt-2 mb-1">
+          每個案例下載：
+        </p>
+        <p className="text-sm font-medium text-gray-700">
+          <span className="font-bold text-blue-700">{warmupBars + lookbackBars + forwardBars}</span> 根K線
+          <span className="text-gray-500 text-xs ml-2">
+            = {warmupBars} (Warmup) + {lookbackBars} (有效) + {forwardBars} (往後)
+          </span>
+        </p>
+        <p className="text-xs text-green-600 mt-2 font-medium">
+          ✓ 密度計算基數：{lookbackBars} 根有效K線
         </p>
       </div>
 

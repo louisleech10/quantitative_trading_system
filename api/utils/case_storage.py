@@ -1,13 +1,15 @@
 """
 案例存儲管理器
 
-提供案例的內存存儲和可選SQLite持久化功能
+提供案例的內存存儲和JSON持久化功能
 """
 
 import sys
+import json
 from pathlib import Path
 from typing import Dict, List, Optional
 from collections import defaultdict
+from datetime import datetime
 import logging
 
 # Add project root to Python path
@@ -30,12 +32,13 @@ class CaseStorageManager:
     3. 案例查詢和統計
     """
 
-    def __init__(self, use_persistent_storage: bool = False):
+    def __init__(self, use_persistent_storage: bool = True, json_path: Optional[str] = None):
         """
         初始化案例存儲管理器
 
         Args:
-            use_persistent_storage: 是否使用持久化存儲（SQLite）
+            use_persistent_storage: 是否使用JSON持久化存儲（預設True）
+            json_path: JSON文件路徑（None=使用預設路徑）
         """
         self.use_persistent = use_persistent_storage
 
@@ -48,12 +51,24 @@ class CaseStorageManager:
         # 索引：timeframe → List[case_id]
         self.timeframe_index: Dict[str, List[str]] = defaultdict(list)
 
-        # TODO: 未來可添加SQLite持久化
-        if self.use_persistent:
-            logger.warning("Persistent storage not yet implemented, using memory only")
+        # JSON持久化路徑
+        if json_path:
+            self.json_path = Path(json_path)
+        else:
+            # 預設路徑：data_cache/cases.json
+            self.json_path = project_root / "data_cache" / "cases.json"
+
+        # 確保data_cache目錄存在
+        self.json_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # 從JSON載入現有案例
+        if self.use_persistent and self.json_path.exists():
+            loaded_count = self._load_from_json()
+            logger.info(f"Loaded {loaded_count} cases from {self.json_path}")
 
         logger.info(
-            f"CaseStorageManager initialized (persistent={self.use_persistent})"
+            f"CaseStorageManager initialized (persistent={self.use_persistent}, "
+            f"json_path={self.json_path}, cases={len(self.cases)})"
         )
 
 
@@ -101,6 +116,10 @@ class CaseStorageManager:
         logger.info(
             f"Saved {len(saved_ids)}/{len(cases)} cases to storage"
         )
+
+        # 自動持久化到JSON
+        if self.use_persistent and saved_ids:
+            self._save_to_json()
 
         return saved_ids
 
@@ -214,6 +233,15 @@ class CaseStorageManager:
         self.cases.clear()
         self.symbol_index.clear()
         self.timeframe_index.clear()
+
+        # 刪除JSON文件
+        if self.use_persistent and self.json_path.exists():
+            try:
+                self.json_path.unlink()
+                logger.info(f"Deleted JSON file: {self.json_path}")
+            except Exception as e:
+                logger.error(f"Failed to delete JSON file: {e}", exc_info=True)
+
         logger.info(f"Cleared all {count} cases from storage")
         return count
 
@@ -256,6 +284,110 @@ class CaseStorageManager:
             bool: 是否存在
         """
         return case_id in self.cases
+
+
+    def _save_to_json(self) -> None:
+        """
+        將案例列表保存到JSON文件
+
+        JSON格式：
+        {
+            "version": "1.0",
+            "last_update": "2025-11-09T12:00:00Z",
+            "total_cases": 156,
+            "cases": [...]
+        }
+        """
+        try:
+            # 將CaseRecord轉換為dict
+            cases_data = []
+            for case in self.cases.values():
+                case_dict = {
+                    "case_id": case.case_id,
+                    "symbol": case.symbol,
+                    "timeframe": case.timeframe,
+                    "timestamp": case.timestamp,
+                    "positive_case": case.positive_case,
+                    "source_file": case.source_file,
+                    "import_time": case.import_time.isoformat() if case.import_time else None
+                }
+                cases_data.append(case_dict)
+
+            # 構建JSON結構
+            json_data = {
+                "version": "1.0",
+                "last_update": datetime.utcnow().isoformat() + "Z",
+                "total_cases": len(cases_data),
+                "cases": cases_data
+            }
+
+            # 寫入JSON文件
+            with open(self.json_path, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+
+            logger.debug(f"Saved {len(cases_data)} cases to {self.json_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to save cases to JSON: {e}", exc_info=True)
+
+
+    def _load_from_json(self) -> int:
+        """
+        從JSON文件載入案例列表
+
+        Returns:
+            int: 載入的案例數量
+        """
+        try:
+            with open(self.json_path, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+
+            # 驗證JSON格式
+            if "cases" not in json_data:
+                logger.warning(f"Invalid JSON format in {self.json_path}: missing 'cases' key")
+                return 0
+
+            # 載入案例
+            loaded_count = 0
+            for case_dict in json_data["cases"]:
+                try:
+                    # 轉換import_time
+                    import_time = None
+                    if case_dict.get("import_time"):
+                        import_time = datetime.fromisoformat(case_dict["import_time"].replace('Z', '+00:00'))
+
+                    # 創建CaseRecord
+                    case = CaseRecord(
+                        case_id=case_dict["case_id"],
+                        symbol=case_dict["symbol"],
+                        timeframe=case_dict["timeframe"],
+                        timestamp=case_dict["timestamp"],
+                        positive_case=case_dict["positive_case"],
+                        source_file=case_dict.get("source_file"),
+                        import_time=import_time
+                    )
+
+                    # 存儲到內存
+                    self.cases[case.case_id] = case
+
+                    # 更新索引
+                    if case.case_id not in self.symbol_index[case.symbol]:
+                        self.symbol_index[case.symbol].append(case.case_id)
+                    if case.case_id not in self.timeframe_index[case.timeframe]:
+                        self.timeframe_index[case.timeframe].append(case.case_id)
+
+                    loaded_count += 1
+
+                except Exception as e:
+                    logger.error(f"Failed to load case {case_dict.get('case_id')}: {e}")
+                    continue
+
+            logger.info(f"Loaded {loaded_count}/{len(json_data['cases'])} cases from JSON")
+            return loaded_count
+
+        except Exception as e:
+            logger.error(f"Failed to load cases from JSON: {e}", exc_info=True)
+            return 0
 
 
 # 創建全局實例

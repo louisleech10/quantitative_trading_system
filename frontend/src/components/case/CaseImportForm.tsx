@@ -15,6 +15,8 @@ interface ImportResult {
   errors: string[];
   warnings: string[];
   case_ids: string[];
+  need_confirmation?: boolean;
+  existing_count?: number;
 }
 
 export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps) {
@@ -33,7 +35,7 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (forceClear: boolean = false) => {
     if (!file) {
       setError("Please select a file");
       return;
@@ -48,7 +50,7 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
       formData.append("file", file);
 
       const response = await fetch(
-        `/api/v1/case/import?default_timeframe=${defaultTimeframe}&validate_only=${validateOnly}`,
+        `/api/v1/case/import?default_timeframe=${defaultTimeframe}&validate_only=${validateOnly}&force_clear=${forceClear}`,
         {
           method: "POST",
           body: formData,
@@ -76,6 +78,27 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
       }
 
       const data: ImportResult = await response.json();
+
+      // 檢查是否需要用戶確認清空
+      if (data.need_confirmation && data.existing_count) {
+        setUploading(false);
+
+        const confirmed = window.confirm(
+          `系統已有 ${data.existing_count} 個案例。\n\n` +
+          `上傳新CSV將清空所有舊案例，是否繼續？`
+        );
+
+        if (confirmed) {
+          // 用戶確認，重新上傳並強制清空
+          await handleUpload(true);
+          return;
+        } else {
+          // 用戶取消
+          setError("導入已取消");
+          return;
+        }
+      }
+
       setResult(data);
 
       if (data.success && onImportSuccess) {

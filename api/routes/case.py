@@ -34,7 +34,8 @@ case_storage = get_case_storage_manager()
 async def import_cases_from_csv(
     file: UploadFile = File(...),
     default_timeframe: Optional[str] = "1h",
-    validate_only: bool = False
+    validate_only: bool = False,
+    force_clear: bool = False
 ):
     """
     上傳CSV/Excel文件並導入案例
@@ -43,16 +44,19 @@ async def import_cases_from_csv(
         file: CSV或Excel文件
         default_timeframe: 預設時間框架（CSV缺少時使用）
         validate_only: 僅驗證不導入
+        force_clear: 導入前強制清空所有舊案例（需用戶確認）
 
     Returns:
         CaseImportResponse: 導入結果
+            - 如果有現有案例且force_clear=False，返回need_confirmation=True
+            - 如果force_clear=True，清空舊案例後導入
 
     Raises:
         HTTPException: 導入失敗
     """
     logger.info(
         f"Receiving case import request: {file.filename} "
-        f"(default_timeframe={default_timeframe}, validate_only={validate_only})"
+        f"(default_timeframe={default_timeframe}, validate_only={validate_only}, force_clear={force_clear})"
     )
 
     # 檢查文件格式
@@ -68,12 +72,13 @@ async def import_cases_from_csv(
         # 讀取文件內容
         file_content = await file.read()
 
-        # 導入案例
+        # 導入案例（支持force_clear參數）
         result = case_import_service.import_from_file(
             file_content=file_content,
             filename=filename,
             default_timeframe=default_timeframe,
-            validate_only=validate_only
+            validate_only=validate_only,
+            force_clear=force_clear
         )
 
         logger.info(
@@ -112,6 +117,29 @@ async def get_case_list():
     except Exception as e:
         logger.error(f"Failed to retrieve case list: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retrieve cases: {str(e)}")
+
+
+@router.get("/case/count")
+async def get_case_count():
+    """
+    獲取當前案例數量
+
+    Returns:
+        dict: {"count": int} - 當前案例總數
+    """
+    logger.info("Retrieving case count")
+
+    try:
+        cases = case_storage.get_cases()
+        count = len(cases)
+
+        logger.info(f"Current case count: {count}")
+
+        return {"count": count}
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve case count: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve case count: {str(e)}")
 
 
 @router.post("/kline/batch-download")

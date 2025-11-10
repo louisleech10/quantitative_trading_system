@@ -1876,3 +1876,130 @@ for case in candidates:
 ---
 
 *此文件由Claude Code CLI自動維護，每次工作結束時更新*
+---
+
+## 2025-11-10: 單一活動案例集實現 + Warmup參數拆分
+
+### 🎯 核心改進
+
+#### 1. 單一活動案例集系統（P0修復）
+**問題**：案例只存在內存中，重啟後全部丟失
+**解決方案**：
+- ✅ 實現JSON持久化存儲（data_cache/cases.json）
+- ✅ CSV導入自動清空機制（防止案例混亂）
+- ✅ 前端確認對話框（有案例時提示清空）
+- ✅ K線數據完全獨立（不受案例清空影響）
+
+**修改文件**：
+- `api/utils/case_storage.py` - 添加JSON持久化
+- `api/services/case_import_service.py` - 添加force_clear參數
+- `api/routes/case.py` - 添加/case/count端點
+- `api/models/case_models.py` - 添加need_confirmation欄位
+- `frontend/src/components/case/CaseImportForm.tsx` - 確認對話框
+
+**工作流**：
+```
+首次上傳 → 直接導入
+第二次上傳 → 提示確認「系統已有X個案例，是否清空？」
+用戶確認 → 清空舊案例 → 導入新案例
+```
+
+**測試結果**：
+- ✅ JSON持久化正常工作
+- ✅ 重啟服務後案例自動恢復
+- ✅ 自動清空機制正確
+- ✅ K線數據不受影響
+
+#### 2. Warmup參數拆分（密度計算改進）
+**問題**：用戶需要手動計算 lookback + warmup，密度計算基數不明確
+**解決方案**：
+- ✅ 前端添加獨立「Warmup期」輸入框
+- ✅ 前端自動加總傳給後端（後端API零修改）
+- ✅ 顯示實際下載總量和密度基數
+
+**修改文件**：
+- `frontend/src/components/case/BatchDownloadPanel.tsx` - 添加warmup輸入框
+
+**用戶體驗**：
+```
+輸入：
+  Warmup: 150根
+  Lookback: 100根（TO前有效K線）
+  Forward: 96根
+
+顯示：
+  實際下載：346根K線
+  = 150 (Warmup) + 100 (有效) + 96 (往後)
+  ✓ 密度計算基數：100根有效K線
+```
+
+**優勢**：
+- ✅ 後端零修改，完全向後兼容
+- ✅ 密度基數明確（lookback不含warmup）
+- ✅ 統計檢驗有效（所有案例相同基數）
+
+### 📊 系統狀態
+
+**案例存儲**：
+- 位置：`data_cache/cases.json`
+- 格式：JSON（version 1.0）
+- 自動持久化：每次保存案例時
+- 自動載入：服務啟動時
+
+**K線存儲**：
+- 位置：`data/kline_storage/kline_cache.h5`
+- 狀態：完全獨立，不受案例清空影響
+
+**Warmup配置**：
+- 預設值：150根（適合EMA50×3）
+- 建議：最長EMA週期×3
+- 自動加總：前端計算total_lookback
+
+### 🔧 技術細節
+
+**JSON持久化**：
+```python
+# 自動保存
+def save_cases(cases):
+    # ... 保存到內存 ...
+    if self.use_persistent:
+        self._save_to_json()
+
+# 自動載入
+def __init__():
+    if self.json_path.exists():
+        self._load_from_json()
+```
+
+**Warmup加總**：
+```typescript
+const totalLookbackBars = warmupBars + lookbackBars;
+fetch('/api/v1/kline/batch-download', {
+  body: JSON.stringify({
+    lookback_bars: totalLookbackBars  // 前端加總
+  })
+});
+```
+
+### 📝 文檔
+
+- `單一活動案例集實現報告.md` - 案例持久化詳細文檔
+- `Warmup參數拆分實現報告.md` - Warmup功能文檔
+- `數據遷移總結.md` - 歷史遷移分析（保留）
+- `清理完成報告.md` - 系統清理記錄（保留）
+
+### ✅ 驗證完成
+
+- [x] JSON持久化測試通過
+- [x] 重啟恢復測試通過
+- [x] CSV自動清空測試通過
+- [x] Warmup參數顯示正確
+- [x] 後端API向後兼容
+
+### 🎯 下一步
+
+系統核心功能已完善，可以開始：
+1. PHASE3手動驗證（使用2.1腳本）
+2. 信號密度計算驗證（使用明確的密度基數）
+3. 批量下載測試（使用新的warmup分離參數）
+

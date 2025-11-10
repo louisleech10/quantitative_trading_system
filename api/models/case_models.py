@@ -86,6 +86,10 @@ class CaseImportResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list, description="警告列表")
     case_ids: List[str] = Field(default_factory=list, description="導入的案例ID列表")
 
+    # 清空確認相關欄位
+    need_confirmation: bool = Field(False, description="是否需要用戶確認清空現有案例")
+    existing_count: int = Field(0, description="現有案例數量")
+
     class Config:
         json_schema_extra = {
             "example": {

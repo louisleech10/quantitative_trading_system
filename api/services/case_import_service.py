@@ -55,7 +55,8 @@ class CaseImportService:
         file_content: bytes,
         filename: str,
         default_timeframe: str = "1h",
-        validate_only: bool = False
+        validate_only: bool = False,
+        force_clear: bool = False
     ) -> CaseImportResponse:
         """
         從文件導入案例
@@ -65,16 +66,18 @@ class CaseImportService:
             filename: 文件名
             default_timeframe: 預設時間框架（CSV缺少時使用）
             validate_only: 僅驗證不導入
+            force_clear: 導入前強制清空所有舊案例（預設False）
 
         Returns:
             CaseImportResponse: 導入結果
+            如果需要確認清空：success=False, need_confirmation=True
 
         Raises:
             ValueError: 文件格式錯誤或驗證失敗
         """
         logger.info(
             f"Importing cases from file: {filename} "
-            f"(size: {len(file_content)} bytes, validate_only={validate_only})"
+            f"(size: {len(file_content)} bytes, validate_only={validate_only}, force_clear={force_clear})"
         )
 
         # 檢查文件大小
@@ -115,6 +118,39 @@ class CaseImportService:
         total_rows = len(df)
         valid_cases = len(df_cleaned)
         invalid_cases = total_rows - valid_cases
+
+        # Step 6.5: 檢查現有案例（如果不是僅驗證模式）
+        existing_count = 0
+        if not validate_only:
+            existing_cases = self.storage.get_cases()
+            existing_count = len(existing_cases)
+
+            # 如果已有案例且未強制清空，返回需要確認
+            if existing_count > 0 and not force_clear:
+                logger.warning(
+                    f"System has {existing_count} existing cases. "
+                    f"Import cancelled - need user confirmation to clear."
+                )
+                return CaseImportResponse(
+                    success=False,
+                    need_confirmation=True,
+                    existing_count=existing_count,
+                    total_rows=total_rows,
+                    valid_cases=valid_cases,
+                    invalid_cases=invalid_cases,
+                    imported_cases=0,
+                    errors=[],
+                    warnings=[
+                        f"系統已有 {existing_count} 個案例。上傳新CSV將清空所有舊案例，請確認是否繼續。"
+                    ],
+                    case_ids=[]
+                )
+
+            # 如果強制清空，執行清空
+            if force_clear and existing_count > 0:
+                cleared_count = self.storage.clear_all()
+                logger.info(f"Cleared {cleared_count} existing cases before import (force_clear=True)")
+                validation_warnings.append(f"已清空 {cleared_count} 個舊案例")
 
         # Step 7: 如果不是僅驗證，則存儲案例
         imported_case_ids = []
