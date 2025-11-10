@@ -181,17 +181,13 @@ class ChartDataService:
                 expected_total = bars_before + case_bars + bars_after
                 actual_total = len(klines_data)
 
-                if actual_total < expected_total or to_index != bars_before:
+                # 檢查 lookback 是否足夠（這是必要的）
+                if to_index < bars_before:
                     logger.warning(
-                        "Incomplete kline coverage for %s/%s: expected %d bars (lookback=%d, case=%d, forward=%d) "
-                        "but got %d bars with TO index %d",
+                        "Insufficient lookback for %s/%s: expected %d lookback bars but TO is at index %d",
                         symbol,
                         timeframe,
-                        expected_total,
                         bars_before,
-                        case_bars,
-                        bars_after,
-                        actual_total,
                         to_index
                     )
                     return {
@@ -199,11 +195,27 @@ class ChartDataService:
                         "error": {
                             "code": "DATA_INCOMPLETE",
                             "message": (
-                                f"{symbol}/{timeframe} 的緩存不足，無法提供案例所需的K線範圍。"
+                                f"{symbol}/{timeframe} 的緩存不足，lookback 資料不完整。"
                                 "請先下載缺失的歷史資料後再重試。"
                             )
                         }
                     }
+                
+                # Forward 資料不足時只記錄警告，不阻止顯示
+                if actual_total < expected_total:
+                    logger.info(
+                        "Partial forward data for %s/%s: expected %d bars (lookback=%d, case=%d, forward=%d) "
+                        "but got %d bars with TO index %d (forward available: %d)",
+                        symbol,
+                        timeframe,
+                        expected_total,
+                        bars_before,
+                        case_bars,
+                        bars_after,
+                        actual_total,
+                        to_index,
+                        actual_total - to_index - case_bars
+                    )
 
                 # 格式化響應數據（新邏輯）
                 response_data = self._format_response(

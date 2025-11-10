@@ -498,6 +498,18 @@ class KlineStorageManager:
                 logger.warning(f"Legacy cache {legacy_file} produced empty dataframe")
                 return False
 
+            # 驗證連續性：確保舊數據沒有缺口
+            try:
+                self._validate_continuity(df_formatted, symbol, timeframe)
+                logger.info(f"Legacy data continuity validation passed for {symbol}/{timeframe}")
+            except ValueError as e:
+                logger.error(
+                    f"Legacy data {legacy_file} has continuity issues and cannot be imported.\n"
+                    f"Error: {e}\n"
+                    f"Recommendation: Use batch download to fetch fresh data from Binance instead."
+                )
+                return False
+
             write_success = self.write_klines(
                 symbol=symbol,
                 timeframe=timeframe,
