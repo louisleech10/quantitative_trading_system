@@ -21,6 +21,7 @@ export interface TrainingWindowConfig {
   reference_point: "TO" | "TC";
   lookback_bars: number;
   lookforward_bars: number;
+  far_lookback_bars?: number;  // 遠期窗口配置 (雙密度模式)
   mode: "relative" | "full_range";
 }
 
@@ -148,55 +149,85 @@ export default function WindowConfigPanel({
       </div>
 
       {/* 窗口參數 */}
-      <div className="grid grid-cols-2 gap-4">
-        {/* 往前看 */}
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-2">
-            往前看 (Lookback)
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              value={value.lookback_bars}
-              onChange={(e) =>
-                updateField("lookback_bars", Number(e.target.value))
-              }
-              disabled={disabled}
-              className={`
-                w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
-              `}
-              min={1}
-              max={1000}
-            />
-            <div className="text-xs text-gray-500 mt-1">
-              從參考點往前 N 根K線
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          {/* 往前看 (近期窗口) */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">
+              近期窗口 (Lookback)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                value={value.lookback_bars}
+                onChange={(e) =>
+                  updateField("lookback_bars", Number(e.target.value))
+                }
+                disabled={disabled}
+                className={`
+                  w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+                  ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+                `}
+                min={1}
+                max={1000}
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                從參考點往前 N 根K線
+              </div>
+            </div>
+          </div>
+
+          {/* 往後看 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">
+              往後看 (Lookforward)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                value={value.lookforward_bars}
+                onChange={(e) =>
+                  updateField("lookforward_bars", Number(e.target.value))
+                }
+                disabled={disabled}
+                className={`
+                  w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+                  ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+                `}
+                min={0}
+                max={100}
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                從參考點往後 M 根K線
+              </div>
             </div>
           </div>
         </div>
 
-        {/* 往後看 */}
+        {/* 遠期窗口 (雙密度模式) */}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-2">
-            往後看 (Lookforward)
+            遠期窗口 (Far Lookback) - 雙密度模式
           </label>
           <div className="relative">
             <input
               type="number"
-              value={value.lookforward_bars}
-              onChange={(e) =>
-                updateField("lookforward_bars", Number(e.target.value))
-              }
+              value={value.far_lookback_bars || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                updateField("far_lookback_bars", val === "" ? undefined : Number(val));
+              }}
               disabled={disabled}
+              placeholder="不啟用雙密度模式"
               className={`
                 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
                 ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
               `}
-              min={0}
-              max={100}
+              min={value.lookback_bars + 1}
+              max={1000}
             />
             <div className="text-xs text-gray-500 mt-1">
-              從參考點往後 M 根K線
+              從參考點往前 Z 根K線 (用於背景密度計算，必須 &gt; 近期窗口)
             </div>
           </div>
         </div>
@@ -205,65 +236,119 @@ export default function WindowConfigPanel({
       {/* 視覺化時間軸 */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <div className="text-xs font-medium text-gray-700 mb-3">
-          窗口視覺化示意圖
+          窗口視覺化示意圖 {value.far_lookback_bars ? "(雙密度模式)" : ""}
         </div>
-        <div className="relative">
-          {/* 時間軸 */}
-          <div className="h-2 bg-gray-200 rounded-full relative">
-            {/* Lookback 區域 */}
-            <div
-              className="absolute left-0 h-full bg-blue-400 rounded-l-full"
-              style={{
-                width: `${
-                  (value.lookback_bars / (totalBars || 1)) * 100
-                }%`,
-              }}
-            />
-            {/* Lookforward 區域 */}
-            <div
-              className="absolute right-0 h-full bg-orange-400 rounded-r-full"
-              style={{
-                width: `${
-                  (value.lookforward_bars / (totalBars || 1)) * 100
-                }%`,
-              }}
-            />
-            {/* 參考點標記 */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow"
-              style={{
-                left: `${(value.lookback_bars / (totalBars || 1)) * 100}%`,
-                transform: "translate(-50%, -50%)",
-              }}
-            />
+        <div className="relative space-y-4">
+          {/* 主時間軸 (近期窗口) */}
+          <div className="relative">
+            <div className="h-2 bg-gray-200 rounded-full relative">
+              {/* Lookback 區域 */}
+              <div
+                className="absolute left-0 h-full bg-blue-400 rounded-l-full"
+                style={{
+                  width: `${
+                    (value.lookback_bars / (totalBars || 1)) * 100
+                  }%`,
+                }}
+              />
+              {/* Lookforward 區域 */}
+              <div
+                className="absolute right-0 h-full bg-orange-400 rounded-r-full"
+                style={{
+                  width: `${
+                    (value.lookforward_bars / (totalBars || 1)) * 100
+                  }%`,
+                }}
+              />
+              {/* 參考點標記 */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow"
+                style={{
+                  left: `${(value.lookback_bars / (totalBars || 1)) * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                }}
+              />
+            </div>
+
+            {/* 標籤 */}
+            <div className="flex justify-between mt-2 text-xs">
+              <div className="text-blue-600 font-medium">
+                ← {value.lookback_bars} 根 (近期)
+              </div>
+              <div className="text-red-600 font-bold">
+                {selectedRefPoint?.icon} {value.reference_point}
+              </div>
+              <div className="text-orange-600 font-medium">
+                {value.lookforward_bars} 根 →
+              </div>
+            </div>
           </div>
 
-          {/* 標籤 */}
-          <div className="flex justify-between mt-2 text-xs">
-            <div className="text-blue-600 font-medium">
-              ← {value.lookback_bars} 根
+          {/* 雙密度模式: 遠期窗口時間軸 */}
+          {value.far_lookback_bars && value.far_lookback_bars > value.lookback_bars && (
+            <div className="relative pt-2 border-t border-gray-300">
+              <div className="text-xs text-purple-600 font-medium mb-2">
+                遠期窗口 (背景密度)
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full relative">
+                {/* 遠期窗口區域 (排除近期部分) */}
+                <div
+                  className="absolute left-0 h-full bg-purple-300 rounded-l-full"
+                  style={{
+                    width: `${
+                      ((value.far_lookback_bars - value.lookback_bars) / value.far_lookback_bars) * 100
+                    }%`,
+                  }}
+                />
+                {/* 近期窗口區域 (灰色顯示) */}
+                <div
+                  className="absolute right-0 h-full bg-gray-300 rounded-r-full opacity-50"
+                  style={{
+                    width: `${
+                      (value.lookback_bars / value.far_lookback_bars) * 100
+                    }%`,
+                  }}
+                />
+                {/* 參考點標記 */}
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow"
+                  style={{
+                    right: "0%",
+                    transform: "translate(50%, -50%)",
+                  }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-xs">
+                <div className="text-purple-600 font-medium">
+                  ← {value.far_lookback_bars - value.lookback_bars} 根 (遠期)
+                </div>
+                <div className="text-gray-500">
+                  排除近期 {value.lookback_bars} 根
+                </div>
+              </div>
             </div>
-            <div className="text-red-600 font-bold">
-              {selectedRefPoint?.icon} {value.reference_point}
-            </div>
-            <div className="text-orange-600 font-medium">
-              {value.lookforward_bars} 根 →
-            </div>
-          </div>
+          )}
         </div>
 
         {/* 窗口統計 */}
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
           <div className="bg-white p-2 rounded">
-            <div className="text-gray-500">窗口總長</div>
+            <div className="text-gray-500">近期窗口總長</div>
             <div className="text-gray-900 font-semibold">{totalBars} 根K線</div>
           </div>
-          <div className="bg-white p-2 rounded">
-            <div className="text-gray-500">窗口模式</div>
-            <div className="text-gray-900 font-semibold">
-              {value.mode === "relative" ? "嚴格模式" : "彈性模式"}
+          {value.far_lookback_bars ? (
+            <div className="bg-white p-2 rounded">
+              <div className="text-gray-500">遠期窗口總長</div>
+              <div className="text-purple-700 font-semibold">{value.far_lookback_bars} 根K線</div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-white p-2 rounded">
+              <div className="text-gray-500">窗口模式</div>
+              <div className="text-gray-900 font-semibold">
+                {value.mode === "relative" ? "嚴格模式" : "彈性模式"}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -272,7 +357,7 @@ export default function WindowConfigPanel({
         <label className="block text-xs font-medium text-gray-600">
           快速預設
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() =>
@@ -288,7 +373,7 @@ export default function WindowConfigPanel({
             className="px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs hover:bg-gray-50 transition-colors"
           >
             <div className="font-medium text-gray-900">TO前24根</div>
-            <div className="text-gray-500">常用配置</div>
+            <div className="text-gray-500">單密度</div>
           </button>
           <button
             type="button"
@@ -307,21 +392,57 @@ export default function WindowConfigPanel({
             <div className="font-medium text-gray-900">TC前後各12根</div>
             <div className="text-gray-500">對稱窗口</div>
           </button>
+          <button
+            type="button"
+            onClick={() =>
+              !disabled &&
+              onChange({
+                reference_point: "TO",
+                lookback_bars: 24,
+                lookforward_bars: 0,
+                far_lookback_bars: 100,
+                mode: "relative",
+              })
+            }
+            disabled={disabled}
+            className="px-3 py-2 bg-white border border-purple-300 rounded-lg text-xs hover:bg-purple-50 transition-colors"
+          >
+            <div className="font-medium text-purple-900">雙窗口模式</div>
+            <div className="text-purple-600">近24 / 遠100</div>
+          </button>
         </div>
       </div>
 
       {/* 提示訊息 */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-        <div className="flex items-start gap-2">
-          <span className="text-yellow-600 text-sm">⚠️</span>
-          <div className="text-xs text-yellow-700">
-            <div className="font-medium mb-1">未來函數洩漏警告:</div>
-            <div className="text-yellow-600">
-              • lookforward_bars &gt; 0 可能導致未來函數洩漏
-              <br />• 建議使用 lookforward_bars = 0 確保策略有效性
+      <div className="space-y-2">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-600 text-sm">⚠️</span>
+            <div className="text-xs text-yellow-700">
+              <div className="font-medium mb-1">未來函數洩漏警告:</div>
+              <div className="text-yellow-600">
+                • lookforward_bars &gt; 0 可能導致未來函數洩漏
+                <br />• 建議使用 lookforward_bars = 0 確保策略有效性
+              </div>
             </div>
           </div>
         </div>
+
+        {value.far_lookback_bars && value.far_lookback_bars > value.lookback_bars && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <span className="text-purple-600 text-sm">💡</span>
+              <div className="text-xs text-purple-700">
+                <div className="font-medium mb-1">雙密度模式已啟用:</div>
+                <div className="text-purple-600">
+                  • 近期窗口: {value.reference_point}-{value.lookback_bars} 到 {value.reference_point}-1
+                  <br />• 遠期窗口: {value.reference_point}-{value.far_lookback_bars} 到 {value.reference_point}-{value.lookback_bars + 1}
+                  <br />• 優化目標: 正例 near/far ratio &gt;&gt; 反例 near/far ratio
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

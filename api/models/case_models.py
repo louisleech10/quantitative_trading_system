@@ -115,6 +115,12 @@ class BatchDownloadRequest(BaseModel):
     case_ids: Optional[List[str]] = Field(None, description="要下載的案例ID列表（None=全部）")
     lookback_bars: int = Field(240, description="往前K線根數", ge=1, le=1000)
     forward_bars: int = Field(96, description="往後K線根數", ge=1, le=500)
+    warmup_bars: Optional[int] = Field(
+        None,
+        description="指標預熱期K線根數（預設為 max_indicator_param×3，若未指定則使用 lookback_bars×0.3）",
+        ge=0,
+        le=500
+    )
     force_redownload: bool = Field(False, description="強制重新下載（覆蓋已有數據）")
     timeframe: str = Field("1h", description="K線時間框架（預設1h用於ML訓練，可選1m/5m/15m/30m/1h/4h/12h/1d）")
 

@@ -225,11 +225,11 @@ except ValueError as e:
 ```
 
 **驗證點**:
-- [ ] period=20 驗證通過
-- [ ] period=1 拋出 ValueError
-- [ ] period=300 拋出 ValueError  
-- [ ] period=20.5 拋出 ValueError
-- [ ] period=2 和 period=200 都通過（邊界值）
+- [v] period=20 驗證通過
+- [v] period=1 拋出 ValueError
+- [v] period=300 拋出 ValueError  
+- [v] period=20.5 拋出 ValueError
+- [v] period=2 和 period=200 都通過（邊界值）
 
 **✅ 通過標準**:
 - 5個測試全部符合預期行為
@@ -248,7 +248,7 @@ indicator = EMAIndicator()
 manager = DataSourceManager()
 
 # 獲取數據
-symbol = "BTCUSDT"
+symbol = "ETHUSDT"
 timeframe = "12h"
 close_data = manager.get_data_source(symbol, timeframe, DataSourceEnum.CLOSE)
 
@@ -284,11 +284,11 @@ else:
 ```
 
 **驗證點**:
-- [ ] safe_calculate 成功返回結果字典
-- [ ] 結果包含 'name', 'values', 'valid_from', 'metadata' 鍵
-- [ ] valid_from = 19（對於period=20）
-- [ ] calc_time_ms < 10 ms（性能要求）
-- [ ] 數據不足時返回 None（錯誤處理）
+- [v] safe_calculate 成功返回結果字典
+- [v] 結果包含 'name', 'values', 'valid_from', 'metadata' 鍵
+- [v] valid_from = 19（對於period=20）
+- [v] calc_time_ms < 10 ms（性能要求）
+- [-] 數據不足時返回 None（錯誤處理）
 
 **✅ 通過標準**:
 - 所有驗證點通過
@@ -317,7 +317,7 @@ from momentum.Indicators import EMAIndicator, DataSourceManager, DataSourceEnum
 # 1. 準備數據
 indicator = EMAIndicator()
 manager = DataSourceManager()
-symbol = "BTCUSDT"
+symbol = "ETHUSDT"
 timeframe = "12h"
 close_data = manager.get_data_source(symbol, timeframe, DataSourceEnum.CLOSE)
 

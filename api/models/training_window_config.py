@@ -24,12 +24,14 @@ class TrainingWindowConfig(BaseModel):
 
     核心概念:
     - 參考點(reference_point): TO(開單時間點)/TC(平倉時間點)/custom(自定義)
-    - 往前看(lookback_bars): 從參考點往前N根K線(用於計算指標和策略信號)
+    - 往前看(lookback_bars): 從參考點往前N根K線(近期窗口,用於計算指標和策略信號)
     - 往後看(lookforward_bars): 從參考點往後M根K線(通常為0,避免未來函數洩漏)
+    - 遠期窗口(far_lookback_bars): 可選,用於計算背景密度,實現近期/遠期雙密度比較
 
     使用場景:
     - TO前24根K線: reference_point="TO", lookback_bars=24, lookforward_bars=0
     - TC前後各12根: reference_point="TC", lookback_bars=12, lookforward_bars=12
+    - 雙窗口密度比較: lookback_bars=24, far_lookback_bars=100 (近期TO-24~TO-1, 遠期TO-100~TO-25)
     """
     reference_point: Literal["TO", "TC", "custom"] = Field(
         "TO",
@@ -47,6 +49,12 @@ class TrainingWindowConfig(BaseModel):
         ge=0,
         le=100
     )
+    far_lookback_bars: Optional[int] = Field(
+        None,
+        description="遠期窗口：TO往前看M根K線(用於背景密度計算，實現近期/遠期雙密度比較)",
+        ge=1,
+        le=1000
+    )
     mode: Literal["relative", "full_range"] = Field(
         "relative",
         description="窗口模式:relative(嚴格N根)/full_range(使用全部可用K線)"
@@ -55,6 +63,17 @@ class TrainingWindowConfig(BaseModel):
         None,
         description="自定義時間戳(僅當reference_point='custom'時使用)"
     )
+
+    @validator('far_lookback_bars')
+    def validate_far_lookback_bars(cls, v, values):
+        """驗證far_lookback_bars > lookback_bars"""
+        if v is not None:
+            lookback = values.get('lookback_bars')
+            if lookback and v <= lookback:
+                raise ValueError(
+                    f"far_lookback_bars ({v}) 必須大於 lookback_bars ({lookback})"
+                )
+        return v
 
     @validator('custom_timestamp')
     def validate_custom_timestamp(cls, v, values):
@@ -71,6 +90,7 @@ class TrainingWindowConfig(BaseModel):
                 "reference_point": "TO",
                 "lookback_bars": 24,
                 "lookforward_bars": 0,
+                "far_lookback_bars": 100,
                 "mode": "relative"
             }
         }
@@ -211,33 +231,71 @@ class SignalDensityResponse(BaseModel):
     返回策略在正反例中的信號密度統計分析結果。
     所有密度值範圍為 0.0~1.0,代表符合策略的K線占比。
 
+    支援兩種模式:
+    1. 單密度模式: 僅計算近期窗口密度
+    2. 雙密度模式: 同時計算近期和遠期窗口密度,並計算near/far ratio
+
     核心指標:
-    - separation: 密度差異(Optuna優化目標),越大越好
+    - separation: 密度差異(單密度模式Optuna優化目標),越大越好
+    - ratio_separation: near/far ratio差異(雙密度模式Optuna優化目標)
     - p_value: 統計顯著性,<0.05為顯著差異
     - cohens_d: 效果量,>0.5為中等,>0.8為大效果
     - stability_cv: 穩定性,<0.3為穩定
 
-    判斷標準:
+    判斷標準(單密度):
     - 好的策略: separation>0.3, p_value<0.05, cohens_d>0.5, stability_cv<0.3
     - 中等策略: separation>0.2, p_value<0.10, cohens_d>0.3
     - 弱策略: separation<0.1 或 p_value>0.10
+
+    判斷標準(雙密度):
+    - 好的策略: ratio_separation>0.5, p_value<0.05
+    - 中等策略: ratio_separation>0.3, p_value<0.10
+    - 弱策略: ratio_separation<0.3 或 p_value>0.10
     """
-    # 核心統計指標
+    # 核心統計指標 (單密度模式或雙密度模式的近期密度)
     positive_avg_density: float = Field(
         ...,
-        description="正例平均信號密度(0.0~1.0)",
+        description="正例平均信號密度(0.0~1.0) - 單密度:全窗口密度 / 雙密度:近期窗口密度",
         ge=0.0,
         le=1.0
     )
     negative_avg_density: float = Field(
         ...,
-        description="反例平均信號密度(0.0~1.0)",
+        description="反例平均信號密度(0.0~1.0) - 單密度:全窗口密度 / 雙密度:近期窗口密度",
         ge=0.0,
         le=1.0
     )
     separation: float = Field(
         ...,
-        description="密度差異(positive - negative),Optuna優化目標,範圍-1.0~1.0"
+        description="密度差異(positive - negative),單密度模式優化目標,範圍-1.0~1.0"
+    )
+
+    # 雙密度模式額外指標 (當far_lookback_bars配置時有效)
+    positive_far_avg_density: Optional[float] = Field(
+        None,
+        description="正例遠期平均密度(雙密度模式)",
+        ge=0.0,
+        le=1.0
+    )
+    negative_far_avg_density: Optional[float] = Field(
+        None,
+        description="反例遠期平均密度(雙密度模式)",
+        ge=0.0,
+        le=1.0
+    )
+    positive_near_far_ratio: Optional[float] = Field(
+        None,
+        description="正例near/far ratio平均值(雙密度模式)",
+        ge=0.0
+    )
+    negative_near_far_ratio: Optional[float] = Field(
+        None,
+        description="反例near/far ratio平均值(雙密度模式)",
+        ge=0.0
+    )
+    ratio_separation: Optional[float] = Field(
+        None,
+        description="near/far ratio差異(正例-反例),雙密度模式優化目標"
     )
 
     # 統計檢驗指標
@@ -288,9 +346,17 @@ class SignalDensityResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
+                # 單密度模式範例
                 "positive_avg_density": 0.75,
                 "negative_avg_density": 0.35,
                 "separation": 0.40,
+                # 雙密度模式範例 (可選)
+                "positive_far_avg_density": 0.60,
+                "negative_far_avg_density": 0.33,
+                "positive_near_far_ratio": 1.25,
+                "negative_near_far_ratio": 1.06,
+                "ratio_separation": 0.19,
+                # 統計指標
                 "p_value": 0.001,
                 "cohens_d": 1.2,
                 "stability_cv": 0.15,

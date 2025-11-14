@@ -4,7 +4,7 @@
 提供案例導入、批量下載等API端點
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query
 from typing import Optional
 
 from ..models.case_models import (
@@ -33,9 +33,9 @@ case_storage = get_case_storage_manager()
 @router.post("/case/import", response_model=CaseImportResponse)
 async def import_cases_from_csv(
     file: UploadFile = File(...),
-    default_timeframe: Optional[str] = "1h",
-    validate_only: bool = False,
-    force_clear: bool = False
+    default_timeframe: Optional[str] = Query("1h"),
+    validate_only: bool = Query(False),
+    force_clear: bool = Query(False)
 ):
     """
     上傳CSV/Excel文件並導入案例

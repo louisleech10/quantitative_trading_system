@@ -3,11 +3,12 @@ Optuna參數優化引擎 - Ultra Think 最終優化版本
 
 核心功能:
 1. 自動搜索最佳EMA策略參數組合
-2. 優化目標: 最大化正反例信號密度差異(separation)
+2. 優化目標: 最大化正反例信號密度差異(separation)或加權雙密度得分(weighted dual-density)
 3. 支援多種優化器(TPE/CmaEs/Random/GP/NSGA-II)
 4. 多目標優化(separation + stability,Pareto前沿)
 5. 斷點續跑機制(SQLite持久化)
 6. 並行多進程優化
+7. 雙密度模式: 加權優化信號聚集(clustering)和正反例區分(discrimination)
 
 Ultra Think 記錄:
 - Day 1 步驟1: 初版代碼 - 核心優化邏輯和目標函數(TPE/CmaEs/Random)
@@ -21,6 +22,7 @@ Ultra Think 記錄:
 - Day 3 步驟3: 整合 - 包裝器模式整合重試邏輯,callback整合檢查點保存
 - Day 4 步驟1: ProgressMonitor - 進度追蹤與實時通知(里程碑、ETA、試驗速度)
 - Day 4 步驟2: 整合 - callback整合進度監控,檢查點包含progress_statistics
+- Day 5 步驟1: 雙密度模式 - 檢測far_lookback_bars,自動切換優化目標為ratio_separation
 
 優化內容:
 Day 1:
@@ -55,8 +57,18 @@ Day 4:
 - ✅ 優化完成調用finish()(發送optimization_finished通知)
 - ✅ 里程碑通知(25%/50%/75%),新最佳值通知,實時進度更新
 
+Day 5:
+- ✅ 雙密度模式檢測(檢查training_window.far_lookback_bars是否存在)
+- ✅ 目標函數切換(雙密度模式使用ratio_separation,單密度使用separation)
+- ✅ 日誌記錄增強(顯示當前優化模式和目標)
+- ✅ 步驟2: 加權雙密度優化(方案D) - 同時優化信號聚集和正反例區分
+  - clustering_weight參數控制權重(預設0.5)
+  - clustering_score = positive_near_far_ratio - 1.0 (聚集程度)
+  - discrimination_score = ratio_separation (區分度)
+  - objective = clustering_weight * clustering_score + (1-clustering_weight) * discrimination_score
+
 Author: Claude (Phase 3.5)
-Date: 2025-11-02
+Date: 2025-11-02 (Updated: 2025-11-12)
 """
 
 import logging
@@ -79,7 +91,7 @@ from api.models.training_window_config import (
 )
 from api.models.strategy_test_models import ParameterRange
 from api.services.signal_analysis_service import SignalAnalysisService
-from api.services.case_storage import CaseStorage
+from api.utils.case_storage import get_case_storage_manager
 
 # 導入新增的容錯機制
 from momentum.Optimization.checkpoint_manager import CheckpointManager
@@ -210,7 +222,8 @@ class OptunaOptimizer:
         max_retries: int = 3,
         retry_base_delay: float = 1.0,
         enable_progress_monitor: bool = True,
-        progress_notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
+        progress_notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        clustering_weight: float = 0.5
     ):
         """
         初始化Optuna優化器
@@ -232,6 +245,10 @@ class OptunaOptimizer:
             retry_base_delay: 重試基礎延遲(秒,default: 1.0)
             enable_progress_monitor: 是否啟用進度監控(default: True)
             progress_notification_callback: 進度通知回調函數(event_type, data)
+            clustering_weight: 雙密度模式中聚集得分的權重(0.0-1.0, default: 0.5)
+                              - 聚集得分: 測量正例信號在近期窗口的聚集程度
+                              - 區分得分: 測量正反例的near/far ratio差異
+                              - 加權公式: clustering_weight * 聚集得分 + (1-clustering_weight) * 區分得分
         """
         self.study_name = study_name
         self.storage = storage
@@ -245,10 +262,11 @@ class OptunaOptimizer:
         self.use_multi_objective = use_multi_objective
         self.enable_progress_monitor = enable_progress_monitor
         self.progress_notification_callback = progress_notification_callback
+        self.clustering_weight = clustering_weight
 
         # 依賴服務
         self.signal_service = SignalAnalysisService()
-        self.case_storage = CaseStorage()
+        self.case_storage = get_case_storage_manager()
 
         # 日誌
         self.logger = logging.getLogger(__name__)
@@ -494,21 +512,26 @@ class OptunaOptimizer:
         1. 參數採樣: 從搜索空間採樣參數組合
         2. 參數驗證: 確保參數約束(如short < mid < long)
         3. 調用信號密度分析: 計算正反例的平均信號密度
-        4. 計算目標值: separation = positive_avg - negative_avg
-        5. 返回目標值: Optuna將最大化此值
+        4. 檢測雙密度模式: 若training_window有far_lookback_bars,使用ratio_separation
+        5. 計算目標值:
+           - 單密度模式: separation = positive_avg - negative_avg
+           - 雙密度模式: ratio_separation = positive_near_far_ratio - negative_near_far_ratio
+        6. 返回目標值: Optuna將最大化此值
 
         Args:
             trial: Optuna Trial對象
 
         Returns:
-            separation(密度差異)
+            目標值(單密度:separation / 雙密度:ratio_separation)
 
         Raises:
             optuna.TrialPruned: 參數不合法時剪枝
             Exception: 其他錯誤由_objective_function_with_retry處理
 
         Design Note:
-        - 優化目標: 最大化正反例信號密度差異(而非Win Rate)
+        - 優化目標:
+          - 單密度: 最大化正反例信號密度差異(而非Win Rate)
+          - 雙密度: 最大化正反例near/far ratio差異(檢測信號聚集)
         - 參數約束: 三線排列必須 short < mid < long
         - 數據源: 從DataSourceEnum中選擇,無硬編碼
         """
@@ -583,16 +606,53 @@ class OptunaOptimizer:
 
             response: SignalDensityResponse = await self.signal_service.analyze_signal_density(request)
 
-            # 步驟5: 計算目標值
-            separation = response.positive_avg_density - response.negative_avg_density
-
-            # 日誌記錄
-            self.logger.info(
-                f"Trial {trial.number}: separation={separation:.4f}, "
-                f"params={trial.params}"
+            # 步驟5: 檢測雙密度模式並計算目標值
+            is_dual_density = (
+                self.training_window.far_lookback_bars is not None
+                and response.ratio_separation is not None
             )
 
-            return separation
+            if is_dual_density:
+                # 雙密度模式: 加權優化 (方案D)
+                # 條件1得分: 正例信號聚集程度 (positive_near_far_ratio - 1.0)
+                # - 若 ratio=1.5, score=0.5 (信號在近期聚集50%)
+                # - 若 ratio=1.0, score=0.0 (無聚集效應)
+                # - 若 ratio<1.0, score<0 (近期反而更少,懲罰)
+                clustering_score = response.positive_near_far_ratio - 1.0
+
+                # 條件2得分: 正反例區分度 (ratio_separation)
+                discrimination_score = response.ratio_separation
+
+                # 加權綜合得分
+                clustering_weight = self.clustering_weight
+                discrimination_weight = 1.0 - clustering_weight
+
+                objective_value = (
+                    clustering_weight * clustering_score +
+                    discrimination_weight * discrimination_score
+                )
+
+                self.logger.info(
+                    f"Trial {trial.number} [DUAL-DENSITY-WEIGHTED]: "
+                    f"objective={objective_value:.4f} "
+                    f"(clustering={clustering_score:.4f} [w={clustering_weight:.2f}], "
+                    f"discrimination={discrimination_score:.4f} [w={discrimination_weight:.2f}]), "
+                    f"pos_ratio={response.positive_near_far_ratio:.4f}, "
+                    f"neg_ratio={response.negative_near_far_ratio:.4f}, "
+                    f"params={trial.params}"
+                )
+            else:
+                # 單密度模式: 優化separation
+                objective_value = response.separation
+                self.logger.info(
+                    f"Trial {trial.number} [SINGLE-DENSITY]: "
+                    f"separation={objective_value:.4f} "
+                    f"(pos={response.positive_avg_density:.4f}, "
+                    f"neg={response.negative_avg_density:.4f}), "
+                    f"params={trial.params}"
+                )
+
+            return objective_value
 
         except optuna.TrialPruned:
             # 參數不合法,重新拋出(由包裝器處理)
@@ -848,6 +908,22 @@ class OptunaOptimizer:
         self.positive_cases = positive_cases
         self.negative_cases = negative_cases
         self.training_window = training_window
+
+        # 檢測雙密度模式
+        is_dual_density_mode = training_window.far_lookback_bars is not None
+        if is_dual_density_mode:
+            self.logger.info(
+                f"DUAL-DENSITY MODE detected: "
+                f"near window={training_window.lookback_bars}, "
+                f"far window={training_window.far_lookback_bars}. "
+                f"Optimization target: ratio_separation (near/far ratio difference)"
+            )
+        else:
+            self.logger.info(
+                f"SINGLE-DENSITY MODE: "
+                f"window={training_window.lookback_bars}. "
+                f"Optimization target: separation (density difference)"
+            )
 
         # 步驟3: 創建/載入Study
         if self.study is None:

@@ -209,6 +209,16 @@ class BatchDownloadService:
         else:
             cases = self.case_storage.get_cases()
 
+        # 計算 warmup_bars（如果未指定，使用保守估計）
+        warmup_bars = request.warmup_bars
+        if warmup_bars is None:
+            # 預設使用 lookback_bars * 0.3 作為 warmup
+            warmup_bars = int(request.lookback_bars * 0.3)
+            logger.info(
+                f"warmup_bars not specified, using conservative estimate: "
+                f"{warmup_bars} bars (30% of lookback_bars={request.lookback_bars})"
+            )
+
         # 按symbol分組（使用request.timeframe作為K線下載時間框架）
         grouped_cases = self._group_cases_by_symbol(cases)
 
@@ -242,12 +252,13 @@ class BatchDownloadService:
                 )
 
                 try:
-                    # Step 1: 計算時間範圍
+                    # Step 1: 計算時間範圍（包含 warmup）
                     time_ranges = self._calculate_time_ranges(
                         group_cases,
                         timeframe,
                         request.lookback_bars,
-                        request.forward_bars
+                        request.forward_bars,
+                        warmup_bars
                     )
 
                     # Step 2: 合併重疊時間範圍
@@ -389,11 +400,12 @@ class BatchDownloadService:
                     # Step 4: 為每個案例創建HDF5存儲（按案例組織）
                     for case in group_cases:
                         try:
-                            # 計算案例所需的時間範圍
+                            # 計算案例所需的時間範圍（包含 warmup）
                             case_start, case_end = self._calculate_case_time_range(
                                 case,
                                 request.lookback_bars,
-                                request.forward_bars
+                                request.forward_bars,
+                                warmup_bars
                             )
                             
                             # 檢查時間範圍是否包含已知的數據缺口
@@ -469,13 +481,40 @@ class BatchDownloadService:
                                     error_details[case.case_id] = "No klines data after download"
                                 continue
 
+                            # 驗證案例範圍的連續性
+                            # 檢查 TO - (lookback + warmup) 到 TO 的範圍是否完全連續
+                            case_timestamp = case.timestamp
+                            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+                            required_start = case_timestamp - (request.lookback_bars + warmup_bars) * timeframe_seconds
+                            required_end = case_timestamp
+
+                            is_continuous, continuity_error = await asyncio.to_thread(
+                                self.kline_storage.validate_range_continuity,
+                                symbol,
+                                timeframe,
+                                required_start,
+                                required_end
+                            )
+
+                            if not is_continuous:
+                                logger.warning(
+                                    f"⚠️  案例 {case.case_id} 的數據範圍不連續\n"
+                                    f"   需要範圍: TO-{request.lookback_bars + warmup_bars} 到 TO\n"
+                                    f"   時間戳範圍: {required_start} 到 {required_end}\n"
+                                    f"   連續性錯誤: {continuity_error}\n"
+                                    f"   建議: 重新下載或檢查數據完整性"
+                                )
+                                async with stats_lock:
+                                    failed_case_ids.append(case.case_id)
+                                    error_details[case.case_id] = f"數據不連續: {continuity_error}"
+                                continue
+
                             # [優化] 不再保存案例切片，只驗證數據可讀取
                             # 案例數據應實時從共享K線庫讀取，避免數據重複和空間浪費
                             # 原邏輯：await asyncio.to_thread(self._save_case_klines, case, case_df, request)
 
                             logger.info(
-                                f"Saved {len(case_df)} klines for case {case.case_id} "
-                                f"(read from shared K-line library)"
+                                f"✓ 案例 {case.case_id} 驗證通過: {len(case_df)} K線，範圍連續"
                             )
 
                             async with stats_lock:
@@ -605,7 +644,8 @@ class BatchDownloadService:
         cases: List[CaseRecord],
         timeframe: str,
         lookback_bars: int,
-        forward_bars: int
+        forward_bars: int,
+        warmup_bars: int = 0
     ) -> List[TimeRange]:
         """
         計算時間範圍列表
@@ -613,7 +653,7 @@ class BatchDownloadService:
         **新邏輯（使用TO/TC概念）**：
         - case.timestamp = TO (Target Open)
         - 計算案例在下載timeframe的K線數（case_bars）
-        - start_time = TO - lookback_bars * timeframe_seconds
+        - start_time = TO - (lookback_bars + warmup_bars) * timeframe_seconds
         - end_time = TO + (case_bars + forward_bars) * timeframe_seconds
 
         Args:
@@ -621,6 +661,7 @@ class BatchDownloadService:
             timeframe: 時間框架（下載用，如1h）
             lookback_bars: 往前K線根數
             forward_bars: 往後K線根數
+            warmup_bars: 指標預熱期K線根數
 
         Returns:
             List[TimeRange]: 時間範圍列表
@@ -633,16 +674,17 @@ class BatchDownloadService:
             case_tf_seconds = self.TIMEFRAME_SECONDS.get(case.timeframe, 43200)
             case_bars = max(1, case_tf_seconds // download_tf_seconds)
 
-            # 計算開始和結束時間（以TO為起點）
+            # 計算開始和結束時間（以TO為起點，包含 warmup）
             case_time = datetime.utcfromtimestamp(case.timestamp)  # TO
-            start_time = case_time - timedelta(seconds=lookback_bars * download_tf_seconds)
+            total_lookback = lookback_bars + warmup_bars
+            start_time = case_time - timedelta(seconds=total_lookback * download_tf_seconds)
             end_time = case_time + timedelta(seconds=(case_bars + forward_bars) * download_tf_seconds)
 
             ranges.append(TimeRange(start_time, end_time))
 
         logger.debug(
             f"Calculated {len(ranges)} time ranges for {len(cases)} cases "
-            f"(download_tf={timeframe})"
+            f"(download_tf={timeframe}, lookback={lookback_bars}, warmup={warmup_bars})"
         )
         return ranges
 
@@ -686,7 +728,8 @@ class BatchDownloadService:
         self,
         case: CaseRecord,
         lookback_bars: int,
-        forward_bars: int
+        forward_bars: int,
+        warmup_bars: int = 0
     ) -> Tuple[datetime, datetime]:
         """
         計算單個案例的時間範圍
@@ -695,14 +738,21 @@ class BatchDownloadService:
             case: 案例記錄
             lookback_bars: 往前K線根數
             forward_bars: 往後K線根數
+            warmup_bars: 指標預熱期K線根數
 
         Returns:
             Tuple[datetime, datetime]: (start_time, end_time)
+
+        Note:
+            實際下載範圍 = TO - (lookback + warmup) 到 TO + forward
+            這確保指標計算時有足夠的預熱數據
         """
         timeframe_seconds = self.TIMEFRAME_SECONDS.get(case.timeframe, 3600)
         case_time = datetime.utcfromtimestamp(case.timestamp)
 
-        start_time = case_time - timedelta(seconds=lookback_bars * timeframe_seconds)
+        # 包含 warmup 在起始時間計算中
+        total_lookback = lookback_bars + warmup_bars
+        start_time = case_time - timedelta(seconds=total_lookback * timeframe_seconds)
         end_time = case_time + timedelta(seconds=forward_bars * timeframe_seconds)
 
         return start_time, end_time

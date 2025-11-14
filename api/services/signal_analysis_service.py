@@ -21,7 +21,7 @@ from fastapi import HTTPException
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.Indicators import IndicatorEngine
 from momentum.Analysis import SignalDensityAnalyzer
-from api.services.case_storage import CaseStorage
+from api.utils.case_storage import get_case_storage_manager
 from api.models.training_window_config import (
     SignalDensityRequest,
     SignalDensityResponse,
@@ -57,7 +57,7 @@ class SignalAnalysisService:
         # 依賴注入
         self.kline_storage = KlineStorageManager()
         self.indicator_engine = IndicatorEngine()
-        self.case_storage = CaseStorage()
+        self.case_storage = get_case_storage_manager()
         self.analyzer = SignalDensityAnalyzer(
             kline_storage=self.kline_storage,
             indicator_engine=self.indicator_engine
@@ -286,7 +286,7 @@ class SignalAnalysisService:
             raise ValueError("lookforward_bars不能為負數")
 
         # 檢查指標是否已註冊
-        available_indicators = self.indicator_engine.get_available_indicators()
+        available_indicators = self.indicator_engine.list_indicators()
         if request.strategy_config.indicator_type not in available_indicators:
             raise ValueError(
                 f"未知的指標類型: {request.strategy_config.indicator_type}. "

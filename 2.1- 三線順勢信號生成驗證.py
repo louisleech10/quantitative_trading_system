@@ -37,7 +37,7 @@ def main():
 
     # 配置參數
     symbol = "ETHUSDT"
-    timeframe = "12h"
+    timeframe = "1h"
     ema_periods = {
         'short': 12,
         'mid': 26,

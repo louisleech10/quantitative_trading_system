@@ -24,10 +24,12 @@ except ImportError:
     logging.warning("pandas_ta not available, using pandas native ewm")
 
 from .base_indicator import BaseIndicator
+from .indicator_engine import register_indicator
 
 logger = logging.getLogger(__name__)
 
 
+@register_indicator("ema")
 class EMAIndicator(BaseIndicator):
     """
     EMA（指數移動平均線）指標實作

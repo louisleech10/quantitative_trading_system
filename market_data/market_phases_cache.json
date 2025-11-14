@@ -1,14 +1,4 @@
 {
-  "NEUTRAL_20200504": {
-    "start_date": "2020-05-04",
-    "end_date": "2020-05-10",
-    "description": "NEUTRAL"
-  },
-  "FEAR_20200511": {
-    "start_date": "2020-05-11",
-    "end_date": "2020-05-17",
-    "description": "FEAR"
-  },
   "NEUTRAL_20200518": {
     "start_date": "2020-05-18",
     "end_date": "2020-05-24",
@@ -491,7 +481,7 @@
   },
   "FEAR_20251013": {
     "start_date": "2025-10-13",
-    "end_date": "2025-10-26",
+    "end_date": "2025-11-09",
     "description": "FEAR"
   }
 }

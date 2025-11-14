@@ -32,7 +32,7 @@ storage_manager = KlineStorageManager()
 # 配置參數
 symbol = "ETHUSDT"
 timeframe = "12h"
-ema_periods = [12, 26, 50]
+ema_periods = [5, 16, 30]
 
 print("=" * 100)
 print(f"📊 {symbol} {timeframe} EMA 驗證報告 - 與 Binance 比對")
@@ -107,10 +107,10 @@ print("-" * 100)
 recent_data = df.tail(15)
 for idx, row in recent_data.iterrows():
     dt_str = row['datetime'].strftime('%Y-%m-%d %H:%M:%S')
-    ema_12 = row['EMA_12'] if pd.notna(row['EMA_12']) else float('nan')
-    ema_26 = row['EMA_26'] if pd.notna(row['EMA_26']) else float('nan')
-    ema_50 = row['EMA_50'] if pd.notna(row['EMA_50']) else float('nan')
-    print(f"{dt_str:<25} {row['close']:>12.2f} {ema_12:>12.2f} {ema_26:>12.2f} {ema_50:>12.2f}")
+    ema_5 = row['EMA_5'] if pd.notna(row['EMA_5']) else float('nan')
+    ema_16 = row['EMA_16'] if pd.notna(row['EMA_16']) else float('nan')
+    ema_30 = row['EMA_30'] if pd.notna(row['EMA_30']) else float('nan')
+    print(f"{dt_str:<25} {row['close']:>12.2f} {ema_5:>12.2f} {ema_16:>12.2f} {ema_30:>12.2f}")
 
 # 匯出 CSV 供進一步分析
 csv_filename = f"{symbol}_{timeframe}_EMA_驗證_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"

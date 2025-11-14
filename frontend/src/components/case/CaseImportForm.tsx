@@ -178,7 +178,7 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
 
       {/* Upload Button */}
       <button
-        onClick={handleUpload}
+        onClick={() => handleUpload(false)}
         disabled={!file || uploading}
         className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-colors ${
           !file || uploading

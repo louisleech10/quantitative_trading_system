@@ -1085,6 +1085,66 @@ class KlineStorageManager:
             self.stats['errors'] += 1
             return None
 
+    def validate_range_continuity(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_timestamp: int,
+        end_timestamp: int
+    ) -> tuple[bool, Optional[str]]:
+        """
+        驗證指定時間範圍內的數據連續性
+
+        只檢查請求範圍內的K線是否連續，不檢查整個數據集。
+        適用於按需驗證場景（例如：驗證某個案例需要的lookback範圍）。
+
+        Args:
+            symbol: 交易對
+            timeframe: 時間框架
+            start_timestamp: 範圍起始時間戳（秒）
+            end_timestamp: 範圍結束時間戳（秒）
+
+        Returns:
+            (is_continuous, error_message)
+            - is_continuous: True 表示範圍內數據完全連續
+            - error_message: 如果不連續，包含詳細錯誤信息；否則為 None
+        """
+        try:
+            # 讀取範圍數據（不驗證，後面手動檢查）
+            df = self.read_klines(
+                symbol=symbol,
+                timeframe=timeframe,
+                start_time=start_timestamp,
+                end_time=end_timestamp,
+                validate_continuity=False  # 關閉自動驗證
+            )
+
+            if df is None or len(df) == 0:
+                return False, f"範圍 [{start_timestamp}, {end_timestamp}] 內無數據"
+
+            # 計算期望的K線數量
+            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+            expected_bars = int((end_timestamp - start_timestamp) / timeframe_seconds) + 1
+
+            if len(df) < expected_bars:
+                missing = expected_bars - len(df)
+                actual_start = df['timestamp'].iloc[0] if len(df) > 0 else None
+                actual_end = df['timestamp'].iloc[-1] if len(df) > 0 else None
+                return False, (
+                    f"範圍內數據不完整: 期望 {expected_bars} 根，實際 {len(df)} 根，缺少 {missing} 根\n"
+                    f"請求範圍: [{start_timestamp}, {end_timestamp}]\n"
+                    f"實際範圍: [{actual_start}, {actual_end}]"
+                )
+
+            # 檢查連續性（使用現有的 _validate_continuity）
+            try:
+                self._validate_continuity(df, symbol, timeframe)
+                return True, None
+            except ValueError as e:
+                return False, str(e)
+
+        except Exception as e:
+            return False, f"驗證範圍連續性時發生錯誤: {str(e)}"
 
     def read_klines_around_timestamp(self, symbol: str, timeframe: str,
                                      center_timestamp: int,
@@ -1117,8 +1177,21 @@ class KlineStorageManager:
             pd.DataFrame or None (包含metadata: to_index, tc_index, case_bars)
         """
         try:
-            # 先讀取全部數據
-            df = self.read_klines(symbol, timeframe)
+            # 計算需要讀取的時間範圍（避免讀取整個數據集）
+            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+            # 預留足夠的緩衝區，因為我們需要在找到 TO 後切片
+            buffer = max(lookback, forward) + 100  # 額外緩衝
+            range_start = center_timestamp - (lookback + buffer) * timeframe_seconds
+            range_end = center_timestamp + (forward + buffer) * timeframe_seconds
+
+            # 讀取範圍數據（關閉全局連續性驗證，稍後驗證使用範圍）
+            df = self.read_klines(
+                symbol,
+                timeframe,
+                start_time=range_start,
+                end_time=range_end,
+                validate_continuity=False  # 關閉全局驗證，使用範圍驗證
+            )
 
             if df is None or len(df) == 0:
                 return None
@@ -1183,8 +1256,26 @@ class KlineStorageManager:
                 logger.info(f"Read {len(result_df)} klines around timestamp {center_timestamp} "
                            f"({lookback} before, {forward} after)")
 
+            # 驗證返回範圍的連續性
+            if len(result_df) > 1:
+                try:
+                    self._validate_continuity(result_df, symbol, timeframe)
+                    logger.debug(f"✓ Range continuity validated for {symbol}/{timeframe}")
+                except ValueError as e:
+                    # 範圍內有缺口，記錄並向上傳播
+                    logger.error(
+                        f"❌ Range continuity check failed for {symbol}/{timeframe}\n"
+                        f"   Center timestamp: {center_timestamp}\n"
+                        f"   Lookback: {lookback}, Forward: {forward}\n"
+                        f"   Error: {str(e)}"
+                    )
+                    raise
+
             return result_df
 
+        except ValueError as e:
+            # 連續性驗證失敗，向上傳播
+            raise
         except Exception as e:
             error_type = classify_storage_error(e)
             logger.error(f"Failed to read klines around timestamp for {symbol}/{timeframe}: {e}")
