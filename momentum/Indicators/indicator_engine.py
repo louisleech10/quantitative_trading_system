@@ -303,7 +303,12 @@ class IndicatorEngine:
                 indicator_name = config['indicator']
                 data_source_str = config['data_source']
                 params = config.get('params', {})
-                output_name = config.get('output_name')
+                output_name = self._generate_output_name(
+                    indicator_name,
+                    data_source_str,
+                    params,
+                    config.get('output_name')
+                )
 
                 # 轉換數據源
                 try:
@@ -314,11 +319,6 @@ class IndicatorEngine:
                     )
                     fail_count += 1
                     continue
-
-                # 生成輸出名稱
-                if not output_name:
-                    param_str = "_".join(f"{k}{v}" for k, v in params.items())
-                    output_name = f"{indicator_name}_{data_source_str}_{param_str}"
 
                 # 計算指標
                 logger.debug(f"Calculating #{i}: {output_name}")
@@ -351,6 +351,125 @@ class IndicatorEngine:
         else:
             logger.warning("No indicators calculated successfully")
             return pd.DataFrame()
+
+    def calculate_indicators_from_dataframe(
+        self,
+        kline_df: pd.DataFrame,
+        configs: List[IndicatorConfig]
+    ) -> pd.DataFrame:
+        """從現有 K 線 DataFrame 計算指標"""
+        if kline_df is None or kline_df.empty:
+            raise ValueError("kline_df is empty; cannot calculate indicators")
+
+        logger.info(
+            f"Starting in-memory calculation: {len(configs)} indicators on {len(kline_df)} bars"
+        )
+        start_time = time.time()
+
+        results: Dict[str, pd.Series] = {}
+        success_count = 0
+        fail_count = 0
+
+        for i, config in enumerate(configs, 1):
+            try:
+                indicator_name = config['indicator']
+                data_source_str = config['data_source']
+                params = config.get('params', {})
+            except KeyError as e:
+                logger.error(f"Config #{i} missing required field: {e}")
+                fail_count += 1
+                continue
+
+            output_name = self._generate_output_name(
+                indicator_name,
+                data_source_str,
+                params,
+                config.get('output_name')
+            )
+
+            # 轉換枚舉
+            try:
+                data_source = DataSourceEnum(data_source_str)
+            except ValueError:
+                logger.error(
+                    f"Invalid data_source '{data_source_str}' in config #{i}"
+                )
+                fail_count += 1
+                continue
+
+            if indicator_name not in self._indicators:
+                available = ", ".join(self.list_indicators()) or "<none>"
+                logger.error(
+                    f"Indicator '{indicator_name}' not registered. Available: {available}"
+                )
+                fail_count += 1
+                continue
+
+            # 取得資料欄位
+            try:
+                data_series = self.data_manager.get_data_source_from_df(
+                    kline_df,
+                    data_source
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to extract data_source '{data_source.value}' for config #{i}: {e}"
+                )
+                raise ValueError(
+                    f"DataFrame 缺少所需欄位 '{data_source.value}' 或包含無效數據"
+                ) from e
+
+            indicator_class = self._indicators[indicator_name]
+            indicator = indicator_class()
+
+            indicator_result = indicator.safe_calculate(data_series, **params)
+            if indicator_result is None:
+                last_error = indicator.get_last_error() or "Unknown indicator error"
+                logger.error(
+                    f"Indicator '{indicator_name}' failed on config #{i}: {last_error}"
+                )
+                fail_count += 1
+                continue
+
+            result_series = indicator_result['data']
+            if not result_series.index.equals(kline_df.index):
+                result_series = result_series.reindex(kline_df.index)
+
+            results[output_name] = result_series
+            success_count += 1
+
+        total_time = (time.time() - start_time) * 1000
+        logger.info(
+            f"In-memory calculation completed: {success_count} succeeded, "
+            f"{fail_count} failed, {total_time:.2f}ms total"
+        )
+
+        if not results:
+            raise ValueError(
+                "No indicators calculated successfully from dataframe; see logs for details"
+            )
+
+        return pd.DataFrame(results, index=kline_df.index)
+
+    @staticmethod
+    def _generate_output_name(
+        indicator_name: str,
+        data_source_str: str,
+        params: Dict[str, Any],
+        custom_name: Optional[str]
+    ) -> str:
+        """建立一致且可控的輸出欄位名稱"""
+        if custom_name:
+            return custom_name
+
+        if params:
+            param_str = "_".join(
+                f"{key}{value}" for key, value in sorted(params.items())
+            )
+        else:
+            param_str = "default"
+
+        return f"{indicator_name}_{data_source_str}_{param_str}"
 
     # ==================== 輔助方法 ====================
 

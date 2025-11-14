@@ -114,6 +114,9 @@ class SignalDensityAnalyzer:
             )
             raise
 
+        # 移除參考點(TO)所在的K線,確保窗口覆蓋 TO-1 ~ TO-X
+        klines = self._remove_reference_bar(klines, ref_timestamp)
+
         # 驗證K線數量
         expected_bars = window_config.lookback_bars + window_config.lookforward_bars
         actual_bars = len(klines)
@@ -206,10 +209,24 @@ class SignalDensityAnalyzer:
         ]
 
         # 批量計算指標
-        indicators_df = self.indicator_engine.calculate_indicators_from_dataframe(
-            kline_data,
-            configs
-        )
+        try:
+            indicators_df = self.indicator_engine.calculate_indicators_from_dataframe(
+                kline_data,
+                configs
+            )
+        except Exception as e:
+            self.logger.error(
+                "Failed to calculate EMA indicators for three-line strategy",
+                exc_info=True
+            )
+            raise
+
+        required_cols = ["ema_short", "ema_mid", "ema_long"]
+        missing_cols = [col for col in required_cols if col not in indicators_df.columns]
+        if missing_cols:
+            error_msg = f"Indicator calculation missing columns: {missing_cols}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
 
         # 應用三線排列邏輯
         signals = (
@@ -284,6 +301,9 @@ class SignalDensityAnalyzer:
                 f"symbol={case.symbol}, timeframe={case.timeframe}"
             )
 
+        # 遠期窗口同樣需要排除TO所在K線
+        klines = self._remove_reference_bar(klines, ref_timestamp)
+
         # 裁剪遠期窗口: 移除最近的lookback_bars根K線
         # klines已按時間排序,最後lookback_bars根是近期窗口,需要移除
         far_window_size = window_config.far_lookback_bars - window_config.lookback_bars
@@ -297,6 +317,38 @@ class SignalDensityAnalyzer:
             f"near_lookback={window_config.lookback_bars}, "
             f"far_window_bars={len(klines)}"
         )
+
+        return klines
+
+    def _remove_reference_bar(
+        self,
+        klines: pd.DataFrame,
+        ref_timestamp: int
+    ) -> pd.DataFrame:
+        """移除TO所在的K線,讓窗口僅覆蓋TO之前的資料"""
+        if klines is None or klines.empty:
+            return klines
+
+        try:
+            if 'timestamp' in klines.columns:
+                closest_idx = (klines['timestamp'] - ref_timestamp).abs().idxmin()
+            else:
+                closest_idx = klines.index[-1]
+
+            if closest_idx in klines.index:
+                klines = klines.drop(index=closest_idx)
+
+            if 'timestamp' in klines.columns:
+                # Preserve real timeline ordering for downstream validation (e.g. window overlap checks)
+                klines = klines.set_index('timestamp', drop=False)
+            else:
+                klines = klines.reset_index(drop=True)
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to remove reference bar at {ref_timestamp}: {e}"
+            )
+            if len(klines) > 0:
+                klines = klines.iloc[:-1].reset_index(drop=True)
 
         return klines
 

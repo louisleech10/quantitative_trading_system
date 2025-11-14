@@ -173,7 +173,8 @@ class DualDensityVerifier:
             print("✗ No positive cases found for testing")
             return False
 
-        test_case_id = positive_cases[0]
+        test_case = positive_cases[0]
+        test_case_id = test_case.case_id
 
         # 從cases.json讀取案例詳情
         cases_path = project_root / "data_cache" / "cases.json"
