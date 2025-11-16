@@ -1,503 +1,745 @@
-/**
- * page.tsx - 策略測試主頁面
- *
- * Phase 3.3+3.4 - Task B3: 主頁面整合
- *
- * 功能:
- * - 整合所有策略配置組件 (B1+B2)
- * - 整合操作按鈕組件 (B3)
- * - 統一狀態管理 (useState)
- * - 配置驗證邏輯
- * - API 調用 (POST /api/chart-signals/signals)
- * - 錯誤處理和使用者反饋
- *
- * Ultra Think 記錄:
- * - 步驟 1: 初版代碼 (當前)
- * - 步驟 2: 審查優化 (待執行)
- * - 步驟 3: 最終優化 (待執行)
- */
-
 "use client";
 
-import { useState } from "react";
-import DataSourceSelector from "@/components/strategy/DataSourceSelector";
-import IndicatorSelector from "@/components/strategy/IndicatorSelector";
-import StrategyLogicSelector from "@/components/strategy/StrategyLogicSelector";
-import ParameterRangeInput, {
-  type EMAParameters,
-} from "@/components/strategy/ParameterRangeInput";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-hot-toast";
+import {
+  BarChart2,
+  ChevronRight,
+  Database,
+  Layers,
+  LineChart,
+  Loader2,
+  RefreshCw,
+  Save,
+  Share2,
+  Trash2,
+} from "lucide-react";
+import { Accordion } from "@/components/ui/Accordion";
+import { AccordionItem } from "@/components/ui/AccordionItem";
+import { MultiSelect } from "@/components/ui/MultiSelect";
+import { Select, type SelectOption } from "@/components/ui/Select";
+import { NumberInput } from "@/components/ui/NumberInput";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import WindowConfigPanel, {
   type TrainingWindowConfig,
 } from "@/components/strategy/WindowConfigPanel";
-import TestModeSelector, {
-  type TestModeConfig,
-} from "@/components/strategy/TestModeSelector";
-import ActionButtons from "@/components/strategy/ActionButtons";
-import SaveTemplateDialog, {
-  type StrategyTemplate,
-} from "@/components/strategy/SaveTemplateDialog";
+import {
+  useStrategyConfig,
+  type StrategyTemplatePayload,
+} from "@/hooks/useStrategyConfig";
 
-/**
- * 策略配置完整狀態
- */
-interface StrategyTestState {
-  // B1: 基礎選擇
-  data_source: string;
-  indicator_type: string;
-  strategy_logic: string;
-
-  // B2: 配置組件
-  test_mode: TestModeConfig;
-  ema_parameters: EMAParameters;
-  training_window: TrainingWindowConfig;
-
-  // 測試範圍 (時間和標的)
-  symbol: string;
-  timeframe: string;
-  start_time: number;
-  end_time: number;
-}
-
-/**
- * API 回應類型
- */
 interface SignalPoint {
   timestamp: number;
   indicator_values: Record<string, number>;
   signal_density?: number;
 }
 
+interface DensityMetrics {
+  positive_avg_density?: number;
+  negative_avg_density?: number;
+  near_far_ratio?: number;
+  separation?: number;
+  ratio_separation?: number;
+  p_value?: number;
+  cohens_d?: number;
+}
+
+interface DataQualitySummary {
+  total_cases?: number;
+  positive_cases?: number;
+  negative_cases?: number;
+  success_rate?: number;
+  error_messages?: string[];
+}
+
 interface ChartSignalResponse {
-  success: boolean;
-  symbol: string;
-  timeframe: string;
   signal_points: SignalPoint[];
-  total_signals: number;
-  sampled: boolean;
-  metadata: {
-    total_klines: number;
-    calculation_time_ms: number;
-    strategy_config: any;
+  total_bars: number;
+  signal_count: number;
+  signal_density: number;
+  is_sampled: boolean;
+  strategy_name: string;
+  metadata?: {
+    total_klines?: number;
+    calculation_time_ms?: number;
+    strategy_config?: Record<string, unknown>;
+    density_metrics?: DensityMetrics;
+    quality?: DataQualitySummary;
   };
 }
 
+const DATA_SOURCE_OPTIONS = [
+  { value: "close", label: "收盤價 Close", icon: "📊" },
+  { value: "open", label: "開盤價 Open", icon: "🔓" },
+  { value: "high", label: "最高價 High", icon: "⬆️" },
+  { value: "low", label: "最低價 Low", icon: "⬇️" },
+  { value: "volume", label: "成交量 Volume", icon: "📦" },
+  { value: "taker_buy_volume", label: "主動買量", icon: "🟢" },
+  { value: "taker_ratio", label: "Taker Ratio", icon: "%" },
+];
+
+const INDICATOR_OPTIONS: SelectOption[] = [
+  { value: "ema", label: "EMA 指數移動平均", icon: "📈" },
+  { value: "sma", label: "SMA 簡單移動平均", icon: "📉", disabled: true },
+  { value: "rsi", label: "RSI 相對強弱", icon: "⚡", disabled: true },
+  { value: "macd", label: "MACD", icon: "🌊", disabled: true },
+];
+
+const STRATEGY_OPTIONS: SelectOption[] = [
+  { value: "three_line", label: "三線順勢 (EMA 短 > 中 > 長)", icon: "📐" },
+  { value: "crossover", label: "均線交叉", icon: "✂️", disabled: true },
+  { value: "threshold", label: "閾值突破", icon: "🎯", disabled: true },
+];
+
+const SYMBOL_OPTIONS: SelectOption[] = [
+  { value: "BTCUSDT", label: "BTCUSDT", icon: "₿" },
+  { value: "ETHUSDT", label: "ETHUSDT", icon: "◇" },
+  { value: "SOLUSDT", label: "SOLUSDT", icon: "🌀" },
+  { value: "CUSTOM", label: "自訂交易對", icon: "✏️" },
+];
+
+const TIMEFRAME_OPTIONS: SelectOption[] = [
+  { value: "1h", label: "1 小時" },
+  { value: "4h", label: "4 小時" },
+  { value: "12h", label: "12 小時" },
+  { value: "1d", label: "1 天" },
+];
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const formatPercent = (value?: number) => {
+  if (value === undefined || Number.isNaN(value)) return "—";
+  return `${(value * 100).toFixed(2)}%`;
+};
+
+const formatNumber = (value?: number, digits = 2) => {
+  if (value === undefined || Number.isNaN(value)) return "—";
+  return value.toFixed(digits);
+};
+
+const formatCount = (value?: number) => {
+  if (value === undefined || value === null) return "—";
+  return value.toLocaleString();
+};
+
+const parseDateToTimestamp = (date: string, fallback: number) => {
+  if (!date) return fallback;
+  const timestamp = Date.parse(`${date}T00:00:00Z`);
+  return Number.isNaN(timestamp) ? fallback : timestamp;
+};
+
 export default function StrategyTestPage() {
-  // ========== 狀態管理 ==========
-  const [state, setState] = useState<StrategyTestState>({
-    // 預設值
-    data_source: "close",
-    indicator_type: "ema",
-    strategy_logic: "three_line",
-
-    test_mode: {
-      mode: "single",
-    },
-
-    ema_parameters: {
-      ema_short: 7,
-      ema_mid: 18,
-      ema_long: 35,
-    },
-
-    training_window: {
-      reference_point: "TO",
-      lookback_bars: 24,
-      lookforward_bars: 0,
-      mode: "relative",
-    },
-
-    // 測試範圍 (預設: BTCUSDT 1小時 最近7天)
-    symbol: "BTCUSDT",
-    timeframe: "1h",
-    start_time: Date.now() - 7 * 24 * 60 * 60 * 1000,
-    end_time: Date.now(),
-  });
+  const router = useRouter();
+  const {
+    state,
+    setField,
+    reset,
+    saveTemplate,
+    loadTemplate,
+    listTemplates,
+    deleteTemplate,
+    syncToUrl,
+  } = useStrategyConfig();
 
   const [isRunning, setIsRunning] = useState(false);
-  const [testResult, setTestResult] = useState<ChartSignalResponse | null>(
-    null
-  );
-  const [error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<ChartSignalResponse | null>(null);
+  const [templates, setTemplates] = useState<StrategyTemplatePayload[]>([]);
+  const [isTemplatePanelOpen, setTemplatePanelOpen] = useState(false);
 
-  // 範本對話框狀態
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"save" | "load">("save");
+  useEffect(() => {
+    if (isTemplatePanelOpen) {
+      setTemplates(listTemplates());
+    }
+  }, [isTemplatePanelOpen, listTemplates]);
 
-  // ========== 配置更新函數 ==========
-  const updateState = <K extends keyof StrategyTestState>(
-    field: K,
-    value: StrategyTestState[K]
-  ) => {
-    setState((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // ========== 配置驗證 ==========
-  const validateConfig = (): { isValid: boolean; errors: string[] } => {
+  const validationErrors = useMemo(() => {
     const errors: string[] = [];
+    const { indicatorParams, dateRange, dataSources } = state;
+    const short = indicatorParams.ema_short;
+    const mid = indicatorParams.ema_mid;
+    const long = indicatorParams.ema_long;
 
-    // 驗證 EMA 參數
-    if (state.test_mode.mode === "single") {
-      const short = state.ema_parameters.ema_short as number;
-      const mid = state.ema_parameters.ema_mid as number;
-      const long = state.ema_parameters.ema_long as number;
-
-      if (short >= mid) {
-        errors.push("短期 EMA 必須小於中期 EMA");
-      }
-      if (mid >= long) {
-        errors.push("中期 EMA 必須小於長期 EMA");
-      }
-    } else {
-      // Optuna 模式: 驗證範圍
-      const short = state.ema_parameters.ema_short as {
-        min: number;
-        max: number;
-      };
-      const mid = state.ema_parameters.ema_mid as { min: number; max: number };
-      const long = state.ema_parameters.ema_long as {
-        min: number;
-        max: number;
-      };
-
-      if (short.min >= short.max) {
-        errors.push("短期 EMA 最小值必須小於最大值");
-      }
-      if (mid.min >= mid.max) {
-        errors.push("中期 EMA 最小值必須小於最大值");
-      }
-      if (long.min >= long.max) {
-        errors.push("長期 EMA 最小值必須小於最大值");
-      }
-      if (short.max >= mid.min) {
-        errors.push("短期 EMA 最大值必須小於中期 EMA 最小值");
-      }
-      if (mid.max >= long.min) {
-        errors.push("中期 EMA 最大值必須小於長期 EMA 最小值");
-      }
+    if (!(short < mid && mid < long)) {
+      errors.push("請維持 EMA 週期為 短 < 中 < 長");
     }
 
-    // 驗證時間範圍
-    if (state.start_time >= state.end_time) {
-      errors.push("開始時間必須早於結束時間");
+    if (!dateRange.start || !dateRange.end) {
+      errors.push("請完整設定時間範圍");
+    } else if (dateRange.start > dateRange.end) {
+      errors.push("開始日期不可晚於結束日期");
     }
 
-    // 驗證標的和時間框架
+    if (dataSources.length === 0) {
+      errors.push("至少選擇一個數據源");
+    }
+
     if (!state.symbol) {
-      errors.push("請選擇交易標的");
+      errors.push("請輸入或選擇交易對");
     }
+
     if (!state.timeframe) {
       errors.push("請選擇時間框架");
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
+    return errors;
+  }, [state]);
+
+  const densityMetrics = useMemo(
+    () => testResult?.metadata?.density_metrics ?? null,
+    [testResult]
+  );
+  const qualitySummary = useMemo(
+    () => testResult?.metadata?.quality ?? null,
+    [testResult]
+  );
+
+  const handleIndicatorParamChange = (field: string, value: number) => {
+    setField("indicatorParams", {
+      ...state.indicatorParams,
+      [field]: value,
+    });
   };
 
-  const { isValid } = validateConfig();
+  const handleWindowConfigChange = (config: TrainingWindowConfig) => {
+    setField("windowConfig", config);
+  };
 
-  // ========== API 調用 ==========
+  const handleApplyDualWindowPreset = () => {
+    setField("windowConfig", {
+      ...state.windowConfig,
+      reference_point: "TO",
+      lookback_bars: 24,
+      lookforward_bars: 0,
+      far_lookback_bars: 100,
+      mode: "relative",
+    });
+  };
+
   const handleRunTest = async () => {
+    if (validationErrors.length > 0) {
+      toast.error("請先修正配置錯誤");
+      return;
+    }
+
     setIsRunning(true);
-    setError(null);
-    setTestResult(null);
+    setApiError(null);
 
     try {
-      // 構建 API 請求
+      const startTime = parseDateToTimestamp(state.dateRange.start, Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const endTime = parseDateToTimestamp(state.dateRange.end, Date.now());
+
       const requestBody = {
         symbol: state.symbol,
         timeframe: state.timeframe,
-        start_time: state.start_time,
-        end_time: state.end_time,
+        start_time: startTime,
+        end_time: endTime,
         strategy_config: {
-          data_source: state.data_source,
-          indicator_type: state.indicator_type,
-          strategy_logic: state.strategy_logic,
-          ema_parameters: state.ema_parameters,
-          training_window: state.training_window,
-          test_mode: state.test_mode.mode,
-          optuna_trials: state.test_mode.optuna_trials,
+          data_source: state.dataSources[0] ?? "close",
+          data_sources: state.dataSources,
+          indicator_type: state.indicatorType,
+          strategy_logic: state.strategyLogic,
+          params: state.indicatorParams,
+          training_window: state.windowConfig,
+          clustering_weight: state.clusteringWeight,
         },
       };
 
-      const response = await fetch("/api/chart-signals/signals", {
+      const response = await fetch(`${API_BASE_URL}/api/v1/chart/signals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "API 請求失敗");
+        let message = "API 請求失敗";
+        const errorText = await response.text().catch(() => "");
+        try {
+          const errorData = JSON.parse(errorText || "{}");
+          message =
+            errorData.detail ||
+            errorData.message ||
+            errorData.error?.message ||
+            message;
+        } catch {
+          if (response.status) {
+            message = `HTTP ${response.status}: ${errorText || message}`;
+          }
+        }
+        throw new Error(message);
       }
 
       const data: ChartSignalResponse = await response.json();
       setTestResult(data);
-    } catch (err) {
-      console.error("Test execution failed:", err);
-      setError(
-        err instanceof Error ? err.message : "執行測試時發生未知錯誤"
-      );
+      toast.success("測試完成");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "執行測試時發生未知錯誤";
+      setApiError(message);
+      toast.error(message);
     } finally {
       setIsRunning(false);
     }
   };
 
-  // ========== 範本管理 ==========
   const handleSaveTemplate = () => {
-    setDialogMode("save");
-    setDialogOpen(true);
-  };
-
-  const handleLoadTemplate = () => {
-    setDialogMode("load");
-    setDialogOpen(true);
-  };
-
-  const handleClearConfig = () => {
-    if (confirm("確定要清除所有配置嗎?")) {
-      setState({
-        data_source: "close",
-        indicator_type: "ema",
-        strategy_logic: "three_line",
-        test_mode: { mode: "single" },
-        ema_parameters: {
-          ema_short: 7,
-          ema_mid: 18,
-          ema_long: 35,
-        },
-        training_window: {
-          reference_point: "TO",
-          lookback_bars: 24,
-          lookforward_bars: 0,
-          mode: "relative",
-        },
-        symbol: "BTCUSDT",
-        timeframe: "1h",
-        start_time: Date.now() - 7 * 24 * 60 * 60 * 1000,
-        end_time: Date.now(),
-      });
-      setTestResult(null);
-      setError(null);
+    const name = window.prompt("輸入範本名稱", state.strategyName || "自訂策略");
+    if (!name) return;
+    const description = window.prompt("輸入範本描述 (可留空)", state.strategyDescription ?? "") || undefined;
+    const result = saveTemplate({ name, description });
+    if (result) {
+      toast.success(`已保存範本「${result.name}」`);
+      setTemplates(listTemplates());
     }
   };
 
-  const handleTemplateSave = (template: StrategyTemplate) => {
-    console.log("Template saved:", template);
-    // 可選: 顯示成功訊息
+  const handleReset = () => {
+    if (confirm("確定要清除所有配置嗎？")) {
+      reset();
+      setTestResult(null);
+      setApiError(null);
+      toast.success("已回復預設值");
+    }
   };
 
-  const handleTemplateLoad = (template: StrategyTemplate) => {
-    setState((prev) => ({
-      ...prev,
-      data_source: template.config.data_source,
-      indicator_type: template.config.indicator_type,
-      strategy_logic: template.config.strategy_logic,
-      test_mode: template.config.test_mode,
-      ema_parameters: template.config.ema_parameters,
-      training_window: template.config.training_window,
-    }));
-    console.log("Template loaded:", template);
+  const handleViewCharts = () => {
+    const query = syncToUrl();
+    router.push(`/charts${query ?? ""}`);
   };
 
-  // ========== 渲染 ==========
+  const handleLoadTemplate = (template: StrategyTemplatePayload) => {
+    loadTemplate(template);
+    toast.success(`已載入範本「${template.name}」`);
+    setTemplatePanelOpen(false);
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    deleteTemplate(templateId);
+    setTemplates(listTemplates());
+  };
+
+  const selectedSymbolOption = SYMBOL_OPTIONS.find((option) => option.value === state.symbol) ?? null;
+  const symbolSelectValue = selectedSymbolOption ? selectedSymbolOption.value : null;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 頁面標題 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            📊 策略測試配置
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Phase 3.3+3.4: 策略選擇 UI + 圖表信號箭頭系統
-          </p>
+    <div className="min-h-screen bg-slate-50">
+      <div className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-3 text-sm text-slate-500">
+              <span className="flex items-center gap-1 text-indigo-600">
+                <Layers className="h-4 w-4" /> Phase 3.2
+              </span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+              <span>雙窗口密度 / 策略測試</span>
+            </div>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
+              <input
+                type="text"
+                value={state.strategyName}
+                onChange={(event) => setField("strategyName", event.target.value)}
+                className="w-full rounded-lg border border-slate-200 px-4 py-2 text-lg font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                placeholder="輸入策略名稱"
+              />
+              <button
+                type="button"
+                onClick={() => setTemplatePanelOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                <Database className="h-4 w-4" /> 管理範本
+              </button>
+            </div>
+            <textarea
+              value={state.strategyDescription ?? ""}
+              onChange={(event) => setField("strategyDescription", event.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder="補充策略說明、假設或使用情境..."
+            />
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handleSaveTemplate}
+              className="inline-flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+            >
+              <Save className="h-4 w-4" /> 保存範本
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              <Trash2 className="h-4 w-4" /> 清除
+            </button>
+            <button
+              type="button"
+              onClick={handleViewCharts}
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <LineChart className="h-4 w-4" /> 查看圖表
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 主要內容區域 */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左側: 配置面板 */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* 測試範圍配置 */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">
-                🎯 測試範圍
-              </h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    交易標的
-                  </label>
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[360px,1fr]">
+        <div className="space-y-4">
+          <Accordion defaultExpanded={["basic", "indicator"]}>
+            <AccordionItem id="basic" title="基本配置" badge={`${state.dataSources.length} 個來源`}>
+              <div className="space-y-4">
+                <MultiSelect
+                  label="數據來源"
+                  options={DATA_SOURCE_OPTIONS}
+                  value={state.dataSources}
+                  onChange={(options) => setField("dataSources", options)}
+                  placeholder="選擇欲追蹤的 K 線欄位"
+                />
+                <Select
+                  label="指標類型"
+                  options={INDICATOR_OPTIONS}
+                  value={state.indicatorType}
+                  onChange={(value) => setField("indicatorType", value ?? "ema")}
+                />
+                <Select
+                  label="策略邏輯"
+                  options={STRATEGY_OPTIONS}
+                  value={state.strategyLogic}
+                  onChange={(value) => setField("strategyLogic", value ?? "three_line")}
+                />
+              </div>
+            </AccordionItem>
+
+            <AccordionItem id="indicator" title="指標參數" badge="EMA">
+              <div className="grid grid-cols-1 gap-4">
+                <NumberInput
+                  label="EMA Short"
+                  value={state.indicatorParams.ema_short}
+                  min={3}
+                  max={50}
+                  onChange={(value) => handleIndicatorParamChange("ema_short", value)}
+                />
+                <NumberInput
+                  label="EMA Mid"
+                  value={state.indicatorParams.ema_mid}
+                  min={state.indicatorParams.ema_short + 1}
+                  max={150}
+                  onChange={(value) => handleIndicatorParamChange("ema_mid", value)}
+                />
+                <NumberInput
+                  label="EMA Long"
+                  value={state.indicatorParams.ema_long}
+                  min={state.indicatorParams.ema_mid + 1}
+                  max={400}
+                  onChange={(value) => handleIndicatorParamChange("ema_long", value)}
+                />
+              </div>
+            </AccordionItem>
+
+            <AccordionItem
+              id="window"
+              title="窗口配置"
+              badge={state.windowConfig.far_lookback_bars ? "雙密度" : "單密度"}
+            >
+              <div className="space-y-4">
+                <WindowConfigPanel
+                  value={state.windowConfig}
+                  onChange={handleWindowConfigChange}
+                />
+                <button
+                  type="button"
+                  onClick={handleApplyDualWindowPreset}
+                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-medium text-purple-700 transition hover:bg-purple-100"
+                >
+                  套用 Near 24 / Far 100 預設
+                </button>
+              </div>
+            </AccordionItem>
+
+            <AccordionItem id="range" title="測試範圍" badge={state.timeframe}>
+              <div className="space-y-4">
+                <Select
+                  label="交易對"
+                  options={SYMBOL_OPTIONS}
+                  value={symbolSelectValue}
+                  onChange={(value) => {
+                    if (!value || value === "CUSTOM") return;
+                    setField("symbol", value);
+                  }}
+                  allowClear
+                />
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600">自訂交易對</label>
                   <input
                     type="text"
                     value={state.symbol}
-                    onChange={(e) => updateState("symbol", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    placeholder="例: BTCUSDT"
+                    onChange={(event) => setField("symbol", event.target.value.toUpperCase())}
+                    placeholder="例：BTCUSDT"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    時間框架
-                  </label>
-                  <select
-                    value={state.timeframe}
-                    onChange={(e) => updateState("timeframe", e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="1m">1分鐘</option>
-                    <option value="5m">5分鐘</option>
-                    <option value="15m">15分鐘</option>
-                    <option value="1h">1小時</option>
-                    <option value="4h">4小時</option>
-                    <option value="1d">1天</option>
-                  </select>
+                <Select
+                  label="時間框架"
+                  options={TIMEFRAME_OPTIONS}
+                  value={state.timeframe}
+                  onChange={(value) => setField("timeframe", value ?? state.timeframe)}
+                />
+                <DateRangePicker
+                  label="時間範圍"
+                  startDate={state.dateRange.start}
+                  endDate={state.dateRange.end}
+                  onChange={(start, end) =>
+                    setField("dateRange", {
+                      start,
+                      end,
+                    })
+                  }
+                />
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={state.syncToUrl}
+                    onChange={(event) => setField("syncToUrl", event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  轉跳 /charts 時同步參數至 URL
+                </label>
+              </div>
+            </AccordionItem>
+
+            <AccordionItem id="optimizer" title="優化參數" badge={`${(state.clusteringWeight * 100).toFixed(0)}% 聚集權重`}>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-slate-700">clustering_weight (0=只看區分度, 1=只看聚集度)</label>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={state.clusteringWeight}
+                  onChange={(event) => setField("clusteringWeight", Number(event.target.value))}
+                  className="w-full"
+                />
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>偏重 Near/Far Ratio</span>
+                  <span className="font-semibold text-slate-700">{state.clusteringWeight.toFixed(2)}</span>
+                  <span>偏重 正反例區分</span>
                 </div>
               </div>
+            </AccordionItem>
+          </Accordion>
+
+          <button
+            type="button"
+            disabled={isRunning}
+            onClick={handleRunTest}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          >
+            {isRunning ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> 執行中...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" /> 執行測試
+              </>
+            )}
+          </button>
+
+          {validationErrors.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <div className="mb-1 font-semibold">需先修正：</div>
+              <ul className="list-inside list-disc space-y-1">
+                {validationErrors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
             </div>
+          )}
+        </div>
 
-            {/* B1: 基礎選擇組件 */}
-            <div className="bg-white rounded-lg shadow p-6 space-y-6">
-              <h2 className="text-lg font-bold text-gray-900">
-                ⚙️ 基礎配置
-              </h2>
-
-              <DataSourceSelector
-                value={state.data_source}
-                onChange={(v) => updateState("data_source", v)}
-                disabled={isRunning}
-              />
-
-              <IndicatorSelector
-                value={state.indicator_type}
-                onChange={(v) => updateState("indicator_type", v)}
-                disabled={isRunning}
-              />
-
-              <StrategyLogicSelector
-                value={state.strategy_logic}
-                onChange={(v) => updateState("strategy_logic", v)}
-                disabled={isRunning}
-              />
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-wide text-slate-500">密度統計</p>
+                <h2 className="text-2xl font-semibold text-slate-900">模型指標</h2>
+              </div>
+              <BarChart2 className="h-6 w-6 text-indigo-500" />
             </div>
-
-            {/* B2: 參數配置組件 */}
-            <div className="bg-white rounded-lg shadow p-6 space-y-6">
-              <h2 className="text-lg font-bold text-gray-900">
-                🔧 參數配置
-              </h2>
-
-              <TestModeSelector
-                value={state.test_mode}
-                onChange={(v) => updateState("test_mode", v)}
-                disabled={isRunning}
-              />
-
-              <ParameterRangeInput
-                value={state.ema_parameters}
-                onChange={(v) => updateState("ema_parameters", v)}
-                mode={state.test_mode.mode}
-                disabled={isRunning}
-              />
-
-              <WindowConfigPanel
-                value={state.training_window}
-                onChange={(v) => updateState("training_window", v)}
-                disabled={isRunning}
-              />
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricCard label="正例密度" value={formatPercent(densityMetrics?.positive_avg_density)} helper="正例平均 signal density" />
+              <MetricCard label="反例密度" value={formatPercent(densityMetrics?.negative_avg_density)} helper="反例平均 signal density" />
+              <MetricCard label="Near/Far Ratio" value={formatNumber(densityMetrics?.near_far_ratio)} helper="正例窗口密度比" />
+              <MetricCard label="Separation" value={formatNumber(densityMetrics?.separation)} helper="正反差值" />
+              <MetricCard label="Ratio Separation" value={formatNumber(densityMetrics?.ratio_separation)} helper="ratio 差值" />
+              <MetricCard label="p-value" value={densityMetrics?.p_value ? densityMetrics.p_value.toExponential(2) : "—"} helper="統計顯著性" />
+              <MetricCard label="Cohen's d" value={formatNumber(densityMetrics?.cohens_d)} helper="效果量" />
             </div>
+            {!densityMetrics && (
+              <p className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">
+                後端尚未回傳密度統計，或尚未執行測試。
+              </p>
+            )}
           </div>
 
-          {/* 右側: 操作面板和結果 */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* B3: 操作按鈕 */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">
-                🚀 操作
-              </h2>
-              <ActionButtons
-                onRunTest={handleRunTest}
-                onSaveTemplate={handleSaveTemplate}
-                onLoadTemplate={handleLoadTemplate}
-                onClearConfig={handleClearConfig}
-                isValid={isValid}
-                isRunning={isRunning}
-              />
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-wide text-slate-500">執行概況</p>
+                <h2 className="text-2xl font-semibold text-slate-900">測試結果</h2>
+              </div>
+              <Share2 className="h-6 w-6 text-indigo-500" />
             </div>
-
-            {/* 測試結果 */}
-            {testResult && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">
-                  📈 測試結果
-                </h2>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">信號數量:</span>
-                    <span className="font-semibold text-gray-900">
-                      {testResult.total_signals}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">K線總數:</span>
-                    <span className="font-semibold text-gray-900">
-                      {testResult.metadata.total_klines}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">計算時間:</span>
-                    <span className="font-semibold text-gray-900">
-                      {testResult.metadata.calculation_time_ms.toFixed(2)} ms
-                    </span>
-                  </div>
-                  {testResult.sampled && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-yellow-700">
-                      ⚠️ 信號數量超過 500,已進行均勻採樣
-                    </div>
-                  )}
-                </div>
+            {testResult ? (
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <SummaryItem label="回傳信號數" value={formatCount(testResult.signal_count)} />
+                <SummaryItem label="K 線採樣" value={formatCount(testResult.total_bars)} />
+                <SummaryItem
+                  label="計算耗時"
+                  value={
+                    testResult.metadata?.calculation_time_ms !== undefined
+                      ? `${testResult.metadata.calculation_time_ms.toFixed(1)} ms`
+                      : "—"
+                  }
+                />
+                <SummaryItem label="採樣狀態" value={testResult.is_sampled ? "已抽樣 (500)" : "完整樣本"} />
+              </div>
+            ) : (
+              <div className="mt-6 rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                尚未執行測試，執行後會顯示密度統計與資料品質。
               </div>
             )}
-
-            {/* 錯誤訊息 */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <span className="text-red-600">❌</span>
-                  <div>
-                    <div className="text-sm font-medium text-red-700">
-                      執行失敗
-                    </div>
-                    <div className="text-xs text-red-600 mt-1">{error}</div>
-                  </div>
+            {qualitySummary && (
+              <div className="mt-6 rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="font-semibold text-slate-800">資料品質</div>
+                <div className="mt-2 grid gap-4 md:grid-cols-2">
+                  <SummaryItem label="案例總數" value={qualitySummary.total_cases?.toString() ?? "—"} subtle />
+                  <SummaryItem label="成功率" value={formatPercent(qualitySummary.success_rate)} subtle />
                 </div>
+                {qualitySummary.error_messages && qualitySummary.error_messages.length > 0 && (
+                  <ul className="mt-3 list-inside list-disc text-xs text-amber-700">
+                    {qualitySummary.error_messages.map((message) => (
+                      <li key={message}>{message}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {apiError && (
+              <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                {apiError}
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* 範本對話框 */}
-      <SaveTemplateDialog
-        isOpen={dialogOpen}
-        mode={dialogMode}
-        currentConfig={{
-          data_source: state.data_source,
-          indicator_type: state.indicator_type,
-          strategy_logic: state.strategy_logic,
-          test_mode: state.test_mode,
-          ema_parameters: state.ema_parameters,
-          training_window: state.training_window,
-        }}
-        onClose={() => setDialogOpen(false)}
-        onSave={handleTemplateSave}
-        onLoad={handleTemplateLoad}
-      />
+      {isTemplatePanelOpen && (
+        <TemplatePanel
+          templates={templates}
+          onClose={() => setTemplatePanelOpen(false)}
+          onLoad={handleLoadTemplate}
+          onDelete={handleDeleteTemplate}
+        />
+      )}
+    </div>
+  );
+}
+
+interface MetricCardProps {
+  label: string;
+  value: string;
+  helper?: string;
+}
+
+function MetricCard({ label, value, helper }: MetricCardProps) {
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-4">
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
+      {helper && <p className="text-xs text-slate-500">{helper}</p>}
+    </div>
+  );
+}
+
+interface SummaryItemProps {
+  label: string;
+  value: string;
+  subtle?: boolean;
+}
+
+function SummaryItem({ label, value, subtle = false }: SummaryItemProps) {
+  return (
+    <div className={`rounded-lg p-3 ${subtle ? "bg-white" : "bg-slate-50"}`}>
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-lg font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+interface TemplatePanelProps {
+  templates: StrategyTemplatePayload[];
+  onClose: () => void;
+  onLoad: (template: StrategyTemplatePayload) => void;
+  onDelete: (templateId: string) => void;
+}
+
+function TemplatePanel({ templates, onClose, onLoad, onDelete }: TemplatePanelProps) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-end bg-black/40">
+      <div className="h-full w-full max-w-md overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500">Templates</p>
+            <h3 className="text-lg font-semibold text-slate-900">策略範本管理</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="space-y-3 px-5 py-4">
+          {templates.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">
+              尚未建立任何範本，保存後即可在此快速載入。
+            </p>
+          ) : (
+            templates.map((template) => (
+              <div key={template.id} className="rounded-lg border border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-base font-semibold text-slate-900">{template.name}</p>
+                    {template.description && (
+                      <p className="text-xs text-slate-500">{template.description}</p>
+                    )}
+                    <p className="mt-1 text-[11px] text-slate-400">更新於 {new Date(template.updatedAt).toLocaleString()}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(template.id)}
+                    className="text-xs text-rose-500 hover:underline"
+                  >
+                    移除
+                  </button>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onLoad(template)}
+                    className="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
+                  >
+                    載入此範本
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

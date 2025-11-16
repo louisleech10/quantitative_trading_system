@@ -340,6 +340,10 @@ class ChartSignalCalculationResponse(BaseModel):
         description="總K線數量",
         ge=0
     )
+    is_sampled: bool = Field(
+        False,
+        description="是否進行了採樣(當signal_count > 500時)"
+    )
     signal_count: int = Field(
         ...,
         description="符合策略的K線數量",
@@ -351,21 +355,10 @@ class ChartSignalCalculationResponse(BaseModel):
         ge=0.0,
         le=1.0
     )
-    is_sampled: bool = Field(
-        False,
-        description="是否進行了採樣(當signal_count > 500時)"
-    )
     strategy_name: str = Field(
         ...,
         description="策略名稱(用於UI顯示)"
     )
-
-    @validator('signal_points')
-    def validate_signal_points_limit(cls, v):
-        """驗證信號點數量不超過500"""
-        if len(v) > 500:
-            raise ValueError(f"signal_points數量({len(v)})超過限制(500)")
-        return v
 
     @validator('signal_count')
     def validate_signal_count_matches(cls, v, values):

@@ -264,7 +264,7 @@ async def validate_strategy_config(
 
         # 2. 驗證指標類型
         service = get_chart_signal_service()
-        available_indicators = service.indicator_engine.get_available_indicators()
+        available_indicators = service.indicator_engine.list_indicators()
         if request.strategy_config.indicator_type not in available_indicators:
             errors.append(
                 f"未知的指標類型: {request.strategy_config.indicator_type}. "

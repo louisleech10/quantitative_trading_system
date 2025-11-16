@@ -110,7 +110,7 @@ class BatchDownloadService:
         self.case_storage = case_storage or CaseStorageManager()
         # 使用配置的 data_cache 路徑，確保所有下載使用同一存儲位置
         self.kline_storage = kline_storage or KlineStorageManager(
-            cache_dir=str(settings.data_cache_path)
+            cache_dir=str(settings.kline_cache_dir)
         )
 
         if download_service:

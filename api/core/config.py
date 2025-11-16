@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # 資料路徑設定
     project_root: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent)
     data_cache_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache")
+    kline_cache_dir: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache",
+        env="KLINE_CACHE_DIR"
+    )
     results_output_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "search_results")
     logs_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "logs")
     
@@ -73,6 +77,7 @@ class Settings(BaseSettings):
         """確保所有必要的目錄都存在"""
         directories = [
             self.data_cache_path,
+            self.kline_cache_dir,
             self.results_output_path,
             self.logs_path
         ]

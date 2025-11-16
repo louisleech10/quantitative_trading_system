@@ -28,7 +28,7 @@ from fastapi import HTTPException
 
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.Indicators import IndicatorEngine
-from momentum.Indicators.types import DataSourceEnum
+from api.core.config import settings
 from api.models.strategy_test_models import (
     ChartSignalCalculationRequest,
     ChartSignalCalculationResponse,
@@ -66,14 +66,14 @@ class ChartSignalService:
             return
 
         # 依賴注入
-        self.kline_storage = KlineStorageManager()
+        self.kline_storage = KlineStorageManager(cache_dir=str(settings.kline_cache_dir))
         self.indicator_engine = IndicatorEngine()
 
         self.logger = logging.getLogger(__name__)
         self.logger.info("ChartSignalService initialized")
 
         # 配置常量
-        self.MAX_SIGNAL_POINTS = 500  # 最多返回500個標記點
+        self.MAX_SIGNAL_POINTS = None  # 無上限，返回完整信號列表
 
         self._initialized = True
 
@@ -204,13 +204,24 @@ class ChartSignalService:
             )
 
             signal_count = len(signal_points)
-            # 計算密度時使用實際信號範圍的K線數
-            signal_range_bars = total_bars - warmup_bars
-            signal_density = signal_count / signal_range_bars if signal_range_bars > 0 else 0.0
+            # 計算密度時使用用戶請求範圍內的有效 K 線數量
+            valid_range_mask = (klines["timestamp"].to_numpy() * 1000) >= request.start_time
+            signal_range_bars = int(valid_range_mask.sum())
+            if signal_range_bars <= 0:
+                signal_range_bars = max(total_bars - warmup_bars, 1)
+
+            signal_density = signal_count / signal_range_bars
+            if signal_density > 1:
+                self.logger.warning(
+                    "信號密度超過 100%%，已限制於 1.0，signal_count=%d, bars=%d",
+                    signal_count,
+                    signal_range_bars,
+                )
+                signal_density = 1.0
 
             # 7. 智能採樣 (若超過限制)
             is_sampled = False
-            if len(signal_points) > self.MAX_SIGNAL_POINTS:
+            if self.MAX_SIGNAL_POINTS is not None and len(signal_points) > self.MAX_SIGNAL_POINTS:
                 self.logger.warning(
                     f"信號點數量({len(signal_points)})超過限制({self.MAX_SIGNAL_POINTS}),進行採樣"
                 )
@@ -252,7 +263,7 @@ class ChartSignalService:
 
         except Exception as e:
             # 內部錯誤(500 Internal Server Error)
-            elapsed_time = time.time() - start_time
+            elapsed_time = time.time() - start_time_calc
             self.logger.error(
                 f"圖表信號計算失敗: {e}, 耗時={elapsed_time:.3f}秒",
                 exc_info=True
@@ -277,7 +288,7 @@ class ChartSignalService:
             raise ValueError("end_time 必須大於 start_time")
 
         # 檢查指標是否已註冊
-        available_indicators = self.indicator_engine.get_available_indicators()
+        available_indicators = self.indicator_engine.list_indicators()
         if request.strategy_config.indicator_type not in available_indicators:
             raise ValueError(
                 f"未知的指標類型: {request.strategy_config.indicator_type}. "
@@ -324,19 +335,36 @@ class ChartSignalService:
             start_ts_sec = start_time // 1000
             end_ts_sec = end_time // 1000
             
-            # 讀取K線數據（會自動進行連續性檢查）
+            # 讀取K線數據（允許中間有缺口，避免整體任務被阻擋）
             klines = self.kline_storage.read_klines(
                 symbol=symbol,
                 timeframe=timeframe,
                 start_time=start_ts_sec,
                 end_time=end_ts_sec,
-                validate_continuity=True  # 零容忍連續性檢查
+                validate_continuity=False  # 前端策略測試允許分段資料
             )
 
             if klines is None or len(klines) == 0:
                 raise FileNotFoundError(
                     f"K線數據不存在或為空: {symbol} {timeframe}"
                 )
+
+            # 評估實際覆蓋率，若少於預期則記錄警告方便排查
+            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(timeframe)
+            if timeframe_seconds:
+                expected_bars = int((end_ts_sec - start_ts_sec) / timeframe_seconds) + 1
+                missing_bars = max(expected_bars - len(klines), 0)
+                if missing_bars > 0:
+                    coverage = len(klines) / expected_bars
+                    self.logger.warning(
+                        "讀取的 K 線存在缺口: %s/%s, 預期 %d 根、實際 %d 根、缺少 %d 根、覆蓋率 %.2f%%",
+                        symbol,
+                        timeframe,
+                        expected_bars,
+                        len(klines),
+                        missing_bars,
+                        coverage * 100,
+                    )
 
             return klines
 
@@ -425,47 +453,45 @@ class ChartSignalService:
                 self.logger.error(f"暖機數據不足: {error_detail}")
                 raise ValueError(error_detail["message"])
 
-            results = {}
-
             if strategy_logic == "three_line":
-                # EMA 三線排列:需要計算 short, mid, long 三條 EMA
-                for period_name in ["ema_short", "ema_mid", "ema_long"]:
-                    if period_name not in params:
-                        raise ValueError(f"策略參數缺少 {period_name}")
+                period_names = ["ema_short", "ema_mid", "ema_long"]
+            elif strategy_logic == "short_long_cross":
+                period_names = ["ema_short", "ema_long"]
+            elif strategy_logic == "mid_long_cross":
+                period_names = ["ema_mid", "ema_long"]
+            else:
+                raise ValueError(f"不支持的策略邏輯: {strategy_logic}")
 
-                    period = params[period_name]
+            indicator_configs = []
+            for period_name in period_names:
+                if period_name not in params:
+                    raise ValueError(f"策略參數缺少 {period_name}")
 
-                    # 調用 IndicatorEngine
-                    indicator_result = self.indicator_engine.calculate(
-                        klines=klines,
-                        indicator_type=indicator_type,
-                        data_source=DataSourceEnum(data_source),
-                        params={"period": period}
-                    )
+                period = params[period_name]
+                indicator_configs.append(
+                    {
+                        "indicator": indicator_type,
+                        "data_source": data_source,
+                        "params": {"period": period},
+                        "output_name": period_name,
+                    }
+                )
 
-                    results[period_name] = indicator_result["values"]
+            indicator_df = self.indicator_engine.calculate_indicators_from_dataframe(
+                kline_df=klines,
+                configs=indicator_configs,
+            )
 
-            elif strategy_logic in ["short_long_cross", "mid_long_cross"]:
-                # 雙線交叉:需要計算兩條 EMA
-                if strategy_logic == "short_long_cross":
-                    period_names = ["ema_short", "ema_long"]
-                else:  # mid_long_cross
-                    period_names = ["ema_mid", "ema_long"]
+            missing_columns = [name for name in period_names if name not in indicator_df.columns]
+            if missing_columns:
+                raise ValueError(
+                    f"指標計算缺少欄位: {', '.join(missing_columns)}"
+                )
 
-                for period_name in period_names:
-                    if period_name not in params:
-                        raise ValueError(f"策略參數缺少 {period_name}")
-
-                    period = params[period_name]
-
-                    indicator_result = self.indicator_engine.calculate(
-                        klines=klines,
-                        indicator_type=indicator_type,
-                        data_source=DataSourceEnum(data_source),
-                        params={"period": period}
-                    )
-
-                    results[period_name] = indicator_result["values"]
+            results = {
+                period_name: indicator_df[period_name].to_numpy()
+                for period_name in period_names
+            }
 
             return results
 

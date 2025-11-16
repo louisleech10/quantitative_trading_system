@@ -179,7 +179,7 @@ class KlineStorageManager:
     """
 
     # 類常量
-    DEFAULT_CACHE_DIR = "./data/kline_storage"
+    DEFAULT_CACHE_DIR = Path(os.environ.get("KLINE_STORAGE_DIR", "./data_cache"))
     HDF5_FILENAME = "kline_cache.h5"
     COMPRESSION_LEVEL = 5  # zlib壓縮等級（1-9，平衡壓縮率與速度）
 

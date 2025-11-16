@@ -22,6 +22,7 @@ from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.Indicators import IndicatorEngine
 from momentum.Analysis import SignalDensityAnalyzer
 from api.utils.case_storage import get_case_storage_manager
+from api.core.config import settings
 from api.models.training_window_config import (
     SignalDensityRequest,
     SignalDensityResponse,
@@ -55,7 +56,7 @@ class SignalAnalysisService:
             return
 
         # 依賴注入
-        self.kline_storage = KlineStorageManager()
+        self.kline_storage = KlineStorageManager(cache_dir=str(settings.kline_cache_dir))
         self.indicator_engine = IndicatorEngine()
         self.case_storage = get_case_storage_manager()
         self.analyzer = SignalDensityAnalyzer(

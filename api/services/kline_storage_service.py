@@ -50,7 +50,7 @@ class KlineStorageService:
         """
         # 從設定檔獲取緩存目錄（如果有）
         if cache_dir is None:
-            cache_dir = getattr(settings, 'KLINE_CACHE_DIR', './data/kline_storage')
+            cache_dir = str(settings.kline_cache_dir)
 
         self.storage_manager = KlineStorageManager(cache_dir=cache_dir)
         logger.info(f"KlineStorageService initialized with cache_dir: {cache_dir}")

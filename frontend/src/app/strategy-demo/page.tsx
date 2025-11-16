@@ -58,6 +58,9 @@ interface ChartSignalResponse {
   };
 }
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export default function StrategyDemoPage() {
   // ========== 配置狀態 ==========
   const [config, setConfig] = useState<StrategyConfig>({
@@ -135,7 +138,7 @@ export default function StrategyDemoPage() {
       console.log("[StrategyDemo] API Request:", requestBody);
 
       // 2. 調用 API
-      const response = await fetch("/api/chart-signals/signals", {
+      const response = await fetch(`${API_BASE_URL}/api/v1/chart/signals`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -144,8 +147,21 @@ export default function StrategyDemoPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "API 請求失敗");
+        let message = "API 請求失敗";
+        const errorText = await response.text().catch(() => "");
+        try {
+          const errorData = JSON.parse(errorText || "{}");
+          message =
+            errorData.detail ||
+            errorData.message ||
+            errorData.error?.message ||
+            message;
+        } catch {
+          if (response.status) {
+            message = `HTTP ${response.status}: ${errorText || message}`;
+          }
+        }
+        throw new Error(message);
       }
 
       const data: ChartSignalResponse = await response.json();

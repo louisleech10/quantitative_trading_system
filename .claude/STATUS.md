@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-11-09 15:30
-**當前階段**: 系統穩定性增強 - K線存儲修復完成
+**最後更新**: 2025-11-16 11:10
+**當前階段**: Phase 3.2 階段二 UI/UX 重構
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,11 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Phase 3.2 階段二 UI組件 & 策略測試骨架** (100%) - 2025-11-16完成
+  - ✅ 新增 Accordion/MultiSelect/Select/NumberInput/DateRangePicker 等自訂元件並套用統一樣式
+  - ✅ `/strategy-test` 以 30%/70% 佈局重構，整合折疊面板、模板管理與全量信號統計顯示
+  - ✅ Zustand `useStrategyConfig` hook 完成 URL encode/decode，跨頁傳遞策略設定
+  - ✅ 更新《雙窗口密度整合計劃》Stage 2 TODO，標記已完成項並記錄進度說明
 - **K線存儲系統根本性修復** (100%) - 2025-11-08~09完成
   - ✅ 實現事務性寫入（ACID原則：Atomicity + Consistency）
   - ✅ 添加後寫驗證層（Durability保證）
@@ -18,30 +23,49 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-**當前無進行中任務** - 系統處於穩定狀態
+- **/charts 整合與多 Pane 信號呈現**
+  - 建立跨頁 hydration＋localStorage fallback，確保 `/charts` 可直接讀取 strategy-test 傳遞的狀態
+  - 重新串接指標/信號 API，輸出通用 `indicatorSeries` / `signalMarkers`
+- **URL + store 雙軌同步強化**
+  - router.replace debounce、Option B 純 URL 模式與狀態回填仍待實作
 
 ---
 
 ## 🎯 當前重點
 
 ### 下一步工作
+**短期行動（1-3天）**：
+
+1. **完成 `/charts` 狀態載入與 API 串接**
+  - 在頁面載入時優先讀取 `state` query → Zustand store → fallback 預設值
+  - 呼叫 chart signal/indicator API，整合為 `indicatorSeries` / `signalMarkers`
+  - 缺參數時提供 CTA 返回 `/strategy-test` 並沿用既有設定
+
+2. **實作多 Pane 指標/訊號視覺化**
+  - Price/Volume/TakerRatio chart 同步顯示多條 EMA、信號標記、TO/TC 垂直線
+  - 新增指標顯示切換與 hover tooltip 同步
+
+3. **強化 URL + store 雙軌同步體驗**
+  - router.replace debounce、純 URL 分享模式、localStorage 快取回填
+  - 完成 Option B 設計並紀錄在整合計劃
+
 **建議方向**（按優先級排序）：
 
 1. **系統穩定性驗證**（優先級：高）
-   - 多時間框架批量下載壓力測試
-   - 並發寫入場景測試
-   - 長時間運行穩定性測試
+  - 多時間框架批量下載壓力測試
+  - 並發寫入場景測試
+  - 長時間運行穩定性測試
 
 2. **Phase 4：實盤交易整合**（依照FEATURE_ROADMAP.md）
-   - 訂單管理系統
-   - 倉位管理
-   - 風險控制
-   - Binance實盤API整合
+  - 訂單管理系統
+  - 倉位管理
+  - 風險控制
+  - Binance實盤API整合
 
 3. **文檔與測試完善**
-   - 更新ARCHITECTURE.md（K線存儲架構圖）
-   - 補充API_SPECIFICATION.md
-   - 提升測試覆蓋率（Phase 3組件測試）
+  - 更新ARCHITECTURE.md（K線存儲架構圖）
+  - 補充API_SPECIFICATION.md
+  - 提升測試覆蓋率（Phase 3組件測試）
   - ✅ 9個核心組件（MetricsPanel, BestParamsCard, DensityComparisonChart, StabilityChart, OptimizationHistoryChart, ParameterImportanceChart, TrialHistoryTable, ComparisonTool, ExportButton）
   - ✅ 4個自定義Tooltip + 3個工具函數庫（exportUtils, errorHandler, ToastProvider）
   - ✅ 主頁面整合：/optimization-result/[taskId]（4 Sections, 8組件）
