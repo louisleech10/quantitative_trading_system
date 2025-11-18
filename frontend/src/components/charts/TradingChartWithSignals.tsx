@@ -18,12 +18,25 @@
 
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import { StrategySignalChart, KlineData, SignalPoint } from "./StrategySignalChart";
 import { VolumeChart } from "./VolumeChart";
 import { TakerRatioChart } from "./TakerRatioChart";
 import SignalTooltip, { SignalTooltipData } from "./SignalTooltip";
 import { TimeAxisProvider, useTimeAxis } from "@/contexts/TimeAxisContext";
+
+export interface IndicatorLineSeries {
+  id: string;
+  label: string;
+  color: string;
+  data: Array<{ time: number; value: number }>;
+}
+
+export interface WindowOverlayRange {
+  type: "near" | "far";
+  startTimestamp: number;
+  endTimestamp: number;
+}
 
 /**
  * TradingChartWithSignals Props
@@ -78,6 +91,16 @@ export interface TradingChartWithSignalsProps {
    * 信號點擊回調
    */
   onSignalClick?: (signal: SignalPoint) => void;
+
+  /**
+   * 指標線資料 (如 EMA)
+   */
+  indicatorSeries?: IndicatorLineSeries[];
+
+  /**
+   * 近/遠窗口覆蓋範圍
+   */
+  windowOverlays?: WindowOverlayRange[];
 }
 
 /**
@@ -115,6 +138,8 @@ function TradingChartWithSignalsInner({
   showCaseMarker = true,
   showSignalMarkers = true,
   onSignalClick,
+  indicatorSeries = [],
+  windowOverlays = [],
 }: TradingChartWithSignalsProps) {
   // ===== Refs =====
   const containerRef = useRef<HTMLDivElement>(null);
@@ -123,9 +148,7 @@ function TradingChartWithSignalsInner({
   const { updateCrosshair } = useTimeAxis();
 
   // ===== State =====
-  const [containerWidth, setContainerWidth] = useState<number>(0);
   const [crosshairX, setCrosshairX] = useState<number | null>(null);
-  const [crosshairTime, setCrosshairTime] = useState<number | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [hoveredSignal, setHoveredSignal] = useState<SignalTooltipData | null>(
     null
@@ -140,6 +163,68 @@ function TradingChartWithSignalsInner({
   const volumeHeight = Math.floor(totalHeight * 0.25); // 25% - 成交量圖
   const takerRatioHeight = Math.floor(totalHeight * 0.25); // 25% - Taker Ratio 圖
 
+  const timelineRange = useMemo(() => {
+    if (!klines.length) return null;
+    const first = klines[0].timestamp;
+    const last = klines[klines.length - 1].timestamp;
+    return {
+      start: first,
+      end: last,
+      total: Math.max(last - first, 1),
+    };
+  }, [klines]);
+
+  const overlayRects = useMemo(() => {
+    if (!timelineRange || windowOverlays.length === 0) return [];
+    return windowOverlays
+      .map((overlay) => {
+        const clampedStart = Math.max(
+          timelineRange.start,
+          Math.min(overlay.startTimestamp, timelineRange.end)
+        );
+        const clampedEnd = Math.max(
+          timelineRange.start,
+          Math.min(overlay.endTimestamp, timelineRange.end)
+        );
+        if (clampedEnd <= clampedStart) {
+          return null;
+        }
+        const left = ((clampedStart - timelineRange.start) / timelineRange.total) * 100;
+        const width = ((clampedEnd - clampedStart) / timelineRange.total) * 100;
+        return {
+          ...overlay,
+          left,
+          width,
+        };
+      })
+      .filter((rect): rect is WindowOverlayRange & { left: number; width: number } =>
+        rect !== null && rect.width > 0
+      );
+  }, [timelineRange, windowOverlays]);
+
+  const verticalLines = useMemo(() => {
+    if (!timelineRange) return [];
+    const toPercent = (timestamp?: number) => {
+      if (!timestamp) return null;
+      const clamped = Math.max(
+        timelineRange.start,
+        Math.min(timestamp, timelineRange.end)
+      );
+      return ((clamped - timelineRange.start) / timelineRange.total) * 100;
+    };
+
+    const lines: Array<{ label: string; color: string; left: number }> = [];
+    const toLeft = toPercent(toTimestamp);
+    if (toLeft !== null) {
+      lines.push({ label: "TO", color: "#4338ca", left: toLeft });
+    }
+    const tcLeft = toPercent(tcTimestamp);
+    if (tcLeft !== null) {
+      lines.push({ label: "TC", color: "#ea580c", left: tcLeft });
+    }
+    return lines.filter((line) => line.left >= 0 && line.left <= 100);
+  }, [timelineRange, toTimestamp, tcTimestamp]);
+
   /**
    * 初始化延遲（避免刷新歪掉）
    */
@@ -148,25 +233,6 @@ function TradingChartWithSignalsInner({
       setIsInitialized(true);
     }, 50);
     return () => clearTimeout(timer);
-  }, []);
-
-  /**
-   * 監聽容器寬度變化（響應式設計）
-   */
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
   }, []);
 
   /**
@@ -180,7 +246,6 @@ function TradingChartWithSignalsInner({
       if (!rect) return;
 
       const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
 
       // 更新滑鼠位置（用於 tooltip）
       setMousePosition({ x: e.clientX, y: e.clientY });
@@ -204,19 +269,16 @@ function TradingChartWithSignalsInner({
             firstTime + (lastTime - firstTime) * ratio
           );
 
-          setCrosshairTime(estimatedTime);
           updateCrosshair(estimatedTime, "container");
         }
       } else {
         setCrosshairX(null);
-        setCrosshairTime(null);
         updateCrosshair(null, "container");
       }
     };
 
     const handleMouseLeave = () => {
       setCrosshairX(null);
-      setCrosshairTime(null);
       setHoveredSignal(null);
       updateCrosshair(null, "container");
     };
@@ -252,10 +314,41 @@ function TradingChartWithSignalsInner({
       className="relative w-full bg-white rounded-lg shadow-md overflow-hidden"
       style={{ height: `${totalHeight}px` }}
     >
+      {overlayRects.map((overlay) => (
+        <div
+          key={`${overlay.type}-${overlay.left.toFixed(2)}`}
+          className="absolute inset-y-0 pointer-events-none"
+          style={{
+            left: `${overlay.left}%`,
+            width: `${overlay.width}%`,
+            backgroundColor:
+              overlay.type === "near"
+                ? "rgba(79, 70, 229, 0.08)"
+                : "rgba(168, 85, 247, 0.08)",
+          }}
+        />
+      ))}
+
+      {verticalLines.map((line) => (
+        <div
+          key={`line-${line.label}`}
+          className="absolute top-0 bottom-0 pointer-events-none"
+          style={{
+            left: `${line.left}%`,
+            width: "1px",
+            backgroundColor: line.color,
+          }}
+        >
+          <span className="absolute -top-2 -translate-x-1/2 rounded bg-slate-900 px-1 text-[10px] font-semibold text-white">
+            {line.label}
+          </span>
+        </div>
+      ))}
+
       {/* 十字線疊層（貫穿三個圖表的灰色虛線） */}
       {crosshairX !== null && (
         <div
-          className="absolute top-0 bottom-0 pointer-events-none z-10"
+          className="absolute top-0 bottom-0 pointer-events-none z-20"
           style={{
             left: `${crosshairX}px`,
             width: "1px",
@@ -265,7 +358,7 @@ function TradingChartWithSignalsInner({
       )}
 
       {/* 三個圖表垂直堆疊 */}
-      <div className="relative w-full h-full flex flex-col">
+      <div className="relative z-10 w-full h-full flex flex-col">
         {!isInitialized ? (
           <div className="flex items-center justify-center w-full h-full">
             <div className="text-gray-400 text-sm">初始化中...</div>
@@ -291,6 +384,7 @@ function TradingChartWithSignalsInner({
                 enableSync={true}
                 onSignalHover={handleSignalHover}
                 onSignalClick={handleSignalClick}
+                indicatorSeries={indicatorSeries}
               />
             </div>
 
@@ -307,6 +401,8 @@ function TradingChartWithSignalsInner({
                 chartId="volume-chart"
                 enableSync={true}
                 toTimestamp={toTimestamp}
+                tcTimestamp={tcTimestamp}
+                windowOverlays={windowOverlays}
               />
             </div>
 
@@ -320,6 +416,8 @@ function TradingChartWithSignalsInner({
                 chartId="taker-ratio-chart"
                 enableSync={true}
                 toTimestamp={toTimestamp}
+                tcTimestamp={tcTimestamp}
+                windowOverlays={windowOverlays}
               />
             </div>
           </>

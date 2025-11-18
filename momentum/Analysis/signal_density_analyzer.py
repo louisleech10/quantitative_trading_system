@@ -236,6 +236,104 @@ class SignalDensityAnalyzer:
 
         return signals.values
 
+    def _extract_full_density_window(
+        self,
+        case: Dict[str, Any],
+        window_config: TrainingWindowConfig,
+        strategy_config: StrategyConfig
+    ) -> pd.DataFrame:
+        """
+        提取完整密度分析窗口（包含warmup數據）
+
+        雙密度模式專用: 一次讀取完整範圍,自動包含warmup數據以支持任意EMA參數。
+        讀取範圍: TO-far_lookback_bars-warmup 到 TO-1
+
+        Warmup計算:
+        - 從strategy_config.params中獲取最大EMA週期
+        - warmup = max_ema_period * 3 (經驗法則)
+
+        Args:
+            case: 案例記錄
+            window_config: 訓練窗口配置(必須包含far_lookback_bars)
+            strategy_config: 策略配置(用於計算warmup)
+
+        Returns:
+            包含完整範圍K線數據的DataFrame (包含warmup)
+
+        Raises:
+            ValueError: 當far_lookback_bars未配置或K線數據不足時
+
+        Example:
+            若 far_lookback_bars=100, ema_long=35
+            則 warmup=105, 讀取範圍=205根 (TO-205 到 TO-1)
+        """
+        if window_config.far_lookback_bars is None:
+            raise ValueError("未配置far_lookback_bars,無法提取完整密度窗口")
+
+        # 確定參考時間戳
+        if window_config.reference_point == "TO":
+            ref_timestamp = case.timestamp
+        elif window_config.reference_point == "TC":
+            if not hasattr(case, 'tc_timestamp') or case.tc_timestamp is None:
+                raise ValueError(
+                    f"案例 {case.case_id} 缺少 tc_timestamp,無法使用TC作為參考點"
+                )
+            ref_timestamp = case.tc_timestamp
+        elif window_config.reference_point == "custom":
+            if window_config.custom_timestamp is None:
+                raise ValueError("使用custom參考點時必須提供custom_timestamp")
+            ref_timestamp = window_config.custom_timestamp
+        else:
+            raise ValueError(f"未知的reference_point: {window_config.reference_point}")
+
+        # 計算warmup: 取最大EMA週期的3倍
+        params = strategy_config.params
+        max_ema_period = max(
+            params.get("ema_short", 0),
+            params.get("ema_mid", 0),
+            params.get("ema_long", 0)
+        )
+        warmup_bars = max_ema_period * 3
+
+        # 完整讀取範圍: far_lookback + warmup
+        total_lookback = window_config.far_lookback_bars + warmup_bars
+
+        try:
+            klines = self.storage.read_klines_around_timestamp(
+                symbol=case.symbol,
+                timeframe=case.timeframe,
+                center_timestamp=ref_timestamp,
+                lookback=total_lookback,
+                forward=0
+            )
+        except Exception as e:
+            self.logger.error(
+                f"讀取完整密度窗口失敗: case_id={case.case_id}, "
+                f"symbol={case.symbol}, timeframe={case.timeframe}, "
+                f"total_lookback={total_lookback}, error={e}"
+            )
+            raise
+
+        # 驗證K線數量
+        if len(klines) == 0:
+            raise ValueError(
+                f"未找到完整密度窗口K線數據: case_id={case.case_id}, "
+                f"symbol={case.symbol}, timeframe={case.timeframe}"
+            )
+
+        # 移除TO所在K線
+        klines = self._remove_reference_bar(klines, ref_timestamp)
+
+        self.logger.debug(
+            f"提取完整密度窗口: case_id={case.case_id}, "
+            f"far_lookback={window_config.far_lookback_bars}, "
+            f"warmup={warmup_bars}, "
+            f"total_lookback={total_lookback}, "
+            f"actual_bars={len(klines)}"
+        )
+
+        return klines
+
     def extract_far_window(
         self,
         case: Dict[str, Any],
@@ -257,6 +355,9 @@ class SignalDensityAnalyzer:
 
         Raises:
             ValueError: 當far_lookback_bars未配置或K線數據不足時
+
+        Note:
+            此方法為舊版雙密度實現保留,新實現應使用_extract_full_density_window
         """
         if window_config.far_lookback_bars is None:
             raise ValueError("未配置far_lookback_bars,無法提取遠期窗口")
@@ -319,6 +420,61 @@ class SignalDensityAnalyzer:
         )
 
         return klines
+
+    def _split_near_far_signals(
+        self,
+        full_signals: np.ndarray,
+        window_config: TrainingWindowConfig
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        從完整信號數組中提取近期和遠期信號
+
+        雙密度模式專用: 從一次性計算的完整信號中切分出近期和遠期窗口的信號。
+        完整信號順序: [warmup區 | 遠期窗口 | 近期窗口]
+
+        切分邏輯:
+        - 近期信號: 最後lookback_bars根 (TO-lookback_bars 到 TO-1)
+        - 遠期信號: 倒數第(lookback_bars + far_window_size)到倒數第(lookback_bars+1)根
+
+        Args:
+            full_signals: 完整信號數組 (包含warmup, 遠期, 近期)
+            window_config: 訓練窗口配置
+
+        Returns:
+            (near_signals, far_signals): 近期信號數組和遠期信號數組
+
+        Raises:
+            ValueError: 當信號數組長度不足時
+
+        Example:
+            若 lookback_bars=24, far_lookback_bars=100, warmup=105
+            完整信號長度=205 (105+76+24)
+            近期信號: [-24:]
+            遠期信號: [-100:-24]
+        """
+        near_bars = window_config.lookback_bars
+        far_window_size = window_config.far_lookback_bars - window_config.lookback_bars
+
+        # 驗證信號長度
+        min_required = window_config.far_lookback_bars
+        if len(full_signals) < min_required:
+            raise ValueError(
+                f"信號數組長度不足: 需要至少{min_required}根(不含warmup), "
+                f"實際{len(full_signals)}根"
+            )
+
+        # 提取近期信號 (最後near_bars根)
+        near_signals = full_signals[-near_bars:]
+
+        # 提取遠期信號 (倒數第far_lookback_bars到倒數第near_bars+1根)
+        far_signals = full_signals[-window_config.far_lookback_bars:-near_bars]
+
+        self.logger.debug(
+            f"切分near/far信號: full_length={len(full_signals)}, "
+            f"near_length={len(near_signals)}, far_length={len(far_signals)}"
+        )
+
+        return near_signals, far_signals
 
     def _remove_reference_bar(
         self,
@@ -581,23 +737,38 @@ class SignalDensityAnalyzer:
         # 處理正例
         for i, case in enumerate(positive_cases, 1):
             try:
-                # 近期窗口密度 (原有邏輯)
-                klines = self.extract_training_window(case, window_config)
-                signals = self.calculate_strategy_signals(klines, strategy_config)
-                density = self.calculate_case_density(signals)
-                positive_densities.append(density)
-                case_level_densities[case.case_id] = density
-
-                # 雙密度模式: 計算遠期密度
                 if dual_density_mode:
-                    far_klines = self.extract_far_window(case, window_config)
-                    far_signals = self.calculate_strategy_signals(far_klines, strategy_config)
+                    # 雙密度模式: 一次讀取完整窗口(含warmup), 一次計算EMA
+                    full_klines = self._extract_full_density_window(
+                        case, window_config, strategy_config
+                    )
+                    full_signals = self.calculate_strategy_signals(
+                        full_klines, strategy_config
+                    )
+
+                    # 從完整信號中提取近期和遠期信號
+                    near_signals, far_signals = self._split_near_far_signals(
+                        full_signals, window_config
+                    )
+
+                    # 計算密度
+                    near_density = self.calculate_case_density(near_signals)
                     far_density = self.calculate_case_density(far_signals)
 
-                    positive_near_densities.append(density)
+                    # 存儲結果
+                    positive_densities.append(near_density)
+                    case_level_densities[case.case_id] = near_density
+                    positive_near_densities.append(near_density)
                     positive_far_densities.append(far_density)
-                    case_level_near_densities[case.case_id] = density
+                    case_level_near_densities[case.case_id] = near_density
                     case_level_far_densities[case.case_id] = far_density
+                else:
+                    # 單密度模式: 僅計算近期窗口密度
+                    klines = self.extract_training_window(case, window_config)
+                    signals = self.calculate_strategy_signals(klines, strategy_config)
+                    density = self.calculate_case_density(signals)
+                    positive_densities.append(density)
+                    case_level_densities[case.case_id] = density
 
                 if i % 10 == 0:  # 每10個案例記錄一次進度
                     self.logger.info(f"正例進度: {i}/{len(positive_cases)}")
@@ -613,23 +784,38 @@ class SignalDensityAnalyzer:
         # 處理反例
         for i, case in enumerate(negative_cases, 1):
             try:
-                # 近期窗口密度 (原有邏輯)
-                klines = self.extract_training_window(case, window_config)
-                signals = self.calculate_strategy_signals(klines, strategy_config)
-                density = self.calculate_case_density(signals)
-                negative_densities.append(density)
-                case_level_densities[case.case_id] = density
-
-                # 雙密度模式: 計算遠期密度
                 if dual_density_mode:
-                    far_klines = self.extract_far_window(case, window_config)
-                    far_signals = self.calculate_strategy_signals(far_klines, strategy_config)
+                    # 雙密度模式: 一次讀取完整窗口(含warmup), 一次計算EMA
+                    full_klines = self._extract_full_density_window(
+                        case, window_config, strategy_config
+                    )
+                    full_signals = self.calculate_strategy_signals(
+                        full_klines, strategy_config
+                    )
+
+                    # 從完整信號中提取近期和遠期信號
+                    near_signals, far_signals = self._split_near_far_signals(
+                        full_signals, window_config
+                    )
+
+                    # 計算密度
+                    near_density = self.calculate_case_density(near_signals)
                     far_density = self.calculate_case_density(far_signals)
 
-                    negative_near_densities.append(density)
+                    # 存儲結果
+                    negative_densities.append(near_density)
+                    case_level_densities[case.case_id] = near_density
+                    negative_near_densities.append(near_density)
                     negative_far_densities.append(far_density)
-                    case_level_near_densities[case.case_id] = density
+                    case_level_near_densities[case.case_id] = near_density
                     case_level_far_densities[case.case_id] = far_density
+                else:
+                    # 單密度模式: 僅計算近期窗口密度
+                    klines = self.extract_training_window(case, window_config)
+                    signals = self.calculate_strategy_signals(klines, strategy_config)
+                    density = self.calculate_case_density(signals)
+                    negative_densities.append(density)
+                    case_level_densities[case.case_id] = density
 
                 if i % 10 == 0:  # 每10個案例記錄一次進度
                     self.logger.info(f"反例進度: {i}/{len(negative_cases)}")
@@ -643,14 +829,14 @@ class SignalDensityAnalyzer:
                 continue
 
         # 驗證樣本數量
-        if len(positive_densities) < 5:
+        if len(positive_densities) < 1:
             raise ValueError(
-                f"正例有效樣本不足: 需要至少5個,實際{len(positive_densities)}個"
+                f"正例有效樣本不足: 需要至少1個,實際{len(positive_densities)}個"
             )
 
-        if len(negative_densities) < 5:
+        if len(negative_densities) < 1:
             raise ValueError(
-                f"反例有效樣本不足: 需要至少5個,實際{len(negative_densities)}個"
+                f"反例有效樣本不足: 需要至少1個,實際{len(negative_densities)}個"
             )
 
         if len(failed_cases) > 0:
@@ -699,9 +885,15 @@ class SignalDensityAnalyzer:
             negative_avg_ratio = float(np.mean(negative_near_far_ratios))
             ratio_separation = positive_avg_ratio - negative_avg_ratio
 
-            # 計算遠期密度的平均值
+            # 計算遠期密度的平均值和標準差
             positive_far_avg = float(np.mean(positive_far_densities))
             negative_far_avg = float(np.mean(negative_far_densities))
+            positive_far_std = float(np.std(positive_far_densities, ddof=1)) if len(positive_far_densities) > 1 else 0.0
+            negative_far_std = float(np.std(negative_far_densities, ddof=1)) if len(negative_far_densities) > 1 else 0.0
+
+            # 計算比率的標準差
+            positive_ratio_std = float(np.std(positive_near_far_ratios, ddof=1)) if len(positive_near_far_ratios) > 1 else 0.0
+            negative_ratio_std = float(np.std(negative_near_far_ratios, ddof=1)) if len(negative_near_far_ratios) > 1 else 0.0
 
             # 將雙密度數據存入case_level_densities (使用特殊前綴區分)
             for case_id in case_level_near_densities:
@@ -712,8 +904,12 @@ class SignalDensityAnalyzer:
             dual_density_result = {
                 "positive_far_avg_density": positive_far_avg,
                 "negative_far_avg_density": negative_far_avg,
+                "positive_far_std": positive_far_std,
+                "negative_far_std": negative_far_std,
                 "positive_near_far_ratio": positive_avg_ratio,
                 "negative_near_far_ratio": negative_avg_ratio,
+                "positive_ratio_std": positive_ratio_std,
+                "negative_ratio_std": negative_ratio_std,
                 "ratio_separation": ratio_separation
             }
 

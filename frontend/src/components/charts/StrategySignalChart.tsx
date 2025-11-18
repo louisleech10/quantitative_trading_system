@@ -27,7 +27,21 @@ import {
   formatVolume,
   chartColors,
 } from "@/utils/chartConfig";
-import { ISeriesApi, SeriesMarker } from "lightweight-charts";
+import {
+  ISeriesApi,
+  SeriesMarker,
+  Time,
+  MouseEventParams,
+  UTCTimestamp,
+} from "lightweight-charts";
+import type { IndicatorLineSeries } from "./TradingChartWithSignals";
+
+const toUtcTime = (timestamp: number): UTCTimestamp =>
+  timestamp as UTCTimestamp;
+
+const extractNumericTime = (time: Time | undefined): number | null =>
+  typeof time === "number" ? time : null;
+ // moved above
 
 /**
  * K線數據接口
@@ -137,6 +151,11 @@ export interface StrategySignalChartProps {
    * 信號懸停回調
    */
   onSignalHover?: (signal: HoveredSignalInfo | null) => void;
+
+  /**
+   * 指標線資料
+   */
+  indicatorSeries?: IndicatorLineSeries[];
 }
 
 /**
@@ -157,6 +176,7 @@ export function StrategySignalChart({
   enableSync = false,
   onSignalClick,
   onSignalHover,
+  indicatorSeries = [],
 }: StrategySignalChartProps) {
   console.log("[StrategySignalChart] Initializing with:", {
     chartId,
@@ -179,6 +199,7 @@ export function StrategySignalChart({
 
   // 保存 series 引用，用於 cleanup
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const indicatorLineRefs = useRef<ISeriesApi<"Line">[]>([]);
 
   /**
    * 渲染 K線數據和信號標記到圖表
@@ -196,7 +217,7 @@ export function StrategySignalChart({
 
       // 轉換數據格式 (Lightweight Charts 格式)
       const formattedKlines = klines.map((kline) => ({
-        time: kline.timestamp as any,
+        time: toUtcTime(kline.timestamp),
         open: kline.open,
         high: kline.high,
         low: kline.low,
@@ -207,21 +228,21 @@ export function StrategySignalChart({
       candlestickSeries.setData(formattedKlines);
 
       // 構建標記數組
-      const markers: SeriesMarker<any>[] = [];
+      const markers: SeriesMarker<UTCTimestamp>[] = [];
 
       // 1. 添加 TO/TC 標記 (案例標記)
       if (showCaseMarker) {
         if (toTimestamp && tcTimestamp) {
           // 標記 TO 和 TC 兩個點
           markers.push({
-            time: toTimestamp as any,
+            time: toUtcTime(toTimestamp),
             position: "aboveBar" as const,
             color: "#2196F3", // 藍色 - TO
             shape: "arrowDown" as const,
             text: "TO",
           });
           markers.push({
-            time: tcTimestamp as any,
+            time: toUtcTime(tcTimestamp),
             position: "aboveBar" as const,
             color: "#FF9800", // 橙色 - TC
             shape: "arrowDown" as const,
@@ -230,7 +251,7 @@ export function StrategySignalChart({
         } else if (caseTimestamp) {
           // 只標記一個 T 點 (向後兼容)
           markers.push({
-            time: caseTimestamp as any,
+            time: toUtcTime(caseTimestamp),
             position: "aboveBar" as const,
             color: chartColors.caseMarkerColor,
             shape: "arrowDown" as const,
@@ -243,7 +264,7 @@ export function StrategySignalChart({
       if (showSignalMarkers && signalPoints.length > 0) {
         signalPoints.forEach((signal) => {
           markers.push({
-            time: signal.timestamp as any,
+            time: toUtcTime(signal.timestamp),
             position: "belowBar" as const,
             color: "#4CAF50", // 綠色 - 信號
             shape: "arrowUp" as const,
@@ -265,25 +286,26 @@ export function StrategySignalChart({
         const firstTime = formattedKlines[0].time;
         const lastTime = formattedKlines[formattedKlines.length - 1].time;
         chartInstance.timeScale().setVisibleRange({
-          from: firstTime as any,
-          to: lastTime as any,
+          from: firstTime,
+          to: lastTime,
         });
       }
 
       console.log(`[StrategySignalChart] Rendered ${formattedKlines.length} klines and ${markers.length} markers for ${symbol}`);
 
       // 訂閱懸停事件 (用於顯示 OHLCV 和信號資訊)
-      const handleCrosshairMove = (param: any) => {
-        if (param.time) {
+      const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+        const hoveredTime = extractNumericTime(param.time);
+        if (hoveredTime !== null) {
           // 查找懸停的 K線
-          const hoveredKline = klines.find((k) => k.timestamp === param.time);
+          const hoveredKline = klines.find((k) => k.timestamp === hoveredTime);
           if (hoveredKline) {
             setHoveredData(hoveredKline);
           }
 
           // 查找懸停的信號點
           const hoveredSignalPoint = signalPoints.find(
-            (s) => s.timestamp === param.time
+            (s) => s.timestamp === hoveredTime
           );
           if (hoveredSignalPoint) {
             setHoveredSignal(hoveredSignalPoint);
@@ -317,10 +339,11 @@ export function StrategySignalChart({
       chartInstance.subscribeCrosshairMove(handleCrosshairMove);
 
       // 訂閱點擊事件 (用於信號點擊)
-      const handleClick = (param: any) => {
-        if (param.time && onSignalClick) {
+      const handleClick = (param: MouseEventParams<Time>) => {
+        const clickedTime = extractNumericTime(param.time);
+        if (clickedTime !== null && onSignalClick) {
           const clickedSignal = signalPoints.find(
-            (s) => s.timestamp === param.time
+            (s) => s.timestamp === clickedTime
           );
           if (clickedSignal) {
             onSignalClick(clickedSignal);
@@ -335,6 +358,14 @@ export function StrategySignalChart({
         try {
           chartInstance.unsubscribeCrosshairMove(handleCrosshairMove);
           chartInstance.unsubscribeClick(handleClick);
+          indicatorLineRefs.current.forEach((line) => {
+            try {
+              chartInstance.removeSeries(line);
+            } catch (err) {
+              console.error("[StrategySignalChart] Indicator cleanup error", err);
+            }
+          });
+          indicatorLineRefs.current = [];
           if (candlestickSeries) {
             chartInstance.removeSeries(candlestickSeries);
           }
@@ -362,6 +393,46 @@ export function StrategySignalChart({
     onSignalClick,
     onSignalHover,
   ]);
+
+  useEffect(() => {
+    if (!chartInstance || !isReady) return;
+    indicatorLineRefs.current.forEach((line) => {
+      try {
+        chartInstance.removeSeries(line);
+      } catch (err) {
+        console.error("[StrategySignalChart] Indicator cleanup error", err);
+      }
+    });
+    indicatorLineRefs.current = [];
+
+    indicatorSeries.forEach((series) => {
+      if (!series.data.length) return;
+      const line = chartInstance.addLineSeries({
+        color: series.color,
+        lineWidth: 2,
+        priceScaleId: "right",
+        lastValueVisible: false,
+      });
+      line.setData(
+        series.data.map((point) => ({
+          time: toUtcTime(point.time),
+          value: point.value,
+        }))
+      );
+      indicatorLineRefs.current.push(line);
+    });
+
+    return () => {
+      indicatorLineRefs.current.forEach((line) => {
+        try {
+          chartInstance.removeSeries(line);
+        } catch (err) {
+          console.error("[StrategySignalChart] Indicator cleanup error", err);
+        }
+      });
+      indicatorLineRefs.current = [];
+    };
+  }, [chartInstance, indicatorSeries, isReady]);
 
   return (
     <div

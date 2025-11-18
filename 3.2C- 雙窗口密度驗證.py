@@ -86,9 +86,9 @@ class DualDensityVerifier:
             indicator_type="ema",
             strategy_logic="three_line",
             params={
-                "ema_short": 5,
-                "ema_mid": 10,
-                "ema_long": 20
+                "ema_short": 7,
+                "ema_mid": 16,
+                "ema_long": 36
             }
         )
 

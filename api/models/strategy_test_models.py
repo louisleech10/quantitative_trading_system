@@ -423,12 +423,12 @@ class StrategyTestRequest(BaseModel):
     positive_cases: List[str] = Field(
         ...,
         description="正例案例ID列表",
-        min_items=10
+        min_items=1
     )
     negative_cases: List[str] = Field(
         ...,
         description="反例案例ID列表",
-        min_items=10
+        min_items=1
     )
     test_mode: Literal["single", "optuna"] = Field(
         "single",

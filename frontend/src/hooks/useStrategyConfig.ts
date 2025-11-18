@@ -6,10 +6,11 @@ import type { TrainingWindowConfig } from "@/components/strategy/WindowConfigPan
 
 const STORE_KEY = "strategy-config-store-v2";
 const TEMPLATE_STORAGE_KEY = "strategy-test-templates-v2";
+const STATE_CACHE_KEY = "strategy-config-last-url-payload";
 
-const DEFAULT_DATA_SOURCES = ["close", "volume"];
+const DEFAULT_DATA_SOURCE = "close";
 
-type HydrationSource = "default" | "storage" | "url";
+export type HydrationSource = "default" | "storage" | "url";
 
 type StrategyWindowConfig = TrainingWindowConfig & {
   far_lookback_bars?: number;
@@ -23,7 +24,7 @@ interface DateRange {
 export interface StrategyFormState {
   strategyName: string;
   strategyDescription?: string;
-  dataSources: string[];
+  dataSources: string;
   indicatorType: string;
   strategyLogic: string;
   indicatorParams: Record<string, number>;
@@ -46,7 +47,7 @@ export interface StrategyTemplatePayload {
 }
 
 interface StrategyUrlPayload {
-  dataSources: string[];
+  dataSources: string;
   indicatorType: string;
   strategyLogic: string;
   indicatorParams: Record<string, number>;
@@ -77,6 +78,8 @@ interface StrategyConfigStore {
   deleteTemplate: (templateId: string) => void;
   syncToUrl: (extraParams?: Record<string, string>) => string | null;
   hydrateFromUrl: (input?: string | URLSearchParams) => boolean;
+  hydrateFromCache: () => boolean;
+  cacheStateSnapshot: () => string | null;
 }
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10);
@@ -87,13 +90,13 @@ const defaultStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 const DEFAULT_STATE: StrategyFormState = {
   strategyName: "雙窗口密度測試",
   strategyDescription: "三線順勢 + 雙窗口密度",
-  dataSources: DEFAULT_DATA_SOURCES,
+  dataSources: DEFAULT_DATA_SOURCE,
   indicatorType: "ema",
   strategyLogic: "three_line",
   indicatorParams: {
-    ema_short: 7,
-    ema_mid: 18,
-    ema_long: 35,
+    ema_short: 5,
+    ema_mid: 10,
+    ema_long: 20,
   },
   windowConfig: {
     reference_point: "TO",
@@ -174,11 +177,122 @@ const mergeFromPayload = (
   templateId: null,
 });
 
-const extractEncodedState = (
+const hasPlainParams = (params?: URLSearchParams | null): boolean => {
+  if (!params) return false;
+  const candidateKeys = [
+    "symbol",
+    "timeframe",
+    "start",
+    "end",
+    "dataSources",
+    "indicatorType",
+    "strategyLogic",
+    "emaShort",
+    "emaMid",
+    "emaLong",
+    "lookback",
+    "farLookback",
+    "forward",
+    "clusterWeight",
+  ];
+  return candidateKeys.some((key) => params.has(key));
+};
+
+const parsePlainQueryPayload = (
+  params: URLSearchParams
+): StrategyUrlPayload | null => {
+  if (!hasPlainParams(params)) {
+    return null;
+  }
+
+  const getNumber = (key: string): number | undefined => {
+    const value = params.get(key);
+    if (value === null || value === "") return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const getDate = (key: "start" | "end", fallback: string): string => {
+    const value = params.get(key);
+    if (!value) return fallback;
+    return value.slice(0, 10);
+  };
+
+  const dataSourcesParam = params.get("dataSources");
+  const parsedDataSource = dataSourcesParam?.trim() || null;
+
+  const indicatorParams = {
+    ...DEFAULT_STATE.indicatorParams,
+    ema_short: getNumber("emaShort") ?? DEFAULT_STATE.indicatorParams.ema_short,
+    ema_mid: getNumber("emaMid") ?? DEFAULT_STATE.indicatorParams.ema_mid,
+    ema_long: getNumber("emaLong") ?? DEFAULT_STATE.indicatorParams.ema_long,
+  };
+
+  const windowConfig: StrategyWindowConfig = {
+    ...DEFAULT_STATE.windowConfig,
+    lookback_bars:
+      getNumber("lookback") ?? DEFAULT_STATE.windowConfig.lookback_bars,
+    lookforward_bars:
+      getNumber("forward") ?? DEFAULT_STATE.windowConfig.lookforward_bars,
+    far_lookback_bars:
+      getNumber("farLookback") ?? DEFAULT_STATE.windowConfig.far_lookback_bars,
+  };
+
+  const clusteringWeight = getNumber("clusterWeight");
+
+  return {
+    dataSources: parsedDataSource ?? DEFAULT_STATE.dataSources,
+    indicatorType:
+      params.get("indicatorType") ?? DEFAULT_STATE.indicatorType,
+    strategyLogic:
+      params.get("strategyLogic") ?? DEFAULT_STATE.strategyLogic,
+    indicatorParams,
+    windowConfig,
+    symbol: params.get("symbol") ?? DEFAULT_STATE.symbol,
+    timeframe: params.get("timeframe") ?? DEFAULT_STATE.timeframe,
+    dateRange: {
+      start: getDate("start", DEFAULT_STATE.dateRange.start),
+      end: getDate("end", DEFAULT_STATE.dateRange.end),
+    },
+    clusteringWeight:
+      typeof clusteringWeight === "number"
+        ? Math.min(Math.max(clusteringWeight, 0), 1)
+        : DEFAULT_STATE.clusteringWeight,
+  };
+};
+
+const appendPlainQueryParams = (
+  params: URLSearchParams,
+  state: StrategyFormState
+) => {
+  const assignIfValue = (key: string, value?: string | number | null) => {
+    if (value === undefined || value === null) return;
+    const stringValue = typeof value === "number" ? String(value) : value;
+    if (!stringValue) return;
+    params.set(key, stringValue);
+  };
+
+  assignIfValue("symbol", state.symbol);
+  assignIfValue("timeframe", state.timeframe);
+  assignIfValue("start", state.dateRange.start);
+  assignIfValue("end", state.dateRange.end);
+  assignIfValue("dataSources", state.dataSources);
+  assignIfValue("indicatorType", state.indicatorType);
+  assignIfValue("strategyLogic", state.strategyLogic);
+  assignIfValue("emaShort", state.indicatorParams.ema_short);
+  assignIfValue("emaMid", state.indicatorParams.ema_mid);
+  assignIfValue("emaLong", state.indicatorParams.ema_long);
+  assignIfValue("lookback", state.windowConfig.lookback_bars);
+  assignIfValue("farLookback", state.windowConfig.far_lookback_bars);
+  assignIfValue("forward", state.windowConfig.lookforward_bars);
+  assignIfValue("clusterWeight", state.clusteringWeight);
+};
+
+const normalizeSearchParams = (
   input?: string | URLSearchParams
-): string | null => {
+): { params: URLSearchParams | null; directState: string | null } => {
   if (input instanceof URLSearchParams) {
-    return input.get("state");
+    return { params: input, directState: null };
   }
 
   if (typeof input === "string" && input.length > 0) {
@@ -186,17 +300,19 @@ const extractEncodedState = (
       const params = new URLSearchParams(
         input.startsWith("?") ? input : `?${input}`
       );
-      return params.get("state");
+      return { params, directState: null };
     }
-    return input;
+    return { params: null, directState: input };
   }
 
   if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("state");
+    return {
+      params: new URLSearchParams(window.location.search),
+      directState: null,
+    };
   }
 
-  return null;
+  return { params: null, directState: null };
 };
 
 const readTemplatesFromStorage = (): StrategyTemplatePayload[] => {
@@ -222,6 +338,34 @@ const writeTemplatesToStorage = (templates: StrategyTemplatePayload[]) => {
   }
 };
 
+const cacheEncodedPayload = (encoded: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STATE_CACHE_KEY, encoded);
+  } catch (error) {
+    console.error("寫入策略快照失敗", error);
+  }
+};
+
+const readCachedEncodedPayload = (): string | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(STATE_CACHE_KEY);
+  } catch (error) {
+    console.error("讀取策略快照失敗", error);
+    return null;
+  }
+};
+
+const clearCachedEncodedPayload = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(STATE_CACHE_KEY);
+  } catch (error) {
+    console.error("清除策略快照失敗", error);
+  }
+};
+
 export const useStrategyConfig = create<StrategyConfigStore>()(
   persist(
     (set, get) => ({
@@ -244,10 +388,13 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
           },
         })),
       reset: () =>
-        set({
-          state: DEFAULT_STATE,
-          lastHydrationSource: "default",
-          lastSyncedQuery: null,
+        set(() => {
+          clearCachedEncodedPayload();
+          return {
+            state: DEFAULT_STATE,
+            lastHydrationSource: "default",
+            lastSyncedQuery: null,
+          };
         }),
       saveTemplate: ({ name, description }) => {
         if (!name.trim()) {
@@ -299,10 +446,13 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
       },
       syncToUrl: (extraParams = {}) => {
         if (!get().state.syncToUrl) return null;
-        const payload = buildUrlPayload(get().state);
+        const snapshot = get().state;
+        const payload = buildUrlPayload(snapshot);
         const encoded = encodePayload(payload);
         if (!encoded) return null;
+        cacheEncodedPayload(encoded);
         const params = new URLSearchParams(extraParams);
+        appendPlainQueryParams(params, snapshot);
         params.set("state", encoded);
         const query = params.toString();
         set({
@@ -311,16 +461,53 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
         return `?${query}`;
       },
       hydrateFromUrl: (input) => {
-        const encoded = extractEncodedState(input);
+        const { params, directState } = normalizeSearchParams(input);
+        const encoded = directState ?? params?.get("state") ?? null;
+
+        if (encoded) {
+          const payload = decodePayload(encoded);
+          if (!payload) return false;
+          cacheEncodedPayload(encoded);
+          set((current) => ({
+            state: mergeFromPayload(current.state, payload),
+            lastHydrationSource: "url",
+            isHydrated: true,
+          }));
+          return true;
+        }
+
+        if (params) {
+          const plainPayload = parsePlainQueryPayload(params);
+          if (plainPayload) {
+            set((current) => ({
+              state: mergeFromPayload(current.state, plainPayload),
+              lastHydrationSource: "url",
+              isHydrated: true,
+            }));
+            return true;
+          }
+        }
+
+        return false;
+      },
+      hydrateFromCache: () => {
+        const encoded = readCachedEncodedPayload();
         if (!encoded) return false;
         const payload = decodePayload(encoded);
         if (!payload) return false;
         set((current) => ({
           state: mergeFromPayload(current.state, payload),
-          lastHydrationSource: "url",
+          lastHydrationSource: "storage",
           isHydrated: true,
         }));
         return true;
+      },
+      cacheStateSnapshot: () => {
+        const payload = buildUrlPayload(get().state);
+        const encoded = encodePayload(payload);
+        if (!encoded) return null;
+        cacheEncodedPayload(encoded);
+        return encoded;
       },
     }),
     {

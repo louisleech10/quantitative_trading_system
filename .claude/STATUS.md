@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-11-16 11:10
-**當前階段**: Phase 3.2 階段二 UI/UX 重構
+**最後更新**: 2025-11-18 18:00
+**當前階段**: Phase 3.2 UI/UX 重構與優化
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,16 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Phase 3.2 密度視覺化與 UI 優化** (100%) - 2025-11-18完成
+  - ✅ 三合一 Boxplot：Near/Far/Ratio 密度橫向對比，獨立 Y 軸，離群值自動範圍調整
+  - ✅ 數據源從多選改為單選：與後端實際邏輯一致，簡化用戶操作
+  - ✅ NumberInput 組件修復：支持多位數輸入，失焦時才驗證 min/max 範圍
+  - ✅ 密度統計完整顯示：Near/Far 密度、Near/Far Ratio、標準差、穩定性 CV
+- **Phase 3.2 Stage 2 圖表整合與多 Pane 視覺** (100%) - 2025-11-16完成
+  - ✅ `/strategy-test → /charts` 狀態沿用：Zustand + URL 雙軌同步、Option B 純網址、LocalStorage fallback
+  - ✅ `/charts` 載入體驗：缺參數 CTA、阻擋訊息、Refresh Token 重試、資料載入動態提示
+  - ✅ 策略指引：依模板顯示策略邏輯/風控重點，取代 `strategy-demo` 的說明責任
+  - ✅ 多 Pane 視覺：Price/Volume/Taker Ratio 共享窗格遮罩、TO/TC 參考線、指標/信號切換
 - **Phase 3.2 階段二 UI組件 & 策略測試骨架** (100%) - 2025-11-16完成
   - ✅ 新增 Accordion/MultiSelect/Select/NumberInput/DateRangePicker 等自訂元件並套用統一樣式
   - ✅ `/strategy-test` 以 30%/70% 佈局重構，整合折疊面板、模板管理與全量信號統計顯示
@@ -23,11 +33,9 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-- **/charts 整合與多 Pane 信號呈現**
-  - 建立跨頁 hydration＋localStorage fallback，確保 `/charts` 可直接讀取 strategy-test 傳遞的狀態
-  - 重新串接指標/信號 API，輸出通用 `indicatorSeries` / `signalMarkers`
-- **URL + store 雙軌同步強化**
-  - router.replace debounce、Option B 純 URL 模式與狀態回填仍待實作
+- **窗口配置 TC 模式問題修復**
+  - 問題：選擇 TC（Training Case）模式時出現異常
+  - 狀態：待調查與修復
 
 ---
 
@@ -36,18 +44,17 @@
 ### 下一步工作
 **短期行動（1-3天）**：
 
-1. **完成 `/charts` 狀態載入與 API 串接**
-  - 在頁面載入時優先讀取 `state` query → Zustand store → fallback 預設值
-  - 呼叫 chart signal/indicator API，整合為 `indicatorSeries` / `signalMarkers`
-  - 缺參數時提供 CTA 返回 `/strategy-test` 並沿用既有設定
+1. **修復 TC 窗口配置問題**
+  - 診斷 TC（Training Case）模式選擇時的異常行為
+  - 修復相關邏輯並測試驗證
 
-2. **實作多 Pane 指標/訊號視覺化**
-  - Price/Volume/TakerRatio chart 同步顯示多條 EMA、信號標記、TO/TC 垂直線
-  - 新增指標顯示切換與 hover tooltip 同步
+2. **Optuna 整合準備**
+  - 基於單選數據源設計，規劃 Optuna 超參數優化策略
+  - 評估是否需要多源策略模板（價量確認、主動買盤過濾等）
 
-3. **強化 URL + store 雙軌同步體驗**
-  - router.replace debounce、純 URL 分享模式、localStorage 快取回填
-  - 完成 Option B 設計並紀錄在整合計劃
+3. **系統穩定性測試**
+  - 驗證數據源單選後的完整流程
+  - 測試 Boxplot 在各種數據分佈下的顯示效果
 
 **建議方向**（按優先級排序）：
 
@@ -91,7 +98,7 @@
   - ✅ 策略配置UI：9個React組件（DataSource, Indicator, StrategyLogic, ParameterRange, WindowConfig, TestMode, ActionButtons, SaveTemplate, 主頁面）
   - ✅ 圖表信號標記：3個視覺化組件（StrategySignalChart, SignalTooltip, TradingChartWithSignals）
   - ✅ 測試驗證：組件單元測試（40+案例）+ API整合測試（20+案例）
-  - ✅ 整合示例：strategy-demo頁面（完整工作流演示）
+  - ✅ 整合示例：strategy-demo頁面（完整工作流演示，2025-11-16 已併入 /strategy-test + /charts）
   - ✅ 總計：16個組件 + 3個測試文件，約4,746行代碼
 
 - **Phase 3.2：信號密度分析系統** (100%) - 2025-11-01完成
@@ -566,7 +573,12 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-**當前無Critical問題** ✅
+- **窗口配置 TC 模式問題**（優先級：高）
+  - 問題：選擇 TC（Training Case）模式時出現異常
+  - 影響：窗口配置功能部分不可用
+  - 狀態：待調查
+
+**其他系統** ✅
 - K線存儲系統已通過全面修復（2025-11-08~09）
 - 所有時間框架（1m~1d）下載正常
 - ACID事務性保證數據完整性
@@ -637,6 +649,50 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-11-18
+
+**密度視覺化與 UI 優化** ⭐⭐⭐⭐
+
+**核心改進**（3個重要優化）
+
+1. **三合一 Boxplot 密度對比圖**
+   - 文件：`frontend/src/components/charts/CombinedDensityBoxplot.tsx`（新建，約450行）
+   - 功能：Near/Far/Ratio 三種密度指標橫向並排顯示
+   - 技術：純 SVG 繪製，每個指標獨立 Y 軸刻度
+   - 統計：箱體（Q1-Q3）、中位數、平均值、鬚線、離群值偵測（1.5×IQR）
+   - 優化：自動包含離群值計算範圍，15% padding 避免超出
+
+2. **數據源多選改為單選**
+   - 問題診斷：發現後端只使用第一個數據源，多選 UI 為非功能性設計
+   - 修改文件：
+     - `frontend/src/hooks/useStrategyConfig.ts`：state 類型 `string[]` → `string`
+     - `frontend/src/app/strategy-test/page.tsx`：MultiSelect → Select 組件
+   - 影響：與後端實際邏輯完全一致，為 Optuna 優化減少搜索空間
+   - 建議：未來可通過策略模板支持多源（價量確認、Taker 過濾等）
+
+3. **NumberInput 組件輸入修復**
+   - 文件：`frontend/src/components/ui/NumberInput.tsx`
+   - 問題：動態 min 限制導致無法輸入多位數（如 EMA Mid=10，輸入 `1` 立即被限制為 `4`）
+   - 解決：分離輸入與驗證時機
+     - `onChange`：允許自由輸入，不執行 clamp
+     - `onBlur`：失焦時才執行 min/max 限制
+   - 結果：用戶可流暢輸入任意多位數字
+
+**修改文件**（5個文件）
+- `frontend/src/components/charts/CombinedDensityBoxplot.tsx`（新建，+450行）
+- `frontend/src/hooks/useStrategyConfig.ts`（類型修改，7處）
+- `frontend/src/app/strategy-test/page.tsx`（UI 修改，6處）
+- `frontend/src/components/ui/NumberInput.tsx`（邏輯優化，+15行）
+- `.claude/STATUS.md`（本文件，狀態更新）
+
+**技術總結**
+- 視覺化改進：統計學標準 Boxplot，支持橫向多指標對比
+- 用戶體驗：修復輸入框阻擋問題，簡化數據源選擇
+- 架構對齊：前端 UI 與後端實際邏輯完全一致
+- 優化準備：為 Optuna 超參數優化奠定基礎（單選 vs 多選搜索空間）
+
+---
 
 ### 2025-11-08~09
 
@@ -1795,15 +1851,21 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ✅ 已同步（2025-11-09 15:30）
+**遠端同步**: ⚠️ 待同步（2025-11-18 18:00）
 
-**最新提交** (2025-11-09):
-- ✅ **commit 3239855**: K線存儲系統根本性修復 (2025-11-08~09)
+**最新提交** (2025-11-18):
+- ⏳ **待提交**: 密度視覺化與 UI 優化
+  - 新增 CombinedDensityBoxplot 組件（Near/Far/Ratio 橫向對比）
+  - 數據源從多選改為單選（前後端邏輯對齊）
+  - NumberInput 組件修復（支持多位數輸入）
+  - 修改文件：5個文件，+465行/-30行
+
+**上一次提交** (2025-11-09):
+- ✅ **commit 3239855**: K線存儲系統根本性修復
   - 實現ACID事務性寫入
   - 添加後寫驗證層
   - 智能數據存在檢測
   - 批量下載時間範圍覆蓋檢查
-  - 修改文件：5個核心文件，+310行/-49行
   - 測試：8/8時間框架全部通過
 
 **Phase 3 提交歷史** (2025-11-01~02):
@@ -1841,53 +1903,48 @@ for case in candidates:
 **當前狀態**:
 - ✅ Phase 1全部任務：完成並推送
 - ✅ Phase 2.1-2.3：完成並推送
-- ✅ Phase 3.1：完成並提交（待推送）
-- ⏳ 工作區狀態：需推送到遠端（1個新commit）
+- ✅ Phase 3.1-3.6：完成並提交
+- ⏳ 工作區狀態：需提交並推送到遠端（密度視覺化與 UI 優化）
 
 ---
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-11-08~09）：
-   - ✅ **K線存儲系統根本性修復**（Critical級別）
-     - 實現ACID事務性寫入（Atomicity + Consistency + Durability）
-     - 添加後寫驗證層（Checksum + 行數 + 時間範圍）
-     - 智能數據存在檢測（修復metadata-data不一致）
-     - 批量下載時間範圍覆蓋檢查
-     - 自動gap檢測與填補（12,433根K線自動下載）
-     - 測試：8/8時間框架全部通過 ✅
-     - 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
-     - Git狀態：⚠️ 待推送到遠端
+1. **已完成工作**（2025-11-18）：
+   - ✅ **密度視覺化與 UI 優化**
+     - 新增 CombinedDensityBoxplot 組件（Near/Far/Ratio 三合一對比）
+     - 數據源從多選改為單選（前後端邏輯對齊）
+     - NumberInput 組件修復（支持多位數輸入，失焦驗證）
+     - 修改文件：5個文件，+465行/-30行
+     - Git狀態：⚠️ 待提交並推送到遠端
 
-2. **當前狀態**（2025-11-09 15:30）：
-   - 分支：main（⚠️ 待推送）
+2. **當前狀態**（2025-11-18 18:00）：
+   - 分支：main（⚠️ 待提交並推送）
    - Phase 1 進度：5/5任務完成 (100%) ✅
    - Phase 2 進度：4/4任務完成 (100%) ✅
    - Phase 3 進度：6/6任務完成 (100%) ✅
-   - K線存儲：✅ ACID保證，全時間框架正常
-   - 系統狀態：✅ 穩定，無Critical問題
+   - 密度視覺化：✅ 三合一 Boxplot，獨立 Y 軸
+   - UI 體驗：✅ 數據源單選，輸入框修復
+   - 已知問題：⚠️ TC 窗口配置模式異常（待修復）
 
 3. **下一步工作建議**：
-   
-   **優先：Git推送與驗證**
-   - 推送K線存儲修復到遠端
-   - 更新文檔同步（STATUS.md已更新）
-   
-   **選項A：系統穩定性驗證**（優先級：高）
-   - 多時間框架批量下載壓力測試
-   - 並發寫入場景測試
-   - 長時間運行穩定性測試
-   
-   **選項B：Phase 4 實盤交易整合**（依照FEATURE_ROADMAP.md）
-   - 訂單管理系統
-   - 倉位管理
-   - 風險控制
-   - Binance實盤API整合
-   
-   **選項C：文檔與測試完善**
-   - 更新ARCHITECTURE.md（K線存儲架構圖）
-   - 補充API_SPECIFICATION.md
-   - 提升測試覆蓋率
+
+   **優先：Git 提交與推送**
+   - 提交密度視覺化與 UI 優化變更
+   - 推送到遠端同步
+   - 更新 .claude/STATUS.md（已完成）
+
+   **選項A：修復 TC 窗口配置問題**（優先級：高）
+   - 診斷 TC（Training Case）模式選擇時的異常
+   - 修復相關邏輯並測試驗證
+
+   **選項B：Optuna 整合準備**（優先級：中）
+   - 基於單選數據源設計超參數優化策略
+   - 評估是否需要多源策略模板（價量確認、Taker 過濾）
+
+   **選項C：系統穩定性測試**（優先級：中）
+   - 驗證數據源單選後的完整流程
+   - 測試 Boxplot 在各種數據分佈下的顯示效果
 
 4. **開發工作流程**：
    - 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範

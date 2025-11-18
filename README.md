@@ -77,6 +77,12 @@
 - 案例時間點高亮
 - 流暢的縮放和拖曳
 
+**最新進展（Stage 2 - 2025/11/16）**：
+- `/strategy-test → /charts` 狀態沿用：Zustand + URL 雙軌同步、Option B 純網址分享、LocalStorage 快取
+- `/charts` 資料載入 UX：缺參數 CTA、重試按鈕、阻擋訊息（支持 `strategy-demo` 移除後的導流）
+- 策略說明區塊：依模板顯示策略邏輯/風控重點，避免新手迷失
+- 多 Pane 指標遮罩：Price/Volume/Taker Ratio 共享近/遠視窗、TO/TC 參考線與指標開關
+
 ### 3. 指標測試系統（計劃中 📋）
 
 **多數據源 × 多指標**：

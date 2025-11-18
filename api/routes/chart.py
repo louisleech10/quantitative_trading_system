@@ -26,7 +26,7 @@ async def get_chart_data(
     max_bars: int = Query(200, description="最大返回根數（預設200）", ge=1, le=1000),
     case_timeframe: Optional[str] = Query(None, description="案例時間框架（如12h），提供則使用TO/TC邏輯"),
     lookback_bars: Optional[int] = Query(None, description="往前K線根數（預設100）", ge=1, le=1000),
-    forward_bars: Optional[int] = Query(None, description="往後K線根數（預設48）", ge=1, le=1000)
+    forward_bars: Optional[int] = Query(None, description="往後K線根數（預設48，可為0表示不看未來）", ge=0, le=1000)
 ):
     """
     獲取圖表數據

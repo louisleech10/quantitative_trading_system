@@ -14,8 +14,7 @@ import {
   Home,
   LineChart,
   Target,
-  TrendingUp,
-  Sparkles
+  TrendingUp
 } from 'lucide-react';
 
 interface MainLayoutProps {
@@ -43,7 +42,7 @@ const navigationItems = [
   },
   {
     name: '圖表查看',
-    href: '/chart',
+    href: '/charts',
     icon: LineChart,
     description: '查看案例K線圖表和技術指標'
   },
@@ -52,12 +51,6 @@ const navigationItems = [
     href: '/strategy-test',
     icon: Target,
     description: '配置策略參數並進行回測（Phase 3.3）'
-  },
-  {
-    name: '策略演示',
-    href: '/strategy-demo',
-    icon: Sparkles,
-    description: '策略信號標記演示（Phase 3.4）'
   },
   {
     name: '優化結果',

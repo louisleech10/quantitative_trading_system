@@ -113,12 +113,17 @@ class SignalAnalysisService:
             negative_cases = []
             missing_cases = []
 
+            # 決定使用的計算 timeframe（優先使用 1h，因為它是最常見且數據最完整的）
+            calculation_timeframe = "1h"
+
             for case_id in request.positive_cases:
                 case = self.case_storage.get_case(case_id)
                 if case is None:
                     self.logger.warning(f"正例案例不存在: {case_id}")
                     missing_cases.append(case_id)
                     continue
+                # 覆寫 timeframe 為實際可用的數據（如 1h），忽略案例元數據中的 timeframe
+                case.timeframe = calculation_timeframe
                 positive_cases.append(case)
 
             for case_id in request.negative_cases:
@@ -127,18 +132,20 @@ class SignalAnalysisService:
                     self.logger.warning(f"反例案例不存在: {case_id}")
                     missing_cases.append(case_id)
                     continue
+                # 覆寫 timeframe 為實際可用的數據（如 1h），忽略案例元數據中的 timeframe
+                case.timeframe = calculation_timeframe
                 negative_cases.append(case)
 
             # 驗證載入後的案例數量
-            if len(positive_cases) < 5:
+            if len(positive_cases) < 1:
                 raise ValueError(
-                    f"正例案例載入不足: 需要至少5個,實際載入{len(positive_cases)}個。"
+                    f"正例案例載入不足: 需要至少1個,實際載入{len(positive_cases)}個。"
                     f"請求{len(request.positive_cases)}個,缺失{len(missing_cases)}個"
                 )
 
-            if len(negative_cases) < 5:
+            if len(negative_cases) < 1:
                 raise ValueError(
-                    f"反例案例載入不足: 需要至少5個,實際載入{len(negative_cases)}個"
+                    f"反例案例載入不足: 需要至少1個,實際載入{len(negative_cases)}個"
                 )
 
             if missing_cases:

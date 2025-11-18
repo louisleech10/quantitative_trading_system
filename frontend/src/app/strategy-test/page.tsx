@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
   BarChart2,
@@ -17,10 +17,11 @@ import {
 } from "lucide-react";
 import { Accordion } from "@/components/ui/Accordion";
 import { AccordionItem } from "@/components/ui/AccordionItem";
-import { MultiSelect } from "@/components/ui/MultiSelect";
 import { Select, type SelectOption } from "@/components/ui/Select";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import StatMetricCard from "@/components/ui/StatMetricCard";
+import CombinedDensityBoxplot from "@/components/charts/CombinedDensityBoxplot";
 import WindowConfigPanel, {
   type TrainingWindowConfig,
 } from "@/components/strategy/WindowConfigPanel";
@@ -36,13 +37,39 @@ interface SignalPoint {
 }
 
 interface DensityMetrics {
+  // 近期密度 (Near window density)
   positive_avg_density?: number;
   negative_avg_density?: number;
-  near_far_ratio?: number;
+
+  // 遠期密度 (Far window density)
+  positive_far_avg_density?: number;
+  negative_far_avg_density?: number;
+
+  // 近遠比 (Near/Far ratio)
+  positive_near_far_ratio?: number;
+  negative_near_far_ratio?: number;
+  near_far_ratio?: number; // Legacy field, maps to positive_near_far_ratio
+
+  // 標準差 (Standard deviations)
+  positive_std?: number;
+  negative_std?: number;
+  positive_far_std?: number;
+  negative_far_std?: number;
+  positive_ratio_std?: number;
+  negative_ratio_std?: number;
+
+  // 分離度指標 (Separation metrics)
   separation?: number;
   ratio_separation?: number;
+
+  // 統計檢驗 (Statistical tests)
   p_value?: number;
   cohens_d?: number;
+  stability_cv?: number;
+
+  // 樣本數 (Sample sizes)
+  positive_sample_size?: number;
+  negative_sample_size?: number;
 }
 
 interface DataQualitySummary {
@@ -92,6 +119,50 @@ const STRATEGY_OPTIONS: SelectOption[] = [
   { value: "threshold", label: "閾值突破", icon: "🎯", disabled: true },
 ];
 
+interface StrategyGuide {
+  title: string;
+  description: string;
+  bullets?: string[];
+  status: "active" | "locked";
+  note?: string;
+}
+
+const STRATEGY_GUIDES: Record<string, StrategyGuide> = {
+  three_line: {
+    title: "三線順勢 (EMA 短 > 中 > 長)",
+    description:
+      "EMA 短線必須大於中線、中線大於長線，搭配多數據源 (Close + Volume/Taker) 觀察趨勢延續性，適合尋找連續性突破案例。",
+    bullets: [
+      "建議與 Near 24 / Far 100 雙窗口搭配，強調近期密度聚集。",
+      "可同時觀察 Volume / Taker Buy Volume 以過濾放量假突破。",
+      "若出現 EMA 排序被破壞，可將其視為策略失效並重置窗口。",
+    ],
+    status: "active",
+  },
+  crossover: {
+    title: "均線交叉 (等待驗證)",
+    description:
+      "觀察 EMA/SMA 快慢線交叉觸發信號，需結合波動過濾才能有效區分雜訊，目前仍在驗證資料品質。",
+    bullets: [
+      "預計支援多指標組合，並加入震盪/趨勢濾網。",
+      "完成 Phase 3.4 驗證後才會開放。",
+    ],
+    status: "locked",
+    note: "預計 3.4 版開放",
+  },
+  threshold: {
+    title: "閾值突破 (規劃中)",
+    description:
+      "以 RSI / ATR / Volume Spike 等閾值觸發進出場，需與 Optuna 參數掃描結合，目前僅保留 UI 區塊。",
+    bullets: [
+      "將支援自定義指標加總與布林帶偏離率。",
+      "待雙密度驗證完成後再導入。",
+    ],
+    status: "locked",
+    note: "Roadmap Q1",
+  },
+};
+
 const SYMBOL_OPTIONS: SelectOption[] = [
   { value: "BTCUSDT", label: "BTCUSDT", icon: "₿" },
   { value: "ETHUSDT", label: "ETHUSDT", icon: "◇" },
@@ -132,6 +203,7 @@ const parseDateToTimestamp = (date: string, fallback: number) => {
 
 export default function StrategyTestPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     state,
     setField,
@@ -141,6 +213,8 @@ export default function StrategyTestPage() {
     listTemplates,
     deleteTemplate,
     syncToUrl,
+    cacheStateSnapshot,
+    hydrateFromUrl,
   } = useStrategyConfig();
 
   const [isRunning, setIsRunning] = useState(false);
@@ -148,6 +222,44 @@ export default function StrategyTestPage() {
   const [testResult, setTestResult] = useState<ChartSignalResponse | null>(null);
   const [templates, setTemplates] = useState<StrategyTemplatePayload[]>([]);
   const [isTemplatePanelOpen, setTemplatePanelOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const hasHydratedFromUrl = useRef(false);
+
+  // State for Boxplot chart
+  const [caseLevelDensities, setCaseLevelDensities] = useState<Record<string, number>>({});
+  const [positiveCaseIds, setPositiveCaseIds] = useState<string[]>([]);
+  const [negativeCaseIds, setNegativeCaseIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient || hasHydratedFromUrl.current) return;
+    const stateParam = searchParams?.get("state");
+    if (!stateParam) return;
+    const hydrated = hydrateFromUrl(searchParams);
+    if (hydrated) {
+      hasHydratedFromUrl.current = true;
+      toast.success("已從 URL 還原策略設定");
+    }
+  }, [hydrateFromUrl, isClient, searchParams]);
+
+  useEffect(() => {
+    if (!isClient) return;
+    const timeout = window.setTimeout(() => {
+      cacheStateSnapshot();
+      if (!state.syncToUrl) return;
+      const query = syncToUrl();
+      if (!query) return;
+      if (typeof window === "undefined") return;
+      if (window.location.search === query) return;
+      const path = window.location.pathname.replace(/\/$/, "");
+      if (path !== "/strategy-test") return;
+      router.replace(`/strategy-test${query}`, { scroll: false });
+    }, 400);
+    return () => window.clearTimeout(timeout);
+  }, [state, syncToUrl, cacheStateSnapshot, router, isClient]);
 
   useEffect(() => {
     if (isTemplatePanelOpen) {
@@ -172,8 +284,8 @@ export default function StrategyTestPage() {
       errors.push("開始日期不可晚於結束日期");
     }
 
-    if (dataSources.length === 0) {
-      errors.push("至少選擇一個數據源");
+    if (!dataSources) {
+      errors.push("請選擇數據源");
     }
 
     if (!state.symbol) {
@@ -231,14 +343,15 @@ export default function StrategyTestPage() {
       const startTime = parseDateToTimestamp(state.dateRange.start, Date.now() - 7 * 24 * 60 * 60 * 1000);
       const endTime = parseDateToTimestamp(state.dateRange.end, Date.now());
 
-      const requestBody = {
+      // Step 1: 呼叫 chart/signals 取得圖表數據
+      const chartRequestBody = {
         symbol: state.symbol,
         timeframe: state.timeframe,
         start_time: startTime,
         end_time: endTime,
         strategy_config: {
-          data_source: state.dataSources[0] ?? "close",
-          data_sources: state.dataSources,
+          data_source: state.dataSources ?? "close",
+          data_sources: [state.dataSources],
           indicator_type: state.indicatorType,
           strategy_logic: state.strategyLogic,
           params: state.indicatorParams,
@@ -247,15 +360,15 @@ export default function StrategyTestPage() {
         },
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/chart/signals`, {
+      const chartResponse = await fetch(`${API_BASE_URL}/api/v1/chart/signals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(chartRequestBody),
       });
 
-      if (!response.ok) {
+      if (!chartResponse.ok) {
         let message = "API 請求失敗";
-        const errorText = await response.text().catch(() => "");
+        const errorText = await chartResponse.text().catch(() => "");
         try {
           const errorData = JSON.parse(errorText || "{}");
           message =
@@ -264,15 +377,124 @@ export default function StrategyTestPage() {
             errorData.error?.message ||
             message;
         } catch {
-          if (response.status) {
-            message = `HTTP ${response.status}: ${errorText || message}`;
+          if (chartResponse.status) {
+            message = `HTTP ${chartResponse.status}: ${errorText || message}`;
           }
         }
         throw new Error(message);
       }
 
-      const data: ChartSignalResponse = await response.json();
-      setTestResult(data);
+      const chartData: ChartSignalResponse = await chartResponse.json();
+
+      // Step 2: 載入真實案例並過濾出符合當前 symbol/timeframe 的案例
+      try {
+        const casesResponse = await fetch(`${API_BASE_URL}/api/v1/case/list`);
+        if (casesResponse.ok) {
+          const casesData = await casesResponse.json();
+
+          // 過濾出符合當前測試配置的案例（相同 symbol 和 timeframe）
+          const positiveCases: string[] = [];
+          const negativeCases: string[] = [];
+
+          if (casesData.cases && Array.isArray(casesData.cases)) {
+            casesData.cases.forEach((c: any) => {
+              // 只使用符合當前 symbol 的案例（忽略 timeframe 差異，因為後端會處理）
+              if (c.symbol === state.symbol) {
+                if (c.positive_case === 1) {
+                  positiveCases.push(c.case_id);
+                } else if (c.positive_case === 0) {
+                  negativeCases.push(c.case_id);
+                }
+              }
+            });
+          }
+
+          // Step 3: 如果有足夠的案例，呼叫 signal-analysis/density 取得密度統計
+          if (positiveCases.length > 0 && negativeCases.length > 0) {
+            const densityRequestBody = {
+              strategy_config: {
+                data_source: state.dataSources ?? "close",
+                indicator_type: state.indicatorType,
+                strategy_logic: state.strategyLogic,
+                params: state.indicatorParams,
+              },
+              training_window: state.windowConfig,
+              positive_cases: positiveCases,
+              negative_cases: negativeCases,
+            };
+
+            const densityResponse = await fetch(`${API_BASE_URL}/api/v1/signal-analysis/density`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(densityRequestBody),
+            });
+
+            if (densityResponse.ok) {
+              const densityData = await densityResponse.json();
+
+              // Store data for Boxplot chart
+              setCaseLevelDensities(densityData.case_level_densities || {});
+              setPositiveCaseIds(positiveCases);
+              setNegativeCaseIds(negativeCases);
+
+              // 合併密度數據到圖表結果中
+              chartData.metadata = {
+                ...chartData.metadata,
+                density_metrics: {
+                  // 近期密度
+                  positive_avg_density: densityData.positive_avg_density,
+                  negative_avg_density: densityData.negative_avg_density,
+
+                  // 遠期密度
+                  positive_far_avg_density: densityData.positive_far_avg_density,
+                  negative_far_avg_density: densityData.negative_far_avg_density,
+
+                  // 近遠比
+                  positive_near_far_ratio: densityData.positive_near_far_ratio,
+                  negative_near_far_ratio: densityData.negative_near_far_ratio,
+                  near_far_ratio: densityData.positive_near_far_ratio, // Legacy compatibility
+
+                  // 標準差
+                  positive_std: densityData.positive_std,
+                  negative_std: densityData.negative_std,
+                  positive_far_std: densityData.positive_far_std,
+                  negative_far_std: densityData.negative_far_std,
+                  positive_ratio_std: densityData.positive_ratio_std,
+                  negative_ratio_std: densityData.negative_ratio_std,
+
+                  // 分離度指標
+                  separation: densityData.separation,
+                  ratio_separation: densityData.ratio_separation,
+
+                  // 統計檢驗
+                  p_value: densityData.p_value,
+                  cohens_d: densityData.cohens_d,
+                  stability_cv: densityData.stability_cv,
+
+                  // 樣本數
+                  positive_sample_size: densityData.positive_sample_size,
+                  negative_sample_size: densityData.negative_sample_size,
+                },
+                quality: {
+                  total_cases: densityData.positive_sample_size + densityData.negative_sample_size,
+                  positive_cases: densityData.positive_sample_size,
+                  negative_cases: densityData.negative_sample_size,
+                  success_rate: densityData.positive_sample_size / (densityData.positive_sample_size + densityData.negative_sample_size),
+                },
+              };
+            } else {
+              const errorText = await densityResponse.text();
+              console.warn("密度分析API呼叫失敗，但圖表數據正常", errorText);
+            }
+          } else {
+            console.warn(`符合 ${state.symbol} 的案例數量不足：正例${positiveCases.length}個，反例${negativeCases.length}個`);
+          }
+        }
+      } catch (densityError) {
+        console.warn("密度分析計算失敗，但圖表數據正常", densityError);
+      }
+
+      setTestResult(chartData);
       toast.success("測試完成");
     } catch (error) {
       const message = error instanceof Error ? error.message : "執行測試時發生未知錯誤";
@@ -321,6 +543,8 @@ export default function StrategyTestPage() {
 
   const selectedSymbolOption = SYMBOL_OPTIONS.find((option) => option.value === state.symbol) ?? null;
   const symbolSelectValue = selectedSymbolOption ? selectedSymbolOption.value : null;
+  const currentStrategyGuide =
+    STRATEGY_GUIDES[state.strategyLogic] ?? STRATEGY_GUIDES.three_line;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -387,13 +611,13 @@ export default function StrategyTestPage() {
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[360px,1fr]">
         <div className="space-y-4">
           <Accordion defaultExpanded={["basic", "indicator"]}>
-            <AccordionItem id="basic" title="基本配置" badge={`${state.dataSources.length} 個來源`}>
+            <AccordionItem id="basic" title="基本配置" badge={state.dataSources || "未選擇"}>
               <div className="space-y-4">
-                <MultiSelect
+                <Select
                   label="數據來源"
                   options={DATA_SOURCE_OPTIONS}
                   value={state.dataSources}
-                  onChange={(options) => setField("dataSources", options)}
+                  onChange={(value) => setField("dataSources", value ?? "close")}
                   placeholder="選擇欲追蹤的 K 線欄位"
                 />
                 <Select
@@ -408,6 +632,35 @@ export default function StrategyTestPage() {
                   value={state.strategyLogic}
                   onChange={(value) => setField("strategyLogic", value ?? "three_line")}
                 />
+                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-slate-800">
+                      {currentStrategyGuide.title}
+                    </p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        currentStrategyGuide.status === "active"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {currentStrategyGuide.status === "active" ? "已啟用" : "開發中"}
+                    </span>
+                    {currentStrategyGuide.note && (
+                      <span className="text-[10px] text-slate-500">{currentStrategyGuide.note}</span>
+                    )}
+                  </div>
+                  <p className="mt-2 leading-relaxed text-slate-600">
+                    {currentStrategyGuide.description}
+                  </p>
+                  {currentStrategyGuide.bullets && (
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-[11px] text-slate-500">
+                      {currentStrategyGuide.bullets.map((tip, index) => (
+                        <li key={`${currentStrategyGuide.title}-${index}`}>{tip}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </AccordionItem>
 
@@ -567,14 +820,141 @@ export default function StrategyTestPage() {
               </div>
               <BarChart2 className="h-6 w-6 text-indigo-500" />
             </div>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <MetricCard label="正例密度" value={formatPercent(densityMetrics?.positive_avg_density)} helper="正例平均 signal density" />
-              <MetricCard label="反例密度" value={formatPercent(densityMetrics?.negative_avg_density)} helper="反例平均 signal density" />
-              <MetricCard label="Near/Far Ratio" value={formatNumber(densityMetrics?.near_far_ratio)} helper="正例窗口密度比" />
-              <MetricCard label="Separation" value={formatNumber(densityMetrics?.separation)} helper="正反差值" />
-              <MetricCard label="Ratio Separation" value={formatNumber(densityMetrics?.ratio_separation)} helper="ratio 差值" />
-              <MetricCard label="p-value" value={densityMetrics?.p_value ? densityMetrics.p_value.toExponential(2) : "—"} helper="統計顯著性" />
-              <MetricCard label="Cohen's d" value={formatNumber(densityMetrics?.cohens_d)} helper="效果量" />
+            {/* 正例密度指標 */}
+            <div className="mt-5">
+              <div className="text-sm font-semibold text-slate-700 mb-3">正例密度指標</div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {densityMetrics?.positive_avg_density !== undefined && (
+                  <StatMetricCard
+                    label="正例近期密度"
+                    value={densityMetrics.positive_avg_density}
+                    std={densityMetrics.positive_std}
+                    helper="TO前24根K線的策略信號密度"
+                    format="decimal"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.positive_far_avg_density !== undefined && (
+                  <StatMetricCard
+                    label="正例遠期密度"
+                    value={densityMetrics.positive_far_avg_density}
+                    std={densityMetrics.positive_far_std}
+                    helper="TO-100至TO-25根K線的背景密度"
+                    format="decimal"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.positive_near_far_ratio !== undefined && (
+                  <StatMetricCard
+                    label="正例 Near/Far Ratio"
+                    value={densityMetrics.positive_near_far_ratio}
+                    std={densityMetrics.positive_ratio_std}
+                    helper="近期密度 / 遠期密度"
+                    format="ratio"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.positive_sample_size !== undefined && (
+                  <StatMetricCard
+                    label="正例樣本數"
+                    value={densityMetrics.positive_sample_size}
+                    helper="有效的正例案例數量"
+                    format="number"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* 反例密度指標 */}
+            <div className="mt-5">
+              <div className="text-sm font-semibold text-slate-700 mb-3">反例密度指標</div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {densityMetrics?.negative_avg_density !== undefined && (
+                  <StatMetricCard
+                    label="反例近期密度"
+                    value={densityMetrics.negative_avg_density}
+                    std={densityMetrics.negative_std}
+                    helper="TO前24根K線的策略信號密度"
+                    format="decimal"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.negative_far_avg_density !== undefined && (
+                  <StatMetricCard
+                    label="反例遠期密度"
+                    value={densityMetrics.negative_far_avg_density}
+                    std={densityMetrics.negative_far_std}
+                    helper="TO-100至TO-25根K線的背景密度"
+                    format="decimal"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.negative_near_far_ratio !== undefined && (
+                  <StatMetricCard
+                    label="反例 Near/Far Ratio"
+                    value={densityMetrics.negative_near_far_ratio}
+                    std={densityMetrics.negative_ratio_std}
+                    helper="近期密度 / 遠期密度"
+                    format="ratio"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.negative_sample_size !== undefined && (
+                  <StatMetricCard
+                    label="反例樣本數"
+                    value={densityMetrics.negative_sample_size}
+                    helper="有效的反例案例數量"
+                    format="number"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* 統計檢驗指標 */}
+            <div className="mt-5">
+              <div className="text-sm font-semibold text-slate-700 mb-3">統計檢驗指標</div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {densityMetrics?.separation !== undefined && (
+                  <StatMetricCard
+                    label="Density Separation"
+                    value={densityMetrics.separation}
+                    helper="正反例密度差異 (優化目標)"
+                    format="decimal"
+                  />
+                )}
+                {densityMetrics?.ratio_separation !== undefined && (
+                  <StatMetricCard
+                    label="Ratio Separation"
+                    value={densityMetrics.ratio_separation}
+                    helper="正反例比率差異 (雙密度優化目標)"
+                    format="decimal"
+                  />
+                )}
+                {densityMetrics?.p_value !== undefined && (
+                  <StatMetricCard
+                    label="p-value"
+                    value={densityMetrics.p_value}
+                    helper="統計顯著性 (<0.05為顯著)"
+                    format="decimal"
+                  />
+                )}
+                {densityMetrics?.cohens_d !== undefined && (
+                  <StatMetricCard
+                    label="Cohen's d"
+                    value={densityMetrics.cohens_d}
+                    helper="效果量 (>0.5為中等, >0.8為大效果)"
+                    format="decimal"
+                  />
+                )}
+                {densityMetrics?.stability_cv !== undefined && (
+                  <StatMetricCard
+                    label="Stability CV"
+                    value={densityMetrics.stability_cv}
+                    helper="穩定性係數 (<0.3穩定, <0.5可接受)"
+                    format="decimal"
+                  />
+                )}
+              </div>
             </div>
             {!densityMetrics && (
               <p className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">
@@ -582,6 +962,19 @@ export default function StrategyTestPage() {
               </p>
             )}
           </div>
+
+          {/* Combined Boxplot 密度分佈視覺化 - 三種指標橫向對比 */}
+          {densityMetrics &&
+            positiveCaseIds.length > 0 &&
+            negativeCaseIds.length > 0 &&
+            Object.keys(caseLevelDensities).length > 0 && (
+              <CombinedDensityBoxplot
+                caseLevelDensities={caseLevelDensities}
+                positiveCases={positiveCaseIds}
+                negativeCases={negativeCaseIds}
+                title="密度分佈對比 (Near / Far / Ratio)"
+              />
+            )}
 
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">

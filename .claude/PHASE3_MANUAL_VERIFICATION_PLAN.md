@@ -889,7 +889,7 @@ for case in valid_params_cases:
 **前置**: 先在策略測試頁面執行測試，生成信號
 
 **步驟**:
-1. 執行測試後，點擊「查看圖表」或訪問 http://localhost:3000/strategy-demo
+1. 執行測試後，點擊「查看圖表」或訪問 http://localhost:3000/charts
 2. 圖表應載入並顯示信號標記
 
 **驗證點**:

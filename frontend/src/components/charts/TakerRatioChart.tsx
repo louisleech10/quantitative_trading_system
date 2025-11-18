@@ -14,7 +14,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useChartSync } from '../../hooks/useChartSync';
 import { useTimeAxis } from '@/contexts/TimeAxisContext';
 import {
@@ -23,6 +23,7 @@ import {
 } from '../../utils/chartConfig';
 import { ISeriesApi, LineStyle } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
+import type { WindowOverlayRange } from './TradingChartWithSignals';
 
 /**
  * TakerRatioChart組件Props
@@ -62,6 +63,16 @@ export interface TakerRatioChartProps {
    * TO時間戳（用於初始可見範圍）
    */
   toTimestamp?: number;
+
+  /**
+   * TC時間戳（案例結束點，用於垂直參考線）
+   */
+  tcTimestamp?: number;
+
+  /**
+   * 近/遠窗口覆蓋範圍
+   */
+  windowOverlays?: WindowOverlayRange[];
 }
 
 /**
@@ -74,7 +85,9 @@ export function TakerRatioChart({
   height = 120,
   chartId = 'taker-ratio-chart',
   enableSync = false,
-  toTimestamp
+  toTimestamp,
+  tcTimestamp,
+  windowOverlays = []
 }: TakerRatioChartProps) {
   console.log('[TakerRatioChart] Initializing with:', { chartId, enableSync, toTimestamp });
   
@@ -94,6 +107,76 @@ export function TakerRatioChart({
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const buyAreaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const sellAreaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
+
+  const timelineRange = useMemo(() => {
+    if (!klines.length) return null;
+    const start = klines[0].timestamp;
+    const end = klines[klines.length - 1].timestamp;
+    return {
+      start,
+      end,
+      total: Math.max(end - start, 1),
+    };
+  }, [klines]);
+
+  const overlayRects = useMemo(() => {
+    if (!timelineRange || windowOverlays.length === 0) return [];
+    return windowOverlays
+      .map((overlay) => {
+        const clampedStart = Math.max(
+          timelineRange.start,
+          Math.min(overlay.startTimestamp, timelineRange.end)
+        );
+        const clampedEnd = Math.max(
+          timelineRange.start,
+          Math.min(overlay.endTimestamp, timelineRange.end)
+        );
+        if (clampedEnd <= clampedStart) {
+          return null;
+        }
+        const left =
+          ((clampedStart - timelineRange.start) / timelineRange.total) * 100;
+        const width =
+          ((clampedEnd - clampedStart) / timelineRange.total) * 100;
+        return {
+          ...overlay,
+          left,
+          width,
+        };
+      })
+      .filter(
+        (
+          rect
+        ): rect is WindowOverlayRange & { left: number; width: number } =>
+          rect !== null && rect.width > 0
+      );
+  }, [timelineRange, windowOverlays]);
+
+  const verticalLines = useMemo(() => {
+    if (!timelineRange) return [];
+    const positions: Array<{ label: string; color: string; left: number }> = [];
+
+    const toPercent = (timestamp?: number) => {
+      if (!timestamp) return null;
+      const clamped = Math.max(
+        timelineRange.start,
+        Math.min(timestamp, timelineRange.end)
+      );
+      return ((clamped - timelineRange.start) / timelineRange.total) * 100;
+    };
+
+    const toLeft = toPercent(toTimestamp);
+    if (toLeft !== null) {
+      positions.push({ label: 'TO', color: '#4338ca', left: toLeft });
+    }
+
+    const tcLeft = toPercent(tcTimestamp);
+    if (tcLeft !== null) {
+      positions.push({ label: 'TC', color: '#ea580c', left: tcLeft });
+    }
+
+    return positions;
+  }, [timelineRange, toTimestamp, tcTimestamp]);
 
   /**
    * 渲染Taker Ratio數據到圖表
@@ -272,7 +355,7 @@ export function TakerRatioChart({
       {/* 圖表容器 */}
       <div className="flex-1 relative">
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
             <div className="text-center">
               <div className="text-red-500 text-xl mb-1">⚠️</div>
               <p className="text-xs text-red-600">{error}</p>
@@ -281,7 +364,7 @@ export function TakerRatioChart({
         )}
 
         {klines.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
             <p className="text-xs text-gray-500">無Taker Ratio數據</p>
           </div>
         )}
@@ -290,6 +373,39 @@ export function TakerRatioChart({
           ref={chartContainerRef}
           className="w-full h-full"
         />
+        {(overlayRects.length > 0 || verticalLines.length > 0) && (
+          <div className="pointer-events-none absolute inset-0 z-10">
+            {overlayRects.map((overlay) => (
+              <div
+                key={`${overlay.type}-${overlay.left.toFixed(3)}`}
+                className="absolute inset-y-0"
+                style={{
+                  left: `${overlay.left}%`,
+                  width: `${overlay.width}%`,
+                  backgroundColor:
+                    overlay.type === 'near'
+                      ? 'rgba(79, 70, 229, 0.08)'
+                      : 'rgba(168, 85, 247, 0.08)',
+                }}
+              />
+            ))}
+            {verticalLines.map((line) => (
+              <div
+                key={`taker-${line.label}`}
+                className="absolute inset-y-0"
+                style={{
+                  left: `${line.left}%`,
+                  width: '1px',
+                  backgroundColor: line.color,
+                }}
+              >
+                <span className="absolute -top-1 -translate-x-1/2 rounded bg-slate-900 px-1 text-[10px] font-semibold text-white">
+                  {line.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

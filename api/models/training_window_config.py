@@ -12,6 +12,7 @@ Ultra Think 優化記錄:
 
 from typing import Dict, Any, List, Optional, Literal
 from pydantic import BaseModel, Field, validator
+import math
 from momentum.Indicators.types import DataSourceEnum
 
 
@@ -188,15 +189,15 @@ class SignalDensityRequest(BaseModel):
     @validator('positive_cases')
     def validate_positive_cases(cls, v):
         """驗證正例數量"""
-        if len(v) < 10:
-            raise ValueError("正例數量不足,建議至少10個")
+        if len(v) < 1:
+            raise ValueError("正例數量至少需要1個")
         return v
 
     @validator('negative_cases')
     def validate_negative_cases(cls, v):
         """驗證反例數量"""
-        if len(v) < 10:
-            raise ValueError("反例數量不足,建議至少10個")
+        if len(v) < 1:
+            raise ValueError("反例數量至少需要1個")
         return v
 
     class Config:
@@ -283,6 +284,16 @@ class SignalDensityResponse(BaseModel):
         ge=0.0,
         le=1.0
     )
+    positive_far_std: Optional[float] = Field(
+        None,
+        description="正例遠期密度標準差(雙密度模式)",
+        ge=0.0
+    )
+    negative_far_std: Optional[float] = Field(
+        None,
+        description="反例遠期密度標準差(雙密度模式)",
+        ge=0.0
+    )
     positive_near_far_ratio: Optional[float] = Field(
         None,
         description="正例near/far ratio平均值(雙密度模式)",
@@ -291,6 +302,16 @@ class SignalDensityResponse(BaseModel):
     negative_near_far_ratio: Optional[float] = Field(
         None,
         description="反例near/far ratio平均值(雙密度模式)",
+        ge=0.0
+    )
+    positive_ratio_std: Optional[float] = Field(
+        None,
+        description="正例near/far ratio標準差(雙密度模式)",
+        ge=0.0
+    )
+    negative_ratio_std: Optional[float] = Field(
+        None,
+        description="反例near/far ratio標準差(雙密度模式)",
         ge=0.0
     )
     ratio_separation: Optional[float] = Field(
@@ -309,6 +330,18 @@ class SignalDensityResponse(BaseModel):
         ...,
         description="Cohen's d效果量,>0.2小效果,>0.5中效果,>0.8大效果"
     )
+
+    @validator('p_value', pre=True)
+    def handle_nan_p_value(cls, v):
+        """
+        處理NaN p-value
+
+        當密度為0或統計檢驗無法執行時,可能產生NaN。
+        將NaN轉換為1.0(表示無顯著性差異)
+        """
+        if isinstance(v, float) and math.isnan(v):
+            return 1.0
+        return v
     stability_cv: float = Field(
         ...,
         description="穩定性係數(按月分組CV),<0.3穩定,<0.5可接受,>0.5不穩定",

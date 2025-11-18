@@ -40,12 +40,27 @@ export function NumberInput({
   };
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const parsed = Number(event.target.value);
-    if (Number.isNaN(parsed)) {
-      onChange(value);
+    const inputValue = event.target.value;
+
+    // Allow empty input (user is clearing the field)
+    if (inputValue === '') {
+      onChange(min ?? 0);
       return;
     }
-    onChange(clampValue(parsed));
+
+    const parsed = Number(inputValue);
+    if (Number.isNaN(parsed)) {
+      // Don't update if input is invalid (e.g., partial negative sign)
+      return;
+    }
+
+    // Don't clamp during typing - allow user to input freely
+    onChange(parsed);
+  };
+
+  const handleBlur = () => {
+    // Apply clamping only when user finishes editing
+    onChange(clampValue(value));
   };
 
   const handleStep = (direction: 'inc' | 'dec') => {
@@ -75,6 +90,7 @@ export function NumberInput({
             type="number"
             value={value}
             onChange={handleInputChange}
+            onBlur={handleBlur}
             min={min}
             max={max}
             step={step}
