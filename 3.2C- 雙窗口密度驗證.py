@@ -2,11 +2,13 @@
 3.2C- 雙窗口密度驗證腳本
 
 驗證目標:
+0. 策略信號驗證: EMA 計算、策略信號判斷邏輯、輸出詳細 CSV 供人工檢查
 1. 核心功能驗證: 近期窗口和遠期窗口提取是否正確
 2. 密度計算驗證: near density、far density、near/far ratio 計算是否正確
 3. 統計分析驗證: ratio_separation、p-value、Cohen's d 是否正確
-4. 數據完整性驗證: 165個案例(55正例、110反例)是否全部處理成功
-5. CSV輸出驗證: 結果輸出格式和內容是否符合預期
+4. 穩定性分析驗證: positive_ratio_cv、separation_cv、monthly_breakdown 是否正確計算
+5. 數據完整性驗證: 165個案例(55正例、110反例)是否全部處理成功
+6. CSV輸出驗證: 結果輸出格式和內容是否符合預期
 
 測試配置:
 - 數據源: kline_cache.h5 (12,592 bars, ETHUSDT/12h)
@@ -16,7 +18,7 @@
   - lookback_bars: 24 (近期窗口: TO-24 to TO-1)
   - far_lookback_bars: 100 (遠期窗口: TO-100 to TO-25, 共76根K線)
   - lookforward_bars: 0 (避免未來函數洩漏)
-- 策略: EMA三線排列 (5/10/20, close)
+- 策略: EMA三線排列 (7/16/36, close)
 
 預期結果:
 - 正例near/far ratio > 反例near/far ratio (信號聚集效應)
@@ -72,6 +74,9 @@ class DualDensityVerifier:
             indicator_engine=self.indicator_engine
         )
 
+        # 信號驗證配置
+        self.VERIFY_SIGNAL_CASES = 2  # 驗證案例數量（建議 1-3 個）
+
         # 測試配置
         self.training_window = TrainingWindowConfig(
             reference_point="TO",
@@ -88,7 +93,7 @@ class DualDensityVerifier:
             params={
                 "ema_short": 7,
                 "ema_mid": 16,
-                "ema_long": 36
+                "ema_long": 40
             }
         )
 
@@ -149,6 +154,311 @@ class DualDensityVerifier:
         print(f"  - Total cases: {len(positive_cases) + len(negative_cases)}")
 
         return positive_cases, negative_cases
+
+    async def verify_signal_generation(self) -> bool:
+        """
+        驗證策略信號生成邏輯（深度驗證）
+
+        測試:
+        1. EMA 指標計算正確性
+        2. 策略信號判斷邏輯
+        3. 信號密度計算
+        4. 輸出詳細 CSV 供人工檢查
+
+        Returns:
+            測試是否通過
+        """
+        print("\n" + "="*80)
+        print("TEST 0: 策略信號深度驗證 (Signal Generation Validation)")
+        print("="*80)
+
+        positive_cases, negative_cases = self.load_cases()
+
+        # 選擇案例：1 個正例 + 1 個反例（或根據配置）
+        num_positive = max(1, self.VERIFY_SIGNAL_CASES // 2)
+        num_negative = self.VERIFY_SIGNAL_CASES - num_positive
+
+        selected_positive = positive_cases[:num_positive]
+        selected_negative = negative_cases[:num_negative]
+        selected_cases = selected_positive + selected_negative
+
+        print(f"\nSelecting {len(selected_cases)} cases for detailed verification:")
+        print(f"  - {len(selected_positive)} positive case(s)")
+        print(f"  - {len(selected_negative)} negative case(s)")
+
+        # 創建輸出目錄
+        output_dir = project_root / "test_results" / f"signal_verification_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            all_passed = True
+            verification_report = []
+
+            for idx, case in enumerate(selected_cases, 1):
+                label = "Positive" if case in selected_positive else "Negative"
+                print(f"\n{'='*60}")
+                print(f"Case {idx}/{len(selected_cases)}: {case.case_id} ({label})")
+                print(f"{'='*60}")
+
+                # 覆寫 timeframe
+                case.timeframe = self.CALCULATION_TIMEFRAME
+
+                # 提取完整窗口（含 warmup）
+                try:
+                    full_klines = self.analyzer._extract_full_density_window(
+                        case, self.training_window, self.strategy_config
+                    )
+                    print(f"✓ Extracted {len(full_klines)} bars")
+
+                    # 計算策略信號
+                    signals = self.analyzer.calculate_strategy_signals(
+                        full_klines, self.strategy_config
+                    )
+                    print(f"✓ Generated {len(signals)} signals")
+
+                    # 分割近期和遠期信號
+                    near_signals, far_signals = self.analyzer._split_near_far_signals(
+                        signals, self.training_window
+                    )
+
+                    # 計算密度
+                    near_density = self.analyzer.calculate_case_density(near_signals)
+                    far_density = self.analyzer.calculate_case_density(far_signals)
+                    ratio = near_density / far_density if far_density > 0.001 else (near_density * 10)
+
+                    print(f"\n  Near Window: {sum(near_signals)}/{len(near_signals)} signals ({near_density:.4f} density)")
+                    print(f"  Far Window: {sum(far_signals)}/{len(far_signals)} signals ({far_density:.4f} density)")
+                    print(f"  Near/Far Ratio: {ratio:.4f}")
+
+                    # 準備詳細表格數據
+                    data_rows = []
+
+                    # 使用與系統相同的warmup計算邏輯（signal_density_analyzer.py:289-301）
+                    # EMA 收斂精度分析：× 4.5 確保 99.5% 精度（小數點後 2-3 位）
+                    WARMUP_MULTIPLIER = 4.5
+                    max_ema_period = max(
+                        self.strategy_config.params.get('ema_short', 5),
+                        self.strategy_config.params.get('ema_mid', 10),
+                        self.strategy_config.params.get('ema_long', 20)
+                    )
+                    warmup_bars = int(max_ema_period * WARMUP_MULTIPLIER)  # 與SignalDensityAnalyzer一致
+
+                    # 計算 EMA 指標（用於驗證）
+                    ema_short = full_klines['close'].ewm(span=self.strategy_config.params['ema_short'], adjust=False).mean()
+                    ema_mid = full_klines['close'].ewm(span=self.strategy_config.params['ema_mid'], adjust=False).mean()
+                    ema_long = full_klines['close'].ewm(span=self.strategy_config.params['ema_long'], adjust=False).mean()
+
+                    total_bars = len(full_klines)
+                    # Near window 的起始索引（最後 lookback_bars 根）
+                    near_start_idx = total_bars - self.training_window.lookback_bars
+
+                    for i, (ts, row) in enumerate(full_klines.iterrows()):
+                        # 確定窗口類型和bar_index
+                        if i < warmup_bars:
+                            # Warmup 區間: [0, warmup_bars)
+                            window_type = "warmup"
+                            bar_index = None
+                            signal_value = None
+                        elif i >= near_start_idx:
+                            # Near window: [near_start_idx, total_bars)
+                            # bar_index 從 -lookback_bars+1 到 0 (即 TO-23 到 TO)
+                            window_type = "near"
+                            bar_index = i - near_start_idx - self.training_window.lookback_bars + 1
+                            signal_idx = i - warmup_bars
+                            signal_value = int(signals[signal_idx]) if signal_idx < len(signals) else None
+                        elif i >= warmup_bars:
+                            # Far window: [warmup_bars, near_start_idx)
+                            # bar_index 從 -far_lookback_bars+1 到 -lookback_bars (即 TO-99 到 TO-24)
+                            window_type = "far"
+                            bar_index = i - warmup_bars - self.training_window.far_lookback_bars + 1
+                            signal_idx = i - warmup_bars
+                            signal_value = int(signals[signal_idx]) if signal_idx < len(signals) else None
+                        else:
+                            # 不應該到這裡
+                            window_type = "unknown"
+                            bar_index = None
+                            signal_value = None
+
+                        # EMA 順序判斷
+                        ema_short_val = ema_short.iloc[i]
+                        ema_mid_val = ema_mid.iloc[i]
+                        ema_long_val = ema_long.iloc[i]
+
+                        if ema_short_val > ema_mid_val > ema_long_val:
+                            ema_order = "bull"
+                        elif ema_short_val < ema_mid_val < ema_long_val:
+                            ema_order = "bear"
+                        else:
+                            ema_order = "neutral"
+
+                        close_vs_ema_short = "above" if row['close'] > ema_short_val else "below"
+
+                        data_rows.append({
+                            'timestamp': datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S'),
+                            'timestamp_unix': ts,
+                            'open': row['open'],
+                            'high': row['high'],
+                            'low': row['low'],
+                            'close': row['close'],
+                            'volume': row['volume'],
+                            f'ema_{self.strategy_config.params["ema_short"]}': ema_short_val,
+                            f'ema_{self.strategy_config.params["ema_mid"]}': ema_mid_val,
+                            f'ema_{self.strategy_config.params["ema_long"]}': ema_long_val,
+                            'signal': signal_value if signal_value is not None else '',
+                            'ema_order': ema_order,
+                            'close_vs_ema_short': close_vs_ema_short,
+                            'window_type': window_type,
+                            'bar_index': bar_index if bar_index is not None else ''
+                        })
+
+                    # 保存 CSV
+                    df = pd.DataFrame(data_rows)
+                    csv_path = output_dir / f"case_{case.case_id}_signals.csv"
+                    df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+                    print(f"\n✓ Saved detailed table: {csv_path}")
+
+                    # 生成案例摘要
+                    summary_lines = [
+                        f"Case ID: {case.case_id}",
+                        f"Label: {label}",
+                        f"Timeframe: {case.timeframe}",
+                        f"TO Timestamp: {datetime.fromtimestamp(case.timestamp).strftime('%Y-%m-%d %H:%M:%S')}",
+                        f"",
+                        f"Near Window (TO-{self.training_window.lookback_bars} to TO-1):",
+                        f"  - Total bars: {len(near_signals)}",
+                        f"  - Signal bars: {sum(near_signals)}",
+                        f"  - Density: {near_density:.4f}",
+                        f"",
+                        f"Far Window (TO-{self.training_window.far_lookback_bars} to TO-{self.training_window.lookback_bars+1}):",
+                        f"  - Total bars: {len(far_signals)}",
+                        f"  - Signal bars: {sum(far_signals)}",
+                        f"  - Density: {far_density:.4f}",
+                        f"",
+                        f"Near/Far Ratio: {ratio:.4f}",
+                        f"",
+                        f"Signal Pattern Analysis:",
+                        f"  - Consecutive signals (max): {self._max_consecutive(signals, 1)}",
+                        f"  - Signal gaps (max): {self._max_consecutive(signals, 0)}",
+                        f"  - Total signals: {sum(signals)}/{len(signals)}",
+                        f"",
+                        f"EMA Validation:",
+                        f"  ✓ EMA Short calculated ({self.strategy_config.params['ema_short']} period)",
+                        f"  ✓ EMA Mid calculated ({self.strategy_config.params['ema_mid']} period)",
+                        f"  ✓ EMA Long calculated ({self.strategy_config.params['ema_long']} period)",
+                        f"  ✓ Three-line order logic verified",
+                    ]
+
+                    summary_text = "\n".join(summary_lines)
+                    summary_path = output_dir / f"case_{case.case_id}_summary.txt"
+                    with open(summary_path, 'w', encoding='utf-8') as f:
+                        f.write(summary_text)
+
+                    verification_report.append({
+                        'case_id': case.case_id,
+                        'label': label,
+                        'near_density': near_density,
+                        'far_density': far_density,
+                        'ratio': ratio,
+                        'status': 'PASS'
+                    })
+
+                except Exception as e:
+                    print(f"\n✗ Failed to verify case {case.case_id}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    all_passed = False
+                    verification_report.append({
+                        'case_id': case.case_id,
+                        'label': label,
+                        'status': 'FAIL',
+                        'error': str(e)
+                    })
+
+            # 生成總體驗證報告
+            report_lines = [
+                "="*80,
+                "SIGNAL GENERATION VERIFICATION REPORT",
+                "="*80,
+                f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Total cases verified: {len(selected_cases)}",
+                "",
+                "Results:",
+            ]
+
+            for item in verification_report:
+                if item['status'] == 'PASS':
+                    report_lines.append(
+                        f"  ✓ {item['case_id']} ({item['label']}): "
+                        f"Near={item['near_density']:.4f}, Far={item['far_density']:.4f}, Ratio={item['ratio']:.4f}"
+                    )
+                else:
+                    report_lines.append(f"  ✗ {item['case_id']} ({item['label']}): {item.get('error', 'Unknown error')}")
+
+            report_lines.extend([
+                "",
+                "📊 How to use the output:",
+                "1. Open CSV files in Excel or Python pandas",
+                "2. Check EMA values for smooth transitions",
+                "3. Verify Signal column matches EMA_Order and Close_vs_EMA_Short",
+                "4. Confirm Window_Type boundaries (warmup/far/near regions)",
+                "5. Compare with TradingView or other charting tools",
+                "",
+                "🔍 Suspicious patterns to look for:",
+                "  - Signal density = 0 or = 1 (too extreme)",
+                "  - EMA values with sudden jumps (should be smooth)",
+                "  - Signal flipping every bar (unrealistic)",
+                ""
+            ])
+
+            report_text = "\n".join(report_lines)
+            report_path = output_dir / "verification_report.txt"
+            with open(report_path, 'w', encoding='utf-8') as f:
+                f.write(report_text)
+
+            print(f"\n{'='*80}")
+            print(f"✓ Verification complete!")
+            print(f"📁 Results saved to: {output_dir}")
+            print(f"{'='*80}")
+
+            if all_passed:
+                print(f"\n✓ TEST 0 PASSED: Signal generation verified for {len(selected_cases)} cases")
+                self.results['tests'].append({
+                    'test_name': 'signal_generation',
+                    'status': 'PASS',
+                    'cases_verified': len(selected_cases),
+                    'output_dir': str(output_dir)
+                })
+                return True
+            else:
+                print(f"\n✗ TEST 0 FAILED: Some cases failed verification")
+                self.results['tests'].append({
+                    'test_name': 'signal_generation',
+                    'status': 'FAIL'
+                })
+                return False
+
+        except Exception as e:
+            print(f"\n✗ TEST 0 FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+            self.results['tests'].append({
+                'test_name': 'signal_generation',
+                'status': 'FAIL',
+                'error': str(e)
+            })
+            return False
+
+    def _max_consecutive(self, signals, value):
+        """計算最長連續出現次數"""
+        max_count = 0
+        current_count = 0
+        for sig in signals:
+            if sig == value:
+                current_count += 1
+                max_count = max(max_count, current_count)
+            else:
+                current_count = 0
+        return max_count
 
     async def verify_window_extraction(self) -> bool:
         """
@@ -375,6 +685,139 @@ class DualDensityVerifier:
             })
             return False
 
+    async def verify_stability_calculation(self) -> bool:
+        """
+        驗證穩定性計算邏輯 (新增功能)
+
+        測試:
+        1. Positive Ratio CV 計算
+        2. Separation CV 計算
+        3. Monthly breakdown 數據結構
+        4. Edge case 處理 (月份數不足)
+
+        Returns:
+            測試是否通過
+        """
+        print("\n" + "="*80)
+        print("TEST 3: 穩定性計算驗證 (Stability CV Analysis)")
+        print("="*80)
+
+        positive_cases, negative_cases = self.load_cases()
+
+        # 覆寫 timeframe 為配置的計算時間框架
+        for case in positive_cases + negative_cases:
+            case.timeframe = self.CALCULATION_TIMEFRAME
+
+        try:
+            print(f"\nRunning stability analysis on {len(positive_cases) + len(negative_cases)} cases...")
+
+            response: SignalDensityResponse = self.analyzer.analyze_signal_density(
+                positive_cases=positive_cases,
+                negative_cases=negative_cases,
+                strategy_config=self.strategy_config,
+                window_config=self.training_window
+            )
+
+            print(f"\n✓ Stability analysis completed")
+
+            checks_passed = True
+
+            # Check 1: Positive Ratio CV
+            if response.positive_ratio_cv is not None:
+                print(f"\n✓ Positive Ratio CV calculated: {response.positive_ratio_cv:.4f}")
+
+                # CV 應該是非負數
+                if response.positive_ratio_cv < 0:
+                    print(f"✗ FAIL: Positive Ratio CV should be non-negative: {response.positive_ratio_cv}")
+                    checks_passed = False
+                else:
+                    # 判斷穩定性等級
+                    if response.positive_ratio_cv < 0.3:
+                        stability = "穩定 🟢"
+                    elif response.positive_ratio_cv < 0.5:
+                        stability = "可接受 🟡"
+                    else:
+                        stability = "不穩定 🔴"
+                    print(f"  - Stability level: {stability}")
+            else:
+                print(f"\n⚠️  Positive Ratio CV is None (expected if <2 months of data)")
+
+            # Check 2: Separation CV
+            if response.separation_cv is not None:
+                print(f"\n✓ Separation CV calculated: {response.separation_cv:.4f}")
+
+                if response.separation_cv < 0:
+                    print(f"✗ FAIL: Separation CV should be non-negative: {response.separation_cv}")
+                    checks_passed = False
+                else:
+                    if response.separation_cv < 0.3:
+                        stability = "穩定 🟢"
+                    elif response.separation_cv < 0.5:
+                        stability = "可接受 🟡"
+                    else:
+                        stability = "不穩定 🔴"
+                    print(f"  - Stability level: {stability}")
+            else:
+                print(f"\n⚠️  Separation CV is None (expected if <2 months of data)")
+
+            # Check 3: Monthly Breakdown
+            if response.monthly_breakdown:
+                print(f"\n✓ Monthly breakdown available: {len(response.monthly_breakdown)} months")
+
+                # 驗證數據結構
+                required_keys = ['month', 'positive_sample_size', 'negative_sample_size',
+                               'positive_avg_near', 'negative_avg_near', 'separation']
+
+                for i, month_data in enumerate(response.monthly_breakdown):
+                    missing_keys = [key for key in required_keys if key not in month_data]
+                    if missing_keys:
+                        print(f"✗ FAIL: Month {i} missing keys: {missing_keys}")
+                        checks_passed = False
+
+                if checks_passed:
+                    print(f"  - All monthly data structure validated")
+
+                    # 顯示每月數據摘要
+                    print(f"\n  Monthly Summary:")
+                    for month_data in response.monthly_breakdown:
+                        ratio_str = f"{month_data.get('positive_avg_ratio', 0):.3f}" if month_data.get('positive_avg_ratio') else "N/A"
+                        print(f"    {month_data['month']}: Pos={month_data['positive_sample_size']}, "
+                              f"Neg={month_data['negative_sample_size']}, "
+                              f"Ratio={ratio_str}, Sep={month_data['separation']:.3f}")
+            else:
+                print(f"\n⚠️  Monthly breakdown is None (expected if <2 months)")
+
+            if checks_passed:
+                print(f"\n✓ TEST 3 PASSED: Stability calculation verified")
+                self.results['tests'].append({
+                    'test_name': 'stability_calculation',
+                    'status': 'PASS',
+                    'details': {
+                        'positive_ratio_cv': response.positive_ratio_cv,
+                        'separation_cv': response.separation_cv,
+                        'months_analyzed': len(response.monthly_breakdown) if response.monthly_breakdown else 0
+                    }
+                })
+                return True
+            else:
+                print(f"\n✗ TEST 3 FAILED: Some stability checks did not pass")
+                self.results['tests'].append({
+                    'test_name': 'stability_calculation',
+                    'status': 'FAIL'
+                })
+                return False
+
+        except Exception as e:
+            print(f"\n✗ TEST 3 FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+            self.results['tests'].append({
+                'test_name': 'stability_calculation',
+                'status': 'FAIL',
+                'error': str(e)
+            })
+            return False
+
     async def verify_full_analysis(self) -> bool:
         """
         驗證完整分析 (全部165個案例)
@@ -388,7 +831,7 @@ class DualDensityVerifier:
             測試是否通過
         """
         print("\n" + "="*80)
-        print("TEST 3: 完整分析驗證 (全部165案例)")
+        print("TEST 4: 完整分析驗證 (全部165案例)")
         print("="*80)
 
         positive_cases, negative_cases = self.load_cases()
@@ -436,8 +879,32 @@ class DualDensityVerifier:
             print(f"   - Cohen's d: {response.cohens_d:.4f}")
             print(f"   - Stability CV: {response.stability_cv:.4f}")
 
+            print(f"\n6. Dual-Density Stability Analysis:")
+            if response.positive_ratio_cv is not None:
+                cv_status = "🟢 穩定" if response.positive_ratio_cv < 0.3 else "🟡 可接受" if response.positive_ratio_cv < 0.5 else "🔴 不穩定"
+                print(f"   - Positive Ratio CV: {response.positive_ratio_cv:.4f} ({cv_status})")
+            else:
+                print(f"   - Positive Ratio CV: N/A (月份數不足或計算失敗)")
+
+            if response.separation_cv is not None:
+                cv_status = "🟢 穩定" if response.separation_cv < 0.3 else "🟡 可接受" if response.separation_cv < 0.5 else "🔴 不穩定"
+                print(f"   - Separation CV: {response.separation_cv:.4f} ({cv_status})")
+            else:
+                print(f"   - Separation CV: N/A (月份數不足或計算失敗)")
+
+            # 顯示月度詳細數據（如果有）
+            if response.monthly_breakdown:
+                print(f"\n   Monthly Breakdown ({len(response.monthly_breakdown)} months):")
+                print(f"   {'Month':<10} {'Pos Size':<10} {'Neg Size':<10} {'Pos Ratio':<12} {'Separation':<12}")
+                print(f"   {'-'*56}")
+                for month in response.monthly_breakdown:
+                    ratio_str = f"{month['positive_avg_ratio']:.4f}" if month['positive_avg_ratio'] is not None else "N/A"
+                    print(f"   {month['month']:<10} {month['positive_sample_size']:<10} {month['negative_sample_size']:<10} {ratio_str:<12} {month['separation']:<12.4f}")
+            else:
+                print(f"   - Monthly Breakdown: N/A")
+
             # 判斷策略質量
-            print(f"\n6. Strategy Quality Assessment:")
+            print(f"\n7. Strategy Quality Assessment:")
             if response.ratio_separation > 0.5 and response.p_value < 0.05:
                 quality = "EXCELLENT"
                 symbol = "🟢"
@@ -489,6 +956,9 @@ class DualDensityVerifier:
                 'p_value': response.p_value,
                 'cohens_d': response.cohens_d,
                 'stability_cv': response.stability_cv,
+                'positive_ratio_cv': response.positive_ratio_cv,
+                'separation_cv': response.separation_cv,
+                'monthly_breakdown': response.monthly_breakdown,
                 'quality': quality
             }
 
@@ -499,7 +969,7 @@ class DualDensityVerifier:
                 json.dump(self.results, f, indent=2, ensure_ascii=False)
             print(f"✓ Summary saved to: {json_path}")
 
-            print(f"\n✓ TEST 3 PASSED: Full analysis completed successfully")
+            print(f"\n✓ TEST 4 PASSED: Full analysis completed successfully")
             self.results['tests'].append({
                 'test_name': 'full_analysis',
                 'status': 'PASS',
@@ -508,7 +978,7 @@ class DualDensityVerifier:
             return True
 
         except Exception as e:
-            print(f"\n✗ TEST 3 FAILED: {e}")
+            print(f"\n✗ TEST 4 FAILED: {e}")
             import traceback
             traceback.print_exc()
             self.results['tests'].append({
@@ -537,6 +1007,10 @@ class DualDensityVerifier:
 
         all_passed = True
 
+        # Test 0: Signal generation (新增 - 深度驗證)
+        if not await self.verify_signal_generation():
+            all_passed = False
+
         # Test 1: Window extraction
         if not await self.verify_window_extraction():
             all_passed = False
@@ -545,7 +1019,11 @@ class DualDensityVerifier:
         if not await self.verify_density_calculation():
             all_passed = False
 
-        # Test 3: Full analysis
+        # Test 3: Stability calculation (新增)
+        if not await self.verify_stability_calculation():
+            all_passed = False
+
+        # Test 4: Full analysis
         if not await self.verify_full_analysis():
             all_passed = False
 

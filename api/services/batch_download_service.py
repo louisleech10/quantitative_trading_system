@@ -240,7 +240,7 @@ class BatchDownloadService:
 
         async def download_group(symbol: str, group_cases: List[CaseRecord]):
             """下載單個分組（支援並行）"""
-            nonlocal downloaded_case_ids, failed_case_ids, error_details, skipped_cases, total_bars
+            nonlocal downloaded_case_ids, failed_case_ids, error_details, skipped_cases, total_bars, warmup_bars
 
             # 使用request.timeframe作為K線下載時間框架（與案例的timeframe獨立）
             timeframe = request.timeframe
@@ -375,6 +375,15 @@ class BatchDownloadService:
                                     f"   Requested: {time_range.start} to {time_range.end}\n"
                                     f"   Actual data: {actual_start} to {actual_end}\n"
                                     f"   Saved to HDF5: data_cache/{symbol}_{timeframe}.h5"
+                                )
+
+                                # 儲存批量下載使用的 warmup_bars 到 metadata（用於後續 warmup 驗證）
+                                self.kline_storage.update_metadata(
+                                    symbol=symbol,
+                                    timeframe=timeframe,
+                                    warmup_bars_downloaded=warmup_bars,
+                                    lookback_bars=request.lookback_bars,
+                                    forward_bars=request.forward_bars
                                 )
                             else:
                                 logger.warning(

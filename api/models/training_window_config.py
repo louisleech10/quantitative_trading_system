@@ -348,6 +348,22 @@ class SignalDensityResponse(BaseModel):
         ge=0.0
     )
 
+    # 雙密度穩定性指標 (當far_lookback_bars配置時有效)
+    positive_ratio_cv: Optional[float] = Field(
+        None,
+        description="正例 Near/Far Ratio 跨月穩定性係數,<0.3穩定,<0.5可接受",
+        ge=0.0
+    )
+    separation_cv: Optional[float] = Field(
+        None,
+        description="每月 Separation 跨月穩定性係數,<0.3穩定,<0.5可接受",
+        ge=0.0
+    )
+    monthly_breakdown: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="月度詳細數據,包含每月的樣本數、密度、ratio、separation等"
+    )
+
     # 詳細統計指標
     positive_std: float = Field(
         ...,

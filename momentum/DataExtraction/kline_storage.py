@@ -707,7 +707,8 @@ class KlineStorageManager:
     # ==================== 數據寫入 ====================
 
     def write_klines(self, symbol: str, timeframe: str, df: pd.DataFrame,
-                     data_source: str = "binance") -> bool:
+                     data_source: str = "binance",
+                     warmup_bars: Optional[int] = None) -> bool:
         """
         寫入K線數據（覆寫模式）- 帶有事務性保證和後寫驗證
 
@@ -814,6 +815,10 @@ class KlineStorageManager:
                     tf_group.attrs['is_complete'] = True
                     tf_group.attrs['data_checksum'] = data_checksum
                     tf_group.attrs['last_updated'] = datetime.now().isoformat()
+
+                    # 儲存批量下載時使用的 warmup_bars（用於後續驗證）
+                    if warmup_bars is not None:
+                        tf_group.attrs['warmup_bars_downloaded'] = warmup_bars
 
                     # 刪除備份（事務成功）
                     if old_dataset_backup_name and old_dataset_backup_name in tf_group:

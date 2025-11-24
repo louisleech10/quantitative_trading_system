@@ -67,6 +67,10 @@ interface DensityMetrics {
   cohens_d?: number;
   stability_cv?: number;
 
+  // 雙密度穩定性指標 (Dual density stability)
+  positive_ratio_cv?: number;
+  separation_cv?: number;
+
   // 樣本數 (Sample sizes)
   positive_sample_size?: number;
   negative_sample_size?: number;
@@ -387,112 +391,133 @@ export default function StrategyTestPage() {
       const chartData: ChartSignalResponse = await chartResponse.json();
 
       // Step 2: 載入真實案例並過濾出符合當前 symbol/timeframe 的案例
-      try {
-        const casesResponse = await fetch(`${API_BASE_URL}/api/v1/case/list`);
-        if (casesResponse.ok) {
-          const casesData = await casesResponse.json();
+      const casesResponse = await fetch(`${API_BASE_URL}/api/v1/case/list`);
+      if (casesResponse.ok) {
+        const casesData = await casesResponse.json();
 
-          // 過濾出符合當前測試配置的案例（相同 symbol 和 timeframe）
-          const positiveCases: string[] = [];
-          const negativeCases: string[] = [];
+        // 過濾出符合當前測試配置的案例（相同 symbol 和 timeframe）
+        const positiveCases: string[] = [];
+        const negativeCases: string[] = [];
 
-          if (casesData.cases && Array.isArray(casesData.cases)) {
-            casesData.cases.forEach((c: any) => {
-              // 只使用符合當前 symbol 的案例（忽略 timeframe 差異，因為後端會處理）
-              if (c.symbol === state.symbol) {
-                if (c.positive_case === 1) {
-                  positiveCases.push(c.case_id);
-                } else if (c.positive_case === 0) {
-                  negativeCases.push(c.case_id);
-                }
+        if (casesData.cases && Array.isArray(casesData.cases)) {
+          casesData.cases.forEach((c: any) => {
+            // 只使用符合當前 symbol 的案例（忽略 timeframe 差異，因為後端會處理）
+            if (c.symbol === state.symbol) {
+              if (c.positive_case === 1) {
+                positiveCases.push(c.case_id);
+              } else if (c.positive_case === 0) {
+                negativeCases.push(c.case_id);
               }
-            });
-          }
-
-          // Step 3: 如果有足夠的案例，呼叫 signal-analysis/density 取得密度統計
-          if (positiveCases.length > 0 && negativeCases.length > 0) {
-            const densityRequestBody = {
-              strategy_config: {
-                data_source: state.dataSources ?? "close",
-                indicator_type: state.indicatorType,
-                strategy_logic: state.strategyLogic,
-                params: state.indicatorParams,
-              },
-              training_window: state.windowConfig,
-              positive_cases: positiveCases,
-              negative_cases: negativeCases,
-            };
-
-            const densityResponse = await fetch(`${API_BASE_URL}/api/v1/signal-analysis/density`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(densityRequestBody),
-            });
-
-            if (densityResponse.ok) {
-              const densityData = await densityResponse.json();
-
-              // Store data for Boxplot chart
-              setCaseLevelDensities(densityData.case_level_densities || {});
-              setPositiveCaseIds(positiveCases);
-              setNegativeCaseIds(negativeCases);
-
-              // 合併密度數據到圖表結果中
-              chartData.metadata = {
-                ...chartData.metadata,
-                density_metrics: {
-                  // 近期密度
-                  positive_avg_density: densityData.positive_avg_density,
-                  negative_avg_density: densityData.negative_avg_density,
-
-                  // 遠期密度
-                  positive_far_avg_density: densityData.positive_far_avg_density,
-                  negative_far_avg_density: densityData.negative_far_avg_density,
-
-                  // 近遠比
-                  positive_near_far_ratio: densityData.positive_near_far_ratio,
-                  negative_near_far_ratio: densityData.negative_near_far_ratio,
-                  near_far_ratio: densityData.positive_near_far_ratio, // Legacy compatibility
-
-                  // 標準差
-                  positive_std: densityData.positive_std,
-                  negative_std: densityData.negative_std,
-                  positive_far_std: densityData.positive_far_std,
-                  negative_far_std: densityData.negative_far_std,
-                  positive_ratio_std: densityData.positive_ratio_std,
-                  negative_ratio_std: densityData.negative_ratio_std,
-
-                  // 分離度指標
-                  separation: densityData.separation,
-                  ratio_separation: densityData.ratio_separation,
-
-                  // 統計檢驗
-                  p_value: densityData.p_value,
-                  cohens_d: densityData.cohens_d,
-                  stability_cv: densityData.stability_cv,
-
-                  // 樣本數
-                  positive_sample_size: densityData.positive_sample_size,
-                  negative_sample_size: densityData.negative_sample_size,
-                },
-                quality: {
-                  total_cases: densityData.positive_sample_size + densityData.negative_sample_size,
-                  positive_cases: densityData.positive_sample_size,
-                  negative_cases: densityData.negative_sample_size,
-                  success_rate: densityData.positive_sample_size / (densityData.positive_sample_size + densityData.negative_sample_size),
-                },
-              };
-            } else {
-              const errorText = await densityResponse.text();
-              console.warn("密度分析API呼叫失敗，但圖表數據正常", errorText);
             }
-          } else {
-            console.warn(`符合 ${state.symbol} 的案例數量不足：正例${positiveCases.length}個，反例${negativeCases.length}個`);
-          }
+          });
         }
-      } catch (densityError) {
-        console.warn("密度分析計算失敗，但圖表數據正常", densityError);
+
+        // Step 3: 如果有足夠的案例，呼叫 signal-analysis/density 取得密度統計
+        if (positiveCases.length > 0 && negativeCases.length > 0) {
+          const densityRequestBody = {
+            strategy_config: {
+              data_source: state.dataSources ?? "close",
+              indicator_type: state.indicatorType,
+              strategy_logic: state.strategyLogic,
+              params: state.indicatorParams,
+            },
+            training_window: state.windowConfig,
+            positive_cases: positiveCases,
+            negative_cases: negativeCases,
+          };
+
+          const densityResponse = await fetch(`${API_BASE_URL}/api/v1/signal-analysis/density`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(densityRequestBody),
+          });
+
+          if (densityResponse.ok) {
+            const densityData = await densityResponse.json();
+
+            // Debug: Log stability CV values
+            console.log("Density API Response - Stability CVs:", {
+              positive_ratio_cv: densityData.positive_ratio_cv,
+              separation_cv: densityData.separation_cv,
+            });
+
+            // Store data for Boxplot chart
+            setCaseLevelDensities(densityData.case_level_densities || {});
+            setPositiveCaseIds(positiveCases);
+            setNegativeCaseIds(negativeCases);
+
+            // 合併密度數據到圖表結果中
+            chartData.metadata = {
+              ...chartData.metadata,
+              density_metrics: {
+                // 近期密度
+                positive_avg_density: densityData.positive_avg_density,
+                negative_avg_density: densityData.negative_avg_density,
+
+                // 遠期密度
+                positive_far_avg_density: densityData.positive_far_avg_density,
+                negative_far_avg_density: densityData.negative_far_avg_density,
+
+                // 近遠比
+                positive_near_far_ratio: densityData.positive_near_far_ratio,
+                negative_near_far_ratio: densityData.negative_near_far_ratio,
+                near_far_ratio: densityData.positive_near_far_ratio, // Legacy compatibility
+
+                // 標準差
+                positive_std: densityData.positive_std,
+                negative_std: densityData.negative_std,
+                positive_far_std: densityData.positive_far_std,
+                negative_far_std: densityData.negative_far_std,
+                positive_ratio_std: densityData.positive_ratio_std,
+                negative_ratio_std: densityData.negative_ratio_std,
+
+                // 分離度指標
+                separation: densityData.separation,
+                ratio_separation: densityData.ratio_separation,
+
+                // 統計檢驗
+                p_value: densityData.p_value,
+                cohens_d: densityData.cohens_d,
+                stability_cv: densityData.stability_cv,
+
+                // 雙密度穩定性指標
+                positive_ratio_cv: densityData.positive_ratio_cv,
+                separation_cv: densityData.separation_cv,
+
+                // 樣本數
+                positive_sample_size: densityData.positive_sample_size,
+                negative_sample_size: densityData.negative_sample_size,
+              },
+              quality: {
+                total_cases: densityData.positive_sample_size + densityData.negative_sample_size,
+                positive_cases: densityData.positive_sample_size,
+                negative_cases: densityData.negative_sample_size,
+                success_rate: densityData.positive_sample_size / (densityData.positive_sample_size + densityData.negative_sample_size),
+              },
+            };
+          } else {
+            // ❌ 密度分析失敗時應立即中斷執行，並顯示錯誤給使用者
+            let message = "密度分析失敗";
+            const errorText = await densityResponse.text().catch(() => "");
+
+            try {
+              const errorData = JSON.parse(errorText || "{}");
+              message =
+                errorData.error?.message ||
+                errorData.detail ||
+                errorData.message ||
+                message;
+            } catch {
+              message = errorText || message;
+            }
+
+            throw new Error(message);  // 中斷執行並傳播錯誤
+          }
+        } else {
+          console.warn(`符合 ${state.symbol} 的案例數量不足：正例${positiveCases.length}個，反例${negativeCases.length}個`);
+        }
       }
+      // ✅ 內層 try-catch 已移除，讓所有錯誤向上傳播到主 catch 處理（第 522 行）
 
       setTestResult(chartData);
       toast.success("測試完成");
@@ -951,6 +976,22 @@ export default function StrategyTestPage() {
                     label="Stability CV"
                     value={densityMetrics.stability_cv}
                     helper="穩定性係數 (<0.3穩定, <0.5可接受)"
+                    format="decimal"
+                  />
+                )}
+                {densityMetrics?.positive_ratio_cv !== undefined && (
+                  <StatMetricCard
+                    label="正例 Ratio 穩定性"
+                    value={densityMetrics.positive_ratio_cv}
+                    helper="正例 Near/Far Ratio 跨月穩定性 (<0.3穩定, <0.5可接受)"
+                    format="decimal"
+                  />
+                )}
+                {densityMetrics?.separation_cv !== undefined && (
+                  <StatMetricCard
+                    label="Separation 穩定性"
+                    value={densityMetrics.separation_cv}
+                    helper="每月分離度穩定性 (<0.3穩定, <0.5可接受)"
                     format="decimal"
                   />
                 )}

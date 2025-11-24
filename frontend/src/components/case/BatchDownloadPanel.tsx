@@ -109,7 +109,8 @@ export default function BatchDownloadPanel({
         },
         body: JSON.stringify({
           case_ids: null, // 下載全部案例
-          lookback_bars: totalLookbackBars, // 傳加總後的值
+          lookback_bars: lookbackBars, // 傳送真正的 lookback（不含 warmup）
+          warmup_bars: warmupBars, // 明確傳送 warmup_bars
           forward_bars: forwardBars,
           force_redownload: false,
           timeframe: downloadTimeframe, // 新增：K線下載時間框架
@@ -184,7 +185,7 @@ export default function BatchDownloadPanel({
             placeholder="150"
           />
           <p className="text-xs text-gray-500 mt-1 font-medium">
-            建議：最長EMA週期×3 (例如：EMA50 → 150)
+            建議：最長EMA週期×4.5 (例如：EMA50 → 225)
           </p>
         </div>
 

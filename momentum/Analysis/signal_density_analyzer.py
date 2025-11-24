@@ -250,7 +250,7 @@ class SignalDensityAnalyzer:
 
         Warmup計算:
         - 從strategy_config.params中獲取最大EMA週期
-        - warmup = max_ema_period * 3 (經驗法則)
+        - warmup = max_ema_period * 4.5 (確保 99.5% 精度)
 
         Args:
             case: 案例記錄
@@ -264,8 +264,8 @@ class SignalDensityAnalyzer:
             ValueError: 當far_lookback_bars未配置或K線數據不足時
 
         Example:
-            若 far_lookback_bars=100, ema_long=35
-            則 warmup=105, 讀取範圍=205根 (TO-205 到 TO-1)
+            若 far_lookback_bars=100, ema_long=36
+            則 warmup=162, 讀取範圍=262根 (TO-262 到 TO-1)
         """
         if window_config.far_lookback_bars is None:
             raise ValueError("未配置far_lookback_bars,無法提取完整密度窗口")
@@ -286,17 +286,45 @@ class SignalDensityAnalyzer:
         else:
             raise ValueError(f"未知的reference_point: {window_config.reference_point}")
 
-        # 計算warmup: 取最大EMA週期的3倍
+        # 計算warmup: 取最大EMA週期的4.5倍
+        # EMA 收斂精度分析：
+        # - × 3.0: ~95-99% 精度（小數點後 1-2 位）
+        # - × 4.5: ~99.5% 精度（小數點後 2-3 位）- 推薦
+        # 測試數據（EMA36）：147 根（× 4.1）達到小數點後 2 位精確匹配
+        WARMUP_MULTIPLIER = 4.5
         params = strategy_config.params
         max_ema_period = max(
             params.get("ema_short", 0),
             params.get("ema_mid", 0),
             params.get("ema_long", 0)
         )
-        warmup_bars = max_ema_period * 3
+        warmup_bars = int(max_ema_period * WARMUP_MULTIPLIER)
 
         # 完整讀取範圍: far_lookback + warmup
         total_lookback = window_config.far_lookback_bars + warmup_bars
+
+        # 從 metadata 讀取批量下載時實際使用的 warmup_bars，並與計算需求比較
+        metadata = self.storage.get_metadata(case.symbol, case.timeframe)
+        actual_warmup_downloaded = metadata.get('warmup_bars_downloaded') if metadata else None
+
+        if actual_warmup_downloaded is not None:
+            # 比較計算需求 vs 實際下載的 warmup
+            if warmup_bars > actual_warmup_downloaded:
+                raise ValueError(
+                    f"❌ Warmup 數據不足: 策略需要 {warmup_bars} 根 warmup（EMA{max_ema_period} × {WARMUP_MULTIPLIER}），\n"
+                    f"   但批量下載時只設置了 {actual_warmup_downloaded} 根 warmup。\n"
+                    f"   請在批量下載時設置 warmup_bars >= {warmup_bars}，然後重新下載K線數據。"
+                )
+            self.logger.debug(
+                f"Warmup 驗證通過: 需要 {warmup_bars} 根，實際下載 {actual_warmup_downloaded} 根"
+            )
+        else:
+            # 舊版 HDF5 檔案沒有 warmup_bars_downloaded metadata，記錄警告但繼續執行
+            # 後續會由 Line 339 的動態檢查來驗證資料是否足夠
+            self.logger.warning(
+                f"⚠️  未找到 warmup_bars_downloaded metadata for {case.symbol}/{case.timeframe}，\n"
+                f"   這可能是舊版批量下載的資料。將依靠動態資料檢查來驗證 warmup 充足性。"
+            )
 
         try:
             klines = self.storage.read_klines_around_timestamp(
@@ -319,6 +347,14 @@ class SignalDensityAnalyzer:
             raise ValueError(
                 f"未找到完整密度窗口K線數據: case_id={case.case_id}, "
                 f"symbol={case.symbol}, timeframe={case.timeframe}"
+            )
+
+        # 實際讀取後驗證數據充足性
+        if len(klines) < total_lookback:
+            raise ValueError(
+                f"K線數據不足: 需要 {total_lookback} 根（far_lookback={window_config.far_lookback_bars} + warmup={warmup_bars}），\n"
+                f"實際只有 {len(klines)} 根，缺少 {total_lookback - len(klines)} 根。\n"
+                f"請重新批量下載，設置 warmup_bars >= {warmup_bars}。"
             )
 
         # 移除TO所在K線
@@ -677,6 +713,174 @@ class SignalDensityAnalyzer:
         cv = std / mean
         return float(cv)
 
+    def calculate_dual_density_stability(
+        self,
+        positive_cases: List[Dict[str, Any]],
+        negative_cases: List[Dict[str, Any]],
+        case_level_near_densities: Dict[str, float],
+        case_level_far_densities: Dict[str, float]
+    ) -> Tuple[Optional[float], Optional[float], Optional[List[Dict[str, Any]]]]:
+        """
+        計算雙窗口密度穩定性分析
+
+        Args:
+            positive_cases: 正例案例列表
+            negative_cases: 反例案例列表
+            case_level_near_densities: 近期密度字典 (case_id -> density)
+            case_level_far_densities: 遠期密度字典 (case_id -> density)
+
+        Returns:
+            Tuple of (positive_ratio_cv, separation_cv, monthly_breakdown):
+                - positive_ratio_cv: 正例 Near/Far Ratio 的跨月變異係數
+                - separation_cv: 每月 Separation 的跨月變異係數
+                - monthly_breakdown: 月度詳細數據列表
+
+        Note:
+            - 當月份數 < 2 時, CV 返回 None
+            - 當 mean = 0 時, CV 返回 None
+            - Separation 允許負值, CV 使用絕對值計算
+        """
+        # 按月份分組
+        monthly_data = {}
+
+        # 處理正例
+        for case in positive_cases:
+            if case.case_id not in case_level_near_densities:
+                continue
+            if case.case_id not in case_level_far_densities:
+                continue
+
+            # 轉換timestamp為年月
+            dt = datetime.fromtimestamp(case.timestamp)
+            month_key = f"{dt.year}-{dt.month:02d}"
+
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {
+                    "positive_near": [],
+                    "positive_far": [],
+                    "negative_near": [],
+                    "negative_far": []
+                }
+
+            near_density = case_level_near_densities[case.case_id]
+            far_density = case_level_far_densities[case.case_id]
+
+            monthly_data[month_key]["positive_near"].append(near_density)
+            monthly_data[month_key]["positive_far"].append(far_density)
+
+        # 處理反例
+        for case in negative_cases:
+            if case.case_id not in case_level_near_densities:
+                continue
+            if case.case_id not in case_level_far_densities:
+                continue
+
+            dt = datetime.fromtimestamp(case.timestamp)
+            month_key = f"{dt.year}-{dt.month:02d}"
+
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {
+                    "positive_near": [],
+                    "positive_far": [],
+                    "negative_near": [],
+                    "negative_far": []
+                }
+
+            near_density = case_level_near_densities[case.case_id]
+            far_density = case_level_far_densities[case.case_id]
+
+            monthly_data[month_key]["negative_near"].append(near_density)
+            monthly_data[month_key]["negative_far"].append(far_density)
+
+        # 檢查樣本數量
+        if len(monthly_data) < 2:
+            self.logger.warning(
+                f"月份數不足: 需要至少2個月,實際{len(monthly_data)}個月"
+            )
+            return None, None, None
+
+        # 計算每月統計指標
+        monthly_breakdown = []
+        monthly_positive_ratios = []
+        monthly_separations = []
+
+        for month_key in sorted(monthly_data.keys()):
+            data = monthly_data[month_key]
+
+            # 計算正例 Near/Far Ratio
+            positive_ratios = []
+            if len(data["positive_near"]) > 0 and len(data["positive_far"]) > 0:
+                for i in range(len(data["positive_near"])):
+                    near = data["positive_near"][i]
+                    far = data["positive_far"][i]
+                    # 避免除以0
+                    if far > 0.001:
+                        ratio = near / far
+                    else:
+                        ratio = min(near * 10, 5.0)
+                    positive_ratios.append(ratio)
+
+            # 計算該月的平均比率
+            if len(positive_ratios) > 0:
+                monthly_avg_ratio = float(np.mean(positive_ratios))
+                monthly_positive_ratios.append(monthly_avg_ratio)
+            else:
+                monthly_avg_ratio = None
+
+            # 計算該月的 Separation (正例平均 - 反例平均)
+            positive_avg_near = float(np.mean(data["positive_near"])) if len(data["positive_near"]) > 0 else 0.0
+            negative_avg_near = float(np.mean(data["negative_near"])) if len(data["negative_near"]) > 0 else 0.0
+            monthly_separation = positive_avg_near - negative_avg_near
+            monthly_separations.append(monthly_separation)
+
+            # 構建月度詳細數據
+            breakdown_entry = {
+                "month": month_key,
+                "positive_sample_size": len(data["positive_near"]),
+                "negative_sample_size": len(data["negative_near"]),
+                "positive_avg_near": positive_avg_near,
+                "negative_avg_near": negative_avg_near,
+                "positive_avg_ratio": monthly_avg_ratio,
+                "separation": monthly_separation
+            }
+            monthly_breakdown.append(breakdown_entry)
+
+        # 計算 Positive Ratio CV
+        positive_ratio_cv = None
+        if len(monthly_positive_ratios) >= 2:
+            mean_ratio = np.mean(monthly_positive_ratios)
+            std_ratio = np.std(monthly_positive_ratios, ddof=1)
+
+            if mean_ratio != 0:
+                positive_ratio_cv = float(std_ratio / mean_ratio)
+            else:
+                self.logger.warning("正例 Ratio 平均值為0, 無法計算 CV")
+
+        # 計算 Separation CV
+        separation_cv = None
+        if len(monthly_separations) >= 2:
+            mean_sep = np.mean(monthly_separations)
+            std_sep = np.std(monthly_separations, ddof=1)
+
+            # 使用絕對值計算 CV (允許 separation 為負)
+            if abs(mean_sep) > 0.001:
+                separation_cv = float(std_sep / abs(mean_sep))
+            else:
+                self.logger.warning("Separation 平均值接近0, 無法計算 CV")
+
+        # Format CV values for logging
+        ratio_cv_str = f"{positive_ratio_cv:.3f}" if positive_ratio_cv is not None else "N/A"
+        sep_cv_str = f"{separation_cv:.3f}" if separation_cv is not None else "N/A"
+
+        self.logger.info(
+            f"雙密度穩定性分析完成:\n"
+            f"  月份數: {len(monthly_data)}\n"
+            f"  正例 Ratio CV: {ratio_cv_str}\n"
+            f"  Separation CV: {sep_cv_str}"
+        )
+
+        return positive_ratio_cv, separation_cv, monthly_breakdown
+
     def analyze_signal_density(
         self,
         positive_cases: List[Dict[str, Any]],
@@ -732,8 +936,6 @@ class SignalDensityAnalyzer:
         case_level_near_densities = {}
         case_level_far_densities = {}
 
-        failed_cases = []
-
         # 處理正例
         for i, case in enumerate(positive_cases, 1):
             try:
@@ -774,12 +976,12 @@ class SignalDensityAnalyzer:
                     self.logger.info(f"正例進度: {i}/{len(positive_cases)}")
 
             except Exception as e:
-                self.logger.warning(
+                self.logger.error(
                     f"計算正例密度失敗: case_id={case.case_id}, error={e}",
                     exc_info=True
                 )
-                failed_cases.append(case.case_id)
-                continue
+                # 不再靜默吞噬錯誤，立即向上傳播以中斷執行
+                raise
 
         # 處理反例
         for i, case in enumerate(negative_cases, 1):
@@ -821,12 +1023,12 @@ class SignalDensityAnalyzer:
                     self.logger.info(f"反例進度: {i}/{len(negative_cases)}")
 
             except Exception as e:
-                self.logger.warning(
+                self.logger.error(
                     f"計算反例密度失敗: case_id={case.case_id}, error={e}",
                     exc_info=True
                 )
-                failed_cases.append(case.case_id)
-                continue
+                # 不再靜默吞噬錯誤，立即向上傳播以中斷執行
+                raise
 
         # 驗證樣本數量
         if len(positive_densities) < 1:
@@ -837,11 +1039,6 @@ class SignalDensityAnalyzer:
         if len(negative_densities) < 1:
             raise ValueError(
                 f"反例有效樣本不足: 需要至少1個,實際{len(negative_densities)}個"
-            )
-
-        if len(failed_cases) > 0:
-            self.logger.warning(
-                f"共有{len(failed_cases)}個案例計算失敗,已跳過"
             )
 
         # 2. 計算統計指標
@@ -920,6 +1117,26 @@ class SignalDensityAnalyzer:
                 f"  ratio_separation: {ratio_separation:.3f}"
             )
 
+            # 計算雙密度穩定性分析
+            self.logger.info(
+                f"準備計算穩定性: positive={len(positive_cases)}, negative={len(negative_cases)}, "
+                f"near_dict_size={len(case_level_near_densities)}, far_dict_size={len(case_level_far_densities)}"
+            )
+            positive_ratio_cv, separation_cv_value, monthly_breakdown = self.calculate_dual_density_stability(
+                positive_cases=positive_cases,
+                negative_cases=negative_cases,
+                case_level_near_densities=case_level_near_densities,
+                case_level_far_densities=case_level_far_densities
+            )
+
+            # 添加穩定性分析結果到雙密度響應
+            if positive_ratio_cv is not None:
+                dual_density_result["positive_ratio_cv"] = positive_ratio_cv
+            if separation_cv_value is not None:
+                dual_density_result["separation_cv"] = separation_cv_value
+            if monthly_breakdown is not None:
+                dual_density_result["monthly_breakdown"] = monthly_breakdown
+
         # 3. 返回結果
         result = SignalDensityResponse(
             positive_avg_density=positive_stats["mean"],
@@ -941,8 +1158,7 @@ class SignalDensityAnalyzer:
             f"信號密度分析完成:\n"
             f"  正例: mean={positive_stats['mean']:.4f}, std={positive_stats['std']:.4f}, n={len(positive_densities)}\n"
             f"  反例: mean={negative_stats['mean']:.4f}, std={negative_stats['std']:.4f}, n={len(negative_densities)}\n"
-            f"  separation={separation:.4f}, p_value={p_value:.6f}, cohens_d={cohens_d:.2f}, cv={stability_cv:.3f}\n"
-            f"  失敗案例數: {len(failed_cases)}"
+            f"  separation={separation:.4f}, p_value={p_value:.6f}, cohens_d={cohens_d:.2f}, cv={stability_cv:.3f}"
         )
 
         # 判斷策略質量並記錄
