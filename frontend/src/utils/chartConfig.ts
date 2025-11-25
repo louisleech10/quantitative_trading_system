@@ -57,18 +57,55 @@ export const defaultChartOptions: DeepPartial<ChartOptions> = {
     horzLines: { color: chartColors.gridColor },
   },
   crosshair: {
-    mode: 1, // CrosshairMode.Normal
+    mode: 0, // CrosshairMode.Magnet - 自動吸附到最近的數據點
+    vertLine: {
+      visible: true,
+      labelVisible: true,
+    },
+    horzLine: {
+      visible: true,
+      labelVisible: true,
+    },
   },
   rightPriceScale: {
     borderColor: chartColors.gridColor,
+    autoScale: true,
   },
   timeScale: {
     borderColor: chartColors.gridColor,
     timeVisible: true,
     secondsVisible: false,
+    // 啟用時間軸的拖曳和縮放
+    rightOffset: 5,
+    barSpacing: 6,
+    minBarSpacing: 1,
+    fixLeftEdge: false,
+    fixRightEdge: false,
+    lockVisibleTimeRangeOnResize: false,
+    rightBarStaysOnScroll: false,
+    shiftVisibleRangeOnNewBar: false,
   },
-  // 響應式設置
-  autoSize: true,
+  // 啟用滑鼠互動
+  handleScroll: {
+    mouseWheel: true,
+    pressedMouseMove: true,
+    horzTouchDrag: true,
+    vertTouchDrag: true,
+  },
+  handleScale: {
+    axisPressedMouseMove: {
+      time: true,
+      price: true,
+    },
+    axisDoubleClickReset: {
+      time: true,
+      price: true,
+    },
+    mouseWheel: true,
+    pinch: true,
+  },
+  // 不使用 autoSize，避免覆蓋尺寸
+  autoSize: false,
 };
 
 /**
@@ -89,11 +126,20 @@ export const darkChartOptions: DeepPartial<ChartOptions> = {
   },
   rightPriceScale: {
     borderColor: darkChartColors.gridColor,
+    autoScale: true,
   },
   timeScale: {
     borderColor: darkChartColors.gridColor,
     timeVisible: true,
     secondsVisible: false,
+    rightOffset: 5,
+    barSpacing: 6,
+    minBarSpacing: 1,
+    fixLeftEdge: false,
+    fixRightEdge: false,
+    lockVisibleTimeRangeOnResize: false,
+    rightBarStaysOnScroll: false,
+    shiftVisibleRangeOnNewBar: false,
   },
 };
 

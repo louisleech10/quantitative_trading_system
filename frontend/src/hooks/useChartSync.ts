@@ -73,7 +73,7 @@ export function useChartSync({
   // Refs
   const isApplyingExternalUpdateRef = useRef(false);
   const lastRangeRef = useRef<TimeRange | null>(null);
-  const lockTimeoutRef = useRef<NodeJS.Timeout | null>(null); // 追蹤鎖釋放的 timeout
+  const lockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
    * 訂閱時間範圍變化（從其他圖表同步過來）
@@ -102,24 +102,9 @@ export function useChartSync({
       try {
         // 檢查是否為重置信號（特殊標記）
         if (range.from === -999999 && range.to === -999999) {
-          // 重置到 TO 中心
-          if (toTimestamp) {
-            const timeScale = chartInstance.timeScale();
-            const coordinate = timeScale.timeToCoordinate(toTimestamp as any);
-            
-            if (coordinate !== null) {
-              const logicalIndex = timeScale.coordinateToLogical(coordinate);
-              
-              if (logicalIndex !== null) {
-                const halfRange = 50;
-                timeScale.setVisibleLogicalRange({
-                  from: logicalIndex - halfRange,
-                  to: logicalIndex + halfRange
-                });
-                if (debug) console.log(`[useChartSync:${chartId}] Reset to TO center (logical)`, logicalIndex);
-              }
-            }
-          }
+          // 使用 fitContent 重置所有圖表
+          chartInstance.timeScale().fitContent();
+          if (debug) console.log(`[useChartSync:${chartId}] Reset via fitContent`);
         } else {
           // 使用邏輯範圍同步（關鍵修復）
           const currentRange = timeScale.getVisibleLogicalRange();
@@ -144,21 +129,14 @@ export function useChartSync({
       } catch (err) {
         console.error(`[useChartSync:${chartId}] Failed to apply logical range:`, err);
       } finally {
-        // 釋放鎖（使用 ref 追蹤 timeout）
-        lockTimeoutRef.current = setTimeout(() => {
-          isApplyingExternalUpdateRef.current = false;
-          lockTimeoutRef.current = null;
-          if (debug) console.log(`[useChartSync:${chartId}] Lock released`);
-        }, 30);
+        // 立即釋放鎖（不使用 timeout，讓滾輪縮放更即時）
+        isApplyingExternalUpdateRef.current = false;
+        if (debug) console.log(`[useChartSync:${chartId}] Lock released immediately`);
       }
     });
 
-    // Cleanup：清除 timeout 和訂閱
+    // Cleanup：取消訂閱
     return () => {
-      if (lockTimeoutRef.current) {
-        clearTimeout(lockTimeoutRef.current);
-        lockTimeoutRef.current = null;
-      }
       unsubscribe();
     };
   }, [chartInstance, isReady, enableSync, chartId, subscribeVisibleRangeChange, toTimestamp, debug]);
@@ -276,14 +254,19 @@ export function useChartSync({
    * 重置到 TO 中心
    */
   const resetToCenter = useCallback(() => {
-    if (!toTimestamp) {
-      console.warn(`[useChartSync:${chartId}] Cannot reset: toTimestamp not provided`);
+    if (!chartInstance || !isReady) {
+      console.warn(`[useChartSync:${chartId}] Cannot reset: chart not ready`);
       return;
     }
 
-    if (debug) console.log(`[useChartSync:${chartId}] Resetting to TO center`, toTimestamp);
-    contextResetToCenter(toTimestamp);
-  }, [toTimestamp, chartId, contextResetToCenter, debug]);
+    if (debug) console.log(`[useChartSync:${chartId}] Resetting to fit all content`);
+    
+    // 直接使用 fitContent 重置所有圖表
+    chartInstance.timeScale().fitContent();
+    
+    // 廣播重置信號給其他圖表
+    contextResetToCenter(toTimestamp || 0);
+  }, [chartInstance, isReady, toTimestamp, chartId, contextResetToCenter, debug]);
 
   /**
    * 實現雙擊重置功能

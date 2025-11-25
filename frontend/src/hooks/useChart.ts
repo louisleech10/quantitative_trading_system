@@ -75,23 +75,27 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  
+  // 使用 ref 緩存 chartOptions，避免引用變化導致重新創建圖表
+  const chartOptionsRef = useRef(options?.chartOptions);
 
   const [isReady, setIsReady] = useState(false);
 
+  // 只在首次掛載時創建圖表，不因 options 變化而重新創建
   useEffect(() => {
     // 確保容器存在
     if (!chartContainerRef.current) {
       return;
     }
 
-    // 合併圖表選項
-    const chartOptions: DeepPartial<ChartOptions> = {
+    // 合併圖表選項（使用緩存的選項）
+    const mergedOptions: DeepPartial<ChartOptions> = {
       ...defaultChartOptions,
-      ...options?.chartOptions,
+      ...chartOptionsRef.current,
     };
 
     // 創建圖表實例
-    const chart = createChart(chartContainerRef.current, chartOptions);
+    const chart = createChart(chartContainerRef.current, mergedOptions);
     chartInstanceRef.current = chart;
 
     // 標記為已準備
@@ -131,7 +135,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
 
       setIsReady(false);
     };
-  }, [options?.chartOptions]); // 當chartOptions變化時重新創建圖表
+  }, []); // 移除 options?.chartOptions 依賴，只在首次掛載時創建圖表
 
   return {
     chartContainerRef,

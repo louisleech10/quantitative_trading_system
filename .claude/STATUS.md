@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-11-23 03:00
-**當前階段**: Phase 3.2 Warmup 驗證系統完善
+**最後更新**: 2025-11-25 21:00
+**當前階段**: Phase 3.2 圖表同步與十字線優化
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,12 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **圖表同步與 Y 軸縮放優化** (100%) - 2025-11-25完成
+  - ✅ 修復回調函數導致的 useEffect 重複執行問題
+  - ✅ 使用 useCallback 包裝 handleSignalHover/handleSignalClick
+  - ✅ 使用 ref 存儲回調函數避免依賴變化
+  - ✅ 添加貫穿三圖表的十字虛線（容器層級）
+  - ✅ 分離 Y 軸縮放控制為獨立 useEffect
 - **Phase 3.2 Warmup 驗證系統與錯誤處理** (100%) - 2025-11-23完成
   - ✅ Warmup 追蹤：HDF5 metadata 儲存 `warmup_bars_downloaded`，動態比對計算需求 vs 實際下載
   - ✅ 前端錯誤顯示：strategy-test 頁面移除靜默錯誤處理，warmup 不足時立即中斷並顯示錯誤
@@ -40,6 +46,12 @@
 ### 進行中 🚧
 - 無活躍任務
 
+### 剛完成 🔧
+- **/strategy-test 驗證錯誤處理改進** (2025-11-25)
+  - ✅ 改進 chart/signals API 錯誤顯示，解析並顯示 validation_errors 詳細信息
+  - ✅ 改進 signal-analysis/density API 錯誤顯示
+  - ✅ 診斷確認：Pydantic 驗證實際通過，錯誤是「數據不存在」而非「驗證失敗」
+
 ---
 
 ## 🎯 當前重點
@@ -47,7 +59,11 @@
 ### 下一步工作
 **短期行動（1-3天）**：
 
-1. **Warmup 系統驗證**
+1. **數據準備**
+   - 確保 data_cache/ 或 data_cache_backup/ 有足夠的 K 線數據
+   - 或設置 LEGACY_KLINE_CACHE_DIR 環境變量指向備份目錄
+
+2. **Warmup 系統驗證**
   - 重新批量下載 K 線資料（warmup_bars=185）
   - 驗證 metadata 正確儲存（warmup_bars_downloaded=185, lookback_bars=100）
   - 測試 EMA40 策略（需要 180 warmup）應正常執行
@@ -577,7 +593,10 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-**無已知高優先級問題** ✅
+- **/strategy-test 數據路徑配置**（優先級：高）
+  - 問題：kline_cache.h5 只有有限數據（2025年8月-11月），data_cache_backup/ 有完整數據但不在搜索路徑
+  - 影響：API 返回 404「K線數據不存在」
+  - 解決方案：設置 LEGACY_KLINE_CACHE_DIR=data_cache_backup 或複製數據到 data_cache/
 
 **已修復系統**：
 - ✅ Warmup 驗證系統（2025-11-23）
@@ -652,6 +671,36 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-11-25
+
+**/strategy-test 驗證錯誤處理改進** ⭐⭐
+
+**問題診斷**
+- 用戶反饋：/strategy-test 頁面顯示「請求參數驗證失敗」
+- 診斷過程：
+  1. 測試 Pydantic 模型驗證 → 通過，前端發送的額外字段被正確忽略
+  2. 測試 API endpoint → 返回 404「K線數據不存在或為空」
+  3. 確認根因：kline_cache.h5 只有 199 根 BTCUSDT 12h K線（2025年8月-11月）
+  4. 發現 data_cache_backup/ 有完整數據（2023-01-01 到 2025-10-06）但不在搜索路徑
+
+**修復內容**（2個文件，+20行）
+- `frontend/src/app/strategy-test/page.tsx`
+  - 改進 chart/signals API 錯誤處理（第 373-395 行）
+  - 改進 density API 錯誤處理（第 509-531 行）
+  - 現在會解析並顯示 validation_errors 的具體字段和消息
+
+**錯誤顯示改進**
+```
+修改前：「請求參數驗證失敗」
+修改後：「驗證失敗: strategy_config -> data_source: 無效的data_source; ...」
+```
+
+**建議解決數據問題**
+- 選項A：`export LEGACY_KLINE_CACHE_DIR=data_cache_backup`
+- 選項B：`cp data_cache_backup/*.h5 data_cache/`
+
+---
 
 ### 2025-11-23
 
@@ -1901,14 +1950,12 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⚠️ 待同步（2025-11-18 18:00）
+**遠端同步**: ⏳ 待同步（2025-11-25）
 
-**最新提交** (2025-11-18):
-- ⏳ **待提交**: 密度視覺化與 UI 優化
-  - 新增 CombinedDensityBoxplot 組件（Near/Far/Ratio 橫向對比）
-  - 數據源從多選改為單選（前後端邏輯對齊）
-  - NumberInput 組件修復（支持多位數輸入）
-  - 修改文件：5個文件，+465行/-30行
+**最新提交** (2025-11-25):
+- ⏳ **待提交**: /strategy-test 驗證錯誤處理改進
+  - 改進 API 錯誯顯示，解析 validation_errors 詳細信息
+  - 修改文件：1個文件（frontend/src/app/strategy-test/page.tsx），+20行
 
 **上一次提交** (2025-11-09):
 - ✅ **commit 3239855**: K線存儲系統根本性修復
@@ -1960,37 +2007,25 @@ for case in candidates:
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-11-18）：
-   - ✅ **密度視覺化與 UI 優化**
-     - 新增 CombinedDensityBoxplot 組件（Near/Far/Ratio 三合一對比）
-     - 數據源從多選改為單選（前後端邏輯對齊）
-     - NumberInput 組件修復（支持多位數輸入，失焦驗證）
-     - 修改文件：5個文件，+465行/-30行
-     - Git狀態：⚠️ 待提交並推送到遠端
+1. **已完成工作**（2025-11-25）：
+   - ✅ **/strategy-test 驗證錯誤處理改進**
+     - 改進 API 錯誤顯示，現在會解析並顯示 validation_errors 詳細信息
+     - 診斷確認：Pydantic 驗證通過，真正問題是 K 線數據不存在
+     - Git狀態：⏳ 待提交並推送
 
-2. **當前狀態**（2025-11-18 18:00）：
-   - 分支：main（⚠️ 待提交並推送）
-   - Phase 1 進度：5/5任務完成 (100%) ✅
-   - Phase 2 進度：4/4任務完成 (100%) ✅
-   - Phase 3 進度：6/6任務完成 (100%) ✅
-   - 密度視覺化：✅ 三合一 Boxplot，獨立 Y 軸
-   - UI 體驗：✅ 數據源單選，輸入框修復
-   - 已知問題：⚠️ TC 窗口配置模式異常（待修復）
+2. **當前狀態**（2025-11-25）：
+   - 分支：main（⏳ 待提交並推送）
+   - 數據路徑問題：kline_cache.h5 數據有限，data_cache_backup/ 有完整數據但不在搜索路徑
 
 3. **下一步工作建議**：
 
-   **優先：Git 提交與推送**
-   - 提交密度視覺化與 UI 優化變更
+   **優先：數據路徑配置**
+   - 設置 LEGACY_KLINE_CACHE_DIR 環境變量，或複製備份數據到 data_cache/
+   - 測試 /strategy-test 頁面功能
+
+   **Git 提交與推送**
+   - 提交錯誤處理改進變更
    - 推送到遠端同步
-   - 更新 .claude/STATUS.md（已完成）
-
-   **選項A：修復 TC 窗口配置問題**（優先級：高）
-   - 診斷 TC（Training Case）模式選擇時的異常
-   - 修復相關邏輯並測試驗證
-
-   **選項B：Optuna 整合準備**（優先級：中）
-   - 基於單選數據源設計超參數優化策略
-   - 評估是否需要多源策略模板（價量確認、Taker 過濾）
 
    **選項C：系統穩定性測試**（優先級：中）
    - 驗證數據源單選後的完整流程

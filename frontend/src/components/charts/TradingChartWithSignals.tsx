@@ -18,7 +18,7 @@
 
 "use client";
 
-import React, { useRef, useEffect, useState, useMemo } from "react";
+import React, { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { StrategySignalChart, KlineData, SignalPoint } from "./StrategySignalChart";
 import { VolumeChart } from "./VolumeChart";
 import { TakerRatioChart } from "./TakerRatioChart";
@@ -88,14 +88,35 @@ export interface TradingChartWithSignalsProps {
   showSignalMarkers?: boolean;
 
   /**
+   * 是否在成交量和 Taker Ratio 圖表顯示 TO/TC 標線（默認 true）
+   */
+  showVolumeToTcMarkers?: boolean;
+
+  /**
    * 信號點擊回調
    */
   onSignalClick?: (signal: SignalPoint) => void;
 
   /**
-   * 指標線資料 (如 EMA)
+   * 指標線資料 (如 EMA) - 顯示在 Price 圖表上
+   * @deprecated 使用 priceIndicatorSeries 替代
    */
   indicatorSeries?: IndicatorLineSeries[];
+
+  /**
+   * Price 圖表的指標線資料（基於 OHLC 計算的指標）
+   */
+  priceIndicatorSeries?: IndicatorLineSeries[];
+
+  /**
+   * Volume 圖表的指標線資料（基於 volume 計算的指標）
+   */
+  volumeIndicatorSeries?: IndicatorLineSeries[];
+
+  /**
+   * Taker Ratio 圖表的指標線資料（基於 taker_ratio/taker_buy_volume 計算的指標）
+   */
+  takerIndicatorSeries?: IndicatorLineSeries[];
 
   /**
    * 近/遠窗口覆蓋範圍
@@ -137,18 +158,24 @@ function TradingChartWithSignalsInner({
   totalHeight = 800,
   showCaseMarker = true,
   showSignalMarkers = true,
+  showVolumeToTcMarkers = true,
   onSignalClick,
   indicatorSeries = [],
+  priceIndicatorSeries,
+  volumeIndicatorSeries = [],
+  takerIndicatorSeries = [],
   windowOverlays = [],
 }: TradingChartWithSignalsProps) {
+  // 合併 indicatorSeries 和 priceIndicatorSeries（向後兼容）
+  const effectivePriceIndicatorSeries = priceIndicatorSeries ?? indicatorSeries;
+  
   // ===== Refs =====
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ===== Context =====
-  const { updateCrosshair } = useTimeAxis();
+  const { resetToCenter, subscribeCrosshairChange } = useTimeAxis();
 
   // ===== State =====
-  const [crosshairX, setCrosshairX] = useState<number | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [hoveredSignal, setHoveredSignal] = useState<SignalTooltipData | null>(
     null
@@ -157,6 +184,7 @@ function TradingChartWithSignalsInner({
     x: 0,
     y: 0,
   });
+  const [crosshairX, setCrosshairX] = useState<number | null>(null);
 
   // ===== 高度分配（5:2:2:1 比例）=====
   const priceHeight = Math.floor(totalHeight * 0.5); // 50% - 策略信號圖
@@ -226,61 +254,32 @@ function TradingChartWithSignalsInner({
   }, [timelineRange, toTimestamp, tcTimestamp]);
 
   /**
-   * 初始化延遲（避免刷新歪掉）
+   * 初始化延遲（避免刷新歪掉）+ 初始同步
    */
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitialized(true);
+      // 初始化完成後，觸發一次 fitContent 同步所有圖表
+      setTimeout(() => {
+        resetToCenter(toTimestamp || 0);
+      }, 100);
     }, 50);
     return () => clearTimeout(timer);
-  }, []);
+  }, [toTimestamp, resetToCenter]);
 
   /**
-   * 監聽滑鼠移動，實現十字線貫穿效果 + 廣播時間戳
+   * 監聽滑鼠移動，用於 tooltip 位置
    */
   useEffect(() => {
     if (!containerRef.current) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const x = e.clientX - rect.left;
-
       // 更新滑鼠位置（用於 tooltip）
       setMousePosition({ x: e.clientX, y: e.clientY });
-
-      // 只在圖表區域內顯示十字線
-      const chartStartX = 60;
-      const chartEndX = rect.width - 80;
-
-      if (x >= chartStartX && x <= chartEndX) {
-        setCrosshairX(x);
-
-        // 將 X 座標轉換為時間戳
-        if (klines.length > 1) {
-          const chartWidth = chartEndX - chartStartX;
-          const relativeX = x - chartStartX;
-          const ratio = relativeX / chartWidth;
-
-          const firstTime = klines[0].timestamp;
-          const lastTime = klines[klines.length - 1].timestamp;
-          const estimatedTime = Math.floor(
-            firstTime + (lastTime - firstTime) * ratio
-          );
-
-          updateCrosshair(estimatedTime, "container");
-        }
-      } else {
-        setCrosshairX(null);
-        updateCrosshair(null, "container");
-      }
     };
 
     const handleMouseLeave = () => {
-      setCrosshairX(null);
       setHoveredSignal(null);
-      updateCrosshair(null, "container");
     };
 
     const container = containerRef.current;
@@ -291,22 +290,22 @@ function TradingChartWithSignalsInner({
       container.removeEventListener("mousemove", handleMouseMove);
       container.removeEventListener("mouseleave", handleMouseLeave);
     };
-  }, [klines, updateCrosshair]);
+  }, []);
 
   /**
    * 處理信號懸停
    */
-  const handleSignalHover = (signal: SignalTooltipData | null) => {
+  const handleSignalHover = useCallback((signal: SignalTooltipData | null) => {
     setHoveredSignal(signal);
-  };
+  }, []);
 
   /**
    * 處理信號點擊
    */
-  const handleSignalClick = (signal: SignalPoint) => {
+  const handleSignalClick = useCallback((signal: SignalPoint) => {
     console.log("[TradingChartWithSignals] Signal clicked:", signal);
     onSignalClick?.(signal);
-  };
+  }, [onSignalClick]);
 
   return (
     <div
@@ -348,11 +347,11 @@ function TradingChartWithSignalsInner({
       {/* 十字線疊層（貫穿三個圖表的灰色虛線） */}
       {crosshairX !== null && (
         <div
-          className="absolute top-0 bottom-0 pointer-events-none z-20"
+          className="absolute top-0 bottom-0 pointer-events-none z-30"
           style={{
             left: `${crosshairX}px`,
             width: "1px",
-            borderLeft: "1px dashed rgba(128, 128, 128, 0.5)",
+            borderLeft: "1px dashed rgba(128, 128, 128, 0.6)",
           }}
         />
       )}
@@ -384,7 +383,7 @@ function TradingChartWithSignalsInner({
                 enableSync={true}
                 onSignalHover={handleSignalHover}
                 onSignalClick={handleSignalClick}
-                indicatorSeries={indicatorSeries}
+                indicatorSeries={effectivePriceIndicatorSeries}
               />
             </div>
 
@@ -400,9 +399,10 @@ function TradingChartWithSignalsInner({
                 height={volumeHeight}
                 chartId="volume-chart"
                 enableSync={true}
-                toTimestamp={toTimestamp}
-                tcTimestamp={tcTimestamp}
+                toTimestamp={showVolumeToTcMarkers ? toTimestamp : undefined}
+                tcTimestamp={showVolumeToTcMarkers ? tcTimestamp : undefined}
                 windowOverlays={windowOverlays}
+                indicatorSeries={volumeIndicatorSeries}
               />
             </div>
 
@@ -415,9 +415,10 @@ function TradingChartWithSignalsInner({
                 height={takerRatioHeight}
                 chartId="taker-ratio-chart"
                 enableSync={true}
-                toTimestamp={toTimestamp}
-                tcTimestamp={tcTimestamp}
+                toTimestamp={showVolumeToTcMarkers ? toTimestamp : undefined}
+                tcTimestamp={showVolumeToTcMarkers ? tcTimestamp : undefined}
                 windowOverlays={windowOverlays}
+                indicatorSeries={takerIndicatorSeries}
               />
             </div>
           </>

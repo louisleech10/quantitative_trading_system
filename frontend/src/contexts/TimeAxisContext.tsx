@@ -154,9 +154,6 @@ export function TimeAxisProvider({
   // 訂閱者映射：chartId -> callback
   const rangeSubscribers = useRef<Map<string, (range: TimeRange) => void>>(new Map());
   const crosshairSubscribers = useRef<Map<string, (time: number | null) => void>>(new Map());
-  
-  // RAF (RequestAnimationFrame) ID，用於節流
-  const rafId = useRef<number | null>(null);
 
   /**
    * 記錄調試日誌
@@ -168,38 +165,28 @@ export function TimeAxisProvider({
   }, [debug]);
 
   /**
-   * 更新可見範圍（帶 RAF 節流）
+   * 更新可見範圍（即時同步，不使用 RAF 節流）
    */
   const updateVisibleRange = useCallback((range: TimeRange, sourceChartId?: string) => {
     log('updateVisibleRange called', { range, sourceChartId });
 
-    // 取消之前的 RAF（如果有）
-    if (rafId.current !== null) {
-      cancelAnimationFrame(rafId.current);
-    }
+    // 更新 state
+    setSyncState(prev => ({
+      ...prev,
+      visibleRange: range,
+      isSyncing: true
+    }));
 
-    rafId.current = requestAnimationFrame(() => {
-      // 更新 state
-      setSyncState(prev => ({
-        ...prev,
-        visibleRange: range,
-        isSyncing: true
-      }));
-
-      // 通知所有訂閱者（除了源圖表）
-      rangeSubscribers.current.forEach((callback, chartId) => {
-        if (chartId !== sourceChartId) {
-          log(`Notifying chart ${chartId} of range change`);
-          callback(range);
-        }
-      });
-
-      // 延遲更新狀態
-      setTimeout(() => {
-        setSyncState(prev => ({ ...prev, isSyncing: false }));
-        log('Sync complete');
-      }, 50);
+    // 立即通知所有訂閱者（除了源圖表）
+    rangeSubscribers.current.forEach((callback, chartId) => {
+      if (chartId !== sourceChartId) {
+        log(`Notifying chart ${chartId} of range change`);
+        callback(range);
+      }
     });
+
+    // 立即釋放同步狀態
+    setSyncState(prev => ({ ...prev, isSyncing: false }));
   }, [log]);
 
   /**
@@ -211,8 +198,7 @@ export function TimeAxisProvider({
     // 更新 state
     setSyncState(prev => ({
       ...prev,
-      crosshairTime: time,
-      isSyncing: true
+      crosshairTime: time
     }));
 
     // 通知所有訂閱者（除了源圖表）
@@ -222,11 +208,6 @@ export function TimeAxisProvider({
         callback(time);
       }
     });
-
-    // 釋放狀態
-    setTimeout(() => {
-      setSyncState(prev => ({ ...prev, isSyncing: false }));
-    }, 10);
   }, [log]);
 
   /**

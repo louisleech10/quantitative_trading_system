@@ -21,9 +21,12 @@ import {
   formatPercentage,
   chartColors
 } from '../../utils/chartConfig';
-import { ISeriesApi, LineStyle } from 'lightweight-charts';
+import { ISeriesApi, LineStyle, UTCTimestamp } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
-import type { WindowOverlayRange } from './TradingChartWithSignals';
+import type { WindowOverlayRange, IndicatorLineSeries } from './TradingChartWithSignals';
+
+const toUtcTime = (timestamp: number): UTCTimestamp =>
+  timestamp as UTCTimestamp;
 
 /**
  * TakerRatioChart組件Props
@@ -73,6 +76,11 @@ export interface TakerRatioChartProps {
    * 近/遠窗口覆蓋範圍
    */
   windowOverlays?: WindowOverlayRange[];
+
+  /**
+   * 指標線資料（基於 taker_ratio/taker_buy_volume 計算的 EMA 等指標）
+   */
+  indicatorSeries?: IndicatorLineSeries[];
 }
 
 /**
@@ -87,7 +95,8 @@ export function TakerRatioChart({
   enableSync = false,
   toTimestamp,
   tcTimestamp,
-  windowOverlays = []
+  windowOverlays = [],
+  indicatorSeries = []
 }: TakerRatioChartProps) {
   console.log('[TakerRatioChart] Initializing with:', { chartId, enableSync, toTimestamp });
   
@@ -275,8 +284,11 @@ export function TakerRatioChart({
         autoScale: false,
       });
 
-      // 自動縮放時間軸
-      chartInstance.timeScale().fitContent();
+      // 不再手動調用 fitContent，讓同步機制控制時間軸
+      // 首次載入時使用 fitContent，但只在非同步模式下
+      if (!enableSync) {
+        chartInstance.timeScale().fitContent();
+      }
 
       console.log(`[TakerRatioChart] Rendered ${takerRatioData.length} taker ratio data for ${symbol}`);
 
@@ -329,6 +341,69 @@ export function TakerRatioChart({
       setError(err instanceof Error ? err.message : 'Failed to render taker ratio chart');
     }
   }, [chartInstance, isReady, klines, symbol]);
+
+  // 指標線渲染 refs
+  const indicatorLineRefs = useRef<ISeriesApi<'Line'>[]>([]);
+  const prevIndicatorSeriesJsonRef = useRef<string>("");
+
+  /**
+   * 指標線渲染 useEffect（基於 taker_ratio/taker_buy_volume 計算的 EMA 等指標）
+   */
+  useEffect(() => {
+    if (!chartInstance || !isReady) return;
+    
+    // 序列化當前 indicatorSeries 用於比較
+    const currentJson = JSON.stringify(
+      indicatorSeries.map(s => ({ id: s.id, color: s.color, dataLength: s.data.length }))
+    );
+    
+    // 如果內容相同，跳過更新
+    if (currentJson === prevIndicatorSeriesJsonRef.current && indicatorLineRefs.current.length > 0) {
+      return;
+    }
+    
+    // 更新緩存
+    prevIndicatorSeriesJsonRef.current = currentJson;
+    
+    // 清除舊的指標線
+    indicatorLineRefs.current.forEach((line) => {
+      try {
+        chartInstance.removeSeries(line);
+      } catch (err) {
+        console.error("[TakerRatioChart] Indicator cleanup error", err);
+      }
+    });
+    indicatorLineRefs.current = [];
+
+    // 添加新的指標線
+    indicatorSeries.forEach((series) => {
+      if (!series.data.length) return;
+      const line = chartInstance.addLineSeries({
+        color: series.color,
+        lineWidth: 2,
+        priceScaleId: "taker_ratio",
+        lastValueVisible: false,
+      });
+      line.setData(
+        series.data.map((point) => ({
+          time: toUtcTime(point.time),
+          value: point.value,
+        }))
+      );
+      indicatorLineRefs.current.push(line);
+    });
+
+    return () => {
+      indicatorLineRefs.current.forEach((line) => {
+        try {
+          chartInstance.removeSeries(line);
+        } catch (err) {
+          console.error("[TakerRatioChart] Indicator cleanup error", err);
+        }
+      });
+      indicatorLineRefs.current = [];
+    };
+  }, [chartInstance, indicatorSeries, isReady]);
 
   return (
     <div className="w-full flex flex-col bg-white border-t border-gray-200" style={{ height: `${height}px` }}>

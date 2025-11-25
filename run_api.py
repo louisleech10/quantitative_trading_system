@@ -37,9 +37,15 @@ def main():
 
 def show_hardware_info():
     """啟動時顯示硬體配置"""
+    import multiprocessing
+    try:
+        import psutil
+        memory_gb = psutil.virtual_memory().total / (1024**3)
+    except ImportError:
+        memory_gb = 0.0  # psutil 未安裝時的 fallback
+    
     cpu_count = multiprocessing.cpu_count()
-    memory_gb = psutil.virtual_memory().total / (1024**3)
-    optimal_workers = get_optimal_workers()
+    optimal_workers = max(1, cpu_count - 1)  # 簡單計算，留一個核心給系統
     
     print("="*50)
     print("硬體配置檢測")

@@ -19,9 +19,12 @@ import {
   formatVolume,
   chartColors
 } from '../../utils/chartConfig';
-import { ISeriesApi } from 'lightweight-charts';
+import { ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
-import type { WindowOverlayRange } from './TradingChartWithSignals';
+import type { WindowOverlayRange, IndicatorLineSeries } from './TradingChartWithSignals';
+
+const toUtcTime = (timestamp: number): UTCTimestamp =>
+  timestamp as UTCTimestamp;
 
 /**
  * 計算成交量柱的顏色（跟隨價格漲跌）
@@ -84,6 +87,11 @@ export interface VolumeChartProps {
    * 近/遠窗口覆蓋範圍
    */
   windowOverlays?: WindowOverlayRange[];
+
+  /**
+   * 指標線資料（基於 volume 計算的 EMA 等指標）
+   */
+  indicatorSeries?: IndicatorLineSeries[];
 }
 
 /**
@@ -107,7 +115,8 @@ export function VolumeChart({
   enableSync = false,
   toTimestamp,
   tcTimestamp,
-  windowOverlays = []
+  windowOverlays = [],
+  indicatorSeries = []
 }: VolumeChartProps) {
   console.log('[VolumeChart] Initializing with:', { chartId, enableSync, toTimestamp });
   
@@ -217,13 +226,13 @@ export function VolumeChart({
       });
       volumeSeriesRef.current = volumeSeries;
 
-      // 配置 right price scale 的顯示範圍和啟用拖曳
+      // 配置 right price scale 的顯示範圍
       chartInstance.priceScale('right').applyOptions({
+        autoScale: true,
         scaleMargins: {
-          top: 0.1,    // 上方留 10% 空間
-          bottom: 0.1, // 下方留 10% 空間（讓柱狀圖使用中間 80% 的高度）
+          top: 0.1,
+          bottom: 0.1,
         },
-        // 預設已啟用拖曳和滾輪縮放（visible: true）
       });
 
       // 轉換數據格式並計算顏色
@@ -241,8 +250,11 @@ export function VolumeChart({
       // 設置成交量數據
       volumeSeries.setData(volumeData);
 
-      // 自動縮放到適合的範圍
-      chartInstance.timeScale().fitContent();
+      // 不再手動調用 fitContent，讓同步機制控制時間軸
+      // 首次載入時使用 fitContent，但只在非同步模式下
+      if (!enableSync) {
+        chartInstance.timeScale().fitContent();
+      }
 
       console.log(`[VolumeChart] Rendered ${volumeData.length} volume bars for ${symbol}`);
 
@@ -287,7 +299,70 @@ export function VolumeChart({
       console.error('[VolumeChart] Failed to render chart:', err);
       setError(err instanceof Error ? err.message : 'Failed to render volume chart');
     }
-  }, [chartInstance, isReady, klines, symbol]);
+  }, [chartInstance, isReady, klines, symbol, chartId, enableSync, subscribeCrosshairChange]);
+
+  // 指標線渲染 refs
+  const indicatorLineRefs = useRef<ISeriesApi<'Line'>[]>([]);
+  const prevIndicatorSeriesJsonRef = useRef<string>("");
+
+  /**
+   * 指標線渲染 useEffect（基於 volume 計算的 EMA 等指標）
+   */
+  useEffect(() => {
+    if (!chartInstance || !isReady) return;
+    
+    // 序列化當前 indicatorSeries 用於比較
+    const currentJson = JSON.stringify(
+      indicatorSeries.map(s => ({ id: s.id, color: s.color, dataLength: s.data.length }))
+    );
+    
+    // 如果內容相同，跳過更新
+    if (currentJson === prevIndicatorSeriesJsonRef.current && indicatorLineRefs.current.length > 0) {
+      return;
+    }
+    
+    // 更新緩存
+    prevIndicatorSeriesJsonRef.current = currentJson;
+    
+    // 清除舊的指標線
+    indicatorLineRefs.current.forEach((line) => {
+      try {
+        chartInstance.removeSeries(line);
+      } catch (err) {
+        console.error("[VolumeChart] Indicator cleanup error", err);
+      }
+    });
+    indicatorLineRefs.current = [];
+
+    // 添加新的指標線
+    indicatorSeries.forEach((series) => {
+      if (!series.data.length) return;
+      const line = chartInstance.addLineSeries({
+        color: series.color,
+        lineWidth: 2,
+        priceScaleId: "right",
+        lastValueVisible: false,
+      });
+      line.setData(
+        series.data.map((point) => ({
+          time: toUtcTime(point.time),
+          value: point.value,
+        }))
+      );
+      indicatorLineRefs.current.push(line);
+    });
+
+    return () => {
+      indicatorLineRefs.current.forEach((line) => {
+        try {
+          chartInstance.removeSeries(line);
+        } catch (err) {
+          console.error("[VolumeChart] Indicator cleanup error", err);
+        }
+      });
+      indicatorLineRefs.current = [];
+    };
+  }, [chartInstance, indicatorSeries, isReady]);
 
   return (
     <div className="w-full flex flex-col bg-white border-t border-gray-200" style={{ height: `${height}px` }}>

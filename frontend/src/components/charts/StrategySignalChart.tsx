@@ -200,6 +200,78 @@ export function StrategySignalChart({
   // 保存 series 引用，用於 cleanup
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const indicatorLineRefs = useRef<ISeriesApi<"Line">[]>([]);
+  
+  // 追蹤用戶是否手動縮放了 Y 軸
+  const userScaledYAxisRef = useRef(false);
+
+  // 使用 ref 存儲回調函數，避免依賴變化導致 useEffect 重新執行
+  const onSignalHoverRef = useRef(onSignalHover);
+  const onSignalClickRef = useRef(onSignalClick);
+  
+  // 使用 ref 緩存 indicatorSeries，避免不必要的重渲染
+  const indicatorSeriesRef = useRef(indicatorSeries);
+  
+  // 更新 ref 當 props 變化時
+  useEffect(() => {
+    onSignalHoverRef.current = onSignalHover;
+    onSignalClickRef.current = onSignalClick;
+  }, [onSignalHover, onSignalClick]);
+  
+  // 更新 indicatorSeries ref（淺比較）
+  useEffect(() => {
+    indicatorSeriesRef.current = indicatorSeries;
+  }, [indicatorSeries]);
+
+  /**
+   * 獨立的 Y 軸縮放控制 useEffect
+   * 這個 useEffect 只依賴 chartInstance 和 isReady，不會因為其他狀態變化而重新執行
+   */
+  useEffect(() => {
+    if (!chartInstance || !isReady) return;
+    
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    const priceScale = chartInstance.priceScale('right');
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // 檢查是否點擊在右側 Y 軸區域（大約右邊 60px）
+      const rect = container.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const isYAxisArea = clickX > rect.width - 60;
+      
+      if (isYAxisArea) {
+        // 用戶開始拖曳 Y 軸
+        const handleMouseUp = () => {
+          // 拖曳結束後，禁用 autoScale 以維持縮放
+          userScaledYAxisRef.current = true;
+          priceScale.applyOptions({ autoScale: false });
+          document.removeEventListener('mouseup', handleMouseUp);
+        };
+        document.addEventListener('mouseup', handleMouseUp);
+      }
+    };
+
+    // 雙擊重置 Y 軸
+    const handleDoubleClick = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const isYAxisArea = clickX > rect.width - 60;
+      
+      if (isYAxisArea) {
+        userScaledYAxisRef.current = false;
+        priceScale.applyOptions({ autoScale: true });
+      }
+    };
+
+    container.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('dblclick', handleDoubleClick);
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('dblclick', handleDoubleClick);
+    };
+  }, [chartInstance, isReady]);
 
   /**
    * 渲染 K線數據和信號標記到圖表
@@ -214,6 +286,16 @@ export function StrategySignalChart({
       const candlestickSeries =
         chartInstance.addCandlestickSeries(candlestickSeriesOptions);
       candlestickSeriesRef.current = candlestickSeries;
+
+      // 配置 right price scale - 根據用戶是否已縮放來決定 autoScale
+      const priceScale = chartInstance.priceScale('right');
+      priceScale.applyOptions({
+        autoScale: !userScaledYAxisRef.current,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
+      });
 
       // 轉換數據格式 (Lightweight Charts 格式)
       const formattedKlines = klines.map((kline) => ({
@@ -281,14 +363,10 @@ export function StrategySignalChart({
       // 設置所有標記
       candlestickSeries.setMarkers(markers);
 
-      // 設置可見範圍為所有 K線
-      if (formattedKlines.length > 0) {
-        const firstTime = formattedKlines[0].time;
-        const lastTime = formattedKlines[formattedKlines.length - 1].time;
-        chartInstance.timeScale().setVisibleRange({
-          from: firstTime,
-          to: lastTime,
-        });
+      // 不再手動設置可見範圍，讓同步機制控制
+      // 首次載入時使用 fitContent，但只在非同步模式下
+      if (!enableSync && formattedKlines.length > 0) {
+        chartInstance.timeScale().fitContent();
       }
 
       console.log(`[StrategySignalChart] Rendered ${formattedKlines.length} klines and ${markers.length} markers for ${symbol}`);
@@ -310,11 +388,11 @@ export function StrategySignalChart({
           if (hoveredSignalPoint) {
             setHoveredSignal(hoveredSignalPoint);
 
-            // 觸發回調
-            if (onSignalHover) {
+            // 觸發回調（使用 ref 避免依賴問題）
+            if (onSignalHoverRef.current) {
               const price =
                 hoveredKline?.close || klines[klines.length - 1].close;
-              onSignalHover({
+              onSignalHoverRef.current({
                 timestamp: hoveredSignalPoint.timestamp,
                 indicator_values: hoveredSignalPoint.indicator_values,
                 signal_density: hoveredSignalPoint.signal_density,
@@ -323,15 +401,15 @@ export function StrategySignalChart({
             }
           } else {
             setHoveredSignal(null);
-            if (onSignalHover) {
-              onSignalHover(null);
+            if (onSignalHoverRef.current) {
+              onSignalHoverRef.current(null);
             }
           }
         } else {
           setHoveredData(null);
           setHoveredSignal(null);
-          if (onSignalHover) {
-            onSignalHover(null);
+          if (onSignalHoverRef.current) {
+            onSignalHoverRef.current(null);
           }
         }
       };
@@ -341,12 +419,12 @@ export function StrategySignalChart({
       // 訂閱點擊事件 (用於信號點擊)
       const handleClick = (param: MouseEventParams<Time>) => {
         const clickedTime = extractNumericTime(param.time);
-        if (clickedTime !== null && onSignalClick) {
+        if (clickedTime !== null && onSignalClickRef.current) {
           const clickedSignal = signalPoints.find(
             (s) => s.timestamp === clickedTime
           );
           if (clickedSignal) {
-            onSignalClick(clickedSignal);
+            onSignalClickRef.current(clickedSignal);
           }
         }
       };
@@ -390,12 +468,32 @@ export function StrategySignalChart({
     showCaseMarker,
     showSignalMarkers,
     symbol,
-    onSignalClick,
-    onSignalHover,
+    enableSync,
   ]);
 
+  /**
+   * 指標線渲染 useEffect
+   * 使用 JSON 字符串比較來避免不必要的重渲染
+   */
+  const prevIndicatorSeriesJsonRef = useRef<string>("");
+  
   useEffect(() => {
     if (!chartInstance || !isReady) return;
+    
+    // 序列化當前 indicatorSeries 用於比較
+    const currentJson = JSON.stringify(
+      indicatorSeries.map(s => ({ id: s.id, color: s.color, dataLength: s.data.length }))
+    );
+    
+    // 如果內容相同，跳過更新
+    if (currentJson === prevIndicatorSeriesJsonRef.current && indicatorLineRefs.current.length > 0) {
+      return;
+    }
+    
+    // 更新緩存
+    prevIndicatorSeriesJsonRef.current = currentJson;
+    
+    // 清除舊的指標線
     indicatorLineRefs.current.forEach((line) => {
       try {
         chartInstance.removeSeries(line);
@@ -405,6 +503,7 @@ export function StrategySignalChart({
     });
     indicatorLineRefs.current = [];
 
+    // 添加新的指標線
     indicatorSeries.forEach((series) => {
       if (!series.data.length) return;
       const line = chartInstance.addLineSeries({
@@ -493,8 +592,7 @@ export function StrategySignalChart({
       <div className="flex-1 relative">
         <div
           ref={chartContainerRef}
-          className="absolute inset-0"
-          style={{ width: "100%", height: "100%" }}
+          className="w-full h-full"
         />
 
         {/* 錯誤提示 */}

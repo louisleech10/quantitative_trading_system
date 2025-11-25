@@ -375,11 +375,20 @@ export default function StrategyTestPage() {
         const errorText = await chartResponse.text().catch(() => "");
         try {
           const errorData = JSON.parse(errorText || "{}");
-          message =
-            errorData.detail ||
-            errorData.message ||
-            errorData.error?.message ||
-            message;
+          // 優先顯示驗證錯誤的詳細信息
+          if (errorData.error?.details?.validation_errors?.length > 0) {
+            const errors = errorData.error.details.validation_errors;
+            const errorDetails = errors.map((e: { field: string; message: string }) => 
+              `${e.field}: ${e.message}`
+            ).join('; ');
+            message = `驗證失敗: ${errorDetails}`;
+          } else {
+            message =
+              errorData.detail ||
+              errorData.message ||
+              errorData.error?.message ||
+              message;
+          }
         } catch {
           if (chartResponse.status) {
             message = `HTTP ${chartResponse.status}: ${errorText || message}`;
@@ -502,11 +511,20 @@ export default function StrategyTestPage() {
 
             try {
               const errorData = JSON.parse(errorText || "{}");
-              message =
-                errorData.error?.message ||
-                errorData.detail ||
-                errorData.message ||
-                message;
+              // 優先顯示驗證錯誤的詳細信息
+              if (errorData.error?.details?.validation_errors?.length > 0) {
+                const errors = errorData.error.details.validation_errors;
+                const errorDetails = errors.map((e: { field: string; message: string }) => 
+                  `${e.field}: ${e.message}`
+                ).join('; ');
+                message = `驗證失敗: ${errorDetails}`;
+              } else {
+                message =
+                  errorData.error?.message ||
+                  errorData.detail ||
+                  errorData.message ||
+                  message;
+              }
             } catch {
               message = errorText || message;
             }
