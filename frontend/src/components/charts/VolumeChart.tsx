@@ -14,6 +14,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useChartSync } from '../../hooks/useChartSync';
+import { darkChartOptions } from '../../utils/chartConfig';
 import { useTimeAxis } from '@/contexts/TimeAxisContext';
 import {
   formatVolume,
@@ -22,6 +23,7 @@ import {
 import { ISeriesApi, UTCTimestamp } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
 import type { WindowOverlayRange, IndicatorLineSeries } from './TradingChartWithSignals';
+import type { SignalPoint } from './StrategySignalChart';
 
 const toUtcTime = (timestamp: number): UTCTimestamp =>
   timestamp as UTCTimestamp;
@@ -92,6 +94,11 @@ export interface VolumeChartProps {
    * 指標線資料（基於 volume 計算的 EMA 等指標）
    */
   indicatorSeries?: IndicatorLineSeries[];
+
+  /**
+   * 策略信號點（用於標記策略條件符合的 K 線）
+   */
+  signalPoints?: SignalPoint[];
 }
 
 /**
@@ -116,24 +123,31 @@ export function VolumeChart({
   toTimestamp,
   tcTimestamp,
   windowOverlays = [],
-  indicatorSeries = []
+  indicatorSeries = [],
+  signalPoints = []
 }: VolumeChartProps) {
-  console.log('[VolumeChart] Initializing with:', { chartId, enableSync, toTimestamp });
-  
   const { chartContainerRef, chartInstance, isReady } = useChartSync({
     chartId,
     toTimestamp: toTimestamp || (klines.length > 0 ? klines[0].timestamp : Date.now() / 1000),
     enableSync,
-    debug: true
+    debug: true,
+    chartOptions: darkChartOptions
   });
   const { subscribeCrosshairChange } = useTimeAxis();
 
   // 狀態管理
   const [error, setError] = useState<string | null>(null);
   const [hoveredVolume, setHoveredVolume] = useState<number | null>(null);
+  const [hoveredIndicators, setHoveredIndicators] = useState<Record<string, number>>({});
 
   // 保存series引用，用於cleanup
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+
+  // 使用 ref 緩存 indicatorSeries，避免閉包問題
+  const indicatorSeriesRef = useRef(indicatorSeries);
+  useEffect(() => {
+    indicatorSeriesRef.current = indicatorSeries;
+  }, [indicatorSeries]);
 
   const timelineRange = useMemo(() => {
     if (!klines.length) return null;
@@ -222,6 +236,8 @@ export function VolumeChart({
         priceFormat: {
           type: 'volume',
         },
+        lastValueVisible: false,
+        priceLineVisible: false,
         // 移除 priceScaleId，使用默認的 'right'，這樣可以啟用 Y 軸拖曳縮放
       });
       volumeSeriesRef.current = volumeSeries;
@@ -258,15 +274,25 @@ export function VolumeChart({
 
       console.log(`[VolumeChart] Rendered ${volumeData.length} volume bars for ${symbol}`);
 
-      // 訂閱懸停事件（用於顯示成交量數值）
+      // 訂閱懸停事件（用於顯示成交量數值和指標值）
       const handleCrosshairMove = (param: any) => {
         if (param.time) {
           const hoveredKline = klines.find(k => k.timestamp === param.time);
           if (hoveredKline) {
             setHoveredVolume(hoveredKline.volume);
           }
+          // 查找指標值（使用 ref 避免閉包問題）
+          const indicatorValues: Record<string, number> = {};
+          indicatorSeriesRef.current.forEach((series) => {
+            const point = series.data.find((d) => d.time === param.time);
+            if (point) {
+              indicatorValues[series.id] = point.value;
+            }
+          });
+          setHoveredIndicators(indicatorValues);
         } else {
           setHoveredVolume(null);
+          setHoveredIndicators({});
         }
       };
 
@@ -277,8 +303,19 @@ export function VolumeChart({
         if (time !== null) {
           const hoveredKline = klines.find(k => k.timestamp === time);
           setHoveredVolume(hoveredKline?.volume ?? null);
+          
+          // 查找指標值（使用 ref 避免閉包問題）
+          const indicatorValues: Record<string, number> = {};
+          indicatorSeriesRef.current.forEach((series) => {
+            const point = series.data.find((d) => d.time === time);
+            if (point) {
+              indicatorValues[series.id] = point.value;
+            }
+          });
+          setHoveredIndicators(indicatorValues);
         } else {
           setHoveredVolume(null);
+          setHoveredIndicators({});
         }
       });
 
@@ -335,13 +372,14 @@ export function VolumeChart({
     indicatorLineRefs.current = [];
 
     // 添加新的指標線
-    indicatorSeries.forEach((series) => {
+    indicatorSeries.forEach((series, index) => {
       if (!series.data.length) return;
       const line = chartInstance.addLineSeries({
         color: series.color,
         lineWidth: 2,
         priceScaleId: "right",
         lastValueVisible: false,
+        priceLineVisible: false,
       });
       line.setData(
         series.data.map((point) => ({
@@ -349,6 +387,20 @@ export function VolumeChart({
           value: point.value,
         }))
       );
+      
+      // 在第一條指標線上設置信號標記
+      if (index === 0 && signalPoints.length > 0) {
+        const markers = signalPoints.map((signal) => ({
+          time: toUtcTime(signal.timestamp),
+          position: 'aboveBar' as const,
+          color: signal.windowType === 'near' ? '#3B82F6' : '#CA8A04',
+          shape: 'arrowDown' as const,
+          text: signal.windowType === 'near' ? 'N' : 'F',
+        }));
+        line.setMarkers(markers);
+        console.log(`[VolumeChart] Set ${markers.length} signal markers on indicator line`);
+      }
+      
       indicatorLineRefs.current.push(line);
     });
 
@@ -362,36 +414,65 @@ export function VolumeChart({
       });
       indicatorLineRefs.current = [];
     };
-  }, [chartInstance, indicatorSeries, isReady]);
+  }, [chartInstance, indicatorSeries, isReady, signalPoints]);
 
   return (
-    <div className="w-full flex flex-col bg-white border-t border-gray-200" style={{ height: `${height}px` }}>
+    <div className="w-full flex flex-col bg-[#1e1e1e] border-t border-gray-700" style={{ height: `${height}px` }}>
       {/* 頂部標籤 */}
-      <div className="px-4 py-1 flex items-center justify-between border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-700">成交量</span>
+      <div className="px-4 py-1 flex items-center justify-between border-b border-gray-700">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-gray-300">成交量</span>
+          
+          {/* 信號統計 - 顯示 Near(藍) 和 Far(土黃) 計數 */}
+          {signalPoints.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
+                <span style={{ color: '#3B82F6' }}>▼</span>
+                N: {signalPoints.filter(s => s.windowType === 'near').length}
+              </span>
+              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded flex items-center gap-1">
+                <span style={{ color: '#CA8A04' }}>▼</span>
+                F: {signalPoints.filter(s => s.windowType === 'far').length}
+              </span>
+            </div>
+          )}
+          
           {hoveredVolume !== null && (
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-gray-300">
               {formatVolume(hoveredVolume)}
             </span>
           )}
+          {/* 指標值顯示 */}
+          {indicatorSeries.map((series) => {
+            const value = hoveredIndicators[series.id];
+            if (value === undefined) return null;
+            return (
+              <span key={series.id} className="text-xs text-gray-300">
+                <span style={{ color: series.color }}>●</span>{" "}
+                {series.label?.replace(/\s*\(\d+\)/, "") || series.id}:{" "}
+                <span className="font-mono" style={{ color: series.color }}>
+                  {formatVolume(value)}
+                </span>
+              </span>
+            );
+          })}
         </div>
       </div>
 
       {/* 圖表容器 */}
       <div className="flex-1 relative">
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] z-20">
             <div className="text-center">
-              <div className="text-red-500 text-xl mb-1">⚠️</div>
-              <p className="text-xs text-red-600">{error}</p>
+              <div className="text-red-400 text-xl mb-1">⚠️</div>
+              <p className="text-xs text-red-400">{error}</p>
             </div>
           </div>
         )}
 
         {klines.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
-            <p className="text-xs text-gray-500">無成交量數據</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] z-20">
+            <p className="text-xs text-gray-400">無成交量數據</p>
           </div>
         )}
 

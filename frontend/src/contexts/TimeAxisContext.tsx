@@ -143,6 +143,7 @@ export function TimeAxisProvider({
   debug = false
 }: TimeAxisProviderProps) {
   // ===== State =====
+  // 只保留必要的 state，避免頻繁更新導致整個樹重新渲染
   const [syncState, setSyncState] = useState<ChartSyncState>({
     visibleRange: initialRange ?? null,
     crosshairTime: null,
@@ -151,64 +152,54 @@ export function TimeAxisProvider({
   });
 
   // ===== Refs =====
+  // 使用 ref 存儲 crosshair time，避免頻繁更新 state
+  const crosshairTimeRef = useRef<number | null>(null);
+  
   // 訂閱者映射：chartId -> callback
   const rangeSubscribers = useRef<Map<string, (range: TimeRange) => void>>(new Map());
   const crosshairSubscribers = useRef<Map<string, (time: number | null) => void>>(new Map());
+  
+  // 緩存 debug 值，避免依賴變化
+  const debugRef = useRef(debug);
+  debugRef.current = debug;
 
   /**
    * 記錄調試日誌
    */
   const log = useCallback((message: string, ...args: any[]) => {
-    if (debug) {
+    if (debugRef.current) {
       console.log(`[TimeAxisContext] ${message}`, ...args);
     }
-  }, [debug]);
+  }, []);
 
   /**
    * 更新可見範圍（即時同步，不使用 RAF 節流）
+   * 注意：只通知訂閱者，不頻繁更新 state
    */
   const updateVisibleRange = useCallback((range: TimeRange, sourceChartId?: string) => {
-    log('updateVisibleRange called', { range, sourceChartId });
-
-    // 更新 state
-    setSyncState(prev => ({
-      ...prev,
-      visibleRange: range,
-      isSyncing: true
-    }));
-
     // 立即通知所有訂閱者（除了源圖表）
     rangeSubscribers.current.forEach((callback, chartId) => {
       if (chartId !== sourceChartId) {
-        log(`Notifying chart ${chartId} of range change`);
         callback(range);
       }
     });
-
-    // 立即釋放同步狀態
-    setSyncState(prev => ({ ...prev, isSyncing: false }));
-  }, [log]);
+  }, []);
 
   /**
    * 更新十字游標位置
+   * 注意：不更新 state，只更新 ref 並通知訂閱者，避免重新渲染
    */
   const updateCrosshair = useCallback((time: number | null, sourceChartId?: string) => {
-    log('updateCrosshair called', { time, sourceChartId });
-
-    // 更新 state
-    setSyncState(prev => ({
-      ...prev,
-      crosshairTime: time
-    }));
+    // 只更新 ref，不更新 state
+    crosshairTimeRef.current = time;
 
     // 通知所有訂閱者（除了源圖表）
     crosshairSubscribers.current.forEach((callback, chartId) => {
       if (chartId !== sourceChartId) {
-        log(`Notifying chart ${chartId} of crosshair change`);
         callback(time);
       }
     });
-  }, [log]);
+  }, []);
 
   /**
    * 重置到 TO 中心
@@ -224,25 +215,14 @@ export function TimeAxisProvider({
     lookbackBars: number = 100,
     forwardBars: number = 50
   ) => {
-    log('resetToCenter called', { toTimestamp, lookbackBars, forwardBars });
-
     // 廣播特殊重置信號
     const resetSignal: TimeRange = { from: -999999, to: -999999 };
-
-    setSyncState(prev => ({
-      ...prev,
-      isSyncing: true
-    }));
 
     // 通知所有訂閱者執行重置
     rangeSubscribers.current.forEach((callback) => {
       callback(resetSignal);
     });
-
-    setTimeout(() => {
-      setSyncState(prev => ({ ...prev, isSyncing: false }));
-    }, 10);
-  }, [log]);
+  }, []);
 
   /**
    * 訂閱可見範圍變化
@@ -251,15 +231,13 @@ export function TimeAxisProvider({
     chartId: string,
     callback: (range: TimeRange) => void
   ): (() => void) => {
-    log(`Chart ${chartId} subscribed to visibleRange changes`);
     rangeSubscribers.current.set(chartId, callback);
 
     // 返回取消訂閱函數
     return () => {
-      log(`Chart ${chartId} unsubscribed from visibleRange changes`);
       rangeSubscribers.current.delete(chartId);
     };
-  }, [log]);
+  }, []);
 
   /**
    * 訂閱十字游標變化
@@ -268,25 +246,24 @@ export function TimeAxisProvider({
     chartId: string,
     callback: (time: number | null) => void
   ): (() => void) => {
-    log(`Chart ${chartId} subscribed to crosshair changes`);
     crosshairSubscribers.current.set(chartId, callback);
 
     // 返回取消訂閱函數
     return () => {
-      log(`Chart ${chartId} unsubscribed from crosshair changes`);
       crosshairSubscribers.current.delete(chartId);
     };
-  }, [log]);
+  }, []);
 
   // ===== Context Value =====
-  const contextValue: TimeAxisContextValue = {
+  // 使用 useMemo 避免每次渲染創建新對象
+  const contextValue: TimeAxisContextValue = React.useMemo(() => ({
     syncState,
     updateVisibleRange,
     updateCrosshair,
     resetToCenter,
     subscribeVisibleRangeChange,
     subscribeCrosshairChange
-  };
+  }), [syncState, updateVisibleRange, updateCrosshair, resetToCenter, subscribeVisibleRangeChange, subscribeCrosshairChange]);
 
   return (
     <TimeAxisContext.Provider value={contextValue}>

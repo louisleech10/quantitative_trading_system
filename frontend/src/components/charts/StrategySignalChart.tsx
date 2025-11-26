@@ -20,6 +20,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useChartSync } from "@/hooks/useChartSync";
+import { darkChartOptions } from "@/utils/chartConfig";
 import {
   candlestickSeriesOptions,
   formatTime,
@@ -66,6 +67,7 @@ export interface SignalPoint {
   timestamp: number;
   indicator_values: Record<string, number>; // 例: { ema_short: 7, ema_mid: 18, ema_long: 35 }
   signal_density?: number; // 信號密度 (0-1)
+  windowType?: 'near' | 'far'; // 窗口類型: 近期窗口或遠期窗口
 }
 
 /**
@@ -178,24 +180,20 @@ export function StrategySignalChart({
   onSignalHover,
   indicatorSeries = [],
 }: StrategySignalChartProps) {
-  console.log("[StrategySignalChart] Initializing with:", {
-    chartId,
-    enableSync,
-    signalCount: signalPoints.length,
-    toTimestamp: toTimestamp || caseTimestamp,
-  });
 
   const { chartContainerRef, chartInstance, isReady } = useChartSync({
     chartId,
     toTimestamp: toTimestamp || caseTimestamp || 0,
     enableSync,
     debug: true,
+    chartOptions: darkChartOptions,
   });
 
   // 狀態管理
   const [error, setError] = useState<string | null>(null);
   const [hoveredData, setHoveredData] = useState<KlineData | null>(null);
   const [hoveredSignal, setHoveredSignal] = useState<SignalPoint | null>(null);
+  const [hoveredIndicators, setHoveredIndicators] = useState<Record<string, number>>({});
 
   // 保存 series 引用，用於 cleanup
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -215,7 +213,8 @@ export function StrategySignalChart({
   useEffect(() => {
     onSignalHoverRef.current = onSignalHover;
     onSignalClickRef.current = onSignalClick;
-  }, [onSignalHover, onSignalClick]);
+    indicatorSeriesRef.current = indicatorSeries;
+  }, [onSignalHover, onSignalClick, indicatorSeries]);
   
   // 更新 indicatorSeries ref（淺比較）
   useEffect(() => {
@@ -342,23 +341,26 @@ export function StrategySignalChart({
         }
       }
 
-      // 2. 添加策略信號標記 (綠色向上箭頭)
+      // 2. 添加策略信號標記 (根據窗口類型使用不同顏色)
       if (showSignalMarkers && signalPoints.length > 0) {
         signalPoints.forEach((signal) => {
+          // 根據 windowType 決定顏色: 近期窗口藍色，遠期窗口土黃色
+          const color = signal.windowType === 'near' ? '#3B82F6' : '#CA8A04';
+          const text = signal.windowType === 'near' ? 'N' : 'F';
+          
           markers.push({
             time: toUtcTime(signal.timestamp),
             position: "belowBar" as const,
-            color: "#4CAF50", // 綠色 - 信號
+            color: color,
             shape: "arrowUp" as const,
-            text: "S", // Signal
-            id: `signal-${signal.timestamp}`, // 用於點擊識別
+            text: text,
+            id: `signal-${signal.timestamp}`,
           });
         });
-
-        console.log(
-          `[StrategySignalChart] Added ${signalPoints.length} signal markers`
-        );
       }
+
+      // 按時間排序標記（Lightweight Charts 要求）
+      markers.sort((a, b) => (a.time as number) - (b.time as number));
 
       // 設置所有標記
       candlestickSeries.setMarkers(markers);
@@ -369,17 +371,26 @@ export function StrategySignalChart({
         chartInstance.timeScale().fitContent();
       }
 
-      console.log(`[StrategySignalChart] Rendered ${formattedKlines.length} klines and ${markers.length} markers for ${symbol}`);
-
       // 訂閱懸停事件 (用於顯示 OHLCV 和信號資訊)
       const handleCrosshairMove = (param: MouseEventParams<Time>) => {
         const hoveredTime = extractNumericTime(param.time);
+        
         if (hoveredTime !== null) {
           // 查找懸停的 K線
           const hoveredKline = klines.find((k) => k.timestamp === hoveredTime);
           if (hoveredKline) {
             setHoveredData(hoveredKline);
           }
+
+          // 查找懸停的指標值
+          const indicatorValues: Record<string, number> = {};
+          indicatorSeriesRef.current.forEach((series) => {
+            const point = series.data.find((d) => d.time === hoveredTime);
+            if (point) {
+              indicatorValues[series.id] = point.value;
+            }
+          });
+          setHoveredIndicators(indicatorValues);
 
           // 查找懸停的信號點
           const hoveredSignalPoint = signalPoints.find(
@@ -408,6 +419,7 @@ export function StrategySignalChart({
         } else {
           setHoveredData(null);
           setHoveredSignal(null);
+          setHoveredIndicators({});
           if (onSignalHoverRef.current) {
             onSignalHoverRef.current(null);
           }
@@ -511,6 +523,7 @@ export function StrategySignalChart({
         lineWidth: 2,
         priceScaleId: "right",
         lastValueVisible: false,
+        priceLineVisible: false,
       });
       line.setData(
         series.data.map((point) => ({
@@ -535,53 +548,74 @@ export function StrategySignalChart({
 
   return (
     <div
-      className="w-full flex flex-col bg-white"
+      className="w-full flex flex-col bg-[#1e1e1e]"
       style={{ height: `${height}px` }}
     >
       {/* 頂部資訊欄 */}
-      <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className="text-sm font-semibold text-gray-100">
             {symbol} / {timeframe}
           </h3>
-          <span className="text-xs text-gray-500">策略信號圖表</span>
+          <span className="text-xs text-gray-400">策略信號圖表</span>
 
-          {/* 信號統計 */}
+          {/* 信號統計 - 顯示 Near(藍) 和 Far(土黃) 計數 */}
           {showSignalMarkers && signalPoints.length > 0 && (
-            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
-              {signalPoints.length} 個信號
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
+                <span style={{ color: '#3B82F6' }}>▼</span>
+                N: {signalPoints.filter(s => s.windowType === 'near').length}
+              </span>
+              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded flex items-center gap-1">
+                <span style={{ color: '#CA8A04' }}>▼</span>
+                F: {signalPoints.filter(s => s.windowType === 'far').length}
+              </span>
+            </div>
           )}
         </div>
 
         {/* OHLCV 懸停資訊 */}
         {hoveredData && (
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-gray-600">
+          <div className="flex items-center gap-3 text-xs flex-wrap">
+            <span className="text-gray-300">
               O: <span className="font-mono">{formatPrice(hoveredData.open)}</span>
             </span>
-            <span className="text-gray-600">
+            <span className="text-gray-300">
               H: <span className="font-mono">{formatPrice(hoveredData.high)}</span>
             </span>
-            <span className="text-gray-600">
+            <span className="text-gray-300">
               L: <span className="font-mono">{formatPrice(hoveredData.low)}</span>
             </span>
-            <span className="text-gray-600">
+            <span className="text-gray-300">
               C:{" "}
               <span
                 className={`font-mono ${
                   hoveredData.close >= hoveredData.open
-                    ? "text-green-600"
-                    : "text-red-600"
+                    ? "text-green-400"
+                    : "text-red-400"
                 }`}
               >
                 {formatPrice(hoveredData.close)}
               </span>
             </span>
-            <span className="text-gray-600">
+            <span className="text-gray-300">
               V: <span className="font-mono">{formatVolume(hoveredData.volume)}</span>
             </span>
-            <span className="text-gray-400">
+            {/* 指標值顯示 */}
+            {indicatorSeries.map((series) => {
+              const value = hoveredIndicators[series.id];
+              if (value === undefined) return null;
+              return (
+                <span key={series.id} className="text-gray-300">
+                  <span style={{ color: series.color }}>●</span>{" "}
+                  {series.label?.replace(/\s*\(\d+\)/, "") || series.id}:{" "}
+                  <span className="font-mono" style={{ color: series.color }}>
+                    {formatPrice(value)}
+                  </span>
+                </span>
+              );
+            })}
+            <span className="text-gray-500">
               {formatTime(hoveredData.timestamp)}
             </span>
           </div>
@@ -597,8 +631,8 @@ export function StrategySignalChart({
 
         {/* 錯誤提示 */}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-red-50">
-            <div className="text-sm text-red-600">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e]">
+            <div className="text-sm text-red-400">
               <span className="mr-2">⚠️</span>
               {error}
             </div>
@@ -607,7 +641,7 @@ export function StrategySignalChart({
 
         {/* 載入中提示 */}
         {!isReady && !error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e]">
             <div className="text-sm text-gray-400">載入圖表中...</div>
           </div>
         )}

@@ -16,6 +16,7 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useChartSync } from '../../hooks/useChartSync';
+import { darkChartOptions } from '../../utils/chartConfig';
 import { useTimeAxis } from '@/contexts/TimeAxisContext';
 import {
   formatPercentage,
@@ -24,6 +25,7 @@ import {
 import { ISeriesApi, LineStyle, UTCTimestamp } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
 import type { WindowOverlayRange, IndicatorLineSeries } from './TradingChartWithSignals';
+import type { SignalPoint } from './StrategySignalChart';
 
 const toUtcTime = (timestamp: number): UTCTimestamp =>
   timestamp as UTCTimestamp;
@@ -81,6 +83,11 @@ export interface TakerRatioChartProps {
    * 指標線資料（基於 taker_ratio/taker_buy_volume 計算的 EMA 等指標）
    */
   indicatorSeries?: IndicatorLineSeries[];
+
+  /**
+   * 策略信號點（用於標記策略條件符合的 K 線）
+   */
+  signalPoints?: SignalPoint[];
 }
 
 /**
@@ -96,24 +103,31 @@ export function TakerRatioChart({
   toTimestamp,
   tcTimestamp,
   windowOverlays = [],
-  indicatorSeries = []
+  indicatorSeries = [],
+  signalPoints = []
 }: TakerRatioChartProps) {
-  console.log('[TakerRatioChart] Initializing with:', { chartId, enableSync, toTimestamp });
-  
   const { chartContainerRef, chartInstance, isReady } = useChartSync({
     chartId,
     toTimestamp: toTimestamp || (klines.length > 0 ? klines[0].timestamp : Date.now() / 1000),
     enableSync,
-    debug: true
+    debug: true,
+    chartOptions: darkChartOptions
   });
   const { subscribeCrosshairChange } = useTimeAxis();
 
   // 狀態管理
   const [error, setError] = useState<string | null>(null);
   const [hoveredRatio, setHoveredRatio] = useState<number | null>(null);
+  const [hoveredIndicators, setHoveredIndicators] = useState<Record<string, number>>({});
 
   // 保存series引用，用於cleanup
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+
+  // 使用 ref 緩存 indicatorSeries，避免閉包問題
+  const indicatorSeriesRef = useRef(indicatorSeries);
+  useEffect(() => {
+    indicatorSeriesRef.current = indicatorSeries;
+  }, [indicatorSeries]);
   const buyAreaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
   const sellAreaSeriesRef = useRef<ISeriesApi<'Area'> | null>(null);
 
@@ -222,6 +236,8 @@ export function TakerRatioChart({
         bottomColor: `rgba(239, 83, 80, 0.02)`,
         lineColor: 'transparent',
         priceScaleId: 'taker_ratio',
+        lastValueVisible: false,
+        priceLineVisible: false,
       });
       sellAreaSeriesRef.current = sellAreaSeries;
 
@@ -231,6 +247,8 @@ export function TakerRatioChart({
         bottomColor: `rgba(38, 166, 154, 0.02)`,
         lineColor: 'transparent',
         priceScaleId: 'taker_ratio',
+        lastValueVisible: false,
+        priceLineVisible: false,
       });
       buyAreaSeriesRef.current = buyAreaSeries;
 
@@ -244,6 +262,8 @@ export function TakerRatioChart({
           precision: 2,
           minMove: 0.01,
         },
+        lastValueVisible: false,
+        priceLineVisible: false,
       });
       lineSeriesRef.current = lineSeries;
 
@@ -263,6 +283,19 @@ export function TakerRatioChart({
       sellAreaSeries.setData(sellAreaData);
       buyAreaSeries.setData(buyAreaData);
       lineSeries.setData(takerRatioData);
+
+      // 在主線上設置信號標記
+      if (signalPoints.length > 0) {
+        const markers = signalPoints.map((signal) => ({
+          time: toUtcTime(signal.timestamp),
+          position: 'aboveBar' as const,
+          color: signal.windowType === 'near' ? '#3B82F6' : '#CA8A04',
+          shape: 'arrowDown' as const,
+          text: signal.windowType === 'near' ? 'N' : 'F',
+        }));
+        lineSeries.setMarkers(markers);
+        console.log(`[TakerRatioChart] Set ${markers.length} signal markers on main line`);
+      }
 
       // 添加0.5參考線（中性線，虛線）
       lineSeries.createPriceLine({
@@ -292,15 +325,25 @@ export function TakerRatioChart({
 
       console.log(`[TakerRatioChart] Rendered ${takerRatioData.length} taker ratio data for ${symbol}`);
 
-      // 訂閱懸停事件
+      // 訂閱懸停事件（用於顯示 Taker Ratio 和指標值）
       const handleCrosshairMove = (param: any) => {
         if (param.time) {
           const hoveredKline = klines.find(k => k.timestamp === param.time);
           if (hoveredKline && hoveredKline.taker_ratio !== undefined) {
             setHoveredRatio(hoveredKline.taker_ratio);
           }
+          // 查找指標值（使用 ref 避免閉包問題）
+          const indicatorValues: Record<string, number> = {};
+          indicatorSeriesRef.current.forEach((series) => {
+            const point = series.data.find((d) => d.time === param.time);
+            if (point) {
+              indicatorValues[series.id] = point.value;
+            }
+          });
+          setHoveredIndicators(indicatorValues);
         } else {
           setHoveredRatio(null);
+          setHoveredIndicators({});
         }
       };
 
@@ -311,8 +354,19 @@ export function TakerRatioChart({
         if (time !== null) {
           const hoveredKline = klines.find(k => k.timestamp === time);
           setHoveredRatio(hoveredKline?.taker_ratio ?? null);
+          
+          // 查找指標值（使用 ref 避免閉包問題）
+          const indicatorValues: Record<string, number> = {};
+          indicatorSeriesRef.current.forEach((series) => {
+            const point = series.data.find((d) => d.time === time);
+            if (point) {
+              indicatorValues[series.id] = point.value;
+            }
+          });
+          setHoveredIndicators(indicatorValues);
         } else {
           setHoveredRatio(null);
+          setHoveredIndicators({});
         }
       });
 
@@ -340,7 +394,7 @@ export function TakerRatioChart({
       console.error('[TakerRatioChart] Failed to render chart:', err);
       setError(err instanceof Error ? err.message : 'Failed to render taker ratio chart');
     }
-  }, [chartInstance, isReady, klines, symbol]);
+  }, [chartInstance, isReady, klines, symbol, signalPoints]);
 
   // 指標線渲染 refs
   const indicatorLineRefs = useRef<ISeriesApi<'Line'>[]>([]);
@@ -383,6 +437,7 @@ export function TakerRatioChart({
         lineWidth: 2,
         priceScaleId: "taker_ratio",
         lastValueVisible: false,
+        priceLineVisible: false,
       });
       line.setData(
         series.data.map((point) => ({
@@ -406,41 +461,70 @@ export function TakerRatioChart({
   }, [chartInstance, indicatorSeries, isReady]);
 
   return (
-    <div className="w-full flex flex-col bg-white border-t border-gray-200" style={{ height: `${height}px` }}>
+    <div className="w-full flex flex-col bg-[#1e1e1e] border-t border-gray-700" style={{ height: `${height}px` }}>
       {/* 頂部標籤 */}
-      <div className="px-4 py-1 flex items-center justify-between border-b border-gray-100">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-700">Taker Ratio</span>
+      <div className="px-4 py-1 flex items-center justify-between border-b border-gray-700">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-gray-300">Taker Ratio</span>
+          
+          {/* 信號統計 - 顯示 Near(藍) 和 Far(土黃) 計數 */}
+          {signalPoints.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
+                <span style={{ color: '#3B82F6' }}>▼</span>
+                N: {signalPoints.filter(s => s.windowType === 'near').length}
+              </span>
+              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded flex items-center gap-1">
+                <span style={{ color: '#CA8A04' }}>▼</span>
+                F: {signalPoints.filter(s => s.windowType === 'far').length}
+              </span>
+            </div>
+          )}
+          
           {hoveredRatio !== null && (
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-gray-300">
               {formatPercentage(hoveredRatio)}
               {' - '}
               {hoveredRatio > 0.5 ? (
-                <span className="text-green-600">買盤強</span>
+                <span className="text-green-400">買盤強</span>
               ) : hoveredRatio < 0.5 ? (
-                <span className="text-red-600">賣盤強</span>
+                <span className="text-red-400">賣盤強</span>
               ) : (
-                <span className="text-gray-600">中性</span>
+                <span className="text-gray-400">中性</span>
               )}
             </span>
           )}
+          {/* 指標值顯示 */}
+          {indicatorSeries.map((series) => {
+            const value = hoveredIndicators[series.id];
+            if (value === undefined) return null;
+            return (
+              <span key={series.id} className="text-xs text-gray-300">
+                <span style={{ color: series.color }}>●</span>{" "}
+                {series.label?.replace(/\s*\(\d+\)/, "") || series.id}:{" "}
+                <span className="font-mono" style={{ color: series.color }}>
+                  {formatPercentage(value)}
+                </span>
+              </span>
+            );
+          })}
         </div>
       </div>
 
       {/* 圖表容器 */}
       <div className="flex-1 relative">
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] z-20">
             <div className="text-center">
-              <div className="text-red-500 text-xl mb-1">⚠️</div>
-              <p className="text-xs text-red-600">{error}</p>
+              <div className="text-red-400 text-xl mb-1">⚠️</div>
+              <p className="text-xs text-red-400">{error}</p>
             </div>
           </div>
         )}
 
         {klines.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-20">
-            <p className="text-xs text-gray-500">無Taker Ratio數據</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] z-20">
+            <p className="text-xs text-gray-400">無Taker Ratio數據</p>
           </div>
         )}
 

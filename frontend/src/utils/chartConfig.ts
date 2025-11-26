@@ -153,6 +153,8 @@ export const candlestickSeriesOptions = {
   borderDownColor: chartColors.downColor,
   wickUpColor: chartColors.upWickColor,
   wickDownColor: chartColors.downWickColor,
+  lastValueVisible: false,
+  priceLineVisible: false,
 };
 
 /**

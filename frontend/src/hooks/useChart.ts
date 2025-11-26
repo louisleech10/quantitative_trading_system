@@ -80,6 +80,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
   const chartOptionsRef = useRef(options?.chartOptions);
 
   const [isReady, setIsReady] = useState(false);
+  const [chartInstance, setChartInstance] = useState<IChartApi | null>(null);
 
   // 只在首次掛載時創建圖表，不因 options 變化而重新創建
   useEffect(() => {
@@ -97,6 +98,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
     // 創建圖表實例
     const chart = createChart(chartContainerRef.current, mergedOptions);
     chartInstanceRef.current = chart;
+    setChartInstance(chart);
 
     // 標記為已準備
     setIsReady(true);
@@ -131,6 +133,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
       if (chartInstanceRef.current) {
         chartInstanceRef.current.remove();
         chartInstanceRef.current = null;
+        setChartInstance(null);
       }
 
       setIsReady(false);
@@ -139,7 +142,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
 
   return {
     chartContainerRef,
-    chartInstance: chartInstanceRef.current,
+    chartInstance,
     isReady,
   };
 }

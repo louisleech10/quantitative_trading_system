@@ -122,6 +122,16 @@ export interface TradingChartWithSignalsProps {
    * 近/遠窗口覆蓋範圍
    */
   windowOverlays?: WindowOverlayRange[];
+
+  /**
+   * Volume 圖表的策略信號點
+   */
+  volumeSignalPoints?: SignalPoint[];
+
+  /**
+   * Taker Ratio 圖表的策略信號點
+   */
+  takerSignalPoints?: SignalPoint[];
 }
 
 /**
@@ -130,16 +140,8 @@ export interface TradingChartWithSignalsProps {
  * 垂直堆疊三個圖表，並添加策略信號可視化
  */
 export function TradingChartWithSignals(props: TradingChartWithSignalsProps) {
-  console.log("[TradingChartWithSignals] Rendering with props:", {
-    symbol: props.symbol,
-    timeframe: props.timeframe,
-    toTimestamp: props.toTimestamp,
-    klinesCount: props.klines.length,
-    signalCount: props.signalPoints?.length || 0,
-  });
-
   return (
-    <TimeAxisProvider debug={true}>
+    <TimeAxisProvider debug={false}>
       <TradingChartWithSignalsInner {...props} />
     </TimeAxisProvider>
   );
@@ -165,6 +167,8 @@ function TradingChartWithSignalsInner({
   volumeIndicatorSeries = [],
   takerIndicatorSeries = [],
   windowOverlays = [],
+  volumeSignalPoints = [],
+  takerSignalPoints = [],
 }: TradingChartWithSignalsProps) {
   // 合併 indicatorSeries 和 priceIndicatorSeries（向後兼容）
   const effectivePriceIndicatorSeries = priceIndicatorSeries ?? indicatorSeries;
@@ -173,7 +177,11 @@ function TradingChartWithSignalsInner({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ===== Context =====
-  const { resetToCenter, subscribeCrosshairChange } = useTimeAxis();
+  const { resetToCenter } = useTimeAxis();
+  
+  // 使用 ref 穩定 resetToCenter，避免 useEffect 重複執行
+  const resetToCenterRef = useRef(resetToCenter);
+  resetToCenterRef.current = resetToCenter;
 
   // ===== State =====
   const [isInitialized, setIsInitialized] = useState(false);
@@ -186,10 +194,10 @@ function TradingChartWithSignalsInner({
   });
   const [crosshairX, setCrosshairX] = useState<number | null>(null);
 
-  // ===== 高度分配（5:2:2:1 比例）=====
-  const priceHeight = Math.floor(totalHeight * 0.5); // 50% - 策略信號圖
-  const volumeHeight = Math.floor(totalHeight * 0.25); // 25% - 成交量圖
-  const takerRatioHeight = Math.floor(totalHeight * 0.25); // 25% - Taker Ratio 圖
+  // ===== 高度分配（調整為 K線:成交量:Taker = 10:7:7 比例）=====
+  const priceHeight = Math.floor(totalHeight * 0.42); // 42% - 策略信號圖
+  const volumeHeight = Math.floor(totalHeight * 0.29); // 29% - 成交量圖（約為 K 線的 70%）
+  const takerRatioHeight = Math.floor(totalHeight * 0.29); // 29% - Taker Ratio 圖（約為 K 線的 70%）
 
   const timelineRange = useMemo(() => {
     if (!klines.length) return null;
@@ -261,11 +269,11 @@ function TradingChartWithSignalsInner({
       setIsInitialized(true);
       // 初始化完成後，觸發一次 fitContent 同步所有圖表
       setTimeout(() => {
-        resetToCenter(toTimestamp || 0);
+        resetToCenterRef.current(toTimestamp || 0);
       }, 100);
     }, 50);
     return () => clearTimeout(timer);
-  }, [toTimestamp, resetToCenter]);
+  }, [toTimestamp]); // 移除 resetToCenter 依賴，使用 ref
 
   /**
    * 監聽滑鼠移動，用於 tooltip 位置
@@ -403,6 +411,7 @@ function TradingChartWithSignalsInner({
                 tcTimestamp={showVolumeToTcMarkers ? tcTimestamp : undefined}
                 windowOverlays={windowOverlays}
                 indicatorSeries={volumeIndicatorSeries}
+                signalPoints={volumeSignalPoints}
               />
             </div>
 
@@ -419,6 +428,7 @@ function TradingChartWithSignalsInner({
                 tcTimestamp={showVolumeToTcMarkers ? tcTimestamp : undefined}
                 windowOverlays={windowOverlays}
                 indicatorSeries={takerIndicatorSeries}
+                signalPoints={takerSignalPoints}
               />
             </div>
           </>
@@ -431,31 +441,6 @@ function TradingChartWithSignalsInner({
         mousePosition={mousePosition}
         showArrow={true}
       />
-
-      {/* 信號統計面板（右上角） */}
-      {showSignalMarkers && signalPoints.length > 0 && (
-        <div className="absolute top-4 right-4 z-20">
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-2">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-gray-700">
-                策略信號統計
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">總計:</span>
-                <span className="text-sm font-bold text-green-600">
-                  {signalPoints.length}
-                </span>
-                <span className="text-xs text-gray-500">個信號</span>
-              </div>
-              {signalPoints.length >= 500 && (
-                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">
-                  ⚠️ 已達上限
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

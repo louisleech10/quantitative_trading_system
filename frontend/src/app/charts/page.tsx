@@ -16,7 +16,9 @@ import {
 import {
   TradingChartWithSignals,
   type IndicatorLineSeries,
+  type WindowOverlayRange,
 } from "@/components/charts/TradingChartWithSignals";
+import type { SignalPoint } from "@/components/charts/StrategySignalChart";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -105,24 +107,12 @@ const formatTimestampDate = (timestamp?: number) => {
   return new Date(timestamp * 1000).toISOString().slice(0, 10);
 };
 
-const calculateEMA = (
-  klines: ChartKline[],
-  period: number
-): Array<{ time: number; value: number }> => {
-  if (!period || klines.length === 0) return [];
-  const multiplier = 2 / (period + 1);
-  let ema = klines[0].close;
-  return klines.map((kline, index) => {
-    if (index === 0) {
-      ema = kline.close;
-    } else {
-      ema = (kline.close - ema) * multiplier + ema;
-    }
-    return { time: kline.timestamp, value: ema };
-  });
-};
+// ============ 指標顏色配置 ============
 
 const AVAILABLE_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d"];
+
+// 空數組常量，避免重新渲染
+const EMPTY_ARRAY: never[] = [];
 
 // ============ 主組件 ============
 
@@ -345,10 +335,162 @@ export default function ChartsPage() {
     [indicatorSeries, indicatorVisibility]
   );
   
-  // 根據數據源將指標分配到對應的圖表
-  const priceIndicatorSeries = isPriceSource ? activeIndicatorSeries : [];
-  const volumeIndicatorSeries = isVolumeSource ? activeIndicatorSeries : [];
-  const takerIndicatorSeries = isTakerSource ? activeIndicatorSeries : [];
+  // 根據數據源將指標分配到對應的圖表（使用 useMemo 穩定引用）
+  const priceIndicatorSeries = useMemo(() => isPriceSource ? activeIndicatorSeries : EMPTY_ARRAY as IndicatorLineSeries[], [isPriceSource, activeIndicatorSeries]);
+  const volumeIndicatorSeries = useMemo(() => isVolumeSource ? activeIndicatorSeries : EMPTY_ARRAY as IndicatorLineSeries[], [isVolumeSource, activeIndicatorSeries]);
+  const takerIndicatorSeries = useMemo(() => isTakerSource ? activeIndicatorSeries : EMPTY_ARRAY as IndicatorLineSeries[], [isTakerSource, activeIndicatorSeries]);
+
+  // ============ 計算近窗口遮罩 (near window overlay) ============
+  const windowOverlays = useMemo<WindowOverlayRange[]>(() => {
+    // 需要 alignedCaseTimestamp (TO 時間戳) 和 timeframe 來計算
+    const toTs = alignedCaseTimestamp ?? selectedTimestamp;
+    if (!toTs || !selectedTimeframe) return [];
+    
+    // 從 state 獲取 lookback_bars (近窗口範圍)
+    const nearWindowBars = state.windowConfig?.lookback_bars ?? 24;
+    
+    // 將 timeframe 轉換為秒數
+    const getTimeframeSeconds = (tf: string): number => {
+      const match = tf.match(/^(\d+)([mhdwM])$/);
+      if (!match) return 43200; // 默認 12h
+      const [, numStr, unit] = match;
+      const num = parseInt(numStr, 10);
+      switch (unit) {
+        case "m": return num * 60;
+        case "h": return num * 3600;
+        case "d": return num * 86400;
+        case "w": return num * 604800;
+        case "M": return num * 2592000; // ~30 days
+        default: return 43200;
+      }
+    };
+    
+    const barSeconds = getTimeframeSeconds(selectedTimeframe);
+    
+    // near window: TO - nearWindowBars 到 TO - 1
+    // 使用 bar 的結束時間作為時間戳 (因為 K 線 timestamp 是開盤時間)
+    const nearStartTs = toTs - nearWindowBars * barSeconds;
+    const nearEndTs = toTs - barSeconds; // TO - 1 bar
+    
+    return [
+      {
+        type: "near" as const,
+        startTimestamp: nearStartTs,
+        endTimestamp: nearEndTs,
+      },
+    ];
+  }, [alignedCaseTimestamp, selectedTimestamp, selectedTimeframe, state.windowConfig?.lookback_bars]);
+
+  // ============ 計算策略信號點 ============
+  const signalPoints = useMemo<SignalPoint[]>(() => {
+    // 需要指標數據和策略邏輯
+    if (!chartData || chartData.klines.length === 0) return [];
+    if (indicatorSeries.length < 3) return []; // 需要至少 3 條 EMA 線
+    
+    const strategyLogic = state.strategyLogic;
+    if (!strategyLogic) return [];
+    
+    // 獲取 EMA 數據
+    const emaShort = indicatorSeries.find(s => s.id === 'ema_short')?.data ?? [];
+    const emaMid = indicatorSeries.find(s => s.id === 'ema_mid')?.data ?? [];
+    const emaLong = indicatorSeries.find(s => s.id === 'ema_long')?.data ?? [];
+    
+    if (emaShort.length === 0 || emaMid.length === 0 || emaLong.length === 0) return [];
+    
+    // 獲取窗口配置
+    const toTs = alignedCaseTimestamp ?? selectedTimestamp;
+    const nearBars = state.windowConfig?.lookback_bars ?? 24;
+    const farBars = state.windowConfig?.far_lookback_bars; // 可能為 undefined
+    
+    // 計算 timeframe 秒數
+    const getTimeframeSeconds = (tf: string): number => {
+      const match = tf.match(/^(\d+)([mhdwM])$/);
+      if (!match) return 43200;
+      const [, numStr, unit] = match;
+      const num = parseInt(numStr, 10);
+      switch (unit) {
+        case "m": return num * 60;
+        case "h": return num * 3600;
+        case "d": return num * 86400;
+        case "w": return num * 604800;
+        case "M": return num * 2592000;
+        default: return 43200;
+      }
+    };
+    
+    const barSeconds = selectedTimeframe ? getTimeframeSeconds(selectedTimeframe) : 43200;
+    
+    // 計算窗口邊界時間戳
+    const nearStartTs = toTs ? toTs - nearBars * barSeconds : 0;
+    const nearEndTs = toTs ? toTs - barSeconds : 0; // TO - 1
+    const farStartTs = toTs && farBars ? toTs - farBars * barSeconds : 0;
+    const farEndTs = toTs ? toTs - (nearBars + 1) * barSeconds : 0; // TO - nearBars - 1
+    
+    const signals: SignalPoint[] = [];
+    
+    // 遍歷每個時間點檢查策略條件
+    chartData.klines.forEach((kline, index) => {
+      const ts = kline.timestamp;
+      
+      // 查找對應的 EMA 值
+      const shortVal = emaShort.find(d => d.time === ts)?.value;
+      const midVal = emaMid.find(d => d.time === ts)?.value;
+      const longVal = emaLong.find(d => d.time === ts)?.value;
+      
+      if (shortVal === undefined || midVal === undefined || longVal === undefined) return;
+      
+      // 檢查策略條件
+      let conditionMet = false;
+      if (strategyLogic === 'three_line') {
+        conditionMet = shortVal > midVal && midVal > longVal;
+      } else if (strategyLogic === 'short_long_cross') {
+        conditionMet = shortVal > longVal;
+      } else if (strategyLogic === 'mid_long_cross') {
+        conditionMet = midVal > longVal;
+      }
+      
+      if (!conditionMet) return;
+      
+      // 判斷屬於哪個窗口
+      let windowType: 'near' | 'far' | undefined;
+      
+      if (toTs) {
+        if (ts >= nearStartTs && ts <= nearEndTs) {
+          windowType = 'near';
+        } else if (farBars) {
+          // 有設定 far_lookback_bars
+          if (ts >= farStartTs && ts <= farEndTs) {
+            windowType = 'far';
+          }
+        } else {
+          // 沒設定 far_lookback_bars，近期以外都是遠期
+          if (ts < nearStartTs) {
+            windowType = 'far';
+          }
+        }
+      }
+      
+      // 只有在窗口內的信號才加入
+      if (windowType) {
+        signals.push({
+          timestamp: ts,
+          indicator_values: {
+            ema_short: shortVal,
+            ema_mid: midVal,
+            ema_long: longVal,
+          },
+          windowType,
+        });
+      }
+    });
+    
+    return signals;
+  }, [chartData, indicatorSeries, state.strategyLogic, state.windowConfig, alignedCaseTimestamp, selectedTimestamp, selectedTimeframe]);
+
+  // 根據數據源分配信號點到對應圖表（使用 useMemo 穩定引用）
+  const priceSignalPoints = useMemo(() => isPriceSource ? signalPoints : EMPTY_ARRAY as SignalPoint[], [isPriceSource, signalPoints]);
+  const volumeSignalPoints = useMemo(() => isVolumeSource ? signalPoints : EMPTY_ARRAY as SignalPoint[], [isVolumeSource, signalPoints]);
+  const takerSignalPoints = useMemo(() => isTakerSource ? signalPoints : EMPTY_ARRAY as SignalPoint[], [isTakerSource, signalPoints]);
 
   const handleToggleSeries = (seriesId: string) => {
     setIndicatorVisibility((prev) => ({ ...prev, [seriesId]: !prev[seriesId] }));
@@ -405,7 +547,7 @@ export default function ChartsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-4">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 text-sm text-slate-500">
@@ -426,7 +568,7 @@ export default function ChartsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 space-y-6">
+      <main className="px-6 py-6 space-y-6">
         {/* 案例選擇 */}
         <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-700 mb-4">案例選擇</h2>
@@ -523,15 +665,18 @@ export default function ChartsPage() {
                   symbol={selectedSymbol}
                   timeframe={selectedTimeframe}
                   klines={chartData.klines}
-                  signalPoints={[]}
+                  signalPoints={priceSignalPoints}
                   toTimestamp={alignedCaseTimestamp ?? selectedTimestamp ?? 0}
                   tcTimestamp={alignedTcTimestamp ?? undefined}
                   totalHeight={700}
-                  showSignalMarkers={false}
+                  showSignalMarkers={priceSignalPoints.length > 0}
                   priceIndicatorSeries={priceIndicatorSeries}
                   volumeIndicatorSeries={volumeIndicatorSeries}
                   takerIndicatorSeries={takerIndicatorSeries}
+                  volumeSignalPoints={volumeSignalPoints}
+                  takerSignalPoints={takerSignalPoints}
                   showVolumeToTcMarkers={false}
+                  windowOverlays={EMPTY_ARRAY}
                 />
               </div>
             ) : (
@@ -546,16 +691,45 @@ export default function ChartsPage() {
           )}
         </section>
 
-        {/* 調試信息 */}
+        {/* 信號統計 */}
         {chartData && (
           <section className="bg-slate-100 rounded-lg p-4 text-xs text-slate-600">
-            <p className="font-semibold mb-2">調試信息</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div>to_index: {chartData.to_index ?? "null"}</div>
-              <div>tc_index: {chartData.tc_index ?? "null"}</div>
-              <div>case_bars: {chartData.case_bars ?? "null"}</div>
-              <div>total_bars: {chartData.metadata.total_bars}</div>
-            </div>
+            <p className="font-semibold mb-2">信號統計</p>
+            {(() => {
+              const nearCount = signalPoints.filter(s => s.windowType === 'near').length;
+              const farCount = signalPoints.filter(s => s.windowType === 'far').length;
+              const totalBars = chartData.metadata.total_bars;
+              const nearBars = state.windowConfig?.lookback_bars ?? 24;
+              const farBars = state.windowConfig?.far_lookback_bars ?? (totalBars - nearBars);
+              const nearRatio = nearBars > 0 ? (nearCount / nearBars * 100) : 0;
+              const farRatio = farBars > 0 ? (farCount / farBars * 100) : 0;
+              // Near/Far 比率 = Near密度 / Far密度
+              const densityRatio = farRatio > 0 ? (nearRatio / farRatio).toFixed(2) : (nearRatio > 0 ? '∞' : '0.00');
+              
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#3B82F6' }}></span>
+                    <span>Near 信號: <strong>{nearCount}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#CA8A04' }}></span>
+                    <span>Far 信號: <strong>{farCount}</strong></span>
+                  </div>
+                  <div>
+                    Near 密度: <strong>{nearRatio.toFixed(1)}%</strong>
+                    <span className="text-gray-400 ml-1">({nearCount}/{nearBars} bars)</span>
+                  </div>
+                  <div>
+                    Far 密度: <strong>{farRatio.toFixed(1)}%</strong>
+                    <span className="text-gray-400 ml-1">({farCount}/{farBars} bars)</span>
+                  </div>
+                  <div>
+                    Near/Far 密度比: <strong className={parseFloat(String(densityRatio)) > 1 ? 'text-green-600' : parseFloat(String(densityRatio)) < 1 ? 'text-red-600' : ''}>{densityRatio}</strong>
+                  </div>
+                </div>
+              );
+            })()}
           </section>
         )}
       </main>
