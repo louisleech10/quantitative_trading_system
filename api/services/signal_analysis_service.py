@@ -122,9 +122,10 @@ class SignalAnalysisService:
                     self.logger.warning(f"正例案例不存在: {case_id}")
                     missing_cases.append(case_id)
                     continue
-                # 覆寫 timeframe 為實際可用的數據（如 1h），忽略案例元數據中的 timeframe
-                case.timeframe = calculation_timeframe
-                positive_cases.append(case)
+                # 創建案例副本，避免修改原始物件（重要：原案例保留原始 timeframe）
+                case_copy = case.model_copy()
+                case_copy.timeframe = calculation_timeframe
+                positive_cases.append(case_copy)
 
             for case_id in request.negative_cases:
                 case = self.case_storage.get_case(case_id)
@@ -132,9 +133,10 @@ class SignalAnalysisService:
                     self.logger.warning(f"反例案例不存在: {case_id}")
                     missing_cases.append(case_id)
                     continue
-                # 覆寫 timeframe 為實際可用的數據（如 1h），忽略案例元數據中的 timeframe
-                case.timeframe = calculation_timeframe
-                negative_cases.append(case)
+                # 創建案例副本，避免修改原始物件（重要：原案例保留原始 timeframe）
+                case_copy = case.model_copy()
+                case_copy.timeframe = calculation_timeframe
+                negative_cases.append(case_copy)
 
             # 驗證載入後的案例數量
             if len(positive_cases) < 1:

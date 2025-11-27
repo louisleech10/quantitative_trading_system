@@ -238,6 +238,13 @@ export default function ChartsPage() {
         setAlignedTcTimestamp(null);
 
         const caseTimeframe = currentCase.timeframe;
+        
+        // 防護性檢查：確保 case_timeframe 有效
+        if (!caseTimeframe) {
+          console.error(`[ChartsPage] ERROR: currentCase.timeframe is undefined for case ${currentCase.case_id}`);
+          throw new Error("案例缺少時間框架資訊，請重新導入案例");
+        }
+        
         const url = `${API_BASE_URL}/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&case_timeframe=${caseTimeframe}&lookback_bars=${lookbackBars}&forward_bars=${forwardBars}`;
 
         console.log(`[ChartsPage] Fetching: case_tf=${caseTimeframe}, view_tf=${selectedTimeframe}, lookback=${lookbackBars}, forward=${forwardBars}`);
