@@ -20,6 +20,7 @@ from api.services.optimization_task_service import (
     optimization_task_service,
     OptimizationTaskStatus
 )
+from momentum.Optimization.result_analyzer import ResultAnalyzer  # Ultra Think Step 3 優化: 導入新模組
 
 
 router = APIRouter(prefix="/api/v1/optimization")
@@ -407,4 +408,262 @@ async def get_parameter_space(
         raise
     except Exception as e:
         logger.error(f"Failed to get parameter space for task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Ultra Think Step 3 優化: 新增端點 ====================
+
+# 初始化 ResultAnalyzer
+result_analyzer = ResultAnalyzer()
+
+
+@router.get("/tasks/{task_id}/analysis/heatmap")
+async def get_parameter_heatmap(
+    task_id: str,
+    param_x: str = Query(..., description="X 軸參數名"),
+    param_y: str = Query(..., description="Y 軸參數名"),
+    max_trials: int = Query(1000, description="最大 trials 數量")
+):
+    """
+    獲取參數空間熱力圖數據
+
+    返回 2D 參數組合與目標值映射，用於繪製熱力圖。
+
+    Args:
+        task_id: 任務 ID
+        param_x: X 軸參數名（如 "ema_short"）
+        param_y: Y 軸參數名（如 "ema_mid"）
+        max_trials: 最大 trials 數量（默認 1000）
+
+    Returns:
+        熱力圖數據點列表
+
+    Example:
+        GET /api/v1/optimization/tasks/xxx/analysis/heatmap?param_x=ema_short&param_y=ema_mid
+    """
+    try:
+        study = _get_study_from_task(task_id)
+        heatmap_data = result_analyzer.generate_heatmap_data(
+            study=study,
+            param_x=param_x,
+            param_y=param_y,
+            max_trials=max_trials
+        )
+
+        logger.info(
+            f"Generated heatmap for task {task_id}: "
+            f"{len(heatmap_data.data_points)} points"
+        )
+
+        return {
+            "success": True,
+            "task_id": task_id,
+            "data": heatmap_data.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate heatmap for task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tasks/{task_id}/analysis/convergence")
+async def get_convergence_analysis(
+    task_id: str,
+    convergence_threshold: float = Query(0.05, description="收斂閾值（默認 5%）"),
+    window_ratio: float = Query(0.2, description="檢測窗口比例（默認 20%）")
+):
+    """
+    獲取收斂分析數據
+
+    檢測優化是否已收斂，返回收斂點和 best value 歷史。
+
+    Args:
+        task_id: 任務 ID
+        convergence_threshold: 收斂閾值（默認 0.05 = 5%）
+        window_ratio: 檢測窗口比例（默認 0.2 = 20%）
+
+    Returns:
+        收斂分析結果
+
+    Example:
+        GET /api/v1/optimization/tasks/xxx/analysis/convergence
+    """
+    try:
+        study = _get_study_from_task(task_id)
+        convergence_analysis = result_analyzer.analyze_convergence(
+            study=study,
+            convergence_threshold=convergence_threshold,
+            window_ratio=window_ratio
+        )
+
+        logger.info(
+            f"Convergence analysis for task {task_id}: "
+            f"converged={convergence_analysis.converged}"
+        )
+
+        return {
+            "success": True,
+            "task_id": task_id,
+            "data": convergence_analysis.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to analyze convergence for task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tasks/{task_id}/analysis/stability")
+async def get_stability_analysis(
+    task_id: str,
+    time_attr: str = Query("datetime_start", description="Trial 時間屬性名")
+):
+    """
+    獲取穩定性分析數據
+
+    按月份分組計算平均值和標準差，識別最差和最佳月份。
+
+    Args:
+        task_id: 任務 ID
+        time_attr: Trial 時間屬性名（默認 "datetime_start"）
+
+    Returns:
+        穩定性分析結果
+
+    Example:
+        GET /api/v1/optimization/tasks/xxx/analysis/stability
+    """
+    try:
+        study = _get_study_from_task(task_id)
+        stability_analysis = result_analyzer.analyze_stability(
+            study=study,
+            time_attr=time_attr
+        )
+
+        logger.info(
+            f"Stability analysis for task {task_id}: "
+            f"overall_cv={stability_analysis.overall_cv:.4f}"
+        )
+
+        return {
+            "success": True,
+            "task_id": task_id,
+            "data": stability_analysis.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to analyze stability for task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tasks/{task_id}/trials")
+async def get_top_trials(
+    task_id: str,
+    top_n: int = Query(20, description="返回前 N 個最佳 trials"),
+    sort_by: str = Query("value", description="排序依據（value）"),
+    include_params: bool = Query(True, description="是否包含參數詳情")
+):
+    """
+    獲取 Top N trials
+
+    返回排序後的最佳 trials 列表。
+
+    Args:
+        task_id: 任務 ID
+        top_n: 返回前 N 個最佳 trials（默認 20）
+        sort_by: 排序依據（目前僅支援 "value"）
+        include_params: 是否包含參數詳情（默認 True）
+
+    Returns:
+        Trial 排名列表
+
+    Example:
+        GET /api/v1/optimization/tasks/xxx/trials?top_n=20&sort_by=value
+    """
+    try:
+        study = _get_study_from_task(task_id)
+        top_trials = result_analyzer.get_top_trials(
+            study=study,
+            top_n=top_n,
+            include_params=include_params
+        )
+
+        logger.info(f"Retrieved top {len(top_trials)} trials for task {task_id}")
+
+        return {
+            "success": True,
+            "task_id": task_id,
+            "trials": top_trials,
+            "total_count": len(top_trials)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get top trials for task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tasks/{task_id}/result")
+async def get_optimization_result(task_id: str):
+    """
+    獲取完整優化結果
+
+    返回最佳參數、最佳值、trial 數量等完整信息。
+
+    Args:
+        task_id: 任務 ID
+
+    Returns:
+        完整優化結果
+
+    Example:
+        GET /api/v1/optimization/tasks/xxx/result
+    """
+    try:
+        task_info = optimization_task_service.get_task(task_id)
+
+        if not task_info:
+            raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+        if task_info.status != OptimizationTaskStatus.COMPLETED:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Task must be COMPLETED. Current status: {task_info.status.value}"
+            )
+
+        if not task_info.result:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No result found for task {task_id}"
+            )
+
+        result = task_info.result
+
+        logger.info(f"Retrieved optimization result for task {task_id}")
+
+        return {
+            "success": True,
+            "task_id": task_id,
+            "study_name": task_info.study_name,
+            "result": {
+                "best_value": result.best_value,
+                "best_params": result.best_params,
+                "best_trial_number": result.best_trial_number,
+                "n_trials": result.n_trials,
+                "optimization_time": result.optimization_time_seconds,
+                "study_direction": result.study_direction,
+                "convergence_info": result.convergence_info if hasattr(result, 'convergence_info') else None
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get result for task {task_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
