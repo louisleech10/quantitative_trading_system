@@ -207,3 +207,104 @@ export interface ParamSpaceResponse {
   param_names: string[]
   total_trials: number
 }
+
+// ==================== Ultra Think Step 3 優化: 新增 Phase 2 API 類型 ====================
+
+// 參數空間熱力圖
+export interface HeatmapDataPoint {
+  x: number
+  y: number
+  value: number
+  trial_number: number
+}
+
+export interface HeatmapData {
+  param_x: string
+  param_y: string
+  data_points: HeatmapDataPoint[]
+  value_range: [number, number]
+}
+
+export interface HeatmapResponse {
+  success: boolean
+  task_id: string
+  data: HeatmapData
+}
+
+// 收斂分析
+export interface BestValueHistoryPoint {
+  trial: number
+  value: number
+}
+
+export interface ConvergenceAnalysis {
+  converged: boolean
+  convergence_trial?: number
+  convergence_value?: number
+  best_value_history: BestValueHistoryPoint[]
+  improvement_rate: number
+}
+
+export interface ConvergenceResponse {
+  success: boolean
+  task_id: string
+  data: ConvergenceAnalysis
+}
+
+// 穩定性分析
+export interface MonthlyStability {
+  month: string // YYYY-MM
+  mean_value: number
+  std_value: number
+  n_trials: number
+  is_worst_month: boolean
+}
+
+export interface StabilityAnalysis {
+  overall_cv: number // Coefficient of Variation
+  monthly_stats: MonthlyStability[]
+  worst_month?: string
+  best_month?: string
+}
+
+export interface StabilityResponse {
+  success: boolean
+  task_id: string
+  data: StabilityAnalysis
+}
+
+// Top Trials
+export interface TrialDetail {
+  rank: number
+  trial_number: number
+  value: number
+  datetime_start?: string
+  datetime_complete?: string
+  params: Record<string, any>
+  user_attrs?: Record<string, any>
+}
+
+export interface TrialsResponse {
+  success: boolean
+  task_id: string
+  trials: TrialDetail[]
+  total_count: number
+}
+
+// 完整優化結果
+export interface OptimizationResultDetail {
+  best_value: number
+  best_params: Record<string, any>
+  best_trial_number: number
+  n_trials: number
+  optimization_time: number
+  study_direction: string
+  convergence_info?: any
+}
+
+export interface OptimizationResultResponse {
+  success: boolean
+  task_id: string
+  study_name: string
+  result: OptimizationResultDetail
+}
