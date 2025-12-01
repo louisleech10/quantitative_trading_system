@@ -148,6 +148,59 @@ class ParameterRanges:
         ]
     )
 
+    def __post_init__(self):
+        """
+        Ultra Think Step 3 優化: 驗證參數範圍配置的合法性
+
+        確保:
+        1. short_max < mid_min (短期EMA最大值必須小於中期EMA最小值)
+        2. mid_max < long_min (中期EMA最大值必須小於長期EMA最小值)
+        3. 範圍值必須為正整數
+
+        Raises:
+            ValueError: 參數範圍配置不合法
+        """
+        # 驗證範圍值為正整數
+        for range_name, range_value in [
+            ('ema_short_range', self.ema_short_range),
+            ('ema_mid_range', self.ema_mid_range),
+            ('ema_long_range', self.ema_long_range)
+        ]:
+            if len(range_value) != 2:
+                raise ValueError(
+                    f"{range_name} must be a tuple of (min, max), got {range_value}"
+                )
+            min_val, max_val = range_value
+            if not (isinstance(min_val, int) and isinstance(max_val, int)):
+                raise ValueError(
+                    f"{range_name} must contain integers, got ({type(min_val)}, {type(max_val)})"
+                )
+            if min_val <= 0 or max_val <= 0:
+                raise ValueError(
+                    f"{range_name} must be positive, got ({min_val}, {max_val})"
+                )
+            if min_val >= max_val:
+                raise ValueError(
+                    f"{range_name} min must be less than max, got ({min_val}, {max_val})"
+                )
+
+        # 驗證三線排列約束: short < mid < long
+        short_min, short_max = self.ema_short_range
+        mid_min, mid_max = self.ema_mid_range
+        long_min, long_max = self.ema_long_range
+
+        if short_max >= mid_min:
+            raise ValueError(
+                f"EMA parameter ranges overlap: short_max ({short_max}) >= mid_min ({mid_min}). "
+                f"三線排列要求 short < mid < long，請調整參數範圍。"
+            )
+
+        if mid_max >= long_min:
+            raise ValueError(
+                f"EMA parameter ranges overlap: mid_max ({mid_max}) >= long_min ({long_min}). "
+                f"三線排列要求 short < mid < long，請調整參數範圍。"
+            )
+
 
 @dataclass
 class OptimizationResult:
@@ -614,6 +667,20 @@ class OptunaOptimizer:
 
             if is_dual_density:
                 # 雙密度模式: 加權優化 (方案D)
+                # Ultra Think Step 3 優化: 添加邊界條件檢查
+                # 檢查 near/far ratio 是否有效 (必須 > 0)
+                if (response.positive_near_far_ratio is None or
+                    response.negative_near_far_ratio is None or
+                    response.positive_near_far_ratio <= 0 or
+                    response.negative_near_far_ratio <= 0):
+                    self.logger.warning(
+                        f"Trial {trial.number}: Invalid near/far ratio detected "
+                        f"(pos={response.positive_near_far_ratio}, "
+                        f"neg={response.negative_near_far_ratio}). "
+                        f"數據異常，剪枝此 trial。"
+                    )
+                    raise optuna.TrialPruned()
+
                 # 條件1得分: 正例信號聚集程度 (positive_near_far_ratio - 1.0)
                 # - 若 ratio=1.5, score=0.5 (信號在近期聚集50%)
                 # - 若 ratio=1.0, score=0.0 (無聚集效應)
@@ -898,11 +965,16 @@ class OptunaOptimizer:
                 f"Case validation passed: {len(positive_cases)} positive, "
                 f"{len(negative_cases)} negative"
             )
-        except AttributeError:
-            # case_storage未實作case_exists,跳過驗證
-            self.logger.warning(
-                "Case validation skipped: CaseStorage.case_exists() not implemented"
+        except AttributeError as e:
+            # Ultra Think Step 3 優化: case_storage 未實作 case_exists 應該拋出異常
+            # 數據真實性原則: 必須確保案例 ID 存在，不能跳過驗證
+            self.logger.error(
+                f"CaseStorage.case_exists() method not implemented: {e}"
             )
+            raise ValueError(
+                "CaseStorage.case_exists() method not implemented. "
+                "Cannot validate case IDs - this violates data authenticity principle."
+            ) from e
 
         # 步驟2: 設置優化配置
         self.positive_cases = positive_cases

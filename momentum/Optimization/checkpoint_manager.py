@@ -18,6 +18,7 @@ Date: 2025-11-02
 
 import logging
 import pickle
+import gzip  # Ultra Think Step 3 優化: 添加 gzip 壓縮支援
 import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -37,7 +38,8 @@ class CheckpointManager:
         self,
         checkpoint_dir: str = "data/checkpoints",
         save_interval: int = 50,
-        max_checkpoints: int = 10
+        max_checkpoints: int = 10,
+        use_compression: bool = True  # Ultra Think Step 3 優化: 添加壓縮選項
     ):
         """
         初始化檢查點管理器
@@ -46,10 +48,12 @@ class CheckpointManager:
             checkpoint_dir: 檢查點保存目錄
             save_interval: 保存間隔（每N次試驗保存一次）
             max_checkpoints: 最大保存檢查點數量（超過則刪除舊檢查點）
+            use_compression: 是否使用 gzip 壓縮（默認 True，可節省 60-80% 空間）
         """
         self.checkpoint_dir = Path(checkpoint_dir)
         self.save_interval = save_interval
         self.max_checkpoints = max_checkpoints
+        self.use_compression = use_compression  # Ultra Think Step 3 優化
         self.logger = logging.getLogger(__name__)
 
         # 確保檢查點目錄存在
@@ -57,7 +61,8 @@ class CheckpointManager:
 
         self.logger.info(
             f"CheckpointManager initialized: dir={checkpoint_dir}, "
-            f"interval={save_interval}, max={max_checkpoints}"
+            f"interval={save_interval}, max={max_checkpoints}, "
+            f"compression={use_compression}"  # Ultra Think Step 3 優化
         )
 
     def should_save_checkpoint(self, trial_number: int) -> bool:
@@ -94,7 +99,11 @@ class CheckpointManager:
             IOError: 保存失敗時拋出
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        checkpoint_name = f"checkpoint_trial_{trial_number}_{timestamp}.pkl"
+        # Ultra Think Step 3 優化: 根據壓縮選項使用不同的文件擴展名
+        if self.use_compression:
+            checkpoint_name = f"checkpoint_trial_{trial_number}_{timestamp}.pkl.gz"
+        else:
+            checkpoint_name = f"checkpoint_trial_{trial_number}_{timestamp}.pkl"
         checkpoint_path = self.checkpoint_dir / checkpoint_name
 
         try:
@@ -132,15 +141,27 @@ class CheckpointManager:
             if additional_data:
                 checkpoint_data['additional_data'] = additional_data
 
-            # 保存到pickle文件
-            with open(checkpoint_path, 'wb') as f:
-                pickle.dump(checkpoint_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-            self.logger.info(
-                f"Checkpoint saved: trial={trial_number}, "
-                f"best_value={checkpoint_data.get('best_value')}, "
-                f"path={checkpoint_path}"
-            )
+            # Ultra Think Step 3 優化: 根據壓縮選項保存文件
+            if self.use_compression:
+                # 使用 gzip 壓縮（可節省 60-80% 空間）
+                with gzip.open(checkpoint_path, 'wb') as f:
+                    pickle.dump(checkpoint_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                file_size = checkpoint_path.stat().st_size
+                self.logger.info(
+                    f"Checkpoint saved (compressed): trial={trial_number}, "
+                    f"best_value={checkpoint_data.get('best_value')}, "
+                    f"size={file_size / 1024:.2f} KB, path={checkpoint_path}"
+                )
+            else:
+                # 未壓縮保存
+                with open(checkpoint_path, 'wb') as f:
+                    pickle.dump(checkpoint_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                file_size = checkpoint_path.stat().st_size
+                self.logger.info(
+                    f"Checkpoint saved (uncompressed): trial={trial_number}, "
+                    f"best_value={checkpoint_data.get('best_value')}, "
+                    f"size={file_size / 1024:.2f} KB, path={checkpoint_path}"
+                )
 
             # 清理舊檢查點
             self._cleanup_old_checkpoints()
@@ -174,13 +195,29 @@ class CheckpointManager:
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
         try:
-            with open(checkpoint_path, 'rb') as f:
-                checkpoint_data = pickle.load(f)
+            # Ultra Think Step 3 優化: 自動檢測壓縮格式並載入
+            is_compressed = checkpoint_path.suffix == '.gz'
 
-            self.logger.info(
-                f"Checkpoint loaded: trial={checkpoint_data.get('trial_number')}, "
-                f"best_value={checkpoint_data.get('best_value')}"
-            )
+            if is_compressed:
+                # 載入壓縮檢查點
+                with gzip.open(checkpoint_path, 'rb') as f:
+                    checkpoint_data = pickle.load(f)
+                file_size = checkpoint_path.stat().st_size
+                self.logger.info(
+                    f"Checkpoint loaded (compressed): trial={checkpoint_data.get('trial_number')}, "
+                    f"best_value={checkpoint_data.get('best_value')}, "
+                    f"size={file_size / 1024:.2f} KB"
+                )
+            else:
+                # 載入未壓縮檢查點
+                with open(checkpoint_path, 'rb') as f:
+                    checkpoint_data = pickle.load(f)
+                file_size = checkpoint_path.stat().st_size
+                self.logger.info(
+                    f"Checkpoint loaded (uncompressed): trial={checkpoint_data.get('trial_number')}, "
+                    f"best_value={checkpoint_data.get('best_value')}, "
+                    f"size={file_size / 1024:.2f} KB"
+                )
 
             return checkpoint_data
 

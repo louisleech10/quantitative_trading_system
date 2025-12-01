@@ -374,6 +374,9 @@ class OptimizationTaskService:
             # 保存結果到文件
             self._save_result(task_id, result)
 
+            # Ultra Think Step 3 優化: 任務完成後清理舊任務
+            self._cleanup_old_tasks(keep_latest=100)
+
             self.logger.info(f"Task completed: {task_id}, best_value={result.best_value}")
 
         except Exception as e:
@@ -536,6 +539,55 @@ class OptimizationTaskService:
                 del self.notification_callbacks[task_id]
 
         self.logger.debug(f"Notification callback unregistered for task: {task_id}")
+
+    def _cleanup_old_tasks(self, keep_latest: int = 100):
+        """
+        Ultra Think Step 3 優化: 清理舊的已完成任務，防止內存洩漏
+
+        保留最近 N 個已完成任務，刪除更舊的任務。
+        注意: 只清理 COMPLETED 狀態的任務，FAILED/CANCELLED 任務會保留用於調試。
+
+        Args:
+            keep_latest: 保留最近N個已完成任務（默認100個）
+        """
+        with self.tasks_lock:
+            # 收集所有已完成的任務（按完成時間排序）
+            completed_tasks = [
+                (task_id, task_info)
+                for task_id, task_info in self.tasks.items()
+                if task_info.status == OptimizationTaskStatus.COMPLETED
+                and task_info.completed_at is not None
+            ]
+
+            # 如果已完成任務數量超過限制，清理最舊的
+            if len(completed_tasks) > keep_latest:
+                # 按完成時間排序（最舊的在前）
+                sorted_tasks = sorted(completed_tasks, key=lambda x: x[1].completed_at)
+
+                # 刪除最舊的任務（保留最新的 keep_latest 個）
+                tasks_to_delete = sorted_tasks[:-keep_latest]
+
+                for task_id, task_info in tasks_to_delete:
+                    # 刪除任務信息
+                    del self.tasks[task_id]
+
+                    # 刪除 optimizer 實例（如果存在）
+                    if task_id in self.optimizers:
+                        del self.optimizers[task_id]
+
+                    # 刪除通知回調（如果存在）
+                    if task_id in self.notification_callbacks:
+                        del self.notification_callbacks[task_id]
+
+                    self.logger.info(
+                        f"Cleaned up old completed task: {task_id} "
+                        f"(completed at {task_info.completed_at})"
+                    )
+
+                self.logger.info(
+                    f"Task cleanup completed: removed {len(tasks_to_delete)} old tasks, "
+                    f"kept {keep_latest} recent tasks"
+                )
 
 
 # 全局單例
