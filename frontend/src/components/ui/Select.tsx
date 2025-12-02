@@ -191,3 +191,42 @@ export function Select({
     </div>
   );
 }
+
+// Radix UI compatible exports for compatibility with optimization results components
+export const SelectTrigger = ({ children, className, ...props }: React.HTMLAttributes<HTMLButtonElement>) => {
+  return (
+    <button
+      type="button"
+      className={`flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className || ''}`}
+      {...props as any}
+    >
+      {children}
+    </button>
+  );
+};
+
+export const SelectValue = ({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) => {
+  return <span>{children || placeholder}</span>;
+};
+
+export const SelectContent = ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
+  return (
+    <div
+      className={`relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md ${className || ''}`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};
+
+export const SelectItem = ({ children, value, className, ...props }: React.HTMLAttributes<HTMLDivElement> & { value: string }) => {
+  return (
+    <div
+      className={`relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ${className || ''}`}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};

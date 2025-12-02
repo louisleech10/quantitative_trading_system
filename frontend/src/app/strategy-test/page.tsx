@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
 import {
@@ -211,7 +211,7 @@ const parseDateToTimestamp = (date: string, fallback: number) => {
   return Number.isNaN(timestamp) ? fallback : timestamp;
 };
 
-export default function StrategyTestPage() {
+function StrategyTestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -1222,5 +1222,13 @@ function TemplatePanel({ templates, onClose, onLoad, onDelete }: TemplatePanelPr
         </div>
       </div>
     </div>
+  );
+}
+
+export default function StrategyTestPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="text-gray-500">Loading...</div></div>}>
+      <StrategyTestPageContent />
+    </Suspense>
   );
 }
