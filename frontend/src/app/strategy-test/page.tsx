@@ -29,6 +29,12 @@ import {
   useStrategyConfig,
   type StrategyTemplatePayload,
 } from "@/hooks/useStrategyConfig";
+import {
+  OptunaConfigPanel,
+  type OptunaConfig,
+  loadOptunaConfig,
+  saveOptunaConfig,
+} from "@/components/strategy-test/OptunaConfigPanel";
 
 interface SignalPoint {
   timestamp: number;
@@ -234,9 +240,18 @@ export default function StrategyTestPage() {
   const [positiveCaseIds, setPositiveCaseIds] = useState<string[]>([]);
   const [negativeCaseIds, setNegativeCaseIds] = useState<string[]>([]);
 
+  // Optuna 配置狀態
+  const [optunaConfig, setOptunaConfig] = useState<OptunaConfig>(() => loadOptunaConfig());
+
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Optuna 配置變更處理
+  const handleOptunaConfigChange = (newConfig: OptunaConfig) => {
+    setOptunaConfig(newConfig);
+    saveOptunaConfig(newConfig);
+  };
 
   useEffect(() => {
     if (!isClient || hasHydratedFromUrl.current) return;
@@ -822,6 +837,20 @@ export default function StrategyTestPage() {
                   <span>偏重 正反例區分</span>
                 </div>
               </div>
+            </AccordionItem>
+
+            <AccordionItem
+              id="optuna"
+              title="Optuna 參數優化"
+              badge={optunaConfig.enabled ? `已啟用 (${optunaConfig.n_trials} trials)` : "未啟用"}
+            >
+              <OptunaConfigPanel
+                config={optunaConfig}
+                onChange={handleOptunaConfigChange}
+                positiveCasesCount={positiveCaseIds.length}
+                negativeCasesCount={negativeCaseIds.length}
+                disabled={isRunning}
+              />
             </AccordionItem>
           </Accordion>
 
