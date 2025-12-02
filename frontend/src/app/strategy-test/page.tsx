@@ -847,8 +847,6 @@ function StrategyTestPageContent() {
               <OptunaConfigPanel
                 config={optunaConfig}
                 onChange={handleOptunaConfigChange}
-                positiveCasesCount={positiveCaseIds.length}
-                negativeCasesCount={negativeCaseIds.length}
                 disabled={isRunning}
               />
             </AccordionItem>

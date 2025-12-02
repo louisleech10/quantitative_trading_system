@@ -49,8 +49,6 @@ export interface OptunaConfig {
 export interface OptunaConfigPanelProps {
   config: OptunaConfig
   onChange: (config: OptunaConfig) => void
-  positiveCasesCount?: number
-  negativeCasesCount?: number
   disabled?: boolean
 }
 
@@ -71,23 +69,11 @@ const DEFAULT_CONFIG: OptunaConfig = {
 export function OptunaConfigPanel({
   config,
   onChange,
-  positiveCasesCount = 0,
-  negativeCasesCount = 0,
   disabled = false
 }: OptunaConfigPanelProps) {
   // 驗證警告
   const validationWarnings = useMemo(() => {
     const warnings: string[] = []
-
-    // 案例數量檢查
-    if (config.enabled) {
-      if (positiveCasesCount < 10) {
-        warnings.push(`正例案例不足: ${positiveCasesCount}/10（建議至少 10 個）`)
-      }
-      if (negativeCasesCount < 10) {
-        warnings.push(`反例案例不足: ${negativeCasesCount}/10（建議至少 10 個）`)
-      }
-    }
 
     // 參數範圍檢查 (short < mid < long)
     if (config.ema_short_range[1] >= config.ema_mid_range[0]) {
@@ -103,7 +89,7 @@ export function OptunaConfigPanel({
     }
 
     return warnings
-  }, [config, positiveCasesCount, negativeCasesCount])
+  }, [config])
 
   // 預估時間計算
   const estimatedTime = useMemo(() => {
