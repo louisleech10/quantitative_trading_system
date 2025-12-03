@@ -1,0 +1,249 @@
+# 策略配置文件
+#
+# 此文件定義所有可用的優化策略的元數據
+# 通過配置驅動的方式，可以輕鬆添加新策略而無需修改核心代碼
+#
+# Author: Claude (Phase 1 - Dynamic Parameters Refactoring)
+# Date: 2025-12-03
+
+strategies:
+  # ==================== 三線排列策略 ====================
+  three_line:
+    display_name: "三線排列"
+    description: "短期EMA > 中期EMA > 長期EMA，順勢交易策略。當三條均線按順序排列時產生信號。"
+    category: "trend"
+    icon: "📈"
+    complexity: "simple"
+    recommended_for: "適合趨勢明顯的市場，在震盪市場中可能產生較多假信號"
+
+    # 支援的指標和數據源
+    supported_indicators:
+      - "ema"
+      - "sma"
+
+    supported_data_sources:
+      - "close"
+      - "open"
+      - "high"
+      - "low"
+      - "volume"
+
+    # 參數定義
+    parameters:
+      - name: "short_period"
+        display_name: "短期週期"
+        type: "int"
+        default_value: 7
+        min_value: 5
+        max_value: 15
+        step: 1
+        description: "短期移動平均線週期"
+        unit: "根K線"
+        constraints:
+          - type: "less_than"
+            target: "mid_period"
+            message: "短期週期必須小於中期週期"
+
+      - name: "mid_period"
+        display_name: "中期週期"
+        type: "int"
+        default_value: 25
+        min_value: 20
+        max_value: 40
+        step: 1
+        description: "中期移動平均線週期"
+        unit: "根K線"
+        constraints:
+          - type: "less_than"
+            target: "long_period"
+            message: "中期週期必須小於長期週期"
+
+      - name: "long_period"
+        display_name: "長期週期"
+        type: "int"
+        default_value: 70
+        min_value: 50
+        max_value: 100
+        step: 1
+        description: "長期移動平均線週期"
+        unit: "根K線"
+
+    # 計算函數位置
+    calculator_module: "momentum.Analysis.strategies.three_line_strategy"
+    calculator_function: "calculate_signals"
+
+    # 驗證函數位置（可選）
+    validator_module: "momentum.Analysis.strategies.three_line_strategy"
+    validator_function: "validate_params"
+
+    # 標籤
+    tags:
+      - "trend"
+      - "moving_average"
+      - "triple_ema"
+
+
+  # ==================== 短長交叉策略 ====================
+  short_long_cross:
+    display_name: "短長交叉"
+    description: "短期EMA上穿長期EMA時產生買入信號（金叉）。雙均線交叉策略，比三線排列更靈敏。"
+    category: "trend"
+    icon: "⚡"
+    complexity: "simple"
+    recommended_for: "適合需要快速反應的趨勢追蹤，但可能產生更多假信號"
+
+    supported_indicators:
+      - "ema"
+      - "sma"
+
+    supported_data_sources:
+      - "close"
+      - "open"
+      - "high"
+      - "low"
+
+    parameters:
+      - name: "short_period"
+        display_name: "短期週期"
+        type: "int"
+        default_value: 7
+        min_value: 5
+        max_value: 20
+        step: 1
+        description: "短期移動平均線週期"
+        unit: "根K線"
+        constraints:
+          - type: "less_than"
+            target: "long_period"
+            message: "短期週期必須小於長期週期"
+
+      - name: "long_period"
+        display_name: "長期週期"
+        type: "int"
+        default_value: 70
+        min_value: 30
+        max_value: 100
+        step: 1
+        description: "長期移動平均線週期"
+        unit: "根K線"
+
+    calculator_module: "momentum.Analysis.strategies.short_long_cross_strategy"
+    calculator_function: "calculate_signals"
+
+    validator_module: "momentum.Analysis.strategies.short_long_cross_strategy"
+    validator_function: "validate_params"
+
+    tags:
+      - "trend"
+      - "moving_average"
+      - "crossover"
+
+
+  # ==================== 中長交叉策略 ====================
+  mid_long_cross:
+    display_name: "中長交叉"
+    description: "中期EMA上穿長期EMA時產生買入信號。比短長交叉更穩定，但反應較慢。"
+    category: "trend"
+    icon: "🎯"
+    complexity: "simple"
+    recommended_for: "適合較長週期的趨勢追蹤，適合穩健型交易者"
+
+    supported_indicators:
+      - "ema"
+      - "sma"
+
+    supported_data_sources:
+      - "close"
+      - "open"
+      - "high"
+      - "low"
+
+    parameters:
+      - name: "mid_period"
+        display_name: "中期週期"
+        type: "int"
+        default_value: 25
+        min_value: 15
+        max_value: 50
+        step: 1
+        description: "中期移動平均線週期"
+        unit: "根K線"
+        constraints:
+          - type: "less_than"
+            target: "long_period"
+            message: "中期週期必須小於長期週期"
+
+      - name: "long_period"
+        display_name: "長期週期"
+        type: "int"
+        default_value: 70
+        min_value: 40
+        max_value: 120
+        step: 1
+        description: "長期移動平均線週期"
+        unit: "根K線"
+
+    calculator_module: "momentum.Analysis.strategies.mid_long_cross_strategy"
+    calculator_function: "calculate_signals"
+
+    validator_module: "momentum.Analysis.strategies.mid_long_cross_strategy"
+    validator_function: "validate_params"
+
+    tags:
+      - "trend"
+      - "moving_average"
+      - "crossover"
+
+
+# ==================== 未來擴展範例 ====================
+#
+# 以下是未來可以添加的策略範例（目前註釋掉）
+#
+# rsi_overbought:
+#   display_name: "RSI 超買超賣"
+#   description: "RSI 指標判斷超買超賣區域"
+#   category: "momentum"
+#   icon: "📊"
+#
+#   supported_indicators:
+#     - "rsi"
+#
+#   supported_data_sources:
+#     - "close"
+#
+#   parameters:
+#     - name: "rsi_period"
+#       display_name: "RSI 週期"
+#       type: "int"
+#       default_value: 14
+#       min_value: 7
+#       max_value: 21
+#       step: 1
+#
+#     - name: "overbought_threshold"
+#       display_name: "超買閾值"
+#       type: "float"
+#       default_value: 70.0
+#       min_value: 65.0
+#       max_value: 85.0
+#       step: 0.5
+#       constraints:
+#         - type: "greater_than"
+#           target: "oversold_threshold"
+#           message: "超買閾值必須大於超賣閾值"
+#
+#     - name: "oversold_threshold"
+#       display_name: "超賣閾值"
+#       type: "float"
+#       default_value: 30.0
+#       min_value: 15.0
+#       max_value: 35.0
+#       step: 0.5
+#
+#   calculator_module: "momentum.Analysis.strategies.rsi_strategy"
+#   calculator_function: "calculate_signals"
+#
+#   tags:
+#     - "momentum"
+#     - "oscillator"
+#     - "rsi"
