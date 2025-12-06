@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-hot-toast";
+import { useStrategyTestStore } from "@/store/strategyTestStore";
 import {
   BarChart2,
   ChevronRight,
@@ -80,6 +81,16 @@ interface DensityMetrics {
   // 樣本數 (Sample sizes)
   positive_sample_size?: number;
   negative_sample_size?: number;
+
+  // 零值統計 (v1.1 新增) - 透明化顯示策略信號未觸發或 Far=0 被排除的案例比例
+  positive_near_zero_count?: number;
+  positive_near_zero_ratio?: number;
+  positive_far_zero_count?: number;
+  positive_far_zero_ratio?: number;
+  negative_near_zero_count?: number;
+  negative_near_zero_ratio?: number;
+  negative_far_zero_count?: number;
+  negative_far_zero_ratio?: number;
 }
 
 interface DataQualitySummary {
@@ -228,18 +239,25 @@ function StrategyTestPageContent() {
   } = useStrategyConfig();
 
   const [isRunning, setIsRunning] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<ChartSignalResponse | null>(null);
   const [templates, setTemplates] = useState<StrategyTemplatePayload[]>([]);
   const [isTemplatePanelOpen, setTemplatePanelOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const hasHydratedFromUrl = useRef(false);
 
-  // State for Boxplot chart
-  const [caseLevelDensities, setCaseLevelDensities] = useState<Record<string, number>>({});
-  const [positiveCaseIds, setPositiveCaseIds] = useState<string[]>([]);
-  const [negativeCaseIds, setNegativeCaseIds] = useState<string[]>([]);
-
+  // Use Zustand store for persistent state across route changes
+  const {
+    testResult,
+    caseLevelDensities,
+    positiveCaseIds,
+    negativeCaseIds,
+    apiError,
+    setTestResult,
+    setCaseLevelDensities,
+    setPositiveCaseIds,
+    setNegativeCaseIds,
+    setApiError,
+    clearResults,
+  } = useStrategyTestStore();
   // Optuna 配置狀態
   const [optunaConfig, setOptunaConfig] = useState<OptunaConfig>(() => loadOptunaConfig());
 
@@ -511,6 +529,16 @@ function StrategyTestPageContent() {
                 // 樣本數
                 positive_sample_size: densityData.positive_sample_size,
                 negative_sample_size: densityData.negative_sample_size,
+
+                // 零值統計 (v1.1 新增)
+                positive_near_zero_count: densityData.positive_near_zero_count,
+                positive_near_zero_ratio: densityData.positive_near_zero_ratio,
+                positive_far_zero_count: densityData.positive_far_zero_count,
+                positive_far_zero_ratio: densityData.positive_far_zero_ratio,
+                negative_near_zero_count: densityData.negative_near_zero_count,
+                negative_near_zero_ratio: densityData.negative_near_zero_ratio,
+                negative_far_zero_count: densityData.negative_far_zero_count,
+                negative_far_zero_ratio: densityData.negative_far_zero_ratio,
               },
               quality: {
                 total_cases: densityData.positive_sample_size + densityData.negative_sample_size,
@@ -577,8 +605,7 @@ function StrategyTestPageContent() {
   const handleReset = () => {
     if (confirm("確定要清除所有配置嗎？")) {
       reset();
-      setTestResult(null);
-      setApiError(null);
+      clearResults();  // Clear all persisted results from store
       toast.success("已回復預設值");
     }
   };
@@ -1042,6 +1069,56 @@ function StrategyTestPageContent() {
                 )}
               </div>
             </div>
+
+            {/* 零值統計 (v1.1 新增) */}
+            {(densityMetrics?.positive_far_zero_count !== undefined ||
+              densityMetrics?.negative_far_zero_count !== undefined) && (
+              <div className="mt-5">
+                <div className="text-sm font-semibold text-slate-700 mb-3">零值統計 (透明化)</div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="text-sm font-medium text-gray-600 mb-1">正例 Near=0</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {densityMetrics.positive_near_zero_count ?? 0}
+                      <span className="text-base font-normal text-gray-500 ml-2">
+                        ({((densityMetrics.positive_near_zero_ratio ?? 0) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">策略信號完全未觸發的案例</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="text-sm font-medium text-gray-600 mb-1">正例 Far=0</div>
+                    <div className="text-2xl font-bold text-amber-600">
+                      {densityMetrics.positive_far_zero_count ?? 0}
+                      <span className="text-base font-normal text-gray-500 ml-2">
+                        ({((densityMetrics.positive_far_zero_ratio ?? 0) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">被排除於 ratio 統計的案例</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="text-sm font-medium text-gray-600 mb-1">反例 Near=0</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {densityMetrics.negative_near_zero_count ?? 0}
+                      <span className="text-base font-normal text-gray-500 ml-2">
+                        ({((densityMetrics.negative_near_zero_ratio ?? 0) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">策略信號完全未觸發的案例</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="text-sm font-medium text-gray-600 mb-1">反例 Far=0</div>
+                    <div className="text-2xl font-bold text-amber-600">
+                      {densityMetrics.negative_far_zero_count ?? 0}
+                      <span className="text-base font-normal text-gray-500 ml-2">
+                        ({((densityMetrics.negative_far_zero_ratio ?? 0) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">被排除於 ratio 統計的案例</div>
+                  </div>
+                </div>
+              </div>
+            )}
             {!densityMetrics && (
               <p className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">
                 後端尚未回傳密度統計，或尚未執行測試。

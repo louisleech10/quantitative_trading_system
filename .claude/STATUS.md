@@ -1,6 +1,6 @@
 # 項目狀態
 
-**最後更新**: 2025-12-06 16:30
+**最後更新**: 2025-12-06 20:30
 **當前階段**: Optuna 參數優化測試準備
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
@@ -9,6 +9,13 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Far=0 統計透明化與狀態持久化** (100%) - 2025-12-06完成
+  - ✅ FAR_ZERO_THRESHOLD = 0.001 常數定義
+  - ✅ 8 個零值統計欄位（Near/Far 零值計數與比例）
+  - ✅ Far=0 案例從 ratio 計算中排除
+  - ✅ NaN 驗證錯誤修復（std 在 n≤1 時返回 0.0）
+  - ✅ Zustand 持久化 store（localStorage 保存測試結果）
+  - ✅ 前端頁面切換後結果不再清空
 - **EMA 計算與顯示修復** (100%) - 2025-12-06完成
   - ✅ EMA 算法統一：強制使用 `pandas.ewm(span=period, adjust=False).mean()`
   - ✅ 移除 pandas_ta 分支，消除計算不一致來源
@@ -79,16 +86,16 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**Optuna 參數優化測試**（優先級：高）
+**信號密度分析系統增強**（優先級：高）
 
-1. **Optuna 整合驗證**
+1. **零值統計視覺化**
+   - 在前端 UI 顯示 Near/Far 零值計數
+   - 可選：添加零值案例過濾開關
+
+2. **Optuna 參數優化測試**
    - 測試 Optuna 超參數優化系統
    - 驗證 TPE/CmaEs/Random/GP/NSGA-II 五種 Sampler
    - 確認 WebSocket 實時推送功能
-
-2. **多目標優化測試**
-   - 測試 Pareto 前沿分析
-   - 驗證 separation + stability 雙目標優化
 
 3. **系統穩定性驗證**
    - CheckpointManager 容錯測試
@@ -614,6 +621,9 @@ quantitative_trading_system/
 - 無需立即修復的問題
 
 **已修復系統**：
+- ✅ Far=0 統計透明化（2025-12-06）
+- ✅ NaN 驗證錯誤（2025-12-06）
+- ✅ 前端狀態持久化（2025-12-06）
 - ✅ EMA 計算一致性（2025-12-06）
 - ✅ 前端數值顯示格式（2025-12-06）
 - ✅ Warmup 驗證系統（2025-11-23）
@@ -689,7 +699,39 @@ quantitative_trading_system/
 
 ## 📝 最近完成的工作
 
-### 2025-12-06
+### 2025-12-06（晚間）
+
+**Far=0 統計透明化與狀態持久化** ⭐⭐⭐⭐
+
+**問題診斷**
+- API 返回 None：因 `negative_std=nan`（僅 1 個樣本時 ddof=1 除以 0）
+- 前端結果消失：useState 在路由切換時丟失狀態
+
+**核心修復**（3 個文件）
+
+1. **NaN 驗證錯誤修復**（momentum/Analysis/signal_density_analyzer.py）
+   - `calculate_group_statistics` 增加樣本數檢查
+   - `std_val = 0.0 if len(densities) <= 1 else np.std(densities, ddof=1)`
+   - 避免 Pydantic 驗證失敗
+
+2. **前端狀態持久化**（frontend/src/store/strategyTestStore.ts，新建）
+   - Zustand store with `persist` middleware
+   - localStorage key: 'strategy-test-storage'
+   - 保存 testResult、caseLevelDensities、caseIds
+
+3. **頁面整合**（frontend/src/app/strategy-test/page.tsx）
+   - 替換 useState 為 useStrategyTestStore
+   - handleReset 使用 clearResults()
+
+**驗證結果**
+- ✅ API 返回完整 8 個零值統計欄位
+- ✅ Near/Far Ratio 正確計算（2.605 / 0.728）
+- ✅ 頁面切換後結果保留
+- ✅ Next.js cache 錯誤已解決（清除 .next 目錄）
+
+---
+
+### 2025-12-06（下午）
 
 **EMA 計算與顯示一致性修復** ⭐⭐⭐⭐⭐
 
@@ -1977,16 +2019,19 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待同步（2025-12-06）
+**遠端同步**: ⏳ 待推送（2025-12-06）
 
 **待提交變更** (2025-12-06):
+- **Far=0 統計透明化與狀態持久化**
+  - momentum/Analysis/signal_density_analyzer.py - NaN 錯誤修復
+  - frontend/src/store/strategyTestStore.ts - 新建 Zustand 持久化 store
+  - frontend/src/app/strategy-test/page.tsx - 整合持久化 store
 - **EMA 計算與顯示修復**
   - momentum/Indicators/ema.py - 移除 pandas_ta，統一 pandas ewm
   - api/services/chart_data_service.py - 新增 warmup 計算方法
   - frontend/src/utils/chartConfig.ts - 新增截斷函數
   - frontend/src/components/charts/SignalTooltip.tsx - 改用截斷顯示
   - docs/STRATEGY_EXTENSION_GUIDE.md - 新增 Warmup 文檔章節
-  - test_results/signal_verification_*/ - 驗證測試結果
 
 **Tags**:
 - phase-0-complete, phase-1-complete, phase-2-complete

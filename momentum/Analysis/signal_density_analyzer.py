@@ -33,6 +33,12 @@ from api.models.training_window_config import (
     SignalDensityResponse
 )
 
+# 零值判斷閾值常量
+# 當 density < 此閾值時視為零值
+# - Far density 為零時：排除該案例，不納入 ratio 統計（避免除以零產生無意義數值）
+# - Near density 為零時：仍計算 ratio（ratio=0 是合法值），僅統計計數
+FAR_ZERO_THRESHOLD = 0.001
+
 
 class SignalDensityAnalyzer:
     """
@@ -608,9 +614,14 @@ class SignalDensityAnalyzer:
         Returns:
             統計指標字典
         """
+        mean_val = float(np.mean(densities))
+        # 當樣本數<=1時，標準差無法計算（ddof=1需要n-1個自由度）
+        # 返回 0.0 表示無法估算變異，避免 NaN 導致 Pydantic 驗證失敗
+        std_val = float(np.std(densities, ddof=1)) if len(densities) > 1 else 0.0
+        
         return {
-            "mean": float(np.mean(densities)),
-            "std": float(np.std(densities, ddof=1)),
+            "mean": mean_val,
+            "std": std_val,
             "median": float(np.median(densities)),
             "min": float(np.min(densities)),
             "max": float(np.max(densities))
@@ -830,12 +841,10 @@ class SignalDensityAnalyzer:
                 for i in range(len(data["positive_near"])):
                     near = data["positive_near"][i]
                     far = data["positive_far"][i]
-                    # 避免除以0
-                    if far > 0.001:
+                    # 排除法：Far density 為零時跳過該案例，不納入 ratio 統計
+                    if far >= FAR_ZERO_THRESHOLD:
                         ratio = near / far
-                    else:
-                        ratio = min(near * 10, 5.0)
-                    positive_ratios.append(ratio)
+                        positive_ratios.append(ratio)
 
             # 計算該月的平均比率
             if len(positive_ratios) > 0:
@@ -1077,37 +1086,94 @@ class SignalDensityAnalyzer:
             positive_near_far_ratios = []
             negative_near_far_ratios = []
 
+            # 零值統計計數器
+            positive_near_zero_count = 0
+            positive_far_zero_count = 0
+            negative_near_zero_count = 0
+            negative_far_zero_count = 0
+
             for i in range(len(positive_near_densities)):
+                near_val = positive_near_densities[i]
                 far_val = positive_far_densities[i]
-                # 避免除以0: 如果far_density=0,設ratio為near_density的10倍或5.0(取較小值)
-                if far_val > 0.001:
-                    ratio = positive_near_densities[i] / far_val
+
+                # 統計 near = 0 的案例（策略信號完全未觸發）
+                if near_val < FAR_ZERO_THRESHOLD:
+                    positive_near_zero_count += 1
+
+                # 排除法：Far density 為零時跳過該案例，不納入 ratio 統計
+                if far_val < FAR_ZERO_THRESHOLD:
+                    positive_far_zero_count += 1
+                    # 不加入 ratio 列表，避免無意義數值污染統計
                 else:
-                    ratio = min(positive_near_densities[i] * 10, 5.0)
-                positive_near_far_ratios.append(ratio)
+                    ratio = near_val / far_val
+                    positive_near_far_ratios.append(ratio)
 
             for i in range(len(negative_near_densities)):
+                near_val = negative_near_densities[i]
                 far_val = negative_far_densities[i]
-                if far_val > 0.001:
-                    ratio = negative_near_densities[i] / far_val
-                else:
-                    ratio = min(negative_near_densities[i] * 10, 5.0)
-                negative_near_far_ratios.append(ratio)
 
-            # 計算ratio的統計指標
-            positive_avg_ratio = float(np.mean(positive_near_far_ratios))
-            negative_avg_ratio = float(np.mean(negative_near_far_ratios))
-            ratio_separation = positive_avg_ratio - negative_avg_ratio
+                # 統計 near = 0 的案例（策略信號完全未觸發）
+                if near_val < FAR_ZERO_THRESHOLD:
+                    negative_near_zero_count += 1
+
+                # 排除法：Far density 為零時跳過該案例，不納入 ratio 統計
+                if far_val < FAR_ZERO_THRESHOLD:
+                    negative_far_zero_count += 1
+                    # 不加入 ratio 列表，避免無意義數值污染統計
+                else:
+                    ratio = near_val / far_val
+                    negative_near_far_ratios.append(ratio)
+
+            # 計算零值統計比例
+            positive_total = len(positive_near_densities)
+            negative_total = len(negative_near_densities)
+            positive_near_zero_ratio = positive_near_zero_count / positive_total if positive_total > 0 else 0.0
+            positive_far_zero_ratio = positive_far_zero_count / positive_total if positive_total > 0 else 0.0
+            negative_near_zero_ratio = negative_near_zero_count / negative_total if negative_total > 0 else 0.0
+            negative_far_zero_ratio = negative_far_zero_count / negative_total if negative_total > 0 else 0.0
+
+            # 記錄零值統計
+            if positive_far_zero_count > 0 or negative_far_zero_count > 0:
+                self.logger.info(
+                    f"零值統計:\n"
+                    f"  正例: near_zero={positive_near_zero_count}/{positive_total} ({positive_near_zero_ratio:.1%}), "
+                    f"far_zero={positive_far_zero_count}/{positive_total} ({positive_far_zero_ratio:.1%})\n"
+                    f"  反例: near_zero={negative_near_zero_count}/{negative_total} ({negative_near_zero_ratio:.1%}), "
+                    f"far_zero={negative_far_zero_count}/{negative_total} ({negative_far_zero_ratio:.1%})"
+                )
+
+            # 處理邊界情況：若所有案例 far=0，則無法計算 ratio
+            if len(positive_near_far_ratios) == 0:
+                self.logger.warning(
+                    f"所有正例 ({positive_total} 個) Far density 均 < {FAR_ZERO_THRESHOLD}，無法計算 ratio"
+                )
+                positive_avg_ratio = None
+                positive_ratio_std = 0.0
+            else:
+                positive_avg_ratio = float(np.mean(positive_near_far_ratios))
+                positive_ratio_std = float(np.std(positive_near_far_ratios, ddof=1)) if len(positive_near_far_ratios) > 1 else 0.0
+
+            if len(negative_near_far_ratios) == 0:
+                self.logger.warning(
+                    f"所有反例 ({negative_total} 個) Far density 均 < {FAR_ZERO_THRESHOLD}，無法計算 ratio"
+                )
+                negative_avg_ratio = None
+                negative_ratio_std = 0.0
+            else:
+                negative_avg_ratio = float(np.mean(negative_near_far_ratios))
+                negative_ratio_std = float(np.std(negative_near_far_ratios, ddof=1)) if len(negative_near_far_ratios) > 1 else 0.0
+
+            # 計算 ratio_separation（若任一方為 None 則也為 None）
+            if positive_avg_ratio is not None and negative_avg_ratio is not None:
+                ratio_separation = positive_avg_ratio - negative_avg_ratio
+            else:
+                ratio_separation = None
 
             # 計算遠期密度的平均值和標準差
             positive_far_avg = float(np.mean(positive_far_densities))
             negative_far_avg = float(np.mean(negative_far_densities))
             positive_far_std = float(np.std(positive_far_densities, ddof=1)) if len(positive_far_densities) > 1 else 0.0
             negative_far_std = float(np.std(negative_far_densities, ddof=1)) if len(negative_far_densities) > 1 else 0.0
-
-            # 計算比率的標準差
-            positive_ratio_std = float(np.std(positive_near_far_ratios, ddof=1)) if len(positive_near_far_ratios) > 1 else 0.0
-            negative_ratio_std = float(np.std(negative_near_far_ratios, ddof=1)) if len(negative_near_far_ratios) > 1 else 0.0
 
             # 將雙密度數據存入case_level_densities (使用特殊前綴區分)
             for case_id in case_level_near_densities:
@@ -1124,14 +1190,28 @@ class SignalDensityAnalyzer:
                 "negative_near_far_ratio": negative_avg_ratio,
                 "positive_ratio_std": positive_ratio_std,
                 "negative_ratio_std": negative_ratio_std,
-                "ratio_separation": ratio_separation
+                "ratio_separation": ratio_separation,
+                # 零值統計 (v1.1 新增)
+                "positive_near_zero_count": positive_near_zero_count,
+                "positive_near_zero_ratio": positive_near_zero_ratio,
+                "positive_far_zero_count": positive_far_zero_count,
+                "positive_far_zero_ratio": positive_far_zero_ratio,
+                "negative_near_zero_count": negative_near_zero_count,
+                "negative_near_zero_ratio": negative_near_zero_ratio,
+                "negative_far_zero_count": negative_far_zero_count,
+                "negative_far_zero_ratio": negative_far_zero_ratio,
             }
+
+            # 格式化 ratio 數值（可能為 None）
+            pos_ratio_str = f"{positive_avg_ratio:.3f}" if positive_avg_ratio is not None else "N/A"
+            neg_ratio_str = f"{negative_avg_ratio:.3f}" if negative_avg_ratio is not None else "N/A"
+            ratio_sep_str = f"{ratio_separation:.3f}" if ratio_separation is not None else "N/A"
 
             self.logger.info(
                 f"雙密度統計:\n"
-                f"  正例 near: {positive_stats['mean']:.3f}, far: {positive_far_avg:.3f}, ratio: {positive_avg_ratio:.3f}\n"
-                f"  反例 near: {negative_stats['mean']:.3f}, far: {negative_far_avg:.3f}, ratio: {negative_avg_ratio:.3f}\n"
-                f"  ratio_separation: {ratio_separation:.3f}"
+                f"  正例 near: {positive_stats['mean']:.3f}, far: {positive_far_avg:.3f}, ratio: {pos_ratio_str}\n"
+                f"  反例 near: {negative_stats['mean']:.3f}, far: {negative_far_avg:.3f}, ratio: {neg_ratio_str}\n"
+                f"  ratio_separation: {ratio_sep_str}"
             )
 
             # 計算雙密度穩定性分析
