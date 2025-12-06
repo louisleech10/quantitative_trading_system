@@ -8,10 +8,58 @@
 
 ## 目錄
 
+0. [測試環境準備（首次使用必做）](#0-測試環境準備首次使用必做)
 1. [手動驗證指南（圖形界面操作）](#1-手動驗證指南圖形界面操作)
 2. [自動化測試執行](#2-自動化測試執行)
 3. [驗證結果記錄](#3-驗證結果記錄)
 4. [常見問題排除](#4-常見問題排除)
+5. [API 端點參考](#5-api-端點參考)
+
+---
+
+## 0. 測試環境準備（首次使用必做）
+
+在開始測試之前，請確保以下環境已正確配置。
+
+### 0.1 Python 依賴安裝
+
+```bash
+cd /Users/louis/Desktop/quantitative_trading_system
+
+# 安裝所有 Python 依賴
+pip install -r requirements.txt
+
+# 安裝測試相關依賴（如尚未包含）
+pip install pytest pytest-asyncio pytest-cov optuna
+```
+
+### 0.2 驗證 Optuna 安裝
+
+```bash
+python -c "import optuna; print(f'Optuna version: {optuna.__version__}')"
+# 預期輸出: Optuna version: 3.x.x
+```
+
+### 0.3 驗證後端可啟動
+
+```bash
+python -c "from api.main import app; print('API module OK')"
+# 預期輸出: API module OK
+```
+
+### 0.4 驗證前端依賴
+
+```bash
+cd frontend
+npm install  # 首次需要執行
+npm run build  # 驗證可編譯
+```
+
+### 0.5 API 文檔驗證
+
+啟動後端後，訪問 Swagger UI 確認 API 正常：
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ---
 
@@ -626,6 +674,144 @@
 
 ---
 
+#### 測試案例 10: 雙密度模式驗證 ⭐⭐⭐（進階功能）
+
+**目標**: 驗證設置 `far_lookback_bars` 後的雙密度優化模式
+
+**背景說明**:
+雙密度模式是 Optuna 優化器的進階功能。當設置 `far_lookback_bars` 時，優化目標會從簡單的 `separation`（正反例密度差）切換為加權雙密度得分，同時考慮：
+- **信號聚集度 (Clustering)**: 正例信號在近期窗口的聚集程度
+- **正反例區分度 (Discrimination)**: `ratio_separation`（近遠比的差異）
+
+**步驟**:
+
+1. **導航到策略測試頁面**
+   - 前往 `http://localhost:3000/strategy-test`
+
+2. **選擇案例**
+   - 選擇 15+ 正例案例
+   - 選擇 15+ 反例案例
+
+3. **配置訓練窗口（關鍵步驟）**
+   - 找到「訓練窗口配置」面板
+   - 設定:
+     - **Near Lookback Bars**: `100`（近期窗口）
+     - **Far Lookback Bars**: `500`（遠期窗口）← 這會啟用雙密度模式
+   - ✅ **驗證點**: 應顯示「雙密度模式已啟用」提示
+
+4. **配置 Optuna 設定**
+   - Trial 次數: `20`
+   - 其他保持預設
+
+5. **啟動優化**
+   - 點擊「開始優化」
+   - ✅ **驗證點 1**: 後端日誌顯示「雙密度模式啟用」
+   - ✅ **驗證點 2**: 進度更新正常
+
+6. **查看結果**
+   - 優化完成後，查看結果頁面
+   - ✅ **驗證點 1**: 最佳結果顯示 `ratio_separation` 指標
+   - ✅ **驗證點 2**: 顯示 `near_far_ratio` 相關參數
+
+**預期結果**:
+- 雙密度模式正確啟用
+- 優化目標為加權雙密度得分
+- 結果頁面顯示相關指標
+
+---
+
+#### 測試案例 11: WebSocket 實時推送驗證 ⭐⭐（進階功能）
+
+**目標**: 驗證優化過程中的 WebSocket 實時推送功能
+
+**步驟**:
+
+1. **打開瀏覽器開發者工具**
+   - 按 F12 打開開發者工具
+   - 切換到「Network」標籤
+   - 勾選「WS」（WebSocket）過濾器
+
+2. **啟動優化任務**
+   - 在策略測試頁面啟動一個優化任務
+   - 觀察 Network 面板
+
+3. **驗證 WebSocket 連接**
+   - ✅ **驗證點 1**: 看到 WebSocket 連接建立
+   - 連接 URL 格式: `ws://localhost:8000/ws/optimization/{task_id}`
+
+4. **監控 WebSocket 消息**
+   - 點擊 WebSocket 連接查看消息
+   - ✅ **驗證點 2**: 收到 `optimization_started` 事件
+   - ✅ **驗證點 3**: 收到多個 `progress_update` 事件
+   - ✅ **驗證點 4**: 事件包含:
+     - `completed_trials`: 已完成試驗數
+     - `total_trials`: 總試驗數
+     - `completion_percentage`: 完成百分比
+     - `best_value`: 當前最佳值
+     - `estimated_remaining_time`: 預估剩餘時間
+
+5. **驗證里程碑事件**
+   - 在 25%/50%/75% 進度時
+   - ✅ **驗證點 5**: 收到 `milestone_reached` 事件
+
+6. **驗證完成事件**
+   - 優化完成時
+   - ✅ **驗證點 6**: 收到 `optimization_finished` 事件
+
+**預期結果**:
+- WebSocket 連接穩定
+- 所有事件類型正確推送
+- 前端進度條與事件同步
+
+---
+
+#### 測試案例 12: 斷點續跑驗證 ⭐⭐⭐（進階功能）
+
+**目標**: 驗證優化中斷後可以從檢查點恢復
+
+**步驟**:
+
+1. **啟動長時間優化**
+   - 設定 Trial 次數: `50`（較多次數）
+   - 啟動優化
+
+2. **等待部分完成**
+   - 等待進度達到約 30-40%（15-20 trials）
+   - 記錄當前:
+     - Trial 數量: ____
+     - 最佳值: ____
+
+3. **模擬中斷**
+   - 方式 1: 在後端終端按 Ctrl+C 停止服務
+   - 方式 2: 關閉瀏覽器頁面
+
+4. **重新啟動後端**
+   ```bash
+   python -m uvicorn api.main:app --reload --port 8000
+   ```
+
+5. **重新啟動相同任務**
+   - 使用相同的 Study Name 創建新任務
+   - 或通過 API 重新啟動原任務
+   - ✅ **驗證點 1**: 系統識別到已存在的 Study
+
+6. **驗證恢復**
+   - ✅ **驗證點 2**: Trial 數量從中斷點繼續（如從 Trial 16 開始）
+   - ✅ **驗證點 3**: 最佳值保留（不從 0 開始）
+   - ✅ **驗證點 4**: 優化正常繼續直到完成
+
+**預期結果**:
+- 斷點續跑成功
+- 之前的試驗結果保留
+- 無需從頭重新優化
+
+**注意事項**:
+- 斷點續跑依賴 SQLite 數據庫持久化
+- 檢查點每 50 次試驗自動保存
+- Study Name 必須相同才能恢復
+
+---
+
 ### 1.3 驗證結果記錄表
 
 請在測試時填寫以下表格：
@@ -659,6 +845,13 @@
 | 10.1 | 桌面響應式 | 2 列佈局 | | | |
 | 10.2 | 平板響應式 | 1 列佈局 | | | |
 | 10.3 | 手機響應式 | 堆疊顯示 | | | |
+| 11.1 | 雙密度模式啟用 | 顯示提示訊息 | | | |
+| 11.2 | 雙密度優化結果 | 顯示 ratio_separation | | | |
+| 12.1 | WebSocket 連接 | 連接建立成功 | | | |
+| 12.2 | 進度事件推送 | 收到 progress_update | | | |
+| 12.3 | 里程碑事件 | 收到 milestone_reached | | | |
+| 13.1 | 斷點續跑 - 中斷 | 記錄中斷點 | | | |
+| 13.2 | 斷點續跑 - 恢復 | Trial 從中斷點繼續 | | | |
 
 ---
 
@@ -666,38 +859,101 @@
 
 如果你想執行自動化測試（可選，需要技術背景），以下是執行命令：
 
-### 2.1 後端單元測試
+### 2.1 測試依賴安裝（首次執行）
 
 ```bash
-# 進入專案目錄
 cd /Users/louis/Desktop/quantitative_trading_system
 
-# 執行所有單元測試
+# 安裝測試依賴
+pip install pytest pytest-asyncio pytest-cov
+
+# 驗證安裝
+pytest --version
+```
+
+### 2.2 Optuna 優化器單元測試（不需要後端）
+
+```bash
+cd /Users/louis/Desktop/quantitative_trading_system
+
+# 執行基礎測試 - Study 創建、Sampler/Pruner 配置、參數驗證
+pytest tests/optimization/test_optuna_optimizer_basic.py -v
+
+# 執行進階測試 - CheckpointManager、ErrorHandler、ProgressMonitor
+pytest tests/optimization/test_optuna_optimizer_advanced.py -v
+
+# 執行所有 Optuna 測試並生成覆蓋率報告
 pytest tests/optimization/ -v --cov=momentum/Optimization --cov-report=html
-
-# 執行特定測試文件
-pytest tests/optimization/test_data_validator.py -v
-pytest tests/optimization/test_result_analyzer.py -v
 ```
 
-### 2.2 整合測試
+**測試覆蓋範圍**:
+- `test_optuna_optimizer_basic.py` (345 行): Study 創建/載入、Sampler 配置、參數約束
+- `test_optuna_optimizer_advanced.py` (451 行): 檢查點、錯誤處理、進度監控
+
+### 2.3 信號密度分析測試
 
 ```bash
-# 執行整合測試（需要啟動後端）
-pytest tests/integration/test_optimization_e2e.py -v
+# 執行信號分析器測試
+pytest tests/analysis/test_signal_density_analyzer.py -v
+
+# 執行信號分析服務測試
+pytest tests/analysis/test_signal_analysis_service.py -v
+
+# 執行 API 端點測試
+pytest tests/analysis/test_api_endpoints.py -v
+
+# 執行性能測試（較慢）
+pytest tests/analysis/test_performance.py -v -m "slow"
 ```
 
-### 2.3 前端單元測試
+### 2.4 整合測試（需要啟動後端）
 
 ```bash
-# 進入前端目錄
-cd /Users/louis/Desktop/quantitative_trading_system/frontend
+# 步驟 1: 在另一個終端啟動後端
+python -m uvicorn api.main:app --reload --port 8000
 
-# 執行所有前端測試
-npm test
+# 步驟 2: 執行整合測試
+pytest tests/optimization/test_optimization_integration.py -v
+```
 
-# 執行特定測試
-npm test -- BestResultCard.test.tsx
+**整合測試覆蓋範圍**:
+- 任務創建和查詢
+- 任務列表和過濾
+- 任務取消
+- 單例模式驗證
+
+### 2.5 前端測試（目前不可用）
+
+> **注意**: 前端目前沒有配置測試框架。如需前端測試，請先配置 Jest 或 Vitest。
+
+```bash
+# 目前會報錯
+# cd frontend && npm test
+```
+
+### 2.6 完整測試執行腳本
+
+```bash
+#!/bin/bash
+# 保存為 run_tests.sh
+
+echo "=== Optuna 優化系統測試 ==="
+
+# 1. 單元測試
+echo ">> 執行單元測試..."
+pytest tests/optimization/test_optuna_optimizer_basic.py -v
+pytest tests/optimization/test_optuna_optimizer_advanced.py -v
+
+# 2. 信號分析測試
+echo ">> 執行信號分析測試..."
+pytest tests/analysis/ -v --ignore=tests/analysis/test_performance.py
+
+# 3. 生成覆蓋率報告
+echo ">> 生成覆蓋率報告..."
+pytest tests/optimization/ tests/analysis/ --cov=momentum --cov-report=html
+
+echo "=== 測試完成 ==="
+echo "覆蓋率報告: htmlcov/index.html"
 ```
 
 ---
@@ -852,12 +1108,75 @@ lsof -i :3000
 
 ---
 
+## 5. API 端點參考
+
+### 5.1 任務管理 API
+
+| 端點 | 方法 | 說明 | 驗證方式 |
+|------|------|------|----------|
+| `/api/v1/optimization/tasks` | POST | 創建優化任務 | Swagger UI |
+| `/api/v1/optimization/tasks/{task_id}/start` | POST | 啟動任務 | curl/Swagger |
+| `/api/v1/optimization/tasks/{task_id}` | GET | 查詢任務狀態 | 瀏覽器 |
+| `/api/v1/optimization/tasks` | GET | 列出所有任務 | 瀏覽器 |
+| `/api/v1/optimization/tasks/{task_id}/cancel` | POST | 取消任務 | curl |
+| `/api/v1/optimization/strategies` | GET | 列出可用策略 | 瀏覽器 |
+| `/api/v1/optimization/strategies/{strategy_id}` | GET | 策略詳情 | 瀏覽器 |
+
+### 5.2 分析結果 API
+
+| 端點 | 方法 | 說明 | 前端組件 |
+|------|------|------|----------|
+| `/api/v1/optimization/tasks/{task_id}/result` | GET | 最佳結果 | BestResultCard |
+| `/api/v1/optimization/tasks/{task_id}/analysis/importance` | GET | 參數重要性 | ParamImportanceChart |
+| `/api/v1/optimization/tasks/{task_id}/analysis/history` | GET | 優化歷史曲線 | - |
+| `/api/v1/optimization/tasks/{task_id}/analysis/param-space` | GET | 參數空間數據 | - |
+| `/api/v1/optimization/tasks/{task_id}/analysis/heatmap` | GET | 2D 熱力圖 | ParamHeatmap |
+| `/api/v1/optimization/tasks/{task_id}/analysis/convergence` | GET | 收斂分析 | ConvergencePlot |
+| `/api/v1/optimization/tasks/{task_id}/analysis/stability` | GET | 穩定性分析 | StabilityChart |
+| `/api/v1/optimization/tasks/{task_id}/trials` | GET | Trial 列表 | TrialRankingTable |
+
+### 5.3 WebSocket 實時推送
+
+| 端點 | 說明 |
+|------|------|
+| `ws://localhost:8000/ws/optimization/{task_id}` | 優化進度實時推送 |
+
+**WebSocket 事件類型**:
+- `optimization_started` - 優化開始
+- `progress_update` - 進度更新
+- `new_best_value` - 發現新最佳值
+- `milestone_reached` - 達成里程碑 (25%/50%/75%)
+- `optimization_finished` - 優化完成
+- `ping` - 心跳包 (每 30 秒)
+
+### 5.4 API 驗證步驟
+
+1. **啟動後端**
+   ```bash
+   python -m uvicorn api.main:app --reload --port 8000
+   ```
+
+2. **訪問 Swagger UI**
+   - 打開瀏覽器: http://localhost:8000/docs
+   - 驗證所有端點顯示正確
+
+3. **測試端點**
+   ```bash
+   # 列出所有策略
+   curl http://localhost:8000/api/v1/optimization/strategies
+
+   # 列出所有任務
+   curl http://localhost:8000/api/v1/optimization/tasks
+   ```
+
+---
+
 **測試完成！** 🎉
 
 如果你按照以上步驟完成了所有測試，且通過率 >= 95%，代表 Optuna 優化系統已經成功完成 Phase 1-4，可以進入生產環境使用。
 
 ---
 
-**文檔版本**: v1.0
-**最後更新**: 2025-12-02
+**文檔版本**: v1.1
+**最後更新**: 2025-12-06
 **作者**: Claude (Optuna 優化系統)

@@ -1017,6 +1017,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.separation}
                     helper="正反例密度差異 (優化目標)"
                     format="decimal"
+                    source="= 正例 Near 密度均值 − 反例 Near 密度均值"
                   />
                 )}
                 {densityMetrics?.ratio_separation !== undefined && (
@@ -1025,6 +1026,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.ratio_separation}
                     helper="正反例比率差異 (雙密度優化目標)"
                     format="decimal"
+                    source="= 正例 Near/Far Ratio − 反例 Near/Far Ratio"
                   />
                 )}
                 {densityMetrics?.p_value !== undefined && (
@@ -1033,6 +1035,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.p_value}
                     helper="統計顯著性 (<0.05為顯著)"
                     format="decimal"
+                    source="獨立 t-test: 正例 Near 密度 vs 反例 Near 密度"
                   />
                 )}
                 {densityMetrics?.cohens_d !== undefined && (
@@ -1041,6 +1044,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.cohens_d}
                     helper="效果量 (>0.5為中等, >0.8為大效果)"
                     format="decimal"
+                    source="= (正例均值 − 反例均值) / 合併標準差 (Near 密度)"
                   />
                 )}
                 {densityMetrics?.stability_cv !== undefined && (
@@ -1049,6 +1053,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.stability_cv}
                     helper="穩定性係數 (<0.3穩定, <0.5可接受)"
                     format="decimal"
+                    source="= 正例每月 Near 密度均值的標準差 / 整體均值"
                   />
                 )}
                 {densityMetrics?.positive_ratio_cv !== undefined && (
@@ -1057,6 +1062,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.positive_ratio_cv}
                     helper="正例 Near/Far Ratio 跨月穩定性 (<0.3穩定, <0.5可接受)"
                     format="decimal"
+                    source="= 每月正例 Ratio 均值的標準差 / 整體 Ratio 均值"
                   />
                 )}
                 {densityMetrics?.separation_cv !== undefined && (
@@ -1065,6 +1071,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.separation_cv}
                     helper="每月分離度穩定性 (<0.3穩定, <0.5可接受)"
                     format="decimal"
+                    source="= 每月 Separation 的標準差 / |Separation 均值|"
                   />
                 )}
               </div>

@@ -1,0 +1,27 @@
+Case ID: ETHUSDT_1751155200_0
+Label: Negative
+Timeframe: 1h
+TO Timestamp: 2025-06-29 08:00:00
+
+Near Window (TO-24 to TO-1):
+  - Total bars: 24
+  - Signal bars: 7
+  - Density: 0.2917
+
+Far Window (TO-100 to TO-25):
+  - Total bars: 76
+  - Signal bars: 30
+  - Density: 0.3947
+
+Near/Far Ratio: 0.7389
+
+Signal Pattern Analysis:
+  - Consecutive signals (max): 38
+  - Signal gaps (max): 76
+  - Total signals: 74/235
+
+EMA Validation:
+  ✓ EMA Short calculated (7 period)
+  ✓ EMA Mid calculated (16 period)
+  ✓ EMA Long calculated (30 period)
+  ✓ Three-line order logic verified

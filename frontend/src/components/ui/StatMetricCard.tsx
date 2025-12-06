@@ -7,6 +7,7 @@ interface StatMetricCardProps {
   value: number;
   std?: number;
   helper?: string;
+  source?: string;  // 數據來源/計算公式說明
   format?: "percent" | "decimal" | "ratio" | "number";
   showConfidence?: boolean;
   colorCode?: boolean; // Color code based on CV (coefficient of variation)
@@ -23,6 +24,7 @@ export default function StatMetricCard({
   value,
   std,
   helper,
+  source,
   format = "decimal",
   showConfidence = false,
   colorCode = false,
@@ -87,6 +89,13 @@ export default function StatMetricCard({
       {helper && (
         <div className="text-xs text-gray-400 mt-2 leading-tight">
           {helper}
+        </div>
+      )}
+
+      {/* Source / Formula */}
+      {source && (
+        <div className="text-xs text-blue-500 mt-1 leading-tight font-mono">
+          {source}
         </div>
       )}
 

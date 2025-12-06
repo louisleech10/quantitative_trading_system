@@ -224,11 +224,18 @@ class DualDensityVerifier:
                     # 計算密度
                     near_density = self.analyzer.calculate_case_density(near_signals)
                     far_density = self.analyzer.calculate_case_density(far_signals)
-                    ratio = near_density / far_density if far_density > 0.001 else (near_density * 10)
+                    # 排除法：Far density = 0 時不計算 ratio，標記為 None
+                    FAR_ZERO_THRESHOLD = 0.001
+                    if far_density >= FAR_ZERO_THRESHOLD:
+                        ratio = near_density / far_density
+                        ratio_str = f"{ratio:.4f}"
+                    else:
+                        ratio = None
+                        ratio_str = "N/A (far=0)"
 
                     print(f"\n  Near Window: {sum(near_signals)}/{len(near_signals)} signals ({near_density:.4f} density)")
                     print(f"  Far Window: {sum(far_signals)}/{len(far_signals)} signals ({far_density:.4f} density)")
-                    print(f"  Near/Far Ratio: {ratio:.4f}")
+                    print(f"  Near/Far Ratio: {ratio_str}")
 
                     # 準備詳細表格數據
                     data_rows = []
@@ -411,9 +418,10 @@ class DualDensityVerifier:
 
             for item in verification_report:
                 if item['status'] == 'PASS':
+                    ratio_str = f"{item['ratio']:.4f}" if item['ratio'] is not None else "N/A"
                     report_lines.append(
                         f"  ✓ {item['case_id']} ({item['label']}): "
-                        f"Near={item['near_density']:.4f}, Far={item['far_density']:.4f}, Ratio={item['ratio']:.4f}"
+                        f"Near={item['near_density']:.4f}, Far={item['far_density']:.4f}, Ratio={ratio_str}"
                     )
                 else:
                     report_lines.append(f"  ✗ {item['case_id']} ({item['label']}): {item.get('error', 'Unknown error')}")
@@ -894,9 +902,24 @@ class DualDensityVerifier:
             print(f"   - Negative avg: {response.negative_far_avg_density:.4f}")
 
             print(f"\n4. Near/Far Ratio (Signal Clustering):")
-            print(f"   - Positive ratio: {response.positive_near_far_ratio:.4f}")
-            print(f"   - Negative ratio: {response.negative_near_far_ratio:.4f}")
-            print(f"   - Ratio separation: {response.ratio_separation:.4f}")
+            pos_ratio_str = f"{response.positive_near_far_ratio:.4f}" if response.positive_near_far_ratio is not None else "N/A"
+            neg_ratio_str = f"{response.negative_near_far_ratio:.4f}" if response.negative_near_far_ratio is not None else "N/A"
+            ratio_sep_str = f"{response.ratio_separation:.4f}" if response.ratio_separation is not None else "N/A"
+            print(f"   - Positive ratio: {pos_ratio_str}")
+            print(f"   - Negative ratio: {neg_ratio_str}")
+            print(f"   - Ratio separation: {ratio_sep_str}")
+
+            # 零值統計 (v1.1 新增)
+            print(f"\n4.1. Zero-Value Statistics (透明化統計):")
+            if response.positive_near_zero_count is not None:
+                print(f"   正例:")
+                print(f"     - Near=0: {response.positive_near_zero_count} 個 ({response.positive_near_zero_ratio:.1%}) - 策略信號完全未觸發")
+                print(f"     - Far=0:  {response.positive_far_zero_count} 個 ({response.positive_far_zero_ratio:.1%}) - 被排除於 ratio 統計")
+                print(f"   反例:")
+                print(f"     - Near=0: {response.negative_near_zero_count} 個 ({response.negative_near_zero_ratio:.1%}) - 策略信號完全未觸發")
+                print(f"     - Far=0:  {response.negative_far_zero_count} 個 ({response.negative_far_zero_ratio:.1%}) - 被排除於 ratio 統計")
+            else:
+                print(f"   - 零值統計: N/A (非雙密度模式)")
 
             print(f"\n5. Statistical Significance:")
             print(f"   - p-value: {response.p_value:.6f} {'✓ Significant' if response.p_value < 0.05 else '✗ Not significant'}")
@@ -929,10 +952,11 @@ class DualDensityVerifier:
 
             # 判斷策略質量
             print(f"\n7. Strategy Quality Assessment:")
-            if response.ratio_separation > 0.5 and response.p_value < 0.05:
+            ratio_sep = response.ratio_separation if response.ratio_separation is not None else 0.0
+            if ratio_sep > 0.5 and response.p_value < 0.05:
                 quality = "EXCELLENT"
                 symbol = "🟢"
-            elif response.ratio_separation > 0.3 and response.p_value < 0.10:
+            elif ratio_sep > 0.3 and response.p_value < 0.10:
                 quality = "GOOD"
                 symbol = "🟡"
             else:
@@ -940,7 +964,8 @@ class DualDensityVerifier:
                 symbol = "🔴"
 
             print(f"   {symbol} Quality: {quality}")
-            print(f"   - Ratio separation: {response.ratio_separation:.4f} (target: >0.3)")
+            ratio_sep_display = f"{response.ratio_separation:.4f}" if response.ratio_separation is not None else "N/A"
+            print(f"   - Ratio separation: {ratio_sep_display} (target: >0.3)")
             print(f"   - Statistical significance: p={response.p_value:.6f} (target: <0.05)")
 
             # 保存結果到CSV

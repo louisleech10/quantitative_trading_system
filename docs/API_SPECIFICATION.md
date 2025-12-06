@@ -1,9 +1,11 @@
 # API接口規範
 
 ## 文檔信息
-- **版本**: 1.0
-- **最後更新**: 2025-09-30
+- **版本**: 1.1
+- **最後更新**: 2025-12-06
 - **Base URL**: `http://localhost:8000` (開發環境)
+- **變更記錄**:
+  - v1.1 (2025-12-06): 新增 SignalDensityResponse 零值統計欄位，修復 Far=0 統計偏差
 
 ---
 
@@ -794,6 +796,53 @@ interface SearchConfig {
     ratio: number;
     time_separation_days: number;
   };
+}
+```
+
+### SignalDensityResponse (v1.1 更新)
+```typescript
+/**
+ * 信號密度分析響應模型
+ * 
+ * 計算策略在正反例中的信號密度差異，評估策略有效性。
+ * v1.1 更新：新增零值統計欄位，透明化顯示 Far=0 被排除的案例比例。
+ */
+interface SignalDensityResponse {
+  // === 核心統計指標 ===
+  positive_avg_density: number;      // 正例平均信號密度 (0.0~1.0)
+  negative_avg_density: number;      // 反例平均信號密度 (0.0~1.0)
+  separation: number;                // 密度差異 (正例 - 反例)，優化目標
+  
+  // === 雙密度模式額外指標 (當 far_lookback_bars 配置時有效) ===
+  positive_far_avg_density?: number; // 正例遠期平均密度
+  negative_far_avg_density?: number; // 反例遠期平均密度
+  positive_near_far_ratio?: number;  // 正例 Near/Far Ratio 平均值 (可能為 null)
+  negative_near_far_ratio?: number;  // 反例 Near/Far Ratio 平均值 (可能為 null)
+  ratio_separation?: number;         // Ratio 差異 (正例 - 反例)，雙密度優化目標
+  
+  // === 零值統計 (v1.1 新增) ===
+  // 透明化顯示策略信號未觸發或 Far=0 被排除的案例比例
+  // Far density = 0 的案例會被排除於 ratio 統計，避免除以零產生無意義數值
+  positive_near_zero_count?: number;  // 正例中 Near=0 的案例數（策略信號完全未觸發）
+  positive_near_zero_ratio?: number;  // 正例中 Near=0 的比例 (0.0~1.0)
+  positive_far_zero_count?: number;   // 正例中 Far=0 的案例數（被排除於 ratio 統計）
+  positive_far_zero_ratio?: number;   // 正例中 Far=0 的比例 (0.0~1.0)
+  negative_near_zero_count?: number;  // 反例中 Near=0 的案例數（策略信號完全未觸發）
+  negative_near_zero_ratio?: number;  // 反例中 Near=0 的比例 (0.0~1.0)
+  negative_far_zero_count?: number;   // 反例中 Far=0 的案例數（被排除於 ratio 統計）
+  negative_far_zero_ratio?: number;   // 反例中 Far=0 的比例 (0.0~1.0)
+  
+  // === 統計檢驗指標 ===
+  p_value: number;                   // 統計顯著性 (<0.05 為顯著)
+  cohens_d: number;                  // Cohen's d 效果量 (>0.5 中效果, >0.8 大效果)
+  stability_cv: number;              // 穩定性係數 (<0.3 穩定)
+  
+  // === 詳細統計 ===
+  positive_std: number;
+  negative_std: number;
+  positive_sample_size: number;
+  negative_sample_size: number;
+  case_level_densities: Record<string, number>;
 }
 ```
 

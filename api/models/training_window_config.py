@@ -364,6 +364,54 @@ class SignalDensityResponse(BaseModel):
         description="月度詳細數據,包含每月的樣本數、密度、ratio、separation等"
     )
 
+    # 零值統計指標 (v1.1 新增) - 透明化顯示策略信號未觸發或 far=0 的案例比例
+    # Near density = 0 表示策略信號在該窗口完全未觸發
+    # Far density = 0 的案例會被排除於 ratio 統計，避免除以零產生無意義數值
+    positive_near_zero_count: Optional[int] = Field(
+        None,
+        description="正例中 Near density = 0 的案例數（策略信號完全未觸發）",
+        ge=0
+    )
+    positive_near_zero_ratio: Optional[float] = Field(
+        None,
+        description="正例中 Near density = 0 的比例 (0.0~1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    positive_far_zero_count: Optional[int] = Field(
+        None,
+        description="正例中 Far density = 0 的案例數（被排除於 ratio 統計）",
+        ge=0
+    )
+    positive_far_zero_ratio: Optional[float] = Field(
+        None,
+        description="正例中 Far density = 0 的比例 (0.0~1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    negative_near_zero_count: Optional[int] = Field(
+        None,
+        description="反例中 Near density = 0 的案例數（策略信號完全未觸發）",
+        ge=0
+    )
+    negative_near_zero_ratio: Optional[float] = Field(
+        None,
+        description="反例中 Near density = 0 的比例 (0.0~1.0)",
+        ge=0.0,
+        le=1.0
+    )
+    negative_far_zero_count: Optional[int] = Field(
+        None,
+        description="反例中 Far density = 0 的案例數（被排除於 ratio 統計）",
+        ge=0
+    )
+    negative_far_zero_ratio: Optional[float] = Field(
+        None,
+        description="反例中 Far density = 0 的比例 (0.0~1.0)",
+        ge=0.0,
+        le=1.0
+    )
+
     # 詳細統計指標
     positive_std: float = Field(
         ...,
@@ -405,6 +453,15 @@ class SignalDensityResponse(BaseModel):
                 "positive_near_far_ratio": 1.25,
                 "negative_near_far_ratio": 1.06,
                 "ratio_separation": 0.19,
+                # 零值統計 (v1.1 新增)
+                "positive_near_zero_count": 2,
+                "positive_near_zero_ratio": 0.067,
+                "positive_far_zero_count": 3,
+                "positive_far_zero_ratio": 0.10,
+                "negative_near_zero_count": 5,
+                "negative_near_zero_ratio": 0.071,
+                "negative_far_zero_count": 7,
+                "negative_far_zero_ratio": 0.10,
                 # 統計指標
                 "p_value": 0.001,
                 "cohens_d": 1.2,
