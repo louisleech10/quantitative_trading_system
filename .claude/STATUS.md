@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-11-26 14:30
-**當前階段**: Phase 3.2 圖表 UI 優化與深色主題
+**最後更新**: 2025-12-06 16:30
+**當前階段**: Optuna 參數優化測試準備
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,18 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **EMA 計算與顯示修復** (100%) - 2025-12-06完成
+  - ✅ EMA 算法統一：強制使用 `pandas.ewm(span=period, adjust=False).mean()`
+  - ✅ 移除 pandas_ta 分支，消除計算不一致來源
+  - ✅ API Warmup 支援：新增 `_calculate_indicators_with_warmup()` 方法
+  - ✅ WARMUP_MULTIPLIER = 4.5（確保 EMA 收斂至 99.5% 精度）
+  - ✅ 前端顯示修復：改用截斷取代四捨五入（符合交易所標準）
+  - ✅ 驗證通過：API EMA_30 = 3441.9981957684013，與 CSV 完全一致
+- **STRATEGY_EXTENSION_GUIDE.md Warmup 文檔** (100%) - 2025-12-06完成
+  - ✅ 新增 Section 2.3「Warmup 需求」完整說明
+  - ✅ 新增 Section 3.2 Warmup 警告提醒
+  - ✅ 新增 Error 5「指標值與交易所不一致」疑難排解
+  - ✅ 新增 Section 9.3 規則 6（Warmup 處理）和規則 7（數值截斷）
 - **圖表 UI 優化與深色主題** (100%) - 2025-11-26完成
   - ✅ 深色主題：背景 #1e1e1e、網格 #2a2a2a、文字淺灰 #d1d4dc
   - ✅ 圖表高度比例調整：K 線 42%、Volume 29%、Taker Ratio 29%
@@ -55,37 +67,32 @@
 - 無活躍任務
 
 ### 剛完成 🔧
-- **圖表 UI 優化與深色主題** (2025-11-26)
-  - ✅ 深色主題全面實現（StrategySignalChart、VolumeChart、TakerRatioChart）
-  - ✅ 圖表高度比例優化（42:29:29）
-  - ✅ 移除浮動信號統計面板，改為底部統一顯示
-  - ✅ 全寬佈局，移除 max-w-7xl 容器限制
-  - ✅ 移除最後價格虛線（priceLineVisible: false）
-  - ✅ 三圖表均添加信號計數顯示
+- **EMA 計算與顯示一致性修復** (2025-12-06)
+  - ✅ EMA 算法：統一使用 pandas ewm，移除 pandas_ta
+  - ✅ Warmup 支援：API 自動獲取額外數據進行預熱
+  - ✅ 顯示格式：前端改用截斷（交易所標準）
+  - ✅ 驗證結果：EMA 值與 Binance/CSV 完全一致
+  - ✅ 文檔更新：STRATEGY_EXTENSION_GUIDE.md 新增 Warmup 章節
 
 ---
 
 ## 🎯 當前重點
 
 ### 下一步工作
-**短期行動（1-3天）**：
+**Optuna 參數優化測試**（優先級：高）
 
-1. **數據準備**
-   - 確保 data_cache/ 或 data_cache_backup/ 有足夠的 K 線數據
-   - 或設置 LEGACY_KLINE_CACHE_DIR 環境變量指向備份目錄
+1. **Optuna 整合驗證**
+   - 測試 Optuna 超參數優化系統
+   - 驗證 TPE/CmaEs/Random/GP/NSGA-II 五種 Sampler
+   - 確認 WebSocket 實時推送功能
 
-2. **Warmup 系統驗證**
-  - 重新批量下載 K 線資料（warmup_bars=185）
-  - 驗證 metadata 正確儲存（warmup_bars_downloaded=185, lookback_bars=100）
-  - 測試 EMA40 策略（需要 180 warmup）應正常執行
+2. **多目標優化測試**
+   - 測試 Pareto 前沿分析
+   - 驗證 separation + stability 雙目標優化
 
-2. **Optuna 整合準備**
-  - 基於單選數據源設計，規劃 Optuna 超參數優化策略
-  - 評估是否需要多源策略模板（價量確認、主動買盤過濾等）
-
-3. **系統穩定性測試**
-  - 驗證完整錯誤處理鏈（後端 ValueError → HTTP 400 → 前端 Toast）
-  - 測試各種 EMA 組合的 warmup 需求驗證
+3. **系統穩定性驗證**
+   - CheckpointManager 容錯測試
+   - 長時間運行穩定性測試
 
 **建議方向**（按優先級排序）：
 
@@ -604,12 +611,11 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-- **/strategy-test 數據路徑配置**（優先級：高）
-  - 問題：kline_cache.h5 只有有限數據（2025年8月-11月），data_cache_backup/ 有完整數據但不在搜索路徑
-  - 影響：API 返回 404「K線數據不存在」
-  - 解決方案：設置 LEGACY_KLINE_CACHE_DIR=data_cache_backup 或複製數據到 data_cache/
+- 無需立即修復的問題
 
 **已修復系統**：
+- ✅ EMA 計算一致性（2025-12-06）
+- ✅ 前端數值顯示格式（2025-12-06）
 - ✅ Warmup 驗證系統（2025-11-23）
 - ✅ 前端錯誤處理（2025-11-23）
 - ✅ K線存儲系統（2025-11-08~09）
@@ -683,33 +689,43 @@ quantitative_trading_system/
 
 ## 📝 最近完成的工作
 
-### 2025-11-25
+### 2025-12-06
 
-**/strategy-test 驗證錯誤處理改進** ⭐⭐
+**EMA 計算與顯示一致性修復** ⭐⭐⭐⭐⭐
 
 **問題診斷**
-- 用戶反饋：/strategy-test 頁面顯示「請求參數驗證失敗」
-- 診斷過程：
-  1. 測試 Pydantic 模型驗證 → 通過，前端發送的額外字段被正確忽略
-  2. 測試 API endpoint → 返回 404「K線數據不存在或為空」
-  3. 確認根因：kline_cache.h5 只有 199 根 BTCUSDT 12h K線（2025年8月-11月）
-  4. 發現 data_cache_backup/ 有完整數據（2023-01-01 到 2025-10-06）但不在搜索路徑
+- 用戶反饋：/Charts 頁面 EMA_30 顯示 3442.04，但 Binance 顯示 3441.99，CSV 顯示 3441.9981957684
+- 根本原因 1：API 只返回 160 根 K 線（顯示範圍），但 EMA 計算需要 warmup 預熱數據
+- 根本原因 2：前端使用 `toFixed()` 四捨五入，但交易所使用截斷
 
-**修復內容**（2個文件，+20行）
-- `frontend/src/app/strategy-test/page.tsx`
-  - 改進 chart/signals API 錯誤處理（第 373-395 行）
-  - 改進 density API 錯誤處理（第 509-531 行）
-  - 現在會解析並顯示 validation_errors 的具體字段和消息
+**核心修復**（5 個文件）
 
-**錯誤顯示改進**
-```
-修改前：「請求參數驗證失敗」
-修改後：「驗證失敗: strategy_config -> data_source: 無效的data_source; ...」
-```
+1. **EMA 算法統一**（momentum/Indicators/ema.py）
+   - 移除 pandas_ta 分支
+   - 強制使用 `pandas.ewm(span=period, adjust=False).mean()`
+   - 確保與 Binance 計算方式完全一致
 
-**建議解決數據問題**
-- 選項A：`export LEGACY_KLINE_CACHE_DIR=data_cache_backup`
-- 選項B：`cp data_cache_backup/*.h5 data_cache/`
+2. **API Warmup 支援**（api/services/chart_data_service.py）
+   - 新增 `_calculate_indicators_with_warmup()` 方法
+   - WARMUP_MULTIPLIER = 4.5（確保 99.5% 精度收斂）
+   - 獲取 display_bars + warmup_bars 數據，計算後僅返回顯示範圍
+
+3. **前端顯示格式**（2 個文件）
+   - frontend/src/utils/chartConfig.ts：新增 `truncateToDecimals()`
+   - frontend/src/components/charts/SignalTooltip.tsx：改用截斷
+   - 公式：`Math.floor(value * 10^decimals) / 10^decimals`
+
+**驗證結果**
+- ✅ API EMA_30 = 3441.9981957684013（與 CSV 完全一致）
+- ✅ 差異 = 0.000000000000000（精確匹配）
+- ✅ 正例案例 Near=0.8333, Far=0.3158, Ratio=2.6389
+- ✅ 反例案例 Near=0.2917, Far=0.3947, Ratio=0.7389
+
+**文檔更新**（docs/STRATEGY_EXTENSION_GUIDE.md）
+- 新增 Section 2.3「Warmup 需求」
+- 新增 Section 3.2 Warmup 警告
+- 新增 Error 5 疑難排解
+- 新增 Section 9.3 規則 6 和 7
 
 ---
 
@@ -1961,35 +1977,16 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待同步（2025-11-25）
+**遠端同步**: ⏳ 待同步（2025-12-06）
 
-**最新提交** (2025-11-25):
-- ⏳ **待提交**: /strategy-test 驗證錯誤處理改進
-  - 改進 API 錯誯顯示，解析 validation_errors 詳細信息
-  - 修改文件：1個文件（frontend/src/app/strategy-test/page.tsx），+20行
-
-**上一次提交** (2025-11-09):
-- ✅ **commit 3239855**: K線存儲系統根本性修復
-  - 實現ACID事務性寫入
-  - 添加後寫驗證層
-  - 智能數據存在檢測
-  - 批量下載時間範圍覆蓋檢查
-  - 測試：8/8時間框架全部通過
-
-**Phase 3 提交歷史** (2025-11-01~02):
-  - 新增文件（19個）：
-    - 9個組件（MetricsPanel, BestParamsCard等）
-    - 4個自定義Tooltip
-    - 3個工具庫（exportUtils, errorHandler, ToastProvider）
-    - ErrorBoundary + 主頁面
-    - 3個文檔（TASK_3.6_COMPLETION_REPORT.md等）
-  - 總代碼：+4210行，-7行
-
-**Phase 3 提交歷史** (2025-11-01~02):
-- commit 049a435: Phase 3.6 優化結果展示UI（6,394行）
-- commit bccaa90, c077a19: Phase 3.3+3.4 策略配置UI與圖表信號（~4,746行）
-- commit 1c28971: Phase 3.1 多數據源指標計算引擎（~3,500行）
-- Phase 3.2, 3.5 commits（~7,000行）
+**待提交變更** (2025-12-06):
+- **EMA 計算與顯示修復**
+  - momentum/Indicators/ema.py - 移除 pandas_ta，統一 pandas ewm
+  - api/services/chart_data_service.py - 新增 warmup 計算方法
+  - frontend/src/utils/chartConfig.ts - 新增截斷函數
+  - frontend/src/components/charts/SignalTooltip.tsx - 改用截斷顯示
+  - docs/STRATEGY_EXTENSION_GUIDE.md - 新增 Warmup 文檔章節
+  - test_results/signal_verification_*/ - 驗證測試結果
 
 **Tags**:
 - phase-0-complete, phase-1-complete, phase-2-complete
@@ -2001,53 +1998,38 @@ for case in candidates:
 - **phase-3.6-complete** ⭐
 - **phase-3-complete** ⭐⭐⭐
 
-**備份分支**: backup-before-phase0, backup-before-phase1
-
-**統計**:
-- Phase 3 總提交：18+ commits
-- Phase 3 總代碼：~21,640行
-- Phase 3 總文件：~68個
-
 **當前狀態**:
-- ✅ Phase 1全部任務：完成並推送
-- ✅ Phase 2.1-2.3：完成並推送
-- ✅ Phase 3.1-3.6：完成並提交
-- ✅ 工作區狀態：已提交並推送（圖表 UI 優化與深色主題）
+- ✅ Phase 1-3 全部完成
+- ⏳ EMA 修復待提交推送
 
 ---
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-11-26）：
-   - ✅ **圖表 UI 優化與深色主題**
-     - 深色主題：背景 #1e1e1e、網格 #2a2a2a、文字 #d1d4dc
-     - 圖表高度調整：K 線 42%、Volume 29%、Taker 29%
-     - 移除浮動面板，信號統計統一至底部
-     - 全寬佈局（移除 max-w-7xl）
-     - 移除最後價格水平虛線（priceLineVisible: false）
-   - Git狀態：✅ 已提交並推送
+1. **已完成工作**（2025-12-06）：
+   - ✅ **EMA 計算一致性修復**
+     - 算法統一：pandas.ewm(span=period, adjust=False).mean()
+     - API Warmup：WARMUP_MULTIPLIER = 4.5
+     - 前端截斷：Math.floor(value * 10^decimals) / 10^decimals
+     - 驗證通過：API EMA 與 CSV 完全一致
+   - ✅ **STRATEGY_EXTENSION_GUIDE.md 更新**
+     - 新增 Warmup 需求章節
+     - 新增疑難排解和規範
 
-2. **當前狀態**（2025-11-26）：
-   - 分支：main（✅ 已同步）
-   - 圖表系統：深色主題、全寬佈局、信號標記完整
+2. **當前狀態**（2025-12-06）：
+   - 分支：main（⏳ 待推送）
+   - EMA 系統：已修復，等待 Git 同步
 
-3. **下一步工作建議**：
-
-   **優先：數據路徑配置**
-   - 設置 LEGACY_KLINE_CACHE_DIR 環境變量，或複製備份數據到 data_cache/
-   - 測試 /strategy-test 頁面功能
-
-   **Git 提交與推送**
-   - 提交錯誤處理改進變更
-   - 推送到遠端同步
-
-   **選項C：系統穩定性測試**（優先級：中）
-   - 驗證數據源單選後的完整流程
-   - 測試 Boxplot 在各種數據分佈下的顯示效果
+3. **下一步工作**：
+   - **Optuna 參數優化測試**
+     - 測試五種 Sampler（TPE/CmaEs/Random/GP/NSGA-II）
+     - 驗證多目標優化和 Pareto 前沿
+     - 測試 WebSocket 實時推送
+     - 驗證 CheckpointManager 容錯機制
 
 4. **開發工作流程**：
-   - 遵循DEVELOPMENT_GUIDE.md和Ultra Think三步驟規範
-   - 使用 `replace_string_in_file` 改程式碼（不需approve）
+   - 遵循 DEVELOPMENT_GUIDE.md 和 Ultra Think 三步驟規範
+   - 使用 `replace_string_in_file` 改程式碼（不需 approve）
    - 必要時用 `run_in_terminal` 執行命令（自動執行）
    - 完成後自動更新此文件（勿需手動提醒）
 

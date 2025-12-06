@@ -5,20 +5,24 @@
 1. 獲取以T點為中心的K線數據（用於圖表顯示）
 2. 數據格式轉換（HDF5 → JSON）
 3. center_index計算（T在陣列中的位置）
-4. 錯誤處理和日誌記錄
+4. **指標計算**（可選，使用 IndicatorEngine 確保與策略計算一致）
+5. 錯誤處理和日誌記錄
 
 設計原則：
 - 基於kline_storage_service構建
 - 符合API_SPECIFICATION_CHART.md規範
 - 完整錯誤處理
 - 適當日誌記錄
+- 前端不計算指標，全部由後端負責（架構一致性）
 """
 
 import sys
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from datetime import datetime
 import logging
+import numpy as np
+import pandas as pd
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent.parent
@@ -30,6 +34,7 @@ from api.services.kline_data_service import (
     get_kline_data_service
 )
 from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.Indicators import IndicatorEngine
 from api.core.logging import get_logger
 
 logger = get_logger("api.chart_data_service")
@@ -39,8 +44,12 @@ class ChartDataService:
     """
     圖表數據服務
 
-    為前端圖表提供K線數據，支援以案例時間點T為中心的數據裁切
+    為前端圖表提供K線數據，支援以案例時間點T為中心的數據裁切。
+    支援可選的指標計算（使用 IndicatorEngine 確保與策略計算一致）。
     """
+    
+    # Warmup 乘數（與 chart_signal_service.py 一致）
+    WARMUP_MULTIPLIER = 4.5
 
     def __init__(
         self,
@@ -55,7 +64,8 @@ class ChartDataService:
         """
         self.storage_service = KlineStorageService(cache_dir=cache_dir)
         self.kline_data_service = kline_data_service or get_kline_data_service(cache_dir=cache_dir)
-        logger.info(f"ChartDataService initialized")
+        self.indicator_engine = IndicatorEngine()  # 新增：用於指標計算
+        logger.info(f"ChartDataService initialized with IndicatorEngine")
 
 
     def get_chart_data(self,
@@ -65,9 +75,10 @@ class ChartDataService:
                       max_bars: int = 200,
                       case_timeframe: Optional[str] = None,
                       lookback_bars: Optional[int] = None,
-                      forward_bars: Optional[int] = None) -> Dict:
+                      forward_bars: Optional[int] = None,
+                      indicator_config: Optional[Dict[str, Any]] = None) -> Dict:
         """
-        獲取圖表數據
+        獲取圖表數據（可含指標數據）
 
         **新邏輯（如果提供case_timeframe）**：
         - case_timestamp = TO (Target Open)
@@ -77,6 +88,10 @@ class ChartDataService:
         **舊邏輯（不提供case_timeframe，向後兼容）**：
         - case_timestamp 為中心點
         - 返回 center_index
+        
+        **指標計算（可選）**：
+        - 如提供 indicator_config，則使用 IndicatorEngine 計算指標
+        - 確保與策略計算使用相同的 warmup 和算法
 
         Args:
             symbol: 交易對（如ETHUSDT）
@@ -86,6 +101,17 @@ class ChartDataService:
             case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
             lookback_bars: 往前K線根數（預設100，僅當case_timeframe提供時使用）
             forward_bars: 往後K線根數（預設48，僅當case_timeframe提供時使用）
+            indicator_config: 指標配置（可選）
+                {
+                    "indicator_type": "ema",           # 指標類型
+                    "data_source": "close",            # 數據源
+                    "strategy_logic": "three_line",   # 策略邏輯
+                    "params": {                        # 指標參數
+                        "short_period": 5,
+                        "mid_period": 20,
+                        "long_period": 60
+                    }
+                }
 
         Returns:
             Dict: 符合API規範的響應格式
@@ -96,6 +122,7 @@ class ChartDataService:
                     "klines": List[Dict],
                     "center_index": int (舊) 或
                     "to_index": int, "tc_index": int, "case_bars": int (新),
+                    "indicators": {...} (可選，當提供 indicator_config 時),
                     "metadata": {...}
                 },
                 "error": {...} (僅錯誤時)
@@ -253,6 +280,39 @@ class ChartDataService:
                     f"center_index={center_index}"
                 )
 
+            # === 可選：計算指標（含 warmup 數據獲取）===
+            if indicator_config:
+                try:
+                    # 計算需要的 warmup 數據量
+                    params = indicator_config.get("params", {})
+                    max_period = max(
+                        params.get("short_period", 0),
+                        params.get("mid_period", 0),
+                        params.get("long_period", 0)
+                    )
+                    required_warmup = int(max_period * self.WARMUP_MULTIPLIER)
+                    
+                    # 獲取包含 warmup 的完整數據進行計算
+                    indicators_result = self._calculate_indicators_with_warmup(
+                        symbol=symbol,
+                        timeframe=timeframe,
+                        display_klines=klines_data,
+                        indicator_config=indicator_config,
+                        required_warmup=required_warmup
+                    )
+                    if indicators_result:
+                        response_data["indicators"] = indicators_result
+                        logger.info(
+                            f"Calculated indicators with warmup: {list(indicators_result.keys())}"
+                        )
+                except Exception as ind_err:
+                    # 指標計算失敗不應阻止返回 K 線數據
+                    logger.warning(
+                        f"Failed to calculate indicators: {ind_err}", 
+                        exc_info=True
+                    )
+                    response_data["indicator_error"] = str(ind_err)
+
             return {
                 "success": True,
                 "data": response_data
@@ -395,6 +455,247 @@ class ChartDataService:
             logger.warning(
                 f"Failed to ensure data coverage for {symbol}/{timeframe} at {case_timestamp}: {e}"
             )
+
+
+    def _calculate_indicators_with_warmup(
+        self,
+        symbol: str,
+        timeframe: str,
+        display_klines: List[Dict],
+        indicator_config: Dict[str, Any],
+        required_warmup: int
+    ) -> Optional[Dict[str, List[Dict[str, Any]]]]:
+        """
+        計算指標（含 warmup 數據獲取）
+        
+        為確保 EMA 計算精度，先獲取額外的 warmup 數據進行計算，
+        然後只返回 display_klines 範圍內的 EMA 值。
+        
+        Args:
+            symbol: 交易對
+            timeframe: 時間框架
+            display_klines: 需要顯示的 K 線數據（API 返回給前端的）
+            indicator_config: 指標配置
+            required_warmup: 需要的 warmup 數據量（4.5 × max_period）
+            
+        Returns:
+            Dict: 指標結果，只包含 display_klines 範圍內的數據
+        """
+        if not display_klines:
+            return None
+            
+        try:
+            # 獲取 display_klines 的時間範圍
+            first_display_ts = display_klines[0]['timestamp']
+            last_display_ts = display_klines[-1]['timestamp']
+            display_timestamps = set(kline['timestamp'] for kline in display_klines)
+            
+            # 計算 timeframe 對應的秒數
+            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(timeframe)
+            if not timeframe_seconds:
+                logger.warning(f"Unknown timeframe: {timeframe}, falling back to simple calculation")
+                return self._calculate_indicators_for_chart(display_klines, indicator_config)
+            
+            # 計算需要獲取的更早的開始時間（含 warmup）
+            warmup_start_ts = first_display_ts - (required_warmup * timeframe_seconds)
+            
+            logger.info(
+                f"Fetching warmup data: need {required_warmup} extra bars before {first_display_ts}, "
+                f"warmup_start={warmup_start_ts}"
+            )
+            
+            # 從 storage 讀取包含 warmup 的完整數據
+            warmup_result = self.storage_service.read_klines(
+                symbol=symbol,
+                timeframe=timeframe,
+                start_time=warmup_start_ts,
+                end_time=last_display_ts
+            )
+            
+            if not warmup_result.get("success"):
+                logger.warning(
+                    f"Failed to read warmup data: {warmup_result.get('message')}, "
+                    f"falling back to simple calculation"
+                )
+                return self._calculate_indicators_for_chart(display_klines, indicator_config)
+            
+            warmup_klines = warmup_result.get("data", [])
+            
+            if len(warmup_klines) < len(display_klines):
+                logger.warning(
+                    f"Warmup data shorter than display data: {len(warmup_klines)} < {len(display_klines)}, "
+                    f"falling back to simple calculation"
+                )
+                return self._calculate_indicators_for_chart(display_klines, indicator_config)
+            
+            logger.info(
+                f"Got {len(warmup_klines)} klines with warmup (display: {len(display_klines)}), "
+                f"extra warmup bars: {len(warmup_klines) - len(display_klines)}"
+            )
+            
+            # 使用完整數據（含 warmup）計算指標
+            full_indicators = self._calculate_indicators_for_chart(warmup_klines, indicator_config)
+            
+            if not full_indicators:
+                return None
+            
+            # 只保留 display_klines 範圍內的指標值
+            trimmed_indicators = {}
+            for indicator_name, indicator_data in full_indicators.items():
+                trimmed_data = [
+                    point for point in indicator_data 
+                    if point['time'] in display_timestamps
+                ]
+                trimmed_indicators[indicator_name] = trimmed_data
+                
+            logger.info(
+                f"Trimmed indicators to display range: "
+                f"{len(list(full_indicators.values())[0])} -> {len(list(trimmed_indicators.values())[0])} points"
+            )
+            
+            return trimmed_indicators
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate indicators with warmup: {e}", exc_info=True)
+            # 回退到簡單計算
+            return self._calculate_indicators_for_chart(display_klines, indicator_config)
+
+
+    def _calculate_indicators_for_chart(
+        self,
+        klines: List[Dict],
+        indicator_config: Dict[str, Any]
+    ) -> Optional[Dict[str, List[Dict[str, Any]]]]:
+        """
+        為圖表計算指標數據
+
+        使用 IndicatorEngine 計算指標，確保與策略計算使用相同算法和 warmup。
+        
+        Args:
+            klines: K線數據列表（已格式化的 Dict 列表）
+            indicator_config: 指標配置
+                {
+                    "indicator_type": "ema",
+                    "data_source": "close",
+                    "strategy_logic": "three_line",
+                    "params": {"short_period": 5, "mid_period": 20, "long_period": 60}
+                }
+
+        Returns:
+            Dict: 指標結果，格式為
+            {
+                "ema_short": [{"time": 1704067200, "value": 50000.0}, ...],
+                "ema_mid": [{"time": 1704067200, "value": 49500.0}, ...],
+                "ema_long": [{"time": 1704067200, "value": 49000.0}, ...]
+            }
+            如果計算失敗則返回 None
+        """
+        if not klines or not indicator_config:
+            return None
+
+        try:
+            # 提取配置
+            indicator_type = indicator_config.get("indicator_type", "ema")
+            data_source = indicator_config.get("data_source", "close")
+            strategy_logic = indicator_config.get("strategy_logic", "three_line")
+            params = indicator_config.get("params", {})
+
+            # 根據策略邏輯確定需要計算的指標
+            if strategy_logic == "three_line":
+                param_to_output = {
+                    "short_period": "ema_short",
+                    "mid_period": "ema_mid",
+                    "long_period": "ema_long"
+                }
+            elif strategy_logic == "short_long_cross":
+                param_to_output = {
+                    "short_period": "ema_short",
+                    "long_period": "ema_long"
+                }
+            elif strategy_logic == "mid_long_cross":
+                param_to_output = {
+                    "mid_period": "ema_mid",
+                    "long_period": "ema_long"
+                }
+            else:
+                logger.warning(f"Unsupported strategy_logic: {strategy_logic}")
+                return None
+
+            # 將 klines 轉換為 DataFrame
+            kline_df = pd.DataFrame(klines)
+            
+            # 確保必要的欄位存在
+            required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
+            missing_cols = [col for col in required_columns if col not in kline_df.columns]
+            if missing_cols:
+                logger.error(f"Missing columns in klines: {missing_cols}")
+                return None
+
+            # 計算最大週期（用於 warmup 檢查和日誌）
+            max_period = 0
+            for param_name in param_to_output.keys():
+                period = params.get(param_name, 0)
+                max_period = max(max_period, period)
+
+            required_warmup = int(max_period * self.WARMUP_MULTIPLIER)
+            if len(kline_df) < required_warmup:
+                logger.warning(
+                    f"Insufficient data for indicator calculation: "
+                    f"need {required_warmup} bars (max_period={max_period} × 4.5), "
+                    f"have {len(kline_df)} bars. Indicators may be less accurate."
+                )
+                # 注意：不返回 None，仍計算（IndicatorEngine 會處理）
+
+            # 構建指標配置
+            indicator_configs = []
+            for param_name, output_name in param_to_output.items():
+                period = params.get(param_name)
+                if period is None or period <= 0:
+                    logger.warning(f"Invalid or missing {param_name}: {period}")
+                    continue
+
+                indicator_configs.append({
+                    "indicator": indicator_type,
+                    "data_source": data_source,
+                    "params": {"period": period},
+                    "output_name": output_name,
+                })
+
+            if not indicator_configs:
+                logger.warning("No valid indicator configs to calculate")
+                return None
+
+            # 使用 IndicatorEngine 計算
+            indicator_df = self.indicator_engine.calculate_indicators_from_dataframe(
+                kline_df=kline_df,
+                configs=indicator_configs,
+            )
+
+            # 將結果轉換為前端需要的格式
+            # 格式：{"ema_short": [{"time": ts, "value": val}, ...], ...}
+            results = {}
+            timestamps = kline_df['timestamp'].tolist()
+
+            for output_name in param_to_output.values():
+                if output_name not in indicator_df.columns:
+                    continue
+
+                values = indicator_df[output_name].tolist()
+                results[output_name] = [
+                    {"time": int(ts), "value": float(val) if not np.isnan(val) else None}
+                    for ts, val in zip(timestamps, values)
+                ]
+
+            logger.info(
+                f"Calculated {len(results)} indicators using IndicatorEngine "
+                f"(data_source={data_source}, max_period={max_period})"
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to calculate indicators: {e}", exc_info=True)
+            return None
 
 
     def _validate_parameters(self,

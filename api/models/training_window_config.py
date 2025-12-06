@@ -157,9 +157,9 @@ class StrategyConfig(BaseModel):
                 "indicator_type": "ema",
                 "strategy_logic": "three_line",
                 "params": {
-                    "ema_short": 5,
-                    "ema_mid": 10,
-                    "ema_long": 20
+                    "short_period": 5,
+                    "mid_period": 10,
+                    "long_period": 20
                 }
             }
         }

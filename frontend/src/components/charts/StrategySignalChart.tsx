@@ -608,7 +608,7 @@ export function StrategySignalChart({
               return (
                 <span key={series.id} className="text-gray-300">
                   <span style={{ color: series.color }}>●</span>{" "}
-                  {series.label?.replace(/\s*\(\d+\)/, "") || series.id}:{" "}
+                  {series.label || series.id}:{" "}
                   <span className="font-mono" style={{ color: series.color }}>
                     {formatPrice(value)}
                   </span>

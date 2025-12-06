@@ -1,0 +1,169 @@
+{
+  "timestamp": "2025-12-06T15:56:33.375477",
+  "config": {
+    "training_window": {
+      "reference_point": "TO",
+      "lookback_bars": 24,
+      "lookforward_bars": 0,
+      "far_lookback_bars": 100,
+      "mode": "relative",
+      "custom_timestamp": null
+    },
+    "strategy_config": {
+      "data_source": "close",
+      "indicator_type": "ema",
+      "strategy_logic": "three_line",
+      "params": {
+        "short_period": 7,
+        "mid_period": 16,
+        "long_period": 30
+      }
+    }
+  },
+  "tests": [
+    {
+      "test_name": "signal_generation",
+      "status": "PASS",
+      "cases_verified": 2,
+      "output_dir": "/Users/louis/Desktop/quantitative_trading_system/test_results/signal_verification_20251206_155633"
+    },
+    {
+      "test_name": "window_extraction",
+      "status": "PASS",
+      "details": {
+        "near_window_size": 24,
+        "far_window_size": 76,
+        "no_overlap": true
+      }
+    },
+    {
+      "test_name": "density_calculation",
+      "status": "PASS",
+      "details": {
+        "positive_near_density": 0.2541666666666667,
+        "positive_far_density": 0.44342105263157905,
+        "positive_ratio": 0.7257986498459059,
+        "ratio_separation": -1.0841134560220818
+      }
+    },
+    {
+      "test_name": "stability_calculation",
+      "status": "PASS",
+      "details": {
+        "positive_ratio_cv": 0.5564137285432472,
+        "separation_cv": 2.942854647803552,
+        "months_analyzed": 10
+      }
+    }
+  ],
+  "summary": {
+    "positive_sample_size": 55,
+    "negative_sample_size": 110,
+    "positive_near_density": 0.41893939393939394,
+    "positive_far_density": 0.39449760765550235,
+    "positive_near_far_ratio": 1.4656418056109082,
+    "negative_near_density": 0.3174242424242424,
+    "negative_far_density": 0.38684210526315793,
+    "negative_near_far_ratio": 1.5917353943717627,
+    "separation": 0.10151515151515156,
+    "ratio_separation": -0.12609358876085452,
+    "p_value": 0.07547357299050567,
+    "cohens_d": 0.29544182695214377,
+    "stability_cv": 0.3798399078974528,
+    "positive_ratio_cv": 0.5564137285432472,
+    "separation_cv": 2.942854647803552,
+    "monthly_breakdown": [
+      {
+        "month": "2025-01",
+        "positive_sample_size": 7,
+        "negative_sample_size": 6,
+        "positive_avg_near": 0.3571428571428572,
+        "negative_avg_near": 0.34722222222222215,
+        "positive_avg_ratio": 1.0227183093036751,
+        "separation": 0.009920634920635052
+      },
+      {
+        "month": "2025-02",
+        "positive_sample_size": 4,
+        "negative_sample_size": 7,
+        "positive_avg_near": 0.010416666666666666,
+        "negative_avg_near": 0.4404761904761905,
+        "positive_avg_ratio": 0.024739583333333332,
+        "separation": -0.43005952380952384
+      },
+      {
+        "month": "2025-03",
+        "positive_sample_size": 5,
+        "negative_sample_size": 8,
+        "positive_avg_near": 0.25833333333333336,
+        "negative_avg_near": 0.052083333333333336,
+        "positive_avg_ratio": 1.4277586206896553,
+        "separation": 0.20625000000000002
+      },
+      {
+        "month": "2025-04",
+        "positive_sample_size": 6,
+        "negative_sample_size": 15,
+        "positive_avg_near": 0.3125,
+        "negative_avg_near": 0.45,
+        "positive_avg_ratio": 0.9084721911627941,
+        "separation": -0.1375
+      },
+      {
+        "month": "2025-05",
+        "positive_sample_size": 8,
+        "negative_sample_size": 9,
+        "positive_avg_near": 0.6510416666666667,
+        "negative_avg_near": 0.43518518518518523,
+        "positive_avg_ratio": 2.9132429346459876,
+        "separation": 0.2158564814814815
+      },
+      {
+        "month": "2025-06",
+        "positive_sample_size": 4,
+        "negative_sample_size": 16,
+        "positive_avg_near": 0.26041666666666663,
+        "negative_avg_near": 0.21354166666666669,
+        "positive_avg_ratio": 1.1376543209876544,
+        "separation": 0.046874999999999944
+      },
+      {
+        "month": "2025-07",
+        "positive_sample_size": 7,
+        "negative_sample_size": 8,
+        "positive_avg_near": 0.6428571428571429,
+        "negative_avg_near": 0.3854166666666667,
+        "positive_avg_ratio": 1.1483635373341257,
+        "separation": 0.2574404761904762
+      },
+      {
+        "month": "2025-08",
+        "positive_sample_size": 7,
+        "negative_sample_size": 7,
+        "positive_avg_near": 0.4523809523809523,
+        "negative_avg_near": 0.041666666666666664,
+        "positive_avg_ratio": 1.8714578864578864,
+        "separation": 0.4107142857142856
+      },
+      {
+        "month": "2025-09",
+        "positive_sample_size": 3,
+        "negative_sample_size": 22,
+        "positive_avg_near": 0.5,
+        "negative_avg_near": 0.28787878787878785,
+        "positive_avg_ratio": 1.2983333333333331,
+        "separation": 0.21212121212121215
+      },
+      {
+        "month": "2025-10",
+        "positive_sample_size": 4,
+        "negative_sample_size": 12,
+        "positive_avg_near": 0.47916666666666663,
+        "negative_avg_near": 0.4618055555555556,
+        "positive_avg_ratio": 1.9680939580133128,
+        "separation": 0.01736111111111105
+      }
+    ],
+    "quality": "WEAK"
+  }
+}

@@ -6,6 +6,7 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
+import json
 
 from ..services.chart_data_service import get_chart_data_service
 from ..core.logging import get_logger
@@ -26,10 +27,17 @@ async def get_chart_data(
     max_bars: int = Query(200, description="最大返回根數（預設200）", ge=1, le=1000),
     case_timeframe: Optional[str] = Query(None, description="案例時間框架（如12h），提供則使用TO/TC邏輯"),
     lookback_bars: Optional[int] = Query(None, description="往前K線根數（預設100）", ge=1, le=1000),
-    forward_bars: Optional[int] = Query(None, description="往後K線根數（預設48，可為0表示不看未來）", ge=0, le=1000)
+    forward_bars: Optional[int] = Query(None, description="往後K線根數（預設48，可為0表示不看未來）", ge=0, le=1000),
+    # 新增：指標計算參數
+    indicator_type: Optional[str] = Query(None, description="指標類型（如ema）"),
+    data_source: Optional[str] = Query(None, description="數據源（close/open/high/low/volume/taker_buy_volume/taker_ratio）"),
+    strategy_logic: Optional[str] = Query(None, description="策略邏輯（three_line/short_long_cross/mid_long_cross）"),
+    short_period: Optional[int] = Query(None, description="短週期EMA（如5）", ge=1, le=500),
+    mid_period: Optional[int] = Query(None, description="中週期EMA（如20）", ge=1, le=500),
+    long_period: Optional[int] = Query(None, description="長週期EMA（如60）", ge=1, le=500)
 ):
     """
-    獲取圖表數據
+    獲取圖表數據（可含指標計算）
 
     **新邏輯（如果提供case_timeframe）**：
     - case_timestamp = TO (Target Open)
@@ -41,12 +49,22 @@ async def get_chart_data(
     - 返回 center_index
     - K線範圍：中心點±max_bars/2
 
+    **指標計算（可選）**：
+    - 如果提供 indicator_type + strategy_logic + 對應週期，將返回 indicators 欄位
+    - 使用後端 IndicatorEngine 計算，確保與策略測試結果一致
+
     Args:
         symbol: 交易對（如ETHUSDT）
         case_timestamp: 案例時間點T/TO（Unix秒）
         timeframe: 時間框架（查看用，1h, 4h, 1d等）
         max_bars: 最大返回根數（預設200，範圍1-1000）
         case_timeframe: 案例時間框架（如"12h"），如提供則使用新邏輯
+        indicator_type: 指標類型（如 "ema"）
+        data_source: 數據源（如 "close"）
+        strategy_logic: 策略邏輯（three_line/short_long_cross/mid_long_cross）
+        short_period: 短週期（如 5）
+        mid_period: 中週期（如 20）
+        long_period: 長週期（如 60）
 
     Returns:
         Dict: 圖表數據
@@ -57,6 +75,7 @@ async def get_chart_data(
                 "klines": List[Dict],
                 "center_index": int (舊) 或
                 "to_index": int, "tc_index": int, "case_bars": int (新),
+                "indicators": {...} (可選),
                 "metadata": {...}
             }
         }
@@ -67,10 +86,31 @@ async def get_chart_data(
             - 404: 數據不存在
             - 500: 系統錯誤
     """
+    # 構建指標配置（如果提供了相關參數）
+    indicator_config = None
+    if indicator_type and strategy_logic:
+        params = {}
+        if short_period is not None:
+            params["short_period"] = short_period
+        if mid_period is not None:
+            params["mid_period"] = mid_period
+        if long_period is not None:
+            params["long_period"] = long_period
+        
+        if params:  # 至少有一個週期參數
+            indicator_config = {
+                "indicator_type": indicator_type,
+                "data_source": data_source or "close",
+                "strategy_logic": strategy_logic,
+                "params": params
+            }
+            logger.info(f"Indicator config: {indicator_config}")
+
     logger.info(
         f"GET /api/v1/chart/data: symbol={symbol}, case_timestamp={case_timestamp}, "
         f"timeframe={timeframe}, case_timeframe={case_timeframe}, max_bars={max_bars}, "
-        f"lookback_bars={lookback_bars}, forward_bars={forward_bars}"
+        f"lookback_bars={lookback_bars}, forward_bars={forward_bars}, "
+        f"has_indicator_config={indicator_config is not None}"
     )
 
     try:
@@ -82,7 +122,8 @@ async def get_chart_data(
             max_bars=max_bars,
             case_timeframe=case_timeframe,
             lookback_bars=lookback_bars,
-            forward_bars=forward_bars
+            forward_bars=forward_bars,
+            indicator_config=indicator_config
         )
 
         # 檢查結果

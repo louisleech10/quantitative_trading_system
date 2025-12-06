@@ -179,19 +179,31 @@ export function formatTime(timestamp: number): string {
 }
 
 /**
- * 價格格式化函數
+ * 截斷數字到指定小數位數（不四捨五入，與幣安等交易所一致）
+ *
+ * @param value - 數值
+ * @param decimals - 小數位數
+ * @returns 截斷後的數值
+ */
+export function truncateToDecimals(value: number, decimals: number): number {
+  const multiplier = Math.pow(10, decimals);
+  return Math.floor(value * multiplier) / multiplier;
+}
+
+/**
+ * 價格格式化函數（使用截斷，符合金融行業標準）
  *
  * @param price - 價格數值
  * @returns 格式化的價格字符串
  */
 export function formatPrice(price: number): string {
-  // 根據價格大小決定小數位數
+  // 根據價格大小決定小數位數，使用截斷而非四捨五入
   if (price >= 1000) {
-    return price.toFixed(2);
+    return truncateToDecimals(price, 2).toFixed(2);
   } else if (price >= 1) {
-    return price.toFixed(4);
+    return truncateToDecimals(price, 4).toFixed(4);
   } else {
-    return price.toFixed(6);
+    return truncateToDecimals(price, 6).toFixed(6);
   }
 }
 

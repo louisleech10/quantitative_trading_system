@@ -98,6 +98,10 @@ from momentum.Optimization.checkpoint_manager import CheckpointManager
 from momentum.Optimization.error_handler import OptimizationErrorHandler, ErrorType
 from momentum.Optimization.progress_monitor import ProgressMonitor, ProgressStats
 
+# 導入動態策略系統 (Phase 2 Refactoring)
+# Note: strategy_registry 使用 lazy import 避免循環依賴
+from momentum.Optimization.strategy_metadata import ParameterType
+
 
 # ==================== 錯誤分類定義 ====================
 
@@ -589,7 +593,8 @@ class OptunaOptimizer:
         - 數據源: 從DataSourceEnum中選擇,無硬編碼
         """
         try:
-            # 步驟1: 參數採樣(使用配置的範圍,無硬編碼)
+            # ==================== Phase 2 重構：動態參數採樣 ====================
+            # 步驟1: 採樣固定參數（data_source, strategy_logic, indicator_type）
             data_source = trial.suggest_categorical(
                 'data_source',
                 self.parameter_ranges.data_sources
@@ -600,53 +605,69 @@ class OptunaOptimizer:
                 self.parameter_ranges.strategy_logics
             )
 
-            ema_short = trial.suggest_int(
-                'ema_short',
-                self.parameter_ranges.ema_short_range[0],
-                self.parameter_ranges.ema_short_range[1]
-            )
-            ema_long = trial.suggest_int(
-                'ema_long',
-                self.parameter_ranges.ema_long_range[0],
-                self.parameter_ranges.ema_long_range[1]
+            indicator_type = trial.suggest_categorical(
+                'indicator_type',
+                ['ema', 'sma']  # 可從 IndicatorEngine 獲取
             )
 
-            # 三線排列需要額外採樣ema_mid
-            if strategy_logic == 'three_line':
-                ema_mid = trial.suggest_int(
-                    'ema_mid',
-                    self.parameter_ranges.ema_mid_range[0],
-                    self.parameter_ranges.ema_mid_range[1]
+            # 步驟2: 根據策略元數據動態採樣參數
+            # Lazy import to avoid circular dependency
+            from momentum.Analysis.strategy_registry import strategy_registry
+
+            try:
+                metadata = strategy_registry.get_strategy(strategy_logic)
+            except ValueError as e:
+                self.logger.error(f"Strategy '{strategy_logic}' not found: {e}")
+                raise optuna.TrialPruned()
+
+            # 動態採樣策略參數
+            params = {}
+            for param_def in metadata.parameters:
+                param_name = param_def.name
+
+                if param_def.type == ParameterType.INT:
+                    params[param_name] = trial.suggest_int(
+                        param_name,
+                        int(param_def.min_value),
+                        int(param_def.max_value),
+                        step=int(param_def.step) if param_def.step else 1
+                    )
+                elif param_def.type == ParameterType.FLOAT:
+                    params[param_name] = trial.suggest_float(
+                        param_name,
+                        param_def.min_value,
+                        param_def.max_value,
+                        step=param_def.step
+                    )
+                elif param_def.type == ParameterType.CATEGORICAL:
+                    params[param_name] = trial.suggest_categorical(
+                        param_name,
+                        param_def.choices
+                    )
+
+            # 添加 indicator_type 和 data_source 到 params（策略函數需要）
+            params['indicator_type'] = indicator_type
+            params['data_source'] = data_source
+
+            # 步驟3: 參數驗證（使用策略註冊系統）
+            validation_result = strategy_registry.validate_parameters(
+                strategy_logic,
+                params
+            )
+
+            if not validation_result.is_valid:
+                self.logger.debug(
+                    f"Trial {trial.number} pruned: "
+                    f"Parameter validation failed: {validation_result.errors}"
                 )
-            else:
-                ema_mid = None
+                raise optuna.TrialPruned()
 
-            # 步驟2: 參數驗證
-            if strategy_logic == 'three_line':
-                if not (ema_short < ema_mid < ema_long):
-                    self.logger.debug(
-                        f"Trial {trial.number} pruned: "
-                        f"Invalid EMA order: {ema_short} < {ema_mid} < {ema_long}"
-                    )
-                    raise optuna.TrialPruned()
-            else:
-                if not (ema_short < ema_long):
-                    self.logger.debug(
-                        f"Trial {trial.number} pruned: "
-                        f"Invalid EMA order: {ema_short} < {ema_long}"
-                    )
-                    raise optuna.TrialPruned()
-
-            # 步驟3: 組裝策略配置
+            # 步驟4: 組裝策略配置
             strategy_config = StrategyConfig(
                 data_source=data_source,
-                indicator_type="ema",
+                indicator_type=indicator_type,
                 strategy_logic=strategy_logic,
-                params={
-                    "ema_short": ema_short,
-                    "ema_mid": ema_mid,
-                    "ema_long": ema_long
-                }
+                params=params
             )
 
             # 步驟4: 調用信號密度分析
@@ -803,8 +824,8 @@ class OptunaOptimizer:
         - Pareto前沿: NSGA-II會返回多個非支配解
         """
         try:
-            # 步驟1-4: 與單目標相同,獲取separation
-            # (復用參數採樣、驗證、調用分析邏輯)
+            # ==================== Phase 2 重構：動態參數採樣（多目標）====================
+            # 步驟1: 採樣固定參數
             data_source = trial.suggest_categorical(
                 'data_source',
                 self.parameter_ranges.data_sources
@@ -815,52 +836,69 @@ class OptunaOptimizer:
                 self.parameter_ranges.strategy_logics
             )
 
-            ema_short = trial.suggest_int(
-                'ema_short',
-                self.parameter_ranges.ema_short_range[0],
-                self.parameter_ranges.ema_short_range[1]
-            )
-            ema_long = trial.suggest_int(
-                'ema_long',
-                self.parameter_ranges.ema_long_range[0],
-                self.parameter_ranges.ema_long_range[1]
+            indicator_type = trial.suggest_categorical(
+                'indicator_type',
+                ['ema', 'sma']
             )
 
-            if strategy_logic == 'three_line':
-                ema_mid = trial.suggest_int(
-                    'ema_mid',
-                    self.parameter_ranges.ema_mid_range[0],
-                    self.parameter_ranges.ema_mid_range[1]
+            # 步驟2: 根據策略元數據動態採樣參數
+            # Lazy import to avoid circular dependency
+            from momentum.Analysis.strategy_registry import strategy_registry
+
+            try:
+                metadata = strategy_registry.get_strategy(strategy_logic)
+            except ValueError as e:
+                self.logger.error(f"Strategy '{strategy_logic}' not found: {e}")
+                raise optuna.TrialPruned()
+
+            # 動態採樣策略參數
+            params = {}
+            for param_def in metadata.parameters:
+                param_name = param_def.name
+
+                if param_def.type == ParameterType.INT:
+                    params[param_name] = trial.suggest_int(
+                        param_name,
+                        int(param_def.min_value),
+                        int(param_def.max_value),
+                        step=int(param_def.step) if param_def.step else 1
+                    )
+                elif param_def.type == ParameterType.FLOAT:
+                    params[param_name] = trial.suggest_float(
+                        param_name,
+                        param_def.min_value,
+                        param_def.max_value,
+                        step=param_def.step
+                    )
+                elif param_def.type == ParameterType.CATEGORICAL:
+                    params[param_name] = trial.suggest_categorical(
+                        param_name,
+                        param_def.choices
+                    )
+
+            # 添加 indicator_type 和 data_source 到 params
+            params['indicator_type'] = indicator_type
+            params['data_source'] = data_source
+
+            # 步驟3: 參數驗證
+            validation_result = strategy_registry.validate_parameters(
+                strategy_logic,
+                params
+            )
+
+            if not validation_result.is_valid:
+                self.logger.debug(
+                    f"Trial {trial.number} pruned: "
+                    f"Parameter validation failed: {validation_result.errors}"
                 )
-            else:
-                ema_mid = None
+                raise optuna.TrialPruned()
 
-            # 參數驗證
-            if strategy_logic == 'three_line':
-                if not (ema_short < ema_mid < ema_long):
-                    self.logger.debug(
-                        f"Trial {trial.number} pruned: "
-                        f"Invalid EMA order: {ema_short} < {ema_mid} < {ema_long}"
-                    )
-                    raise optuna.TrialPruned()
-            else:
-                if not (ema_short < ema_long):
-                    self.logger.debug(
-                        f"Trial {trial.number} pruned: "
-                        f"Invalid EMA order: {ema_short} < {ema_long}"
-                    )
-                    raise optuna.TrialPruned()
-
-            # 組裝策略配置
+            # 步驟4: 組裝策略配置
             strategy_config = StrategyConfig(
                 data_source=data_source,
-                indicator_type="ema",
+                indicator_type=indicator_type,
                 strategy_logic=strategy_logic,
-                params={
-                    "ema_short": ema_short,
-                    "ema_mid": ema_mid,
-                    "ema_long": ema_long
-                }
+                params=params
             )
 
             # 調用信號密度分析

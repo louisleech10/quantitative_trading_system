@@ -94,9 +94,9 @@ const DEFAULT_STATE: StrategyFormState = {
   indicatorType: "ema",
   strategyLogic: "three_line",
   indicatorParams: {
-    ema_short: 5,
-    ema_mid: 10,
-    ema_long: 20,
+    short_period: 7,
+    mid_period: 25,
+    long_period: 70,
   },
   windowConfig: {
     reference_point: "TO",
@@ -223,9 +223,9 @@ const parsePlainQueryPayload = (
 
   const indicatorParams = {
     ...DEFAULT_STATE.indicatorParams,
-    ema_short: getNumber("emaShort") ?? DEFAULT_STATE.indicatorParams.ema_short,
-    ema_mid: getNumber("emaMid") ?? DEFAULT_STATE.indicatorParams.ema_mid,
-    ema_long: getNumber("emaLong") ?? DEFAULT_STATE.indicatorParams.ema_long,
+    short_period: getNumber("emaShort") ?? DEFAULT_STATE.indicatorParams.short_period,
+    mid_period: getNumber("emaMid") ?? DEFAULT_STATE.indicatorParams.mid_period,
+    long_period: getNumber("emaLong") ?? DEFAULT_STATE.indicatorParams.long_period,
   };
 
   const windowConfig: StrategyWindowConfig = {
@@ -279,9 +279,9 @@ const appendPlainQueryParams = (
   assignIfValue("dataSources", state.dataSources);
   assignIfValue("indicatorType", state.indicatorType);
   assignIfValue("strategyLogic", state.strategyLogic);
-  assignIfValue("emaShort", state.indicatorParams.ema_short);
-  assignIfValue("emaMid", state.indicatorParams.ema_mid);
-  assignIfValue("emaLong", state.indicatorParams.ema_long);
+  assignIfValue("emaShort", state.indicatorParams.short_period);
+  assignIfValue("emaMid", state.indicatorParams.mid_period);
+  assignIfValue("emaLong", state.indicatorParams.long_period);
   assignIfValue("lookback", state.windowConfig.lookback_bars);
   assignIfValue("farLookback", state.windowConfig.far_lookback_bars);
   assignIfValue("forward", state.windowConfig.lookforward_bars);

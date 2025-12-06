@@ -34,8 +34,8 @@ strategies:
         display_name: "短期週期"
         type: "int"
         default_value: 7
-        min_value: 5
-        max_value: 15
+        min_value: 2
+        max_value: 500
         step: 1
         description: "短期移動平均線週期"
         unit: "根K線"
@@ -48,8 +48,8 @@ strategies:
         display_name: "中期週期"
         type: "int"
         default_value: 25
-        min_value: 20
-        max_value: 40
+        min_value: 2
+        max_value: 500
         step: 1
         description: "中期移動平均線週期"
         unit: "根K線"
@@ -62,8 +62,8 @@ strategies:
         display_name: "長期週期"
         type: "int"
         default_value: 70
-        min_value: 50
-        max_value: 100
+        min_value: 2
+        max_value: 500
         step: 1
         description: "長期移動平均線週期"
         unit: "根K線"
@@ -107,8 +107,8 @@ strategies:
         display_name: "短期週期"
         type: "int"
         default_value: 7
-        min_value: 5
-        max_value: 20
+        min_value: 2
+        max_value: 500
         step: 1
         description: "短期移動平均線週期"
         unit: "根K線"
@@ -121,8 +121,8 @@ strategies:
         display_name: "長期週期"
         type: "int"
         default_value: 70
-        min_value: 30
-        max_value: 100
+        min_value: 2
+        max_value: 500
         step: 1
         description: "長期移動平均線週期"
         unit: "根K線"
@@ -163,8 +163,8 @@ strategies:
         display_name: "中期週期"
         type: "int"
         default_value: 25
-        min_value: 15
-        max_value: 50
+        min_value: 2
+        max_value: 500
         step: 1
         description: "中期移動平均線週期"
         unit: "根K線"
@@ -177,8 +177,8 @@ strategies:
         display_name: "長期週期"
         type: "int"
         default_value: 70
-        min_value: 40
-        max_value: 120
+        min_value: 2
+        max_value: 500
         step: 1
         description: "長期移動平均線週期"
         unit: "根K線"

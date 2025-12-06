@@ -91,9 +91,9 @@ class DualDensityVerifier:
             indicator_type="ema",
             strategy_logic="three_line",
             params={
-                "ema_short": 7,
-                "ema_mid": 16,
-                "ema_long": 40
+                "short_period": 7,
+                "mid_period": 16,
+                "long_period": 30
             }
         )
 
@@ -237,16 +237,40 @@ class DualDensityVerifier:
                     # EMA 收斂精度分析：× 4.5 確保 99.5% 精度（小數點後 2-3 位）
                     WARMUP_MULTIPLIER = 4.5
                     max_ema_period = max(
-                        self.strategy_config.params.get('ema_short', 5),
-                        self.strategy_config.params.get('ema_mid', 10),
-                        self.strategy_config.params.get('ema_long', 20)
+                        self.strategy_config.params.get('short_period', 5),
+                        self.strategy_config.params.get('mid_period', 10),
+                        self.strategy_config.params.get('long_period', 20)
                     )
                     warmup_bars = int(max_ema_period * WARMUP_MULTIPLIER)  # 與SignalDensityAnalyzer一致
 
-                    # 計算 EMA 指標（用於驗證）
-                    ema_short = full_klines['close'].ewm(span=self.strategy_config.params['ema_short'], adjust=False).mean()
-                    ema_mid = full_klines['close'].ewm(span=self.strategy_config.params['ema_mid'], adjust=False).mean()
-                    ema_long = full_klines['close'].ewm(span=self.strategy_config.params['ema_long'], adjust=False).mean()
+                    # 計算 EMA 指標（使用 IndicatorEngine 確保與系統一致）
+                    indicator_configs = [
+                        {
+                            "indicator": "ema",
+                            "data_source": "close",
+                            "params": {"period": self.strategy_config.params['short_period']},
+                            "output_name": "ema_short",
+                        },
+                        {
+                            "indicator": "ema",
+                            "data_source": "close",
+                            "params": {"period": self.strategy_config.params['mid_period']},
+                            "output_name": "ema_mid",
+                        },
+                        {
+                            "indicator": "ema",
+                            "data_source": "close",
+                            "params": {"period": self.strategy_config.params['long_period']},
+                            "output_name": "ema_long",
+                        },
+                    ]
+                    indicator_df = self.indicator_engine.calculate_indicators_from_dataframe(
+                        kline_df=full_klines,
+                        configs=indicator_configs,
+                    )
+                    ema_short = indicator_df['ema_short']
+                    ema_mid = indicator_df['ema_mid']
+                    ema_long = indicator_df['ema_long']
 
                     total_bars = len(full_klines)
                     # Near window 的起始索引（最後 lookback_bars 根）
@@ -301,9 +325,9 @@ class DualDensityVerifier:
                             'low': row['low'],
                             'close': row['close'],
                             'volume': row['volume'],
-                            f'ema_{self.strategy_config.params["ema_short"]}': ema_short_val,
-                            f'ema_{self.strategy_config.params["ema_mid"]}': ema_mid_val,
-                            f'ema_{self.strategy_config.params["ema_long"]}': ema_long_val,
+                            f'ema_{self.strategy_config.params["short_period"]}': ema_short_val,
+                            f'ema_{self.strategy_config.params["mid_period"]}': ema_mid_val,
+                            f'ema_{self.strategy_config.params["long_period"]}': ema_long_val,
                             'signal': signal_value if signal_value is not None else '',
                             'ema_order': ema_order,
                             'close_vs_ema_short': close_vs_ema_short,
@@ -342,9 +366,9 @@ class DualDensityVerifier:
                         f"  - Total signals: {sum(signals)}/{len(signals)}",
                         f"",
                         f"EMA Validation:",
-                        f"  ✓ EMA Short calculated ({self.strategy_config.params['ema_short']} period)",
-                        f"  ✓ EMA Mid calculated ({self.strategy_config.params['ema_mid']} period)",
-                        f"  ✓ EMA Long calculated ({self.strategy_config.params['ema_long']} period)",
+                        f"  ✓ EMA Short calculated ({self.strategy_config.params['short_period']} period)",
+                        f"  ✓ EMA Mid calculated ({self.strategy_config.params['mid_period']} period)",
+                        f"  ✓ EMA Long calculated ({self.strategy_config.params['long_period']} period)",
                         f"  ✓ Three-line order logic verified",
                     ]
 
@@ -1003,7 +1027,7 @@ class DualDensityVerifier:
         print(f"  - Calculation Timeframe: {self.CALCULATION_TIMEFRAME}")
         print(f"  - Near window: TO-{self.training_window.lookback_bars} to TO-1")
         print(f"  - Far window: TO-{self.training_window.far_lookback_bars} to TO-{self.training_window.lookback_bars + 1}")
-        print(f"  - Strategy: EMA({self.strategy_config.params['ema_short']}/{self.strategy_config.params['ema_mid']}/{self.strategy_config.params['ema_long']}) on {self.strategy_config.data_source}")
+        print(f"  - Strategy: EMA({self.strategy_config.params['short_period']}/{self.strategy_config.params['mid_period']}/{self.strategy_config.params['long_period']}) on {self.strategy_config.data_source}")
 
         all_passed = True
 

@@ -23,6 +23,7 @@ from api.services.optimization_task_service import (
 )
 from api.models.training_window_config import TrainingWindowConfig
 from momentum.Optimization.optuna_optimizer import ParameterRanges
+from momentum.Analysis.strategy_registry import strategy_registry
 
 
 router = APIRouter(prefix="/api/v1/optimization")
@@ -248,4 +249,152 @@ async def cancel_optimization_task(task_id: str):
         raise
     except Exception as e:
         logger.error(f"Failed to cancel optimization task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Strategy Management Endpoints ====================
+
+class StrategyListResponse(BaseModel):
+    """策略列表響應"""
+    success: bool
+    strategies: List[dict]
+    total: int
+
+
+class StrategyDetailResponse(BaseModel):
+    """策略詳情響應"""
+    success: bool
+    strategy: dict
+
+
+@router.get("/strategies", response_model=StrategyListResponse)
+async def list_strategies():
+    """
+    列出所有可用策略
+
+    返回系統中註冊的所有策略及其基本信息。
+
+    Returns:
+        策略列表，每個策略包含：
+        - strategy_id: 策略唯一標識符
+        - display_name: 顯示名稱
+        - description: 策略描述
+        - category: 策略分類
+        - complexity: 複雜度等級
+        - icon: 策略圖標
+        - tags: 標籤列表
+        - parameter_count: 參數數量
+    """
+    try:
+        strategy_list = strategy_registry.list_strategies()
+        strategies = []
+
+        for metadata in strategy_list:
+            strategies.append({
+                "strategy_id": metadata.strategy_id,
+                "display_name": metadata.display_name,
+                "description": metadata.description,
+                "category": metadata.category,
+                "complexity": metadata.complexity,
+                "icon": metadata.icon,
+                "tags": metadata.tags,
+                "parameter_count": len(metadata.parameters),
+                "supported_indicators": metadata.supported_indicators,
+                "supported_data_sources": metadata.supported_data_sources
+            })
+
+        logger.info(f"Listed {len(strategies)} strategies")
+
+        return StrategyListResponse(
+            success=True,
+            strategies=strategies,
+            total=len(strategies)
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to list strategies: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/strategies/{strategy_id}", response_model=StrategyDetailResponse)
+async def get_strategy_detail(strategy_id: str):
+    """
+    獲取策略詳細信息
+
+    返回指定策略的完整配置信息，包括所有參數定義、約束條件等。
+
+    Args:
+        strategy_id: 策略唯一標識符
+
+    Returns:
+        策略詳細信息，包含：
+        - 基本信息（strategy_id, display_name, description等）
+        - 參數定義列表（每個參數的類型、範圍、約束等）
+        - 支援的指標和數據源
+        - 計算函數位置
+    """
+    try:
+        metadata = strategy_registry.get_strategy(strategy_id)
+
+        # 構建參數定義
+        parameters = []
+        for param in metadata.parameters:
+            param_dict = {
+                "name": param.name,
+                "display_name": param.display_name,
+                "type": param.type,
+                "default_value": param.default_value,
+                "description": param.description,
+                "unit": param.unit
+            }
+
+            # 根據類型添加額外字段
+            if param.type in ["int", "float"]:
+                param_dict["min_value"] = param.min_value
+                param_dict["max_value"] = param.max_value
+                param_dict["step"] = param.step
+            elif param.type == "categorical":
+                param_dict["choices"] = param.choices
+
+            # 添加約束條件
+            if param.constraints:
+                param_dict["constraints"] = [
+                    {
+                        "type": c.type,
+                        "target": c.target,
+                        "message": c.message
+                    }
+                    for c in param.constraints
+                ]
+
+            parameters.append(param_dict)
+
+        strategy_detail = {
+            "strategy_id": metadata.strategy_id,
+            "display_name": metadata.display_name,
+            "description": metadata.description,
+            "category": metadata.category,
+            "complexity": metadata.complexity,
+            "icon": metadata.icon,
+            "tags": metadata.tags,
+            "recommended_for": metadata.recommended_for,
+            "parameters": parameters,
+            "supported_indicators": metadata.supported_indicators,
+            "supported_data_sources": metadata.supported_data_sources,
+            "calculator_module": metadata.calculator_module,
+            "calculator_function": metadata.calculator_function
+        }
+
+        logger.info(f"Retrieved strategy detail: {strategy_id}")
+
+        return StrategyDetailResponse(
+            success=True,
+            strategy=strategy_detail
+        )
+
+    except ValueError as e:
+        logger.warning(f"Strategy not found: {strategy_id}")
+        raise HTTPException(status_code=404, detail=f"Strategy '{strategy_id}' not found")
+    except Exception as e:
+        logger.error(f"Failed to get strategy detail for {strategy_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

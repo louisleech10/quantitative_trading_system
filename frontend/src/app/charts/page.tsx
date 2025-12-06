@@ -61,6 +61,14 @@ interface ChartDataPayload {
   case_bars?: number;
   aligned_case_timestamp?: number;
   aligned_tc_timestamp?: number;
+  // 新增：後端計算的指標數據
+  indicators?: {
+    ema_short?: Array<{ time: number; value: number | null }>;
+    ema_mid?: Array<{ time: number; value: number | null }>;
+    ema_long?: Array<{ time: number; value: number | null }>;
+    [key: string]: Array<{ time: number; value: number | null }> | undefined;
+  };
+  indicator_error?: string;
   metadata: {
     symbol: string;
     timeframe: string;
@@ -120,7 +128,7 @@ export default function ChartsPage() {
   const router = useRouter();
 
   // 策略配置 Hook (用於 EMA 參數和窗口設定)
-  const { state, hydrateFromCache, lastHydrationSource, isHydrated, lastSyncedQuery, syncToUrl } = useStrategyConfig();
+  const { state, hydrateFromCache, hydrateFromUrl, lastHydrationSource, isHydrated, lastSyncedQuery, syncToUrl } = useStrategyConfig();
 
   const [hydrationSource, setHydrationSource] = useState<HydrationSource>(lastHydrationSource ?? "default");
 
@@ -166,13 +174,26 @@ export default function ChartsPage() {
 
   // ============ Hydration ============
   useEffect(() => {
+    // 優先從 URL 讀取參數（從 Strategy Test 頁面跳轉時）
+    if (typeof window !== "undefined") {
+      const urlParams = window.location.search;
+      if (urlParams && urlParams.length > 1) {
+        const hydratedFromUrl = hydrateFromUrl(urlParams);
+        if (hydratedFromUrl) {
+          setHydrationSource("url");
+          return;
+        }
+      }
+    }
+    
+    // Fallback 到 cache/storage
     if (isHydrated) {
       setHydrationSource(lastHydrationSource ?? "storage");
     } else {
       const restored = hydrateFromCache();
       setHydrationSource(restored ? "storage" : "default");
     }
-  }, [hydrateFromCache, isHydrated, lastHydrationSource]);
+  }, [hydrateFromCache, hydrateFromUrl, isHydrated, lastHydrationSource]);
 
   // ============ 載入案例列表 ============
   useEffect(() => {
@@ -225,7 +246,7 @@ export default function ChartsPage() {
     }
   }, [selectedTimestamp, filteredCases]);
 
-  // ============ 獲取 K 線數據 ============
+  // ============ 獲取 K 線數據（含指標計算）============
   useEffect(() => {
     if (!selectedSymbol || selectedTimestamp === null || !selectedTimeframe || !currentCase) return;
 
@@ -245,9 +266,41 @@ export default function ChartsPage() {
           throw new Error("案例缺少時間框架資訊，請重新導入案例");
         }
         
-        const url = `${API_BASE_URL}/api/v1/chart/data?symbol=${selectedSymbol}&case_timestamp=${selectedTimestamp}&timeframe=${selectedTimeframe}&case_timeframe=${caseTimeframe}&lookback_bars=${lookbackBars}&forward_bars=${forwardBars}`;
+        // 構建 URL 參數
+        const params = new URLSearchParams({
+          symbol: selectedSymbol,
+          case_timestamp: selectedTimestamp.toString(),
+          timeframe: selectedTimeframe,
+          case_timeframe: caseTimeframe,
+          lookback_bars: lookbackBars.toString(),
+          forward_bars: forwardBars.toString(),
+        });
+        
+        // 新增：指標計算參數
+        const dataSource = state.dataSources ?? "close";
+        const indicatorType = state.indicatorType ?? "ema";
+        const strategyLogic = state.strategyLogic ?? "three_line";
+        const indicatorParams = state.indicatorParams;
+        
+        if (indicatorParams) {
+          params.append("indicator_type", indicatorType);
+          params.append("data_source", dataSource);
+          params.append("strategy_logic", strategyLogic);
+          
+          if (indicatorParams.short_period) {
+            params.append("short_period", indicatorParams.short_period.toString());
+          }
+          if (indicatorParams.mid_period) {
+            params.append("mid_period", indicatorParams.mid_period.toString());
+          }
+          if (indicatorParams.long_period) {
+            params.append("long_period", indicatorParams.long_period.toString());
+          }
+        }
+        
+        const url = `${API_BASE_URL}/api/v1/chart/data?${params.toString()}`;
 
-        console.log(`[ChartsPage] Fetching: case_tf=${caseTimeframe}, view_tf=${selectedTimeframe}, lookback=${lookbackBars}, forward=${forwardBars}`);
+        console.log(`[ChartsPage] Fetching: case_tf=${caseTimeframe}, view_tf=${selectedTimeframe}, lookback=${lookbackBars}, forward=${forwardBars}, indicator=${indicatorType}, source=${dataSource}`);
 
         const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -259,7 +312,14 @@ export default function ChartsPage() {
           setChartData(result.data);
           setAlignedCaseTimestamp(result.data.aligned_case_timestamp ?? selectedTimestamp);
           setAlignedTcTimestamp(result.data.aligned_tc_timestamp ?? null);
-          console.log(`[ChartsPage] Loaded ${result.data.klines.length} klines, TO at ${result.data.to_index}, TC at ${result.data.tc_index}`);
+          
+          // 日誌：是否包含指標數據
+          const hasIndicators = !!result.data.indicators;
+          console.log(`[ChartsPage] Loaded ${result.data.klines.length} klines, TO at ${result.data.to_index}, TC at ${result.data.tc_index}, has_indicators=${hasIndicators}`);
+          
+          if (result.data.indicator_error) {
+            console.warn(`[ChartsPage] Indicator calculation warning: ${result.data.indicator_error}`);
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -274,7 +334,7 @@ export default function ChartsPage() {
 
     fetchChartData();
     return () => { cancelled = true; };
-  }, [selectedSymbol, selectedTimestamp, selectedTimeframe, currentCase, lookbackBars, forwardBars, refreshToken]);
+  }, [selectedSymbol, selectedTimestamp, selectedTimeframe, currentCase, lookbackBars, forwardBars, refreshToken, state.dataSources, state.indicatorType, state.strategyLogic, state.indicatorParams]);
 
   // ============ 計算 EMA（支持不同數據源）============
   const calculateEMAForSource = (
@@ -322,19 +382,43 @@ export default function ChartsPage() {
   
   const indicatorSeries = useMemo<IndicatorLineSeries[]>(() => {
     if (!chartData || chartData.klines.length === 0) return [];
-    const { ema_short, ema_mid, ema_long } = state.indicatorParams;
-    return [
+    
+    // 使用統一命名規範：short_period, mid_period, long_period
+    const ema_short = state.indicatorParams.short_period;
+    const ema_mid = state.indicatorParams.mid_period;
+    const ema_long = state.indicatorParams.long_period;
+    
+    const indicatorConfigs = [
       { key: "ema_short", period: ema_short, label: `EMA Short (${ema_short})` },
       { key: "ema_mid", period: ema_mid, label: `EMA Mid (${ema_mid})` },
       { key: "ema_long", period: ema_long, label: `EMA Long (${ema_long})` },
-    ]
-      .filter((item) => Number.isFinite(item.period) && item.period > 0)
-      .map((item) => ({
+    ].filter((item) => Number.isFinite(item.period) && item.period > 0);
+    
+    // 優先使用後端計算的指標數據
+    const backendIndicators = chartData.indicators;
+    
+    return indicatorConfigs.map((item) => {
+      let data: Array<{ time: number; value: number }>;
+      
+      if (backendIndicators && backendIndicators[item.key]) {
+        // 使用後端數據（過濾掉 null 值）
+        data = backendIndicators[item.key]!
+          .filter((point): point is { time: number; value: number } => point.value !== null)
+          .map((point) => ({ time: point.time, value: point.value }));
+        console.log(`[ChartsPage] Using backend EMA for ${item.key}: ${data.length} points`);
+      } else {
+        // 回退到前端計算（兜底方案，不應該常發生）
+        console.warn(`[ChartsPage] Fallback to frontend EMA calculation for ${item.key} - backend data not available`);
+        data = calculateEMAForSource(chartData.klines, item.period, dataSource);
+      }
+      
+      return {
         id: item.key,
         label: item.label,
         color: INDICATOR_COLORS[item.key] ?? "#64748b",
-        data: calculateEMAForSource(chartData.klines, item.period, dataSource),
-      }));
+        data,
+      };
+    });
   }, [chartData, state.indicatorParams, dataSource]);
 
   const activeIndicatorSeries = useMemo<IndicatorLineSeries[]>(
@@ -623,6 +707,12 @@ export default function ChartsPage() {
         <section className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
             <span className="font-semibold text-slate-800">指標顯示：</span>
+            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-medium">
+              EMA: {state.indicatorParams.short_period} / {state.indicatorParams.mid_period} / {state.indicatorParams.long_period}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+              策略: {state.strategyLogic === 'three_line' ? '三線順勢' : state.strategyLogic}
+            </span>
             <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500">
               數據源: {dataSource} → {isPriceSource ? "Price圖" : isVolumeSource ? "Volume圖" : "Taker圖"}
             </span>

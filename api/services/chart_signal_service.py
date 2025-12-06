@@ -132,19 +132,19 @@ class ChartSignalService:
             max_period = 0
             if strategy_logic == "three_line":
                 max_period = max(
-                    params.get("ema_short", 0),
-                    params.get("ema_mid", 0),
-                    params.get("ema_long", 0)
+                    params.get("short_period", 0),
+                    params.get("mid_period", 0),
+                    params.get("long_period", 0)
                 )
             elif strategy_logic == "short_long_cross":
                 max_period = max(
-                    params.get("ema_short", 0),
-                    params.get("ema_long", 0)
+                    params.get("short_period", 0),
+                    params.get("long_period", 0)
                 )
             elif strategy_logic == "mid_long_cross":
                 max_period = max(
-                    params.get("ema_mid", 0),
-                    params.get("ema_long", 0)
+                    params.get("mid_period", 0),
+                    params.get("long_period", 0)
                 )
             
             # 計算暖機期（4.5× 最大週期，確保 99.5% 精度）
@@ -416,19 +416,19 @@ class ChartSignalService:
             max_period = 0
             if strategy_logic == "three_line":
                 max_period = max(
-                    params.get("ema_short", 0),
-                    params.get("ema_mid", 0),
-                    params.get("ema_long", 0)
+                    params.get("short_period", 0),
+                    params.get("mid_period", 0),
+                    params.get("long_period", 0)
                 )
             elif strategy_logic == "short_long_cross":
                 max_period = max(
-                    params.get("ema_short", 0),
-                    params.get("ema_long", 0)
+                    params.get("short_period", 0),
+                    params.get("long_period", 0)
                 )
             elif strategy_logic == "mid_long_cross":
                 max_period = max(
-                    params.get("ema_mid", 0),
-                    params.get("ema_long", 0)
+                    params.get("mid_period", 0),
+                    params.get("long_period", 0)
                 )
             
             # 暖機充足性檢查（4.5× 最大週期）
@@ -455,27 +455,38 @@ class ChartSignalService:
                 self.logger.error(f"暖機數據不足: {error_detail}")
                 raise ValueError(error_detail["message"])
 
+            # 定義參數名稱到輸出列名的映射
             if strategy_logic == "three_line":
-                period_names = ["ema_short", "ema_mid", "ema_long"]
+                param_to_output = {
+                    "short_period": "ema_short",
+                    "mid_period": "ema_mid",
+                    "long_period": "ema_long"
+                }
             elif strategy_logic == "short_long_cross":
-                period_names = ["ema_short", "ema_long"]
+                param_to_output = {
+                    "short_period": "ema_short",
+                    "long_period": "ema_long"
+                }
             elif strategy_logic == "mid_long_cross":
-                period_names = ["ema_mid", "ema_long"]
+                param_to_output = {
+                    "mid_period": "ema_mid",
+                    "long_period": "ema_long"
+                }
             else:
                 raise ValueError(f"不支持的策略邏輯: {strategy_logic}")
 
             indicator_configs = []
-            for period_name in period_names:
-                if period_name not in params:
-                    raise ValueError(f"策略參數缺少 {period_name}")
+            for param_name, output_name in param_to_output.items():
+                if param_name not in params:
+                    raise ValueError(f"策略參數缺少 {param_name}")
 
-                period = params[period_name]
+                period = params[param_name]
                 indicator_configs.append(
                     {
                         "indicator": indicator_type,
                         "data_source": data_source,
                         "params": {"period": period},
-                        "output_name": period_name,
+                        "output_name": output_name,
                     }
                 )
 
@@ -484,15 +495,17 @@ class ChartSignalService:
                 configs=indicator_configs,
             )
 
-            missing_columns = [name for name in period_names if name not in indicator_df.columns]
+            # 獲取輸出列名列表
+            output_names = list(param_to_output.values())
+            missing_columns = [name for name in output_names if name not in indicator_df.columns]
             if missing_columns:
                 raise ValueError(
                     f"指標計算缺少欄位: {', '.join(missing_columns)}"
                 )
 
             results = {
-                period_name: indicator_df[period_name].to_numpy()
-                for period_name in period_names
+                output_name: indicator_df[output_name].to_numpy()
+                for output_name in output_names
             }
 
             return results
@@ -703,11 +716,11 @@ class ChartSignalService:
 
         # 提取參數
         if strategy_logic == "three_line":
-            param_str = f"({params.get('ema_short')},{params.get('ema_mid')},{params.get('ema_long')})"
+            param_str = f"({params.get('short_period')},{params.get('mid_period')},{params.get('long_period')})"
         elif strategy_logic == "short_long_cross":
-            param_str = f"({params.get('ema_short')},{params.get('ema_long')})"
+            param_str = f"({params.get('short_period')},{params.get('long_period')})"
         elif strategy_logic == "mid_long_cross":
-            param_str = f"({params.get('ema_mid')},{params.get('ema_long')})"
+            param_str = f"({params.get('mid_period')},{params.get('long_period')})"
         else:
             param_str = ""
 

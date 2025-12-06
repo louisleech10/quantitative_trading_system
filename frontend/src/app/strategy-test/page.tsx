@@ -289,9 +289,9 @@ function StrategyTestPageContent() {
   const validationErrors = useMemo(() => {
     const errors: string[] = [];
     const { indicatorParams, dateRange, dataSources } = state;
-    const short = indicatorParams.ema_short;
-    const mid = indicatorParams.ema_mid;
-    const long = indicatorParams.ema_long;
+    const short = indicatorParams.short_period;
+    const mid = indicatorParams.mid_period;
+    const long = indicatorParams.long_period;
 
     if (!(short < mid && mid < long)) {
       errors.push("請維持 EMA 週期為 短 < 中 < 長");
@@ -726,24 +726,24 @@ function StrategyTestPageContent() {
               <div className="grid grid-cols-1 gap-4">
                 <NumberInput
                   label="EMA Short"
-                  value={state.indicatorParams.ema_short}
-                  min={3}
-                  max={50}
-                  onChange={(value) => handleIndicatorParamChange("ema_short", value)}
+                  value={state.indicatorParams.short_period}
+                  min={2}
+                  max={500}
+                  onChange={(value) => handleIndicatorParamChange("short_period", value)}
                 />
                 <NumberInput
                   label="EMA Mid"
-                  value={state.indicatorParams.ema_mid}
-                  min={state.indicatorParams.ema_short + 1}
-                  max={150}
-                  onChange={(value) => handleIndicatorParamChange("ema_mid", value)}
+                  value={state.indicatorParams.mid_period}
+                  min={state.indicatorParams.short_period + 1}
+                  max={500}
+                  onChange={(value) => handleIndicatorParamChange("mid_period", value)}
                 />
                 <NumberInput
                   label="EMA Long"
-                  value={state.indicatorParams.ema_long}
-                  min={state.indicatorParams.ema_mid + 1}
-                  max={400}
-                  onChange={(value) => handleIndicatorParamChange("ema_long", value)}
+                  value={state.indicatorParams.long_period}
+                  min={state.indicatorParams.mid_period + 1}
+                  max={500}
+                  onChange={(value) => handleIndicatorParamChange("long_period", value)}
                 />
               </div>
             </AccordionItem>

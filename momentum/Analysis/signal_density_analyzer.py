@@ -151,6 +151,7 @@ class SignalDensityAnalyzer:
         計算策略信號
 
         整合Task 3.1的IndicatorEngine計算指標,然後應用策略邏輯生成信號。
+        使用動態策略註冊表來加載策略計算函數,支援任意策略擴展。
 
         Args:
             kline_data: K線數據DataFrame
@@ -158,14 +159,30 @@ class SignalDensityAnalyzer:
 
         Returns:
             boolean numpy array,True表示符合策略,False表示不符合
+
+        Raises:
+            ValueError: 當策略未註冊或參數無效時
         """
-        # 根據strategy_logic計算信號
-        if strategy_config.strategy_logic == "three_line":
-            return self._calculate_three_line_signals(kline_data, strategy_config)
-        else:
-            raise NotImplementedError(
-                f"Strategy logic '{strategy_config.strategy_logic}' not implemented yet"
+        # Lazy import to avoid circular dependency
+        from momentum.Analysis.strategy_registry import strategy_registry
+
+        # 動態獲取策略計算函數
+        try:
+            calculator = strategy_registry.get_calculator(strategy_config.strategy_logic)
+        except ValueError as e:
+            self.logger.error(f"策略未註冊: {strategy_config.strategy_logic}")
+            raise
+
+        # 執行策略計算
+        try:
+            signals = calculator(kline_data, {}, strategy_config.params)
+            return signals
+        except Exception as e:
+            self.logger.error(
+                f"策略計算失敗: strategy={strategy_config.strategy_logic}, error={e}",
+                exc_info=True
             )
+            raise
 
     def _calculate_three_line_signals(
         self,
@@ -179,7 +196,7 @@ class SignalDensityAnalyzer:
 
         Args:
             kline_data: K線數據
-            strategy_config: 策略配置(需包含ema_short, ema_mid, ema_long參數)
+            strategy_config: 策略配置(需包含short_period, mid_period, long_period參數)
 
         Returns:
             boolean numpy array
@@ -191,19 +208,19 @@ class SignalDensityAnalyzer:
             {
                 "indicator": strategy_config.indicator_type,
                 "data_source": strategy_config.data_source,
-                "params": {"period": params["ema_short"]},
+                "params": {"period": params["short_period"]},
                 "output_name": "ema_short"
             },
             {
                 "indicator": strategy_config.indicator_type,
                 "data_source": strategy_config.data_source,
-                "params": {"period": params["ema_mid"]},
+                "params": {"period": params["mid_period"]},
                 "output_name": "ema_mid"
             },
             {
                 "indicator": strategy_config.indicator_type,
                 "data_source": strategy_config.data_source,
-                "params": {"period": params["ema_long"]},
+                "params": {"period": params["long_period"]},
                 "output_name": "ema_long"
             }
         ]
@@ -294,9 +311,9 @@ class SignalDensityAnalyzer:
         WARMUP_MULTIPLIER = 4.5
         params = strategy_config.params
         max_ema_period = max(
-            params.get("ema_short", 0),
-            params.get("ema_mid", 0),
-            params.get("ema_long", 0)
+            params.get("short_period", 0),
+            params.get("mid_period", 0),
+            params.get("long_period", 0)
         )
         warmup_bars = int(max_ema_period * WARMUP_MULTIPLIER)
 

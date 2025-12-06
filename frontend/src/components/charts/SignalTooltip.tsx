@@ -122,14 +122,20 @@ export default function SignalTooltip({
     });
   };
 
-  // 格式化價格
+  // 截斷數字到指定小數位數（不四捨五入，與幣安等交易所一致）
+  const truncateToDecimals = (value: number, decimals: number): number => {
+    const multiplier = Math.pow(10, decimals);
+    return Math.floor(value * multiplier) / multiplier;
+  };
+
+  // 格式化價格（使用截斷，符合金融行業標準）
   const formatPrice = (price: number): string => {
     if (price >= 1000) {
-      return price.toFixed(2);
+      return truncateToDecimals(price, 2).toFixed(2);
     } else if (price >= 1) {
-      return price.toFixed(4);
+      return truncateToDecimals(price, 4).toFixed(4);
     } else {
-      return price.toFixed(8);
+      return truncateToDecimals(price, 8).toFixed(8);
     }
   };
 
