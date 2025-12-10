@@ -129,6 +129,10 @@ export default function OptimizationResultPage() {
   const [stabilityData, setStabilityData] = useState<StabilityAnalysis | null>(null)
   const [topTrials, setTopTrials] = useState<TrialDetail[]>([])
 
+  // 實時進度狀態
+  const [taskStatus, setTaskStatus] = useState<string>('unknown')
+  const [progress, setProgress] = useState<any>(null)
+
   // Selected parameters for heatmap
   const [selectedParamX, setSelectedParamX] = useState<string>('')
   const [selectedParamY, setSelectedParamY] = useState<string>('')
@@ -141,6 +145,30 @@ export default function OptimizationResultPage() {
     setError(null)
 
     try {
+      // Step 0: 先檢查任務狀態
+      const statusResponse = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}`)
+      if (!statusResponse.ok) {
+        throw new Error('無法獲取任務狀態')
+      }
+      const statusData = await statusResponse.json()
+      const taskStatus = statusData.data?.status || 'unknown'
+
+      // 如果任務失敗，顯示錯誤
+      if (taskStatus === 'failed') {
+        const errorMsg = statusData.data?.error_message || '優化任務失敗'
+        throw new Error(`任務失敗: ${errorMsg}`)
+      }
+
+      // 如果任務還在運行，等待完成
+      if (taskStatus === 'running' || taskStatus === 'pending') {
+        throw new Error('任務仍在執行中，請稍後重試')
+      }
+
+      // 如果任務未完成，不能獲取結果
+      if (taskStatus !== 'completed') {
+        throw new Error(`任務狀態異常: ${taskStatus}`)
+      }
+
       // Step 1: 獲取基本結果（必須成功）
       const resultData = await fetchOptimizationResult(taskId)
       setResult(resultData)
@@ -221,17 +249,120 @@ export default function OptimizationResultPage() {
     }
   }
 
-  // 初始載入
+  /**
+   * 輪詢任務狀態（用於實時進度顯示）
+   */
   useEffect(() => {
-    if (taskId) {
-      loadAllData()
+    if (!taskId) return
+
+    const pollStatus = async () => {
+      try {
+        const statusResponse = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}`)
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json()
+          const status = statusData.data?.status || 'unknown'
+          const progressData = statusData.data?.progress || null
+
+          setTaskStatus(status)
+          setProgress(progressData)
+
+          // 如果任務完成，載入結果
+          if (status === 'completed') {
+            loadAllData()
+          }
+        }
+      } catch (err) {
+        console.error('Failed to poll task status:', err)
+      }
     }
-  }, [taskId])
+
+    // 立即執行一次
+    pollStatus()
+
+    // 如果任務還在執行，每 3 秒輪詢一次
+    const intervalId = setInterval(() => {
+      if (taskStatus === 'running' || taskStatus === 'pending' || taskStatus === 'unknown') {
+        pollStatus()
+      } else {
+        clearInterval(intervalId)
+      }
+    }, 3000)
+
+    return () => clearInterval(intervalId)
+  }, [taskId, taskStatus])
 
   // ==================== 渲染 ====================
 
+  // 進行中狀態 - 顯示實時進度
+  if (taskStatus === 'running' || taskStatus === 'pending') {
+    const completedTrials = progress?.completed_trials || 0
+    const totalTrials = progress?.total_trials || 0
+    const percentage = totalTrials > 0 ? (completedTrials / totalTrials * 100) : 0
+    const bestValue = progress?.best_value
+
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-2xl mx-auto">
+          {/* 頁面標題 */}
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold mb-2">優化進行中</h1>
+            <p className="text-muted-foreground">Task ID: {taskId}</p>
+          </div>
+
+          {/* 進度卡片 */}
+          <div className="bg-card border rounded-lg p-6 space-y-6">
+            {/* 進度條 */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm font-medium">優化進度</span>
+                <span className="text-sm text-muted-foreground">
+                  {completedTrials} / {totalTrials} trials ({percentage.toFixed(1)}%)
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-purple-600 h-full transition-all duration-500 ease-out"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 當前最佳值 */}
+            {bestValue !== null && bestValue !== undefined && (
+              <div className="flex items-center justify-between p-4 bg-muted rounded-md">
+                <span className="text-sm font-medium">當前最佳值</span>
+                <span className="text-lg font-bold text-green-600">{bestValue.toFixed(4)}</span>
+              </div>
+            )}
+
+            {/* 狀態指示 */}
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>優化正在進行中，頁面會自動更新...</span>
+            </div>
+
+            {/* 提示信息 */}
+            <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+              💡 優化可能需要幾分鐘到幾十分鐘，具體取決於 trial 數量和案例複雜度。
+              完成後會自動顯示結果，無需手動刷新。
+            </div>
+          </div>
+
+          {/* 返回按鈕 */}
+          <div className="mt-6 text-center">
+            <Button variant="outline" asChild>
+              <Link href="/strategy-test">
+                返回策略測試
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Loading 狀態
-  if (loading) {
+  if (loading && taskStatus === 'completed') {
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <div className="text-center">
@@ -244,25 +375,46 @@ export default function OptimizationResultPage() {
 
   // Error 狀態
   if (error || !result) {
+    const isTaskRunning = error?.includes('仍在執行中')
+    const isTaskFailed = error?.includes('任務失敗')
+
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <div className="max-w-md w-full space-y-4">
-          <Alert variant="destructive">
+          <Alert variant={isTaskRunning ? "default" : "destructive"}>
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>載入失敗</AlertTitle>
+            <AlertTitle>{isTaskRunning ? '任務進行中' : '載入失敗'}</AlertTitle>
             <AlertDescription>
               {error || '無法載入優化結果，請稍後再試'}
             </AlertDescription>
           </Alert>
+
+          {isTaskRunning && (
+            <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+              💡 提示：優化任務通常需要幾分鐘到幾十分鐘，具體取決於 trial 數量和案例數量。請稍後重新整理此頁面查看結果。
+            </div>
+          )}
+
+          {isTaskFailed && (
+            <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+              ⚠️ 常見原因：
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>參數範圍設置過窄，所有 trials 都被過濾</li>
+                <li>案例數據不符合策略要求</li>
+                <li>訓練窗口配置錯誤</li>
+              </ul>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <Button onClick={loadAllData} className="flex-1">
               <RefreshCw className="h-4 w-4 mr-2" />
               重試
             </Button>
             <Button variant="outline" asChild className="flex-1">
-              <Link href="/">
+              <Link href="/strategy-test">
                 <Home className="h-4 w-4 mr-2" />
-                返回首頁
+                返回策略測試
               </Link>
             </Button>
           </div>

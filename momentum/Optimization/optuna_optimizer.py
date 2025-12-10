@@ -136,6 +136,7 @@ class ParameterRanges:
         ema_long_range: 長期EMA範圍(min, max)
         data_sources: 可選數據源列表
         strategy_logics: 可選策略邏輯列表
+        indicator_types: 可選指標類型列表（尊重用戶選擇）
     """
     ema_short_range: Tuple[int, int] = (5, 200)
     ema_mid_range: Tuple[int, int] = (10, 200)
@@ -150,6 +151,9 @@ class ParameterRanges:
         default_factory=lambda: [
             'three_line', 'short_long_cross', 'mid_long_cross'
         ]
+    )
+    indicator_types: List[str] = field(
+        default_factory=lambda: ['ema']  # 默認只使用已實現的 EMA
     )
 
     def __post_init__(self):
@@ -605,9 +609,11 @@ class OptunaOptimizer:
                 self.parameter_ranges.strategy_logics
             )
 
+            # 指標類型：尊重用戶在前端的選擇
+            # 如果用戶選擇了特定指標類型，則只使用該類型；否則使用所有可用類型
             indicator_type = trial.suggest_categorical(
                 'indicator_type',
-                ['ema', 'sma']  # 可從 IndicatorEngine 獲取
+                self.parameter_ranges.indicator_types
             )
 
             # 步驟2: 根據策略元數據動態採樣參數
@@ -622,14 +628,39 @@ class OptunaOptimizer:
 
             # 動態採樣策略參數
             params = {}
+
+            # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值
+            range_overrides = {}
+            if self.parameter_ranges:
+                # 構建參數名到範圍的映射
+                if hasattr(self.parameter_ranges, 'ema_short_range') and self.parameter_ranges.ema_short_range:
+                    range_overrides['short_period'] = self.parameter_ranges.ema_short_range
+                if hasattr(self.parameter_ranges, 'ema_mid_range') and self.parameter_ranges.ema_mid_range:
+                    range_overrides['mid_period'] = self.parameter_ranges.ema_mid_range
+                if hasattr(self.parameter_ranges, 'ema_long_range') and self.parameter_ranges.ema_long_range:
+                    range_overrides['long_period'] = self.parameter_ranges.ema_long_range
+
+            self.logger.debug(f"Parameter range overrides: {range_overrides}")
+
             for param_def in metadata.parameters:
                 param_name = param_def.name
 
                 if param_def.type == ParameterType.INT:
+                    # 使用覆蓋範圍（如果有）
+                    if param_name in range_overrides:
+                        min_val, max_val = range_overrides[param_name]
+                        self.logger.debug(
+                            f"Using frontend range for {param_name}: [{min_val}, {max_val}] "
+                            f"(YAML default: [{param_def.min_value}, {param_def.max_value}])"
+                        )
+                    else:
+                        min_val = int(param_def.min_value)
+                        max_val = int(param_def.max_value)
+
                     params[param_name] = trial.suggest_int(
                         param_name,
-                        int(param_def.min_value),
-                        int(param_def.max_value),
+                        min_val,
+                        max_val,
                         step=int(param_def.step) if param_def.step else 1
                     )
                 elif param_def.type == ParameterType.FLOAT:
@@ -836,9 +867,11 @@ class OptunaOptimizer:
                 self.parameter_ranges.strategy_logics
             )
 
+            # 指標類型：尊重用戶在前端的選擇
+            # 如果用戶選擇了特定指標類型，則只使用該類型；否則使用所有可用類型
             indicator_type = trial.suggest_categorical(
                 'indicator_type',
-                ['ema', 'sma']
+                self.parameter_ranges.indicator_types
             )
 
             # 步驟2: 根據策略元數據動態採樣參數
@@ -853,14 +886,39 @@ class OptunaOptimizer:
 
             # 動態採樣策略參數
             params = {}
+
+            # 參數範圍覆蓋邏輯: 優先使用前端傳遞的 parameter_ranges，否則使用 YAML 默認值
+            range_overrides = {}
+            if self.parameter_ranges:
+                # 構建參數名到範圍的映射
+                if hasattr(self.parameter_ranges, 'ema_short_range') and self.parameter_ranges.ema_short_range:
+                    range_overrides['short_period'] = self.parameter_ranges.ema_short_range
+                if hasattr(self.parameter_ranges, 'ema_mid_range') and self.parameter_ranges.ema_mid_range:
+                    range_overrides['mid_period'] = self.parameter_ranges.ema_mid_range
+                if hasattr(self.parameter_ranges, 'ema_long_range') and self.parameter_ranges.ema_long_range:
+                    range_overrides['long_period'] = self.parameter_ranges.ema_long_range
+
+            self.logger.debug(f"Parameter range overrides: {range_overrides}")
+
             for param_def in metadata.parameters:
                 param_name = param_def.name
 
                 if param_def.type == ParameterType.INT:
+                    # 使用覆蓋範圍（如果有）
+                    if param_name in range_overrides:
+                        min_val, max_val = range_overrides[param_name]
+                        self.logger.debug(
+                            f"Using frontend range for {param_name}: [{min_val}, {max_val}] "
+                            f"(YAML default: [{param_def.min_value}, {param_def.max_value}])"
+                        )
+                    else:
+                        min_val = int(param_def.min_value)
+                        max_val = int(param_def.max_value)
+
                     params[param_name] = trial.suggest_int(
                         param_name,
-                        int(param_def.min_value),
-                        int(param_def.max_value),
+                        min_val,
+                        max_val,
                         step=int(param_def.step) if param_def.step else 1
                     )
                 elif param_def.type == ParameterType.FLOAT:

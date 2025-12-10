@@ -410,7 +410,7 @@ class OptimizationTaskService:
                 'best_value': result.best_value,
                 'best_params': result.best_params,
                 'best_trial_number': result.best_trial_number,
-                'n_trials': result.n_trials,
+                'n_trials': result.total_trials if hasattr(result, 'total_trials') else (result.n_trials if hasattr(result, 'n_trials') else None),
                 'optimization_time': result.optimization_time,
                 'timestamp': datetime.now().isoformat()
             }

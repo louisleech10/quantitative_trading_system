@@ -68,6 +68,20 @@ class CaseStorage:
             logger.error(f"[CaseStorage] 保存案例失敗: {case_id}, 錯誤: {e}")
             return False
 
+    def case_exists(self, case_id: str) -> bool:
+        """
+        檢查案例是否存在
+
+        Args:
+            case_id: 案例唯一標識符
+
+        Returns:
+            True 表示案例存在，False 表示不存在
+        """
+        exists = case_id in self._cases
+        logger.debug(f"[CaseStorage] 檢查案例存在性: {case_id} -> {exists}")
+        return exists
+
     def delete_case(self, case_id: str) -> bool:
         """
         刪除案例數據

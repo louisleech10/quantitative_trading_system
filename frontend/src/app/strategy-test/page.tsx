@@ -14,11 +14,12 @@ import {
   RefreshCw,
   Save,
   Share2,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { Accordion } from "@/components/ui/Accordion";
 import { AccordionItem } from "@/components/ui/AccordionItem";
-import { Select, type SelectOption } from "@/components/ui/Select";
+import { Select, type SelectOption } from "@/components/ui/select";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import StatMetricCard from "@/components/ui/StatMetricCard";
@@ -239,6 +240,7 @@ function StrategyTestPageContent() {
   } = useStrategyConfig();
 
   const [isRunning, setIsRunning] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
   const [templates, setTemplates] = useState<StrategyTemplatePayload[]>([]);
   const [isTemplatePanelOpen, setTemplatePanelOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -365,6 +367,127 @@ function StrategyTestPageContent() {
       far_lookback_bars: 100,
       mode: "relative",
     });
+  };
+
+  // 獲取指定 symbol 的案例
+  const fetchCasesBySymbol = async (symbol: string): Promise<{ positive: string[]; negative: string[] }> => {
+    try {
+      const casesResponse = await fetch(`${API_BASE_URL}/api/v1/case/list`);
+      if (!casesResponse.ok) return { positive: [], negative: [] };
+
+      const casesData = await casesResponse.json();
+      const positive: string[] = [];
+      const negative: string[] = [];
+
+      if (casesData.cases && Array.isArray(casesData.cases)) {
+        casesData.cases.forEach((c: { symbol: string; positive_case: number; case_id: string }) => {
+          if (c.symbol === symbol) {
+            if (c.positive_case === 1) {
+              positive.push(c.case_id);
+            } else if (c.positive_case === 0) {
+              negative.push(c.case_id);
+            }
+          }
+        });
+      }
+
+      return { positive, negative };
+    } catch (error) {
+      console.error("Failed to fetch cases:", error);
+      return { positive: [], negative: [] };
+    }
+  };
+
+  // 開始 Optuna 優化
+  const handleStartOptimization = async () => {
+    // 驗證基本配置
+    if (validationErrors.length > 0) {
+      toast.error("請先修正配置錯誤");
+      return;
+    }
+
+    if (!optunaConfig.enabled) {
+      toast.error("請先啟用 Optuna 優化");
+      return;
+    }
+
+    setIsOptimizing(true);
+    setApiError(null);
+
+    try {
+      // Step 1: 獲取案例
+      const { positive, negative } = await fetchCasesBySymbol(state.symbol);
+
+      if (positive.length === 0 || negative.length === 0) {
+        throw new Error(`符合 ${state.symbol} 的案例數量不足：正例 ${positive.length} 個，反例 ${negative.length} 個`);
+      }
+
+      toast.success(`已載入 ${positive.length} 個正例和 ${negative.length} 個反例`);
+
+      // Step 2: 創建優化任務
+      const createResponse = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          study_name: `${state.symbol}_${state.strategyLogic}_${Date.now()}`,
+          positive_cases: positive,
+          negative_cases: negative,
+          training_window: state.windowConfig,
+          sampler_type: "TPE",
+          n_trials: optunaConfig.n_trials,
+          n_jobs: 1,
+          use_multi_objective: false,
+          parameter_ranges: {
+            ema_short_range: optunaConfig.ema_short_range,
+            ema_mid_range: optunaConfig.ema_mid_range,
+            ema_long_range: optunaConfig.ema_long_range,
+            data_sources: [state.dataSources ?? "close"],
+            strategy_logics: [state.strategyLogic],
+            indicator_types: [state.indicatorType],  // 傳遞用戶選擇的指標類型
+          },
+        }),
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.message || "創建優化任務失敗");
+      }
+
+      const createData = await createResponse.json();
+      const taskId = createData.task_id;
+
+      toast.success(`優化任務已創建：${taskId}`);
+
+      // Step 3: 啟動優化任務
+      const startResponse = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/start`, {
+        method: "POST",
+      });
+
+      if (!startResponse.ok) {
+        const errorData = await startResponse.json().catch(() => ({}));
+        throw new Error(errorData.detail || errorData.message || "啟動優化任務失敗");
+      }
+
+      toast.success("優化任務已啟動！");
+
+      // Step 4: 等待一小段時間再跳轉（讓用戶看到成功消息）
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // 提示用戶任務正在後台執行
+      toast.loading(`優化進行中 (${optunaConfig.n_trials} trials)，正在跳轉到結果頁面...`, {
+        duration: 2000
+      });
+
+      // 導航到結果頁面
+      router.push(`/optimization-result/${taskId}`);
+
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "執行優化時發生未知錯誤";
+      setApiError(message);
+      toast.error(message);
+    } finally {
+      setIsOptimizing(false);
+    }
   };
 
   const handleRunTest = async () => {
@@ -881,7 +1004,7 @@ function StrategyTestPageContent() {
 
           <button
             type="button"
-            disabled={isRunning}
+            disabled={isRunning || isOptimizing}
             onClick={handleRunTest}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-300"
           >
@@ -895,6 +1018,26 @@ function StrategyTestPageContent() {
               </>
             )}
           </button>
+
+          {/* Optuna 優化按鈕 - 僅在啟用時顯示 */}
+          {optunaConfig.enabled && (
+            <button
+              type="button"
+              disabled={isOptimizing || isRunning}
+              onClick={handleStartOptimization}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-300"
+            >
+              {isOptimizing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> 優化中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" /> 開始優化 ({optunaConfig.n_trials} trials)
+                </>
+              )}
+            </button>
+          )}
 
           {validationErrors.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">

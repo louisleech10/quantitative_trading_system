@@ -19,7 +19,7 @@ strategies:
     # 支援的指標和數據源
     supported_indicators:
       - "ema"
-      - "sma"
+      # - "sma"  # 未實現，未來擴展
 
     supported_data_sources:
       - "close"
@@ -94,7 +94,7 @@ strategies:
 
     supported_indicators:
       - "ema"
-      - "sma"
+      # - "sma"  # 未實現，未來擴展
 
     supported_data_sources:
       - "close"
@@ -150,7 +150,7 @@ strategies:
 
     supported_indicators:
       - "ema"
-      - "sma"
+      # - "sma"  # 未實現，未來擴展
 
     supported_data_sources:
       - "close"

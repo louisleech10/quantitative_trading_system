@@ -275,10 +275,12 @@ class ProgressMonitor:
         else:
             eta_str = "N/A"
 
+        best_value_str = f"{stats.best_value:.4f}" if stats.best_value is not None else 'N/A'
+
         self.logger.info(
             f"Progress: {stats.completed_trials}/{stats.total_trials} trials "
             f"({stats.completion_percentage:.1f}%), "
-            f"best={stats.best_value:.4f if stats.best_value else 'N/A'}, "
+            f"best={best_value_str}, "
             f"speed={stats.trials_per_hour:.1f} trials/hour, "
             f"ETA={eta_str}"
         )
@@ -313,9 +315,13 @@ class ProgressMonitor:
         # 最佳值和試驗編號
         best_value = None
         best_trial_number = None
-        if hasattr(study, 'best_trial') and study.best_trial:
-            best_value = study.best_value
-            best_trial_number = study.best_trial.number
+        try:
+            if hasattr(study, 'best_trial') and total_finished > 0:
+                best_value = study.best_value
+                best_trial_number = study.best_trial.number
+        except ValueError:
+            # 當沒有完成的 trial 時，best_trial 會拋出 ValueError
+            pass
 
         return ProgressStats(
             total_trials=self.total_trials,
@@ -344,11 +350,13 @@ class ProgressMonitor:
 
         stats = self.get_progress_stats(study)
 
+        best_value_str = f"{stats.best_value:.4f}" if stats.best_value is not None else 'N/A'
+
         self.logger.info(
             f"Optimization finished: {stats.completed_trials} completed, "
             f"{stats.pruned_trials} pruned, {stats.failed_trials} failed, "
             f"total time={timedelta(seconds=int(stats.elapsed_time))}, "
-            f"best_value={stats.best_value:.4f if stats.best_value else 'N/A'}"
+            f"best_value={best_value_str}"
         )
 
         # 發送完成通知

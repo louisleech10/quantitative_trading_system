@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-12-06 20:30
-**當前階段**: Optuna 參數優化測試準備
+**最後更新**: 2025-12-10 15:30
+**當前階段**: Optuna 參數優化系統測試中
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,14 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Optuna 參數範圍與用戶選擇尊重** (100%) - 2025-12-09~10完成
+  - ✅ 參數範圍覆蓋邏輯：前端 parameter_ranges 優先於 YAML 默認值
+  - ✅ indicator_types 字段：ParameterRanges 新增用戶選擇指標類型傳遞
+  - ✅ SMA 聲明移除：config/strategies.yaml 移除未實現指標
+  - ✅ 前端整合：strategy-test 頁面傳遞 indicator_types 用戶選擇
+  - ✅ 隨機選擇修復：Optuna 不再隨機選擇指標/策略，100% 尊重用戶選擇
+  - ✅ n_trials 屬性修復：OptimizationResult 使用 total_trials 替代 n_trials
+  - ✅ 驗證通過：10 trials 測試，所有參數在配置範圍內，無 SMA 錯誤
 - **Far=0 統計透明化與狀態持久化** (100%) - 2025-12-06完成
   - ✅ FAR_ZERO_THRESHOLD = 0.001 常數定義
   - ✅ 8 個零值統計欄位（Near/Far 零值計數與比例）
@@ -74,6 +82,12 @@
 - 無活躍任務
 
 ### 剛完成 🔧
+- **Optuna 用戶選擇尊重與參數範圍修復** (2025-12-09~10)
+  - ✅ 修復隨機選擇問題：indicator_types 字段傳遞用戶選擇
+  - ✅ 參數範圍覆蓋：前端配置優先於 YAML 默認值
+  - ✅ SMA 錯誤解決：移除 YAML 中未實現指標聲明
+  - ✅ n_trials 屬性：使用 total_trials 修復保存錯誤
+  - ✅ 驗證通過：10 trials 全部在配置範圍內
 - **EMA 計算與顯示一致性修復** (2025-12-06)
   - ✅ EMA 算法：統一使用 pandas ewm，移除 pandas_ta
   - ✅ Warmup 支援：API 自動獲取額外數據進行預熱
@@ -621,6 +635,9 @@ quantitative_trading_system/
 - 無需立即修復的問題
 
 **已修復系統**：
+- ✅ Optuna 參數範圍與隨機選擇（2025-12-09~10）
+- ✅ OptimizationResult n_trials 屬性（2025-12-10）
+- ✅ SMA 未實現指標錯誤（2025-12-09）
 - ✅ Far=0 統計透明化（2025-12-06）
 - ✅ NaN 驗證錯誤（2025-12-06）
 - ✅ 前端狀態持久化（2025-12-06）
@@ -698,6 +715,48 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-12-09~10
+
+**Optuna 參數範圍與用戶選擇尊重修復** ⭐⭐⭐⭐⭐
+
+**問題診斷**
+- SMA 指標錯誤：Optuna 隨機選擇 SMA 但系統僅實現 EMA，導致 Trial 失敗
+- 參數範圍被忽略：用戶配置 Short 3-12, Mid 14-18, Long 20-33，但系統使用 YAML 默認 2-500
+- 設計缺陷：用戶在前端明確選擇指標/策略，但 Optuna 仍隨機選擇
+
+**核心修復**（5 個文件）
+
+1. **indicator_types 字段新增**（momentum/Optimization/optuna_optimizer.py）
+   - ParameterRanges dataclass 新增 `indicator_types: List[str]` 字段
+   - `_objective_function_core()` 改用 `self.parameter_ranges.indicator_types`
+   - `_multi_objective_function_core()` 同步修改
+   - 結果：100% 使用用戶選擇指標，不再隨機
+
+2. **前端傳遞用戶選擇**（frontend/src/app/strategy-test/page.tsx）
+   - 新增 `indicator_types: [state.indicatorType]` 到 parameter_ranges
+   - 確保前端選擇正確傳遞到後端
+
+3. **移除未實現指標聲明**（config/strategies.yaml）
+   - 三個策略全部移除 `- "sma"` 聲明
+   - 添加註解 `# 未實現，未來擴展`
+
+4. **n_trials 屬性修復**（api/services/optimization_task_service.py）
+   - Line 413: `result.n_trials` → `result.total_trials`
+   - 添加 hasattr 檢查確保向後兼容
+
+**驗證結果**
+- ✅ 10 trials 測試：所有參數在配置範圍內
+- ✅ 無 SMA 錯誤：全部 trials 使用 EMA
+- ✅ 完成率 50%：5 completed, 5 pruned（參數約束導致，符合預期）
+- ✅ 結果保存成功：n_trials 屬性錯誤已修復
+
+**影響範圍**
+- 修改文件：5 個（optimizer, frontend, yaml x3, service）
+- 解決問題：SMA 錯誤、參數範圍被忽略、隨機選擇、保存失敗
+- 架構改進：雙參數系統統一，前端選擇優先
+
+---
 
 ### 2025-12-06（晚間）
 
@@ -2019,14 +2078,19 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待推送（2025-12-06）
+**遠端同步**: ⏳ 待推送（2025-12-10）
 
-**待提交變更** (2025-12-06):
-- **Far=0 統計透明化與狀態持久化**
+**待提交變更** (2025-12-09~10):
+- **Optuna 參數範圍與用戶選擇尊重**
+  - momentum/Optimization/optuna_optimizer.py - indicator_types 字段新增
+  - frontend/src/app/strategy-test/page.tsx - 傳遞 indicator_types
+  - config/strategies.yaml (3個策略) - 移除 SMA 聲明
+  - api/services/optimization_task_service.py - n_trials 屬性修復
+- **Far=0 統計透明化與狀態持久化** (2025-12-06)
   - momentum/Analysis/signal_density_analyzer.py - NaN 錯誤修復
   - frontend/src/store/strategyTestStore.ts - 新建 Zustand 持久化 store
   - frontend/src/app/strategy-test/page.tsx - 整合持久化 store
-- **EMA 計算與顯示修復**
+- **EMA 計算與顯示修復** (2025-12-06)
   - momentum/Indicators/ema.py - 移除 pandas_ta，統一 pandas ewm
   - api/services/chart_data_service.py - 新增 warmup 計算方法
   - frontend/src/utils/chartConfig.ts - 新增截斷函數
@@ -2051,23 +2115,27 @@ for case in candidates:
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-12-06）：
-   - ✅ **EMA 計算一致性修復**
+1. **已完成工作**（2025-12-09~10）：
+   - ✅ **Optuna 參數範圍與用戶選擇尊重修復**
+     - indicator_types 字段：ParameterRanges 新增用戶選擇傳遞
+     - 前端整合：strategy-test 傳遞 indicator_types
+     - SMA 錯誤：移除未實現指標聲明
+     - n_trials 屬性：修復保存錯誤
+     - 驗證通過：10 trials 全部在範圍內，無 SMA 錯誤
+   - ✅ **EMA 計算一致性修復**（2025-12-06）
      - 算法統一：pandas.ewm(span=period, adjust=False).mean()
      - API Warmup：WARMUP_MULTIPLIER = 4.5
      - 前端截斷：Math.floor(value * 10^decimals) / 10^decimals
-     - 驗證通過：API EMA 與 CSV 完全一致
-   - ✅ **STRATEGY_EXTENSION_GUIDE.md 更新**
-     - 新增 Warmup 需求章節
-     - 新增疑難排解和規範
 
-2. **當前狀態**（2025-12-06）：
+2. **當前狀態**（2025-12-10）：
    - 分支：main（⏳ 待推送）
-   - EMA 系統：已修復，等待 Git 同步
+   - Optuna 系統：參數範圍修復完成，用戶持續測試中
+   - 等待 Git 同步：3 組修復（Optuna + Far=0 + EMA）
 
 3. **下一步工作**：
-   - **Optuna 參數優化測試**
-     - 測試五種 Sampler（TPE/CmaEs/Random/GP/NSGA-II）
+   - **Optuna 參數優化持續測試**
+     - 用戶持續測試 Optuna 系統穩定性
+     - 驗證五種 Sampler（TPE/CmaEs/Random/GP/NSGA-II）
      - 驗證多目標優化和 Pareto 前沿
      - 測試 WebSocket 實時推送
      - 驗證 CheckpointManager 容錯機制

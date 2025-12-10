@@ -188,6 +188,19 @@ class CaseStorageManager:
         return self.get_cases(case_ids)
 
 
+    def case_exists(self, case_id: str) -> bool:
+        """
+        檢查案例是否存在
+
+        Args:
+            case_id: 案例ID
+
+        Returns:
+            bool: 案例是否存在
+        """
+        return case_id in self.cases
+
+
     def delete_case(self, case_id: str) -> bool:
         """
         刪除案例
