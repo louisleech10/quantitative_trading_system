@@ -154,6 +154,34 @@ const buildUrlPayload = (state: StrategyFormState): StrategyUrlPayload => ({
   clusteringWeight: state.clusteringWeight,
 });
 
+// 清理舊版參數名稱 (ema_short -> short_period 等)
+const cleanIndicatorParams = (
+  params: Record<string, number>
+): Record<string, number> => {
+  const legacyToNew: Record<string, string> = {
+    ema_short: "short_period",
+    ema_mid: "mid_period",
+    ema_long: "long_period",
+  };
+
+  const cleaned: Record<string, number> = {};
+
+  for (const [key, value] of Object.entries(params)) {
+    // 如果是舊版 key 且新版 key 不存在，則轉換
+    if (key in legacyToNew) {
+      const newKey = legacyToNew[key];
+      if (!(newKey in params) && !(newKey in cleaned)) {
+        cleaned[newKey] = value;
+      }
+      // 舊版 key 不保留
+    } else {
+      cleaned[key] = value;
+    }
+  }
+
+  return cleaned;
+};
+
 const mergeFromPayload = (
   original: StrategyFormState,
   payload: StrategyUrlPayload
@@ -162,10 +190,10 @@ const mergeFromPayload = (
   dataSources: payload.dataSources ?? original.dataSources,
   indicatorType: payload.indicatorType ?? original.indicatorType,
   strategyLogic: payload.strategyLogic ?? original.strategyLogic,
-  indicatorParams: {
+  indicatorParams: cleanIndicatorParams({
     ...original.indicatorParams,
     ...payload.indicatorParams,
-  },
+  }),
   windowConfig: {
     ...original.windowConfig,
     ...payload.windowConfig,
@@ -525,6 +553,10 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
           return;
         }
         if (state) {
+          // 清理 localStorage 中的舊版參數名稱
+          if (state.state?.indicatorParams) {
+            state.state.indicatorParams = cleanIndicatorParams(state.state.indicatorParams);
+          }
           state.lastHydrationSource = "storage";
           state.isHydrated = true;
         }

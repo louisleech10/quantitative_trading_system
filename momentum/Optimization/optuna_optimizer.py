@@ -1077,6 +1077,17 @@ class OptunaOptimizer:
         self.negative_cases = negative_cases
         self.training_window = training_window
 
+        # [DEBUG] 詳細日誌：記錄 Optuna 任務使用的配置，用於與單參數測試比對
+        self.logger.info(
+            f"[DEBUG] Optuna 優化配置:\n"
+            f"  - positive_cases: {sorted(positive_cases)[:5]}... (共{len(positive_cases)}個)\n"
+            f"  - negative_cases: {sorted(negative_cases)[:5]}... (共{len(negative_cases)}個)\n"
+            f"  - training_window: near={training_window.lookback_bars}, "
+            f"far={training_window.far_lookback_bars}, "
+            f"ref={training_window.reference_point}, "
+            f"mode={training_window.mode}"
+        )
+
         # 檢測雙密度模式
         is_dual_density_mode = training_window.far_lookback_bars is not None
         if is_dual_density_mode:

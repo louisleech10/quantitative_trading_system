@@ -108,6 +108,21 @@ class SignalAnalysisService:
             # 1. 驗證請求
             self._validate_request(request)
 
+            # [DEBUG] 詳細日誌：記錄完整輸入參數用於調試 Optuna vs 單參數測試差異
+            self.logger.info(
+                f"[DEBUG] 信號密度分析輸入參數:\n"
+                f"  - positive_cases: {sorted(request.positive_cases)[:5]}... (共{len(request.positive_cases)}個)\n"
+                f"  - negative_cases: {sorted(request.negative_cases)[:5]}... (共{len(request.negative_cases)}個)\n"
+                f"  - training_window: near={request.training_window.lookback_bars}, "
+                f"far={request.training_window.far_lookback_bars}, "
+                f"ref={request.training_window.reference_point}, "
+                f"mode={request.training_window.mode}\n"
+                f"  - strategy_config: data_source={request.strategy_config.data_source}, "
+                f"indicator={request.strategy_config.indicator_type}, "
+                f"logic={request.strategy_config.strategy_logic}, "
+                f"params={request.strategy_config.params}"
+            )
+
             # 2. 載入案例數據
             positive_cases = []
             negative_cases = []
@@ -266,21 +281,21 @@ class SignalAnalysisService:
 
         Note:
             驗證規則:
-            - 正例數量 ≥ 10
-            - 反例數量 ≥ 10
+            - 正例數量 ≥ 1
+            - 反例數量 ≥ 1
             - 案例ID格式有效
             - lookback_bars ≥ 1
             - indicator已在IndicatorEngine中註冊
         """
-        # 檢查案例數量
-        if len(request.positive_cases) < 10:
+        # 檢查案例數量（最少各1個，支援調試驗證場景）
+        if len(request.positive_cases) < 1:
             raise ValueError(
-                f"正例數量不足: 需要至少10個,實際{len(request.positive_cases)}個"
+                f"正例數量不足: 需要至少1個,實際{len(request.positive_cases)}個"
             )
 
-        if len(request.negative_cases) < 10:
+        if len(request.negative_cases) < 1:
             raise ValueError(
-                f"反例數量不足: 需要至少10個,實際{len(request.negative_cases)}個"
+                f"反例數量不足: 需要至少1個,實際{len(request.negative_cases)}個"
             )
 
         # 檢查案例ID格式

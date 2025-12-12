@@ -284,16 +284,16 @@ async def validate_strategy_config(
         strategy_logic = request.strategy_config.strategy_logic
 
         if strategy_logic == "three_line":
-            required_params = ["ema_short", "ema_mid", "ema_long"]
+            required_params = ["short_period", "mid_period", "long_period"]
             for param in required_params:
                 if param not in params:
                     errors.append(f"策略參數缺少 {param}")
 
             # 驗證參數合理性
             if all(param in params for param in required_params):
-                short = params["ema_short"]
-                mid = params["ema_mid"]
-                long = params["ema_long"]
+                short = params["short_period"]
+                mid = params["mid_period"]
+                long = params["long_period"]
 
                 if not (short < mid < long):
                     errors.append(
@@ -302,39 +302,39 @@ async def validate_strategy_config(
 
                 # 警告: 間距過小
                 if mid - short < 3:
-                    warnings.append(f"建議ema_short({short})與ema_mid({mid})間距不要過小 (當前:{mid-short})")
+                    warnings.append(f"建議short({short})與mid({mid})間距不要過小 (當前:{mid-short})")
 
                 if long - mid < 5:
-                    warnings.append(f"建議ema_mid({mid})與ema_long({long})間距不要過小 (當前:{long-mid})")
+                    warnings.append(f"建議mid({mid})與long({long})間距不要過小 (當前:{long-mid})")
 
         elif strategy_logic == "short_long_cross":
-            required_params = ["ema_short", "ema_long"]
+            required_params = ["short_period", "long_period"]
             for param in required_params:
                 if param not in params:
                     errors.append(f"策略參數缺少 {param}")
 
             if all(param in params for param in required_params):
-                short = params["ema_short"]
-                long = params["ema_long"]
+                short = params["short_period"]
+                long = params["long_period"]
 
                 if short >= long:
                     errors.append(
-                        f"EMA參數大小關係錯誤: ema_short({short})必須小於ema_long({long})"
+                        f"EMA參數大小關係錯誤: short({short})必須小於long({long})"
                     )
 
         elif strategy_logic == "mid_long_cross":
-            required_params = ["ema_mid", "ema_long"]
+            required_params = ["mid_period", "long_period"]
             for param in required_params:
                 if param not in params:
                     errors.append(f"策略參數缺少 {param}")
 
             if all(param in params for param in required_params):
-                mid = params["ema_mid"]
-                long = params["ema_long"]
+                mid = params["mid_period"]
+                long = params["long_period"]
 
                 if mid >= long:
                     errors.append(
-                        f"EMA參數大小關係錯誤: ema_mid({mid})必須小於ema_long({long})"
+                        f"EMA參數大小關係錯誤: mid({mid})必須小於long({long})"
                     )
 
         # 5. 驗證參數類型和範圍

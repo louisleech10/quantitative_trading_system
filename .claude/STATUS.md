@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-12-10 15:30
-**當前階段**: Optuna 參數優化系統測試中
+**最後更新**: 2025-12-12 00:20
+**當前階段**: Optuna vs 單參數測試一致性驗證完成
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,13 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Optuna vs 單參數測試一致性修復** (100%) - 2025-12-11完成
+  - ✅ 根因分析：策略計算函數從 params 讀取 indicator_type/data_source，缺失時使用默認值 close
+  - ✅ 後端修復：SignalDensityAnalyzer 自動注入 indicator_type/data_source 到 params
+  - ✅ 前端優化：窗口描述動態顯示（TO前N根、TO-M至TO-N）替代硬編碼
+  - ✅ 前端修復：StatMetricCard 完整 null/NaN 處理，避免 toFixed 錯誤
+  - ✅ 驗證工具：test_density_comparison.py 腳本，最小案例數降至1個
+  - ✅ 驗證通過：Optuna 與單參數測試結果完全一致
 - **Optuna 參數範圍與用戶選擇尊重** (100%) - 2025-12-09~10完成
   - ✅ 參數範圍覆蓋邏輯：前端 parameter_ranges 優先於 YAML 默認值
   - ✅ indicator_types 字段：ParameterRanges 新增用戶選擇指標類型傳遞
@@ -79,9 +86,17 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-- 無活躍任務
+- **Optuna 優化系統實戰測試**
+  - 多 trials 運行穩定性驗證
+  - 參數收斂性分析
+  - 最佳參數實用性評估
 
 ### 剛完成 🔧
+- **Optuna vs 單參數測試一致性修復** (2025-12-11)
+  - ✅ 修復策略計算 data_source 注入問題
+  - ✅ 前端窗口描述動態化
+  - ✅ StatMetricCard null 處理
+  - ✅ 驗證腳本與最小案例數支持
 - **Optuna 用戶選擇尊重與參數範圍修復** (2025-12-09~10)
   - ✅ 修復隨機選擇問題：indicator_types 字段傳遞用戶選擇
   - ✅ 參數範圍覆蓋：前端配置優先於 YAML 默認值
@@ -100,20 +115,22 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**信號密度分析系統增強**（優先級：高）
+**Optuna 優化系統驗證與擴展**（優先級：高）
 
-1. **零值統計視覺化**
-   - 在前端 UI 顯示 Near/Far 零值計數
-   - 可選：添加零值案例過濾開關
-
-2. **Optuna 參數優化測試**
-   - 測試 Optuna 超參數優化系統
-   - 驗證 TPE/CmaEs/Random/GP/NSGA-II 五種 Sampler
-   - 確認 WebSocket 實時推送功能
-
-3. **系統穩定性驗證**
+1. **Optuna 實戰測試**
+   - 多 trials（100+）穩定性驗證
+   - 參數收斂性與最佳解分析
    - CheckpointManager 容錯測試
-   - 長時間運行穩定性測試
+   - WebSocket 實時推送確認
+
+2. **系統擴展準備**
+   - 評估多策略並行優化需求
+   - 規劃參數敏感性分析功能
+   - 考慮添加早停機制（Early Stopping）
+
+3. **文檔與測試完善**
+   - 更新 Optuna 使用指南
+   - 補充一致性驗證案例
 
 **建議方向**（按優先級排序）：
 
@@ -635,6 +652,9 @@ quantitative_trading_system/
 - 無需立即修復的問題
 
 **已修復系統**：
+- ✅ Optuna vs 單參數測試一致性（2025-12-11）
+- ✅ 前端窗口描述硬編碼（2025-12-11）
+- ✅ StatMetricCard null 值處理（2025-12-11）
 - ✅ Optuna 參數範圍與隨機選擇（2025-12-09~10）
 - ✅ OptimizationResult n_trials 屬性（2025-12-10）
 - ✅ SMA 未實現指標錯誤（2025-12-09）
@@ -715,6 +735,55 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-12-11
+
+**Optuna vs 單參數測試一致性修復** ⭐⭐⭐⭐⭐
+
+**問題發現**
+- 使用相同配置（Volume/EMA/三線排列，short=6/mid=18/long=30），Optuna 與單參數測試結果不一致
+- Optuna Trial #0: separation=0.1098, positive_mean=0.3636
+- 單參數測試: separation=0.1019, positive_mean=0.4121
+- 差異約 7.7%，不可接受
+
+**根因分析**
+- 策略計算函數（three_line_strategy.py）從 `params` 中讀取 `indicator_type` 和 `data_source`
+- 缺失時使用默認值：`indicator_type='ema'` ✅，`data_source='close'` ❌
+- Optuna: params 包含 `{'indicator_type': 'ema', 'data_source': 'volume'}` → 使用 volume ✅
+- 單參數: params 只有 `{'short_period': 6, ...}` → 使用默認 close ❌
+- SignalDensityAnalyzer 調用策略時未注入頂層配置到 params
+
+**修復方案**
+1. **後端修復**（`momentum/Analysis/signal_density_analyzer.py:182-199`）
+   - `calculate_strategy_signals()` 自動注入 `indicator_type` 和 `data_source` 到 params
+   - 確保策略函數始終獲得正確配置
+
+2. **前端優化**（`frontend/src/app/strategy-test/page.tsx`）
+   - 窗口描述動態化：`TO前${lookback_bars}根K線` 替代硬編碼 "TO前24根"
+   - 遠期窗口：`TO-${far_lookback_bars}至TO-${lookback_bars+1}` 替代 "TO-100至TO-25"
+
+3. **前端修復**（`frontend/src/components/ui/StatMetricCard.tsx`）
+   - 完整 null/undefined/NaN 處理
+   - 新增 `isValidNumber()` 類型守衛
+   - 避免 `toFixed()` 調用錯誤
+
+4. **驗證工具**（`test_density_comparison.py`）
+   - 創建一致性驗證腳本
+   - 最小案例數降至 1 個（支持快速調試）
+   - 詳細日誌輸出供比對
+
+**驗證結果**
+- ✅ Optuna 與單參數測試使用相同 data_source（volume）
+- ✅ 兩者計算結果完全一致
+- ✅ 前端窗口描述正確反映用戶配置
+- ✅ StatMetricCard 不再出現 null 錯誤
+
+**影響範圍**
+- 修改文件: 4 個（1 後端核心 + 2 前端 UI + 1 測試腳本）
+- 修改行數: ~50 行
+- 測試覆蓋: 完整驗證流程
+
+---
 
 ### 2025-12-09~10
 
@@ -2078,13 +2147,21 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待推送（2025-12-10）
+**遠端同步**: ⏳ 待推送（2025-12-11）
 
-**待提交變更** (2025-12-09~10):
+**待提交變更** (2025-12-11):
+- **Optuna vs 單參數測試一致性修復**
+  - momentum/Analysis/signal_density_analyzer.py - 注入 indicator_type/data_source
+  - frontend/src/app/strategy-test/page.tsx - 窗口描述動態化
+  - frontend/src/components/ui/StatMetricCard.tsx - null 處理
+  - test_density_comparison.py - 一致性驗證腳本
+  - api/services/signal_analysis_service.py - 最小案例數降至1
+
+**已提交變更** (2025-12-09~10):
 - **Optuna 參數範圍與用戶選擇尊重**
-  - momentum/Optimization/optuna_optimizer.py - indicator_types 字段新增
-  - frontend/src/app/strategy-test/page.tsx - 傳遞 indicator_types
-  - config/strategies.yaml (3個策略) - 移除 SMA 聲明
+  - momentum/Optimization/optuna_optimizer.py - indicator_types 字段
+  - frontend/src/app/strategy-test/page.tsx - indicator_types 傳遞
+  - config/strategies.yaml - 移除 SMA 聲明
   - api/services/optimization_task_service.py - n_trials 屬性修復
 - **Far=0 統計透明化與狀態持久化** (2025-12-06)
   - momentum/Analysis/signal_density_analyzer.py - NaN 錯誤修復
@@ -2115,15 +2192,24 @@ for case in candidates:
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-12-09~10）：
+1. **已完成工作**（2025-12-11）：
+   - ✅ **Optuna vs 單參數測試一致性修復**
+     - 根因：策略計算函數從 params 讀取 data_source，缺失時默認 close
+     - 修復：SignalDensityAnalyzer 自動注入 indicator_type/data_source
+     - 優化：前端窗口描述動態化（TO前N根）
+     - 驗證：Optuna 與單參數結果完全一致
+   - ✅ **前端 UI 改進**
+     - StatMetricCard 完整 null/NaN 處理
+     - 窗口描述動態反映用戶配置
+   - ✅ **調試工具**
+     - test_density_comparison.py 一致性驗證腳本
+     - 最小案例數降至 1 個
+
+2. **已完成工作**（2025-12-09~10）：
    - ✅ **Optuna 參數範圍與用戶選擇尊重修復**
-     - indicator_types 字段：ParameterRanges 新增用戶選擇傳遞
-     - 前端整合：strategy-test 傳遞 indicator_types
-     - SMA 錯誤：移除未實現指標聲明
-     - n_trials 屬性：修復保存錯誤
-     - 驗證通過：10 trials 全部在範圍內，無 SMA 錯誤
-   - ✅ **EMA 計算一致性修復**（2025-12-06）
-     - 算法統一：pandas.ewm(span=period, adjust=False).mean()
+     - indicator_types 字段傳遞用戶選擇
+     - 參數範圍覆蓋邏輯修復
+     - SMA 錯誤解決
      - API Warmup：WARMUP_MULTIPLIER = 4.5
      - 前端截斷：Math.floor(value * 10^decimals) / 10^decimals
 

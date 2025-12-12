@@ -342,6 +342,19 @@ class SignalDensityResponse(BaseModel):
         if isinstance(v, float) and math.isnan(v):
             return 1.0
         return v
+
+    @validator('cohens_d', pre=True)
+    def handle_nan_cohens_d(cls, v):
+        """
+        處理NaN Cohen's d
+
+        當樣本數不足或標準差為0時,可能產生NaN。
+        將NaN轉換為0.0(表示無效果)
+        """
+        if isinstance(v, float) and math.isnan(v):
+            return 0.0
+        return v
+
     stability_cv: float = Field(
         ...,
         description="穩定性係數(按月分組CV),<0.3穩定,<0.5可接受,>0.5不穩定",

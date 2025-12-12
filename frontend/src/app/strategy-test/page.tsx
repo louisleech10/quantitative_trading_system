@@ -1069,7 +1069,7 @@ function StrategyTestPageContent() {
                     label="正例近期密度"
                     value={densityMetrics.positive_avg_density}
                     std={densityMetrics.positive_std}
-                    helper="TO前24根K線的策略信號密度"
+                    helper={`TO前${state.windowConfig.lookback_bars}根K線的策略信號密度`}
                     format="decimal"
                     colorCode={true}
                   />
@@ -1079,7 +1079,7 @@ function StrategyTestPageContent() {
                     label="正例遠期密度"
                     value={densityMetrics.positive_far_avg_density}
                     std={densityMetrics.positive_far_std}
-                    helper="TO-100至TO-25根K線的背景密度"
+                    helper={`TO-${state.windowConfig.far_lookback_bars}至TO-${state.windowConfig.lookback_bars + 1}根K線的背景密度`}
                     format="decimal"
                     colorCode={true}
                   />
@@ -1114,7 +1114,7 @@ function StrategyTestPageContent() {
                     label="反例近期密度"
                     value={densityMetrics.negative_avg_density}
                     std={densityMetrics.negative_std}
-                    helper="TO前24根K線的策略信號密度"
+                    helper={`TO前${state.windowConfig.lookback_bars}根K線的策略信號密度`}
                     format="decimal"
                     colorCode={true}
                   />
@@ -1124,7 +1124,7 @@ function StrategyTestPageContent() {
                     label="反例遠期密度"
                     value={densityMetrics.negative_far_avg_density}
                     std={densityMetrics.negative_far_std}
-                    helper="TO-100至TO-25根K線的背景密度"
+                    helper={`TO-${state.windowConfig.far_lookback_bars}至TO-${state.windowConfig.lookback_bars + 1}根K線的背景密度`}
                     format="decimal"
                     colorCode={true}
                   />

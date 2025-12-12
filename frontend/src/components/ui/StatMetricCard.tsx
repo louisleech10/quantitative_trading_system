@@ -4,8 +4,8 @@ import React from "react";
 
 interface StatMetricCardProps {
   label: string;
-  value: number;
-  std?: number;
+  value: number | null | undefined;
+  std?: number | null;
   helper?: string;
   source?: string;  // 數據來源/計算公式說明
   format?: "percent" | "decimal" | "ratio" | "number";
@@ -30,7 +30,11 @@ export default function StatMetricCard({
   colorCode = false,
 }: StatMetricCardProps) {
   // Format value based on type
-  const formatValue = (val: number): string => {
+  const formatValue = (val: number | null | undefined): string => {
+    // Handle null, undefined, and NaN values
+    if (val === null || val === undefined || Number.isNaN(val)) {
+      return "—";
+    }
     switch (format) {
       case "percent":
         return `${(val * 100).toFixed(2)}%`;
@@ -44,9 +48,16 @@ export default function StatMetricCard({
     }
   };
 
+  // Helper to check if a value is valid for calculations
+  const isValidNumber = (val: number | null | undefined): val is number => {
+    return val !== null && val !== undefined && !Number.isNaN(val);
+  };
+
   // Calculate coefficient of variation for color coding
   const getStabilityColor = (): string => {
-    if (!colorCode || !std || value === 0) return "text-gray-900";
+    if (!colorCode || !isValidNumber(std) || !isValidNumber(value) || value === 0) {
+      return "text-gray-900";
+    }
 
     const cv = Math.abs(std / value);
 
@@ -56,7 +67,7 @@ export default function StatMetricCard({
   };
 
   // Calculate 95% confidence interval (mean ± 1.96 * std)
-  const confidenceInterval = std
+  const confidenceInterval = isValidNumber(std) && isValidNumber(value)
     ? {
         lower: value - 1.96 * std,
         upper: value + 1.96 * std,
@@ -71,7 +82,7 @@ export default function StatMetricCard({
       {/* Value with Standard Deviation */}
       <div className={`text-2xl font-bold ${getStabilityColor()}`}>
         {formatValue(value)}
-        {std !== undefined && std > 0 && (
+        {isValidNumber(std) && std > 0 && (
           <span className="text-base font-normal text-gray-500 ml-2">
             (± {formatValue(std)})
           </span>
@@ -100,7 +111,7 @@ export default function StatMetricCard({
       )}
 
       {/* Stability Indicator */}
-      {colorCode && std && value !== 0 && (
+      {colorCode && isValidNumber(std) && isValidNumber(value) && value !== 0 && (
         <div className="mt-2 flex items-center text-xs">
           <div className="flex-1">
             <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">

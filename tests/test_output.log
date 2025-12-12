@@ -1,0 +1,25 @@
+/Users/louis/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+============================================================
+Optuna 優化流程測試
+============================================================
+
+[Step 1] 獲取案例列表...
+✅ 成功獲取 165 個案例
+   - ETHUSDT 正例: 55 個
+   - ETHUSDT 反例: 110 個
+
+[Step 2] 創建優化任務...
+✅ 任務已創建: 8d25341a-2e96-466a-8e09-92512a4e7c71
+   狀態: N/A
+
+[Step 3] 啟動優化任務...
+✅ 任務已啟動
+   狀態: N/A
+
+[Step 4] 監控任務進度...
+   [0s] 狀態: running - 進度: 0/5 trials
+   [5s] 狀態: failed - 進度: 0/5 trials
+
+❌ 優化失敗
+   錯誤: Record does not exist.

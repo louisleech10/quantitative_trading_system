@@ -180,8 +180,16 @@ class SignalDensityAnalyzer:
             raise
 
         # 執行策略計算
+        # 注意：將 indicator_type 和 data_source 注入到 params 中
+        # 因為策略計算函數需要這些參數來動態計算指標
+        enriched_params = {
+            **strategy_config.params,
+            'indicator_type': strategy_config.indicator_type,
+            'data_source': strategy_config.data_source
+        }
+
         try:
-            signals = calculator(kline_data, {}, strategy_config.params)
+            signals = calculator(kline_data, {}, enriched_params)
             return signals
         except Exception as e:
             self.logger.error(
