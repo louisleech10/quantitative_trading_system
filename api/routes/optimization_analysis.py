@@ -10,17 +10,20 @@ Author: Claude (Phase 3.5 Day 7-8)
 Date: 2025-11-02
 """
 
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, TYPE_CHECKING
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-import optuna
+
+# 延遲導入 optuna 以避免 sklearn 在模塊加載時初始化
+if TYPE_CHECKING:
+    import optuna
 
 from api.core.logging import get_logger
 from api.services.optimization_task_service import (
     optimization_task_service,
     OptimizationTaskStatus
 )
-from momentum.Optimization.result_analyzer import ResultAnalyzer  # Ultra Think Step 3 優化: 導入新模組
+# from momentum.Optimization.result_analyzer import ResultAnalyzer  # 延遲導入以避免 optuna 在模塊加載時初始化
 
 
 router = APIRouter(prefix="/api/v1/optimization")
@@ -86,7 +89,7 @@ class ParamSpaceResponse(BaseModel):
 
 # ==================== Helper Functions ====================
 
-def _get_study_from_task(task_id: str) -> optuna.Study:
+def _get_study_from_task(task_id: str) -> "optuna.Study":
     """
     從任務ID獲取Optuna Study
 
@@ -99,6 +102,8 @@ def _get_study_from_task(task_id: str) -> optuna.Study:
     Raises:
         HTTPException: 任務不存在或未完成
     """
+    import optuna  # 延遲導入
+
     task_info = optimization_task_service.get_task(task_id)
 
     if not task_info:
@@ -180,6 +185,8 @@ async def get_parameter_importance(
             )
 
         # 計算參數重要性
+        import optuna  # 延遲導入
+
         if evaluator == "fanova":
             # 使用FANOVA（推薦）
             try:
@@ -281,6 +288,8 @@ async def get_optimization_history(
             "total_trials": 100
         }
     """
+    import optuna  # 延遲導入
+
     try:
         # 獲取Study
         study = _get_study_from_task(task_id)
@@ -368,6 +377,8 @@ async def get_parameter_space(
             "total_trials": 100
         }
     """
+    import optuna  # 延遲導入
+
     try:
         # 獲取Study
         study = _get_study_from_task(task_id)
@@ -413,8 +424,16 @@ async def get_parameter_space(
 
 # ==================== Ultra Think Step 3 優化: 新增端點 ====================
 
-# 初始化 ResultAnalyzer
-result_analyzer = ResultAnalyzer()
+# 延遲初始化 ResultAnalyzer（避免在模塊加載時導入 optuna）
+_result_analyzer = None
+
+def get_result_analyzer():
+    """延遲初始化 ResultAnalyzer"""
+    global _result_analyzer
+    if _result_analyzer is None:
+        from momentum.Optimization.result_analyzer import ResultAnalyzer
+        _result_analyzer = ResultAnalyzer()
+    return _result_analyzer
 
 
 @router.get("/tasks/{task_id}/analysis/heatmap")
@@ -443,7 +462,7 @@ async def get_parameter_heatmap(
     """
     try:
         study = _get_study_from_task(task_id)
-        heatmap_data = result_analyzer.generate_heatmap_data(
+        heatmap_data = get_result_analyzer().generate_heatmap_data(
             study=study,
             param_x=param_x,
             param_y=param_y,
@@ -492,7 +511,7 @@ async def get_convergence_analysis(
     """
     try:
         study = _get_study_from_task(task_id)
-        convergence_analysis = result_analyzer.analyze_convergence(
+        convergence_analysis = get_result_analyzer().analyze_convergence(
             study=study,
             convergence_threshold=convergence_threshold,
             window_ratio=window_ratio
@@ -538,7 +557,7 @@ async def get_stability_analysis(
     """
     try:
         study = _get_study_from_task(task_id)
-        stability_analysis = result_analyzer.analyze_stability(
+        stability_analysis = get_result_analyzer().analyze_stability(
             study=study,
             time_attr=time_attr
         )
@@ -587,7 +606,7 @@ async def get_top_trials(
     """
     try:
         study = _get_study_from_task(task_id)
-        top_trials = result_analyzer.get_top_trials(
+        top_trials = get_result_analyzer().get_top_trials(
             study=study,
             top_n=top_n,
             include_params=include_params

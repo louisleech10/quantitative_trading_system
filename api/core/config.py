@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # 應用基本設定
     app_name: str = "Case Search API"
     app_version: str = "1.0.0"
-    debug: bool = Field(default=True, env="DEBUG")
+    debug: bool = Field(default=False, env="DEBUG")  # 關閉 reload 以避免 sklearn 導入問題
     
     # API設定
     api_prefix: str = "/api/v1"

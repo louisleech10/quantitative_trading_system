@@ -72,16 +72,19 @@ Date: 2025-11-02 (Updated: 2025-11-12)
 """
 
 import logging
-import optuna
-from optuna import Trial, Study
-from optuna.samplers import TPESampler, CmaEsSampler, RandomSampler, GPSampler, NSGAIISampler
-from optuna.pruners import MedianPruner, PercentilePruner, NopPruner
-from typing import Dict, Any, Optional, List, Callable, Tuple
+from typing import Dict, Any, Optional, List, Callable, Tuple, TYPE_CHECKING
 import asyncio
 from dataclasses import dataclass, field
 import time
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
+
+# 延遲導入 optuna 以避免 sklearn 在模塊加載時初始化
+if TYPE_CHECKING:
+    import optuna
+    from optuna import Trial, Study
+    from optuna.samplers import BaseSampler
+    from optuna.pruners import BasePruner
 
 from api.models.training_window_config import (
     SignalDensityRequest,
@@ -333,7 +336,7 @@ class OptunaOptimizer:
         self.logger = logging.getLogger(__name__)
 
         # Study對象(延遲初始化)
-        self.study: Optional[Study] = None
+        self.study: Optional["Study"] = None
 
         # 優化配置(在optimize()時設置)
         self.positive_cases: List[str] = []
@@ -367,7 +370,7 @@ class OptunaOptimizer:
             f"checkpoint_interval={checkpoint_interval}, max_retries={max_retries}"
         )
 
-    def _create_sampler(self) -> optuna.samplers.BaseSampler:
+    def _create_sampler(self) -> "BaseSampler":
         """
         創建Sampler(優化器)
 
@@ -384,6 +387,9 @@ class OptunaOptimizer:
         Raises:
             ValueError: 不支援的sampler類型
         """
+        # 延遲導入
+        from optuna.samplers import TPESampler, CmaEsSampler, RandomSampler, GPSampler, NSGAIISampler
+
         if self.sampler_type == 'TPE':
             return TPESampler(
                 seed=self.random_seed,
@@ -420,7 +426,7 @@ class OptunaOptimizer:
                 f"Supported: TPE, CmaEs, Random, GP, NSGA-II"
             )
 
-    def _create_pruner(self) -> optuna.pruners.BasePruner:
+    def _create_pruner(self) -> "BasePruner":
         """
         創建Pruner(剪枝器)
 
@@ -435,6 +441,9 @@ class OptunaOptimizer:
         Raises:
             ValueError: 不支援的pruner類型
         """
+        # 延遲導入
+        from optuna.pruners import MedianPruner, PercentilePruner, NopPruner
+
         if self.pruner_type == 'Median':
             return MedianPruner(
                 n_startup_trials=5,  # 前5次不剪枝
@@ -454,7 +463,7 @@ class OptunaOptimizer:
                 f"Supported: Median, Percentile, None"
             )
 
-    def create_study(self) -> Study:
+    def create_study(self) -> "Study":
         """
         創建或載入Optuna Study
 
@@ -471,6 +480,9 @@ class OptunaOptimizer:
         - directions=["maximize", "maximize"](多目標): separation和stability
         - load_if_exists=True: 支援斷點續跑
         """
+        # 延遲導入
+        import optuna
+
         sampler = self._create_sampler()
         pruner = self._create_pruner()
 
@@ -506,7 +518,7 @@ class OptunaOptimizer:
         self.study = study
         return study
 
-    async def _objective_function_with_retry(self, trial: Trial) -> float:
+    async def _objective_function_with_retry(self, trial: "Trial") -> float:
         """
         帶重試機制的目標函數包裝器
 
@@ -522,6 +534,9 @@ class OptunaOptimizer:
         Returns:
             separation(密度差異)
         """
+        # 延遲導入
+        import optuna
+
         attempt = 1
 
         while attempt <= self.error_handler.max_retries + 1:  # +1 for initial attempt
@@ -565,7 +580,7 @@ class OptunaOptimizer:
         self.logger.error(f"Trial {trial.number} exceeded max retries ({self.error_handler.max_retries})")
         return -999.0
 
-    async def _objective_function_core(self, trial: Trial) -> float:
+    async def _objective_function_core(self, trial: "Trial") -> float:
         """
         Optuna目標函數核心實作(不含重試邏輯)
 
@@ -596,6 +611,9 @@ class OptunaOptimizer:
         - 參數約束: 三線排列必須 short < mid < long
         - 數據源: 從DataSourceEnum中選擇,無硬編碼
         """
+        # 延遲導入
+        import optuna
+
         try:
             # ==================== Phase 2 重構：動態參數採樣 ====================
             # 步驟1: 採樣固定參數（data_source, strategy_logic, indicator_type）
@@ -780,7 +798,7 @@ class OptunaOptimizer:
             # 所有其他錯誤由_objective_function_with_retry的重試邏輯處理
             raise
 
-    async def _multi_objective_function_with_retry(self, trial: Trial) -> Tuple[float, float]:
+    async def _multi_objective_function_with_retry(self, trial: "Trial") -> Tuple[float, float]:
         """
         帶重試機制的多目標函數包裝器
 
@@ -796,6 +814,9 @@ class OptunaOptimizer:
         Returns:
             (separation, stability_score) 元組
         """
+        # 延遲導入
+        import optuna
+
         attempt = 1
 
         while attempt <= self.error_handler.max_retries + 1:
@@ -831,7 +852,7 @@ class OptunaOptimizer:
         self.logger.error(f"Trial {trial.number} exceeded max retries ({self.error_handler.max_retries})")
         return (-999.0, 0.0)
 
-    async def _multi_objective_function_core(self, trial: Trial) -> Tuple[float, float]:
+    async def _multi_objective_function_core(self, trial: "Trial") -> Tuple[float, float]:
         """
         多目標優化函數核心實作(不含重試邏輯)
 
@@ -854,6 +875,9 @@ class OptunaOptimizer:
         - cv = std_separation / mean_separation (變異係數)
         - Pareto前沿: NSGA-II會返回多個非支配解
         """
+        # 延遲導入
+        import optuna
+
         try:
             # ==================== Phase 2 重構：動態參數採樣（多目標）====================
             # 步驟1: 採樣固定參數
@@ -1131,7 +1155,10 @@ class OptunaOptimizer:
         # 步驟5: 定義callback追蹤進度
         last_log_trial = [0]  # 使用列表保持可變性
 
-        def callback(study: Study, trial: optuna.trial.FrozenTrial):
+        # 延遲導入
+        import optuna
+
+        def callback(study: "Study", trial: "optuna.trial.FrozenTrial"):
             """
             每完成一次試驗的回調
 
@@ -1198,7 +1225,7 @@ class OptunaOptimizer:
 
             # 根據use_multi_objective選擇目標函數(使用帶重試版本)
             if self.use_multi_objective:
-                def sync_objective(trial: Trial) -> Tuple[float, float]:
+                def sync_objective(trial: "Trial") -> Tuple[float, float]:
                     """
                     多目標同步包裝器(帶重試機制)
 
@@ -1211,7 +1238,7 @@ class OptunaOptimizer:
                     )
                     return future.result()
             else:
-                def sync_objective(trial: Trial) -> float:
+                def sync_objective(trial: "Trial") -> float:
                     """
                     單目標同步包裝器(帶重試機制)
 
