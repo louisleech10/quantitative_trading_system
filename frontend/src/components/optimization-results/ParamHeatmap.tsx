@@ -47,7 +47,25 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
 
     // 從紅色（低）到綠色（高）的漸變
     const hue = normalized * 120 // 0 (red) to 120 (green)
-    return `hsl(${hue}, 70%, 50%)`
+    return `hsl(${hue}, 80%, 55%)`
+  }
+
+  // 自定義散點形狀
+  const renderCustomDot = (props: any) => {
+    const { cx, cy, payload } = props
+    const color = getPointColor(payload.value)
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={10}
+        fill={color}
+        fillOpacity={0.9}
+        stroke="#ffffff"
+        strokeWidth={2}
+        style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.6))' }}
+      />
+    )
   }
 
   // 自定義 Tooltip
@@ -150,19 +168,8 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
               <Tooltip content={<CustomTooltip />} />
               <Scatter
                 data={heatmapData.data_points}
-                shape="circle"
-              >
-                {heatmapData.data_points.map((entry, index) => (
-                  <circle
-                    key={`dot-${index}`}
-                    r={5}
-                    fill={getPointColor(entry.value)}
-                    fillOpacity={0.7}
-                    stroke="#fff"
-                    strokeWidth={1}
-                  />
-                ))}
-              </Scatter>
+                shape={renderCustomDot}
+              />
             </ScatterChart>
           </ResponsiveContainer>
         )}
@@ -170,11 +177,23 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
         {/* 顏色圖例 */}
         <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-12 h-3 rounded" style={{ background: 'linear-gradient(to right, hsl(0, 70%, 50%), hsl(120, 70%, 50%))' }} />
+            <div className="w-16 h-4 rounded" style={{ background: 'linear-gradient(to right, hsl(0, 70%, 50%), hsl(60, 70%, 50%), hsl(120, 70%, 50%))' }} />
             <span className="text-muted-foreground">
               低 ({heatmapData.value_range[0].toFixed(3)}) → 高 ({heatmapData.value_range[1].toFixed(3)})
             </span>
           </div>
+        </div>
+
+        {/* 閱讀指南 */}
+        <div className="mt-4 p-3 bg-muted/30 rounded-lg space-y-2">
+          <p className="text-xs font-medium text-foreground">📖 如何閱讀熱力圖</p>
+          <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+            <li><span className="text-green-500">●</span> <strong>綠色點</strong>：該參數組合的目標值較高（表現較好）</li>
+            <li><span className="text-yellow-500">●</span> <strong>黃色點</strong>：該參數組合的目標值中等</li>
+            <li><span className="text-red-500">●</span> <strong>紅色點</strong>：該參數組合的目標值較低（表現較差）</li>
+            <li><strong>點的位置</strong>：代表兩個參數的具體數值組合</li>
+            <li><strong>分析技巧</strong>：觀察綠色點的聚集區域，找出最佳參數範圍</li>
+          </ul>
         </div>
       </CardContent>
     </Card>

@@ -67,12 +67,16 @@ async function fetchOptimizationResult(taskId: string): Promise<OptimizationResu
 }
 
 async function fetchParamImportance(taskId: string): Promise<ParameterImportance[]> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/param-importance`)
+  const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/importance`)
   if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Parameter importance API error:', response.status, errorText)
     throw new Error(`Failed to fetch parameter importance: ${response.statusText}`)
   }
   const data = await response.json()
-  return data.data.importances
+  // API 回傳結構: { success, task_id, study_name, n_trials, importances, evaluator }
+  // importances 在根層級，不是 data.importances
+  return data.importances || []
 }
 
 async function fetchHeatmap(taskId: string, paramX: string, paramY: string): Promise<HeatmapData> {
@@ -124,6 +128,7 @@ export default function OptimizationResultPage() {
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<OptimizationResultDetail | null>(null)
   const [importances, setImportances] = useState<ParameterImportance[]>([])
+  const [importanceError, setImportanceError] = useState<string | null>(null)  // 追蹤參數重要性載入錯誤
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null)
   const [convergenceData, setConvergenceData] = useState<ConvergenceAnalysis | null>(null)
   const [stabilityData, setStabilityData] = useState<StabilityAnalysis | null>(null)
@@ -187,6 +192,7 @@ export default function OptimizationResultPage() {
       ])
 
       // 處理參數重要性
+      setImportanceError(null)  // 重置錯誤狀態
       if (importancesResult.status === 'fulfilled') {
         const importancesData = importancesResult.value
         setImportances(importancesData)
@@ -206,6 +212,18 @@ export default function OptimizationResultPage() {
           } catch (err) {
             console.warn('Failed to load heatmap:', err)
           }
+        }
+      } else {
+        // 參數重要性載入失敗，記錄錯誤訊息
+        const reason = importancesResult.reason as Error
+        const errorMsg = reason?.message || '未知錯誤'
+        console.warn('Failed to load parameter importance:', errorMsg)
+        
+        // 判斷是否為試驗次數不足的錯誤
+        if (errorMsg.includes('at least 2') || errorMsg.includes('2 completed trials')) {
+          setImportanceError('需要至少 2 次完成的試驗才能計算參數重要性')
+        } else {
+          setImportanceError(`無法載入參數重要性: ${errorMsg}`)
         }
       }
 
@@ -456,9 +474,11 @@ export default function OptimizationResultPage() {
         </section>
 
         {/* Section 2: 參數重要性與熱力圖 */}
-        {importances.length > 0 && (
-          <section>
-            <h2 className="text-2xl font-semibold mb-4">參數分析</h2>
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">參數分析</h2>
+          
+          {/* 有資料時顯示圖表 */}
+          {importances.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* 參數重要性圖表 */}
               <ParamImportanceChart importances={importances} />
@@ -472,8 +492,33 @@ export default function OptimizationResultPage() {
                 />
               )}
             </div>
-          </section>
-        )}
+          ) : (
+            /* 無資料時顯示友善提示 */
+            <div className="bg-card border rounded-lg p-6">
+              <div className="flex items-start gap-4">
+                <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900">
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground mb-2">
+                    無法顯示參數重要性分析
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {importanceError || '參數重要性資料尚未載入'}
+                  </p>
+                  <div className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                    <p className="font-medium mb-2">💡 可能原因：</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>試驗次數不足（需要至少 2 次完成的試驗）</li>
+                      <li>所有試驗都被剪枝（Pruned）或失敗</li>
+                      <li>參數數量不足以進行重要性分析</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Section 3: 收斂與穩定性 */}
         <section>

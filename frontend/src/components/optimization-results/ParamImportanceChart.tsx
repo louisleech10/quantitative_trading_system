@@ -100,10 +100,27 @@ export function ParamImportanceChart({ importances, evaluator = 'fanova' }: Para
         )}
 
         {/* 說明文字 */}
-        <div className="mt-4 pt-4 border-t">
+        <div className="mt-4 pt-4 border-t space-y-3">
           <p className="text-xs text-muted-foreground">
             💡 數值越高表示該參數對優化目標的影響越大
           </p>
+          
+          {/* fANOVA 詳細說明 */}
+          <div className="p-3 bg-muted/30 rounded-lg space-y-2">
+            <p className="text-xs font-medium text-foreground">📊 fANOVA 評估方法說明</p>
+            <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+              <li><strong>原理</strong>：功能性方差分析 (Functional ANOVA)，分解目標函數的變異來源</li>
+              <li><strong>計算方式</strong>：測量每個參數單獨變化時，對目標值變異的貢獻比例</li>
+              <li><strong>數值範圍</strong>：0% ~ 100%，所有參數的重要性總和為 100%</li>
+              <li><strong>解讀建議</strong>：
+                <ul className="ml-4 mt-1 space-y-0.5">
+                  <li>• &gt;30%：<span className="text-green-500">關鍵參數</span>，需要精細調整</li>
+                  <li>• 10-30%：<span className="text-yellow-500">重要參數</span>，值得關注</li>
+                  <li>• &lt;10%：<span className="text-gray-400">次要參數</span>，可使用預設值</li>
+                </ul>
+              </li>
+            </ul>
+          </div>
         </div>
       </CardContent>
     </Card>
