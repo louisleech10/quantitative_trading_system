@@ -789,6 +789,25 @@ class OptunaOptimizer:
                     f"params={trial.params}"
                 )
 
+            # 步驟6: 存儲統計數據到 Trial user_attrs（供前端顯示和CSV匯出）
+            # 核心統計指標
+            trial.set_user_attr("p_value", response.p_value)
+            trial.set_user_attr("cohens_d", response.cohens_d)
+            trial.set_user_attr("stability_cv", response.stability_cv)
+            trial.set_user_attr("positive_avg_density", response.positive_avg_density)
+            trial.set_user_attr("negative_avg_density", response.negative_avg_density)
+            trial.set_user_attr("separation", response.separation)
+
+            # 雙密度模式額外存儲
+            if is_dual_density:
+                trial.set_user_attr("positive_near_far_ratio", response.positive_near_far_ratio)
+                trial.set_user_attr("negative_near_far_ratio", response.negative_near_far_ratio)
+                trial.set_user_attr("ratio_separation", response.ratio_separation)
+                if response.positive_ratio_cv is not None:
+                    trial.set_user_attr("positive_ratio_cv", response.positive_ratio_cv)
+                if response.separation_cv is not None:
+                    trial.set_user_attr("separation_cv", response.separation_cv)
+
             return objective_value
 
         except optuna.TrialPruned:
@@ -1025,6 +1044,15 @@ class OptunaOptimizer:
                 f"Trial {trial.number}: separation={separation:.4f}, "
                 f"stability={stability_score:.4f}, params={trial.params}"
             )
+
+            # 存儲統計數據到 Trial user_attrs（供前端顯示和CSV匯出）
+            trial.set_user_attr("p_value", response.p_value)
+            trial.set_user_attr("cohens_d", response.cohens_d)
+            trial.set_user_attr("stability_cv", response.stability_cv)
+            trial.set_user_attr("positive_avg_density", response.positive_avg_density)
+            trial.set_user_attr("negative_avg_density", response.negative_avg_density)
+            trial.set_user_attr("separation", separation)
+            trial.set_user_attr("stability_score", stability_score)
 
             return (separation, stability_score)
 

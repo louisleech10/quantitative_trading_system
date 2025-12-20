@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-12-20 17:30
-**當前階段**: Optuna優化系統完善（Pruning語義修復、目標值計算說明）
+**最後更新**: 2025-12-20 19:45
+**當前階段**: Optuna優化系統增強（統計數據展示與CSV匯出）
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,11 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Optuna優化系統增強：統計數據展示** (100%) - 2025-12-20完成
+  - ✅ Trial統計數據存儲：p_value、cohens_d、stability_cv等存入user_attrs
+  - ✅ 前端統計欄位：顯示p/d/cv值，顏色標識（綠=優/黃=中/灰=差）
+  - ✅ CSV完整匯出：包含所有user_attrs統計欄位
+  - ✅ 雙密度模式：額外存儲near/far ratio、ratio_separation等
 - **Optuna優化系統完善** (100%) - 2025-12-20完成
   - ✅ Pruning語義修復：參數驗證失敗從TrialPruned改為ValueError
   - ✅ 業務邏輯約束移除：刪除過度的週期差距限制（mid-short≥5等）
@@ -102,6 +107,11 @@
 - 無
 
 ### 剛完成 🔧
+- **Optuna優化系統增強：統計數據展示** (2025-12-20)
+  - ✅ 後端存儲：trial.set_user_attr()存儲p_value/cohens_d/stability_cv等
+  - ✅ 前端顯示：統計欄位顏色標識（p<0.05綠、d>0.8綠、cv<0.3綠）
+  - ✅ CSV匯出：完整包含所有user_attrs統計欄位
+  - ✅ 雙密度支援：near/far ratio、ratio_separation自動存儲
 - **Optuna優化系統完善** (2025-12-20)
   - ✅ Pruning語義修復：TrialPruned → ValueError
   - ✅ 業務邏輯約束移除：週期差距限制刪除
@@ -753,6 +763,42 @@ quantitative_trading_system/
 ## 📝 最近完成的工作
 
 ### 2025-12-20
+
+**Optuna優化系統增強：統計數據展示與CSV匯出** ⭐⭐⭐⭐
+
+**需求背景**
+- 用戶需求：將p_value、cohens_d、stability_cv等統計指標顯示在Trial排名中
+- 原問題：統計數據已計算但未存儲到Trial，前端無法顯示和匯出
+- 目標方案：最小變更，後端存儲→前端顯示→CSV匯出
+
+**核心修改**（2個文件）
+
+1. **後端統計數據存儲**（momentum/Optimization/optuna_optimizer.py）
+   - 單目標函數：Line 792-809 添加trial.set_user_attr()存儲
+   - 多目標函數：Line 1048-1055 添加統計數據存儲
+   - 存儲欄位：p_value、cohens_d、stability_cv、positive_avg_density、negative_avg_density、separation
+   - 雙密度模式：額外存儲positive_near_far_ratio、negative_near_far_ratio、ratio_separation、positive_ratio_cv、separation_cv
+
+2. **前端顯示與匯出**（frontend/src/components/optimization-results/TrialRankingTable.tsx）
+   - CSV匯出優化：Line 76-95 自動包含所有user_attrs欄位
+   - 統計欄位顯示：Line 219-240 添加stability_cv顯示
+   - 顏色標識：
+     - p_value：<0.05綠色、<0.1黃色、其他灰色
+     - cohens_d：>0.8綠色、>0.5黃色、其他灰色
+     - stability_cv：<0.3綠色、<0.5黃色、其他灰色
+
+**實現效果**
+- ✅ Trial排名表顯示p/d/cv值，一目了然
+- ✅ CSV匯出包含完整統計數據（15+欄位）
+- ✅ 顏色標識幫助快速篩選優質Trial
+- ✅ 雙密度模式自動存儲額外指標
+
+**影響範圍**
+- 修改文件：2個（1後端 + 1前端）
+- 變更量：約30行代碼
+- 架構：務實方案（方案C），變更最少
+
+---
 
 **Optuna優化系統完善：Pruning語義與目標值說明** ⭐⭐⭐⭐⭐
 
@@ -2284,13 +2330,17 @@ for case in candidates:
 **遠端同步**: ⏳ 待推送（2025-12-20）
 
 **待提交變更** (2025-12-20):
+- **Optuna優化系統增強：統計數據展示**
+  - momentum/Optimization/optuna_optimizer.py - Trial統計數據存儲（user_attrs）
+  - frontend/src/components/optimization-results/TrialRankingTable.tsx - CSV匯出與顏色標識
+  - docs/Optuna 參數優化系統文檔.md - 新增系統文檔
+  - .claude/STATUS.md - 狀態更新
 - **Optuna優化系統完善**
   - momentum/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueError）
   - momentum/Analysis/strategies/three_line_strategy.py - 業務邏輯約束移除
   - frontend/src/components/ui/select.tsx - Select組件衝突修復
   - frontend/src/app/strategy-test/page.tsx - CustomSelect使用
   - frontend/src/components/optimization-results/BestResultCard.tsx - 目標值計算說明
-  - .claude/STATUS.md - 狀態更新
 
 **待提交變更** (2025-12-16):
 - **PHASE4 測試案例3：參數重要性圖表修復**
@@ -2344,15 +2394,21 @@ for case in candidates:
 ## 💡 下次啟動時
 
 1. **已完成工作**（2025-12-20）：
+   - ✅ **Optuna優化系統增強：統計數據展示**
+     - 後端存儲：trial.set_user_attr()存儲p_value、cohens_d、stability_cv等統計數據
+     - 前端顯示：統計欄位顯示p/d/cv值，顏色標識（綠=優/黃=中/灰=差）
+     - CSV匯出：自動包含所有user_attrs統計欄位（15+欄位）
+     - 雙密度模式：自動存儲near/far ratio、ratio_separation等額外指標
    - ✅ **Optuna優化系統完善**
      - Pruning語義修復：參數驗證失敗從TrialPruned改為ValueError
      - 業務邏輯約束移除：刪除硬編碼週期差距限制
      - Select組件衝突修復：Radix UI與CustomSelect共存
      - 目標值計算說明：BestResultCard顯示詳細公式
    - ✅ **測試驗證**
+     - 統計數據正確顯示在Trial排名表
+     - CSV匯出包含完整統計欄位
+     - 顏色標識幫助快速篩選優質Trial
      - n_trials=50 產生 50 個 COMPLETE trials（FAIL自動重試）
-     - strategy-test 下拉框正常顯示
-     - 目標值計算公式清晰易懂
 
 2. **已完成工作**（2025-12-16）：
    - ✅ **PHASE4 測試案例3完整修復**

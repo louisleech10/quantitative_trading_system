@@ -73,14 +73,25 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
       return
     }
 
-    // 默認匯出邏輯
-    const headers = ['Rank', 'Trial #', 'Value', 'State', ...Object.keys(trials[0]?.params || {})]
+    // 獲取 user_attrs 欄位名稱（從第一個有 user_attrs 的 trial 取得）
+    const userAttrKeys = trials[0]?.user_attrs ? Object.keys(trials[0].user_attrs) : []
+
+    // 默認匯出邏輯（包含 user_attrs 統計數據）
+    const headers = [
+      'Rank', 'Trial #', 'Value', 'State',
+      ...Object.keys(trials[0]?.params || {}),
+      ...userAttrKeys
+    ]
     const rows = trials.map(trial => [
       trial.rank,
       trial.trial_number,
       trial.value != null ? trial.value.toFixed(6) : 'N/A',
       trial.state || 'COMPLETE',
-      ...Object.values(trial.params)
+      ...Object.values(trial.params).map(v => typeof v === 'number' ? v.toFixed(4) : String(v)),
+      ...userAttrKeys.map(key => {
+        const val = trial.user_attrs?.[key]
+        return val != null ? (typeof val === 'number' ? val.toFixed(6) : String(val)) : ''
+      })
     ])
 
     const csvContent = [
@@ -210,13 +221,18 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                       {trial.user_attrs && (
                         <div className="space-y-0.5">
                           {trial.user_attrs.p_value !== undefined && (
-                            <div className="text-muted-foreground">
+                            <div className={trial.user_attrs.p_value < 0.05 ? "text-green-500" : trial.user_attrs.p_value < 0.1 ? "text-yellow-500" : "text-muted-foreground"}>
                               p: {trial.user_attrs.p_value.toFixed(4)}
                             </div>
                           )}
                           {trial.user_attrs.cohens_d !== undefined && (
-                            <div className="text-muted-foreground">
+                            <div className={trial.user_attrs.cohens_d > 0.8 ? "text-green-500" : trial.user_attrs.cohens_d > 0.5 ? "text-yellow-500" : "text-muted-foreground"}>
                               d: {trial.user_attrs.cohens_d.toFixed(3)}
+                            </div>
+                          )}
+                          {trial.user_attrs.stability_cv !== undefined && (
+                            <div className={trial.user_attrs.stability_cv < 0.3 ? "text-green-500" : trial.user_attrs.stability_cv < 0.5 ? "text-yellow-500" : "text-muted-foreground"}>
+                              cv: {trial.user_attrs.stability_cv.toFixed(3)}
                             </div>
                           )}
                         </div>
