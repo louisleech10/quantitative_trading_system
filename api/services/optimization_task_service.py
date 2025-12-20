@@ -176,6 +176,7 @@ class OptimizationTaskService:
         n_jobs: int = 1,
         parameter_ranges: Optional[ParameterRanges] = None,
         use_multi_objective: bool = False,
+        enable_pruning: bool = True,
         notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
     ) -> str:
         """
@@ -191,12 +192,16 @@ class OptimizationTaskService:
             n_jobs: 並行核心數
             parameter_ranges: 參數搜索範圍
             use_multi_objective: 是否使用多目標優化
+            enable_pruning: 是否啟用 Pruner（MedianPruner）
             notification_callback: WebSocket通知回調函數
 
         Returns:
             task_id: 任務ID
         """
         task_id = str(uuid.uuid4())
+
+        # 決定 pruner 類型
+        pruner_type = "Median" if enable_pruning else None
 
         # 創建任務信息
         task_info = OptimizationTaskInfo(
@@ -211,7 +216,8 @@ class OptimizationTaskService:
                 'sampler_type': sampler_type,
                 'n_trials': n_trials,
                 'n_jobs': n_jobs,
-                'use_multi_objective': use_multi_objective
+                'use_multi_objective': use_multi_objective,
+                'enable_pruning': enable_pruning
             }
         )
         task_info.progress.total_trials = n_trials
@@ -221,6 +227,7 @@ class OptimizationTaskService:
             study_name=study_name,
             storage=f"sqlite:///data/optuna_{study_name}.db",
             sampler_type=sampler_type,
+            pruner_type=pruner_type,
             n_trials=n_trials,
             n_jobs=n_jobs,
             parameter_ranges=parameter_ranges,

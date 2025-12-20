@@ -42,6 +42,7 @@ class CreateOptimizationTaskRequest(BaseModel):
     n_trials: int = Field(100, description="試驗次數", ge=1, le=10000)
     n_jobs: int = Field(1, description="並行核心數", ge=1, le=16)
     use_multi_objective: bool = Field(False, description="是否使用多目標優化（separation + stability）")
+    enable_pruning: bool = Field(True, description="是否啟用 Pruner（MedianPruner）")
     parameter_ranges: Optional[ParameterRanges] = Field(None, description="參數搜索範圍（None使用預設）")
 
     class Config:
@@ -107,7 +108,8 @@ async def create_optimization_task(request: CreateOptimizationTaskRequest):
             n_trials=request.n_trials,
             n_jobs=request.n_jobs,
             parameter_ranges=request.parameter_ranges,
-            use_multi_objective=request.use_multi_objective
+            use_multi_objective=request.use_multi_objective,
+            enable_pruning=request.enable_pruning
         )
 
         logger.info(f"Optimization task created: {task_id}")

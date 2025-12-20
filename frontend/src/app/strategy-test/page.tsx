@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Accordion } from "@/components/ui/Accordion";
 import { AccordionItem } from "@/components/ui/AccordionItem";
-import { Select, type SelectOption } from "@/components/ui/select";
+import { CustomSelect, type SelectOption } from "@/components/ui/select";
 import { NumberInput } from "@/components/ui/NumberInput";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import StatMetricCard from "@/components/ui/StatMetricCard";
@@ -437,6 +437,7 @@ function StrategyTestPageContent() {
           n_trials: optunaConfig.n_trials,
           n_jobs: 1,
           use_multi_objective: false,
+          enable_pruning: optunaConfig.enable_pruning,  // 傳遞剪枝配置
           parameter_ranges: {
             ema_short_range: optunaConfig.ema_short_range,
             ema_mid_range: optunaConfig.ema_mid_range,
@@ -821,20 +822,20 @@ function StrategyTestPageContent() {
           <Accordion defaultExpanded={["basic", "indicator"]}>
             <AccordionItem id="basic" title="基本配置" badge={state.dataSources || "未選擇"}>
               <div className="space-y-4">
-                <Select
+                <CustomSelect
                   label="數據來源"
                   options={DATA_SOURCE_OPTIONS}
                   value={state.dataSources}
                   onChange={(value) => setField("dataSources", value ?? "close")}
                   placeholder="選擇欲追蹤的 K 線欄位"
                 />
-                <Select
+                <CustomSelect
                   label="指標類型"
                   options={INDICATOR_OPTIONS}
                   value={state.indicatorType}
                   onChange={(value) => setField("indicatorType", value ?? "ema")}
                 />
-                <Select
+                <CustomSelect
                   label="策略邏輯"
                   options={STRATEGY_OPTIONS}
                   value={state.strategyLogic}
@@ -920,7 +921,7 @@ function StrategyTestPageContent() {
 
             <AccordionItem id="range" title="測試範圍" badge={state.timeframe}>
               <div className="space-y-4">
-                <Select
+                <CustomSelect
                   label="交易對"
                   options={SYMBOL_OPTIONS}
                   value={symbolSelectValue}
@@ -940,7 +941,7 @@ function StrategyTestPageContent() {
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                   />
                 </div>
-                <Select
+                <CustomSelect
                   label="時間框架"
                   options={TIMEFRAME_OPTIONS}
                   value={state.timeframe}

@@ -78,18 +78,18 @@ return 0.46  # ← 這個值用於排序
 # 正例
 positive_near_densities = [0.83, 0.75, ...]  # 平均 0.80
 positive_far_densities = [0.35, 0.40, ...]   # 平均 0.38
-positive_near_far_ratio = 0.80 / 0.38 = 2.11
+positive_near_far_ratio = [0.83/0.35, 0.75/0.40, ...] # 平均 2.1232
 
 # 反例
 negative_near_densities = [0.29, 0.33, ...]  # 平均 0.31
 negative_far_densities = [0.42, 0.38, ...]   # 平均 0.40
-negative_near_far_ratio = 0.31 / 0.40 = 0.78
+negative_near_far_ratio = [0.29/0.42, 0.33/0.38, ...] # 平均 0.7794
 
 # 條件1：聚集度
 clustering_score = 2.11 - 1.0 = 1.11
 
 # 條件2：區分度
-discrimination_score = ratio_separation = 2.11 - 0.78 = 1.33
+discrimination_score = ratio_separation = 2.1232 - 0.7794 = 1.3438
 
 # 目標值計算（假設 clustering_weight = 0.5）
 objective_value = 0.5 × 1.11 + 0.5 × 1.33 = 1.22

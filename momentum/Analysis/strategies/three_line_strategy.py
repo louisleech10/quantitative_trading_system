@@ -128,25 +128,10 @@ def validate_params(params: Dict[str, Any]) -> List[str]:
         mid_period = params['mid_period']
         long_period = params['long_period']
 
-        # 業務邏輯驗證：週期差距不能太小
-        if mid_period - short_period < 5:
-            errors.append(
-                f"中期週期({mid_period})與短期週期({short_period})差距過小，"
-                f"建議至少相差 5 個週期"
-            )
-
-        if long_period - mid_period < 10:
-            errors.append(
-                f"長期週期({long_period})與中期週期({mid_period})差距過小，"
-                f"建議至少相差 10 個週期"
-            )
-
-        # 驗證週期不要太接近（避免信號混亂）
-        if long_period - short_period < 20:
-            errors.append(
-                f"長期週期({long_period})與短期週期({short_period})總差距過小，"
-                f"建議至少相差 20 個週期以獲得穩定信號"
-            )
+        # 業務邏輯驗證已移除
+        # 基礎約束（short < mid < long）已由 YAML 配置的 constraints 保證
+        # 不需要額外的差距限制，用戶有自由選擇參數的權利
+        pass
 
     except KeyError as e:
         errors.append(f"缺少必要參數: {e}")

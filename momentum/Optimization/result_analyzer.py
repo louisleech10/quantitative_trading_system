@@ -27,6 +27,32 @@ from optuna import Study
 from optuna.importance import get_param_importances
 
 
+def convert_numpy_types(obj: Any) -> Any:
+    """
+    遞歸轉換 numpy 類型為 Python 原生類型，以便 JSON 序列化
+
+    Args:
+        obj: 待轉換的對象
+
+    Returns:
+        轉換後的對象（Python 原生類型）
+    """
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_numpy_types(item) for item in obj]
+    else:
+        return obj
+
+
 @dataclass
 class ParamImportance:
     """參數重要性分析結果"""
@@ -35,7 +61,7 @@ class ParamImportance:
 
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典（用於 API 返回）"""
-        return {
+        return convert_numpy_types({
             'importances': self.importances,
             'evaluator': self.evaluator,
             'sorted_params': sorted(
@@ -43,7 +69,7 @@ class ParamImportance:
                 key=lambda x: x[1],
                 reverse=True
             )
-        }
+        })
 
 
 @dataclass
@@ -65,7 +91,7 @@ class HeatmapData:
 
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典（用於 API 返回）"""
-        return {
+        return convert_numpy_types({
             'param_x': self.param_x,
             'param_y': self.param_y,
             'data_points': [
@@ -78,7 +104,7 @@ class HeatmapData:
                 for point in self.data_points
             ],
             'value_range': self.value_range
-        }
+        })
 
 
 @dataclass
@@ -92,7 +118,7 @@ class ConvergenceAnalysis:
 
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典（用於 API 返回）"""
-        return {
+        return convert_numpy_types({
             'converged': self.converged,
             'convergence_trial': self.convergence_trial,
             'convergence_value': self.convergence_value,
@@ -101,7 +127,7 @@ class ConvergenceAnalysis:
                 for t, v in self.best_value_history
             ],
             'improvement_rate': self.improvement_rate
-        }
+        })
 
 
 @dataclass
@@ -124,7 +150,7 @@ class StabilityAnalysis:
 
     def to_dict(self) -> Dict[str, Any]:
         """轉換為字典（用於 API 返回）"""
-        return {
+        return convert_numpy_types({
             'overall_cv': self.overall_cv,
             'monthly_stats': [
                 {
@@ -138,7 +164,7 @@ class StabilityAnalysis:
             ],
             'worst_month': self.worst_month,
             'best_month': self.best_month
-        }
+        })
 
 
 class ResultAnalyzer:
@@ -229,7 +255,7 @@ class ResultAnalyzer:
             HeatmapData: 熱力圖數據
 
         Raises:
-            ValueError: 參數不存在或數據不足
+            ValueError: 參數不存在或數據不足，或參數類型不是數值型
         """
         # 獲取完成的 trials
         completed_trials = [
@@ -250,6 +276,25 @@ class ResultAnalyzer:
         if param_y not in first_trial.params:
             raise ValueError(f"參數 '{param_y}' 不存在於 trials 中")
 
+        # 檢查參數是否為數值型（避免分類參數導致轉換錯誤）
+        def is_numeric_param(param_value) -> bool:
+            """檢查參數值是否為數值型"""
+            return isinstance(param_value, (int, float, np.integer, np.floating))
+
+        sample_x = first_trial.params[param_x]
+        sample_y = first_trial.params[param_y]
+
+        if not is_numeric_param(sample_x):
+            raise ValueError(
+                f"參數 '{param_x}' 是分類型參數（值為 '{sample_x}'），"
+                f"熱力圖只支援數值型參數。請選擇其他參數。"
+            )
+        if not is_numeric_param(sample_y):
+            raise ValueError(
+                f"參數 '{param_y}' 是分類型參數（值為 '{sample_y}'），"
+                f"熱力圖只支援數值型參數。請選擇其他參數。"
+            )
+
         # 提取數據點（限制數量）
         data_points = []
         values = []
@@ -257,9 +302,20 @@ class ResultAnalyzer:
         for trial in completed_trials[:max_trials]:
             if param_x in trial.params and param_y in trial.params:
                 value = trial.value if trial.value is not None else 0.0
+
+                # 安全地轉換參數值（已經檢查過是數值型）
+                try:
+                    x_val = float(trial.params[param_x])
+                    y_val = float(trial.params[param_y])
+                except (ValueError, TypeError) as e:
+                    self.logger.warning(
+                        f"Trial {trial.number} 參數轉換失敗，跳過: {e}"
+                    )
+                    continue
+
                 data_points.append(HeatmapDataPoint(
-                    x=float(trial.params[param_x]),
-                    y=float(trial.params[param_y]),
+                    x=x_val,
+                    y=y_val,
                     value=float(value),
                     trial_number=trial.number
                 ))
@@ -487,40 +543,59 @@ class ResultAnalyzer:
         self,
         study: Study,
         top_n: int = 20,
-        include_params: bool = True
+        include_params: bool = True,
+        include_all_states: bool = False
     ) -> List[Dict[str, Any]]:
         """
         獲取 Top N trials
 
         Args:
             study: Optuna Study 對象
-            top_n: 返回前 N 個最佳 trials（默認 20）
+            top_n: 返回前 N 個最佳 trials（默認 20），如果為 -1 則返回所有
             include_params: 是否包含參數詳情（默認 True）
+            include_all_states: 是否包含所有狀態的 trials（PRUNED, FAILED），默認只返回 COMPLETE
 
         Returns:
             List[Dict]: Trial 列表（按目標值排序）
         """
-        # 獲取完成的 trials
-        completed_trials = [
-            t for t in study.trials
-            if t.state == optuna.trial.TrialState.COMPLETE and t.value is not None
-        ]
-
-        # 按目標值排序
-        if study.direction == optuna.study.StudyDirection.MAXIMIZE:
-            sorted_trials = sorted(completed_trials, key=lambda t: t.value, reverse=True)
+        if include_all_states:
+            # 包含所有狀態
+            trials_to_process = study.trials
         else:
-            sorted_trials = sorted(completed_trials, key=lambda t: t.value)
+            # 只包含完成的 trials
+            trials_to_process = [
+                t for t in study.trials
+                if t.state == optuna.trial.TrialState.COMPLETE and t.value is not None
+            ]
 
-        # 提取 Top N
-        top_trials = sorted_trials[:top_n]
+        # 按目標值排序（COMPLETE trials 排前面，其他狀態的按 trial_number 排序）
+        completed_trials = [t for t in trials_to_process if t.state == optuna.trial.TrialState.COMPLETE and t.value is not None]
+        other_trials = [t for t in trials_to_process if t.state != optuna.trial.TrialState.COMPLETE or t.value is None]
+
+        if study.direction == optuna.study.StudyDirection.MAXIMIZE:
+            sorted_completed = sorted(completed_trials, key=lambda t: t.value, reverse=True)
+        else:
+            sorted_completed = sorted(completed_trials, key=lambda t: t.value)
+
+        # 其他狀態按 trial_number 排序
+        sorted_other = sorted(other_trials, key=lambda t: t.number)
+
+        # 合併：COMPLETE trials 在前，其他狀態在後
+        sorted_trials = sorted_completed + sorted_other
+
+        # 提取 Top N（如果 top_n 為 -1，返回所有）
+        if top_n == -1:
+            top_trials = sorted_trials
+        else:
+            top_trials = sorted_trials[:top_n]
 
         result = []
         for rank, trial in enumerate(top_trials, start=1):
             trial_dict = {
                 'rank': rank,
                 'trial_number': trial.number,
-                'value': trial.value,
+                'value': trial.value if trial.value is not None else None,
+                'state': trial.state.name,  # 添加 state 字段
                 'datetime_start': trial.datetime_start.isoformat() if trial.datetime_start else None,
                 'datetime_complete': trial.datetime_complete.isoformat() if trial.datetime_complete else None,
             }
@@ -532,8 +607,9 @@ class ResultAnalyzer:
             if trial.user_attrs:
                 trial_dict['user_attrs'] = trial.user_attrs
 
-            result.append(trial_dict)
+            # 轉換 numpy 類型為 Python 原生類型
+            result.append(convert_numpy_types(trial_dict))
 
-        self.logger.info(f"Retrieved top {len(result)} trials")
+        self.logger.info(f"Retrieved top {len(result)} trials (include_all_states={include_all_states})")
 
         return result

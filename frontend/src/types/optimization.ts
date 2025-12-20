@@ -273,6 +273,14 @@ export interface StabilityResponse {
   data: StabilityAnalysis
 }
 
+// Trial 統計
+export interface TrialStats {
+  total: number
+  complete: number
+  pruned: number
+  failed: number
+}
+
 // Top Trials
 export interface TrialDetail {
   rank: number
@@ -282,6 +290,7 @@ export interface TrialDetail {
   datetime_complete?: string
   params: Record<string, any>
   user_attrs?: Record<string, any>
+  state?: string // COMPLETE, PRUNED, FAIL
 }
 
 export interface TrialsResponse {
@@ -307,4 +316,5 @@ export interface OptimizationResultResponse {
   task_id: string
   study_name: string
   result: OptimizationResultDetail
+  trial_stats?: TrialStats
 }

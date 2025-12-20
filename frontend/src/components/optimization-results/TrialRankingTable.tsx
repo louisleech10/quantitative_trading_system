@@ -74,11 +74,12 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
     }
 
     // 默認匯出邏輯
-    const headers = ['Rank', 'Trial #', 'Value', ...Object.keys(trials[0]?.params || {})]
+    const headers = ['Rank', 'Trial #', 'Value', 'State', ...Object.keys(trials[0]?.params || {})]
     const rows = trials.map(trial => [
       trial.rank,
       trial.trial_number,
-      trial.value.toFixed(6),
+      trial.value != null ? trial.value.toFixed(6) : 'N/A',
+      trial.state || 'COMPLETE',
       ...Object.values(trial.params)
     ])
 
@@ -188,7 +189,9 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
 
                     {/* 目標值 */}
                     <TableCell className="font-mono text-sm font-semibold text-green-600">
-                      {trial.value.toFixed(6)}
+                      {trial.value !== null && trial.value !== undefined 
+                        ? trial.value.toFixed(6) 
+                        : 'N/A'}
                     </TableCell>
 
                     {/* 參數 */}

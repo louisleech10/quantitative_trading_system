@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-12-12 00:20
-**當前階段**: Optuna vs 單參數測試一致性驗證完成
+**最後更新**: 2025-12-20 17:30
+**當前階段**: Optuna優化系統完善（Pruning語義修復、目標值計算說明）
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,12 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Optuna優化系統完善** (100%) - 2025-12-20完成
+  - ✅ Pruning語義修復：參數驗證失敗從TrialPruned改為ValueError
+  - ✅ 業務邏輯約束移除：刪除過度的週期差距限制（mid-short≥5等）
+  - ✅ Select組件衝突修復：Radix UI Select與CustomSelect共存
+  - ✅ 目標值計算說明：BestResultCard顯示詳細公式（clustering/discrimination/separation）
+  - ✅ 確保n_trials產生正確數量的COMPLETE trials（FAIL自動重試）
 - **PHASE4 測試案例3：參數重要性圖表修復** (100%) - 2025-12-16完成
   - ✅ API響應解析修復：data.importances (flat結構)
   - ✅ 安裝scikit-learn包：後端fANOVA計算依賴
@@ -96,6 +102,11 @@
 - 無
 
 ### 剛完成 🔧
+- **Optuna優化系統完善** (2025-12-20)
+  - ✅ Pruning語義修復：TrialPruned → ValueError
+  - ✅ 業務邏輯約束移除：週期差距限制刪除
+  - ✅ Select組件衝突修復：兩種Select共存方案
+  - ✅ BestResultCard計算說明：完整公式顯示
 - **Optuna vs 單參數測試一致性修復** (2025-12-11)
   - ✅ 修復策略計算 data_source 注入問題
   - ✅ 前端窗口描述動態化
@@ -656,6 +667,8 @@ quantitative_trading_system/
 - 無
 
 **已修復系統**：
+- ✅ Optuna Pruning 語義（2025-12-20）
+- ✅ Select 組件衝突（2025-12-20）
 - ✅ Optuna vs 單參數測試一致性（2025-12-11）
 - ✅ 前端窗口描述硬編碼（2025-12-11）
 - ✅ StatMetricCard null 值處理（2025-12-11）
@@ -738,6 +751,61 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-12-20
+
+**Optuna優化系統完善：Pruning語義與目標值說明** ⭐⭐⭐⭐⭐
+
+**問題發現**
+- 用戶測試發現：enable_pruning=False 但仍有 25/50 trials 為 PRUNED 狀態
+- 用戶期望：n_trials=50 應產生 50 個 COMPLETE trials
+- 根因：應用層參數驗證使用 `raise TrialPruned()`，導致驗證失敗計入 PRUNED
+
+**核心修復**（4個文件）
+
+1. **Pruning語義修復**（momentum/Optimization/optuna_optimizer.py）
+   - 問題：參數驗證失敗使用 `raise TrialPruned()`，導致 FAIL 試驗計入 PRUNED
+   - 修復：Line 707-712（單目標）、Line 971-976（多目標）改為 `raise ValueError()`
+   - 效果：FAIL 不計入 n_trials，Optuna 自動重試直到獲得 50 個 COMPLETE
+   - Optuna 狀態語義：COMPLETE/PRUNED 計入 n_trials，FAIL 不計入
+
+2. **業務邏輯約束移除**（momentum/Analysis/strategies/three_line_strategy.py）
+   - 問題：硬編碼週期差距限制（mid-short≥5, long-mid≥10, long-short≥20）導致 50% 失敗率
+   - 修復：Line 132-149 刪除 3 個過度約束檢查
+   - 原則：用戶有參數選擇自由，只需尊重 YAML 基礎約束（short<mid<long）
+   - 未來兼容：RSI、MACD 等策略不需要這些約束
+
+3. **Select組件衝突修復**（frontend/src/components/ui/select.tsx, strategy-test/page.tsx）
+   - 問題：Radix UI Select 與 CustomSelect 導出衝突，導致 strategy-test 下拉框消失
+   - 修復：
+     - select.tsx Line 149-160：保留 Radix UI Select 導出（ParamHeatmap 使用）
+     - select.tsx Line 187：CustomSelect 獨立導出
+     - strategy-test/page.tsx Line 22, 825, 832, 838, 924, 944：改用 CustomSelect
+   - 架構：兩種 Select 共存，各司其職
+
+4. **目標值計算說明**（frontend/src/components/optimization-results/BestResultCard.tsx）
+   - 用戶需求：顯示最佳目標值如何計算
+   - 實現：Line 76-110 添加計算公式說明
+   - 雙密度模式：
+     - clustering_score = positive_near_far_ratio - 1.0
+     - discrimination_score = positive_near_far_ratio - negative_near_far_ratio
+     - 最終目標值 = clustering_score × clustering_weight + discrimination_score × (1-clustering_weight)
+     - clustering_weight 預設為 0.5
+   - 單密度模式：
+     - separation = positive_near_far_ratio - negative_near_far_ratio
+
+**測試驗證**
+- ✅ Pruning 語義正確：參數驗證失敗為 FAIL（自動重試）
+- ✅ Select 組件正常：strategy-test 下拉框恢復
+- ✅ 目標值說明完整：用戶可理解計算邏輯
+- ✅ 架構通用性：未來策略無需修改 Python 代碼
+
+**影響範圍**
+- 修改文件：4個（2後端 + 2前端）
+- 架構改進：YAML驅動約束，減少硬編碼
+- 測試覆蓋：手動測試通過
+
+---
 
 ### 2025-12-16
 
@@ -2213,7 +2281,16 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待推送（2025-12-16）
+**遠端同步**: ⏳ 待推送（2025-12-20）
+
+**待提交變更** (2025-12-20):
+- **Optuna優化系統完善**
+  - momentum/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueError）
+  - momentum/Analysis/strategies/three_line_strategy.py - 業務邏輯約束移除
+  - frontend/src/components/ui/select.tsx - Select組件衝突修復
+  - frontend/src/app/strategy-test/page.tsx - CustomSelect使用
+  - frontend/src/components/optimization-results/BestResultCard.tsx - 目標值計算說明
+  - .claude/STATUS.md - 狀態更新
 
 **待提交變更** (2025-12-16):
 - **PHASE4 測試案例3：參數重要性圖表修復**
@@ -2266,7 +2343,18 @@ for case in candidates:
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-12-16）：
+1. **已完成工作**（2025-12-20）：
+   - ✅ **Optuna優化系統完善**
+     - Pruning語義修復：參數驗證失敗從TrialPruned改為ValueError
+     - 業務邏輯約束移除：刪除硬編碼週期差距限制
+     - Select組件衝突修復：Radix UI與CustomSelect共存
+     - 目標值計算說明：BestResultCard顯示詳細公式
+   - ✅ **測試驗證**
+     - n_trials=50 產生 50 個 COMPLETE trials（FAIL自動重試）
+     - strategy-test 下拉框正常顯示
+     - 目標值計算公式清晰易懂
+
+2. **已完成工作**（2025-12-16）：
    - ✅ **PHASE4 測試案例3完整修復**
      - API響應解析：data.importances flat結構
      - scikit-learn安裝：fANOVA計算依賴

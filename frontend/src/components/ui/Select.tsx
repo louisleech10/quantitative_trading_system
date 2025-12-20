@@ -146,6 +146,7 @@ const SelectSeparator = React.forwardRef<
 ))
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName
 
+// 導出 Radix UI 組件（用於 ParamHeatmap 等組件）
 export {
   Select,
   SelectGroup,
@@ -168,6 +169,9 @@ export interface CustomSelectOption {
   icon?: React.ReactNode;
   disabled?: boolean;
 }
+
+// 類型別名，向後兼容
+export type SelectOption = CustomSelectOption;
 
 interface CustomSelectProps {
   label: string;
@@ -352,3 +356,5 @@ export function CustomSelect({
     </div>
   );
 }
+
+// CustomSelect 已在上面 Line 187 通過函數聲明導出

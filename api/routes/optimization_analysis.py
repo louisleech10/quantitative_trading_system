@@ -583,9 +583,10 @@ async def get_stability_analysis(
 @router.get("/tasks/{task_id}/trials")
 async def get_top_trials(
     task_id: str,
-    top_n: int = Query(20, description="返回前 N 個最佳 trials"),
+    top_n: int = Query(20, description="返回前 N 個最佳 trials，-1 表示返回所有"),
     sort_by: str = Query("value", description="排序依據（value）"),
-    include_params: bool = Query(True, description="是否包含參數詳情")
+    include_params: bool = Query(True, description="是否包含參數詳情"),
+    include_all_states: bool = Query(False, description="是否包含所有狀態（PRUNED, FAILED）")
 ):
     """
     獲取 Top N trials
@@ -594,25 +595,27 @@ async def get_top_trials(
 
     Args:
         task_id: 任務 ID
-        top_n: 返回前 N 個最佳 trials（默認 20）
+        top_n: 返回前 N 個最佳 trials（默認 20），-1 表示返回所有
         sort_by: 排序依據（目前僅支援 "value"）
         include_params: 是否包含參數詳情（默認 True）
+        include_all_states: 是否包含所有狀態（PRUNED, FAILED），默認只返回 COMPLETE
 
     Returns:
         Trial 排名列表
 
     Example:
-        GET /api/v1/optimization/tasks/xxx/trials?top_n=20&sort_by=value
+        GET /api/v1/optimization/tasks/xxx/trials?top_n=-1&include_all_states=true
     """
     try:
         study = _get_study_from_task(task_id)
         top_trials = get_result_analyzer().get_top_trials(
             study=study,
             top_n=top_n,
-            include_params=include_params
+            include_params=include_params,
+            include_all_states=include_all_states
         )
 
-        logger.info(f"Retrieved top {len(top_trials)} trials for task {task_id}")
+        logger.info(f"Retrieved top {len(top_trials)} trials for task {task_id} (include_all_states={include_all_states})")
 
         return {
             "success": True,
@@ -664,6 +667,27 @@ async def get_optimization_result(task_id: str):
 
         result = task_info.result
 
+        # 計算 trial 統計
+        trial_stats = None
+        try:
+            import optuna
+            study = _get_study_from_task(task_id)
+            all_trials = study.get_trials(deepcopy=False)
+
+            # 統計各狀態的 trial 數量
+            complete_count = sum(1 for t in all_trials if t.state == optuna.trial.TrialState.COMPLETE)
+            pruned_count = sum(1 for t in all_trials if t.state == optuna.trial.TrialState.PRUNED)
+            failed_count = sum(1 for t in all_trials if t.state == optuna.trial.TrialState.FAIL)
+
+            trial_stats = {
+                "total": len(all_trials),
+                "complete": complete_count,
+                "pruned": pruned_count,
+                "failed": failed_count
+            }
+        except Exception as e:
+            logger.warning(f"Failed to calculate trial stats for task {task_id}: {e}")
+
         logger.info(f"Retrieved optimization result for task {task_id}")
 
         return {
@@ -678,7 +702,8 @@ async def get_optimization_result(task_id: str):
                 "optimization_time": result.optimization_time if hasattr(result, 'optimization_time') else result.optimization_time_seconds if hasattr(result, 'optimization_time_seconds') else None,
                 "study_direction": result.study_direction if hasattr(result, 'study_direction') else "maximize",
                 "convergence_info": result.convergence_info if hasattr(result, 'convergence_info') else None
-            }
+            },
+            "trial_stats": trial_stats
         }
 
     except HTTPException:

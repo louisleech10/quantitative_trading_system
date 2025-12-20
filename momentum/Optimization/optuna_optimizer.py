@@ -705,11 +705,11 @@ class OptunaOptimizer:
             )
 
             if not validation_result.is_valid:
-                self.logger.debug(
-                    f"Trial {trial.number} pruned: "
-                    f"Parameter validation failed: {validation_result.errors}"
+                error_msg = f"Parameter validation failed: {', '.join(validation_result.errors)}"
+                self.logger.error(
+                    f"Trial {trial.number} failed: {error_msg}"
                 )
-                raise optuna.TrialPruned()
+                raise ValueError(error_msg)
 
             # 步驟4: 組裝策略配置
             strategy_config = StrategyConfig(
@@ -969,11 +969,11 @@ class OptunaOptimizer:
             )
 
             if not validation_result.is_valid:
-                self.logger.debug(
-                    f"Trial {trial.number} pruned: "
-                    f"Parameter validation failed: {validation_result.errors}"
+                error_msg = f"Parameter validation failed: {', '.join(validation_result.errors)}"
+                self.logger.error(
+                    f"Trial {trial.number} failed: {error_msg}"
                 )
-                raise optuna.TrialPruned()
+                raise ValueError(error_msg)
 
             # 步驟4: 組裝策略配置
             strategy_config = StrategyConfig(

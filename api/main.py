@@ -153,7 +153,7 @@ def setup_basic_routes(app: FastAPI):
 def register_routes(app: FastAPI):
     """Register all API routes"""
     try:
-        from api.routes import case_search, config, case, chart, signal_analysis, chart_signals, optimization, optimization_analysis, debug
+        from api.routes import case_search, config, case, chart, signal_analysis, chart_signals, optimization, optimization_analysis
         from api.websocket import optimization_ws
 
         # 新增導入兩階段搜索路由
@@ -162,6 +162,13 @@ def register_routes(app: FastAPI):
             two_stage_available = True
         except ImportError:
             two_stage_available = False
+
+        # 嘗試導入 debug 路由（可選）
+        try:
+            from api.routes import debug
+            debug_available = True
+        except ImportError:
+            debug_available = False
 
         # Register search routes
         app.include_router(
@@ -219,11 +226,12 @@ def register_routes(app: FastAPI):
             tags=["Optimization Analysis"]
         )
 
-        # Register debug routes
-        app.include_router(
-            debug.router,
-            tags=["Debug"]
-        )
+        # Register debug routes if available
+        if debug_available:
+            app.include_router(
+                debug.router,
+                tags=["Debug"]
+            )
 
         # Register two-stage search routes if available
         if two_stage_available:

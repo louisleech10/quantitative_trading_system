@@ -60,16 +60,53 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
       </CardHeader>
       <CardContent className="space-y-4">
         {/* 最佳目標值 */}
-        <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-          <div>
-            <p className="text-sm text-muted-foreground">最佳目標值</p>
-            <p className="text-2xl font-bold text-green-600">
-              {result.best_value.toFixed(6)}
+        <div className="space-y-2 p-4 bg-muted rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">最佳目標值</p>
+              <p className="text-2xl font-bold text-green-600">
+                {result.best_value.toFixed(6)}
+              </p>
+            </div>
+            <Badge variant="secondary" className="text-xs">
+              {result.study_direction === 'MAXIMIZE' ? '最大化' : '最小化'}
+            </Badge>
+          </div>
+
+          {/* 目標值計算說明 */}
+          <div className="pt-2 border-t border-border/50">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              <span className="font-medium">計算方式：</span>
+              {/* 檢測是否為雙密度模式（通過檢查 best_params 中是否有 clustering_weight 或相關參數） */}
+              {(() => {
+                // 簡化判斷：如果目標值看起來是加權分數（通常 0-1 之間），可能是雙密度模式
+                const isDualDensity = result.best_value > 0 && result.best_value < 2
+
+                if (isDualDensity) {
+                  return (
+                    <>
+                      <br />• <span className="text-foreground font-semibold">信號聚集分數 (Clustering Score)</span>
+                      <br />&nbsp;&nbsp;= positive_near_far_ratio - 1.0
+                      <br />• <span className="text-foreground font-semibold">正反例區分度 (Discrimination Score)</span>
+                      <br />&nbsp;&nbsp;= positive_near_far_ratio - negative_near_far_ratio
+                      <br />• <span className="text-foreground font-semibold">最終目標值</span>
+                      <br />&nbsp;&nbsp;= clustering_score × clustering_weight
+                      <br />&nbsp;&nbsp;+ discrimination_score × (1 - clustering_weight)
+                      <br />• clustering_weight 預設為 <span className="text-foreground">0.5</span>
+                    </>
+                  )
+                } else {
+                  return (
+                    <>
+                      <br />• <span className="text-foreground font-semibold">正反例信號密度差異 (Separation)</span>
+                      <br />&nbsp;&nbsp;= positive_near_far_ratio - negative_near_far_ratio
+                      <br />• 越大表示策略區分度越高
+                    </>
+                  )
+                }
+              })()}
             </p>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            {result.study_direction === 'MAXIMIZE' ? '最大化' : '最小化'}
-          </Badge>
         </div>
 
         {/* 最佳參數 */}

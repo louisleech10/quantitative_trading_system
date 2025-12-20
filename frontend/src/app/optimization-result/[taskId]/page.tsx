@@ -33,7 +33,8 @@ import {
   ParamHeatmap,
   ConvergencePlot,
   StabilityChart,
-  TrialRankingTable
+  TrialRankingTable,
+  TrialStatsCard
 } from '@/components/optimization-results'
 import {
   OptimizationResultDetail,
@@ -42,6 +43,7 @@ import {
   ConvergenceAnalysis,
   StabilityAnalysis,
   TrialDetail,
+  TrialStats,
   OptimizationResultResponse,
   HeatmapResponse,
   ConvergenceResponse,
@@ -57,13 +59,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 // ==================== API 調用函數 ====================
 
-async function fetchOptimizationResult(taskId: string): Promise<OptimizationResultDetail> {
+async function fetchOptimizationResult(taskId: string): Promise<OptimizationResultResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/result`)
   if (!response.ok) {
     throw new Error(`Failed to fetch optimization result: ${response.statusText}`)
   }
   const data: OptimizationResultResponse = await response.json()
-  return data.result
+  return data
 }
 
 async function fetchParamImportance(taskId: string): Promise<ParameterImportance[]> {
@@ -108,8 +110,10 @@ async function fetchStability(taskId: string): Promise<StabilityAnalysis> {
   return data.data
 }
 
-async function fetchTopTrials(taskId: string, topN: number = 20): Promise<TrialDetail[]> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/trials?top_n=${topN}`)
+async function fetchTopTrials(taskId: string, topN: number = 20, includeAllStates: boolean = false): Promise<TrialDetail[]> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/trials?top_n=${topN}&include_all_states=${includeAllStates}`
+  )
   if (!response.ok) {
     throw new Error(`Failed to fetch top trials: ${response.statusText}`)
   }
@@ -127,6 +131,7 @@ export default function OptimizationResultPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<OptimizationResultDetail | null>(null)
+  const [trialStats, setTrialStats] = useState<TrialStats | null>(null)
   const [importances, setImportances] = useState<ParameterImportance[]>([])
   const [importanceError, setImportanceError] = useState<string | null>(null)  // 追蹤參數重要性載入錯誤
   const [heatmapData, setHeatmapData] = useState<HeatmapData | null>(null)
@@ -175,8 +180,11 @@ export default function OptimizationResultPage() {
       }
 
       // Step 1: 獲取基本結果（必須成功）
-      const resultData = await fetchOptimizationResult(taskId)
-      setResult(resultData)
+      const resultResponse = await fetchOptimizationResult(taskId)
+      setResult(resultResponse.result)
+      if (resultResponse.trial_stats) {
+        setTrialStats(resultResponse.trial_stats)
+      }
 
       // Step 2: 並行獲取其他分析數據（允許部分失敗）
       const [
@@ -188,7 +196,7 @@ export default function OptimizationResultPage() {
         fetchParamImportance(taskId),
         fetchConvergence(taskId),
         fetchStability(taskId),
-        fetchTopTrials(taskId, 20)
+        fetchTopTrials(taskId, -1, true) // 獲取所有 trials，包含所有狀態
       ])
 
       // 處理參數重要性
@@ -470,7 +478,10 @@ export default function OptimizationResultPage() {
         {/* Section 1: 最佳結果總覽 */}
         <section>
           <h2 className="text-2xl font-semibold mb-4">最佳結果</h2>
-          <BestResultCard result={result} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BestResultCard result={result} />
+            {trialStats && <TrialStatsCard stats={trialStats} />}
+          </div>
         </section>
 
         {/* Section 2: 參數重要性與熱力圖 */}

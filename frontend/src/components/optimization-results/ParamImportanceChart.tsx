@@ -23,12 +23,12 @@ export function ParamImportanceChart({ importances, evaluator = 'fanova' }: Para
   // 按重要性降序排序
   const sortedData = [...importances].sort((a, b) => b.importance - a.importance)
 
-  // 顏色梯度（根據重要性）
+  // 顏色梯度（根據重要性和排名）
   const getColor = (importance: number, index: number) => {
-    if (index === 0) return 'hsl(142, 76%, 36%)' // 最重要 - 綠色
-    if (importance > 0.5) return 'hsl(217, 91%, 60%)' // 高重要性 - 藍色
-    if (importance > 0.2) return 'hsl(47, 96%, 53%)' // 中等重要性 - 黃色
-    return 'hsl(215, 16%, 47%)' // 低重要性 - 灰色
+    if (index === 0) return 'hsl(142, 76%, 36%)'      // 第1名 - 綠色
+    if (importance > 0.5) return 'hsl(217, 91%, 60%)' // >50% - 藍色
+    if (importance > 0.2) return 'hsl(47, 96%, 53%)'  // 20-50% - 黃色
+    return 'hsl(215, 16%, 47%)'                       // <20% - 灰色
   }
 
   // 自定義 Tooltip
@@ -114,9 +114,10 @@ export function ParamImportanceChart({ importances, evaluator = 'fanova' }: Para
               <li><strong>數值範圍</strong>：0% ~ 100%，所有參數的重要性總和為 100%</li>
               <li><strong>解讀建議</strong>：
                 <ul className="ml-4 mt-1 space-y-0.5">
-                  <li>• &gt;30%：<span className="text-green-500">關鍵參數</span>，需要精細調整</li>
-                  <li>• 10-30%：<span className="text-yellow-500">重要參數</span>，值得關注</li>
-                  <li>• &lt;10%：<span className="text-gray-400">次要參數</span>，可使用預設值</li>
+                  <li>• 第1名參數（<span className="text-green-500">綠色</span>）：最關鍵，優先精調</li>
+                  <li>• &gt;50%（<span className="text-blue-500">藍色</span>）：高重要性，需關注</li>
+                  <li>• 20-50%（<span className="text-yellow-500">黃色</span>）：中等重要，值得測試</li>
+                  <li>• &lt;20%（<span className="text-gray-400">灰色</span>）：低重要性，可用預設值</li>
                 </ul>
               </li>
             </ul>
