@@ -539,6 +539,115 @@ class ResultAnalyzer:
             best_month=best_month
         )
 
+    def analyze_stability_by_case_month(
+        self,
+        study: Study
+    ) -> StabilityAnalysis:
+        """
+        按案例月份分析穩定性（而非Trial執行時間）
+
+        使用最佳Trial的參數，分析其在不同月份案例上的表現穩定性。
+        這才是真正的策略穩定性分析，而不是Trial之間的參數差異。
+
+        Args:
+            study: Optuna Study對象
+
+        Returns:
+            StabilityAnalysis: 穩定性分析結果
+                - monthly_stats中的n_trials字段代表該月的案例數量（非Trial數）
+                - mean_value代表該月所有案例的平均密度（使用最佳Trial的參數計算）
+        """
+        # 獲取最佳Trial
+        try:
+            best_trial = study.best_trial
+        except ValueError:
+            # 沒有完成的trials
+            return StabilityAnalysis(
+                overall_cv=0.0,
+                monthly_stats=[],
+                worst_month=None,
+                best_month=None
+            )
+
+        # 從最佳Trial的user_attrs中獲取案例級別數據
+        case_level_densities = best_trial.user_attrs.get("case_level_densities")
+        case_timestamps = best_trial.user_attrs.get("case_timestamps")
+
+        if not case_level_densities or not case_timestamps:
+            self.logger.warning(
+                "最佳Trial缺少案例級別數據（case_level_densities或case_timestamps），"
+                "無法進行按案例月份的穩定性分析"
+            )
+            return StabilityAnalysis(
+                overall_cv=0.0,
+                monthly_stats=[],
+                worst_month=None,
+                best_month=None
+            )
+
+        # 按月份分組案例密度
+        from datetime import datetime
+        from collections import defaultdict
+
+        monthly_data = defaultdict(list)
+        for case_id, density in case_level_densities.items():
+            if case_id in case_timestamps:
+                timestamp = case_timestamps[case_id]
+                dt = datetime.fromtimestamp(timestamp)
+                month_key = f"{dt.year}-{dt.month:02d}"
+                monthly_data[month_key].append(density)
+
+        # 計算月度統計
+        monthly_stats = []
+        monthly_means = []
+
+        for month, densities in sorted(monthly_data.items()):
+            if len(densities) >= 1:  # 至少有1個案例
+                mean_val = float(np.mean(densities))
+                std_val = float(np.std(densities)) if len(densities) > 1 else 0.0
+                monthly_stats.append(MonthlyStability(
+                    month=month,
+                    mean_value=mean_val,
+                    std_value=std_val,
+                    n_trials=len(densities)  # 這裡代表案例數量，不是Trial數
+                ))
+                monthly_means.append(mean_val)
+
+        # 計算總體變異係數（基於月度平均值）
+        if len(monthly_means) >= 2:
+            overall_mean = np.mean(monthly_means)
+            overall_std = np.std(monthly_means, ddof=1)
+            overall_cv = overall_std / abs(overall_mean) if overall_mean != 0 else 0.0
+        else:
+            overall_cv = 0.0
+
+        # 識別最差和最佳月份（基於平均密度）
+        if monthly_stats:
+            # 假設目標是最大化密度（separation）
+            worst_month_stat = min(monthly_stats, key=lambda s: s.mean_value)
+            best_month_stat = max(monthly_stats, key=lambda s: s.mean_value)
+
+            worst_month_stat.is_worst_month = True
+
+            worst_month = worst_month_stat.month
+            best_month = best_month_stat.month
+        else:
+            worst_month = None
+            best_month = None
+
+        self.logger.info(
+            f"Case-month stability analysis: overall_cv={overall_cv:.4f}, "
+            f"monthly_stats={len(monthly_stats)} months, "
+            f"worst_month={worst_month}"
+        )
+
+        return StabilityAnalysis(
+            overall_cv=overall_cv,
+            monthly_stats=monthly_stats,
+            worst_month=worst_month,
+            best_month=best_month
+        )
+
     def get_top_trials(
         self,
         study: Study,

@@ -1,6 +1,7 @@
 Optuna 挑選最高分數 Trial 的依據研究
 1️⃣ 評分模式判斷
 系統根據 training_window.far_lookback_bars 是否設置，自動切換優化模式：
+
 單密度模式（無 Far 窗口）
 優化目標: separation
 計算公式:
@@ -8,6 +9,7 @@ separation = positive_avg_density - negative_avg_density
 意義: 正例平均密度 - 反例平均密度
 範圍: -1.0 ~ 1.0
 期望: 越大越好（正例應該有更高的信號密度）
+
 雙密度模式（有 Far 窗口）
 系統採用加權雙密度優化（方案 D），同時考慮兩個條件： 目標函數:
 objective_value = clustering_weight × clustering_score + 
@@ -28,6 +30,7 @@ ratio_separation = positive_near_far_ratio - negative_near_far_ratio
 權重配置:
 clustering_weight: 默認 0.5（可配置）
 discrimination_weight: 1.0 - clustering_weight
+
 2️⃣ Optuna 最佳 Trial 選擇機制
 單目標優化（默認模式）
 direction="maximize"  # 最大化目標值
@@ -55,6 +58,7 @@ Pareto 前沿：所有不被其他 Trial 支配的 Trial 集合
 系統提供:
 study.best_trials  # 返回 Pareto 前沿所有 Trials（複數）
 pareto_analyzer.get_knee_point()  # 推薦膝點（平衡兩目標的最佳解）
+
 3️⃣ 具體數值範例
 單密度模式案例
 # Trial #42 的計算過程
@@ -92,9 +96,9 @@ clustering_score = 2.11 - 1.0 = 1.11
 discrimination_score = ratio_separation = 2.1232 - 0.7794 = 1.3438
 
 # 目標值計算（假設 clustering_weight = 0.5）
-objective_value = 0.5 × 1.11 + 0.5 × 1.33 = 1.22
+objective_value = 0.5 × 1.11 + 0.5 × 1.3438 = 1.23
 
-return 1.22  # ← 這個值用於排序
+return 1.23  # ← 這個值用於排序
 4️⃣ 判斷標準總結
 好的策略參數組合（單密度）:
 ✅ separation > 0.3

@@ -798,6 +798,10 @@ class OptunaOptimizer:
             trial.set_user_attr("negative_avg_density", response.negative_avg_density)
             trial.set_user_attr("separation", response.separation)
 
+            # 步驟6.1: 存儲案例級別數據（用於按案例月份的穩定性分析）
+            trial.set_user_attr("case_level_densities", response.case_level_densities)
+            trial.set_user_attr("case_timestamps", self.case_timestamps)
+
             # 雙密度模式額外存儲
             if is_dual_density:
                 trial.set_user_attr("positive_near_far_ratio", response.positive_near_far_ratio)
@@ -1054,6 +1058,10 @@ class OptunaOptimizer:
             trial.set_user_attr("separation", separation)
             trial.set_user_attr("stability_score", stability_score)
 
+            # 存儲案例級別數據（用於按案例月份的穩定性分析）
+            trial.set_user_attr("case_level_densities", response.case_level_densities)
+            trial.set_user_attr("case_timestamps", self.case_timestamps)
+
             return (separation, stability_score)
 
         except optuna.TrialPruned:
@@ -1128,6 +1136,21 @@ class OptunaOptimizer:
         self.positive_cases = positive_cases
         self.negative_cases = negative_cases
         self.training_window = training_window
+
+        # 步驟2.1: 構建 case_timestamps 字典（用於穩定性分析按案例月份分組）
+        # 從 case_storage 讀取所有案例的 timestamp
+        self.case_timestamps = {}
+        all_case_ids = positive_cases + negative_cases
+        for case_id in all_case_ids:
+            case = self.case_storage.get_case(case_id)
+            if case is not None:
+                self.case_timestamps[case_id] = case.timestamp
+            else:
+                self.logger.warning(f"無法讀取案例 {case_id} 的 timestamp，已跳過")
+
+        self.logger.info(
+            f"成功構建 case_timestamps 字典：{len(self.case_timestamps)} 個案例"
+        )
 
         # [DEBUG] 詳細日誌：記錄 Optuna 任務使用的配置，用於與單參數測試比對
         self.logger.info(

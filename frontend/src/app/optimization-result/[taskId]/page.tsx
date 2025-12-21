@@ -102,7 +102,9 @@ async function fetchConvergence(taskId: string): Promise<ConvergenceAnalysis> {
 }
 
 async function fetchStability(taskId: string): Promise<StabilityAnalysis> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/stability`)
+  // 使用按案例月份的穩定性分析（而非Trial執行時間）
+  // 這是真正的策略穩定性分析，測量最佳參數在不同月份案例上的表現
+  const response = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks/${taskId}/analysis/stability-by-case-month`)
   if (!response.ok) {
     throw new Error(`Failed to fetch stability: ${response.statusText}`)
   }

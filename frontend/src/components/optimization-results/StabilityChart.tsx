@@ -37,7 +37,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
               <span className="font-mono">{data.std_value.toFixed(6)}</span>
             </p>
             <p>
-              <span className="text-muted-foreground">Trial 數:</span>{' '}
+              <span className="text-muted-foreground">案例數:</span>{' '}
               <span className="font-mono">{data.n_trials}</span>
             </p>
             {data.is_worst_month && (

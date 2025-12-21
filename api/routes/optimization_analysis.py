@@ -580,6 +580,56 @@ async def get_stability_analysis(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/tasks/{task_id}/analysis/stability-by-case-month")
+async def get_stability_analysis_by_case_month(
+    task_id: str
+):
+    """
+    獲取按案例月份的穩定性分析數據（而非Trial執行時間）
+
+    使用最佳Trial的參數，分析其在不同月份案例上的表現穩定性。
+    這是真正的策略穩定性分析，測量策略對不同時期市場的適應性。
+
+    與 /stability 端點的區別：
+    - /stability：按Trial執行時間分組，測量不同參數間的變異（無意義）
+    - /stability-by-case-month：按案例發生時間分組，測量最佳參數在不同月份的表現（有意義）
+
+    Args:
+        task_id: 任務 ID
+
+    Returns:
+        穩定性分析結果
+        - monthly_stats中的n_trials字段代表該月的案例數量（非Trial數）
+        - mean_value代表該月所有案例的平均密度（使用最佳Trial的參數計算）
+
+    Example:
+        GET /api/v1/optimization/tasks/xxx/analysis/stability-by-case-month
+    """
+    try:
+        study = _get_study_from_task(task_id)
+        stability_analysis = get_result_analyzer().analyze_stability_by_case_month(
+            study=study
+        )
+
+        logger.info(
+            f"Case-month stability analysis for task {task_id}: "
+            f"overall_cv={stability_analysis.overall_cv:.4f}, "
+            f"months={len(stability_analysis.monthly_stats)}"
+        )
+
+        return {
+            "success": True,
+            "task_id": task_id,
+            "data": stability_analysis.to_dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to analyze case-month stability for task {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/tasks/{task_id}/trials")
 async def get_top_trials(
     task_id: str,
