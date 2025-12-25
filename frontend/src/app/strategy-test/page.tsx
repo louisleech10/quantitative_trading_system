@@ -1188,7 +1188,8 @@ function StrategyTestPageContent() {
                     value={densityMetrics.cohens_d}
                     helper="效果量 (>0.5為中等, >0.8為大效果)"
                     format="decimal"
-                    source="= (正例均值 − 反例均值) / 合併標準差 (Near 密度)"
+                    source="= (正例 NEAR 密度均值 − 反例 NEAR 密度均值) / 合併標準差, 
+                    [合併標準差 = sqrt( ((n1-1)×std1² + (n2-1)×std2²) / (n1+n2-2)); n1, n2 = 樣本數; std1, std2 = 標準差]"
                   />
                 )}
                 {densityMetrics?.stability_cv !== undefined && (
