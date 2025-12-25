@@ -287,7 +287,11 @@ class OptunaOptimizer:
         retry_base_delay: float = 1.0,
         enable_progress_monitor: bool = True,
         progress_notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-        clustering_weight: float = 0.5
+        clustering_weight: float = 0.5,
+        # Golden Formula v2.0 參數
+        golden_lambda: float = 1.0,
+        min_pos_active_cases: int = 3,
+        min_pos_total_weight: float = 0.0
     ):
         """
         初始化Optuna優化器
@@ -313,6 +317,9 @@ class OptunaOptimizer:
                               - 聚集得分: 測量正例信號在近期窗口的聚集程度
                               - 區分得分: 測量正反例的near/far ratio差異
                               - 加權公式: clustering_weight * 聚集得分 + (1-clustering_weight) * 區分得分
+            golden_lambda: Golden Formula v2.0 穩定性懲罰係數 λ (default: 1.0)
+            min_pos_active_cases: 最小正例有效案例數門檻 (default: 3, 設為 0 則不檢查)
+            min_pos_total_weight: 最小正例權重總和門檻 (default: 0.0, 設為 0 則不檢查)
         """
         self.study_name = study_name
         self.storage = storage
@@ -327,6 +334,10 @@ class OptunaOptimizer:
         self.enable_progress_monitor = enable_progress_monitor
         self.progress_notification_callback = progress_notification_callback
         self.clustering_weight = clustering_weight
+        # Golden Formula v2.0 參數
+        self.golden_lambda = golden_lambda
+        self.min_pos_active_cases = min_pos_active_cases
+        self.min_pos_total_weight = min_pos_total_weight
 
         # 依賴服務
         self.signal_service = SignalAnalysisService()
@@ -729,68 +740,85 @@ class OptunaOptimizer:
 
             response: SignalDensityResponse = await self.signal_service.analyze_signal_density(request)
 
-            # 步驟5: 檢測雙密度模式並計算目標值
-            is_dual_density = (
-                self.training_window.far_lookback_bars is not None
-                and response.ratio_separation is not None
-            )
+            # 步驟5: 使用 Golden Formula v2.0 計算目標值 (單密度和雙密度統一使用)
+            # 參考規範: OPTIMIZATION_FORMULA_SPEC.md 第 105-136 行
 
-            if is_dual_density:
-                # 雙密度模式: 加權優化 (方案D)
-                # Ultra Think Step 3 優化: 添加邊界條件檢查
-                # 檢查 near/far ratio 是否有效 (必須 > 0)
-                if (response.positive_near_far_ratio is None or
-                    response.negative_near_far_ratio is None or
-                    response.positive_near_far_ratio <= 0 or
-                    response.negative_near_far_ratio <= 0):
+            # 獲取 M 值統計結果
+            s_pos = response.positive_total_weight  # 正例權重總和 Σw_i
+            s_neg = response.negative_total_weight  # 反例權重總和 Σw_i
+            n_pos_active = response.positive_active_cases  # 正例有效案例數
+
+            # ========== 邊界條件處理 (規範第 105-136 行) ==========
+
+            # Case A: S_pos = 0 (正例無訊號) → Prune
+            if s_pos is None or s_pos <= 0:
+                self.logger.warning(
+                    f"Trial {trial.number}: Case A - 正例無訊號 (S_pos={s_pos})，Prune"
+                )
+                raise optuna.TrialPruned()
+
+            # Case C: S_pos = 0 且 S_neg = 0 (正反都無訊號) → Prune
+            # (已被 Case A 覆蓋)
+
+            # Case B: S_neg = 0 (反例無訊號) → μ_neg = 0, σ_neg = 0
+            if s_neg is None or s_neg <= 0:
+                # 正例覆蓋門檻檢查 (避免退化解)
+                if self.min_pos_active_cases > 0 and (n_pos_active is None or n_pos_active < self.min_pos_active_cases):
                     self.logger.warning(
-                        f"Trial {trial.number}: Invalid near/far ratio detected "
-                        f"(pos={response.positive_near_far_ratio}, "
-                        f"neg={response.negative_near_far_ratio}). "
-                        f"數據異常，剪枝此 trial。"
+                        f"Trial {trial.number}: Case B - 反例無訊號但正例覆蓋不足 "
+                        f"(N_pos_active={n_pos_active} < {self.min_pos_active_cases})，Prune"
                     )
                     raise optuna.TrialPruned()
 
-                # 條件1得分: 正例信號聚集程度 (positive_near_far_ratio - 1.0)
-                # - 若 ratio=1.5, score=0.5 (信號在近期聚集50%)
-                # - 若 ratio=1.0, score=0.0 (無聚集效應)
-                # - 若 ratio<1.0, score<0 (近期反而更少,懲罰)
-                clustering_score = response.positive_near_far_ratio - 1.0
+                if self.min_pos_total_weight > 0 and s_pos < self.min_pos_total_weight:
+                    self.logger.warning(
+                        f"Trial {trial.number}: Case B - 反例無訊號但正例權重不足 "
+                        f"(S_pos={s_pos:.4f} < {self.min_pos_total_weight})，Prune"
+                    )
+                    raise optuna.TrialPruned()
 
-                # 條件2得分: 正反例區分度 (ratio_separation)
-                discrimination_score = response.ratio_separation
-
-                # 加權綜合得分
-                clustering_weight = self.clustering_weight
-                discrimination_weight = 1.0 - clustering_weight
-
-                objective_value = (
-                    clustering_weight * clustering_score +
-                    discrimination_weight * discrimination_score
-                )
-
+                mu_neg = 0.0
+                sigma_neg = 0.0
                 self.logger.info(
-                    f"Trial {trial.number} [DUAL-DENSITY-WEIGHTED]: "
-                    f"objective={objective_value:.4f} "
-                    f"(clustering={clustering_score:.4f} [w={clustering_weight:.2f}], "
-                    f"discrimination={discrimination_score:.4f} [w={discrimination_weight:.2f}]), "
-                    f"pos_ratio={response.positive_near_far_ratio:.4f}, "
-                    f"neg_ratio={response.negative_near_far_ratio:.4f}, "
-                    f"params={trial.params}"
+                    f"Trial {trial.number}: Case B - 反例無訊號，設定 μ_neg=0, σ_neg=0"
                 )
             else:
-                # 單密度模式: 優化separation
-                objective_value = response.separation
-                self.logger.info(
-                    f"Trial {trial.number} [SINGLE-DENSITY]: "
-                    f"separation={objective_value:.4f} "
-                    f"(pos={response.positive_avg_density:.4f}, "
-                    f"neg={response.negative_avg_density:.4f}), "
-                    f"params={trial.params}"
+                # Case D: 正常情況
+                mu_neg = response.negative_weighted_mean_m
+                sigma_neg = response.negative_m_std or 0.0
+
+            # 獲取正例 M 值統計
+            mu_pos = response.positive_weighted_mean_m
+            sigma_pos = response.positive_m_std or 0.0
+
+            # 確保 mu_pos 有效
+            if mu_pos is None:
+                self.logger.warning(
+                    f"Trial {trial.number}: μ_pos 為 None，Prune"
                 )
+                raise optuna.TrialPruned()
+
+            # ========== 黃金公式計算 (規範第 48-51 行) ==========
+            # Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
+            m_separation = mu_pos - mu_neg
+            penalty = self.golden_lambda * (sigma_pos + 0.5 * sigma_neg)
+            objective_value = m_separation - penalty
+
+            # 檢測雙密度模式 (用於日誌記錄)
+            is_dual_density = self.training_window.far_lookback_bars is not None
+
+            self.logger.info(
+                f"Trial {trial.number} [GOLDEN-FORMULA-v2.0]: "
+                f"objective={objective_value:.4f} "
+                f"(m_sep={m_separation:.4f}, penalty={penalty:.4f}, λ={self.golden_lambda}), "
+                f"μ_pos={mu_pos:.4f}, μ_neg={mu_neg:.4f}, "
+                f"σ_pos={sigma_pos:.4f}, σ_neg={sigma_neg:.4f}, "
+                f"mode={'DUAL' if is_dual_density else 'SINGLE'}, "
+                f"params={trial.params}"
+            )
 
             # 步驟6: 存儲統計數據到 Trial user_attrs（供前端顯示和CSV匯出）
-            # 核心統計指標
+            # 核心統計指標 (保留向後相容)
             trial.set_user_attr("p_value", response.p_value)
             trial.set_user_attr("cohens_d", response.cohens_d)
             trial.set_user_attr("stability_cv", response.stability_cv)
@@ -802,7 +830,23 @@ class OptunaOptimizer:
             trial.set_user_attr("case_level_densities", response.case_level_densities)
             trial.set_user_attr("case_timestamps", self.case_timestamps)
 
-            # 雙密度模式額外存儲
+            # ========== Golden Formula v2.0 M 值統計存儲 ==========
+            trial.set_user_attr("positive_weighted_mean_m", mu_pos)
+            trial.set_user_attr("negative_weighted_mean_m", mu_neg)
+            trial.set_user_attr("positive_m_std", sigma_pos)
+            trial.set_user_attr("negative_m_std", sigma_neg)
+            trial.set_user_attr("m_separation", m_separation)
+            trial.set_user_attr("optuna_golden_score", objective_value)
+            trial.set_user_attr("positive_total_weight", s_pos)
+            trial.set_user_attr("negative_total_weight", s_neg if s_neg else 0.0)
+            trial.set_user_attr("positive_active_cases", n_pos_active)
+            trial.set_user_attr("negative_active_cases", response.negative_active_cases)
+            if response.positive_m_cv is not None:
+                trial.set_user_attr("positive_m_cv", response.positive_m_cv)
+            if response.sample_warnings:
+                trial.set_user_attr("sample_warnings", response.sample_warnings)
+
+            # 雙密度模式額外存儲 (保留向後相容)
             if is_dual_density:
                 trial.set_user_attr("positive_near_far_ratio", response.positive_near_far_ratio)
                 trial.set_user_attr("negative_near_far_ratio", response.negative_near_far_ratio)
@@ -1152,6 +1196,18 @@ class OptunaOptimizer:
             f"成功構建 case_timestamps 字典：{len(self.case_timestamps)} 個案例"
         )
 
+        # 步驟3: 創建/載入Study (必須在使用 study 之前)
+        if self.study is None:
+            self.create_study()
+
+        # Store case lists in study user_attrs for stability analysis
+        self.study.set_user_attr("positive_cases", positive_cases)
+        self.study.set_user_attr("negative_cases", negative_cases)
+        self.logger.info(
+            f"Stored case lists in study: {len(positive_cases)} positive, "
+            f"{len(negative_cases)} negative cases"
+        )
+
         # [DEBUG] 詳細日誌：記錄 Optuna 任務使用的配置，用於與單參數測試比對
         self.logger.info(
             f"[DEBUG] Optuna 優化配置:\n"
@@ -1178,10 +1234,6 @@ class OptunaOptimizer:
                 f"window={training_window.lookback_bars}. "
                 f"Optimization target: separation (density difference)"
             )
-
-        # 步驟3: 創建/載入Study
-        if self.study is None:
-            self.create_study()
 
         # 步驟4: 記錄優化開始
         start_time = time.time()

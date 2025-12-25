@@ -635,6 +635,279 @@ class SignalDensityAnalyzer:
             "max": float(np.max(densities))
         }
 
+    # ========== Golden Formula v2.0 方法 ==========
+
+    def calculate_normalized_metric(
+        self,
+        near_density: float,
+        far_density: float,
+        near_count: int,
+        far_count: int,
+        epsilon: float = 1e-5
+    ) -> Tuple[float, float]:
+        """
+        計算歸一化指標 M 和權重 w (Golden Formula v2.0)
+
+        黃金公式:
+        - M = (Near_density - Far_density) / (Near_density + Far_density + epsilon)
+        - w = Near_count + Far_count (信號觸發次數作為權重)
+
+        重要區別 (規範第 23-32 行):
+        - M 衡量信號的聚集傾向，使用「密度」計算
+        - w 衡量信號強度作為權重，使用「信號觸發次數 (counts)」計算
+
+        Args:
+            near_density: Near 區密度 (0.0~1.0)
+            far_density: Far 區密度 (0.0~1.0)
+            near_count: Near 區信號觸發次數
+            far_count: Far 區信號觸發次數
+            epsilon: 防止分母為零的小值 (default: 1e-5)
+
+        Returns:
+            (M, w): M 值範圍 [-1, 1], w >= 0
+        """
+        # M 使用密度計算
+        m = (near_density - far_density) / (near_density + far_density + epsilon)
+        # w 使用信號數計算
+        w = near_count + far_count
+        return float(m), float(w)
+
+    def calculate_weighted_stats(
+        self,
+        values: List[float],
+        weights: List[float]
+    ) -> Dict[str, Any]:
+        """
+        計算加權統計量 (Golden Formula v2.0)
+
+        加權平均: μ = Σ(w_i × M_i) / Σw_i
+        加權標準差: σ = √(Σw_i(M_i - μ)² / Σw_i) (population form)
+
+        Args:
+            values: M 值列表
+            weights: 對應權重列表
+
+        Returns:
+            {
+                "mean": μ (加權平均),
+                "std": σ (加權標準差),
+                "total_weight": Σw_i (權重總和),
+                "active_count": N^active (w > 0 的案例數)
+            }
+        """
+        values_arr = np.array(values)
+        weights_arr = np.array(weights)
+
+        # 過濾有效權重 (w > 0)
+        valid_mask = weights_arr > 0
+        valid_values = values_arr[valid_mask]
+        valid_weights = weights_arr[valid_mask]
+
+        total_weight = float(np.sum(valid_weights))
+        active_count = int(np.sum(valid_mask))
+
+        if total_weight <= 0 or active_count == 0:
+            return {
+                "mean": None,
+                "std": None,
+                "total_weight": 0.0,
+                "active_count": 0
+            }
+
+        # 加權平均
+        weighted_mean = float(np.sum(valid_weights * valid_values) / total_weight)
+
+        # 加權標準差 (population form，分母為 Σw_i，避免權重情境下的自由度歧義)
+        variance = np.sum(valid_weights * (valid_values - weighted_mean) ** 2) / total_weight
+        weighted_std = float(np.sqrt(variance))
+
+        return {
+            "mean": weighted_mean,
+            "std": weighted_std,
+            "total_weight": total_weight,
+            "active_count": active_count
+        }
+
+    def calculate_m_monthly_cv(
+        self,
+        case_m_values: Dict[str, float],
+        case_weights: Dict[str, float],
+        cases: List[Any],
+        min_monthly_cases: int = 2,
+        min_monthly_weight: float = 0.0
+    ) -> Tuple[Optional[float], Dict[str, Any]]:
+        """
+        計算 M 值的月度穩定性 CV (Golden Formula v2.0)
+
+        按月分組計算加權平均 M，再計算 CV = Std(月度均值) / max(|Mean(月度均值)|, epsilon)
+
+        規範說明 (第 143-159 行):
+        - 對象：僅針對正例 (Positive Cases)
+        - 方法：將正例按「案例發生月份」分組，計算每月的加權平均 M
+        - 計算這組月度平均值的變異係數 (CV)
+        - 最小樣本規則：月份正例案例數或權重總和需達門檻
+
+        Args:
+            case_m_values: 案例 M 值字典 {case_id -> M}
+            case_weights: 案例權重字典 {case_id -> w}
+            cases: 案例列表
+            min_monthly_cases: 月份最小案例數門檻 (default: 2)
+            min_monthly_weight: 月份最小權重總和門檻 (default: 0.0)
+
+        Returns:
+            (cv, breakdown): CV 值和月度詳細數據
+        """
+        # 按月分組
+        monthly_data: Dict[str, Dict[str, List[float]]] = {}
+        for case in cases:
+            case_id = case.case_id
+            if case_id not in case_m_values:
+                continue
+
+            dt = datetime.fromtimestamp(case.timestamp)
+            month_key = f"{dt.year}-{dt.month:02d}"
+
+            if month_key not in monthly_data:
+                monthly_data[month_key] = {"m_values": [], "weights": []}
+
+            monthly_data[month_key]["m_values"].append(case_m_values[case_id])
+            monthly_data[month_key]["weights"].append(case_weights.get(case_id, 1.0))
+
+        # 計算每月加權平均 M
+        monthly_means = []
+        breakdown: Dict[str, Any] = {"included_months": [], "excluded_months": []}
+
+        for month, data in sorted(monthly_data.items()):
+            total_weight = sum(data["weights"])
+            n_cases = len(data["m_values"])
+
+            # 門檻檢查
+            if n_cases < min_monthly_cases or total_weight < min_monthly_weight:
+                breakdown["excluded_months"].append({
+                    "month": month,
+                    "n_cases": n_cases,
+                    "total_weight": total_weight,
+                    "reason": "below_threshold"
+                })
+                continue
+
+            # 計算加權平均
+            weighted_mean = sum(m * w for m, w in zip(data["m_values"], data["weights"])) / total_weight
+            monthly_means.append(weighted_mean)
+            breakdown["included_months"].append({
+                "month": month,
+                "n_cases": n_cases,
+                "total_weight": total_weight,
+                "weighted_mean_m": weighted_mean
+            })
+
+        # 計算 CV
+        if len(monthly_means) < 2:
+            breakdown["cv"] = None
+            breakdown["excluded_months_count"] = len(breakdown["excluded_months"])
+            breakdown["included_months_count"] = len(breakdown["included_months"])
+            return None, breakdown
+
+        mean_of_means = np.mean(monthly_means)
+        std_of_means = np.std(monthly_means, ddof=1)
+        epsilon = 1e-5
+
+        # CV = Std(月度均值) / max(|Mean(月度均值)|, epsilon)
+        # 使用 |Mean| 與下界可避免 CV 爆炸與符號歧義 (規範第 149 行)
+        cv = float(std_of_means / max(abs(mean_of_means), epsilon))
+
+        breakdown["cv"] = cv
+        breakdown["mean_of_monthly_means"] = float(mean_of_means)
+        breakdown["std_of_monthly_means"] = float(std_of_means)
+        breakdown["excluded_months_count"] = len(breakdown["excluded_months"])
+        breakdown["included_months_count"] = len(breakdown["included_months"])
+
+        return cv, breakdown
+
+    def calculate_m_separation_cv(
+        self,
+        case_m_values: Dict[str, float],
+        case_weights: Dict[str, float],
+        positive_cases: List[Any],
+        negative_cases: List[Any],
+        min_monthly_cases: int = 2
+    ) -> Optional[float]:
+        """
+        計算 M Separation 的月度穩定性 CV
+
+        按月分組計算正反例的加權平均 M，計算每月的 M Separation，
+        再計算這些月度 Separation 的變異係數。
+
+        Args:
+            case_m_values: 案例 M 值字典 {case_id -> M}
+            case_weights: 案例權重字典 {case_id -> w}
+            positive_cases: 正例案例列表
+            negative_cases: 反例案例列表
+            min_monthly_cases: 單側（正例或反例）最小案例數門檻
+
+        Returns:
+            M Separation 的 CV 值，若月份數 < 2 則返回 None
+        """
+        # 按月分組正例
+        pos_monthly: Dict[str, Dict[str, List[float]]] = {}
+        for case in positive_cases:
+            if case.case_id not in case_m_values:
+                continue
+            dt = datetime.fromtimestamp(case.timestamp)
+            month_key = f"{dt.year}-{dt.month:02d}"
+            if month_key not in pos_monthly:
+                pos_monthly[month_key] = {"m_values": [], "weights": []}
+            pos_monthly[month_key]["m_values"].append(case_m_values[case.case_id])
+            pos_monthly[month_key]["weights"].append(case_weights.get(case.case_id, 1.0))
+
+        # 按月分組反例
+        neg_monthly: Dict[str, Dict[str, List[float]]] = {}
+        for case in negative_cases:
+            if case.case_id not in case_m_values:
+                continue
+            dt = datetime.fromtimestamp(case.timestamp)
+            month_key = f"{dt.year}-{dt.month:02d}"
+            if month_key not in neg_monthly:
+                neg_monthly[month_key] = {"m_values": [], "weights": []}
+            neg_monthly[month_key]["m_values"].append(case_m_values[case.case_id])
+            neg_monthly[month_key]["weights"].append(case_weights.get(case.case_id, 1.0))
+
+        # 計算每月的 M Separation
+        monthly_separations = []
+        all_months = set(pos_monthly.keys()) | set(neg_monthly.keys())
+
+        for month in sorted(all_months):
+            pos_data = pos_monthly.get(month)
+            neg_data = neg_monthly.get(month)
+
+            # 要求兩側都有最小案例數
+            if (not pos_data or len(pos_data["m_values"]) < min_monthly_cases or
+                not neg_data or len(neg_data["m_values"]) < min_monthly_cases):
+                continue
+
+            # 計算正例加權平均 M
+            pos_weight_sum = sum(pos_data["weights"])
+            pos_mean_m = sum(m * w for m, w in zip(pos_data["m_values"], pos_data["weights"])) / pos_weight_sum if pos_weight_sum > 0 else 0
+
+            # 計算反例加權平均 M
+            neg_weight_sum = sum(neg_data["weights"])
+            neg_mean_m = sum(m * w for m, w in zip(neg_data["m_values"], neg_data["weights"])) / neg_weight_sum if neg_weight_sum > 0 else 0
+
+            # 月度 M Separation
+            monthly_sep = pos_mean_m - neg_mean_m
+            monthly_separations.append(monthly_sep)
+
+        # 計算 CV
+        if len(monthly_separations) < 2:
+            return None
+
+        mean_sep = np.mean(monthly_separations)
+        std_sep = np.std(monthly_separations, ddof=1)
+        epsilon = 1e-5
+
+        cv = float(std_sep / max(abs(mean_sep), epsilon))
+        return cv
+
     def calculate_separation(
         self,
         positive_densities: List[float],
@@ -970,6 +1243,20 @@ class SignalDensityAnalyzer:
         case_level_near_densities = {}
         case_level_far_densities = {}
 
+        # ========== Golden Formula v2.0 數據收集 ==========
+        # M 值和權重 w (信號數)
+        positive_m_values: List[float] = []
+        positive_weights: List[float] = []
+        negative_m_values: List[float] = []
+        negative_weights: List[float] = []
+        case_m_values: Dict[str, float] = {}
+        case_weights: Dict[str, float] = {}
+        # 信號數收集 (用於計算權重 w)
+        positive_near_counts: List[int] = []
+        positive_far_counts: List[int] = []
+        negative_near_counts: List[int] = []
+        negative_far_counts: List[int] = []
+
         # 處理正例
         for i, case in enumerate(positive_cases, 1):
             try:
@@ -998,6 +1285,23 @@ class SignalDensityAnalyzer:
                     positive_far_densities.append(far_density)
                     case_level_near_densities[case.case_id] = near_density
                     case_level_far_densities[case.case_id] = far_density
+
+                    # ========== Golden Formula v2.0: 計算 M 和 w ==========
+                    # 計算信號數 (用於權重 w)
+                    near_count = int(np.sum(near_signals[~pd.isna(near_signals)])) if len(near_signals) > 0 else 0
+                    far_count = int(np.sum(far_signals[~pd.isna(far_signals)])) if len(far_signals) > 0 else 0
+                    positive_near_counts.append(near_count)
+                    positive_far_counts.append(far_count)
+
+                    # 計算 M (用密度) 和 w (用信號數)
+                    m, w = self.calculate_normalized_metric(
+                        near_density, far_density,
+                        near_count, far_count
+                    )
+                    positive_m_values.append(m)
+                    positive_weights.append(w)
+                    case_m_values[case.case_id] = m
+                    case_weights[case.case_id] = w
                 else:
                     # 單密度模式: 僅計算近期窗口密度
                     klines = self.extract_training_window(case, window_config)
@@ -1005,6 +1309,19 @@ class SignalDensityAnalyzer:
                     density = self.calculate_case_density(signals)
                     positive_densities.append(density)
                     case_level_densities[case.case_id] = density
+
+                    # ========== Golden Formula v2.0: 單密度模式 M 值計算 ==========
+                    # 單密度模式沒有 Far 窗口，設定 Far = 0
+                    # M = Near / (Near + ε) ≈ 1 (當 Near > 0) 或 M = 0 (當 Near = 0)
+                    near_count = int(np.sum(signals[~pd.isna(signals)])) if len(signals) > 0 else 0
+                    m, w = self.calculate_normalized_metric(
+                        density, 0.0,  # far_density = 0 for single density mode
+                        near_count, 0  # far_count = 0 for single density mode
+                    )
+                    positive_m_values.append(m)
+                    positive_weights.append(w)
+                    case_m_values[case.case_id] = m
+                    case_weights[case.case_id] = w
 
                 if i % 10 == 0:  # 每10個案例記錄一次進度
                     self.logger.info(f"正例進度: {i}/{len(positive_cases)}")
@@ -1045,6 +1362,23 @@ class SignalDensityAnalyzer:
                     negative_far_densities.append(far_density)
                     case_level_near_densities[case.case_id] = near_density
                     case_level_far_densities[case.case_id] = far_density
+
+                    # ========== Golden Formula v2.0: 計算 M 和 w ==========
+                    # 計算信號數 (用於權重 w)
+                    near_count = int(np.sum(near_signals[~pd.isna(near_signals)])) if len(near_signals) > 0 else 0
+                    far_count = int(np.sum(far_signals[~pd.isna(far_signals)])) if len(far_signals) > 0 else 0
+                    negative_near_counts.append(near_count)
+                    negative_far_counts.append(far_count)
+
+                    # 計算 M (用密度) 和 w (用信號數)
+                    m, w = self.calculate_normalized_metric(
+                        near_density, far_density,
+                        near_count, far_count
+                    )
+                    negative_m_values.append(m)
+                    negative_weights.append(w)
+                    case_m_values[case.case_id] = m
+                    case_weights[case.case_id] = w
                 else:
                     # 單密度模式: 僅計算近期窗口密度
                     klines = self.extract_training_window(case, window_config)
@@ -1052,6 +1386,17 @@ class SignalDensityAnalyzer:
                     density = self.calculate_case_density(signals)
                     negative_densities.append(density)
                     case_level_densities[case.case_id] = density
+
+                    # ========== Golden Formula v2.0: 單密度模式 M 值計算 ==========
+                    near_count = int(np.sum(signals[~pd.isna(signals)])) if len(signals) > 0 else 0
+                    m, w = self.calculate_normalized_metric(
+                        density, 0.0,
+                        near_count, 0
+                    )
+                    negative_m_values.append(m)
+                    negative_weights.append(w)
+                    case_m_values[case.case_id] = m
+                    case_weights[case.case_id] = w
 
                 if i % 10 == 0:  # 每10個案例記錄一次進度
                     self.logger.info(f"反例進度: {i}/{len(negative_cases)}")
@@ -1080,11 +1425,129 @@ class SignalDensityAnalyzer:
         negative_stats = self.calculate_group_statistics(negative_densities)
 
         separation = self.calculate_separation(positive_densities, negative_densities)
-        p_value = self.statistical_significance_test(positive_densities, negative_densities)
-        cohens_d = self.calculate_cohens_d(positive_densities, negative_densities)
         stability_cv = self.stability_analysis_by_month(
             case_level_densities,
             positive_cases + negative_cases
+        )
+
+        # ========== Golden Formula v2.0: M 值加權統計 ==========
+        # 計算 M 值加權統計 (規範第 35-43 行)
+        self.logger.info(
+            f"[DEBUG] M值數據收集: "
+            f"positive_m_values={len(positive_m_values)}, positive_weights={len(positive_weights)}, "
+            f"negative_m_values={len(negative_m_values)}, negative_weights={len(negative_weights)}"
+        )
+        if len(positive_m_values) > 0:
+            self.logger.info(f"[DEBUG] positive_m_values前3個: {positive_m_values[:3]}")
+            self.logger.info(f"[DEBUG] positive_weights前3個: {positive_weights[:3]}")
+
+        pos_m_stats = self.calculate_weighted_stats(positive_m_values, positive_weights)
+        neg_m_stats = self.calculate_weighted_stats(negative_m_values, negative_weights)
+
+        self.logger.info(
+            f"[DEBUG] M值統計結果: "
+            f"pos_mean={pos_m_stats.get('mean')}, pos_std={pos_m_stats.get('std')}, "
+            f"neg_mean={neg_m_stats.get('mean')}, neg_std={neg_m_stats.get('std')}"
+        )
+
+        # 警告訊息收集
+        sample_warnings: List[str] = []
+
+        # 提取 M 值統計結果
+        positive_weighted_mean_m = pos_m_stats.get("mean")
+        negative_weighted_mean_m = neg_m_stats.get("mean")
+        positive_m_std = pos_m_stats.get("std")
+        negative_m_std = neg_m_stats.get("std")
+        positive_total_weight = pos_m_stats.get("total_weight", 0.0)
+        negative_total_weight = neg_m_stats.get("total_weight", 0.0)
+        positive_active_cases = pos_m_stats.get("active_count", 0)
+        negative_active_cases = neg_m_stats.get("active_count", 0)
+
+        # M 值區分度 (μ_pos - μ_neg)
+        m_separation = None
+        if positive_weighted_mean_m is not None and negative_weighted_mean_m is not None:
+            m_separation = positive_weighted_mean_m - negative_weighted_mean_m
+        elif positive_weighted_mean_m is not None and negative_total_weight == 0:
+            # Case B: 反例無訊號，視 μ_neg = 0 (規範第 114-117 行)
+            m_separation = positive_weighted_mean_m
+            negative_weighted_mean_m = 0.0
+            negative_m_std = 0.0
+            self.logger.info("反例無訊號 (S_neg=0)，設定 μ_neg=0, σ_neg=0")
+
+        # 黃金公式得分 (規範第 48-51 行)
+        # Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
+        optuna_golden_score = None
+        lambda_penalty = 1.0
+        if m_separation is not None and positive_m_std is not None:
+            sigma_neg = negative_m_std if negative_m_std is not None else 0.0
+            penalty = lambda_penalty * (positive_m_std + 0.5 * sigma_neg)
+            optuna_golden_score = m_separation - penalty
+
+        # 樣本不足警告檢查
+        min_active_cases = 3  # 可配置門檻
+        if positive_active_cases < min_active_cases:
+            sample_warnings.append(
+                f"正例有效案例數不足: {positive_active_cases} < {min_active_cases}"
+            )
+        if negative_active_cases < min_active_cases:
+            sample_warnings.append(
+                f"反例有效案例數不足: {negative_active_cases} < {min_active_cases}"
+            )
+
+        # 計算月度穩定性 CV (規範第 143-159 行)
+        positive_m_cv = None
+        excluded_months_count = None
+        included_months_count = None
+        if len(positive_m_values) > 0:
+            cv_result, monthly_breakdown_m = self.calculate_m_monthly_cv(
+                case_m_values=case_m_values,
+                case_weights=case_weights,
+                cases=positive_cases,
+                min_monthly_cases=2,
+                min_monthly_weight=0.0
+            )
+            positive_m_cv = cv_result
+            if monthly_breakdown_m:
+                excluded_months_count = monthly_breakdown_m.get("excluded_months_count", 0)
+                included_months_count = monthly_breakdown_m.get("included_months_count", 0)
+                if excluded_months_count and excluded_months_count > 0:
+                    sample_warnings.append(
+                        f"{excluded_months_count} 個月份因樣本不足被排除於月度 CV 計算"
+                    )
+
+        # 計算 M Separation 月度穩定性 CV
+        m_separation_cv = None
+        if len(positive_m_values) > 0 and len(negative_m_values) > 0:
+            m_separation_cv = self.calculate_m_separation_cv(
+                case_m_values=case_m_values,
+                case_weights=case_weights,
+                positive_cases=positive_cases,
+                negative_cases=negative_cases,
+                min_monthly_cases=2
+            )
+
+        # P-value 和 Cohen's d 改用 M 值計算 (規範第 84 行)
+        # 注意: 只有當雙方都有 M 值時才計算
+        if len(positive_m_values) > 0 and len(negative_m_values) > 0:
+            p_value = self.statistical_significance_test(positive_m_values, negative_m_values)
+            cohens_d = self.calculate_cohens_d(positive_m_values, negative_m_values)
+        else:
+            # 回退到密度計算 (當無 M 值時)
+            p_value = self.statistical_significance_test(positive_densities, negative_densities)
+            cohens_d = self.calculate_cohens_d(positive_densities, negative_densities)
+
+        # 格式化日誌輸出 (處理 None 值)
+        def fmt(v, precision=4):
+            return f"{v:.{precision}f}" if v is not None else "N/A"
+
+        self.logger.info(
+            f"Golden Formula v2.0 統計:\n"
+            f"  正例: μ_m={fmt(positive_weighted_mean_m)}, σ_m={fmt(positive_m_std)}, "
+            f"S={fmt(positive_total_weight)}, N_active={positive_active_cases}\n"
+            f"  反例: μ_m={fmt(negative_weighted_mean_m)}, σ_m={fmt(negative_m_std)}, "
+            f"S={fmt(negative_total_weight)}, N_active={negative_active_cases}\n"
+            f"  m_separation={fmt(m_separation)}, golden_score={fmt(optuna_golden_score)}, "
+            f"cv={fmt(positive_m_cv)}"
         )
 
         # 雙密度模式: 計算near/far ratio統計
@@ -1242,6 +1705,14 @@ class SignalDensityAnalyzer:
             if monthly_breakdown is not None:
                 dual_density_result["monthly_breakdown"] = monthly_breakdown
 
+        # 將 M 值和權重存入 case_level_densities (用於前端顯示和穩定性分析)
+        for case_id, m_value in case_m_values.items():
+            case_level_densities[f"__m_{case_id}"] = m_value
+        
+        # 將權重也存儲（用於穩定性分析的加權平均計算）
+        for case_id, weight in case_weights.items():
+            case_level_densities[f"__weight_{case_id}"] = weight
+
         # 3. 返回結果
         result = SignalDensityResponse(
             positive_avg_density=positive_stats["mean"],
@@ -1255,6 +1726,22 @@ class SignalDensityAnalyzer:
             positive_sample_size=len(positive_densities),
             negative_sample_size=len(negative_densities),
             case_level_densities=case_level_densities,
+            # ========== Golden Formula v2.0 欄位 ==========
+            positive_weighted_mean_m=positive_weighted_mean_m,
+            negative_weighted_mean_m=negative_weighted_mean_m,
+            positive_m_std=positive_m_std,
+            negative_m_std=negative_m_std,
+            m_separation=m_separation,
+            positive_m_cv=positive_m_cv,
+            m_separation_cv=m_separation_cv,
+            positive_total_weight=positive_total_weight,
+            negative_total_weight=negative_total_weight,
+            positive_active_cases=positive_active_cases,
+            negative_active_cases=negative_active_cases,
+            optuna_golden_score=optuna_golden_score,
+            sample_warnings=sample_warnings if sample_warnings else None,
+            excluded_months_count=excluded_months_count,
+            included_months_count=included_months_count,
             **dual_density_result  # 展開雙密度字段 (如果有的話)
         )
 

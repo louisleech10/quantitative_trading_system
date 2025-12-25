@@ -447,6 +447,86 @@ class SignalDensityResponse(BaseModel):
         ge=1
     )
 
+    # ========== M 值統計欄位 (Golden Formula v2.0) ==========
+    # 歸一化指標 M = (Near - Far) / (Near + Far + ε)，範圍 [-1, 1]
+    # 權重 w = Near_count + Far_count (信號觸發次數)
+    positive_weighted_mean_m: Optional[float] = Field(
+        None,
+        description="正例加權平均 M 值 (μ_pos)，範圍 [-1, 1]",
+        ge=-1.0,
+        le=1.0
+    )
+    negative_weighted_mean_m: Optional[float] = Field(
+        None,
+        description="反例加權平均 M 值 (μ_neg)，範圍 [-1, 1]",
+        ge=-1.0,
+        le=1.0
+    )
+    positive_m_std: Optional[float] = Field(
+        None,
+        description="正例 M 值加權標準差 (σ_pos)",
+        ge=0.0
+    )
+    negative_m_std: Optional[float] = Field(
+        None,
+        description="反例 M 值加權標準差 (σ_neg)",
+        ge=0.0
+    )
+    m_separation: Optional[float] = Field(
+        None,
+        description="M 值區分度 (μ_pos - μ_neg)"
+    )
+    positive_m_cv: Optional[float] = Field(
+        None,
+        description="正例 M 的月度穩定性 CV (用於後處理篩選)",
+        ge=0.0
+    )
+    m_separation_cv: Optional[float] = Field(
+        None,
+        description="M Separation 的月度穩定性 CV (每月正反例差異的變異係數)",
+        ge=0.0
+    )
+    positive_total_weight: Optional[float] = Field(
+        None,
+        description="正例權重總和 (S_pos = Σw_i，信號數總和)",
+        ge=0.0
+    )
+    negative_total_weight: Optional[float] = Field(
+        None,
+        description="反例權重總和 (S_neg = Σw_i，信號數總和)",
+        ge=0.0
+    )
+    positive_active_cases: Optional[int] = Field(
+        None,
+        description="正例有效案例數 (N_pos^active，w_i > 0 的案例)",
+        ge=0
+    )
+    negative_active_cases: Optional[int] = Field(
+        None,
+        description="反例有效案例數 (N_neg^active，w_i > 0 的案例)",
+        ge=0
+    )
+    optuna_golden_score: Optional[float] = Field(
+        None,
+        description="Optuna 黃金公式得分: (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)"
+    )
+
+    # ========== 樣本不足提示欄位 (前端警告用) ==========
+    sample_warnings: Optional[List[str]] = Field(
+        None,
+        description="樣本不足的警告訊息列表"
+    )
+    excluded_months_count: Optional[int] = Field(
+        None,
+        description="CV 計算中被排除的月份數（因樣本不足）",
+        ge=0
+    )
+    included_months_count: Optional[int] = Field(
+        None,
+        description="CV 計算中被納入的月份數",
+        ge=0
+    )
+
     # 案例級別數據
     case_level_densities: Dict[str, float] = Field(
         ...,
@@ -483,6 +563,22 @@ class SignalDensityResponse(BaseModel):
                 "negative_std": 0.10,
                 "positive_sample_size": 30,
                 "negative_sample_size": 70,
+                # M 值統計 (Golden Formula v2.0)
+                "positive_weighted_mean_m": 0.65,
+                "negative_weighted_mean_m": -0.15,
+                "positive_m_std": 0.25,
+                "negative_m_std": 0.30,
+                "m_separation": 0.80,
+                "positive_m_cv": 0.22,
+                "positive_total_weight": 85.0,
+                "negative_total_weight": 120.0,
+                "positive_active_cases": 28,
+                "negative_active_cases": 65,
+                "optuna_golden_score": 0.425,
+                # 樣本警告
+                "sample_warnings": [],
+                "excluded_months_count": 1,
+                "included_months_count": 5,
                 "case_level_densities": {
                     "BTCUSDT_1736942400_1": 0.78,
                     "ETHUSDT_1736946000_0": 0.32

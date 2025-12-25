@@ -544,18 +544,20 @@ class ResultAnalyzer:
         study: Study
     ) -> StabilityAnalysis:
         """
-        按案例月份分析穩定性（而非Trial執行時間）
+        按案例月份分析 M Separation 穩定性
 
-        使用最佳Trial的參數，分析其在不同月份案例上的表現穩定性。
-        這才是真正的策略穩定性分析，而不是Trial之間的參數差異。
+        計算每月的 M Separation (positive_M_avg - negative_M_avg)，
+        然後計算這些月度 Separation 的 CV 值。
 
         Args:
             study: Optuna Study對象
 
         Returns:
-            StabilityAnalysis: 穩定性分析結果
-                - monthly_stats中的n_trials字段代表該月的案例數量（非Trial數）
-                - mean_value代表該月所有案例的平均密度（使用最佳Trial的參數計算）
+            StabilityAnalysis: M Separation 穩定性分析結果
+                - overall_cv: M Separation 的月度 CV
+                - monthly_stats: 每月的 M Separation 值
+                - worst_month: M Separation 最低的月份
+                - best_month: M Separation 最高的月份
         """
         # 獲取最佳Trial
         try:
@@ -573,10 +575,23 @@ class ResultAnalyzer:
         case_level_densities = best_trial.user_attrs.get("case_level_densities")
         case_timestamps = best_trial.user_attrs.get("case_timestamps")
 
+        # 從study的user_attrs中獲取案例列表
+        positive_cases = study.user_attrs.get("positive_cases")
+        negative_cases = study.user_attrs.get("negative_cases")
+
         if not case_level_densities or not case_timestamps:
+            self.logger.warning("Missing case_level_densities or case_timestamps")
+            return StabilityAnalysis(
+                overall_cv=0.0,
+                monthly_stats=[],
+                worst_month=None,
+                best_month=None
+            )
+
+        if not positive_cases or not negative_cases:
             self.logger.warning(
-                "最佳Trial缺少案例級別數據（case_level_densities或case_timestamps），"
-                "無法進行按案例月份的穩定性分析"
+                "Missing positive_cases or negative_cases in study metadata. "
+                "This is likely an old optimization task. Please re-run optimization."
             )
             return StabilityAnalysis(
                 overall_cv=0.0,
@@ -585,61 +600,161 @@ class ResultAnalyzer:
                 best_month=None
             )
 
-        # 按月份分組案例密度
+        # 提取 M 值和權重
+        case_m_values = {}
+        case_weights = {}
+        for key, value in case_level_densities.items():
+            if key.startswith("__m_"):
+                case_id = key[4:]  # Remove "__m_" prefix
+                case_m_values[case_id] = value
+            elif key.startswith("__weight_"):
+                case_id = key[9:]  # Remove "__weight_" prefix
+                case_weights[case_id] = value
+
+        # 如果沒有存儲權重資料（舊版本的優化任務），使用等權重
+        if not case_weights:
+            self.logger.warning(
+                "No weight data found in trial user_attrs. Using equal weights. "
+                "This may cause inconsistency with single-parameter test results."
+            )
+            case_weights = {case_id: 1.0 for case_id in case_m_values.keys()}
+
+        # 按月分組正例和反例
         from datetime import datetime
         from collections import defaultdict
 
-        monthly_data = defaultdict(list)
-        for case_id, density in case_level_densities.items():
-            if case_id in case_timestamps:
+        pos_monthly = defaultdict(lambda: {"m_values": [], "weights": []})
+        neg_monthly = defaultdict(lambda: {"m_values": [], "weights": []})
+
+        for case_id in positive_cases:
+            if case_id in case_m_values and case_id in case_timestamps:
+                m_val = case_m_values[case_id]
+                weight = case_weights[case_id]
                 timestamp = case_timestamps[case_id]
                 dt = datetime.fromtimestamp(timestamp)
                 month_key = f"{dt.year}-{dt.month:02d}"
-                monthly_data[month_key].append(density)
+                pos_monthly[month_key]["m_values"].append(m_val)
+                pos_monthly[month_key]["weights"].append(weight)
 
-        # 計算月度統計
+        for case_id in negative_cases:
+            if case_id in case_m_values and case_id in case_timestamps:
+                m_val = case_m_values[case_id]
+                weight = case_weights[case_id]
+                timestamp = case_timestamps[case_id]
+                dt = datetime.fromtimestamp(timestamp)
+                month_key = f"{dt.year}-{dt.month:02d}"
+                neg_monthly[month_key]["m_values"].append(m_val)
+                neg_monthly[month_key]["weights"].append(weight)
+
+        # 計算每月的 M Separation
+        monthly_separations = []
         monthly_stats = []
-        monthly_means = []
+        all_months = sorted(set(pos_monthly.keys()) | set(neg_monthly.keys()))
 
-        for month, densities in sorted(monthly_data.items()):
-            if len(densities) >= 1:  # 至少有1個案例
-                mean_val = float(np.mean(densities))
-                std_val = float(np.std(densities)) if len(densities) > 1 else 0.0
-                monthly_stats.append(MonthlyStability(
-                    month=month,
-                    mean_value=mean_val,
-                    std_value=std_val,
-                    n_trials=len(densities)  # 這裡代表案例數量，不是Trial數
-                ))
-                monthly_means.append(mean_val)
+        min_cases = 2  # 每側最少案例數
 
-        # 計算總體變異係數（基於月度平均值）
-        if len(monthly_means) >= 2:
-            overall_mean = np.mean(monthly_means)
-            overall_std = np.std(monthly_means, ddof=1)
-            overall_cv = overall_std / abs(overall_mean) if overall_mean != 0 else 0.0
+        for month in all_months:
+            pos_data = pos_monthly.get(month)
+            neg_data = neg_monthly.get(month)
+
+            # 要求兩側都有最小案例數
+            if (not pos_data or len(pos_data["m_values"]) < min_cases or
+                not neg_data or len(neg_data["m_values"]) < min_cases):
+                continue
+
+            # 計算正例加權平均 M
+            pos_weight_sum = sum(pos_data["weights"])
+            pos_mean_m = (
+                sum(m * w for m, w in zip(pos_data["m_values"], pos_data["weights"]))
+                / pos_weight_sum if pos_weight_sum > 0 else 0
+            )
+
+            # 計算反例加權平均 M
+            neg_weight_sum = sum(neg_data["weights"])
+            neg_mean_m = (
+                sum(m * w for m, w in zip(neg_data["m_values"], neg_data["weights"]))
+                / neg_weight_sum if neg_weight_sum > 0 else 0
+            )
+
+            # 月度 M Separation
+            m_separation = pos_mean_m - neg_mean_m
+            monthly_separations.append(m_separation)
+
+            # 存儲為 MonthlyStability (mean_value = M Separation)
+            monthly_stats.append(MonthlyStability(
+                month=month,
+                mean_value=float(m_separation),
+                std_value=0.0,  # 對於 separation 不計算標準差
+                n_trials=len(pos_data["m_values"]) + len(neg_data["m_values"])
+            ))
+
+        # 計算月度 Separation 的 CV
+        if len(monthly_separations) >= 2:
+            mean_sep = np.mean(monthly_separations)
+            std_sep = np.std(monthly_separations, ddof=1)
+            epsilon = 1e-5
+            overall_cv = float(std_sep / max(abs(mean_sep), epsilon))
         else:
             overall_cv = 0.0
 
-        # 識別最差和最佳月份（基於平均密度）
+        # 同時計算整體 M Separation（用於對比）
+        # 使用加權平均而非簡單平均，與信號密度分析保持一致
+        all_pos_m = []
+        all_pos_weights = []
+        all_neg_m = []
+        all_neg_weights = []
+        
+        for month in all_months:
+            if month in pos_monthly:
+                all_pos_m.extend(pos_monthly[month]["m_values"])
+                all_pos_weights.extend(pos_monthly[month]["weights"])
+            if month in neg_monthly:
+                all_neg_m.extend(neg_monthly[month]["m_values"])
+                all_neg_weights.extend(neg_monthly[month]["weights"])
+
+        # 計算加權平均 M
+        if all_pos_m and sum(all_pos_weights) > 0:
+            overall_pos_mean = sum(m * w for m, w in zip(all_pos_m, all_pos_weights)) / sum(all_pos_weights)
+        else:
+            overall_pos_mean = 0
+            
+        if all_neg_m and sum(all_neg_weights) > 0:
+            overall_neg_mean = sum(m * w for m, w in zip(all_neg_m, all_neg_weights)) / sum(all_neg_weights)
+        else:
+            overall_neg_mean = 0
+            
+        overall_m_separation = overall_pos_mean - overall_neg_mean
+
+        # 識別最差/最佳月份（最低/最高 M Separation）
         if monthly_stats:
-            # 假設目標是最大化密度（separation）
             worst_month_stat = min(monthly_stats, key=lambda s: s.mean_value)
             best_month_stat = max(monthly_stats, key=lambda s: s.mean_value)
-
             worst_month_stat.is_worst_month = True
-
             worst_month = worst_month_stat.month
             best_month = best_month_stat.month
         else:
             worst_month = None
             best_month = None
 
+        # 詳細日誌
         self.logger.info(
-            f"Case-month stability analysis: overall_cv={overall_cv:.4f}, "
-            f"monthly_stats={len(monthly_stats)} months, "
-            f"worst_month={worst_month}"
+            f"M Separation stability analysis:\n"
+            f"  - Months included: {len(monthly_stats)} / {len(all_months)} total\n"
+            f"  - Monthly avg M Separation: {mean_sep:.4f} (月度平均)\n"
+            f"  - Overall M Separation: {overall_m_separation:.4f} (整體計算)\n"
+            f"  - CV: {overall_cv:.4f} ({overall_cv*100:.2f}%)\n"
+            f"  - Worst month: {worst_month}\n"
+            f"  - Pos cases total: {len(all_pos_m)}, Neg cases total: {len(all_neg_m)}"
         )
+
+        # 顯示每月詳情
+        if monthly_stats:
+            month_details = []
+            for stat in monthly_stats:
+                month_details.append(
+                    f"{stat.month}: {stat.mean_value:.4f} (n={stat.n_trials})"
+                )
+            self.logger.info(f"Monthly breakdown:\n  " + "\n  ".join(month_details))
 
         return StabilityAnalysis(
             overall_cv=overall_cv,

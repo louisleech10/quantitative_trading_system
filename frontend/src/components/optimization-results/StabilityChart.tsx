@@ -29,7 +29,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
           <p className="font-semibold text-sm">{data.month}</p>
           <div className="mt-2 space-y-1 text-xs">
             <p>
-              <span className="text-muted-foreground">平均值:</span>{' '}
+              <span className="text-muted-foreground">M Separation:</span>{' '}
               <span className="font-mono font-bold">{data.mean_value.toFixed(6)}</span>
             </p>
             <p>
@@ -70,7 +70,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
           </Badge>
         </div>
         <CardDescription>
-          月度表現變異分析
+          M Separation 月度穩定性分析 - CV 值衡量每月正反例差異的穩定性
           {stabilityData.worst_month && (
             <span className="ml-2 text-red-600 font-medium">
               · 最差月份: {stabilityData.worst_month}
@@ -98,7 +98,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
                 className="text-xs"
               />
               <YAxis
-                label={{ value: '平均目標值', angle: -90, position: 'left', className: 'text-xs' }}
+                label={{ value: 'M Separation', angle: -90, position: 'left', className: 'text-xs' }}
                 className="text-xs"
               />
               <Tooltip content={<CustomTooltip />} />

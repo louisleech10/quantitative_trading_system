@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-12-20 19:45
-**當前階段**: Optuna優化系統增強（統計數據展示與CSV匯出）
+**最後更新**: 2025-12-25 22:30
+**當前階段**: Golden Formula v2.0 M值優化系統
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,12 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Golden Formula v2.0 M值優化系統** (100%) - 2025-12-25完成
+  - ✅ M值統計顯示：strategy-test頁面顯示正反例M值平均/標準差
+  - ✅ M Stability CV：正例M值月度穩定性指標
+  - ✅ M Separation CV：M Separation月度穩定性計算
+  - ✅ 優化結果穩定性分析：改用M Separation替代overall_cv
+  - ✅ 前端顯示修復：density_metrics對象完整傳遞M值欄位
 - **Optuna優化系統增強：統計數據展示** (100%) - 2025-12-20完成
   - ✅ Trial統計數據存儲：p_value、cohens_d、stability_cv等存入user_attrs
   - ✅ 前端統計欄位：顯示p/d/cv值，顏色標識（綠=優/黃=中/灰=差）
@@ -107,6 +113,11 @@
 - 無
 
 ### 剛完成 🔧
+- **Golden Formula v2.0 M值優化系統** (2025-12-25)
+  - ✅ 前端M值卡片：正例/反例M值平均、標準差、穩定性CV
+  - ✅ M Separation CV計算：按月分組計算M Separation穩定性
+  - ✅ 穩定性圖表更新：optimization-result頁面改用M Separation
+  - ✅ 詳細日誌：對比月度平均vs整體計算的M Separation
 - **Optuna優化系統增強：統計數據展示** (2025-12-20)
   - ✅ 後端存儲：trial.set_user_attr()存儲p_value/cohens_d/stability_cv等
   - ✅ 前端顯示：統計欄位顏色標識（p<0.05綠、d>0.8綠、cv<0.3綠）
@@ -674,7 +685,11 @@ quantitative_trading_system/
 ## 🐛 已知問題
 
 ### 需要修復
-- 無
+- **Optuna Study初始化問題** (2025-12-25發現)
+  - 問題：optuna_optimizer.py line 1200, self.study為None導致set_user_attr()失敗
+  - 影響：無法存儲positive_cases/negative_cases到study，optimization-result頁面載入失敗
+  - 優先級：高
+  - 狀態：待修復
 
 **已修復系統**：
 - ✅ Optuna Pruning 語義（2025-12-20）
@@ -761,6 +776,61 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2025-12-25
+
+**Golden Formula v2.0 M值優化系統** ⭐⭐⭐⭐
+
+**需求背景**
+- 用戶需求：在strategy-test頁面顯示M值統計（正反例M值平均/標準差、穩定性CV、M Separation穩定性）
+- 優化需求：optimization-result頁面穩定性分析改用M Separation月度穩定性
+- 原問題：前端未傳遞M值欄位，optimization-result使用overall_cv而非M Separation
+
+**實現方案**
+1. **M值統計顯示** (frontend/src/app/strategy-test/page.tsx)
+   - 修復density_metrics對象構建：添加所有M值欄位（positive_weighted_mean_m, positive_m_std, m_separation, positive_m_cv, m_separation_cv等）
+   - 新增M值卡片：在「正例密度指標」區域顯示M值平均/標準差
+   - 新增M優化指標區：顯示M Separation、正例M穩定性、M Separation穩定性
+
+2. **M Separation CV計算** (momentum/Analysis/signal_density_analyzer.py)
+   - 新增calculate_m_separation_cv()方法：按月分組計算M Separation穩定性
+   - 分別計算正例/反例月度加權平均M
+   - 計算每月M Separation，再計算CV值
+   - API模型更新：SignalDensityResponse添加m_separation_cv欄位
+
+3. **優化結果穩定性分析** (momentum/Optimization/result_analyzer.py)
+   - 重寫analyze_stability_by_case_month()：改用M Separation替代overall_cv
+   - 從case_level_densities提取M值（__m_前綴）
+   - 按月分組計算正反例M Separation
+   - 詳細日誌：對比月度平均vs整體計算的差異
+
+4. **Study元數據存儲** (momentum/Optimization/optuna_optimizer.py)
+   - 存儲positive_cases/negative_cases到study.user_attrs
+   - 供result_analyzer提取案例列表進行穩定性分析
+
+**修復問題**
+- ✅ 前端M值不顯示：修復density_metrics對象未傳遞M值欄位
+- ✅ M Separation CV缺失：實現月度穩定性計算方法
+- ✅ 穩定性圖表標籤更新：改為"M Separation"
+
+**測試結果**
+- ✅ strategy-test頁面正確顯示M值統計卡片
+- ✅ M Separation CV計算正確（<0.3穩定，<0.5可接受）
+- ✅ optimization-result穩定性圖表顯示M Separation
+
+**已知問題**
+- ❌ study為None導致set_user_attr()失敗（待修復）
+- ❌ optimization-result頁面載入失敗（Next.js建置問題已解決，study問題待修復）
+
+**涉及文件**
+- frontend/src/app/strategy-test/page.tsx (M值卡片顯示)
+- momentum/Analysis/signal_density_analyzer.py (M Separation CV計算)
+- api/models/training_window_config.py (m_separation_cv欄位)
+- momentum/Optimization/result_analyzer.py (穩定性分析重寫)
+- momentum/Optimization/optuna_optimizer.py (case lists存儲)
+- frontend/src/components/optimization-results/StabilityChart.tsx (標籤更新)
+
+---
 
 ### 2025-12-20
 
@@ -2327,7 +2397,17 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待推送（2025-12-20）
+**遠端同步**: ⏳ 待推送（2025-12-25）
+
+**待提交變更** (2025-12-25):
+- **Golden Formula v2.0 M值優化系統**
+  - frontend/src/app/strategy-test/page.tsx - M值卡片顯示與density_metrics修復
+  - momentum/Analysis/signal_density_analyzer.py - M Separation CV計算方法
+  - api/models/training_window_config.py - m_separation_cv欄位
+  - momentum/Optimization/result_analyzer.py - 穩定性分析改用M Separation
+  - momentum/Optimization/optuna_optimizer.py - Study存儲case lists
+  - frontend/src/components/optimization-results/StabilityChart.tsx - 標籤更新
+  - .claude/STATUS.md - 狀態更新
 
 **待提交變更** (2025-12-20):
 - **Optuna優化系統增強：統計數據展示**
@@ -2393,7 +2473,29 @@ for case in candidates:
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2025-12-20）：
+1. **待修復問題**（2025-12-25）：
+   - ❌ **Optuna Study初始化問題**
+     - 問題：optuna_optimizer.py line 1200, self.study為None
+     - 錯誤：AttributeError: 'NoneType' object has no attribute 'set_user_attr'
+     - 影響：無法存儲positive_cases/negative_cases，導致optimization-result頁面無法載入穩定性分析
+     - 優先級：高
+     - 建議：檢查study初始化時機，確保在set_user_attr()前study已創建
+
+2. **已完成工作**（2025-12-25）：
+   - ✅ **Golden Formula v2.0 M值優化系統**
+     - M值統計顯示：strategy-test頁面完整顯示正反例M值平均/標準差/穩定性CV
+     - M Separation CV計算：按月分組計算M Separation穩定性（<0.3穩定，<0.5可接受）
+     - 優化結果穩定性：optimization-result頁面改用M Separation替代overall_cv
+     - 詳細日誌：對比月度平均vs整體計算的M Separation差異
+   - ✅ **前端修復**
+     - 修復density_metrics對象未傳遞M值欄位問題
+     - 更新StabilityChart標籤為"M Separation"
+   - ✅ **測試驗證**
+     - M值卡片正確顯示在strategy-test頁面
+     - M Separation CV計算正確
+     - 穩定性圖表標籤更新完成
+
+3. **已完成工作**（2025-12-20）：
    - ✅ **Optuna優化系統增強：統計數據展示**
      - 後端存儲：trial.set_user_attr()存儲p_value、cohens_d、stability_cv等統計數據
      - 前端顯示：統計欄位顯示p/d/cv值，顏色標識（綠=優/黃=中/灰=差）

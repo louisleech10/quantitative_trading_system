@@ -92,6 +92,25 @@ interface DensityMetrics {
   negative_near_zero_ratio?: number;
   negative_far_zero_count?: number;
   negative_far_zero_ratio?: number;
+
+  // ========== Golden Formula v2.0 M 值統計 ==========
+  positive_weighted_mean_m?: number;   // μ_pos，範圍 [-1, 1]
+  negative_weighted_mean_m?: number;   // μ_neg，範圍 [-1, 1]
+  positive_m_std?: number;             // σ_pos
+  negative_m_std?: number;             // σ_neg
+  m_separation?: number;               // μ_pos - μ_neg
+  positive_m_cv?: number;              // 月度穩定性 CV
+  m_separation_cv?: number;            // M Separation 月度穩定性 CV
+  positive_total_weight?: number;      // S_pos = Σw_i
+  negative_total_weight?: number;      // S_neg = Σw_i
+  positive_active_cases?: number;      // N_pos^active
+  negative_active_cases?: number;      // N_neg^active
+  optuna_golden_score?: number;        // 黃金公式得分
+
+  // 樣本不足警告 (v2.0 新增)
+  sample_warnings?: string[];
+  excluded_months_count?: number;
+  included_months_count?: number;
 }
 
 interface DataQualitySummary {
@@ -663,6 +682,23 @@ function StrategyTestPageContent() {
                 negative_near_zero_ratio: densityData.negative_near_zero_ratio,
                 negative_far_zero_count: densityData.negative_far_zero_count,
                 negative_far_zero_ratio: densityData.negative_far_zero_ratio,
+
+                // M 值統計 (Golden Formula v2.0)
+                positive_weighted_mean_m: densityData.positive_weighted_mean_m,
+                negative_weighted_mean_m: densityData.negative_weighted_mean_m,
+                positive_m_std: densityData.positive_m_std,
+                negative_m_std: densityData.negative_m_std,
+                m_separation: densityData.m_separation,
+                positive_m_cv: densityData.positive_m_cv,
+                m_separation_cv: densityData.m_separation_cv,
+                positive_total_weight: densityData.positive_total_weight,
+                negative_total_weight: densityData.negative_total_weight,
+                positive_active_cases: densityData.positive_active_cases,
+                negative_active_cases: densityData.negative_active_cases,
+                optuna_golden_score: densityData.optuna_golden_score,
+                sample_warnings: densityData.sample_warnings,
+                excluded_months_count: densityData.excluded_months_count,
+                included_months_count: densityData.included_months_count,
               },
               quality: {
                 total_cases: densityData.positive_sample_size + densityData.negative_sample_size,
@@ -1103,6 +1139,27 @@ function StrategyTestPageContent() {
                     format="number"
                   />
                 )}
+                {densityMetrics?.positive_weighted_mean_m !== undefined && (
+                  <StatMetricCard
+                    label="正例 M 值"
+                    value={densityMetrics.positive_weighted_mean_m}
+                    std={densityMetrics.positive_m_std}
+                    helper="歸一化指標 M ∈ [-1, 1]，越接近 1 表示信號越聚集於近期"
+                    format="decimal"
+                    colorCode={true}
+                  />
+                )}
+                {densityMetrics?.positive_m_cv !== undefined && (
+                  <StatMetricCard
+                    label="正例 M 穩定性 CV"
+                    value={densityMetrics.positive_m_cv}
+                    helper="月度 M 值的變異係數 (<0.3穩定, <0.5可接受)"
+                    format="decimal"
+                    source={densityMetrics.excluded_months_count !== undefined
+                      ? `${densityMetrics.included_months_count || 0}個月納入計算，${densityMetrics.excluded_months_count}個月排除`
+                      : undefined}
+                  />
+                )}
               </div>
             </div>
 
@@ -1148,8 +1205,74 @@ function StrategyTestPageContent() {
                     format="number"
                   />
                 )}
+                {densityMetrics?.negative_weighted_mean_m !== undefined && (
+                  <StatMetricCard
+                    label="反例 M 值"
+                    value={densityMetrics.negative_weighted_mean_m}
+                    std={densityMetrics.negative_m_std}
+                    helper="歸一化指標 M ∈ [-1, 1]，反例應接近 0 或負值"
+                    format="decimal"
+                    colorCode={true}
+                  />
+                )}
               </div>
             </div>
+
+            {/* M 值優化指標 (Golden Formula v2.0) */}
+            {(densityMetrics?.m_separation !== undefined || densityMetrics?.optuna_golden_score !== undefined) && (
+              <div className="mt-5">
+                <div className="text-sm font-semibold text-slate-700 mb-3">M 值優化指標</div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {densityMetrics?.m_separation !== undefined && (
+                    <StatMetricCard
+                      label="M Separation"
+                      value={densityMetrics.m_separation}
+                      helper="正反例 M 值差異 (μ_pos - μ_neg)"
+                      format="decimal"
+                      colorCode={true}
+                      source="= 正例加權平均 M − 反例加權平均 M"
+                    />
+                  )}
+                  {densityMetrics?.m_separation_cv !== undefined && (
+                    <StatMetricCard
+                      label="M Separation 穩定性"
+                      value={densityMetrics.m_separation_cv}
+                      helper="M Separation 月度穩定性 (<0.3穩定, <0.5可接受)"
+                      format="decimal"
+                      source="= Std(每月M差異) / |Mean(每月M差異)|"
+                    />
+                  )}
+                  {densityMetrics?.optuna_golden_score !== undefined && (
+                    <StatMetricCard
+                      label="Golden Score"
+                      value={densityMetrics.optuna_golden_score}
+                      helper="黃金公式得分 (Optuna 優化目標)"
+                      format="decimal"
+                      colorCode={true}
+                      source="= M Separation − λ×(σ_pos + 0.5×σ_neg)"
+                    />
+                  )}
+                  {densityMetrics?.positive_total_weight !== undefined && (
+                    <StatMetricCard
+                      label="正例信號強度"
+                      value={densityMetrics.positive_total_weight}
+                      helper="正例權重總和 (Near + Far 信號數)"
+                      format="decimal"
+                      source={`有效案例: ${densityMetrics.positive_active_cases || 0}`}
+                    />
+                  )}
+                  {densityMetrics?.negative_total_weight !== undefined && (
+                    <StatMetricCard
+                      label="反例信號強度"
+                      value={densityMetrics.negative_total_weight}
+                      helper="反例權重總和 (Near + Far 信號數)"
+                      format="decimal"
+                      source={`有效案例: ${densityMetrics.negative_active_cases || 0}`}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 統計檢驗指標 */}
             <div className="mt-5">
@@ -1179,7 +1302,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.p_value}
                     helper="統計顯著性 (<0.05為顯著)"
                     format="decimal"
-                    source="獨立 t-test: 正例 Near 密度 vs 反例 Near 密度"
+                    source="獨立 t-test: 正例 M 值 vs 反例 M 值"
                   />
                 )}
                 {densityMetrics?.cohens_d !== undefined && (
@@ -1188,8 +1311,7 @@ function StrategyTestPageContent() {
                     value={densityMetrics.cohens_d}
                     helper="效果量 (>0.5為中等, >0.8為大效果)"
                     format="decimal"
-                    source="= (正例 NEAR 密度均值 − 反例 NEAR 密度均值) / 合併標準差, 
-                    [合併標準差 = sqrt( ((n1-1)×std1² + (n2-1)×std2²) / (n1+n2-2)); n1, n2 = 樣本數; std1, std2 = 標準差]"
+                    source="= (正例 M 均值 − 反例 M 均值) / 合併標準差"
                   />
                 )}
                 {densityMetrics?.stability_cv !== undefined && (
@@ -1221,6 +1343,31 @@ function StrategyTestPageContent() {
                 )}
               </div>
             </div>
+
+            {/* 樣本不足警告 */}
+            {densityMetrics?.sample_warnings && densityMetrics.sample_warnings.length > 0 && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center gap-2 text-amber-800">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-sm font-medium">樣本警告</span>
+                </div>
+                <ul className="mt-2 list-inside list-disc text-xs text-amber-700">
+                  {densityMetrics.sample_warnings.map((warning, i) => (
+                    <li key={i}>{warning}</li>
+                  ))}
+                </ul>
+                {densityMetrics.excluded_months_count !== undefined && densityMetrics.excluded_months_count > 0 && (
+                  <p className="mt-2 text-xs text-amber-600">
+                    {densityMetrics.excluded_months_count} 個月份因樣本不足被排除於穩定性計算
+                    {densityMetrics.included_months_count !== undefined && (
+                      <span>（納入 {densityMetrics.included_months_count} 個月份）</span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* 零值統計 (v1.1 新增) */}
             {(densityMetrics?.positive_far_zero_count !== undefined ||

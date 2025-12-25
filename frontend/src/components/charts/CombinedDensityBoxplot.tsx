@@ -72,18 +72,18 @@ function calculateBoxPlotStats(values: number[]): BoxPlotStats {
 /**
  * Combined Density Boxplot Chart
  *
- * Displays three side-by-side boxplots for Near, Far, and Ratio densities
+ * Displays four side-by-side boxplots for Near, Far, Ratio, and M value densities
  */
 export default function CombinedDensityBoxplot({
   caseLevelDensities,
   positiveCases,
   negativeCases,
-  title = "密度分佈對比 (Near / Far / Ratio)",
+  title = "密度分佈對比 (Near / Far / Ratio / M 值)",
 }: CombinedDensityBoxplotProps) {
-  // Calculate boxplot data for all three metrics
+  // Calculate boxplot data for all four metrics
   const allStats = useMemo(() => {
     // Helper function to extract densities by mode
-    const extractDensities = (cases: string[], mode: "near" | "far" | "ratio") => {
+    const extractDensities = (cases: string[], mode: "near" | "far" | "ratio" | "m") => {
       return cases
         .map((caseId) => {
           if (mode === "ratio") {
@@ -97,6 +97,10 @@ export default function CombinedDensityBoxplot({
               return near / far;
             }
             return undefined;
+          } else if (mode === "m") {
+            // Extract M value (Golden Formula v2.0)
+            const mKey = `__m_${caseId}`;
+            return caseLevelDensities[mKey];
           } else {
             const key = mode === "far" ? `__far_${caseId}` : `__near_${caseId}`;
             return caseLevelDensities[key] ?? caseLevelDensities[caseId];
@@ -117,6 +121,10 @@ export default function CombinedDensityBoxplot({
       ratio: {
         positive: calculateBoxPlotStats(extractDensities(positiveCases, "ratio")),
         negative: calculateBoxPlotStats(extractDensities(negativeCases, "ratio")),
+      },
+      m: {
+        positive: calculateBoxPlotStats(extractDensities(positiveCases, "m")),
+        negative: calculateBoxPlotStats(extractDensities(negativeCases, "m")),
       },
     };
   }, [caseLevelDensities, positiveCases, negativeCases]);
@@ -144,29 +152,37 @@ export default function CombinedDensityBoxplot({
       };
     };
 
+    // M 值的範圍固定在 [-1, 1] 附近
+    const mRange = calculateRange(allStats.m.positive, allStats.m.negative);
+    // 確保 M 值範圍至少包含 [-1, 1]
+    mRange.min = Math.min(mRange.min, -1.1);
+    mRange.max = Math.max(mRange.max, 1.1);
+
     return {
       near: calculateRange(allStats.near.positive, allStats.near.negative),
       far: calculateRange(allStats.far.positive, allStats.far.negative),
       ratio: calculateRange(allStats.ratio.positive, allStats.ratio.negative),
+      m: mRange,
     };
   }, [allStats]);
 
   // Chart dimensions
-  const chartWidth = 1200;
+  const chartWidth = 1400;
   const chartHeight = 500;
   const margin = { top: 40, right: 40, bottom: 100, left: 60 };
   const plotWidth = chartWidth - margin.left - margin.right;
   const plotHeight = chartHeight - margin.top - margin.bottom;
 
-  // Divide plot into 3 sections (Near, Far, Ratio)
-  const sectionWidth = plotWidth / 3;
-  const boxWidth = 50;
+  // Divide plot into 4 sections (Near, Far, Ratio, M)
+  const sectionWidth = plotWidth / 4;
+  const boxWidth = 40;
 
   // Positions for each metric section with their Y-axis ranges
   const sections = [
     { name: "Near Density", x: 0, stats: allStats.near, range: yRanges.near },
     { name: "Far Density", x: sectionWidth, stats: allStats.far, range: yRanges.far },
     { name: "Ratio (Near/Far)", x: sectionWidth * 2, stats: allStats.ratio, range: yRanges.ratio },
+    { name: "M 值 (v2.0)", x: sectionWidth * 3, stats: allStats.m, range: yRanges.m },
   ];
 
   // Create scale function for a specific Y-axis range
@@ -288,7 +304,7 @@ export default function CombinedDensityBoxplot({
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
         <p className="text-sm text-slate-500">
-          橫向對比三種密度指標的分佈情況 (各有獨立Y軸): Near (近期密度), Far (遠期密度), Ratio (近遠比)
+          橫向對比四種密度指標的分佈情況 (各有獨立Y軸): Near (近期密度), Far (遠期密度), Ratio (近遠比), M 值 (歸一化指標)
         </p>
       </div>
 
@@ -439,8 +455,8 @@ export default function CombinedDensityBoxplot({
         </svg>
       </div>
 
-      {/* Statistics Summary - Three Columns */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
+      {/* Statistics Summary - Four Columns */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Near Density Stats */}
         <div className="space-y-3">
           <h4 className="text-center font-semibold text-slate-700 border-b pb-2">
@@ -541,6 +557,41 @@ export default function CombinedDensityBoxplot({
               <p>
                 範圍: [{allStats.ratio.negative.min.toFixed(4)},{" "}
                 {allStats.ratio.negative.max.toFixed(4)}]
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* M Value Stats (Golden Formula v2.0) */}
+        <div className="space-y-3">
+          <h4 className="text-center font-semibold text-slate-700 border-b pb-2">
+            M 值 (v2.0)
+          </h4>
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-green-900">正例</h5>
+            <div className="space-y-0.5 text-xs text-green-700">
+              <p>中位數: {allStats.m.positive.median.toFixed(4)}</p>
+              <p>
+                平均值: {allStats.m.positive.mean.toFixed(4)} (±
+                {allStats.m.positive.std.toFixed(4)})
+              </p>
+              <p>
+                範圍: [{allStats.m.positive.min.toFixed(4)},{" "}
+                {allStats.m.positive.max.toFixed(4)}]
+              </p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-red-900">反例</h5>
+            <div className="space-y-0.5 text-xs text-red-700">
+              <p>中位數: {allStats.m.negative.median.toFixed(4)}</p>
+              <p>
+                平均值: {allStats.m.negative.mean.toFixed(4)} (±
+                {allStats.m.negative.std.toFixed(4)})
+              </p>
+              <p>
+                範圍: [{allStats.m.negative.min.toFixed(4)},{" "}
+                {allStats.m.negative.max.toFixed(4)}]
               </p>
             </div>
           </div>
