@@ -9,6 +9,11 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Optuna優化系統Bug修復：Study初始化與權重加權** (100%) - 2025-12-26完成
+  - ✅ Study初始化順序：create_study()提前至使用前（避免NoneType錯誤）
+  - ✅ 權重資料存儲：case_weights存入trial.user_attrs（__weight_前綴）
+  - ✅ 穩定性分析加權：result_analyzer使用加權平均計算M Separation
+  - ✅ 向後兼容：舊優化任務自動降級為等權重
 - **Golden Formula v2.0 M值優化系統** (100%) - 2025-12-25完成
   - ✅ M值統計顯示：strategy-test頁面顯示正反例M值平均/標準差
   - ✅ M Stability CV：正例M值月度穩定性指標
@@ -110,7 +115,7 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-- 無
+- 無（等待用戶重新運行優化任務驗證修復）
 
 ### 剛完成 🔧
 - **Golden Formula v2.0 M值優化系統** (2025-12-25)
@@ -151,7 +156,14 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**PHASE4 測試驗證與系統完善**（優先級：高）
+**驗證修復並繼續PHASE4測試**（優先級：高）
+
+1. **驗證穩定性分析修復**
+   - 重新運行優化任務（舊任務沒有權重資料）
+   - 確認Overall M Separation = 0.1392（與單參數一致）
+   - 確認穩定性CV值正確
+
+2. **繼續PHASE4測試驗證**（依 PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
 
 1. **繼續 PHASE4 測試**（依 PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
    - 測試案例4：優化歷史記錄表
@@ -678,18 +690,15 @@ quantitative_trading_system/
 ├── ✅ momentum/          # 核心業務邏輯（Case Search）
 ├── .claude/             # 工作狀態文件（新建）
 └── ✅ requirements.txt  # Python依賴
-```
-
----
-
-## 🐛 已知問題
+``無
 
 ### 需要修復
 - **Optuna Study初始化問題** (2025-12-25發現)
   - 問題：optuna_optimizer.py line 1200, self.study為None導致set_user_attr()失敗
   - 影響：無法存儲positive_cases/negative_cases到study，optimization-result頁面載入失敗
   - 優先級：高
-  - 狀態：待修復
+  - 狀態：待修復Study初始化與穩定性計算加權（2025-12-26）
+- ✅ Optuna 
 
 **已修復系統**：
 - ✅ Optuna Pruning 語義（2025-12-20）
@@ -780,7 +789,55 @@ quantitative_trading_system/
 ### 2025-12-25
 
 **Golden Formula v2.0 M值優化系統** ⭐⭐⭐⭐
+6
 
+**Optuna優化系統Bug修復：Study初始化與加權平均** ⭐⭐⭐⭐⭐
+
+**問題診斷**
+- 用戶問題1：optimization-result頁面載入失敗（study初始化錯誤）
+- 用戶問題2：優化結果Overall M Separation (0.1715) 與單參數測試(0.1392)不一致
+
+**根因分析**
+1. **Study初始化順序錯誤**
+   - optuna_optimizer.py L1200嘗試使用self.study.set_user_attr()
+   - 但create_study()在L1229才調用，導致self.study=None
+   - 結果：AttributeError: 'NoneType' object has no attribute 'set_user_attr'
+
+2. **穩定性分析計算方法不一致**
+   - 信號密度分析：使用加權平均M（權重=信號數量）
+   - 穩定性分析：使用簡單平均M（等權重1.0）
+   - 差異原因：權重資料未存儲到trial user_attrs
+
+**核心修復**（3個文件）
+
+1. **Study初始化順序修復**（momentum/Optimization/optuna_optimizer.py）
+   - 將create_study()調用從L1229移至L1203（使用前）
+   - 確保self.study在使用前已初始化
+
+2. **權重資料存儲**（momentum/Analysis/signal_density_analyzer.py）
+   - L1710-1716：將case_weights存入case_level_densities
+   - 格式：__weight_{case_id} → 權重值（信號數量）
+
+3. **穩定性分析加權平均**（momentum/Optimization/result_analyzer.py）
+   - L604-620：從case_level_densities提取權重資料
+   - L692-714：使用加權平均計算Overall M Separation
+   - 向後兼容：舊任務沒有權重時自動降級為等權重
+
+**預期結果**
+- ✅ Study初始化不再報錯
+- ✅ 新優化任務Overall M Separation = 0.1392（與單參數一致）
+- ✅ 舊優化任務顯示警告但仍可運行（等權重）
+
+**影響範圍**
+- 修改文件：3個（optimizer, analyzer, result_analyzer）
+- 數據兼容：舊任務自動降級，新任務使用加權
+
+**測試狀態**
+- ⚠️ 等待用戶重新運行優化任務驗證
+
+---
+
+### 2025-12-2
 **需求背景**
 - 用戶需求：在strategy-test頁面顯示M值統計（正反例M值平均/標準差、穩定性CV、M Separation穩定性）
 - 優化需求：optimization-result頁面穩定性分析改用M Separation月度穩定性
@@ -2349,6 +2406,12 @@ for case in candidates:
 - 大數據（8768根K線）：平均讀取2.1秒（目標0.05秒，待優化）
 - API調用減少：95%+
 
+
+**最新提交**（2025-12-26）
+- ✅ 3個文件修改（optimizer, analyzer, result_analyzer）
+- ✅ 待推送：修復Study初始化與加權平均計算
+
+
 ### 2025-09-30
 **文檔系統建立**
 - ✅ 完成5份核心文檔（共11,200行）
@@ -2416,7 +2479,19 @@ for case in candidates:
   - docs/Optuna 參數優化系統文檔.md - 新增系統文檔
   - .claude/STATUS.md - 狀態更新
 - **Optuna優化系統完善**
-  - momentum/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueError）
+  - momentu
+
+**優先任務**
+1. 驗證Study初始化修復（重新運行優化任務）
+2. 確認Overall M Separation一致性（0.1392 vs 0.1392）
+3. 推送Git提交並繼續PHASE4測試
+
+**提醒事項**
+- 舊優化任務會使用等權重（發出警告但正常運行）
+- 新優化任務會使用真實權重（加權平均）
+- 需要重新運行優化才能驗證修復
+
+m/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueError）
   - momentum/Analysis/strategies/three_line_strategy.py - 業務邏輯約束移除
   - frontend/src/components/ui/select.tsx - Select組件衝突修復
   - frontend/src/app/strategy-test/page.tsx - CustomSelect使用
