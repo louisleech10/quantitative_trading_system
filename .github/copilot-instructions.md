@@ -1,14 +1,17 @@
 # AI Agent Instructions for Quantitative Trading System
 
-> Quick reference guide for AI coding agents (GitHub Copilot, Claude, Cursor, etc.)
+> Quick reference guide for AI coding agents (GitHub Copilot, Claude, Cursor, etc.)  
+> **Last Updated**: 2026-01-01 | **Version**: 2.0
 
 ## 🎯 System Overview
 
 **ML-first strategy research platform** — discover trading patterns from historical data, not just backtest known strategies.
 
-**Architecture**: FastAPI backend (`api/`) → Core engines (`momentum/`) → Next.js frontend (`frontend/`) → HDF5 data storage (`data_cache/`)
+**Architecture**: FastAPI backend (`api/`) → Core engines (`momentum/`) → Next.js 15 frontend (`frontend/`) → HDF5 data storage (`data_cache/`)
 
 **Key distinction**: This is a *research platform*, not an execution system. Focus: pattern discovery → ML optimization → backtesting.
+
+**Current Status** (2026 Q1): Phase 3 completed (optimization system, chart signals). Active development on Phase 4 (pattern discovery).
 
 ---
 
@@ -16,23 +19,37 @@
 
 ### Backend (`api/`)
 - **`api/main.py`** - FastAPI app entry, lifespan management, router registration
-- **`api/routes/`** - Thin route handlers (case_search.py, chart.py, config.py, two_stage_search.py)
-- **`api/services/`** - Heavy business logic (search_task_service.py, batch_download_service.py, chart_data_service.py)
+- **`api/routes/`** - Thin route handlers (case_search.py, chart.py, config.py, optimization.py, signal_analysis.py)
+- **`api/services/`** - Heavy business logic:
+  - `search_task_service.py` - Async case search orchestration
+  - `optimization_task_service.py` - Optuna hyperparameter optimization
+  - `chart_data_service.py`, `chart_signal_service.py` - Chart data & signal generation
+  - `batch_download_service.py` - Parallel kline data download
+  - `signal_analysis_service.py` - Signal statistics & density analysis
 - **`api/core/`** - Config (Settings from pydantic-settings), logging (ColoredFormatter), middleware
 - **`api/models/`** - Pydantic request/response models
+- **`api/websocket/`** - WebSocket handlers (optimization_ws.py - real-time optimization progress)
 
 ### Core Engines (`momentum/`)
 - **`momentum/DataExtraction/`** - Case search engine, parallel search, kline download, HDF5 storage
-  - `case_search_engine.py` - 20-parameter search framework with FilterCondition class
-  - `parallel_search_engine.py` - Async multi-symbol concurrent search
+  - `case_search_engine.py` - 30-parameter search framework (6 trigger + 24 future performance + 2 counter-example)
+  - `parallel_search_engine.py` - Async multi-symbol concurrent search with retry logic
   - `kline_storage.py` - HDF5 read/write/append operations with metadata management
 - **`momentum/Indicator/`** - Technical indicator modules (pure functions, accept/return DataFrames)
+- **`momentum/Optimization/`** - Optuna-based parameter optimization system
+- **`momentum/Analysis/`** - Signal analysis, density calculation, statistical testing
 
 ### Frontend (`frontend/src/`)
 - **`app/`** - Next.js 15 App Router pages (page.tsx, layout.tsx)
-- **`components/`** - React components (charts/, shared UI)
-- **`store/`** - Zustand state management (searchStore.ts - global search results/config)
+- **`components/`** - React components:
+  - `charts/` - Lightweight Charts integration (TakerRatioChart, MultiPaneChartNew)
+  - `optimization/` - 9+ components (MetricsPanel, DensityComparisonChart, StabilityChart, TrialHistoryTable)
+  - `search/`, `case/` - Search interface and case management
+- **`store/`** - Zustand state management:
+  - `searchStore.ts` - Global search results/config
+  - `optimizationStore.ts` - Optimization task state & results
 - **`lib/types.ts`** - TypeScript interfaces matching backend models
+- **`hooks/`** - Custom React hooks (useWebSocket for optimization progress)
 
 ### Data (`data_cache/`)
 - **HDF5 files** - `{SYMBOL}_{timeframe}.h5` (e.g., BTCUSDT_12h.h5)
@@ -55,17 +72,31 @@ cd frontend
 npm install
 npm run dev  # → http://localhost:3000
 
-# Tests (pytest expected but not explicitly configured)
-python test_kline_downloader.py  # Run individual test files
+# Tests (pytest configured in pytest.ini)
+pytest                           # Run all tests
+pytest tests/api/                # Backend tests only
+pytest -v --tb=short             # Verbose with short tracebacks
+python test_kline_downloader.py  # Legacy standalone test files
+
+# Development
+pytest --cov=momentum --cov-report=html  # Coverage report
 ```
 
-**Environment variables**: Set `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` (checked in `api/core/config.py`). Not required for all features but needed for live data downloads.
+**Environment variables**: Set `BINANCE_API_KEY` and `BINANCE_SECRET_KEY` in `.env` (see `api/core/config.py`). Optional for most features but required for live data downloads.
 
 ---
 
 ## 🔑 Project-Specific Patterns
 
-### Data Truth Principle
+### 0. First Principle Thinking
+```
+All code and architecture decisions start from First Principles
+Ask "why" until you reach fundamental truths
+Challenge assumptions before implementing
+Document the reasoning behind non-obvious decisions
+```
+
+### 1. Data Truth Principle
 ```python
 # ❌ NEVER do this
 symbols = ['BTC', 'ETH', 'DOGE']  # Hardcoded data
@@ -76,7 +107,7 @@ symbols = config.get_symbols()  # From config/API
 prices = binance_client.get_prices(symbols)  # Real source
 ```
 
-### Logging Standards
+### 2. Logging Standards
 ```python
 # Use api.core.logging.get_logger()
 from api.core.logging import get_logger
@@ -85,13 +116,37 @@ logger = get_logger(__name__)
 # ✅ Good patterns
 logger.info(f"Processing {len(symbols)} symbols")  # INFO for normal flow
 logger.error(f"Failed to download {symbol}: {str(e)}", exc_info=True)  # ERROR with traceback
+logger.warning("API key not set, limited functionality")  # WARN for degraded state
 
 # ❌ Avoid
-print("Debug message")  # Use logger
+print("Debug message")  # Use logger instead
 logger.debug("Loop iteration 12453")  # Too noisy in tight loops
+logger.info(f"Processing {symbol}")  # Inside hot loops - log summaries instead
 ```
 
-### Error Classification & Retry Logic
+### 3. Ultra Think Development Process
+```
+MANDATORY 3-step process for all code generation:
+
+Step 1 - Initial Generation:
+  Generate working code that implements the feature
+  Include basic error handling and logging
+  Focus on correctness, not perfection
+
+Step 2 - Self Review:
+  Review Step 1 code and create To-do List
+  Check: fake data? error handling? logs? naming? duplicates? performance? security?
+  Output: List of improvements (DO NOT modify code yet)
+
+Step 3 - Optimize & Refactor:
+  Apply all items from Step 2 To-do List
+  Generate production-ready final version
+  Add comments for complex logic
+
+See docs/DEVELOPMENT_GUIDE.md for detailed examples and checklist
+```
+
+### 4. Error Classification & Retry Logic
 ```python
 # Pattern from parallel_search_engine.py, kline_storage.py
 from enum import Enum
@@ -110,7 +165,7 @@ def classify_error(error: Exception) -> FailureType:
 # Apply backoff for retryable errors
 ```
 
-### Async Service Pattern (FastAPI + asyncio)
+### 5. Async Service Pattern (FastAPI + asyncio)
 ```python
 # api/services/ pattern
 class SearchTaskService:
@@ -129,7 +184,7 @@ class SearchTaskService:
             self.task_manager.update_status(task_id, "failed", error=str(e))
 ```
 
-### HDF5 Storage Operations
+### 6. HDF5 Storage Operations
 ```python
 # Pattern from momentum/DataExtraction/kline_storage.py
 import h5py
@@ -146,7 +201,7 @@ df = pd.read_hdf(hdf5_path, key=f"{symbol}/{timeframe}")
 df_filtered = df[(df['open_time'] >= start_ms) & (df['close_time'] <= end_ms)]
 ```
 
-### Frontend State Management (Zustand)
+### 7. Frontend State Management (Zustand)
 ```typescript
 // frontend/src/store/searchStore.ts pattern
 import { create } from 'zustand';
@@ -167,29 +222,105 @@ export const useSearchStore = create<SearchState>((set) => ({
 const { currentResult, setSearchResult } = useSearchStore();
 ```
 
+### 8. WebSocket Real-Time Updates
+```python
+# Pattern from api/websocket/optimization_ws.py
+from fastapi import WebSocket
+
+@router.websocket("/ws/optimization/{task_id}")
+async def optimization_progress(websocket: WebSocket, task_id: str):
+    await websocket.accept()
+    try:
+        while True:
+            progress = await task_service.get_progress(task_id)
+            await websocket.send_json(progress)
+            if progress["status"] in ["completed", "failed"]:
+                break
+            await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        logger.info(f"Client disconnected from task {task_id}")
+```
+
+### 9. Frontend Component Patterns (Ultra Think)
+```typescript
+// Pattern from frontend/src/components/optimization/*.tsx
+// All major components follow this structure:
+
+/**
+ * ComponentName.tsx
+ * 
+ * STEP 1 - THINK: Purpose and requirements
+ * STEP 2 - REVIEW: Issues to address
+ * STEP 3 - OPTIMIZE: Final implementation
+ * 
+ * Features:
+ * - Feature 1 description
+ * - Feature 2 description
+ */
+
+// Empty state handling
+if (!data || data.length === 0) {
+  return <EmptyState message="No data available" />;
+}
+
+// PNG export for charts
+const handleExportPNG = () => {
+  const element = chartRef.current;
+  html2canvas(element).then(canvas => {
+    const link = document.createElement('a');
+    link.download = `${componentName}_${Date.now()}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+  });
+};
+
+// Custom tooltips with detailed info
+const CustomTooltip = ({ active, payload }: TooltipProps) => {
+  if (!active || !payload?.[0]) return null;
+  return (
+    <div className="bg-white p-3 border rounded shadow-lg">
+      {/* Detailed info display */}
+    </div>
+  );
+};
+```
+
 ---
 
 ## 🧪 Testing Approach
 
-**Location**: Top-level `test_*.py` files (not in a `tests/` directory)  
-**Framework**: Standard Python (no pytest fixtures visible, but pytest expected)  
-**Pattern**: Function-based tests with descriptive names
+**Location**: `tests/` directory (formal pytest structure) + legacy top-level `test_*.py`  
+**Framework**: pytest (configured in `pytest.ini`)  
+**Pattern**: Function-based tests with Chinese docstrings for clarity
 
 ```python
-# Example from test_kline_downloader.py
+# Modern pattern - tests/api/test_optimization.py
+import pytest
+from api.services.optimization_task_service import OptimizationTaskService
+
+@pytest.fixture
+async def optimization_service():
+    return OptimizationTaskService()
+
+async def test_start_optimization_task(optimization_service):
+    """測試啟動優化任務"""
+    result = await optimization_service.start_task(config)
+    assert result["status"] == "running"
+
+# Legacy pattern - test_kline_downloader.py (still valid)
 def test_1_single_download_ethusdt():
     """測試1: 單一標的下載 - ETHUSDT 12小時"""
     logger.info("開始測試1...")
-    # Test implementation with detailed logging
-    
-def test_4_storage_integration():
-    """測試4: HDF5存儲整合 - 驗收標準: 數據自動保存到HDF5，可以正確讀取"""
+    # Direct test execution with detailed logging
 ```
 
-**Run tests individually** (no suite runner discovered):
+**Run tests**:
 ```bash
-python test_kline_downloader.py
-python test_kline_storage.py
+pytest                    # All tests with pytest
+pytest -v --tb=short      # Verbose with short tracebacks
+pytest -m "not slow"      # Skip slow tests
+pytest tests/api/         # Specific directory
+python test_*.py          # Legacy standalone tests
 ```
 
 ---
@@ -222,14 +353,17 @@ price_change_pct = (df['close'] / df['open'] - 1)
 ## 📋 Pre-Commit Checklist
 
 Before submitting code:
-- [ ] No hardcoded symbols/prices/fake data
-- [ ] All external API calls have try/except with error classification
-- [ ] Logging: INFO for key events, ERROR with `exc_info=True`
-- [ ] Variables named clearly (no `df1`, `temp`, `x`)
-- [ ] Vectorized operations where applicable (check pandas docs)
-- [ ] Update `docs/` if architecture/API changes (ARCHITECTURE.md, API_SPECIFICATION.md)
-- [ ] Add test case or smoke test for new features
-- [ ] No large binary files staged for commit (check `.gitignore` for `data_cache/`)
+- [ ] **Ultra Think completed**: Step 1 (generate) → Step 2 (review) → Step 3 (optimize)
+- [ ] **No hardcoded data**: No symbols/prices/fake data (Data Truth Principle)
+- [ ] **Error handling**: All external API calls have try/except with error classification
+- [ ] **Logging**: INFO for key events, ERROR with `exc_info=True`, no logs in hot loops
+- [ ] **Naming**: Variables clearly named (no `df1`, `temp`, `x`)
+- [ ] **Performance**: Vectorized operations where applicable (pandas/numpy first)
+- [ ] **Type hints**: All functions have proper type annotations
+- [ ] **Tests**: New features have test coverage (pytest for backend, manual for frontend)
+- [ ] **Docs**: Update `docs/` if architecture/API changes (ARCHITECTURE.md, API_SPECIFICATION.md)
+- [ ] **Git**: No large binary files staged (check `.gitignore` for `data_cache/`, `*.h5`)
+- [ ] **Frontend**: TypeScript compilation passes, no console errors, responsive design tested
 
 ---
 
@@ -252,24 +386,137 @@ Before submitting code:
 1. **Breaking API contracts** - Changes in `api/models/` must be backward-compatible or versioned
 2. **Replacing vectorized code with loops** - Always benchmark before changing existing numeric algorithms
 3. **Committing HDF5/CSV data** - Check `.gitignore`, use `data_cache/` directory only
-4. **Ignoring error types** - Not all errors should be retried (classify first)
-5. **Over-logging in loops** - Kills performance; log summaries instead
+4. **Ignoring error types** - Not all errors should be retried (classify: rate_limit vs network vs invalid_symbol)
+5. **Over-logging in loops** - Kills performance; log summaries instead (e.g., "Processed 1000 symbols in 5.2s")
 6. **Mixing UI and logic** - Keep route handlers thin; heavy work goes in `api/services/`
+7. **Skipping Ultra Think** - All code must go through 3-step process (THINK → REVIEW → OPTIMIZE)
+8. **Hardcoded chart dimensions** - Use responsive design and handle empty/loading states
+9. **Missing TypeScript types** - All props, state, and API responses must be typed
+10. **Async without error boundaries** - Wrap async operations with proper try/catch and user feedback
+
+---
+
+## 🎨 UI/UX Patterns
+
+### Component Structure (from optimization UI)
+```
+1. Empty state handling (no data message)
+2. Loading state (skeleton or spinner)
+3. Error state (retry button, error message)
+4. Main content (responsive grid/flex)
+5. Export functionality (PNG for charts, CSV for tables)
+6. Keyboard shortcuts (Ctrl+A, Escape for tables)
+7. Tooltips (custom with detailed info)
+8. Color coding (green=good, yellow=medium, red=bad)
+```
+
+### Chart Best Practices
+```typescript
+// Responsive container
+<ResponsiveContainer width="100%" height={400}>
+
+// Always include empty state
+if (!data || data.length === 0) return <EmptyStateComponent />;
+
+// Custom tooltips for clarity
+<Tooltip content={<CustomTooltip />} />
+
+// Export functionality
+<button onClick={handleExportPNG}>Export PNG</button>
+
+// Color scales for data visualization
+const getColor = (value: number) => {
+  if (value > threshold1) return 'text-green-600';
+  if (value > threshold2) return 'text-yellow-600';
+  return 'text-red-600';
+};
+```
+
+---
+
+## 🔧 Configuration Management
+
+### Backend Config Pattern
+```python
+# api/core/config.py - Pydantic Settings
+from pydantic_settings import BaseSettings
+from pydantic import Field
+
+class Settings(BaseSettings):
+    # Use Field() for env var mapping and defaults
+    debug: bool = Field(default=False, env="DEBUG")
+    api_prefix: str = "/api/v1"
+    
+    # Path handling with Path objects
+    data_cache_path: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache"
+    )
+    
+    class Config:
+        env_file = ".env"
+        extra = "allow"  # Allow extra fields for extensibility
+```
+
+### Frontend Config Pattern
+```typescript
+// lib/config.ts or constants.ts
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+
+// Chart defaults
+export const CHART_COLORS = {
+  positive: '#10b981',  // green-500
+  negative: '#ef4444',  // red-500
+  neutral: '#6b7280',   // gray-500
+};
+```
+
+---
+
+## 📊 Data Flow Examples
+
+### Case Search Flow
+```
+1. User inputs search params → frontend/src/app/search/page.tsx
+2. POST /api/v1/search/execute → api/routes/case_search.py
+3. SearchTaskService.execute() → api/services/search_task_service.py
+4. CaseSearchEngine.search() → momentum/DataExtraction/case_search_engine.py
+5. Results saved to CSV → data_cache/cases.json
+6. Frontend polls GET /api/v1/search/task/{id} for status
+7. Display results in ResultsTable component
+```
+
+### Optimization Flow
+```
+1. User clicks "Start Optimization" → frontend/src/app/optimization/page.tsx
+2. POST /api/v1/optimization/start → api/routes/optimization.py
+3. WebSocket connection opened → api/websocket/optimization_ws.py
+4. OptimizationTaskService runs Optuna study → api/services/optimization_task_service.py
+5. Real-time progress via WebSocket → frontend receives updates
+6. Results stored and analyzed → display in MetricsPanel, DensityChart, etc.
+7. Export available (CSV for trials, PNG for charts)
+```
 
 ---
 
 ## 🔍 Finding Examples
 
 **Need to add a case search filter?**  
-→ See `momentum/DataExtraction/case_search_engine.py` (FilterCondition class, evaluate method)
+→ [momentum/DataExtraction/case_search_engine.py](momentum/DataExtraction/case_search_engine.py) (FilterCondition class, 30-parameter framework)
 
 **Need to add an API endpoint?**  
-→ Copy pattern from `api/routes/case_search.py`, implement service in `api/services/`
+→ Copy pattern from [api/routes/optimization.py](api/routes/optimization.py), implement service in `api/services/`
 
 **Need to add a chart component?**  
-→ See `frontend/src/components/charts/TakerRatioChart.tsx` (Lightweight Charts integration)
+→ [frontend/src/components/charts/MultiPaneChartNew.tsx](frontend/src/components/charts/MultiPaneChartNew.tsx) (Lightweight Charts with synchronized panes)
+
+**Need to add an optimization component?**  
+→ [frontend/src/components/optimization/MetricsPanel.tsx](frontend/src/components/optimization/MetricsPanel.tsx) (responsive grid, color-coded metrics, tooltips)
 
 **Need to add a technical indicator?**  
-→ See `momentum/Indicator/Base_Indicator_Reference.py` (pure function pattern)
+→ [momentum/Indicator/Base_Indicator_Reference.py](momentum/Indicator/Base_Indicator_Reference.py) (pure function pattern)
 
-**Questions?** → Search docs/ for detailed explanations or ask for specific file examples.
+**Need WebSocket real-time updates?**  
+→ [api/websocket/optimization_ws.py](api/websocket/optimization_ws.py) + [frontend/src/hooks/useWebSocket.ts](frontend/src/hooks/useWebSocket.ts)
+
+**Questions?** → Search `docs/` for detailed explanations or ask for specific file examples.

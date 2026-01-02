@@ -228,6 +228,7 @@ class OptimizationResult:
         optimization_time: 優化總耗時(秒)
         convergence_history: 收斂曲線(每次試驗的最佳值)
         study_name: Study名稱
+        study_direction: 優化方向(MAXIMIZE/MINIMIZE)
     """
     best_value: float
     best_params: Dict[str, Any]
@@ -236,6 +237,7 @@ class OptimizationResult:
     optimization_time: float
     convergence_history: List[float]
     study_name: str
+    study_direction: str = "MAXIMIZE"
 
 
 class OptunaOptimizer:
@@ -1391,10 +1393,14 @@ class OptunaOptimizer:
                     current_best = trial.value
             convergence_history.append(current_best)
 
+        # 獲取 study direction 並轉換為字符串
+        study_direction = str(self.study.direction.name) if hasattr(self.study.direction, 'name') else "MAXIMIZE"
+
         # 日誌記錄
         self.logger.info(
             f"Optimization completed: best_value={best_value:.4f}, "
-            f"best_params={best_params}, total_time={optimization_time:.1f}s"
+            f"best_params={best_params}, total_time={optimization_time:.1f}s, "
+            f"direction={study_direction}"
         )
 
         return OptimizationResult(
@@ -1404,7 +1410,8 @@ class OptunaOptimizer:
             total_trials=len(self.study.trials),
             optimization_time=optimization_time,
             convergence_history=convergence_history,
-            study_name=self.study_name
+            study_name=self.study_name,
+            study_direction=study_direction
         )
 
     def get_best_trial(self) -> Dict[str, Any]:

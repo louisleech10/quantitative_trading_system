@@ -98,9 +98,10 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
                 } else {
                   return (
                     <>
-                      <br />• <span className="text-foreground font-semibold">正反例信號密度差異 (Separation)</span>
-                      <br />&nbsp;&nbsp;= positive_near_far_ratio - negative_near_far_ratio
-                      <br />• 越大表示策略區分度越高
+                      <br />• <span className="text-foreground font-semibold">公式：Score=區分度−穩定性懲罰</span>
+                      <br />&nbsp;&nbsp;區分度 (Separation)：正例的加權平均M - 反例的加權平均M
+                      <br />&nbsp;&nbsp;穩定性懲罰 (Penalty)：如果正例的表現忽好忽壞（標準差大），分數會被扣減
+                      <br />• Score=(μpos−μneg​)−λ⋅(σpos+0.5⋅σneg​) 其中λ預設為 1.0
                     </>
                   )
                 }

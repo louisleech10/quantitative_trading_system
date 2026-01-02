@@ -750,7 +750,7 @@ async def get_optimization_result(task_id: str):
                 "best_trial_number": result.best_trial_number,
                 "n_trials": result.total_trials if hasattr(result, 'total_trials') else result.n_trials if hasattr(result, 'n_trials') else None,
                 "optimization_time": result.optimization_time if hasattr(result, 'optimization_time') else result.optimization_time_seconds if hasattr(result, 'optimization_time_seconds') else None,
-                "study_direction": result.study_direction if hasattr(result, 'study_direction') else "maximize",
+                "study_direction": result.study_direction if hasattr(result, 'study_direction') else "MAXIMIZE",
                 "convergence_info": result.convergence_info if hasattr(result, 'convergence_info') else None
             },
             "trial_stats": trial_stats

@@ -1141,7 +1141,7 @@ function StrategyTestPageContent() {
                 )}
                 {densityMetrics?.positive_weighted_mean_m !== undefined && (
                   <StatMetricCard
-                    label="正例 M 值"
+                    label="正例 加權平均M 值"
                     value={densityMetrics.positive_weighted_mean_m}
                     std={densityMetrics.positive_m_std}
                     helper="歸一化指標 M ∈ [-1, 1]，越接近 1 表示信號越聚集於近期"
@@ -1207,7 +1207,7 @@ function StrategyTestPageContent() {
                 )}
                 {densityMetrics?.negative_weighted_mean_m !== undefined && (
                   <StatMetricCard
-                    label="反例 M 值"
+                    label="反例 加權平均M 值"
                     value={densityMetrics.negative_weighted_mean_m}
                     std={densityMetrics.negative_m_std}
                     helper="歸一化指標 M ∈ [-1, 1]，反例應接近 0 或負值"
@@ -1441,15 +1441,15 @@ function StrategyTestPageContent() {
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm uppercase tracking-wide text-slate-500">執行概況</p>
+                <p className="text-sm uppercase tracking-wide text-slate-500">時間範圍統計</p>
                 <h2 className="text-2xl font-semibold text-slate-900">測試結果</h2>
               </div>
               <Share2 className="h-6 w-6 text-indigo-500" />
             </div>
             {testResult ? (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <SummaryItem label="回傳信號數" value={formatCount(testResult.signal_count)} />
-                <SummaryItem label="K 線採樣" value={formatCount(testResult.total_bars)} />
+                <SummaryItem label="時間範圍內信號數" value={formatCount(testResult.signal_count)} />
+                <SummaryItem label="時間範圍內K線數" value={formatCount(testResult.total_bars)} />
                 <SummaryItem
                   label="計算耗時"
                   value={
@@ -1467,10 +1467,10 @@ function StrategyTestPageContent() {
             )}
             {qualitySummary && (
               <div className="mt-6 rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600">
-                <div className="font-semibold text-slate-800">資料品質</div>
+                <div className="font-semibold text-slate-800">案例統計</div>
                 <div className="mt-2 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="案例總數" value={qualitySummary.total_cases?.toString() ?? "—"} subtle />
-                  <SummaryItem label="成功率" value={formatPercent(qualitySummary.success_rate)} subtle />
+                  <SummaryItem label="正例佔比" value={formatPercent(qualitySummary.success_rate)} subtle />
                 </div>
                 {qualitySummary.error_messages && qualitySummary.error_messages.length > 0 && (
                   <ul className="mt-3 list-inside list-disc text-xs text-amber-700">
