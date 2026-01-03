@@ -224,7 +224,9 @@ from momentum.Indicators.sma_indicator import SMAIndicator
 IndicatorEngine.register("sma", SMAIndicator)
 ```
 
-### 步驟 6: 更新 YAML 配置
+### 步驟 6: 更新 YAML 配置（傳統方式，向後兼容）
+
+> **注意**：此方式仍然有效，但推薦使用「步驟 7」的 StrategyMetadata 方式，更適合 Optuna 優化系統。
 
 編輯 [config/indicators.yaml](../config/indicators.yaml)，添加新指標配置：
 
@@ -269,6 +271,141 @@ indicators:
       cache_result: true
       estimated_time_ms: 3
 ```
+
+### 步驟 7: 整合到策略系統（推薦方式）⭐
+
+**為什麼推薦這種方式？**
+- ✅ 自動整合到 Optuna 優化系統
+- ✅ 動態參數採樣，無需硬編碼
+- ✅ 類型安全，編譯時檢查
+- ✅ 更好的文檔化和可維護性
+
+#### 定義策略元數據
+
+```python
+# momentum/Analysis/strategies/sma_strategy.py
+"""
+SMA 策略定義
+
+基於簡單移動平均線的趨勢跟蹤策略
+"""
+
+from momentum.Analysis.strategy_registry import (
+    strategy_registry,
+    StrategyMetadata,
+    ParameterDefinition,
+    ParameterType
+)
+
+# 定義策略元數據
+sma_strategy = StrategyMetadata(
+    name="sma_trend",
+    display_name="SMA 趨勢策略",
+    description="使用單一 SMA 作為趨勢判斷指標",
+    category="trend",
+
+    # 參數定義（Optuna 會自動識別這些範圍）
+    parameters=[
+        ParameterDefinition(
+            name="period",
+            display_name="SMA 週期",
+            type=ParameterType.INT,
+            min_value=5,
+            max_value=200,
+            default_value=20,
+            step=1,
+            description="計算 SMA 的回看週期"
+        )
+    ],
+
+    # 需要的指標
+    required_indicators=["sma"],
+
+    # 支援的數據源
+    supported_data_sources=["close", "open", "high", "low"],
+
+    # 實作函數（可選，用於信號生成）
+    implementation_module="momentum.Analysis.strategies.sma_strategy",
+    implementation_function="generate_sma_signals"
+)
+
+# 註冊到全局策略註冊表
+strategy_registry.register(sma_strategy)
+
+
+def generate_sma_signals(klines_df, strategy_config):
+    """
+    生成 SMA 策略信號
+
+    Args:
+        klines_df: K 線數據（包含價格、成交量等）
+        strategy_config: 策略配置（包含 period 參數）
+
+    Returns:
+        信號序列（1=多頭, -1=空頭, 0=無信號）
+    """
+    from momentum.Indicators import IndicatorEngine, DataSourceEnum
+
+    # 計算 SMA
+    engine = IndicatorEngine()
+    sma = engine.calculate_indicator(
+        "sma",
+        DataSourceEnum(strategy_config.data_source),
+        klines_df['symbol'].iloc[0],
+        klines_df['timeframe'].iloc[0],
+        period=strategy_config.params['period']
+    )
+
+    # 生成信號：價格 > SMA 為多頭
+    signals = (klines_df['close'] > sma).astype(int)
+    signals[signals == 0] = -1  # 空頭
+
+    return signals
+```
+
+#### 在 Optuna 優化中使用
+
+```python
+from momentum.Optimization import OptunaOptimizer
+from momentum.Analysis.strategy_registry import strategy_registry
+
+# 1. 獲取策略元數據
+metadata = strategy_registry.get_strategy("sma_trend")
+print(f"Strategy: {metadata.display_name}")
+print(f"Parameters: {[p.name for p in metadata.parameters]}")
+
+# 2. Optuna 會自動使用 ParameterDefinition 進行採樣
+optimizer = OptunaOptimizer(
+    study_name="sma_optimization",
+    positive_cases=positive_cases,
+    negative_cases=negative_cases,
+    training_window=window_config,
+    n_trials=50,
+    n_jobs=4  # 多核並行
+)
+
+# 3. 運行優化（參數範圍自動從 metadata 讀取）
+result = await optimizer.optimize()
+
+# 4. 獲取最佳參數
+print(f"Best period: {result.best_params['period']}")
+```
+
+#### YAML 配置 vs StrategyMetadata 對比
+
+| 特性 | YAML 配置 | StrategyMetadata（推薦）|
+|------|-----------|------------------------|
+| **類型安全** | ❌ 執行時檢查 | ✅ 編譯時檢查 |
+| **Optuna 整合** | ⚠️ 需手動解析 | ✅ 自動整合 |
+| **動態擴展** | ❌ 需修改文件 | ✅ 代碼即配置 |
+| **文檔化** | ⚠️ 需同步維護 | ✅ Docstring 即文檔 |
+| **版本控制** | ✅ 易於追蹤 | ✅ 與代碼一起管理 |
+| **適用場景** | 簡單指標配置 | 複雜策略系統 |
+
+**建議**：
+- 新策略使用 StrategyMetadata
+- 舊配置保留 YAML（向後兼容）
+- 兩種方式可以共存
 
 ---
 
@@ -610,20 +747,327 @@ def calculate(
 
 ---
 
+## 整合到 Optuna 優化系統 🚀
+
+完成指標實作後，您可以將其整合到 Optuna 參數優化系統中，自動尋找最佳參數組合。
+
+### 完整優化流程範例
+
+```python
+"""
+完整的指標 → 策略 → Optuna 優化流程範例
+
+此範例展示如何從零開始定義一個新指標並整合到 Optuna 優化系統中。
+"""
+
+# ==================== 1. 定義並註冊指標 ====================
+from momentum.Indicators import BaseIndicator, register_indicator
+import pandas as pd
+
+@register_indicator("my_sma")
+class MySMAIndicator(BaseIndicator):
+    """簡單移動平均線指標"""
+
+    def calculate(self, data: pd.Series, period: int = 20, **kwargs) -> pd.Series:
+        return data.rolling(window=period).mean()
+
+    def validate_params(self, period: int = 20, **kwargs) -> bool:
+        if not isinstance(period, int) or period < 2:
+            raise ValueError(f"Invalid period: {period}")
+        return True
+
+
+# ==================== 2. 定義策略元數據 ====================
+from momentum.Analysis.strategy_registry import (
+    strategy_registry,
+    StrategyMetadata,
+    ParameterDefinition,
+    ParameterType
+)
+
+# 定義策略元數據（Optuna 會自動讀取參數範圍）
+sma_strategy = StrategyMetadata(
+    name="my_sma_strategy",
+    display_name="我的 SMA 策略",
+    description="基於雙 SMA 的趨勢跟蹤策略",
+    category="trend",
+
+    # 參數定義（Optuna 會自動使用這些範圍進行採樣）
+    parameters=[
+        ParameterDefinition(
+            name="short_period",
+            display_name="短週期",
+            type=ParameterType.INT,
+            min_value=5,
+            max_value=50,
+            default_value=20,
+            step=1,
+            description="短期 SMA 週期"
+        ),
+        ParameterDefinition(
+            name="long_period",
+            display_name="長週期",
+            type=ParameterType.INT,
+            min_value=20,
+            max_value=200,
+            default_value=50,
+            step=1,
+            description="長期 SMA 週期"
+        )
+    ],
+
+    required_indicators=["my_sma"],
+    supported_data_sources=["close", "volume"]
+)
+
+# 註冊策略到全局註冊表
+strategy_registry.register(sma_strategy)
+
+
+# ==================== 3. 運行 Optuna 優化 ====================
+import asyncio
+from momentum.Optimization import OptunaOptimizer, ParameterRanges
+from api.models.training_window_config import TrainingWindowConfig
+
+async def run_optimization():
+    """執行 Optuna 參數優化"""
+
+    # 定義案例數據（正例和反例）
+    positive_cases = ["case1", "case2", "case3"]  # 替換為實際 case IDs
+    negative_cases = ["case4", "case5", "case6"]
+
+    # 定義訓練窗口
+    window_config = TrainingWindowConfig(
+        lookback_bars=100,
+        reference_point="peak"
+    )
+
+    # 創建 Optuna 優化器
+    optimizer = OptunaOptimizer(
+        study_name="my_sma_optimization",
+        positive_cases=positive_cases,
+        negative_cases=negative_cases,
+        training_window=window_config,
+
+        # Optuna 配置
+        sampler_type="TPE",  # Tree-structured Parzen Estimator
+        n_trials=100,        # 運行 100 次試驗
+        n_jobs=4,            # 使用 4 核並行（4.3x 加速）⚡
+        random_seed=42,
+
+        # 參數範圍（可選：覆蓋策略元數據中的範圍）
+        parameter_ranges=ParameterRanges(
+            data_sources=["close", "volume"],
+            strategy_logics=["my_sma_strategy"],
+            indicator_types=["my_sma"]
+        )
+    )
+
+    # 執行優化
+    result = await optimizer.optimize()
+
+    # 輸出結果
+    print(f"✅ 最佳參數: {result.best_params}")
+    print(f"✅ 最佳得分 (Golden Formula): {result.best_value:.4f}")
+    print(f"✅ 優化耗時: {result.optimization_time:.1f} 秒")
+
+    # 獲取所有試驗結果
+    trials_df = optimizer.get_trials_dataframe()
+    print(f"\n📊 前 10 名結果:")
+    print(trials_df.head(10))
+
+    return result
+
+# 執行優化
+if __name__ == "__main__":
+    result = asyncio.run(run_optimization())
+```
+
+### Golden Formula v2.0 得分計算
+
+Optuna 優化使用 **Golden Formula v2.0** 作為目標函數：
+
+```
+Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
+```
+
+**符號說明**：
+- **μ_pos**: 正例加權平均 M 值（範圍 [-1, 1]）
+- **μ_neg**: 反例加權平均 M 值（範圍 [-1, 1]）
+- **σ_pos**: 正例 M 值標準差（穩定性指標）
+- **σ_neg**: 反例 M 值標準差
+- **λ**: 穩定性懲罰係數（默認 1.0）
+
+**M 值定義**：
+```
+M = (Near - Far) / (Near + Far)
+```
+- **Near**: 近期信號密度（lookback_bars 範圍內）
+- **Far**: 遠期信號密度（far_lookback_bars 範圍內）
+
+**優化目標**：
+- ✅ **最大化 μ_pos**：正例在近期有高信號密度
+- ✅ **最小化 μ_neg**：反例在近期信號密度低
+- ✅ **最小化 σ_pos**：正例表現穩定（不同月份一致）
+
+### 多核並行優化（2026-01 更新）⚡
+
+系統支援真正的多核並行加速：
+
+```python
+optimizer = OptunaOptimizer(
+    # ... 其他參數 ...
+    n_jobs=4,  # 使用 4 個 CPU 核心並行
+)
+```
+
+**性能提升實測**：
+```
+1 核:  ~2.5 分鐘 (100 trials)
+4 核:  ~58 秒    (4.3x 加速) ⚡
+8 核:  ~35 秒    (預估)      ⚡
+```
+
+**配置建議**：
+- 推薦設為 CPU 核心數的 **50-75%**
+- 超過 8 核後收益遞減（I/O 瓶頸）
+- 記憶體使用會線性增長（每核心獨立載入案例數據）
+
+**前端配置**（NEW）：
+```typescript
+// 現在可以在前端直接配置並行核心數
+const optunaConfig = {
+  enabled: true,
+  n_trials: 100,
+  n_jobs: 4,  // ← 用戶可自行調整
+}
+```
+
+### 參數去重機制（NEW）
+
+系統會自動剪枝重複的參數組合，確保：
+
+```
+n_trials=50  →  50 組不同的參數（而非 50 次嘗試）
+```
+
+**工作原理**：
+1. 每個 trial 採樣參數後，檢查是否已經測試過
+2. 如果重複，剪枝並採樣新參數
+3. 如果試驗不足，自動補充試驗直到達到目標數量
+
+**範例**：
+```python
+# 用戶設定 50 trials
+optimizer = OptunaOptimizer(n_trials=50, ...)
+
+# 實際執行
+- 初始運行: 40 個 COMPLETE + 10 個 PRUNED (重複)
+- 自動補充: 額外運行 10 個 trials
+- 最終結果: 50 個 COMPLETE trials（每個參數組合唯一）
+```
+
+### CSV 導出與統計欄位（NEW）
+
+優化完成後，CSV 會包含 **20+ 個統計欄位**：
+
+```csv
+Rank,Trial #,Value,State,data_source,strategy_logic,indicator_type,
+short_period,mid_period,long_period,
+p_value,cohens_d,stability_cv,                    # 統計檢驗
+positive_avg_density,negative_avg_density,        # 密度指標
+separation,m_separation,                          # 分離度
+positive_weighted_mean_m,negative_weighted_mean_m,# M 值
+positive_m_std,negative_m_std,                    # M 值穩定性
+positive_total_weight,negative_total_weight,      # 權重統計
+positive_active_cases,negative_active_cases,      # 案例統計
+...
+```
+
+### 最佳實踐
+
+#### 1. 合理設定參數範圍
+
+```python
+# ✅ 推薦：基於領域知識設定範圍
+ParameterDefinition(
+    name="period",
+    min_value=5,    # 太小會過擬合
+    max_value=200,  # 太大會失去響應性
+    step=1
+)
+
+# ❌ 避免：範圍過大導致搜索低效
+ParameterDefinition(
+    name="period",
+    min_value=1,
+    max_value=1000  # 範圍過大
+)
+```
+
+#### 2. 選擇適當的試驗次數
+
+```python
+# 快速測試：20-50 trials
+optimizer = OptunaOptimizer(n_trials=20, n_jobs=4)
+
+# 正式優化：100-200 trials（推薦）
+optimizer = OptunaOptimizer(n_trials=100, n_jobs=4)
+
+# 精細調優：500+ trials
+optimizer = OptunaOptimizer(n_trials=500, n_jobs=8)
+```
+
+#### 3. 啟用進度監控
+
+```python
+optimizer = OptunaOptimizer(
+    # ... 其他參數 ...
+    enable_progress_monitor=True,  # 顯示進度條
+    checkpoint_interval=50,        # 每 50 trials 保存檢查點
+    checkpoint_dir="data/checkpoints"
+)
+```
+
+#### 4. 處理優化結果
+
+```python
+# 執行優化
+result = await optimizer.optimize()
+
+# 分析最佳參數
+best_params = result.best_params
+print(f"最佳短週期: {best_params['short_period']}")
+print(f"最佳長週期: {best_params['long_period']}")
+
+# 獲取收斂歷史
+convergence = result.convergence_history
+print(f"優化路徑: {convergence}")
+
+# 導出完整結果
+trials_df = optimizer.get_trials_dataframe()
+trials_df.to_csv("optimization_results.csv")
+```
+
+---
+
 ## 下一步
 
 完成指標實作後：
 
 1. ✅ **運行測試**：確保所有測試通過
-2. ✅ **更新配置**：添加到 `config/indicators.yaml`
-3. ✅ **編寫文檔**：在 docstring 中說明用法
-4. ✅ **性能測試**：確保計算效率符合預期
-5. ✅ **提交代碼**：創建 Pull Request
+2. ✅ **定義策略元數據**：使用 StrategyMetadata（推薦）
+3. ✅ **整合到 Optuna**：運行參數優化找到最佳配置
+4. ✅ **編寫文檔**：在 docstring 中說明用法
+5. ✅ **性能測試**：確保計算效率符合預期
+6. ✅ **提交代碼**：創建 Pull Request
 
 **參考資源**：
 - [EMA 指標實作](../momentum/Indicators/ema_indicator.py) - 完整範例
+- [Three Line 策略](../momentum/Analysis/strategies/three_line_strategy.py) - 策略元數據範例
 - [BaseIndicator 文檔](../momentum/Indicators/base_indicator.py) - 基類說明
 - [API 使用文檔](./indicator_api_usage.md) - 如何使用指標
+- [Optuna 優化系統](../momentum/Optimization/README.md) - 深入了解優化系統
 
 ---
 

@@ -556,35 +556,205 @@ print(f"Module: {info['module']}")
 print(f"Default params: {info['default_params']}")
 print(f"Param ranges: {info['param_ranges']}")
 
-# 用於 Optuna 優化（Phase 3.5）
-param_range = info['param_ranges']['period']
-print(f"Period range: {param_range['min']} - {param_range['max']}")
+# ==================== 用於 Optuna 優化（2026-01 更新）====================
+# 推薦方式：使用 strategy_registry 獲取策略元數據
+from momentum.Analysis.strategy_registry import strategy_registry
+
+# 獲取策略元數據
+metadata = strategy_registry.get_strategy("three_line")
+
+# 查看所有參數定義
+for param_def in metadata.parameters:
+    print(f"{param_def.display_name} ({param_def.name}):")
+    print(f"  範圍: {param_def.min_value} - {param_def.max_value}")
+    print(f"  默認值: {param_def.default_value}")
+    print(f"  步長: {param_def.step}")
+
+# Optuna 會自動使用這些參數範圍進行優化
 ```
 
 ---
 
-## 與 Phase 3.2 任務的銜接
+## 與信號密度分析整合（2026-01 更新）
 
-Phase 3.2 需要使用指標引擎進行信號密度分析。範例：
+指標引擎可與 **SignalDensityAnalyzer** 結合使用，實現 Golden Formula v2.0 評分系統。
+
+### 完整工作流程
 
 ```python
-from momentum.Indicators import IndicatorEngine, ConfigLoader, DataSourceEnum
+from momentum.Indicators import IndicatorEngine, DataSourceEnum
+from momentum.Analysis import SignalDensityAnalyzer
+from momentum.DataExtraction import KlineStorageManager
+from api.models.strategy_config import StrategyConfig
+from api.models.training_window_config import TrainingWindowConfig
 
-# 1. 載入配置
-loader = ConfigLoader()
-loader.load_config()
+# ==================== 1. 準備數據 ====================
+# 載入 K 線數據
+kline_storage = KlineStorageManager()
 
-# 2. 獲取完整指標集
-configs = loader.get_calculation_preset("full_indicator_set")
+# 載入案例數據（正例和反例）
+positive_cases = [...]  # 正例 Case 對象列表
+negative_cases = [...]  # 反例 Case 對象列表
 
-# 3. 批量計算所有指標
+# ==================== 2. 配置策略 ====================
+strategy_config = StrategyConfig(
+    data_source="volume",
+    strategy_logic="three_line",
+    indicator_type="ema",
+    params={
+        "short_period": 5,
+        "mid_period": 15,
+        "long_period": 33
+    }
+)
+
+# ==================== 3. 配置訓練窗口 ====================
+window_config = TrainingWindowConfig(
+    lookback_bars=100,          # 近期窗口（Near）
+    far_lookback_bars=200,      # 遠期窗口（Far，可選）
+    reference_point="peak",     # 參考點：peak/bottom/center
+    mode="dual_density"         # 雙密度模式
+)
+
+# ==================== 4. 創建分析器 ====================
+# 指標引擎會自動被 SignalDensityAnalyzer 使用
+indicator_engine = IndicatorEngine()
+
+analyzer = SignalDensityAnalyzer(
+    kline_storage=kline_storage,
+    indicator_engine=indicator_engine
+)
+
+# ==================== 5. 執行信號密度分析 ====================
+result = analyzer.analyze_signal_density(
+    positive_cases=positive_cases,
+    negative_cases=negative_cases,
+    strategy_config=strategy_config,
+    window_config=window_config
+)
+
+# ==================== 6. 查看分析結果 ====================
+print("信號密度分析結果:")
+print(f"  正例加權平均 M 值: {result.positive_weighted_mean_m:.4f}")
+print(f"  反例加權平均 M 值: {result.negative_weighted_mean_m:.4f}")
+print(f"  M 分離度: {result.m_separation:.4f}")
+print(f"  Golden Formula 得分: {result.optuna_golden_score:.4f}")
+print(f"\n統計檢驗:")
+print(f"  p-value: {result.p_value:.4f}")
+print(f"  Cohen's d: {result.cohens_d:.4f}")
+print(f"  穩定性 CV: {result.stability_cv:.4f}")
+```
+
+### Golden Formula v2.0 解讀
+
+**目標函數**：
+```
+Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
+```
+
+**M 值計算**（每個案例）：
+```
+M = (Near - Far) / (Near + Far)
+```
+- **Near**: 近期信號密度（lookback_bars 範圍內）
+- **Far**: 遠期信號密度（far_lookback_bars 範圍內）
+- **M 值範圍**: [-1, 1]
+  - M > 0: 近期密度高於遠期（理想狀態）
+  - M < 0: 遠期密度高於近期（不理想）
+  - M ≈ 1: 幾乎所有信號都在近期
+  - M ≈ -1: 幾乎所有信號都在遠期
+
+**加權平均**：
+```
+μ_pos = Σ(w_i × M_i) / Σw_i
+```
+- 權重 w_i = Near_i（信號越多權重越大）
+- 確保有足夠信號的案例有更大影響力
+
+**優化目標**：
+- ✅ 最大化 μ_pos（正例近期信號密集）
+- ✅ 最小化 μ_neg（反例近期信號稀疏）
+- ✅ 最小化 σ_pos（正例表現穩定）
+
+### 與 Optuna 優化整合
+
+```python
+from momentum.Optimization import OptunaOptimizer
+
+# 創建優化器（會自動使用 SignalDensityAnalyzer）
+optimizer = OptunaOptimizer(
+    study_name="ema_optimization",
+    positive_cases=positive_cases,
+    negative_cases=negative_cases,
+    training_window=window_config,
+    n_trials=100,
+    n_jobs=4  # 多核並行
+)
+
+# 執行優化（自動計算 Golden Formula 得分）
+result = await optimizer.optimize()
+
+print(f"最佳參數: {result.best_params}")
+print(f"最佳得分: {result.best_value:.4f}")
+```
+
+### 實用技巧
+
+#### 1. 調試信號生成
+
+```python
+# 獲取單個案例的信號密度
+case = positive_cases[0]
+
+# 提取訓練窗口
+klines = analyzer.extract_training_window(case, window_config)
+
+# 計算指標
 engine = IndicatorEngine()
-indicators_df = engine.calculate_indicators("ETHUSDT", "1h", configs)
+ema = engine.calculate_indicator(
+    "ema",
+    DataSourceEnum.VOLUME,
+    case.symbol,
+    "1h",  # 使用固定 timeframe
+    period=15
+)
 
-# 4. 進行信號密度分析
-# indicators_df 包含所有計算好的指標，可以直接用於後續分析
-print(f"Calculated {len(indicators_df.columns)} indicators")
-print(f"Data length: {len(indicators_df)} rows")
+# 生成信號
+from momentum.Analysis.strategies.three_line_strategy import check_three_line_signal
+signals = check_three_line_signal(klines, strategy_config)
+
+print(f"總 K 線數: {len(klines)}")
+print(f"信號數: {signals.sum()}")
+print(f"信號密度: {signals.sum() / len(klines):.4f}")
+```
+
+#### 2. 批量分析不同參數
+
+```python
+# 測試多組參數
+param_sets = [
+    {"short_period": 5, "mid_period": 15, "long_period": 30},
+    {"short_period": 8, "mid_period": 20, "long_period": 50},
+    {"short_period": 13, "mid_period": 25, "long_period": 100},
+]
+
+results = []
+for params in param_sets:
+    strategy_config.params = params
+    result = analyzer.analyze_signal_density(
+        positive_cases, negative_cases,
+        strategy_config, window_config
+    )
+    results.append({
+        "params": params,
+        "score": result.optuna_golden_score,
+        "m_separation": result.m_separation
+    })
+
+# 排序找最佳
+best = sorted(results, key=lambda x: x['score'], reverse=True)[0]
+print(f"最佳參數: {best['params']}")
+print(f"最佳得分: {best['score']:.4f}")
 ```
 
 ---
@@ -621,8 +791,18 @@ print(f"Data length: {len(indicators_df)} rows")
 
 ## 更多資源
 
-- [指標擴展指南](./indicator_extension_guide.md) - 如何添加新指標
+**指標開發**：
+- [指標擴展指南](./indicator_extension_guide.md) - 如何添加新指標（含 Optuna 整合）
 - [EMA 指標源碼](../momentum/Indicators/ema_indicator.py) - 完整實作範例
 - [配置文件說明](../config/indicators.yaml) - 配置格式詳解
+
+**策略系統**：
+- [策略註冊表文檔](../momentum/Analysis/strategy_registry.py) - StrategyMetadata 使用說明
+- [Three Line 策略](../momentum/Analysis/strategies/three_line_strategy.py) - 完整策略範例
+
+**優化系統（2026-01 更新）**：
+- [Optuna 優化器文檔](../momentum/Optimization/README.md) - Golden Formula v2.0
+- [SignalDensityAnalyzer](../momentum/Analysis/signal_density_analyzer.py) - 信號密度分析核心
+- [多核並行優化指南](../docs/optimization_guide.md) - n_jobs 配置與性能調優
 
 **有問題？** 查看代碼中的 docstring 或提交 Issue。
