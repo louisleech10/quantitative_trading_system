@@ -41,6 +41,7 @@ export interface OptunaConfig {
   timeout: number  // seconds
   random_seed: number
   enable_pruning: boolean
+  n_jobs: number  // 並行線程數
   ema_short_range: [number, number]
   ema_mid_range: [number, number]
   ema_long_range: [number, number]
@@ -61,6 +62,7 @@ const DEFAULT_CONFIG: OptunaConfig = {
   timeout: 1800,  // 30 minutes
   random_seed: 42,
   enable_pruning: true,
+  n_jobs: 4,  // 默認使用 4 核並行
   ema_short_range: [5, 15],
   ema_mid_range: [20, 40],
   ema_long_range: [50, 100]
@@ -224,6 +226,28 @@ export function OptunaConfigPanel({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   自動終止表現不佳的 trial
+                </p>
+              </div>
+
+              {/* 並行線程數 */}
+              <div className="space-y-2">
+                <Label htmlFor="n_jobs" className="flex items-center gap-2">
+                  並行線程數
+                  <Badge variant="secondary" className="text-xs">
+                    多核加速
+                  </Badge>
+                </Label>
+                <Input
+                  id="n_jobs"
+                  type="number"
+                  min={1}
+                  max={16}
+                  value={config.n_jobs}
+                  onChange={(e) => updateConfig({ n_jobs: parseInt(e.target.value) || 1 })}
+                  disabled={disabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  建議設置為 CPU 核心數的 50-75%
                 </p>
               </div>
             </div>

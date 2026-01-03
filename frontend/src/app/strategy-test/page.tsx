@@ -454,7 +454,7 @@ function StrategyTestPageContent() {
           training_window: state.windowConfig,
           sampler_type: "TPE",
           n_trials: optunaConfig.n_trials,
-          n_jobs: 1,
+          n_jobs: optunaConfig.n_jobs,  // 使用用戶配置的並行線程數
           use_multi_objective: false,
           enable_pruning: optunaConfig.enable_pruning,  // 傳遞剪枝配置
           parameter_ranges: {

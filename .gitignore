@@ -95,6 +95,10 @@ temp_data/
 *.h5
 *.hdf5
 
+# Optuna optimization data
+data/*.db
+data/checkpoints/*.pkl.gz
+
 # Search results
 search_results/
 results/
@@ -112,6 +116,8 @@ temp/
 
 # Log output
 logs/
+backend.log
+*.log
 sessions/PHASE_3.3+3.4_COMPLETION_REPORT.md
 sessions/Phase3.1.md
 sessions/PHASE3.5_COMPLETE_SUMMARY.md

@@ -218,8 +218,25 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
 
                     {/* 統計指標 */}
                     <TableCell className="text-xs">
-                      {trial.user_attrs && (
+                      {trial.user_attrs && Object.keys(trial.user_attrs).length > 0 ? (
                         <div className="space-y-0.5">
+                          {/* Golden Formula 核心指標 */}
+                          {trial.user_attrs.m_separation !== undefined && (
+                            <div className="font-semibold text-blue-600">
+                              M分離: {trial.user_attrs.m_separation.toFixed(4)}
+                            </div>
+                          )}
+                          {trial.user_attrs.positive_weighted_mean_m !== undefined && (
+                            <div className="text-muted-foreground">
+                              μ_pos: {trial.user_attrs.positive_weighted_mean_m.toFixed(4)}
+                            </div>
+                          )}
+                          {trial.user_attrs.negative_weighted_mean_m !== undefined && (
+                            <div className="text-muted-foreground">
+                              μ_neg: {trial.user_attrs.negative_weighted_mean_m.toFixed(4)}
+                            </div>
+                          )}
+                          {/* 統計檢驗指標 */}
                           {trial.user_attrs.p_value !== undefined && (
                             <div className={trial.user_attrs.p_value < 0.05 ? "text-green-500" : trial.user_attrs.p_value < 0.1 ? "text-yellow-500" : "text-muted-foreground"}>
                               p: {trial.user_attrs.p_value.toFixed(4)}
@@ -236,6 +253,8 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                             </div>
                           )}
                         </div>
+                      ) : (
+                        <div className="text-muted-foreground italic">無統計數據</div>
                       )}
                     </TableCell>
                   </TableRow>

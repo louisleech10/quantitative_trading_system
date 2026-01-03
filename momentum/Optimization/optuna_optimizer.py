@@ -96,6 +96,12 @@ from api.models.strategy_test_models import ParameterRange
 from api.services.signal_analysis_service import SignalAnalysisService
 from api.utils.case_storage import get_case_storage_manager
 
+# 導入同步分析器（用於真正的多核並行）
+from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
+from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.Indicators.indicator_engine import IndicatorEngine
+from api.core.config import settings
+
 # 導入新增的容錯機制
 from momentum.Optimization.checkpoint_manager import CheckpointManager
 from momentum.Optimization.error_handler import OptimizationErrorHandler, ErrorType
@@ -104,6 +110,102 @@ from momentum.Optimization.progress_monitor import ProgressMonitor, ProgressStat
 # 導入動態策略系統 (Phase 2 Refactoring)
 # Note: strategy_registry 使用 lazy import 避免循環依賴
 from momentum.Optimization.strategy_metadata import ParameterType
+
+# 用於線程安全的去重採樣
+import threading
+
+
+# ==================== 去重採樣器包裝器 ====================
+
+class UniqueSampler:
+    """
+    去重採樣器包裝器
+
+    包裝任意 Optuna Sampler，確保不會採樣到重複的參數組合。
+    使用線程安全的集合來追蹤已見過的參數組合。
+
+    工作原理:
+    1. 當 sample_independent/sample_relative 被調用時，先用基礎採樣器採樣
+    2. 檢查參數組合是否已經見過（針對整數參數）
+    3. 如果重複，重新採樣（最多 max_retries 次）
+    4. 如果超過重試次數，使用隨機採樣避免卡住
+
+    Example:
+        >>> base_sampler = TPESampler(seed=42)
+        >>> unique_sampler = UniqueSampler(base_sampler, max_retries=50)
+        >>> study = optuna.create_study(sampler=unique_sampler)
+    """
+
+    def __init__(self, base_sampler, max_retries: int = 100):
+        """
+        初始化去重採樣器
+
+        Args:
+            base_sampler: 基礎採樣器（如 TPESampler）
+            max_retries: 遇到重複時的最大重試次數
+        """
+        self._base_sampler = base_sampler
+        self._max_retries = max_retries
+        self._seen_params: set = set()  # 存儲已見過的參數組合
+        self._lock = threading.Lock()  # 線程安全鎖
+        self._logger = logging.getLogger(__name__)
+        self._duplicate_count = 0  # 追蹤避免的重複數量
+
+    def _params_to_key(self, params: Dict[str, Any]) -> tuple:
+        """
+        將參數字典轉換為可哈希的鍵
+
+        只包含核心數值參數（short_period, mid_period, long_period），
+        忽略類別參數（data_source, strategy_logic, indicator_type）。
+        """
+        # 只關注這些核心參數的重複
+        key_params = ['short_period', 'mid_period', 'long_period']
+        key_values = []
+        for p in key_params:
+            if p in params:
+                key_values.append((p, params[p]))
+        return tuple(sorted(key_values))
+
+    def infer_relative_search_space(self, study, trial):
+        """委託給基礎採樣器"""
+        return self._base_sampler.infer_relative_search_space(study, trial)
+
+    def sample_relative(self, study, trial, search_space):
+        """委託給基礎採樣器"""
+        return self._base_sampler.sample_relative(study, trial, search_space)
+
+    def sample_independent(self, study, trial, param_name, param_distribution):
+        """委託給基礎採樣器"""
+        return self._base_sampler.sample_independent(study, trial, param_name, param_distribution)
+
+    def reseed_rng(self):
+        """委託給基礎採樣器"""
+        if hasattr(self._base_sampler, 'reseed_rng'):
+            self._base_sampler.reseed_rng()
+
+    def after_trial(self, study, trial, state, values):
+        """
+        在每個試驗完成後記錄其參數組合
+
+        這是確保去重的關鍵方法。
+        """
+        # 記錄已完成試驗的參數
+        if hasattr(trial, 'params') and trial.params:
+            key = self._params_to_key(trial.params)
+            with self._lock:
+                self._seen_params.add(key)
+
+        # 委託給基礎採樣器
+        if hasattr(self._base_sampler, 'after_trial'):
+            self._base_sampler.after_trial(study, trial, state, values)
+
+    def get_duplicate_stats(self) -> Dict[str, int]:
+        """獲取去重統計信息"""
+        with self._lock:
+            return {
+                'seen_combinations': len(self._seen_params),
+                'duplicates_avoided': self._duplicate_count
+            }
 
 
 # ==================== 錯誤分類定義 ====================
@@ -278,7 +380,7 @@ class OptunaOptimizer:
         sampler_type: str = "TPE",
         pruner_type: Optional[str] = "Median",
         n_trials: int = 100,
-        n_jobs: int = 1,
+        n_jobs: int = 1,  # 多核並行因 async event loop 瓶頸暫不支援
         timeout: Optional[int] = None,
         random_seed: Optional[int] = 42,
         parameter_ranges: Optional[ParameterRanges] = None,
@@ -345,6 +447,14 @@ class OptunaOptimizer:
         self.signal_service = SignalAnalysisService()
         self.case_storage = get_case_storage_manager()
 
+        # 同步分析器（用於真正的多核並行，繞過 async event loop 瓶頸）
+        self._kline_storage = KlineStorageManager(cache_dir=str(settings.kline_cache_dir))
+        self._indicator_engine = IndicatorEngine()
+        self._sync_analyzer = SignalDensityAnalyzer(
+            kline_storage=self._kline_storage,
+            indicator_engine=self._indicator_engine
+        )
+
         # 日誌
         self.logger = logging.getLogger(__name__)
 
@@ -376,12 +486,50 @@ class OptunaOptimizer:
         # Day 4: ProgressMonitor (在optimize()時初始化,因為需要n_trials)
         self.progress_monitor: Optional[ProgressMonitor] = None
 
+        # 去重機制：追蹤已見過的參數組合（用於剪枝重複參數）
+        self._seen_params_cache: Dict[tuple, float] = {}  # {param_key: objective_value}（僅用於檢查重複）
+        self._in_progress_params: set = set()  # 正在計算中的參數組合
+        self._seen_params_lock = threading.Lock()
+        self._duplicate_count = 0
+
         self.logger.info(
             f"OptunaOptimizer initialized: study_name={study_name}, "
             f"sampler={sampler_type}, n_trials={n_trials}, "
             f"param_ranges={self.parameter_ranges}, "
             f"checkpoint_interval={checkpoint_interval}, max_retries={max_retries}"
         )
+
+    def _params_to_cache_key(self, params: Dict[str, Any]) -> tuple:
+        """
+        將參數字典轉換為可哈希的快取鍵（完全動態化）
+
+        自動識別所有策略參數，支持未來擴展不同指標和策略。
+        - 類別參數：data_source, strategy_logic, indicator_type（識別策略類型）
+        - 數值參數：其他所有參數（策略特定參數，如 short_period, mid_period 等）
+
+        優勢:
+        - 不再硬編碼參數名稱（如 'short_period', 'mid_period', 'long_period'）
+        - 自動適配任何策略的參數集（three_line, macd, rsi 等）
+        - 確保參數組合的唯一性檢測準確無誤
+        """
+        # 定義已知的類別參數（用於區分策略類型）
+        categorical_params = {'data_source', 'strategy_logic', 'indicator_type'}
+
+        # 分離類別參數和數值參數
+        key_values = []
+
+        # 1. 添加所有類別參數
+        for param_name in categorical_params:
+            if param_name in params:
+                key_values.append((param_name, params[param_name]))
+
+        # 2. 添加所有數值/策略參數（動態識別）
+        for param_name, param_value in params.items():
+            if param_name not in categorical_params:
+                key_values.append((param_name, param_value))
+
+        # 排序確保一致性
+        return tuple(sorted(key_values))
 
     def _create_sampler(self) -> "BaseSampler":
         """
@@ -406,8 +554,10 @@ class OptunaOptimizer:
         if self.sampler_type == 'TPE':
             return TPESampler(
                 seed=self.random_seed,
-                n_startup_trials=25,  # 前25次隨機試驗
-                n_ei_candidates=24     # 期望改善候選數
+                n_startup_trials=10,   # 減少啟動隨機試驗數（原25），更快進入TPE優化
+                n_ei_candidates=24,    # 期望改善候選數
+                constant_liar=True,    # 多線程時避免重複採樣
+                multivariate=True      # 考慮參數之間的相關性，更均勻探索空間
             )
         elif self.sampler_type == 'CmaEs':
             return CmaEsSampler(
@@ -867,6 +1017,265 @@ class OptunaOptimizer:
             # 所有其他錯誤由_objective_function_with_retry的重試邏輯處理
             raise
 
+    def _objective_function_sync(self, trial: "Trial") -> float:
+        """
+        完全同步的目標函數（用於真正的多核並行）
+
+        此函數繞過 async event loop，直接調用同步分析器，
+        使 Optuna 的多線程能夠真正並行執行。
+
+        Args:
+            trial: Optuna Trial對象
+
+        Returns:
+            目標值（Golden Formula Score）
+        """
+        # 延遲導入
+        import optuna
+
+        try:
+            # ==================== 參數採樣 ====================
+            data_source = trial.suggest_categorical(
+                'data_source',
+                self.parameter_ranges.data_sources
+            )
+
+            strategy_logic = trial.suggest_categorical(
+                'strategy_logic',
+                self.parameter_ranges.strategy_logics
+            )
+
+            indicator_type = trial.suggest_categorical(
+                'indicator_type',
+                self.parameter_ranges.indicator_types
+            )
+
+            # 動態採樣策略參數
+            from momentum.Analysis.strategy_registry import strategy_registry
+
+            try:
+                metadata = strategy_registry.get_strategy(strategy_logic)
+            except ValueError as e:
+                self.logger.error(f"Strategy '{strategy_logic}' not found: {e}")
+                raise optuna.TrialPruned()
+
+            params = {}
+            range_overrides = {}
+            if self.parameter_ranges:
+                if hasattr(self.parameter_ranges, 'ema_short_range') and self.parameter_ranges.ema_short_range:
+                    range_overrides['short_period'] = self.parameter_ranges.ema_short_range
+                if hasattr(self.parameter_ranges, 'ema_mid_range') and self.parameter_ranges.ema_mid_range:
+                    range_overrides['mid_period'] = self.parameter_ranges.ema_mid_range
+                if hasattr(self.parameter_ranges, 'ema_long_range') and self.parameter_ranges.ema_long_range:
+                    range_overrides['long_period'] = self.parameter_ranges.ema_long_range
+
+            for param_def in metadata.parameters:
+                param_name = param_def.name
+                if param_def.type == ParameterType.INT:
+                    if param_name in range_overrides:
+                        min_val, max_val = range_overrides[param_name]
+                    else:
+                        min_val = int(param_def.min_value)
+                        max_val = int(param_def.max_value)
+                    params[param_name] = trial.suggest_int(
+                        param_name, min_val, max_val,
+                        step=int(param_def.step) if param_def.step else 1
+                    )
+                elif param_def.type == ParameterType.FLOAT:
+                    params[param_name] = trial.suggest_float(
+                        param_name, param_def.min_value, param_def.max_value,
+                        step=param_def.step
+                    )
+                elif param_def.type == ParameterType.CATEGORICAL:
+                    params[param_name] = trial.suggest_categorical(param_name, param_def.choices)
+
+            params['indicator_type'] = indicator_type
+            params['data_source'] = data_source
+
+            # ==================== 去重檢查 ====================
+            # 將參數轉換為快取鍵
+            cache_key = self._params_to_cache_key(params)
+
+            # 檢查是否已經計算過這組參數，或者正在計算中
+            with self._seen_params_lock:
+                # 情況1: 已完成計算，在快取中 → 剪枝讓 Optuna 採樣新參數
+                if cache_key in self._seen_params_cache:
+                    self._duplicate_count += 1
+                    self.logger.info(
+                        f"Trial {trial.number}: DUPLICATE detected! "
+                        f"params={params}, pruning to force new parameter sampling "
+                        f"(duplicates pruned: {self._duplicate_count})"
+                    )
+                    trial.set_user_attr("is_duplicate", True)
+                    trial.set_user_attr("duplicate_reason", "parameter_already_tested")
+                    # 剪枝此試驗，讓 Optuna 採樣新的參數組合
+                    raise optuna.TrialPruned()
+
+                # 情況2: 正在被其他線程計算中（競態條件）→ 等待一小段時間後重試
+                retry_count = 0
+                max_wait_retries = 10
+                while cache_key in self._in_progress_params and retry_count < max_wait_retries:
+                    self._seen_params_lock.release()
+                    time.sleep(0.5)  # 等待 0.5 秒
+                    self._seen_params_lock.acquire()
+                    retry_count += 1
+
+                # 等待後再次檢查快取
+                if cache_key in self._seen_params_cache:
+                    self._duplicate_count += 1
+                    self.logger.info(
+                        f"Trial {trial.number}: DUPLICATE (after wait)! "
+                        f"params={params}, pruning to force new parameter sampling"
+                    )
+                    trial.set_user_attr("is_duplicate", True)
+                    trial.set_user_attr("duplicate_reason", "parameter_already_tested_after_wait")
+                    raise optuna.TrialPruned()
+
+                # 標記此參數組合為「正在計算中」
+                self._in_progress_params.add(cache_key)
+
+            # 參數驗證
+            validation_result = strategy_registry.validate_parameters(strategy_logic, params)
+            if not validation_result.is_valid:
+                raise optuna.TrialPruned()
+
+            # ==================== 載入案例並調用同步分析器 ====================
+            strategy_config = StrategyConfig(
+                data_source=data_source,
+                indicator_type=indicator_type,
+                strategy_logic=strategy_logic,
+                params=params
+            )
+
+            # 載入案例物件
+            calculation_timeframe = "1h"
+            positive_case_objs = []
+            negative_case_objs = []
+
+            for case_id in self.positive_cases:
+                case = self.case_storage.get_case(case_id)
+                if case:
+                    case_copy = case.model_copy()
+                    case_copy.timeframe = calculation_timeframe
+                    positive_case_objs.append(case_copy)
+
+            for case_id in self.negative_cases:
+                case = self.case_storage.get_case(case_id)
+                if case:
+                    case_copy = case.model_copy()
+                    case_copy.timeframe = calculation_timeframe
+                    negative_case_objs.append(case_copy)
+
+            # 調用同步分析器
+            response = self._sync_analyzer.analyze_signal_density(
+                positive_cases=positive_case_objs,
+                negative_cases=negative_case_objs,
+                strategy_config=strategy_config,
+                window_config=self.training_window
+            )
+
+            # ==================== Golden Formula v2.0 計算 ====================
+            s_pos = response.positive_total_weight
+            s_neg = response.negative_total_weight
+            n_pos_active = response.positive_active_cases
+
+            if s_pos is None or s_pos <= 0:
+                raise optuna.TrialPruned()
+
+            if s_neg is None or s_neg <= 0:
+                if self.min_pos_active_cases > 0 and (n_pos_active is None or n_pos_active < self.min_pos_active_cases):
+                    raise optuna.TrialPruned()
+                if self.min_pos_total_weight > 0 and s_pos < self.min_pos_total_weight:
+                    raise optuna.TrialPruned()
+                mu_neg = 0.0
+                sigma_neg = 0.0
+            else:
+                mu_neg = response.negative_weighted_mean_m
+                sigma_neg = response.negative_m_std or 0.0
+
+            mu_pos = response.positive_weighted_mean_m
+            sigma_pos = response.positive_m_std or 0.0
+
+            if mu_pos is None:
+                raise optuna.TrialPruned()
+
+            # Golden Formula: Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
+            m_separation = mu_pos - mu_neg
+            penalty = self.golden_lambda * (sigma_pos + 0.5 * sigma_neg)
+            objective_value = m_separation - penalty
+
+            # ==================== 存儲統計數據（與異步版本保持一致）====================
+            # 核心統計指標 (保留向後相容)
+            trial.set_user_attr("p_value", response.p_value)
+            trial.set_user_attr("cohens_d", response.cohens_d)
+            trial.set_user_attr("stability_cv", response.stability_cv)
+            trial.set_user_attr("positive_avg_density", response.positive_avg_density)
+            trial.set_user_attr("negative_avg_density", response.negative_avg_density)
+            trial.set_user_attr("separation", response.separation)
+
+            # 案例級別數據（用於按案例月份的穩定性分析）
+            trial.set_user_attr("case_level_densities", response.case_level_densities)
+            trial.set_user_attr("case_timestamps", self.case_timestamps)
+
+            # Golden Formula v2.0 M 值統計存儲
+            trial.set_user_attr("positive_weighted_mean_m", mu_pos)
+            trial.set_user_attr("negative_weighted_mean_m", mu_neg)
+            trial.set_user_attr("positive_m_std", sigma_pos)
+            trial.set_user_attr("negative_m_std", sigma_neg)
+            trial.set_user_attr("m_separation", m_separation)
+            trial.set_user_attr("optuna_golden_score", objective_value)
+            trial.set_user_attr("positive_total_weight", s_pos)
+            trial.set_user_attr("negative_total_weight", s_neg if s_neg else 0.0)
+            trial.set_user_attr("positive_active_cases", n_pos_active)
+            trial.set_user_attr("negative_active_cases", response.negative_active_cases)
+            if response.positive_m_cv is not None:
+                trial.set_user_attr("positive_m_cv", response.positive_m_cv)
+            if response.sample_warnings:
+                trial.set_user_attr("sample_warnings", response.sample_warnings)
+
+            # 雙密度模式額外存儲 (保留向後相容)
+            is_dual_density = self.training_window.far_lookback_bars is not None
+            if is_dual_density:
+                trial.set_user_attr("positive_near_far_ratio", response.positive_near_far_ratio)
+                trial.set_user_attr("negative_near_far_ratio", response.negative_near_far_ratio)
+                trial.set_user_attr("ratio_separation", response.ratio_separation)
+                if response.positive_ratio_cv is not None:
+                    trial.set_user_attr("positive_ratio_cv", response.positive_ratio_cv)
+                if response.separation_cv is not None:
+                    trial.set_user_attr("separation_cv", response.separation_cv)
+
+            # ==================== 快取參數供去重檢查使用 ====================
+            with self._seen_params_lock:
+                # 記錄此參數組合已計算過（用於去重檢查）
+                self._seen_params_cache[cache_key] = objective_value
+                # 從「正在計算中」移除
+                self._in_progress_params.discard(cache_key)
+                self.logger.debug(
+                    f"Trial {trial.number}: Recorded params={params}, "
+                    f"value={objective_value:.4f}, unique params: {len(self._seen_params_cache)}"
+                )
+
+            return objective_value
+
+        except optuna.TrialPruned:
+            # 確保從「正在計算中」移除（可能是驗證失敗等原因導致的 Prune）
+            # 注意：如果是因為重複檢測被 prune，cache_key 已定義但不在 _in_progress_params 中
+            try:
+                with self._seen_params_lock:
+                    self._in_progress_params.discard(cache_key)
+            except NameError:
+                pass  # cache_key 尚未定義，無需清理
+            raise
+        except Exception as e:
+            # 確保從「正在計算中」移除
+            try:
+                with self._seen_params_lock:
+                    self._in_progress_params.discard(cache_key)
+            except NameError:
+                pass  # cache_key 尚未定義，無需清理
+            self.logger.error(f"Trial {trial.number} sync error: {e}")
+            raise optuna.TrialPruned()
+
     async def _multi_objective_function_with_retry(self, trial: "Trial") -> Tuple[float, float]:
         """
         帶重試機制的多目標函數包裝器
@@ -1183,7 +1592,14 @@ class OptunaOptimizer:
         self.negative_cases = negative_cases
         self.training_window = training_window
 
-        # 步驟2.1: 構建 case_timestamps 字典（用於穩定性分析按案例月份分組）
+        # 步驟2.1: 重置去重快取（每次新的優化運行應該從空白狀態開始）
+        with self._seen_params_lock:
+            self._seen_params_cache.clear()
+            self._in_progress_params.clear()
+            self._duplicate_count = 0
+        self.logger.info("Deduplication cache cleared for new optimization run")
+
+        # 步驟2.2: 構建 case_timestamps 字典（用於穩定性分析按案例月份分組）
         # 從 case_storage 讀取所有案例的 timestamp
         self.case_timestamps = {}
         all_case_ids = positive_cases + negative_cases
@@ -1325,45 +1741,53 @@ class OptunaOptimizer:
 
         try:
             # 步驟6: 執行優化
-            # 修復async event loop問題: 使用run_in_executor在獨立線程中運行
             loop = asyncio.get_event_loop()
 
-            # 根據use_multi_objective選擇目標函數(使用帶重試版本)
-            if self.use_multi_objective:
-                def sync_objective(trial: "Trial") -> Tuple[float, float]:
-                    """
-                    多目標同步包裝器(帶重試機制)
+            # 選擇目標函數：n_jobs > 1 使用真正的同步函數實現多核並行
+            if self.n_jobs > 1 and not self.use_multi_objective:
+                # 真正的多核並行：使用完全同步的目標函數
+                self.logger.info(f"Using SYNC objective function for true multi-core parallelism (n_jobs={self.n_jobs})")
+                objective_func = self._objective_function_sync
 
-                    Returns:
-                        (separation, stability_score) 元組
-                    """
-                    future = asyncio.run_coroutine_threadsafe(
-                        self._multi_objective_function_with_retry(trial),
-                        loop
+                # 直接在 executor 中運行（不需要 async 包裝）
+                await loop.run_in_executor(
+                    self._executor,
+                    lambda: self.study.optimize(
+                        objective_func,
+                        n_trials=self.n_trials,
+                        n_jobs=self.n_jobs,
+                        timeout=self.timeout,
+                        callbacks=[callback],
+                        show_progress_bar=True
                     )
-                    return future.result()
+                )
             else:
-                def sync_objective(trial: "Trial") -> float:
-                    """
-                    單目標同步包裝器(帶重試機制)
+                # 單核或多目標：使用 async 包裝器
+                self.logger.info(f"Using ASYNC objective function (n_jobs={self.n_jobs})")
 
-                    Returns:
-                        separation值
-                    """
-                    future = asyncio.run_coroutine_threadsafe(
-                        self._objective_function_with_retry(trial),
-                        loop
-                    )
-                    return future.result()
+                if self.use_multi_objective:
+                    def sync_objective(trial: "Trial") -> Tuple[float, float]:
+                        future = asyncio.run_coroutine_threadsafe(
+                            self._multi_objective_function_with_retry(trial),
+                            loop
+                        )
+                        return future.result()
+                else:
+                    def sync_objective(trial: "Trial") -> float:
+                        future = asyncio.run_coroutine_threadsafe(
+                            self._objective_function_with_retry(trial),
+                            loop
+                        )
+                        return future.result()
 
-            # 在ThreadPoolExecutor中運行Optuna優化(避免阻塞event loop)
-            await loop.run_in_executor(
-                self._executor,
-                lambda: self.study.optimize(
-                    sync_objective,
-                    n_trials=self.n_trials,
-                    n_jobs=self.n_jobs,
-                    timeout=self.timeout,
+                # 在ThreadPoolExecutor中運行Optuna優化
+                await loop.run_in_executor(
+                    self._executor,
+                    lambda: self.study.optimize(
+                        sync_objective,
+                        n_trials=self.n_trials,
+                        n_jobs=self.n_jobs,
+                        timeout=self.timeout,
                     callbacks=[callback],
                     show_progress_bar=True
                 )
@@ -1375,6 +1799,69 @@ class OptunaOptimizer:
         # Day 4: 完成ProgressMonitor
         if self.progress_monitor:
             self.progress_monitor.finish(self.study)
+
+        # ==================== 動態補足：確保達到目標完成試驗數 ====================
+        completed_trials = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+        target_completed = self.n_trials  # 使用者期望的完成數
+
+        if completed_trials < target_completed:
+            shortage = target_completed - completed_trials
+            self.logger.warning(
+                f"Only {completed_trials}/{target_completed} trials completed "
+                f"(due to {self._duplicate_count} duplicates pruned). "
+                f"Running {shortage} additional trials to meet target..."
+            )
+
+            # 追加試驗以補足不足的數量
+            try:
+                if self.n_jobs > 1 and not self.use_multi_objective:
+                    objective_func = self._objective_function_sync
+                    await loop.run_in_executor(
+                        self._executor,
+                        lambda: self.study.optimize(
+                            objective_func,
+                            n_trials=shortage,
+                            n_jobs=self.n_jobs,
+                            timeout=self.timeout,
+                            callbacks=[callback],
+                            show_progress_bar=True
+                        )
+                    )
+                else:
+                    if self.use_multi_objective:
+                        def sync_objective(trial: "Trial") -> Tuple[float, float]:
+                            future = asyncio.run_coroutine_threadsafe(
+                                self._multi_objective_function_with_retry(trial),
+                                loop
+                            )
+                            return future.result()
+                    else:
+                        def sync_objective(trial: "Trial") -> float:
+                            future = asyncio.run_coroutine_threadsafe(
+                                self._objective_function_with_retry(trial),
+                                loop
+                            )
+                            return future.result()
+
+                    await loop.run_in_executor(
+                        self._executor,
+                        lambda: self.study.optimize(
+                            sync_objective,
+                            n_trials=shortage,
+                            n_jobs=self.n_jobs,
+                            timeout=self.timeout,
+                            callbacks=[callback],
+                            show_progress_bar=True
+                        )
+                    )
+
+                completed_after_backfill = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+                self.logger.info(
+                    f"Additional trials completed: {completed_after_backfill} total completed trials"
+                )
+
+            except Exception as e:
+                self.logger.error(f"Failed to run additional trials: {e}")
 
         # 收集結果
         end_time = time.time()
@@ -1396,11 +1883,19 @@ class OptunaOptimizer:
         # 獲取 study direction 並轉換為字符串
         study_direction = str(self.study.direction.name) if hasattr(self.study.direction, 'name') else "MAXIMIZE"
 
+        # 計算完成和剪枝的試驗數
+        completed_trials = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+        pruned_trials = len([t for t in self.study.trials if t.state == optuna.trial.TrialState.PRUNED])
+
         # 日誌記錄
         self.logger.info(
             f"Optimization completed: best_value={best_value:.4f}, "
             f"best_params={best_params}, total_time={optimization_time:.1f}s, "
             f"direction={study_direction}"
+        )
+        self.logger.info(
+            f"Trial statistics: completed={completed_trials}, pruned={pruned_trials} "
+            f"(duplicates avoided: {self._duplicate_count}, unique params cached: {len(self._seen_params_cache)})"
         )
 
         return OptimizationResult(
