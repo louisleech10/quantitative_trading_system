@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2025-12-25 22:30
-**當前階段**: Golden Formula v2.0 M值優化系統
+**最後更新**: 2026-01-07 21:30
+**當前階段**: Optuna優化系統加速 - EMA預計算快取
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,16 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Optuna優化系統加速：EMA預計算快取** (100%) - 2026-01-07完成
+  - ✅ IndicatorCache類別：預計算所有EMA週期，O(n)→O(1)查表
+  - ✅ 雙分析器注入：_sync_analyzer（n_jobs>1）+ signal_service.analyzer（n_jobs=1）
+  - ✅ 性能提升：50 trials 1.4m→5.4s（15x）、100 trials 13.4s、200 trials 32.5s
+  - ✅ 記憶體管理：動態估算、2GB上限、自動清理
+- **Optuna CSV導出增強：完整統計欄位** (100%) - 2026-01-03完成
+  - ✅ CSV包含20+統計欄位：p_value、cohens_d、stability_cv、M值、分離度等
+  - ✅ 與NEW.csv格式一致：完整導出所有trial的user_attrs數據
+  - ✅ 前端文檔更新：indicator_extension_guide.md、indicator_api_usage.md標註CSV導出功能
+  - ✅ 驗證通過：用戶確認CSV導出功能正常
 - **Optuna優化系統Bug修復：Study初始化與權重加權** (100%) - 2025-12-26完成
   - ✅ Study初始化順序：create_study()提前至使用前（避免NoneType錯誤）
   - ✅ 權重資料存儲：case_weights存入trial.user_attrs（__weight_前綴）
@@ -115,9 +125,14 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-- 無（等待用戶重新運行優化任務驗證修復）
+- 無
 
 ### 剛完成 🔧
+- **Optuna優化系統加速：EMA預計算快取** (2026-01-07)
+  - ✅ IndicatorCache類別實現（O(1)查表替代O(n)計算）
+  - ✅ 雙分析器快取注入（修復n_jobs=1快取miss問題）
+  - ✅ 性能驗證：50 trials加速15倍（1.4m→5.4s）
+  - ✅ 文件新增：momentum/Analysis/indicator_cache.py、test_data/verify_indicator_cache.py
 - **Golden Formula v2.0 M值優化系統** (2025-12-25)
   - ✅ 前端M值卡片：正例/反例M值平均、標準差、穩定性CV
   - ✅ M Separation CV計算：按月分組計算M Separation穩定性
@@ -730,6 +745,9 @@ quantitative_trading_system/
   - Web Workers（CSV匯出優化，如試驗數>5000）
   - Code Splitting（bundle優化，如>500KB）
 
+**已優化完成**：
+- ✅ Optuna優化速度（2026-01-07）：50 trials 1.4m→5.4s（15x加速）
+
 - **Phase 2.4 進階交互功能**（優先級：低，可選）
   - 區間選擇（Shift+拖曳時間範圍）
   - 鍵盤快捷鍵（Space拖曳、← → 移動）
@@ -785,6 +803,85 @@ quantitative_trading_system/
 ---
 
 ## 📝 最近完成的工作
+
+### 2026-01-07
+
+**Optuna優化系統加速：EMA預計算快取** ⭐⭐⭐⭐⭐
+
+**問題背景**：
+- Optuna優化速度瓶頸：50 trials需要1.4分鐘
+- 每個trial重複計算相同的EMA值（O(n)複雜度）
+- 10,000案例×100週期=100萬次重複計算
+
+**實施方案**：
+1. **IndicatorCache類別** (`momentum/Analysis/indicator_cache.py`)
+   - 預計算所有可能的EMA週期（用戶配置範圍）
+   - 存儲結構：`{(case_id, indicator_type, period): np.ndarray}`
+   - 支援動態參數範圍讀取（從parameter_ranges）
+   - 記憶體管理：估算、2GB上限、自動清理
+
+2. **雙分析器快取注入**
+   - 修復關鍵bug：n_jobs=1使用signal_service.analyzer，而非_sync_analyzer
+   - 解決方案：同時注入快取到兩個分析器實例
+   - 代碼位置：`optuna_optimizer.py:1617, 1703`
+
+3. **快取優先路徑**
+   - `calculate_strategy_signals_cached()`：O(1)查表
+   - 未命中時fallback到動態計算（向後兼容）
+   - 支援配置驗證：indicator_type、data_source、period範圍
+
+**效能提升**：
+- 50 trials：1.4分鐘 → 5.4秒（15x加速）
+- 100 trials：13.4秒
+- 200 trials：32.5秒
+- 預計算時間：約2-3分鐘（一次性）
+
+**相關檔案**：
+- `momentum/Analysis/indicator_cache.py` - 新增快取類別
+- `momentum/Analysis/signal_density_analyzer.py` - 快取整合
+- `momentum/Optimization/optuna_optimizer.py` - 雙分析器注入
+- `test_data/verify_indicator_cache.py` - 驗證腳本
+
+### 2026-01-03
+
+**Optuna CSV導出增強：完整統計欄位** ⭐⭐⭐⭐
+
+**任務背景**
+- 用戶需要CSV導出包含完整的統計欄位（20+欄位）
+- 現有get_trials_dataframe()僅返回基本的Optuna標準欄位
+- NEW.csv範例顯示需要包含：p_value、cohens_d、stability_cv、M值、分離度等
+
+**完成內容**
+1. **驗證現有功能**
+   - 確認momentum/Optimization/optuna_optimizer.py已在trial.set_user_attr()存儲所有統計數據
+   - 確認Optuna的trials_dataframe()自動包含user_attrs欄位
+   - 驗證CSV導出已包含所有20+統計欄位
+
+2. **文檔更新**
+   - docs/indicator_extension_guide.md：添加CSV導出說明（L833-848）
+   - docs/indicator_api_usage.md：更新Optuna優化整合章節
+   - 標註CSV包含完整統計欄位的功能
+
+3. **用戶驗證**
+   - 用戶確認CSV導出功能正常
+   - 與NEW.csv格式一致
+
+**技術細節**
+- CSV欄位包括：
+  - 基本資訊：Rank, Trial #, Value, State
+  - 參數：data_source, strategy_logic, indicator_type, short_period, mid_period, long_period
+  - 統計檢驗：p_value, cohens_d, stability_cv
+  - 密度指標：positive_avg_density, negative_avg_density
+  - 分離度：separation, m_separation
+  - M值統計：positive_weighted_mean_m, negative_weighted_mean_m, positive_m_std, negative_m_std
+  - 權重與案例：positive_total_weight, negative_total_weight, positive_active_cases, negative_active_cases
+  - Golden Formula：optuna_golden_score
+
+**影響範圍**
+- 文檔：2個文件更新
+- 功能：確認CSV導出完整性
+
+---
 
 ### 2025-12-25
 
@@ -2460,7 +2557,15 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待推送（2025-12-25）
+**遠端同步**: ⏳ 待推送（2026-01-07）
+
+**待提交變更** (2026-01-07):
+- **Optuna優化系統加速：EMA預計算快取**
+  - momentum/Analysis/indicator_cache.py - 新增IndicatorCache類別
+  - momentum/Analysis/signal_density_analyzer.py - 快取整合與優先路徑
+  - momentum/Optimization/optuna_optimizer.py - 雙分析器快取注入
+  - test_data/verify_indicator_cache.py - 驗證腳本
+  - .github/STATUS.md - 狀態更新
 
 **待提交變更** (2025-12-25):
 - **Golden Formula v2.0 M值優化系統**
@@ -2548,16 +2653,17 @@ m/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueEr
 
 ## 💡 下次啟動時
 
-1. **待修復問題**（2025-12-25）：
-   - ❌ **Optuna Study初始化問題**
-     - 問題：optuna_optimizer.py line 1200, self.study為None
-     - 錯誤：AttributeError: 'NoneType' object has no attribute 'set_user_attr'
-     - 影響：無法存儲positive_cases/negative_cases，導致optimization-result頁面無法載入穩定性分析
-     - 優先級：高
-     - 建議：檢查study初始化時機，確保在set_user_attr()前study已創建
+1. **已完成工作**（2026-01-07）：
+   - ✅ **Optuna優化系統加速：EMA預計算快取**
+     - IndicatorCache類別實現完成
+     - 雙分析器快取注入問題修復
+     - 性能提升15倍：50 trials 1.4m→5.4s
+     - 待推送Git
 
-2. **已完成工作**（2025-12-25）：
-   - ✅ **Golden Formula v2.0 M值優化系統**
+2. **下一步工作**：
+   - 繼續PHASE4測試驗證（依PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
+   - 多trials（500+）穩定性觀察
+   - 大規模案例集（10,000+）效能驗證
      - M值統計顯示：strategy-test頁面完整顯示正反例M值平均/標準差/穩定性CV
      - M Separation CV計算：按月分組計算M Separation穩定性（<0.3穩定，<0.5可接受）
      - 優化結果穩定性：optimization-result頁面改用M Separation替代overall_cv

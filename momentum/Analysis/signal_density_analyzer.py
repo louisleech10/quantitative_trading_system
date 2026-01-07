@@ -21,7 +21,7 @@ Date: 2025-11-01
 import logging
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, TYPE_CHECKING
 from scipy import stats
 from datetime import datetime
 
@@ -32,6 +32,10 @@ from api.models.training_window_config import (
     StrategyConfig,
     SignalDensityResponse
 )
+
+if TYPE_CHECKING:
+    from momentum.Analysis.kline_cache import KlineCache
+    from momentum.Analysis.indicator_cache import IndicatorCache
 
 # 零值判斷閾值常量
 # 當 density < 此閾值時視為零值
@@ -55,7 +59,9 @@ class SignalDensityAnalyzer:
     def __init__(
         self,
         kline_storage: KlineStorageManager,
-        indicator_engine: IndicatorEngine
+        indicator_engine: IndicatorEngine,
+        kline_cache: Optional['KlineCache'] = None,
+        indicator_cache: Optional['IndicatorCache'] = None
     ):
         """
         初始化分析引擎
@@ -63,10 +69,43 @@ class SignalDensityAnalyzer:
         Args:
             kline_storage: K線數據存儲管理器
             indicator_engine: 指標計算引擎(來自Task 3.1)
+            kline_cache: K線預載入快取（可選，用於加速 Optuna 優化）
+            indicator_cache: 指標預計算快取（可選，用於加速 Optuna 優化）
         """
         self.storage = kline_storage
         self.indicator_engine = indicator_engine
+        self.kline_cache = kline_cache
+        self.indicator_cache = indicator_cache
         self.logger = logging.getLogger(__name__)
+
+    def set_kline_cache(self, kline_cache: 'KlineCache') -> None:
+        """
+        設置 K 線快取（用於在初始化後注入快取）
+
+        Args:
+            kline_cache: 預載入的 K 線快取
+        """
+        self.kline_cache = kline_cache
+        self.logger.info(
+            f"已設置 K 線快取: {len(kline_cache)} 個案例, "
+            f"記憶體: {kline_cache.stats.memory_mb:.1f} MB"
+        )
+
+    def set_indicator_cache(self, indicator_cache: 'IndicatorCache') -> None:
+        """
+        設置指標預計算快取（用於在初始化後注入快取）
+
+        Args:
+            indicator_cache: 預計算的指標快取
+        """
+        self.indicator_cache = indicator_cache
+        # 重置快取命中日誌標記
+        self._cache_hit_logged = False
+        self.logger.info(
+            f"已設置指標快取: {len(indicator_cache)} 個指標值, "
+            f"週期範圍: {sorted(indicator_cache.get_cached_periods())[:3]}...{sorted(indicator_cache.get_cached_periods())[-3:]}, "
+            f"記憶體: {indicator_cache.stats.memory_mb:.1f} MB"
+        )
 
     def extract_training_window(
         self,
@@ -198,6 +237,79 @@ class SignalDensityAnalyzer:
             )
             raise
 
+    def calculate_strategy_signals_cached(
+        self,
+        case_id: str,
+        strategy_config: StrategyConfig,
+        far_lookback_bars: int
+    ) -> Optional[np.ndarray]:
+        """
+        使用指標快取計算策略信號 (O(1) 查表)
+
+        當 indicator_cache 可用且包含所需週期時，直接從快取查表計算信號，
+        避免重複的 EMA 計算，將時間複雜度從 O(n) 降為 O(1)。
+
+        Args:
+            case_id: 案例 ID
+            strategy_config: 策略配置
+            far_lookback_bars: 遠期窗口回看 K 線數 (用於切片信號)
+
+        Returns:
+            np.ndarray: boolean 信號數組，或 None (快取不可用時)
+
+        Note:
+            目前僅支援 three_line 策略，其他策略返回 None 以 fallback 到動態計算
+        """
+        # 檢查快取是否可用
+        if self.indicator_cache is None:
+            return None
+        if not self.indicator_cache.is_precomputed():
+            return None
+
+        # 目前僅支援 three_line 策略
+        if strategy_config.strategy_logic != "three_line":
+            return None
+
+        # 提取參數
+        params = strategy_config.params
+        short_period = params.get('short_period')
+        mid_period = params.get('mid_period')
+        long_period = params.get('long_period')
+        indicator_type = strategy_config.indicator_type
+        data_source = strategy_config.data_source
+
+        # 檢查 indicator_type 和 data_source 是否匹配快取
+        if not self.indicator_cache.matches_config(indicator_type, data_source):
+            return None
+
+        # 檢查所有週期是否在快取中
+        if not all(self.indicator_cache.has_period(p) for p in [short_period, mid_period, long_period]):
+            return None
+
+        # 檢查案例是否在快取中
+        if not self.indicator_cache.has_case(case_id):
+            return None
+
+        # 從快取獲取信號
+        signals = self.indicator_cache.get_signals_for_case(
+            case_id=case_id,
+            indicator_type=indicator_type,
+            short_period=short_period,
+            mid_period=mid_period,
+            long_period=long_period
+        )
+
+        # 只在第一次命中時記錄（避免大量日誌）
+        if signals is not None and not hasattr(self, '_cache_hit_logged'):
+            self._cache_hit_logged = True
+            self.logger.info(
+                f"[快取命中] 首次命中確認 - case_id={case_id}, "
+                f"periods=({short_period}, {mid_period}, {long_period}), "
+                f"signals_length={len(signals)}"
+            )
+
+        return signals
+
     def _calculate_three_line_signals(
         self,
         kline_data: pd.DataFrame,
@@ -279,6 +391,8 @@ class SignalDensityAnalyzer:
         雙密度模式專用: 一次讀取完整範圍,自動包含warmup數據以支持任意EMA參數。
         讀取範圍: TO-far_lookback_bars-warmup 到 TO-1
 
+        優化: 若 kline_cache 可用，優先從記憶體快取讀取，避免 HDF5 I/O。
+
         Warmup計算:
         - 從strategy_config.params中獲取最大EMA週期
         - warmup = max_ema_period * 4.5 (確保 99.5% 精度)
@@ -334,6 +448,23 @@ class SignalDensityAnalyzer:
         # 完整讀取範圍: far_lookback + warmup
         total_lookback = window_config.far_lookback_bars + warmup_bars
 
+        # ==================== 快取優先路徑 ====================
+        # 如果快取可用且包含此案例，直接從記憶體讀取
+        if self.kline_cache is not None and self.kline_cache.has_case(case.case_id):
+            klines = self.kline_cache.get(case.case_id, actual_lookback=total_lookback)
+            if klines is not None and len(klines) >= total_lookback:
+                self.logger.debug(
+                    f"[快取命中] case_id={case.case_id}, "
+                    f"total_lookback={total_lookback}, actual_bars={len(klines)}"
+                )
+                return klines
+            # 快取資料不足，fallback 到 HDF5 讀取
+            self.logger.debug(
+                f"[快取不足] case_id={case.case_id}, "
+                f"需要 {total_lookback} 根，快取只有 {len(klines) if klines is not None else 0} 根"
+            )
+
+        # ==================== 原始 HDF5 讀取路徑 ====================
         # 從 metadata 讀取批量下載時實際使用的 warmup_bars，並與計算需求比較
         metadata = self.storage.get_metadata(case.symbol, case.timeframe)
         actual_warmup_downloaded = metadata.get('warmup_bars_downloaded') if metadata else None
@@ -351,7 +482,7 @@ class SignalDensityAnalyzer:
             )
         else:
             # 舊版 HDF5 檔案沒有 warmup_bars_downloaded metadata，記錄警告但繼續執行
-            # 後續會由 Line 339 的動態檢查來驗證資料是否足夠
+            # 後續會由動態檢查來驗證資料是否足夠
             self.logger.warning(
                 f"⚠️  未找到 warmup_bars_downloaded metadata for {case.symbol}/{case.timeframe}，\n"
                 f"   這可能是舊版批量下載的資料。將依靠動態資料檢查來驗證 warmup 充足性。"
@@ -392,7 +523,7 @@ class SignalDensityAnalyzer:
         klines = self._remove_reference_bar(klines, ref_timestamp)
 
         self.logger.debug(
-            f"提取完整密度窗口: case_id={case.case_id}, "
+            f"[HDF5] 提取完整密度窗口: case_id={case.case_id}, "
             f"far_lookback={window_config.far_lookback_bars}, "
             f"warmup={warmup_bars}, "
             f"total_lookback={total_lookback}, "
@@ -1261,13 +1392,25 @@ class SignalDensityAnalyzer:
         for i, case in enumerate(positive_cases, 1):
             try:
                 if dual_density_mode:
-                    # 雙密度模式: 一次讀取完整窗口(含warmup), 一次計算EMA
-                    full_klines = self._extract_full_density_window(
-                        case, window_config, strategy_config
+                    # ========== 快取優先路徑 ==========
+                    # 嘗試從指標快取獲取信號 (O(1) 查表)
+                    cached_signals = self.calculate_strategy_signals_cached(
+                        case_id=case.case_id,
+                        strategy_config=strategy_config,
+                        far_lookback_bars=window_config.far_lookback_bars
                     )
-                    full_signals = self.calculate_strategy_signals(
-                        full_klines, strategy_config
-                    )
+
+                    if cached_signals is not None:
+                        # 快取命中: 直接使用預計算的信號
+                        full_signals = cached_signals
+                    else:
+                        # 快取未命中: 回退到動態計算
+                        full_klines = self._extract_full_density_window(
+                            case, window_config, strategy_config
+                        )
+                        full_signals = self.calculate_strategy_signals(
+                            full_klines, strategy_config
+                        )
 
                     # 從完整信號中提取近期和遠期信號
                     near_signals, far_signals = self._split_near_far_signals(
@@ -1338,13 +1481,25 @@ class SignalDensityAnalyzer:
         for i, case in enumerate(negative_cases, 1):
             try:
                 if dual_density_mode:
-                    # 雙密度模式: 一次讀取完整窗口(含warmup), 一次計算EMA
-                    full_klines = self._extract_full_density_window(
-                        case, window_config, strategy_config
+                    # ========== 快取優先路徑 ==========
+                    # 嘗試從指標快取獲取信號 (O(1) 查表)
+                    cached_signals = self.calculate_strategy_signals_cached(
+                        case_id=case.case_id,
+                        strategy_config=strategy_config,
+                        far_lookback_bars=window_config.far_lookback_bars
                     )
-                    full_signals = self.calculate_strategy_signals(
-                        full_klines, strategy_config
-                    )
+
+                    if cached_signals is not None:
+                        # 快取命中: 直接使用預計算的信號
+                        full_signals = cached_signals
+                    else:
+                        # 快取未命中: 回退到動態計算
+                        full_klines = self._extract_full_density_window(
+                            case, window_config, strategy_config
+                        )
+                        full_signals = self.calculate_strategy_signals(
+                            full_klines, strategy_config
+                        )
 
                     # 從完整信號中提取近期和遠期信號
                     near_signals, far_signals = self._split_near_far_signals(

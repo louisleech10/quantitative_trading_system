@@ -38,6 +38,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 export interface OptunaConfig {
   enabled: boolean
   n_trials: number
+  n_startup_trials: number | null  // TPE 初始隨機試驗數（null 則自動計算）
   timeout: number  // seconds
   random_seed: number
   enable_pruning: boolean
@@ -59,6 +60,7 @@ export interface OptunaConfigPanelProps {
 const DEFAULT_CONFIG: OptunaConfig = {
   enabled: false,
   n_trials: 50,
+  n_startup_trials: null,  // null 則自動計算為 n_trials 的 15%
   timeout: 1800,  // 30 minutes
   random_seed: 42,
   enable_pruning: true,
@@ -205,6 +207,32 @@ export function OptunaConfigPanel({
                 />
                 <p className="text-xs text-muted-foreground">
                   固定種子可重現結果
+                </p>
+              </div>
+
+              {/* 初始隨機試驗數 */}
+              <div className="space-y-2">
+                <Label htmlFor="n_startup_trials" className="flex items-center gap-2">
+                  初始隨機數
+                  <Badge variant="outline" className="text-xs">
+                    TPE
+                  </Badge>
+                </Label>
+                <Input
+                  id="n_startup_trials"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={config.n_startup_trials ?? ''}
+                  placeholder={`自動 (${Math.max(10, Math.floor(config.n_trials * 0.15))})`}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    updateConfig({ n_startup_trials: val === '' ? null : parseInt(val) || null })
+                  }}
+                  disabled={disabled}
+                />
+                <p className="text-xs text-muted-foreground">
+                  留空自動計算（建議 n_trials 的 15-25%）
                 </p>
               </div>
 

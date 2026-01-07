@@ -40,6 +40,7 @@ class CreateOptimizationTaskRequest(BaseModel):
     training_window: TrainingWindowConfig = Field(..., description="訓練窗口配置")
     sampler_type: str = Field("TPE", description="優化器類型（TPE/CmaEs/Random/GP/NSGA-II）")
     n_trials: int = Field(100, description="試驗次數", ge=1, le=10000)
+    n_startup_trials: Optional[int] = Field(None, description="TPE 初始隨機試驗數（None 則自動設為 n_trials 的 15-25%）", ge=1, le=1000)
     n_jobs: int = Field(1, description="並行核心數（目前架構不支援真正多核）", ge=1, le=16)
     use_multi_objective: bool = Field(False, description="是否使用多目標優化（separation + stability）")
     enable_pruning: bool = Field(True, description="是否啟用 Pruner（MedianPruner）")
@@ -58,6 +59,7 @@ class CreateOptimizationTaskRequest(BaseModel):
                 },
                 "sampler_type": "TPE",
                 "n_trials": 100,
+                "n_startup_trials": 15,
                 "n_jobs": 6,
                 "use_multi_objective": False
             }
@@ -106,6 +108,7 @@ async def create_optimization_task(request: CreateOptimizationTaskRequest):
             training_window=request.training_window,
             sampler_type=request.sampler_type,
             n_trials=request.n_trials,
+            n_startup_trials=request.n_startup_trials,
             n_jobs=request.n_jobs,
             parameter_ranges=request.parameter_ranges,
             use_multi_objective=request.use_multi_objective,

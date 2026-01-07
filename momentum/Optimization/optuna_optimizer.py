@@ -98,6 +98,8 @@ from api.utils.case_storage import get_case_storage_manager
 
 # 導入同步分析器（用於真正的多核並行）
 from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
+from momentum.Analysis.kline_cache import KlineCache
+from momentum.Analysis.indicator_cache import IndicatorCache
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.Indicators.indicator_engine import IndicatorEngine
 from api.core.config import settings
@@ -380,6 +382,7 @@ class OptunaOptimizer:
         sampler_type: str = "TPE",
         pruner_type: Optional[str] = "Median",
         n_trials: int = 100,
+        n_startup_trials: Optional[int] = None,
         n_jobs: int = 1,  # 多核並行因 async event loop 瓶頸暫不支援
         timeout: Optional[int] = None,
         random_seed: Optional[int] = 42,
@@ -406,6 +409,7 @@ class OptunaOptimizer:
             sampler_type: 優化器類型(TPE/CmaEs/Random/GP/NSGA-II)
             pruner_type: 剪枝器類型(Median/Percentile/None)
             n_trials: 試驗次數
+            n_startup_trials: TPE 初始隨機試驗數（None 則自動計算為 n_trials 的 15-20%）
             n_jobs: 並行核心數(1=串行,>1=並行)
             timeout: 總優化超時(秒,None=無限制)
             random_seed: 隨機種子(可重現性)
@@ -430,6 +434,11 @@ class OptunaOptimizer:
         self.sampler_type = sampler_type
         self.pruner_type = pruner_type
         self.n_trials = n_trials
+        # 自動計算 n_startup_trials（若未指定，則為 n_trials 的 15-20%，最少 10）
+        if n_startup_trials is None:
+            self.n_startup_trials = max(10, int(n_trials * 0.15))
+        else:
+            self.n_startup_trials = n_startup_trials
         self.n_jobs = n_jobs
         self.timeout = timeout
         self.random_seed = random_seed
@@ -454,6 +463,12 @@ class OptunaOptimizer:
             kline_storage=self._kline_storage,
             indicator_engine=self._indicator_engine
         )
+
+        # K 線預載入快取（用於加速優化，在 optimize() 時初始化）
+        self._kline_cache: Optional[KlineCache] = None
+
+        # 指標預計算快取（用於加速 EMA 計算，在 optimize() 時初始化）
+        self._indicator_cache: Optional[IndicatorCache] = None
 
         # 日誌
         self.logger = logging.getLogger(__name__)
@@ -494,7 +509,7 @@ class OptunaOptimizer:
 
         self.logger.info(
             f"OptunaOptimizer initialized: study_name={study_name}, "
-            f"sampler={sampler_type}, n_trials={n_trials}, "
+            f"sampler={sampler_type}, n_trials={n_trials}, n_startup_trials={self.n_startup_trials}, "
             f"param_ranges={self.parameter_ranges}, "
             f"checkpoint_interval={checkpoint_interval}, max_retries={max_retries}"
         )
@@ -554,8 +569,8 @@ class OptunaOptimizer:
         if self.sampler_type == 'TPE':
             return TPESampler(
                 seed=self.random_seed,
-                n_startup_trials=10,   # 減少啟動隨機試驗數（原25），更快進入TPE優化
-                n_ei_candidates=24,    # 期望改善候選數
+                n_startup_trials=self.n_startup_trials,  # 初始隨機試驗數（可由前端設定）
+                n_ei_candidates=48,    # 期望改善候選數，提升決策準確度
                 constant_liar=True,    # 多線程時避免重複採樣
                 multivariate=True      # 考慮參數之間的相關性，更均勻探索空間
             )
@@ -1526,6 +1541,178 @@ class OptunaOptimizer:
             # 所有其他錯誤由_multi_objective_function_with_retry的重試邏輯處理
             raise
 
+    async def _preload_kline_cache(
+        self,
+        positive_cases: List[str],
+        negative_cases: List[str],
+        training_window: TrainingWindowConfig
+    ) -> None:
+        """
+        預載入 K 線資料到記憶體快取
+
+        在優化開始前一次性載入所有案例的 K 線資料，
+        避免每個 Trial 重複進行 HDF5 I/O 操作，加速 2-3 倍。
+
+        Args:
+            positive_cases: 正例案例 ID 列表
+            negative_cases: 反例案例 ID 列表
+            training_window: 訓練窗口配置
+        """
+        # 只在雙密度模式下使用快取（單密度模式的 I/O 較少，快取效益不明顯）
+        if training_window.far_lookback_bars is None:
+            self.logger.info("單密度模式，跳過 K 線快取預載入")
+            return
+
+        self.logger.info("🚀 開始預載入 K 線快取...")
+
+        # 計算最大 EMA 週期（從參數範圍配置中取得）
+        max_ema_period = max(
+            self.parameter_ranges.ema_short_range[1],
+            self.parameter_ranges.ema_mid_range[1],
+            self.parameter_ranges.ema_long_range[1]
+        )
+
+        # 載入所有案例物件
+        all_case_objs = []
+        all_case_ids = positive_cases + negative_cases
+
+        for case_id in all_case_ids:
+            case = self.case_storage.get_case(case_id)
+            if case is not None:
+                # 設置計算用的 timeframe
+                case_copy = case.model_copy()
+                case_copy.timeframe = "1h"  # 計算統一使用 1h
+                all_case_objs.append(case_copy)
+
+        if not all_case_objs:
+            self.logger.warning("無有效案例，跳過 K 線快取預載入")
+            return
+
+        # 建立並預載入快取
+        self._kline_cache = KlineCache(
+            kline_storage=self._kline_storage,
+            n_workers=min(8, self.n_jobs * 2)  # 使用更多線程加速預載入
+        )
+
+        # 使用 run_in_executor 執行同步的預載入操作
+        loop = asyncio.get_event_loop()
+
+        def do_preload():
+            return self._kline_cache.preload(
+                cases=all_case_objs,
+                far_lookback_bars=training_window.far_lookback_bars,
+                max_ema_period=max_ema_period,
+                timeframe="1h",
+                reference_point=training_window.reference_point
+            )
+
+        stats = await loop.run_in_executor(self._executor, do_preload)
+
+        # 將快取注入到兩個分析器
+        # 1. _sync_analyzer: 用於 n_jobs > 1 的多核並行
+        self._sync_analyzer.set_kline_cache(self._kline_cache)
+
+        # 2. signal_service.analyzer: 用於 n_jobs = 1 的 async 路徑
+        self.signal_service.analyzer.set_kline_cache(self._kline_cache)
+
+        self.logger.info(
+            f"✅ K 線快取預載入完成並注入到兩個分析器: "
+            f"{stats.cached_cases}/{stats.total_cases} 案例, "
+            f"記憶體 {stats.memory_mb:.1f} MB, "
+            f"耗時 {stats.load_time_seconds:.1f}s"
+        )
+
+    async def _precompute_indicators(
+        self,
+        all_case_objs: List[Any],
+        training_window: TrainingWindowConfig,
+        strategy_config: StrategyConfig
+    ) -> None:
+        """
+        預計算所有案例的指標值 (EMA/SMA 等)
+
+        在優化開始前一次性預計算所有可能的 EMA 週期，
+        將每個 Trial 的 EMA 計算從 O(n) 降為 O(1) 查表，大幅加速優化。
+
+        效能預估:
+        - 預計算時間: ~2-3 分鐘 (一次性)
+        - 每 Trial 加速: 11.4ms → <1ms (查表)
+        - 50 Trials 總時間: ~90分鐘 → ~6分鐘
+
+        Args:
+            all_case_objs: 所有案例物件列表
+            training_window: 訓練窗口配置
+            strategy_config: 策略配置 (用於獲取 indicator_type 和 data_source)
+        """
+        # 只在雙密度模式下使用快取
+        if training_window.far_lookback_bars is None:
+            self.logger.info("單密度模式，跳過指標預計算")
+            return
+
+        # 需要先有 K 線快取
+        if self._kline_cache is None or not self._kline_cache.is_loaded():
+            self.logger.warning("K 線快取不可用，跳過指標預計算")
+            return
+
+        self.logger.info("🚀 開始預計算指標快取...")
+
+        # 從參數範圍配置中取得所有可能的週期
+        periods_to_cache = set()
+        periods_to_cache.update(range(
+            self.parameter_ranges.ema_short_range[0],
+            self.parameter_ranges.ema_short_range[1] + 1
+        ))
+        periods_to_cache.update(range(
+            self.parameter_ranges.ema_mid_range[0],
+            self.parameter_ranges.ema_mid_range[1] + 1
+        ))
+        periods_to_cache.update(range(
+            self.parameter_ranges.ema_long_range[0],
+            self.parameter_ranges.ema_long_range[1] + 1
+        ))
+
+        periods_list = sorted(list(periods_to_cache))
+        self.logger.info(
+            f"預計算週期範圍: {min(periods_list)}-{max(periods_list)} "
+            f"({len(periods_list)} 種)"
+        )
+
+        # 建立指標快取
+        self._indicator_cache = IndicatorCache(
+            kline_cache=self._kline_cache,
+            n_workers=min(8, self.n_jobs * 2),
+            memory_limit_mb=2000.0  # 2GB 上限
+        )
+
+        # 使用 run_in_executor 執行同步的預計算操作
+        loop = asyncio.get_event_loop()
+
+        def do_precompute():
+            return self._indicator_cache.precompute(
+                cases=all_case_objs,
+                indicator_type=strategy_config.indicator_type,
+                data_source=strategy_config.data_source,
+                periods=periods_list,
+                far_lookback_bars=training_window.far_lookback_bars
+            )
+
+        stats = await loop.run_in_executor(self._executor, do_precompute)
+
+        # 將快取注入到兩個分析器
+        # 1. _sync_analyzer: 用於 n_jobs > 1 的多核並行
+        self._sync_analyzer.set_indicator_cache(self._indicator_cache)
+
+        # 2. signal_service.analyzer: 用於 n_jobs = 1 的 async 路徑
+        self.signal_service.analyzer.set_indicator_cache(self._indicator_cache)
+
+        self.logger.info(
+            f"✅ 指標快取預計算完成並注入到兩個分析器: "
+            f"{stats.cached_cases}/{stats.total_cases} 案例, "
+            f"總指標數 {stats.total_indicators}, "
+            f"記憶體 {stats.memory_mb:.1f} MB, "
+            f"耗時 {stats.precompute_time_seconds:.1f}s"
+        )
+
     async def optimize(
         self,
         positive_cases: List[str],
@@ -1613,6 +1800,73 @@ class OptunaOptimizer:
         self.logger.info(
             f"成功構建 case_timestamps 字典：{len(self.case_timestamps)} 個案例"
         )
+
+        # 步驟2.3: 預載入 K 線資料到記憶體快取（加速優化）
+        await self._preload_kline_cache(
+            positive_cases=positive_cases,
+            negative_cases=negative_cases,
+            training_window=training_window
+        )
+
+        # 步驟2.4: 預計算指標快取（加速 EMA 計算）
+        # 載入案例物件用於指標預計算
+        all_case_objs = []
+        for case_id in all_case_ids:
+            case = self.case_storage.get_case(case_id)
+            if case is not None:
+                case_copy = case.model_copy()
+                case_copy.timeframe = "1h"  # 計算統一使用 1h
+                all_case_objs.append(case_copy)
+
+        if all_case_objs and self._kline_cache is not None:
+            # 構建預設策略配置 (用於指標預計算)
+            # 使用用戶配置的 data_source（從 parameter_ranges 讀取）
+            # 如果用戶配置了多個 data_source，取第一個（通常用戶只會選一個）
+            configured_data_sources = self.parameter_ranges.data_sources
+            if len(configured_data_sources) == 1:
+                precompute_data_source = configured_data_sources[0]
+            else:
+                # 多個 data_source：使用第一個並記錄警告
+                precompute_data_source = configured_data_sources[0]
+                self.logger.warning(
+                    f"配置了多個 data_source: {configured_data_sources}，"
+                    f"指標快取僅預計算 '{precompute_data_source}'，"
+                    f"其他 data_source 的 Trial 將 fallback 到動態計算"
+                )
+
+            # 同樣處理 indicator_type
+            configured_indicator_types = self.parameter_ranges.indicator_types
+            if len(configured_indicator_types) == 1:
+                precompute_indicator_type = configured_indicator_types[0]
+            else:
+                precompute_indicator_type = configured_indicator_types[0]
+                self.logger.warning(
+                    f"配置了多個 indicator_type: {configured_indicator_types}，"
+                    f"指標快取僅預計算 '{precompute_indicator_type}'，"
+                    f"其他 indicator_type 的 Trial 將 fallback 到動態計算"
+                )
+
+            self.logger.info(
+                f"指標預計算配置: data_source='{precompute_data_source}', "
+                f"indicator_type='{precompute_indicator_type}'"
+            )
+
+            default_strategy_config = StrategyConfig(
+                strategy_logic="three_line",
+                indicator_type=precompute_indicator_type,
+                data_source=precompute_data_source,
+                params={
+                    # 佔位參數 (實際週期由 parameter_ranges 決定)
+                    "short_period": self.parameter_ranges.ema_short_range[0],
+                    "mid_period": self.parameter_ranges.ema_mid_range[0],
+                    "long_period": self.parameter_ranges.ema_long_range[0]
+                }
+            )
+            await self._precompute_indicators(
+                all_case_objs=all_case_objs,
+                training_window=training_window,
+                strategy_config=default_strategy_config
+            )
 
         # 步驟3: 創建/載入Study (必須在使用 study 之前)
         if self.study is None:
@@ -1897,6 +2151,24 @@ class OptunaOptimizer:
             f"Trial statistics: completed={completed_trials}, pruned={pruned_trials} "
             f"(duplicates avoided: {self._duplicate_count}, unique params cached: {len(self._seen_params_cache)})"
         )
+
+        # 清理 K 線快取以釋放記憶體
+        if self._kline_cache is not None:
+            cache_memory = self._kline_cache.stats.memory_mb
+            self._kline_cache.clear()
+            self._kline_cache = None
+            self._sync_analyzer.kline_cache = None
+            self.signal_service.analyzer.kline_cache = None
+            self.logger.info(f"已清理 K 線快取，釋放 {cache_memory:.1f} MB 記憶體")
+
+        # 清理指標快取以釋放記憶體
+        if self._indicator_cache is not None:
+            cache_memory = self._indicator_cache.stats.memory_mb
+            self._indicator_cache.clear()
+            self._indicator_cache = None
+            self._sync_analyzer.indicator_cache = None
+            self.signal_service.analyzer.indicator_cache = None
+            self.logger.info(f"已清理指標快取，釋放 {cache_memory:.1f} MB 記憶體")
 
         return OptimizationResult(
             best_value=best_value,

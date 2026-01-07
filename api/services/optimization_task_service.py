@@ -173,6 +173,7 @@ class OptimizationTaskService:
         training_window: TrainingWindowConfig,
         sampler_type: str = "TPE",
         n_trials: int = 100,
+        n_startup_trials: Optional[int] = None,
         n_jobs: int = 1,
         parameter_ranges: Optional[ParameterRanges] = None,
         use_multi_objective: bool = False,
@@ -189,6 +190,7 @@ class OptimizationTaskService:
             training_window: 訓練窗口配置
             sampler_type: 優化器類型（TPE/CmaEs/Random/GP/NSGA-II）
             n_trials: 試驗次數
+            n_startup_trials: TPE 初始隨機試驗數（None 則自動計算）
             n_jobs: 並行核心數
             parameter_ranges: 參數搜索範圍
             use_multi_objective: 是否使用多目標優化
@@ -215,6 +217,7 @@ class OptimizationTaskService:
                 'training_window': training_window.__dict__ if hasattr(training_window, '__dict__') else training_window,
                 'sampler_type': sampler_type,
                 'n_trials': n_trials,
+                'n_startup_trials': n_startup_trials,
                 'n_jobs': n_jobs,
                 'use_multi_objective': use_multi_objective,
                 'enable_pruning': enable_pruning
@@ -229,6 +232,7 @@ class OptimizationTaskService:
             sampler_type=sampler_type,
             pruner_type=pruner_type,
             n_trials=n_trials,
+            n_startup_trials=n_startup_trials,
             n_jobs=n_jobs,
             parameter_ranges=parameter_ranges,
             use_multi_objective=use_multi_objective,
