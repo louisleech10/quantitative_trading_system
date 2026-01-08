@@ -1622,6 +1622,117 @@ class OptunaOptimizer:
             f"耗時 {stats.load_time_seconds:.1f}s"
         )
 
+    def _collect_cacheable_periods_from_config(self) -> set:
+        """
+        從 strategies.yaml 動態讀取所有策略的可快取週期參數
+        
+        遍歷 parameter_ranges 中配置的所有策略，收集標記為 is_cacheable: true 的參數範圍。
+        
+        Returns:
+            set: 所有需要預計算的週期值集合
+        """
+        import yaml
+        from pathlib import Path
+        
+        periods_to_cache = set()
+        
+        try:
+            # 讀取 strategies.yaml
+            config_path = Path(__file__).parent.parent.parent / "config" / "strategies.yaml"
+            
+            if not config_path.exists():
+                self.logger.warning(f"找不到 strategies.yaml: {config_path}")
+                return self._fallback_to_hardcoded_periods()
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            
+            strategies = config.get('strategies', {})
+            
+            # 獲取用戶配置的策略列表
+            configured_strategies = self.parameter_ranges.strategy_logics
+            
+            for strategy_name in configured_strategies:
+                if strategy_name not in strategies:
+                    self.logger.warning(f"策略 '{strategy_name}' 不在 strategies.yaml 中")
+                    continue
+                
+                strategy_config = strategies[strategy_name]
+                parameters = strategy_config.get('parameters', [])
+                
+                for param in parameters:
+                    # 只收集標記為 is_cacheable: true 的參數
+                    if not param.get('is_cacheable', False):
+                        continue
+                    
+                    param_name = param.get('name')
+                    param_type = param.get('type')
+                    
+                    # 只處理整數類型的參數
+                    if param_type != 'int':
+                        continue
+                    
+                    # 從 parameter_ranges 獲取對應的範圍
+                    # 嘗試多種命名方式: ema_short_range, short_period_range 等
+                    range_attr_names = [
+                        f"ema_{param_name.replace('_period', '')}_range",  # ema_short_range
+                        f"{param_name}_range",  # short_period_range
+                    ]
+                    
+                    param_range = None
+                    for attr_name in range_attr_names:
+                        if hasattr(self.parameter_ranges, attr_name):
+                            param_range = getattr(self.parameter_ranges, attr_name)
+                            break
+                    
+                    if param_range is not None and len(param_range) == 2:
+                        min_val, max_val = param_range
+                        periods_to_cache.update(range(min_val, max_val + 1))
+                        self.logger.debug(
+                            f"收集週期參數 {param_name}: {min_val}-{max_val}"
+                        )
+            
+            if periods_to_cache:
+                self.logger.info(
+                    f"從 strategies.yaml 收集了 {len(periods_to_cache)} 個可快取週期"
+                )
+            else:
+                self.logger.warning("未從 strategies.yaml 收集到任何可快取週期，使用 fallback")
+                return self._fallback_to_hardcoded_periods()
+            
+            return periods_to_cache
+            
+        except Exception as e:
+            self.logger.warning(f"讀取 strategies.yaml 失敗: {e}，使用 fallback")
+            return self._fallback_to_hardcoded_periods()
+    
+    def _fallback_to_hardcoded_periods(self) -> set:
+        """
+        Fallback: 從 parameter_ranges 的 ema_*_range 屬性收集週期
+        
+        當 strategies.yaml 不可用時使用此方法。
+        
+        Returns:
+            set: 週期值集合
+        """
+        periods_to_cache = set()
+        
+        # 嘗試讀取已知的 EMA 範圍屬性
+        range_attrs = ['ema_short_range', 'ema_mid_range', 'ema_long_range']
+        
+        for attr_name in range_attrs:
+            if hasattr(self.parameter_ranges, attr_name):
+                param_range = getattr(self.parameter_ranges, attr_name)
+                if param_range and len(param_range) == 2:
+                    min_val, max_val = param_range
+                    periods_to_cache.update(range(min_val, max_val + 1))
+        
+        self.logger.info(
+            f"Fallback: 從 parameter_ranges 收集了 {len(periods_to_cache)} 個週期"
+        )
+        
+        return periods_to_cache
+
     async def _precompute_indicators(
         self,
         all_case_objs: List[Any],
@@ -1656,20 +1767,12 @@ class OptunaOptimizer:
 
         self.logger.info("🚀 開始預計算指標快取...")
 
-        # 從參數範圍配置中取得所有可能的週期
-        periods_to_cache = set()
-        periods_to_cache.update(range(
-            self.parameter_ranges.ema_short_range[0],
-            self.parameter_ranges.ema_short_range[1] + 1
-        ))
-        periods_to_cache.update(range(
-            self.parameter_ranges.ema_mid_range[0],
-            self.parameter_ranges.ema_mid_range[1] + 1
-        ))
-        periods_to_cache.update(range(
-            self.parameter_ranges.ema_long_range[0],
-            self.parameter_ranges.ema_long_range[1] + 1
-        ))
+        # 從 strategies.yaml 動態讀取策略的可快取參數範圍
+        periods_to_cache = self._collect_cacheable_periods_from_config()
+        
+        if not periods_to_cache:
+            self.logger.warning("無法從策略配置收集可快取週期，跳過指標預計算")
+            return
 
         periods_list = sorted(list(periods_to_cache))
         self.logger.info(
@@ -1677,11 +1780,11 @@ class OptunaOptimizer:
             f"({len(periods_list)} 種)"
         )
 
-        # 建立指標快取
+        # 建立指標快取 (使用自動記憶體偵測)
         self._indicator_cache = IndicatorCache(
             kline_cache=self._kline_cache,
             n_workers=min(8, self.n_jobs * 2),
-            memory_limit_mb=2000.0  # 2GB 上限
+            memory_limit_mb=None  # 自動偵測
         )
 
         # 使用 run_in_executor 執行同步的預計算操作
@@ -2049,6 +2152,14 @@ class OptunaOptimizer:
 
         except KeyboardInterrupt:
             self.logger.warning("Optimization interrupted by user")
+            # 確保即使中斷也清理資源
+            self._cleanup_caches()
+            raise  # 重新拋出讓上層處理
+        except Exception as e:
+            self.logger.error(f"Optimization failed with unexpected error: {e}", exc_info=True)
+            # 確保異常時也清理資源
+            self._cleanup_caches()
+            raise
 
         # Day 4: 完成ProgressMonitor
         if self.progress_monitor:
@@ -2117,6 +2228,9 @@ class OptunaOptimizer:
             except Exception as e:
                 self.logger.error(f"Failed to run additional trials: {e}")
 
+        # ==================== 資源清理 ====================
+        self._cleanup_caches()
+
         # 收集結果
         end_time = time.time()
         optimization_time = end_time - start_time
@@ -2152,24 +2266,6 @@ class OptunaOptimizer:
             f"(duplicates avoided: {self._duplicate_count}, unique params cached: {len(self._seen_params_cache)})"
         )
 
-        # 清理 K 線快取以釋放記憶體
-        if self._kline_cache is not None:
-            cache_memory = self._kline_cache.stats.memory_mb
-            self._kline_cache.clear()
-            self._kline_cache = None
-            self._sync_analyzer.kline_cache = None
-            self.signal_service.analyzer.kline_cache = None
-            self.logger.info(f"已清理 K 線快取，釋放 {cache_memory:.1f} MB 記憶體")
-
-        # 清理指標快取以釋放記憶體
-        if self._indicator_cache is not None:
-            cache_memory = self._indicator_cache.stats.memory_mb
-            self._indicator_cache.clear()
-            self._indicator_cache = None
-            self._sync_analyzer.indicator_cache = None
-            self.signal_service.analyzer.indicator_cache = None
-            self.logger.info(f"已清理指標快取，釋放 {cache_memory:.1f} MB 記憶體")
-
         return OptimizationResult(
             best_value=best_value,
             best_params=best_params,
@@ -2180,6 +2276,40 @@ class OptunaOptimizer:
             study_name=self.study_name,
             study_direction=study_direction
         )
+
+    def _cleanup_caches(self) -> None:
+        """
+        清理所有快取以釋放記憶體
+        
+        此方法應在 finally 區塊中呼叫，確保即使發生異常也能釋放資源。
+        """
+        # 清理 K 線快取
+        if self._kline_cache is not None:
+            try:
+                cache_memory = self._kline_cache.stats.memory_mb
+                self._kline_cache.clear()
+                self._kline_cache = None
+                if hasattr(self, '_sync_analyzer') and self._sync_analyzer is not None:
+                    self._sync_analyzer.kline_cache = None
+                if hasattr(self, 'signal_service') and self.signal_service is not None:
+                    self.signal_service.analyzer.kline_cache = None
+                self.logger.info(f"已清理 K 線快取，釋放 {cache_memory:.1f} MB 記憶體")
+            except Exception as e:
+                self.logger.warning(f"清理 K 線快取時發生錯誤: {e}")
+
+        # 清理指標快取
+        if self._indicator_cache is not None:
+            try:
+                cache_memory = self._indicator_cache.stats.memory_mb
+                self._indicator_cache.clear()
+                self._indicator_cache = None
+                if hasattr(self, '_sync_analyzer') and self._sync_analyzer is not None:
+                    self._sync_analyzer.indicator_cache = None
+                if hasattr(self, 'signal_service') and self.signal_service is not None:
+                    self.signal_service.analyzer.indicator_cache = None
+                self.logger.info(f"已清理指標快取，釋放 {cache_memory:.1f} MB 記憶體")
+            except Exception as e:
+                self.logger.warning(f"清理指標快取時發生錯誤: {e}")
 
     def get_best_trial(self) -> Dict[str, Any]:
         """

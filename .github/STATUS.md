@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2026-01-07 21:30
-**當前階段**: Optuna優化系統加速 - EMA預計算快取
+**最後更新**: 2026-01-08 21:12
+**當前階段**: Optuna快取系統優化完成
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,11 +9,14 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
-- **Optuna優化系統加速：EMA預計算快取** (100%) - 2026-01-07完成
-  - ✅ IndicatorCache類別：預計算所有EMA週期，O(n)→O(1)查表
-  - ✅ 雙分析器注入：_sync_analyzer（n_jobs>1）+ signal_service.analyzer（n_jobs=1）
-  - ✅ 性能提升：50 trials 1.4m→5.4s（15x）、100 trials 13.4s、200 trials 32.5s
-  - ✅ 記憶體管理：動態估算、2GB上限、自動清理
+- **Optuna快取系統優化** (100%) - 2026-01-08完成
+  - ✅ 策略快取註冊機制：@register_strategy_cache裝飾器，支援未來策略擴展
+  - ✅ 記憶體自動偵測：psutil偵測可用記憶體50%，fallback 2GB
+  - ✅ 動態週期收集：從strategies.yaml的is_cacheable標記自動推斷
+  - ✅ 並發安全性：threading.Lock保護快取寫入（準備Python 3.13+）
+  - ✅ 資源清理：異常處理確保_cleanup_caches()執行
+  - ✅ 文檔更新：indicator_extension_guide.md、indicator_api_usage.md
+  - ✅ 測試驗證：17個單元測試全部通過
 - **Optuna CSV導出增強：完整統計欄位** (100%) - 2026-01-03完成
   - ✅ CSV包含20+統計欄位：p_value、cohens_d、stability_cv、M值、分離度等
   - ✅ 與NEW.csv格式一致：完整導出所有trial的user_attrs數據
@@ -128,11 +131,9 @@
 - 無
 
 ### 剛完成 🔧
-- **Optuna優化系統加速：EMA預計算快取** (2026-01-07)
-  - ✅ IndicatorCache類別實現（O(1)查表替代O(n)計算）
-  - ✅ 雙分析器快取注入（修復n_jobs=1快取miss問題）
-  - ✅ 性能驗證：50 trials加速15倍（1.4m→5.4s）
-  - ✅ 文件新增：momentum/Analysis/indicator_cache.py、test_data/verify_indicator_cache.py
+- **Optuna CSV導出增強** (2026-01-03)
+  - ✅ CSV包含20+統計欄位（已驗證與NEW.csv一致）
+  - ✅ 文檔更新：indicator_extension_guide.md、indicator_api_usage.md
 - **Golden Formula v2.0 M值優化系統** (2025-12-25)
   - ✅ 前端M值卡片：正例/反例M值平均、標準差、穩定性CV
   - ✅ M Separation CV計算：按月分組計算M Separation穩定性
@@ -171,14 +172,7 @@
 ## 🎯 當前重點
 
 ### 下一步工作
-**驗證修復並繼續PHASE4測試**（優先級：高）
-
-1. **驗證穩定性分析修復**
-   - 重新運行優化任務（舊任務沒有權重資料）
-   - 確認Overall M Separation = 0.1392（與單參數一致）
-   - 確認穩定性CV值正確
-
-2. **繼續PHASE4測試驗證**（依 PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
+**繼續PHASE4測試驗證**（優先級：高）
 
 1. **繼續 PHASE4 測試**（依 PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
    - 測試案例4：優化歷史記錄表
@@ -745,9 +739,6 @@ quantitative_trading_system/
   - Web Workers（CSV匯出優化，如試驗數>5000）
   - Code Splitting（bundle優化，如>500KB）
 
-**已優化完成**：
-- ✅ Optuna優化速度（2026-01-07）：50 trials 1.4m→5.4s（15x加速）
-
 - **Phase 2.4 進階交互功能**（優先級：低，可選）
   - 區間選擇（Shift+拖曳時間範圍）
   - 鍵盤快捷鍵（Space拖曳、← → 移動）
@@ -804,43 +795,76 @@ quantitative_trading_system/
 
 ## 📝 最近完成的工作
 
-### 2026-01-07
+### 2026-01-08
 
-**Optuna優化系統加速：EMA預計算快取** ⭐⭐⭐⭐⭐
+**Optuna快取系統優化** ⭐⭐⭐⭐⭐
 
-**問題背景**：
-- Optuna優化速度瓶頸：50 trials需要1.4分鐘
-- 每個trial重複計算相同的EMA值（O(n)複雜度）
-- 10,000案例×100週期=100萬次重複計算
+**需求背景**
+- 問題來源：OPTUNA_CACHE_REVIEW.md識別出7個硬編碼問題
+- 核心問題：策略類型硬編碼、參數名稱硬編碼、方法簽名硬編碼、記憶體上限硬編碼、異常時資源洩漏
+- 目標：未來新增策略/指標/data_source時無需修改核心程式碼
 
-**實施方案**：
-1. **IndicatorCache類別** (`momentum/Analysis/indicator_cache.py`)
-   - 預計算所有可能的EMA週期（用戶配置範圍）
-   - 存儲結構：`{(case_id, indicator_type, period): np.ndarray}`
-   - 支援動態參數範圍讀取（從parameter_ranges）
-   - 記憶體管理：估算、2GB上限、自動清理
+**完成內容**
 
-2. **雙分析器快取注入**
-   - 修復關鍵bug：n_jobs=1使用signal_service.analyzer，而非_sync_analyzer
-   - 解決方案：同時注入快取到兩個分析器實例
-   - 代碼位置：`optuna_optimizer.py:1617, 1703`
+1. **策略快取註冊機制**（momentum/Analysis/strategy_cache_registry.py，新建）
+   - StrategyCacheRegistry類：單例註冊中心
+   - @register_strategy_cache裝飾器：自動註冊策略計算函數
+   - 3個內建策略：three_line、short_long_cross、mid_long_cross
+   - 支援未來擴展：新策略僅需裝飾器註冊，無需修改核心代碼
 
-3. **快取優先路徑**
-   - `calculate_strategy_signals_cached()`：O(1)查表
-   - 未命中時fallback到動態計算（向後兼容）
-   - 支援配置驗證：indicator_type、data_source、period範圍
+2. **is_cacheable參數標記**（config/strategies.yaml）
+   - 為所有週期參數新增is_cacheable: true標記
+   - 標記short_period、mid_period、long_period需預計算
+   - 未來策略遵循相同模式
 
-**效能提升**：
-- 50 trials：1.4分鐘 → 5.4秒（15x加速）
-- 100 trials：13.4秒
-- 200 trials：32.5秒
-- 預計算時間：約2-3分鐘（一次性）
+3. **記憶體自動偵測**（momentum/Analysis/indicator_cache.py）
+   - _detect_memory_limit_mb()函數：使用psutil偵測可用記憶體50%
+   - fallback機制：psutil不可用時使用2000 MB預設值
+   - 測試驗證：M1 MacBook偵測約680 MB（50%可用記憶體）
 
-**相關檔案**：
-- `momentum/Analysis/indicator_cache.py` - 新增快取類別
-- `momentum/Analysis/signal_density_analyzer.py` - 快取整合
-- `momentum/Optimization/optuna_optimizer.py` - 雙分析器注入
-- `test_data/verify_indicator_cache.py` - 驗證腳本
+4. **並發安全性**（momentum/Analysis/indicator_cache.py）
+   - threading.Lock保護快取寫入操作
+   - 準備Python 3.13+移除GIL後的並發環境
+
+5. **動態週期收集**（momentum/Optimization/optuna_optimizer.py）
+   - _collect_cacheable_periods_from_config()方法：從strategies.yaml動態讀取
+   - 自動遍歷is_cacheable: true參數收集週期範圍
+   - fallback機制：無法讀取YAML時使用硬編碼值
+
+6. **資源清理修復**（momentum/Optimization/optuna_optimizer.py）
+   - _cleanup_caches()方法：清理K線快取和指標快取
+   - 異常處理：KeyboardInterrupt和Exception都呼叫清理
+   - 記憶體釋放日誌：記錄釋放的記憶體大小
+
+7. **移除硬編碼檢查**（momentum/Analysis/signal_density_analyzer.py）
+   - 改用strategy_cache_registry.has_strategy()檢查
+   - 移除!= "three_line"硬編碼邏輯
+
+8. **文檔更新**
+   - docs/indicator_extension_guide.md：新增「步驟8: 註冊策略快取計算器」章節
+   - docs/indicator_api_usage.md：新增「快取加速系統」章節
+
+**測試結果**
+- ✅ 17個單元測試全部通過（tests/test_optuna_cache_fixes.py）
+- ✅ 策略註冊機制：3個內建策略正確註冊
+- ✅ 記憶體偵測：正確偵測系統可用記憶體50%
+- ✅ is_cacheable解析：strategies.yaml正確解析週期參數
+- ✅ 動態週期收集：模擬收集38個週期（5-10, 20-30, 50-70）
+- ✅ 並發安全性：threading.Lock存在於程式碼中
+- ✅ 資源清理：_cleanup_caches()方法正確實現
+
+**影響範圍**
+- 修改文件：7個（3後端核心 + 1配置 + 2文檔 + 1測試）
+- 新建文件：2個（strategy_cache_registry.py + test_optuna_cache_fixes.py）
+- 程式碼行數：約1200行（含測試）
+
+**架構改進**
+- 策略擴展性：新策略僅需3步驟（YAML配置 + 裝飾器註冊 + 實作計算函數）
+- 記憶體管理：自動適應不同機器配置
+- 並發準備：為Python 3.13+無GIL環境做好準備
+- 資源安全：異常情況下確保記憶體釋放
+
+---
 
 ### 2026-01-03
 
@@ -2557,15 +2581,25 @@ for case in candidates:
 
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ⏳ 待推送（2026-01-07）
+**遠端同步**: ⏳ 待推送（2026-01-08）
 
-**待提交變更** (2026-01-07):
-- **Optuna優化系統加速：EMA預計算快取**
-  - momentum/Analysis/indicator_cache.py - 新增IndicatorCache類別
-  - momentum/Analysis/signal_density_analyzer.py - 快取整合與優先路徑
-  - momentum/Optimization/optuna_optimizer.py - 雙分析器快取注入
-  - test_data/verify_indicator_cache.py - 驗證腳本
+**待提交變更** (2026-01-08):
+- **Optuna快取系統優化**
+  - config/strategies.yaml - is_cacheable標記
+  - momentum/Analysis/strategy_cache_registry.py - 策略註冊機制（新建）
+  - momentum/Analysis/indicator_cache.py - 記憶體自動偵測+Lock
+  - momentum/Analysis/signal_density_analyzer.py - 移除硬編碼檢查
+  - momentum/Optimization/optuna_optimizer.py - 動態週期收集+資源清理
+  - docs/indicator_extension_guide.md - 步驟8註冊說明
+  - docs/indicator_api_usage.md - 快取系統文檔
+  - tests/test_optuna_cache_fixes.py - 17個單元測試（新建）
   - .github/STATUS.md - 狀態更新
+
+**待提交變更** (2026-01-03):
+- **Optuna CSV導出增強與文檔更新**
+  - docs/indicator_extension_guide.md - CSV導出說明（L833-848）
+  - docs/indicator_api_usage.md - Optuna優化整合章節更新
+  - .claude/STATUS.md - 狀態更新
 
 **待提交變更** (2025-12-25):
 - **Golden Formula v2.0 M值優化系統**
@@ -2653,17 +2687,29 @@ m/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueEr
 
 ## 💡 下次啟動時
 
-1. **已完成工作**（2026-01-07）：
-   - ✅ **Optuna優化系統加速：EMA預計算快取**
-     - IndicatorCache類別實現完成
-     - 雙分析器快取注入問題修復
-     - 性能提升15倍：50 trials 1.4m→5.4s
-     - 待推送Git
+1. **已完成工作**（2026-01-08）：
+   - ✅ **Optuna快取系統優化**
+     - 策略快取註冊機制：@register_strategy_cache裝飾器
+     - 記憶體自動偵測：psutil偵測可用記憶體50%
+     - 動態週期收集：從strategies.yaml的is_cacheable自動推斷
+     - 並發安全性：threading.Lock保護快取寫入
+     - 資源清理：異常處理確保記憶體釋放
+     - 測試驗證：17個單元測試全部通過
 
-2. **下一步工作**：
-   - 繼續PHASE4測試驗證（依PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
-   - 多trials（500+）穩定性觀察
-   - 大規模案例集（10,000+）效能驗證
+2. **已完成工作**（2026-01-03）：
+   - ✅ **Optuna CSV導出增強**
+     - CSV已包含所有20+統計欄位
+     - 文檔已更新標註CSV導出功能
+     - 用戶確認功能正常
+
+2. **已完成工作**（2025-12-26）：
+   - ✅ **Optuna Study初始化問題**（已修復）
+     - 修復：create_study()提前至使用前
+     - 修復：權重資料存儲到trial.user_attrs
+     - 驗證：Overall M Separation與單參數測試一致
+
+3. **已完成工作**（2025-12-25）：
+   - ✅ **Golden Formula v2.0 M值優化系統**
      - M值統計顯示：strategy-test頁面完整顯示正反例M值平均/標準差/穩定性CV
      - M Separation CV計算：按月分組計算M Separation穩定性（<0.3穩定，<0.5可接受）
      - 優化結果穩定性：optimization-result頁面改用M Separation替代overall_cv

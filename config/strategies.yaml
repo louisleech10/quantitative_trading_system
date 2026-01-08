@@ -29,6 +29,7 @@ strategies:
       - "volume"
 
     # 參數定義
+    # is_cacheable: 標記此參數是否為週期類型，需要預計算快取 (用於 Optuna 加速)
     parameters:
       - name: "short_period"
         display_name: "短期週期"
@@ -39,6 +40,7 @@ strategies:
         step: 1
         description: "短期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
         constraints:
           - type: "less_than"
             target: "mid_period"
@@ -53,6 +55,7 @@ strategies:
         step: 1
         description: "中期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
         constraints:
           - type: "less_than"
             target: "long_period"
@@ -67,6 +70,7 @@ strategies:
         step: 1
         description: "長期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
 
     # 計算函數位置
     calculator_module: "momentum.Analysis.strategies.three_line_strategy"
@@ -112,6 +116,7 @@ strategies:
         step: 1
         description: "短期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
         constraints:
           - type: "less_than"
             target: "long_period"
@@ -126,6 +131,7 @@ strategies:
         step: 1
         description: "長期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
 
     calculator_module: "momentum.Analysis.strategies.short_long_cross_strategy"
     calculator_function: "calculate_signals"
@@ -168,6 +174,7 @@ strategies:
         step: 1
         description: "中期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
         constraints:
           - type: "less_than"
             target: "long_period"
@@ -182,6 +189,7 @@ strategies:
         step: 1
         description: "長期移動平均線週期"
         unit: "根K線"
+        is_cacheable: true  # 週期參數，需要預計算
 
     calculator_module: "momentum.Analysis.strategies.mid_long_cross_strategy"
     calculator_function: "calculate_signals"

@@ -249,6 +249,8 @@ class SignalDensityAnalyzer:
         當 indicator_cache 可用且包含所需週期時，直接從快取查表計算信號，
         避免重複的 EMA 計算，將時間複雜度從 O(n) 降為 O(1)。
 
+        支援所有在 strategy_cache_registry 中註冊的策略。
+
         Args:
             case_id: 案例 ID
             strategy_config: 策略配置
@@ -256,47 +258,60 @@ class SignalDensityAnalyzer:
 
         Returns:
             np.ndarray: boolean 信號數組，或 None (快取不可用時)
-
-        Note:
-            目前僅支援 three_line 策略，其他策略返回 None 以 fallback 到動態計算
         """
+        # 延遲導入避免循環依賴
+        from momentum.Analysis.strategy_cache_registry import strategy_cache_registry
+        
         # 檢查快取是否可用
         if self.indicator_cache is None:
+            self.logger.debug("[快取未命中] indicator_cache is None")
             return None
         if not self.indicator_cache.is_precomputed():
+            self.logger.debug("[快取未命中] indicator_cache 未預計算")
             return None
 
-        # 目前僅支援 three_line 策略
-        if strategy_config.strategy_logic != "three_line":
+        # 檢查策略是否在 strategy_cache_registry 中註冊
+        strategy_logic = strategy_config.strategy_logic
+        if not strategy_cache_registry.has_strategy(strategy_logic):
+            self.logger.debug(
+                f"[快取未命中] 策略 '{strategy_logic}' 未在 strategy_cache_registry 中註冊"
+            )
             return None
 
-        # 提取參數
+        # 提取參數 (只取週期類型的參數)
         params = strategy_config.params
-        short_period = params.get('short_period')
-        mid_period = params.get('mid_period')
-        long_period = params.get('long_period')
         indicator_type = strategy_config.indicator_type
         data_source = strategy_config.data_source
 
         # 檢查 indicator_type 和 data_source 是否匹配快取
         if not self.indicator_cache.matches_config(indicator_type, data_source):
+            self.logger.debug(
+                f"[快取未命中] indicator_type/data_source 不匹配: "
+                f"快取={self.indicator_cache.get_indicator_type()}/{self.indicator_cache.get_data_source()}, "
+                f"請求={indicator_type}/{data_source}"
+            )
             return None
 
         # 檢查所有週期是否在快取中
-        if not all(self.indicator_cache.has_period(p) for p in [short_period, mid_period, long_period]):
-            return None
+        period_params = {k: v for k, v in params.items() if isinstance(v, int)}
+        for param_name, period in period_params.items():
+            if not self.indicator_cache.has_period(period):
+                self.logger.debug(
+                    f"[快取未命中] 週期 {period} ({param_name}) 不在快取範圍內"
+                )
+                return None
 
         # 檢查案例是否在快取中
         if not self.indicator_cache.has_case(case_id):
+            self.logger.debug(f"[快取未命中] 案例 {case_id} 不在快取中")
             return None
 
-        # 從快取獲取信號
+        # 從快取獲取信號 (使用新的通用介面)
         signals = self.indicator_cache.get_signals_for_case(
             case_id=case_id,
             indicator_type=indicator_type,
-            short_period=short_period,
-            mid_period=mid_period,
-            long_period=long_period
+            params=period_params,
+            strategy_logic=strategy_logic
         )
 
         # 只在第一次命中時記錄（避免大量日誌）
@@ -304,7 +319,7 @@ class SignalDensityAnalyzer:
             self._cache_hit_logged = True
             self.logger.info(
                 f"[快取命中] 首次命中確認 - case_id={case_id}, "
-                f"periods=({short_period}, {mid_period}, {long_period}), "
+                f"strategy={strategy_logic}, params={period_params}, "
                 f"signals_length={len(signals)}"
             )
 

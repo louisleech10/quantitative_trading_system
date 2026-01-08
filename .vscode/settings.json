@@ -2,5 +2,11 @@
   "workbench.editor.enablePreview": false,
   "workbench.editor.enablePreviewFromQuickOpen": false,
   "workbench.editor.enablePreviewFromCodeNavigation": false,
-  "chat.agent.maxRequests": 1000
+  "chat.agent.maxRequests": 1000,
+  "chat.tools.terminal.autoApprove": {
+    "/^cd /Users/louis/Desktop/quantitative_trading_system && python3 -c \"\nimport yaml\nfrom pathlib import Path\n\nprint\\('=== strategies\\.yaml is_cacheable 測試 ==='\\)\n\nconfig_path = Path\\('config/strategies\\.yaml'\\)\nwith open\\(config_path, 'r', encoding='utf-8'\\) as f:\n    config = yaml\\.safe_load\\(f\\)\n\n# 收集所有策略的可快取參數\nstrategies = config\\.get\\('strategies', \\{\\}\\)\nprint\\(f'共 \\{len\\(strategies\\)\\} 個策略\\\\n'\\)\n\nfor strategy_name, strategy_config in strategies\\.items\\(\\):\n    print\\(f'策略: \\{strategy_name\\}'\\)\n    params = strategy_config\\.get\\('params', \\{\\}\\)\n    cacheable_params = \\[\\]\n    for param_name, param_config in params\\.items\\(\\):\n        is_cacheable = param_config\\.get\\('is_cacheable', False\\)\n        if is_cacheable:\n            cacheable_params\\.append\\(param_name\\)\n        print\\(f'  - \\{param_name\\}: is_cacheable=\\{is_cacheable\\}'\\)\n    print\\(f'  => 可快取參數: \\{cacheable_params\\}'\\)\n    print\\(\\)\n\nprint\\('strategies\\.yaml is_cacheable 測試完成 ✓'\\)\n\"\n$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
 }

@@ -407,6 +407,162 @@ print(f"Best period: {result.best_params['period']}")
 - 舊配置保留 YAML（向後兼容）
 - 兩種方式可以共存
 
+### 步驟 8: 註冊策略快取計算器（Optuna 加速）⭐ NEW
+
+**為什麼需要這一步？**
+- ✅ 將 Optuna 優化中的指標計算從 O(n) 降為 O(1) 查表
+- ✅ 50 trials 加速 15x (1.4 分鐘 → 5.4 秒)
+- ✅ 新增策略無需修改核心快取程式碼
+
+當你的策略需要在 Optuna 優化中使用快取加速時，需要在 `strategy_cache_registry` 中註冊策略的信號計算函式。
+
+#### 8.1 在 strategies.yaml 標記可快取參數
+
+```yaml
+# config/strategies.yaml
+strategies:
+  my_new_strategy:
+    display_name: "我的新策略"
+    # ... 其他配置
+    
+    parameters:
+      - name: "short_period"
+        type: "int"
+        is_cacheable: true  # ← 標記為週期參數，需要預計算
+        min_value: 2
+        max_value: 500
+        
+      - name: "long_period"
+        type: "int"
+        is_cacheable: true  # ← 標記為週期參數，需要預計算
+        min_value: 2
+        max_value: 500
+        
+      - name: "threshold"
+        type: "float"
+        is_cacheable: false  # ← 閾值參數，不需要預計算
+        min_value: 0.5
+        max_value: 1.5
+```
+
+**參數類型說明**：
+- `is_cacheable: true`：週期類參數（period），會被預計算快取
+- `is_cacheable: false`：閾值/乘數參數（threshold, multiplier），不需要預計算
+
+#### 8.2 註冊策略快取計算器
+
+```python
+# 可以在策略檔案中直接註冊，或在 strategy_cache_registry.py 中新增
+from momentum.Analysis.strategy_cache_registry import (
+    register_strategy_cache,
+    strategy_cache_registry
+)
+import numpy as np
+from typing import Dict
+
+@register_strategy_cache(
+    "my_new_strategy",
+    "我的新策略: short > long"
+)
+def calc_my_new_strategy_signals(indicator_values: Dict[str, np.ndarray]) -> np.ndarray:
+    """
+    計算我的新策略信號
+    
+    Args:
+        indicator_values: {
+            "short_period": np.ndarray,  # 短期指標值（從快取獲取）
+            "long_period": np.ndarray    # 長期指標值（從快取獲取）
+        }
+    
+    Returns:
+        np.ndarray: boolean 信號陣列
+        
+    Note:
+        - 參數名稱必須與 strategies.yaml 中的 name 欄位一致
+        - 只會收到 is_cacheable: true 的參數
+    """
+    short = indicator_values["short_period"]
+    long = indicator_values["long_period"]
+    
+    # 你的策略信號邏輯
+    return short > long
+```
+
+#### 8.3 現有策略範例
+
+系統內建了三種策略的快取計算器：
+
+```python
+# momentum/Analysis/strategy_cache_registry.py
+
+@register_strategy_cache("three_line", "三線排列策略: short > mid > long")
+def calc_three_line_signals(indicator_values: Dict[str, np.ndarray]) -> np.ndarray:
+    short = indicator_values["short_period"]
+    mid = indicator_values["mid_period"]
+    long = indicator_values["long_period"]
+    return (short > mid) & (mid > long)
+
+
+@register_strategy_cache("short_long_cross", "短長交叉策略: short > long")
+def calc_short_long_cross_signals(indicator_values: Dict[str, np.ndarray]) -> np.ndarray:
+    short = indicator_values["short_period"]
+    long = indicator_values["long_period"]
+    return short > long
+
+
+@register_strategy_cache("mid_long_cross", "中長交叉策略: mid > long")
+def calc_mid_long_cross_signals(indicator_values: Dict[str, np.ndarray]) -> np.ndarray:
+    mid = indicator_values["mid_period"]
+    long = indicator_values["long_period"]
+    return mid > long
+```
+
+#### 8.4 驗證註冊成功
+
+```python
+from momentum.Analysis.strategy_cache_registry import strategy_cache_registry
+
+# 列出所有已註冊的策略
+print(strategy_cache_registry.list_strategies())
+# ['three_line', 'short_long_cross', 'mid_long_cross', 'my_new_strategy']
+
+# 檢查特定策略是否已註冊
+print(strategy_cache_registry.has_strategy("my_new_strategy"))
+# True
+
+# 獲取策略描述
+print(strategy_cache_registry.get_description("my_new_strategy"))
+# "我的新策略: short > long"
+```
+
+#### 8.5 快取加速原理
+
+```
+未使用快取時 (每個 Trial):
+┌─────────────────────────────────────────────┐
+│ 1. 讀取 K 線資料 (HDF5 I/O)                  │
+│ 2. 計算 EMA_short (pandas ewm)               │
+│ 3. 計算 EMA_mid (pandas ewm)                 │
+│ 4. 計算 EMA_long (pandas ewm)                │
+│ 5. 計算信號 (short > mid > long)             │
+└─────────────────────────────────────────────┘
+每個案例 ~11.4ms × 16500 案例 × 50 trials = ~2.5 小時
+
+使用快取時 (每個 Trial):
+┌─────────────────────────────────────────────┐
+│ 1. 查表獲取預計算的 EMA 值 (O(1))            │
+│ 2. 計算信號 (short > mid > long)             │
+└─────────────────────────────────────────────┘
+每個案例 ~0.1ms × 16500 案例 × 50 trials = ~1.4 分鐘
+
+預計算階段 (一次性):
+┌─────────────────────────────────────────────┐
+│ 為所有案例 × 所有可能週期預計算 EMA          │
+│ 記憶體: ~1.5 GB (自動偵測系統可用記憶體)      │
+│ 時間: ~2-3 分鐘                              │
+└─────────────────────────────────────────────┘
+```
+
 ---
 
 ## 完整範例：SMA 指標

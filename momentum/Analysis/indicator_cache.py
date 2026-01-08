@@ -8,7 +8,9 @@
 - 根據用戶 Optuna 設定的參數範圍動態預計算
 - 以 (case_id, indicator_type, period) 為 key 存儲
 - 支援未來擴展其他指標 (RSI, SMA 等)
-- 記憶體上限約 2GB (適配 8GB 機器)
+- 自動偵測系統記憶體並調整上限
+- 並發安全 (threading.Lock 保護)
+- 透過 strategy_cache_registry 支援任意策略
 
 效能預估:
 - 預計算時間: ~2-3 分鐘 (一次性)
@@ -17,10 +19,12 @@
 
 Author: Claude (Optuna Optimization Phase)
 Date: 2025-01-05
+Updated: 2026-01-08 (通用化重構)
 """
 
 import logging
 import time
+import threading
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, field
 import pandas as pd
@@ -34,6 +38,41 @@ logger = logging.getLogger(__name__)
 
 # EMA 收斂所需的 warmup 倍數
 WARMUP_MULTIPLIER = 4.5
+
+# 自動記憶體上限的可用記憶體比例 (50%)
+MEMORY_USAGE_RATIO = 0.5
+
+
+def _detect_memory_limit_mb() -> float:
+    """
+    自動偵測系統可用記憶體並計算上限
+    
+    使用 psutil 偵測可用記憶體，設定為可用量的 50%。
+    若 psutil 不可用則返回保守的 2GB 預設值。
+    
+    Returns:
+        float: 記憶體上限 (MB)
+    """
+    try:
+        import psutil
+        available_bytes = psutil.virtual_memory().available
+        available_mb = available_bytes / (1024 * 1024)
+        limit_mb = available_mb * MEMORY_USAGE_RATIO
+        
+        # 設定最小 512MB，最大 8GB
+        limit_mb = max(512.0, min(limit_mb, 8192.0))
+        
+        logger.info(
+            f"自動偵測記憶體上限: 可用 {available_mb:.0f} MB × {MEMORY_USAGE_RATIO} = {limit_mb:.0f} MB"
+        )
+        return limit_mb
+        
+    except ImportError:
+        logger.warning("psutil 未安裝，使用預設記憶體上限 2000 MB")
+        return 2000.0
+    except Exception as e:
+        logger.warning(f"記憶體偵測失敗: {e}，使用預設記憶體上限 2000 MB")
+        return 2000.0
 
 
 @dataclass
@@ -85,7 +124,7 @@ class IndicatorCache:
         self,
         kline_cache: KlineCache,
         n_workers: int = 4,
-        memory_limit_mb: float = 2000.0
+        memory_limit_mb: Optional[float] = None
     ):
         """
         初始化指標快取
@@ -93,14 +132,22 @@ class IndicatorCache:
         Args:
             kline_cache: K 線資料快取 (必須已完成 preload)
             n_workers: 預計算時的並行工作線程數
-            memory_limit_mb: 記憶體上限 (MB)，預設 2GB
+            memory_limit_mb: 記憶體上限 (MB)，None 時自動偵測
         """
         self.kline_cache = kline_cache
         self.n_workers = n_workers
-        self.memory_limit_mb = memory_limit_mb
+        
+        # 自動偵測或使用指定的記憶體上限
+        if memory_limit_mb is None:
+            self.memory_limit_mb = _detect_memory_limit_mb()
+        else:
+            self.memory_limit_mb = memory_limit_mb
 
         # 快取存儲: {(case_id, indicator_type, period): np.ndarray}
         self._cache: Dict[Tuple[str, str, int], np.ndarray] = {}
+        
+        # 並發安全鎖 (預防 Python 3.13+ GIL 移除後的競態條件)
+        self._cache_lock = threading.Lock()
 
         # 快取的週期集合 (用於快速檢查)
         self._cached_periods: Set[int] = set()
@@ -225,10 +272,11 @@ class IndicatorCache:
                 try:
                     indicators = future.result()
                     if indicators:
-                        # 存入快取
-                        for period, values in indicators.items():
-                            cache_key = (case_id, indicator_type, period)
-                            self._cache[cache_key] = values
+                        # 存入快取 (使用鎖保護並發安全)
+                        with self._cache_lock:
+                            for period, values in indicators.items():
+                                cache_key = (case_id, indicator_type, period)
+                                self._cache[cache_key] = values
                         computed_count += 1
                     else:
                         failed_cases.append(case_id)
@@ -312,12 +360,23 @@ class IndicatorCache:
                 return None
 
             data = klines[data_source].astype(np.float64)
+            data_length = len(data)
 
             # 計算所有週期的指標
             result = {}
 
             if indicator_type == "ema":
                 for period in periods:
+                    # 參數驗證
+                    if period <= 0:
+                        logger.debug(f"跳過無效週期 {period} (必須 > 0)")
+                        continue
+                    if period > data_length:
+                        logger.debug(
+                            f"跳過週期 {period} > 數據長度 {data_length} (案例 {case_id})"
+                        )
+                        continue
+                    
                     # 計算 EMA
                     ema = data.ewm(span=period, adjust=False).mean()
                     # 只保留 far_lookback_bars 範圍內的值
@@ -325,11 +384,17 @@ class IndicatorCache:
 
             elif indicator_type == "sma":
                 for period in periods:
+                    # 參數驗證
+                    if period <= 0 or period > data_length:
+                        continue
                     sma = data.rolling(window=period).mean()
                     result[period] = sma.iloc[-far_lookback_bars:].values.astype(np.float64)
 
             elif indicator_type == "rsi":
                 for period in periods:
+                    # 參數驗證
+                    if period <= 0 or period > data_length:
+                        continue
                     # RSI 計算
                     delta = data.diff()
                     gain = delta.where(delta > 0, 0.0)
@@ -396,13 +461,75 @@ class IndicatorCache:
         self,
         case_id: str,
         indicator_type: str,
+        params: Dict[str, int],
+        strategy_logic: str
+    ) -> Optional[np.ndarray]:
+        """
+        計算策略信號 (通用介面，支援任意策略)
+
+        透過 strategy_cache_registry 動態呼叫對應策略的計算函式，
+        無需在此處硬編碼策略邏輯。
+
+        Args:
+            case_id: 案例 ID
+            indicator_type: 指標類型 (ema/sma)
+            params: 策略參數字典，例如:
+                - three_line: {"short_period": 7, "mid_period": 25, "long_period": 70}
+                - short_long_cross: {"short_period": 7, "long_period": 70}
+            strategy_logic: 策略名稱 (必須在 strategy_cache_registry 中註冊)
+
+        Returns:
+            np.ndarray (boolean): 信號陣列，或 None (快取不可用或策略未註冊)
+        """
+        # 延遲導入避免循環依賴
+        from momentum.Analysis.strategy_cache_registry import strategy_cache_registry
+        
+        # 檢查策略是否已註冊
+        if not strategy_cache_registry.has_strategy(strategy_logic):
+            logger.debug(f"策略 '{strategy_logic}' 未在 strategy_cache_registry 中註冊")
+            return None
+        
+        # 收集所有參數對應的指標值
+        indicator_values: Dict[str, np.ndarray] = {}
+        
+        for param_name, period in params.items():
+            values = self.get(case_id, indicator_type, period)
+            if values is None:
+                logger.debug(
+                    f"快取未命中: case_id={case_id}, "
+                    f"indicator_type={indicator_type}, period={period}"
+                )
+                return None
+            indicator_values[param_name] = values
+        
+        # 呼叫註冊的策略計算函式
+        calculator = strategy_cache_registry.get_calculator(strategy_logic)
+        if calculator is None:
+            return None
+        
+        try:
+            signals = calculator(indicator_values)
+            return signals
+        except Exception as e:
+            logger.warning(
+                f"策略 '{strategy_logic}' 快取計算失敗: {e}"
+            )
+            return None
+
+    # 保留舊方法以向後兼容 (deprecated)
+    def get_signals_for_case_legacy(
+        self,
+        case_id: str,
+        indicator_type: str,
         short_period: int,
         mid_period: int,
         long_period: int
     ) -> Optional[np.ndarray]:
         """
-        計算三線排列信號 (專用於 three_line_strategy)
-
+        計算三線排列信號 (舊版方法，已棄用)
+        
+        請使用新的 get_signals_for_case(case_id, indicator_type, params, strategy_logic)
+        
         Args:
             case_id: 案例 ID
             indicator_type: 指標類型 (ema/sma)
@@ -413,16 +540,20 @@ class IndicatorCache:
         Returns:
             np.ndarray (boolean): 信號陣列，或 None
         """
-        short_values = self.get(case_id, indicator_type, short_period)
-        mid_values = self.get(case_id, indicator_type, mid_period)
-        long_values = self.get(case_id, indicator_type, long_period)
-
-        if short_values is None or mid_values is None or long_values is None:
-            return None
-
-        # 三線排列邏輯: short > mid > long
-        signals = (short_values > mid_values) & (mid_values > long_values)
-        return signals
+        logger.warning(
+            "get_signals_for_case_legacy() 已棄用，"
+            "請使用 get_signals_for_case(case_id, indicator_type, params, strategy_logic)"
+        )
+        return self.get_signals_for_case(
+            case_id=case_id,
+            indicator_type=indicator_type,
+            params={
+                "short_period": short_period,
+                "mid_period": mid_period,
+                "long_period": long_period
+            },
+            strategy_logic="three_line"
+        )
 
     def has_case(self, case_id: str) -> bool:
         """檢查案例是否有快取"""

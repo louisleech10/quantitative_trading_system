@@ -571,6 +571,21 @@ for param_def in metadata.parameters:
     print(f"  步長: {param_def.step}")
 
 # Optuna 會自動使用這些參數範圍進行優化
+
+# ==================== 快取加速系統（2026-01-08 更新）====================
+# 新增 strategy_cache_registry 用於 Optuna 快取加速
+from momentum.Analysis.strategy_cache_registry import strategy_cache_registry
+
+# 列出支援快取加速的策略
+print(strategy_cache_registry.list_strategies())
+# ['three_line', 'short_long_cross', 'mid_long_cross']
+
+# 檢查策略是否支援快取
+if strategy_cache_registry.has_strategy("three_line"):
+    print("three_line 策略支援快取加速 (15x 效能提升)")
+
+# 在 strategies.yaml 中，使用 is_cacheable: true 標記週期參數
+# 系統會自動預計算這些參數的所有可能值，加速 Optuna 優化
 ```
 
 ---
