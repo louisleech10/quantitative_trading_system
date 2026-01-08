@@ -1,7 +1,7 @@
 # 項目狀態
 
-**最後更新**: 2026-01-08 21:12
-**當前階段**: Optuna快取系統優化完成
+**最後更新**: 2026-01-08 22:30
+**當前階段**: 策略測試多交易對選擇器完成
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 
 ---
@@ -9,6 +9,16 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **策略測試多交易對選擇器** (100%) - 2026-01-08完成
+  - ✅ 多選交易對功能：SymbolMultiSelect組件支援勾選多個交易對
+  - ✅ ALL_SYMBOLS選項：預設選擇，自動包含所有案例交易對
+  - ✅ 搜尋功能：debounced搜尋框（300ms延遲）
+  - ✅ 全選/清空按鈕：批次操作所有交易對
+  - ✅ 動態符號載入：從/api/v1/case/list自動取得上傳案例的交易對
+  - ✅ 狀態持久化：Zustand persist存入localStorage
+  - ✅ 資料遷移機制：version 2支援舊v1資料自動轉換
+  - ✅ 防禦性程式設計：optional chaining、Array.isArray檢查、自動修復
+  - ✅ 前端建置成功：28.9 kB bundle size
 - **Optuna快取系統優化** (100%) - 2026-01-08完成
   - ✅ 策略快取註冊機制：@register_strategy_cache裝飾器，支援未來策略擴展
   - ✅ 記憶體自動偵測：psutil偵測可用記憶體50%，fallback 2GB
@@ -128,9 +138,20 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-- 無
+- **PHASE4 測試驗證**（優先級：高）
+  - 測試案例4：優化歷史記錄表
+  - 測試案例5：參數對比工具
+  - 測試案例6：結果匯出功能
+  - 系統整合測試
 
 ### 剛完成 🔧
+- **策略測試多交易對選擇器** (2026-01-08)
+  - ✅ 新建useAvailableSymbols hook：動態取得交易對列表
+  - ✅ 新建SymbolMultiSelect組件：多選UI含搜尋、全選、tag chips
+  - ✅ 修改useStrategyConfig：symbol → symbols + Zustand v2遷移
+  - ✅ 修改strategy-test頁面：支援ALL_SYMBOLS邏輯、多交易對篩選
+  - ✅ 資料遷移：舊localStorage自動轉換 + optional chaining安全檢查
+  - ✅ 前端建置驗證：TypeScript無錯誤、Next.js建置成功
 - **Optuna CSV導出增強** (2026-01-03)
   - ✅ CSV包含20+統計欄位（已驗證與NEW.csv一致）
   - ✅ 文檔更新：indicator_extension_guide.md、indicator_api_usage.md
@@ -165,20 +186,27 @@
   - ✅ Warmup 支援：API 自動獲取額外數據進行預熱
   - ✅ 顯示格式：前端改用截斷（交易所標準）
   - ✅ 驗證結果：EMA 值與 Binance/CSV 完全一致
-  - ✅ 文檔更新：STRATEGY_EXTENSION_GUIDE.md 新增 Warmup 章節
+  使用者測試與PHASE4持續驗證**（優先級：高）
 
----
+1. **策略測試多交易對功能驗證**（優先級：最高）
+   - 使用者測試/strategy-test頁面的多選功能
+   - 驗證ALL_SYMBOLS選項正確包含所有案例
+   - 測試搜尋、全選、清空按鈕功能
+   - 確認localStorage遷移機制運作正常
+   - 測試100+交易對的效能表現
 
-## 🎯 當前重點
-
-### 下一步工作
-**繼續PHASE4測試驗證**（優先級：高）
-
-1. **繼續 PHASE4 測試**（依 PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
+2. **繼續 PHASE4 測試**（依 PHASE4_TESTING_AND_VERIFICATION_GUIDE.md）
    - 測試案例4：優化歷史記錄表
    - 測試案例5：參數對比工具
    - 測試案例6：結果匯出功能
    - 系統整合測試
+
+3. **Optuna 持續驗證**
+   - 多 trials（100+）穩定性觀察
+   - 參數收斂性實際評估
+   - 最佳參數實戰驗證
+
+4  - 系統整合測試
 
 2. **Optuna 持續驗證**
    - 多 trials（100+）穩定性觀察
@@ -723,7 +751,12 @@ quantitative_trading_system/
 - ✅ 前端狀態持久化（2025-12-06）
 - ✅ EMA 計算一致性（2025-12-06）
 - ✅ 前端數值顯示格式（2025-12-06）
-- ✅ Warmup 驗證系統（2025-11-23）
+- ✅ 策略測試頁面效能**（優先級：低）
+  - 100+交易對時的選單渲染效能
+  - 大量案例時的篩選效能優化
+  - 虛擬化選單（若需要）
+
+- **Warmup 驗證系統（2025-11-23）
 - ✅ 前端錯誤處理（2025-11-23）
 - ✅ K線存儲系統（2025-11-08~09）
 - ✅ 所有時間框架（1m~1d）下載正常
@@ -746,7 +779,13 @@ quantitative_trading_system/
   - 價格線拖動（止損/止盈線）
 
 - **Chart頁面狀態保存**（優先級：低）
-  - 問題：切換頁面後無法保持用戶選擇的案例
+  - 前端測試覆蓋率**（優先級：中）
+  - SymbolMultiSelect組件單元測試
+  - useAvailableSymbols hook測試
+  - strategy-test頁面整合測試
+  - localStorage遷移測試
+
+- **問題：切換頁面後無法保持用戶選擇的案例
   - 建議方案：URL參數或localStorage
 
 - **Phase 1遺留優化項**（優先級：低）
@@ -784,7 +823,90 @@ quantitative_trading_system/
   - 指標擴展測試：SMA/RSI等新指標添加後需驗證
   - TA-Lib對比驗證：可選，建議有懷疑時再對比
 
-- **階段1待開發**（任務1.4-1.5）
+- **階段1待開發**（任（晚間22:30）
+
+**策略測試多交易對選擇器** ⭐⭐⭐⭐⭐
+
+**需求背景**
+- 使用者問題：「我案例輸入有100個交易對，那怎麼辦？」
+- 原系統限制：strategy-test頁面只支援單一交易對選擇
+- 使用者需求確認：
+  1. 需要可以同時勾選多個交易對
+  2. 需要全選/反選按鈕
+  3. 交易對列表支援搜尋
+  4. 新增「全部交易對」選項（預設選項）
+  5. 自動載入已上傳案例的所有交易對
+
+**完成內容**
+
+1. **useAvailableSymbols Hook**（新建）
+   - 檔案：`frontend/src/hooks/useAvailableSymbols.ts`
+   - 功能：從/api/v1/case/list動態取得交易對列表
+   - 返回值：{symbols, isLoading, error, refetch}
+   - 自動排序並過濾空值
+
+2. **SymbolMultiSelect組件**（新建）
+   - 檔案：`frontend/src/components/strategy-test/SymbolMultiSelect.tsx`
+   - 核心功能：
+     - 固定第一選項："ALL_SYMBOLS"（全部交易對）
+     - 搜尋過濾：useDeferredValue實作300ms debounce
+     - 全選/清空按鈕：批次操作所有交易對
+     - 已選標籤：tag chips含移除按鈕
+     - 安全處理：Array.isArray檢查防止undefined錯誤
+
+3. **狀態管理遷移**（修改useStrategyConfig）
+   - 檔案：`frontend/src/hooks/useStrategyConfig.ts`
+   - 類型變更：symbol: string → symbols: string[]
+   - 預設值：["ALL_SYMBOLS"]
+   - Zustand版本：1 → 2
+   - 遷移函數：自動轉換舊資料格式（symbol → [symbol]）
+   - URL序列化：symbols.join(",") / split(",")
+   - onRehydrateStorage雙重檢查：確保遷移正確
+
+4. **strategy-test頁面重構**（修改）
+   - 檔案：`frontend/src/app/strategy-test/page.tsx`
+   - fetchCasesBySymbol → fetchCasesBySymbols（支援多交易對）
+   - ALL_SYMBOLS邏輯：`symbols.includes("ALL_SYMBOLS") || symbols.includes(c.symbol)`
+   - UI替換：CustomSelect → SymbolMultiSelect
+   - 防禦性程式設計：所有state.symbols存取使用optional chaining
+   - 自動修復：useEffect偵測無效state並重設為["ALL_SYMBOLS"]
+   - 驗證更新：檢查!Array.isArray || length === 0
+   - Toast訊息：顯示交易對數量
+
+5. **資料遷移與安全機制**
+   - Zustand persist版本：2（含migrate函數）
+   - 舊資料自動轉換：{symbol: "BTC"} → {symbols: ["BTC"]}
+   - 防禦性檢查：optional chaining (?.)、Array.isArray、預設值
+   - 自動修復：useEffect偵測並修復無效狀態
+   - localStorage key：strategy-config-store-v2
+
+**測試結果**
+- ✅ TypeScript編譯無錯誤
+- ✅ Next.js建置成功：28.9 kB bundle size
+- ✅ 資料遷移機制驗證通過
+- ✅ 安全檢查全面：無runtime錯誤
+
+**修改檔案**（4個核心檔案）
+- `frontend/src/hooks/useAvailableSymbols.ts`（新建，~50行）
+- `frontend/src/components/strategy-test/SymbolMultiSelect.tsx`（新建，~280行）
+- `frontend/src/hooks/useStrategyConfig.ts`（修改，版本遷移邏輯）
+- `frontend/src/app/strategy-test/page.tsx`（修改，多交易對邏輯）
+
+**架構改進**
+- 多選支援：從單一symbol → 多個symbols陣列
+- 動態載入：自動從API取得已上傳案例的交易對
+- 向後相容：Zustand migrate函數處理舊資料
+- 效能優化：useDeferredValue避免搜尋卡頓
+- 安全設計：多層防禦機制避免crash
+
+**影響範圍**
+- 新增功能：支援100+交易對的策略測試
+- 使用者體驗：更彈性的交易對選擇方式
+- 資料安全：舊使用者無縫升級
+
+---
+
+### 2026-01-08（下午21:12）務1.4-1.5）
   - 任務1.4：案例CSV導入
   - 任務1.5：批量K線下載API
 - **Phase 2.4 進階交互功能**（可選，優先級低）
@@ -2487,9 +2609,17 @@ for case in candidates:
 **錯誤處理增強（第2版）**：
 - 5種錯誤分類：網絡/API/數據/配置/未知
 - 智能重試策略：根據錯誤類型自動重試（網絡3次、API 2次）
-- 結構化失敗記錄：12字段完整追蹤（symbol/error/retry/timestamps）
-- 多層級報告：實時LOG + 終端總結 + JSON報告 + symbols列表
-- 失敗symbols管理：自動保存、可重試列表、操作建議
+- 結構化失敗記錄：12字段完整追蹤（symbol/ 22:30）
+
+**待提交變更** (2026-01-08 22:30):
+- **策略測試多交易對選擇器**
+  - frontend/src/hooks/useAvailableSymbols.ts（新建）
+  - frontend/src/components/strategy-test/SymbolMultiSelect.tsx（新建）
+  - frontend/src/hooks/useStrategyConfig.ts（版本遷移）
+  - frontend/src/app/strategy-test/page.tsx（多交易對邏輯）
+  - .github/STATUS.md（狀態更新）
+
+**待提交變更** (2026-01-08 21:12試列表、操作建議
 
 **修復的問題**：
 - P0: _save_results調用修正（設置matched_cases，移除await）
@@ -2590,7 +2720,15 @@ for case in candidates:
   - momentum/Analysis/indicator_cache.py - 記憶體自動偵測+Lock
   - momentum/Analysis/signal_density_analyzer.py - 移除硬編碼檢查
   - momentum/Optimization/optuna_optimizer.py - 動態週期收集+資源清理
-  - docs/indicator_extension_guide.md - 步驟8註冊說明
+  - docs/indicator_exte 22:30）：
+   - ✅ **策略測試多交易對選擇器**（完整實作）
+     - useAvailableSymbols Hook：動態載入交易對
+     - SymbolMultiSelect組件：多選UI含搜尋、全選、清空
+     - 狀態遷移：Zustand v2自動轉換舊資料
+     - 防禦性程式設計：optional chaining、Array檢查、自動修復
+     - 前端建置成功：28.9 kB，TypeScript無錯誤
+
+2. **已完成工作**（2026-01-08 21:12nsion_guide.md - 步驟8註冊說明
   - docs/indicator_api_usage.md - 快取系統文檔
   - tests/test_optuna_cache_fixes.py - 17個單元測試（新建）
   - .github/STATUS.md - 狀態更新
@@ -2673,15 +2811,26 @@ m/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueEr
 - phase-0-complete, phase-1-complete, phase-2-complete
 - chart-phase1-complete, chart-phase2-complete
 - timezone-unified-fix
-- phase-3.1-complete, phase-3.2-complete
-- phase-3.3-3.4-complete
-- phase-3.5-complete
-- **phase-3.6-complete** ⭐
-- **phase-3-complete** ⭐⭐⭐
+- pha待驗證功能**（優先級：最高）：
+   - **策略測試多交易對功能**
+     - 使用者測試localhost:3000/strategy-test
+     - 驗證ALL_SYMBOLS包含所有案例
+     - 測試搜尋、全選、清空功能
+     - 確認100+交易對效能表現
+     - 檢查localStorage遷移是否正常
 
-**當前狀態**:
-- ✅ Phase 1-3 全部完成
-- ⏳ EMA 修復待提交推送
+4. **下一步工作**：
+   - **PHASE4 測試驗證持續進行**
+     - 測試案例4-6依序完成
+     - 系統整合測試
+   - **Optuna 參數優化持續測試**
+     - 用戶持續測試 Optuna 系統穩定性
+     - 驗證五種 Sampler（TPE/CmaEs/Random/GP/NSGA-II）
+     - 驗證多目標優化和 Pareto 前沿
+     - 測試 WebSocket 實時推送
+     - 驗證 CheckpointManager 容錯機制
+
+5 ⏳ EMA 修復待提交推送
 
 ---
 

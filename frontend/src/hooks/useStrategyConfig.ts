@@ -29,7 +29,7 @@ export interface StrategyFormState {
   strategyLogic: string;
   indicatorParams: Record<string, number>;
   windowConfig: StrategyWindowConfig;
-  symbol: string;
+  symbols: string[];
   timeframe: string;
   dateRange: DateRange;
   clusteringWeight: number;
@@ -52,7 +52,7 @@ interface StrategyUrlPayload {
   strategyLogic: string;
   indicatorParams: Record<string, number>;
   windowConfig: StrategyWindowConfig;
-  symbol: string;
+  symbols: string[];
   timeframe: string;
   dateRange: DateRange;
   clusteringWeight: number;
@@ -105,7 +105,7 @@ const DEFAULT_STATE: StrategyFormState = {
     far_lookback_bars: 100,
     mode: "relative",
   },
-  symbol: "BTCUSDT",
+  symbols: ["ALL_SYMBOLS"],
   timeframe: "12h",
   dateRange: {
     start: formatDate(defaultStart),
@@ -148,7 +148,7 @@ const buildUrlPayload = (state: StrategyFormState): StrategyUrlPayload => ({
   strategyLogic: state.strategyLogic,
   indicatorParams: state.indicatorParams,
   windowConfig: state.windowConfig,
-  symbol: state.symbol,
+  symbols: state.symbols,
   timeframe: state.timeframe,
   dateRange: state.dateRange,
   clusteringWeight: state.clusteringWeight,
@@ -198,7 +198,7 @@ const mergeFromPayload = (
     ...original.windowConfig,
     ...payload.windowConfig,
   },
-  symbol: payload.symbol ?? original.symbol,
+  symbols: payload.symbols ?? original.symbols,
   timeframe: payload.timeframe ?? original.timeframe,
   dateRange: payload.dateRange ?? original.dateRange,
   clusteringWeight: payload.clusteringWeight ?? original.clusteringWeight,
@@ -276,7 +276,7 @@ const parsePlainQueryPayload = (
       params.get("strategyLogic") ?? DEFAULT_STATE.strategyLogic,
     indicatorParams,
     windowConfig,
-    symbol: params.get("symbol") ?? DEFAULT_STATE.symbol,
+    symbols: params.get("symbols")?.split(",").filter(s => s.trim()) ?? DEFAULT_STATE.symbols,
     timeframe: params.get("timeframe") ?? DEFAULT_STATE.timeframe,
     dateRange: {
       start: getDate("start", DEFAULT_STATE.dateRange.start),
@@ -300,7 +300,7 @@ const appendPlainQueryParams = (
     params.set(key, stringValue);
   };
 
-  assignIfValue("symbol", state.symbol);
+  assignIfValue("symbols", state.symbols.join(","));
   assignIfValue("timeframe", state.timeframe);
   assignIfValue("start", state.dateRange.start);
   assignIfValue("end", state.dateRange.end);
@@ -541,6 +541,26 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
     {
       name: STORE_KEY,
       storage: createJSONStorage(() => localStorage),
+      version: 2, // 版本升級到 2 以觸發遷移
+      migrate: (persistedState: any, version: number) => {
+        // 遷移舊版 symbol (string) 到新版 symbols (string[])
+        if (persistedState?.state) {
+          const oldState = persistedState.state;
+          
+          // 如果有舊的 symbol 欄位且沒有 symbols 欄位
+          if (oldState.symbol && !oldState.symbols) {
+            oldState.symbols = [oldState.symbol];
+            delete oldState.symbol; // 移除舊欄位
+          }
+          
+          // 確保 symbols 至少有預設值
+          if (!oldState.symbols || !Array.isArray(oldState.symbols) || oldState.symbols.length === 0) {
+            oldState.symbols = ["ALL_SYMBOLS"];
+          }
+        }
+        
+        return persistedState;
+      },
       partialize: (store) => ({
         state: store.state,
         lastSyncedQuery: store.lastSyncedQuery,
@@ -557,6 +577,12 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
           if (state.state?.indicatorParams) {
             state.state.indicatorParams = cleanIndicatorParams(state.state.indicatorParams);
           }
+          
+          // 再次確保 symbols 欄位存在（雙重保險）
+          if (!state.state?.symbols || !Array.isArray(state.state.symbols) || state.state.symbols.length === 0) {
+            state.state.symbols = ["ALL_SYMBOLS"];
+          }
+          
           state.lastHydrationSource = "storage";
           state.isHydrated = true;
         }

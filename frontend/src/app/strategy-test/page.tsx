@@ -31,6 +31,8 @@ import {
   useStrategyConfig,
   type StrategyTemplatePayload,
 } from "@/hooks/useStrategyConfig";
+import { useAvailableSymbols } from "@/hooks/useAvailableSymbols";
+import { SymbolMultiSelect } from "@/components/strategy-test/SymbolMultiSelect";
 import {
   OptunaConfigPanel,
   type OptunaConfig,
@@ -279,12 +281,24 @@ function StrategyTestPageContent() {
     setApiError,
     clearResults,
   } = useStrategyTestStore();
+  
+  // 載入可用交易對
+  const { symbols: availableSymbols, isLoading: isLoadingSymbols, error: symbolsError } = useAvailableSymbols();
+  
   // Optuna 配置狀態
   const [optunaConfig, setOptunaConfig] = useState<OptunaConfig>(() => loadOptunaConfig());
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // 確保 symbols 欄位存在（處理舊版資料遷移）
+  useEffect(() => {
+    if (isClient && (!state.symbols || !Array.isArray(state.symbols) || state.symbols.length === 0)) {
+      console.warn("偵測到 symbols 欄位異常，重置為預設值");
+      setField("symbols", ["ALL_SYMBOLS"]);
+    }
+  }, [isClient, state.symbols, setField]);
 
   // Optuna 配置變更處理
   const handleOptunaConfigChange = (newConfig: OptunaConfig) => {
@@ -346,8 +360,8 @@ function StrategyTestPageContent() {
       errors.push("請選擇數據源");
     }
 
-    if (!state.symbol) {
-      errors.push("請輸入或選擇交易對");
+    if (!state.symbols || !Array.isArray(state.symbols) || state.symbols.length === 0) {
+      errors.push("請選擇至少一個交易對");
     }
 
     if (!state.timeframe) {
@@ -388,8 +402,8 @@ function StrategyTestPageContent() {
     });
   };
 
-  // 獲取指定 symbol 的案例
-  const fetchCasesBySymbol = async (symbol: string): Promise<{ positive: string[]; negative: string[] }> => {
+  // 獲取指定 symbols 的案例（支援多交易對與 ALL_SYMBOLS）
+  const fetchCasesBySymbols = async (symbols: string[]): Promise<{ positive: string[]; negative: string[] }> => {
     try {
       const casesResponse = await fetch(`${API_BASE_URL}/api/v1/case/list`);
       if (!casesResponse.ok) return { positive: [], negative: [] };
@@ -398,9 +412,15 @@ function StrategyTestPageContent() {
       const positive: string[] = [];
       const negative: string[] = [];
 
+      // 判斷是否包含所有交易對
+      const includeAllSymbols = symbols.includes("ALL_SYMBOLS");
+
       if (casesData.cases && Array.isArray(casesData.cases)) {
         casesData.cases.forEach((c: { symbol: string; positive_case: number; case_id: string }) => {
-          if (c.symbol === symbol) {
+          // 如果選中 ALL_SYMBOLS 或該 symbol 在選中列表中
+          const shouldInclude = includeAllSymbols || symbols.includes(c.symbol);
+          
+          if (shouldInclude) {
             if (c.positive_case === 1) {
               positive.push(c.case_id);
             } else if (c.positive_case === 0) {
@@ -435,20 +455,26 @@ function StrategyTestPageContent() {
 
     try {
       // Step 1: 獲取案例
-      const { positive, negative } = await fetchCasesBySymbol(state.symbol);
+      const { positive, negative } = await fetchCasesBySymbols(state.symbols);
 
       if (positive.length === 0 || negative.length === 0) {
-        throw new Error(`符合 ${state.symbol} 的案例數量不足：正例 ${positive.length} 個，反例 ${negative.length} 個`);
+        const symbolsDesc = state.symbols?.includes("ALL_SYMBOLS") 
+          ? "所有交易對" 
+          : `${state.symbols?.length || 0} 個交易對 (${state.symbols?.join(", ") || ""})`;
+        throw new Error(`符合 ${symbolsDesc} 的案例數量不足：正例 ${positive.length} 個，反例 ${negative.length} 個`);
       }
 
-      toast.success(`已載入 ${positive.length} 個正例和 ${negative.length} 個反例`);
+      const symbolsDesc = state.symbols?.includes("ALL_SYMBOLS")
+        ? "所有交易對"
+        : `${state.symbols?.length || 0} 個交易對`;
+      toast.success(`已載入 ${symbolsDesc}：${positive.length} 個正例和 ${negative.length} 個反例`);
 
       // Step 2: 創建優化任務
       const createResponse = await fetch(`${API_BASE_URL}/api/v1/optimization/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          study_name: `${state.symbol}_${state.strategyLogic}_${Date.now()}`,
+          study_name: `${state.symbols?.includes("ALL_SYMBOLS") ? "ALL" : (state.symbols?.[0] || "UNKNOWN")}_${state.strategyLogic}_${Date.now()}`,
           positive_cases: positive,
           negative_cases: negative,
           training_window: state.windowConfig,
@@ -525,8 +551,13 @@ function StrategyTestPageContent() {
       const endTime = parseDateToTimestamp(state.dateRange.end, Date.now());
 
       // Step 1: 呼叫 chart/signals 取得圖表數據
+      // 注意：圖表 API 目前只支援單一 symbol，這裡使用第一個選中的交易對
+      const chartSymbol = state.symbols?.includes("ALL_SYMBOLS") 
+        ? "BTCUSDT"  // 如果選中全部，使用 BTCUSDT 作為預設
+        : (state.symbols?.[0] || "BTCUSDT");
+
       const chartRequestBody = {
-        symbol: state.symbol,
+        symbol: chartSymbol,
         timeframe: state.timeframe,
         start_time: startTime,
         end_time: endTime,
@@ -576,19 +607,24 @@ function StrategyTestPageContent() {
 
       const chartData: ChartSignalResponse = await chartResponse.json();
 
-      // Step 2: 載入真實案例並過濾出符合當前 symbol/timeframe 的案例
+      // Step 2: 載入真實案例並過濾出符合當前 symbols 的案例
       const casesResponse = await fetch(`${API_BASE_URL}/api/v1/case/list`);
       if (casesResponse.ok) {
         const casesData = await casesResponse.json();
 
-        // 過濾出符合當前測試配置的案例（相同 symbol 和 timeframe）
+        // 過濾出符合當前測試配置的案例
         const positiveCases: string[] = [];
         const negativeCases: string[] = [];
 
+        // 判斷是否包含所有交易對
+        const includeAllSymbols = state.symbols?.includes("ALL_SYMBOLS") || false;
+
         if (casesData.cases && Array.isArray(casesData.cases)) {
           casesData.cases.forEach((c: any) => {
-            // 只使用符合當前 symbol 的案例（忽略 timeframe 差異，因為後端會處理）
-            if (c.symbol === state.symbol) {
+            // 只使用符合 symbols 條件的案例（忽略 timeframe 差異，因為後端會處理）
+            const shouldInclude = includeAllSymbols || state.symbols.includes(c.symbol);
+            
+            if (shouldInclude) {
               if (c.positive_case === 1) {
                 positiveCases.push(c.case_id);
               } else if (c.positive_case === 0) {
@@ -736,7 +772,10 @@ function StrategyTestPageContent() {
             throw new Error(message);  // 中斷執行並傳播錯誤
           }
         } else {
-          console.warn(`符合 ${state.symbol} 的案例數量不足：正例${positiveCases.length}個，反例${negativeCases.length}個`);
+          const symbolsDesc = state.symbols?.includes("ALL_SYMBOLS") 
+            ? "所有交易對" 
+            : (state.symbols?.join(", ") || "未選擇");
+          console.warn(`符合 ${symbolsDesc} 的案例數量不足：正例${positiveCases.length}個，反例${negativeCases.length}個`);
         }
       }
       // ✅ 內層 try-catch 已移除，讓所有錯誤向上傳播到主 catch 處理（第 522 行）
@@ -787,8 +826,6 @@ function StrategyTestPageContent() {
     setTemplates(listTemplates());
   };
 
-  const selectedSymbolOption = SYMBOL_OPTIONS.find((option) => option.value === state.symbol) ?? null;
-  const symbolSelectValue = selectedSymbolOption ? selectedSymbolOption.value : null;
   const currentStrategyGuide =
     STRATEGY_GUIDES[state.strategyLogic] ?? STRATEGY_GUIDES.three_line;
 
@@ -956,28 +993,28 @@ function StrategyTestPageContent() {
               </div>
             </AccordionItem>
 
-            <AccordionItem id="range" title="測試範圍" badge={state.timeframe}>
+            <AccordionItem 
+              id="range" 
+              title="測試範圍" 
+              badge={
+                state.symbols?.includes("ALL_SYMBOLS") 
+                  ? `全部交易對 (${availableSymbols.length})` 
+                  : `${state.symbols?.length || 0} 個交易對`
+              }
+            >
               <div className="space-y-4">
-                <CustomSelect
-                  label="交易對"
-                  options={SYMBOL_OPTIONS}
-                  value={symbolSelectValue}
-                  onChange={(value) => {
-                    if (!value || value === "CUSTOM") return;
-                    setField("symbol", value);
-                  }}
-                  allowClear
-                />
+                {/* 多選交易對選擇器 */}
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">自訂交易對</label>
-                  <input
-                    type="text"
-                    value={state.symbol}
-                    onChange={(event) => setField("symbol", event.target.value.toUpperCase())}
-                    placeholder="例：BTCUSDT"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  <label className="text-xs font-medium text-slate-600">交易對選擇</label>
+                  <SymbolMultiSelect
+                    value={state.symbols}
+                    onChange={(symbols) => setField("symbols", symbols)}
+                    availableSymbols={availableSymbols}
+                    isLoading={isLoadingSymbols}
+                    error={symbolsError}
                   />
                 </div>
+                
                 <CustomSelect
                   label="時間框架"
                   options={TIMEFRAME_OPTIONS}
