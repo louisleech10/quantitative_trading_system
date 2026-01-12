@@ -1,24 +1,4 @@
 {
-  "NEUTRAL_20200518": {
-    "start_date": "2020-05-18",
-    "end_date": "2020-05-24",
-    "description": "NEUTRAL"
-  },
-  "FEAR_20200525": {
-    "start_date": "2020-05-25",
-    "end_date": "2020-05-31",
-    "description": "FEAR"
-  },
-  "NEUTRAL_20200601": {
-    "start_date": "2020-06-01",
-    "end_date": "2020-06-14",
-    "description": "NEUTRAL"
-  },
-  "FEAR_20200615": {
-    "start_date": "2020-06-15",
-    "end_date": "2020-07-19",
-    "description": "FEAR"
-  },
   "NEUTRAL_20200720": {
     "start_date": "2020-07-20",
     "end_date": "2020-07-26",
@@ -482,6 +462,16 @@
   "FEAR_20251013": {
     "start_date": "2025-10-13",
     "end_date": "2025-11-09",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20251110": {
+    "start_date": "2025-11-10",
+    "end_date": "2026-01-04",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20260105": {
+    "start_date": "2026-01-05",
+    "end_date": "2026-01-18",
     "description": "FEAR"
   }
 }

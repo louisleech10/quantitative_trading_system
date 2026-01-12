@@ -5,19 +5,24 @@ Pattern Analysis Routes - 模式分析 API 路由
 
 Author: AI Agent
 Date: 2026-01-10
+Updated: 2026-01-13 - 新增批量分析 API
 """
 
 from fastapi import APIRouter, HTTPException
-from typing import List
+from typing import List, Optional
 
 from api.models.pattern_analysis_models import (
     XGBoostAnalysisRequest,
+    XGBoostBatchAnalysisRequest,
     XGBoostAnalysisResponse,
     XGBoostAnalysisResult,
+    XGBoostBatchAnalysisResult,
+    CaseSummaryResponse,
     ModelInfoResponse,
     ModelListItem
 )
 from api.services.xgboost_task_service import XGBoostTaskService
+from api.services.xgboost_batch_service import get_xgboost_batch_service
 from api.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -28,10 +33,105 @@ router = APIRouter(prefix="/pattern-analysis", tags=["Pattern Analysis"])
 xgboost_service = XGBoostTaskService()
 
 
+# ==================== 批量分析 API（新增）====================
+
+@router.get("/cases/summary", response_model=CaseSummaryResponse)
+async def get_case_summary(
+    symbol: Optional[str] = None,
+    timeframe: Optional[str] = None
+):
+    """
+    獲取案例摘要統計
+    
+    Args:
+        symbol: 過濾特定交易對（可選）
+        timeframe: 過濾特定時間週期（可選）
+        
+    Returns:
+        案例統計（總數、正例數、反例數、可用交易對和時間週期）
+    """
+    try:
+        batch_service = get_xgboost_batch_service()
+        summary = batch_service.get_case_summary(symbol, timeframe)
+        return summary
+    except Exception as e:
+        logger.error(f"獲取案例摘要失敗: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/xgboost/batch/start", response_model=XGBoostAnalysisResponse)
+async def start_batch_xgboost_analysis(request: XGBoostBatchAnalysisRequest):
+    """
+    啟動 XGBoost 批量分析任務
+    
+    正確流程:
+    1. 讀取 K 線數據（HDF5）
+    2. 根據指標配置計算特徵
+    3. 為所有案例提取特徵和標籤
+    4. 訓練 XGBoost 模型並交叉驗證
+    5. 計算特徵重要性
+    6. 提取決策規則
+    7. 儲存模型
+    
+    Args:
+        request: 批量分析請求（包含 symbol, timeframe, indicators）
+        
+    Returns:
+        任務 ID 和狀態
+    """
+    try:
+        batch_service = get_xgboost_batch_service()
+        
+        # 轉換指標配置
+        indicators = [
+            {
+                'indicator': ind.indicator,
+                'data_source': ind.data_source,
+                'params': ind.params
+            }
+            for ind in request.indicators
+        ]
+        
+        result = await batch_service.start_batch_analysis(
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            indicators=indicators,
+            lookback_bars=request.lookback_bars,
+            xgboost_params=request.xgboost_params,
+            cv_folds=request.cv_folds,
+            top_n_rules=request.top_n_rules,
+            min_support=request.min_support
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"啟動批量 XGBoost 分析失敗: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/xgboost/batch/task/{task_id}")
+async def get_batch_xgboost_task_status(task_id: str):
+    """
+    獲取批量 XGBoost 分析任務狀態
+    
+    返回任務的進度、當前步驟、結果或錯誤資訊
+    """
+    batch_service = get_xgboost_batch_service()
+    task = batch_service.get_task_status(task_id)
+    
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+    
+    return task
+
+
+# ==================== 單案例分析 API（保留向後相容）====================
+
 @router.post("/xgboost/start", response_model=XGBoostAnalysisResponse)
 async def start_xgboost_analysis(request: XGBoostAnalysisRequest):
     """
-    啟動 XGBoost 分析任務
+    啟動 XGBoost 分析任務（單案例，向後相容）
     
     分析流程:
     1. 讀取案例的特徵數據

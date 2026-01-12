@@ -41,10 +41,10 @@ const AVAILABLE_INDICATORS = [
     value: 'ema_three_line',
     label: 'EMA 三線順勢',
     params: {
-      ema_short: { type: 'number', label: '短期 EMA', default: 5 },
-      ema_mid: { type: 'number', label: '中期 EMA', default: 20 },
-      ema_long: { type: 'number', label: '長期 EMA', default: 60 },
-      volume_threshold: { type: 'number', label: '成交量閾值', default: 0.6, step: 0.1, min: 0, max: 1 }
+      ema_short: { type: 'number', label: '短期 EMA', default: 5, step: 1, min: 1 },
+      ema_mid: { type: 'number', label: '中期 EMA', default: 20, step: 1, min: 1 },
+      ema_long: { type: 'number', label: '長期 EMA', default: 60, step: 1, min: 1 },
+      volume_threshold: { type: 'number', label: '成交量閾值（0=不考慮）', default: 0.6, step: 0.01, min: 0, max: 1 }
     }
   },
   {
@@ -155,27 +155,65 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
     ))
   }
 
-  // 預覽特徵名稱
+  // 預覽特徵名稱 - 完整列出所有會生成的特徵
   const handlePreview = () => {
     const features: string[] = []
     
+    // 基礎價格特徵（8個）- 固定生成
+    const priceFeatures = [
+      'price_change_pct',
+      'high_low_range_pct',
+      'close_position_in_range',
+      'price_volatility_5',
+      'price_momentum_3',
+      'upper_shadow_pct',
+      'lower_shadow_pct',
+      'body_pct'
+    ]
+    features.push(...priceFeatures)
+    
+    // 基礎成交量特徵（6個）- 固定生成
+    const volumeFeatures = [
+      'volume_change_pct',
+      'volume_ma_ratio_5',
+      'taker_buy_ratio',
+      'taker_buy_value_ratio',
+      'volume_price_correlation_5',
+      'abnormal_volume_flag'
+    ]
+    features.push(...volumeFeatures)
+    
+    // 策略特徵（依據配置動態生成）
     value.forEach(config => {
       const { indicator, data_source, params } = config
       
       if (indicator === 'ema_three_line') {
+        // EMA 策略特徵（9個）
         features.push(`${data_source}_ema${params.ema_short}_value`)
         features.push(`${data_source}_ema${params.ema_mid}_value`)
         features.push(`${data_source}_ema${params.ema_long}_value`)
         features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_distance`)
+        features.push(`${data_source}_ema${params.ema_mid}_${params.ema_long}_distance`)
         features.push(`${data_source}_ema_trend_aligned`)
+        features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_cross_signal`)
+        features.push(`volume_spike_${Math.round(params.volume_threshold * 100)}`)
+        features.push(`taker_ratio_distance_${Math.round(params.volume_threshold * 100)}`)
+        
+        // 信號組合特徵（3個）
+        features.push(`${data_source}_ema_entry_signal_score`)
+        features.push(`${data_source}_ema_trend_consistency_5`)
+        features.push(`${data_source}_ema_signal_strength`)
       } else if (indicator === 'rsi') {
         features.push(`${data_source}_rsi${params.period}_value`)
-        features.push(`${data_source}_rsi${params.period}_${params.overbought}_signal`)
-        features.push(`${data_source}_rsi${params.period}_${params.oversold}_signal`)
+        features.push(`${data_source}_rsi_overbought_signal`)
+        features.push(`${data_source}_rsi_oversold_signal`)
+        features.push(`${data_source}_rsi_divergence`)
       } else if (indicator === 'macd') {
-        features.push(`${data_source}_macd${params.fast}_${params.slow}_line`)
-        features.push(`${data_source}_macd${params.fast}_${params.slow}_${params.signal}_signal`)
-        features.push(`${data_source}_macd${params.fast}_${params.slow}_${params.signal}_histogram`)
+        features.push(`${data_source}_macd_line`)
+        features.push(`${data_source}_macd_signal`)
+        features.push(`${data_source}_macd_histogram`)
+        features.push(`${data_source}_macd_cross_signal`)
+        features.push(`${data_source}_macd_divergence`)
       }
     })
     
@@ -190,10 +228,10 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
         const indicatorDef = AVAILABLE_INDICATORS.find(i => i.value === config.indicator)
         
         return (
-          <Card key={config.id}>
+          <Card key={config.id} className="bg-white border-gray-200">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span className="text-base">指標 #{index + 1}</span>
+                <span className="text-base text-gray-900">指標 #{index + 1}</span>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -207,17 +245,17 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
             <CardContent className="space-y-4">
               {/* 指標類型 */}
               <div className="space-y-2">
-                <Label>指標類型</Label>
+                <Label className="text-gray-800 font-medium">指標類型</Label>
                 <Select
                   value={config.indicator}
                   onValueChange={(val) => handleIndicatorChange(config.id, val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
                     {AVAILABLE_INDICATORS.map(indicator => (
-                      <SelectItem key={indicator.value} value={indicator.value}>
+                      <SelectItem key={indicator.value} value={indicator.value} className="text-gray-900 hover:bg-gray-100 cursor-pointer">
                         {indicator.label}
                       </SelectItem>
                     ))}
@@ -227,17 +265,17 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
 
               {/* 數據源 */}
               <div className="space-y-2">
-                <Label>數據源</Label>
+                <Label className="text-gray-800">數據源</Label>
                 <Select
                   value={config.data_source}
                   onValueChange={(val) => handleDataSourceChange(config.id, val)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
                     {DATA_SOURCES.map(source => (
-                      <SelectItem key={source.value} value={source.value}>
+                      <SelectItem key={source.value} value={source.value} className="text-gray-900 hover:bg-gray-100 cursor-pointer">
                         {source.label}
                       </SelectItem>
                     ))}
@@ -248,22 +286,37 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
               {/* 參數配置 */}
               {indicatorDef && (
                 <div className="space-y-3">
-                  <Label>參數配置</Label>
+                  <Label className="text-gray-800 font-medium">參數配置</Label>
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(indicatorDef.params).map(([paramKey, paramConfig]) => (
                       <div key={paramKey} className="space-y-1">
-                        <Label className="text-xs">{paramConfig.label}</Label>
+                        <Label className="text-xs text-gray-700">{paramConfig.label}</Label>
                         <Input
                           type="number"
-                          value={config.params[paramKey] || paramConfig.default}
-                          onChange={(e) => handleParamChange(
-                            config.id,
-                            paramKey,
-                            paramConfig.type === 'number' ? parseFloat(e.target.value) : e.target.value
-                          )}
-                          step={paramConfig.step || 1}
+                          value={config.params[paramKey] ?? paramConfig.default}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            // 允許空值和任意數字輸入
+                            if (val === '' || val === '-') {
+                              handleParamChange(config.id, paramKey, val)
+                            } else {
+                              const num = parseFloat(val)
+                              if (!isNaN(num)) {
+                                handleParamChange(config.id, paramKey, num)
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // 失焦時確保是有效數字，否則恢復預設值
+                            const val = e.target.value
+                            if (val === '' || isNaN(parseFloat(val))) {
+                              handleParamChange(config.id, paramKey, paramConfig.default)
+                            }
+                          }}
+                          step="any"
                           min={paramConfig.min}
                           max={paramConfig.max}
+                          className="bg-white border-gray-300 text-gray-900"
                         />
                       </div>
                     ))}
@@ -277,11 +330,11 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
 
       {/* 操作按鈕 */}
       <div className="flex gap-2">
-        <Button onClick={handleAddIndicator} variant="outline">
+        <Button onClick={handleAddIndicator} variant="outline" className="bg-white border-gray-300 text-gray-900 hover:bg-gray-50">
           <Plus className="h-4 w-4 mr-2" />
           添加指標
         </Button>
-        <Button onClick={handlePreview} variant="outline">
+        <Button onClick={handlePreview} variant="outline" className="bg-white border-gray-300 text-gray-900 hover:bg-gray-50">
           <Eye className="h-4 w-4 mr-2" />
           預覽特徵
         </Button>
@@ -289,13 +342,16 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
 
       {/* 特徵預覽 */}
       {showPreview && (
-        <Alert>
+        <Alert className="bg-white border-gray-200">
           <AlertDescription>
             <div className="space-y-2">
-              <p className="font-semibold">將生成 {previewFeatures.length} 個特徵：</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="font-semibold text-gray-900">將生成 {previewFeatures.length} 個特徵：</p>
+              <div className="text-xs text-gray-600 mb-2">
+                包含：8 個價格特徵 + 6 個成交量特徵 + 策略特徵（依配置）
+              </div>
+              <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
                 {previewFeatures.map(feature => (
-                  <Badge key={feature} variant="secondary" className="font-mono text-xs">
+                  <Badge key={feature} variant="secondary" className="font-mono text-xs bg-gray-100 text-gray-800">
                     {feature}
                   </Badge>
                 ))}

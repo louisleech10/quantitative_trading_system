@@ -40,21 +40,29 @@ export default function PatternsPage() {
   };
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* 頁面標題 */}
-      <div className="bg-white border-b">
+      <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold mb-2">樣式發現系統</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">樣式發現系統</h1>
               <p className="text-gray-600">Pattern Discovery & Management</p>
             </div>
-            <Link
-              href="/patterns/create"
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-            >
-              + 建立新樣式
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/patterns/xgboost-analysis"
+                className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
+              >
+                🧠 XGBoost 分析
+              </Link>
+              <Link
+                href="/patterns/create"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
+              >
+                + 建立新樣式
+              </Link>
+            </div>
           </div>
         </div>
       </div>
