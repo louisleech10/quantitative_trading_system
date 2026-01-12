@@ -1,9 +1,12 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 1.0
-- **最後更新**: 2025-09-30
+- **版本**: 2.0
+- **最後更新**: 2026-01-09
 - **狀態**: 生產中 + 持續開發
+- **更新內容**: 
+  - v2.0 (2026-01-09): 添加 Phase 3 完整架構（Optuna優化系統、WebSocket通訊、9個視覺化組件）
+  - v1.0 (2025-09-30): 初始版本
 
 ---
 
@@ -311,7 +314,279 @@ IDE: VS Code
 
 ---
 
-### ✅ 6. 配置管理系統
+### ✅ 6. Optuna 參數優化系統 (Phase 3)
+
+#### 功能概述
+完整的參數優化系統，支持多種優化器、斷點續跑(未驗證)、實時進度推送。
+
+#### 核心架構
+
+**優化目標函數**:
+```python
+# 雙密度模式（v2.0公式）
+Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
+
+其中:
+- M_i = (Near_i - Far_i) / (Near_i + Far_i + ε)  # 信號質量
+- w_i = Near_i + Far_i  # 權重（基於信號數量）
+- μ = Σ(w_i·M_i) / Σw_i  # 加權平均
+- σ = sqrt(Σw_i(M_i-μ)² / Σw_i)  # 加權標準差
+- λ = 1.0  # 穩定性懲罰係數
+```
+
+#### 支持的優化器 (5種)
+1. **TPESampler** (預設) - Tree-structured Parzen Estimator
+2. **CmaEsSampler** - Covariance Matrix Adaptation Evolution Strategy
+3. **RandomSampler** - 隨機搜索基準
+4. **GPSampler** - Gaussian Process
+5. **NSGAIISampler** - 多目標優化（NSGA-II演算法）
+
+#### 容錯機制
+
+**斷點續跑**:(未驗證)
+- SQLite數據庫存儲（`optuna_study.db`）
+- Pickle檢查點（每50次試驗）
+- 自動從中斷點恢復
+- 歷史試驗查詢
+
+**錯誤處理**:
+- 3層錯誤分類（Retryable/NonRetryable/Fatal）
+- 自動重試機制（最多3次）
+- 指數退避策略
+- 詳細錯誤日誌
+
+#### 實時通訊
+
+**WebSocket協議**:
+- **端點**: `ws://localhost:8000/ws/optimization/{task_id}`
+- **功能**: 實時優化進度推送
+- **心跳檢測**: 30秒間隔
+- **自動重連**: 斷線自動恢復
+
+**推送內容**:
+```json
+{
+  "status": "running|completed|failed",
+  "progress": 0.0-1.0,
+  "current_trial": 45,
+  "total_trials": 300,
+  "best_value": 0.35,
+  "best_params": {"ema_short": 7, "ema_mid": 18, "ema_long": 35},
+  "milestone": "25%|50%|75%|100%"
+}
+```
+
+#### 核心模組
+- **優化引擎**: `momentum/Optimization/optuna_optimizer.py`
+- **任務服務**: `api/services/optimization_task_service.py`
+- **WebSocket**: `api/websocket/optimization_ws.py`
+- **路由**: `api/routes/optimization.py`
+- **模型**: `api/models/training_window_config.py`
+
+#### REST API端點
+```python
+POST   /api/v1/optimization/start       # 啟動優化任務
+GET    /api/v1/optimization/task/{id}   # 查詢任務狀態
+DELETE /api/v1/optimization/task/{id}   # 取消任務
+GET    /api/v1/optimization/tasks       # 列出所有任務
+GET    /api/v1/optimization/analysis    # 參數重要性分析
+GET    /api/v1/optimization/history     # 優化歷史記錄
+```
+
+#### 測試與驗證
+- **測試代碼**: ~970行
+- **單元測試**: 優化器、任務管理、WebSocket
+- **整合測試**: 完整優化流程
+- **文檔**: `sessions/PHASE3.5_COMPLETE_SUMMARY.md`
+
+---
+
+### ✅ 7. 優化結果視覺化系統 (Phase 3)
+
+#### 功能概述
+9個專業圖表組件，全面展示優化結果與統計分析。
+
+#### 前端組件架構
+
+**核心組件** (`frontend/src/components/optimization/`):
+
+1. **MetricsPanel.tsx** - 指標總覽面板
+   - 最佳分數、μ分離、σ穩定性
+   - 統計顯著性（p-value, Cohen's d）
+   - 顏色編碼（綠=好，黃=中，紅=差）
+   - PNG導出功能
+
+2. **DensityComparisonChart.tsx** - 正反例密度對比
+   - 雙軸條形圖
+   - 正例密度 vs 反例密度
+   - 月度分組對比
+   - 自定義工具提示
+
+3. **StabilityChart.tsx** - 穩定性分析
+   - 折線圖展示月度分數變化
+   - 變異係數（CV）計算
+   - 最佳/最差月份標記
+   - 趨勢線顯示
+
+4. **TrialHistoryTable.tsx** - 試驗歷史表格
+   - 所有試驗詳細記錄
+   - 可排序（分數、參數、時間）
+   - 搜索功能（試驗編號、參數值）
+   - CSV導出
+   - 鍵盤快捷鍵（Ctrl+A全選）
+
+5. **ParameterImportanceChart.tsx** - 參數重要性
+   - 橫向條形圖
+   - FANOVA / MDI 重要性分數
+   - 參數排名
+   - 貢獻百分比
+
+6. **ParameterDistributionChart.tsx** - 參數分布
+   - 多參數散點圖
+   - 顏色映射分數高低
+   - 參數相關性視覺化
+
+7. **ParallelCoordinatePlot.tsx** - 平行坐標圖
+   - 多維參數關係
+   - 高分試驗突出顯示
+   - 互動式篩選
+
+8. **OptimizationProgress.tsx** - 優化進度
+   - 實時進度條
+   - WebSocket連接狀態
+   - 當前最佳值更新
+   - 估計剩餘時間
+
+9. **CompareTrialsTable.tsx** - 試驗對比
+   - 並排對比多個試驗
+   - 參數差異高亮
+   - 性能指標對比
+
+#### UI/UX特性
+
+**統一設計模式**:
+- 空狀態處理（無數據提示）
+- 加載狀態（骨架屏/Spinner）
+- 錯誤狀態（重試按鈕）
+- 響應式設計（手機/平板適配）
+
+**導出功能**:
+- PNG導出（圖表）
+- CSV導出（表格）
+- 一鍵導出所有結果
+
+**交互功能**:
+- 自定義工具提示（詳細資訊）
+- 顏色編碼（直觀判斷）
+- 搜索與篩選
+- 鍵盤快捷鍵
+
+#### 核心頁面
+- **路徑**: `frontend/src/app/optimization/page.tsx`
+- **布局**: 響應式網格系統
+- **路由**: Next.js 15 App Router
+
+---
+
+### ✅ 8. 信號密度分析系統 (Phase 3)
+
+#### 功能概述
+計算策略在正反例中的信號密度差異，支持窗口配置與統計分析。
+
+#### 核心計算邏輯
+
+**雙窗口密度計算**:
+```python
+# 正例窗口（TO點後0-24小時）
+positive_density = 符合策略的K線數 / 總K線數
+
+# 反例窗口（TO點後24-48小時）
+negative_density = 符合策略的K線數 / 總K線數
+
+# 分離度
+separation = positive_density - negative_density
+```
+
+**M-Metric計算** (v2.0):
+```python
+M_i = (Near_i - Far_i) / (Near_i + Far_i + ε)
+範圍: [-1, 1]
+```
+
+**統計顯著性**:
+- t檢驗（p-value）
+- Cohen's d（效果量）
+- 按月穩定性分析
+- 變異係數（CV）
+
+#### 核心模組
+- **分析引擎**: `momentum/Analysis/signal_density_analyzer.py`
+- **服務層**: `api/services/signal_analysis_service.py`
+- **API路由**: `api/routes/signal_analysis.py`
+- **配置模型**: `api/models/training_window_config.py`
+
+#### API端點
+```python
+POST /api/v1/signal-analysis/density    # 計算信號密度
+POST /api/v1/signal-analysis/batch      # 批量分析
+GET  /api/v1/signal-analysis/windows    # 獲取窗口配置
+```
+
+---
+
+### ✅ 9. 多指標計算引擎 (Phase 3)
+
+#### 功能概述
+靈活的指標計算系統，支持7種數據源和20+種技術指標。
+
+#### 數據源支持 (7種)
+- `close` - 收盤價
+- `open` - 開盤價
+- `high` - 最高價
+- `low` - 最低價
+- `volume` - 成交量
+- `taker_volume` - 主動買入量
+- `taker_ratio` - 主動買入比例
+
+#### 指標類型 (20+種)
+
+**趨勢類**:
+- EMA, SMA, DEMA, TEMA
+- WMA, HMA
+
+**動能類**:
+- RSI, MACD, Stochastic
+- CCI, Williams %R, ROC
+
+**波動類**:
+- ATR, Bollinger Bands
+- Keltner Channel, Donchian Channel
+
+**成交量類**:
+- OBV, Volume MA, VWAP
+- MFI, CMF
+
+**籌碼類** (加密貨幣特有):
+- Taker Ratio MA
+- Taker Strength
+- Taker Volume Delta
+
+#### 技術特性
+- **向量化計算**: pandas/numpy優化
+- **參數可配置**: period, multiplier等
+- **缺失值處理**: 前向填充/線性插值
+- **無未來函數**: 嚴格時序性驗證
+
+#### 核心模組
+- **指標引擎**: `momentum/Indicator/indicator_engine.py`
+- **趨勢指標**: `momentum/Indicator/trend_indicators.py`
+- **動能指標**: `momentum/Indicator/momentum_indicators.py`
+- **波動指標**: `momentum/Indicator/volatility_indicators.py`
+- **成交量指標**: `momentum/Indicator/volume_indicators.py`
+
+---
+
+### ✅ 10. 配置管理系統
 
 #### 系統配置
 - **文件**: `api/core/config.py`

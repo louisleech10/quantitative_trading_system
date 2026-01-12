@@ -120,6 +120,27 @@ export default function Home() {
             </div>
           </Link>
 
+          {/* ML Pipeline 展示 (NEW) */}
+          <Link href="/ml-pipeline-demo" className="group">
+            <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-indigo-300 transition-all duration-200">
+              <div className="flex items-start justify-between mb-4">
+                <div className="p-3 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                  <TrendingUp className="w-8 h-8 text-indigo-600" />
+                </div>
+                <span className="text-sm text-indigo-600 font-medium">🆕 新功能 →</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">ML Pipeline 配置</h3>
+              <p className="text-gray-600 mb-4">
+                Phase 3-6 新功能：Trial 比較、多指標配置、Pipeline 創建（功能展示頁面）
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">Trial 比較</span>
+                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">多指標</span>
+                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">Pipeline</span>
+              </div>
+            </div>
+          </Link>
+
           {/* 系統設定 */}
           <Link href="/settings" className="group">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md hover:border-orange-300 transition-all duration-200">

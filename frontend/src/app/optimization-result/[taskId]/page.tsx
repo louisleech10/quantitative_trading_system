@@ -469,10 +469,22 @@ export default function OptimizationResultPage() {
 
       {/* 頁面標題 */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">優化結果</h1>
-        <p className="text-muted-foreground">
-          Task ID: {taskId} · Study: {result.study_direction}
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">優化結果</h1>
+            <p className="text-muted-foreground">
+              Task ID: {taskId} · Study: {result.study_direction}
+            </p>
+          </div>
+          <Button asChild size="lg">
+            <Link href={`/optimization-result/${taskId}/pipeline`}>
+              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              配置 Pipeline
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* 內容區域 */}

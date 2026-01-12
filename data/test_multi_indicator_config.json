@@ -1,0 +1,68 @@
+{
+  "pipeline_name": "test_multi_indicator_pipeline",
+  "created_at": "2026-01-11T23:04:10.089912",
+  "strategy_config": {
+    "strategy_type": "multi_indicator",
+    "data_source": "close",
+    "strategy_params": {},
+    "optuna_trial_number": null,
+    "optuna_trial_value": null,
+    "optuna_study_name": null
+  },
+  "feature_config": {
+    "include_basic_features": true,
+    "selected_features": null,
+    "indicators": [
+      {
+        "indicator": "ema_three_line",
+        "params": {
+          "ema_short": 5,
+          "ema_mid": 20,
+          "ema_long": 60,
+          "volume_threshold": 0.6
+        },
+        "data_source": "close"
+      },
+      {
+        "indicator": "rsi",
+        "params": {
+          "period": 14,
+          "overbought": 70,
+          "oversold": 30
+        },
+        "data_source": "close"
+      },
+      {
+        "indicator": "macd",
+        "params": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        },
+        "data_source": "close"
+      }
+    ]
+  },
+  "xgboost_config": {
+    "params": {
+      "objective": "binary:logistic",
+      "eval_metric": "auc",
+      "max_depth": 5,
+      "learning_rate": 0.05,
+      "n_estimators": 100,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "min_child_weight": 5,
+      "gamma": 0.1,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.0,
+      "random_state": 42
+    },
+    "early_stopping_rounds": 10,
+    "eval_size": 0.2,
+    "cv_folds": 5,
+    "use_optuna_tuning": false,
+    "optuna_n_trials": 50
+  },
+  "user_notes": "測試多指標組合：EMA + RSI + MACD"
+}

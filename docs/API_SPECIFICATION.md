@@ -1,11 +1,13 @@
 # API接口規範
 
 ## 文檔信息
-- **版本**: 1.1
-- **最後更新**: 2025-12-06
+- **版本**: 2.0
+- **最後更新**: 2026-01-09
 - **Base URL**: `http://localhost:8000` (開發環境)
 - **變更記錄**:
+  - v2.0 (2026-01-09): 新增 Phase 3 API（Optuna優化、信號分析、WebSocket）
   - v1.1 (2025-12-06): 新增 SignalDensityResponse 零值統計欄位，修復 Far=0 統計偏差
+  - v1.0 (2025-09-30): 初始版本
 
 ---
 
@@ -167,9 +169,155 @@ PATCH /api/v1/config
 
 ---
 
-## 待開發API
+### 3. Optimization API (Phase 3) ✅
 
-### 3. Chart Data API
+#### 啟動優化任務
+```http
+POST /api/v1/optimization/start
+```
+
+**Request Body:**
+```json
+{
+  "case_ids": ["uuid1", "uuid2"],
+  "training_window": {
+    "reference_point": "TO|TC",
+    "look_back_bars": 24,
+    "look_forward_bars": 0
+  },
+  "parameter_space": {
+    "ema_short": {"min": 5, "max": 15},
+    "ema_mid": {"min": 15, "max": 25},
+    "ema_long": {"min": 30, "max": 50}
+  },
+  "optimization_config": {
+    "n_trials": 300,
+    "sampler": "tpe|cmaes|random|gp|nsgaii",
+    "n_jobs": 6,
+    "timeout": 3600
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "task_id": "uuid",
+    "status": "pending",
+    "created_at": "ISO8601"
+  }
+}
+```
+
+---
+
+#### 查詢優化任務狀態
+```http
+GET /api/v1/optimization/task/{task_id}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "task_id": "uuid",
+    "status": "pending|running|completed|failed",
+    "progress": 0.75,
+    "current_trial": 225,
+    "total_trials": 300,
+    "best_value": 0.35,
+    "best_params": {
+      "ema_short": 7,
+      "ema_mid": 18,
+      "ema_long": 35
+    },
+    "started_at": "ISO8601",
+    "completed_at": "ISO8601",
+    "error": "string | null"
+  }
+}
+```
+
+---
+
+#### 取消優化任務
+```http
+DELETE /api/v1/optimization/task/{task_id}
+```
+
+---
+
+#### 列出所有優化任務
+```http
+GET /api/v1/optimization/tasks?status=completed&limit=50
+```
+
+---
+
+#### WebSocket - 實時優化進度
+```
+ws://localhost:8000/ws/optimization/{task_id}
+```
+
+**推送格式:**
+```json
+{
+  "type": "progress|milestone|completed",
+  "progress": 0.45,
+  "current_trial": 135,
+  "best_value": 0.32
+}
+```
+
+---
+
+### 4. Signal Analysis API (Phase 3) ✅
+
+#### 計算信號密度
+```http
+POST /api/v1/signal-analysis/density
+```
+
+**Request Body:**
+```json
+{
+  "case_id": "uuid",
+  "strategy_config": {
+    "indicator": "ema",
+    "params": {"short": 7, "mid": 18, "long": 35}
+  },
+  "training_window": {
+    "reference_point": "TO",
+    "look_back_bars": 24
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "positive_density": 0.75,
+    "negative_density": 0.35,
+    "separation": 0.40,
+    "m_value": 0.35,
+    "statistics": {
+      "p_value": 0.001,
+      "cohens_d": 1.25
+    }
+  }
+}
+```
+
+---
+
+## 待開發API (Phase 4+)
+
+### 5. Chart Data API
 
 #### 獲取K線數據
 ```http

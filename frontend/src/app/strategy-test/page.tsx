@@ -553,7 +553,7 @@ function StrategyTestPageContent() {
       // Step 1: 呼叫 chart/signals 取得圖表數據
       // 注意：圖表 API 目前只支援單一 symbol，這裡使用第一個選中的交易對
       const chartSymbol = state.symbols?.includes("ALL_SYMBOLS") 
-        ? "BTCUSDT"  // 如果選中全部，使用 BTCUSDT 作為預設
+        ? availableSymbols[0] || "BTCUSDT"  // 如果選中全部，使用第一個可用交易對
         : (state.symbols?.[0] || "BTCUSDT");
 
       const chartRequestBody = {

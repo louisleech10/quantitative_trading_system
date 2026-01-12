@@ -59,6 +59,18 @@ const navigationItems = [
     description: '查看參數優化結果（Phase 3.6）'
   },
   {
+    name: '模式發現',
+    href: '/patterns',
+    icon: Target,
+    description: 'XGBoost 模式分析與管理（Phase 4）'
+  },
+  {
+    name: 'ML Pipeline 展示',
+    href: '/ml-pipeline-demo',
+    icon: TrendingUp,
+    description: 'Phase 3-6 新功能展示（Trial 比較、多指標配置）'
+  },
+  {
     name: '圖表分析',
     href: '/dashboard',
     icon: BarChart3,

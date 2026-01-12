@@ -24,6 +24,7 @@ from api.services.optimization_task_service import (
 from api.models.training_window_config import TrainingWindowConfig
 from momentum.Optimization.optuna_optimizer import ParameterRanges
 from momentum.Analysis.strategy_registry import strategy_registry
+from momentum.Optimization.trial_comparison import compare_trials, TrialComparisonResult
 
 
 router = APIRouter(prefix="/api/v1/optimization")
@@ -403,3 +404,102 @@ async def get_strategy_detail(strategy_id: str):
     except Exception as e:
         logger.error(f"Failed to get strategy detail for {strategy_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Trial Comparison Endpoints ====================
+
+class TrialComparisonResponse(BaseModel):
+    """Trial 比較響應"""
+    success: bool
+    data: Optional[dict] = None
+    message: str
+
+
+@router.get("/trials/compare", response_model=TrialComparisonResponse)
+async def compare_optimization_trials(
+    study_name: str = Query(..., description="Optuna Study 名稱"),
+    trial_numbers: str = Query(..., description="Trial 編號列表，用逗號分隔，例如: '1,2,3,5,10'")
+):
+    """
+    比較多個 Optimization Trials
+    
+    比較指定的多個 trial，返回統計資訊和推薦建議。
+    
+    Args:
+        study_name: Optuna study 名稱
+        trial_numbers: Trial 編號列表（逗號分隔），例如 "1,2,3,5,10"
+        
+    Returns:
+        TrialComparisonResult 包含:
+        - best_trial_number: 最佳 trial 編號
+        - best_value: 最佳分數
+        - value_mean, value_std: 平均值和標準差
+        - trials: 各 trial 詳細資訊
+        - recommendation: 推薦理由
+        
+    Example:
+        GET /api/v1/optimization/trials/compare?study_name=momentum_001&trial_numbers=1,2,3,5
+    """
+    try:
+        # 解析 trial 編號列表
+        try:
+            trial_nums = [int(x.strip()) for x in trial_numbers.split(',')]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid trial_numbers format. Expected comma-separated integers, got: {trial_numbers}"
+            )
+        
+        if len(trial_nums) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="At least 2 trials are required for comparison"
+            )
+        
+        logger.info(f"Comparing {len(trial_nums)} trials from study '{study_name}': {trial_nums}")
+        
+        # 調用 trial_comparison.py 的 compare_trials 函式
+        comparison_result: TrialComparisonResult = compare_trials(
+            study_name=study_name,
+            trial_numbers=trial_nums
+        )
+        
+        # 轉換為 API 響應格式
+        response_data = {
+            "best_trial_number": comparison_result.best_trial_number,
+            "best_value": comparison_result.best_value,
+            "value_mean": comparison_result.value_mean,
+            "value_std": comparison_result.value_std,
+            "value_min": comparison_result.value_min,
+            "value_max": comparison_result.value_max,
+            "trials": [
+                {
+                    "number": trial.number,
+                    "value": trial.value,
+                    "state": trial.state,
+                    "duration_seconds": trial.duration_seconds,
+                    "params": trial.params,
+                    "user_attrs": trial.user_attrs
+                }
+                for trial in comparison_result.trials
+            ],
+            "recommendation": comparison_result.recommendation
+        }
+        
+        logger.info(f"Trial comparison completed. Best trial: #{comparison_result.best_trial_number} with value {comparison_result.best_value:.4f}")
+        
+        return TrialComparisonResponse(
+            success=True,
+            data=response_data,
+            message=f"Successfully compared {len(trial_nums)} trials"
+        )
+        
+    except FileNotFoundError as e:
+        logger.warning(f"Study not found: {study_name}")
+        raise HTTPException(status_code=404, detail=f"Study '{study_name}' not found. {str(e)}")
+    except ValueError as e:
+        logger.warning(f"Invalid trial numbers for study {study_name}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to compare trials: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal error during trial comparison: {str(e)}")
