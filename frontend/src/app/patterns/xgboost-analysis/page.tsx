@@ -30,6 +30,7 @@ import { Progress } from '@/components/ui/progress'
 import MultiIndicatorConfig from '@/components/optimization/MultiIndicatorConfig'
 import { createPattern } from '@/lib/api/patternApi'
 import type { CreatePatternRequest } from '@/lib/patternTypes'
+import { usePatternStore } from '@/store/patternStore'
 import { 
   Play, CheckCircle, AlertCircle, Loader2, Database, 
   TrendingUp, List, Brain, CheckSquare, Square, Info, Save
@@ -568,6 +569,8 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
 export default function XGBoostAnalysisPage() {
   // State
   const router = useRouter()
+  const { currentAnalysis, setCurrentAnalysis } = usePatternStore()
+  
   const [caseSummary, setCaseSummary] = useState<CaseSummary | null>(null)
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([])
   const [klineTimeframe, setKlineTimeframe] = useState<string>('12h')
@@ -578,13 +581,15 @@ export default function XGBoostAnalysisPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [taskId, setTaskId] = useState<string | null>(null)
   const [taskStatus, setTaskStatus] = useState<TaskStatus | null>(null)
-  const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   
   // Save pattern state
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [savedPatternId, setSavedPatternId] = useState<string | null>(null)
+  
+  // Use currentAnalysis from store instead of local state
+  const result = currentAnalysis
 
   // Load case summary on mount
   useEffect(() => {
@@ -609,7 +614,7 @@ export default function XGBoostAnalysisPage() {
           setTaskStatus(status)
 
           if (status.status === 'completed') {
-            setResult(status.result || null)
+            setCurrentAnalysis(status.result || null)
             setIsLoading(false)
           } else if (status.status === 'failed') {
             setError(status.error || '分析失敗')
@@ -712,7 +717,7 @@ export default function XGBoostAnalysisPage() {
 
     setIsLoading(true)
     setError(null)
-    setResult(null)
+    setCurrentAnalysis(null)
     setTaskStatus(null)
     setSaveSuccess(false)
     setSavedPatternId(null)
