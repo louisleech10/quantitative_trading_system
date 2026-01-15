@@ -111,8 +111,8 @@ export default function PatternList() {
     <div className="space-y-4">
       {/* 標題與統計 */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">模式列表</h2>
-        <span className="text-sm text-gray-600">共 {filteredPatterns.length} 個模式</span>
+        <h2 className="text-xl font-bold text-gray-900">模式列表</h2>
+        <span className="text-sm text-gray-900 font-semibold">共 {filteredPatterns.length} 個模式</span>
       </div>
       
       {/* 模式卡片網格 */}

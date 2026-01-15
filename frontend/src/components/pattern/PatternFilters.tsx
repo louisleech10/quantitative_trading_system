@@ -51,10 +51,10 @@ export default function PatternFilters() {
   return (
     <div className="bg-white rounded-lg border p-4 space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="font-bold">篩選器</h3>
+        <h3 className="font-bold text-gray-900 text-base">篩選器</h3>
         <button
           onClick={handleClearAll}
-          className="text-sm text-blue-600 hover:text-blue-700"
+          className="text-sm text-blue-600 hover:text-blue-800 font-semibold"
         >
           清除全部
         </button>
@@ -62,44 +62,44 @@ export default function PatternFilters() {
       
       {/* 狀態篩選 */}
       <div>
-        <label className="block text-sm font-semibold mb-2">狀態</label>
+        <label className="block text-sm font-bold mb-2 text-gray-800">狀態</label>
         <div className="flex gap-2">
           <button
             onClick={() => setFilterStatus(undefined)}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-sm font-semibold ${
               filters.status === undefined
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
             }`}
           >
             全部
           </button>
           <button
             onClick={() => setFilterStatus('active')}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-sm font-semibold ${
               filters.status === 'active'
                 ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
             }`}
           >
             啟用中
           </button>
           <button
             onClick={() => setFilterStatus('testing')}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-sm font-semibold ${
               filters.status === 'testing'
                 ? 'bg-yellow-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
             }`}
           >
             測試中
           </button>
           <button
             onClick={() => setFilterStatus('archived')}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-sm font-semibold ${
               filters.status === 'archived'
                 ? 'bg-gray-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
             }`}
           >
             已封存
@@ -109,7 +109,7 @@ export default function PatternFilters() {
       
       {/* 案例 ID 搜尋 */}
       <div>
-        <label className="block text-sm font-semibold mb-2">案例 ID</label>
+        <label className="block text-sm font-bold mb-2 text-gray-800">案例 ID</label>
         <div className="flex gap-2">
           <input
             type="text"
@@ -117,25 +117,25 @@ export default function PatternFilters() {
             onChange={(e) => setCaseIdInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleApplyCaseId()}
             placeholder="輸入案例 ID 搜尋"
-            className="flex-1 px-3 py-2 border rounded text-sm"
+            className="flex-1 px-3 py-2 border rounded text-sm text-gray-900 placeholder:text-gray-500"
           />
           <button
             onClick={handleApplyCaseId}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-semibold"
           >
             搜尋
           </button>
         </div>
         {filters.case_id && (
-          <p className="text-xs text-gray-500 mt-1">
-            目前搜尋: <span className="font-semibold">{filters.case_id}</span>
+          <p className="text-xs text-gray-700 mt-1">
+            目前搜尋: <span className="font-bold text-gray-900">{filters.case_id}</span>
           </p>
         )}
       </div>
       
       {/* 標籤篩選 */}
       <div>
-        <label className="block text-sm font-semibold mb-2">標籤</label>
+        <label className="block text-sm font-bold mb-2 text-gray-800">標籤</label>
         <div className="flex gap-2 mb-2">
           <input
             type="text"
@@ -143,11 +143,11 @@ export default function PatternFilters() {
             onChange={(e) => setTagInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
             placeholder="輸入標籤篩選"
-            className="flex-1 px-3 py-2 border rounded text-sm"
+            className="flex-1 px-3 py-2 border rounded text-sm text-gray-900 placeholder:text-gray-500"
           />
           <button
             onClick={handleAddTag}
-            className="px-4 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300"
+            className="px-4 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300 font-semibold text-gray-900"
           >
             新增
           </button>
@@ -157,11 +157,11 @@ export default function PatternFilters() {
         {filters.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {filters.tags.map(tag => (
-              <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm flex items-center gap-2">
+              <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-900 rounded-full text-sm font-semibold flex items-center gap-2">
                 {tag}
                 <button
                   onClick={() => handleRemoveTag(tag)}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-blue-700 hover:text-blue-900 font-bold text-base"
                 >
                   ×
                 </button>
@@ -172,7 +172,7 @@ export default function PatternFilters() {
       </div>
       
       {/* 篩選結果統計 */}
-      <div className="pt-3 border-t text-sm text-gray-500">
+      <div className="pt-3 border-t text-sm text-gray-700 font-medium">
         {filters.status !== undefined && <p>✓ 狀態篩選已啟用</p>}
         {filters.case_id && <p>✓ 案例 ID 搜尋已啟用</p>}
         {filters.tags.length > 0 && <p>✓ 標籤篩選已啟用 ({filters.tags.length} 個)</p>}
