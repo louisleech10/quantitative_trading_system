@@ -27,11 +27,9 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import MultiIndicatorConfig from '@/components/optimization/MultiIndicatorConfig'
-import { createPattern } from '@/lib/api/patternApi'
-import Link from 'next/link'
 import { 
   Play, CheckCircle, AlertCircle, Loader2, Database, 
-  TrendingUp, List, Brain, CheckSquare, Square, Info, Save, Trash2
+  TrendingUp, List, Brain, CheckSquare, Square, Info
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -498,44 +496,13 @@ function DecisionRulesCard({ rules }: { rules: DecisionRule[] }) {
   )
 }
 
-function AnalysisResultView({ 
-  result, 
-  onSave, 
-  onClear 
-}: { 
-  result: AnalysisResult
-  onSave?: () => void
-  onClear?: () => void
-}) {
+function AnalysisResultView({ result }: { result: AnalysisResult }) {
   return (
     <div className="space-y-6">
       {/* 摘要資訊 */}
       <Card className="bg-white border-gray-200">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3">
           <CardTitle className="text-lg text-gray-900">分析摘要</CardTitle>
-          <div className="flex gap-2">
-            {onSave && (
-              <Button 
-                onClick={onSave}
-                size="sm"
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Save className="w-4 h-4 mr-1" />
-                儲存分析
-              </Button>
-            )}
-            {onClear && (
-              <Button 
-                onClick={onClear}
-                size="sm"
-                variant="outline"
-                className="border-red-300 text-red-600 hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                清除結果
-              </Button>
-            )}
-          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
@@ -582,7 +549,6 @@ function AnalysisResultView({
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {result.feature_names.map(name => (
-  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
               <Badge key={name} variant="outline" className="font-mono text-xs text-gray-800">
                 {name}
               </Badge>
@@ -701,72 +667,7 @@ export default function XGBoostAnalysisPage() {
       setIsLoading(false)
     }
   }
-const handleSavePattern = async () => {
-    if (!result) return
-    
-    try {
-      setSaveSuccess(null)
-      const rules = result.decision_rules.map(rule => ({
-        condiv className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">XGBoost 批量分析</h1>
-              <p className="text-gray-600 mt-1">
-                使用指標配置對所有案例進行機器學習分析，發現獲利模式
-              </p>
-            </div>
-            <Link 
-              href="/patterns" 
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              📊 查看所有模式
-            </Link>
-          </div rule.lift,
-        feature_conditions: []
-      }))
-      
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-      const patternName = `XGBoost-${result.symbol}-${result.timeframe}-${timestamp}`
-      
-      await createPattern({
-        name: patternName,
-        description: `特徵數: ${result.features_generated}, AUC: ${result.model_performance.cv_auc_mean.toFixed(4)}`,
-        rules: rules,
-        xgboost_importance: result.feature_importance.map(fi => ({
-          feature: fi.feature,
-          importance: fi.importance,
-          rank: fi.rank,
-          method: fi.method
-        })),
-        performance_metrics: result.model_performance,
-        tags: ['xgboost', result.symbol, result.timeframe],
-        metadata: {
-          total_cases: result.total_cases,
-          valid_cases: result.valid_cases,
-          positive_cases: result.positive_cases,
-          negative_cases: result.negative_cases,
-          features_generated: result.features_generated,
-          model_saved: result.model_saved,
-          analysis_timestamp: timestamp
-        }
-      })
-      
-      setSaveSuccess(`✅ 分析已儲存為: ${patternName}`)
-      setTimeout(() => setSaveSuccess(null), 5000)
-    } catch (error: any) {
-      setError(error.message || '儲存失敗')
-    }
-  }
 
-  const handleClearResult = () => {
-    if (confirm('確定要清除當前結果？')) {
-      setResult(null)
-      setTaskStatus(null)
-      setTaskId(null)
-      setSaveSuccess(null)
-    }
-  }
-
-  
   return (
     <div className="min-h-screen bg-white">
       {/* 頁面標題 */}
@@ -917,17 +818,6 @@ const handleSavePattern = async () => {
                 <AlertDescription className="text-red-900 font-medium">{error}</AlertDescription>
               </Alert>
             )}
-
-            {/* 成功訊息 */}
-            {saveSuccess && (
-              <Alert className="bg-green-50 border-green-300">
-                <CheckCircle className="w-4 h-4 text-green-700" />
-                <AlertDescription className="text-green-900 font-medium">
-                  {saveSuccess}
-                  <Link href="/patterns" className="ml-2 underline">前往查看</Link>
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
 
           {/* 右側：結果面板 */}
@@ -936,7 +826,7 @@ const handleSavePattern = async () => {
             {taskStatus && <TaskProgressCard task={taskStatus} />}
 
             {/* 分析結果 */}
-            {result && <AnalysisResultView result={result} onSave={handleSavePattern} onClear={handleClearResult} />}
+            {result && <AnalysisResultView result={result} />}
 
             {/* 空狀態 */}
             {!result && !taskStatus && (
