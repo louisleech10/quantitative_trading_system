@@ -18,7 +18,7 @@ const API_PREFIX = '/api/v1';
 // ===== Pattern Management API =====
 
 export async function createPattern(request: CreatePatternRequest): Promise<{ success: boolean; pattern_id?: string; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/define`, {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/define`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
@@ -33,7 +33,7 @@ export async function createPattern(request: CreatePatternRequest): Promise<{ su
 }
 
 export async function getPattern(patternId: string): Promise<{ success: boolean; pattern?: Pattern; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/${patternId}`);
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/${patternId}`);
   
   if (!response.ok) {
     const error = await response.text();
@@ -54,7 +54,7 @@ export async function listPatterns(
   if (caseId) params.append('case_id', caseId);
   
   const response = await fetch(
-    `${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/list?${params.toString()}`
+    `${API_BASE_URL}${API_PREFIX}/patterns/list?${params.toString()}`
   );
   
   if (!response.ok) {
@@ -68,7 +68,7 @@ export async function updatePattern(
   patternId: string,
   request: UpdatePatternRequest
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/${patternId}`, {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/${patternId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request)
@@ -83,7 +83,7 @@ export async function updatePattern(
 }
 
 export async function deletePattern(patternId: string): Promise<{ success: boolean; message?: string; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/${patternId}`, {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/${patternId}`, {
     method: 'DELETE'
   });
   
@@ -107,7 +107,7 @@ export async function deleteAllPatterns(): Promise<{ success: boolean; message?:
   return response.json();
 }
 export async function getPatternSummary(patternId: string): Promise<{ success: boolean; summary?: PatternSummary; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/${patternId}/summary`);
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/${patternId}/summary`);
   
   if (!response.ok) {
     throw new Error('Failed to fetch pattern summary');
@@ -117,7 +117,7 @@ export async function getPatternSummary(patternId: string): Promise<{ success: b
 }
 
 export async function getPatternStatistics(): Promise<{ success: boolean; statistics?: PatternStatistics; error?: string }> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/statistics`);
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/statistics`);
   
   if (!response.ok) {
     throw new Error('Failed to fetch pattern statistics');
