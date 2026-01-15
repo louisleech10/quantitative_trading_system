@@ -24,8 +24,7 @@ export default function PatternList() {
     patterns,
     setPatterns,
     selectPattern,
-    filterStatus,
-    filterTags,
+    filters,
     getFilteredPatterns
   } = usePatternStore();
   
@@ -35,7 +34,7 @@ export default function PatternList() {
   // 載入模式列表
   useEffect(() => {
     loadPatterns();
-  }, [filterStatus, filterTags]);
+  }, [filters.status, filters.tags]);
   
   const loadPatterns = async () => {
     setLoading(true);
@@ -43,8 +42,8 @@ export default function PatternList() {
     
     try {
       const response = await listPatterns(
-        filterStatus || undefined,
-        filterTags.length > 0 ? filterTags : undefined
+        filters.status || undefined,
+        filters.tags.length > 0 ? filters.tags : undefined
       );
       
       if (response.success) {
