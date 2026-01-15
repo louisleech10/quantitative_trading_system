@@ -295,6 +295,35 @@ class PatternManagementService:
                 'error': str(e)
             }
     
+    def delete_all_patterns(self) -> Dict:
+        """
+        刪除所有模式
+        
+        Returns:
+            刪除結果
+        """
+        try:
+            patterns = self.storage.get_all_patterns()
+            deleted_count = 0
+            
+            for pattern in patterns:
+                if self.storage.delete_pattern(pattern.pattern_id):
+                    deleted_count += 1
+            
+            self.logger.info(f"批量刪除完成 - 共刪除 {deleted_count} 個模式")
+            return {
+                'success': True,
+                'message': f'已刪除 {deleted_count} 個模式',
+                'deleted_count': deleted_count
+            }
+            
+        except Exception as e:
+            self.logger.error(f"批量刪除失敗: {str(e)}", exc_info=True)
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
     def get_pattern_summary(self, pattern_id: str) -> Dict:
         """獲取模式摘要"""
         try:

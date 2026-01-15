@@ -158,3 +158,18 @@ async def delete_pattern(pattern_id: str):
     except Exception as e:
         logger.error(f"刪除模式失敗: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/batch/delete-all")
+async def delete_all_patterns():
+    """刪除所有模式"""
+    try:
+        result = pattern_service.delete_all_patterns()
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=result.get("error"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"刪除所有模式失敗: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

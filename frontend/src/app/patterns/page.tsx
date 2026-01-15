@@ -9,12 +9,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePatternStore } from '@/store/patternStore';
-import { listPatterns } from '@/lib/api/patternApi';
+import { listPatterns, deleteAllPatterns } from '@/lib/api/patternApi';
 import PatternList from '@/components/pattern/PatternList';
 import PatternFilters from '@/components/pattern/PatternFilters';
 import PatternStatistics from '@/components/pattern/PatternStatistics';
 import PatternComparison from '@/components/pattern/PatternComparison';
 import Link from 'next/link';
+import { Trash2 } from 'lucide-react';
 
 type TabType = 'list' | 'statistics' | 'comparison';
 
@@ -38,6 +39,20 @@ export default function PatternsPage() {
       setLoading(false);
     }
   };
+
+  const handleDeleteAll = async () => {
+    if (!confirm('確定要刪除所有模式？此操作無法復原！')) return;
+    
+    try {
+      const result = await deleteAllPatterns();
+      if (result.success) {
+        alert(`✅ ${result.message}`);
+        loadPatterns(); // 重新載入
+      }
+    } catch (error: any) {
+      alert('❌ 刪除失敗: ' + (error.message || '未知錯誤'));
+    }
+  };
   
   return (
     <div className="min-h-screen bg-white">
@@ -56,12 +71,15 @@ export default function PatternsPage() {
               >
                 🧠 XGBoost 分析
               </Link>
-              <Link
-                href="/patterns/create"
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700"
-              >
-                + 建立新樣式
-              </Link>
+              {patterns.length > 0 && (
+                <button
+                  onClick={handleDeleteAll}
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  全部刪除
+                </button>
+              )}
             </div>
           </div>
         </div>

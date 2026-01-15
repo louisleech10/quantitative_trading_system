@@ -94,7 +94,18 @@ export async function deletePattern(patternId: string): Promise<{ success: boole
   
   return response.json();
 }
-
+export async function deleteAllPatterns(): Promise<{ success: boolean; message?: string; deleted_count?: number; error?: string }> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/batch/delete-all`, {
+    method: 'DELETE'
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error);
+  }
+  
+  return response.json();
+}
 export async function getPatternSummary(patternId: string): Promise<{ success: boolean; summary?: PatternSummary; error?: string }> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-management/patterns/${patternId}/summary`);
   
