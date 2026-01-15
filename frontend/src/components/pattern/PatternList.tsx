@@ -153,35 +153,35 @@ function PatternCard({
     >
       {/* 標題與狀態 */}
       <div className="flex justify-between items-start mb-2">
-        <h3 className="font-bold text-lg truncate flex-1">{pattern.name}</h3>
-        <span className={`text-xs px-2 py-1 rounded ${statusColors[pattern.status]}`}>
+        <h3 className="font-bold text-lg truncate flex-1 text-gray-900">{pattern.name}</h3>
+        <span className={`text-xs px-2 py-1 rounded font-semibold ${statusColors[pattern.status]}`}>
           {pattern.status}
         </span>
       </div>
       
       {/* 描述 */}
-      <p className="text-sm text-gray-700 mb-3 line-clamp-2">
+      <p className="text-sm text-gray-800 mb-3 line-clamp-2 leading-relaxed">
         {pattern.description}
       </p>
       
       {/* 規則數量 */}
-      <div className="text-sm text-gray-700 mb-3">
-        規則數: <span className="font-semibold text-gray-900">{pattern.rules.length}</span>
+      <div className="text-sm text-gray-800 mb-3">
+        規則數: <span className="font-bold text-gray-900">{pattern.rules.length}</span>
       </div>
       
       {/* 效能指標 */}
       <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
         <div className="text-center">
-          <div className="text-gray-600 font-medium">Precision</div>
-          <div className="font-semibold text-gray-900">{(pattern.performance_metrics.precision * 100).toFixed(1)}%</div>
+          <div className="text-gray-700 font-semibold">Precision</div>
+          <div className="font-bold text-gray-900">{(pattern.performance_metrics.precision * 100).toFixed(1)}%</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-600 font-medium">Recall</div>
-          <div className="font-semibold text-gray-900">{(pattern.performance_metrics.recall * 100).toFixed(1)}%</div>
+          <div className="text-gray-700 font-semibold">Recall</div>
+          <div className="font-bold text-gray-900">{(pattern.performance_metrics.recall * 100).toFixed(1)}%</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-600 font-medium">F1</div>
-          <div className="font-semibold text-gray-900">{(pattern.performance_metrics.f1_score * 100).toFixed(1)}%</div>
+          <div className="text-gray-700 font-semibold">F1</div>
+          <div className="font-bold text-gray-900">{(pattern.performance_metrics.f1_score * 100).toFixed(1)}%</div>
         </div>
       </div>
       
@@ -189,12 +189,12 @@ function PatternCard({
       {pattern.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
           {pattern.tags.slice(0, 3).map(tag => (
-            <span key={tag} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
+            <span key={tag} className="text-xs bg-blue-100 text-blue-900 px-2 py-1 rounded font-semibold">
               {tag}
             </span>
           ))}
           {pattern.tags.length > 3 && (
-            <span className="text-xs text-gray-700 font-medium">+{pattern.tags.length - 3}</span>
+            <span className="text-xs text-gray-800 font-semibold">+{pattern.tags.length - 3}</span>
           )}
         </div>
       )}
