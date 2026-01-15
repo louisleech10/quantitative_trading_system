@@ -17,6 +17,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,9 +28,11 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Progress } from '@/components/ui/progress'
 import MultiIndicatorConfig from '@/components/optimization/MultiIndicatorConfig'
+import { createPattern } from '@/lib/api/patternApi'
+import type { CreatePatternRequest } from '@/lib/patternTypes'
 import { 
   Play, CheckCircle, AlertCircle, Loader2, Database, 
-  TrendingUp, List, Brain, CheckSquare, Square, Info
+  TrendingUp, List, Brain, CheckSquare, Square, Info, Save
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -564,6 +567,7 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
 
 export default function XGBoostAnalysisPage() {
   // State
+  const router = useRouter()
   const [caseSummary, setCaseSummary] = useState<CaseSummary | null>(null)
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([])
   const [klineTimeframe, setKlineTimeframe] = useState<string>('12h')
@@ -576,6 +580,11 @@ export default function XGBoostAnalysisPage() {
   const [taskStatus, setTaskStatus] = useState<TaskStatus | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  
+  // Save pattern state
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [savedPatternId, setSavedPatternId] = useState<string | null>(null)
 
   // Load case summary on mount
   useEffect(() => {
@@ -627,6 +636,70 @@ export default function XGBoostAnalysisPage() {
     }
   }
 
+  const handleSavePattern = async () => {
+    if (!result) return
+
+    setIsSaving(true)
+    setError(null)
+    setSaveSuccess(false)
+
+    try {
+      // 將分析結果轉換為 Pattern 格式
+      const request: CreatePatternRequest = {
+        name: `XGBoost_${result.symbol}_${result.timeframe}_${new Date().toISOString().split('T')[0]}`,
+        description: `XGBoost 分析結果 - ${result.symbol} ${result.timeframe}\n` +
+                     `有效案例: ${result.valid_cases}/${result.total_cases}\n` +
+                     `正樣本: ${result.positive_cases}, 負樣本: ${result.negative_cases}\n` +
+                     `AUC: ${result.model_performance.cv_auc_mean.toFixed(4)} ± ${result.model_performance.cv_auc_std.toFixed(4)}\n` +
+                     `F1: ${result.model_performance.f1_score.toFixed(4)}`,
+        rules: result.decision_rules.slice(0, 10).map(rule => ({
+          feature: rule.condition.split(' ')[0] || 'unknown',
+          operator: '>=',
+          threshold: rule.confidence,
+          description: rule.condition
+        })),
+        case_id: `${result.symbol}_${result.timeframe}`,
+        xgboost_importance: result.feature_importance.reduce((acc, feat) => {
+          acc[feat.feature] = feat.importance
+          return acc
+        }, {} as Record<string, number>),
+        performance_metrics: {
+          precision: result.model_performance.precision,
+          recall: result.model_performance.recall,
+          f1_score: result.model_performance.f1_score,
+          train_auc: result.model_performance.train_auc,
+          cv_auc_mean: result.model_performance.cv_auc_mean,
+          cv_auc_std: result.model_performance.cv_auc_std
+        },
+        tags: ['xgboost', result.symbol, result.timeframe, 'auto-generated'],
+        metadata: {
+          total_cases: result.total_cases,
+          valid_cases: result.valid_cases,
+          features_generated: result.features_generated,
+          feature_names: result.feature_names,
+          model_saved: result.model_saved,
+          model_path: result.model_path,
+          created_from: 'xgboost-analysis-page'
+        }
+      }
+
+      const response = await createPattern(request)
+      
+      if (response.success) {
+        setSaveSuccess(true)
+        setSavedPatternId(response.pattern_id || null)
+        // 3秒後自動隱藏成功訊息
+        setTimeout(() => setSaveSuccess(false), 3000)
+      } else {
+        setError(response.error || '儲存樣式失敗')
+      }
+    } catch (e: any) {
+      setError(e.message || '儲存樣式失敗')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleStartAnalysis = async () => {
     if (selectedSymbols.length === 0) {
       setError('請至少選擇一個交易對')
@@ -641,6 +714,8 @@ export default function XGBoostAnalysisPage() {
     setError(null)
     setResult(null)
     setTaskStatus(null)
+    setSaveSuccess(false)
+    setSavedPatternId(null)
 
     try {
       // 目前 API 只支援單一 symbol，取第一個
@@ -824,6 +899,58 @@ export default function XGBoostAnalysisPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* 任務進度 */}
             {taskStatus && <TaskProgressCard task={taskStatus} />}
+
+            {/* 儲存成功訊息 */}
+            {saveSuccess && (
+              <Alert className="bg-green-50 border-green-300">
+                <CheckCircle className="w-4 h-4 text-green-700" />
+                <AlertDescription className="text-green-900 font-medium flex items-center justify-between">
+                  <span>樣式已成功儲存！</span>
+                  {savedPatternId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push('/patterns')}
+                      className="ml-4 border-green-600 text-green-700 hover:bg-green-100"
+                    >
+                      前往樣式管理
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* 儲存按鈕 */}
+            {result && !saveSuccess && (
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleSavePattern}
+                  disabled={isSaving}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  size="lg"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      儲存中...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      儲存為樣式
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/patterns')}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                  size="lg"
+                >
+                  前往樣式管理
+                </Button>
+              </div>
+            )}
 
             {/* 分析結果 */}
             {result && <AnalysisResultView result={result} />}
