@@ -9,7 +9,7 @@ Date: 2026-01-10
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass
 import logging
 
@@ -92,8 +92,9 @@ class XGBoostAnalyzer:
     
     def train_model(
         self,
-        X: pd.DataFrame,
+        X: Union[pd.DataFrame, np.ndarray],
         y: np.ndarray,
+        feature_names: Optional[List[str]] = None,
         early_stopping_rounds: int = 10,
         eval_size: float = 0.2,
         xgboost_params: Optional[Dict] = None
@@ -102,8 +103,9 @@ class XGBoostAnalyzer:
         訓練 XGBoost 模型
         
         Args:
-            X: 特徵矩陣 (n_samples, n_features)
+            X: 特徵矩陣 (n_samples, n_features) - 可以是 DataFrame 或 numpy array
             y: 標籤數組 (n_samples,) - 1=盈利, 0=虧損
+            feature_names: 特徵名稱列表（當 X 是 numpy array 時必須提供）
             early_stopping_rounds: Early stopping 輪數
             eval_size: 驗證集比例
             xgboost_params: 自訂 XGBoost 參數（可選）
@@ -111,8 +113,13 @@ class XGBoostAnalyzer:
         Returns:
             ModelPerformance 物件
         """
-        # 儲存特徵名稱
-        self.feature_names = X.columns.tolist()
+        # 儲存特徵名稱（支援 DataFrame 和 numpy array）
+        if isinstance(X, pd.DataFrame):
+            self.feature_names = X.columns.tolist()
+        elif feature_names is not None:
+            self.feature_names = feature_names
+        else:
+            raise ValueError("當 X 是 numpy array 時，必須提供 feature_names 參數")
         
         self.logger.info(
             f"開始訓練 XGBoost 模型 - 樣本數: {len(X)}, 特徵數: {len(self.feature_names)}"
@@ -259,9 +266,15 @@ class XGBoostAnalyzer:
         cv_f1_scores = []
         
         for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-            X_train_fold = X.iloc[train_idx]
+            # 支援 DataFrame 和 numpy array
+            if isinstance(X, pd.DataFrame):
+                X_train_fold = X.iloc[train_idx]
+                X_val_fold = X.iloc[val_idx]
+            else:
+                X_train_fold = X[train_idx]
+                X_val_fold = X[val_idx]
+            
             y_train_fold = y[train_idx]
-            X_val_fold = X.iloc[val_idx]
             y_val_fold = y[val_idx]
             
             # 訓練模型

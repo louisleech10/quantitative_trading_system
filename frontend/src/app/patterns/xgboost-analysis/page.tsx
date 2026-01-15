@@ -347,8 +347,8 @@ function TaskProgressCard({ task }: { task: TaskStatus | null }) {
             </div>
           )}
           {task.error && (
-            <Alert variant="destructive">
-              <AlertDescription>{task.error}</AlertDescription>
+            <Alert variant="destructive" className="bg-red-50 border-red-300">
+              <AlertDescription className="text-red-900 font-medium">{task.error}</AlertDescription>
             </Alert>
           )}
         </div>
@@ -813,9 +813,9 @@ export default function XGBoostAnalysisPage() {
 
             {/* 錯誤訊息 */}
             {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="w-4 h-4" />
-                <AlertDescription>{error}</AlertDescription>
+              <Alert variant="destructive" className="bg-red-50 border-red-300">
+                <AlertCircle className="w-4 h-4 text-red-700" />
+                <AlertDescription className="text-red-900 font-medium">{error}</AlertDescription>
               </Alert>
             )}
           </div>

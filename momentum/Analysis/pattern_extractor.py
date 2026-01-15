@@ -9,7 +9,7 @@ Date: 2026-01-10
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass
 import logging
 
@@ -104,7 +104,7 @@ class PatternExtractor:
     def _extract_rules_from_trees(
         self,
         model: xgb.XGBClassifier,
-        X: pd.DataFrame,
+        X: Union[pd.DataFrame, np.ndarray],
         y: np.ndarray,
         feature_names: List[str],
         min_support: int
@@ -137,8 +137,15 @@ class PatternExtractor:
             if importance == 0:
                 continue
             
+            # 獲取特徵值（支援 DataFrame 和 numpy array）
+            if isinstance(X, pd.DataFrame):
+                feature_values = X[fname]
+            else:
+                # numpy array: 找到特徵索引
+                feature_idx = feature_names.index(fname)
+                feature_values = pd.Series(X[:, feature_idx])
+            
             # 計算該特徵的四分位數
-            feature_values = X[fname]
             q25, q50, q75 = feature_values.quantile([0.25, 0.5, 0.75])
             
             # 生成 3 條規則（> q25, > q50, > q75）
@@ -178,12 +185,22 @@ class PatternExtractor:
                     _, _, fname1 = top_features[i]
                     _, _, fname2 = top_features[j]
                     
+                    # 獲取特徵值（支援 DataFrame 和 numpy array）
+                    if isinstance(X, pd.DataFrame):
+                        feature1_values = X[fname1]
+                        feature2_values = X[fname2]
+                    else:
+                        feature1_idx = feature_names.index(fname1)
+                        feature2_idx = feature_names.index(fname2)
+                        feature1_values = pd.Series(X[:, feature1_idx])
+                        feature2_values = pd.Series(X[:, feature2_idx])
+                    
                     # 使用中位數
-                    threshold1 = X[fname1].quantile(0.5)
-                    threshold2 = X[fname2].quantile(0.5)
+                    threshold1 = feature1_values.quantile(0.5)
+                    threshold2 = feature2_values.quantile(0.5)
                     
                     # 組合條件
-                    mask = (X[fname1] > threshold1) & (X[fname2] > threshold2)
+                    mask = (feature1_values > threshold1) & (feature2_values > threshold2)
                     support = mask.sum()
                     
                     if support < min_support:

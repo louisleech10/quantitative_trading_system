@@ -31,6 +31,7 @@ import numpy as np
 from api.core.config import settings
 from api.core.logging import get_logger
 from api.utils.case_storage import get_case_storage_manager
+from api.utils.json_serializer import sanitize_for_json
 from api.services.kline_data_service import KlineDataService
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
@@ -166,7 +167,7 @@ class XGBoostBatchService:
         
         Args:
             symbol: 交易對
-            timeframe: 時間週期
+            timeframe: K線時間週期（用於計算指標，與案例搜尋週期無關）
             indicators: 指標配置列表
             lookback_bars: 每個案例回看 K 線數量
             xgboost_params: XGBoost 參數
@@ -177,12 +178,13 @@ class XGBoostBatchService:
         Returns:
             任務 ID 和狀態
         """
-        # 獲取符合條件的案例
+        # 獲取符合條件的案例（不過濾 timeframe，使用所有該交易對的案例）
         cases = self.case_storage.get_cases_by_symbol(symbol)
-        cases = [c for c in cases if c.timeframe == timeframe]
+        # 注意：timeframe 參數是 K線週期，用於下載數據計算指標
+        # 不需要過濾案例的 timeframe（案例可能是 12h 搜尋出來的，但用 1h K線分析）
         
         if not cases:
-            raise ValueError(f"找不到 {symbol} {timeframe} 的案例")
+            raise ValueError(f"找不到 {symbol} 的案例")
         
         task_id = str(uuid.uuid4())
         
@@ -236,7 +238,20 @@ class XGBoostBatchService:
             # ===== Step 1: 計算時間範圍 =====
             self.task_manager.update_progress(task_id, 5, '計算時間範圍', '分析案例時間範圍...')
             
-            timestamps = [c.timestamp for c in cases]
+            # 確保 timestamp 是整數（處理可能的 datetime 物件）
+            timestamps = []
+            for c in cases:
+                if isinstance(c.timestamp, int):
+                    timestamps.append(c.timestamp)
+                elif isinstance(c.timestamp, datetime):
+                    timestamps.append(int(c.timestamp.timestamp()))
+                else:
+                    self.logger.warning(f"Invalid timestamp type for case {c.case_id}: {type(c.timestamp)}")
+                    continue
+            
+            if not timestamps:
+                raise ValueError("沒有有效的時間戳")
+            
             min_ts = min(timestamps)
             max_ts = max(timestamps)
             
@@ -253,12 +268,17 @@ class XGBoostBatchService:
             # ===== Step 2: 讀取 K 線數據 =====
             self.task_manager.update_progress(task_id, 10, '讀取 K 線', f'從 HDF5 讀取 {symbol} K 線數據...')
             
+            # 將時間戳轉換為 datetime 物件（KlineDataService 需要 datetime）
+            from datetime import datetime
+            start_dt = datetime.utcfromtimestamp(start_ts)
+            end_dt = datetime.utcfromtimestamp(end_ts)
+            
             kline_df = await asyncio.to_thread(
                 self.kline_service.get_kline_data,
                 symbol=symbol,
                 timeframe=timeframe,
-                start_time=start_ts * 1000,  # 轉為毫秒
-                end_time=end_ts * 1000
+                start_time=start_dt,
+                end_time=end_dt
             )
             
             if kline_df is None or kline_df.empty:
@@ -320,11 +340,30 @@ class XGBoostBatchService:
             y_list = []
             valid_cases = 0
             
-            # 建立時間戳索引
-            all_features['timestamp_sec'] = (all_features['timestamp'] // 1000).astype(int)
+            # 建立時間戳索引（智能檢測毫秒 vs 秒）
+            if 'timestamp' not in all_features.columns:
+                raise ValueError("特徵 DataFrame 缺少 timestamp 欄位")
+            
+            # 檢查 timestamp 的單位（毫秒 > 10^12，秒 < 10^12）
+            sample_ts = all_features['timestamp'].iloc[0]
+            if sample_ts > 10**12:
+                # 毫秒級時間戳，需要除以 1000 轉換為秒
+                all_features['timestamp_sec'] = (all_features['timestamp'] // 1000).astype(int)
+                self.logger.info(f"檢測到毫秒級 timestamp，轉換為秒級")
+            else:
+                # 已經是秒級時間戳，直接使用
+                all_features['timestamp_sec'] = all_features['timestamp'].astype(int)
+                self.logger.info(f"檢測到秒級 timestamp，直接使用")
             
             for i, case in enumerate(cases):
-                case_ts = case.timestamp
+                # 確保 case_ts 是整數
+                if isinstance(case.timestamp, int):
+                    case_ts = case.timestamp
+                elif isinstance(case.timestamp, datetime):
+                    case_ts = int(case.timestamp.timestamp())
+                else:
+                    self.logger.warning(f"Invalid timestamp for case {case.case_id}")
+                    continue
                 
                 # 找到對應的行
                 idx = all_features[all_features['timestamp_sec'] == case_ts].index
@@ -370,7 +409,7 @@ class XGBoostBatchService:
             
             performance = await asyncio.to_thread(
                 self.xgboost_analyzer.train_model,
-                X, y, xgboost_params
+                X, y, all_feature_names, 10, 0.2, xgboost_params
             )
             
             self.logger.info(
@@ -434,6 +473,9 @@ class XGBoostBatchService:
                 'model_saved': True,
                 'model_path': model_path
             }
+            
+            # 清理 result 中的 numpy 類型，防止 JSON 序列化錯誤
+            result = sanitize_for_json(result)
             
             self.task_manager.update_status(task_id, 'completed', result=result)
             self.task_manager.update_progress(task_id, 100, '完成', '分析完成')

@@ -48,11 +48,11 @@ class EMAExtractor(BaseStrategyExtractor):
                 f"收到: short={short}, mid={mid}, long={long}"
             )
         
-        # 驗證 volume_threshold 範圍
+        # 驗證 volume_threshold 範圍（允許 0，表示不考慮成交量條件）
         volume_threshold = params['volume_threshold']
-        if not (0 < volume_threshold < 1):
+        if not (0 <= volume_threshold <= 1):
             raise ValueError(
-                f"volume_threshold 必須在 0-1 之間, 收到: {volume_threshold}"
+                f"volume_threshold 必須在 0-1 之間（含 0 和 1）, 收到: {volume_threshold}"
             )
     
     def extract(
