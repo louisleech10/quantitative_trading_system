@@ -169,6 +169,28 @@ class PatternStorage:
         
         return pattern_files
     
+    def get_all_patterns(self) -> List[Pattern]:
+        """
+        獲取所有模式的列表
+        
+        Returns:
+            Pattern 物件列表
+        """
+        patterns = []
+        
+        for file_info in self.list_pattern_files():
+            try:
+                pattern = self.load_pattern_from_json(file_info['pattern_id'])
+                patterns.append(pattern)
+            except Exception as e:
+                self.logger.error(
+                    f"載入模式失敗 - ID: {file_info['pattern_id']}, 錯誤: {str(e)}"
+                )
+        
+        self.logger.info(f"載入完成 - 共 {len(patterns)} 個模式")
+        
+        return patterns
+    
     def load_all_patterns(self) -> PatternLibrary:
         """
         載入所有模式至 PatternLibrary
