@@ -1,6 +1,6 @@
 # 項目狀態
 
-**最後更新**: 2026-01-15 23:30
+**最後更新**: 2026-01-17 00:30
 **當前階段**: XGBoost 分析儲存功能完成，Pattern Management 系統全面可用  
 **歷史歸檔**: 📚 [2025 Q3-Q4 歷史記錄](STATUS_ARCHIVE_2025_Q3Q4.md) _(2025-09-30 至 2025-11-30)_  
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
@@ -10,6 +10,11 @@
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **XGBoost 序列特徵與時間序列切分** (100%) - 2026-01-17完成
+  - ✅ 序列特徵：彙總/展平模式 + 多尺度窗口
+  - ✅ 時間序列切分：避免洩漏的訓練/驗證分割
+  - ✅ XGBoost 分析 UI 說明：性能/重要性/規則提示
+  - ✅ 單元測試：新增序列特徵與時間序列切分測試，7/7通過
 - **XGBoost 分析儲存功能與 UI 改善** (100%) - 2026-01-15晚間完成
   - ✅ XGBoost 分析結果儲存功能：handleSavePattern、createPattern API 整合
   - ✅ Pattern API 路徑 404 修復：8 個端點統一為 /patterns/*
@@ -176,6 +181,36 @@
   - ✅ XGBoost 分析頁面 UI 完成
   - ✅ JSON 序列化問題修復
   - 📋 待測：完整端到端工作流程、模型效能指標展示
+
+## 🎯 當前重點
+- XGBoost 序列特徵（彙總/展平）與時間序列切分已完成，準備進入真實案例驗證
+
+### 下一步工作
+- 以 2021-2022/2023 分檔進行時間序列驗證與策略回測比對
+- 驗證展平模式在多時間尺度下的效能與資源消耗
+
+## 🐛 已知問題
+
+### 需要修復
+- 無新增（本次測試通過）
+
+### 需要優化
+- 測試輸出仍有環境警告（pydantic/urllib3），功能不受影響
+
+### 技術債務
+- 部分既有測試仍使用 return 而非 assert（PytestReturnNotNoneWarning）
+
+## 📝 最近完成的工作
+- 2026-01-17：XGBoost 序列特徵（彙總/展平）與時間序列切分完成
+- 2026-01-17：模型性能/特徵重要性/決策規則說明加入 UI
+- 2026-01-17：新增序列特徵與時間序列切分測試，7/7 通過
+
+## 🔄 Git狀態
+- main 分支，與遠端同步（2026-01-17）
+- 最新提交：XGBoost 序列特徵與時間序列切分、測試與狀態更新
+
+## 💡 下次啟動時
+- 以真實案例驗證序列模式表現與時間序列切分效果
 
 ### 剛完成 🔧
 - **策略測試多交易對選擇器** (2026-01-08)
@@ -2949,115 +2984,13 @@ for case in candidates:
 ---
 
 ## 🔄 Git狀態
-
 **當前分支**: main
 **主分支**: main
-**遠端同步**: ✅ 已同步（2026-01-15 23:30）
+**遠端同步**: ✅ 已同步（2026-01-17）
 
-**最新提交**（7個commits, 2026-01-15）：
-- 45f8705: feat: 實作XGBoost分析儲存為樣式功能
-- 4e86b96: fix: 修正Pattern API路徑404錯誤
-- 1cd922d: fix: 修正PatternList組件store屬性讀取錯誤
-- e638b54: feat: 將XGBoost分析結果整合到Zustand store實現持久化
-- fd00ea0: fix: 修正PatternStorage get_all_patterns方法支援全部刪除
-- 2794865: style: 改善Pattern卡片UI文字顏色可讀性
-- 9f161a2: style: 全面改善PatternFilters UI文字可讀性
+**最新提交**：XGBoost 序列特徵與時間序列切分、測試與狀態更新
 
-**已完成推送**（2026-01-12）：
-- PHASE4_TESTING_GUIDE.md v2.0.0 改寫
-- STATUS.md 狀態更新
-
-**待提交變更** (2026-01-10):
-- **Pattern Discovery UI 修復**
-  - frontend/src/store/patternStore.ts - filters 嵌套結構修復
-  - frontend/src/components/layout/MainLayout.tsx - 導航選單新增
-  - api/routes/pattern_management.py - 路由順序修復（重建檔案）
-
-**待提交變更** (2026-01-08):
-- **Optuna快取系統優化**
-  - config/strategies.yaml - is_cacheable標記
-  - momentum/Analysis/strategy_cache_registry.py - 策略註冊機制（新建）
-  - momentum/Analysis/indicator_cache.py - 記憶體自動偵測+Lock
-  - momentum/Analysis/signal_density_analyzer.py - 移除硬編碼檢查
-  - momentum/Optimization/optuna_optimizer.py - 動態週期收集+資源清理
-  - docs/indicator_exte 22:30）：
-   - ✅ **策略測試多交易對選擇器**（完整實作）
-     - useAvailableSymbols Hook：動態載入交易對
-     - SymbolMultiSelect組件：多選UI含搜尋、全選、清空
-     - 狀態遷移：Zustand v2自動轉換舊資料
-     - 防禦性程式設計：optional chaining、Array檢查、自動修復
-     - 前端建置成功：28.9 kB，TypeScript無錯誤
-
-2. **已完成工作**（2026-01-08 21:12nsion_guide.md - 步驟8註冊說明
-  - docs/indicator_api_usage.md - 快取系統文檔
-  - tests/test_optuna_cache_fixes.py - 17個單元測試（新建）
-  - .github/STATUS.md - 狀態更新
-
-**待提交變更** (2026-01-03):
-- **Optuna CSV導出增強與文檔更新**
-  - docs/indicator_extension_guide.md - CSV導出說明（L833-848）
-  - docs/indicator_api_usage.md - Optuna優化整合章節更新
-  - .claude/STATUS.md - 狀態更新
-
-**待提交變更** (2025-12-25):
-- **Golden Formula v2.0 M值優化系統**
-  - frontend/src/app/strategy-test/page.tsx - M值卡片顯示與density_metrics修復
-  - momentum/Analysis/signal_density_analyzer.py - M Separation CV計算方法
-  - api/models/training_window_config.py - m_separation_cv欄位
-  - momentum/Optimization/result_analyzer.py - 穩定性分析改用M Separation
-  - momentum/Optimization/optuna_optimizer.py - Study存儲case lists
-  - frontend/src/components/optimization-results/StabilityChart.tsx - 標籤更新
-  - .claude/STATUS.md - 狀態更新
-
-**待提交變更** (2025-12-20):
-- **Optuna優化系統增強：統計數據展示**
-  - momentum/Optimization/optuna_optimizer.py - Trial統計數據存儲（user_attrs）
-  - frontend/src/components/optimization-results/TrialRankingTable.tsx - CSV匯出與顏色標識
-  - docs/Optuna 參數優化系統文檔.md - 新增系統文檔
-  - .claude/STATUS.md - 狀態更新
-- **Optuna優化系統完善**
-  - momentu
-
-**優先任務**
-1. 驗證Study初始化修復（重新運行優化任務）
-2. 確認Overall M Separation一致性（0.1392 vs 0.1392）
-3. 推送Git提交並繼續PHASE4測試
-
-**提醒事項**
-- 舊優化任務會使用等權重（發出警告但正常運行）
-- 新優化任務會使用真實權重（加權平均）
-- 需要重新運行優化才能驗證修復
-
-m/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueError）
-  - momentum/Analysis/strategies/three_line_strategy.py - 業務邏輯約束移除
-  - frontend/src/components/ui/select.tsx - Select組件衝突修復
-  - frontend/src/app/strategy-test/page.tsx - CustomSelect使用
-  - frontend/src/components/optimization-results/BestResultCard.tsx - 目標值計算說明
-
-**待提交變更** (2025-12-16):
-- **PHASE4 測試案例3：參數重要性圖表修復**
-  - frontend/src/app/optimization-result/[taskId]/page.tsx - API解析修復
-  - frontend/src/components/ui/select.tsx - Radix UI Select組件
-  - frontend/src/components/optimization-results/ParamHeatmap.tsx - 可見性優化+閱讀指南
-  - frontend/src/components/optimization-results/ParamImportanceChart.tsx - fANOVA說明
-  - requirements.txt - scikit-learn依賴（已安裝）
-
-**待提交變更** (2025-12-11):
-- **Optuna vs 單參數測試一致性修復**
-  - momentum/Analysis/signal_density_analyzer.py - 注入 indicator_type/data_source
-  - frontend/src/app/strategy-test/page.tsx - 窗口描述動態化
-  - frontend/src/components/ui/StatMetricCard.tsx - null 處理
-  - test_density_comparison.py - 一致性驗證腳本
-  - api/services/signal_analysis_service.py - 最小案例數降至1
-
-**已提交變更** (2025-12-09~10):
-- **Optuna 參數範圍與用戶選擇尊重**
-  - momentum/Optimization/optuna_optimizer.py - indicator_types 字段
-  - frontend/src/app/strategy-test/page.tsx - indicator_types 傳遞
-  - config/strategies.yaml - 移除 SMA 聲明
-  - api/services/optimization_task_service.py - n_trials 屬性修復
-- **Far=0 統計透明化與狀態持久化** (2025-12-06)
-  - momentum/Analysis/signal_density_analyzer.py - NaN 錯誤修復
+**狀態**：工作目錄乾淨
   - frontend/src/store/strategyTestStore.ts - 新建 Zustand 持久化 store
   - frontend/src/app/strategy-test/page.tsx - 整合持久化 store
 - **EMA 計算與顯示修復** (2025-12-06)
@@ -3095,16 +3028,10 @@ m/Optimization/optuna_optimizer.py - Pruning語義修復（TrialPruned→ValueEr
 ---
 
 ## 💡 下次啟動時
+- 以真實案例驗證序列模式與時間序列切分效果
+（以下為歷史紀錄）
 
-**立即檢查**（2026-01-16）：
-1. Pattern Discovery完整流程測試：XGBoost分析→儲存→管理→編輯
-2. 驗證Pattern評估指標顯示正確性
-3. 測試多個分析結果的儲存與比較功能
-4. 收集用戶對整體工作流程的回饋
-
-**上次完成**（2026-01-15）：
-
-1. **已完成工作**（2026-01-12 23:15）：
+---
    - ✅ **PHASE4_TESTING_GUIDE.md v2.0.0 改寫完成**
      - 移除所有程式碼範例（90+ code blocks）
      - 轉換為純操作指引格式

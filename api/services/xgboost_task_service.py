@@ -150,6 +150,7 @@ class XGBoostTaskService:
                 raise ValueError("特徵數據缺少 label 欄位")
             
             y = df['label'].values
+            timestamps = df['timestamp'].values if 'timestamp' in df.columns else None
             X = df.drop(columns=['label', 'open_time'], errors='ignore')
             feature_names = X.columns.tolist()
             
@@ -162,7 +163,14 @@ class XGBoostTaskService:
             
             performance = await asyncio.to_thread(
                 self.xgboost_analyzer.train_model,
-                X, y, xgboost_params
+                X, y,
+                feature_names,
+                10,
+                0.2,
+                xgboost_params,
+                cv_folds,
+                True,
+                timestamps
             )
             
             self.logger.info(

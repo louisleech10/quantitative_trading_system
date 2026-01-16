@@ -97,7 +97,10 @@ class XGBoostAnalyzer:
         feature_names: Optional[List[str]] = None,
         early_stopping_rounds: int = 10,
         eval_size: float = 0.2,
-        xgboost_params: Optional[Dict] = None
+        xgboost_params: Optional[Dict] = None,
+        cv_folds: int = 5,
+        time_series_split: bool = False,
+        timestamps: Optional[List[int]] = None
     ) -> ModelPerformance:
         """
         訓練 XGBoost 模型
@@ -138,10 +141,31 @@ class XGBoostAnalyzer:
             raise ValueError(f"標籤只有一個類別: {unique}，無法訓練二分類模型")
         
         # 分割訓練集和驗證集
-        from sklearn.model_selection import train_test_split
-        X_train, X_val, y_train, y_val = train_test_split(
-            X, y, test_size=eval_size, random_state=42, stratify=y
-        )
+        if time_series_split:
+            if timestamps is None:
+                order = np.arange(len(y))
+            else:
+                order = np.argsort(np.array(timestamps))
+
+            if isinstance(X, pd.DataFrame):
+                X_sorted = X.iloc[order]
+            else:
+                X_sorted = X[order]
+            y_sorted = y[order]
+
+            split_idx = int(len(y_sorted) * (1 - eval_size))
+            if split_idx < 1 or split_idx >= len(y_sorted):
+                raise ValueError("時間序列切分比例不合理，請調整 eval_size")
+
+            X_train = X_sorted[:split_idx]
+            X_val = X_sorted[split_idx:]
+            y_train = y_sorted[:split_idx]
+            y_val = y_sorted[split_idx:]
+        else:
+            from sklearn.model_selection import train_test_split
+            X_train, X_val, y_train, y_val = train_test_split(
+                X, y, test_size=eval_size, random_state=42, stratify=y
+            )
         
         self.logger.info(
             f"訓練集: {len(X_train)} 樣本, 驗證集: {len(X_val)} 樣本"
@@ -163,7 +187,11 @@ class XGBoostAnalyzer:
         train_auc = roc_auc_score(y_train, y_train_pred)
         
         # 驗證模型
-        performance = self.validate_model(X, y, cv_folds=5)
+        performance = self.validate_model(
+            X, y, cv_folds=cv_folds,
+            time_series_split=time_series_split,
+            timestamps=timestamps
+        )
         
         self.logger.info(
             f"訓練完成 - Train AUC: {train_auc:.4f}, "
@@ -242,7 +270,9 @@ class XGBoostAnalyzer:
         self,
         X: pd.DataFrame,
         y: np.ndarray,
-        cv_folds: int = 5
+        cv_folds: int = 5,
+        time_series_split: bool = False,
+        timestamps: Optional[List[int]] = None
     ) -> ModelPerformance:
         """
         交叉驗證模型效能
@@ -258,24 +288,43 @@ class XGBoostAnalyzer:
         self.logger.info(f"開始交叉驗證 - {cv_folds}-fold CV")
         
         # 建立交叉驗證分割
-        skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
+        if time_series_split:
+            from sklearn.model_selection import TimeSeriesSplit
+            if timestamps is None:
+                order = np.arange(len(y))
+            else:
+                order = np.argsort(np.array(timestamps))
+
+            if isinstance(X, pd.DataFrame):
+                X_ordered = X.iloc[order]
+            else:
+                X_ordered = X[order]
+            y_ordered = y[order]
+
+            splitter = TimeSeriesSplit(n_splits=cv_folds)
+            split_iter = splitter.split(X_ordered)
+        else:
+            skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
+            X_ordered = X
+            y_ordered = y
+            split_iter = skf.split(X_ordered, y_ordered)
         
         cv_auc_scores = []
         cv_precision_scores = []
         cv_recall_scores = []
         cv_f1_scores = []
         
-        for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
+        for fold, (train_idx, val_idx) in enumerate(split_iter):
             # 支援 DataFrame 和 numpy array
-            if isinstance(X, pd.DataFrame):
-                X_train_fold = X.iloc[train_idx]
-                X_val_fold = X.iloc[val_idx]
+            if isinstance(X_ordered, pd.DataFrame):
+                X_train_fold = X_ordered.iloc[train_idx]
+                X_val_fold = X_ordered.iloc[val_idx]
             else:
-                X_train_fold = X[train_idx]
-                X_val_fold = X[val_idx]
+                X_train_fold = X_ordered[train_idx]
+                X_val_fold = X_ordered[val_idx]
             
-            y_train_fold = y[train_idx]
-            y_val_fold = y[val_idx]
+            y_train_fold = y_ordered[train_idx]
+            y_val_fold = y_ordered[val_idx]
             
             # 訓練模型
             model_fold = xgb.XGBClassifier(**self.params)
@@ -306,8 +355,8 @@ class XGBoostAnalyzer:
         if self.model is None:
             raise ValueError("模型尚未訓練")
         
-        y_train_pred = self.model.predict_proba(X)[:, 1]
-        train_auc = roc_auc_score(y, y_train_pred)
+        y_train_pred = self.model.predict_proba(X_ordered)[:, 1]
+        train_auc = roc_auc_score(y_ordered, y_train_pred)
         
         # 平均指標
         cv_auc_mean = np.mean(cv_auc_scores)

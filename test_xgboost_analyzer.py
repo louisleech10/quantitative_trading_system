@@ -22,7 +22,7 @@ from api.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-def test_xgboost_training():
+def _train_sample_model():
     """測試 XGBoost 模型訓練"""
     logger.info("=" * 60)
     logger.info("測試 1: XGBoost 模型訓練")
@@ -65,12 +65,18 @@ def test_xgboost_training():
     return analyzer, X.columns.tolist()
 
 
-def test_feature_importance(analyzer, feature_names):
+def test_xgboost_training():
+    """測試 XGBoost 模型訓練"""
+    _train_sample_model()
+
+
+def test_feature_importance():
     """測試特徵重要性計算"""
     logger.info("=" * 60)
     logger.info("測試 2: 特徵重要性計算")
     logger.info("=" * 60)
-    
+
+    analyzer, feature_names = _train_sample_model()
     importance = analyzer.calculate_feature_importance(feature_names)
     
     logger.info(f"前 5 個重要特徵:")
@@ -93,10 +99,10 @@ def run_all_tests():
     
     try:
         # 測試 1: 模型訓練
-        analyzer, feature_names = test_xgboost_training()
+        analyzer, feature_names = _train_sample_model()
         
         # 測試 2: 特徵重要性
-        test_feature_importance(analyzer, feature_names)
+        test_feature_importance()
         
         logger.info("=" * 60)
         logger.info("✅ 所有測試通過!")

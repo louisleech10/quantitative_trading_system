@@ -7,7 +7,7 @@ Updated: 2026-01-13 - 新增批量分析模型，支援指標配置
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
 
 
 # ==================== 指標配置模型 ====================
@@ -39,6 +39,27 @@ class XGBoostBatchAnalysisRequest(BaseModel):
     timeframe: str = Field(default="12h", description="時間週期：1h, 4h, 12h, 1d")
     indicators: List[IndicatorParamsConfig] = Field(..., description="指標配置列表")
     lookback_bars: int = Field(default=200, description="每個案例回看 K 線數量")
+    sequence_length: Optional[int] = Field(
+        default=None,
+        description="序列特徵長度（TO 前 N 根，None 表示使用單根特徵）"
+    )
+    sequence_feature_mode: Literal["aggregate", "flatten"] = Field(
+        default="aggregate",
+        description="序列特徵模式：aggregate=彙總統計，flatten=展平序列"
+    )
+    sequence_stride: int = Field(default=1, description="序列抽樣步長（預設 1）")
+    aggregation_methods: Optional[List[str]] = Field(
+        default=None,
+        description="序列彙總方法（如 mean, std, min, max, last, slope）"
+    )
+    multi_scale_windows: Optional[List[int]] = Field(
+        default=None,
+        description="多時間尺度窗口（如 [8, 16, 32]）"
+    )
+    time_series_split: bool = Field(
+        default=True,
+        description="是否使用時間序列切分避免洩漏"
+    )
     xgboost_params: Optional[Dict[str, Any]] = Field(
         default=None,
         description="XGBoost 參數（可選，使用預設值）"
@@ -65,6 +86,12 @@ class XGBoostBatchAnalysisRequest(BaseModel):
                     }
                 ],
                 "lookback_bars": 200,
+                "sequence_length": 64,
+                "sequence_feature_mode": "aggregate",
+                "sequence_stride": 1,
+                "aggregation_methods": ["mean", "std", "min", "max", "last", "slope"],
+                "multi_scale_windows": [16, 32],
+                "time_series_split": True,
                 "xgboost_params": {
                     "max_depth": 5,
                     "learning_rate": 0.05,

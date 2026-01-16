@@ -157,6 +157,12 @@ class XGBoostBatchService:
         timeframe: str,
         indicators: List[Dict],
         lookback_bars: int = 200,
+        sequence_length: Optional[int] = None,
+        sequence_feature_mode: str = "aggregate",
+        sequence_stride: int = 1,
+        aggregation_methods: Optional[List[str]] = None,
+        multi_scale_windows: Optional[List[int]] = None,
+        time_series_split: bool = True,
         xgboost_params: Optional[Dict] = None,
         cv_folds: int = 5,
         top_n_rules: int = 10,
@@ -170,6 +176,12 @@ class XGBoostBatchService:
             timeframe: K線時間週期（用於計算指標，與案例搜尋週期無關）
             indicators: 指標配置列表
             lookback_bars: 每個案例回看 K 線數量
+            sequence_length: 序列特徵長度（TO 前 N 根）
+            sequence_feature_mode: 序列特徵模式（aggregate 或 flatten）
+            sequence_stride: 序列抽樣步長
+            aggregation_methods: 序列彙總方法
+            multi_scale_windows: 多時間尺度窗口
+            time_series_split: 是否使用時間序列切分
             xgboost_params: XGBoost 參數
             cv_folds: 交叉驗證折數
             top_n_rules: 提取前 N 條規則
@@ -206,6 +218,12 @@ class XGBoostBatchService:
                 cases=cases,
                 indicators=indicators,
                 lookback_bars=lookback_bars,
+                sequence_length=sequence_length,
+                sequence_feature_mode=sequence_feature_mode,
+                sequence_stride=sequence_stride,
+                aggregation_methods=aggregation_methods,
+                multi_scale_windows=multi_scale_windows,
+                time_series_split=time_series_split,
                 xgboost_params=xgboost_params,
                 cv_folds=cv_folds,
                 top_n_rules=top_n_rules,
@@ -228,6 +246,12 @@ class XGBoostBatchService:
         cases: List,
         indicators: List[Dict],
         lookback_bars: int,
+        sequence_length: Optional[int],
+        sequence_feature_mode: str,
+        sequence_stride: int,
+        aggregation_methods: Optional[List[str]],
+        multi_scale_windows: Optional[List[int]],
+        time_series_split: bool,
         xgboost_params: Optional[Dict],
         cv_folds: int,
         top_n_rules: int,
@@ -254,6 +278,24 @@ class XGBoostBatchService:
             
             min_ts = min(timestamps)
             max_ts = max(timestamps)
+
+            if sequence_length is not None:
+                if sequence_length < 1:
+                    raise ValueError("sequence_length 必須大於 0")
+                if sequence_stride < 1:
+                    raise ValueError("sequence_stride 必須大於 0")
+                if lookback_bars < sequence_length:
+                    raise ValueError("lookback_bars 必須大於等於 sequence_length")
+                if sequence_feature_mode not in {"aggregate", "flatten"}:
+                    raise ValueError("sequence_feature_mode 只支援 aggregate 或 flatten")
+
+                if aggregation_methods is None:
+                    aggregation_methods = ["mean", "std", "min", "max", "last", "slope"]
+
+                if multi_scale_windows:
+                    invalid_windows = [w for w in multi_scale_windows if w < 1 or w > sequence_length]
+                    if invalid_windows:
+                        raise ValueError("multi_scale_windows 必須介於 1 到 sequence_length 之間")
             
             # 計算需要的 K 線時間範圍（含 warmup）
             timeframe_seconds = self._get_timeframe_seconds(timeframe)
@@ -338,7 +380,9 @@ class XGBoostBatchService:
             
             X_list = []
             y_list = []
+            case_timestamps = []
             valid_cases = 0
+            sequence_feature_names: Optional[List[str]] = None
             
             # 建立時間戳索引（智能檢測毫秒 vs 秒）
             if 'timestamp' not in all_features.columns:
@@ -354,6 +398,8 @@ class XGBoostBatchService:
                 # 已經是秒級時間戳，直接使用
                 all_features['timestamp_sec'] = all_features['timestamp'].astype(int)
                 self.logger.info(f"檢測到秒級 timestamp，直接使用")
+
+            all_features = all_features.sort_values('timestamp_sec').reset_index(drop=True)
             
             for i, case in enumerate(cases):
                 # 確保 case_ts 是整數
@@ -374,8 +420,28 @@ class XGBoostBatchService:
                 
                 row_idx = idx[0]
                 
-                # 提取特徵（取該時間點的特徵值）
-                feature_values = all_features.loc[row_idx, all_feature_names].values
+                if sequence_length is None:
+                    # 提取特徵（取該時間點的特徵值）
+                    feature_values = all_features.loc[row_idx, all_feature_names].values
+                    feature_names = all_feature_names
+                else:
+                    sequence_result = self._build_sequence_features(
+                        all_features=all_features,
+                        row_idx=row_idx,
+                        feature_names=all_feature_names,
+                        sequence_length=sequence_length,
+                        sequence_feature_mode=sequence_feature_mode,
+                        sequence_stride=sequence_stride,
+                        aggregation_methods=aggregation_methods,
+                        multi_scale_windows=multi_scale_windows
+                    )
+                    if sequence_result is None:
+                        continue
+                    feature_values, feature_names = sequence_result
+                    if sequence_feature_names is None:
+                        sequence_feature_names = feature_names
+                    else:
+                        feature_names = sequence_feature_names
                 
                 # 檢查是否有 NaN
                 if np.isnan(feature_values).any():
@@ -384,6 +450,7 @@ class XGBoostBatchService:
                 
                 X_list.append(feature_values)
                 y_list.append(case.positive_case)
+                case_timestamps.append(case_ts)
                 valid_cases += 1
                 
                 # 更新進度
@@ -395,6 +462,9 @@ class XGBoostBatchService:
             
             X = np.array(X_list)
             y = np.array(y_list)
+            if sequence_length is not None and sequence_feature_names is None:
+                raise ValueError("序列特徵生成失敗，無有效案例")
+            feature_names = sequence_feature_names or all_feature_names
             
             positive_count = sum(y)
             negative_count = len(y) - positive_count
@@ -409,7 +479,8 @@ class XGBoostBatchService:
             
             performance = await asyncio.to_thread(
                 self.xgboost_analyzer.train_model,
-                X, y, all_feature_names, 10, 0.2, xgboost_params
+                X, y, feature_names, 10, 0.2, xgboost_params, cv_folds,
+                time_series_split, case_timestamps
             )
             
             self.logger.info(
@@ -422,7 +493,7 @@ class XGBoostBatchService:
             
             feature_importance = await asyncio.to_thread(
                 self.xgboost_analyzer.calculate_feature_importance,
-                all_feature_names
+                feature_names
             )
             
             # ===== Step 7: 提取決策規則 =====
@@ -431,7 +502,7 @@ class XGBoostBatchService:
             rules = await asyncio.to_thread(
                 self.pattern_extractor.extract_decision_rules,
                 self.xgboost_analyzer.model,
-                X, y, all_feature_names,
+                X, y, feature_names,
                 top_n_rules, min_support
             )
             
@@ -443,7 +514,7 @@ class XGBoostBatchService:
                 self.model_storage.save_model_to_pickle,
                 model_id,
                 self.xgboost_analyzer.model,
-                all_feature_names,
+                feature_names,
                 performance.__dict__,
                 xgboost_params or {},
                 {
@@ -453,7 +524,13 @@ class XGBoostBatchService:
                     'total_cases': len(cases),
                     'valid_cases': valid_cases,
                     'indicators': indicators,
-                    'cv_folds': cv_folds
+                    'cv_folds': cv_folds,
+                    'sequence_length': sequence_length,
+                    'sequence_feature_mode': sequence_feature_mode,
+                    'sequence_stride': sequence_stride,
+                    'aggregation_methods': aggregation_methods,
+                    'multi_scale_windows': multi_scale_windows,
+                    'time_series_split': time_series_split
                 }
             )
             
@@ -465,8 +542,8 @@ class XGBoostBatchService:
                 'valid_cases': valid_cases,
                 'positive_cases': int(positive_count),
                 'negative_cases': int(negative_count),
-                'features_generated': len(all_feature_names),
-                'feature_names': all_feature_names,
+                'features_generated': len(feature_names),
+                'feature_names': feature_names,
                 'model_performance': performance.__dict__,
                 'feature_importance': [fi.__dict__ for fi in feature_importance],
                 'decision_rules': [rule.to_dict() for rule in rules],
@@ -493,6 +570,121 @@ class XGBoostBatchService:
     def get_task_status(self, task_id: str) -> Optional[Dict]:
         """獲取任務狀態"""
         return self.task_manager.get_task(task_id)
+
+    def _build_sequence_features(
+        self,
+        all_features: pd.DataFrame,
+        row_idx: int,
+        feature_names: List[str],
+        sequence_length: int,
+        sequence_feature_mode: str,
+        sequence_stride: int,
+        aggregation_methods: Optional[List[str]],
+        multi_scale_windows: Optional[List[int]]
+    ) -> Optional[Tuple[np.ndarray, List[str]]]:
+        """建立 TO 前 N 根序列特徵"""
+        window_sizes = [sequence_length]
+        if multi_scale_windows:
+            for w in multi_scale_windows:
+                if w not in window_sizes:
+                    window_sizes.append(w)
+
+        agg_methods = aggregation_methods or ["mean", "std", "min", "max", "last", "slope"]
+
+        all_feature_vectors: List[np.ndarray] = []
+        all_sequence_feature_names: List[str] = []
+
+        for window_size in window_sizes:
+            start_idx = row_idx - (window_size - 1) * sequence_stride
+            if start_idx < 0:
+                return None
+
+            window_indices = list(range(start_idx, row_idx + 1, sequence_stride))
+            if len(window_indices) != window_size:
+                return None
+
+            window_values = all_features.iloc[window_indices][feature_names].values
+            if window_values.size == 0:
+                return None
+
+            if sequence_feature_mode == "flatten":
+                window_feature_vectors, window_feature_names = self._flatten_sequence_features(
+                    window_values=window_values,
+                    feature_names=feature_names,
+                    window_size=window_size
+                )
+            else:
+                window_feature_vectors, window_feature_names = self._aggregate_sequence_features(
+                    window_values=window_values,
+                    feature_names=feature_names,
+                    window_size=window_size,
+                    aggregation_methods=agg_methods
+                )
+
+            all_feature_vectors.append(window_feature_vectors)
+            all_sequence_feature_names.extend(window_feature_names)
+
+        combined_features = np.concatenate(all_feature_vectors)
+        return combined_features, all_sequence_feature_names
+
+    def _flatten_sequence_features(
+        self,
+        window_values: np.ndarray,
+        feature_names: List[str],
+        window_size: int
+    ) -> Tuple[np.ndarray, List[str]]:
+        """將序列視窗展平為特徵向量"""
+        flattened_values = window_values.reshape(-1)
+
+        flattened_feature_names: List[str] = []
+        for idx in range(window_size):
+            offset = window_size - 1 - idx
+            if offset == 0:
+                suffix = "t0"
+            else:
+                suffix = f"t-{offset}"
+            for name in feature_names:
+                flattened_feature_names.append(f"{name}_w{window_size}_{suffix}")
+
+        return flattened_values, flattened_feature_names
+
+    def _aggregate_sequence_features(
+        self,
+        window_values: np.ndarray,
+        feature_names: List[str],
+        window_size: int,
+        aggregation_methods: List[str]
+    ) -> Tuple[np.ndarray, List[str]]:
+        """將序列視窗彙總為特徵向量"""
+        aggregated_vectors: List[np.ndarray] = []
+        aggregated_feature_names: List[str] = []
+
+        for method in aggregation_methods:
+            method_lower = method.lower()
+            if method_lower == "mean":
+                values = window_values.mean(axis=0)
+            elif method_lower == "std":
+                values = window_values.std(axis=0)
+            elif method_lower == "min":
+                values = window_values.min(axis=0)
+            elif method_lower == "max":
+                values = window_values.max(axis=0)
+            elif method_lower == "last":
+                values = window_values[-1]
+            elif method_lower == "slope":
+                if len(window_values) == 1:
+                    values = np.zeros(window_values.shape[1])
+                else:
+                    values = (window_values[-1] - window_values[0]) / (len(window_values) - 1)
+            else:
+                raise ValueError(f"不支援的 aggregation method: {method}")
+
+            aggregated_vectors.append(values)
+            aggregated_feature_names.extend(
+                [f"{name}_w{window_size}_{method_lower}" for name in feature_names]
+            )
+
+        return np.concatenate(aggregated_vectors), aggregated_feature_names
     
     def _get_timeframe_seconds(self, timeframe: str) -> int:
         """

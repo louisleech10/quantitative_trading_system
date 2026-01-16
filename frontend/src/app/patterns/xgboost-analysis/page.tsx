@@ -134,6 +134,12 @@ async function startBatchAnalysis(config: {
   timeframe: string
   indicators: IndicatorConfig[]
   lookback_bars: number
+  sequence_length?: number | null
+  sequence_feature_mode?: 'aggregate' | 'flatten'
+  sequence_stride?: number
+  aggregation_methods?: string[] | null
+  multi_scale_windows?: number[] | null
+  time_series_split?: boolean
   xgboost_params?: Record<string, any>
   cv_folds: number
 }): Promise<{ task_id: string }> {
@@ -149,6 +155,12 @@ async function startBatchAnalysis(config: {
         params: i.params
       })),
       lookback_bars: config.lookback_bars,
+      sequence_length: config.sequence_length,
+      sequence_feature_mode: config.sequence_feature_mode,
+      sequence_stride: config.sequence_stride,
+      aggregation_methods: config.aggregation_methods,
+      multi_scale_windows: config.multi_scale_windows,
+      time_series_split: config.time_series_split,
       xgboost_params: config.xgboost_params,
       cv_folds: config.cv_folds
     })
@@ -388,27 +400,57 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
             <div className={`text-2xl font-bold ${getAUCColor(performance.train_auc)}`}>
               {(performance.train_auc * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-600">訓練 AUC</div>
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              訓練 AUC
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                  訓練集上的 AUC，越高代表模型在訓練資料的分類能力越好。
+                </div>
+              </div>
+            </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className={`text-2xl font-bold ${getAUCColor(performance.cv_auc_mean)}`}>
               {(performance.cv_auc_mean * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-600">
+            <div className="text-xs text-gray-600 flex items-center gap-1">
               CV AUC (±{(performance.cv_auc_std * 100).toFixed(1)}%)
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                  交叉驗證平均 AUC，反映泛化能力；± 為標準差，越小越穩定。
+                </div>
+              </div>
             </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-gray-900">
               {(performance.precision * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-600">Precision</div>
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              Precision
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-60 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                  判為正例的樣本中，有多少比例是真的正例（準確度）。
+                </div>
+              </div>
+            </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-gray-900">
               {(performance.recall * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-600">Recall</div>
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              Recall
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                  真正例中，被模型抓到的比例（覆蓋率）。
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -416,13 +458,29 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
             <div className="text-xl font-bold text-gray-900">
               {(performance.f1_score * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-600">F1 Score</div>
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              F1 Score
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                  Precision 與 Recall 的調和平均，兼顧準確與覆蓋。
+                </div>
+              </div>
+            </div>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className={`text-xl font-bold ${getOverfitColor(performance.overfitting_score)}`}>
               {(performance.overfitting_score * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-gray-600">過擬合程度</div>
+            <div className="text-xs text-gray-600 flex items-center gap-1">
+              過擬合程度
+              <div className="group relative">
+                <Info className="w-3 h-3 text-gray-400 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                  訓練 AUC 與 CV AUC 的差距；越大代表過擬合風險越高。
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
@@ -440,6 +498,12 @@ function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) 
         <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
           <List className="w-5 h-5" />
           特徵重要性 (Top 15)
+          <div className="group relative">
+            <Info className="w-4 h-4 text-gray-400 cursor-help" />
+            <div className="absolute left-0 bottom-6 hidden group-hover:block w-72 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+              特徵重要性為模型貢獻比例，% 越高代表模型越依賴此特徵（相對值）。
+            </div>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -478,6 +542,12 @@ function DecisionRulesCard({ rules }: { rules: DecisionRule[] }) {
         <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
           <Brain className="w-5 h-5" />
           決策規則 (Top 10)
+          <div className="group relative">
+            <Info className="w-4 h-4 text-gray-400 cursor-help" />
+            <div className="absolute left-0 bottom-6 hidden group-hover:block w-80 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+              支持度：符合規則的案例數。信心度：符合規則的案例中為正例的比例。提升度：規則正例率 / 全體正例率（>1 表示優於平均）。
+            </div>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -576,6 +646,12 @@ export default function XGBoostAnalysisPage() {
   const [klineTimeframe, setKlineTimeframe] = useState<string>('12h')
   const [indicators, setIndicators] = useState<IndicatorConfig[]>([])
   const [lookbackBars, setLookbackBars] = useState<number>(200)
+  const [sequenceLength, setSequenceLength] = useState<number>(64)
+  const [sequenceFeatureMode, setSequenceFeatureMode] = useState<'aggregate' | 'flatten'>('aggregate')
+  const [sequenceStride, setSequenceStride] = useState<number>(1)
+  const [aggregationMethodsInput, setAggregationMethodsInput] = useState<string>('mean,std,min,max,last,slope')
+  const [multiScaleWindowsInput, setMultiScaleWindowsInput] = useState<string>('16,32')
+  const [timeSeriesSplit, setTimeSeriesSplit] = useState<boolean>(true)
   const [cvFolds, setCvFolds] = useState<number>(5)
   
   const [isLoading, setIsLoading] = useState(false)
@@ -714,6 +790,10 @@ export default function XGBoostAnalysisPage() {
       setError('請至少配置一個指標')
       return
     }
+    if (sequenceLength > lookbackBars) {
+      setError('序列長度不能大於回看 K 線數量')
+      return
+    }
 
     setIsLoading(true)
     setError(null)
@@ -723,6 +803,18 @@ export default function XGBoostAnalysisPage() {
     setSavedPatternId(null)
 
     try {
+      const aggregationMethods = sequenceFeatureMode === 'aggregate'
+        ? aggregationMethodsInput
+          .split(',')
+          .map(method => method.trim())
+          .filter(method => method.length > 0)
+        : []
+
+      const multiScaleWindows = multiScaleWindowsInput
+        .split(',')
+        .map(value => parseInt(value.trim(), 10))
+        .filter(value => !Number.isNaN(value) && value > 0)
+
       // 目前 API 只支援單一 symbol，取第一個
       // TODO: 後端支援多 symbol 批量分析
       const response = await startBatchAnalysis({
@@ -730,6 +822,12 @@ export default function XGBoostAnalysisPage() {
         timeframe: klineTimeframe,
         indicators,
         lookback_bars: lookbackBars,
+        sequence_length: sequenceLength > 0 ? sequenceLength : null,
+        sequence_feature_mode: sequenceFeatureMode,
+        sequence_stride: sequenceStride,
+        aggregation_methods: aggregationMethods.length > 0 ? aggregationMethods : null,
+        multi_scale_windows: multiScaleWindows.length > 0 ? multiScaleWindows : null,
+        time_series_split: timeSeriesSplit,
         cv_folds: cvFolds
       })
 
@@ -838,6 +936,94 @@ export default function XGBoostAnalysisPage() {
                   <p className="text-xs text-gray-500">
                     公式：Warmup（最長指標週期）+ 學習窗口（想分析的 K 線數）
                   </p>
+                </div>
+
+                {/* 序列特徵設定 */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-gray-800 font-medium">序列特徵設定</Label>
+                    <div className="group relative">
+                      <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-80 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                        <p className="mb-1"><strong>TO 前 N 根序列特徵</strong>，不是只取 T0 單根。</p>
+                        <p className="mb-1">• 序列長度：TO 往前 N 根</p>
+                        <p className="mb-1">• 步長：序列抽樣間隔</p>
+                        <p className="mb-1">• 彙總方法：mean/std/min/max/last/slope</p>
+                        <p className="text-yellow-300">建議：序列長度 64，步長 1</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-gray-800 text-sm">序列長度（N）</Label>
+                      <Input
+                        type="number"
+                        value={sequenceLength}
+                        onChange={(e) => setSequenceLength(parseInt(e.target.value) || 0)}
+                        className="bg-white border-gray-300 text-gray-900"
+                        min={1}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-gray-800 text-sm">序列步長</Label>
+                      <Input
+                        type="number"
+                        value={sequenceStride}
+                        onChange={(e) => setSequenceStride(parseInt(e.target.value) || 1)}
+                        className="bg-white border-gray-300 text-gray-900"
+                        min={1}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-800 text-sm">序列模式</Label>
+                    <Select value={sequenceFeatureMode} onValueChange={(value) => setSequenceFeatureMode(value as 'aggregate' | 'flatten')}>
+                      <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
+                        <SelectValue placeholder="選擇序列模式" className="text-gray-900" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
+                        <SelectItem value="aggregate" className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                          彙總統計（較省資源）
+                        </SelectItem>
+                        <SelectItem value="flatten" className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                          展平序列（保留形狀）
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {sequenceFeatureMode === 'aggregate' && (
+                    <div className="space-y-2">
+                      <Label className="text-gray-800 text-sm">彙總方法（逗號分隔）</Label>
+                      <Input
+                        value={aggregationMethodsInput}
+                        onChange={(e) => setAggregationMethodsInput(e.target.value)}
+                        className="bg-white border-gray-300 text-gray-900"
+                        placeholder="mean,std,min,max,last,slope"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-800 text-sm">多時間尺度窗口（逗號分隔）</Label>
+                    <Input
+                      value={multiScaleWindowsInput}
+                      onChange={(e) => setMultiScaleWindowsInput(e.target.value)}
+                      className="bg-white border-gray-300 text-gray-900"
+                      placeholder="16,32"
+                    />
+                    <p className="text-xs text-gray-500">可留空，僅使用序列長度 N</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={timeSeriesSplit}
+                      onCheckedChange={(value) => setTimeSeriesSplit(Boolean(value))}
+                    />
+                    <Label className="text-gray-800 text-sm">啟用時間序列切分（避免洩漏）</Label>
+                  </div>
                 </div>
 
                 {/* 交叉驗證折數 */}
