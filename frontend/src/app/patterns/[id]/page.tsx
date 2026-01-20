@@ -28,8 +28,12 @@ export default function PatternDetailPage() {
   const loadPattern = async () => {
     try {
       setLoading(true);
-      const data = await getPattern(patternId);
-      setPattern(data);
+      const response = await getPattern(patternId);
+      if (response.success && response.pattern) {
+        setPattern(response.pattern);
+      } else {
+        setError(response.error || '載入樣式失敗');
+      }
     } catch (err) {
       console.error('載入樣式失敗:', err);
       setError(err instanceof Error ? err.message : '載入失敗');

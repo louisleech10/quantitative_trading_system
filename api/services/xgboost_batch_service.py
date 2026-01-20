@@ -465,6 +465,12 @@ class XGBoostBatchService:
             if sequence_length is not None and sequence_feature_names is None:
                 raise ValueError("序列特徵生成失敗，無有效案例")
             feature_names = sequence_feature_names or all_feature_names
+
+            if sequence_length is not None:
+                if sequence_feature_mode == "flatten" and not any("_t-" in name for name in feature_names):
+                    raise ValueError("序列特徵未生效：展平模式特徵名稱缺少 _t- 後綴")
+                if sequence_feature_mode == "aggregate" and not any("_w" in name for name in feature_names):
+                    raise ValueError("序列特徵未生效：彙總模式特徵名稱缺少 _w 後綴")
             
             positive_count = sum(y)
             negative_count = len(y) - positive_count

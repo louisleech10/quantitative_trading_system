@@ -15,6 +15,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { usePatternStore } from '@/store/patternStore';
 import { listPatterns, deletePattern } from '@/lib/api/patternApi';
 import type { Pattern } from '@/lib/patternTypes';
@@ -140,16 +141,23 @@ function PatternCard({
   onSelect: () => void; 
   onDelete: () => void;
 }) {
+  const router = useRouter();
+  
   const statusColors = {
     active: 'bg-green-100 text-green-800',
     archived: 'bg-gray-100 text-gray-800',
     testing: 'bg-yellow-100 text-yellow-800'
   };
   
+  const handleCardClick = () => {
+    onSelect(); // 更新 store 狀態
+    router.push(`/patterns/${pattern.pattern_id}`); // 導航到詳情頁
+  };
+  
   return (
     <div 
       className="border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer bg-white"
-      onClick={onSelect}
+      onClick={handleCardClick}
     >
       {/* 標題與狀態 */}
       <div className="flex justify-between items-start mb-2">
@@ -204,7 +212,7 @@ function PatternCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onSelect();
+            handleCardClick();
           }}
           className="flex-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
         >

@@ -17,7 +17,7 @@ const API_PREFIX = '/api/v1';
 
 // ===== Pattern Management API =====
 
-export async function createPattern(request: CreatePatternRequest): Promise<{ success: boolean; pattern_id?: string; error?: string }> {
+export async function createPattern(request: CreatePatternRequest): Promise<{ success: boolean; pattern_id?: string; pattern?: Pattern; error?: string }> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/patterns/define`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

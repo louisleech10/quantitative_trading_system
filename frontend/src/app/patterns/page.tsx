@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { usePatternStore } from '@/store/patternStore';
 import { listPatterns, deleteAllPatterns } from '@/lib/api/patternApi';
 import PatternList from '@/components/pattern/PatternList';
@@ -20,12 +21,28 @@ import { Trash2 } from 'lucide-react';
 type TabType = 'list' | 'statistics' | 'comparison';
 
 export default function PatternsPage() {
+  const router = useRouter();
   const { patterns, setPatterns } = usePatternStore();
   const [activeTab, setActiveTab] = useState<TabType>('list');
   const [loading, setLoading] = useState(true);
   
+  // 初始載入
   useEffect(() => {
     loadPatterns();
+  }, []);
+  
+  // 監聽頁面可見性變化，重新載入資料
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadPatterns();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
   
   const loadPatterns = async () => {

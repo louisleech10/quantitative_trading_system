@@ -27,8 +27,8 @@ class PatternValidator:
     # 支援的運算符
     VALID_OPERATORS = ['>', '<', '>=', '<=', '==', '!=']
     
-    # 特徵名稱規則：字母、數字、底線
-    FEATURE_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+    # 特徵名稱規則：字母、數字、底線、連字號
+    FEATURE_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_-]*$')
     
     def __init__(self, valid_feature_names: Optional[List[str]] = None):
         """
@@ -137,16 +137,32 @@ class PatternValidator:
         """
         errors = []
         
-        # 必須的指標
-        required_metrics = ['precision', 'recall', 'f1_score']
+        # 必須的指標（至少要有其中一組）
+        # 組 1: 傳統 ML 指標
+        has_traditional = all(k in metrics for k in ['precision', 'recall', 'f1_score'])
+        # 組 2: XGBoost 指標
+        has_xgboost = 'cv_auc_mean' in metrics or 'train_auc' in metrics
         
-        for metric in required_metrics:
-            if metric not in metrics:
-                errors.append(f"缺少必須的效能指標: {metric}")
-            elif not isinstance(metrics[metric], (int, float)):
-                errors.append(f"{metric} 必須是數字")
-            elif not (0 <= metrics[metric] <= 1):
-                errors.append(f"{metric} 必須在 [0, 1] 範圍內: {metrics[metric]}")
+        if not has_traditional and not has_xgboost:
+            errors.append("必須包含效能指標（precision/recall/f1_score 或 train_auc/cv_auc_mean）")
+            return errors
+        
+        # 驗證存在的指標範圍
+        range_check_metrics = ['precision', 'recall', 'f1_score', 'train_auc', 'cv_auc_mean', 'accuracy']
+        
+        for metric in range_check_metrics:
+            if metric in metrics:
+                if not isinstance(metrics[metric], (int, float)):
+                    errors.append(f"{metric} 必須是數字")
+                elif not (0 <= metrics[metric] <= 1):
+                    errors.append(f"{metric} 必須在 [0, 1] 範圍內: {metrics[metric]}")
+        
+        # cv_auc_std 可以是任意非負數
+        if 'cv_auc_std' in metrics:
+            if not isinstance(metrics['cv_auc_std'], (int, float)):
+                errors.append("cv_auc_std 必須是數字")
+            elif metrics['cv_auc_std'] < 0:
+                errors.append(f"cv_auc_std 必須是非負數: {metrics['cv_auc_std']}")
         
         return errors
     

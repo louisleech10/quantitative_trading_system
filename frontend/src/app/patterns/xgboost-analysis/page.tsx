@@ -639,7 +639,7 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
 export default function XGBoostAnalysisPage() {
   // State
   const router = useRouter()
-  const { currentAnalysis, setCurrentAnalysis } = usePatternStore()
+  const { currentAnalysis, setCurrentAnalysis, addPattern } = usePatternStore()
   
   const [caseSummary, setCaseSummary] = useState<CaseSummary | null>(null)
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([])
@@ -726,19 +726,28 @@ export default function XGBoostAnalysisPage() {
 
     try {
       // 將分析結果轉換為 Pattern 格式
+      const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0]
       const request: CreatePatternRequest = {
-        name: `XGBoost_${result.symbol}_${result.timeframe}_${new Date().toISOString().split('T')[0]}`,
+        name: `XGBoost_${result.symbol}_${result.timeframe}_${timestamp}`,
         description: `XGBoost 分析結果 - ${result.symbol} ${result.timeframe}\n` +
                      `有效案例: ${result.valid_cases}/${result.total_cases}\n` +
                      `正樣本: ${result.positive_cases}, 負樣本: ${result.negative_cases}\n` +
                      `AUC: ${result.model_performance.cv_auc_mean.toFixed(4)} ± ${result.model_performance.cv_auc_std.toFixed(4)}\n` +
                      `F1: ${result.model_performance.f1_score.toFixed(4)}`,
-        rules: result.decision_rules.slice(0, 10).map(rule => ({
-          feature: rule.condition.split(' ')[0] || 'unknown',
-          operator: '>=',
-          threshold: rule.confidence,
-          description: rule.condition
-        })),
+        rules: result.decision_rules.slice(0, 10).map((rule, index) => {
+          // 從 condition 字串抽取第一個單詞作為 feature（如果失敗則使用索引）
+          const conditionParts = rule.condition.trim().split(/\s+/)
+          const featureName = conditionParts.length > 0 && conditionParts[0] 
+            ? conditionParts[0] 
+            : `rule_${index + 1}`
+          
+          return {
+            feature: featureName,
+            operator: '>=',
+            threshold: rule.confidence,
+            description: rule.condition || `規則 ${index + 1} (信心度: ${rule.confidence.toFixed(2)})`
+          }
+        }),
         case_id: `${result.symbol}_${result.timeframe}`,
         xgboost_importance: result.feature_importance.reduce((acc, feat) => {
           acc[feat.feature] = feat.importance
@@ -769,13 +778,30 @@ export default function XGBoostAnalysisPage() {
       if (response.success) {
         setSaveSuccess(true)
         setSavedPatternId(response.pattern_id || null)
-        // 3秒後自動隱藏成功訊息
-        setTimeout(() => setSaveSuccess(false), 3000)
+        
+        // 如果返回了完整的 pattern 資料，加入到 store
+        if (response.pattern) {
+          addPattern(response.pattern)
+        }
+        
+        // 3秒後自動隱藏成功訊息並清理狀態
+        setTimeout(() => {
+          setSaveSuccess(false)
+          setSavedPatternId(null)
+        }, 3000)
       } else {
         setError(response.error || '儲存樣式失敗')
       }
     } catch (e: any) {
-      setError(e.message || '儲存樣式失敗')
+      // 嘗試從錯誤中提取詳細訊息
+      let errorMessage = '儲存樣式失敗'
+      if (e.message) {
+        errorMessage = e.message
+      } else if (typeof e === 'string') {
+        errorMessage = e
+      }
+      setError(errorMessage)
+      console.error('儲存樣式錯誤:', e)
     } finally {
       setIsSaving(false)
     }

@@ -67,8 +67,8 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
       <div className="bg-white rounded-lg border p-6">
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            <h1 className="text-2xl font-bold mb-2">{pattern.name}</h1>
-            <p className="text-gray-600">{pattern.description}</p>
+            <h1 className="text-2xl font-bold mb-2 text-gray-900">{pattern.name}</h1>
+            <p className="text-gray-900">{pattern.description}</p>
             
             {/* 狀態標籤 */}
             <div className="flex gap-2 mt-3">
@@ -116,106 +116,169 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
         {/* 基本資訊 */}
         <div className="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
           <div>
-            <p className="text-sm text-gray-500">案例 ID</p>
-            <p className="font-semibold">{pattern.case_id}</p>
+            <p className="text-sm text-gray-700 font-medium">案例 ID</p>
+            <p className="font-semibold text-gray-900">{pattern.case_id}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">建立時間</p>
-            <p className="font-semibold">{new Date(pattern.created_at).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-700 font-medium">建立時間</p>
+            <p className="font-semibold text-gray-900">{new Date(pattern.created_at).toLocaleDateString()}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">最後更新</p>
-            <p className="font-semibold">{new Date(pattern.updated_at).toLocaleDateString()}</p>
+            <p className="text-sm text-gray-700 font-medium">最後更新</p>
+            <p className="font-semibold text-gray-900">{new Date(pattern.updated_at).toLocaleDateString()}</p>
           </div>
         </div>
       </div>
       
       {/* 效能指標 */}
       <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-bold mb-4">效能指標</h2>
-        <div className="grid grid-cols-4 gap-4">
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <p className="text-sm text-gray-500 mb-1">準確度</p>
-            <p className="text-2xl font-bold text-blue-600">
-              {(pattern.performance_metrics.accuracy * 100).toFixed(1)}%
-            </p>
-          </div>
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <p className="text-sm text-gray-500 mb-1">精確度</p>
-            <p className="text-2xl font-bold text-green-600">
-              {(pattern.performance_metrics.precision * 100).toFixed(1)}%
-            </p>
-          </div>
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <p className="text-sm text-gray-500 mb-1">召回率</p>
-            <p className="text-2xl font-bold text-yellow-600">
-              {(pattern.performance_metrics.recall * 100).toFixed(1)}%
-            </p>
-          </div>
-          <div className="text-center p-4 bg-gray-50 rounded">
-            <p className="text-sm text-gray-500 mb-1">F1 分數</p>
-            <p className="text-2xl font-bold text-purple-600">
-              {pattern.performance_metrics.f1_score.toFixed(3)}
-            </p>
-          </div>
-        </div>
+        <h2 className="text-lg font-bold mb-4 text-gray-900">效能指標</h2>
         
-        {/* 樣本數 */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="text-center p-3 bg-blue-50 rounded">
-            <p className="text-sm text-gray-600">訓練樣本</p>
-            <p className="text-xl font-semibold">{pattern.performance_metrics.sample_count}</p>
+        {!pattern.performance_metrics || Object.keys(pattern.performance_metrics).length === 0 ? (
+          <div className="text-center py-8 text-gray-700">
+            <p>無效能指標資料</p>
           </div>
-          {pattern.performance_metrics.profitable_count !== undefined && (
-            <div className="text-center p-3 bg-green-50 rounded">
-              <p className="text-sm text-gray-600">盈利樣本</p>
-              <p className="text-xl font-semibold">{pattern.performance_metrics.profitable_count}</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* 精確度 Precision */}
+              {pattern.performance_metrics.precision !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">精確度</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {(pattern.performance_metrics.precision * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+              
+              {/* 召回率 Recall */}
+              {pattern.performance_metrics.recall !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">召回率</p>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {(pattern.performance_metrics.recall * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+              
+              {/* F1 分數 */}
+              {pattern.performance_metrics.f1_score !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">F1 分數</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {(pattern.performance_metrics.f1_score * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+              
+              {/* 準確度 Accuracy (舊版相容) */}
+              {pattern.performance_metrics.accuracy !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">準確度</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {(pattern.performance_metrics.accuracy * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+              
+              {/* Train AUC (XGBoost) */}
+              {pattern.performance_metrics.train_auc !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">Train AUC</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {(pattern.performance_metrics.train_auc * 100).toFixed(1)}%
+                  </p>
+                </div>
+              )}
+              
+              {/* CV AUC (XGBoost) */}
+              {pattern.performance_metrics.cv_auc_mean !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">CV AUC</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {(pattern.performance_metrics.cv_auc_mean * 100).toFixed(1)}%
+                  </p>
+                  {pattern.performance_metrics.cv_auc_std !== undefined && (
+                    <p className="text-xs text-gray-700 mt-1">
+                      ±{(pattern.performance_metrics.cv_auc_std * 100).toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+            
+            {/* 樣本數 */}
+            {(pattern.performance_metrics.sample_count !== undefined || 
+              pattern.performance_metrics.profitable_count !== undefined) && (
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                {pattern.performance_metrics.sample_count !== undefined && (
+                  <div className="text-center p-3 bg-blue-50 rounded">
+                    <p className="text-sm text-gray-700 font-medium">訓練樣本</p>
+                    <p className="text-xl font-semibold text-gray-900">{pattern.performance_metrics.sample_count}</p>
+                  </div>
+                )}
+                {pattern.performance_metrics.profitable_count !== undefined && (
+                  <div className="text-center p-3 bg-green-50 rounded">
+                    <p className="text-sm text-gray-700 font-medium">盈利樣本</p>
+                    <p className="text-xl font-semibold text-gray-900">{pattern.performance_metrics.profitable_count}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
       
       {/* 規則列表 */}
       <div className="bg-white rounded-lg border">
         <div className="p-4 border-b">
-          <h2 className="text-lg font-bold">樣式規則 (共 {pattern.rules.length} 條)</h2>
+          <h2 className="text-lg font-bold text-gray-900">
+            樣式規則 {pattern.rules && pattern.rules.length > 0 ? `(共 ${pattern.rules.length} 條)` : ''}
+          </h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left">#</th>
-                <th className="px-4 py-2 text-left">特徵</th>
-                <th className="px-4 py-2 text-left">條件</th>
-                <th className="px-4 py-2 text-left">閾值</th>
-                <th className="px-4 py-2 text-left">說明</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pattern.rules.map((rule, index) => (
-                <tr key={index} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-2">{index + 1}</td>
-                  <td className="px-4 py-2 font-mono text-xs">{rule.feature}</td>
-                  <td className="px-4 py-2">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded font-semibold">
-                      {rule.operator}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 font-semibold">{rule.threshold}</td>
-                  <td className="px-4 py-2 text-gray-600">{rule.description || '-'}</td>
+        
+        {!pattern.rules || pattern.rules.length === 0 ? (
+          <div className="p-8 text-center text-gray-700">
+            <p>無規則資料</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left text-gray-900 font-semibold">#</th>
+                  <th className="px-4 py-2 text-left text-gray-900 font-semibold">特徵</th>
+                  <th className="px-4 py-2 text-left text-gray-900 font-semibold">條件</th>
+                  <th className="px-4 py-2 text-left text-gray-900 font-semibold">閾值</th>
+                  <th className="px-4 py-2 text-left text-gray-900 font-semibold">說明</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pattern.rules.map((rule, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-2 text-gray-900">{index + 1}</td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-900">{rule.feature}</td>
+                    <td className="px-4 py-2">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded font-semibold">
+                        {rule.operator}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-semibold text-gray-900">{rule.threshold}</td>
+                    <td className="px-4 py-2 text-gray-900">{rule.description || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       
       {/* 刪除確認對話框 */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md">
-            <h3 className="text-lg font-bold mb-2">確認刪除</h3>
-            <p className="text-gray-600 mb-4">
+            <h3 className="text-lg font-bold mb-2 text-gray-900">確認刪除</h3>
+            <p className="text-gray-900 mb-4">
               確定要刪除樣式「{pattern.name}」嗎？此操作無法復原。
             </p>
             <div className="flex justify-end gap-2">

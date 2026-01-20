@@ -84,6 +84,7 @@ class PatternManagementService:
             # 驗證模式
             is_valid, errors = self.validator.validate_pattern(pattern)
             if not is_valid:
+                self.logger.error(f"模式驗證失敗 - ID: {pattern_id}, 錯誤: {errors}")
                 return {
                     'success': False,
                     'error': '模式驗證失敗',
@@ -98,6 +99,7 @@ class PatternManagementService:
             return {
                 'success': True,
                 'pattern_id': pattern_id,
+                'pattern': pattern.to_dict(),
                 'file_path': file_path,
                 'message': '模式建立成功'
             }

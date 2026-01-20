@@ -47,7 +47,10 @@ async def create_pattern(request: CreatePatternRequest):
             metadata=request.metadata
         )
         if not result["success"]:
-            raise HTTPException(status_code=400, detail=result.get("error"))
+            error_detail = result.get("error", "未知錯誤")
+            if "validation_errors" in result:
+                error_detail = f"{error_detail}: {', '.join(result['validation_errors'])}"
+            raise HTTPException(status_code=400, detail=error_detail)
         return result
     except HTTPException:
         raise
