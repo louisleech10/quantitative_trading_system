@@ -116,6 +116,9 @@ class SignalDensityAnalyzer:
         提取訓練窗口K線數據
 
         從HDF5存儲中讀取指定案例的訓練窗口範圍的K線數據。
+        
+        重要：TO (Time Open) 是開單時間點，在 TO 開盤時決策
+        因此訓練窗口只包含 TO-1 之前的數據，不包含 TO 當根 K 線
 
         Args:
             case: 案例記錄

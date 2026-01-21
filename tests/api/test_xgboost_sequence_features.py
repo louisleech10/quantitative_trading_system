@@ -5,7 +5,10 @@ from api.services.xgboost_batch_service import XGBoostBatchService
 
 
 def test_flatten_sequence_features():
-    """測試展平序列特徵輸出形狀與命名"""
+    """測試展平序列特徵輸出形狀與命名
+    
+    注意：現在特徵只用到 TO-1，所以命名從 t-3 到 t-1（沒有 t0）
+    """
     service = XGBoostBatchService()
     window_values = np.array([
         [1.0, 2.0],
@@ -22,8 +25,12 @@ def test_flatten_sequence_features():
 
     assert values.shape == (6,)
     assert len(names) == 6
-    assert names[0] == "a_w3_t-2"
-    assert names[-1] == "b_w3_t0"
+    # 修正：現在是 t-3, t-2, t-1 (沒有 t0)
+    assert names[0] == "a_w3_t-3"
+    assert names[1] == "a_w3_t-2"
+    assert names[2] == "a_w3_t-1"
+    assert names[3] == "b_w3_t-3"
+    assert names[-1] == "b_w3_t-1"
 
 
 def test_aggregate_sequence_features_mean_last():

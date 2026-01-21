@@ -205,6 +205,25 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
                   )}
                 </div>
               )}
+              
+              {/* 過擬合分數 (XGBoost) */}
+              {pattern.performance_metrics.overfitting_score !== undefined && (
+                <div className="text-center p-4 bg-gray-50 rounded">
+                  <p className="text-sm text-gray-700 font-medium mb-1">過擬合分數</p>
+                  <p className={`text-2xl font-bold ${
+                    pattern.performance_metrics.overfitting_score <= 0.05 ? 'text-green-600' :
+                    pattern.performance_metrics.overfitting_score <= 0.1 ? 'text-yellow-600' :
+                    'text-red-600'
+                  }`}>
+                    {(pattern.performance_metrics.overfitting_score * 100).toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-gray-700 mt-1">
+                    {pattern.performance_metrics.overfitting_score <= 0.05 ? '✅ 良好' :
+                     pattern.performance_metrics.overfitting_score <= 0.1 ? '⚠️ 中等' :
+                     '❌ 過高'}
+                  </p>
+                </div>
+              )}
             </div>
             
             {/* 樣本數 */}
@@ -228,6 +247,163 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
           </>
         )}
       </div>
+      
+      {/* 配置資訊 (XGBoost Analysis) */}
+      {pattern.metadata && (
+        pattern.metadata.data_selection || 
+        pattern.metadata.indicator_config || 
+        pattern.metadata.sequence_config || 
+        pattern.metadata.training_config
+      ) && (
+        <div className="bg-white rounded-lg border p-6">
+          <h2 className="text-lg font-bold mb-4 text-gray-900">分析配置</h2>
+          
+          <div className="space-y-4">
+            {/* 數據選擇配置 */}
+            {pattern.metadata.data_selection && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-blue-600">📊</span> 數據選擇配置
+                </h3>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-700 font-medium">交易對</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.data_selection.symbol || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium">時間週期</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.data_selection.timeframe || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium">回溯 K 線數</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.data_selection.lookback_bars || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* 指標配置 */}
+            {pattern.metadata.indicator_config && pattern.metadata.indicator_config.length > 0 && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-green-600">📈</span> 指標配置
+                </h3>
+                <div className="space-y-2">
+                  {pattern.metadata.indicator_config.map((indicator: any, idx: number) => (
+                    <div key={idx} className="bg-white border rounded p-3 text-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
+                          {indicator.indicator || 'Unknown'}
+                        </span>
+                        <span className="text-gray-700">
+                          資料來源: <span className="font-semibold text-gray-900">{indicator.data_source || 'close'}</span>
+                        </span>
+                      </div>
+                      {indicator.params && Object.keys(indicator.params).length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(indicator.params).map(([key, value]) => (
+                            <span key={key} className="text-xs text-gray-700">
+                              <span className="font-medium">{key}:</span> <span className="text-gray-900">{String(value)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* 序列特徵配置 */}
+            {pattern.metadata.sequence_config && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-purple-600">🔄</span> 序列特徵配置
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-700 font-medium">序列窗口長度</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.sequence_config.sequence_length || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium">特徵模式</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.sequence_config.sequence_feature_mode || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium">序列步長</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.sequence_config.sequence_stride || '-'}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* 彙總方法 */}
+                {pattern.metadata.sequence_config.aggregation_methods && 
+                 pattern.metadata.sequence_config.aggregation_methods.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-gray-700 font-medium text-sm mb-2">彙總方法</p>
+                    <div className="flex flex-wrap gap-2">
+                      {pattern.metadata.sequence_config.aggregation_methods.map((method: string) => (
+                        <span key={method} className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-semibold">
+                          {method}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* 多時間尺度窗口 */}
+                {pattern.metadata.sequence_config.multi_scale_windows && 
+                 pattern.metadata.sequence_config.multi_scale_windows.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-gray-700 font-medium text-sm mb-2">多時間尺度窗口</p>
+                    <div className="flex flex-wrap gap-2">
+                      {pattern.metadata.sequence_config.multi_scale_windows.map((window: number) => (
+                        <span key={window} className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-semibold">
+                          {window}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* 訓練配置 */}
+            {pattern.metadata.training_config && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-yellow-600">⚙️</span> 訓練配置
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-700 font-medium">時間序列切分</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.training_config.time_series_split ? '✅ 是' : '❌ 否'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-700 font-medium">交叉驗證折數</p>
+                    <p className="text-gray-900 font-semibold mt-1">
+                      {pattern.metadata.training_config.cv_folds || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* 規則列表 */}
       <div className="bg-white rounded-lg border">

@@ -601,11 +601,13 @@ class XGBoostBatchService:
         all_sequence_feature_names: List[str] = []
 
         for window_size in window_sizes:
-            start_idx = row_idx - (window_size - 1) * sequence_stride
+            # 注意：不包含 row_idx (TO)，只用到 TO-1
+            # 因為 TO 是開單時間點，應該在 TO 開盤時決策，只能看到 TO-1 之前的數據
+            start_idx = row_idx - window_size * sequence_stride
             if start_idx < 0:
                 return None
 
-            window_indices = list(range(start_idx, row_idx + 1, sequence_stride))
+            window_indices = list(range(start_idx, row_idx, sequence_stride))
             if len(window_indices) != window_size:
                 return None
 
@@ -639,17 +641,22 @@ class XGBoostBatchService:
         feature_names: List[str],
         window_size: int
     ) -> Tuple[np.ndarray, List[str]]:
-        """將序列視窗展平為特徵向量"""
-        flattened_values = window_values.reshape(-1)
+        """將序列視窗展平為特徵向量
+        
+        注意：window_values shape = (window_size, n_features)
+        我們需要先轉置再展平，才能得到正確的特徵順序
+        """
+        # 轉置後展平: (n_features, window_size) -> flat
+        # 這樣每個特徵的時間序列會連續排列
+        flattened_values = window_values.T.reshape(-1)
 
         flattened_feature_names: List[str] = []
-        for idx in range(window_size):
-            offset = window_size - 1 - idx
-            if offset == 0:
-                suffix = "t0"
-            else:
+        # 先按特徵名稱，再按時間順序（從舊到新）
+        for name in feature_names:
+            for idx in range(window_size):
+                # 注意：現在 t-1 是最新可見的 K 線（TO-1），因為 TO 當根看不到
+                offset = window_size - idx
                 suffix = f"t-{offset}"
-            for name in feature_names:
                 flattened_feature_names.append(f"{name}_w{window_size}_{suffix}")
 
         return flattened_values, flattened_feature_names

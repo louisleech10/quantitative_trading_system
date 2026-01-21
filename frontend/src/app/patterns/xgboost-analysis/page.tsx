@@ -103,6 +103,29 @@ interface AnalysisResult {
   decision_rules: DecisionRule[]
   model_saved: boolean
   model_path?: string
+  metadata?: {
+    data_selection?: {
+      symbol: string
+      timeframe: string
+      lookback_bars: number
+    }
+    indicator_config?: Array<{
+      indicator: string
+      data_source: string
+      params: Record<string, any>
+    }>
+    sequence_config?: {
+      sequence_length: number
+      sequence_feature_mode: 'aggregate' | 'flatten'
+      sequence_stride: number
+      aggregation_methods: string[]
+      multi_scale_windows: number[]
+    }
+    training_config?: {
+      time_series_split: boolean
+      cv_folds: number
+    }
+  }
 }
 
 // ==================== Constants ====================
@@ -512,11 +535,14 @@ function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) 
             <div key={feature.feature} className="flex items-center gap-3">
               <span className="w-6 text-sm text-gray-600">{idx + 1}</span>
               <div className="flex-1">
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-mono text-gray-900 truncate max-w-[200px]" title={feature.feature}>
+                <div className="grid grid-cols-[1fr_auto] gap-3 mb-1">
+                  <span
+                    className="text-sm font-mono text-gray-900 break-all whitespace-normal"
+                    title={feature.feature}
+                  >
                     {feature.feature}
                   </span>
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-gray-700 whitespace-nowrap">
                     {(feature.importance * 100).toFixed(2)}%
                   </span>
                 </div>
@@ -679,6 +705,60 @@ export default function XGBoostAnalysisPage() {
     }
   }, [caseSummary])
 
+  // Restore configuration from currentAnalysis metadata when returning to page
+  useEffect(() => {
+    if (currentAnalysis?.metadata) {
+      const meta = currentAnalysis.metadata
+      
+      // 恢復數據選擇配置
+      if (meta.data_selection) {
+        if (meta.data_selection.symbol) {
+          setSelectedSymbols([meta.data_selection.symbol])
+        }
+        if (meta.data_selection.timeframe) {
+          setKlineTimeframe(meta.data_selection.timeframe)
+        }
+        if (meta.data_selection.lookback_bars) {
+          setLookbackBars(meta.data_selection.lookback_bars)
+        }
+      }
+      
+      // 恢復指標配置
+      if (meta.indicator_config && meta.indicator_config.length > 0) {
+        setIndicators(meta.indicator_config)
+      }
+      
+      // 恢復序列特徵配置
+      if (meta.sequence_config) {
+        if (meta.sequence_config.sequence_length) {
+          setSequenceLength(meta.sequence_config.sequence_length)
+        }
+        if (meta.sequence_config.sequence_feature_mode) {
+          setSequenceFeatureMode(meta.sequence_config.sequence_feature_mode)
+        }
+        if (meta.sequence_config.sequence_stride) {
+          setSequenceStride(meta.sequence_config.sequence_stride)
+        }
+        if (meta.sequence_config.aggregation_methods) {
+          setAggregationMethodsInput(meta.sequence_config.aggregation_methods.join(','))
+        }
+        if (meta.sequence_config.multi_scale_windows) {
+          setMultiScaleWindowsInput(meta.sequence_config.multi_scale_windows.join(','))
+        }
+      }
+      
+      // 恢復訓練配置
+      if (meta.training_config) {
+        if (meta.training_config.time_series_split !== undefined) {
+          setTimeSeriesSplit(meta.training_config.time_series_split)
+        }
+        if (meta.training_config.cv_folds) {
+          setCvFolds(meta.training_config.cv_folds)
+        }
+      }
+    }
+  }, [currentAnalysis])
+
   // Poll task status when running
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null
@@ -689,8 +769,35 @@ export default function XGBoostAnalysisPage() {
           const status = await getTaskStatus(taskId)
           setTaskStatus(status)
 
-          if (status.status === 'completed') {
-            setCurrentAnalysis(status.result || null)
+          if (status.status === 'completed' && status.result) {
+            // 將當前的配置信息添加到分析結果中
+            const resultWithMetadata: AnalysisResult = {
+              ...status.result,
+              metadata: {
+                data_selection: {
+                  symbol: selectedSymbols[0] || status.result.symbol,
+                  timeframe: klineTimeframe,
+                  lookback_bars: lookbackBars
+                },
+                indicator_config: indicators.map(ind => ({
+                  indicator: ind.indicator,
+                  data_source: ind.data_source,
+                  params: ind.params
+                })),
+                sequence_config: {
+                  sequence_length: sequenceLength,
+                  sequence_feature_mode: sequenceFeatureMode,
+                  sequence_stride: sequenceStride,
+                  aggregation_methods: aggregationMethodsInput.split(',').map(m => m.trim()).filter(m => m),
+                  multi_scale_windows: multiScaleWindowsInput.split(',').map(w => parseInt(w.trim())).filter(w => !isNaN(w))
+                },
+                training_config: {
+                  time_series_split: timeSeriesSplit,
+                  cv_folds: cvFolds
+                }
+              }
+            }
+            setCurrentAnalysis(resultWithMetadata)
             setIsLoading(false)
           } else if (status.status === 'failed') {
             setError(status.error || '分析失敗')
@@ -705,7 +812,7 @@ export default function XGBoostAnalysisPage() {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [taskId, taskStatus?.status])
+  }, [taskId, taskStatus?.status, selectedSymbols, klineTimeframe, lookbackBars, indicators, sequenceLength, sequenceFeatureMode, sequenceStride, aggregationMethodsInput, multiScaleWindowsInput, timeSeriesSplit, cvFolds])
 
   const loadCaseSummary = async () => {
     try {
@@ -759,17 +866,49 @@ export default function XGBoostAnalysisPage() {
           f1_score: result.model_performance.f1_score,
           train_auc: result.model_performance.train_auc,
           cv_auc_mean: result.model_performance.cv_auc_mean,
-          cv_auc_std: result.model_performance.cv_auc_std
+          cv_auc_std: result.model_performance.cv_auc_std,
+          overfitting_score: result.model_performance.overfitting_score
         },
         tags: ['xgboost', result.symbol, result.timeframe, 'auto-generated'],
         metadata: {
+          // ===== 結果資料 =====
           total_cases: result.total_cases,
           valid_cases: result.valid_cases,
           features_generated: result.features_generated,
           feature_names: result.feature_names,
           model_saved: result.model_saved,
           model_path: result.model_path,
-          created_from: 'xgboost-analysis-page'
+          created_from: 'xgboost-analysis-page',
+          
+          // ===== 分析輸入配置參數 =====
+          // 數據選擇配置
+          data_selection: {
+            symbol: result.symbol,
+            timeframe: result.timeframe,
+            lookback_bars: lookbackBars
+          },
+          
+          // 指標配置
+          indicator_config: indicators.map(ind => ({
+            indicator: ind.indicator,
+            data_source: ind.data_source,
+            params: ind.params
+          })),
+          
+          // 序列特徵配置
+          sequence_config: {
+            sequence_length: sequenceLength,
+            sequence_feature_mode: sequenceFeatureMode,
+            sequence_stride: sequenceStride,
+            aggregation_methods: aggregationMethodsInput.split(',').map(m => m.trim()).filter(m => m),
+            multi_scale_windows: multiScaleWindowsInput.split(',').map(w => parseInt(w.trim())).filter(w => !isNaN(w))
+          },
+          
+          // 訓練配置
+          training_config: {
+            time_series_split: timeSeriesSplit,
+            cv_folds: cvFolds
+          }
         }
       }
 
