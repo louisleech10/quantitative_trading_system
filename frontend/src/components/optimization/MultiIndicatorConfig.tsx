@@ -165,7 +165,7 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
       'high_low_range_pct',
       'close_position_in_range',
       'price_volatility_5',
-      'price_momentum_3',
+      'price_momentum_3_pct',  // ✅ 修正：改為百分比（跨標的兼容）
       'upper_shadow_pct',
       'lower_shadow_pct',
       'body_pct'
@@ -188,14 +188,27 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
       const { indicator, data_source, params } = config
       
       if (indicator === 'ema_three_line') {
-        // EMA 策略特徵（9個）
-        features.push(`${data_source}_ema${params.ema_short}_value`)
-        features.push(`${data_source}_ema${params.ema_mid}_value`)
-        features.push(`${data_source}_ema${params.ema_long}_value`)
-        features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_distance`)
-        features.push(`${data_source}_ema${params.ema_mid}_${params.ema_long}_distance`)
+        // EMA 策略特徵（11個）
+        // ✅ 跨標的訓練：只使用相對特徵，不使用 EMA 絕對值
+        
+        // 價格與 EMA 的相對距離（3個，百分比）
+        features.push(`${data_source}_price_ema_short_distance_pct`)
+        features.push(`${data_source}_price_ema_mid_distance_pct`)
+        features.push(`${data_source}_price_ema_long_distance_pct`)
+        
+        // EMA 之間的相對距離（2個，百分比）
+        features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_distance_pct`)
+        features.push(`${data_source}_ema${params.ema_mid}_${params.ema_long}_distance_pct`)
+        
+        // EMA 趨勢特徵（2個）
         features.push(`${data_source}_ema_trend_aligned`)
         features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_cross_signal`)
+        
+        // EMA 斜率（2個，百分比變化率）
+        features.push(`${data_source}_ema_short_slope_pct`)
+        features.push(`${data_source}_ema_mid_slope_pct`)
+        
+        // 成交量特徵（2個）
         features.push(`volume_spike_${Math.round(params.volume_threshold * 100)}`)
         features.push(`taker_ratio_distance_${Math.round(params.volume_threshold * 100)}`)
         
@@ -348,6 +361,8 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
               <p className="font-semibold text-gray-900">將生成 {previewFeatures.length} 個特徵：</p>
               <div className="text-xs text-gray-600 mb-2">
                 包含：8 個價格特徵 + 6 個成交量特徵 + 策略特徵（依配置）
+                <br />
+                <span className="text-green-700 font-medium">✅ 跨標的訓練兼容：所有特徵均為相對值（百分比/比例/標記），無絕對價格/成交量</span>
               </div>
               <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
                 {previewFeatures.map(feature => (

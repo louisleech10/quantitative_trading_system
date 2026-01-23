@@ -24,6 +24,7 @@ from api.models.pattern_analysis_models import (
 from api.services.xgboost_task_service import XGBoostTaskService
 from api.services.xgboost_batch_service import get_xgboost_batch_service
 from api.core.logging import get_logger
+from api.utils.json_serializer import sanitize_for_json
 
 logger = get_logger(__name__)
 
@@ -62,19 +63,19 @@ async def get_case_summary(
 @router.post("/xgboost/batch/start", response_model=XGBoostAnalysisResponse)
 async def start_batch_xgboost_analysis(request: XGBoostBatchAnalysisRequest):
     """
-    啟動 XGBoost 批量分析任務
+    啟動 XGBoost 批量分析任務（支援多標的跨商品訓練）
     
     正確流程:
-    1. 讀取 K 線數據（HDF5）
-    2. 根據指標配置計算特徵
-    3. 為所有案例提取特徵和標籤
-    4. 訓練 XGBoost 模型並交叉驗證
+    1. 讀取所有標的的 K 線數據（HDF5）
+    2. 根據指標配置為每個標的計算特徵
+    3. 合併所有標的的案例並提取特徵和標籤
+    4. 訓練單一跨商品 XGBoost 模型並交叉驗證
     5. 計算特徵重要性
     6. 提取決策規則
     7. 儲存模型
     
     Args:
-        request: 批量分析請求（包含 symbol, timeframe, indicators）
+        request: 批量分析請求（包含 symbols, timeframe, indicators）
         
     Returns:
         任務 ID 和狀態
@@ -93,7 +94,7 @@ async def start_batch_xgboost_analysis(request: XGBoostBatchAnalysisRequest):
         ]
         
         result = await batch_service.start_batch_analysis(
-            symbol=request.symbol,
+            symbols=request.symbols,
             timeframe=request.timeframe,
             indicators=indicators,
             lookback_bars=request.lookback_bars,
@@ -128,6 +129,9 @@ async def get_batch_xgboost_task_status(task_id: str):
     
     if not task:
         raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+    
+    # 清理 NaN/Infinity 等無法 JSON 序列化的值
+    task = sanitize_for_json(task)
     
     return task
 
@@ -171,6 +175,9 @@ async def get_xgboost_task_status(task_id: str):
     
     if not task:
         raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+    
+    # 清理 NaN/Infinity 等無法 JSON 序列化的值
+    task = sanitize_for_json(task)
     
     return task
 

@@ -229,331 +229,329 @@ class BatchDownloadService:
         skipped_cases = 0
         total_bars = 0
 
-        # 用於線程安全的統計
+        # 用於線程安全的統計（雖然改為串行，但保留以備將來優化）
         stats_lock = asyncio.Lock()
 
         start_time = datetime.utcnow()
 
-        # 並行下載配置：最多5個並發下載任務
-        max_concurrent_downloads = 5
-        semaphore = asyncio.Semaphore(max_concurrent_downloads)
+        # 注意：已改為串行下載（HDF5 不支援並行寫入同一檔案）
+        # 保留 semaphore 結構以便將來改用每 symbol 獨立 HDF5 檔案時可以恢復並行
 
         async def download_group(symbol: str, group_cases: List[CaseRecord]):
-            """下載單個分組（支援並行）"""
+            """下載單個分組"""
             nonlocal downloaded_case_ids, failed_case_ids, error_details, skipped_cases, total_bars, warmup_bars
 
             # 使用request.timeframe作為K線下載時間框架（與案例的timeframe獨立）
             timeframe = request.timeframe
 
-            async with semaphore:  # 限制並發數
-                logger.info(
-                    f"Processing {len(group_cases)} cases for {symbol}/{timeframe} "
-                    f"(download timeframe={request.timeframe}, cases may have different timeframes)"
+            logger.info(
+                f"Processing {len(group_cases)} cases for {symbol}/{timeframe} "
+                f"(download timeframe={request.timeframe}, cases may have different timeframes)"
+            )
+
+            try:
+                # Step 1: 計算時間範圍（包含 warmup）
+                time_ranges = self._calculate_time_ranges(
+                    group_cases,
+                    timeframe,
+                    request.lookback_bars,
+                    request.forward_bars,
+                    warmup_bars
                 )
 
-                try:
-                    # Step 1: 計算時間範圍（包含 warmup）
-                    time_ranges = self._calculate_time_ranges(
-                        group_cases,
-                        timeframe,
-                        request.lookback_bars,
-                        request.forward_bars,
-                        warmup_bars
-                    )
+                # Step 2: 合併重疊時間範圍
+                merged_ranges = self._merge_overlapping_ranges(time_ranges)
 
-                    # Step 2: 合併重疊時間範圍
-                    merged_ranges = self._merge_overlapping_ranges(time_ranges)
+                logger.info(
+                    f"Merged {len(time_ranges)} ranges into {len(merged_ranges)} "
+                    f"for {symbol}/{timeframe}"
+                )
 
-                    logger.info(
-                        f"Merged {len(time_ranges)} ranges into {len(merged_ranges)} "
-                        f"for {symbol}/{timeframe}"
-                    )
-
-                    # Step 3: 下載合併後的時間範圍
-                    for time_range in merged_ranges:
-                        try:
-                            # 檢查是否已存在（如果非force模式）
-                            # **CRITICAL FIX**: 不只檢查metadata，還要驗證數據實際存在
-                            if not request.force_redownload:
-                                metadata = self.kline_storage.get_metadata(symbol, timeframe)
-                                if metadata:
-                                    # 驗證數據實際存在且非空
-                                    total_bars = metadata.get('total_bars', 0)
-                                    if total_bars > 0:
-                                        # **CRITICAL FIX**: 檢查現有數據是否覆蓋請求的時間範圍
-                                        meta_start = datetime.fromtimestamp(metadata.get('time_range_start', 0))
-                                        meta_end = datetime.fromtimestamp(metadata.get('time_range_end', 0))
-
-                                        # 將請求範圍轉為datetime便於比較
-                                        requested_start = time_range.start
-                                        requested_end = time_range.end
-
-                                        # 檢查現有數據是否完全覆蓋請求範圍
-                                        if meta_start <= requested_start and meta_end >= requested_end:
-                                            # 時間範圍覆蓋，但還需要驗證數據連續性
-                                            try:
-                                                # 讀取數據並驗證連續性（避免有缺口的數據被誤判為完整）
-                                                existing_df = await asyncio.to_thread(
-                                                    self.kline_storage.read_klines,
-                                                    symbol,
-                                                    timeframe,
-                                                    validate_continuity=True  # 啟用零容忍連續性驗證
-                                                )
-                                                # 如果沒有拋出異常，說明數據連續完整
-                                                logger.warning(
-                                                    f"⏭️  SKIPPING download for {symbol}/{timeframe} (force_redownload=False)\n"
-                                                    f"   Existing data range: {meta_start} to {meta_end}\n"
-                                                    f"   Requested range: {requested_start} to {requested_end}\n"
-                                                    f"   ✅ Requested range is FULLY COVERED by existing data\n"
-                                                    f"   ✅ Data continuity verified: {len(existing_df)} bars with no gaps\n"
-                                                    f"   Affected cases: {len(group_cases)} cases will read from existing HDF5"
-                                                )
-                                                async with stats_lock:
-                                                    skipped_cases += len(group_cases)
-                                                continue
-                                            except ValueError as e:
-                                                # 連續性驗證失敗 - 數據有缺口，需要重新下載
-                                                logger.warning(
-                                                    f"⚠️  Existing data for {symbol}/{timeframe} has GAPS - forcing redownload\n"
-                                                    f"   Existing range: {meta_start} to {meta_end}\n"
-                                                    f"   Continuity error: {str(e)}\n"
-                                                    f"   🔄 Will redownload to ensure data integrity"
-                                                )
-                                                # 不 continue，讓代碼繼續執行下載流程
-                                        else:
-                                            # ❌ 現有數據不覆蓋請求範圍 - 必須下載
-                                            logger.warning(
-                                                f"⚠️  Existing HDF5 data for {symbol}/{timeframe} is OUTDATED/INCOMPLETE\n"
-                                                f"   Existing range: {meta_start} to {meta_end}\n"
-                                                f"   Requested range: {requested_start} to {requested_end}\n"
-                                                f"   📊 Gap analysis:\n"
-                                                f"      - Request starts {'BEFORE' if requested_start < meta_start else 'AFTER'} existing data\n"
-                                                f"      - Request ends {'BEFORE' if requested_end < meta_end else 'AFTER'} existing data\n"
-                                                f"   🔄 Downloading new data to fill the gap..."
-                                            )
-                                            # 繼續往下執行下載流程
-                                    else:
-                                        # total_bars = 0，數據損壞 - 強制下載
-                                        logger.warning(
-                                            f"⚠️  Metadata exists for {symbol}/{timeframe} but total_bars=0\n"
-                                            f"   Forcing download to fix corrupted state"
-                                        )
-
-                            # 診斷日誌：下載前
-                            logger.info(
-                                f"📥 DOWNLOADING from Binance API: {symbol}/{timeframe}\n"
-                                f"   Time range: {time_range.start} to {time_range.end}\n"
-                                f"   For {len(group_cases)} cases\n"
-                                f"   Force redownload: {request.force_redownload}"
-                            )
-
-                            # 使用asyncio.to_thread()在線程池中執行同步下載
-                            download_start_time = datetime.utcnow()
-                            df = await asyncio.to_thread(
-                                self.download_service.download_klines,
-                                source='binance',
-                                symbol=symbol,
-                                start_time=time_range.start,
-                                end_time=time_range.end,
-                                timeframe=timeframe,
-                                save_to_storage=True
-                            )
-                            download_elapsed = (datetime.utcnow() - download_start_time).total_seconds()
-
-                            # 診斷日誌：下載後
-                            if not df.empty:
-                                async with stats_lock:
-                                    total_bars += len(df)
-
-                                # 獲取實際下載的時間範圍
-                                actual_start = datetime.fromtimestamp(df['timestamp'].iloc[0])
-                                actual_end = datetime.fromtimestamp(df['timestamp'].iloc[-1])
-
-                                logger.info(
-                                    f"✅ DOWNLOAD SUCCESS: {symbol}/{timeframe}\n"
-                                    f"   Downloaded: {len(df)} K-lines in {download_elapsed:.2f}s\n"
-                                    f"   Requested: {time_range.start} to {time_range.end}\n"
-                                    f"   Actual data: {actual_start} to {actual_end}\n"
-                                    f"   Saved to HDF5: data_cache/{symbol}_{timeframe}.h5"
-                                )
-
-                                # 儲存批量下載使用的 warmup_bars 到 metadata（用於後續 warmup 驗證）
-                                self.kline_storage.update_metadata(
-                                    symbol=symbol,
-                                    timeframe=timeframe,
-                                    warmup_bars_downloaded=warmup_bars,
-                                    lookback_bars=request.lookback_bars,
-                                    forward_bars=request.forward_bars
-                                )
-                            else:
-                                logger.warning(
-                                    f"⚠️  DOWNLOAD RETURNED EMPTY: {symbol}/{timeframe}\n"
-                                    f"   Time range: {time_range.start} to {time_range.end}\n"
-                                    f"   Binance API returned 0 K-lines (data may not exist for this period)"
-                                )
-
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to download {symbol}/{timeframe} "
-                                f"({time_range.start} to {time_range.end}): {e}",
-                                exc_info=True
-                            )
-                            # 記錄失敗案例
-                            async with stats_lock:
-                                for case in group_cases:
-                                    if case.case_id not in failed_case_ids:
-                                        failed_case_ids.append(case.case_id)
-                                        error_details[case.case_id] = str(e)
-                            continue
-
-                    # Step 4: 為每個案例創建HDF5存儲（按案例組織）
-                    for case in group_cases:
-                        try:
-                            # 計算案例所需的時間範圍（包含 warmup）
-                            case_start, case_end = self._calculate_case_time_range(
-                                case,
-                                request.lookback_bars,
-                                request.forward_bars,
-                                warmup_bars
-                            )
-                            
-                            # 檢查時間範圍是否包含已知的數據缺口
-                            has_gaps, gaps = self._check_timerange_has_known_gaps(case_start, case_end)
-                            
-                            if has_gaps:
-                                # 跳過包含已知缺口的案例
-                                gap_info = gaps[0]  # 顯示第一個缺口
-                                logger.warning(
-                                    f"⚠️  SKIPPING case {case.case_id} due to known data gap\n"
-                                    f"   Case time range: {case_start} to {case_end}\n"
-                                    f"   Known gap: {gap_info['start']} to {gap_info['end']}\n"
-                                    f"   Reason: {gap_info['reason']}\n"
-                                    f"   這是 Binance API 級別的數據缺失，無法下載補齊"
-                                )
-                                async with stats_lock:
-                                    skipped_cases += 1
-                                continue
-
-                            # 從已下載數據中讀取案例範圍的K線
-                            # 注意：KlineStorageManager.read_klines() 期望整數時間戳，不是datetime對象
-                            logger.debug(
-                                f"Reading case data: {case.case_id}\n"
-                                f"   Symbol/Timeframe: {symbol}/{timeframe}\n"
-                                f"   Case time range: {case_start} to {case_end}\n"
-                                f"   Case TO timestamp: {case.timestamp}"
-                            )
-
-                            case_df = self.kline_storage.read_klines(
-                                symbol,
-                                timeframe,
-                                int(case_start.timestamp()),
-                                int(case_end.timestamp())
-                            )
-
-                            if case_df is None or case_df.empty:
-                                # 診斷日誌：讀取失敗的詳細信息
-                                metadata = self.kline_storage.get_metadata(symbol, timeframe)
-                                if metadata:
+                # Step 3: 下載合併後的時間範圍
+                for time_range in merged_ranges:
+                    try:
+                        # 檢查是否已存在（如果非force模式）
+                        # **CRITICAL FIX**: 不只檢查metadata，還要驗證數據實際存在
+                        if not request.force_redownload:
+                            metadata = self.kline_storage.get_metadata(symbol, timeframe)
+                            if metadata:
+                                # 驗證數據實際存在且非空
+                                total_bars = metadata.get('total_bars', 0)
+                                if total_bars > 0:
+                                    # **CRITICAL FIX**: 檢查現有數據是否覆蓋請求的時間範圍
                                     meta_start = datetime.fromtimestamp(metadata.get('time_range_start', 0))
                                     meta_end = datetime.fromtimestamp(metadata.get('time_range_end', 0))
-                                    meta_count = metadata.get('total_bars', 0)
 
-                                    # 檢查案例時間範圍是否超出 HDF5 數據範圍
-                                    case_to = datetime.fromtimestamp(case.timestamp)
-                                    is_before_data = case_end < meta_start
-                                    is_after_data = case_start > meta_end
-                                    is_future = case_to > datetime.utcnow()
+                                    # 將請求範圍轉為datetime便於比較
+                                    requested_start = time_range.start
+                                    requested_end = time_range.end
 
-                                    logger.error(
-                                        f"❌ READ FAILED for case {case.case_id} ({symbol}/{timeframe})\n"
-                                        f"   Case ID: {case.case_id}\n"
-                                        f"   Case TO (時間點): {case_to}\n"
-                                        f"   Case range needed: {case_start} to {case_end}\n"
-                                        f"   HDF5 data range: {meta_start} to {meta_end} ({meta_count} K-lines)\n"
-                                        f"   Diagnosis:\n"
-                                        f"     - Case is BEFORE HDF5 data: {is_before_data}\n"
-                                        f"     - Case is AFTER HDF5 data: {is_after_data}\n"
-                                        f"     - Case is in FUTURE: {is_future}\n"
-                                        f"   Possible causes:\n"
-                                        f"     {'- Case time is in the future (data not exist yet)' if is_future else ''}\n"
-                                        f"     {'- HDF5 data is outdated (need to download newer data)' if is_after_data and not is_future else ''}\n"
-                                        f"     {'- HDF5 data is too recent (need historical data)' if is_before_data else ''}"
-                                    )
+                                    # 檢查現有數據是否完全覆蓋請求範圍
+                                    if meta_start <= requested_start and meta_end >= requested_end:
+                                        # 時間範圍覆蓋，但還需要驗證數據連續性
+                                        try:
+                                            # 讀取數據並驗證連續性（避免有缺口的數據被誤判為完整）
+                                            existing_df = await asyncio.to_thread(
+                                                self.kline_storage.read_klines,
+                                                symbol,
+                                                timeframe,
+                                                validate_continuity=True  # 啟用零容忍連續性驗證
+                                            )
+                                            # 如果沒有拋出異常，說明數據連續完整
+                                            logger.warning(
+                                                f"⏭️  SKIPPING download for {symbol}/{timeframe} (force_redownload=False)\n"
+                                                f"   Existing data range: {meta_start} to {meta_end}\n"
+                                                f"   Requested range: {requested_start} to {requested_end}\n"
+                                                f"   ✅ Requested range is FULLY COVERED by existing data\n"
+                                                f"   ✅ Data continuity verified: {len(existing_df)} bars with no gaps\n"
+                                                f"   Affected cases: {len(group_cases)} cases will read from existing HDF5"
+                                            )
+                                            async with stats_lock:
+                                                skipped_cases += len(group_cases)
+                                            continue
+                                        except ValueError as e:
+                                            # 連續性驗證失敗 - 數據有缺口，需要重新下載
+                                            logger.warning(
+                                                f"⚠️  Existing data for {symbol}/{timeframe} has GAPS - forcing redownload\n"
+                                                f"   Existing range: {meta_start} to {meta_end}\n"
+                                                f"   Continuity error: {str(e)}\n"
+                                                f"   🔄 Will redownload to ensure data integrity"
+                                            )
+                                            # 不 continue，讓代碼繼續執行下載流程
+                                    else:
+                                        # ❌ 現有數據不覆蓋請求範圍 - 必須下載
+                                        logger.warning(
+                                            f"⚠️  Existing HDF5 data for {symbol}/{timeframe} is OUTDATED/INCOMPLETE\n"
+                                            f"   Existing range: {meta_start} to {meta_end}\n"
+                                            f"   Requested range: {requested_start} to {requested_end}\n"
+                                            f"   📊 Gap analysis:\n"
+                                            f"      - Request starts {'BEFORE' if requested_start < meta_start else 'AFTER'} existing data\n"
+                                            f"      - Request ends {'BEFORE' if requested_end < meta_end else 'AFTER'} existing data\n"
+                                            f"   🔄 Downloading new data to fill the gap..."
+                                        )
+                                        # 繼續往下執行下載流程
                                 else:
-                                    logger.error(
-                                        f"❌ READ FAILED for case {case.case_id}\n"
-                                        f"   HDF5 file does not exist or has no metadata: {symbol}_{timeframe}.h5"
+                                    # total_bars = 0，數據損壞 - 強制下載
+                                    logger.warning(
+                                        f"⚠️  Metadata exists for {symbol}/{timeframe} but total_bars=0\n"
+                                        f"   Forcing download to fix corrupted state"
                                     )
 
-                                async with stats_lock:
-                                    failed_case_ids.append(case.case_id)
-                                    error_details[case.case_id] = "No klines data after download"
-                                continue
+                        # 診斷日誌：下載前
+                        logger.info(
+                            f"📥 DOWNLOADING from Binance API: {symbol}/{timeframe}\n"
+                            f"   Time range: {time_range.start} to {time_range.end}\n"
+                            f"   For {len(group_cases)} cases\n"
+                            f"   Force redownload: {request.force_redownload}"
+                        )
 
-                            # 驗證案例範圍的連續性
-                            # 檢查 TO - (lookback + warmup) 到 TO 的範圍是否完全連續
-                            case_timestamp = case.timestamp
-                            timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
-                            required_start = case_timestamp - (request.lookback_bars + warmup_bars) * timeframe_seconds
-                            required_end = case_timestamp
+                        # 使用asyncio.to_thread()在線程池中執行同步下載
+                        download_start_time = datetime.utcnow()
+                        df = await asyncio.to_thread(
+                            self.download_service.download_klines,
+                            source='binance',
+                            symbol=symbol,
+                            start_time=time_range.start,
+                            end_time=time_range.end,
+                            timeframe=timeframe,
+                            save_to_storage=True
+                        )
+                        download_elapsed = (datetime.utcnow() - download_start_time).total_seconds()
 
-                            is_continuous, continuity_error = await asyncio.to_thread(
-                                self.kline_storage.validate_range_continuity,
-                                symbol,
-                                timeframe,
-                                required_start,
-                                required_end
-                            )
+                        # 診斷日誌：下載後
+                        if not df.empty:
+                            async with stats_lock:
+                                total_bars += len(df)
 
-                            if not is_continuous:
-                                logger.warning(
-                                    f"⚠️  案例 {case.case_id} 的數據範圍不連續\n"
-                                    f"   需要範圍: TO-{request.lookback_bars + warmup_bars} 到 TO\n"
-                                    f"   時間戳範圍: {required_start} 到 {required_end}\n"
-                                    f"   連續性錯誤: {continuity_error}\n"
-                                    f"   建議: 重新下載或檢查數據完整性"
-                                )
-                                async with stats_lock:
-                                    failed_case_ids.append(case.case_id)
-                                    error_details[case.case_id] = f"數據不連續: {continuity_error}"
-                                continue
-
-                            # [優化] 不再保存案例切片，只驗證數據可讀取
-                            # 案例數據應實時從共享K線庫讀取，避免數據重複和空間浪費
-                            # 原邏輯：await asyncio.to_thread(self._save_case_klines, case, case_df, request)
+                            # 獲取實際下載的時間範圍
+                            actual_start = datetime.fromtimestamp(df['timestamp'].iloc[0])
+                            actual_end = datetime.fromtimestamp(df['timestamp'].iloc[-1])
 
                             logger.info(
-                                f"✓ 案例 {case.case_id} 驗證通過: {len(case_df)} K線，範圍連續"
+                                f"✅ DOWNLOAD SUCCESS: {symbol}/{timeframe}\n"
+                                f"   Downloaded: {len(df)} K-lines in {download_elapsed:.2f}s\n"
+                                f"   Requested: {time_range.start} to {time_range.end}\n"
+                                f"   Actual data: {actual_start} to {actual_end}\n"
+                                f"   Saved to HDF5: data_cache/{symbol}_{timeframe}.h5"
                             )
 
+                            # 儲存批量下載使用的 warmup_bars 到 metadata（用於後續 warmup 驗證）
+                            self.kline_storage.update_metadata(
+                                symbol=symbol,
+                                timeframe=timeframe,
+                                warmup_bars_downloaded=warmup_bars,
+                                lookback_bars=request.lookback_bars,
+                                forward_bars=request.forward_bars
+                            )
+                        else:
+                            logger.warning(
+                                f"⚠️  DOWNLOAD RETURNED EMPTY: {symbol}/{timeframe}\n"
+                                f"   Time range: {time_range.start} to {time_range.end}\n"
+                                f"   Binance API returned 0 K-lines (data may not exist for this period)"
+                            )
+
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to download {symbol}/{timeframe} "
+                            f"({time_range.start} to {time_range.end}): {e}",
+                            exc_info=True
+                        )
+                        # 記錄失敗案例
+                        async with stats_lock:
+                            for case in group_cases:
+                                if case.case_id not in failed_case_ids:
+                                    failed_case_ids.append(case.case_id)
+                                    error_details[case.case_id] = str(e)
+                        continue
+
+                # Step 4: 為每個案例創建HDF5存儲（按案例組織）
+                for case in group_cases:
+                    try:
+                        # 計算案例所需的時間範圍（包含 warmup）
+                        case_start, case_end = self._calculate_case_time_range(
+                            case,
+                            request.lookback_bars,
+                            request.forward_bars,
+                            warmup_bars
+                        )
+                        
+                        # 檢查時間範圍是否包含已知的數據缺口
+                        has_gaps, gaps = self._check_timerange_has_known_gaps(case_start, case_end)
+                        
+                        if has_gaps:
+                            # 跳過包含已知缺口的案例
+                            gap_info = gaps[0]  # 顯示第一個缺口
+                            logger.warning(
+                                f"⚠️  SKIPPING case {case.case_id} due to known data gap\n"
+                                f"   Case time range: {case_start} to {case_end}\n"
+                                f"   Known gap: {gap_info['start']} to {gap_info['end']}\n"
+                                f"   Reason: {gap_info['reason']}\n"
+                                f"   這是 Binance API 級別的數據缺失，無法下載補齊"
+                            )
                             async with stats_lock:
-                                downloaded_case_ids.append(case.case_id)
+                                skipped_cases += 1
+                            continue
 
-                                # 更新進度
-                                progress.completed_cases += 1
-                                progress.progress_percent = (
-                                    progress.completed_cases / progress.total_cases * 100
+                        # 從已下載數據中讀取案例範圍的K線
+                        # 注意：KlineStorageManager.read_klines() 期望整數時間戳，不是datetime對象
+                        logger.debug(
+                            f"Reading case data: {case.case_id}\n"
+                            f"   Symbol/Timeframe: {symbol}/{timeframe}\n"
+                            f"   Case time range: {case_start} to {case_end}\n"
+                            f"   Case TO timestamp: {case.timestamp}"
+                        )
+
+                        case_df = self.kline_storage.read_klines(
+                            symbol,
+                            timeframe,
+                            int(case_start.timestamp()),
+                            int(case_end.timestamp())
+                        )
+
+                        if case_df is None or case_df.empty:
+                            # 診斷日誌：讀取失敗的詳細信息
+                            metadata = self.kline_storage.get_metadata(symbol, timeframe)
+                            if metadata:
+                                meta_start = datetime.fromtimestamp(metadata.get('time_range_start', 0))
+                                meta_end = datetime.fromtimestamp(metadata.get('time_range_end', 0))
+                                meta_count = metadata.get('total_bars', 0)
+
+                                # 檢查案例時間範圍是否超出 HDF5 數據範圍
+                                case_to = datetime.fromtimestamp(case.timestamp)
+                                is_before_data = case_end < meta_start
+                                is_after_data = case_start > meta_end
+                                is_future = case_to > datetime.utcnow()
+
+                                logger.error(
+                                    f"❌ READ FAILED for case {case.case_id} ({symbol}/{timeframe})\n"
+                                    f"   Case ID: {case.case_id}\n"
+                                    f"   Case TO (時間點): {case_to}\n"
+                                    f"   Case range needed: {case_start} to {case_end}\n"
+                                    f"   HDF5 data range: {meta_start} to {meta_end} ({meta_count} K-lines)\n"
+                                    f"   Diagnosis:\n"
+                                    f"     - Case is BEFORE HDF5 data: {is_before_data}\n"
+                                    f"     - Case is AFTER HDF5 data: {is_after_data}\n"
+                                    f"     - Case is in FUTURE: {is_future}\n"
+                                    f"   Possible causes:\n"
+                                    f"     {'- Case time is in the future (data not exist yet)' if is_future else ''}\n"
+                                    f"     {'- HDF5 data is outdated (need to download newer data)' if is_after_data and not is_future else ''}\n"
+                                    f"     {'- HDF5 data is too recent (need historical data)' if is_before_data else ''}"
                                 )
-                                progress.current_symbol = symbol
+                            else:
+                                logger.error(
+                                    f"❌ READ FAILED for case {case.case_id}\n"
+                                    f"   HDF5 file does not exist or has no metadata: {symbol}_{timeframe}.h5"
+                                )
 
-                                # 計算預估剩餘時間
-                                elapsed_time = (datetime.utcnow() - start_time).total_seconds()
-                                if progress.completed_cases > 0:
-                                    avg_time_per_case = elapsed_time / progress.completed_cases
-                                    remaining_cases = progress.total_cases - progress.completed_cases
-                                    progress.estimated_time_remaining = int(avg_time_per_case * remaining_cases)
+                            async with stats_lock:
+                                failed_case_ids.append(case.case_id)
+                                error_details[case.case_id] = "No klines data after download"
+                            continue
 
-                        except Exception as e:
-                            logger.error(
-                                f"Failed to process case {case.case_id}: {e}",
-                                exc_info=True
+                        # 驗證案例範圍的連續性
+                        # 檢查 TO - (lookback + warmup) 到 TO 的範圍是否完全連續
+                        case_timestamp = case.timestamp
+                        timeframe_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+                        required_start = case_timestamp - (request.lookback_bars + warmup_bars) * timeframe_seconds
+                        required_end = case_timestamp
+
+                        is_continuous, continuity_error = await asyncio.to_thread(
+                            self.kline_storage.validate_range_continuity,
+                            symbol,
+                            timeframe,
+                            required_start,
+                            required_end
+                        )
+
+                        if not is_continuous:
+                            logger.warning(
+                                f"⚠️  案例 {case.case_id} 的數據範圍不連續\n"
+                                f"   需要範圍: TO-{request.lookback_bars + warmup_bars} 到 TO\n"
+                                f"   時間戳範圍: {required_start} 到 {required_end}\n"
+                                f"   連續性錯誤: {continuity_error}\n"
+                                f"   建議: 重新下載或檢查數據完整性"
                             )
                             async with stats_lock:
                                 failed_case_ids.append(case.case_id)
-                                error_details[case.case_id] = str(e)
-                                progress.failed_cases += 1
+                                error_details[case.case_id] = f"數據不連續: {continuity_error}"
+                            continue
 
-                except Exception as e:
+                        # [優化] 不再保存案例切片，只驗證數據可讀取
+                        # 案例數據應實時從共享K線庫讀取，避免數據重複和空間浪費
+                        # 原邏輯：await asyncio.to_thread(self._save_case_klines, case, case_df, request)
+
+                        logger.info(
+                            f"✓ 案例 {case.case_id} 驗證通過: {len(case_df)} K線，範圍連續"
+                        )
+
+                        async with stats_lock:
+                            downloaded_case_ids.append(case.case_id)
+
+                            # 更新進度
+                            progress.completed_cases += 1
+                            progress.progress_percent = (
+                                progress.completed_cases / progress.total_cases * 100
+                            )
+                            progress.current_symbol = symbol
+
+                            # 計算預估剩餘時間
+                            elapsed_time = (datetime.utcnow() - start_time).total_seconds()
+                            if progress.completed_cases > 0:
+                                avg_time_per_case = elapsed_time / progress.completed_cases
+                                remaining_cases = progress.total_cases - progress.completed_cases
+                                progress.estimated_time_remaining = int(avg_time_per_case * remaining_cases)
+
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to process case {case.case_id}: {e}",
+                            exc_info=True
+                        )
+                        async with stats_lock:
+                            failed_case_ids.append(case.case_id)
+                            error_details[case.case_id] = str(e)
+                            progress.failed_cases += 1
+
+            except Exception as e:
                     logger.error(
                         f"Failed to process group {symbol}/{timeframe}: {e}",
                         exc_info=True
@@ -566,14 +564,14 @@ class BatchDownloadService:
                                 error_details[case.case_id] = f"Group error: {str(e)}"
                         progress.failed_cases += len(group_cases)
 
-        # 創建所有下載任務並並行執行
-        download_tasks = [
-            download_group(symbol, group_cases)
-            for symbol, group_cases in grouped_cases.items()
-        ]
-
-        # 並行執行所有下載任務
-        await asyncio.gather(*download_tasks, return_exceptions=True)
+        # 串行執行下載任務（HDF5 不支援並行寫入同一檔案）
+        # 注意：即使不同 symbol 也會寫入同一個 kline_cache.h5，因此必須串行處理
+        for symbol, group_cases in grouped_cases.items():
+            try:
+                await download_group(symbol, group_cases)
+            except Exception as e:
+                logger.error(f"Download group {symbol} failed: {e}", exc_info=True)
+                # 錯誤已在 download_group 內部處理，這裡只記錄日誌
 
         # 完成任務
         end_time = datetime.utcnow()

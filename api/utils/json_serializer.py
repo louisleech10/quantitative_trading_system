@@ -4,6 +4,7 @@ JSON 序列化工具
 """
 
 import numpy as np
+import math
 from typing import Any, Dict, List
 from decimal import Decimal
 
@@ -34,7 +35,18 @@ def convert_numpy_types(obj: Any) -> Any:
     
     # Decimal 類型（如果有使用）
     if isinstance(obj, Decimal):
-        return float(obj)
+        val = float(obj)
+        if math.isnan(val) or math.isinf(val):
+            return None
+        return val
+    
+    # Python float 類型（也需要檢查 NaN/Inf）
+    if isinstance(obj, float):
+        if math.isnan(obj):
+            return None  # NaN 轉為 null
+        elif math.isinf(obj):
+            return None  # Infinity 轉為 null
+        return obj
     
     # 字典：遞迴轉換每個值
     if isinstance(obj, dict):

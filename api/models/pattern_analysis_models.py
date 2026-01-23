@@ -35,7 +35,7 @@ class IndicatorParamsConfig(BaseModel):
 
 class XGBoostBatchAnalysisRequest(BaseModel):
     """XGBoost 批量分析請求（使用指標配置）"""
-    symbol: str = Field(..., description="交易對，如 ETHUSDT")
+    symbols: List[str] = Field(..., description="交易對列表，如 ['ETHUSDT', 'BTCUSDT']")
     timeframe: str = Field(default="12h", description="時間週期：1h, 4h, 12h, 1d")
     indicators: List[IndicatorParamsConfig] = Field(..., description="指標配置列表")
     lookback_bars: int = Field(default=200, description="每個案例回看 K 線數量")
@@ -71,7 +71,7 @@ class XGBoostBatchAnalysisRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "symbol": "ETHUSDT",
+                "symbols": ["ETHUSDT", "BTCUSDT"],
                 "timeframe": "12h",
                 "indicators": [
                     {

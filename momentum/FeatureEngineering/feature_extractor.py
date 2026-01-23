@@ -173,9 +173,11 @@ class FeatureExtractor:
         )
         feature_names.append('price_volatility_5')
         
-        # 5. 3期價格動量
-        df['price_momentum_3'] = df['close'] - df['close'].shift(3)
-        feature_names.append('price_momentum_3')
+        # 5. 3期價格動量（百分比）
+        df['price_momentum_3_pct'] = (
+            (df['close'] - df['close'].shift(3)) / (df['close'].shift(3) + 1e-10)
+        )
+        feature_names.append('price_momentum_3_pct')
         
         # 6. 上影線百分比
         df['upper_shadow_pct'] = (
@@ -252,6 +254,11 @@ class FeatureExtractor:
         支持從任意數據源計算 EMA（與 Optuna 設計一致）
         使用動態命名系統確保特徵唯一性
         
+        **重要設計原則 - 跨標的訓練兼容**：
+        - 不使用 EMA 絕對值作為特徵（避免跨標的雜訊）
+        - 僅使用相對特徵：EMA 之間的距離、價格與 EMA 的距離、EMA 斜率
+        - 所有特徵都是無量綱的百分比，可在任意價格範圍使用
+        
         Args:
             df: K線數據
             ema_params: {'ema_short': 5, 'ema_mid': 20, 'ema_long': 60, 'volume_threshold': 0.6}
@@ -275,30 +282,49 @@ class FeatureExtractor:
         # 使用動態命名系統生成所有特徵名稱
         feature_name_mapping = FeatureNamingConfig.make_ema_feature_names(data_source, ema_params)
         
-        # 1. EMA short 值
+        # 計算 EMA 值（僅用於計算相對特徵，不作為獨立特徵）
         ema_short_col = feature_name_mapping['ema_short']
         df[ema_short_col] = df[data_source].ewm(span=short, adjust=False).mean()
-        feature_names.append(ema_short_col)
         
-        # 2. EMA mid 值
         ema_mid_col = feature_name_mapping['ema_mid']
         df[ema_mid_col] = df[data_source].ewm(span=mid, adjust=False).mean()
-        feature_names.append(ema_mid_col)
         
-        # 3. EMA long 值
         ema_long_col = feature_name_mapping['ema_long']
         df[ema_long_col] = df[data_source].ewm(span=long, adjust=False).mean()
-        feature_names.append(ema_long_col)
         
-        # 4. EMA(short) 與 EMA(mid) 距離
-        ema_dist_short_mid_col = feature_name_mapping['ema_distance_short_mid']
+        # 注意：不將 EMA 絕對值加入 feature_names（避免跨標的雜訊）
+        # 只使用 EMA 之間的相對關係
+        
+        # 1. 價格與 EMA(short) 距離（百分比）
+        price_ema_short_dist_col = f"{data_source}_price_ema_short_distance_pct"
+        df[price_ema_short_dist_col] = (
+            (df[data_source] - df[ema_short_col]) / (df[ema_short_col] + 1e-10)
+        )
+        feature_names.append(price_ema_short_dist_col)
+        
+        # 2. 價格與 EMA(mid) 距離（百分比）
+        price_ema_mid_dist_col = f"{data_source}_price_ema_mid_distance_pct"
+        df[price_ema_mid_dist_col] = (
+            (df[data_source] - df[ema_mid_col]) / (df[ema_mid_col] + 1e-10)
+        )
+        feature_names.append(price_ema_mid_dist_col)
+        
+        # 3. 價格與 EMA(long) 距離（百分比）
+        price_ema_long_dist_col = f"{data_source}_price_ema_long_distance_pct"
+        df[price_ema_long_dist_col] = (
+            (df[data_source] - df[ema_long_col]) / (df[ema_long_col] + 1e-10)
+        )
+        feature_names.append(price_ema_long_dist_col)
+        
+        # 4. EMA(short) 與 EMA(mid) 距離（百分比）
+        ema_dist_short_mid_col = feature_name_mapping['ema_distance_short_mid'] + '_pct'
         df[ema_dist_short_mid_col] = (
             (df[ema_short_col] - df[ema_mid_col]) / (df[ema_mid_col] + 1e-10)
         )
         feature_names.append(ema_dist_short_mid_col)
         
-        # 5. EMA(mid) 與 EMA(long) 距離
-        ema_dist_mid_long_col = feature_name_mapping['ema_distance_mid_long']
+        # 5. EMA(mid) 與 EMA(long) 距離（百分比）
+        ema_dist_mid_long_col = feature_name_mapping['ema_distance_mid_long'] + '_pct'
         df[ema_dist_mid_long_col] = (
             (df[ema_mid_col] - df[ema_long_col]) / (df[ema_long_col] + 1e-10)
         )
@@ -321,14 +347,27 @@ class FeatureExtractor:
         ).astype(float)
         feature_names.append(ema_cross_col)
         
-        # 8. Volume Threshold 特徵 - 成交量激增
+        # 8. EMA 斜率（百分比變化率）
+        ema_short_slope_col = f"{data_source}_ema_short_slope_pct"
+        df[ema_short_slope_col] = (
+            (df[ema_short_col] - df[ema_short_col].shift(3)) / (df[ema_short_col].shift(3) + 1e-10)
+        )
+        feature_names.append(ema_short_slope_col)
+        
+        ema_mid_slope_col = f"{data_source}_ema_mid_slope_pct"
+        df[ema_mid_slope_col] = (
+            (df[ema_mid_col] - df[ema_mid_col].shift(5)) / (df[ema_mid_col].shift(5) + 1e-10)
+        )
+        feature_names.append(ema_mid_slope_col)
+        
+        # 9. Volume Threshold 特徵 - 成交量激增
         volume_spike_col = feature_name_mapping['volume_spike']
         df[volume_spike_col] = (
             df['taker_ratio'] > volume_threshold
         ).astype(float)
         feature_names.append(volume_spike_col)
         
-        # 9. 主動買入比例與閾值距離
+        # 10. 主動買入比例與閾值距離
         taker_dist_col = feature_name_mapping['taker_ratio_distance']
         df[taker_dist_col] = (
             df['taker_ratio'] - volume_threshold
@@ -380,7 +419,7 @@ class FeatureExtractor:
             
             # 3. 信號強度 (多個條件的加權)
             # 權重: EMA距離(40%) + 成交量(30%) + 趨勢一致性(30%)
-            ema_dist_normalized = df[feature_name_mapping['ema_distance_short_mid']].clip(lower=0, upper=0.1) / 0.1
+            ema_dist_normalized = df[feature_name_mapping['ema_distance_short_mid'] + '_pct'].clip(lower=0, upper=0.1) / 0.1
             volume_normalized = df[feature_name_mapping['taker_ratio_distance']].clip(lower=0, upper=0.4) / 0.4
             trend_normalized = df[trend_consistency_col]
             

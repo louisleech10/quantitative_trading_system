@@ -80,17 +80,18 @@ interface DecisionRule {
 }
 
 interface ModelPerformance {
-  train_auc: number
-  cv_auc_mean: number
-  cv_auc_std: number
-  precision: number
-  recall: number
-  f1_score: number
-  overfitting_score: number
+  train_auc: number | null
+  cv_auc_mean: number | null
+  cv_auc_std: number | null
+  precision: number | null
+  recall: number | null
+  f1_score: number | null
+  overfitting_score: number | null
 }
 
 interface AnalysisResult {
   symbol: string
+  symbols?: string[]
   timeframe: string
   total_cases: number
   valid_cases: number
@@ -105,7 +106,8 @@ interface AnalysisResult {
   model_path?: string
   metadata?: {
     data_selection?: {
-      symbol: string
+      symbol?: string
+      symbols?: string[]
       timeframe: string
       lookback_bars: number
     }
@@ -153,7 +155,7 @@ async function getCaseSummary(symbol?: string, timeframe?: string): Promise<Case
 }
 
 async function startBatchAnalysis(config: {
-  symbol: string
+  symbols: string[]
   timeframe: string
   indicators: IndicatorConfig[]
   lookback_bars: number
@@ -170,7 +172,7 @@ async function startBatchAnalysis(config: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      symbol: config.symbol,
+      symbols: config.symbols,
       timeframe: config.timeframe,
       indicators: config.indicators.map(i => ({
         indicator: i.indicator,
@@ -397,15 +399,23 @@ function TaskProgressCard({ task }: { task: TaskStatus | null }) {
 }
 
 function ModelPerformanceCard({ performance }: { performance: ModelPerformance }) {
-  const getAUCColor = (auc: number) => {
-    if (auc >= 0.8) return 'text-green-700'
-    if (auc >= 0.7) return 'text-yellow-700'
+  const isValidNumber = (value: number | null) =>
+    value !== null && !Number.isNaN(value)
+
+  const formatPercent = (value: number | null, digits = 1) =>
+    isValidNumber(value) ? `${(value! * 100).toFixed(digits)}%` : 'N/A'
+
+  const getAUCColor = (auc: number | null) => {
+    if (!isValidNumber(auc)) return 'text-gray-500'
+    if (auc! >= 0.8) return 'text-green-700'
+    if (auc! >= 0.7) return 'text-yellow-700'
     return 'text-red-700'
   }
 
-  const getOverfitColor = (score: number) => {
-    if (score <= 0.05) return 'text-green-700'
-    if (score <= 0.1) return 'text-yellow-700'
+  const getOverfitColor = (score: number | null) => {
+    if (!isValidNumber(score)) return 'text-gray-500'
+    if (score! <= 0.05) return 'text-green-700'
+    if (score! <= 0.1) return 'text-yellow-700'
     return 'text-red-700'
   }
 
@@ -421,7 +431,7 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <div className={`text-2xl font-bold ${getAUCColor(performance.train_auc)}`}>
-              {(performance.train_auc * 100).toFixed(1)}%
+              {formatPercent(performance.train_auc)}
             </div>
             <div className="text-xs text-gray-600 flex items-center gap-1">
               訓練 AUC
@@ -435,10 +445,10 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className={`text-2xl font-bold ${getAUCColor(performance.cv_auc_mean)}`}>
-              {(performance.cv_auc_mean * 100).toFixed(1)}%
+              {formatPercent(performance.cv_auc_mean)}
             </div>
             <div className="text-xs text-gray-600 flex items-center gap-1">
-              CV AUC (±{(performance.cv_auc_std * 100).toFixed(1)}%)
+              CV AUC (±{isValidNumber(performance.cv_auc_std) ? `${(performance.cv_auc_std! * 100).toFixed(1)}%` : 'N/A'})
               <div className="group relative">
                 <Info className="w-3 h-3 text-gray-400 cursor-help" />
                 <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
@@ -449,7 +459,7 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-gray-900">
-              {(performance.precision * 100).toFixed(1)}%
+              {formatPercent(performance.precision)}
             </div>
             <div className="text-xs text-gray-600 flex items-center gap-1">
               Precision
@@ -463,7 +473,7 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-2xl font-bold text-gray-900">
-              {(performance.recall * 100).toFixed(1)}%
+              {formatPercent(performance.recall)}
             </div>
             <div className="text-xs text-gray-600 flex items-center gap-1">
               Recall
@@ -479,7 +489,7 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-xl font-bold text-gray-900">
-              {(performance.f1_score * 100).toFixed(1)}%
+              {formatPercent(performance.f1_score)}
             </div>
             <div className="text-xs text-gray-600 flex items-center gap-1">
               F1 Score
@@ -493,7 +503,7 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <div className={`text-xl font-bold ${getOverfitColor(performance.overfitting_score)}`}>
-              {(performance.overfitting_score * 100).toFixed(1)}%
+              {formatPercent(performance.overfitting_score)}
             </div>
             <div className="text-xs text-gray-600 flex items-center gap-1">
               過擬合程度
@@ -513,7 +523,7 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
 
 function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) {
   const topFeatures = features.slice(0, 15)
-  const maxImportance = Math.max(...topFeatures.map(f => f.importance))
+  const maxImportance = topFeatures.length > 0 ? Math.max(...topFeatures.map(f => f.importance)) : 0
 
   return (
     <Card className="bg-white border-gray-200">
@@ -530,32 +540,38 @@ function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) 
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          {topFeatures.map((feature, idx) => (
-            <div key={feature.feature} className="flex items-center gap-3">
-              <span className="w-6 text-sm text-gray-600">{idx + 1}</span>
-              <div className="flex-1">
-                <div className="grid grid-cols-[1fr_auto] gap-3 mb-1">
-                  <span
-                    className="text-sm font-mono text-gray-900 break-all whitespace-normal"
-                    title={feature.feature}
-                  >
-                    {feature.feature}
-                  </span>
-                  <span className="text-sm text-gray-700 whitespace-nowrap">
-                    {(feature.importance * 100).toFixed(2)}%
-                  </span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full"
-                    style={{ width: `${(feature.importance / maxImportance) * 100}%` }}
-                  />
+        {topFeatures.length === 0 || maxImportance <= 0 ? (
+          <div className="text-sm text-gray-600">
+            無有效特徵重要性（模型可能未產生分裂或重要性為 0）
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {topFeatures.map((feature, idx) => (
+              <div key={feature.feature} className="flex items-center gap-3">
+                <span className="w-6 text-sm text-gray-600">{idx + 1}</span>
+                <div className="flex-1">
+                  <div className="grid grid-cols-[1fr_auto] gap-3 mb-1">
+                    <span
+                      className="text-sm font-mono text-gray-900 break-all whitespace-normal"
+                      title={feature.feature}
+                    >
+                      {feature.feature}
+                    </span>
+                    <span className="text-sm text-gray-700 whitespace-nowrap">
+                      {(feature.importance * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full"
+                      style={{ width: `${(feature.importance / maxImportance) * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -597,6 +613,10 @@ function DecisionRulesCard({ rules }: { rules: DecisionRule[] }) {
 }
 
 function AnalysisResultView({ result }: { result: AnalysisResult }) {
+  const displaySymbols = result.symbols && result.symbols.length > 0
+    ? result.symbols.join(', ')
+    : result.symbol
+
   return (
     <div className="space-y-6">
       {/* 摘要資訊 */}
@@ -607,7 +627,7 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
             <div>
-              <div className="text-xl font-bold text-gray-900">{result.symbol}</div>
+              <div className="text-xl font-bold text-gray-900">{displaySymbols}</div>
               <div className="text-xs text-gray-600">交易對</div>
             </div>
             <div>
@@ -712,7 +732,9 @@ export default function XGBoostAnalysisPage() {
       
       // 恢復數據選擇配置
       if (meta.data_selection) {
-        if (meta.data_selection.symbol) {
+        if (meta.data_selection.symbols && meta.data_selection.symbols.length > 0) {
+          setSelectedSymbols([...meta.data_selection.symbols])
+        } else if (meta.data_selection.symbol) {
           setSelectedSymbols([meta.data_selection.symbol])
         }
         if (meta.data_selection.timeframe) {
@@ -773,9 +795,11 @@ export default function XGBoostAnalysisPage() {
             // 將當前的配置信息添加到分析結果中
             const resultWithMetadata: AnalysisResult = {
               ...status.result,
+              symbols: status.result.symbols || selectedSymbols,
               metadata: {
                 data_selection: {
                   symbol: selectedSymbols[0] || status.result.symbol,
+                  symbols: selectedSymbols,
                   timeframe: klineTimeframe,
                   lookback_bars: lookbackBars
                 },
@@ -832,15 +856,24 @@ export default function XGBoostAnalysisPage() {
     setSaveSuccess(false)
 
     try {
+      const formatMetric = (value: number | null, digits = 4) =>
+        value === null || Number.isNaN(value) ? 'N/A' : value.toFixed(digits)
+      const safeMetric = (value: number | null) =>
+        value === null || Number.isNaN(value) ? 0 : value
+
+      const displaySymbols = result.symbols && result.symbols.length > 0
+        ? result.symbols.join('_')
+        : result.symbol
+
       // 將分析結果轉換為 Pattern 格式
       const timestamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '_').split('.')[0]
       const request: CreatePatternRequest = {
-        name: `XGBoost_${result.symbol}_${result.timeframe}_${timestamp}`,
-        description: `XGBoost 分析結果 - ${result.symbol} ${result.timeframe}\n` +
+        name: `XGBoost_${displaySymbols}_${result.timeframe}_${timestamp}`,
+        description: `XGBoost 分析結果 - ${displaySymbols} ${result.timeframe}\n` +
                      `有效案例: ${result.valid_cases}/${result.total_cases}\n` +
                      `正樣本: ${result.positive_cases}, 負樣本: ${result.negative_cases}\n` +
-                     `AUC: ${result.model_performance.cv_auc_mean.toFixed(4)} ± ${result.model_performance.cv_auc_std.toFixed(4)}\n` +
-                     `F1: ${result.model_performance.f1_score.toFixed(4)}`,
+                     `AUC: ${formatMetric(result.model_performance.cv_auc_mean)} ± ${formatMetric(result.model_performance.cv_auc_std)}\n` +
+                     `F1: ${formatMetric(result.model_performance.f1_score)}`,
         rules: result.decision_rules.slice(0, 10).map((rule, index) => {
           // 從 condition 字串抽取第一個單詞作為 feature（如果失敗則使用索引）
           const conditionParts = rule.condition.trim().split(/\s+/)
@@ -855,21 +888,21 @@ export default function XGBoostAnalysisPage() {
             description: rule.condition || `規則 ${index + 1} (信心度: ${rule.confidence.toFixed(2)})`
           }
         }),
-        case_id: `${result.symbol}_${result.timeframe}`,
+        case_id: `${displaySymbols}_${result.timeframe}`,
         xgboost_importance: result.feature_importance.reduce((acc, feat) => {
           acc[feat.feature] = feat.importance
           return acc
         }, {} as Record<string, number>),
         performance_metrics: {
-          precision: result.model_performance.precision,
-          recall: result.model_performance.recall,
-          f1_score: result.model_performance.f1_score,
-          train_auc: result.model_performance.train_auc,
-          cv_auc_mean: result.model_performance.cv_auc_mean,
-          cv_auc_std: result.model_performance.cv_auc_std,
-          overfitting_score: result.model_performance.overfitting_score
+          precision: safeMetric(result.model_performance.precision),
+          recall: safeMetric(result.model_performance.recall),
+          f1_score: safeMetric(result.model_performance.f1_score),
+          train_auc: safeMetric(result.model_performance.train_auc),
+          cv_auc_mean: safeMetric(result.model_performance.cv_auc_mean),
+          cv_auc_std: safeMetric(result.model_performance.cv_auc_std),
+          overfitting_score: safeMetric(result.model_performance.overfitting_score)
         },
-        tags: ['xgboost', result.symbol, result.timeframe, 'auto-generated'],
+        tags: ['xgboost', ...((result.symbols && result.symbols.length > 0) ? result.symbols : [result.symbol]), result.timeframe, 'auto-generated'],
         metadata: {
           // ===== 結果資料 =====
           total_cases: result.total_cases,
@@ -884,6 +917,7 @@ export default function XGBoostAnalysisPage() {
           // 數據選擇配置
           data_selection: {
             symbol: result.symbol,
+            symbols: result.symbols,
             timeframe: result.timeframe,
             lookback_bars: lookbackBars
           },
@@ -980,10 +1014,9 @@ export default function XGBoostAnalysisPage() {
         .map(value => parseInt(value.trim(), 10))
         .filter(value => !Number.isNaN(value) && value > 0)
 
-      // 目前 API 只支援單一 symbol，取第一個
-      // TODO: 後端支援多 symbol 批量分析
+      // 支援多標的跨商品訓練
       const response = await startBatchAnalysis({
-        symbol: selectedSymbols[0],
+        symbols: selectedSymbols,
         timeframe: klineTimeframe,
         indicators,
         lookback_bars: lookbackBars,
@@ -1048,7 +1081,7 @@ export default function XGBoostAnalysisPage() {
                     onChange={setSelectedSymbols}
                   />
                   <p className="text-xs text-gray-500">
-                    選擇要納入分析的交易對（目前版本會使用第一個選中的交易對）
+                    選擇要納入分析的交易對（將合併所有標的的案例訓練單一跨商品模型）
                   </p>
                 </div>
 

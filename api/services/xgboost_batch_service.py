@@ -153,7 +153,7 @@ class XGBoostBatchService:
     
     async def start_batch_analysis(
         self,
-        symbol: str,
+        symbols: List[str],
         timeframe: str,
         indicators: List[Dict],
         lookback_bars: int = 200,
@@ -169,10 +169,10 @@ class XGBoostBatchService:
         min_support: int = 10
     ) -> Dict:
         """
-        啟動批量 XGBoost 分析
+        啟動批量 XGBoost 分析（支援多標的跨商品訓練）
         
         Args:
-            symbol: 交易對
+            symbols: 交易對列表（如 ['ETHUSDT', 'BTCUSDT']），合併所有案例訓練單一模型
             timeframe: K線時間週期（用於計算指標，與案例搜尋週期無關）
             indicators: 指標配置列表
             lookback_bars: 每個案例回看 K 線數量
@@ -190,32 +190,34 @@ class XGBoostBatchService:
         Returns:
             任務 ID 和狀態
         """
-        # 獲取符合條件的案例（不過濾 timeframe，使用所有該交易對的案例）
-        cases = self.case_storage.get_cases_by_symbol(symbol)
-        # 注意：timeframe 參數是 K線週期，用於下載數據計算指標
-        # 不需要過濾案例的 timeframe（案例可能是 12h 搜尋出來的，但用 1h K線分析）
+        # 獲取所有選中標的的案例並合併（跨商品訓練）
+        all_cases = []
+        for symbol in symbols:
+            symbol_cases = self.case_storage.get_cases_by_symbol(symbol)
+            if symbol_cases:
+                all_cases.extend(symbol_cases)
         
-        if not cases:
-            raise ValueError(f"找不到 {symbol} 的案例")
+        if not all_cases:
+            raise ValueError(f"找不到這些標的的案例: {', '.join(symbols)}")
         
         task_id = str(uuid.uuid4())
         
         self.logger.info(
             f"啟動批量 XGBoost 分析 - task_id: {task_id}, "
-            f"symbol: {symbol}, timeframe: {timeframe}, "
-            f"案例數: {len(cases)}, 指標數: {len(indicators)}"
+            f"symbols: {', '.join(symbols)}, timeframe: {timeframe}, "
+            f"案例數: {len(all_cases)}, 指標數: {len(indicators)}"
         )
         
         # 建立任務
-        self.task_manager.create_task(task_id, len(cases))
+        self.task_manager.create_task(task_id, len(all_cases))
         
         # 在背景執行分析
         asyncio.create_task(
             self._run_batch_analysis(
                 task_id=task_id,
-                symbol=symbol,
+                symbols=symbols,
                 timeframe=timeframe,
-                cases=cases,
+                cases=all_cases,
                 indicators=indicators,
                 lookback_bars=lookback_bars,
                 sequence_length=sequence_length,
@@ -233,15 +235,16 @@ class XGBoostBatchService:
         
         return {
             'task_id': task_id,
-            'message': f'XGBoost 批量分析已啟動，共 {len(cases)} 個案例',
+            'message': f'XGBoost 批量分析已啟動，共 {len(all_cases)} 個案例（{len(symbols)} 個標的）',
             'status': 'running',
-            'total_cases': len(cases)
+            'total_cases': len(all_cases),
+            'symbols': symbols
         }
     
     async def _run_batch_analysis(
         self,
         task_id: str,
-        symbol: str,
+        symbols: List[str],
         timeframe: str,
         cases: List,
         indicators: List[Dict],
@@ -257,7 +260,7 @@ class XGBoostBatchService:
         top_n_rules: int,
         min_support: int
     ):
-        """執行批量分析（背景任務）"""
+        """執行批量分析（背景任務，支援多標的跨商品訓練）"""
         try:
             # ===== Step 1: 計算時間範圍 =====
             self.task_manager.update_progress(task_id, 5, '計算時間範圍', '分析案例時間範圍...')
@@ -307,73 +310,97 @@ class XGBoostBatchService:
                 f"K 線範圍: {start_ts} ~ {end_ts}"
             )
             
-            # ===== Step 2: 讀取 K 線數據 =====
-            self.task_manager.update_progress(task_id, 10, '讀取 K 線', f'從 HDF5 讀取 {symbol} K 線數據...')
+            # ===== Step 2: 讀取所有標的的 K 線數據 =====
+            self.task_manager.update_progress(task_id, 10, '讀取 K 線', f'從 HDF5 讀取 {len(symbols)} 個標的的 K 線數據...')
             
             # 將時間戳轉換為 datetime 物件（KlineDataService 需要 datetime）
             from datetime import datetime
             start_dt = datetime.utcfromtimestamp(start_ts)
             end_dt = datetime.utcfromtimestamp(end_ts)
             
-            kline_df = await asyncio.to_thread(
-                self.kline_service.get_kline_data,
-                symbol=symbol,
-                timeframe=timeframe,
-                start_time=start_dt,
-                end_time=end_dt
-            )
-            
-            if kline_df is None or kline_df.empty:
-                raise ValueError(f"無法獲取 {symbol} {timeframe} 的 K 線數據")
-            
-            self.logger.info(f"K 線數據載入完成 - 行數: {len(kline_df)}")
-            
-            # ===== Step 3: 計算指標特徵 =====
-            self.task_manager.update_progress(task_id, 25, '計算特徵', '根據指標配置計算特徵...')
-            
-            all_features = []
-            all_feature_names = []
-            
-            for indicator_config in indicators:
-                strategy_params = StrategyParams(
-                    strategy_type=indicator_config['indicator'],
-                    params=indicator_config['params'],
-                    data_source=indicator_config.get('data_source', 'close')
+            # 合併所有標的的 K 線數據（字典：symbol -> DataFrame）
+            all_kline_data = {}
+            for sym in symbols:
+                kline_df = await asyncio.to_thread(
+                    self.kline_service.get_kline_data,
+                    symbol=sym,
+                    timeframe=timeframe,
+                    start_time=start_dt,
+                    end_time=end_dt
                 )
                 
-                try:
-                    features_df, feature_names = self.feature_extractor.extract_features_from_strategy(
-                        df=kline_df.copy(),
-                        strategy_params=strategy_params,
-                        include_basic_features=(len(all_feature_names) == 0)  # 只在第一個指標包含基本特徵
-                    )
-                    
-                    # 收集新特徵（排除已有的）
-                    new_features = [f for f in feature_names if f not in all_feature_names]
-                    all_feature_names.extend(new_features)
-                    
-                    # 合併特徵
-                    if not all_features:
-                        all_features = features_df
-                    else:
-                        # 只添加新欄位
-                        for col in new_features:
-                            if col in features_df.columns:
-                                all_features[col] = features_df[col]
-                    
-                    self.logger.info(
-                        f"指標 {indicator_config['indicator']} 特徵提取完成 - "
-                        f"新增 {len(new_features)} 個特徵"
-                    )
-                    
-                except Exception as e:
-                    self.logger.error(f"指標 {indicator_config['indicator']} 特徵提取失敗: {e}")
+                if kline_df is None or kline_df.empty:
+                    self.logger.warning(f"無法獲取 {sym} {timeframe} 的 K 線數據，跳過此標的")
                     continue
+                
+                all_kline_data[sym] = kline_df
+                self.logger.info(f"{sym} K 線數據載入完成 - 行數: {len(kline_df)}")
             
-            if not all_feature_names:
-                raise ValueError("未能成功提取任何特徵")
+            if not all_kline_data:
+                raise ValueError(f"無法獲取任何標的的 K 線數據: {', '.join(symbols)}")
             
-            self.logger.info(f"特徵計算完成 - 總共 {len(all_feature_names)} 個特徵")
+            self.logger.info(f"所有 K 線數據載入完成 - 標的數: {len(all_kline_data)}")
+            
+            # ===== Step 3: 為每個標的計算指標特徵 =====
+            self.task_manager.update_progress(task_id, 25, '計算特徵', '根據指標配置為所有標的計算特徵...')
+            
+            # 字典：symbol -> 該標的的特徵 DataFrame
+            all_symbol_features = {}
+            shared_feature_names = None  # 第一個標的的特徵名稱（應該所有標的相同）
+            
+            for sym, kline_df in all_kline_data.items():
+                self.logger.info(f"開始為 {sym} 計算特徵...")
+                
+                sym_features = []
+                sym_feature_names = []
+                
+                for indicator_config in indicators:
+                    strategy_params = StrategyParams(
+                        strategy_type=indicator_config['indicator'],
+                        params=indicator_config['params'],
+                        data_source=indicator_config.get('data_source', 'close')
+                    )
+                    
+                    try:
+                        features_df, feature_names = self.feature_extractor.extract_features_from_strategy(
+                            df=kline_df.copy(),
+                            strategy_params=strategy_params,
+                            include_basic_features=(len(sym_feature_names) == 0)  # 只在第一個指標包含基本特徵
+                        )
+                        
+                        # 收集新特徵（排除已有的）
+                        new_features = [f for f in feature_names if f not in sym_feature_names]
+                        sym_feature_names.extend(new_features)
+                        
+                        # 合併特徵
+                        if not sym_features:
+                            sym_features = features_df
+                        else:
+                            # 只添加新欄位
+                            for col in new_features:
+                                if col in features_df.columns:
+                                    sym_features[col] = features_df[col]
+                        
+                    except Exception as e:
+                        self.logger.error(f"{sym} 指標 {indicator_config['indicator']} 特徵提取失敗: {e}")
+                        continue
+                
+                if not sym_feature_names:
+                    self.logger.warning(f"{sym} 未能提取任何特徵，跳過")
+                    continue
+                
+                all_symbol_features[sym] = sym_features
+                
+                # 第一個標的設定 shared_feature_names
+                if shared_feature_names is None:
+                    shared_feature_names = sym_feature_names
+                
+                self.logger.info(f"{sym} 特徵計算完成 - 總共 {len(sym_feature_names)} 個特徵")
+            
+            if not all_symbol_features:
+                raise ValueError("未能為任何標的提取特徵")
+            
+            self.logger.info(f"所有標的特徵計算完成 - 共 {len(all_symbol_features)} 個標的，{len(shared_feature_names)} 個特徵")
             
             # ===== Step 4: 為每個案例提取特徵和標籤 =====
             self.task_manager.update_progress(task_id, 45, '提取案例特徵', f'為 {len(cases)} 個案例提取特徵...')
@@ -384,24 +411,35 @@ class XGBoostBatchService:
             valid_cases = 0
             sequence_feature_names: Optional[List[str]] = None
             
-            # 建立時間戳索引（智能檢測毫秒 vs 秒）
-            if 'timestamp' not in all_features.columns:
-                raise ValueError("特徵 DataFrame 缺少 timestamp 欄位")
+            # 為每個標的的特徵 DataFrame 準備 timestamp_sec 欄位
+            for sym, features_df in all_symbol_features.items():
+                if 'timestamp' not in features_df.columns:
+                    raise ValueError(f"{sym} 特徵 DataFrame 缺少 timestamp 欄位")
+                
+                # 檢查 timestamp 的單位（毫秒 > 10^12，秒 < 10^12）
+                sample_ts = features_df['timestamp'].iloc[0]
+                if sample_ts > 10**12:
+                    # 毫秒級時間戳，需要除以 1000 轉換為秒
+                    features_df['timestamp_sec'] = (features_df['timestamp'] // 1000).astype(int)
+                else:
+                    # 已經是秒級時間戳，直接使用
+                    features_df['timestamp_sec'] = features_df['timestamp'].astype(int)
+                
+                features_df.sort_values('timestamp_sec', inplace=True)
+                features_df.reset_index(drop=True, inplace=True)
+                all_symbol_features[sym] = features_df
             
-            # 檢查 timestamp 的單位（毫秒 > 10^12，秒 < 10^12）
-            sample_ts = all_features['timestamp'].iloc[0]
-            if sample_ts > 10**12:
-                # 毫秒級時間戳，需要除以 1000 轉換為秒
-                all_features['timestamp_sec'] = (all_features['timestamp'] // 1000).astype(int)
-                self.logger.info(f"檢測到毫秒級 timestamp，轉換為秒級")
-            else:
-                # 已經是秒級時間戳，直接使用
-                all_features['timestamp_sec'] = all_features['timestamp'].astype(int)
-                self.logger.info(f"檢測到秒級 timestamp，直接使用")
-
-            all_features = all_features.sort_values('timestamp_sec').reset_index(drop=True)
+            self.logger.info(f"所有標的的 timestamp 處理完成")
             
             for i, case in enumerate(cases):
+                # 獲取該案例對應的標的特徵
+                case_symbol = case.symbol
+                if case_symbol not in all_symbol_features:
+                    self.logger.warning(f"案例 {case.case_id} 的標的 {case_symbol} 沒有特徵數據，跳過")
+                    continue
+                
+                features_df = all_symbol_features[case_symbol]
+                
                 # 確保 case_ts 是整數
                 if isinstance(case.timestamp, int):
                     case_ts = case.timestamp
@@ -412,7 +450,7 @@ class XGBoostBatchService:
                     continue
                 
                 # 找到對應的行
-                idx = all_features[all_features['timestamp_sec'] == case_ts].index
+                idx = features_df[features_df['timestamp_sec'] == case_ts].index
                 
                 if len(idx) == 0:
                     self.logger.warning(f"案例 {case.case_id} 找不到對應的 K 線數據")
@@ -422,13 +460,13 @@ class XGBoostBatchService:
                 
                 if sequence_length is None:
                     # 提取特徵（取該時間點的特徵值）
-                    feature_values = all_features.loc[row_idx, all_feature_names].values
-                    feature_names = all_feature_names
+                    feature_values = features_df.loc[row_idx, shared_feature_names].values
+                    feature_names = shared_feature_names
                 else:
                     sequence_result = self._build_sequence_features(
-                        all_features=all_features,
+                        all_features=features_df,
                         row_idx=row_idx,
-                        feature_names=all_feature_names,
+                        feature_names=shared_feature_names,
                         sequence_length=sequence_length,
                         sequence_feature_mode=sequence_feature_mode,
                         sequence_stride=sequence_stride,
@@ -480,6 +518,21 @@ class XGBoostBatchService:
                 f"正例: {positive_count}, 反例: {negative_count}"
             )
             
+            # 檢查標籤分佈是否適合二分類
+            if positive_count == 0:
+                raise ValueError(
+                    f"所有案例都是負例（反例），無法訓練二分類模型。"
+                    f"請檢查案例搜尋條件或選擇其他標的。"
+                )
+            if negative_count == 0:
+                raise ValueError(
+                    f"所有案例都是正例（盈利），無法訓練二分類模型。"
+                    f"建議方案："
+                    f"\n1. 增加更多標的以獲得更多樣的案例"
+                    f"\n2. 調整案例搜尋的正例判定條件（未來漲幅閾值）"
+                    f"\n3. 使用其他標的的案例"
+                )
+            
             # ===== Step 5: 訓練 XGBoost =====
             self.task_manager.update_progress(task_id, 60, '訓練模型', 'XGBoost 模型訓練中...')
             
@@ -515,7 +568,9 @@ class XGBoostBatchService:
             # ===== Step 8: 儲存模型 =====
             self.task_manager.update_progress(task_id, 95, '儲存模型', '儲存分析結果...')
             
-            model_id = f"batch_{symbol}_{timeframe}_{task_id[:8]}"
+            # 多標的模型 ID 使用合併的標的名稱
+            symbols_str = '_'.join(sorted(symbols))  # 例如: BTCUSDT_ETHUSDT
+            model_id = f"batch_{symbols_str}_{timeframe}_{task_id[:8]}"
             model_path = await asyncio.to_thread(
                 self.model_storage.save_model_to_pickle,
                 model_id,
@@ -525,7 +580,7 @@ class XGBoostBatchService:
                 xgboost_params or {},
                 {
                     'task_id': task_id,
-                    'symbol': symbol,
+                    'symbols': symbols,  # 改為 symbols 列表
                     'timeframe': timeframe,
                     'total_cases': len(cases),
                     'valid_cases': valid_cases,
@@ -542,7 +597,7 @@ class XGBoostBatchService:
             
             # ===== Step 9: 完成 =====
             result = {
-                'symbol': symbol,
+                'symbols': symbols,  # 改為 symbols 列表
                 'timeframe': timeframe,
                 'total_cases': len(cases),
                 'valid_cases': valid_cases,
@@ -565,7 +620,7 @@ class XGBoostBatchService:
             
             self.logger.info(
                 f"批量 XGBoost 分析完成 - task_id: {task_id}, "
-                f"有效案例: {valid_cases}, 特徵數: {len(all_feature_names)}"
+                f"有效案例: {valid_cases}, 特徵數: {len(feature_names)}"
             )
             
         except Exception as e:

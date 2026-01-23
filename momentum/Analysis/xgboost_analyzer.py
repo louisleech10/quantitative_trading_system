@@ -233,11 +233,18 @@ class XGBoostAnalyzer:
         
         # 正規化重要性（總和為 1）
         total_importance = sum(imp for _, imp in importance_list)
+        if total_importance == 0:
+            # 回退：嘗試使用 sklearn 介面的 feature_importances_
+            if hasattr(self.model, "feature_importances_"):
+                fallback_importances = self.model.feature_importances_
+                if fallback_importances is not None and len(fallback_importances) == len(feature_names):
+                    importance_list = list(zip(feature_names, fallback_importances))
+                    total_importance = float(np.sum(fallback_importances))
+        
         if total_importance > 0:
-            importance_list = [
-                (name, imp / total_importance)
-                for name, imp in importance_list
-            ]
+            importance_list = [(name, imp / total_importance) for name, imp in importance_list]
+        else:
+            self.logger.warning("特徵重要性總和為 0，模型可能未產生分裂")
         
         # 排序（由高到低）
         importance_list.sort(key=lambda x: x[1], reverse=True)
@@ -335,7 +342,13 @@ class XGBoostAnalyzer:
             y_pred = model_fold.predict(X_val_fold)
             
             # 計算指標
-            auc = roc_auc_score(y_val_fold, y_pred_proba)
+            if len(np.unique(y_val_fold)) < 2:
+                auc = np.nan
+                self.logger.warning(
+                    f"Fold {fold + 1}/{cv_folds} - 驗證集只有單一類別，AUC 設為 NaN"
+                )
+            else:
+                auc = roc_auc_score(y_val_fold, y_pred_proba)
             precision = precision_score(y_val_fold, y_pred, zero_division=0)
             recall = recall_score(y_val_fold, y_pred, zero_division=0)
             f1 = f1_score(y_val_fold, y_pred, zero_division=0)
@@ -356,11 +369,25 @@ class XGBoostAnalyzer:
             raise ValueError("模型尚未訓練")
         
         y_train_pred = self.model.predict_proba(X_ordered)[:, 1]
-        train_auc = roc_auc_score(y_ordered, y_train_pred)
+        if len(np.unique(y_ordered)) < 2:
+            train_auc = np.nan
+            self.logger.warning("訓練集只有單一類別，Train AUC 設為 NaN")
+        else:
+            train_auc = roc_auc_score(y_ordered, y_train_pred)
         
         # 平均指標
-        cv_auc_mean = np.mean(cv_auc_scores)
-        cv_auc_std = np.std(cv_auc_scores)
+        valid_auc_scores = [v for v in cv_auc_scores if not np.isnan(v)]
+        if len(valid_auc_scores) == 0:
+            cv_auc_mean = np.nan
+            cv_auc_std = np.nan
+        else:
+            cv_auc_mean = float(np.mean(valid_auc_scores))
+            cv_auc_std = float(np.std(valid_auc_scores))
+        
+        if np.isnan(train_auc) or np.isnan(cv_auc_mean):
+            overfitting_score = np.nan
+        else:
+            overfitting_score = train_auc - cv_auc_mean
         
         # 建立效能物件
         performance = ModelPerformance(
@@ -370,7 +397,7 @@ class XGBoostAnalyzer:
             precision=np.mean(cv_precision_scores),
             recall=np.mean(cv_recall_scores),
             f1_score=np.mean(cv_f1_scores),
-            overfitting_score=train_auc - cv_auc_mean
+            overfitting_score=overfitting_score
         )
         
         self.logger.info(
