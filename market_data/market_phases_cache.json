@@ -1,14 +1,4 @@
 {
-  "NEUTRAL_20200720": {
-    "start_date": "2020-07-20",
-    "end_date": "2020-07-26",
-    "description": "NEUTRAL"
-  },
-  "GREED_20200727": {
-    "start_date": "2020-07-27",
-    "end_date": "2020-08-02",
-    "description": "GREED"
-  },
   "EXTREME_GREED_20200803": {
     "start_date": "2020-08-03",
     "end_date": "2020-08-30",
@@ -471,7 +461,12 @@
   },
   "FEAR_20260105": {
     "start_date": "2026-01-05",
-    "end_date": "2026-01-18",
+    "end_date": "2026-01-25",
     "description": "FEAR"
+  },
+  "EXTREME_FEAR_20260126": {
+    "start_date": "2026-01-26",
+    "end_date": "2026-02-01",
+    "description": "EXTREME_FEAR"
   }
 }

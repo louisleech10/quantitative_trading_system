@@ -16,6 +16,8 @@ interface SearchConfigRequest {
   // ✅ 修復：添加時間範圍字段
   startDate?: string | null;
   endDate?: string | null;
+  // ✅ 新增：價格計算方式
+  price_change_method?: string;
 }
 
 interface FilterConditionRequest {
@@ -210,6 +212,7 @@ class ApiClient {
     console.log('convertToSearchConfig 接收到的request:', request);
     console.log('  - startDate:', request.startDate);
     console.log('  - endDate:', request.endDate);
+    console.log('  - priceChangeMethod:', request.priceChangeMethod);
 
     return {
       name: request.name || `搜索_${new Date().toISOString().slice(0, 19)}`,
@@ -219,7 +222,9 @@ class ApiClient {
       save_results: request.saveResults || false,
       // ✅ 修復：添加時間範圍字段
       startDate: request.startDate || null,
-      endDate: request.endDate || null
+      endDate: request.endDate || null,
+      // ✅ 新增：傳遞價格計算方式
+      price_change_method: request.priceChangeMethod || "CLOSE_TO_CLOSE"
     };
   }
 

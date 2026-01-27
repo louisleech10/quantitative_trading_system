@@ -134,7 +134,8 @@ class SearchConfiguration:
                 sample_limit: int = 999999,
                 min_volume: float = 0,
                 exclude_new_listing_days: int = 7,
-                time_range: Tuple[str, str] = None):
+                time_range: Tuple[str, str] = None,
+                price_change_method: str = 'CLOSE_TO_CLOSE'):
         """
         初始化搜索配置
         
@@ -150,6 +151,7 @@ class SearchConfiguration:
             min_volume: 最小成交量要求
             exclude_new_listing_days: 排除上市後多少天的數據
             time_range: 時間範圍 (開始時間, 結束時間)
+            price_change_method: 價格計算方式 ('OPEN_TO_CLOSE' 或 'CLOSE_TO_CLOSE')
         """
         self.name = name
         self.description = description or f"{timeframe} 時間週期搜索配置"
@@ -161,6 +163,7 @@ class SearchConfiguration:
         self.sample_limit = sample_limit
         self.min_volume = min_volume
         self.exclude_new_listing_days = exclude_new_listing_days
+        self.price_change_method = price_change_method
         
         # 設置時間範圍，如果沒有提供則使用默認值
         if time_range:
@@ -465,13 +468,23 @@ class CaseSearchEngine:
                 
             self.logger.info(f"Loaded {len(data)} records for {symbol}")
             
-            # 添加計算列
-            data = self._add_calculated_columns(data, config.timeframe)
+            # DEBUG: 記錄即將傳遞的參數
+            self.logger.info(f"🎯 [調用點1] 準備呼叫 _add_calculated_columns")
+            self.logger.info(f"   config.price_change_method = '{config.price_change_method}'")
+            self.logger.info(f"   config.timeframe = '{config.timeframe}'")
+            
+            # 添加計算列，傳遞 price_change_method 參數
+            data = self._add_calculated_columns(data, config.timeframe, config.price_change_method)
             
             # 檢查計算列是否成功添加
             if 'price_change' not in data.columns:
                 self.logger.error(f"[CALC_FAILED] Symbol: {symbol} | Failed to add calculated columns")
                 return []
+            
+            # DEBUG: 顯示計算後的樣本數據
+            self.logger.info(f"✅ [調用點1] _add_calculated_columns 執行完成")
+            if len(data) > 1:
+                self.logger.info(f"   樣本 price_change[1] = {data['price_change'].iloc[1]:.6f}")
             
             # 進行初始篩選
             initial_candidates = self._apply_initial_filter(data, config)
@@ -829,8 +842,8 @@ class CaseSearchEngine:
                 self.logger.info(f"{symbol} 沒有數據，跳過")
                 return []
                 
-            # 添加計算列
-            data = self._add_calculated_columns(data, config.timeframe)
+            # 添加計算列，傳遞 price_change_method 參數
+            data = self._add_calculated_columns(data, config.timeframe, config.price_change_method)
 
             # 進行初始篩選
             initial_candidates = self._apply_initial_filter(data, config)
@@ -1172,17 +1185,23 @@ class CaseSearchEngine:
                     df[col] = np.nan
             return df
 
-    def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h') -> pd.DataFrame:
+    def _add_calculated_columns(self, data: pd.DataFrame, timeframe: str = '4h', 
+                               price_change_method: str = 'CLOSE_TO_CLOSE') -> pd.DataFrame:
         """
-        添加計算列，擴充版本支援完整的20個參數
+        添加計算列，擴充版本支援完整的20個參數，支援可配置的價格計算方式
 
         包含:
         1. 基礎觸發條件參數 (6個)
         2. 未來表現驗證參數 (12個) 
         3. 時間和市場描述參數
+        
+        Args:
+            data: 輸入的DataFrame
+            timeframe: 時間框架
+            price_change_method: 價格計算方式 ('OPEN_TO_CLOSE' 或 'CLOSE_TO_CLOSE')
         """
         # DEBUG: 確認此函數被調用
-        self.logger.debug(f"Adding calculated columns: timeframe={timeframe}, rows={len(data)}")
+        self.logger.debug(f"Adding calculated columns: timeframe={timeframe}, price_change_method={price_change_method}, rows={len(data)}")
 
         try:
             self.logger.debug("開始添加擴充計算列...")
@@ -1203,8 +1222,19 @@ class CaseSearchEngine:
             # 1.1 timeframe (已有)
             df['timeframe'] = timeframe
             
-            # 1.2 price_change - 當前K線相對前一根的漲跌幅
-            df['price_change'] = df['close'].pct_change()
+            # 1.2 price_change - 根據選擇的方法計算價格變動
+            self.logger.info(f"📊 [價格計算] price_change_method 參數值: '{price_change_method}'")
+            
+            if price_change_method == 'OPEN_TO_CLOSE':
+                # K線實體漲幅 (日內策略)
+                df['price_change'] = (df['close'] - df['open']) / df['open']
+                self.logger.info("✅ 使用 OPEN_TO_CLOSE 模式計算 price_change: (close - open) / open")
+                self.logger.info(f"   樣本數據: open={df['open'].iloc[1]:.2f}, close={df['close'].iloc[1]:.2f}, price_change={df['price_change'].iloc[1]:.6f}")
+            else:  # CLOSE_TO_CLOSE (預設)
+                # 實質漲跌幅 (波段策略，包含跳空)
+                df['price_change'] = df['close'].pct_change()
+                self.logger.info("✅ 使用 CLOSE_TO_CLOSE 模式計算 price_change: close.pct_change()")
+                self.logger.info(f"   樣本數據: close[0]={df['close'].iloc[0]:.2f}, close[1]={df['close'].iloc[1]:.2f}, price_change[1]={df['price_change'].iloc[1]:.6f}")
             
             # 1.3 closing_strength - 收盤強度 = (close - low) / (high - low)
             df['closing_strength'] = np.where(

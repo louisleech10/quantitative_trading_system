@@ -23,6 +23,11 @@ class ConditionTypeEnum(str, Enum):
     VOLUME = "volume"
     PATTERN = "pattern"
 
+class PriceChangeMethodEnum(str, Enum):
+    """價格變動計算方式"""
+    OPEN_TO_CLOSE = "OPEN_TO_CLOSE"    # K線實體漲幅（日內策略）
+    CLOSE_TO_CLOSE = "CLOSE_TO_CLOSE"  # 實質漲跌幅（波段策略，預設）
+
 # 修復 FilterConditionRequest 驗證邏輯
 class FilterConditionRequest(BaseModel):
     """篩選條件請求模型"""
@@ -84,6 +89,12 @@ class SearchConfigRequest(BaseModel):
     # 搜索條件
     initial_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="初始條件")
     advanced_conditions: List[FilterConditionRequest] = Field(default_factory=list, description="高級條件")
+    
+    # 價格計算方式
+    price_change_method: PriceChangeMethodEnum = Field(
+        default=PriceChangeMethodEnum.CLOSE_TO_CLOSE,
+        description="價格變動計算方式"
+    )
     
     def model_post_init(self, __context):
         """Pydantic V2 的 post-init 方法"""

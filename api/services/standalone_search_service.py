@@ -307,6 +307,11 @@ class StandaloneSearchService:
     def _convert_request_to_search_config(self, request: SearchConfigRequest):
         """將API請求轉換為搜索引擎配置"""
         try:
+            # DEBUG: 記錄接收到的請求參數
+            self.logger.info(f"=== 轉換請求到搜索配置 ===")
+            self.logger.info(f"請求的 price_change_method: {request.price_change_method}")
+            self.logger.info(f"price_change_method.value: {request.price_change_method.value}")
+            
             # 動態導入搜索配置類
             from momentum.DataExtraction.case_search_engine import SearchConfiguration, FilterCondition
             
@@ -326,8 +331,12 @@ class StandaloneSearchService:
                 sample_limit=request.sample_limit,
                 min_volume=request.min_volume,
                 exclude_new_listing_days=request.exclude_new_listing_days,
-                time_range=time_range  # 添加時間範圍參數
+                time_range=time_range,  # 添加時間範圍參數
+                price_change_method=request.price_change_method.value  # 新增：價格計算方式
             )
+            
+            # DEBUG: 記錄創建的配置
+            self.logger.info(f"創建的 SearchConfiguration.price_change_method: {config.price_change_method}")
             
             # 手動添加 time_range 屬性以確保兼容性
             config.time_range = time_range

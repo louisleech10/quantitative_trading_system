@@ -3,6 +3,16 @@
 
 // ===== 保持現有的基礎類型定義 =====
 
+/**
+ * 價格變動計算方式
+ * OPEN_TO_CLOSE: 使用 (Close - Open) / Open，適合日內交易
+ * CLOSE_TO_CLOSE: 使用 pct_change()，適合波段交易，包含跳空
+ */
+export enum PriceChangeMethod {
+  OPEN_TO_CLOSE = "OPEN_TO_CLOSE",
+  CLOSE_TO_CLOSE = "CLOSE_TO_CLOSE"
+}
+
 export interface CaseData {
   symbol: string;
   timestamp: string;
@@ -185,6 +195,7 @@ export interface SearchRequest {
     sample_limit: number;
     min_volume: number;
     exclude_new_listing_days: number;
+    price_change_method?: PriceChangeMethod; // 可選，預設 CLOSE_TO_CLOSE
     initial_conditions: FilterCondition[];
     advanced_conditions: FilterCondition[];
   };
