@@ -327,7 +327,7 @@ export default function ResultsPage() {
 
   const formatPercentage = (value: number | undefined | null): string => {
     if (value === null || value === undefined || isNaN(value)) return 'N/A';
-    return `${(value * 100).toFixed(2)}%`;
+    return `${(value * 100).toFixed(5)}%`;  // 🔥 改為5位小數以顯示連續市場中的細微差異
   };
 
   const formatInteger = (value: number | undefined | null): string => {

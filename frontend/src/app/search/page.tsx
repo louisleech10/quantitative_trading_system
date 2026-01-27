@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/api';
 import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics, formatTimestamp } from '@/lib/searchResultUtils';
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
+import { PriceChangeMethod } from '@/lib/types';
 
 
 
@@ -16,6 +17,7 @@ interface SimpleSearchRequest {
   timeframe: string;
   startDate?: string | null;     // 新增：開始日期
   endDate?: string | null;       // 新增：結束日期
+  priceChangeMethod?: PriceChangeMethod; // 價格變動計算方式
   priceChange?: number | null;
   volumeMultiplier?: number | null;
   closingStrength?: number | null;
@@ -52,6 +54,7 @@ export default function SearchPage() {
     name: '兩階段搜索測試',
     symbols: [],
     timeframe: '12h',
+    priceChangeMethod: PriceChangeMethod.CLOSE_TO_CLOSE, // 預設使用 CLOSE_TO_CLOSE (波段交易)
     priceChange: null,
     volumeMultiplier: null,
     closingStrength: null,
@@ -289,6 +292,7 @@ export default function SearchPage() {
           name: '反例搜索',
           symbols: searchParams.symbols,  // 使用相同的交易對
           timeframe: searchParams.timeframe,  // 使用相同的時間框架
+          priceChangeMethod: searchParams.priceChangeMethod, // 使用相同的價格計算方式
           priceChange: negativeParams.priceChange,
           volumeMultiplier: negativeParams.volumeMultiplier,
           closingStrength: negativeParams.closingStrength,
@@ -309,6 +313,7 @@ export default function SearchPage() {
             timeframe: apiRequest.config.timeframe,
             startDate: apiRequest.config.start_date,
             endDate: apiRequest.config.end_date,
+            priceChangeMethod: searchParams.priceChangeMethod, // 價格計算方式
             priceChange: searchParams.priceChange,
             volumeMultiplier: searchParams.volumeMultiplier,
             takerBuyRatio: searchParams.takerBuyRatio,
@@ -358,6 +363,7 @@ export default function SearchPage() {
             timeframe: apiRequest.config.timeframe,
             startDate: apiRequest.config.start_date,
             endDate: apiRequest.config.end_date,
+            priceChangeMethod: searchParams.priceChangeMethod, // 價格計算方式
             priceChange: searchParams.priceChange,
             volumeMultiplier: searchParams.volumeMultiplier,
             takerBuyRatio: searchParams.takerBuyRatio,
@@ -512,7 +518,7 @@ export default function SearchPage() {
 
       const formatPercentage = (value: any): string => {
         if (value === null || value === undefined || isNaN(value)) return '';
-        return (Number(value) * 100).toFixed(2);
+        return (Number(value) * 100).toFixed(5);  // 🔥 改為5位小數以顯示連續市場中的細微差異
       };
 
       // 生成CSV內容
@@ -827,6 +833,46 @@ export default function SearchPage() {
                 <option value="12h">12小時</option>
                 <option value="1d">1天</option>
               </select>
+            </div>
+            
+            {/* 價格變動計算方式 */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <label className="block text-sm font-medium text-gray-900">
+                  價格變動計算方式
+                </label>
+                <div className="group relative">
+                  <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
+                  <div className="absolute left-0 top-6 hidden group-hover:block bg-gray-800 text-white text-xs rounded px-3 py-2 z-10 w-96 shadow-lg">
+                    <p className="font-semibold mb-2">OPEN_TO_CLOSE (日內交易)：</p>
+                    <p className="mb-2">計算當根K線內的價格變化 = (Close - Open) / Open</p>
+                    <p className="mb-3">適合日內波動策略，不考慮跳空。</p>
+                    <p className="font-semibold mb-2">CLOSE_TO_CLOSE (波段交易)：</p>
+                    <p>計算相對前一根K線的價格變化 = pct_change()</p>
+                    <p>適合波段策略，包含跳空影響。(預設)</p>
+                  </div>
+                </div>
+              </div>
+              <select
+                value={searchParams.priceChangeMethod}
+                onChange={(e) => setSearchParams(prev => ({ 
+                  ...prev, 
+                  priceChangeMethod: e.target.value as PriceChangeMethod 
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              >
+                <option value={PriceChangeMethod.CLOSE_TO_CLOSE}>
+                  前收盤到當收盤 (波段交易，含跳空) - 預設
+                </option>
+                <option value={PriceChangeMethod.OPEN_TO_CLOSE}>
+                  當開盤到當收盤 (日內交易)
+                </option>
+              </select>
+              <p className="text-sm text-gray-600 mt-1">
+                {searchParams.priceChangeMethod === PriceChangeMethod.CLOSE_TO_CLOSE 
+                  ? '計算方式：(當根收盤價 - 前根收盤價) / 前根收盤價 * 100%' 
+                  : '計算方式：(當根收盤價 - 當根開盤價) / 當根開盤價 * 100%'}
+              </p>
             </div>
           </div>
           

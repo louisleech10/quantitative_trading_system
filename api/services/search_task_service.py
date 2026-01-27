@@ -279,13 +279,23 @@ class SearchTaskService:
                     positive_task_id = task_id
                     break
 
+            # === 獲取正例配置的所有必要參數 ===
+            price_change_method = "CLOSE_TO_CLOSE"  # 默認值
+            
             if positive_task_id and positive_task_id in self.positive_configs:
                 positive_config = self.positive_configs[positive_task_id]
                 search_start_date = positive_config.start_date
                 search_end_date = positive_config.end_date
-                self.logger.debug(f"從正例配置獲取時間範圍: {search_start_date} 到 {search_end_date}")
+                # 🔥 繼承正例的價格計算方法
+                if hasattr(positive_config, 'price_change_method'):
+                    price_change_method = positive_config.price_change_method
+                self.logger.info(f"📋 從正例配置繼承參數:")
+                self.logger.info(f"   - 時間範圍: {search_start_date} 到 {search_end_date}")
+                self.logger.info(f"   - price_change_method: {price_change_method}")
             else:
-                self.logger.warning(f"無法從正例配置獲取時間範圍，使用默認值: {search_start_date} 到 {search_end_date}")
+                self.logger.warning(f"⚠️ 無法從正例配置獲取參數，使用默認值:")
+                self.logger.warning(f"   - 時間範圍: {search_start_date} 到 {search_end_date}")
+                self.logger.warning(f"   - price_change_method: {price_change_method}")
 
             # 轉換為datetime對象以便處理
             try:
@@ -307,8 +317,11 @@ class SearchTaskService:
                 initial_conditions=[],
                 advanced_conditions=[],
                 start_date=search_start_date,  # 使用正例搜索相同的開始日期
-                end_date=search_end_date       # 使用正例搜索相同的結束日期
+                end_date=search_end_date,      # 使用正例搜索相同的結束日期
+                price_change_method=price_change_method  # 🔥 使用正例搜索相同的價格計算方法
             )
+            
+            self.logger.info(f"✅ 反例配置已創建，price_change_method={negative_config.price_change_method}")
             
             # 添加用戶設定的條件
             for condition_data in request.negative_conditions:
@@ -702,8 +715,32 @@ class SearchTaskService:
                             if closest_idx is not None:
                                 row = kline_data.loc[closest_idx]
                                 
-                                # 計算價格變化
-                                price_change = (float(row['close']) - float(row['open'])) / float(row['open'])
+                                # 根據配置計算價格變化（確保與正例一致）
+                                try:
+                                    price_change_method = request.search_config.price_change_method.value
+                                    self.logger.info(f"🔄 [反例生成] 使用正例的 price_change_method: {price_change_method}")
+                                except AttributeError:
+                                    # 向後相容：如果沒有設定，預設使用 CLOSE_TO_CLOSE
+                                    price_change_method = 'CLOSE_TO_CLOSE'
+                                    self.logger.warning(f"⚠️ price_change_method not found in config, using default: CLOSE_TO_CLOSE")
+                                
+                                if price_change_method == 'OPEN_TO_CLOSE':
+                                    # K線實體漲幅（日內策略）
+                                    price_change = (float(row['close']) - float(row['open'])) / float(row['open'])
+                                    self.logger.info(f"✅ [反例] OPEN_TO_CLOSE: open={float(row['open']):.2f}, close={float(row['close']):.2f}, price_change={price_change:.6f}")
+                                else:  # CLOSE_TO_CLOSE (預設，波段策略)
+                                    # 實質漲跌幅（包含跳空）
+                                    prev_idx = kline_data.index.get_loc(closest_idx) - 1
+                                    if prev_idx >= 0:
+                                        prev_close = float(kline_data.iloc[prev_idx]['close'])
+                                        price_change = (float(row['close']) - prev_close) / prev_close
+                                        self.logger.info(f"✅ [反例] CLOSE_TO_CLOSE: prev_close={prev_close:.2f}, close={float(row['close']):.2f}, price_change={price_change:.6f}")
+                                    else:
+                                        # 第一根K線無前值，設為0
+                                        price_change = 0.0
+                                        self.logger.debug(f"反例 {symbol} at {closest_idx} 是第一根K線，price_change設為0")
+                                
+                                self.logger.debug(f"反例計算方式: {price_change_method}, price_change={price_change:.4f}")
 
                                 negative_case = CaseData(
                                     symbol=symbol,
