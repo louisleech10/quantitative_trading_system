@@ -21,6 +21,7 @@ from sklearn.metrics import precision_recall_curve, auc
 
 from api.core.logging import get_logger
 from momentum.Analysis.calibration_analyzer import CalibrationAnalyzer, CalibrationMetrics, CalibrationCurveData
+from momentum.Analysis.time_splitter import PurgedTimeSeriesSplit
 
 logger = get_logger(__name__)
 
@@ -220,7 +221,9 @@ class XGBoostAnalyzer:
         xgboost_params: Optional[Dict] = None,
         cv_folds: int = 5,
         time_series_split: bool = False,
-        timestamps: Optional[List[int]] = None
+        timestamps: Optional[List[int]] = None,
+        purge_gap: Optional[int] = None,
+        embargo_pct: Optional[float] = None
     ) -> ModelPerformance:
         """
         訓練 XGBoost 模型
@@ -310,7 +313,9 @@ class XGBoostAnalyzer:
         performance = self.validate_model(
             X, y, cv_folds=cv_folds,
             time_series_split=time_series_split,
-            timestamps=timestamps
+            timestamps=timestamps,
+            purge_gap=purge_gap,
+            embargo_pct=embargo_pct
         )
         
         self.logger.info(
@@ -319,6 +324,36 @@ class XGBoostAnalyzer:
         )
         
         return performance
+
+    def train_with_purged_cv(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: np.ndarray,
+        feature_names: Optional[List[str]] = None,
+        early_stopping_rounds: int = 10,
+        eval_size: float = 0.2,
+        xgboost_params: Optional[Dict] = None,
+        cv_folds: int = 5,
+        timestamps: Optional[List[int]] = None,
+        purge_gap: int = 5,
+        embargo_pct: float = 0.01
+    ) -> ModelPerformance:
+        """
+        使用 Purged K-Fold 交叉驗證訓練模型
+        """
+        return self.train_model(
+            X=X,
+            y=y,
+            feature_names=feature_names,
+            early_stopping_rounds=early_stopping_rounds,
+            eval_size=eval_size,
+            xgboost_params=xgboost_params,
+            cv_folds=cv_folds,
+            time_series_split=True,
+            timestamps=timestamps,
+            purge_gap=purge_gap,
+            embargo_pct=embargo_pct
+        )
     
     def calculate_feature_importance(
         self,
@@ -553,7 +588,9 @@ class XGBoostAnalyzer:
         y: np.ndarray,
         cv_folds: int = 5,
         time_series_split: bool = False,
-        timestamps: Optional[List[int]] = None
+        timestamps: Optional[List[int]] = None,
+        purge_gap: Optional[int] = None,
+        embargo_pct: Optional[float] = None
     ) -> ModelPerformance:
         """
         交叉驗證模型效能
@@ -570,7 +607,6 @@ class XGBoostAnalyzer:
         
         # 建立交叉驗證分割
         if time_series_split:
-            from sklearn.model_selection import TimeSeriesSplit
             if timestamps is None:
                 order = np.arange(len(y))
             else:
@@ -582,9 +618,19 @@ class XGBoostAnalyzer:
                 X_ordered = X[order]
             y_ordered = y[order]
 
-            splitter = TimeSeriesSplit(n_splits=cv_folds)
-            split_iter = splitter.split(X_ordered)
+            if purge_gap is not None or embargo_pct is not None:
+                split_iter = PurgedTimeSeriesSplit(
+                    n_splits=cv_folds,
+                    purge_gap=int(purge_gap or 0),
+                    embargo_pct=float(embargo_pct or 0.0)
+                ).split(X_ordered)
+            else:
+                from sklearn.model_selection import TimeSeriesSplit
+                splitter = TimeSeriesSplit(n_splits=cv_folds)
+                split_iter = splitter.split(X_ordered)
         else:
+            if purge_gap is not None or embargo_pct is not None:
+                self.logger.warning("非時間序列切分下忽略 purge/embargo 參數")
             skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
             X_ordered = X
             y_ordered = y

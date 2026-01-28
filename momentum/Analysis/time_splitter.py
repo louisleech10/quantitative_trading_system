@@ -35,6 +35,7 @@ class TimeSplitterErrorType(Enum):
     TIMESTAMP_COLUMN_NOT_FOUND = "timestamp_column_not_found"
     INSUFFICIENT_OOT_SAMPLES = "insufficient_oot_samples"
     INSUFFICIENT_TRAIN_SAMPLES = "insufficient_train_samples"
+    INSUFFICIENT_SAMPLES_AFTER_PURGE = "insufficient_samples_after_purge"
     TIME_RANGE_OVERLAP = "time_range_overlap"
     INVALID_RATIO = "invalid_ratio"
     DATA_NOT_SORTED = "data_not_sorted"
@@ -81,6 +82,15 @@ class TimeRangeOverlap(TimeSplitterError):
         super().__init__(
             TimeSplitterErrorType.TIME_RANGE_OVERLAP,
             f"訓練集結束時間 ({train_end}) >= OOT 開始時間 ({oot_start})"
+        )
+
+
+class InsufficientSamplesAfterPurge(TimeSplitterError):
+    """Purge/Embargo 後樣本不足"""
+    def __init__(self, fold_count: int):
+        super().__init__(
+            TimeSplitterErrorType.INSUFFICIENT_SAMPLES_AFTER_PURGE,
+            f"Purged CV 無有效 fold（有效 fold 數: {fold_count}）"
         )
 
 
@@ -517,6 +527,7 @@ class PurgedTimeSeriesSplit:
         n_samples = len(X)
         tscv = TimeSeriesSplit(n_splits=self.n_splits)
         
+        valid_fold_count = 0
         for fold_idx, (train_idx, val_idx) in enumerate(tscv.split(X)):
             original_train_size = len(train_idx)
             original_val_size = len(val_idx)
@@ -549,8 +560,12 @@ class PurgedTimeSeriesSplit:
                 f"訓練: {original_train_size} → {len(train_idx)} (purge: -{self.purge_gap}), "
                 f"驗證: {original_val_size} → {len(val_idx)}"
             )
-            
+
+            valid_fold_count += 1
             yield train_idx, val_idx
+
+        if valid_fold_count == 0:
+            raise InsufficientSamplesAfterPurge(valid_fold_count)
     
     def get_n_splits(
         self,

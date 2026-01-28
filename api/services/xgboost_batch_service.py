@@ -163,6 +163,8 @@ class XGBoostBatchService:
         aggregation_methods: Optional[List[str]] = None,
         multi_scale_windows: Optional[List[int]] = None,
         time_series_split: bool = True,
+        purge_gap: Optional[int] = None,
+        embargo_pct: Optional[float] = None,
         xgboost_params: Optional[Dict] = None,
         cv_folds: int = 5,
         top_n_rules: int = 10,
@@ -182,6 +184,8 @@ class XGBoostBatchService:
             aggregation_methods: 序列彙總方法
             multi_scale_windows: 多時間尺度窗口
             time_series_split: 是否使用時間序列切分
+            purge_gap: 標籤用到未來幾根 K 線（Purged CV）
+            embargo_pct: Embargo 緩衝比例
             xgboost_params: XGBoost 參數
             cv_folds: 交叉驗證折數
             top_n_rules: 提取前 N 條規則
@@ -226,6 +230,8 @@ class XGBoostBatchService:
                 aggregation_methods=aggregation_methods,
                 multi_scale_windows=multi_scale_windows,
                 time_series_split=time_series_split,
+                purge_gap=purge_gap,
+                embargo_pct=embargo_pct,
                 xgboost_params=xgboost_params,
                 cv_folds=cv_folds,
                 top_n_rules=top_n_rules,
@@ -255,6 +261,8 @@ class XGBoostBatchService:
         aggregation_methods: Optional[List[str]],
         multi_scale_windows: Optional[List[int]],
         time_series_split: bool,
+        purge_gap: Optional[int],
+        embargo_pct: Optional[float],
         xgboost_params: Optional[Dict],
         cv_folds: int,
         top_n_rules: int,
@@ -541,7 +549,7 @@ class XGBoostBatchService:
             performance = await asyncio.to_thread(
                 self.xgboost_analyzer.train_model,
                 X, y, feature_names, 10, 0.2, xgboost_params, cv_folds,
-                time_series_split, case_timestamps
+                time_series_split, case_timestamps, purge_gap, embargo_pct
             )
             
             self.logger.info(
@@ -603,7 +611,9 @@ class XGBoostBatchService:
                     'sequence_stride': sequence_stride,
                     'aggregation_methods': aggregation_methods,
                     'multi_scale_windows': multi_scale_windows,
-                    'time_series_split': time_series_split
+                    'time_series_split': time_series_split,
+                    'purge_gap': purge_gap,
+                    'embargo_pct': embargo_pct
                 }
             )
             

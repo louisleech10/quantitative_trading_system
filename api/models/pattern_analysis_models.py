@@ -154,6 +154,16 @@ class XGBoostBatchAnalysisRequest(BaseModel):
         default=True,
         description="是否使用時間序列切分避免洩漏"
     )
+    purge_gap: Optional[int] = Field(
+        default=None,
+        description="標籤用到未來幾根 K 線（Purged CV 用）"
+    )
+    embargo_pct: Optional[float] = Field(
+        default=None,
+        ge=0,
+        le=0.1,
+        description="Embargo 緩衝比例（0-0.1）"
+    )
     xgboost_params: Optional[Dict[str, Any]] = Field(
         default=None,
         description="XGBoost 參數（可選，使用預設值）"

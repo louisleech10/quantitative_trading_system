@@ -5,32 +5,48 @@
 - ✅ Task 1.2: XGBoost 預測機率輸出、API格式、單元測試 — 2026-01-28
 - ✅ Task 1.3: 三種特徵重要性（Gain/Cover/Weight）、校正指標（Brier/ECE）、API整合 — 2026-01-28
 - ✅ Task 1.4: 輸出整合、PR AUC、API與單元測試 — 2026-01-28
+- ✅ Task 1.5: Purged K-Fold / Embargo 去污染交叉驗證 — 2026-01-28（2 tests passed）
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 ### 進行中 🚧
-- Phase 4 前端 OOT 設定與視覺化整合（規劃中）
+- Task 1.6+: 後續 XGBoost 進階功能（SHAP/PSI/群體穩定性）（規劃中）
+- Phase 4 前端 OOT 設定與視覺化整合（預計未來開發）
 
 ## 🎯 當前重點
-- Task 1.2/1.3/1.4 已完成（後端預測機率、特徵重要性、校正/PR AUC 指標、API/單元測試）
-- 下一步：Phase 4 前端 OOT 設定與視覺化整合
-- ✅ Task 1.1: OOT 驗證系統（後端 + 單元測試） — 2026-01-28（17 tests passed）
+- Task 1.5 已完成（Purged K-Fold / Embargo 去污染交叉驗證，2/2 測試通過）
+- XGBoost 完整特徵集實装已達成 Phase 1: 5/5 任務 100% 完成
+- 後續規劃：Task 1.6 SHAP 解釋性分析、Task 2.x PSI 飄移檢測
 ### 下一步工作
-- 前端 OOT 設定 UI 與結果視覺化（Phase 4）
-- API 文件與前端調用範例補充
-- 持續驗證與優化（CI/測試覆蓋）
-- **XGBoost 序列特徵與時間序列切分** (100%) - 2026-01-17完成
+- Task 1.6: SHAP 特徵解釋性分析（Additive Feature Attribution）
+- Task 2.1: PSI 群體穩定性監控（Population Stability Index）
+- Task 2.2: 漂移檢測與告警系統（基於 PSI）
+- Phase 4: 前端 OOT 設定 UI 與結果視覺化整合
+- 完整端到端測試與性能基準測試
+### 需要修復
+- Pydantic v2 警告（field shadowing）— 優先級中
+- 前端 OOT 設定面板缺失（Phase 4）— 優先級中
+
+### 需要優化
+- Purged CV 大樣本性能測試（>100k）
+- API 序列化清理負擔優化
+- 整合測試覆蓋擴充
+
 ### 技術債務
-- 前端整合與視覺化待實作（Phase 4）
-- 完整 E2E/CI 測試覆蓋尚未達成
-  - ✅ 單元測試：新增序列特徵與時間序列切分測試，7/7通過
+- 前端完整整合與視覺化（Phase 4）
+- CI/CD 測試覆蓋完善（目標 >90%）
+- 文檔更新（Purged CV 使用指南）
 ## 📝 最近完成的工作
-- 2026-01-28：Task 1.2/1.3/1.4 完成 — XGBoost 預測機率、特徵重要性、校正/PR AUC 指標、API/單元測試（所有驗證通過）
-- 2026-01-28：Task 1.1 完成 — OOT 驗證系統（後端 + 單元測試；17 tests passed）
-  - ✅ PatternList 組件修復：store 屬性讀取（filters.status/tags）
+- 2026-01-28：**Task 1.5 完成** — Purged K-Fold / Embargo 去污染交叉驗證
+  - ✅ PurgedTimeSeriesSplit 核心實現（purge_gap + embargo_pct + 無有效 fold 保護）
+  - ✅ XGBoostAnalyzer 集成（train_model + validate_model + train_with_purged_cv）
+  - ✅ API 參數傳遞鏈（XGBoostBatchAnalysisRequest → API → Service → Analyzer）
+  - ✅ 單元測試驗證（2/2 通過：InsufficientSamplesAfterPurge + 完整 CV 流程）
+- 2026-01-28：Task 1.1-1.4 完成 — OOT 驗證系統、預測機率、特徵重要性、輸出整合（所有驗證通過）
 ## 🔄 Git狀態
-- main 分支，已同步（已新增 Task1.2/1.3/1.4 相關檔案並推送） — 2026-01-28
-- 最新提交：Task1.2/1.3/1.4 XGBoost 預測機率、特徵重要性、校正/PR AUC、API/單元測試
-  - ✅ PatternStorage 修復：get_all_patterns() 方法支援全部刪除功能
-  - ✅ 完整工作流測試：儲存 → 管理 → 編輯 → 刪除全流程打通
+- main 分支，待同步（已完成 Task 1.5 本地所有修改） — 2026-01-28
+- 最新完成：Task 1.5 Purged K-Fold / Embargo 實装（1 個新類別 + 2 個核心文件修改 + 3 個 API 層修改 + 2 個測試文件）
+  - 修改文件：time_splitter.py, xgboost_analyzer.py, pattern_analysis_models.py, pattern_analysis.py, xgboost_batch_service.py, test_oot_validation.py
+  - 新建文件：test_xgboost_analyzer_purged_cv.py
+  - 待推送項目：全 7 個檔案 + 測試驗證結果
 - **XGBoost 批量分析 JSON 序列化修復** (100%) - 2026-01-15完成
   - ✅ JSON 序列化工具：convert_numpy_types 遞迴轉換 numpy 類型
   - ✅ XGBoost 結果清理：sanitize_for_json 防止 FastAPI 序列化錯誤
@@ -227,9 +243,11 @@
 - 最新提交：Task1.1 OOT 驗證系統與測試
 
 ## 💡 下次啟動時
-- 開始實作 Task1.2/1.3/1.4：後端優先（預測機率、重要性方法、輸出整合）
-- 安排 Phase4 前端 OOT UI 與整合測試時程
-- 執行 pytest 全套並修正發現的 Pydantic 警告
+- **確認 Git 推送**：Task 1.5 所有修改推送到 main 分支
+- **開始 Task 1.6**：SHAP 特徵解釋性分析實装
+- **計劃 Task 2.x**：PSI 群體穩定性監控、漂移檢測系統
+- **修復 Pydantic 警告**：v2 field shadowing issue
+- **執行完整測試**：pytest 全套 + 性能基準測試
 
 ---
 

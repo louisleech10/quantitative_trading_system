@@ -550,6 +550,8 @@ async def start_batch_xgboost_analysis(request: XGBoostBatchAnalysisRequest):
             aggregation_methods=request.aggregation_methods,
             multi_scale_windows=request.multi_scale_windows,
             time_series_split=request.time_series_split,
+            purge_gap=request.purge_gap,
+            embargo_pct=request.embargo_pct,
             xgboost_params=request.xgboost_params,
             cv_folds=request.cv_folds,
             top_n_rules=request.top_n_rules,

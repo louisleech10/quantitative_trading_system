@@ -39,6 +39,7 @@ from momentum.Analysis.time_splitter import (
     TimestampColumnNotFound,
     InsufficientOOTSamples,
     InsufficientTrainSamples,
+    InsufficientSamplesAfterPurge,
     TimeRangeOverlap
 )
 from momentum.Analysis.xgboost_analyzer import (
@@ -318,6 +319,21 @@ class TestPurgedTimeSeriesSplit:
         assert fold_count > 0, "應該產生至少一個 fold"
         
         print(f"✅ Purge 和 Embargo 組合測試通過 - 產生 {fold_count} 個 fold")
+
+    def test_insufficient_samples_after_purge(self):
+        """測試 Purge 後樣本不足會拋錯"""
+        splitter = PurgedTimeSeriesSplit(
+            n_splits=3,
+            purge_gap=5,
+            embargo_pct=0.9
+        )
+
+        X = np.random.randn(20, 4)
+
+        with pytest.raises(InsufficientSamplesAfterPurge):
+            list(splitter.split(X))
+
+        print("✅ Purge 後樣本不足錯誤測試通過")
 
 
 # ==================== XGBoostAnalyzer OOT 驗證測試 ====================
