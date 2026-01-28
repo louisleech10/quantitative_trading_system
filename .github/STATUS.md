@@ -204,53 +204,52 @@
   - ✅ 測試驗證：8/8時間框架（1m/5m/15m/1h/4h/12h/1d）全部通過
   - ✅ 文檔：STORAGE_FIX_SUMMARY.md + BATCH_DOWNLOAD_FIX_SUMMARY.md
 ### 進行中 🚧
-- Task 1.2: 預測機率輸出與 API 格式（後端實作）
-- Task 1.3: 三種特徵重要性（Gain/Cover/Weight + SHAP）實作
-- Task 1.4: 輸出整合、API 與單元測試
-- 系統驗證與測試（價格計算、CSV 驗證）
+- Phase 4 前端 OOT 設定與視覺化整合（預計未來開發）
+- Task 2.4: Purged K-Fold 交叉驗證（待實作）
 
 ## 🎯 當前重點
-- 已完成 Task 1.1（OOT 驗證系統）；當前重點為實作並驗證 Task 1.2 / 1.3 / 1.4（後端優先），並為 Phase 4 前端整合做好準備
+- ✅ Task 2.2/2.3 已完成 API/流程整合與驗證
+- 連續性讀取規則已對齊（圖表/策略嚴格，append 寫入後立即驗證）
+- Phase 2 剩餘 Task 2.4 (Purged K-Fold) 或推進 Phase 4 前端整合
 
 ### 下一步工作
-- 實作 Task 1.2：新增模型輸出預測機率、更新 API schema 並撰寫單元測試
-- 實作 Task 1.3：實作三種特徵重要性 / 加入 SHAP 支援並驗證一致性
-- 實作 Task 1.4：整合輸出格式、API 路由與整合測試（包含 OOT 流程）
-- 準備 Phase 4：前端 OOT 設定 UI 與結果視覺化（於 Phase 4 一次性完成）
-- 執行完整測試（pytest 全套）並確認 CI 綠燈
+- Phase 4: 前端 OOT 設定 UI 與結果視覺化整合
+- Task 2.4: Purged K-Fold 交叉驗證實作（可選）
+- 完整端到端測試與性能基準測試
 
 ## 🐛 已知問題
-- 前端 `xgboost-analysis` 頁面尚未提供 OOT 設定輸入（Phase 4 預計實作）
-- 單元測試中出現 2 則 Pydantic 警告（需後續檢視並視情況修正）
+- 前端 OOT 設定面板缺失（Phase 4 待實作）
 
 ### 需要修復
-- 新增前端 OOT 設定面板（Phase 4）或以 API 為臨時替代
-- 檢查並修正 Pydantic 警告（field name shadowing / config 調整）
+- 前端 OOT 設定面板缺失（Phase 4）— 優先級中
 
 ### 需要優化
-- 優化 API 返回結構與文件（減少序列化清理負擔）
-- 增補整合測試覆蓋（Phase4 前後端整合測試）
+- SHAP 樣本大小配置（目前 100/200 固定值）
+- API 序列化清理負擔優化
+- 整合測試覆蓋擴充
 
 ### 技術債務
-- 前端整合與視覺化待實作（Phase 4）
-- 完整 E2E/CI 測試覆蓋尚未達成
+- 前端完整整合與視覺化（Phase 4）
+- CI/CD 測試覆蓋完善（目標 >90%）
+- 文檔更新（SHAP 使用指南）
 
 ## 📝 最近完成的工作
+- 2026-01-29：Task 2.2 PSI 飄移完成（OOT 整合 + API 端點）
+- 2026-01-29：Task 2.3 市場體制分析完成（批量流程整合 + API 端點）
+- 2026-01-29：修復測試警告（FeatureExtractionRequest 欄位命名、pytest.ini 設定）
+- 2026-01-29：Drift/Regime 測試通過（3/3）
 - 2026-01-29：圖表/策略讀取改為嚴格連續性（避免缺口）
-- 2026-01-29：連續性檢查位置盤點與規則對齊
+- 2026-01-28：Task 2.1 SHAP 分析完成 — 特徵解釋性系統
 - 2026-01-28：Task 1.1 完成 — OOT 驗證系統（後端 + 單元測試；17 tests passed）
-- 2026-01-27：價格計算方法系統完善 - 反例繼承與 CSV 精度優化
-- 2026-01-17：XGBoost 序列特徵與時間序列切分完成
 
 ## 🔄 Git狀態
 - main 分支，已同步 — 2026-01-29
-- 最新提交：STATUS 更新（連續性規則對齊）
+- 最新提交：Task 2.2/2.3 完成 + 測試警告修復（2 warnings → 0 warnings）
 
 ## 💡 下次啟動時
-- **開始 Task 2.2**：PSI 特徵飄移監控實裝（特徵分佈變化檢測）
-- **計劃 Task 2.3**：市場體制分析（按 Market_Phase 實施分析）
-- **修復 Pydantic 警告**：v2 field shadowing issue
-- **執行完整測試**：pytest 全套
+- **選項 A**: 啟動 Phase 4 前端整合（OOT 設定 UI 與結果視覺化）
+- **選項 B**: 實作 Task 2.4 Purged K-Fold 交叉驗證
+- **建議**: Phase 4 前端整合優先（完整用戶體驗閉環）
 
 ---
 
