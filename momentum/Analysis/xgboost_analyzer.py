@@ -18,6 +18,7 @@ import xgboost as xgb
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
 from sklearn.metrics import precision_recall_curve, auc
+from sklearn.inspection import permutation_importance
 
 from api.core.logging import get_logger
 from momentum.Analysis.calibration_analyzer import CalibrationAnalyzer, CalibrationMetrics, CalibrationCurveData
@@ -168,6 +169,72 @@ class PRMetrics:
             "precision": self.precision,
             "recall": self.recall,
             "thresholds": self.thresholds
+        }
+
+
+@dataclass
+class PrecisionAtKResult:
+    """Precision@K 結果"""
+    precision_at_k: Dict[int, float]
+    threshold_at_k: Dict[int, float]
+    sample_count_at_k: Dict[int, int]
+
+    def to_dict(self) -> Dict:
+        return {
+            "precision_at_k": self.precision_at_k,
+            "threshold_at_k": self.threshold_at_k,
+            "sample_count_at_k": self.sample_count_at_k
+        }
+
+
+@dataclass
+class PermutationImportanceItem:
+    """Permutation 重要性單項"""
+    feature: str
+    importance: float
+    std: float
+    rank: int
+    gain_rank: Optional[int] = None
+    rank_gap: Optional[int] = None
+    overfit_flag: bool = False
+
+
+@dataclass
+class PermutationImportanceResult:
+    """Permutation 重要性結果"""
+    items: List[PermutationImportanceItem]
+    rank_gap_threshold: int
+
+    def to_dict(self) -> Dict:
+        return {
+            "rank_gap_threshold": self.rank_gap_threshold,
+            "items": [
+                {
+                    "feature": item.feature,
+                    "importance": item.importance,
+                    "std": item.std,
+                    "rank": item.rank,
+                    "gain_rank": item.gain_rank,
+                    "rank_gap": item.rank_gap,
+                    "overfit_flag": item.overfit_flag
+                }
+                for item in self.items
+            ]
+        }
+
+
+@dataclass
+class FoldImportanceStabilityResult:
+    """Fold-level 重要性穩定性結果"""
+    stable_features: List[str]
+    unstable_features: List[Dict[str, Union[str, float, List[int]]]]
+    feature_cv: Dict[str, float]
+
+    def to_dict(self) -> Dict:
+        return {
+            "stable_features": self.stable_features,
+            "unstable_features": self.unstable_features,
+            "feature_cv": self.feature_cv
         }
 
 
@@ -452,6 +519,332 @@ class XGBoostAnalyzer:
             "cover": self.calculate_feature_importance(feature_names, method="cover", top_n=top_n),
             "weight": self.calculate_feature_importance(feature_names, method="weight", top_n=top_n)
         }
+
+    def _calculate_feature_importance_from_model(
+        self,
+        model: xgb.XGBClassifier,
+        feature_names: List[str],
+        method: str = "gain"
+    ) -> List[FeatureImportance]:
+        """
+        使用指定模型計算特徵重要性（避免改動 self.model）
+        """
+        if model is None:
+            raise ValueError("模型不存在，無法計算特徵重要性")
+
+        importance_dict = model.get_booster().get_score(importance_type=method)
+        importance_list: List[Tuple[str, float]] = []
+
+        for i, feature_name in enumerate(feature_names):
+            xgb_feature_name = f"f{i}"
+            importance = importance_dict.get(xgb_feature_name, 0.0)
+            importance_list.append((feature_name, importance))
+
+        total_importance = sum(imp for _, imp in importance_list)
+        if total_importance == 0:
+            if hasattr(model, "feature_importances_"):
+                fallback_importances = model.feature_importances_
+                if fallback_importances is not None and len(fallback_importances) == len(feature_names):
+                    importance_list = list(zip(feature_names, fallback_importances))
+                    total_importance = float(np.sum(fallback_importances))
+
+        if total_importance > 0:
+            importance_list = [(name, imp / total_importance) for name, imp in importance_list]
+        else:
+            self.logger.warning("特徵重要性總和為 0，模型可能未產生分裂")
+
+        importance_list.sort(key=lambda x: x[1], reverse=True)
+
+        return [
+            FeatureImportance(
+                feature=name,
+                importance=float(importance),
+                rank=idx + 1,
+                method=method
+            )
+            for idx, (name, importance) in enumerate(importance_list)
+        ]
+
+    def calculate_precision_at_k(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: np.ndarray,
+        k_values: Optional[List[int]] = None
+    ) -> PrecisionAtKResult:
+        """
+        計算 Precision@K
+
+        Args:
+            X: 特徵矩陣
+            y: 標籤
+            k_values: K 百分比列表（預設 [1, 5, 10, 20]）
+        """
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+
+        if len(X) == 0:
+            raise ValueError("X 為空，無法計算 Precision@K")
+
+        if len(X) != len(y):
+            raise ValueError("X 與 y 長度不一致")
+
+        k_values = k_values or [1, 5, 10, 20]
+        for k in k_values:
+            if k <= 0 or k > 100:
+                raise ValueError("k_values 必須在 1~100 之間")
+
+        y_pred_proba = self.model.predict_proba(X)[:, 1]
+        n_samples = len(y)
+
+        precision_at_k: Dict[int, float] = {}
+        threshold_at_k: Dict[int, float] = {}
+        sample_count_at_k: Dict[int, int] = {}
+
+        for k in k_values:
+            n_top = max(1, int(n_samples * k / 100))
+            top_indices = np.argsort(y_pred_proba)[-n_top:]
+            precision = float(np.mean(y[top_indices])) if n_top > 0 else 0.0
+            threshold = float(np.min(y_pred_proba[top_indices])) if n_top > 0 else 1.0
+
+            precision_at_k[k] = precision
+            threshold_at_k[k] = threshold
+            sample_count_at_k[k] = int(n_top)
+
+            self.logger.info(
+                f"Precision@{k}% = {precision:.4f}, "
+                f"threshold={threshold:.4f}, samples={n_top}"
+            )
+
+        return PrecisionAtKResult(
+            precision_at_k=precision_at_k,
+            threshold_at_k=threshold_at_k,
+            sample_count_at_k=sample_count_at_k
+        )
+
+    def recommend_k(
+        self,
+        y_true: np.ndarray,
+        y_pred_proba: np.ndarray,
+        target_precision: float = 0.75,
+        k_candidates: Optional[List[int]] = None
+    ) -> Dict[str, Union[int, float, None]]:
+        """
+        推薦最佳 K（滿足目標 precision 的最大 K）
+        """
+        if len(y_true) == 0:
+            raise ValueError("y_true 為空")
+
+        if len(y_true) != len(y_pred_proba):
+            raise ValueError("y_true 與 y_pred_proba 長度不一致")
+
+        k_candidates = k_candidates or [1, 5, 10, 20, 30]
+        best_k = None
+        best_threshold = None
+        best_precision = None
+
+        n_samples = len(y_true)
+        for k in sorted(k_candidates):
+            n_top = max(1, int(n_samples * k / 100))
+            top_indices = np.argsort(y_pred_proba)[-n_top:]
+            precision = float(np.mean(y_true[top_indices])) if n_top > 0 else 0.0
+            threshold = float(np.min(y_pred_proba[top_indices])) if n_top > 0 else 1.0
+
+            if precision >= target_precision:
+                best_k = k
+                best_threshold = threshold
+                best_precision = precision
+
+        return {
+            "recommended_k": best_k,
+            "threshold": best_threshold,
+            "precision": best_precision
+        }
+
+    def calculate_permutation_importance(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: np.ndarray,
+        n_repeats: int = 10,
+        random_state: int = 42,
+        scoring: str = "roc_auc",
+        rank_gap_threshold: int = 5
+    ) -> PermutationImportanceResult:
+        """
+        計算 Permutation Importance，並與 Gain 重要性對比
+        """
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+
+        if len(X) == 0:
+            raise ValueError("X 為空，無法計算 Permutation Importance")
+
+        if len(X) != len(y):
+            raise ValueError("X 與 y 長度不一致")
+
+        if self.feature_names is None:
+            raise ValueError("特徵名稱尚未設定")
+
+        result = permutation_importance(
+            self.model,
+            X,
+            y,
+            n_repeats=n_repeats,
+            random_state=random_state,
+            scoring=scoring
+        )
+
+        importances_mean = result.importances_mean
+        importances_std = result.importances_std
+
+        sorted_idx = np.argsort(importances_mean)[::-1]
+        items: List[PermutationImportanceItem] = []
+
+        gain_importance = self.calculate_feature_importance(
+            feature_names=self.feature_names,
+            method="gain",
+            top_n=None
+        )
+        gain_rank_map = {fi.feature: fi.rank for fi in gain_importance}
+
+        for rank, idx in enumerate(sorted_idx, start=1):
+            feature = self.feature_names[idx]
+            importance = float(importances_mean[idx])
+            std = float(importances_std[idx])
+            gain_rank = gain_rank_map.get(feature)
+            rank_gap = abs(gain_rank - rank) if gain_rank is not None else None
+            overfit_flag = rank_gap is not None and rank_gap > rank_gap_threshold
+
+            items.append(
+                PermutationImportanceItem(
+                    feature=feature,
+                    importance=importance,
+                    std=std,
+                    rank=rank,
+                    gain_rank=gain_rank,
+                    rank_gap=rank_gap,
+                    overfit_flag=overfit_flag
+                )
+            )
+
+        flagged = [item for item in items if item.overfit_flag]
+        if flagged:
+            self.logger.warning(
+                f"Permutation 與 Gain 排名差異較大 (>{rank_gap_threshold}) 的特徵數: {len(flagged)}"
+            )
+
+        return PermutationImportanceResult(items=items, rank_gap_threshold=rank_gap_threshold)
+
+    def calculate_fold_importance_stability(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: np.ndarray,
+        cv_folds: int = 5,
+        time_series_split: bool = False,
+        timestamps: Optional[List[int]] = None,
+        purge_gap: Optional[int] = None,
+        embargo_pct: Optional[float] = None,
+        instability_threshold: float = 0.5
+    ) -> FoldImportanceStabilityResult:
+        """
+        計算 Fold-level 特徵重要性穩定性
+        """
+        if self.feature_names is None:
+            raise ValueError("特徵名稱尚未設定")
+
+        if len(X) == 0:
+            raise ValueError("X 為空，無法計算穩定性")
+
+        if len(X) != len(y):
+            raise ValueError("X 與 y 長度不一致")
+
+        if time_series_split:
+            if timestamps is None:
+                order = np.arange(len(y))
+            else:
+                order = np.argsort(np.array(timestamps))
+
+            if isinstance(X, pd.DataFrame):
+                X_ordered = X.iloc[order]
+            else:
+                X_ordered = X[order]
+            y_ordered = y[order]
+
+            if purge_gap is not None or embargo_pct is not None:
+                split_iter = PurgedTimeSeriesSplit(
+                    n_splits=cv_folds,
+                    purge_gap=int(purge_gap or 0),
+                    embargo_pct=float(embargo_pct or 0.0)
+                ).split(X_ordered)
+            else:
+                from sklearn.model_selection import TimeSeriesSplit
+                splitter = TimeSeriesSplit(n_splits=cv_folds)
+                split_iter = splitter.split(X_ordered)
+        else:
+            skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
+            X_ordered = X
+            y_ordered = y
+            split_iter = skf.split(X_ordered, y_ordered)
+
+        fold_importances: Dict[str, List[float]] = {name: [] for name in self.feature_names}
+        fold_ranks: Dict[str, List[int]] = {name: [] for name in self.feature_names}
+
+        for fold, (train_idx, val_idx) in enumerate(split_iter, start=1):
+            if isinstance(X_ordered, pd.DataFrame):
+                X_train_fold = X_ordered.iloc[train_idx]
+            else:
+                X_train_fold = X_ordered[train_idx]
+            y_train_fold = y_ordered[train_idx]
+
+            model_fold = xgb.XGBClassifier(**self.params)
+            model_fold.fit(X_train_fold, y_train_fold, verbose=False)
+
+            importance_list = self._calculate_feature_importance_from_model(
+                model=model_fold,
+                feature_names=self.feature_names,
+                method="gain"
+            )
+
+            for item in importance_list:
+                fold_importances[item.feature].append(float(item.importance))
+                fold_ranks[item.feature].append(int(item.rank))
+
+            self.logger.info(
+                f"Fold {fold}/{cv_folds} - 完成特徵重要性計算"
+            )
+
+        feature_cv: Dict[str, float] = {}
+        stable_features: List[str] = []
+        unstable_features: List[Dict[str, Union[str, float, List[int]]]] = []
+
+        for feature, values in fold_importances.items():
+            values_arr = np.array(values, dtype=float)
+            mean_val = float(np.mean(values_arr)) if len(values_arr) > 0 else 0.0
+            std_val = float(np.std(values_arr)) if len(values_arr) > 0 else 0.0
+            cv = float(std_val / mean_val) if mean_val > 0 else float("inf")
+            feature_cv[feature] = cv
+
+            ranks = fold_ranks.get(feature, [])
+            rank_range = [int(np.min(ranks)), int(np.max(ranks))] if ranks else [0, 0]
+
+            if cv > instability_threshold:
+                unstable_features.append({
+                    "feature": feature,
+                    "cv": cv,
+                    "rank_range": rank_range
+                })
+            else:
+                stable_features.append(feature)
+
+        if unstable_features:
+            self.logger.warning(
+                f"不穩定特徵數: {len(unstable_features)} (CV > {instability_threshold})"
+            )
+
+        return FoldImportanceStabilityResult(
+            stable_features=stable_features,
+            unstable_features=unstable_features,
+            feature_cv=feature_cv
+        )
 
     def _build_proba_summary(self, y_pred_proba: np.ndarray, n_bins: int = 10) -> ProbabilitySummary:
         """建立預測機率摘要"""

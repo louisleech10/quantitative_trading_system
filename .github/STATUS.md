@@ -9,54 +9,63 @@
 - ✅ Task 2.1: SHAP 解釋性分析（TreeExplainer + 服務層 + API端點） — 2026-01-28（完整驗證通過）
 - ✅ Task 2.2: PSI 特徵飄移監控（OOT 整合 + API 端點）— 2026-01-29
 - ✅ Task 2.3: 市場體制分析（批量流程整合 + API 端點）— 2026-01-29
+- ✅ Task 3.1-3.6: 進階評估指標（API模型+服務整合+前端UI+測試）— 2026-01-29（6 tests passed）
 - ✅ 圖表/策略讀取連續性嚴格化（read_klines validate_continuity=True）— 2026-01-29
 
 **XGBoost 功能增強進度**（依據 [XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md](../docs/XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md)）：
 - ✅ **Phase 1: 核心驗證能力** - 5/5 任務完成 (100%)
 - ✅ **Phase 2: 模型解釋與監控** - 3/3 任務完成 (100%)
-- ⏳ **Phase 3: 進階評估指標** - 0/6 任務（Precision@K, 期望值, Bootstrap CI 等）
+- ✅ **Phase 3: 進階評估指標** - 6/6 任務完成 (100%)
 - ⏳ **Phase 4: 工具與基礎設施** - 0/2 任務（視覺化圖表, MLflow 整合）
 
 **項目整體進度**（歷史 Phase）：
 - ✅ Phase 1~3: 策略信號系統 - 已於 2025-11-02 完成
 
 ### 進行中 🚧
-- XGBoost Phase 3 進階評估指標開發（依計劃優先級）
-- XGBoost Frontend 整合（OOT 設定 UI 與視覺化，Phase 4 的一部分）
+- XGBoost Phase 4 前端視覺化整合（進階圖表組件開發準備中）
 
 ## 🎯 當前重點
-- ✅ XGBoost Phase 1 & 2 已全部完成（OOT/預測機率/校準指標/PR AUC/Purged CV/SHAP/PSI/市場體制）
-- 連續性讀取規則已對齊（圖表/策略嚴格，append 寫入後立即驗證）
-- 下一階段：根據 XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md Phase 3 或直接推進 Phase 4 前端整合
+- ✅ XGBoost Phase 1-3 已全部完成（OOT/SHAP/PSI/市場體制/Precision@K/Bootstrap CI/Permutation Importance）
+- ✅ 進階評估指標已整合至 API 與前端（6個指標+測試覆蓋）
+- 下一階段：Phase 4 前端視覺化整合（6個進階圖表組件）或根據需求調整優先級
 
 ### 下一步工作
-**選項 A**（進階指標）：
-- Task 3.1: Precision@K（評估前 K% 訊號的表現）
-- Task 3.2: 期望值估算（粗估交易期望值）
-- Task 3.3: Bootstrap 信賴區間（統計區間估計）
-- Task 3.4-3.6: Permutation Importance / Fold-level 穩定性 / 跨幣種泛化
+**選項 A**（推薦，前端視覺化）：
+- Task 4.1: 實作 6 個進階圖表組件（校準曲線/PR 曲線/SHAP Summary/PSI 分佈對比/Precision@K 曲線/Bootstrap CI 視覺化）
+- 前端 OOT 設定 UI 與結果展示頁面整合
+- 完整用戶體驗閉環
 
-**選項 B**（前端整合）：
-- Task 4.1: 前端視覺化圖表（校準曲線、PR 曲線、SHAP Summary、PSI 分佈對比等）
-- 前端 OOT 設定 UI 與結果展示頁面
-
-**選項 C**（驗證與文檔）：
+**選項 B**（驗證與文檔）：
 - 完整端到端測試與性能基準測試
-- 更新 API 文檔與使用指南
+- 更新 API 文檔與使用指南（覆蓋 Phase 3 新增指標）
+- 撰寫進階評估指標使用範例
+
+**選項 C**（MLflow 整合）：
+- Task 4.2: MLflow 實驗追蹤整合
+- 模型註冊與版本管理
+- 實驗結果持久化與查詢
 ### 需要修復
 - 前端 OOT 設定面板缺失（XGBoost Phase 4）— 優先級中
-- 前端視覺化圖表缺失（校準曲線、PR 曲線等，XGBoost Phase 4）— 優先級中
+- 前端進階圖表組件缺失（Phase 3 指標視覺化，XGBoost Phase 4）— 優先級中
 
 ### 需要優化
 - SHAP 樣本大小配置（目前 100/200 固定值） — 優先級低
 - API 序列化清理負擔優化 — 優先級低
-- Phase 3 進階指標（Precision@K, Bootstrap CI 等）可選實作 — 視需求
+- Phase 3 進階指標前端展示優化（目前僅基礎 UI）— 優先級中
 
 ### 技術債務
-- XGBoost Phase 4 前端完整整合與視覺化（6 個圖表組件）
+- XGBoost Phase 4 前端視覺化組件（6 個進階圖表待實作）
+- Phase 3 進階指標文檔完善（使用範例與最佳實踐）
 - CI/CD 測試覆蓋完善（目標 >90%）
-- 文檔更新（XGBoost 分析完整使用指南）
+- 整合測試擴充（覆蓋 Phase 3 新增指標）
 ## 📝 最近完成的工作
+- 2026-01-29：**Task 3.1-3.6 進階評估指標完成** — API 整合與前端展示
+  - ✅ 建立 6 個 Pydantic 回應模型（Precision@K, Expectancy, Bootstrap CI, Permutation Importance, Fold Stability, Cross-Symbol Validation）
+  - ✅ 整合單案例服務（xgboost_task_service.py，新增 6 個指標計算）
+  - ✅ 整合批次服務（xgboost_batch_service.py，新增跨交易對驗證）
+  - ✅ 前端類型定義（patternTypes.ts，6 個新介面）
+  - ✅ 前端 UI 組件（AdvancedMetricsCard，6-panel 網格佈局）
+  - ✅ 測試驗證（6/6 tests passed，覆蓋所有核心計算邏輯）
 - 2026-01-29：Task 2.2 PSI 飄移完成（OOT 整合 + API 端點）
 - 2026-01-29：Task 2.3 市場體制分析完成（批量流程整合 + API 端點）
 - 2026-01-29：修復測試警告（FeatureExtractionRequest 欄位命名、pytest.ini 設定）
@@ -73,7 +82,7 @@
   - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
 - 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，已同步 — 2026-01-29
+- main 分支，待推送 — 2026-01-29（Task 3.1-3.6 完成）
 - **XGBoost 批量分析 JSON 序列化修復** (100%) - 2026-01-15完成
   - ✅ JSON 序列化工具：convert_numpy_types 遞迴轉換 numpy 類型
   - ✅ XGBoost 結果清理：sanitize_for_json 防止 FastAPI 序列化錯誤
@@ -273,23 +282,23 @@
 ## 💡 下次啟動時
 根據 [XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md](../docs/XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md)：
 
-- **選項 A**（推薦）: 啟動 XGBoost Phase 4 前端整合
-  - Task 4.1: 實作 6 個視覺化圖表組件
-  - 前端 OOT 設定 UI
+- **選項 A**（推薦）: 啟動 XGBoost Phase 4 前端視覺化整合
+  - Task 4.1: 實作 6 個進階圖表組件（校準曲線/PR 曲線/SHAP Summary/PSI 分佈對比/Precision@K 曲線/Bootstrap CI 視覺化）
+  - 優化 AdvancedMetricsCard 展示效果（目前為基礎佈局）
+  - 前端 OOT 設定 UI 整合
   - 完整用戶體驗閉環
 
-- **選項 B**: 實作 XGBoost Phase 3 進階指標
-  - Task 3.1: Precision@K
-  - Task 3.2: 期望值估算
-  - Task 3.3: Bootstrap 信賴區間
-  - 後續：Permutation Importance / Fold-level 穩定性 / 跨幣種泛化
+- **選項 B**: MLflow 實驗追蹤整合
+  - Task 4.2: MLflow 實驗追蹤整合
+  - 模型註冊與版本管理
+  - 實驗結果持久化與查詢
 
 - **選項 C**: 驗證與文檔完善
-  - 端到端測試
-  - API 文檔更新
-  - 使用指南撰寫
+  - Phase 3 進階指標文檔撰寫（使用範例與最佳實踐）
+  - 端到端測試擴充（覆蓋 Phase 3 新增功能）
+  - API 文檔更新（覆蓋所有新增回應模型）
 
-**建議順序**: Phase 4 前端整合 → Phase 3 進階指標（依需求） → 文檔與測試
+**建議順序**: Phase 4 前端視覺化 → 文檔與測試完善 → MLflow 整合（依需求）
 
 ---
 

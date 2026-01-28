@@ -451,12 +451,84 @@ class ModelPerformanceResponse(BaseModel):
     positive_rate: Optional[float] = None
 
 
+class PrecisionAtKResponse(BaseModel):
+    """Precision@K 回應"""
+    precision_at_k: Dict[int, float]
+    threshold_at_k: Dict[int, float]
+    sample_count_at_k: Dict[int, int]
+    recommended_k: Optional[int] = None
+    recommended_threshold: Optional[float] = None
+    recommended_precision: Optional[float] = None
+
+
+class ExpectancyResponse(BaseModel):
+    """期望值估算回應"""
+    win_rate: float
+    avg_win: float
+    avg_loss: float
+    expectancy: float
+    total_trades: int
+    threshold: float
+    note: str
+    sharpe_proxy: Optional[float] = None
+
+
+class BootstrapCIResponse(BaseModel):
+    """Bootstrap 信賴區間回應"""
+    metric: str
+    point_estimate: float
+    ci_lower: float
+    ci_upper: float
+    confidence_level: float
+    n_bootstrap: int
+
+
+class PermutationImportanceItemResponse(BaseModel):
+    """Permutation 重要性單項回應"""
+    feature: str
+    importance: float
+    std: float
+    rank: int
+    gain_rank: Optional[int] = None
+    rank_gap: Optional[int] = None
+    overfit_flag: bool = False
+
+
+class PermutationImportanceResponse(BaseModel):
+    """Permutation 重要性回應"""
+    rank_gap_threshold: int
+    items: List[PermutationImportanceItemResponse]
+
+
+class FoldImportanceStabilityResponse(BaseModel):
+    """Fold-level 重要性穩定性回應"""
+    stable_features: List[str]
+    unstable_features: List[Dict[str, Any]]
+    feature_cv: Dict[str, float]
+
+
+class CrossSymbolValidationResponse(BaseModel):
+    """跨幣種泛化驗證回應"""
+    source_symbol: str
+    target_symbol: str
+    source_auc: float
+    target_auc: float
+    generalization_gap: float
+    verdict: str
+
+
 class XGBoostAnalysisResult(BaseModel):
     """XGBoost 分析結果"""
     case_id: str
     model_performance: ModelPerformanceResponse
     feature_importance: List[FeatureImportanceResponse]
     decision_rules: List[DecisionRuleResponse]
+    precision_at_k: Optional[PrecisionAtKResponse] = None
+    expectancy: Optional[ExpectancyResponse] = None
+    bootstrap_ci: Optional[Dict[str, BootstrapCIResponse]] = None
+    permutation_importance: Optional[PermutationImportanceResponse] = None
+    fold_importance_stability: Optional[FoldImportanceStabilityResponse] = None
+    cross_symbol_validation: Optional[List[CrossSymbolValidationResponse]] = None
     model_saved: bool
     model_path: Optional[str] = None
 
@@ -473,6 +545,12 @@ class XGBoostBatchAnalysisResult(BaseModel):
     model_performance: ModelPerformanceResponse
     feature_importance: List[FeatureImportanceResponse]
     decision_rules: List[DecisionRuleResponse]
+    precision_at_k: Optional[PrecisionAtKResponse] = None
+    expectancy: Optional[ExpectancyResponse] = None
+    bootstrap_ci: Optional[Dict[str, BootstrapCIResponse]] = None
+    permutation_importance: Optional[PermutationImportanceResponse] = None
+    fold_importance_stability: Optional[FoldImportanceStabilityResponse] = None
+    cross_symbol_validation: Optional[List[CrossSymbolValidationResponse]] = None
     model_saved: bool
     model_path: Optional[str] = None
 

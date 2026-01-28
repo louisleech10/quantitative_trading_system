@@ -34,6 +34,9 @@ from api.utils.case_storage import get_case_storage_manager
 from api.utils.json_serializer import sanitize_for_json
 from api.services.kline_data_service import KlineDataService
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+from momentum.Analysis.expectancy_calculator import ExpectancyCalculator
+from momentum.Analysis.bootstrap_estimator import BootstrapEstimator
+from momentum.Analysis.cross_symbol_validator import CrossSymbolValidator
 from momentum.Analysis.regime_analyzer import RegimeAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
@@ -115,6 +118,9 @@ class XGBoostBatchService:
         self.xgboost_analyzer = XGBoostAnalyzer()
         self.pattern_extractor = PatternExtractor()
         self.model_storage = ModelStorage()
+        self.expectancy_calculator = ExpectancyCalculator()
+        self.bootstrap_estimator = BootstrapEstimator()
+        self.cross_symbol_validator = CrossSymbolValidator()
         self.logger = logger
     
     def get_case_summary(self, symbol: Optional[str] = None, timeframe: Optional[str] = None) -> Dict:
@@ -588,13 +594,77 @@ class XGBoostBatchService:
                 X, y, case_ids
             )
 
+            y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
+
+            # Precision@K 與推薦 K
+            precision_at_k_result = await asyncio.to_thread(
+                self.xgboost_analyzer.calculate_precision_at_k,
+                X, y
+            )
+            recommended = self.xgboost_analyzer.recommend_k(
+                y_true=y,
+                y_pred_proba=y_pred_proba,
+                target_precision=0.75
+            )
+            precision_at_k = {
+                **precision_at_k_result.to_dict(),
+                "recommended_k": recommended.get("recommended_k"),
+                "recommended_threshold": recommended.get("threshold"),
+                "recommended_precision": recommended.get("precision")
+            }
+
+            # 期望值估算（若案例包含 price_change）
+            expectancy = None
+            price_changes = self._resolve_case_price_changes(valid_cases)
+            if price_changes is not None:
+                threshold = recommended.get("threshold") or 0.6
+                trade_returns = price_changes[y_pred_proba >= float(threshold)]
+                expectancy_result = self.expectancy_calculator.estimate_expectancy(
+                    price_changes=price_changes,
+                    predicted_proba=y_pred_proba,
+                    threshold=float(threshold)
+                )
+                sharpe_proxy = self.expectancy_calculator.calculate_sharpe_proxy(
+                    trade_returns if len(trade_returns) > 0 else np.array([])
+                )
+                expectancy = {
+                    **expectancy_result.to_dict(),
+                    "sharpe_proxy": float(sharpe_proxy) if sharpe_proxy is not None else None
+                }
+
+            # Bootstrap 信賴區間
+            bootstrap_ci = {}
+            for metric in ["auc", "pr_auc"]:
+                try:
+                    ci_result = self.bootstrap_estimator.bootstrap_confidence_interval(
+                        y_true=y,
+                        y_pred_proba=y_pred_proba,
+                        metric=metric,
+                        n_bootstrap=200,
+                        confidence=0.9
+                    )
+                    bootstrap_ci[metric] = ci_result.to_dict()
+                except Exception as e:
+                    self.logger.warning(f"Bootstrap {metric} 計算失敗: {str(e)}")
+
+            # Permutation Importance
+            permutation_importance = await asyncio.to_thread(
+                self.xgboost_analyzer.calculate_permutation_importance,
+                X, y, 5
+            )
+
+            # Fold-level 重要性穩定性
+            fold_importance_stability = await asyncio.to_thread(
+                self.xgboost_analyzer.calculate_fold_importance_stability,
+                X, y, cv_folds, time_series_split, case_timestamps, purge_gap, embargo_pct
+            )
+
             # 市場體制分析（若可取得 Market_Phase）
             regime_analysis = None
             market_phases = self._resolve_market_phases(valid_cases, case_timestamps)
             if market_phases:
                 try:
                     analyzer = RegimeAnalyzer()
-                    y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
                     regime_report = analyzer.analyze_by_phase(
                         y_true=y,
                         y_pred_proba=y_pred_proba,
@@ -618,6 +688,34 @@ class XGBoostBatchService:
                 "case_ids": [case_ids[i] for i in sample_indices],
                 "samples": sample_values.tolist()
             }
+
+            # 跨幣種泛化驗證（至少兩個標的）
+            cross_symbol_validation = None
+            if len(symbols) >= 2:
+                try:
+                    X_by_symbol: Dict[str, np.ndarray] = {}
+                    y_by_symbol: Dict[str, np.ndarray] = {}
+                    symbol_indices: Dict[str, List[int]] = {sym: [] for sym in symbols}
+
+                    for idx, case in enumerate(valid_cases):
+                        if case.symbol in symbol_indices:
+                            symbol_indices[case.symbol].append(idx)
+
+                    for sym, indices in symbol_indices.items():
+                        if len(indices) < 10:
+                            continue
+                        X_by_symbol[sym] = X[indices]
+                        y_by_symbol[sym] = y[indices]
+
+                    if len(X_by_symbol) >= 2:
+                        results = self.cross_symbol_validator.run_leave_one_symbol_out(
+                            symbols=list(X_by_symbol.keys()),
+                            X_by_symbol=X_by_symbol,
+                            y_by_symbol=y_by_symbol
+                        )
+                        cross_symbol_validation = [r.to_dict() for r in results]
+                except Exception as e:
+                    self.logger.warning(f"跨幣種泛化驗證失敗: {str(e)}")
             
             # ===== Step 8: 儲存模型 =====
             self.task_manager.update_progress(task_id, 95, '儲存模型', '儲存分析結果...')
@@ -668,6 +766,12 @@ class XGBoostBatchService:
                     for key, values in feature_importance_all.items()
                 },
                 'decision_rules': [rule.to_dict() for rule in rules],
+                'precision_at_k': precision_at_k,
+                'expectancy': expectancy,
+                'bootstrap_ci': bootstrap_ci,
+                'permutation_importance': permutation_importance.to_dict(),
+                'fold_importance_stability': fold_importance_stability.to_dict(),
+                'cross_symbol_validation': cross_symbol_validation,
                 'predictions': predictions_output.to_dict(),
                 'shap_sample': shap_sample,
                 'calibration_curve': (
@@ -882,6 +986,30 @@ class XGBoostBatchService:
         except Exception as e:
             self.logger.warning(f"市場體制推導失敗: {str(e)}")
             return None
+
+    def _resolve_case_price_changes(self, cases: List) -> Optional[np.ndarray]:
+        """解析案例的 price_change"""
+        price_changes: List[float] = []
+        has_value = False
+
+        for case in cases:
+            value = None
+            if hasattr(case, "price_change"):
+                value = getattr(case, "price_change")
+            elif isinstance(case, dict):
+                value = case.get("price_change")
+
+            if value is not None:
+                has_value = True
+                price_changes.append(float(value))
+            else:
+                price_changes.append(0.0)
+
+        if not has_value:
+            self.logger.info("案例缺少 price_change，跳過期望值估算")
+            return None
+
+        return np.array(price_changes)
 
 
 # 全局實例

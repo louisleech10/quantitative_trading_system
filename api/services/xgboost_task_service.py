@@ -17,6 +17,8 @@ import pandas as pd
 import numpy as np
 
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+from momentum.Analysis.expectancy_calculator import ExpectancyCalculator
+from momentum.Analysis.bootstrap_estimator import BootstrapEstimator
 from momentum.Analysis.regime_analyzer import RegimeAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
@@ -80,6 +82,8 @@ class XGBoostTaskService:
         self.pattern_extractor = PatternExtractor()
         self.model_storage = ModelStorage()
         self.feature_storage = FeatureStorage()
+        self.expectancy_calculator = ExpectancyCalculator()
+        self.bootstrap_estimator = BootstrapEstimator()
         self.logger = logger
     
     async def start_xgboost_analysis_task(
@@ -214,6 +218,71 @@ class XGBoostTaskService:
                 X, y, case_ids
             )
 
+            y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
+
+            # 4.2 Precision@K 與推薦 K
+            precision_at_k_result = await asyncio.to_thread(
+                self.xgboost_analyzer.calculate_precision_at_k,
+                X, y
+            )
+            recommended = self.xgboost_analyzer.recommend_k(
+                y_true=y,
+                y_pred_proba=y_pred_proba,
+                target_precision=0.75
+            )
+            precision_at_k = {
+                **precision_at_k_result.to_dict(),
+                "recommended_k": recommended.get("recommended_k"),
+                "recommended_threshold": recommended.get("threshold"),
+                "recommended_precision": recommended.get("precision")
+            }
+
+            # 4.3 期望值估算（若有 price_change 欄位）
+            expectancy = None
+            price_changes = self._resolve_price_changes(df)
+            if price_changes is not None:
+                threshold = recommended.get("threshold") or 0.6
+                trade_returns = price_changes[y_pred_proba >= float(threshold)]
+                expectancy_result = self.expectancy_calculator.estimate_expectancy(
+                    price_changes=price_changes,
+                    predicted_proba=y_pred_proba,
+                    threshold=float(threshold)
+                )
+                sharpe_proxy = self.expectancy_calculator.calculate_sharpe_proxy(
+                    trade_returns if len(trade_returns) > 0 else np.array([])
+                )
+                expectancy = {
+                    **expectancy_result.to_dict(),
+                    "sharpe_proxy": float(sharpe_proxy) if sharpe_proxy is not None else None
+                }
+
+            # 4.4 Bootstrap 信賴區間
+            bootstrap_ci = {}
+            for metric in ["auc", "pr_auc"]:
+                try:
+                    ci_result = self.bootstrap_estimator.bootstrap_confidence_interval(
+                        y_true=y,
+                        y_pred_proba=y_pred_proba,
+                        metric=metric,
+                        n_bootstrap=200,
+                        confidence=0.9
+                    )
+                    bootstrap_ci[metric] = ci_result.to_dict()
+                except Exception as e:
+                    self.logger.warning(f"Bootstrap {metric} 計算失敗: {str(e)}")
+
+            # 4.5 Permutation Importance
+            permutation_importance = await asyncio.to_thread(
+                self.xgboost_analyzer.calculate_permutation_importance,
+                X, y, 5
+            )
+
+            # 4.6 Fold-level 重要性穩定性
+            fold_importance_stability = await asyncio.to_thread(
+                self.xgboost_analyzer.calculate_fold_importance_stability,
+                X, y, cv_folds, True, timestamps
+            )
+
             # 4.2 建立 SHAP 取樣資料（供後續解釋使用）
             max_shap_samples = 200
             sample_size = min(len(X), max_shap_samples)
@@ -232,13 +301,12 @@ class XGBoostTaskService:
                 "samples": sample_values.tolist()
             }
 
-            # 4.3 市場體制分析（若可取得 Market_Phase）
+            # 4.7 市場體制分析（若可取得 Market_Phase）
             regime_analysis = None
             market_phases = self._resolve_market_phases(df)
             if market_phases:
                 try:
                     analyzer = RegimeAnalyzer()
-                    y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
                     regime_report = analyzer.analyze_by_phase(
                         y_true=y,
                         y_pred_proba=y_pred_proba,
@@ -277,6 +345,11 @@ class XGBoostTaskService:
                     for key, values in feature_importance_all.items()
                 },
                 'decision_rules': [rule.to_dict() for rule in rules],
+                'precision_at_k': precision_at_k,
+                'expectancy': expectancy,
+                'bootstrap_ci': bootstrap_ci,
+                'permutation_importance': permutation_importance.to_dict(),
+                'fold_importance_stability': fold_importance_stability.to_dict(),
                 'predictions': predictions_output.to_dict(),
                 'shap_sample': shap_sample,
                 'calibration_curve': (
@@ -328,6 +401,18 @@ class XGBoostTaskService:
 
         if "timestamp" not in df.columns:
             return None
+
+    def _resolve_price_changes(self, df: pd.DataFrame) -> Optional[np.ndarray]:
+        """解析 Price_Change 欄位"""
+        candidates = ["price_change", "Price_Change", "price_change_pct", "price_change_percent"]
+        for col in candidates:
+            if col in df.columns:
+                values = df[col].astype(float).values
+                if len(values) > 0:
+                    return values
+
+        self.logger.info("找不到 Price_Change 欄位，跳過期望值估算")
+        return None
 
         try:
             from datetime import datetime

@@ -33,7 +33,7 @@ import type { CreatePatternRequest } from '@/lib/patternTypes'
 import { usePatternStore } from '@/store/patternStore'
 import { 
   Play, CheckCircle, AlertCircle, Loader2, Database, 
-  TrendingUp, List, Brain, CheckSquare, Square, Info, Save
+  TrendingUp, List, Brain, CheckSquare, Square, Info, Save, BarChart2
 } from 'lucide-react'
 
 // ==================== Types ====================
@@ -87,6 +87,70 @@ interface ModelPerformance {
   recall: number | null
   f1_score: number | null
   overfitting_score: number | null
+  brier_score?: number | null
+  ece?: number | null
+  calibration_quality?: string | null
+  pr_auc?: number | null
+  positive_rate?: number | null
+}
+
+interface PrecisionAtKResult {
+  precision_at_k: Record<number, number>
+  threshold_at_k: Record<number, number>
+  sample_count_at_k: Record<number, number>
+  recommended_k?: number | null
+  recommended_threshold?: number | null
+  recommended_precision?: number | null
+}
+
+interface ExpectancyResult {
+  win_rate: number
+  avg_win: number
+  avg_loss: number
+  expectancy: number
+  total_trades: number
+  threshold: number
+  note: string
+  sharpe_proxy?: number | null
+}
+
+interface BootstrapCIResult {
+  metric: string
+  point_estimate: number
+  ci_lower: number
+  ci_upper: number
+  confidence_level: number
+  n_bootstrap: number
+}
+
+interface PermutationImportanceItem {
+  feature: string
+  importance: number
+  std: number
+  rank: number
+  gain_rank?: number | null
+  rank_gap?: number | null
+  overfit_flag?: boolean
+}
+
+interface PermutationImportanceResult {
+  rank_gap_threshold: number
+  items: PermutationImportanceItem[]
+}
+
+interface FoldImportanceStabilityResult {
+  stable_features: string[]
+  unstable_features: Array<{ feature: string; cv: number; rank_range: number[] }>
+  feature_cv: Record<string, number>
+}
+
+interface CrossSymbolValidationResult {
+  source_symbol: string
+  target_symbol: string
+  source_auc: number
+  target_auc: number
+  generalization_gap: number
+  verdict: string
 }
 
 interface AnalysisResult {
@@ -102,6 +166,12 @@ interface AnalysisResult {
   model_performance: ModelPerformance
   feature_importance: FeatureImportance[]
   decision_rules: DecisionRule[]
+  precision_at_k?: PrecisionAtKResult | null
+  expectancy?: ExpectancyResult | null
+  bootstrap_ci?: Record<string, BootstrapCIResult> | null
+  permutation_importance?: PermutationImportanceResult | null
+  fold_importance_stability?: FoldImportanceStabilityResult | null
+  cross_symbol_validation?: CrossSymbolValidationResult[] | null
   model_saved: boolean
   model_path?: string
   metadata?: {
@@ -521,6 +591,154 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
   )
 }
 
+function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
+  const formatPercent = (value?: number | null, digits = 1) =>
+    value === null || value === undefined || Number.isNaN(value)
+      ? 'N/A'
+      : `${(value * 100).toFixed(digits)}%`
+
+  const formatNumber = (value?: number | null, digits = 4) =>
+    value === null || value === undefined || Number.isNaN(value)
+      ? 'N/A'
+      : value.toFixed(digits)
+
+  const precisionAtK = result.precision_at_k
+  const expectancy = result.expectancy
+  const bootstrap = result.bootstrap_ci
+  const permutation = result.permutation_importance
+  const foldStability = result.fold_importance_stability
+  const crossSymbol = result.cross_symbol_validation
+
+  const precisionKeys = precisionAtK
+    ? Object.keys(precisionAtK.precision_at_k)
+        .map(k => Number(k))
+        .sort((a, b) => a - b)
+    : []
+
+  const topPermutation = permutation?.items?.slice(0, 6) || []
+
+  return (
+    <Card className="bg-white border-gray-200">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+          <BarChart2 className="w-5 h-5" />
+          進階指標
+        </CardTitle>
+        <CardDescription className="text-gray-600">
+          Precision@K、期望值、信賴區間與穩定性分析
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-900 mb-2">Precision@K</div>
+            {precisionKeys.length === 0 ? (
+              <div className="text-sm text-gray-600">無資料</div>
+            ) : (
+              <div className="space-y-2">
+                {precisionKeys.map(k => (
+                  <div key={k} className="flex items-center justify-between text-sm text-gray-800">
+                    <span>P@{k}%</span>
+                    <span>
+                      {formatPercent(precisionAtK?.precision_at_k[k])} ｜ 閾值 {formatNumber(precisionAtK?.threshold_at_k[k], 3)} ｜ {precisionAtK?.sample_count_at_k[k]} 筆
+                    </span>
+                  </div>
+                ))}
+                {precisionAtK?.recommended_k && (
+                  <div className="text-xs text-green-700 mt-2">
+                    推薦 K：{precisionAtK.recommended_k}% ，Precision {formatPercent(precisionAtK.recommended_precision)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-900 mb-2">期望值估算</div>
+            {!expectancy ? (
+              <div className="text-sm text-gray-600">缺少 Price_Change，暫無估算</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-800">
+                <div>勝率：{formatPercent(expectancy.win_rate)}</div>
+                <div>期望值：{formatNumber(expectancy.expectancy, 6)}</div>
+                <div>平均盈：{formatNumber(expectancy.avg_win, 6)}</div>
+                <div>平均虧：{formatNumber(expectancy.avg_loss, 6)}</div>
+                <div>交易數：{expectancy.total_trades}</div>
+                <div>Sharpe Proxy：{formatNumber(expectancy.sharpe_proxy, 3)}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-900 mb-2">Bootstrap 信賴區間</div>
+            {!bootstrap ? (
+              <div className="text-sm text-gray-600">無資料</div>
+            ) : (
+              <div className="space-y-2 text-sm text-gray-800">
+                {Object.entries(bootstrap).map(([key, ci]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span>{key.toUpperCase()}</span>
+                    <span>
+                      {formatNumber(ci.point_estimate, 4)} [{formatNumber(ci.ci_lower, 4)}, {formatNumber(ci.ci_upper, 4)}]
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-900 mb-2">Permutation Importance</div>
+            {topPermutation.length === 0 ? (
+              <div className="text-sm text-gray-600">無資料</div>
+            ) : (
+              <div className="space-y-1 text-sm text-gray-800">
+                {topPermutation.map(item => (
+                  <div key={item.feature} className="flex items-center justify-between">
+                    <span className="font-mono text-xs break-all">{item.feature}</span>
+                    <span>
+                      {formatNumber(item.importance, 4)}
+                      {item.overfit_flag ? ' ⚠️' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-900 mb-2">Fold-level 穩定性</div>
+            {!foldStability ? (
+              <div className="text-sm text-gray-600">無資料</div>
+            ) : (
+              <div className="text-sm text-gray-800 space-y-1">
+                <div>穩定特徵：{foldStability.stable_features.length}</div>
+                <div>不穩定特徵：{foldStability.unstable_features.length}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="text-sm font-semibold text-gray-900 mb-2">跨幣種泛化</div>
+            {!crossSymbol || crossSymbol.length === 0 ? (
+              <div className="text-sm text-gray-600">無資料</div>
+            ) : (
+              <div className="space-y-1 text-sm text-gray-800">
+                {crossSymbol.map(item => (
+                  <div key={`${item.source_symbol}-${item.target_symbol}`} className="flex items-center justify-between">
+                    <span>{item.target_symbol}</span>
+                    <span>{formatNumber(item.generalization_gap, 4)} ({item.verdict})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) {
   const topFeatures = features.slice(0, 15)
   const maxImportance = topFeatures.length > 0 ? Math.max(...topFeatures.map(f => f.importance)) : 0
@@ -654,6 +872,9 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
 
       {/* 模型性能 */}
       <ModelPerformanceCard performance={result.model_performance} />
+
+      {/* 進階指標 */}
+      <AdvancedMetricsCard result={result} />
 
       {/* 特徵重要性和決策規則 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
