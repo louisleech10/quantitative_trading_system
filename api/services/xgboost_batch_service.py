@@ -34,6 +34,7 @@ from api.utils.case_storage import get_case_storage_manager
 from api.utils.json_serializer import sanitize_for_json
 from api.services.kline_data_service import KlineDataService
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+from momentum.Analysis.regime_analyzer import RegimeAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
 from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, StrategyParams
@@ -417,7 +418,8 @@ class XGBoostBatchService:
             y_list = []
             case_timestamps = []
             case_ids = []
-            valid_cases = 0
+            valid_cases = []
+            valid_cases_count = 0
             sequence_feature_names: Optional[List[str]] = None
             
             # 為每個標的的特徵 DataFrame 準備 timestamp_sec 欄位
@@ -499,14 +501,15 @@ class XGBoostBatchService:
                 y_list.append(case.positive_case)
                 case_timestamps.append(case_ts)
                 case_ids.append(case.case_id)
-                valid_cases += 1
+                valid_cases.append(case)
+                valid_cases_count += 1
                 
                 # 更新進度
                 if (i + 1) % 50 == 0:
                     self.task_manager.update_cases_processed(task_id, i + 1)
             
-            if valid_cases < 10:
-                raise ValueError(f"有效案例數量不足: {valid_cases}")
+            if valid_cases_count < 10:
+                raise ValueError(f"有效案例數量不足: {valid_cases_count}")
             
             X = np.array(X_list)
             y = np.array(y_list)
@@ -524,7 +527,7 @@ class XGBoostBatchService:
             negative_count = len(y) - positive_count
             
             self.logger.info(
-                f"案例特徵提取完成 - 有效案例: {valid_cases}, "
+                f"案例特徵提取完成 - 有效案例: {valid_cases_count}, "
                 f"正例: {positive_count}, 反例: {negative_count}"
             )
             
@@ -585,6 +588,23 @@ class XGBoostBatchService:
                 X, y, case_ids
             )
 
+            # 市場體制分析（若可取得 Market_Phase）
+            regime_analysis = None
+            market_phases = self._resolve_market_phases(valid_cases, case_timestamps)
+            if market_phases:
+                try:
+                    analyzer = RegimeAnalyzer()
+                    y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
+                    regime_report = analyzer.analyze_by_phase(
+                        y_true=y,
+                        y_pred_proba=y_pred_proba,
+                        market_phases=market_phases
+                    )
+                    regime_analysis = regime_report.to_dict()
+                    self.logger.info("發現 Market_Phase 欄位，啟用體制分析")
+                except Exception as e:
+                    self.logger.warning(f"市場體制分析失敗: {str(e)}")
+
             # SHAP 取樣資料（供後續解釋使用）
             max_shap_samples = 200
             sample_size = min(len(X), max_shap_samples)
@@ -617,7 +637,7 @@ class XGBoostBatchService:
                     'symbols': symbols,  # 改為 symbols 列表
                     'timeframe': timeframe,
                     'total_cases': len(cases),
-                    'valid_cases': valid_cases,
+                    'valid_cases': valid_cases_count,
                     'indicators': indicators,
                     'cv_folds': cv_folds,
                     'sequence_length': sequence_length,
@@ -636,7 +656,7 @@ class XGBoostBatchService:
                 'symbols': symbols,  # 改為 symbols 列表
                 'timeframe': timeframe,
                 'total_cases': len(cases),
-                'valid_cases': valid_cases,
+                'valid_cases': valid_cases_count,
                 'positive_cases': int(positive_count),
                 'negative_cases': int(negative_count),
                 'features_generated': len(feature_names),
@@ -655,6 +675,7 @@ class XGBoostBatchService:
                     if self.xgboost_analyzer.last_calibration_curve else None
                 ),
                 'pr_curve': self.xgboost_analyzer.last_pr_curve,
+                'regime_analysis': regime_analysis,
                 'model_saved': True,
                 'model_path': model_path
             }
@@ -667,7 +688,7 @@ class XGBoostBatchService:
             
             self.logger.info(
                 f"批量 XGBoost 分析完成 - task_id: {task_id}, "
-                f"有效案例: {valid_cases}, 特徵數: {len(feature_names)}"
+                f"有效案例: {valid_cases_count}, 特徵數: {len(feature_names)}"
             )
             
         except Exception as e:
@@ -827,6 +848,40 @@ class XGBoostBatchService:
             '1w': 604800
         }
         return mapping.get(timeframe, 43200)  # 預設 12h
+
+    def _resolve_market_phases(self, cases: List, timestamps: List[int]) -> Optional[List[str]]:
+        """解析 Market_Phase 欄位，若缺失則以時間戳推導"""
+        phases: List[str] = []
+
+        has_attr_phase = False
+        for case in cases:
+            phase = None
+            if hasattr(case, "market_phase"):
+                phase = getattr(case, "market_phase")
+                has_attr_phase = True
+            elif isinstance(case, dict):
+                phase = case.get("market_phase")
+                has_attr_phase = True
+            phases.append(phase)
+
+        if has_attr_phase and any(phases):
+            return [p if p is not None else "UNKNOWN" for p in phases]
+
+        try:
+            from datetime import datetime
+            from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
+
+            phases = []
+            for ts in timestamps:
+                ts_int = int(ts)
+                if ts_int > 10 ** 12:
+                    ts_int = ts_int // 1000
+                phase = MarketConfig.get_market_phase(datetime.utcfromtimestamp(ts_int))
+                phases.append(phase)
+            return phases
+        except Exception as e:
+            self.logger.warning(f"市場體制推導失敗: {str(e)}")
+            return None
 
 
 # 全局實例

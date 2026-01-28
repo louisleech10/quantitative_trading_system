@@ -336,13 +336,13 @@ class ChartSignalService:
             start_ts_sec = start_time // 1000
             end_ts_sec = end_time // 1000
             
-            # 讀取K線數據（允許中間有缺口，避免整體任務被阻擋）
+            # 讀取K線數據（嚴格連續性，圖表與策略計算皆不可缺K）
             klines = self.kline_storage.read_klines(
                 symbol=symbol,
                 timeframe=timeframe,
                 start_time=start_ts_sec,
                 end_time=end_ts_sec,
-                validate_continuity=False  # 前端策略測試允許分段資料
+                validate_continuity=True
             )
 
             if klines is None or len(klines) == 0:

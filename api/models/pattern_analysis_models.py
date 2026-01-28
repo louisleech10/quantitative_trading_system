@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Pattern Analysis Models - 模式分析 Pydantic 模型
 
@@ -8,7 +10,7 @@ Updated: 2026-01-28 - 新增 OOT 驗證模型
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any, Literal
+from typing import List, Dict, Optional, Any, Literal, Union
 
 
 # ==================== OOT 驗證模型 ====================
@@ -101,7 +103,74 @@ class OOTValidationResponse(BaseModel):
         default=None,
         description="時間切分報告"
     )
+    drift_report: Optional["DriftReport"] = Field(
+        default=None,
+        description="特徵飄移報告（PSI）"
+    )
     error: Optional[str] = Field(default=None, description="錯誤訊息")
+
+
+# ==================== 飄移監控模型 ====================
+
+class PSIDistributionComparison(BaseModel):
+    """PSI 分佈比較"""
+    bins: List[float]
+    train_pct: List[float]
+    test_pct: List[float]
+
+
+class PSIResult(BaseModel):
+    """單一特徵 PSI 結果"""
+    feature: str
+    psi: float
+    status: Literal["stable", "drift_warning", "drift_severe"]
+    distribution_comparison: PSIDistributionComparison
+
+
+class DriftReport(BaseModel):
+    """飄移報告"""
+    total_features: int
+    drifted_features: List[str]
+    severe_features: List[str]
+    results: List[PSIResult]
+
+
+class DriftReportResponse(BaseModel):
+    """飄移報告回應"""
+    task_id: str
+    status: str
+    message: str
+    report: Optional[DriftReport] = None
+    error: Optional[str] = None
+
+
+# ==================== 市場體制分析模型 ====================
+
+class PhaseMetrics(BaseModel):
+    """單一市場體制指標"""
+    phase: str
+    support: int
+    auc: Optional[float] = None
+    precision_at_10: Optional[float] = None
+    avg_pred_proba: Optional[float] = None
+    recommendation: str
+    note: Optional[str] = None
+
+
+class RegimeReport(BaseModel):
+    """市場體制分析報告"""
+    overall_auc: Optional[float] = None
+    phase_metrics: List[PhaseMetrics]
+    trading_rules: Dict[str, Dict[str, Optional[Union[float, str]]]]
+
+
+class RegimeAnalysisResponse(BaseModel):
+    """市場體制分析回應"""
+    task_id: str
+    status: str
+    message: str
+    report: Optional[RegimeReport] = None
+    error: Optional[str] = None
 
 
 # ==================== 指標配置模型 ====================

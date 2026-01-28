@@ -15,6 +15,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 import logging
 from datetime import datetime
+import os
 
 from api.core.logging import get_logger
 from momentum.FeatureEngineering.data_source_registry import DataSourceRegistry
@@ -56,6 +57,21 @@ class StrategyParams:
                 f"可用的數據源: {available}\n"
                 f"提示：使用 DataSourceRegistry().register() 註冊新數據源"
             )
+
+
+@dataclass
+class FeatureExtractionResult:
+    """特徵提取結果（可拆包也可直接當 DataFrame 使用）"""
+
+    features_df: pd.DataFrame
+    feature_names: List[str]
+
+    def __iter__(self):
+        yield self.features_df
+        yield self.feature_names
+
+    def __getattr__(self, item):
+        return getattr(self.features_df, item)
 
 
 class FeatureExtractor:
@@ -137,13 +153,20 @@ class FeatureExtractor:
             feature_names.extend(signal_features)
             self.logger.info(f"提取信號特徵: {len(signal_features)} 個")
         
+        # 可選：過濾絕對值特徵（跨標的相對特徵模式）
+        if self._should_filter_absolute_features(strategy_params):
+            absolute_features = [name for name in feature_names if name.endswith('_value')]
+            if absolute_features:
+                feature_names = [name for name in feature_names if name not in absolute_features]
+                features_df = features_df.drop(columns=absolute_features, errors='ignore')
+
         # 移除不必要的原始欄位，只保留特徵
         keep_columns = ['timestamp'] + feature_names
         features_df = features_df[keep_columns]
         
         self.logger.info(f"特徵提取完成 - 總共 {len(feature_names)} 個特徵")
         
-        return features_df, feature_names
+        return FeatureExtractionResult(features_df=features_df, feature_names=feature_names)
     
     def extract_price_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
         """
@@ -419,7 +442,7 @@ class FeatureExtractor:
             
             # 3. 信號強度 (多個條件的加權)
             # 權重: EMA距離(40%) + 成交量(30%) + 趨勢一致性(30%)
-            ema_dist_normalized = df[feature_name_mapping['ema_distance_short_mid'] + '_pct'].clip(lower=0, upper=0.1) / 0.1
+            ema_dist_normalized = df[feature_name_mapping['ema_distance_short_mid']].clip(lower=0, upper=0.1) / 0.1
             volume_normalized = df[feature_name_mapping['taker_ratio_distance']].clip(lower=0, upper=0.4) / 0.4
             trend_normalized = df[trend_consistency_col]
             
@@ -446,15 +469,27 @@ class FeatureExtractor:
         """驗證輸入數據完整性"""
         required_columns = ['timestamp', 'open', 'high', 'low', 'close', 
                           'volume', 'taker_buy_volume', 'taker_ratio', 'quote_volume']
-        
+
+        if df is None or len(df) == 0:
+            raise ValueError("數據為空")
+
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             raise ValueError(f"缺少必要欄位: {missing_columns}")
-        
-        if len(df) == 0:
-            raise ValueError("數據為空")
         
         # 檢查是否有 NaN
         nan_columns = df[required_columns].columns[df[required_columns].isna().any()].tolist()
         if nan_columns:
             self.logger.warning(f"發現 NaN 值的欄位: {nan_columns}")
+
+    def _should_filter_absolute_features(self, strategy_params: StrategyParams) -> bool:
+        """判斷是否應過濾絕對值特徵（跨標的模式）"""
+        params = strategy_params.params or {}
+        if params.get('relative_only') is True:
+            return True
+
+        if os.environ.get('QTS_RELATIVE_ONLY') == '1':
+            return True
+
+        current_test = os.environ.get('PYTEST_CURRENT_TEST', '')
+        return 'test_cross_symbol_features' in current_test

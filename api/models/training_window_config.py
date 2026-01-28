@@ -11,7 +11,7 @@ Ultra Think 優化記錄:
 """
 
 from typing import Dict, Any, List, Optional, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, root_validator
 import math
 from momentum.Indicators.types import DataSourceEnum
 
@@ -38,13 +38,13 @@ class TrainingWindowConfig(BaseModel):
         "TO",
         description="參考點類型:TO(開單點)/TC(平倉點)/custom(自定義時間戳)"
     )
-    lookback_bars: int = Field(
-        ...,
+    lookback_bars: Optional[int] = Field(
+        None,
         description="從參考點往前看N根K線(1~1000)",
         ge=1,
         le=1000
     )
-    lookforward_bars: int = Field(
+    lookforward_bars: Optional[int] = Field(
         0,
         description="從參考點往後看M根K線(0~100,預設0避免未來函數洩漏)",
         ge=0,
@@ -60,6 +60,18 @@ class TrainingWindowConfig(BaseModel):
         "relative",
         description="窗口模式:relative(嚴格N根)/full_range(使用全部可用K線)"
     )
+    start_date: Optional[str] = Field(
+        None,
+        description="開始日期 (YYYY-MM-DD), 用於優化/回測型流程"
+    )
+    end_date: Optional[str] = Field(
+        None,
+        description="結束日期 (YYYY-MM-DD), 用於優化/回測型流程"
+    )
+    timeframe: Optional[str] = Field(
+        None,
+        description="時間週期 (1h/4h/12h/1d), 用於優化/回測型流程"
+    )
     custom_timestamp: Optional[int] = Field(
         None,
         description="自定義時間戳(僅當reference_point='custom'時使用)"
@@ -70,7 +82,7 @@ class TrainingWindowConfig(BaseModel):
         """驗證far_lookback_bars > lookback_bars"""
         if v is not None:
             lookback = values.get('lookback_bars')
-            if lookback and v <= lookback:
+            if lookback is not None and v <= lookback:
                 raise ValueError(
                     f"far_lookback_bars ({v}) 必須大於 lookback_bars ({lookback})"
                 )
@@ -84,6 +96,18 @@ class TrainingWindowConfig(BaseModel):
         if values.get('reference_point') != 'custom' and v is not None:
             raise ValueError("當reference_point不是'custom'時,不應提供custom_timestamp")
         return v
+
+    @root_validator(skip_on_failure=True)
+    def validate_lookback_or_date_range(cls, values):
+        """驗證 lookback_bars 或日期區間至少提供一種"""
+        lookback = values.get('lookback_bars')
+        start_date = values.get('start_date')
+        end_date = values.get('end_date')
+        timeframe = values.get('timeframe')
+
+        if lookback is None and not (start_date and end_date and timeframe):
+            raise ValueError("必須提供 lookback_bars 或 (start_date, end_date, timeframe)")
+        return values
 
     class Config:
         json_schema_extra = {
@@ -133,21 +157,21 @@ class StrategyConfig(BaseModel):
         description="策略參數字典,包含指標參數(如period)和策略參數(如閾值)"
     )
 
-    @validator('data_source')
-    def validate_data_source(cls, v):
-        """驗證數據源有效性"""
-        valid_sources = [source.value for source in DataSourceEnum]
-        if v not in valid_sources:
-            raise ValueError(
-                f"無效的data_source: {v}. 必須是以下之一: {', '.join(valid_sources)}"
-            )
-        return v
-
     @validator('params')
-    def validate_params(cls, v):
-        """驗證params不為空"""
-        if not v:
-            raise ValueError("params不能為空字典,至少需要包含指標參數")
+    def validate_params(cls, v, values):
+        """驗證params中的型別（不強制要求完整參數）"""
+        indicator_type = values.get('indicator_type')
+        strategy_logic = values.get('strategy_logic')
+
+        if indicator_type == 'ema' and strategy_logic == 'three_line':
+            numeric_keys = [
+                'short_period', 'mid_period', 'long_period',
+                'ema_short', 'ema_mid', 'ema_long'
+            ]
+            for key in numeric_keys:
+                if key in v and not isinstance(v[key], (int, float)):
+                    raise ValueError(f"{key} 必須為數值")
+
         return v
 
     class Config:
@@ -186,20 +210,6 @@ class SignalDensityRequest(BaseModel):
         description="反例案例ID列表"
     )
 
-    @validator('positive_cases')
-    def validate_positive_cases(cls, v):
-        """驗證正例數量"""
-        if len(v) < 1:
-            raise ValueError("正例數量至少需要1個")
-        return v
-
-    @validator('negative_cases')
-    def validate_negative_cases(cls, v):
-        """驗證反例數量"""
-        if len(v) < 1:
-            raise ValueError("反例數量至少需要1個")
-        return v
-
     class Config:
         json_schema_extra = {
             "example": {
@@ -221,6 +231,26 @@ class SignalDensityRequest(BaseModel):
                 },
                 "positive_cases": ["BTCUSDT_1736942400_1"],
                 "negative_cases": ["ETHUSDT_1736946000_0"]
+            }
+        }
+
+
+class TrainingWindowPreviewRequest(BaseModel):
+    """訓練窗口預覽請求模型"""
+
+    case_id: str = Field(..., description="案例ID")
+    window_config: TrainingWindowConfig = Field(..., description="訓練窗口配置")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "case_id": "BTCUSDT_1736942400_1",
+                "window_config": {
+                    "reference_point": "TO",
+                    "lookback_bars": 24,
+                    "lookforward_bars": 0,
+                    "mode": "relative"
+                }
             }
         }
 

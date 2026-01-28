@@ -95,18 +95,21 @@ class OptimizationErrorHandler:
         self.logger.warning(f"Unknown error type {exception_type}, treating as RETRYABLE")
         return ErrorType.RETRYABLE
 
-    def should_retry(self, error_type: ErrorType, attempt: int) -> bool:
+    def should_retry(self, error_type_or_attempt, attempt: Optional[int] = None) -> bool:
         """
         判斷是否應該重試
 
-        Args:
-            error_type: 錯誤類型
-            attempt: 當前重試次數（從1開始）
-
-        Returns:
-            True if應該重試，False otherwise
+        支援兩種呼叫方式:
+        - should_retry(error_type, attempt)
+        - should_retry(attempt)
         """
-        if error_type == ErrorType.RETRYABLE and attempt <= self.max_retries:
+        if attempt is None and isinstance(error_type_or_attempt, int):
+            error_type = ErrorType.RETRYABLE
+            attempt = error_type_or_attempt
+        else:
+            error_type = error_type_or_attempt
+
+        if error_type == ErrorType.RETRYABLE and attempt < self.max_retries:
             return True
         return False
 
@@ -124,6 +127,10 @@ class OptimizationErrorHandler:
         delay = self.base_delay * (2 ** (attempt - 1))
         # 最大延遲60秒
         return min(delay, 60.0)
+
+    def calculate_delay(self, attempt: int) -> float:
+        """兼容舊介面：指數退避延遲計算（attempt 從 0 開始）"""
+        return min(self.base_delay * (2 ** attempt), 60.0)
 
     def handle_trial_error(
         self,

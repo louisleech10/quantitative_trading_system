@@ -122,7 +122,8 @@ class IndicatorEngine:
 
         # 檢查重複註冊
         if name in cls._indicators:
-            logger.warning(f"Indicator '{name}' already registered, overwriting")
+            logger.warning(f"Indicator '{name}' already registered, skipping overwrite")
+            return
 
         cls._indicators[name] = indicator_class
         logger.info(f"Registered indicator: {name} -> {indicator_class.__name__}")

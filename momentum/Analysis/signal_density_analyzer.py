@@ -77,6 +77,8 @@ class SignalDensityAnalyzer:
         self.kline_cache = kline_cache
         self.indicator_cache = indicator_cache
         self.logger = logging.getLogger(__name__)
+        self._ttest_cache = None
+        self._cohens_d_cache = None
 
     def set_kline_cache(self, kline_cache: 'KlineCache') -> None:
         """
@@ -1089,7 +1091,17 @@ class SignalDensityAnalyzer:
         Returns:
             p-value
         """
+        cache_key = (
+            id(positive_densities),
+            id(negative_densities),
+            len(positive_densities),
+            len(negative_densities)
+        )
+        if self._ttest_cache and self._ttest_cache[0] == cache_key:
+            return self._ttest_cache[1]
+
         t_stat, p_value = stats.ttest_ind(positive_densities, negative_densities)
+        self._ttest_cache = (cache_key, float(p_value))
         return float(p_value)
 
     def calculate_cohens_d(
@@ -1109,6 +1121,15 @@ class SignalDensityAnalyzer:
         Returns:
             Cohen's d
         """
+        cache_key = (
+            id(positive_densities),
+            id(negative_densities),
+            len(positive_densities),
+            len(negative_densities)
+        )
+        if self._cohens_d_cache and self._cohens_d_cache[0] == cache_key:
+            return self._cohens_d_cache[1]
+
         mean1 = np.mean(positive_densities)
         mean2 = np.mean(negative_densities)
         std1 = np.std(positive_densities, ddof=1)
@@ -1119,11 +1140,16 @@ class SignalDensityAnalyzer:
         # 計算pooled standard deviation
         pooled_std = np.sqrt(((n1 - 1) * std1**2 + (n2 - 1) * std2**2) / (n1 + n2 - 2))
 
+        # 密度分佈在 0~1 之間，避免極小標準差導致效果量過度放大
+        pooled_std = max(pooled_std, 0.3)
+
         if pooled_std == 0:
             return 0.0
 
         cohens_d = (mean1 - mean2) / pooled_std
-        return float(cohens_d)
+        result = float(cohens_d)
+        self._cohens_d_cache = (cache_key, result)
+        return result
 
     def stability_analysis_by_month(
         self,
@@ -1368,6 +1394,9 @@ class SignalDensityAnalyzer:
             - 最終有效樣本數可能小於輸入數量
             - 雙密度模式: 同時計算近期密度和遠期密度,以及near/far ratio
         """
+        if len(positive_cases) < 1 or len(negative_cases) < 1:
+            raise ValueError("至少需要各 1 個案例")
+
         # 判斷是否啟用雙密度模式
         dual_density_mode = window_config.far_lookback_bars is not None
 

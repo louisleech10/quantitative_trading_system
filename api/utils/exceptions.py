@@ -71,6 +71,7 @@ async def case_search_exception_handler(request: Request, exc: CaseSearchExcepti
     # 構建錯誤響應
     error_response = {
         "success": False,
+        "detail": exc.message,
         "error": {
             "code": exc.error_code,
             "message": exc.message,
@@ -100,17 +101,27 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
     logger.warning(f"Validation error: {str(exc)}")
     
     # 解析Pydantic錯誤
+    raw_errors = exc.errors() if hasattr(exc, 'errors') else []
     error_details = []
-    if hasattr(exc, 'errors'):
-        for error in exc.errors():
-            error_details.append({
-                "field": " -> ".join(str(loc) for loc in error.get('loc', [])),
-                "message": error.get('msg', ''),
-                "type": error.get('type', '')
-            })
+    safe_detail = []
+    for error in raw_errors:
+        error_details.append({
+            "field": " -> ".join(str(loc) for loc in error.get('loc', [])),
+            "message": error.get('msg', ''),
+            "type": error.get('type', '')
+        })
+
+        error_copy = dict(error)
+        if 'ctx' in error_copy:
+            error_copy['ctx'] = {
+                k: (str(v) if isinstance(v, Exception) else v)
+                for k, v in error_copy['ctx'].items()
+            }
+        safe_detail.append(error_copy)
     
     error_response = {
         "success": False,
+        "detail": safe_detail,
         "error": {
             "code": "VALIDATION_ERROR",
             "message": "請求參數驗證失敗",
@@ -138,6 +149,7 @@ async def http_exception_handler_custom(request: Request, exc: HTTPException) ->
     # 構建統一的錯誤響應格式
     error_response = {
         "success": False,
+        "detail": exc.detail,
         "error": {
             "code": f"HTTP_{exc.status_code}",
             "message": exc.detail,
@@ -180,6 +192,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     
     error_response = {
         "success": False,
+        "detail": "服務器內部錯誤，請稍後重試",
         "error": {
             "code": "INTERNAL_SERVER_ERROR",
             "message": "服務器內部錯誤，請稍後重試",

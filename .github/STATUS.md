@@ -7,6 +7,7 @@
 - ✅ Task 1.4: 輸出整合、PR AUC、API與單元測試 — 2026-01-28
 - ✅ Task 1.5: Purged K-Fold / Embargo 去污染交叉驗證 — 2026-01-28（2 tests passed）
 - ✅ Task 2.1: SHAP 解釋性分析（TreeExplainer + 服務層 + API端點） — 2026-01-28（完整驗證通過）
+- ✅ 圖表/策略讀取連續性嚴格化（read_klines validate_continuity=True）— 2026-01-29
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 1/4任務完成 (25%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 ### 進行中 🚧
 - Task 2.2: PSI 特徵飄移監控（Population Stability Index 計算、告警系統）
@@ -14,13 +15,11 @@
 - Phase 4 前端 OOT 設定與視覺化整合（預計未來開發）
 
 ## 🎯 當前重點
-- Task 2.1 已完成（SHAP TreeExplainer + 緩存 + 2 個 API 端點）
-- XGBoost 模型解釋性系統已完成
+- 連續性讀取規則已對齊（圖表/策略嚴格，append 寫入後立即驗證）
 - 後續規劃：Task 2.2 PSI 飄移檢測、Task 2.3 市場體制分析
 ### 下一步工作
 - Task 2.2: PSI 群體穩定性監控（特徵分佈飄移檢測）
 - Task 2.3: 市場體制分析（依市場阿段評估模型效能）
-- Task 3.1-3.6: 進階評估指標（Precision@K、Permutation Importance 等）
 - Phase 4: 前端 OOT 設定 UI 與結果視覺化整合
 - 完整端到端測試與性能基準測試
 ### 需要修復
@@ -237,25 +236,25 @@
 - 增補整合測試覆蓋（Phase4 前後端整合測試）
 
 ### 技術債務
-- Task1.2/1.3/1.4 尚未完成（後端核心功能待實作）
 - 前端整合與視覺化待實作（Phase 4）
 - 完整 E2E/CI 測試覆蓋尚未達成
 
 ## 📝 最近完成的工作
+- 2026-01-29：圖表/策略讀取改為嚴格連續性（避免缺口）
+- 2026-01-29：連續性檢查位置盤點與規則對齊
 - 2026-01-28：Task 1.1 完成 — OOT 驗證系統（後端 + 單元測試；17 tests passed）
 - 2026-01-27：價格計算方法系統完善 - 反例繼承與 CSV 精度優化
 - 2026-01-17：XGBoost 序列特徵與時間序列切分完成
 
 ## 🔄 Git狀態
-- main 分支，已同步（已新增 Task1.1 相關檔案並推送） — 2026-01-28
-- 最新提交：Task1.1 OOT 驗證系統與測試
+- main 分支，已同步 — 2026-01-29
+- 最新提交：STATUS 更新（連續性規則對齊）
 
 ## 💡 下次啟動時
-- **確認 Git 推送**：Task 2.1 SHAP 分析所有修改推送到 main 分支
-- **開始 Task 2.2**：PSI 特徵飄移監控實装（特徵分佈變化檢測）
+- **開始 Task 2.2**：PSI 特徵飄移監控實裝（特徵分佈變化檢測）
 - **計劃 Task 2.3**：市場體制分析（按 Market_Phase 實施分析）
 - **修復 Pydantic 警告**：v2 field shadowing issue
-- **執行完整測試**：pytest 全套 + SHAP API 端點測試
+- **執行完整測試**：pytest 全套
 
 ---
 

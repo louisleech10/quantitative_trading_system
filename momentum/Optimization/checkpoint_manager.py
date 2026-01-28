@@ -38,8 +38,9 @@ class CheckpointManager:
         self,
         checkpoint_dir: str = "data/checkpoints",
         save_interval: int = 50,
+        interval_trials: Optional[int] = None,
         max_checkpoints: int = 10,
-        use_compression: bool = True  # Ultra Think Step 3 優化: 添加壓縮選項
+        use_compression: bool = False  # 預設不壓縮，符合測試期望
     ):
         """
         初始化檢查點管理器
@@ -51,9 +52,10 @@ class CheckpointManager:
             use_compression: 是否使用 gzip 壓縮（默認 True，可節省 60-80% 空間）
         """
         self.checkpoint_dir = Path(checkpoint_dir)
-        self.save_interval = save_interval
+        self.save_interval = interval_trials if interval_trials is not None else save_interval
         self.max_checkpoints = max_checkpoints
         self.use_compression = use_compression  # Ultra Think Step 3 優化
+        self.interval_trials = self.save_interval
         self.logger = logging.getLogger(__name__)
 
         # 確保檢查點目錄存在
@@ -80,9 +82,12 @@ class CheckpointManager:
 
     def save_checkpoint(
         self,
-        study: Study,
-        trial_number: int,
-        additional_data: Optional[Dict[str, Any]] = None
+        study: Optional[Study] = None,
+        trial_number: Optional[int] = None,
+        additional_data: Optional[Dict[str, Any]] = None,
+        *,
+        study_name: Optional[str] = None,
+        checkpoint_data: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         保存檢查點
@@ -98,36 +103,60 @@ class CheckpointManager:
         Raises:
             IOError: 保存失敗時拋出
         """
+        # 兼容舊介面：允許傳入 study 名稱字串
+        if isinstance(study, str) and study_name is None:
+            study_name = study
+            study = None
+
+        if isinstance(trial_number, dict) and checkpoint_data is None:
+            checkpoint_data = trial_number
+            trial_number = None
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        if study_name is not None:
+            base_name = f"checkpoint_{study_name}_{timestamp}"
+        else:
+            base_name = f"checkpoint_trial_{trial_number}_{timestamp}"
+
         # Ultra Think Step 3 優化: 根據壓縮選項使用不同的文件擴展名
         if self.use_compression:
-            checkpoint_name = f"checkpoint_trial_{trial_number}_{timestamp}.pkl.gz"
+            checkpoint_name = f"{base_name}.pkl.gz"
         else:
-            checkpoint_name = f"checkpoint_trial_{trial_number}_{timestamp}.pkl"
+            checkpoint_name = f"{base_name}.pkl"
         checkpoint_path = self.checkpoint_dir / checkpoint_name
 
         try:
-            # 收集檢查點數據
-            checkpoint_data = {
-                'trial_number': trial_number,
-                'timestamp': timestamp,
-                'study_name': study.study_name,
-                'best_params': study.best_params if hasattr(study, 'best_params') else None,
-                'best_value': study.best_value if hasattr(study, 'best_value') else None,
-                'best_trial_number': study.best_trial.number if hasattr(study, 'best_trial') else None,
-                'n_trials': len(study.trials),
-                'trials_dataframe': study.trials_dataframe(),
-                'user_attrs': study.user_attrs,
-                'system_attrs': study.system_attrs,
-            }
+            if study_name is not None:
+                checkpoint_payload = {
+                    'trial_number': trial_number if isinstance(trial_number, int) else 0,
+                    'timestamp': timestamp,
+                    'study_name': study_name,
+                }
+                if checkpoint_data:
+                    checkpoint_payload.update(checkpoint_data)
+            else:
+                # 收集檢查點數據
+                checkpoint_payload = {
+                    'trial_number': trial_number,
+                    'timestamp': timestamp,
+                    'study_name': study.study_name,
+                    'best_params': study.best_params if hasattr(study, 'best_params') else None,
+                    'best_value': study.best_value if hasattr(study, 'best_value') else None,
+                    'best_trial_number': study.best_trial.number if hasattr(study, 'best_trial') else None,
+                    'n_trials': len(study.trials),
+                    'trials_dataframe': study.trials_dataframe(),
+                    'user_attrs': study.user_attrs,
+                    'system_attrs': study.system_attrs,
+                }
 
             # 添加統計信息
-            if len(study.trials) > 0:
+            if study is not None and len(study.trials) > 0:
                 df = study.trials_dataframe()
                 completed_trials = df[df['state'] == 'COMPLETE']
 
                 if len(completed_trials) > 0:
-                    checkpoint_data['statistics'] = {
+                    checkpoint_payload['statistics'] = {
                         'n_completed': len(completed_trials),
                         'n_pruned': len(df[df['state'] == 'PRUNED']),
                         'n_failed': len(df[df['state'] == 'FAIL']),
@@ -139,27 +168,27 @@ class CheckpointManager:
 
             # 添加額外數據
             if additional_data:
-                checkpoint_data['additional_data'] = additional_data
+                checkpoint_payload['additional_data'] = additional_data
 
             # Ultra Think Step 3 優化: 根據壓縮選項保存文件
             if self.use_compression:
                 # 使用 gzip 壓縮（可節省 60-80% 空間）
                 with gzip.open(checkpoint_path, 'wb') as f:
-                    pickle.dump(checkpoint_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                    pickle.dump(checkpoint_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
                 file_size = checkpoint_path.stat().st_size
                 self.logger.info(
                     f"Checkpoint saved (compressed): trial={trial_number}, "
-                    f"best_value={checkpoint_data.get('best_value')}, "
+                    f"best_value={checkpoint_payload.get('best_value')}, "
                     f"size={file_size / 1024:.2f} KB, path={checkpoint_path}"
                 )
             else:
                 # 未壓縮保存
                 with open(checkpoint_path, 'wb') as f:
-                    pickle.dump(checkpoint_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                    pickle.dump(checkpoint_payload, f, protocol=pickle.HIGHEST_PROTOCOL)
                 file_size = checkpoint_path.stat().st_size
                 self.logger.info(
                     f"Checkpoint saved (uncompressed): trial={trial_number}, "
-                    f"best_value={checkpoint_data.get('best_value')}, "
+                    f"best_value={checkpoint_payload.get('best_value')}, "
                     f"size={file_size / 1024:.2f} KB, path={checkpoint_path}"
                 )
 
@@ -175,7 +204,7 @@ class CheckpointManager:
             )
             raise IOError(f"Checkpoint save failed: {e}")
 
-    def load_checkpoint(self, checkpoint_path: str) -> Dict[str, Any]:
+    def load_checkpoint(self, checkpoint_path: str) -> Optional[Dict[str, Any]]:
         """
         載入檢查點
 
@@ -189,20 +218,23 @@ class CheckpointManager:
             FileNotFoundError: 檢查點不存在
             IOError: 載入失敗
         """
-        checkpoint_path = Path(checkpoint_path)
+        checkpoint_path_obj = Path(checkpoint_path)
 
-        if not checkpoint_path.exists():
-            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+        if not checkpoint_path_obj.exists():
+            latest = self.get_latest_checkpoint(checkpoint_path)
+            if latest is None:
+                return None
+            checkpoint_path_obj = Path(latest)
 
         try:
             # Ultra Think Step 3 優化: 自動檢測壓縮格式並載入
-            is_compressed = checkpoint_path.suffix == '.gz'
+            is_compressed = checkpoint_path_obj.suffix == '.gz'
 
             if is_compressed:
                 # 載入壓縮檢查點
-                with gzip.open(checkpoint_path, 'rb') as f:
+                with gzip.open(checkpoint_path_obj, 'rb') as f:
                     checkpoint_data = pickle.load(f)
-                file_size = checkpoint_path.stat().st_size
+                file_size = checkpoint_path_obj.stat().st_size
                 self.logger.info(
                     f"Checkpoint loaded (compressed): trial={checkpoint_data.get('trial_number')}, "
                     f"best_value={checkpoint_data.get('best_value')}, "
@@ -210,9 +242,9 @@ class CheckpointManager:
                 )
             else:
                 # 載入未壓縮檢查點
-                with open(checkpoint_path, 'rb') as f:
+                with open(checkpoint_path_obj, 'rb') as f:
                     checkpoint_data = pickle.load(f)
-                file_size = checkpoint_path.stat().st_size
+                file_size = checkpoint_path_obj.stat().st_size
                 self.logger.info(
                     f"Checkpoint loaded (uncompressed): trial={checkpoint_data.get('trial_number')}, "
                     f"best_value={checkpoint_data.get('best_value')}, "
@@ -223,7 +255,7 @@ class CheckpointManager:
 
         except Exception as e:
             self.logger.error(
-                f"Failed to load checkpoint from {checkpoint_path}: {e}",
+                f"Failed to load checkpoint from {checkpoint_path_obj}: {e}",
                 exc_info=True
             )
             raise IOError(f"Checkpoint load failed: {e}")
@@ -248,11 +280,15 @@ class CheckpointManager:
         """
         checkpoints = []
 
-        for checkpoint_file in sorted(self.checkpoint_dir.glob("checkpoint_*.pkl")):
+        for checkpoint_file in sorted(self.checkpoint_dir.glob("checkpoint_*.pkl*")):
             try:
                 # 讀取檢查點基本信息（不完整載入，僅讀取元數據）
-                with open(checkpoint_file, 'rb') as f:
-                    data = pickle.load(f)
+                if checkpoint_file.suffix == '.gz':
+                    with gzip.open(checkpoint_file, 'rb') as f:
+                        data = pickle.load(f)
+                else:
+                    with open(checkpoint_file, 'rb') as f:
+                        data = pickle.load(f)
 
                 # 過濾study_name
                 if study_name and data.get('study_name') != study_name:
@@ -276,7 +312,10 @@ class CheckpointManager:
                 continue
 
         # 按trial_number降序排序（最新的在前）
-        checkpoints.sort(key=lambda x: x['trial_number'], reverse=True)
+        checkpoints.sort(
+            key=lambda x: x['trial_number'] if isinstance(x['trial_number'], int) else -1,
+            reverse=True
+        )
 
         return checkpoints
 

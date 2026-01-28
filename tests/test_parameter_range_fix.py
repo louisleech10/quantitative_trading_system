@@ -142,6 +142,7 @@ def test_parameter_range_fix():
     # 驗證參數範圍
     violations = []
     for trial in trials:
+        trial_number = trial.get('number', trial.get('trial_number'))
         if trial.get('state') == 'COMPLETE':
             params = trial.get('params', {})
             short = params.get('short_period')
@@ -149,11 +150,11 @@ def test_parameter_range_fix():
             long = params.get('long_period')
 
             if short is not None and (short < 3 or short > 12):
-                violations.append(f"Trial #{trial['number']}: short_period={short} (超出 3-12)")
+                violations.append(f"Trial #{trial_number}: short_period={short} (超出 3-12)")
             if mid is not None and (mid < 14 or mid > 18):
-                violations.append(f"Trial #{trial['number']}: mid_period={mid} (超出 14-18)")
+                violations.append(f"Trial #{trial_number}: mid_period={mid} (超出 14-18)")
             if long is not None and (long < 20 or long > 33):
-                violations.append(f"Trial #{trial['number']}: long_period={long} (超出 20-33)")
+                violations.append(f"Trial #{trial_number}: long_period={long} (超出 20-33)")
 
     print(f"   總共 {len(trials)} 個 trials")
     completed = sum(1 for t in trials if t.get('state') == 'COMPLETE')
@@ -171,8 +172,9 @@ def test_parameter_range_fix():
     print("\n[Step 5] 示例參數:")
     completed_trials = [t for t in trials if t.get('state') == 'COMPLETE']
     for trial in completed_trials[:5]:
+        trial_number = trial.get('number', trial.get('trial_number'))
         params = trial.get('params', {})
-        print(f"   Trial #{trial['number']}: "
+        print(f"   Trial #{trial_number}: "
               f"short={params.get('short_period')}, "
               f"mid={params.get('mid_period')}, "
               f"long={params.get('long_period')}")

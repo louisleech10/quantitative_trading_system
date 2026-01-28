@@ -817,6 +817,7 @@ class ResultAnalyzer:
         for rank, trial in enumerate(top_trials, start=1):
             trial_dict = {
                 'rank': rank,
+                'number': trial.number,
                 'trial_number': trial.number,
                 'value': trial.value if trial.value is not None else None,
                 'state': trial.state.name,  # 添加 state 字段

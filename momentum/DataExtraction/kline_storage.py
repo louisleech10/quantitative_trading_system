@@ -1001,6 +1001,11 @@ class KlineStorageManager:
                 error_msg += f" 缺失時間點（前{display_count}個）: {missing_list}"
             if len(missing_bars) > display_count:
                 error_msg += f" ...等共 {len(missing_bars)} 根"
+
+            error_msg += (
+                "。建議：若為多區間append或分段回填，請在讀取時傳 "
+                "validate_continuity=False，或只針對需要的時間範圍做連續性驗證"
+            )
             
             logger.error(error_msg)
             raise ValueError(error_msg)
@@ -1020,7 +1025,7 @@ class KlineStorageManager:
             timeframe: 時間框架
             start_time: 起始時間戳（秒，可選）
             end_time: 結束時間戳（秒，可選）
-            validate_continuity: 是否驗證數據連續性（預設True，零容忍）
+            validate_continuity: 是否驗證數據連續性（預設True，必要時可關閉以支援多區間append）
 
         Returns:
             pd.DataFrame or None

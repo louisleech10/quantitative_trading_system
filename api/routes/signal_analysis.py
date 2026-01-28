@@ -10,7 +10,8 @@ from typing import Dict, Any
 from api.models.training_window_config import (
     SignalDensityRequest,
     SignalDensityResponse,
-    TrainingWindowConfig
+    TrainingWindowConfig,
+    TrainingWindowPreviewRequest
 )
 from api.services.signal_analysis_service import SignalAnalysisService
 from api.core.logging import get_logger
@@ -132,8 +133,7 @@ async def calculate_signal_density(
 
 @router.post("/preview-window")
 async def preview_training_window(
-    case_id: str,
-    window_config: TrainingWindowConfig,
+    request: TrainingWindowPreviewRequest,
     service: SignalAnalysisService = Depends(get_signal_service)
 ) -> Dict[str, Any]:
     """
@@ -193,11 +193,11 @@ async def preview_training_window(
     """
     logger.info(
         f"POST /api/v1/signal-analysis/preview-window: "
-        f"case_id={case_id}, lookback={window_config.lookback_bars}"
+        f"case_id={request.case_id}, lookback={request.window_config.lookback_bars}"
     )
 
     try:
-        result = await service.preview_training_window(case_id, window_config)
+        result = await service.preview_training_window(request.case_id, request.window_config)
         logger.info(f"預覽成功: actual_bars={result['actual_bars']}")
         return result
 

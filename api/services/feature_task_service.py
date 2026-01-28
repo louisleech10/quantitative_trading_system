@@ -109,6 +109,13 @@ class FeatureTaskService:
         Returns:
             {'task_id': str, 'status': str, 'estimated_time': int}
         """
+        # 先做基本參數驗證（避免無效任務進入佇列）
+        strategy_config = StrategyParams(
+            strategy_type=strategy_type,
+            params=strategy_params
+        )
+        strategy_config.validate()
+
         task_id = f"feat_{uuid.uuid4().hex[:8]}"
         
         self.logger.info(f"啟動特徵提取任務 - task_id: {task_id}, case_id: {case_id}")

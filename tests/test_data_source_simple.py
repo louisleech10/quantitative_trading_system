@@ -6,6 +6,7 @@
 import pandas as pd
 import numpy as np
 from momentum.FeatureEngineering.feature_extractor import FeatureExtractor
+from momentum.FeatureEngineering.feature_config import FeatureNamingConfig
 
 # 建立簡單的測試數據
 np.random.seed(42)
@@ -31,26 +32,29 @@ print("="*60)
 # 測試 1: close
 print("\n1. data_source='close'")
 result_df, feature_names = extractor.extract_ema_features(df.copy(), ema_params, data_source='close')
-print(f"   EMA_5 最後值: {result_df['ema_5'].iloc[-1]:.4f}")
-print(f"   EMA_20 最後值: {result_df['ema_20'].iloc[-1]:.4f}")
+close_mapping = FeatureNamingConfig.make_ema_feature_names('close', ema_params)
+print(f"   EMA_5 最後值: {result_df[close_mapping['ema_short']].iloc[-1]:.4f}")
+print(f"   EMA_20 最後值: {result_df[close_mapping['ema_mid']].iloc[-1]:.4f}")
 
-close_ema5 = result_df['ema_5'].iloc[-1]
+close_ema5 = result_df[close_mapping['ema_short']].iloc[-1]
 
 # 測試 2: volume
 print("\n2. data_source='volume'")
 result_df, feature_names = extractor.extract_ema_features(df.copy(), ema_params, data_source='volume')
-print(f"   EMA_5 最後值: {result_df['ema_5'].iloc[-1]:.4f}")
-print(f"   EMA_20 最後值: {result_df['ema_20'].iloc[-1]:.4f}")
+volume_mapping = FeatureNamingConfig.make_ema_feature_names('volume', ema_params)
+print(f"   EMA_5 最後值: {result_df[volume_mapping['ema_short']].iloc[-1]:.4f}")
+print(f"   EMA_20 最後值: {result_df[volume_mapping['ema_mid']].iloc[-1]:.4f}")
 
-volume_ema5 = result_df['ema_5'].iloc[-1]
+volume_ema5 = result_df[volume_mapping['ema_short']].iloc[-1]
 
 # 測試 3: taker_ratio
 print("\n3. data_source='taker_ratio'")
 result_df, feature_names = extractor.extract_ema_features(df.copy(), ema_params, data_source='taker_ratio')
-print(f"   EMA_5 最後值: {result_df['ema_5'].iloc[-1]:.4f}")
-print(f"   EMA_20 最後值: {result_df['ema_20'].iloc[-1]:.4f}")
+tr_mapping = FeatureNamingConfig.make_ema_feature_names('taker_ratio', ema_params)
+print(f"   EMA_5 最後值: {result_df[tr_mapping['ema_short']].iloc[-1]:.4f}")
+print(f"   EMA_20 最後值: {result_df[tr_mapping['ema_mid']].iloc[-1]:.4f}")
 
-taker_ema5 = result_df['ema_5'].iloc[-1]
+taker_ema5 = result_df[tr_mapping['ema_short']].iloc[-1]
 
 # 驗證結果
 print("\n" + "="*60)

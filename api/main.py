@@ -74,9 +74,9 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description="案例搜索API - 用於量化交易策略的案例搜索和分析",
-        docs_url=f"{settings.api_prefix}/docs" if settings.debug else None,
-        redoc_url=f"{settings.api_prefix}/redoc" if settings.debug else None,
-        openapi_url=f"{settings.api_prefix}/openapi.json" if settings.debug else None,
+        docs_url=f"{settings.api_prefix}/docs" if settings.debug else "/docs",
+        redoc_url=f"{settings.api_prefix}/redoc" if settings.debug else "/redoc",
+        openapi_url="/openapi.json",
         lifespan=lifespan
     )
     

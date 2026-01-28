@@ -81,7 +81,7 @@ class FeatureStorage:
                 group = f.create_group(group_path)
                 
                 # 儲存特徵矩陣
-                feature_matrix = features_df[feature_names].values.astype(np.float32)
+                feature_matrix = features_df[feature_names].values.astype(np.float64)
                 group.create_dataset(
                     'features',
                     data=feature_matrix,
@@ -187,7 +187,11 @@ class FeatureStorage:
                 feature_matrix = group['features'][:]
                 
                 # 讀取特徵名稱
-                feature_names = list(group.attrs['feature_names'])
+                raw_feature_names = list(group.attrs['feature_names'])
+                feature_names = [
+                    n.decode("utf-8") if isinstance(n, (bytes, np.bytes_)) else str(n)
+                    for n in raw_feature_names
+                ]
                 
                 # 讀取時間戳
                 timestamps = group['timestamps'][:]

@@ -220,7 +220,7 @@ class StrategyRegistry:
         if not self.is_registered(strategy_name):
             available = ', '.join(self.list_strategies())
             raise ValueError(
-                f"未知的策略類型: '{strategy_name}'\n"
+                f"不支持的策略類型: '{strategy_name}'\n"
                 f"可用的策略: {available}\n"
                 f"提示：使用 StrategyRegistry().register_strategy() 註冊新策略"
             )
@@ -254,7 +254,7 @@ class StrategyRegistry:
         if not self.is_registered(strategy_name):
             available = ', '.join(self.list_strategies())
             raise ValueError(
-                f"未知的策略類型: '{strategy_name}'\n"
+                f"不支持的策略類型: '{strategy_name}'\n"
                 f"可用的策略: {available}\n"
                 f"提示：使用 StrategyRegistry().register_strategy() 註冊新策略"
             )

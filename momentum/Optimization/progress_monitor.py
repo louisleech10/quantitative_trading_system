@@ -96,7 +96,7 @@ class ProgressMonitor:
         self.logger = logging.getLogger(__name__)
 
         # 進度狀態
-        self.start_time: Optional[float] = None
+        self.start_time: Optional[float] = time.time()
         self.last_best_value: Optional[float] = None
         self.completed_trials: int = 0
         self.pruned_trials: int = 0
@@ -136,26 +136,79 @@ class ProgressMonitor:
 
         self.logger.debug(f"Trial {trial.number} started")
 
-    def on_trial_complete(self, study: Study, trial: FrozenTrial):
+    def on_trial_complete(self, *args, **kwargs):
         """
         試驗完成回調（核心方法）
 
-        Args:
-            study: Optuna Study對象
-            trial: 完成的Trial對象
+        支援兩種呼叫方式:
+        - on_trial_complete(study, trial)
+        - on_trial_complete(trial_number=..., value=..., params=..., state=...)
         """
-        # 步驟1: 更新統計數據
-        self._update_statistics(study, trial)
+        if args and isinstance(args[0], Study):
+            study: Study = args[0]
+            trial: FrozenTrial = args[1]
 
-        # 步驟2: 計算進度統計
-        stats = self.get_progress_stats(study)
+            # 步驟1: 更新統計數據
+            self._update_statistics(study, trial)
 
-        # 步驟3: 檢查並觸發通知
-        self._check_and_notify(study, trial, stats)
+            # 步驟2: 計算進度統計
+            stats = self.get_progress_stats(study)
 
-        # 步驟4: 階段性日誌記錄
-        if stats.completed_trials % self.log_interval == 0:
-            self._log_progress(stats)
+            # 步驟3: 檢查並觸發通知
+            self._check_and_notify(study, trial, stats)
+
+            # 步驟4: 階段性日誌記錄
+            if stats.completed_trials % self.log_interval == 0:
+                self._log_progress(stats)
+
+            return stats
+
+        trial_number = kwargs.get('trial_number', args[0] if len(args) > 0 else 0)
+        value = kwargs.get('value', args[1] if len(args) > 1 else None)
+        params = kwargs.get('params', args[2] if len(args) > 2 else {})
+        state = kwargs.get('state', args[3] if len(args) > 3 else 'COMPLETE')
+
+        state_str = str(state).upper()
+        if state_str == 'COMPLETE':
+            self.completed_trials += 1
+        elif state_str == 'PRUNED':
+            self.pruned_trials += 1
+        elif state_str == 'FAIL':
+            self.failed_trials += 1
+
+        if value is not None:
+            if self.last_best_value is None or value > self.last_best_value:
+                self.last_best_value = value
+                self._send_notification('new_best_value', {
+                    'trial_number': trial_number,
+                    'best_value': value,
+                    'best_params': params,
+                    'completion_percentage': self.get_current_stats().completion_percentage
+                })
+
+        stats = self.get_current_stats()
+        self._check_milestones(stats)
+        self._send_notification('progress_update', {
+            'completed_trials': stats.completed_trials,
+            'total_trials': stats.total_trials,
+            'completion_percentage': stats.completion_percentage,
+            'best_value': stats.best_value
+        })
+
+        return stats
+
+    def _check_milestones(self, stats: ProgressStats) -> None:
+        current_percentage = int(stats.completion_percentage)
+        for milestone in self.milestone_percentages:
+            if current_percentage >= milestone and milestone not in self.reached_milestones:
+                self.reached_milestones.add(milestone)
+                self._send_notification('milestone_reached', {
+                    'milestone_percentage': milestone,
+                    'completed_trials': stats.completed_trials,
+                    'total_trials': stats.total_trials,
+                    'best_value': stats.best_value,
+                    'estimated_remaining_time': stats.estimated_remaining_time
+                })
 
     def _update_statistics(self, study: Study, trial: FrozenTrial):
         """
@@ -330,6 +383,31 @@ class ProgressMonitor:
             failed_trials=self.failed_trials,
             best_value=best_value,
             best_trial_number=best_trial_number,
+            completion_percentage=completion_percentage,
+            elapsed_time=elapsed_time,
+            estimated_remaining_time=estimated_remaining_time,
+            trials_per_hour=trials_per_hour,
+            avg_trial_duration=avg_trial_duration
+        )
+
+    def get_current_stats(self) -> ProgressStats:
+        """獲取目前統計（不依賴 Study）"""
+        total_finished = self.completed_trials + self.pruned_trials + self.failed_trials
+        completion_percentage = (total_finished / self.total_trials * 100) if self.total_trials > 0 else 0.0
+        elapsed_time = time.time() - self.start_time if self.start_time else 0.0
+
+        avg_trial_duration = elapsed_time / total_finished if total_finished > 0 else 0.0
+        remaining_trials = self.total_trials - total_finished
+        estimated_remaining_time = remaining_trials * avg_trial_duration if avg_trial_duration > 0 else None
+        trials_per_hour = (total_finished / elapsed_time * 3600) if elapsed_time > 0 else 0.0
+
+        return ProgressStats(
+            total_trials=self.total_trials,
+            completed_trials=self.completed_trials,
+            pruned_trials=self.pruned_trials,
+            failed_trials=self.failed_trials,
+            best_value=self.last_best_value,
+            best_trial_number=None,
             completion_percentage=completion_percentage,
             elapsed_time=elapsed_time,
             estimated_remaining_time=estimated_remaining_time,

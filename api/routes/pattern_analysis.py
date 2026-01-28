@@ -26,6 +26,10 @@ from api.models.pattern_analysis_models import (
     OOTValidationResult,
     TimeSplitReport,
     TimePeriodInfo,
+    DriftReport,
+    DriftReportResponse,
+    RegimeReport,
+    RegimeAnalysisResponse,
     XGBoostPredictionsResponse,
     FeatureImportanceTypesResponse,
     ProbabilitySummary,
@@ -161,6 +165,7 @@ async def _perform_oot_validation(
         TimeRangeOverlap
     )
     from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+    from momentum.Analysis.drift_analyzer import DriftAnalyzer
     
     # 獲取原始任務資訊
     symbols = task_result.get('symbols', [])
@@ -352,52 +357,85 @@ async def _perform_oot_validation(
             sym_features.reset_index(drop=True, inplace=True)
             all_symbol_features[sym] = sym_features
     
+    def _extract_feature_vectors(cases_df: pd.DataFrame, tag: str):
+        X_list = []
+        y_list = []
+        for _, case_row in cases_df.iterrows():
+            case_symbol = case_row['symbol']
+            case_ts = case_row['timestamp']
+
+            if case_symbol not in all_symbol_features:
+                continue
+
+            features_df = all_symbol_features[case_symbol]
+            idx = features_df[features_df['timestamp_sec'] == case_ts].index
+
+            if len(idx) == 0:
+                continue
+
+            row_idx = idx[0]
+
+            available_features = [f for f in feature_names if f in features_df.columns]
+            if len(available_features) < len(feature_names) * 0.5:
+                logger.warning(
+                    f"{tag} 特徵不足: 需要 {len(feature_names)}, 可用 {len(available_features)}"
+                )
+                continue
+
+            feature_values_map = {
+                name: features_df.loc[row_idx, name]
+                for name in available_features
+            }
+            feature_values = np.array(
+                [feature_values_map.get(name, 0.0) for name in feature_names],
+                dtype=float
+            )
+
+            if np.isnan(feature_values).any():
+                continue
+
+            X_list.append(feature_values)
+            y_list.append(case_row['positive_case'])
+
+        return np.array(X_list), np.array(y_list)
+
     # 提取 OOT 特徵和標籤
-    X_oot_list = []
-    y_oot_list = []
-    
-    for _, case_row in oot_cases.iterrows():
-        case_symbol = case_row['symbol']
-        case_ts = case_row['timestamp']
-        
-        if case_symbol not in all_symbol_features:
-            continue
-        
-        features_df = all_symbol_features[case_symbol]
-        idx = features_df[features_df['timestamp_sec'] == case_ts].index
-        
-        if len(idx) == 0:
-            continue
-        
-        row_idx = idx[0]
-        
-        # 確保 feature_names 存在於 features_df
-        available_features = [f for f in feature_names if f in features_df.columns]
-        if len(available_features) < len(feature_names) * 0.5:
-            logger.warning(f"特徵不足: 需要 {len(feature_names)}, 可用 {len(available_features)}")
-            continue
-        
-        feature_values = features_df.loc[row_idx, available_features].values
-        
-        if np.isnan(feature_values).any():
-            continue
-        
-        # 如果特徵數量不匹配，用 0 填充
-        if len(feature_values) < len(feature_names):
-            padded_values = np.zeros(len(feature_names))
-            padded_values[:len(feature_values)] = feature_values
-            feature_values = padded_values
-        
-        X_oot_list.append(feature_values)
-        y_oot_list.append(case_row['positive_case'])
-    
-    if len(X_oot_list) < 10:
-        raise ValueError(f"有效 OOT 案例不足: {len(X_oot_list)}")
-    
-    X_oot = np.array(X_oot_list)
-    y_oot = np.array(y_oot_list)
+    X_oot, y_oot = _extract_feature_vectors(oot_cases, "OOT")
+
+    if len(X_oot) < 10:
+        raise ValueError(f"有效 OOT 案例不足: {len(X_oot)}")
     
     logger.info(f"OOT 特徵提取完成 - 有效案例: {len(X_oot)}")
+
+    # 產生 PSI 飄移報告（使用訓練集對比 OOT）
+    drift_report = None
+    try:
+        X_train, _ = _extract_feature_vectors(split_result.train_df, "Train")
+        if len(X_train) >= 50:
+            drift_analyzer = DriftAnalyzer()
+            psi_results = drift_analyzer.calculate_all_features_psi(
+                X_train=X_train,
+                X_test=X_oot,
+                feature_names=feature_names,
+                bins=10
+            )
+            drift_report_obj = drift_analyzer.generate_drift_report(psi_results)
+            drift_report = drift_report_obj.to_dict()
+
+            if drift_report is not None:
+                task_result["drift_report"] = drift_report
+
+            severe_features = [r.feature for r in psi_results if r.status == "drift_severe"]
+            for r in psi_results:
+                if r.status == "drift_severe":
+                    logger.warning(f"特徵 {r.feature} PSI={r.psi:.4f}，建議檢查或重新訓練")
+
+            if severe_features:
+                logger.warning(f"飄移嚴重特徵數量: {len(severe_features)}")
+        else:
+            logger.warning(f"訓練樣本不足，無法計算 PSI: {len(X_train)}")
+    except Exception as e:
+        logger.warning(f"PSI 計算失敗: {str(e)}")
     
     # 載入模型並執行 OOT 驗證
     model_storage = batch_service.model_storage
@@ -487,7 +525,52 @@ async def _perform_oot_validation(
         status="success",
         message=f"OOT 驗證完成 - CV-OOT Gap: {oot_result.cv_oot_gap:.4f} ({oot_result.gap_status})",
         validation_result=validation_result,
-        time_split_report=time_split_report
+        time_split_report=time_split_report,
+        drift_report=DriftReport(**drift_report) if drift_report else None
+    )
+
+
+# ==================== 飄移監控 API ====================
+
+@router.get("/xgboost/{task_id}/drift-report", response_model=DriftReportResponse)
+async def get_xgboost_drift_report(task_id: str):
+    """取得特徵飄移報告（PSI）"""
+    task = _get_task_from_services(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+
+    result = task.get('result', {})
+    drift_report = result.get('drift_report')
+    if not drift_report:
+        raise HTTPException(status_code=404, detail=f"任務未包含飄移報告: {task_id}")
+
+    return DriftReportResponse(
+        task_id=task_id,
+        status="success",
+        message="飄移報告取得成功",
+        report=DriftReport(**drift_report)
+    )
+
+
+# ==================== 市場體制分析 API ====================
+
+@router.get("/xgboost/{task_id}/regime-analysis", response_model=RegimeAnalysisResponse)
+async def get_xgboost_regime_analysis(task_id: str):
+    """取得市場體制分析報告"""
+    task = _get_task_from_services(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+
+    result = task.get('result', {})
+    regime_analysis = result.get('regime_analysis')
+    if not regime_analysis:
+        raise HTTPException(status_code=404, detail=f"任務未包含市場體制分析: {task_id}")
+
+    return RegimeAnalysisResponse(
+        task_id=task_id,
+        status="success",
+        message="市場體制分析取得成功",
+        report=RegimeReport(**regime_analysis)
     )
 
 

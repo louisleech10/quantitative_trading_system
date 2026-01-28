@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 
 from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+from momentum.Analysis.regime_analyzer import RegimeAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
@@ -230,6 +231,23 @@ class XGBoostTaskService:
                 "case_ids": [case_ids[i] for i in sample_indices],
                 "samples": sample_values.tolist()
             }
+
+            # 4.3 市場體制分析（若可取得 Market_Phase）
+            regime_analysis = None
+            market_phases = self._resolve_market_phases(df)
+            if market_phases:
+                try:
+                    analyzer = RegimeAnalyzer()
+                    y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
+                    regime_report = analyzer.analyze_by_phase(
+                        y_true=y,
+                        y_pred_proba=y_pred_proba,
+                        market_phases=market_phases
+                    )
+                    regime_analysis = regime_report.to_dict()
+                    self.logger.info("發現 Market_Phase 欄位，啟用體制分析")
+                except Exception as e:
+                    self.logger.warning(f"市場體制分析失敗: {str(e)}")
             
             # 5. 儲存模型
             self.task_manager.update_progress(task_id, 90, '儲存模型...')
@@ -266,6 +284,7 @@ class XGBoostTaskService:
                     if self.xgboost_analyzer.last_calibration_curve else None
                 ),
                 'pr_curve': self.xgboost_analyzer.last_pr_curve,
+                'regime_analysis': regime_analysis,
                 'model_saved': True,
                 'model_path': model_path
             }
@@ -297,3 +316,32 @@ class XGBoostTaskService:
     def model_exists(self, case_id: str) -> bool:
         """檢查模型是否存在"""
         return self.model_storage.model_file_exists(case_id)
+
+    def _resolve_market_phases(self, df: pd.DataFrame) -> Optional[list]:
+        """解析 Market_Phase 欄位，若缺失則以時間戳推導"""
+        phase_columns = ["Market_Phase", "market_phase", "marketPhase"]
+        for col in phase_columns:
+            if col in df.columns:
+                phases = df[col].astype(str).tolist()
+                if any(phases):
+                    return phases
+
+        if "timestamp" not in df.columns:
+            return None
+
+        try:
+            from datetime import datetime
+            from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
+
+            timestamps = df["timestamp"].values
+            phases = []
+            for ts in timestamps:
+                ts_int = int(ts)
+                if ts_int > 10 ** 12:
+                    ts_int = ts_int // 1000
+                phase = MarketConfig.get_market_phase(datetime.utcfromtimestamp(ts_int))
+                phases.append(phase)
+            return phases
+        except Exception as e:
+            self.logger.warning(f"市場體制推導失敗: {str(e)}")
+            return None

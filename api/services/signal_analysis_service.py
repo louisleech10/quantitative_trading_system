@@ -155,13 +155,13 @@ class SignalAnalysisService:
 
             # 驗證載入後的案例數量
             if len(positive_cases) < 1:
-                raise ValueError(
+                raise FileNotFoundError(
                     f"正例案例載入不足: 需要至少1個,實際載入{len(positive_cases)}個。"
                     f"請求{len(request.positive_cases)}個,缺失{len(missing_cases)}個"
                 )
 
             if len(negative_cases) < 1:
-                raise ValueError(
+                raise FileNotFoundError(
                     f"反例案例載入不足: 需要至少1個,實際載入{len(negative_cases)}個"
                 )
 
@@ -241,7 +241,7 @@ class SignalAnalysisService:
             # 載入案例
             case = self.case_storage.get_case(case_id)
             if case is None:
-                raise ValueError(f"案例不存在: {case_id}")
+                raise HTTPException(status_code=404, detail=f"未找到案例: {case_id}")
 
             # 提取訓練窗口
             klines = self.analyzer.extract_training_window(case, window_config)
@@ -261,9 +261,8 @@ class SignalAnalysisService:
                 }
             }
 
-        except ValueError as e:
-            self.logger.error(f"預覽訓練窗口失敗: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
+        except HTTPException:
+            raise
 
         except Exception as e:
             self.logger.error(f"預覽訓練窗口失敗: {e}", exc_info=True)
@@ -290,12 +289,12 @@ class SignalAnalysisService:
         # 檢查案例數量（最少各1個，支援調試驗證場景）
         if len(request.positive_cases) < 1:
             raise ValueError(
-                f"正例數量不足: 需要至少1個,實際{len(request.positive_cases)}個"
+                f"正例案例數量不足: 需要至少1個,實際{len(request.positive_cases)}個"
             )
 
         if len(request.negative_cases) < 1:
             raise ValueError(
-                f"反例數量不足: 需要至少1個,實際{len(request.negative_cases)}個"
+                f"反例案例數量不足: 需要至少1個,實際{len(request.negative_cases)}個"
             )
 
         # 檢查案例ID格式
@@ -304,17 +303,30 @@ class SignalAnalysisService:
                 raise ValueError(f"無效的案例ID: {case_id}")
 
         # 檢查訓練窗口配置
+        if request.training_window.lookback_bars is None:
+            raise ValueError("lookback_bars 必須提供")
+
         if request.training_window.lookback_bars < 1:
             raise ValueError("lookback_bars必須大於0")
 
-        if request.training_window.lookforward_bars < 0:
+        if request.training_window.lookforward_bars is not None and request.training_window.lookforward_bars < 0:
             raise ValueError("lookforward_bars不能為負數")
+
+        # 檢查數據源
+        from momentum.Indicators.types import DataSourceEnum
+
+        valid_sources = [source.value for source in DataSourceEnum]
+        if request.strategy_config.data_source not in valid_sources:
+            raise ValueError(
+                f"無效的data_source: {request.strategy_config.data_source}. "
+                f"必須是以下之一: {', '.join(valid_sources)}"
+            )
 
         # 檢查指標是否已註冊
         available_indicators = self.indicator_engine.list_indicators()
         if request.strategy_config.indicator_type not in available_indicators:
             raise ValueError(
-                f"未知的指標類型: {request.strategy_config.indicator_type}. "
+                f"未註冊的指標: {request.strategy_config.indicator_type}. "
                 f"可用指標: {', '.join(available_indicators)}"
             )
 
@@ -325,5 +337,20 @@ class SignalAnalysisService:
                 f"不支持的策略邏輯: {request.strategy_config.strategy_logic}. "
                 f"支持的邏輯: {', '.join(supported_logics)}"
             )
+
+        # 檢查 EMA 參數完整性與合理性
+        if request.strategy_config.indicator_type == "ema" and request.strategy_config.strategy_logic == "three_line":
+            params = request.strategy_config.params or {}
+            required_sets = [
+                {"short_period", "mid_period", "long_period"},
+                {"ema_short", "ema_mid", "ema_long"}
+            ]
+            has_required = any(required.issubset(params.keys()) for required in required_sets)
+            if not has_required:
+                raise ValueError("參數不足: EMA 三線需要 short/mid/long 週期")
+
+            for key in ["short_period", "mid_period", "long_period", "ema_short", "ema_mid", "ema_long"]:
+                if key in params and (not isinstance(params[key], (int, float)) or params[key] <= 0):
+                    raise ValueError(f"參數 {key} 無效，必須為正數")
 
         self.logger.debug("請求驗證通過")

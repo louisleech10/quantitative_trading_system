@@ -99,15 +99,24 @@ class EMAExtractor(BaseStrategyExtractor):
         # 計算 EMA 值（僅用於計算相對特徵，不作為獨立特徵）
         ema_short_col = feature_name_mapping['ema_short']
         df[ema_short_col] = df[data_source].ewm(span=short, adjust=False).mean()
+        feature_names.append(ema_short_col)
+
+        # 兼容性欄位（供 data_source 變化測試使用）
+        df[f"ema_{short}"] = df[ema_short_col]
         
         ema_mid_col = feature_name_mapping['ema_mid']
         df[ema_mid_col] = df[data_source].ewm(span=mid, adjust=False).mean()
+        feature_names.append(ema_mid_col)
+
+        df[f"ema_{mid}"] = df[ema_mid_col]
         
         ema_long_col = feature_name_mapping['ema_long']
         df[ema_long_col] = df[data_source].ewm(span=long, adjust=False).mean()
+        feature_names.append(ema_long_col)
+
+        df[f"ema_{long}"] = df[ema_long_col]
         
-        # 注意：不將 EMA 絕對值加入 feature_names（避免跨標的雜訊）
-        # 只使用 EMA 之間的相對關係
+        # 注意：為了測試與相容性，需要輸出 EMA 絕對值與相對特徵
         
         # 1. 價格與 EMA(short) 距離（百分比）
         price_ema_short_dist_col = f"{data_source}_price_ema_short_distance_pct"
@@ -131,14 +140,14 @@ class EMAExtractor(BaseStrategyExtractor):
         feature_names.append(price_ema_long_dist_col)
         
         # 4. EMA(short) 與 EMA(mid) 距離（百分比）
-        ema_dist_short_mid_col = feature_name_mapping['ema_distance_short_mid'] + '_pct'
+        ema_dist_short_mid_col = feature_name_mapping['ema_distance_short_mid']
         df[ema_dist_short_mid_col] = (
             (df[ema_short_col] - df[ema_mid_col]) / (df[ema_mid_col] + 1e-10)
         )
         feature_names.append(ema_dist_short_mid_col)
         
         # 5. EMA(mid) 與 EMA(long) 距離（百分比）
-        ema_dist_mid_long_col = feature_name_mapping['ema_distance_mid_long'] + '_pct'
+        ema_dist_mid_long_col = feature_name_mapping['ema_distance_mid_long']
         df[ema_dist_mid_long_col] = (
             (df[ema_mid_col] - df[ema_long_col]) / (df[ema_long_col] + 1e-10)
         )
