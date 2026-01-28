@@ -24,9 +24,14 @@ class FeatureExtractionRequest(BaseModel):
         default=True,
         description="是否包含通用價格/成交量特徵"
     )
-    validate: bool = Field(default=True, description="是否執行驗證")
+    validate_input: bool = Field(
+        default=True,
+        description="是否執行驗證",
+        alias="validate"
+    )
     
     class Config:
+        populate_by_name = True
         json_schema_extra = {
             "example": {
                 "case_id": "ETHUSDT_1735905600_1",

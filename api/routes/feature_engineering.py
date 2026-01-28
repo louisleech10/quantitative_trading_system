@@ -60,7 +60,7 @@ async def start_feature_extraction(
             strategy_type=request.strategy_type,
             strategy_params=request.strategy_params,
             include_basic_features=request.include_basic_features,
-            validate=request.validate
+            validate=request.validate_input
         )
         
         return FeatureExtractionStartResponse(**result)
