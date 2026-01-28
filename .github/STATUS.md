@@ -10,16 +10,16 @@
 - ✅ 圖表/策略讀取連續性嚴格化（read_klines validate_continuity=True）— 2026-01-29
 **整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 1/4任務完成 (25%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 ### 進行中 🚧
-- Task 2.2: PSI 特徵飄移監控（Population Stability Index 計算、告警系統）
-- Task 2.3: 市場體制分析（Market Phase 分佈、交易建議）
+- Task 2.2: PSI 特徵飄移監控（核心分析器與測試完成；API/流程整合待做）
+- Task 2.3: 市場體制分析（核心分析器與測試完成；API/流程整合待做）
 - Phase 4 前端 OOT 設定與視覺化整合（預計未來開發）
 
 ## 🎯 當前重點
 - 連續性讀取規則已對齊（圖表/策略嚴格，append 寫入後立即驗證）
-- 後續規劃：Task 2.2 PSI 飄移檢測、Task 2.3 市場體制分析
+- Task 2.2/2.3 已完成核心分析器與單元測試，等待 API/服務層整合
 ### 下一步工作
-- Task 2.2: PSI 群體穩定性監控（特徵分佈飄移檢測）
-- Task 2.3: 市場體制分析（依市場阿段評估模型效能）
+- Task 2.2: PSI 飄移分析 API/服務層整合
+- Task 2.3: 市場體制分析 API/服務層整合
 - Phase 4: 前端 OOT 設定 UI 與結果視覺化整合
 - 完整端到端測試與性能基準測試
 ### 需要修復
@@ -33,10 +33,12 @@
 
 ### 技術債務
 - 前端完整整合與視覺化（Phase 4）
-- Task 2.2/2.3 實装（PSI/Market Regime Analysis）
+- Task 2.2/2.3 API與流程整合
 - CI/CD 測試覆蓋完善（目標 >90%）
 - 文檔更新（SHAP 使用指南）
 ## 📝 最近完成的工作
+- 2026-01-29：Task 2.2 PSI 分析器完成（DriftAnalyzer + 單元測試）
+- 2026-01-29：Task 2.3 市場體制分析器完成（RegimeAnalyzer + 單元測試）
 - 2026-01-28：**Task 2.1 SHAP 分析完成** — 特徵解釋性系統
   - ✅ 建立 momentum/Analysis/shap_analyzer.py（294 行）- SHAP 核心分析引擎
   - ✅ 整合 XGBoostAnalyzer（支援 TreeExplainer 緩存）
