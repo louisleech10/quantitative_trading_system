@@ -4,10 +4,104 @@ Pattern Analysis Models - 模式分析 Pydantic 模型
 Author: AI Agent
 Date: 2026-01-10
 Updated: 2026-01-13 - 新增批量分析模型，支援指標配置
+Updated: 2026-01-28 - 新增 OOT 驗證模型
 """
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any, Literal
+
+
+# ==================== OOT 驗證模型 ====================
+
+class OOTValidationRequest(BaseModel):
+    """OOT 驗證請求"""
+    task_id: str = Field(..., description="XGBoost 分析任務 ID")
+    oot_start_date: Optional[str] = Field(
+        default=None,
+        description="OOT 開始日期（ISO 格式，如 '2024-07-01'）。為 None 時使用自動切分"
+    )
+    oot_ratio: Optional[float] = Field(
+        default=0.2,
+        ge=0.05,
+        le=0.5,
+        description="OOT 資料比例（0.05-0.5），僅在 oot_start_date 為 None 時使用"
+    )
+    validation_ratio: Optional[float] = Field(
+        default=0.1,
+        ge=0.0,
+        le=0.3,
+        description="驗證集比例（從訓練集末端抽取）"
+    )
+    timestamp_column: Optional[str] = Field(
+        default=None,
+        description="時間欄位名稱（None 時自動偵測）"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "task_id": "task_20260128_123456",
+                "oot_start_date": "2024-07-01",
+                "oot_ratio": 0.2,
+                "validation_ratio": 0.1
+            }
+        }
+
+
+class TimePeriodInfo(BaseModel):
+    """時間區間資訊"""
+    start: str = Field(..., description="開始時間")
+    end: str = Field(..., description="結束時間")
+    samples: int = Field(..., description="樣本數")
+    positive_count: int = Field(default=0, description="正樣本數")
+    positive_rate: float = Field(default=0.0, description="正樣本率")
+
+
+class TimeSplitReport(BaseModel):
+    """時間切分報告"""
+    split_method: str = Field(..., description="切分方法：manual 或 auto")
+    timestamp_column: str = Field(..., description="使用的時間欄位")
+    random_seed: Optional[int] = Field(default=None, description="隨機種子")
+    train_period: TimePeriodInfo = Field(..., description="訓練期間")
+    validation_period: Optional[TimePeriodInfo] = Field(default=None, description="驗證期間")
+    oot_period: TimePeriodInfo = Field(..., description="OOT 期間")
+    total_samples: int = Field(..., description="總樣本數")
+
+
+class OOTValidationResult(BaseModel):
+    """OOT 驗證結果"""
+    oot_auc: float = Field(..., description="OOT AUC")
+    oot_precision: float = Field(..., description="OOT Precision")
+    oot_recall: float = Field(..., description="OOT Recall")
+    oot_f1: float = Field(..., description="OOT F1 Score")
+    oot_samples: int = Field(..., description="OOT 樣本數")
+    oot_positive_count: int = Field(..., description="OOT 正樣本數")
+    oot_positive_rate: float = Field(..., description="OOT 正樣本率")
+    cv_auc_mean: float = Field(..., description="CV AUC 平均值")
+    cv_oot_gap: float = Field(..., description="CV-OOT Gap（CV AUC - OOT AUC）")
+    gap_status: str = Field(
+        ..., 
+        description="Gap 狀態：good (< 0.05), acceptable (< 0.08), warning (>= 0.08)"
+    )
+    is_generalization_good: bool = Field(..., description="模型是否有良好泛化能力")
+    oot_period_start: str = Field(..., description="OOT 期間開始")
+    oot_period_end: str = Field(..., description="OOT 期間結束")
+
+
+class OOTValidationResponse(BaseModel):
+    """OOT 驗證回應"""
+    task_id: str = Field(..., description="任務 ID")
+    status: str = Field(..., description="狀態：success, failed")
+    message: str = Field(..., description="狀態訊息")
+    validation_result: Optional[OOTValidationResult] = Field(
+        default=None, 
+        description="OOT 驗證結果"
+    )
+    time_split_report: Optional[TimeSplitReport] = Field(
+        default=None,
+        description="時間切分報告"
+    )
+    error: Optional[str] = Field(default=None, description="錯誤訊息")
 
 
 # ==================== 指標配置模型 ====================
@@ -154,6 +248,36 @@ class FeatureImportanceResponse(BaseModel):
     method: str
 
 
+class CasePrediction(BaseModel):
+    """單筆案例預測"""
+    case_id: str
+    y_true: Optional[int] = Field(default=None, description="真實標籤（可選）")
+    predicted_proba: float
+
+
+class ProbabilitySummary(BaseModel):
+    """預測機率摘要"""
+    mean: float
+    std: float
+    bins: Dict[str, int]
+    min: float
+    max: float
+
+
+class XGBoostPredictionsResponse(BaseModel):
+    """XGBoost 預測回應"""
+    task_id: str
+    total_cases: int
+    summary: ProbabilitySummary
+    predictions: Optional[List[CasePrediction]] = None
+
+
+class FeatureImportanceTypesResponse(BaseModel):
+    """多種特徵重要性回應"""
+    task_id: str
+    types: Dict[str, List[FeatureImportanceResponse]]
+
+
 class ModelPerformanceResponse(BaseModel):
     """模型效能回應"""
     train_auc: float
@@ -163,6 +287,11 @@ class ModelPerformanceResponse(BaseModel):
     recall: float
     f1_score: float
     overfitting_score: float
+    brier_score: Optional[float] = None
+    ece: Optional[float] = None
+    calibration_quality: Optional[str] = None
+    pr_auc: Optional[float] = None
+    positive_rate: Optional[float] = None
 
 
 class XGBoostAnalysisResult(BaseModel):

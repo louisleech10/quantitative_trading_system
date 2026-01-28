@@ -5,21 +5,65 @@ XGBoost Analyzer - 特徵重要性分析引擎
 
 Author: AI Agent
 Date: 2026-01-10
+Updated: 2026-01-28 - 新增 OOT 驗證功能
 """
 
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Union
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
 
 import xgboost as xgb
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score, precision_score, recall_score, f1_score
+from sklearn.metrics import precision_recall_curve, auc
 
 from api.core.logging import get_logger
+from momentum.Analysis.calibration_analyzer import CalibrationAnalyzer, CalibrationMetrics, CalibrationCurveData
 
 logger = get_logger(__name__)
+
+
+# ==================== OOT 驗證相關資料結構 ====================
+
+@dataclass
+class OOTValidationResult:
+    """OOT 驗證結果"""
+    oot_auc: float
+    oot_precision: float
+    oot_recall: float
+    oot_f1: float
+    oot_samples: int
+    oot_positive_count: int
+    oot_positive_rate: float
+    cv_auc_mean: float
+    cv_oot_gap: float
+    gap_status: str  # 'good' (< 0.05), 'acceptable' (< 0.08), 'warning' (>= 0.08)
+    oot_period_start: str
+    oot_period_end: str
+    
+    def is_generalization_good(self, threshold: float = 0.08) -> bool:
+        """模型是否有良好的泛化能力"""
+        return self.cv_oot_gap < threshold
+    
+    def to_dict(self) -> dict:
+        """轉換為字典"""
+        return {
+            "oot_auc": round(self.oot_auc, 4),
+            "oot_precision": round(self.oot_precision, 4),
+            "oot_recall": round(self.oot_recall, 4),
+            "oot_f1": round(self.oot_f1, 4),
+            "oot_samples": self.oot_samples,
+            "oot_positive_count": self.oot_positive_count,
+            "oot_positive_rate": round(self.oot_positive_rate, 4),
+            "cv_auc_mean": round(self.cv_auc_mean, 4),
+            "cv_oot_gap": round(self.cv_oot_gap, 4),
+            "gap_status": self.gap_status,
+            "oot_period_start": self.oot_period_start,
+            "oot_period_end": self.oot_period_end,
+            "is_generalization_good": self.is_generalization_good()
+        }
 
 
 @dataclass
@@ -32,6 +76,11 @@ class ModelPerformance:
     recall: float
     f1_score: float
     overfitting_score: float  # train_auc - cv_auc_mean
+    brier_score: Optional[float] = None
+    ece: Optional[float] = None
+    calibration_quality: Optional[str] = None
+    pr_auc: Optional[float] = None
+    positive_rate: Optional[float] = None
     
     def is_overfitting(self, threshold: float = 0.15) -> bool:
         """是否過擬合"""
@@ -45,6 +94,74 @@ class FeatureImportance:
     importance: float
     rank: int
     method: str  # 'gain', 'weight', 'cover'
+
+
+@dataclass
+class CasePrediction:
+    """單筆案例預測"""
+    case_id: str
+    y_true: Optional[int]
+    predicted_proba: float
+
+    def to_dict(self) -> Dict:
+        return {
+            "case_id": self.case_id,
+            "y_true": self.y_true,
+            "predicted_proba": self.predicted_proba
+        }
+
+
+@dataclass
+class ProbabilitySummary:
+    """機率摘要"""
+    mean: float
+    std: float
+    bins: Dict[str, int]
+    min: float
+    max: float
+
+    def to_dict(self) -> Dict:
+        return {
+            "mean": self.mean,
+            "std": self.std,
+            "bins": self.bins,
+            "min": self.min,
+            "max": self.max
+        }
+
+
+@dataclass
+class PredictionOutput:
+    """預測輸出"""
+    predictions: List[CasePrediction]
+    proba_summary: ProbabilitySummary
+
+    def to_dict(self) -> Dict:
+        return {
+            "predictions": [p.to_dict() for p in self.predictions],
+            "proba_summary": self.proba_summary.to_dict()
+        }
+
+
+@dataclass
+class PRMetrics:
+    """PR 指標"""
+    pr_auc: float
+    baseline: float
+    positive_rate: float
+    precision: List[float]
+    recall: List[float]
+    thresholds: List[float]
+
+    def to_dict(self) -> Dict:
+        return {
+            "pr_auc": self.pr_auc,
+            "baseline": self.baseline,
+            "positive_rate": self.positive_rate,
+            "precision": self.precision,
+            "recall": self.recall,
+            "thresholds": self.thresholds
+        }
 
 
 class XGBoostAnalyzer:
@@ -89,6 +206,9 @@ class XGBoostAnalyzer:
         
         self.model = None
         self.feature_names = None
+        self.calibration_analyzer = CalibrationAnalyzer()
+        self.last_calibration_curve: Optional[CalibrationCurveData] = None
+        self.last_pr_curve: Optional[Dict[str, List[float]]] = None
     
     def train_model(
         self,
@@ -270,8 +390,162 @@ class XGBoostAnalyzer:
         )
         
         return result
-        
-        return result
+
+    def get_all_importance_types(
+        self,
+        feature_names: List[str],
+        top_n: Optional[int] = None
+    ) -> Dict[str, List[FeatureImportance]]:
+        """
+        取得三種特徵重要性指標（gain/cover/weight）
+        """
+        return {
+            "gain": self.calculate_feature_importance(feature_names, method="gain", top_n=top_n),
+            "cover": self.calculate_feature_importance(feature_names, method="cover", top_n=top_n),
+            "weight": self.calculate_feature_importance(feature_names, method="weight", top_n=top_n)
+        }
+
+    def _build_proba_summary(self, y_pred_proba: np.ndarray, n_bins: int = 10) -> ProbabilitySummary:
+        """建立預測機率摘要"""
+        mean = float(np.mean(y_pred_proba))
+        std = float(np.std(y_pred_proba))
+        min_val = float(np.min(y_pred_proba))
+        max_val = float(np.max(y_pred_proba))
+
+        bins = np.linspace(0.0, 1.0, n_bins + 1)
+        hist, edges = np.histogram(y_pred_proba, bins=bins)
+        bin_map: Dict[str, int] = {}
+        for i in range(len(hist)):
+            left = edges[i]
+            right = edges[i + 1]
+            key = f"{left:.1f}-{right:.1f}"
+            bin_map[key] = int(hist[i])
+
+        return ProbabilitySummary(
+            mean=mean,
+            std=std,
+            bins=bin_map,
+            min=min_val,
+            max=max_val
+        )
+
+    def get_predictions(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y_true: Optional[np.ndarray] = None,
+        case_ids: Optional[List[str]] = None,
+        batch_size: int = 10000
+    ) -> PredictionOutput:
+        """
+        取得預測機率與摘要
+        """
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+
+        if len(X) == 0:
+            raise ValueError("X 為空，無法預測")
+
+        if y_true is not None and len(X) != len(y_true):
+            raise ValueError("X 與 y_true 長度不一致")
+
+        if case_ids is not None and len(X) != len(case_ids):
+            raise ValueError("X 與 case_ids 長度不一致")
+
+        total_samples = len(X)
+        if case_ids is None:
+            case_ids = [f"case_{i}" for i in range(total_samples)]
+        elif len(set(case_ids)) != len(case_ids):
+            self.logger.warning("case_id 存在重複，請確認輸入是否正確")
+
+        y_pred_proba_chunks = []
+        for start in range(0, total_samples, batch_size):
+            end = min(start + batch_size, total_samples)
+            if isinstance(X, pd.DataFrame):
+                X_batch = X.iloc[start:end]
+            else:
+                X_batch = X[start:end]
+            proba_batch = self.model.predict_proba(X_batch)[:, 1]
+            y_pred_proba_chunks.append(proba_batch)
+
+        y_pred_proba = np.concatenate(y_pred_proba_chunks)
+        min_prob = float(np.min(y_pred_proba))
+        max_prob = float(np.max(y_pred_proba))
+        if min_prob < 0.0 or max_prob > 1.0:
+            self.logger.warning(
+                f"預測機率超出 [0, 1] 範圍 (min={min_prob:.4f}, max={max_prob:.4f})"
+            )
+
+        predictions = []
+        for i, proba in enumerate(y_pred_proba):
+            label = int(y_true[i]) if y_true is not None else None
+            predictions.append(
+                CasePrediction(
+                    case_id=case_ids[i],
+                    y_true=label,
+                    predicted_proba=float(proba)
+                )
+            )
+
+        summary = self._build_proba_summary(y_pred_proba)
+        return PredictionOutput(predictions=predictions, proba_summary=summary)
+
+    def calculate_calibration_metrics(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: np.ndarray,
+        n_bins: int = 10
+    ) -> CalibrationMetrics:
+        """計算校準指標與曲線資料"""
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+
+        y_pred_proba = self.model.predict_proba(X)[:, 1]
+        metrics = self.calibration_analyzer.calculate_metrics(y, y_pred_proba, n_bins=n_bins)
+        self.last_calibration_curve = metrics.curve_data
+
+        self.logger.info(
+            f"校準指標 - Brier: {metrics.brier_score:.4f}, ECE: {metrics.ece:.4f}, "
+            f"品質: {metrics.calibration_quality}"
+        )
+        if metrics.calibration_quality == "poor":
+            self.logger.warning("校準品質偏低，建議重新調整模型或做機率校準")
+
+        return metrics
+
+    def calculate_pr_metrics(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        y: np.ndarray
+    ) -> PRMetrics:
+        """計算 PR AUC 與曲線資料"""
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+
+        y_pred_proba = self.model.predict_proba(X)[:, 1]
+        precision, recall, thresholds = precision_recall_curve(y, y_pred_proba)
+        pr_auc = float(auc(recall, precision))
+        positive_rate = float(np.mean(y))
+        baseline = positive_rate
+
+        self.last_pr_curve = {
+            "precision": precision.tolist(),
+            "recall": recall.tolist(),
+            "thresholds": thresholds.tolist()
+        }
+
+        if positive_rate < 0.2:
+            self.logger.info(
+                f"正樣本比例偏低 ({positive_rate:.2%})，建議參考 PR AUC"
+            )
+
+        return PRMetrics(
+            pr_auc=pr_auc,
+            baseline=baseline,
+            positive_rate=positive_rate,
+            precision=precision.tolist(),
+            recall=recall.tolist(),
+            thresholds=thresholds.tolist()
+        )
     
     def validate_model(
         self,
@@ -388,6 +662,17 @@ class XGBoostAnalyzer:
             overfitting_score = np.nan
         else:
             overfitting_score = train_auc - cv_auc_mean
+
+        # 校準指標與 PR AUC
+        calibration_metrics = self.calculate_calibration_metrics(X_ordered, y_ordered)
+        pr_metrics = self.calculate_pr_metrics(X_ordered, y_ordered)
+
+        if not np.isnan(cv_auc_mean) and not np.isnan(pr_metrics.pr_auc):
+            roc_pr_gap = cv_auc_mean - pr_metrics.pr_auc
+            if roc_pr_gap > 0.15:
+                self.logger.warning(
+                    f"ROC AUC 與 PR AUC 差距較大 ({roc_pr_gap:.4f})，ROC AUC 可能過度樂觀"
+                )
         
         # 建立效能物件
         performance = ModelPerformance(
@@ -397,7 +682,12 @@ class XGBoostAnalyzer:
             precision=np.mean(cv_precision_scores),
             recall=np.mean(cv_recall_scores),
             f1_score=np.mean(cv_f1_scores),
-            overfitting_score=overfitting_score
+            overfitting_score=overfitting_score,
+            brier_score=calibration_metrics.brier_score,
+            ece=calibration_metrics.ece,
+            calibration_quality=calibration_metrics.calibration_quality,
+            pr_auc=pr_metrics.pr_auc,
+            positive_rate=pr_metrics.positive_rate
         )
         
         self.logger.info(
@@ -429,5 +719,158 @@ class XGBoostAnalyzer:
         Returns:
             特徵名稱列表
         """
-        importance_list = self.calculate_feature_importance(method=method, top_n=n)
+        if self.feature_names is None:
+            raise ValueError("特徵名稱尚未設定，請先訓練模型")
+
+        importance_list = self.calculate_feature_importance(
+            feature_names=self.feature_names,
+            method=method,
+            top_n=n
+        )
         return [fi.feature for fi in importance_list]
+    
+    # ==================== OOT 驗證方法 ====================
+    
+    def validate_oot(
+        self,
+        X_oot: Union[pd.DataFrame, np.ndarray],
+        y_oot: np.ndarray,
+        cv_auc_mean: Optional[float] = None,
+        oot_period_start: str = "",
+        oot_period_end: str = "",
+        threshold: float = 0.5
+    ) -> OOTValidationResult:
+        """
+        Out-of-Time 驗證
+        
+        評估模型在完全未見過的未來時間段的表現
+        
+        Args:
+            X_oot: OOT 特徵矩陣
+            y_oot: OOT 標籤
+            cv_auc_mean: CV AUC 平均值（用於計算 gap，None 時跳過 gap 計算）
+            oot_period_start: OOT 期間開始時間
+            oot_period_end: OOT 期間結束時間
+            threshold: 分類閾值（預設 0.5）
+            
+        Returns:
+            OOTValidationResult 物件
+            
+        Raises:
+            ValueError: 模型未訓練或 OOT 樣本不足
+        """
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+        
+        # 驗證 OOT 資料
+        if len(X_oot) == 0:
+            raise ValueError("OOT 資料為空")
+        
+        if len(y_oot) == 0 or len(X_oot) != len(y_oot):
+            raise ValueError(f"OOT 標籤長度不匹配: X={len(X_oot)}, y={len(y_oot)}")
+        
+        self.logger.info(
+            f"開始 OOT 驗證 - 樣本數: {len(X_oot)}, "
+            f"期間: {oot_period_start} ~ {oot_period_end}"
+        )
+        
+        # 預測
+        y_pred_proba = self.model.predict_proba(X_oot)[:, 1]
+        y_pred = (y_pred_proba >= threshold).astype(int)
+        
+        # 計算指標
+        unique_labels = np.unique(y_oot)
+        if len(unique_labels) < 2:
+            self.logger.warning(
+                f"OOT 標籤只有單一類別 ({unique_labels})，AUC 設為 NaN"
+            )
+            oot_auc = np.nan
+        else:
+            oot_auc = roc_auc_score(y_oot, y_pred_proba)
+        
+        oot_precision = precision_score(y_oot, y_pred, zero_division=0)
+        oot_recall = recall_score(y_oot, y_pred, zero_division=0)
+        oot_f1 = f1_score(y_oot, y_pred, zero_division=0)
+        
+        # 計算樣本統計
+        oot_samples = len(y_oot)
+        oot_positive_count = int(np.sum(y_oot))
+        oot_positive_rate = oot_positive_count / oot_samples if oot_samples > 0 else 0.0
+        
+        # 計算 CV-OOT Gap
+        if cv_auc_mean is not None and not np.isnan(cv_auc_mean) and not np.isnan(oot_auc):
+            cv_oot_gap = cv_auc_mean - oot_auc
+        else:
+            cv_oot_gap = np.nan
+        
+        # 判斷 Gap 狀態
+        if np.isnan(cv_oot_gap):
+            gap_status = "unknown"
+        elif cv_oot_gap < 0.05:
+            gap_status = "good"
+        elif cv_oot_gap < 0.08:
+            gap_status = "acceptable"
+        else:
+            gap_status = "warning"
+        
+        # 記錄結果
+        self.logger.info(
+            f"OOT 驗證完成 - AUC: {oot_auc:.4f}, "
+            f"Precision: {oot_precision:.4f}, Recall: {oot_recall:.4f}, "
+            f"正樣本率: {oot_positive_rate:.2%}"
+        )
+        
+        if not np.isnan(cv_oot_gap):
+            if gap_status == "warning":
+                self.logger.warning(
+                    f"CV-OOT Gap 較大 ({cv_oot_gap:.4f} >= 0.08)，"
+                    f"模型可能在未來時間段表現較差"
+                )
+            else:
+                self.logger.info(
+                    f"CV-OOT Gap: {cv_oot_gap:.4f} - 狀態: {gap_status}"
+                )
+        
+        return OOTValidationResult(
+            oot_auc=float(oot_auc) if not np.isnan(oot_auc) else 0.0,
+            oot_precision=float(oot_precision),
+            oot_recall=float(oot_recall),
+            oot_f1=float(oot_f1),
+            oot_samples=oot_samples,
+            oot_positive_count=oot_positive_count,
+            oot_positive_rate=float(oot_positive_rate),
+            cv_auc_mean=float(cv_auc_mean) if cv_auc_mean and not np.isnan(cv_auc_mean) else 0.0,
+            cv_oot_gap=float(cv_oot_gap) if not np.isnan(cv_oot_gap) else 0.0,
+            gap_status=gap_status,
+            oot_period_start=oot_period_start,
+            oot_period_end=oot_period_end
+        )
+    
+    def get_cv_oot_gap(
+        self,
+        cv_auc_mean: float,
+        oot_auc: float
+    ) -> Tuple[float, str]:
+        """
+        計算 CV-OOT Gap 並判斷狀態
+        
+        Args:
+            cv_auc_mean: CV AUC 平均值
+            oot_auc: OOT AUC
+            
+        Returns:
+            (gap 值, 狀態字串)
+        """
+        if np.isnan(cv_auc_mean) or np.isnan(oot_auc):
+            return np.nan, "unknown"
+        
+        gap = cv_auc_mean - oot_auc
+        
+        if gap < 0.05:
+            status = "good"
+        elif gap < 0.08:
+            status = "acceptable"
+        else:
+            status = "warning"
+        
+        return gap, status

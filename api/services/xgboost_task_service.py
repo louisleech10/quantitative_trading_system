@@ -21,6 +21,7 @@ from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from api.core.logging import get_logger
+from api.utils.json_serializer import sanitize_for_json
 
 logger = get_logger(__name__)
 
@@ -153,6 +154,10 @@ class XGBoostTaskService:
             timestamps = df['timestamp'].values if 'timestamp' in df.columns else None
             X = df.drop(columns=['label', 'open_time'], errors='ignore')
             feature_names = X.columns.tolist()
+            if 'case_id' in df.columns:
+                case_ids = df['case_id'].astype(str).tolist()
+            else:
+                case_ids = [f"{case_id}_{i}" for i in range(len(X))]
             
             self.logger.info(
                 f"特徵數據載入完成 - 樣本數: {len(X)}, 特徵數: {len(feature_names)}"
@@ -185,6 +190,12 @@ class XGBoostTaskService:
                 self.xgboost_analyzer.calculate_feature_importance,
                 feature_names
             )
+
+            # 3.1 取得三種特徵重要性
+            feature_importance_all = await asyncio.to_thread(
+                self.xgboost_analyzer.get_all_importance_types,
+                feature_names
+            )
             
             # 4. 提取決策規則
             self.task_manager.update_progress(task_id, 70, '提取決策規則...')
@@ -194,6 +205,12 @@ class XGBoostTaskService:
                 self.xgboost_analyzer.model,
                 X, y, feature_names,
                 top_n_rules, min_support
+            )
+
+            # 4.1 取得預測機率與摘要
+            predictions_output = await asyncio.to_thread(
+                self.xgboost_analyzer.get_predictions,
+                X, y, case_ids
             )
             
             # 5. 儲存模型
@@ -219,10 +236,22 @@ class XGBoostTaskService:
                 'case_id': case_id,
                 'model_performance': performance.__dict__,
                 'feature_importance': [fi.__dict__ for fi in feature_importance],
+                'feature_importance_all': {
+                    key: [fi.__dict__ for fi in values]
+                    for key, values in feature_importance_all.items()
+                },
                 'decision_rules': [rule.to_dict() for rule in rules],
+                'predictions': predictions_output.to_dict(),
+                'calibration_curve': (
+                    self.xgboost_analyzer.last_calibration_curve.to_dict()
+                    if self.xgboost_analyzer.last_calibration_curve else None
+                ),
+                'pr_curve': self.xgboost_analyzer.last_pr_curve,
                 'model_saved': True,
                 'model_path': model_path
             }
+
+            result = sanitize_for_json(result)
             
             self.task_manager.update_status(task_id, 'completed', result=result)
             self.task_manager.update_progress(task_id, 100, '分析完成')

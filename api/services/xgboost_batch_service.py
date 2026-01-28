@@ -408,6 +408,7 @@ class XGBoostBatchService:
             X_list = []
             y_list = []
             case_timestamps = []
+            case_ids = []
             valid_cases = 0
             sequence_feature_names: Optional[List[str]] = None
             
@@ -489,6 +490,7 @@ class XGBoostBatchService:
                 X_list.append(feature_values)
                 y_list.append(case.positive_case)
                 case_timestamps.append(case_ts)
+                case_ids.append(case.case_id)
                 valid_cases += 1
                 
                 # 更新進度
@@ -554,6 +556,11 @@ class XGBoostBatchService:
                 self.xgboost_analyzer.calculate_feature_importance,
                 feature_names
             )
+
+            feature_importance_all = await asyncio.to_thread(
+                self.xgboost_analyzer.get_all_importance_types,
+                feature_names
+            )
             
             # ===== Step 7: 提取決策規則 =====
             self.task_manager.update_progress(task_id, 85, '提取規則', '提取決策規則...')
@@ -563,6 +570,11 @@ class XGBoostBatchService:
                 self.xgboost_analyzer.model,
                 X, y, feature_names,
                 top_n_rules, min_support
+            )
+
+            predictions_output = await asyncio.to_thread(
+                self.xgboost_analyzer.get_predictions,
+                X, y, case_ids
             )
             
             # ===== Step 8: 儲存模型 =====
@@ -607,7 +619,17 @@ class XGBoostBatchService:
                 'feature_names': feature_names,
                 'model_performance': performance.__dict__,
                 'feature_importance': [fi.__dict__ for fi in feature_importance],
+                'feature_importance_all': {
+                    key: [fi.__dict__ for fi in values]
+                    for key, values in feature_importance_all.items()
+                },
                 'decision_rules': [rule.to_dict() for rule in rules],
+                'predictions': predictions_output.to_dict(),
+                'calibration_curve': (
+                    self.xgboost_analyzer.last_calibration_curve.to_dict()
+                    if self.xgboost_analyzer.last_calibration_curve else None
+                ),
+                'pr_curve': self.xgboost_analyzer.last_pr_curve,
                 'model_saved': True,
                 'model_path': model_path
             }
