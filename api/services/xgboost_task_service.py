@@ -212,6 +212,24 @@ class XGBoostTaskService:
                 self.xgboost_analyzer.get_predictions,
                 X, y, case_ids
             )
+
+            # 4.2 建立 SHAP 取樣資料（供後續解釋使用）
+            max_shap_samples = 200
+            sample_size = min(len(X), max_shap_samples)
+            rng = np.random.default_rng(42)
+            sample_indices = rng.choice(len(X), size=sample_size, replace=False)
+            if isinstance(X, pd.DataFrame):
+                X_sample = X.iloc[sample_indices]
+                sample_values = X_sample.values
+            else:
+                sample_values = X[sample_indices]
+
+            shap_sample = {
+                "sample_size": int(sample_size),
+                "feature_names": feature_names,
+                "case_ids": [case_ids[i] for i in sample_indices],
+                "samples": sample_values.tolist()
+            }
             
             # 5. 儲存模型
             self.task_manager.update_progress(task_id, 90, '儲存模型...')
@@ -242,6 +260,7 @@ class XGBoostTaskService:
                 },
                 'decision_rules': [rule.to_dict() for rule in rules],
                 'predictions': predictions_output.to_dict(),
+                'shap_sample': shap_sample,
                 'calibration_curve': (
                     self.xgboost_analyzer.last_calibration_curve.to_dict()
                     if self.xgboost_analyzer.last_calibration_curve else None

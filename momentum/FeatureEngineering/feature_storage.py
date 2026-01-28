@@ -139,16 +139,16 @@ class FeatureStorage:
     def load_features_from_hdf5(
         self,
         case_id: str,
-        symbol: str,
-        timeframe: str
+        symbol: Optional[str] = None,
+        timeframe: Optional[str] = None
     ) -> Tuple[pd.DataFrame, List[str], Dict]:
         """
         從 HDF5 讀取特徵
         
         Args:
             case_id: 案例 ID
-            symbol: 交易標的
-            timeframe: 時間週期
+            symbol: 交易標的（可選，未提供時自動偵測）
+            timeframe: 時間週期（可選，未提供時自動偵測）
             
         Returns:
             (features_df, feature_names, metadata)
@@ -162,11 +162,25 @@ class FeatureStorage:
         
         try:
             with h5py.File(file_path, 'r') as f:
+                if symbol is None or timeframe is None:
+                    symbols = list(f.keys())
+                    if not symbols:
+                        raise KeyError("HDF5 檔案沒有任何群組")
+                    symbol = symbols[0]
+                    timeframes = list(f[symbol].keys())
+                    if not timeframes:
+                        raise KeyError(f"群組不存在: {symbol}")
+                    timeframe = timeframes[0]
+                    if len(symbols) > 1 or len(timeframes) > 1:
+                        self.logger.warning(
+                            f"未指定 symbol/timeframe，使用第一個群組: {symbol}/{timeframe}"
+                        )
+
                 group_path = f"{symbol}/{timeframe}"
-                
+
                 if group_path not in f:
                     raise KeyError(f"群組不存在: {group_path}")
-                
+
                 group = f[group_path]
                 
                 # 讀取特徵矩陣

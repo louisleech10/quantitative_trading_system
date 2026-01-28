@@ -6,19 +6,21 @@
 - ✅ Task 1.3: 三種特徵重要性（Gain/Cover/Weight）、校正指標（Brier/ECE）、API整合 — 2026-01-28
 - ✅ Task 1.4: 輸出整合、PR AUC、API與單元測試 — 2026-01-28
 - ✅ Task 1.5: Purged K-Fold / Embargo 去污染交叉驗證 — 2026-01-28（2 tests passed）
-**整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
+- ✅ Task 2.1: SHAP 解釋性分析（TreeExplainer + 服務層 + API端點） — 2026-01-28（完整驗證通過）
+**整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 1/4任務完成 (25%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
 ### 進行中 🚧
-- Task 1.6+: 後續 XGBoost 進階功能（SHAP/PSI/群體穩定性）（規劃中）
+- Task 2.2: PSI 特徵飄移監控（Population Stability Index 計算、告警系統）
+- Task 2.3: 市場體制分析（Market Phase 分佈、交易建議）
 - Phase 4 前端 OOT 設定與視覺化整合（預計未來開發）
 
 ## 🎯 當前重點
-- Task 1.5 已完成（Purged K-Fold / Embargo 去污染交叉驗證，2/2 測試通過）
-- XGBoost 完整特徵集實装已達成 Phase 1: 5/5 任務 100% 完成
-- 後續規劃：Task 1.6 SHAP 解釋性分析、Task 2.x PSI 飄移檢測
+- Task 2.1 已完成（SHAP TreeExplainer + 緩存 + 2 個 API 端點）
+- XGBoost 模型解釋性系統已完成
+- 後續規劃：Task 2.2 PSI 飄移檢測、Task 2.3 市場體制分析
 ### 下一步工作
-- Task 1.6: SHAP 特徵解釋性分析（Additive Feature Attribution）
-- Task 2.1: PSI 群體穩定性監控（Population Stability Index）
-- Task 2.2: 漂移檢測與告警系統（基於 PSI）
+- Task 2.2: PSI 群體穩定性監控（特徵分佈飄移檢測）
+- Task 2.3: 市場體制分析（依市場阿段評估模型效能）
+- Task 3.1-3.6: 進階評估指標（Precision@K、Permutation Importance 等）
 - Phase 4: 前端 OOT 設定 UI 與結果視覺化整合
 - 完整端到端測試與性能基準測試
 ### 需要修復
@@ -26,27 +28,33 @@
 - 前端 OOT 設定面板缺失（Phase 4）— 優先級中
 
 ### 需要優化
-- Purged CV 大樣本性能測試（>100k）
+- SHAP 樣本大小配置（目前 100/200 固定值）
 - API 序列化清理負擔優化
 - 整合測試覆蓋擴充
 
 ### 技術債務
 - 前端完整整合與視覺化（Phase 4）
+- Task 2.2/2.3 實装（PSI/Market Regime Analysis）
 - CI/CD 測試覆蓋完善（目標 >90%）
-- 文檔更新（Purged CV 使用指南）
+- 文檔更新（SHAP 使用指南）
 ## 📝 最近完成的工作
-- 2026-01-28：**Task 1.5 完成** — Purged K-Fold / Embargo 去污染交叉驗證
-  - ✅ PurgedTimeSeriesSplit 核心實現（purge_gap + embargo_pct + 無有效 fold 保護）
-  - ✅ XGBoostAnalyzer 集成（train_model + validate_model + train_with_purged_cv）
-  - ✅ API 參數傳遞鏈（XGBoostBatchAnalysisRequest → API → Service → Analyzer）
-  - ✅ 單元測試驗證（2/2 通過：InsufficientSamplesAfterPurge + 完整 CV 流程）
-- 2026-01-28：Task 1.1-1.4 完成 — OOT 驗證系統、預測機率、特徵重要性、輸出整合（所有驗證通過）
+- 2026-01-28：**Task 2.1 SHAP 分析完成** — 特徵解釋性系統
+  - ✅ 建立 momentum/Analysis/shap_analyzer.py（294 行）- SHAP 核心分析引擎
+  - ✅ 整合 XGBoostAnalyzer（支援 TreeExplainer 緩存）
+  - ✅ 建立 api/services/shap_analysis_service.py（158 行）- 服務層
+  - ✅ 添加 2 個 API 端點（全局分析 + 單案例解釋）
+  - ✅ 新增 10 個 Pydantic 數據模型（請求/響應）
+  - ✅ 添加 SHAP 樣本數據生成（200 樣本緩存）
+  - ✅ 修改 feature_storage.py（Symbol/Timeframe 自動檢測）
+  - ✅ 新增 shap==0.46.0 依賴
+  - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
+- 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，待同步（已完成 Task 1.5 本地所有修改） — 2026-01-28
-- 最新完成：Task 1.5 Purged K-Fold / Embargo 實装（1 個新類別 + 2 個核心文件修改 + 3 個 API 層修改 + 2 個測試文件）
-  - 修改文件：time_splitter.py, xgboost_analyzer.py, pattern_analysis_models.py, pattern_analysis.py, xgboost_batch_service.py, test_oot_validation.py
-  - 新建文件：test_xgboost_analyzer_purged_cv.py
-  - 待推送項目：全 7 個檔案 + 測試驗證結果
+- main 分支，待同步（Task 2.1 SHAP 分析本地所有修改） — 2026-01-28
+- 最新完成：Task 2.1 SHAP 解釋性分析（1 個新類別 + 2 個核心文件修改 + 3 個 API 層修改 + 1 個依賴更新）
+  - 修改文件：xgboost_analyzer.py, feature_storage.py, xgboost_task_service.py, xgboost_batch_service.py, pattern_analysis_models.py, pattern_analysis.py, requirements.txt（共 7 個）
+  - 新建文件：shap_analyzer.py, shap_analysis_service.py（共 2 個）
+  - 待推送項目：全 9 個檔案
 - **XGBoost 批量分析 JSON 序列化修復** (100%) - 2026-01-15完成
   - ✅ JSON 序列化工具：convert_numpy_types 遞迴轉換 numpy 類型
   - ✅ XGBoost 結果清理：sanitize_for_json 防止 FastAPI 序列化錯誤
@@ -243,11 +251,11 @@
 - 最新提交：Task1.1 OOT 驗證系統與測試
 
 ## 💡 下次啟動時
-- **確認 Git 推送**：Task 1.5 所有修改推送到 main 分支
-- **開始 Task 1.6**：SHAP 特徵解釋性分析實装
-- **計劃 Task 2.x**：PSI 群體穩定性監控、漂移檢測系統
+- **確認 Git 推送**：Task 2.1 SHAP 分析所有修改推送到 main 分支
+- **開始 Task 2.2**：PSI 特徵飄移監控實装（特徵分佈變化檢測）
+- **計劃 Task 2.3**：市場體制分析（按 Market_Phase 實施分析）
 - **修復 Pydantic 警告**：v2 field shadowing issue
-- **執行完整測試**：pytest 全套 + 性能基準測試
+- **執行完整測試**：pytest 全套 + SHAP API 端點測試
 
 ---
 

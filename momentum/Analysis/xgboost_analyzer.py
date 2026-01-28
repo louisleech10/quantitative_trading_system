@@ -22,6 +22,12 @@ from sklearn.metrics import precision_recall_curve, auc
 from api.core.logging import get_logger
 from momentum.Analysis.calibration_analyzer import CalibrationAnalyzer, CalibrationMetrics, CalibrationCurveData
 from momentum.Analysis.time_splitter import PurgedTimeSeriesSplit
+from momentum.Analysis.shap_analyzer import (
+    SHAPAnalyzer,
+    GlobalSHAPResult,
+    SingleCaseSHAPResult,
+    InteractionEffect
+)
 
 logger = get_logger(__name__)
 
@@ -208,8 +214,11 @@ class XGBoostAnalyzer:
         self.model = None
         self.feature_names = None
         self.calibration_analyzer = CalibrationAnalyzer()
+        self.shap_analyzer = SHAPAnalyzer()
         self.last_calibration_curve: Optional[CalibrationCurveData] = None
         self.last_pr_curve: Optional[Dict[str, List[float]]] = None
+        self._shap_explainer = None
+        self._shap_model_id: Optional[int] = None
     
     def train_model(
         self,
@@ -304,6 +313,10 @@ class XGBoostAnalyzer:
             eval_set=[(X_val, y_val)],
             verbose=False
         )
+
+        # 重置 SHAP explainer
+        self._shap_explainer = None
+        self._shap_model_id = None
         
         # 計算訓練集 AUC
         y_train_pred = self.model.predict_proba(X_train)[:, 1]
@@ -774,6 +787,64 @@ class XGBoostAnalyzer:
             top_n=n
         )
         return [fi.feature for fi in importance_list]
+
+    # ==================== SHAP 分析方法 ====================
+
+    def _get_shap_explainer(self):
+        """取得快取的 SHAP explainer"""
+        if self.model is None:
+            raise ValueError("模型尚未訓練，請先調用 train_model()")
+
+        model_id = id(self.model)
+        if self._shap_explainer is None or self._shap_model_id != model_id:
+            self._shap_explainer = self.shap_analyzer.build_explainer(self.model)
+            self._shap_model_id = model_id
+
+        return self._shap_explainer
+
+    def analyze_shap_global(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        sample_size: int = 100,
+        include_summary_points: bool = True
+    ) -> GlobalSHAPResult:
+        """全局 SHAP 特徵解釋"""
+        explainer = self._get_shap_explainer()
+        return self.shap_analyzer.analyze_global(
+            model=self.model,
+            X=X,
+            sample_size=sample_size,
+            explainer=explainer,
+            include_summary_points=include_summary_points
+        )
+
+    def explain_shap_single_case(
+        self,
+        case_features: Union[pd.Series, pd.DataFrame, np.ndarray, List[float]],
+        feature_names: Optional[List[str]] = None
+    ) -> SingleCaseSHAPResult:
+        """單案例 SHAP 解釋"""
+        explainer = self._get_shap_explainer()
+        return self.shap_analyzer.explain_single_case(
+            model=self.model,
+            case_features=case_features,
+            feature_names=feature_names,
+            explainer=explainer
+        )
+
+    def get_shap_interaction_effects(
+        self,
+        X: Union[pd.DataFrame, np.ndarray],
+        feature_pairs: List[Tuple[str, str]]
+    ) -> List[InteractionEffect]:
+        """取得 SHAP 交互效應"""
+        explainer = self._get_shap_explainer()
+        return self.shap_analyzer.get_interaction_effects(
+            model=self.model,
+            X=X,
+            feature_pairs=feature_pairs,
+            explainer=explainer
+        )
     
     # ==================== OOT 驗證方法 ====================
     

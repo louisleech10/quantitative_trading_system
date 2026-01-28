@@ -288,6 +288,84 @@ class FeatureImportanceTypesResponse(BaseModel):
     types: Dict[str, List[FeatureImportanceResponse]]
 
 
+# ==================== SHAP 分析模型 ====================
+
+class SHAPGlobalRequest(BaseModel):
+    """SHAP 全局分析請求"""
+    sample_size: int = Field(default=100, ge=10, le=1000, description="SHAP 取樣數量")
+    include_summary_points: bool = Field(default=True, description="是否輸出 beeswarm 點資料")
+    feature_pairs: Optional[List[List[str]]] = Field(
+        default=None,
+        description="交互效應特徵對（每個元素為 [feature_a, feature_b]）"
+    )
+
+
+class SHAPSummaryPoint(BaseModel):
+    """Beeswarm 點資料"""
+    feature: str
+    value: float
+    shap_value: float
+
+
+class GlobalSHAPFeatureImportance(BaseModel):
+    """全局 SHAP 特徵重要性"""
+    feature: str
+    mean_abs_shap: float
+    mean_shap: float
+    rank: int
+
+
+class InteractionEffectResponse(BaseModel):
+    """交互效應結果"""
+    feature_pair: List[str]
+    mean_abs_interaction: float
+
+
+class GlobalSHAPResult(BaseModel):
+    """全局 SHAP 結果"""
+    expected_value: float
+    feature_importance_shap: List[GlobalSHAPFeatureImportance]
+    top_positive_features: List[str]
+    top_negative_features: List[str]
+    sample_size: int
+    summary_points: Optional[List[SHAPSummaryPoint]] = None
+    interaction_effects: Optional[List[InteractionEffectResponse]] = None
+
+
+class SingleCaseContribution(BaseModel):
+    """單案例 SHAP 貢獻"""
+    feature: str
+    value: float
+    shap_value: float
+    contribution_pct: float
+
+
+class SingleCaseSHAPResult(BaseModel):
+    """單案例 SHAP 結果"""
+    predicted_proba: float
+    expected_value: float
+    contributions: List[SingleCaseContribution]
+
+
+class SHAPGlobalResponse(BaseModel):
+    """SHAP 全局回應"""
+    task_id: str
+    status: str
+    message: str
+    result: Optional[GlobalSHAPResult] = None
+    error: Optional[str] = None
+
+
+class SHAPSingleCaseResponse(BaseModel):
+    """SHAP 單案例回應"""
+    task_id: str
+    case_id: str
+    status: str
+    message: str
+    result: Optional[SingleCaseSHAPResult] = None
+    error: Optional[str] = None
+
+
 class ModelPerformanceResponse(BaseModel):
     """模型效能回應"""
     train_auc: float

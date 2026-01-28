@@ -29,10 +29,20 @@ from api.models.pattern_analysis_models import (
     XGBoostPredictionsResponse,
     FeatureImportanceTypesResponse,
     ProbabilitySummary,
-    CasePrediction
+    CasePrediction,
+    SHAPGlobalRequest,
+    SHAPGlobalResponse,
+    SHAPSingleCaseResponse,
+    GlobalSHAPResult,
+    SingleCaseSHAPResult,
+    InteractionEffectResponse,
+    GlobalSHAPFeatureImportance,
+    SHAPSummaryPoint,
+    SingleCaseContribution
 )
 from api.services.xgboost_task_service import XGBoostTaskService
 from api.services.xgboost_batch_service import get_xgboost_batch_service
+from api.services.shap_analysis_service import SHAPAnalysisService
 from api.core.logging import get_logger
 from api.utils.json_serializer import sanitize_for_json
 
@@ -42,6 +52,7 @@ router = APIRouter(prefix="/pattern-analysis", tags=["Pattern Analysis"])
 
 # 服務實例
 xgboost_service = XGBoostTaskService()
+shap_service = SHAPAnalysisService()
 
 
 def _get_task_from_services(task_id: str):
@@ -649,6 +660,124 @@ async def get_xgboost_feature_importance(
     filtered = sanitize_for_json(filtered)
 
     return FeatureImportanceTypesResponse(task_id=task_id, types=filtered)
+
+
+# ==================== SHAP 分析 API ====================
+
+@router.post("/xgboost/{task_id}/shap", response_model=SHAPGlobalResponse)
+async def get_xgboost_shap_global(task_id: str, request: SHAPGlobalRequest):
+    """取得 SHAP 全局分析結果"""
+    task = _get_task_from_services(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+
+    if task.get('status') != 'completed':
+        raise HTTPException(status_code=400, detail=f"任務尚未完成，目前狀態: {task.get('status')}")
+
+    try:
+        task_result = task.get('result', {})
+        feature_pairs = None
+        if request.feature_pairs:
+            feature_pairs = [(pair[0], pair[1]) for pair in request.feature_pairs]
+
+        global_result, interaction_effects = shap_service.analyze_global(
+            task_result=task_result,
+            sample_size=request.sample_size,
+            include_summary_points=request.include_summary_points,
+            feature_pairs=feature_pairs
+        )
+
+        result = GlobalSHAPResult(
+            expected_value=global_result.expected_value,
+            feature_importance_shap=[
+                GlobalSHAPFeatureImportance(
+                    feature=item.feature,
+                    mean_abs_shap=item.mean_abs_shap,
+                    mean_shap=item.mean_shap,
+                    rank=item.rank
+                )
+                for item in global_result.feature_importance_shap
+            ],
+            top_positive_features=global_result.top_positive_features,
+            top_negative_features=global_result.top_negative_features,
+            sample_size=global_result.sample_size,
+            summary_points=[
+                SHAPSummaryPoint(
+                    feature=point.feature,
+                    value=point.value,
+                    shap_value=point.shap_value
+                )
+                for point in (global_result.summary_points or [])
+            ] if request.include_summary_points else None,
+            interaction_effects=[
+                InteractionEffectResponse(
+                    feature_pair=[effect.feature_pair[0], effect.feature_pair[1]],
+                    mean_abs_interaction=effect.mean_abs_interaction
+                )
+                for effect in (interaction_effects or [])
+            ] if interaction_effects else None
+        )
+
+        return SHAPGlobalResponse(
+            task_id=task_id,
+            status="success",
+            message="SHAP 全局分析完成",
+            result=result
+        )
+    except Exception as e:
+        logger.error(f"SHAP 全局分析失敗: {str(e)}", exc_info=True)
+        return SHAPGlobalResponse(
+            task_id=task_id,
+            status="failed",
+            message=f"SHAP 全局分析失敗: {str(e)}",
+            error=str(e)
+        )
+
+
+@router.get("/xgboost/{task_id}/shap/case/{case_id}", response_model=SHAPSingleCaseResponse)
+async def get_xgboost_shap_single_case(task_id: str, case_id: str):
+    """取得單案例 SHAP 解釋"""
+    task = _get_task_from_services(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+
+    if task.get('status') != 'completed':
+        raise HTTPException(status_code=400, detail=f"任務尚未完成，目前狀態: {task.get('status')}")
+
+    try:
+        task_result = task.get('result', {})
+        single_result = shap_service.explain_single_case(task_result=task_result, case_id=case_id)
+
+        result = SingleCaseSHAPResult(
+            predicted_proba=single_result.predicted_proba,
+            expected_value=single_result.expected_value,
+            contributions=[
+                SingleCaseContribution(
+                    feature=item.feature,
+                    value=item.value,
+                    shap_value=item.shap_value,
+                    contribution_pct=item.contribution_pct
+                )
+                for item in single_result.contributions
+            ]
+        )
+
+        return SHAPSingleCaseResponse(
+            task_id=task_id,
+            case_id=case_id,
+            status="success",
+            message="SHAP 單案例分析完成",
+            result=result
+        )
+    except Exception as e:
+        logger.error(f"SHAP 單案例分析失敗: {str(e)}", exc_info=True)
+        return SHAPSingleCaseResponse(
+            task_id=task_id,
+            case_id=case_id,
+            status="failed",
+            message=f"SHAP 單案例分析失敗: {str(e)}",
+            error=str(e)
+        )
 
 
 # ==================== 單案例分析 API（保留向後相容）====================
