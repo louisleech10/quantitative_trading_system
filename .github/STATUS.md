@@ -10,28 +10,52 @@
 - ✅ Task 2.2: PSI 特徵飄移監控（OOT 整合 + API 端點）— 2026-01-29
 - ✅ Task 2.3: 市場體制分析（批量流程整合 + API 端點）— 2026-01-29
 - ✅ 圖表/策略讀取連續性嚴格化（read_klines validate_continuity=True）— 2026-01-29
-**整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 3/4任務完成 (75%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
+
+**XGBoost 功能增強進度**（依據 [XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md](../docs/XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md)）：
+- ✅ **Phase 1: 核心驗證能力** - 5/5 任務完成 (100%)
+- ✅ **Phase 2: 模型解釋與監控** - 3/3 任務完成 (100%)
+- ⏳ **Phase 3: 進階評估指標** - 0/6 任務（Precision@K, 期望值, Bootstrap CI 等）
+- ⏳ **Phase 4: 工具與基礎設施** - 0/2 任務（視覺化圖表, MLflow 整合）
+
+**項目整體進度**（歷史 Phase）：
+- ✅ Phase 1~3: 策略信號系統 - 已於 2025-11-02 完成
+
 ### 進行中 🚧
-- Phase 4 前端 OOT 設定與視覺化整合（預計未來開發）
+- XGBoost Phase 3 進階評估指標開發（依計劃優先級）
+- XGBoost Frontend 整合（OOT 設定 UI 與視覺化，Phase 4 的一部分）
 
 ## 🎯 當前重點
+- ✅ XGBoost Phase 1 & 2 已全部完成（OOT/預測機率/校準指標/PR AUC/Purged CV/SHAP/PSI/市場體制）
 - 連續性讀取規則已對齊（圖表/策略嚴格，append 寫入後立即驗證）
-- Task 2.2/2.3 已完成 API/流程整合與驗證
+- 下一階段：根據 XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md Phase 3 或直接推進 Phase 4 前端整合
+
 ### 下一步工作
-- Phase 4: 前端 OOT 設定 UI 與結果視覺化整合
+**選項 A**（進階指標）：
+- Task 3.1: Precision@K（評估前 K% 訊號的表現）
+- Task 3.2: 期望值估算（粗估交易期望值）
+- Task 3.3: Bootstrap 信賴區間（統計區間估計）
+- Task 3.4-3.6: Permutation Importance / Fold-level 穩定性 / 跨幣種泛化
+
+**選項 B**（前端整合）：
+- Task 4.1: 前端視覺化圖表（校準曲線、PR 曲線、SHAP Summary、PSI 分佈對比等）
+- 前端 OOT 設定 UI 與結果展示頁面
+
+**選項 C**（驗證與文檔）：
 - 完整端到端測試與性能基準測試
+- 更新 API 文檔與使用指南
 ### 需要修復
-- 前端 OOT 設定面板缺失（Phase 4）— 優先級中
+- 前端 OOT 設定面板缺失（XGBoost Phase 4）— 優先級中
+- 前端視覺化圖表缺失（校準曲線、PR 曲線等，XGBoost Phase 4）— 優先級中
 
 ### 需要優化
-- SHAP 樣本大小配置（目前 100/200 固定值）
-- API 序列化清理負擔優化
-- 整合測試覆蓋擴充
+- SHAP 樣本大小配置（目前 100/200 固定值） — 優先級低
+- API 序列化清理負擔優化 — 優先級低
+- Phase 3 進階指標（Precision@K, Bootstrap CI 等）可選實作 — 視需求
 
 ### 技術債務
-- 前端完整整合與視覺化（Phase 4）
+- XGBoost Phase 4 前端完整整合與視覺化（6 個圖表組件）
 - CI/CD 測試覆蓋完善（目標 >90%）
-- 文檔更新（SHAP 使用指南）
+- 文檔更新（XGBoost 分析完整使用指南）
 ## 📝 最近完成的工作
 - 2026-01-29：Task 2.2 PSI 飄移完成（OOT 整合 + API 端點）
 - 2026-01-29：Task 2.3 市場體制分析完成（批量流程整合 + API 端點）
@@ -247,9 +271,25 @@
 - 最新提交：Task 2.2/2.3 完成 + 測試警告修復（2 warnings → 0 warnings）
 
 ## 💡 下次啟動時
-- **選項 A**: 啟動 Phase 4 前端整合（OOT 設定 UI 與結果視覺化）
-- **選項 B**: 實作 Task 2.4 Purged K-Fold 交叉驗證
-- **建議**: Phase 4 前端整合優先（完整用戶體驗閉環）
+根據 [XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md](../docs/XGBOOST_MISSING_FEATURES_IMPLEMENTATION_PLAN.md)：
+
+- **選項 A**（推薦）: 啟動 XGBoost Phase 4 前端整合
+  - Task 4.1: 實作 6 個視覺化圖表組件
+  - 前端 OOT 設定 UI
+  - 完整用戶體驗閉環
+
+- **選項 B**: 實作 XGBoost Phase 3 進階指標
+  - Task 3.1: Precision@K
+  - Task 3.2: 期望值估算
+  - Task 3.3: Bootstrap 信賴區間
+  - 後續：Permutation Importance / Fold-level 穩定性 / 跨幣種泛化
+
+- **選項 C**: 驗證與文檔完善
+  - 端到端測試
+  - API 文檔更新
+  - 使用指南撰寫
+
+**建議順序**: Phase 4 前端整合 → Phase 3 進階指標（依需求） → 文檔與測試
 
 ---
 
