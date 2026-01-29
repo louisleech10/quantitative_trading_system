@@ -5,8 +5,35 @@ import { create } from 'zustand';
 import type { 
   Pattern, 
   XGBoostAnalysisResult, 
-  PatternStatistics 
+  PatternStatistics,
+  OOTValidationResult,
+  DriftReport,
+  RegimeReport,
+  PredictionsResponse,
+  FeatureImportanceTypesResponse,
+  GlobalSHAPResult,
+  SingleCaseSHAPResult,
+  CalibrationCurveData,
+  PRCurveData,
+  ProbabilityDensityData,
+  EquityCurveData,
+  FalsePositiveCase,
+  RollingAUCData
 } from '@/lib/patternTypes';
+import {
+  validateOOT,
+  getDriftReport,
+  getRegimeAnalysis,
+  getPredictions,
+  getFeatureImportanceAll,
+  getSHAPGlobal,
+  getCalibrationCurve,
+  getPRCurve,
+  getProbabilityDensity,
+  getStrategyEquity,
+  getTopFalsePositives,
+  getRollingAUC
+} from '@/lib/api/patternApi';
 
 interface PatternState {
   // Pattern 相關
@@ -18,6 +45,35 @@ interface PatternState {
   currentAnalysis: XGBoostAnalysisResult | null;
   analysisLoading: boolean;
   analysisTaskId: string | null;
+
+  // 深度分析狀態
+  ootValidation: OOTValidationResult | null;
+  driftReport: DriftReport | null;
+  regimeAnalysis: RegimeReport | null;
+  predictions: PredictionsResponse | null;
+  featureImportanceAll: FeatureImportanceTypesResponse | null;
+  shapGlobal: GlobalSHAPResult | null;
+  shapSingleCase: SingleCaseSHAPResult | null;
+  calibrationCurve: CalibrationCurveData | null;
+  prCurve: PRCurveData | null;
+  probabilityDensity: ProbabilityDensityData | null;
+  strategyEquity: EquityCurveData | null;
+  topFalsePositives: FalsePositiveCase[] | null;
+  rollingAUC: RollingAUCData | null;
+
+  deepAnalysisLoading: {
+    oot: boolean;
+    drift: boolean;
+    regime: boolean;
+    shap: boolean;
+    predictions: boolean;
+    calibration: boolean;
+    pr: boolean;
+    density: boolean;
+    equity: boolean;
+    falsePositives: boolean;
+    rollingAuc: boolean;
+  };
   
   // UI 狀態
   selectedPatternId: string | null;
@@ -40,6 +96,24 @@ interface PatternState {
   setCurrentAnalysis: (analysis: XGBoostAnalysisResult | null) => void;
   setAnalysisLoading: (loading: boolean) => void;
   setAnalysisTaskId: (taskId: string | null) => void;
+
+  // Actions - Deep Analysis
+  setOOTValidation: (data: OOTValidationResult | null) => void;
+  setDriftReport: (data: DriftReport | null) => void;
+  setRegimeAnalysis: (data: RegimeReport | null) => void;
+  setPredictions: (data: PredictionsResponse | null) => void;
+  setFeatureImportanceAll: (data: FeatureImportanceTypesResponse | null) => void;
+  setSHAPGlobal: (data: GlobalSHAPResult | null) => void;
+  setSHAPSingleCase: (data: SingleCaseSHAPResult | null) => void;
+  setCalibrationCurve: (data: CalibrationCurveData | null) => void;
+  setPRCurve: (data: PRCurveData | null) => void;
+  setProbabilityDensity: (data: ProbabilityDensityData | null) => void;
+  setStrategyEquity: (data: EquityCurveData | null) => void;
+  setTopFalsePositives: (data: FalsePositiveCase[] | null) => void;
+  setRollingAUC: (data: RollingAUCData | null) => void;
+
+  loadDeepAnalysis: (taskId: string) => Promise<void>;
+  clearDeepAnalysis: () => void;
   
   // Actions - Filters
   setFilterStatus: (status?: string) => void;
@@ -59,6 +133,32 @@ export const usePatternStore = create<PatternState>((set, get) => ({
   currentAnalysis: null,
   analysisLoading: false,
   analysisTaskId: null,
+  ootValidation: null,
+  driftReport: null,
+  regimeAnalysis: null,
+  predictions: null,
+  featureImportanceAll: null,
+  shapGlobal: null,
+  shapSingleCase: null,
+  calibrationCurve: null,
+  prCurve: null,
+  probabilityDensity: null,
+  strategyEquity: null,
+  topFalsePositives: null,
+  rollingAUC: null,
+  deepAnalysisLoading: {
+    oot: false,
+    drift: false,
+    regime: false,
+    shap: false,
+    predictions: false,
+    calibration: false,
+    pr: false,
+    density: false,
+    equity: false,
+    falsePositives: false,
+    rollingAuc: false
+  },
   selectedPatternId: null,
   filters: {
     status: undefined,
@@ -112,6 +212,127 @@ export const usePatternStore = create<PatternState>((set, get) => ({
   setAnalysisLoading: (loading) => set({ analysisLoading: loading }),
   
   setAnalysisTaskId: (taskId) => set({ analysisTaskId: taskId }),
+
+  // Deep Analysis Actions
+  setOOTValidation: (data) => set({ ootValidation: data }),
+  setDriftReport: (data) => set({ driftReport: data }),
+  setRegimeAnalysis: (data) => set({ regimeAnalysis: data }),
+  setPredictions: (data) => set({ predictions: data }),
+  setFeatureImportanceAll: (data) => set({ featureImportanceAll: data }),
+  setSHAPGlobal: (data) => set({ shapGlobal: data }),
+  setSHAPSingleCase: (data) => set({ shapSingleCase: data }),
+  setCalibrationCurve: (data) => set({ calibrationCurve: data }),
+  setPRCurve: (data) => set({ prCurve: data }),
+  setProbabilityDensity: (data) => set({ probabilityDensity: data }),
+  setStrategyEquity: (data) => set({ strategyEquity: data }),
+  setTopFalsePositives: (data) => set({ topFalsePositives: data }),
+  setRollingAUC: (data) => set({ rollingAUC: data }),
+
+  loadDeepAnalysis: async (taskId: string) => {
+    set({
+      deepAnalysisLoading: {
+        oot: true,
+        drift: true,
+        regime: true,
+        shap: true,
+        predictions: true,
+        calibration: true,
+        pr: true,
+        density: true,
+        equity: true,
+        falsePositives: true,
+        rollingAuc: true
+      }
+    });
+
+    const results = await Promise.allSettled([
+      validateOOT({ task_id: taskId }),
+      getDriftReport(taskId),
+      getRegimeAnalysis(taskId),
+      getSHAPGlobal(taskId),
+      getPredictions(taskId, true),
+      getFeatureImportanceAll(taskId, ['gain', 'cover', 'weight']),
+      getCalibrationCurve(taskId),
+      getPRCurve(taskId),
+      getProbabilityDensity(taskId),
+      getStrategyEquity(taskId),
+      getTopFalsePositives(taskId),
+      getRollingAUC(taskId)
+    ]);
+
+    const [
+      oot,
+      drift,
+      regime,
+      shap,
+      predictions,
+      importanceAll,
+      calibration,
+      pr,
+      density,
+      equity,
+      falsePositives,
+      rollingAuc
+    ] = results;
+
+    if (oot.status === 'fulfilled') set({ ootValidation: oot.value.validation_result || null });
+    if (drift.status === 'fulfilled') set({ driftReport: drift.value.report || null });
+    if (regime.status === 'fulfilled') set({ regimeAnalysis: regime.value.report || null });
+    if (shap.status === 'fulfilled') set({ shapGlobal: shap.value.result || null });
+    if (predictions.status === 'fulfilled') set({ predictions: predictions.value });
+    if (importanceAll.status === 'fulfilled') set({ featureImportanceAll: importanceAll.value });
+    if (calibration.status === 'fulfilled') set({ calibrationCurve: calibration.value.data });
+    if (pr.status === 'fulfilled') set({ prCurve: pr.value.data });
+    if (density.status === 'fulfilled') set({ probabilityDensity: density.value.data });
+    if (equity.status === 'fulfilled') set({ strategyEquity: equity.value.data });
+    if (falsePositives.status === 'fulfilled') set({ topFalsePositives: falsePositives.value.cases });
+    if (rollingAuc.status === 'fulfilled') set({ rollingAUC: rollingAuc.value.data });
+
+    set({
+      deepAnalysisLoading: {
+        oot: false,
+        drift: false,
+        regime: false,
+        shap: false,
+        predictions: false,
+        calibration: false,
+        pr: false,
+        density: false,
+        equity: false,
+        falsePositives: false,
+        rollingAuc: false
+      }
+    });
+  },
+
+  clearDeepAnalysis: () => set({
+    ootValidation: null,
+    driftReport: null,
+    regimeAnalysis: null,
+    predictions: null,
+    featureImportanceAll: null,
+    shapGlobal: null,
+    shapSingleCase: null,
+    calibrationCurve: null,
+    prCurve: null,
+    probabilityDensity: null,
+    strategyEquity: null,
+    topFalsePositives: null,
+    rollingAUC: null,
+    deepAnalysisLoading: {
+      oot: false,
+      drift: false,
+      regime: false,
+      shap: false,
+      predictions: false,
+      calibration: false,
+      pr: false,
+      density: false,
+      equity: false,
+      falsePositives: false,
+      rollingAuc: false
+    }
+  }),
   
   // Filter Actions
   setFilterStatus: (status) => set((state) => ({

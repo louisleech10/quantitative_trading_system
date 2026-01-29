@@ -343,6 +343,23 @@ class ProbabilitySummary(BaseModel):
     max: float
 
 
+class CalibrationCurveData(BaseModel):
+    """校準曲線資料"""
+    bin_midpoints: List[float]
+    actual_positive_rate: List[float]
+    predicted_mean: List[float]
+    sample_count: List[int]
+
+
+class PRCurveData(BaseModel):
+    """PR 曲線資料"""
+    precision: List[float]
+    recall: List[float]
+    thresholds: List[float]
+    pr_auc: Optional[float] = None
+    baseline: Optional[float] = None
+
+
 class XGBoostPredictionsResponse(BaseModel):
     """XGBoost 預測回應"""
     task_id: str
@@ -355,6 +372,18 @@ class FeatureImportanceTypesResponse(BaseModel):
     """多種特徵重要性回應"""
     task_id: str
     types: Dict[str, List[FeatureImportanceResponse]]
+
+
+class CalibrationCurveResponse(BaseModel):
+    """校準曲線回應"""
+    task_id: str
+    data: CalibrationCurveData
+
+
+class PRCurveResponse(BaseModel):
+    """PR 曲線回應"""
+    task_id: str
+    data: PRCurveData
 
 
 # ==================== SHAP 分析模型 ====================
@@ -433,6 +462,66 @@ class SHAPSingleCaseResponse(BaseModel):
     message: str
     result: Optional[SingleCaseSHAPResult] = None
     error: Optional[str] = None
+
+
+# ==================== 預測分析圖表模型 ====================
+
+class ProbabilityDensityData(BaseModel):
+    """機率分佈密度資料"""
+    positive_density: Dict[str, List[float]]
+    negative_density: Dict[str, List[float]]
+    overlap_score: float
+
+
+class EquityCurveData(BaseModel):
+    """策略權益曲線資料"""
+    timestamps: List[int]
+    strategy_returns: List[float]
+    benchmark_returns: List[float]
+    threshold: float
+    final_return_pct: Dict[str, float]
+
+
+class FalsePositiveCase(BaseModel):
+    """False Positive 案例"""
+    case_id: str
+    timestamp: str
+    symbol: str
+    predicted_proba: float
+    actual_return: float
+
+
+class RollingAUCData(BaseModel):
+    """滾動 AUC 資料"""
+    timestamps: List[int]
+    auc_values: List[Optional[float]]
+    window_size: int
+    warning_zones: List[Dict[str, str]]
+
+
+class ProbabilityDensityResponse(BaseModel):
+    """機率分佈密度回應"""
+    task_id: str
+    data: ProbabilityDensityData
+
+
+class EquityCurveResponse(BaseModel):
+    """策略權益曲線回應"""
+    task_id: str
+    data: EquityCurveData
+
+
+class TopFalsePositivesResponse(BaseModel):
+    """Top False Positives 回應"""
+    task_id: str
+    cases: List[FalsePositiveCase]
+    total_false_positives: int
+
+
+class RollingAUCResponse(BaseModel):
+    """滾動 AUC 回應"""
+    task_id: str
+    data: RollingAUCData
 
 
 class ModelPerformanceResponse(BaseModel):

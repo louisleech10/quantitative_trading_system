@@ -13,7 +13,14 @@
 - [Phase 1: 高優先級 - 核心驗證能力](#phase-1-高優先級---核心驗證能力)
 - [Phase 2: 高優先級 - 模型解釋與監控](#phase-2-高優先級---模型解釋與監控)
 - [Phase 3: 中優先級 - 進階評估指標](#phase-3-中優先級---進階評估指標)
-- [Phase 4: 低優先級 - 工具與基礎設施](#phase-4-低優先級---工具與基礎設施)
+- [Phase 4: 視覺化分析儀表板 - 詳細規劃](#phase-4-視覺化分析儀表板---詳細規劃)
+  - [4.0 Phase 1-3 前端整合缺口分析](#40-phase-1-3-前端整合缺口分析)
+  - [4.1 UI 架構規劃（方案 B）](#41-ui-架構規劃方案-b獨立詳細分析頁面)
+  - [Task 4.1: 前端 API 與 Store 擴展](#task-41-前端-api-與-store-擴展)
+  - [Task 4.2: 後端補充 API](#task-42-後端補充-api新增)
+  - [Task 4.3: 詳細分析頁面實作](#task-43-詳細分析頁面實作)
+  - [Task 4.4: 圖表組件實作 (11 個)](#task-44-圖表組件實作)
+  - [Task 4.5: MLflow 整合 (可選)](#task-45-mlflow-整合-可選)
 - [資料契約定義](#資料契約定義)
 - [依賴關係圖](#依賴關係圖)
 - [驗收標準](#驗收標準)
@@ -145,10 +152,13 @@ def classify_error(error: Exception) -> AnalysisErrorType:
 | 🟡 P2 | Permutation Importance | 1 天 | 無 | 後端 |
 | 🟡 P2 | Fold-level Importance | 0.5 天 | 無 | 後端 |
 | 🟡 P2 | 跨幣種泛化驗證 | 1 天 | OOT 系統 | 後端 |
-| 🟢 P3 | 視覺化圖表 (雷達/熱力/校準曲線) | 3-4 天 | P0/P1 完成 | 前端 |
-| 🟢 P3 | MLflow/W&B 整合 | 2-3 天 | 無 | 後端基礎設施 |
+| 🟢 **P3** | **Task 4.1: 前端 API + Store 擴展** | **2-3 小時** | Phase 1-3 | **前端** |
+| 🟢 **P3** | **Task 4.2: 後端補充 API** | **3-4 小時** | Task 4.1 | **後端 + API** |
+| 🟢 **P3** | **Task 4.3: 詳細分析頁面** | **3-4 小時** | Task 4.1 | **前端** |
+| 🟢 **P3** | **Task 4.4: 圖表組件 (11 個)** | **6-8 小時** | Task 4.1-4.3 | **前端** |
+| 🟢 P3 | Task 4.5: MLflow 整合 (可選) | 2-3 天 | 無 | 後端基礎設施 |
 
-**預估總工時**: 約 18.5-23.5 天
+**預估總工時**: 約 23-30 天
 
 ---
 
@@ -1180,102 +1190,2670 @@ def calculate_precision_at_k(self, X: pd.DataFrame, y: np.ndarray, k_values: Lis
 
 ---
 
-## Phase 4: 低優先級 - 工具與基礎設施
+## Phase 4: 視覺化分析儀表板 - 詳細規劃
 
-### Task 4.1: 視覺化圖表實作
+### 📋 AI Agent 執行指引
+
+> **執行順序**: Task 4.1 → Task 4.2 → Task 4.3 → Task 4.4 → Task 4.5 (可選)
+
+| Task | 名稱 | 依賴 | 預估時間 | 檔案數量 |
+|------|------|------|---------|---------|
+| **4.1** | 前端 API 與 Store 擴展 | Phase 1-3 後端 | 2-3 小時 | 3 檔案 |
+| **4.2** | 後端補充 API | Task 4.1 類型定義 | 3-4 小時 | 4 檔案 |
+| **4.3** | 詳細分析頁面實作 | Task 4.1 | 3-4 小時 | 🔴 8+ 檔案 |
+| **4.4** | 圖表組件實作 | Task 4.1, 4.2, 4.3 | 6-8 小時 | 11 檔案 |
+| **4.5** | MLflow 整合 (可選) | 無 | 2 小時 | 1 檔案 |
+
+#### 關鍵檔案清單
+
+```
+# 前端 - 必須修改
+frontend/src/lib/api/patternApi.ts           ← Task 4.1.1
+frontend/src/lib/patternTypes.ts             ← Task 4.1.2
+frontend/src/store/patternStore.ts           ← Task 4.1.3
+
+# 後端 - 必須新增
+momentum/Analysis/prediction_analyzer.py     ← Task 4.2.1 (新建)
+api/models/pattern_analysis_models.py        ← Task 4.2.2 (擴展)
+api/routes/pattern_analysis.py               ← Task 4.2.3 (擴展)
+api/services/xgboost_task_cache.py           ← Task 4.2.6 (新建) 🔴 補充
+
+# 前端頁面 - 必須新增
+frontend/src/app/patterns/xgboost-analysis/[task_id]/details/page.tsx  ← Task 4.3.1
+
+# 前端組件 - 必須新增 (Task 4.4)
+frontend/src/components/pattern/details/
+├── tabs/
+│   ├── ValidationTab.tsx
+│   ├── FeaturesTab.tsx
+│   ├── MonitoringTab.tsx
+│   └── DiagnosisTab.tsx
+├── charts/
+│   ├── CalibrationCurveChart.tsx
+│   ├── PRCurveChart.tsx
+│   ├── ProbabilityDensityChart.tsx
+│   ├── SHAPSummaryChart.tsx
+│   ├── SHAPWaterfallChart.tsx         ← 🔴 補充 (Task 4.4.11)
+│   ├── PSIComparisonChart.tsx
+│   ├── RegimeRadarChart.tsx
+│   ├── RollingAUCChart.tsx
+│   ├── NaiveStrategyEquityChart.tsx
+│   └── FeatureImportanceComparison.tsx
+├── tables/
+│   └── TopFalsePositivesTable.tsx
+├── panels/                                    ← 🔴 補充
+│   ├── OOTValidationPanel.tsx
+│   └── SingleCaseSHAPPanel.tsx
+├── DetailsHeader.tsx                           ← 🔴 補充
+└── shared/
+    ├── ChartExportButton.tsx
+    ├── EmptyState.tsx
+    ├── LoadingState.tsx
+    ├── ErrorState.tsx                          ← 🔴 補充
+    └── MetricCard.tsx
+```
+
+---
+
+### 4.0 Phase 1-3 前端整合缺口分析
+
+#### 後端 API 已實作但前端尚未整合
+
+| 後端 API | 路徑 | 前端 API 調用 | 前端 Store | 前端組件 |
+|---------|------|--------------|-----------|---------|
+| OOT 驗證 | `POST /xgboost/validate-oot` | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| PSI 飄移 | `GET /xgboost/{task_id}/drift-report` | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| 市場體制分析 | `GET /xgboost/{task_id}/regime-analysis` | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| 預測結果 | `GET /xgboost/{task_id}/predictions` | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| 三種特徵重要性 | `GET /xgboost/{task_id}/feature-importance` | ❌ 缺少 | ❌ 缺少 | ⚠️ 只有 Gain |
+| 全局 SHAP | `POST /xgboost/{task_id}/shap` | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| 單案例 SHAP | `GET /xgboost/{task_id}/shap/case/{case_id}` | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| 校準曲線數據 | ⚠️ 需新增 API | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+| PR 曲線數據 | ⚠️ 需新增 API | ❌ 缺少 | ❌ 缺少 | ❌ 缺少 |
+
+#### 需補齊的資料流 (API → Store → Component)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           資料流架構圖                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [後端 API]                [前端 API]              [Zustand Store]            │
+│                                                                              │
+│  pattern_analysis.py  →   patternApi.ts      →   patternStore.ts            │
+│  ├─ /validate-oot     →   validateOOT()      →   ootValidation              │
+│  ├─ /drift-report     →   getDriftReport()   →   driftReport                │
+│  ├─ /regime-analysis  →   getRegimeAnalysis()→   regimeAnalysis             │
+│  ├─ /predictions      →   getPredictions()   →   predictions                │
+│  ├─ /feature-importance→  getFeatureImportance()→ featureImportance        │
+│  ├─ /shap             →   getSHAPGlobal()    →   shapAnalysis               │
+│  └─ (新增 4 個 API)    →   (新增 4 個函式)    →   advancedAnalytics          │
+│                                                                              │
+│                           [React Components]                                 │
+│                                                                              │
+│  patternStore.ts  →   /patterns/xgboost-analysis/[task_id]/details/         │
+│  ├─ ootValidation →   OOTValidationPanel.tsx                                │
+│  ├─ driftReport   →   PSIComparisonChart.tsx                                │
+│  ├─ regimeAnalysis→   RegimeRadarChart.tsx                                  │
+│  ├─ predictions   →   ProbabilityDensityChart.tsx                           │
+│  ├─ shapAnalysis  →   SHAPSummaryChart.tsx                                  │
+│  └─ advancedAnalytics → RollingAUCChart.tsx, EquityChart.tsx, etc.          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 4.1 UI 架構規劃（方案 B：獨立詳細分析頁面）
+
+#### 頁面路由結構
+
+```
+/patterns/xgboost-analysis/
+├── page.tsx                           ← 現有：配置 + 執行 + 摘要結果
+└── [task_id]/
+    └── details/
+        └── page.tsx                   ← 新增：深度分析儀表板
+```
+
+#### 詳細分析頁面佈局
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  XGBoost 深度分析儀表板 - Task ID: abc123                        [返回] [導出] │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [Tab: 模型驗證] [Tab: 特徵分析] [Tab: 時序監控] [Tab: 錯誤診斷]              │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────
+│                                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│  Tab 1: 模型驗證                                                             │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                   │
+│  │   OOT 驗證結果           │  │   校準曲線圖             │                   │
+│  │   ├─ OOT AUC: 0.68      │  │   [CalibrationCurveChart]│                   │
+│  │   ├─ CV-OOT Gap: 0.04   │  │                         │                   │
+│  │   └─ 狀態: ✅ Good       │  │                         │                   │
+│  └─────────────────────────┘  └─────────────────────────┘                   │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                   │
+│  │   PR 曲線圖              │  │   機率分佈密度圖         │                   │
+│  │   [PRCurveChart]        │  │   [ProbabilityDensity]  │                   │
+│  │                         │  │                         │                   │
+│  └─────────────────────────┘  └─────────────────────────┘                   │
+│                                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│  Tab 2: 特徵分析                                                             │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                   │
+│  │   SHAP Summary Plot     │  │   三種重要性對比         │                   │
+│  │   [SHAPSummaryChart]    │  │   Gain/Cover/Weight     │                   │
+│  │                         │  │                         │                   │
+│  └─────────────────────────┘  └─────────────────────────┘                   │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────┐                    │
+│  │   PSI 特徵飄移分佈對比 [PSIComparisonChart]          │                    │
+│  │                                                     │                    │
+│  └─────────────────────────────────────────────────────┘                    │
+│                                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│  Tab 3: 時序監控                                                             │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────┐                    │
+│  │   Rolling AUC 監控 [RollingAUCChart]                │                    │
+│  │   ⚠️ 警戒區間: 2024-03-01 ~ 2024-03-15              │                    │
+│  └─────────────────────────────────────────────────────┘                    │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────┐                    │
+│  │   策略權益曲線 [NaiveStrategyEquityChart]            │                    │
+│  │   閾值: [0.75] 策略報酬: +15.2% | 基準: +8.5%       │                    │
+│  └─────────────────────────────────────────────────────┘                    │
+│                                                                              │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                   │
+│  │   市場體制雷達圖         │  │   體制表現詳情          │                   │
+│  │   [RegimeRadarChart]    │  │   EXTREME_FEAR: 0.78   │                   │
+│  │                         │  │   GREED: 0.52 (不建議) │                   │
+│  └─────────────────────────┘  └─────────────────────────┘                   │
+│                                                                              │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│  Tab 4: 錯誤診斷                                                             │
+│  ═══════════════════════════════════════════════════════════════════════════ │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │   Top False Positives [TopFalsePositivesTable]                          ││
+│  │   ┌──────────┬──────────┬──────────┬──────────┬────────────┐           ││
+│  │   │ Timestamp │ Symbol   │ Prob     │ Return   │ 詳細       │           ││
+│  │   ├──────────┼──────────┼──────────┼──────────┼────────────┤           ││
+│  │   │ 2024-01  │ BTCUSDT  │ 0.92     │ -8.2%    │ [查看]     │           ││
+│  │   │ ...      │ ...      │ ...      │ ...      │ ...        │           ││
+│  │   └──────────┴──────────┴──────────┴──────────┴────────────┘           ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Task 4.1: 前端 API 與 Store 擴展
 
 #### 🧠 First Principle Analysis
 
 | 問題 | 分析 |
 |-----|------|
-| **Why** | 數字表格難以快速判斷，圖表能秒懂趨勢與異常 |
-| **What** | 將分析結果轉成視覺化，支援快速決策 |
-| **Challenge** | 後端已有資料，為什麼要前端圖表？→ 因為人腦對圖形的處理速度快 100 倍 |
-| **Root Cause** | 研究人員需要快速迭代假設，圖表是最佳溝通工具 |
+| **Why** | 後端 API 已存在但前端無法調用，形成斷點 |
+| **What** | 建立完整的 API 調用層與狀態管理 |
+| **Challenge** | 直接在組件中 fetch 不行嗎？→ 不行，會導致狀態分散、重複請求 |
+| **Root Cause** | 良好的資料流需要單一來源（Store）和統一介面（API Client） |
 
-**目標**: 在前端實作缺失的視覺化組件
-
-**檔案修改**:
-- `frontend/src/components/pattern/` (新建組件)
-
-#### 🔄 Ultra Think 實作指引
-
-**Step 1 - 核心實作原則**:
-```typescript
-// 所有圖表組件遵循統一模式
-
-// 1. 空狀態處理
-if (!data || data.length === 0) {
-  return <EmptyState message="尚無資料" />;
-}
-
-// 2. 響應式設計
-<ResponsiveContainer width="100%" height={400}>
-  <LineChart data={data}>...</LineChart>
-</ResponsiveContainer>
-
-// 3. PNG 導出功能
-const handleExportPNG = async () => {
-  const canvas = await html2canvas(chartRef.current);
-  // ...
-};
-
-// 4. 自定義 Tooltip
-const CustomTooltip = ({ active, payload }) => {
-  // 詳細資訊展示
-};
-```
-
-**Step 2 - 必須審查**:
-- [ ] 是否處理空資料？→ 顯示 EmptyState
-- [ ] 是否響應式？→ ResponsiveContainer
-- [ ] 是否可導出？→ PNG 下載按鈕
-- [ ] 顏色是否語義化？→ 綠=好, 紅=壞
+**目標**: 擴展 `patternApi.ts` 和 `patternStore.ts`，整合所有 Phase 1-3 的後端 API
 
 #### 實作步驟
 
 ```markdown
-□ 4.1.1 校準曲線圖 (CalibrationCurveChart.tsx)
-  - 顯示預測機率 vs 實際正樣本比例
-  - 對角線為「完美校準」參考
-  - 置信帶顯示不確定性
+□ 4.1.1 擴展前端 API 調用 (patternApi.ts)
+  - 檔案: frontend/src/lib/api/patternApi.ts
+  - 新增函式:
+    
+    // OOT 驗證
+    export async function validateOOT(request: OOTValidationRequest): Promise<OOTValidationResponse>
+    
+    // PSI 飄移報告
+    export async function getDriftReport(taskId: string): Promise<DriftReportResponse>
+    
+    // 市場體制分析
+    export async function getRegimeAnalysis(taskId: string): Promise<RegimeAnalysisResponse>
+    
+    // 預測結果（含機率）
+    export async function getPredictions(taskId: string, includeDetails?: boolean): Promise<PredictionsResponse>
+    
+    // 三種特徵重要性
+    export async function getFeatureImportanceAll(taskId: string, types?: string[]): Promise<FeatureImportanceTypesResponse>
+    
+    // SHAP 全局分析
+    export async function getSHAPGlobal(taskId: string, sampleSize?: number): Promise<SHAPGlobalResponse>
+    
+    // SHAP 單案例
+    export async function getSHAPSingleCase(taskId: string, caseId: string): Promise<SHAPSingleCaseResponse>
+    
+    // 校準曲線數據
+    export async function getCalibrationCurve(taskId: string): Promise<CalibrationCurveResponse>
+    
+    // PR 曲線數據
+    export async function getPRCurve(taskId: string): Promise<PRCurveResponse>
+    
+    // 🔴 補充：Task 4.2 新增 API 對應的前端函式（原 PLAN 遺漏）
+    
+    // 機率分佈密度
+    export async function getProbabilityDensity(taskId: string, nBins?: number): Promise<ProbabilityDensityResponse>
+    
+    // 策略權益曲線
+    export async function getStrategyEquity(taskId: string, threshold?: number): Promise<EquityCurveResponse>
+    
+    // Top False Positives
+    export async function getTopFalsePositives(taskId: string, topN?: number): Promise<TopFalsePositivesResponse>
+    
+    // 滾動 AUC
+    export async function getRollingAUC(taskId: string, window?: number): Promise<RollingAUCResponse>
 
-□ 4.1.2 PR 曲線圖 (PRCurveChart.tsx)
-  - 顯示 Precision-Recall 曲線
-  - 標記隨機猜測的基線 (positive_rate)
-  - 滑鼠懸停顯示對應閾值
+  🔴 補充：API 函式具體實作程式碼範例（原 PLAN 遺漏）
+  
+  // patternApi.ts 通用 fetch 封裝
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  
+  async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(`${API_BASE}/api/v1/patterns${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new APIError(response.status, error.detail || 'API request failed');
+    }
+    
+    return response.json();
+  }
+  
+  // 自定義錯誤類別
+  export class APIError extends Error {
+    constructor(public status: number, message: string) {
+      super(message);
+      this.name = 'APIError';
+    }
+  }
+  
+  // 具體 API 實作範例
+  export async function validateOOT(request: OOTValidationRequest): Promise<OOTValidationResponse> {
+    return fetchAPI<OOTValidationResponse>('/xgboost/validate-oot', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+  
+  export async function getDriftReport(taskId: string): Promise<DriftReportResponse> {
+    return fetchAPI<DriftReportResponse>(`/xgboost/${taskId}/drift-report`);
+  }
+  
+  export async function getRegimeAnalysis(taskId: string): Promise<RegimeAnalysisResponse> {
+    return fetchAPI<RegimeAnalysisResponse>(`/xgboost/${taskId}/regime-analysis`);
+  }
+  
+  export async function getPredictions(taskId: string, includeDetails = false): Promise<PredictionsResponse> {
+    const params = includeDetails ? '?include_details=true' : '';
+    return fetchAPI<PredictionsResponse>(`/xgboost/${taskId}/predictions${params}`);
+  }
+  
+  export async function getFeatureImportanceAll(taskId: string, types?: string[]): Promise<FeatureImportanceTypesResponse> {
+    const params = types ? `?types=${types.join(',')}` : '';
+    return fetchAPI<FeatureImportanceTypesResponse>(`/xgboost/${taskId}/feature-importance${params}`);
+  }
+  
+  export async function getSHAPGlobal(taskId: string, sampleSize?: number): Promise<SHAPGlobalResponse> {
+    return fetchAPI<SHAPGlobalResponse>(`/xgboost/${taskId}/shap`, {
+      method: 'POST',
+      body: JSON.stringify({ sample_size: sampleSize }),
+    });
+  }
+  
+  export async function getSHAPSingleCase(taskId: string, caseId: string): Promise<SHAPSingleCaseResponse> {
+    return fetchAPI<SHAPSingleCaseResponse>(`/xgboost/${taskId}/shap/case/${caseId}`);
+  }
+  
+  export async function getCalibrationCurve(taskId: string): Promise<CalibrationCurveResponse> {
+    return fetchAPI<CalibrationCurveResponse>(`/xgboost/${taskId}/calibration-curve`);
+  }
+  
+  export async function getPRCurve(taskId: string): Promise<PRCurveResponse> {
+    return fetchAPI<PRCurveResponse>(`/xgboost/${taskId}/pr-curve`);
+  }
+  
+  export async function getProbabilityDensity(taskId: string, nBins = 50): Promise<ProbabilityDensityResponse> {
+    return fetchAPI<ProbabilityDensityResponse>(`/xgboost/${taskId}/probability-density?n_bins=${nBins}`);
+  }
+  
+  export async function getStrategyEquity(taskId: string, threshold = 0.75): Promise<EquityCurveResponse> {
+    return fetchAPI<EquityCurveResponse>(`/xgboost/${taskId}/strategy-equity?threshold=${threshold}`);
+  }
+  
+  export async function getTopFalsePositives(taskId: string, topN = 5): Promise<TopFalsePositivesResponse> {
+    return fetchAPI<TopFalsePositivesResponse>(`/xgboost/${taskId}/top-false-positives?top_n=${topN}`);
+  }
+  
+  export async function getRollingAUC(taskId: string, window = 500): Promise<RollingAUCResponse> {
+    return fetchAPI<RollingAUCResponse>(`/xgboost/${taskId}/rolling-auc?window=${window}`);
+  }
 
-□ 4.1.3 SHAP Summary Plot (SHAPSummaryChart.tsx)
-  - Beeswarm 風格的特徵影響圖
-  - 顯示正負方向與值域分佈
-  - 支援點擊特徵看細節
+□ 4.1.2 擴展前端類型定義 (patternTypes.ts)
+  - 檔案: frontend/src/lib/patternTypes.ts
+  - 新增類型:
+    
+    // OOT 驗證
+    interface OOTValidationRequest {
+      task_id: string;
+      oot_start_date?: string;
+      oot_ratio?: number;
+      validation_ratio?: number;
+      timestamp_column?: string;
+    }
+    
+    interface OOTValidationResult {
+      oot_auc: number;
+      oot_precision: number;
+      oot_recall: number;
+      oot_f1: number;
+      oot_samples: number;
+      oot_positive_rate: number;
+      cv_auc_mean: number;
+      cv_oot_gap: number;
+      gap_status: 'good' | 'acceptable' | 'warning' | 'unknown';
+      oot_period_start: string;
+      oot_period_end: string;
+    }
+    
+    interface TimeSplitReport {
+      train_period: TimePeriodInfo;
+      validation_period: TimePeriodInfo;
+      oot_period: TimePeriodInfo;
+    }
+    
+    // 🔴 補充：TimePeriodInfo 定義（原 PLAN 遺漏）
+    interface TimePeriodInfo {
+      start: string;           // ISO datetime string
+      end: string;             // ISO datetime string
+      samples: number;         // 該期間樣本數
+      positive_rate?: number;  // 正例比例（可選）
+    }
+    
+    // PSI 飄移
+    interface PSIResult {
+      feature: string;
+      psi: number;
+      status: 'stable' | 'drift_warning' | 'drift_severe';
+      distribution_comparison: {
+        bins: number[];
+        train_pct: number[];
+        test_pct: number[];
+      };
+    }
+    
+    interface DriftReport {
+      total_features: number;
+      drifted_features: string[];
+      severe_features: string[];
+      results: PSIResult[];
+    }
+    
+    // 市場體制
+    interface PhaseMetrics {
+      phase: string;
+      support: number;
+      auc: number | null;
+      precision_at_10: number | null;
+      avg_pred_proba: number;
+      recommendation: string;
+    }
+    
+    interface RegimeReport {
+      overall_auc: number;
+      phase_metrics: PhaseMetrics[];
+      trading_rules: Record<string, { threshold: number | null; position_size: string }>;
+    }
+    
+    // SHAP
+    interface SHAPFeatureImportance {
+      feature: string;
+      mean_abs_shap: number;
+      mean_shap: number;
+      rank: number;
+    }
+    
+    interface GlobalSHAPResult {
+      expected_value: number;
+      feature_importance_shap: SHAPFeatureImportance[];
+      top_positive_features: string[];
+      top_negative_features: string[];
+      summary_points?: SHAPSummaryPoint[];  // 用於 Beeswarm plot
+    }
+    
+    // 🔴 補充：SHAPSummaryPoint 定義（繪製 Beeswarm 圖所需）
+    interface SHAPSummaryPoint {
+      feature: string;        // 特徵名稱
+      shap_value: number;     // SHAP 貢獻值
+      feature_value: number;  // 實際特徵值，用於著色
+      sample_index: number;   // 樣本索引
+    }
+    
+    interface SingleCaseContribution {
+      feature: string;
+      value: number;
+      shap_value: number;
+      contribution_pct: number;
+    }
+    
+    interface SingleCaseSHAPResult {
+      predicted_proba: number;
+      expected_value: number;
+      contributions: SingleCaseContribution[];
+    }
+    
+    // 曲線數據
+    interface CalibrationCurveData {
+      bin_midpoints: number[];
+      actual_positive_rate: number[];
+      predicted_mean: number[];
+      sample_count: number[];
+      perfect_calibration?: number[];  // 🔴 補充：對角線參考（y=x），供前端繪圖
+    }
+    
+    interface PRCurveData {
+      precision: number[];
+      recall: number[];
+      thresholds: number[];
+      pr_auc: number;
+      baseline: number;
+    }
+    
+    // 🔴 補充：Phase 1-3 API 的 Response 類型（原 PLAN 遺漏）
+    
+    interface OOTValidationResponse {
+      task_id: string;
+      result: OOTValidationResult;
+      time_split_report: TimeSplitReport;
+    }
+    
+    interface DriftReportResponse {
+      task_id: string;
+      report: DriftReport;
+    }
+    
+    interface RegimeAnalysisResponse {
+      task_id: string;
+      report: RegimeReport;
+    }
+    
+    interface PredictionsResponse {
+      task_id: string;
+      predictions: Array<{
+        case_id: string;
+        y_true: number;
+        predicted_proba: number;
+        timestamp?: string;
+        symbol?: string;
+      }>;
+      total_count: number;
+    }
+    
+    interface FeatureImportanceTypesResponse {
+      task_id: string;
+      gain: Array<{ feature: string; importance: number; rank: number }>;
+      cover: Array<{ feature: string; importance: number; rank: number }>;
+      weight: Array<{ feature: string; importance: number; rank: number }>;
+    }
+    
+    interface SHAPGlobalResponse {
+      task_id: string;
+      result: GlobalSHAPResult;
+    }
+    
+    interface SHAPSingleCaseResponse {
+      task_id: string;
+      case_id: string;
+      result: SingleCaseSHAPResult;
+    }
+    
+    interface CalibrationCurveResponse {
+      task_id: string;
+      data: CalibrationCurveData;
+    }
+    
+    interface PRCurveResponse {
+      task_id: string;
+      data: PRCurveData;
+    }
+    
+    // 🔴 補充：Task 4.2 新增 API 對應的類型定義（原 PLAN 遺漏）
+    
+    // 機率分佈密度數據
+    interface ProbabilityDensityData {
+      positive_density: { bins: number[]; density: number[] };
+      negative_density: { bins: number[]; density: number[] };
+      overlap_score: number;
+    }
+    
+    interface ProbabilityDensityResponse {
+      task_id: string;
+      data: ProbabilityDensityData;
+    }
+    
+    // 權益曲線數據
+    interface EquityCurveData {
+      timestamps: number[];
+      strategy_returns: number[];
+      benchmark_returns: number[];
+      threshold: number;
+      final_return_pct: { strategy: number; benchmark: number };
+    }
+    
+    interface EquityCurveResponse {
+      task_id: string;
+      data: EquityCurveData;
+    }
+    
+    // False Positive 案例
+    interface FalsePositiveCase {
+      case_id: string;
+      timestamp: string;
+      symbol: string;
+      predicted_proba: number;
+      actual_return: number;
+    }
+    
+    interface TopFalsePositivesResponse {
+      task_id: string;
+      cases: FalsePositiveCase[];
+      total_false_positives: number;
+    }
+    
+    // 滾動 AUC 數據
+    interface RollingAUCData {
+      timestamps: number[];
+      auc_values: (number | null)[];
+      window_size: number;
+      warning_zones: Array<{ start: string; end: string }>;
+    }
+    
+    interface RollingAUCResponse {
+      task_id: string;
+      data: RollingAUCData;
+    }
 
-□ 4.1.4 PSI 分佈對比圖 (PSIComparisonChart.tsx)
-  - 雙柱狀圖：訓練 vs 測試分佈
-  - 標記飄移嚴重的區間（紅色高亮）
-  - 顯示 PSI 值與狀態
+□ 4.1.3 擴展 Zustand Store (patternStore.ts)
+  - 檔案: frontend/src/store/patternStore.ts
+  - 新增狀態:
+    
+    interface PatternState {
+      // ... 現有狀態 ...
+      
+      // 深度分析狀態
+      ootValidation: OOTValidationResult | null;
+      driftReport: DriftReport | null;
+      regimeAnalysis: RegimeReport | null;
+      predictions: PredictionsResponse | null;
+      featureImportanceAll: FeatureImportanceTypesResponse | null;
+      shapGlobal: GlobalSHAPResult | null;
+      shapSingleCase: SingleCaseSHAPResult | null;
+      calibrationCurve: CalibrationCurveData | null;
+      prCurve: PRCurveData | null;
+      
+      // 進階分析狀態
+      probabilityDensity: ProbabilityDensityData | null;
+      strategyEquity: EquityCurveData | null;
+      topFalsePositives: FalsePositiveCase[] | null;
+      rollingAUC: RollingAUCData | null;
+      
+      // 載入狀態
+      deepAnalysisLoading: {
+        oot: boolean;
+        drift: boolean;
+        regime: boolean;
+        shap: boolean;
+        // ...
+      };
+      
+      // Actions
+      setOOTValidation: (data: OOTValidationResult | null) => void;
+      setDriftReport: (data: DriftReport | null) => void;
+      setRegimeAnalysis: (data: RegimeReport | null) => void;
+      // ... 其他 setters ...
+      
+      // 批量載入深度分析
+      loadDeepAnalysis: (taskId: string) => Promise<void>;
+      clearDeepAnalysis: () => void;
+    }
 
-□ 4.1.5 市場體制雷達圖 (RegimeRadarChart.tsx)
-  - 各 phase 的 AUC/Precision@K 雷達圖
-  - 樣本不足的 phase 用虛線
-
-□ 4.1.6 模型比較熱力圖 (ModelComparisonHeatmap.tsx)
-  - 多模型 × 多指標的熱力圖矩陣
-  - 顏色漸層表示優劣
+□ 4.1.4 實作批量載入邏輯
+  - 在 patternStore.ts 新增:
+    
+    loadDeepAnalysis: async (taskId: string) => {
+      set({ 
+        deepAnalysisLoading: { 
+          oot: true, drift: true, regime: true, shap: true, 
+          predictions: true, calibration: true, pr: true,
+          density: true, equity: true, falsePositives: true, rollingAuc: true
+        } 
+      });
+      
+      // 🔴 補充：完整的並行載入所有數據（原 PLAN 不完整）
+      const [
+        oot, drift, regime, shap, predictions,
+        calibration, pr, density, equity, falsePositives, rollingAuc
+      ] = await Promise.allSettled([
+        // Phase 1-3 已有 API
+        validateOOT({ task_id: taskId }),
+        getDriftReport(taskId),
+        getRegimeAnalysis(taskId),
+        getSHAPGlobal(taskId),
+        getPredictions(taskId, true),
+        // Task 4.2 新增 API
+        getCalibrationCurve(taskId),
+        getPRCurve(taskId),
+        getProbabilityDensity(taskId),
+        getStrategyEquity(taskId),
+        getTopFalsePositives(taskId),
+        getRollingAUC(taskId)
+      ]);
+      
+      // 更新狀態（處理成功/失敗）
+      if (oot.status === 'fulfilled') set({ ootValidation: oot.value.result });
+      if (drift.status === 'fulfilled') set({ driftReport: drift.value.report });
+      if (regime.status === 'fulfilled') set({ regimeAnalysis: regime.value.report });
+      if (shap.status === 'fulfilled') set({ shapGlobal: shap.value.result });
+      if (predictions.status === 'fulfilled') set({ predictions: predictions.value });
+      if (calibration.status === 'fulfilled') set({ calibrationCurve: calibration.value.data });
+      if (pr.status === 'fulfilled') set({ prCurve: pr.value.data });
+      if (density.status === 'fulfilled') set({ probabilityDensity: density.value.data });
+      if (equity.status === 'fulfilled') set({ strategyEquity: equity.value.data });
+      if (falsePositives.status === 'fulfilled') set({ topFalsePositives: falsePositives.value.cases });
+      if (rollingAuc.status === 'fulfilled') set({ rollingAUC: rollingAuc.value.data });
+      
+      set({ 
+        deepAnalysisLoading: { 
+          oot: false, drift: false, regime: false, shap: false,
+          predictions: false, calibration: false, pr: false,
+          density: false, equity: false, falsePositives: false, rollingAuc: false
+        } 
+      });
+    },
+    
+    // 🔴 補充：清除深度分析狀態（原 PLAN 遺漏具體實作）
+    clearDeepAnalysis: () => {
+      set({
+        ootValidation: null,
+        driftReport: null,
+        regimeAnalysis: null,
+        predictions: null,
+        featureImportanceAll: null,
+        shapGlobal: null,
+        shapSingleCase: null,
+        calibrationCurve: null,
+        prCurve: null,
+        probabilityDensity: null,
+        strategyEquity: null,
+        topFalsePositives: null,
+        rollingAUC: null,
+        deepAnalysisLoading: {
+          oot: false, drift: false, regime: false, shap: false,
+          predictions: false, calibration: false, pr: false,
+          density: false, equity: false, falsePositives: false, rollingAuc: false
+        }
+      });
+    }
 ```
 
 #### 驗收標準
 
 | 標準 | 量化指標 | 測試方式 |
 |-----|---------|---------|
-| 空狀態處理 | 無資料時顯示提示 | 傳入空陣列測試 |
-| 響應式 | 視窗縮放正常 | 手動測試 |
-| 導出功能 | PNG 下載成功 | 功能測試 |
-| 語義色彩 | 綠=良好, 紅=需注意 | 視覺檢查 |
+| API 函式完整 | 13 個新函式可調用（9 個 Phase 1-3 API + 4 個 Task 4.2 新增 API） | 單元測試 |
+| 🔴 類型定義完整 | 23+ 個介面定義（含 Request/Response/Data 類型） | tsc --noEmit |
+| Store 狀態完整 | 13 個深度分析狀態 + loadDeepAnalysis + clearDeepAnalysis | 開發者工具檢查 |
+| 錯誤處理 | API 失敗時不會 crash，Promise.allSettled 處理 | 網路斷線測試 |
 
 ---
 
-### Task 4.2: MLflow 整合 (可選)
+### Task 4.2: 後端補充 API（新增）
+
+#### 🧠 First Principle Analysis
+
+| 問題 | 分析 |
+|-----|------|
+| **Why** | 部分圖表需要的數據格式，現有 API 未直接提供 |
+| **What** | 新增專門為圖表優化的 API 端點 |
+| **Challenge** | 前端自己計算不行嗎？→ 不行，涉及大量數據和複雜邏輯，應在後端處理 |
+| **Root Cause** | 前端應只負責渲染，計算邏輯歸後端 |
+
+**目標**: 新增 4 個圖表專用 API + 補齊曲線數據 API
+
+#### 實作步驟
+
+```markdown
+□ 4.2.1 新增 PredictionAnalyzer 模組
+  - 檔案: momentum/Analysis/prediction_analyzer.py (新建)
+  - 類別: PredictionAnalyzer
+  - 輸入: results_df (含 prob, label, actual_return, timestamp 欄位)
+  
+  方法實作:
+  
+  def calculate_probability_density(
+      self,
+      y_true: np.ndarray,
+      y_pred_proba: np.ndarray,
+      n_bins: int = 50
+  ) -> ProbabilityDensityData:
+      """
+      計算正負樣本的機率分佈密度
+      
+      Returns:
+          {
+              "positive_density": {"bins": [...], "density": [...]},
+              "negative_density": {"bins": [...], "density": [...]},
+              "overlap_score": float  # KL 散度或重疊面積
+          }
+      """
+      positive_proba = y_pred_proba[y_true == 1]
+      negative_proba = y_pred_proba[y_true == 0]
+      
+      # 使用 numpy.histogram 計算分佈
+      bins = np.linspace(0, 1, n_bins + 1)
+      pos_hist, _ = np.histogram(positive_proba, bins=bins, density=True)
+      neg_hist, _ = np.histogram(negative_proba, bins=bins, density=True)
+      bin_centers = (bins[:-1] + bins[1:]) / 2
+      
+      # 計算重疊分數 (較低=分離較好)
+      overlap = np.minimum(pos_hist, neg_hist).sum() / n_bins
+      
+      return ProbabilityDensityData(
+          positive_density={"bins": bin_centers.tolist(), "density": pos_hist.tolist()},
+          negative_density={"bins": bin_centers.tolist(), "density": neg_hist.tolist()},
+          overlap_score=float(overlap)
+      )
+  
+  def calculate_strategy_equity_curve(
+      self,
+      timestamps: List[int],
+      y_pred_proba: np.ndarray,
+      actual_returns: np.ndarray,
+      threshold: float = 0.75
+  ) -> EquityCurveData:
+      """
+      計算簡易策略權益曲線
+      
+      邏輯:
+      - prob > threshold: 持有，報酬 = actual_return
+      - prob <= threshold: 空手，報酬 = 0
+      
+      Returns:
+          {
+              "timestamps": [...],
+              "strategy_returns": [...],  # 累積
+              "benchmark_returns": [...],  # Buy & Hold 累積
+              "threshold": 0.75,
+              "final_return_pct": {"strategy": 15.2, "benchmark": 8.5}
+          }
+      """
+      strategy_positions = (y_pred_proba > threshold).astype(float)
+      strategy_returns = actual_returns * strategy_positions
+      
+      cum_strategy = np.cumsum(strategy_returns)
+      cum_benchmark = np.cumsum(actual_returns)
+      
+      return EquityCurveData(
+          timestamps=timestamps,
+          strategy_returns=cum_strategy.tolist(),
+          benchmark_returns=cum_benchmark.tolist(),
+          threshold=threshold,
+          final_return_pct={
+              "strategy": float(cum_strategy[-1] * 100) if len(cum_strategy) > 0 else 0,
+              "benchmark": float(cum_benchmark[-1] * 100) if len(cum_benchmark) > 0 else 0
+          }
+      )
+  
+  def get_top_false_positives(
+      self,
+      case_ids: List[str],
+      timestamps: List[int],
+      symbols: List[str],
+      y_true: np.ndarray,
+      y_pred_proba: np.ndarray,
+      actual_returns: np.ndarray,
+      top_n: int = 5
+  ) -> List[FalsePositiveCase]:
+      """
+      找出模型最有信心但錯誤的案例
+      
+      篩選: label=0 (實際為負)，依 prob 降序
+      
+      Returns:
+          [
+              {
+                  "case_id": "...",
+                  "timestamp": "2024-01-15T12:00:00",
+                  "symbol": "BTCUSDT",
+                  "predicted_proba": 0.92,
+                  "actual_return": -0.08
+              },
+              ...
+          ]
+      """
+      # 篩選 False Positives（預測高但實際為負）
+      fp_mask = (y_true == 0) & (y_pred_proba > 0.5)
+      fp_indices = np.where(fp_mask)[0]
+      
+      # 依機率降序排序
+      sorted_indices = fp_indices[np.argsort(y_pred_proba[fp_indices])[::-1]][:top_n]
+      
+      results = []
+      for idx in sorted_indices:
+          results.append(FalsePositiveCase(
+              case_id=case_ids[idx],
+              timestamp=datetime.fromtimestamp(timestamps[idx]).isoformat(),
+              symbol=symbols[idx],
+              predicted_proba=float(y_pred_proba[idx]),
+              actual_return=float(actual_returns[idx])
+          ))
+      
+      return results
+  
+  def calculate_rolling_auc(
+      self,
+      timestamps: List[int],
+      y_true: np.ndarray,
+      y_pred_proba: np.ndarray,
+      window: int = 500
+  ) -> RollingAUCData:
+      """
+      計算滾動 AUC
+      
+      Returns:
+          {
+              "timestamps": [...],
+              "auc_values": [...],
+              "window_size": 500,
+              "warning_zones": [{"start": "...", "end": "..."}]
+          }
+      """
+      from sklearn.metrics import roc_auc_score
+      
+      n_samples = len(y_true)
+      auc_values = []
+      ts_values = []
+      
+      for i in range(window, n_samples):
+          window_y_true = y_true[i-window:i]
+          window_y_pred = y_pred_proba[i-window:i]
+          
+          # 確保有兩類樣本
+          if len(np.unique(window_y_true)) < 2:
+              auc_values.append(np.nan)
+          else:
+              auc_values.append(roc_auc_score(window_y_true, window_y_pred))
+          
+          ts_values.append(timestamps[i])
+      
+      # 偵測警戒區間（AUC < 0.55）
+      warning_zones = self._detect_warning_zones(ts_values, auc_values, threshold=0.55)
+      
+      return RollingAUCData(
+  
+  # 🔴 補充：_detect_warning_zones 輔助方法（原 PLAN 遺漏）
+  def _detect_warning_zones(
+      self,
+      timestamps: List[int],
+      auc_values: List[float],
+      threshold: float = 0.55
+  ) -> List[Dict[str, str]]:
+      """
+      偵測 AUC 低於閾值的連續區間
+      
+      Returns:
+          [{"start": "2024-03-01T00:00:00", "end": "2024-03-15T00:00:00"}, ...]
+      """
+      from datetime import datetime
+      
+      warning_zones = []
+      in_warning = False
+      zone_start = None
+      
+      for i, (ts, auc) in enumerate(zip(timestamps, auc_values)):
+          is_warning = auc is not None and auc < threshold
+          
+          if is_warning and not in_warning:
+              # 進入警戒區
+              zone_start = ts
+              in_warning = True
+          elif not is_warning and in_warning:
+              # 離開警戒區
+              warning_zones.append({
+                  "start": datetime.fromtimestamp(zone_start / 1000).isoformat(),
+                  "end": datetime.fromtimestamp(timestamps[i-1] / 1000).isoformat()
+              })
+              in_warning = False
+      
+      # 處理結尾仍在警戒區的情況
+      if in_warning and zone_start is not None:
+          warning_zones.append({
+              "start": datetime.fromtimestamp(zone_start / 1000).isoformat(),
+              "end": datetime.fromtimestamp(timestamps[-1] / 1000).isoformat()
+          })
+      
+      return warning_zones
+
+  # （接續原本的 return RollingAUCData
+          timestamps=ts_values,
+          auc_values=auc_values,
+          window_size=window,
+          warning_zones=warning_zones
+      )
+
+□ 4.2.2 新增 Pydantic 回應模型
+  - 檔案: api/models/pattern_analysis_models.py
+  - 新增:
+    
+    class ProbabilityDensityData(BaseModel):
+        positive_density: Dict[str, List[float]]
+        negative_density: Dict[str, List[float]]
+        overlap_score: float
+    
+    class EquityCurveData(BaseModel):
+        timestamps: List[int]
+        strategy_returns: List[float]
+        benchmark_returns: List[float]
+        threshold: float
+        final_return_pct: Dict[str, float]
+    
+    class FalsePositiveCase(BaseModel):
+        case_id: str
+        timestamp: str
+        symbol: str
+        predicted_proba: float
+        actual_return: float
+    
+    class RollingAUCData(BaseModel):
+        timestamps: List[int]
+        auc_values: List[Optional[float]]
+        window_size: int
+        warning_zones: List[Dict[str, str]]
+    
+    # Response Models
+    class ProbabilityDensityResponse(BaseModel):
+        task_id: str
+        data: ProbabilityDensityData
+    
+    class EquityCurveResponse(BaseModel):
+        task_id: str
+        data: EquityCurveData
+    
+    class TopFalsePositivesResponse(BaseModel):
+        task_id: str
+        cases: List[FalsePositiveCase]
+        total_false_positives: int
+    
+    class RollingAUCResponse(BaseModel):
+        task_id: str
+        data: RollingAUCData
+    
+    # 🔴 補充：曲線數據 Response 模型（原 PLAN 遺漏）
+    class CalibrationCurveResponse(BaseModel):
+        task_id: str
+        data: CalibrationCurveData
+    
+    class PRCurveResponse(BaseModel):
+        task_id: str
+        data: PRCurveData
+
+□ 4.2.3 新增 API 端點
+  - 檔案: api/routes/pattern_analysis.py
+  - 新增端點:
+    
+    @router.get("/xgboost/{task_id}/probability-density", response_model=ProbabilityDensityResponse)
+    async def get_probability_density(task_id: str, n_bins: int = 50):
+        """取得機率分佈密度數據"""
+        ...
+    
+    @router.get("/xgboost/{task_id}/strategy-equity", response_model=EquityCurveResponse)
+    async def get_strategy_equity(task_id: str, threshold: float = 0.75):
+        """取得策略權益曲線數據"""
+        ...
+    
+    @router.get("/xgboost/{task_id}/top-false-positives", response_model=TopFalsePositivesResponse)
+    async def get_top_false_positives(task_id: str, top_n: int = 5):
+        """取得 Top False Positives"""
+        ...
+    
+    @router.get("/xgboost/{task_id}/rolling-auc", response_model=RollingAUCResponse)
+    async def get_rolling_auc(task_id: str, window: int = 500):
+        """取得滾動 AUC 數據"""
+        ...
+    
+    @router.get("/xgboost/{task_id}/calibration-curve", response_model=CalibrationCurveResponse)
+    async def get_calibration_curve(task_id: str, n_bins: int = 10):
+        """取得校準曲線數據（來自已計算的 calibration_analyzer）"""
+        ...
+    
+    @router.get("/xgboost/{task_id}/pr-curve", response_model=PRCurveResponse)
+    async def get_pr_curve(task_id: str):
+        """取得 PR 曲線數據（來自已計算的 pr_metrics）"""
+        ...
+
+  🔴 補充：API 端點完整實作程式碼（原 PLAN 只有簽名）
+  
+  # api/routes/pattern_analysis.py
+  
+  from fastapi import APIRouter, HTTPException
+  from api.services.xgboost_task_cache import XGBoostTaskCache
+  from momentum.Analysis.prediction_analyzer import PredictionAnalyzer
+  
+  router = APIRouter(prefix="/patterns", tags=["Pattern Analysis"])
+  task_cache = XGBoostTaskCache()
+  prediction_analyzer = PredictionAnalyzer()
+  
+  @router.get("/xgboost/{task_id}/probability-density", response_model=ProbabilityDensityResponse)
+  async def get_probability_density(task_id: str, n_bins: int = 50):
+      """取得機率分佈密度數據"""
+      task_result = task_cache.get_result(task_id)
+      if not task_result:
+          raise HTTPException(status_code=404, detail=f"Task {task_id} not found or expired")
+      
+      predictions_df = task_result.predictions_df
+      if predictions_df is None or predictions_df.empty:
+          raise HTTPException(status_code=400, detail="No predictions available for this task")
+      
+      density_data = prediction_analyzer.calculate_probability_density(
+          y_true=predictions_df['y_true'].values,
+          y_pred_proba=predictions_df['predicted_proba'].values,
+          n_bins=n_bins
+      )
+      
+      return ProbabilityDensityResponse(task_id=task_id, data=density_data)
+  
+  @router.get("/xgboost/{task_id}/strategy-equity", response_model=EquityCurveResponse)
+  async def get_strategy_equity(task_id: str, threshold: float = 0.75):
+      """取得策略權益曲線數據"""
+      task_result = task_cache.get_result(task_id)
+      if not task_result:
+          raise HTTPException(status_code=404, detail=f"Task {task_id} not found or expired")
+      
+      predictions_df = task_result.predictions_df
+      if 'Price_Change' not in predictions_df.columns:
+          raise HTTPException(
+              status_code=400, 
+              detail="Price_Change column required for equity curve. "
+                     "Please ensure your CSV contains actual price changes."
+          )
+      
+      equity_data = prediction_analyzer.calculate_strategy_equity_curve(
+          timestamps=predictions_df['timestamp'].tolist(),
+          y_pred_proba=predictions_df['predicted_proba'].values,
+          actual_returns=predictions_df['Price_Change'].values,
+          threshold=threshold
+      )
+      
+      return EquityCurveResponse(task_id=task_id, data=equity_data)
+  
+  @router.get("/xgboost/{task_id}/top-false-positives", response_model=TopFalsePositivesResponse)
+  async def get_top_false_positives(task_id: str, top_n: int = 5):
+      """取得 Top False Positives"""
+      task_result = task_cache.get_result(task_id)
+      if not task_result:
+          raise HTTPException(status_code=404, detail=f"Task {task_id} not found or expired")
+      
+      predictions_df = task_result.predictions_df
+      
+      # 構建必要欄位
+      case_ids = predictions_df['case_id'].tolist() if 'case_id' in predictions_df.columns else [f"case_{i}" for i in range(len(predictions_df))]
+      timestamps = predictions_df['timestamp'].tolist() if 'timestamp' in predictions_df.columns else [0] * len(predictions_df)
+      symbols = predictions_df['Symbol'].tolist() if 'Symbol' in predictions_df.columns else ['UNKNOWN'] * len(predictions_df)
+      actual_returns = predictions_df['Price_Change'].values if 'Price_Change' in predictions_df.columns else np.zeros(len(predictions_df))
+      
+      cases = prediction_analyzer.get_top_false_positives(
+          case_ids=case_ids,
+          timestamps=timestamps,
+          symbols=symbols,
+          y_true=predictions_df['y_true'].values,
+          y_pred_proba=predictions_df['predicted_proba'].values,
+          actual_returns=actual_returns,
+          top_n=top_n
+      )
+      
+      # 計算總 FP 數量
+      total_fp = int(((predictions_df['y_true'] == 0) & (predictions_df['predicted_proba'] > 0.5)).sum())
+      
+      return TopFalsePositivesResponse(task_id=task_id, cases=cases, total_false_positives=total_fp)
+  
+  @router.get("/xgboost/{task_id}/rolling-auc", response_model=RollingAUCResponse)
+  async def get_rolling_auc(task_id: str, window: int = 500):
+      """取得滾動 AUC 數據"""
+      task_result = task_cache.get_result(task_id)
+      if not task_result:
+          raise HTTPException(status_code=404, detail=f"Task {task_id} not found or expired")
+      
+      predictions_df = task_result.predictions_df
+      
+      if len(predictions_df) < window:
+          raise HTTPException(
+              status_code=400,
+              detail=f"Not enough samples ({len(predictions_df)}) for window size {window}"
+          )
+      
+      timestamps = predictions_df['timestamp'].tolist() if 'timestamp' in predictions_df.columns else list(range(len(predictions_df)))
+      
+      rolling_data = prediction_analyzer.calculate_rolling_auc(
+          timestamps=timestamps,
+          y_true=predictions_df['y_true'].values,
+          y_pred_proba=predictions_df['predicted_proba'].values,
+          window=window
+      )
+      
+      return RollingAUCResponse(task_id=task_id, data=rolling_data)
+  
+  @router.get("/xgboost/{task_id}/calibration-curve", response_model=CalibrationCurveResponse)
+  async def get_calibration_curve(task_id: str, n_bins: int = 10):
+      """取得校準曲線數據"""
+      task_result = task_cache.get_result(task_id)
+      if not task_result:
+          raise HTTPException(status_code=404, detail=f"Task {task_id} not found or expired")
+      
+      if not task_result.calibration_curve:
+          raise HTTPException(status_code=404, detail="Calibration curve not available for this task")
+      
+      return CalibrationCurveResponse(task_id=task_id, data=task_result.calibration_curve)
+  
+  @router.get("/xgboost/{task_id}/pr-curve", response_model=PRCurveResponse)
+  async def get_pr_curve(task_id: str):
+      """取得 PR 曲線數據"""
+      task_result = task_cache.get_result(task_id)
+      if not task_result:
+          raise HTTPException(status_code=404, detail=f"Task {task_id} not found or expired")
+      
+      if not task_result.pr_curve:
+          raise HTTPException(status_code=404, detail="PR curve not available for this task")
+      
+      return PRCurveResponse(task_id=task_id, data=task_result.pr_curve)
+
+□ 4.2.4 整合到 XGBoostBatchService
+  - 檔案: api/services/xgboost_batch_service.py
+  - 在任務完成後，快取 predictions 數據供後續 API 使用
+  - 新增方法: get_predictions_df(task_id) -> pd.DataFrame
+
+□ 4.2.5 🔴 補充：曲線數據 API 實作說明（原 PLAN 遺漏）
+  
+  **重要**：calibration_curve 和 pr_curve 數據已在 Phase 1-3 計算完成，
+  存儲在 XGBoostAnalyzer 實例的屬性中：
+  - self.last_calibration_curve: CalibrationCurveData
+  - self.last_pr_curve: PRCurveData
+  
+  實作方式：
+  1. XGBoostBatchService 需在任務完成後將 curve 數據序列化到任務結果中
+  2. API 端點直接從任務結果快取取得，無需重新計算：
+     @router.get("/xgboost/{task_id}/calibration-curve")
+     async def get_calibration_curve(task_id: str):
+         task_result = await task_service.get_task_result(task_id)
+         return CalibrationCurveResponse(
+             task_id=task_id,
+             data=task_result.calibration_curve  # 從快取取得
+         )
+
+□ 4.2.6 🔴 補充：任務結果快取結構（原 PLAN 遺漏）
+  
+  新增: api/services/xgboost_task_cache.py (新建)
+  
+  class XGBoostTaskCache:
+      """快取已完成任務的分析結果，供後續 API 使用"""
+      
+      _cache: Dict[str, XGBoostTaskResult] = {}
+      
+      class XGBoostTaskResult(BaseModel):
+          task_id: str
+          predictions_df: pd.DataFrame    # 序列化版本
+          calibration_curve: CalibrationCurveData
+          pr_curve: PRCurveData
+          shap_result: GlobalSHAPResult | None
+          drift_report: DriftReport | None
+          regime_report: RegimeReport | None
+          
+      def store_result(self, task_id: str, result: XGBoostTaskResult) -> None: ...
+      def get_result(self, task_id: str) -> XGBoostTaskResult | None: ...
+      def clear_expired(self, max_age_hours: int = 24) -> None: ...
+```
+
+#### 驗收標準
+
+| 標準 | 量化指標 | 測試方式 |
+|-----|---------|---------|
+| API 回應正確 | JSON Schema 驗證通過 | pytest |
+| 計算效能 | 1000 案例 < 3 秒 | 計時測試 |
+| 錯誤處理 | 缺少 Price_Change 時回傳明確錯誤 | 邊界測試 |
+| 數值正確 | Rolling AUC 與手動計算一致 | 單元測試 |
+
+---
+
+### Task 4.3: 詳細分析頁面實作
+
+#### 🧠 First Principle Analysis
+
+| 問題 | 分析 |
+|-----|------|
+| **Why** | 現有頁面資訊過載，研究員需要深入鑽研的獨立空間 |
+| **What** | 以 Tab 組織的深度分析儀表板 |
+| **Challenge** | 全部放一頁不行嗎？→ 不行，需要按分析階段組織資訊 |
+| **Root Cause** | 研究流程是漸進式的：先驗證 → 再解釋 → 再監控 → 最後診斷 |
+
+**目標**: 建立 `/patterns/xgboost-analysis/[task_id]/details` 頁面
+
+#### 實作步驟
+
+```markdown
+□ 4.3.1 建立頁面結構
+  - 檔案: frontend/src/app/patterns/xgboost-analysis/[task_id]/details/page.tsx
+  - 使用 Next.js 15 App Router
+  - 頁面結構:
+    
+    export default function XGBoostDetailsPage({ params }: { params: { task_id: string } }) {
+      const { task_id } = params;
+      const { loadDeepAnalysis, deepAnalysisLoading, ... } = usePatternStore();
+      
+      useEffect(() => {
+        loadDeepAnalysis(task_id);
+      }, [task_id]);
+      
+      return (
+        <div className="min-h-screen bg-white">
+          {/* Header */}
+          <DetailsHeader taskId={task_id} />
+          
+          {/* Tabs */}
+          <Tabs defaultValue="validation">
+            <TabsList>
+              <TabsTrigger value="validation">模型驗證</TabsTrigger>
+              <TabsTrigger value="features">特徵分析</TabsTrigger>
+              <TabsTrigger value="monitoring">時序監控</TabsTrigger>
+              <TabsTrigger value="diagnosis">錯誤診斷</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="validation">
+              <ValidationTab taskId={task_id} />
+            </TabsContent>
+            <TabsContent value="features">
+              <FeaturesTab taskId={task_id} />
+            </TabsContent>
+            <TabsContent value="monitoring">
+              <MonitoringTab taskId={task_id} />
+            </TabsContent>
+            <TabsContent value="diagnosis">
+              <DiagnosisTab taskId={task_id} />
+            </TabsContent>
+          </Tabs>
+        </div>
+      );
+    }
+
+□ 4.3.2 建立 Tab 組件
+  - 檔案: frontend/src/components/pattern/details/
+  
+  ├── ValidationTab.tsx
+  │   ├── OOTValidationPanel.tsx (OOT 結果 + 狀態指示)
+  │   ├── CalibrationCurveChart.tsx
+  │   ├── PRCurveChart.tsx
+  │   └── ProbabilityDensityChart.tsx
+  
+  🔴 補充：OOTValidationPanel 組件規格（原 PLAN 未詳述）
+  - 檔案: frontend/src/components/pattern/details/panels/OOTValidationPanel.tsx
+  - 功能:
+    - OOT AUC 大數字顯示，帶色標（綠 ≥0.65 / 黃 ≥0.55 / 紅 <0.55）
+    - CV-OOT Gap 顯示，帶狀態指示（good/acceptable/warning）
+    - OOT 時間範圍資訊（oot_period_start ~ oot_period_end）
+    - 樣本數與正例比例（oot_samples, oot_positive_rate）
+  - Props:
+    interface OOTValidationPanelProps {
+      data: OOTValidationResult | null;
+      loading?: boolean;
+    }
+  │
+  ├── FeaturesTab.tsx
+  │   ├── SHAPSummaryChart.tsx
+  │   ├── FeatureImportanceComparison.tsx (Gain/Cover/Weight)
+  │   └── PSIComparisonChart.tsx
+  │
+  ├── MonitoringTab.tsx
+  │   ├── RollingAUCChart.tsx
+  │   ├── NaiveStrategyEquityChart.tsx
+  │   └── RegimeRadarChart.tsx
+  │
+  └── DiagnosisTab.tsx
+      ├── TopFalsePositivesTable.tsx
+      └── SingleCaseSHAPPanel.tsx (點擊案例後顯示)
+
+  🔴 補充：SingleCaseSHAPPanel 組件規格（原 PLAN 遺漏）
+  - 檔案: frontend/src/components/pattern/details/panels/SingleCaseSHAPPanel.tsx
+  - 功能:
+    - 接收 caseId，調用 API 取得單案例 SHAP 分析
+    - 顯示預測機率與 expected_value
+    - 渲染 SHAPWaterfallChart（見 Task 4.4.11）
+    - 列出所有特徵貢獻（可展開/收合）
+    - 高亮正向/負向貢獻（綠色/紅色）
+  - Props:
+    interface SingleCaseSHAPPanelProps {
+      taskId: string;
+      caseId: string | null;  // null 時顯示提示「請選擇案例」
+      onClose?: () => void;
+    }
+  - 狀態管理:
+    - 調用 getSHAPSingleCase(taskId, caseId) 取得數據
+    - 使用 patternStore.shapSingleCase 或組件內部狀態
+  - 使用場景:
+    - DiagnosisTab 中，點擊 TopFalsePositivesTable 的「查看」按鈕
+    - 顯示該錯誤案例的 SHAP 解釋
+
+  🔴 補充：各 Tab 組件內部結構程式碼（原 PLAN 遺漏）
+  
+  // ValidationTab.tsx - 模型驗證 Tab
+  export function ValidationTab({ taskId }: { taskId: string }) {
+    const { ootValidation, calibrationCurve, prCurve, probabilityDensity, deepAnalysisLoading } = usePatternStore();
+    
+    return (
+      <div className="p-6 space-y-6">
+        {/* OOT 驗證結果面板 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <OOTValidationPanel data={ootValidation} loading={deepAnalysisLoading.oot} />
+          
+          {/* 指標卡片組 */}
+          <div className="grid grid-cols-2 gap-4">
+            <MetricCard 
+              title="CV AUC Mean" 
+              value={ootValidation?.cv_auc_mean} 
+              format="percent" 
+              status={ootValidation?.cv_auc_mean >= 0.7 ? 'good' : 'warning'}
+            />
+            <MetricCard 
+              title="CV-OOT Gap" 
+              value={ootValidation?.cv_oot_gap} 
+              format="percent"
+              status={ootValidation?.gap_status}
+            />
+          </div>
+        </div>
+        
+        {/* 校準與 PR 曲線 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-lg font-medium mb-4">校準曲線</h3>
+            <CalibrationCurveChart data={calibrationCurve} loading={deepAnalysisLoading.calibration} />
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-lg font-medium mb-4">PR 曲線</h3>
+            <PRCurveChart data={prCurve} loading={deepAnalysisLoading.pr} />
+          </div>
+        </div>
+        
+        {/* 機率分佈密度 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium mb-4">機率分佈密度</h3>
+          <ProbabilityDensityChart data={probabilityDensity} loading={deepAnalysisLoading.density} />
+        </div>
+      </div>
+    );
+  }
+  
+  // FeaturesTab.tsx - 特徵分析 Tab
+  export function FeaturesTab({ taskId }: { taskId: string }) {
+    const { shapGlobal, featureImportanceAll, driftReport, deepAnalysisLoading } = usePatternStore();
+    const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
+    
+    return (
+      <div className="p-6 space-y-6">
+        {/* SHAP 全局分析 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium mb-4">SHAP 特徵重要性</h3>
+          <SHAPSummaryChart 
+            data={shapGlobal} 
+            loading={deepAnalysisLoading.shap}
+            onFeatureClick={(feature) => setSelectedFeature(feature)}
+          />
+        </div>
+        
+        {/* 三種重要性對比 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium mb-4">特徵重要性對比 (Gain/Cover/Weight)</h3>
+          <FeatureImportanceComparison data={featureImportanceAll} loading={deepAnalysisLoading.shap} />
+        </div>
+        
+        {/* PSI 分佈對比 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium mb-4">特徵飄移分析 (PSI)</h3>
+          <PSIComparisonChart 
+            data={driftReport} 
+            loading={deepAnalysisLoading.drift}
+            selectedFeature={selectedFeature || driftReport?.severe_features?.[0]}
+            onFeatureSelect={setSelectedFeature}
+          />
+        </div>
+      </div>
+    );
+  }
+  
+  // MonitoringTab.tsx - 時序監控 Tab
+  export function MonitoringTab({ taskId }: { taskId: string }) {
+    const { rollingAUC, strategyEquity, regimeAnalysis, deepAnalysisLoading } = usePatternStore();
+    const [threshold, setThreshold] = useState(0.75);
+    
+    // 當閾值改變時重新請求數據
+    const handleThresholdChange = async (newThreshold: number) => {
+      setThreshold(newThreshold);
+      // 調用 API 重新計算
+      const newEquity = await getStrategyEquity(taskId, newThreshold);
+      usePatternStore.setState({ strategyEquity: newEquity.data });
+    };
+    
+    return (
+      <div className="p-6 space-y-6">
+        {/* Rolling AUC 監控 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium mb-4">滾動 AUC 監控</h3>
+          <RollingAUCChart data={rollingAUC} loading={deepAnalysisLoading.rollingAuc} />
+          {rollingAUC?.warning_zones?.length > 0 && (
+            <div className="mt-2 p-2 bg-red-50 rounded text-sm text-red-600">
+              ⚠️ 偵測到 {rollingAUC.warning_zones.length} 個 AUC 警戒區間
+            </div>
+          )}
+        </div>
+        
+        {/* 策略權益曲線 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">策略權益曲線</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">閾值:</span>
+              <input 
+                type="range" 
+                min="0.5" max="0.95" step="0.05"
+                value={threshold}
+                onChange={(e) => handleThresholdChange(parseFloat(e.target.value))}
+                className="w-24"
+              />
+              <span className="text-sm font-medium">{threshold.toFixed(2)}</span>
+            </div>
+          </div>
+          <NaiveStrategyEquityChart 
+            data={strategyEquity} 
+            loading={deepAnalysisLoading.equity}
+            onThresholdChange={handleThresholdChange}
+          />
+        </div>
+        
+        {/* 市場體制分析 */}
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-lg font-medium mb-4">市場體制表現</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <RegimeRadarChart data={regimeAnalysis} loading={deepAnalysisLoading.regime} />
+            <div className="space-y-2">
+              {regimeAnalysis?.phase_metrics?.map((phase) => (
+                <div key={phase.phase} className="flex justify-between p-2 bg-gray-50 rounded">
+                  <span>{phase.phase}</span>
+                  <span className={phase.recommendation === '建議交易' ? 'text-green-600' : 'text-red-600'}>
+                    AUC: {phase.auc?.toFixed(3) || 'N/A'} | {phase.recommendation}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // DiagnosisTab.tsx - 錯誤診斷 Tab
+  export function DiagnosisTab({ taskId }: { taskId: string }) {
+    const { topFalsePositives, shapSingleCase, deepAnalysisLoading } = usePatternStore();
+    const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+    
+    // 點擊案例時載入 SHAP
+    const handleCaseClick = async (caseId: string) => {
+      setSelectedCaseId(caseId);
+      const shapResult = await getSHAPSingleCase(taskId, caseId);
+      usePatternStore.setState({ shapSingleCase: shapResult.result });
+    };
+    
+    return (
+      <div className="p-6 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Top False Positives 表格 */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-lg font-medium mb-4">Top False Positives</h3>
+            <TopFalsePositivesTable 
+              data={topFalsePositives} 
+              loading={deepAnalysisLoading.falsePositives}
+              onCaseClick={handleCaseClick}
+            />
+          </div>
+          
+          {/* 單案例 SHAP 分析 */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-lg font-medium mb-4">
+              案例 SHAP 分析 
+              {selectedCaseId && <span className="text-sm text-gray-500 ml-2">({selectedCaseId})</span>}
+            </h3>
+            <SingleCaseSHAPPanel 
+              taskId={taskId}
+              caseId={selectedCaseId}
+              onClose={() => setSelectedCaseId(null)}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+□ 4.3.3 建立共用組件
+  - 檔案: frontend/src/components/pattern/details/shared/
+  
+  ├── ChartExportButton.tsx (PNG 導出)
+  ├── EmptyState.tsx (無資料狀態)
+  ├── LoadingState.tsx (載入中狀態)
+  ├── ErrorState.tsx (錯誤狀態)
+  └── MetricCard.tsx (指標卡片)
+
+  🔴 補充：共用組件詳細規格與實作（原 PLAN 遺漏）
+  
+  // ========== ChartExportButton.tsx ==========
+  // 功能：將圖表區域導出為 PNG 圖片
+  interface ChartExportButtonProps {
+    targetRef: React.RefObject<HTMLElement>;  // 要導出的 DOM 元素
+    filename?: string;                         // 檔名前綴 (預設: chart)
+    className?: string;
+  }
+  
+  // 實作:
+  import html2canvas from 'html2canvas';
+  
+  export function ChartExportButton({ targetRef, filename = 'chart', className }: ChartExportButtonProps) {
+    const [exporting, setExporting] = useState(false);
+    
+    const handleExport = async () => {
+      if (!targetRef.current) return;
+      
+      setExporting(true);
+      try {
+        const canvas = await html2canvas(targetRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2,  // 高解析度
+          logging: false,
+        });
+        
+        const link = document.createElement('a');
+        link.download = `${filename}_${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (error) {
+        console.error('Export failed:', error);
+      } finally {
+        setExporting(false);
+      }
+    };
+    
+    return (
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={handleExport}
+        disabled={exporting}
+        className={className}
+      >
+        {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+        <span className="ml-2">{exporting ? '導出中...' : '導出 PNG'}</span>
+      </Button>
+    );
+  }
+  
+  // ========== EmptyState.tsx ==========
+  // 功能：顯示無資料時的提示訊息
+  interface EmptyStateProps {
+    message?: string;     // 主訊息 (預設: 暫無資料)
+    description?: string; // 補充說明
+    icon?: React.ReactNode;
+  }
+  
+  export function EmptyState({ 
+    message = '暫無資料', 
+    description,
+    icon = <InboxIcon className="w-12 h-12 text-gray-400" />
+  }: EmptyStateProps) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        {icon}
+        <p className="mt-4 text-lg font-medium text-gray-600">{message}</p>
+        {description && (
+          <p className="mt-2 text-sm text-gray-500">{description}</p>
+        )}
+      </div>
+    );
+  }
+  
+  // ========== LoadingState.tsx ==========
+  // 功能：顯示載入中的骨架屏/佔位符
+  interface LoadingStateProps {
+    type?: 'chart' | 'table' | 'card';  // 不同類型的骨架樣式
+    height?: number | string;           // 容器高度
+  }
+  
+  export function LoadingState({ type = 'chart', height = 300 }: LoadingStateProps) {
+    const skeletonContent = {
+      chart: (
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-[200px] w-full" />
+          <div className="flex justify-center gap-4">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      ),
+      table: (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
+        </div>
+      ),
+      card: (
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-8 w-1/2" />
+        </div>
+      ),
+    };
+    
+    return (
+      <div 
+        className="p-4 animate-pulse bg-gray-50 rounded-lg" 
+        style={{ minHeight: height }}
+      >
+        {skeletonContent[type]}
+      </div>
+    );
+  }
+  
+  // ========== ErrorState.tsx ==========
+  // 功能：顯示錯誤訊息及重試按鈕
+  interface ErrorStateProps {
+    message: string;           // 錯誤訊息
+    onRetry?: () => void;      // 重試回調
+    details?: string;          // 錯誤詳情（可選）
+  }
+  
+  export function ErrorState({ message, onRetry, details }: ErrorStateProps) {
+    const [showDetails, setShowDetails] = useState(false);
+    
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <p className="mt-4 text-lg font-medium text-red-600">{message}</p>
+        
+        {details && (
+          <button 
+            className="mt-2 text-sm text-gray-500 underline"
+            onClick={() => setShowDetails(!showDetails)}
+          >
+            {showDetails ? '隱藏詳情' : '查看詳情'}
+          </button>
+        )}
+        
+        {showDetails && details && (
+          <pre className="mt-2 p-2 bg-gray-100 rounded text-xs text-left max-w-md overflow-auto">
+            {details}
+          </pre>
+        )}
+        
+        {onRetry && (
+          <Button 
+            variant="outline" 
+            className="mt-4"
+            onClick={onRetry}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            重試
+          </Button>
+        )}
+      </div>
+    );
+  }
+  
+  // ========== MetricCard.tsx ==========
+  // 功能：顯示單一指標的卡片，帶狀態顏色和趨勢箭頭
+  interface MetricCardProps {
+    title: string;                          // 指標名稱
+    value: number | string | undefined;     // 指標值
+    format?: 'percent' | 'number' | 'raw';  // 數值格式化方式
+    decimals?: number;                      // 小數位數 (預設: 3)
+    status?: 'good' | 'warning' | 'bad' | 'neutral';  // 狀態顏色
+    trend?: 'up' | 'down' | 'stable';       // 趨勢方向
+    trendValue?: number;                    // 趨勢變化值
+    tooltip?: string;                       // 提示文字
+  }
+  
+  export function MetricCard({
+    title,
+    value,
+    format = 'number',
+    decimals = 3,
+    status = 'neutral',
+    trend,
+    trendValue,
+    tooltip
+  }: MetricCardProps) {
+    // 狀態顏色映射
+    const statusColors = {
+      good: 'border-l-green-500 bg-green-50',
+      warning: 'border-l-yellow-500 bg-yellow-50',
+      bad: 'border-l-red-500 bg-red-50',
+      neutral: 'border-l-gray-300 bg-white',
+    };
+    
+    // 趨勢圖標
+    const trendIcons = {
+      up: <TrendingUp className="w-4 h-4 text-green-500" />,
+      down: <TrendingDown className="w-4 h-4 text-red-500" />,
+      stable: <Minus className="w-4 h-4 text-gray-500" />,
+    };
+    
+    // 格式化數值
+    const formatValue = (val: number | string | undefined): string => {
+      if (val === undefined || val === null) return '-';
+      if (typeof val === 'string') return val;
+      
+      switch (format) {
+        case 'percent':
+          return `${(val * 100).toFixed(decimals)}%`;
+        case 'number':
+          return val.toFixed(decimals);
+        default:
+          return String(val);
+      }
+    };
+    
+    return (
+      <div 
+        className={`rounded-lg border-l-4 p-4 shadow-sm ${statusColors[status]}`}
+        title={tooltip}
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-gray-600">{title}</p>
+          {tooltip && <HelpCircle className="w-4 h-4 text-gray-400" />}
+        </div>
+        <div className="mt-2 flex items-baseline gap-2">
+          <p className="text-2xl font-semibold">{formatValue(value)}</p>
+          {trend && (
+            <div className="flex items-center gap-1">
+              {trendIcons[trend]}
+              {trendValue !== undefined && (
+                <span className={`text-xs ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                  {trendValue > 0 ? '+' : ''}{trendValue.toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+□ 4.3.4 路由設定
+  - 檔案: frontend/src/app/patterns/xgboost-analysis/[task_id]/details/layout.tsx
+  - 確保 task_id 參數傳遞正確
+  
+  🔴 補充：layout.tsx 具體內容（原 PLAN 遺漏）
+  
+  export default function DetailsLayout({
+    children,
+    params
+  }: {
+    children: React.ReactNode;
+    params: { task_id: string };
+  }) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* 可在此加入共用的導航或麵包屑 */}
+        {children}
+      </div>
+    );
+  }
+
+□ 4.3.4.1 🔴 補充：DetailsHeader 組件規格（原 PLAN 遺漏）
+  - 檔案: frontend/src/components/pattern/details/DetailsHeader.tsx
+  - 功能:
+    - 顯示 Task ID（可複製）
+    - 返回按鈕（回到主分析頁）
+    - 全頁導出按鈕（導出整份報告 PDF/PNG）
+    - 任務狀態指示（completed 綠色標籤）
+  - Props:
+    interface DetailsHeaderProps {
+      taskId: string;
+      modelName?: string;
+      createdAt?: string;
+      onExport?: () => void;
+    }
+  - 實作:
+    
+    export function DetailsHeader({ taskId, modelName, createdAt, onExport }: DetailsHeaderProps) {
+      const router = useRouter();
+      
+      return (
+        <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/patterns/xgboost-analysis')}
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              返回
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold">XGBoost 深度分析</h1>
+              <p className="text-sm text-gray-500">
+                Task: {taskId.slice(0, 8)}...
+                <button onClick={() => navigator.clipboard.writeText(taskId)}>
+                  <Copy className="w-3 h-3 ml-1 inline" />
+                </button>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="success">已完成</Badge>
+            {onExport && (
+              <Button variant="outline" size="sm" onClick={onExport}>
+                <Download className="w-4 h-4 mr-2" />
+                導出報告
+              </Button>
+            )}
+          </div>
+        </div>
+      );
+    }
+  
+□ 4.3.5 連結整合
+  - 修改: frontend/src/app/patterns/xgboost-analysis/page.tsx
+  - 在分析完成後，顯示「深度分析」按鈕
+  - 點擊導航到 /patterns/xgboost-analysis/{task_id}/details
+  
+  🔴 補充：具體實作程式碼
+  在 AnalysisResultView 組件中新增:
+  
+  {result && taskId && (
+    <div className="flex gap-3 mt-4">
+      <Button
+        onClick={() => router.push(`/patterns/xgboost-analysis/${taskId}/details`)}
+        className="bg-indigo-600 hover:bg-indigo-700"
+      >
+        <BarChart2 className="w-4 h-4 mr-2" />
+        深度分析儀表板
+      </Button>
+    </div>
+  )}
+
+□ 4.3.6 🔴 補充：錯誤狀態處理（原 PLAN 遺漏）
+  - 檔案: frontend/src/app/patterns/xgboost-analysis/[task_id]/details/page.tsx
+  - 需處理情況:
+    1. task_id 不存在 → 顯示 "任務不存在" + 返回按鈕
+    2. 任務仍在執行 → 顯示進度 + 自動重新導向到主頁
+    3. 任務失敗 → 顯示錯誤訊息 + 返回按鈕
+  
+  實作:
+  
+  const [taskStatus, setTaskStatus] = useState<TaskStatus | null>(null);
+  
+  useEffect(() => {
+    const checkTask = async () => {
+      try {
+        const status = await getTaskStatus(task_id);
+        setTaskStatus(status);
+        
+        if (status.status === 'running') {
+          // 返回主頁面查看進度
+          router.replace('/patterns/xgboost-analysis');
+        } else if (status.status === 'completed') {
+          loadDeepAnalysis(task_id);
+        }
+      } catch (error) {
+        setTaskStatus({ status: 'not_found' });
+      }
+    };
+    checkTask();
+  }, [task_id]);
+  
+  if (!taskStatus) return <LoadingState />;
+  if (taskStatus.status === 'not_found') return <ErrorState message="任務不存在" />;
+  if (taskStatus.status === 'failed') return <ErrorState message={taskStatus.error} />;
+```
+
+#### 驗收標準
+
+| 標準 | 量化指標 | 測試方式 |
+|-----|---------|---------|
+| 路由正確 | /patterns/xgboost-analysis/{task_id}/details 可訪問 | 手動測試 |
+| Tab 切換 | 4 個 Tab 都可點擊 | 手動測試 |
+| 數據載入 | 進入頁面自動載入所有分析數據 | 網路面板檢查 |
+| Loading 狀態 | 載入中顯示 Skeleton | 節流網路測試 |
+| 🔴 錯誤處理 | task_id 不存在/執行中/失敗時顯示對應狀態 | 邊界測試 |
+| 🔴 Header 功能 | 返回按鈕、複製 ID、導出按鈕正常 | 功能測試 |
+
+---
+
+### Task 4.4: 圖表組件實作
+
+#### 🧠 First Principle Analysis
+
+| 問題 | 分析 |
+|-----|------|
+| **Why** | 數字需要視覺化才能快速判斷 |
+| **What** | 可重用的 React 圖表組件 |
+| **Challenge** | 用什麼圖表庫？→ Recharts（現有系統已使用） |
+| **Root Cause** | 統一技術棧降低維護成本 |
+
+**目標**: 實作 11 個視覺化組件
+
+#### 實作步驟
+
+```markdown
+□ 4.4.1 校準曲線圖 (CalibrationCurveChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/CalibrationCurveChart.tsx
+  - 依賴: recharts, @/components/ui
+  - 功能:
+    - 顯示預測機率 vs 實際正樣本比例
+    - 對角線為「完美校準」參考線
+    - 置信帶（可選）
+    - 懸停顯示詳細數值
+  - Props:
+    interface CalibrationCurveChartProps {
+      data: CalibrationCurveData | null;
+      loading?: boolean;
+      height?: number;
+    }
+  - 實作要點:
+    - 使用 ScatterChart + ReferenceLine
+    - Perfect calibration: y = x (對角線)
+    - 點大小與 sample_count 成比例
+
+  🔴 補充：完整實作範例程式碼（原 PLAN 遺漏）
+  
+  // CalibrationCurveChart.tsx - 完整實作
+  import { useMemo, useRef } from 'react';
+  import {
+    ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
+    Tooltip, ResponsiveContainer, ReferenceLine, TooltipProps
+  } from 'recharts';
+  import { ChartExportButton, EmptyState, LoadingState } from '../shared';
+  import type { CalibrationCurveData } from '@/lib/types';
+  
+  interface CalibrationCurveChartProps {
+    data: CalibrationCurveData | null;
+    loading?: boolean;
+    height?: number;
+  }
+  
+  // Custom Tooltip 組件
+  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (!active || !payload?.length) return null;
+    const point = payload[0].payload;
+    return (
+      <div className="bg-white p-3 border rounded shadow-lg">
+        <p className="text-sm font-medium">預測機率: {(point.bin_center * 100).toFixed(1)}%</p>
+        <p className="text-sm text-gray-600">實際正例率: {(point.actual_rate * 100).toFixed(1)}%</p>
+        <p className="text-sm text-gray-500">樣本數: {point.sample_count}</p>
+      </div>
+    );
+  };
+  
+  export function CalibrationCurveChart({ 
+    data, 
+    loading = false, 
+    height = 300 
+  }: CalibrationCurveChartProps) {
+    const chartRef = useRef<HTMLDivElement>(null);
+    
+    // 資料轉換：API 回傳 → Recharts 格式
+    const chartData = useMemo(() => {
+      if (!data?.bins) return [];
+      return data.bins.map((bin, i) => ({
+        bin_center: bin,
+        actual_rate: data.actual_positive_rates[i],
+        sample_count: data.sample_counts[i],
+        // 點大小：樣本越多越大，最小 50，最大 200
+        size: Math.min(200, Math.max(50, Math.sqrt(data.sample_counts[i]) * 5))
+      }));
+    }, [data]);
+    
+    // Loading 狀態
+    if (loading) {
+      return <LoadingState type="chart" height={height} />;
+    }
+    
+    // Empty 狀態
+    if (!data || chartData.length === 0) {
+      return <EmptyState message="校準資料不可用" />;
+    }
+    
+    return (
+      <div ref={chartRef}>
+        <div className="flex justify-between items-center mb-2">
+          <div className="text-sm text-gray-500">
+            ECE: {data.ece?.toFixed(4) || 'N/A'} | 
+            Brier: {data.brier_score?.toFixed(4) || 'N/A'}
+          </div>
+          <ChartExportButton targetRef={chartRef} filename="calibration_curve" />
+        </div>
+        
+        <ResponsiveContainer width="100%" height={height}>
+          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="bin_center" 
+              name="預測機率"
+              domain={[0, 1]}
+              tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+              label={{ value: '預測機率', position: 'bottom', offset: 0 }}
+            />
+            <YAxis 
+              dataKey="actual_rate" 
+              name="實際正例率"
+              domain={[0, 1]}
+              tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+              label={{ value: '實際正例率', angle: -90, position: 'insideLeft' }}
+            />
+            
+            {/* 完美校準參考線 (y = x) */}
+            <ReferenceLine 
+              segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} 
+              stroke="#999" 
+              strokeDasharray="5 5"
+              label={{ value: '完美校準', position: 'insideTopRight' }}
+            />
+            
+            <Tooltip content={<CustomTooltip />} />
+            
+            {/* 校準點，大小依樣本數 */}
+            <Scatter 
+              name="校準點" 
+              data={chartData} 
+              fill="#8884d8"
+              shape={(props) => {
+                const { cx, cy, payload } = props;
+                const radius = Math.sqrt(payload.size / Math.PI);
+                return (
+                  <circle 
+                    cx={cx} 
+                    cy={cy} 
+                    r={radius} 
+                    fill="#8884d8" 
+                    fillOpacity={0.7}
+                    stroke="#6366f1"
+                  />
+                );
+              }}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+□ 4.4.2 PR 曲線圖 (PRCurveChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/PRCurveChart.tsx
+  - 功能:
+    - 顯示 Precision-Recall 曲線
+    - 標記隨機猜測基線 (positive_rate)
+    - 顯示 PR AUC 值
+    - 懸停顯示閾值
+  - Props:
+    interface PRCurveChartProps {
+      data: PRCurveData | null;
+      loading?: boolean;
+      height?: number;
+    }
+  - 實作要點:
+    - 使用 AreaChart
+    - 基線用 ReferenceLine
+    - Tooltip 顯示 threshold
+
+□ 4.4.3 機率分佈密度圖 (ProbabilityDensityChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/ProbabilityDensityChart.tsx
+  - 功能:
+    - 正負樣本雙分佈圖
+    - 綠色=正例，紅色=反例
+    - 顯示重疊分數
+    - 可切換 histogram / KDE
+  - Props:
+    interface ProbabilityDensityChartProps {
+      data: ProbabilityDensityData | null;
+      loading?: boolean;
+      height?: number;
+      mode?: 'histogram' | 'area';
+    }
+  - 實作要點:
+    - 使用 AreaChart 疊加兩個 Area
+    - 透明度區分重疊區域
+
+□ 4.4.4 SHAP Summary Plot (SHAPSummaryChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/SHAPSummaryChart.tsx
+  - 功能:
+    - Beeswarm 風格（或簡化版長條圖）
+    - 顯示正負方向
+    - 可點擊特徵查看詳情
+    - 顯示 Top N 特徵
+  - Props:
+    interface SHAPSummaryChartProps {
+      data: GlobalSHAPResult | null;
+      loading?: boolean;
+      topN?: number;
+      onFeatureClick?: (feature: string) => void;
+    }
+  - 實作要點:
+    - 使用 BarChart
+    - 正向綠色，負向紅色
+    - 簡化版：僅顯示 mean_abs_shap
+  
+  🔴 補充：處理 summary_points 繪製真正的 Beeswarm（原 PLAN 未詳述）
+  
+  後端 GlobalSHAPResult 已包含 summary_points[]，格式為:
+  {
+    "summary_points": [
+      {"feature": "RSI", "shap_value": 0.15, "feature_value": 28.5, "sample_index": 0},
+      {"feature": "RSI", "shap_value": -0.08, "feature_value": 75.2, "sample_index": 1},
+      ...
+    ]
+  }
+  
+  前端可選擇兩種模式:
+  1. **簡化模式**（預設）：使用 BarChart 顯示 mean_abs_shap
+  2. **Beeswarm 模式**：使用 ScatterChart 繪製散點圖
+     - X 軸: SHAP value
+     - Y 軸: 特徵（按 mean_abs_shap 排序）
+     - 點顏色: feature_value（低=藍，高=紅）
+     - 點 jitter: 垂直方向隨機偏移避免重疊
+  
+  建議實作:
+  - 使用 recharts ScatterChart + custom shape
+  - 或使用 d3.js 直接繪製
+
+□ 4.4.5 PSI 分佈對比圖 (PSIComparisonChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/PSIComparisonChart.tsx
+  - 功能:
+    - 選擇特徵下拉選單
+    - 雙柱狀圖：訓練 vs 測試
+    - 飄移嚴重區間紅色高亮
+    - 顯示 PSI 值與狀態
+  - Props:
+    interface PSIComparisonChartProps {
+      data: DriftReport | null;
+      loading?: boolean;
+      selectedFeature?: string;
+      onFeatureSelect?: (feature: string) => void;
+    }
+  - 實作要點:
+    - 使用 BarChart + 分組柱狀
+    - 狀態指示器（紅黃綠燈）
+  
+  🔴 補充：數據來源說明（原 PLAN 未詳述）
+  
+  後端 DriftReport.results[].distribution_comparison 已包含:
+  {
+    "bins": [0.0, 0.1, 0.2, ...],      // 區間邊界
+    "train_pct": [0.05, 0.12, ...],    // 訓練集各區間佔比
+    "test_pct": [0.08, 0.10, ...]      // 測試集各區間佔比
+  }
+  
+  組件應:
+  1. 從 driftReport.results 中取得選中特徵的 distribution_comparison
+  2. 繪製雙柱狀圖（train 藍色，test 橙色）
+  3. 若該特徵 PSI >= 0.25，柱狀區域用紅色高亮
+  4. 顯示 PSI 數值與狀態標籤（stable/warning/severe）
+
+□ 4.4.6 市場體制雷達圖 (RegimeRadarChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/RegimeRadarChart.tsx
+  - 功能:
+    - 各 phase 的 AUC/Precision@K 雷達
+    - 樣本不足的 phase 虛線
+    - 顯示交易建議
+  - Props:
+    interface RegimeRadarChartProps {
+      data: RegimeReport | null;
+      loading?: boolean;
+      metric?: 'auc' | 'precision_at_10';
+    }
+  - 實作要點:
+    - 使用 RadarChart
+    - support < 50 標記不足
+
+□ 4.4.7 Rolling AUC 監控圖 (RollingAUCChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/RollingAUCChart.tsx
+  - 功能:
+    - 時間軸 vs AUC 值
+    - 警戒區間高亮（AUC < 0.55）
+    - 可調整視窗大小
+    - 顯示趨勢線
+  - Props:
+    interface RollingAUCChartProps {
+      data: RollingAUCData | null;
+      loading?: boolean;
+      height?: number;
+    }
+  - 實作要點:
+    - 使用 LineChart + ReferenceArea
+    - 警戒區用紅色背景
+    
+  🔴 補充：完整實作範例程式碼（原 PLAN 遺漏）
+  
+  // RollingAUCChart.tsx - 完整實作
+  import { useMemo, useRef } from 'react';
+  import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid,
+    Tooltip, ResponsiveContainer, ReferenceLine, ReferenceArea, TooltipProps
+  } from 'recharts';
+  import { ChartExportButton, EmptyState, LoadingState } from '../shared';
+  import type { RollingAUCData, WarningZone } from '@/lib/types';
+  
+  interface RollingAUCChartProps {
+    data: RollingAUCData | null;
+    loading?: boolean;
+    height?: number;
+  }
+  
+  // Custom Tooltip
+  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (!active || !payload?.length) return null;
+    const point = payload[0].payload;
+    return (
+      <div className="bg-white p-3 border rounded shadow-lg">
+        <p className="text-sm font-medium">{point.date}</p>
+        <p className="text-sm">
+          AUC: <span className={point.auc < 0.55 ? 'text-red-600 font-medium' : 'text-green-600'}>
+            {point.auc.toFixed(3)}
+          </span>
+        </p>
+        <p className="text-xs text-gray-500">樣本數: {point.sample_count}</p>
+      </div>
+    );
+  };
+  
+  export function RollingAUCChart({ 
+    data, 
+    loading = false, 
+    height = 300 
+  }: RollingAUCChartProps) {
+    const chartRef = useRef<HTMLDivElement>(null);
+    
+    // 資料轉換
+    const chartData = useMemo(() => {
+      if (!data?.rolling_auc) return [];
+      return data.rolling_auc.map((item) => ({
+        date: item.end_date,
+        auc: item.auc,
+        sample_count: item.sample_count,
+      }));
+    }, [data]);
+    
+    // 警戒區間
+    const warningZones = data?.warning_zones || [];
+    
+    if (loading) {
+      return <LoadingState type="chart" height={height} />;
+    }
+    
+    if (!data || chartData.length === 0) {
+      return <EmptyState message="Rolling AUC 資料不可用" />;
+    }
+    
+    return (
+      <div ref={chartRef}>
+        <div className="flex justify-between items-center mb-2">
+          <div className="text-sm text-gray-500">
+            視窗: {data.window_days}天 | 步長: {data.step_days}天 |
+            平均 AUC: {data.mean_auc?.toFixed(3)}
+          </div>
+          <ChartExportButton targetRef={chartRef} filename="rolling_auc" />
+        </div>
+        
+        <ResponsiveContainer width="100%" height={height}>
+          <LineChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="date" 
+              tickFormatter={(v) => v.slice(5)} // MM-DD 格式
+            />
+            <YAxis 
+              domain={[0.4, 0.9]} 
+              tickFormatter={(v) => v.toFixed(2)}
+            />
+            
+            {/* 警戒閾值參考線 */}
+            <ReferenceLine 
+              y={0.55} 
+              stroke="#ef4444" 
+              strokeDasharray="5 5"
+              label={{ value: '警戒線', position: 'right', fill: '#ef4444' }}
+            />
+            
+            {/* 隨機猜測基線 */}
+            <ReferenceLine 
+              y={0.5} 
+              stroke="#999" 
+              strokeDasharray="3 3"
+            />
+            
+            {/* 警戒區間高亮 */}
+            {warningZones.map((zone: WarningZone, i: number) => (
+              <ReferenceArea
+                key={i}
+                x1={zone.start_date}
+                x2={zone.end_date}
+                fill="#fecaca"
+                fillOpacity={0.5}
+                label={{ value: `AUC ${zone.mean_auc.toFixed(2)}`, position: 'top' }}
+              />
+            ))}
+            
+            <Tooltip content={<CustomTooltip />} />
+            
+            <Line 
+              type="monotone" 
+              dataKey="auc" 
+              stroke="#6366f1" 
+              strokeWidth={2}
+              dot={{ fill: '#6366f1', r: 3 }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+        
+        {/* 警戒提示 */}
+        {warningZones.length > 0 && (
+          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            ⚠️ 偵測到 {warningZones.length} 個 AUC 低於 0.55 的警戒區間
+          </div>
+        )}
+      </div>
+    );
+  }
+
+□ 4.4.8 策略權益曲線 (NaiveStrategyEquityChart.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/NaiveStrategyEquityChart.tsx
+  - 功能:
+    - 策略 vs 基準雙線
+    - 可調整閾值滑桿
+    - 顯示最終報酬對比
+    - Drawdown 區間高亮（可選）
+  - Props:
+    interface NaiveStrategyEquityChartProps {
+      data: EquityCurveData | null;
+      loading?: boolean;
+      onThresholdChange?: (threshold: number) => void;
+    }
+  - 實作要點:
+    - 使用 LineChart
+    - 策略綠色，基準灰色
+    - 閾值改變時重新請求 API
+
+□ 4.4.9 特徵重要性對比圖 (FeatureImportanceComparison.tsx)
+  - 檔案: frontend/src/components/pattern/details/charts/FeatureImportanceComparison.tsx
+  - 功能:
+    - Gain/Cover/Weight 三欄對比
+    - 排名差異標記
+    - 可能過擬合特徵警告
+  - Props:
+    interface FeatureImportanceComparisonProps {
+      data: FeatureImportanceTypesResponse | null;
+      loading?: boolean;
+      topN?: number;
+    }
+  - 實作要點:
+    - 三欄並排 BarChart
+    - 排名差異 > 5 標記黃色
+
+□ 4.4.10 Top False Positives 表格 (TopFalsePositivesTable.tsx)
+  - 檔案: frontend/src/components/pattern/details/tables/TopFalsePositivesTable.tsx
+  - 功能:
+    - 列出錯誤案例
+    - 可排序（預設按機率降序）
+    - 可點擊查看詳細 SHAP
+    - CSV 導出
+  - Props:
+    interface TopFalsePositivesTableProps {
+      data: FalsePositiveCase[] | null;
+      loading?: boolean;
+      onCaseClick?: (caseId: string) => void;
+    }
+  - 實作要點:
+    - 使用 Table 組件
+    - 損失用紅色，機率用深淺
+
+  🔴 補充：完整實作範例程式碼（原 PLAN 遺漏）
+  
+  // TopFalsePositivesTable.tsx - 完整實作
+  import { useState, useMemo } from 'react';
+  import {
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+  } from '@/components/ui/table';
+  import { Button } from '@/components/ui/button';
+  import { Download, Eye, ArrowUpDown } from 'lucide-react';
+  import { EmptyState, LoadingState } from '../shared';
+  import type { FalsePositiveCase } from '@/lib/types';
+  
+  interface TopFalsePositivesTableProps {
+    data: FalsePositiveCase[] | null;
+    loading?: boolean;
+    onCaseClick?: (caseId: string) => void;
+  }
+  
+  type SortKey = 'predicted_proba' | 'actual_loss' | 'timestamp';
+  type SortDir = 'asc' | 'desc';
+  
+  export function TopFalsePositivesTable({ 
+    data, 
+    loading = false, 
+    onCaseClick 
+  }: TopFalsePositivesTableProps) {
+    const [sortKey, setSortKey] = useState<SortKey>('predicted_proba');
+    const [sortDir, setSortDir] = useState<SortDir>('desc');
+    
+    // 排序資料
+    const sortedData = useMemo(() => {
+      if (!data) return [];
+      return [...data].sort((a, b) => {
+        const aVal = a[sortKey];
+        const bVal = b[sortKey];
+        if (aVal == null || bVal == null) return 0;
+        const cmp = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }, [data, sortKey, sortDir]);
+    
+    // 切換排序
+    const handleSort = (key: SortKey) => {
+      if (sortKey === key) {
+        setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+      } else {
+        setSortKey(key);
+        setSortDir('desc');
+      }
+    };
+    
+    // CSV 導出
+    const handleExportCSV = () => {
+      if (!sortedData.length) return;
+      
+      const headers = ['case_id', 'timestamp', 'symbol', 'predicted_proba', 'actual_loss', 'top_features'];
+      const rows = sortedData.map(c => [
+        c.case_id,
+        c.timestamp,
+        c.symbol || '',
+        c.predicted_proba.toFixed(4),
+        c.actual_loss?.toFixed(4) || '',
+        c.top_features?.join('; ') || ''
+      ]);
+      
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `false_positives_${Date.now()}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+    
+    // 機率顏色（越高越深）
+    const getProbaColor = (proba: number) => {
+      if (proba >= 0.9) return 'bg-red-100 text-red-800';
+      if (proba >= 0.8) return 'bg-orange-100 text-orange-800';
+      if (proba >= 0.7) return 'bg-yellow-100 text-yellow-800';
+      return 'bg-gray-100 text-gray-700';
+    };
+    
+    // 損失顏色
+    const getLossColor = (loss: number | undefined) => {
+      if (loss === undefined) return '';
+      if (loss < -0.1) return 'text-red-600 font-medium';
+      if (loss < -0.05) return 'text-red-500';
+      return 'text-gray-600';
+    };
+    
+    if (loading) {
+      return <LoadingState type="table" />;
+    }
+    
+    if (!data || data.length === 0) {
+      return <EmptyState message="無誤判案例資料" />;
+    }
+    
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-3">
+          <p className="text-sm text-gray-500">共 {data.length} 個誤判案例</p>
+          <Button variant="outline" size="sm" onClick={handleExportCSV}>
+            <Download className="w-4 h-4 mr-2" />
+            導出 CSV
+          </Button>
+        </div>
+        
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[180px]">案例 ID</TableHead>
+                <TableHead>
+                  <button 
+                    className="flex items-center gap-1"
+                    onClick={() => handleSort('predicted_proba')}
+                  >
+                    預測機率 <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button 
+                    className="flex items-center gap-1"
+                    onClick={() => handleSort('actual_loss')}
+                  >
+                    實際損失 <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </TableHead>
+                <TableHead>主要特徵</TableHead>
+                <TableHead className="w-[80px]">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedData.map((caseItem) => (
+                <TableRow key={caseItem.case_id}>
+                  <TableCell className="font-mono text-xs">
+                    {caseItem.case_id.slice(0, 20)}...
+                  </TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded text-sm ${getProbaColor(caseItem.predicted_proba)}`}>
+                      {(caseItem.predicted_proba * 100).toFixed(1)}%
+                    </span>
+                  </TableCell>
+                  <TableCell className={getLossColor(caseItem.actual_loss)}>
+                    {caseItem.actual_loss !== undefined 
+                      ? `${(caseItem.actual_loss * 100).toFixed(2)}%`
+                      : '-'}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-600">
+                    {caseItem.top_features?.slice(0, 3).join(', ') || '-'}
+                  </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => onCaseClick?.(caseItem.case_id)}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  }
+
+□ 4.4.11 🔴 新增：單案例 SHAP Waterfall 圖（原 PLAN 遺漏）
+  - 檔案: frontend/src/components/pattern/details/charts/SHAPWaterfallChart.tsx
+  - 功能:
+    - 瀑布圖顯示單案例的特徵貢獻
+    - 從 expected_value 開始
+    - 正貢獻綠色向右，負貢獻紅色向左
+    - 最終達到 predicted_proba
+  - Props:
+    interface SHAPWaterfallChartProps {
+      data: SingleCaseSHAPResult | null;
+      loading?: boolean;
+      topN?: number;  // 只顯示貢獻最大的 N 個特徵
+    }
+  - 實作要點:
+    - 使用 Recharts BarChart（水平方向）
+    - 或使用 ComposedChart 實現瀑布效果
+    - Base line = expected_value
+    - 每個 bar 的起點 = 前一個 bar 的終點
+    - 最後一個 bar 的終點 = predicted_proba
+  - 使用場景:
+    - DiagnosisTab 中點擊 TopFalsePositivesTable 的案例後顯示
+    - 幫助理解「為什麼模型對這個案例有高信心但錯誤」
+```
+
+#### 驗收標準
+
+| 標準 | 量化指標 | 測試方式 |
+|-----|---------|---------|
+| 空狀態 | data=null 顯示 EmptyState | Props 測試 |
+| Loading | loading=true 顯示 Skeleton | Props 測試 |
+| 響應式 | 視窗 resize 正常 | 手動測試 |
+| PNG 導出 | 所有圖表可導出 | 功能測試 |
+| Tooltip | 懸停顯示詳細資訊 | 手動測試 |
+| 🔴 交互功能 | 點擊特徵/案例觸發回調正常 | 功能測試 |
+| 🔴 滑桿控制 | NaiveStrategyEquityChart 閾值調整正常 | 功能測試 |
+| 🔴 下拉選單 | PSIComparisonChart 特徵選擇正常 | 功能測試 |
+
+---
+
+### Task 4.5: MLflow 整合 (可選)
 
 #### 🧠 First Principle Analysis
 
@@ -1297,11 +3875,11 @@ const CustomTooltip = ({ active, payload }) => {
 #### 實作步驟
 
 ```markdown
-□ 4.2.1 安裝 MLflow
+□ 4.3.1 安裝 MLflow
   - pip install mlflow
   - 更新 requirements.txt
 
-□ 4.2.2 包裝訓練流程
+□ 4.3.2 包裝訓練流程
   - 自動記錄參數、指標、模型 artifact
   - 使用 Context Manager：
     with mlflow.start_run():
@@ -1309,7 +3887,7 @@ const CustomTooltip = ({ active, payload }) => {
         mlflow.log_metrics(metrics)
         mlflow.xgboost.log_model(model, "model")
 
-□ 4.2.3 設定 MLflow UI
+□ 4.3.3 設定 MLflow UI
   - 可在本地或遠端查看實驗結果
   - 指令: mlflow ui --port 5000
 ```
@@ -1478,12 +4056,13 @@ Week 2: 模型解釋
 
 Week 3: 進階指標 + 視覺化
   Day 1:   Task 3.1-3.5 中優先級指標
-  Day 2-5: Task 4.1 前端視覺化組件
+  Day 2-3: Task 4.2 進階圖表數據計算 (機率密度/策略權益曲線/錯誤分析/滾動AUC)
+  Day 4-5: Task 4.1 前端視覺化組件 (基礎圖表)
 
-Week 4: 整合測試與文件
-  - 端到端測試
-  - 更新 API 文件
-  - 撰寫使用指南
+Week 4: 進階視覺化與整合測試
+  Day 1-2: Task 4.1.7-4.1.10 進階圖表組件 (新增四個圖表)
+  Day 3-4: 端到端測試與前後端整合
+  Day 5:   更新 API 文件與使用指南
 ```
 
 ---

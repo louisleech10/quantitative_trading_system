@@ -1,0 +1,30 @@
+'use client';
+
+import React from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
+
+interface DetailsHeaderProps {
+  taskId: string;
+}
+
+export default function DetailsHeader({ taskId }: DetailsHeaderProps) {
+  const router = useRouter();
+
+  return (
+    <div className="bg-white border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">XGBoost 深度分析儀表板</h1>
+          <p className="text-sm text-gray-600 mt-1">Task ID: {taskId}</p>
+        </div>
+        <Button variant="outline" onClick={() => router.push('/patterns/xgboost-analysis')}
+          className="border-gray-300 text-gray-700 hover:bg-gray-100">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          返回分析頁
+        </Button>
+      </div>
+    </div>
+  );
+}

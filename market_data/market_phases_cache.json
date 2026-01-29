@@ -461,12 +461,7 @@
   },
   "FEAR_20260105": {
     "start_date": "2026-01-05",
-    "end_date": "2026-01-25",
-    "description": "FEAR"
-  },
-  "EXTREME_FEAR_20260126": {
-    "start_date": "2026-01-26",
     "end_date": "2026-02-01",
-    "description": "EXTREME_FEAR"
+    "description": "FEAR"
   }
 }

@@ -194,3 +194,261 @@ export interface XGBoostAnalysisRequest {
   top_n_rules?: number;
   min_support?: number;
 }
+
+// ==================== 深度分析類型 ====================
+
+export interface OOTValidationRequest {
+  task_id: string;
+  oot_start_date?: string;
+  oot_ratio?: number;
+  validation_ratio?: number;
+  timestamp_column?: string;
+}
+
+export interface OOTValidationResult {
+  oot_auc: number;
+  oot_precision: number;
+  oot_recall: number;
+  oot_f1: number;
+  oot_samples: number;
+  oot_positive_count: number;
+  oot_positive_rate: number;
+  cv_auc_mean: number;
+  cv_oot_gap: number;
+  gap_status: 'good' | 'acceptable' | 'warning' | 'unknown';
+  is_generalization_good: boolean;
+  oot_period_start: string;
+  oot_period_end: string;
+}
+
+export interface TimePeriodInfo {
+  start: string;
+  end: string;
+  samples: number;
+  positive_count?: number;
+  positive_rate?: number;
+}
+
+export interface TimeSplitReport {
+  split_method: string;
+  timestamp_column: string;
+  random_seed?: number | null;
+  train_period: TimePeriodInfo;
+  validation_period?: TimePeriodInfo | null;
+  oot_period: TimePeriodInfo;
+  total_samples: number;
+}
+
+export interface PSIResult {
+  feature: string;
+  psi: number;
+  status: 'stable' | 'drift_warning' | 'drift_severe';
+  distribution_comparison: {
+    bins: number[];
+    train_pct: number[];
+    test_pct: number[];
+  };
+}
+
+export interface DriftReport {
+  total_features: number;
+  drifted_features: string[];
+  severe_features: string[];
+  results: PSIResult[];
+}
+
+export interface PhaseMetrics {
+  phase: string;
+  support: number;
+  auc: number | null;
+  precision_at_10: number | null;
+  avg_pred_proba?: number | null;
+  recommendation: string;
+  note?: string | null;
+}
+
+export interface RegimeReport {
+  overall_auc?: number | null;
+  phase_metrics: PhaseMetrics[];
+  trading_rules: Record<string, { threshold: number | null; position_size: string | null }>;
+}
+
+export interface SHAPSummaryPoint {
+  feature: string;
+  value: number;
+  shap_value: number;
+}
+
+export interface SHAPFeatureImportance {
+  feature: string;
+  mean_abs_shap: number;
+  mean_shap: number;
+  rank: number;
+}
+
+export interface GlobalSHAPResult {
+  expected_value: number;
+  feature_importance_shap: SHAPFeatureImportance[];
+  top_positive_features: string[];
+  top_negative_features: string[];
+  sample_size?: number;
+  summary_points?: SHAPSummaryPoint[];
+}
+
+export interface SingleCaseContribution {
+  feature: string;
+  value: number;
+  shap_value: number;
+  contribution_pct: number;
+}
+
+export interface SingleCaseSHAPResult {
+  predicted_proba: number;
+  expected_value: number;
+  contributions: SingleCaseContribution[];
+}
+
+export interface CalibrationCurveData {
+  bin_midpoints: number[];
+  actual_positive_rate: number[];
+  predicted_mean: number[];
+  sample_count: number[];
+  perfect_calibration?: number[];
+}
+
+export interface PRCurveData {
+  precision: number[];
+  recall: number[];
+  thresholds: number[];
+  pr_auc?: number | null;
+  baseline?: number | null;
+}
+
+export interface OOTValidationResponse {
+  task_id: string;
+  status: string;
+  message: string;
+  validation_result?: OOTValidationResult | null;
+  time_split_report?: TimeSplitReport | null;
+  drift_report?: DriftReport | null;
+  error?: string | null;
+}
+
+export interface DriftReportResponse {
+  task_id: string;
+  status: string;
+  message: string;
+  report?: DriftReport | null;
+  error?: string | null;
+}
+
+export interface RegimeAnalysisResponse {
+  task_id: string;
+  status: string;
+  message: string;
+  report?: RegimeReport | null;
+  error?: string | null;
+}
+
+export interface PredictionsResponse {
+  task_id: string;
+  total_cases: number;
+  summary: {
+    mean: number;
+    std: number;
+    bins: Record<string, number>;
+    min: number;
+    max: number;
+  };
+  predictions?: Array<{
+    case_id: string;
+    y_true?: number | null;
+    predicted_proba: number;
+  }> | null;
+}
+
+export interface FeatureImportanceTypesResponse {
+  task_id: string;
+  types: {
+    gain?: Array<{ feature: string; importance: number; rank: number; method: string }>;
+    cover?: Array<{ feature: string; importance: number; rank: number; method: string }>;
+    weight?: Array<{ feature: string; importance: number; rank: number; method: string }>;
+  };
+}
+
+export interface SHAPGlobalResponse {
+  task_id: string;
+  status: string;
+  message: string;
+  result?: GlobalSHAPResult | null;
+  error?: string | null;
+}
+
+export interface SHAPSingleCaseResponse {
+  task_id: string;
+  case_id: string;
+  status: string;
+  message: string;
+  result?: SingleCaseSHAPResult | null;
+  error?: string | null;
+}
+
+export interface CalibrationCurveResponse {
+  task_id: string;
+  data: CalibrationCurveData;
+}
+
+export interface PRCurveResponse {
+  task_id: string;
+  data: PRCurveData;
+}
+
+export interface ProbabilityDensityData {
+  positive_density: { bins: number[]; density: number[] };
+  negative_density: { bins: number[]; density: number[] };
+  overlap_score: number;
+}
+
+export interface ProbabilityDensityResponse {
+  task_id: string;
+  data: ProbabilityDensityData;
+}
+
+export interface EquityCurveData {
+  timestamps: number[];
+  strategy_returns: number[];
+  benchmark_returns: number[];
+  threshold: number;
+  final_return_pct: { strategy: number; benchmark: number };
+}
+
+export interface EquityCurveResponse {
+  task_id: string;
+  data: EquityCurveData;
+}
+
+export interface FalsePositiveCase {
+  case_id: string;
+  timestamp: string;
+  symbol: string;
+  predicted_proba: number;
+  actual_return: number;
+}
+
+export interface TopFalsePositivesResponse {
+  task_id: string;
+  cases: FalsePositiveCase[];
+  total_false_positives: number;
+}
+
+export interface RollingAUCData {
+  timestamps: number[];
+  auc_values: Array<number | null>;
+  window_size: number;
+  warning_zones: Array<{ start: string; end: string }>;
+}
+
+export interface RollingAUCResponse {
+  task_id: string;
+  data: RollingAUCData;
+}

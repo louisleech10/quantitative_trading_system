@@ -11,6 +11,7 @@ Updated: 2026-01-28 - 新增 OOT 驗證 API
 
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
+import numpy as np
 
 from api.models.pattern_analysis_models import (
     XGBoostAnalysisRequest,
@@ -42,13 +43,22 @@ from api.models.pattern_analysis_models import (
     InteractionEffectResponse,
     GlobalSHAPFeatureImportance,
     SHAPSummaryPoint,
-    SingleCaseContribution
+    SingleCaseContribution,
+    ProbabilityDensityResponse,
+    EquityCurveResponse,
+    TopFalsePositivesResponse,
+    RollingAUCResponse,
+    CalibrationCurveResponse,
+    PRCurveResponse,
+    PRCurveData
 )
 from api.services.xgboost_task_service import XGBoostTaskService
 from api.services.xgboost_batch_service import get_xgboost_batch_service
 from api.services.shap_analysis_service import SHAPAnalysisService
+from api.services.xgboost_task_cache import XGBoostTaskCache
 from api.core.logging import get_logger
 from api.utils.json_serializer import sanitize_for_json
+from momentum.Analysis.prediction_analyzer import PredictionAnalyzer
 
 logger = get_logger(__name__)
 
@@ -57,6 +67,8 @@ router = APIRouter(prefix="/pattern-analysis", tags=["Pattern Analysis"])
 # 服務實例
 xgboost_service = XGBoostTaskService()
 shap_service = SHAPAnalysisService()
+task_cache = XGBoostTaskCache()
+prediction_analyzer = PredictionAnalyzer()
 
 
 def _get_task_from_services(task_id: str):
@@ -68,6 +80,30 @@ def _get_task_from_services(task_id: str):
 
     task = xgboost_service.get_task_status(task_id)
     return task
+
+
+def _build_predictions_df(task_result: dict):
+    import pandas as pd
+
+    predictions = task_result.get('predictions', {})
+    items = predictions.get('predictions') or []
+    if not items:
+        return None
+
+    meta = task_result.get('prediction_meta', {})
+    timestamps = meta.get('timestamps')
+    symbols = meta.get('symbols')
+    actual_returns = meta.get('actual_returns')
+
+    df = pd.DataFrame(items)
+    if timestamps is not None:
+        df['timestamp'] = timestamps
+    if symbols is not None:
+        df['symbol'] = symbols
+    if actual_returns is not None:
+        df['actual_return'] = actual_returns
+
+    return df
 
 
 # ==================== OOT 驗證 API ====================
@@ -743,6 +779,182 @@ async def get_xgboost_feature_importance(
     filtered = sanitize_for_json(filtered)
 
     return FeatureImportanceTypesResponse(task_id=task_id, types=filtered)
+
+
+# ==================== 預測分析圖表 API ====================
+
+@router.get("/xgboost/{task_id}/probability-density", response_model=ProbabilityDensityResponse)
+async def get_probability_density(task_id: str, n_bins: int = 50):
+    """取得機率分佈密度數據"""
+    task_result = task_cache.get_result(task_id)
+    if task_result is None:
+        task = _get_task_from_services(task_id)
+        if not task or task.get('status') != 'completed':
+            raise HTTPException(status_code=404, detail=f"任務不存在或未完成: {task_id}")
+        predictions_df = _build_predictions_df(task.get('result', {}) or {})
+        if predictions_df is None or predictions_df.empty:
+            raise HTTPException(status_code=400, detail="無預測資料可用")
+    else:
+        predictions_df = task_result.predictions_df
+
+    density_data = prediction_analyzer.calculate_probability_density(
+        y_true=predictions_df['y_true'].values,
+        y_pred_proba=predictions_df['predicted_proba'].values,
+        n_bins=n_bins
+    )
+
+    return ProbabilityDensityResponse(task_id=task_id, data=density_data.to_dict())
+
+
+@router.get("/xgboost/{task_id}/strategy-equity", response_model=EquityCurveResponse)
+async def get_strategy_equity(task_id: str, threshold: float = 0.75):
+    """取得策略權益曲線數據"""
+    task_result = task_cache.get_result(task_id)
+    if task_result is None:
+        task = _get_task_from_services(task_id)
+        if not task or task.get('status') != 'completed':
+            raise HTTPException(status_code=404, detail=f"任務不存在或未完成: {task_id}")
+        predictions_df = _build_predictions_df(task.get('result', {}) or {})
+        if predictions_df is None or predictions_df.empty:
+            raise HTTPException(status_code=400, detail="無預測資料可用")
+    else:
+        predictions_df = task_result.predictions_df
+
+    if predictions_df is None or predictions_df.empty:
+        raise HTTPException(status_code=400, detail="無預測資料可用")
+
+    if 'actual_return' not in predictions_df.columns or predictions_df['actual_return'].isna().all():
+        raise HTTPException(status_code=400, detail="缺少 actual_return 資料，無法計算權益曲線")
+
+    equity_data = prediction_analyzer.calculate_strategy_equity_curve(
+        timestamps=predictions_df['timestamp'].fillna(0).astype(int).tolist(),
+        y_pred_proba=predictions_df['predicted_proba'].values,
+        actual_returns=predictions_df['actual_return'].fillna(0).values,
+        threshold=threshold
+    )
+
+    return EquityCurveResponse(task_id=task_id, data=equity_data.to_dict())
+
+
+@router.get("/xgboost/{task_id}/top-false-positives", response_model=TopFalsePositivesResponse)
+async def get_top_false_positives(task_id: str, top_n: int = 5):
+    """取得 Top False Positives"""
+    task_result = task_cache.get_result(task_id)
+    if task_result is None:
+        task = _get_task_from_services(task_id)
+        if not task or task.get('status') != 'completed':
+            raise HTTPException(status_code=404, detail=f"任務不存在或未完成: {task_id}")
+        predictions_df = _build_predictions_df(task.get('result', {}) or {})
+        if predictions_df is None or predictions_df.empty:
+            raise HTTPException(status_code=400, detail="無預測資料可用")
+    else:
+        predictions_df = task_result.predictions_df
+
+    if predictions_df is None or predictions_df.empty:
+        raise HTTPException(status_code=400, detail="無預測資料可用")
+
+    case_ids = predictions_df['case_id'].astype(str).tolist()
+    timestamps = predictions_df['timestamp'].fillna(0).astype(int).tolist() if 'timestamp' in predictions_df.columns else [0] * len(case_ids)
+    symbols = predictions_df['symbol'].astype(str).tolist() if 'symbol' in predictions_df.columns else ["UNKNOWN"] * len(case_ids)
+    actual_returns = predictions_df['actual_return'].fillna(0).values if 'actual_return' in predictions_df.columns else np.zeros(len(case_ids))
+
+    cases = prediction_analyzer.get_top_false_positives(
+        case_ids=case_ids,
+        timestamps=timestamps,
+        symbols=symbols,
+        y_true=predictions_df['y_true'].values,
+        y_pred_proba=predictions_df['predicted_proba'].values,
+        actual_returns=actual_returns,
+        top_n=top_n
+    )
+
+    total_fp = int(((predictions_df['y_true'] == 0) & (predictions_df['predicted_proba'] > 0.5)).sum())
+
+    return TopFalsePositivesResponse(
+        task_id=task_id,
+        cases=[item.to_dict() for item in cases],
+        total_false_positives=total_fp
+    )
+
+
+@router.get("/xgboost/{task_id}/rolling-auc", response_model=RollingAUCResponse)
+async def get_rolling_auc(task_id: str, window: int = 500):
+    """取得滾動 AUC 數據"""
+    task_result = task_cache.get_result(task_id)
+    if task_result is None:
+        task = _get_task_from_services(task_id)
+        if not task or task.get('status') != 'completed':
+            raise HTTPException(status_code=404, detail=f"任務不存在或未完成: {task_id}")
+        predictions_df = _build_predictions_df(task.get('result', {}) or {})
+        if predictions_df is None or predictions_df.empty:
+            raise HTTPException(status_code=400, detail="無預測資料可用")
+    else:
+        predictions_df = task_result.predictions_df
+
+    if predictions_df is None or predictions_df.empty:
+        raise HTTPException(status_code=400, detail="無預測資料可用")
+
+    timestamps = predictions_df['timestamp'].fillna(0).astype(int).tolist() if 'timestamp' in predictions_df.columns else list(range(len(predictions_df)))
+
+    rolling_data = prediction_analyzer.calculate_rolling_auc(
+        timestamps=timestamps,
+        y_true=predictions_df['y_true'].values,
+        y_pred_proba=predictions_df['predicted_proba'].values,
+        window=window
+    )
+
+    return RollingAUCResponse(task_id=task_id, data=rolling_data.to_dict())
+
+
+@router.get("/xgboost/{task_id}/calibration-curve", response_model=CalibrationCurveResponse)
+async def get_calibration_curve(task_id: str):
+    """取得校準曲線數據"""
+    task_result = task_cache.get_result(task_id)
+    if task_result and task_result.calibration_curve:
+        return CalibrationCurveResponse(task_id=task_id, data=task_result.calibration_curve)
+
+    task = _get_task_from_services(task_id)
+    if not task or task.get('status') != 'completed':
+        raise HTTPException(status_code=404, detail=f"任務不存在或未完成: {task_id}")
+
+    result = task.get('result', {})
+    calibration_curve = result.get('calibration_curve')
+    if not calibration_curve:
+        raise HTTPException(status_code=404, detail="Calibration curve 不存在")
+
+    return CalibrationCurveResponse(task_id=task_id, data=calibration_curve)
+
+
+@router.get("/xgboost/{task_id}/pr-curve", response_model=PRCurveResponse)
+async def get_pr_curve(task_id: str):
+    """取得 PR 曲線數據"""
+    task_result = task_cache.get_result(task_id)
+    if task_result and task_result.pr_curve:
+        pr_curve_data = task_result.pr_curve
+    else:
+        task = _get_task_from_services(task_id)
+        if not task or task.get('status') != 'completed':
+            raise HTTPException(status_code=404, detail=f"任務不存在或未完成: {task_id}")
+        result = task.get('result', {})
+        pr_curve_data = result.get('pr_curve')
+        if not pr_curve_data:
+            raise HTTPException(status_code=404, detail="PR curve 不存在")
+        model_perf = result.get('model_performance', {})
+    if task_result and task_result.pr_curve:
+        model_perf = {}
+        task = _get_task_from_services(task_id)
+        if task and task.get('status') == 'completed':
+            model_perf = task.get('result', {}).get('model_performance', {})
+
+    pr_curve = PRCurveData(
+        precision=pr_curve_data.get('precision', []),
+        recall=pr_curve_data.get('recall', []),
+        thresholds=pr_curve_data.get('thresholds', []),
+        pr_auc=model_perf.get('pr_auc'),
+        baseline=model_perf.get('positive_rate')
+    )
+
+    return PRCurveResponse(task_id=task_id, data=pr_curve)
 
 
 # ==================== SHAP 分析 API ====================

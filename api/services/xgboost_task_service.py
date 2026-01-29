@@ -23,6 +23,7 @@ from momentum.Analysis.regime_analyzer import RegimeAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from api.services.xgboost_task_cache import XGBoostTaskCache
 from api.core.logging import get_logger
 from api.utils.json_serializer import sanitize_for_json
 
@@ -85,6 +86,7 @@ class XGBoostTaskService:
         self.expectancy_calculator = ExpectancyCalculator()
         self.bootstrap_estimator = BootstrapEstimator()
         self.logger = logger
+        self.task_cache = XGBoostTaskCache()
     
     async def start_xgboost_analysis_task(
         self,
@@ -336,6 +338,14 @@ class XGBoostTaskService:
             )
             
             # 6. 完成
+            prediction_meta = {
+                "timestamps": timestamps.tolist() if timestamps is not None else None,
+                "symbols": df['symbol'].astype(str).tolist() if 'symbol' in df.columns else (
+                    df['Symbol'].astype(str).tolist() if 'Symbol' in df.columns else None
+                ),
+                "actual_returns": price_changes.tolist() if price_changes is not None else None
+            }
+
             result = {
                 'case_id': case_id,
                 'model_performance': performance.__dict__,
@@ -351,6 +361,7 @@ class XGBoostTaskService:
                 'permutation_importance': permutation_importance.to_dict(),
                 'fold_importance_stability': fold_importance_stability.to_dict(),
                 'predictions': predictions_output.to_dict(),
+                'prediction_meta': prediction_meta,
                 'shap_sample': shap_sample,
                 'calibration_curve': (
                     self.xgboost_analyzer.last_calibration_curve.to_dict()
@@ -364,6 +375,28 @@ class XGBoostTaskService:
 
             result = sanitize_for_json(result)
             
+            try:
+                predictions_df = pd.DataFrame({
+                    "case_id": case_ids,
+                    "y_true": y.tolist(),
+                    "predicted_proba": y_pred_proba.tolist(),
+                    "timestamp": timestamps.tolist() if timestamps is not None else [None] * len(case_ids),
+                    "symbol": df['symbol'].astype(str).tolist() if 'symbol' in df.columns else (
+                        df['Symbol'].astype(str).tolist() if 'Symbol' in df.columns else [None] * len(case_ids)
+                    ),
+                    "actual_return": price_changes.tolist() if price_changes is not None else [None] * len(case_ids)
+                })
+            except Exception as e:
+                self.logger.warning(f"建立 predictions_df 失敗: {str(e)}")
+                predictions_df = None
+
+            self.task_cache.store_result(
+                task_id=task_id,
+                predictions_df=predictions_df,
+                calibration_curve=result.get('calibration_curve'),
+                pr_curve=result.get('pr_curve')
+            )
+
             self.task_manager.update_status(task_id, 'completed', result=result)
             self.task_manager.update_progress(task_id, 100, '分析完成')
             

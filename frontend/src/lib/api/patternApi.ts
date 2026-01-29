@@ -9,11 +9,54 @@ import type {
   PatternSummary,
   PatternStatistics,
   XGBoostAnalysisRequest,
-  XGBoostAnalysisResult
+  XGBoostAnalysisResult,
+  OOTValidationRequest,
+  OOTValidationResponse,
+  DriftReportResponse,
+  RegimeAnalysisResponse,
+  PredictionsResponse,
+  FeatureImportanceTypesResponse,
+  SHAPGlobalResponse,
+  SHAPSingleCaseResponse,
+  CalibrationCurveResponse,
+  PRCurveResponse,
+  ProbabilityDensityResponse,
+  EquityCurveResponse,
+  TopFalsePositivesResponse,
+  RollingAUCResponse
 } from '@/lib/patternTypes';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
+
+// 通用 fetch 封裝
+export class APIError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'APIError';
+  }
+}
+
+async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    const message = error.detail || error.message || 'API request failed';
+    throw new APIError(response.status, message);
+  }
+
+  return response.json();
+}
 
 // ===== Pattern Management API =====
 
@@ -177,4 +220,66 @@ export async function listModels(): Promise<any[]> {
   }
   
   return response.json();
+}
+
+// ===== 深度分析 API =====
+
+export async function validateOOT(request: OOTValidationRequest): Promise<OOTValidationResponse> {
+  return fetchAPI<OOTValidationResponse>('/pattern-analysis/xgboost/validate-oot', {
+    method: 'POST',
+    body: JSON.stringify(request)
+  });
+}
+
+export async function getDriftReport(taskId: string): Promise<DriftReportResponse> {
+  return fetchAPI<DriftReportResponse>(`/pattern-analysis/xgboost/${taskId}/drift-report`);
+}
+
+export async function getRegimeAnalysis(taskId: string): Promise<RegimeAnalysisResponse> {
+  return fetchAPI<RegimeAnalysisResponse>(`/pattern-analysis/xgboost/${taskId}/regime-analysis`);
+}
+
+export async function getPredictions(taskId: string, includeDetails = false): Promise<PredictionsResponse> {
+  const params = includeDetails ? '?include_details=true' : '';
+  return fetchAPI<PredictionsResponse>(`/pattern-analysis/xgboost/${taskId}/predictions${params}`);
+}
+
+export async function getFeatureImportanceAll(taskId: string, types?: string[]): Promise<FeatureImportanceTypesResponse> {
+  const params = types && types.length > 0 ? `?types=${types.join(',')}` : '';
+  return fetchAPI<FeatureImportanceTypesResponse>(`/pattern-analysis/xgboost/${taskId}/feature-importance${params}`);
+}
+
+export async function getSHAPGlobal(taskId: string, sampleSize?: number, includeSummaryPoints = true): Promise<SHAPGlobalResponse> {
+  return fetchAPI<SHAPGlobalResponse>(`/pattern-analysis/xgboost/${taskId}/shap`, {
+    method: 'POST',
+    body: JSON.stringify({ sample_size: sampleSize, include_summary_points: includeSummaryPoints })
+  });
+}
+
+export async function getSHAPSingleCase(taskId: string, caseId: string): Promise<SHAPSingleCaseResponse> {
+  return fetchAPI<SHAPSingleCaseResponse>(`/pattern-analysis/xgboost/${taskId}/shap/case/${caseId}`);
+}
+
+export async function getCalibrationCurve(taskId: string): Promise<CalibrationCurveResponse> {
+  return fetchAPI<CalibrationCurveResponse>(`/pattern-analysis/xgboost/${taskId}/calibration-curve`);
+}
+
+export async function getPRCurve(taskId: string): Promise<PRCurveResponse> {
+  return fetchAPI<PRCurveResponse>(`/pattern-analysis/xgboost/${taskId}/pr-curve`);
+}
+
+export async function getProbabilityDensity(taskId: string, nBins = 50): Promise<ProbabilityDensityResponse> {
+  return fetchAPI<ProbabilityDensityResponse>(`/pattern-analysis/xgboost/${taskId}/probability-density?n_bins=${nBins}`);
+}
+
+export async function getStrategyEquity(taskId: string, threshold = 0.75): Promise<EquityCurveResponse> {
+  return fetchAPI<EquityCurveResponse>(`/pattern-analysis/xgboost/${taskId}/strategy-equity?threshold=${threshold}`);
+}
+
+export async function getTopFalsePositives(taskId: string, topN = 5): Promise<TopFalsePositivesResponse> {
+  return fetchAPI<TopFalsePositivesResponse>(`/pattern-analysis/xgboost/${taskId}/top-false-positives?top_n=${topN}`);
+}
+
+export async function getRollingAUC(taskId: string, window = 500): Promise<RollingAUCResponse> {
+  return fetchAPI<RollingAUCResponse>(`/pattern-analysis/xgboost/${taskId}/rolling-auc?window=${window}`);
 }

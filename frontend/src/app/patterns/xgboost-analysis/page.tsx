@@ -1559,6 +1559,16 @@ export default function XGBoostAnalysisPage() {
                 >
                   前往樣式管理
                 </Button>
+                {taskId && (
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push(`/patterns/xgboost-analysis/${taskId}/details`)}
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                    size="lg"
+                  >
+                    開啟深度分析
+                  </Button>
+                )}
               </div>
             )}
 

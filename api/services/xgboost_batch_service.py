@@ -41,6 +41,7 @@ from momentum.Analysis.regime_analyzer import RegimeAnalyzer
 from momentum.Analysis.pattern_extractor import PatternExtractor
 from momentum.Analysis.model_storage import ModelStorage
 from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, StrategyParams
+from api.services.xgboost_task_cache import XGBoostTaskCache
 
 logger = get_logger(__name__)
 
@@ -122,6 +123,7 @@ class XGBoostBatchService:
         self.bootstrap_estimator = BootstrapEstimator()
         self.cross_symbol_validator = CrossSymbolValidator()
         self.logger = logger
+        self.task_cache = XGBoostTaskCache()
     
     def get_case_summary(self, symbol: Optional[str] = None, timeframe: Optional[str] = None) -> Dict:
         """
@@ -750,6 +752,12 @@ class XGBoostBatchService:
             )
             
             # ===== Step 9: 完成 =====
+            prediction_meta = {
+                "timestamps": case_timestamps,
+                "symbols": [case.symbol for case in valid_cases],
+                "actual_returns": price_changes.tolist() if price_changes is not None else None
+            }
+
             result = {
                 'symbols': symbols,  # 改為 symbols 列表
                 'timeframe': timeframe,
@@ -773,6 +781,7 @@ class XGBoostBatchService:
                 'fold_importance_stability': fold_importance_stability.to_dict(),
                 'cross_symbol_validation': cross_symbol_validation,
                 'predictions': predictions_output.to_dict(),
+                'prediction_meta': prediction_meta,
                 'shap_sample': shap_sample,
                 'calibration_curve': (
                     self.xgboost_analyzer.last_calibration_curve.to_dict()
@@ -787,6 +796,26 @@ class XGBoostBatchService:
             # 清理 result 中的 numpy 類型，防止 JSON 序列化錯誤
             result = sanitize_for_json(result)
             
+            try:
+                predictions_df = pd.DataFrame({
+                    "case_id": case_ids,
+                    "y_true": y.tolist(),
+                    "predicted_proba": y_pred_proba.tolist(),
+                    "timestamp": case_timestamps,
+                    "symbol": [case.symbol for case in valid_cases],
+                    "actual_return": price_changes.tolist() if price_changes is not None else [None] * len(case_ids)
+                })
+            except Exception as e:
+                self.logger.warning(f"建立 predictions_df 失敗: {str(e)}")
+                predictions_df = None
+
+            self.task_cache.store_result(
+                task_id=task_id,
+                predictions_df=predictions_df,
+                calibration_curve=result.get('calibration_curve'),
+                pr_curve=result.get('pr_curve')
+            )
+
             self.task_manager.update_status(task_id, 'completed', result=result)
             self.task_manager.update_progress(task_id, 100, '完成', '分析完成')
             
@@ -803,6 +832,11 @@ class XGBoostBatchService:
     def get_task_status(self, task_id: str) -> Optional[Dict]:
         """獲取任務狀態"""
         return self.task_manager.get_task(task_id)
+
+    def get_predictions_df(self, task_id: str) -> Optional[pd.DataFrame]:
+        """取得預測 DataFrame（若有快取）"""
+        cached = self.task_cache.get_result(task_id)
+        return cached.predictions_df if cached else None
 
     def _build_sequence_features(
         self,
