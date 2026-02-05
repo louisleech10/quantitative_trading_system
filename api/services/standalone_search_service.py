@@ -195,16 +195,20 @@ class StandaloneSearchService:
                     sys.path.insert(0, str(path))
             
             # Try to import momentum modules
-            from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-            from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+            from momentum.factories import (
+                create_case_search_engine,
+                create_momentum_data_loader,
+                create_search_configuration,
+                create_filter_condition,
+            )
             
             # Create instances
-            momentum_loader = MomentumDataLoader()
+            momentum_loader = create_momentum_data_loader()
             self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
-            self.search_engine = CaseSearchEngine(
+            self.search_engine = create_case_search_engine(
                 self.data_loader,
                 enable_parallel=True,
-                num_workers=None  # 使用自動偵測（根據CPU核心數和可用內存）
+                num_workers=None,  # 使用自動偵測（根據CPU核心數和可用內存）
             )
             
             self.momentum_available = True
@@ -244,20 +248,18 @@ class StandaloneSearchService:
             try:
                 self.logger.info("Trying direct imports...")
                 
-                # Import the correct class name: MomentumDataLoader (not MomentumStrategyDataLoader)
-                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-                momentum_loader = MomentumDataLoader()
+                from momentum.factories import create_case_search_engine, create_momentum_data_loader
+                momentum_loader = create_momentum_data_loader()
                 
                 # Create a wrapper that provides the expected interface
                 self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
                 self.logger.info("✅ DataLoader imported and wrapped successfully")
 
                 # Import SearchEngine
-                from momentum.DataExtraction.case_search_engine import CaseSearchEngine
-                self.search_engine = CaseSearchEngine(
+                self.search_engine = create_case_search_engine(
                     self.data_loader,
                     enable_parallel=True,
-                    num_workers=None  # 使用自動偵測（根據CPU核心數和可用內存）
+                    num_workers=None,  # 使用自動偵測（根據CPU核心數和可用內存）
                 )
                 self.logger.info("✅ SearchEngine imported successfully")
                 
@@ -277,15 +279,14 @@ class StandaloneSearchService:
                 if str(full_path) not in sys.path:
                     sys.path.insert(0, str(full_path))
                 
-                from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-                from momentum.DataExtraction.case_search_engine import CaseSearchEngine
+                from momentum.factories import create_case_search_engine, create_momentum_data_loader
 
-                momentum_loader = MomentumDataLoader()
+                momentum_loader = create_momentum_data_loader()
                 self.data_loader = MomentumDataLoaderWrapper(momentum_loader)
-                self.search_engine = CaseSearchEngine(
+                self.search_engine = create_case_search_engine(
                     self.data_loader,
                     enable_parallel=True,
-                    num_workers=None  # 使用自動偵測（根據CPU核心數和可用內存）
+                    num_workers=None,  # 使用自動偵測（根據CPU核心數和可用內存）
                 )
                 
                 self.momentum_available = True
@@ -312,8 +313,7 @@ class StandaloneSearchService:
             self.logger.info(f"請求的 price_change_method: {request.price_change_method}")
             self.logger.info(f"price_change_method.value: {request.price_change_method.value}")
             
-            # 動態導入搜索配置類
-            from momentum.DataExtraction.case_search_engine import SearchConfiguration, FilterCondition
+            from momentum.factories import create_filter_condition, create_search_configuration
             
             # 準備時間範圍
             time_range = (
@@ -322,7 +322,7 @@ class StandaloneSearchService:
             )
             
             # 創建基本搜索配置
-            config = SearchConfiguration(
+            config = create_search_configuration(
                 name=request.name,
                 description=request.description or f"{request.timeframe.value} timeframe search",
                 timeframe=request.timeframe.value,  # 轉換 enum 為字符串
@@ -343,7 +343,7 @@ class StandaloneSearchService:
             
             # 添加初始條件
             for condition_req in request.initial_conditions:
-                condition = FilterCondition(
+                condition = create_filter_condition(
                     condition_type=condition_req.condition_type.value,
                     parameter=condition_req.parameter,
                     operator=condition_req.operator.value,
@@ -354,7 +354,7 @@ class StandaloneSearchService:
             
             # 添加高級條件
             for condition_req in request.advanced_conditions:
-                condition = FilterCondition(
+                condition = create_filter_condition(
                     condition_type=condition_req.condition_type.value,
                     parameter=condition_req.parameter,
                     operator=condition_req.operator.value,

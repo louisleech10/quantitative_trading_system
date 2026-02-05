@@ -14,6 +14,7 @@ from api.core.logging import get_logger
 from api.utils.exceptions import DataLoaderException, raise_data_error
 from api.models.requests import SearchConfigRequest
 from api.models.responses import SearchTemplate, ConfigData
+from momentum.factories import create_market_config
 
 class TemplateManager:
     """Manages search templates and configurations"""
@@ -322,9 +323,7 @@ class DataService:
     def get_market_phase(self, timestamp: datetime) -> str:
         """Get market phase for given timestamp"""
         try:
-            # Import here to avoid circular imports
-            from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
-            return MarketConfig.get_market_phase(timestamp)
+            return create_market_config().get_market_phase(timestamp)
         except Exception as e:
             self.logger.error(f"Failed to get market phase: {str(e)}")
             return "UNKNOWN"

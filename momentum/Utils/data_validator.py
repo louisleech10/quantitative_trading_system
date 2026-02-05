@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from api.models.training_window_config import SignalDensityResponse
+from momentum.core.contracts import SignalDensityResponse
 
 
 class ValidationSeverity(str, Enum):

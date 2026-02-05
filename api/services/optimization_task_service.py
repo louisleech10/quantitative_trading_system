@@ -23,8 +23,9 @@ from pathlib import Path
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from momentum.Optimization.optuna_optimizer import OptunaOptimizer, OptimizationResult, ParameterRanges
+from momentum.factories import create_optuna_optimizer
 from api.models.training_window_config import TrainingWindowConfig
+from api.utils.case_storage import get_case_storage_manager
 
 
 class OptimizationTaskStatus(str, Enum):
@@ -61,7 +62,7 @@ class OptimizationTaskInfo:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     progress: OptimizationTaskProgress = field(default_factory=OptimizationTaskProgress)
-    result: Optional[OptimizationResult] = None
+    result: Optional[Any] = None
     error_message: Optional[str] = None
     config: Dict[str, Any] = field(default_factory=dict)  # 優化配置（sampler_type, n_trials等）
 
@@ -149,8 +150,8 @@ class OptimizationTaskService:
         # 運行中的任務（task_id -> asyncio.Task）
         self.running_tasks: Dict[str, asyncio.Task] = {}
 
-        # OptunaOptimizer實例（task_id -> OptunaOptimizer）
-        self.optimizers: Dict[str, OptunaOptimizer] = {}
+        # OptunaOptimizer實例（task_id -> optimizer）
+        self.optimizers: Dict[str, Any] = {}
 
         # WebSocket通知回調（task_id -> callback）
         self.notification_callbacks: Dict[str, Callable[[str, Dict[str, Any]], None]] = {}
@@ -175,7 +176,7 @@ class OptimizationTaskService:
         n_trials: int = 100,
         n_startup_trials: Optional[int] = None,
         n_jobs: int = 1,
-        parameter_ranges: Optional[ParameterRanges] = None,
+        parameter_ranges: Optional[Any] = None,
         use_multi_objective: bool = False,
         enable_pruning: bool = True,
         notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None
@@ -226,7 +227,7 @@ class OptimizationTaskService:
         task_info.progress.total_trials = n_trials
 
         # 創建OptunaOptimizer實例（with ProgressMonitor callback）
-        optimizer = OptunaOptimizer(
+        optimizer = create_optuna_optimizer(
             study_name=study_name,
             storage=f"sqlite:///data/optuna_{study_name}.db",
             sampler_type=sampler_type,
@@ -237,7 +238,8 @@ class OptimizationTaskService:
             parameter_ranges=parameter_ranges,
             use_multi_objective=use_multi_objective,
             enable_progress_monitor=True,
-            progress_notification_callback=self._create_progress_callback(task_id)
+            progress_notification_callback=self._create_progress_callback(task_id),
+            case_storage_factory=get_case_storage_manager
         )
 
         # 保存任務
@@ -405,7 +407,7 @@ class OptimizationTaskService:
                 if task_id in self.running_tasks:
                     del self.running_tasks[task_id]
 
-    def _save_result(self, task_id: str, result: OptimizationResult):
+    def _save_result(self, task_id: str, result: Any):
         """
         保存優化結果到文件
 

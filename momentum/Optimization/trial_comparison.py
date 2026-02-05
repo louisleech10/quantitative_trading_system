@@ -27,7 +27,7 @@ from optuna.trial import FrozenTrial
 
 # 嘗試導入 logger，如果失敗則使用標準 logging
 try:
-    from api.core.logging import get_logger
+    from momentum.core.logging import get_logger
     logger = get_logger(__name__)
 except ImportError:
     import logging

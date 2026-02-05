@@ -3,6 +3,7 @@
 """
 
 import asyncio
+import importlib
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
@@ -14,7 +15,6 @@ from ..core.logging import get_logger
 from ..models.requests import SearchConfigRequest, NegativeCaseRequest
 from ..models.responses import SearchResultData, CaseData, CaseSummary, SamplingQuality, TaskStatusEnum
 from ..utils.exceptions import SearchExecutionException
-from .standalone_search_service import standalone_search_service
 
 class SearchTaskService:
     """兩階段搜索任務服務：正例搜索 → 反例搜索"""
@@ -26,6 +26,10 @@ class SearchTaskService:
         self.positive_configs: Dict[str, SearchConfigRequest] = {}  # 儲存正例搜索配置
         self.positive_execution_times: Dict[str, float] = {}  # 儲存正例執行時間
         self.negative_execution_times: Dict[str, float] = {}  # 儲存反例執行時間
+
+    def _get_standalone_service(self):
+        module = importlib.import_module("api.services.standalone_search_service")
+        return module.standalone_search_service
         
     async def execute_positive_search(self, request: SearchConfigRequest, 
                                     symbols: Optional[List[str]] = None) -> str:
@@ -36,7 +40,8 @@ class SearchTaskService:
         self.logger.info(f"Starting positive search: {request.name}")
 
         # 執行搜索
-        task_id = await standalone_search_service.execute_search(request, symbols)
+        standalone_service = self._get_standalone_service()
+        task_id = await standalone_service.execute_search(request, symbols)
 
         # 儲存正例搜索配置，包含timeframe信息
         self.positive_configs[task_id] = request
@@ -53,7 +58,8 @@ class SearchTaskService:
         start_time = datetime.now()
         
         while (datetime.now() - start_time).seconds < max_wait_time:
-            task_info = standalone_search_service.get_task_status(task_id)
+            standalone_service = self._get_standalone_service()
+            task_info = standalone_service.get_task_status(task_id)
             
             if not task_info:
                 self.logger.error(f"Task {task_id} not found")
@@ -61,7 +67,7 @@ class SearchTaskService:
                 
             if task_info.status.value == "completed":
                 # 獲取結果並儲存
-                result_data = standalone_search_service.get_task_result(task_id)
+                result_data = standalone_service.get_task_result(task_id)
                 if result_data:
                     # 確保正例案例被正確標記（即使為空列表也要處理）
                     if result_data.cases:
@@ -134,13 +140,13 @@ class SearchTaskService:
             )
 
             # 使用 standalone_search_service 的 task_manager
-            from .standalone_search_service import standalone_search_service
-            standalone_search_service.task_manager.create_task(
+            standalone_service = self._get_standalone_service()
+            standalone_service.task_manager.create_task(
                 config_name="negative_search_empty",
                 task_id=negative_task_id
             )
-            standalone_search_service.task_manager.set_task_result(negative_task_id, empty_result)
-            standalone_search_service.task_manager.update_task_status(
+            standalone_service.task_manager.set_task_result(negative_task_id, empty_result)
+            standalone_service.task_manager.update_task_status(
                 negative_task_id,
                 TaskStatusEnum.COMPLETED
             )
@@ -157,7 +163,8 @@ class SearchTaskService:
         else:
             # 備用方案：從搜索結果中獲取
             try:
-                positive_result = standalone_search_service.get_task_result(positive_task_id)
+                standalone_service = self._get_standalone_service()
+                positive_result = standalone_service.get_task_result(positive_task_id)
                 if positive_result and hasattr(positive_result, 'search_config') and positive_result.search_config:
                     if isinstance(positive_result.search_config, dict) and 'timeframe' in positive_result.search_config:
                         positive_timeframe = positive_result.search_config['timeframe']
@@ -195,12 +202,13 @@ class SearchTaskService:
                          request: NegativeCaseRequest, positive_timeframe: str = "12h"):
         """執行反例搜索邏輯 - 修復版本"""
         try:
+            standalone_service = self._get_standalone_service()
             # 創建並更新任務狀態為執行中
-            standalone_search_service.task_manager.create_task(
+            standalone_service.task_manager.create_task(
                 config_name="negative_search",
                 task_id=task_id
             )
-            standalone_search_service.task_manager.update_task_status(
+            standalone_service.task_manager.update_task_status(
                 task_id, "running"
             )
 
@@ -221,7 +229,7 @@ class SearchTaskService:
                 # 檢查結果是否有效
                 if not result_data or not result_data.cases:
                     self.logger.warning("反例搜索沒有找到任何案例")
-                    standalone_search_service.task_manager.update_task_status(
+                    standalone_service.task_manager.update_task_status(
                         task_id, "failed", error_message="No negative cases found"
                     )
                     return
@@ -244,8 +252,8 @@ class SearchTaskService:
                 self.logger.info(f"反例搜索完成，找到 {len(negative_cases)} 個案例")
 
                 # ✅ 直接使用完整的 result_data，不需要手動創建
-                standalone_search_service.task_manager.set_task_result(task_id, result_data)
-                standalone_search_service.task_manager.update_task_status(task_id, "completed")
+                standalone_service.task_manager.set_task_result(task_id, result_data)
+                standalone_service.task_manager.update_task_status(task_id, "completed")
 
             else:
                 self.logger.info("沒有用戶條件，使用時間分離策略")
@@ -253,7 +261,7 @@ class SearchTaskService:
 
         except Exception as e:
             self.logger.error(f"Negative search failed: {str(e)}", exc_info=True)
-            standalone_search_service.task_manager.update_task_status(
+            standalone_service.task_manager.update_task_status(
                 task_id, "failed", error_message=str(e)
             )
     
@@ -264,6 +272,7 @@ class SearchTaskService:
         """基於用戶設定條件執行反例搜索 - 修復版本"""
         try:
             from ..models.requests import SearchConfigRequest, FilterConditionRequest
+            standalone_service = self._get_standalone_service()
             
             self.logger.debug("構建反例搜索配置...")
             
@@ -338,7 +347,7 @@ class SearchTaskService:
             
             # 執行真實搜索
             self.logger.debug("執行基於條件的反例搜索...")
-            negative_task_id = await standalone_search_service.execute_search(negative_config, symbols)
+            negative_task_id = await standalone_service.execute_search(negative_config, symbols)
             
             # 等待搜索完成 - 基於任務狀態的智能等待
             CHECK_INTERVAL = 2  # 每2秒檢查一次
@@ -349,7 +358,7 @@ class SearchTaskService:
 
             while True:
                 elapsed = (datetime.now() - start_time).total_seconds()  # ✅ 修復：使用total_seconds而非seconds
-                task_info = standalone_search_service.get_task_status(negative_task_id)
+                task_info = standalone_service.get_task_status(negative_task_id)
 
                 # 任務不存在
                 if not task_info:
@@ -365,7 +374,7 @@ class SearchTaskService:
 
                 # ✅ 任務完成 - 處理結果
                 if current_status == "completed":
-                    result_data = standalone_search_service.get_task_result(negative_task_id)
+                    result_data = standalone_service.get_task_result(negative_task_id)
 
                     # DEBUG日誌追蹤結果傳遞
                     self.logger.debug(f"Retrieved negative task result: task_id={negative_task_id}")
@@ -638,8 +647,8 @@ class SearchTaskService:
         separation_days = request.time_separation_days
         
         # 獲取數據加載器
-        from ..services.standalone_search_service import standalone_search_service
-        data_loader = standalone_search_service.data_loader
+        standalone_service = self._get_standalone_service()
+        data_loader = standalone_service.data_loader
         
         for i, positive_case in enumerate(positive_cases):
             if len(negative_cases) >= target_count:
@@ -948,7 +957,6 @@ from typing import Optional
 
 from ..models.requests import SearchConfigRequest, NegativeCaseRequest
 from ..models.responses import TaskStartResponse, SearchResponse
-from ..services.search_task_service import search_task_service
 from ..core.logging import get_logger
 
 router = APIRouter(prefix="/two-stage", tags=["Two-Stage Search"])

@@ -25,7 +25,7 @@ import pandas as pd
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.core.protocols import IKlineReader
 
 
 logger = logging.getLogger(__name__)
@@ -72,14 +72,14 @@ class KlineCache:
 
     def __init__(
         self,
-        kline_storage: KlineStorageManager,
+        kline_storage: IKlineReader,
         n_workers: int = 4
     ):
         """
         初始化快取
 
         Args:
-            kline_storage: K 線存儲管理器
+            kline_storage: K 線讀取介面
             n_workers: 預載入時的並行工作線程數
         """
         self.storage = kline_storage

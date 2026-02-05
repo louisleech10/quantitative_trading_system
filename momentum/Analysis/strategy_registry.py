@@ -15,16 +15,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Callable, Any
 from functools import lru_cache
 
-from momentum.Optimization.strategy_metadata import (
+from momentum.core.contracts import (
     StrategyMetadata,
     ParameterDefinition,
     ParameterType,
     ConstraintType,
     ValidationResult,
     StrategyCalculator,
-    StrategyValidator
+    StrategyValidator,
 )
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger("strategy_registry")
 

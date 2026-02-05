@@ -10,10 +10,10 @@ Date: 2025-12-03
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
-from momentum.Indicators.indicator_engine import IndicatorEngine
-from api.core.logging import get_logger
+from momentum.core.protocols import IIndicatorEngine
+from momentum.core.logging import get_logger
 
 logger = get_logger("mid_long_cross_strategy")
 
@@ -42,8 +42,10 @@ def calculate_signals(
         indicator_type = params.get('indicator_type', 'ema')
         data_source = params.get('data_source', 'close')
 
-        # 創建指標引擎
-        indicator_engine = IndicatorEngine()
+        # 從上游注入指標引擎 (Protocol)
+        indicator_engine = indicators.get("indicator_engine")
+        if indicator_engine is None or not isinstance(indicator_engine, IIndicatorEngine):
+            raise ValueError("Indicator engine 未注入或型別不相容")
 
         # 配置兩條均線
         indicator_configs = [

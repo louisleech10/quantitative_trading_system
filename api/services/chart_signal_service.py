@@ -26,8 +26,7 @@ import pandas as pd
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException
 
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.Indicators import IndicatorEngine
+from momentum.factories import create_indicator_engine, create_kline_storage_manager
 from api.core.config import settings
 from api.models.strategy_test_models import (
     ChartSignalCalculationRequest,
@@ -66,8 +65,8 @@ class ChartSignalService:
             return
 
         # 依賴注入
-        self.kline_storage = KlineStorageManager(cache_dir=str(settings.kline_cache_dir))
-        self.indicator_engine = IndicatorEngine()
+        self.kline_storage = create_kline_storage_manager(cache_dir=str(settings.kline_cache_dir))
+        self.indicator_engine = create_indicator_engine()
 
         self.logger = logging.getLogger(__name__)
         self.logger.info("ChartSignalService initialized")
@@ -152,8 +151,7 @@ class ChartSignalService:
             warmup_bars = int(max_period * WARMUP_MULTIPLIER)
 
             # 獲取 timeframe 的秒數
-            from momentum.DataExtraction.kline_storage import KlineStorageManager
-            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(request.timeframe)
+            timeframe_seconds = self.kline_storage.TIMEFRAME_SECONDS.get(request.timeframe)
             if timeframe_seconds is None:
                 raise ValueError(f"不支援的 timeframe: {request.timeframe}")
             

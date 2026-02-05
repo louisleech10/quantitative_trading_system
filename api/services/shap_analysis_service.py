@@ -16,9 +16,11 @@ import numpy as np
 import pandas as pd
 
 from api.core.logging import get_logger
-from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
-from momentum.Analysis.model_storage import ModelStorage
-from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from momentum.factories import (
+    create_feature_storage,
+    create_model_storage,
+    create_xgboost_analyzer,
+)
 
 logger = get_logger(__name__)
 
@@ -27,8 +29,8 @@ class SHAPAnalysisService:
     """SHAP 解釋服務"""
 
     def __init__(self):
-        self.model_storage = ModelStorage()
-        self.feature_storage = FeatureStorage()
+        self.model_storage = create_model_storage()
+        self.feature_storage = create_feature_storage()
         self.logger = logger
 
     def _load_model_data(self, task_result: Dict) -> Dict:
@@ -90,7 +92,7 @@ class SHAPAnalysisService:
 
         X_sample, feature_names, _ = self._build_sample_from_task(task_result, sample_size)
 
-        analyzer = XGBoostAnalyzer()
+        analyzer = create_xgboost_analyzer()
         analyzer.model = model
         analyzer.feature_names = feature_names
 
@@ -137,7 +139,7 @@ class SHAPAnalysisService:
             else:
                 raise ValueError("case_id 不在 SHAP 取樣資料中")
 
-        analyzer = XGBoostAnalyzer()
+        analyzer = create_xgboost_analyzer()
         analyzer.model = model
         analyzer.feature_names = feature_names
 

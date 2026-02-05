@@ -19,7 +19,7 @@ import logging
 
 # 嘗試匯入 api.core.logging，失敗則使用標準 logging
 try:
-    from api.core.logging import get_logger
+    from momentum.core.logging import get_logger
     logger = get_logger(__name__)
 except (ImportError, ModuleNotFoundError):
     logging.basicConfig(level=logging.INFO)

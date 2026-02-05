@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -16,18 +16,54 @@ import logging
 import pandas as pd
 import numpy as np
 
-from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
-from momentum.Analysis.expectancy_calculator import ExpectancyCalculator
-from momentum.Analysis.bootstrap_estimator import BootstrapEstimator
-from momentum.Analysis.regime_analyzer import RegimeAnalyzer
-from momentum.Analysis.pattern_extractor import PatternExtractor
-from momentum.Analysis.model_storage import ModelStorage
-from momentum.FeatureEngineering.feature_storage import FeatureStorage
-from api.services.xgboost_task_cache import XGBoostTaskCache
+from momentum.factories import (
+    create_bootstrap_estimator,
+    create_expectancy_calculator,
+    create_feature_storage,
+    create_model_storage,
+    create_pattern_extractor,
+    create_regime_analyzer,
+    create_xgboost_analyzer,
+    create_market_config,
+)
+from dataclasses import dataclass
 from api.core.logging import get_logger
 from api.utils.json_serializer import sanitize_for_json
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class _XGBoostTaskResult:
+    task_id: str
+    predictions_df: Optional[pd.DataFrame]
+    calibration_curve: Optional[Dict]
+    pr_curve: Optional[Dict]
+    created_at: datetime
+
+
+class _XGBoostTaskCache:
+    """Minimal task cache to avoid cross-service dependency."""
+
+    _cache: Dict[str, _XGBoostTaskResult] = {}
+
+    def store_result(
+        self,
+        task_id: str,
+        predictions_df: Optional[pd.DataFrame],
+        calibration_curve: Optional[Dict],
+        pr_curve: Optional[Dict],
+    ) -> None:
+        self._cache[task_id] = _XGBoostTaskResult(
+            task_id=task_id,
+            predictions_df=predictions_df,
+            calibration_curve=calibration_curve,
+            pr_curve=pr_curve,
+            created_at=datetime.utcnow(),
+        )
+
+    def get_result(self, task_id: str) -> Optional[_XGBoostTaskResult]:
+        return self._cache.get(task_id)
 
 
 class TaskManager:
@@ -79,14 +115,14 @@ class XGBoostTaskService:
     
     def __init__(self):
         self.task_manager = TaskManager()
-        self.xgboost_analyzer = XGBoostAnalyzer()
-        self.pattern_extractor = PatternExtractor()
-        self.model_storage = ModelStorage()
-        self.feature_storage = FeatureStorage()
-        self.expectancy_calculator = ExpectancyCalculator()
-        self.bootstrap_estimator = BootstrapEstimator()
+        self.xgboost_analyzer = create_xgboost_analyzer()
+        self.pattern_extractor = create_pattern_extractor()
+        self.model_storage = create_model_storage()
+        self.feature_storage = create_feature_storage()
+        self.expectancy_calculator = create_expectancy_calculator()
+        self.bootstrap_estimator = create_bootstrap_estimator()
         self.logger = logger
-        self.task_cache = XGBoostTaskCache()
+        self.task_cache = _XGBoostTaskCache()
     
     async def start_xgboost_analysis_task(
         self,
@@ -308,7 +344,7 @@ class XGBoostTaskService:
             market_phases = self._resolve_market_phases(df)
             if market_phases:
                 try:
-                    analyzer = RegimeAnalyzer()
+                    analyzer = create_regime_analyzer()
                     regime_report = analyzer.analyze_by_phase(
                         y_true=y,
                         y_pred_proba=y_pred_proba,
@@ -449,7 +485,6 @@ class XGBoostTaskService:
 
         try:
             from datetime import datetime
-            from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
 
             timestamps = df["timestamp"].values
             phases = []
@@ -457,7 +492,9 @@ class XGBoostTaskService:
                 ts_int = int(ts)
                 if ts_int > 10 ** 12:
                     ts_int = ts_int // 1000
-                phase = MarketConfig.get_market_phase(datetime.utcfromtimestamp(ts_int))
+                phase = create_market_config().get_market_phase(
+                    datetime.utcfromtimestamp(ts_int)
+                )
                 phases.append(phase)
             return phases
         except Exception as e:

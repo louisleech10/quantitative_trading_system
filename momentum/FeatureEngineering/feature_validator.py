@@ -16,7 +16,7 @@ from typing import Dict, List, Tuple
 from dataclasses import dataclass
 import logging
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 

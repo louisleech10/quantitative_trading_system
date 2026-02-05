@@ -17,11 +17,12 @@ import traceback
 import pandas as pd
 import h5py
 
-from momentum.FeatureEngineering.feature_extractor import (
-    FeatureExtractor, StrategyParams
+from momentum.factories import (
+    create_feature_extractor,
+    create_feature_storage,
+    create_feature_validator,
+    create_strategy_params,
 )
-from momentum.FeatureEngineering.feature_validator import FeatureValidator
-from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
 from api.core.logging import get_logger
 
@@ -78,9 +79,9 @@ class FeatureTaskService:
     """
     
     def __init__(self):
-        self.extractor = FeatureExtractor()
-        self.validator = FeatureValidator()
-        self.storage = FeatureStorage()
+        self.extractor = create_feature_extractor()
+        self.validator = create_feature_validator()
+        self.storage = create_feature_storage()
         self.task_manager = TaskManager()
         self.logger = logger
     
@@ -110,9 +111,9 @@ class FeatureTaskService:
             {'task_id': str, 'status': str, 'estimated_time': int}
         """
         # 先做基本參數驗證（避免無效任務進入佇列）
-        strategy_config = StrategyParams(
+        strategy_config = create_strategy_params(
             strategy_type=strategy_type,
-            params=strategy_params
+            params=strategy_params,
         )
         strategy_config.validate()
 
@@ -165,9 +166,9 @@ class FeatureTaskService:
             # Step 2: 提取特徵 (60%)
             self.task_manager.update_progress(task_id, 40)
             
-            strategy_config = StrategyParams(
+            strategy_config = create_strategy_params(
                 strategy_type=strategy_type,
-                params=strategy_params
+                params=strategy_params,
             )
             
             features_df, feature_names = self.extractor.extract_features_from_strategy(

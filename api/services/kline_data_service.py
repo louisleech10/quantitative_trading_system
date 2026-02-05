@@ -36,9 +36,11 @@ sys.path.insert(0, str(project_root))
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.DataExtraction.kline_download_service import KlineDownloadService
-from momentum.DataExtraction.providers.binance_provider import BinanceProvider
+from momentum.factories import (
+    create_binance_provider,
+    create_kline_download_service,
+    create_kline_storage_manager,
+)
 
 logger = get_logger("api.kline_data_service")
 
@@ -57,8 +59,8 @@ class KlineDataService:
 
     def __init__(
         self,
-        storage_manager: Optional[KlineStorageManager] = None,
-        download_service: Optional[KlineDownloadService] = None,
+        storage_manager: Optional[object] = None,
+        download_service: Optional[object] = None,
         cache_dir: Optional[str] = None,
         default_source: str = "binance"
     ):
@@ -77,7 +79,7 @@ class KlineDataService:
         if storage_manager is None:
             if cache_dir is None:
                 cache_dir = str(settings.kline_cache_dir)
-            self.storage_manager = KlineStorageManager(cache_dir=cache_dir)
+            self.storage_manager = create_kline_storage_manager(cache_dir=cache_dir)
             logger.info(f"Created KlineStorageManager with cache_dir: {cache_dir}")
         else:
             self.storage_manager = storage_manager
@@ -85,13 +87,13 @@ class KlineDataService:
 
         # 初始化下載服務
         if download_service is None:
-            self.download_service = KlineDownloadService(
+            self.download_service = create_kline_download_service(
                 storage_manager=self.storage_manager
             )
 
             # 註冊Binance Provider
             try:
-                binance_provider = BinanceProvider()
+                binance_provider = create_binance_provider()
                 self.download_service.registry.register('binance', binance_provider)
                 logger.info("Registered Binance provider")
             except Exception as e:

@@ -28,13 +28,14 @@ import pandas as pd
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from api.services.kline_storage_service import KlineStorageService
-from api.services.kline_data_service import (
-    KlineDataService,
-    get_kline_data_service
+from typing import Any
+
+from momentum.factories import (
+    create_binance_provider,
+    create_indicator_engine,
+    create_kline_download_service,
+    create_kline_storage_manager,
 )
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.Indicators import IndicatorEngine
 from api.core.logging import get_logger
 
 logger = get_logger("api.chart_data_service")
@@ -54,7 +55,7 @@ class ChartDataService:
     def __init__(
         self,
         cache_dir: Optional[str] = None,
-        kline_data_service: Optional[KlineDataService] = None
+        kline_data_service: Optional[Any] = None
     ):
         """
         初始化圖表數據服務
@@ -62,9 +63,20 @@ class ChartDataService:
         Args:
             cache_dir: K線緩存目錄路徑
         """
-        self.storage_service = KlineStorageService(cache_dir=cache_dir)
-        self.kline_data_service = kline_data_service or get_kline_data_service(cache_dir=cache_dir)
-        self.indicator_engine = IndicatorEngine()  # 新增：用於指標計算
+        self.storage_manager = create_kline_storage_manager(cache_dir=cache_dir)
+        self.download_service = create_kline_download_service(
+            storage_manager=self.storage_manager
+        )
+        try:
+            self.download_service.registry.register(
+                "binance",
+                create_binance_provider(),
+            )
+        except Exception:
+            logger.debug("Binance provider already registered", exc_info=True)
+
+        self.kline_data_service = kline_data_service
+        self.indicator_engine = create_indicator_engine()  # 新增：用於指標計算
         logger.info(f"ChartDataService initialized with IndicatorEngine")
 
 
@@ -163,7 +175,7 @@ class ChartDataService:
             )
 
             # 從storage讀取數據
-            result = self.storage_service.read_klines_around_timestamp(
+            result = self._read_klines_around_timestamp(
                 symbol=symbol,
                 timeframe=timeframe,
                 center_timestamp=case_timestamp,
@@ -344,18 +356,15 @@ class ChartDataService:
         
         智能下載：只下載缺失的部分，避開已有數據以防止無效的重複下載。
         """
-        if self.kline_data_service is None:
-            return
-
         try:
-            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(timeframe)
+            timeframe_seconds = self.storage_manager.TIMEFRAME_SECONDS.get(timeframe)
             if timeframe_seconds is None:
                 logger.debug(f"Timeframe {timeframe} not managed for automatic download")
                 return
 
             case_bars = 1
             if case_timeframe:
-                case_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(case_timeframe)
+                case_seconds = self.storage_manager.TIMEFRAME_SECONDS.get(case_timeframe)
                 if case_seconds:
                     case_bars = max(1, case_seconds // timeframe_seconds)
 
@@ -374,8 +383,7 @@ class ChartDataService:
             # 檢查現有數據範圍
             try:
                 # 直接從底層 storage manager 讀取 metadata
-                storage_manager = self.storage_service.storage_manager
-                metadata = storage_manager.get_metadata(symbol, timeframe)
+                metadata = self.storage_manager.get_metadata(symbol, timeframe)
                 existing_start = metadata.get('time_range_start') if metadata else None
                 existing_end = metadata.get('time_range_end') if metadata else None
                 
@@ -426,12 +434,11 @@ class ChartDataService:
                         continue
                         
                     logger.info(f"Downloading {gap_type}: {start_dt} to {end_dt}")
-                    self.kline_data_service.get_kline_data(
+                    self._download_klines_range(
                         symbol=symbol,
                         timeframe=timeframe,
-                        start_time=start_dt,
-                        end_time=end_dt,
-                        validate_integrity=False
+                        start_dt=start_dt,
+                        end_dt=end_dt,
                     )
             else:
                 # 沒有現有數據，下載完整範圍
@@ -443,18 +450,129 @@ class ChartDataService:
                 
                 if end_dt > start_dt:
                     logger.info(f"Downloading full range: {start_dt} to {end_dt}")
-                    self.kline_data_service.get_kline_data(
+                    self._download_klines_range(
                         symbol=symbol,
                         timeframe=timeframe,
-                        start_time=start_dt,
-                        end_time=end_dt,
-                        validate_integrity=False
+                        start_dt=start_dt,
+                        end_dt=end_dt,
                     )
 
         except Exception as e:
             logger.warning(
                 f"Failed to ensure data coverage for {symbol}/{timeframe} at {case_timestamp}: {e}"
             )
+
+    def _download_klines_range(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_dt: datetime,
+        end_dt: datetime,
+    ) -> None:
+        """Download missing klines via injected service or direct download."""
+        if self.kline_data_service is not None:
+            self.kline_data_service.get_kline_data(
+                symbol=symbol,
+                timeframe=timeframe,
+                start_time=start_dt,
+                end_time=end_dt,
+                validate_integrity=False,
+            )
+            return
+
+        try:
+            self.download_service.download_klines(
+                source="binance",
+                symbol=symbol,
+                start_time=start_dt,
+                end_time=end_dt,
+                timeframe=timeframe,
+                save_to_storage=True,
+            )
+        except Exception as e:
+            logger.warning(
+                f"Failed to download klines for {symbol}/{timeframe}: {e}",
+                exc_info=True,
+            )
+
+    def _read_klines_around_timestamp(
+        self,
+        symbol: str,
+        timeframe: str,
+        center_timestamp: int,
+        lookback: int,
+        forward: int,
+        case_timeframe: Optional[str],
+    ) -> Dict[str, Any]:
+        """Read klines around timestamp and return chart_data style payload."""
+        try:
+            df = self.storage_manager.read_klines_around_timestamp(
+                symbol=symbol,
+                timeframe=timeframe,
+                center_timestamp=center_timestamp,
+                lookback=lookback,
+                forward=forward,
+                case_timeframe=case_timeframe,
+            )
+            if df is None or len(df) == 0:
+                return {
+                    "success": False,
+                    "data": [],
+                    "message": "No klines data found",
+                }
+
+            result = {
+                "success": True,
+                "data": df.to_dict("records"),
+            }
+            if case_timeframe:
+                result["to_index"] = df.attrs.get("to_index")
+                result["tc_index"] = df.attrs.get("tc_index")
+                result["case_bars"] = df.attrs.get("case_bars")
+                result["to_timestamp"] = df.attrs.get("to_timestamp")
+                result["tc_timestamp"] = df.attrs.get("tc_timestamp")
+            else:
+                result["center_index"] = df.attrs.get("center_index")
+            return result
+        except Exception as e:
+            return {
+                "success": False,
+                "data": [],
+                "message": str(e),
+            }
+
+    def _read_klines(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_time: int,
+        end_time: int,
+    ) -> Dict[str, Any]:
+        """Read klines in range and return chart_data style payload."""
+        try:
+            df = self.storage_manager.read_klines(
+                symbol,
+                timeframe,
+                start_time=start_time,
+                end_time=end_time,
+                validate_continuity=False,
+            )
+            if df is None or len(df) == 0:
+                return {
+                    "success": False,
+                    "data": [],
+                    "message": "No klines data found",
+                }
+            return {
+                "success": True,
+                "data": df.to_dict("records"),
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "data": [],
+                "message": str(e),
+            }
 
 
     def _calculate_indicators_with_warmup(
@@ -491,7 +609,7 @@ class ChartDataService:
             display_timestamps = set(kline['timestamp'] for kline in display_klines)
             
             # 計算 timeframe 對應的秒數
-            timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(timeframe)
+            timeframe_seconds = self.storage_manager.TIMEFRAME_SECONDS.get(timeframe)
             if not timeframe_seconds:
                 logger.warning(f"Unknown timeframe: {timeframe}, falling back to simple calculation")
                 return self._calculate_indicators_for_chart(display_klines, indicator_config)
@@ -505,7 +623,7 @@ class ChartDataService:
             )
             
             # 從 storage 讀取包含 warmup 的完整數據
-            warmup_result = self.storage_service.read_klines(
+            warmup_result = self._read_klines(
                 symbol=symbol,
                 timeframe=timeframe,
                 start_time=warmup_start_ts,

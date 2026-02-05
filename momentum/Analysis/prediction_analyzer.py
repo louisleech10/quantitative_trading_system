@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 

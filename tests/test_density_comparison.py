@@ -18,12 +18,18 @@ Date: 2025-12-11
 import requests
 import json
 import sys
+import pytest
 
 API_BASE_URL = "http://localhost:8000"
 
 
 def test_density_consistency():
     """測試密度計算一致性"""
+    _run_density_consistency(allow_skip=True)
+
+
+def _run_density_consistency(allow_skip: bool) -> dict:
+    """執行密度一致性檢查（可選擇在不可用時 skip）"""
 
     print("=" * 60)
     print("Optuna vs 單參數測試 - 密度計算一致性驗證")
@@ -36,9 +42,12 @@ def test_density_consistency():
         cases_response.raise_for_status()
         cases_data = cases_response.json()
     except requests.exceptions.RequestException as e:
-        print(f"❌ 無法連接到後端 API: {e}")
+        message = f"無法連接到後端 API: {e}"
+        print(f"❌ {message}")
         print("請確認後端服務已啟動 (通常是 http://localhost:8000)")
-        sys.exit(1)
+        if allow_skip:
+            pytest.skip(message)
+        raise RuntimeError(message)
 
     positive_cases = []
     negative_cases = []
@@ -54,8 +63,11 @@ def test_density_consistency():
     print(f"  反例: {len(negative_cases)} 個")
 
     if len(positive_cases) < 1 or len(negative_cases) < 1:
-        print(f"❌ 案例數量不足 (需要至少各1個)")
-        sys.exit(1)
+        message = "案例數量不足 (需要至少各1個)"
+        print(f"❌ {message}")
+        if allow_skip:
+            pytest.skip(message)
+        raise RuntimeError(message)
 
     # 排序以確保順序一致
     positive_cases_sorted = sorted(positive_cases)
@@ -115,10 +127,13 @@ def test_density_consistency():
         )
         response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        print(f"❌ API 調用失敗: {e}")
+        message = f"API 調用失敗: {e}"
+        print(f"❌ {message}")
         if hasattr(e, 'response') and e.response is not None:
             print(f"  響應內容: {e.response.text}")
-        sys.exit(1)
+        if allow_skip:
+            pytest.skip(message)
+        raise RuntimeError(message)
 
     result = response.json()
 
@@ -192,7 +207,7 @@ def test_density_consistency():
 def main():
     """主函數"""
     try:
-        result = test_density_consistency()
+        result = _run_density_consistency(allow_skip=False)
         print("\n✅ 驗證腳本執行完成")
         return 0
     except Exception as e:

@@ -493,12 +493,16 @@ class CaseSearchIntegrationService:
                     sys.path.insert(0, str(path))
             
             # 導入模組
-            from momentum.DataExtraction.Momentum_Strategy_Data_Loader import MomentumDataLoader
-            from momentum.DataExtraction.case_search_engine import CaseSearchEngine, SearchConfiguration, FilterCondition
+            from momentum.factories import (
+                create_case_search_engine,
+                create_filter_condition,
+                create_momentum_data_loader,
+                create_search_configuration,
+            )
             
             # 創建實例
-            self.data_loader = MomentumDataLoader()
-            self.search_engine = CaseSearchEngine(self.data_loader)
+            self.data_loader = create_momentum_data_loader()
+            self.search_engine = create_case_search_engine(self.data_loader)
             self.momentum_available = True
             
             self.logger.info("✅ Momentum modules loaded successfully")
@@ -637,9 +641,9 @@ class CaseSearchIntegrationService:
     async def _convert_request_to_config(self, request: SearchConfigRequest):
         """轉換API請求為搜索配置"""
         # 導入SearchConfiguration和FilterCondition
-        from momentum.DataExtraction.case_search_engine import SearchConfiguration, FilterCondition
+        from momentum.factories import create_filter_condition, create_search_configuration
         
-        config = SearchConfiguration(
+        config = create_search_configuration(
             name=request.name,
             description=request.description,
             timeframe=request.timeframe.value if hasattr(request.timeframe, 'value') else request.timeframe,
@@ -653,7 +657,7 @@ class CaseSearchIntegrationService:
         
         # 添加初始條件
         for condition_req in request.initial_conditions:
-            condition = FilterCondition(
+            condition = create_filter_condition(
                 condition_type=condition_req.condition_type.value if hasattr(condition_req.condition_type, 'value') else condition_req.condition_type,
                 parameter=condition_req.parameter,
                 operator=condition_req.operator.value if hasattr(condition_req.operator, 'value') else condition_req.operator,
@@ -664,7 +668,7 @@ class CaseSearchIntegrationService:
         
         # 添加高級條件
         for condition_req in request.advanced_conditions:
-            condition = FilterCondition(
+            condition = create_filter_condition(
                 condition_type=condition_req.condition_type.value if hasattr(condition_req.condition_type, 'value') else condition_req.condition_type,
                 parameter=condition_req.parameter,
                 operator=condition_req.operator.value if hasattr(condition_req.operator, 'value') else condition_req.operator,
@@ -680,7 +684,7 @@ class CaseSearchIntegrationService:
         # 確保有預設條件（如果沒有提供任何條件的話）
         if not request.initial_conditions and not request.advanced_conditions:
             # 添加預設的價格變化條件（參照測試腳本）
-            default_condition = FilterCondition(
+            default_condition = create_filter_condition(
                 condition_type="price",
                 parameter="price_change", 
                 operator=">=",

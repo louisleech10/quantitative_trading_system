@@ -17,7 +17,7 @@ import logging
 from datetime import datetime
 import os
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.data_source_registry import DataSourceRegistry
 from momentum.FeatureEngineering.strategy_registry import StrategyRegistry
 from momentum.FeatureEngineering.feature_config import FeatureNamingConfig

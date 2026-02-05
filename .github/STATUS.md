@@ -1,6 +1,12 @@
 # 項目狀態
 
 ### 已完成 ✅
+- ✅ **架構重構 V4（Phase 1-10）** — 2026-02-05
+  - 移除 momentum → api 反向依賴（Rule 1-7 違規全部修復）
+  - 建立 momentum/core 基礎設施（5 個核心檔案）
+  - 實作 Protocol 介面與 Factory 模式解耦
+  - 測試全部通過（251 passed, 33 skipped）
+  - API 正常運行（/docs 200 OK）
 - ✅ Task 1.1: OOT 驗證系統（後端 + 單元測試） — 2026-01-28（17 tests passed）
 - ✅ Task 1.2: XGBoost 預測機率輸出、API格式、單元測試 — 2026-01-28
 - ✅ Task 1.3: 三種特徵重要性（Gain/Cover/Weight）、校正指標（Brier/ECE）、API整合 — 2026-01-28
@@ -25,43 +31,55 @@
 - ✅ Phase 1~3: 策略信號系統 - 已於 2025-11-02 完成
 
 ### 進行中 🚧
-- XGBoost Phase 4 測試驗證（E2E測試與API整合測試規劃中）
+- 無（架構重構 V4 已完成，系統處於穩定狀態）
 
 ## 🎯 當前重點
-- ✅ XGBoost Phase 1-3 已全部完成（OOT/SHAP/PSI/市場體制/Precision@K/Bootstrap CI/Permutation Importance）
-- ✅ Phase 4 Task 4.2-4.4 深度分析功能已完成（後端API+前端UI+圖表組件）
-- ✅ 後端測試通過（pytest 2 passed, XGBoost 模型 CV AUC 0.9953）
-- 下一階段：建立測試流程（前端 E2E 測試 + API 整合測試）
+- ✅ **架構重構 V4 完成**（2026-02-05）
+  - momentum domain 完全獨立（無 api 依賴）
+  - Protocol 介面與 Factory 模式解耦成功
+  - 251 個測試全部通過
+  - API 服務正常運行
+- ✅ XGBoost Phase 1-4 深度分析功能完整（OOT/SHAP/PSI/市場體制/深度分析UI）
+- 系統架構健康，可進行新功能開發或效能優化
 
 ### 下一步工作
-**選項 A**（推薦，測試驗證）：
-- 建立前端 E2E 測試流程（Playwright/Cypress）
-- 建立 API 整合測試（pytest + FastAPI TestClient）
-- 驗證深度分析頁面 4 個 Tab 與 11 個圖表功能
+**選項 A**（推薦，持續優化）：
+- 消除測試警告（117 個 warnings，主要為 PytestReturnNotNoneWarning）
+- 提升測試覆蓋率（目前 251 passed, 33 skipped）
+- 效能基準測試與優化
 
-**選項 B**（特徵工程）：
+**選項 B**（新功能開發）：
 - Task 4.1: Feature Engineering 實作（序列特徵、時間序列切分）
-- 多時間框架特徵提取
-- 技術指標衍生特徵
-
-**選項 C**（MLflow 整合）：
 - Task 4.5: MLflow 實驗追蹤整合
-- 模型註冊與版本管理
-- 實驗結果持久化與查詢
+- 前端 E2E 測試流程建立
+
+**選項 C**（文件與重構）：
+- 更新 ARCHITECTURE.md（反映新架構）
+- 補充 API_SPECIFICATION.md
+- 建立架構圖與最佳實踐指南
 ### 需要修復
-- 無待修復項目（Phase 4 Task 4.2-4.4 已完成並通過驗證）
+- 無待修復項目（架構重構 V4 完成，所有測試通過）
 
 ### 需要優化
+- 測試警告消除（117 個 warnings，主要為 PytestReturnNotNoneWarning） — 優先級中
 - SHAP 樣本大小配置（目前 100/200 固定值） — 優先級低
 - API 序列化清理負擔優化 — 優先級低
-- 測試覆蓋率提升（前端 E2E 測試、API 整合測試） — 優先級高
 
 ### 技術債務
+- 架構文檔更新（ARCHITECTURE.md 需反映 momentum/core 與 Protocol 架構）
 - Task 4.1: Feature Engineering（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合（可選）
-- E2E 測試與 API 整合測試建立（優先級高）
-- Phase 4 深度分析文檔完善（使用指南與最佳實踐）
+- E2E 測試與 API 整合測試建立
 ## 📝 最近完成的工作
+- 2026-02-05：**架構重構 V4 完成** — momentum domain 完全獨立，Protocol 與 Factory 解耦
+  - ✅ Phase 1-10 全部完成（Violation 修復 + Service 分類 + momentum/core 建立 + Protocol/Factory 實作）
+  - ✅ 移除所有 momentum → api 反向依賴（Rule 1-7 違規清零）
+  - ✅ 建立 momentum/core 基礎設施（logging, config, contracts, protocols）
+  - ✅ 實作 momentum/factories.py 統一物件建立
+  - ✅ 修復測試失敗項（test_append_fix, test_density_comparison）
+  - ✅ 修復 API 500 錯誤（signal_density_analyzer None 檢查）
+  - ✅ 測試結果：251 passed, 33 skipped, 117 warnings
+  - ✅ API 驗證：/docs 200 OK
 - 2026-01-29：**Task 4.2-4.4 深度分析功能完成** — 預測分析 API、頁面架構、圖表組件
   - **後端預測分析 API**：
     - ✅ momentum/Analysis/prediction_analyzer.py (333行) — 預測結果進階分析引擎
@@ -93,7 +111,7 @@
   - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
 - 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，待推送 — 2026-01-29（Task 4.2-4.4 深度分析功能完成）
+- main 分支，待推送 — 2026-02-05（架構重構 V4 完成，Phase 1-10）
 - **XGBoost 批量分析 JSON 序列化修復** (100%) - 2026-01-15完成
   - ✅ JSON 序列化工具：convert_numpy_types 遞迴轉換 numpy 類型
   - ✅ XGBoost 結果清理：sanitize_for_json 防止 FastAPI 序列化錯誤
@@ -291,26 +309,25 @@
 - 最新提交：Task 2.2/2.3 完成 + 測試警告修復（2 warnings → 0 warnings）
 
 ## 💡 下次啟動時
-根據 Phase 4 深度分析功能完成狀態：
+根據架構重構 V4 完成狀態，建議後續方向：
 
-- **選項 A**（推薦）: 建立測試流程驗證深度分析功能
-  - 前端 E2E 測試流程（Playwright/Cypress）
-    - 測試場景：啟動服務 → 建立批量分析 → 進入深度分析頁 → 驗證 4 個 Tab 與 11 個圖表載入
-    - 驗證點：URL 正確、資料載入完成、圖表渲染、錯誤處理
-  - API 整合測試流程（pytest + FastAPI TestClient）
-    - 測試 6 個深度分析端點的請求/回應格式
-    - 驗證 Mock 與真實任務資料測試
-  - 完整測試清單建立（每一步期望結果+意義說明）
+- **選項 A**（推薦，品質提升）: 優化與文件化
+  - 消除 117 個測試警告（PytestReturnNotNoneWarning）
+  - 更新 ARCHITECTURE.md（反映 momentum/core、Protocol、Factory 架構）
+  - 建立架構圖與最佳實踐指南
+  - 提升測試覆蓋率（減少 33 skipped）
 
-- **選項 B**: Feature Engineering 實作
+- **選項 B**（新功能開發）: Feature Engineering 或 MLflow
   - Task 4.1: 序列特徵、時間序列切分、技術指標衍生特徵
-  - 多時間框架特徵提取
+  - Task 4.5: MLflow 實驗追蹤整合（模型註冊與版本管理）
+  - 前端 E2E 測試流程建立
 
-- **選項 C**: MLflow 實驗追蹤整合
-  - Task 4.5: 模型註冊與版本管理
-  - 實驗結果持久化與查詢
+- **選項 C**（效能優化）: 基準測試與調優
+  - 建立效能基準測試套件
+  - 分析熱點與瓶頸
+  - 優化關鍵路徑（如 Optuna 優化、信號密度分析）
 
-**建議順序**: 測試流程驗證 → Feature Engineering → MLflow 整合（依需求）
+**建議順序**: 文件化與警告消除 → 新功能開發 → 效能優化
 
 ---
 

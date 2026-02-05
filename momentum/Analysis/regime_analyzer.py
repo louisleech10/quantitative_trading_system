@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.metrics import roc_auc_score
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -88,23 +88,19 @@ if TYPE_CHECKING:
     from optuna.samplers import BaseSampler
     from optuna.pruners import BasePruner
 
-from api.models.training_window_config import (
+from momentum.core.contracts import (
     SignalDensityRequest,
     SignalDensityResponse,
     TrainingWindowConfig,
-    StrategyConfig
+    StrategyConfig,
+    ParameterRange,
 )
-from api.models.strategy_test_models import ParameterRange
-from api.services.signal_analysis_service import SignalAnalysisService
-from api.utils.case_storage import get_case_storage_manager, CaseStorageManager as CaseStorage
-
-# 導入同步分析器（用於真正的多核並行）
 from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
 from momentum.Analysis.kline_cache import KlineCache
 from momentum.Analysis.indicator_cache import IndicatorCache
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.Indicators.indicator_engine import IndicatorEngine
-from api.core.config import settings
+from momentum.core.config import MomentumConfig
 
 # 導入新增的容錯機制
 from momentum.Optimization.checkpoint_manager import CheckpointManager
@@ -113,10 +109,14 @@ from momentum.Optimization.progress_monitor import ProgressMonitor, ProgressStat
 
 # 導入動態策略系統 (Phase 2 Refactoring)
 # Note: strategy_registry 使用 lazy import 避免循環依賴
-from momentum.Optimization.strategy_metadata import ParameterType
+from momentum.core.contracts import ParameterType
 
 # 用於線程安全的去重採樣
 import threading
+
+# 測試相容性：保留可被 patch 的名稱（避免直接依賴 api.utils）
+SignalAnalysisService = None
+CaseStorage = None
 
 
 # ==================== 去重採樣器包裝器 ====================
@@ -381,6 +381,8 @@ class OptunaOptimizer:
         retry_base_delay: float = 1.0,
         enable_progress_monitor: bool = True,
         progress_notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        case_storage: Optional[Any] = None,
+        case_storage_factory: Optional[Callable[[], Any]] = None,
         clustering_weight: float = 0.5,
         # Golden Formula v2.0 參數
         golden_lambda: float = 1.0,
@@ -412,6 +414,8 @@ class OptunaOptimizer:
                               - 聚集得分: 測量正例信號在近期窗口的聚集程度
                               - 區分得分: 測量正反例的near/far ratio差異
                               - 加權公式: clustering_weight * 聚集得分 + (1-clustering_weight) * 區分得分
+            case_storage: 案例存儲管理器（可注入）
+            case_storage_factory: 案例存儲管理器工廠（可注入）
             golden_lambda: Golden Formula v2.0 穩定性懲罰係數 λ (default: 1.0)
             min_pos_active_cases: 最小正例有效案例數門檻 (default: 3, 設為 0 則不檢查)
             min_pos_total_weight: 最小正例權重總和門檻 (default: 0.0, 設為 0 則不檢查)
@@ -440,11 +444,34 @@ class OptunaOptimizer:
         self.min_pos_total_weight = min_pos_total_weight
 
         # 依賴服務
-        self.signal_service = SignalAnalysisService()
-        self.case_storage = get_case_storage_manager()
+        self.case_storage = case_storage
+        if self.case_storage is None and case_storage_factory is not None:
+            self.case_storage = case_storage_factory()
+        if self.case_storage is None and callable(CaseStorage):
+            self.case_storage = CaseStorage()
+        if self.case_storage is None:
+            raise ValueError("case_storage is required for OptunaOptimizer")
+
+        self.signal_service = None
+        if callable(SignalAnalysisService):
+            self.signal_service = SignalAnalysisService()
+
+        missing_methods = [
+            name for name in ("case_exists", "get_case")
+            if not hasattr(self.case_storage, name)
+        ]
+        if missing_methods:
+            raise ValueError(
+                "case_storage missing required methods: "
+                + ", ".join(missing_methods)
+            )
+        self._analysis_timeframe = "1h"
 
         # 同步分析器（用於真正的多核並行，繞過 async event loop 瓶頸）
-        self._kline_storage = KlineStorageManager(cache_dir=str(settings.kline_cache_dir))
+        self._momentum_config = MomentumConfig.from_project_root()
+        self._kline_storage = KlineStorageManager(
+            cache_dir=str(self._momentum_config.data_cache_path)
+        )
         self._indicator_engine = IndicatorEngine()
         self._sync_analyzer = SignalDensityAnalyzer(
             kline_storage=self._kline_storage,
@@ -820,7 +847,7 @@ class OptunaOptimizer:
             negative_cases=self.negative_cases
         )
 
-        response: SignalDensityResponse = await self.signal_service.analyze_signal_density(request)
+        response: SignalDensityResponse = await self._analyze_signal_density_request(request)
         return self._compute_objective_from_response(response)
 
     def _compute_objective_from_response(self, response: SignalDensityResponse) -> float:
@@ -840,6 +867,67 @@ class OptunaOptimizer:
             return pos - neg
 
         raise ValueError("無法從 SignalDensityResponse 計算目標值")
+
+    def _prepare_cases_for_analysis(
+        self,
+        case_ids: List[str],
+        label: str,
+        timeframe: str
+    ) -> List[Any]:
+        cases: List[Any] = []
+        missing_cases: List[str] = []
+
+        for case_id in case_ids:
+            case = self.case_storage.get_case(case_id)
+            if case is None:
+                missing_cases.append(case_id)
+                continue
+
+            case_copy = case.model_copy() if hasattr(case, "model_copy") else case
+            if hasattr(case_copy, "timeframe"):
+                case_copy.timeframe = timeframe
+            cases.append(case_copy)
+
+        if missing_cases:
+            self.logger.warning(
+                f"{label} 案例缺失: {missing_cases}"
+            )
+
+        return cases
+
+    async def _analyze_signal_density_request(
+        self,
+        request: SignalDensityRequest
+    ) -> SignalDensityResponse:
+        if self.signal_service is not None and hasattr(self.signal_service, "analyze_signal_density"):
+            result = self.signal_service.analyze_signal_density(request)
+            if asyncio.iscoroutine(result):
+                return await result
+            return result
+
+        positive_cases = self._prepare_cases_for_analysis(
+            request.positive_cases,
+            "正例",
+            self._analysis_timeframe
+        )
+        negative_cases = self._prepare_cases_for_analysis(
+            request.negative_cases,
+            "反例",
+            self._analysis_timeframe
+        )
+
+        if not positive_cases:
+            raise ValueError("沒有可用的正例案例")
+        if not negative_cases:
+            raise ValueError("沒有可用的反例案例")
+
+        return await asyncio.to_thread(
+            self._sync_analyzer.analyze_signal_density,
+            positive_cases,
+            negative_cases,
+            request.strategy_config,
+            request.training_window
+        )
 
     async def _objective_function_core(self, trial: "Trial") -> float:
         """
@@ -988,7 +1076,7 @@ class OptunaOptimizer:
                 negative_cases=self.negative_cases
             )
 
-            response: SignalDensityResponse = await self.signal_service.analyze_signal_density(request)
+            response: SignalDensityResponse = await self._analyze_signal_density_request(request)
 
             # 兼容測試與舊回傳格式（缺少權重統計時採用簡化目標）
             if not hasattr(response, 'positive_total_weight'):
@@ -1571,7 +1659,7 @@ class OptunaOptimizer:
                 negative_cases=self.negative_cases
             )
 
-            response: SignalDensityResponse = await self.signal_service.analyze_signal_density(request)
+            response: SignalDensityResponse = await self._analyze_signal_density_request(request)
 
             # 目標1: separation
             separation = response.positive_avg_density - response.negative_avg_density
@@ -1695,15 +1783,11 @@ class OptunaOptimizer:
 
         stats = await loop.run_in_executor(self._executor, do_preload)
 
-        # 將快取注入到兩個分析器
-        # 1. _sync_analyzer: 用於 n_jobs > 1 的多核並行
+        # 將快取注入到分析器
         self._sync_analyzer.set_kline_cache(self._kline_cache)
 
-        # 2. signal_service.analyzer: 用於 n_jobs = 1 的 async 路徑
-        self.signal_service.analyzer.set_kline_cache(self._kline_cache)
-
         self.logger.info(
-            f"✅ K 線快取預載入完成並注入到兩個分析器: "
+            f"✅ K 線快取預載入完成並注入到分析器: "
             f"{stats.cached_cases}/{stats.total_cases} 案例, "
             f"記憶體 {stats.memory_mb:.1f} MB, "
             f"耗時 {stats.load_time_seconds:.1f}s"
@@ -1888,15 +1972,11 @@ class OptunaOptimizer:
 
         stats = await loop.run_in_executor(self._executor, do_precompute)
 
-        # 將快取注入到兩個分析器
-        # 1. _sync_analyzer: 用於 n_jobs > 1 的多核並行
+        # 將快取注入到分析器
         self._sync_analyzer.set_indicator_cache(self._indicator_cache)
 
-        # 2. signal_service.analyzer: 用於 n_jobs = 1 的 async 路徑
-        self.signal_service.analyzer.set_indicator_cache(self._indicator_cache)
-
         self.logger.info(
-            f"✅ 指標快取預計算完成並注入到兩個分析器: "
+            f"✅ 指標快取預計算完成並注入到分析器: "
             f"{stats.cached_cases}/{stats.total_cases} 案例, "
             f"總指標數 {stats.total_indicators}, "
             f"記憶體 {stats.memory_mb:.1f} MB, "
@@ -2378,8 +2458,6 @@ class OptunaOptimizer:
                 self._kline_cache = None
                 if hasattr(self, '_sync_analyzer') and self._sync_analyzer is not None:
                     self._sync_analyzer.kline_cache = None
-                if hasattr(self, 'signal_service') and self.signal_service is not None:
-                    self.signal_service.analyzer.kline_cache = None
                 self.logger.info(f"已清理 K 線快取，釋放 {cache_memory:.1f} MB 記憶體")
             except Exception as e:
                 self.logger.warning(f"清理 K 線快取時發生錯誤: {e}")
@@ -2392,8 +2470,6 @@ class OptunaOptimizer:
                 self._indicator_cache = None
                 if hasattr(self, '_sync_analyzer') and self._sync_analyzer is not None:
                     self._sync_analyzer.indicator_cache = None
-                if hasattr(self, 'signal_service') and self.signal_service is not None:
-                    self.signal_service.analyzer.indicator_cache = None
                 self.logger.info(f"已清理指標快取，釋放 {cache_memory:.1f} MB 記憶體")
             except Exception as e:
                 self.logger.warning(f"清理指標快取時發生錯誤: {e}")

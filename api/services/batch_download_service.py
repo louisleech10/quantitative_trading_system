@@ -26,8 +26,11 @@ from api.models.case_models import (
     TaskStatus
 )
 from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.DataExtraction.kline_download_service import KlineDownloadService
+from momentum.factories import (
+    create_binance_provider,
+    create_kline_download_service,
+    create_kline_storage_manager,
+)
 
 logger = get_logger("api.batch_download_service")
 
@@ -96,8 +99,8 @@ class BatchDownloadService:
     def __init__(
         self,
         case_storage: Optional[CaseStorageManager] = None,
-        kline_storage: Optional[KlineStorageManager] = None,
-        download_service: Optional[KlineDownloadService] = None
+        kline_storage: Optional[object] = None,
+        download_service: Optional[object] = None
     ):
         """
         初始化批量下載服務
@@ -109,7 +112,7 @@ class BatchDownloadService:
         """
         self.case_storage = case_storage or CaseStorageManager()
         # 使用配置的 data_cache 路徑，確保所有下載使用同一存儲位置
-        self.kline_storage = kline_storage or KlineStorageManager(
+        self.kline_storage = kline_storage or create_kline_storage_manager(
             cache_dir=str(settings.kline_cache_dir)
         )
 
@@ -117,14 +120,13 @@ class BatchDownloadService:
             self.download_service = download_service
         else:
             # 創建下載服務並註冊BinanceProvider
-            self.download_service = KlineDownloadService(
+            self.download_service = create_kline_download_service(
                 storage_manager=self.kline_storage
             )
 
             # 註冊BinanceProvider
             try:
-                from momentum.DataExtraction.providers.binance_provider import BinanceProvider
-                binance_provider = BinanceProvider()
+                binance_provider = create_binance_provider()
                 self.download_service.registry.register('binance', binance_provider)
                 logger.info("Registered BinanceProvider to KlineDownloadService")
             except Exception as e:

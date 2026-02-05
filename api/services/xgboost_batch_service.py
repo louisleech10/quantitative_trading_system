@@ -20,6 +20,7 @@ Date: 2026-01-13
 
 import asyncio
 import uuid
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import logging
@@ -32,18 +33,55 @@ from api.core.config import settings
 from api.core.logging import get_logger
 from api.utils.case_storage import get_case_storage_manager
 from api.utils.json_serializer import sanitize_for_json
-from api.services.kline_data_service import KlineDataService
-from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
-from momentum.Analysis.expectancy_calculator import ExpectancyCalculator
-from momentum.Analysis.bootstrap_estimator import BootstrapEstimator
-from momentum.Analysis.cross_symbol_validator import CrossSymbolValidator
-from momentum.Analysis.regime_analyzer import RegimeAnalyzer
-from momentum.Analysis.pattern_extractor import PatternExtractor
-from momentum.Analysis.model_storage import ModelStorage
-from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, StrategyParams
-from api.services.xgboost_task_cache import XGBoostTaskCache
+from momentum.factories import (
+    create_binance_provider,
+    create_bootstrap_estimator,
+    create_cross_symbol_validator,
+    create_expectancy_calculator,
+    create_feature_extractor,
+    create_kline_download_service,
+    create_kline_storage_manager,
+    create_model_storage,
+    create_pattern_extractor,
+    create_regime_analyzer,
+    create_strategy_params,
+    create_xgboost_analyzer,
+    create_market_config,
+)
 
 logger = get_logger(__name__)
+
+@dataclass
+class _XGBoostTaskResult:
+    task_id: str
+    predictions_df: Optional[pd.DataFrame]
+    calibration_curve: Optional[Dict]
+    pr_curve: Optional[Dict]
+    created_at: datetime
+
+
+class _XGBoostTaskCache:
+    """Minimal task cache to avoid cross-service dependency."""
+
+    _cache: Dict[str, _XGBoostTaskResult] = {}
+
+    def store_result(
+        self,
+        task_id: str,
+        predictions_df: Optional[pd.DataFrame],
+        calibration_curve: Optional[Dict],
+        pr_curve: Optional[Dict],
+    ) -> None:
+        self._cache[task_id] = _XGBoostTaskResult(
+            task_id=task_id,
+            predictions_df=predictions_df,
+            calibration_curve=calibration_curve,
+            pr_curve=pr_curve,
+            created_at=datetime.utcnow(),
+        )
+
+    def get_result(self, task_id: str) -> Optional[_XGBoostTaskResult]:
+        return self._cache.get(task_id)
 
 
 class BatchTaskManager:
@@ -114,16 +152,28 @@ class XGBoostBatchService:
     def __init__(self):
         self.task_manager = BatchTaskManager()
         self.case_storage = get_case_storage_manager()
-        self.kline_service = KlineDataService()
-        self.feature_extractor = FeatureExtractor()
-        self.xgboost_analyzer = XGBoostAnalyzer()
-        self.pattern_extractor = PatternExtractor()
-        self.model_storage = ModelStorage()
-        self.expectancy_calculator = ExpectancyCalculator()
-        self.bootstrap_estimator = BootstrapEstimator()
-        self.cross_symbol_validator = CrossSymbolValidator()
+        self.kline_storage_manager = create_kline_storage_manager(
+            cache_dir=str(settings.kline_cache_dir)
+        )
+        self.kline_download_service = create_kline_download_service(
+            storage_manager=self.kline_storage_manager
+        )
+        try:
+            self.kline_download_service.registry.register(
+                "binance",
+                create_binance_provider(),
+            )
+        except Exception:
+            logger.debug("Binance provider already registered", exc_info=True)
+        self.feature_extractor = create_feature_extractor()
+        self.xgboost_analyzer = create_xgboost_analyzer()
+        self.pattern_extractor = create_pattern_extractor()
+        self.model_storage = create_model_storage()
+        self.expectancy_calculator = create_expectancy_calculator()
+        self.bootstrap_estimator = create_bootstrap_estimator()
+        self.cross_symbol_validator = create_cross_symbol_validator()
         self.logger = logger
-        self.task_cache = XGBoostTaskCache()
+        self.task_cache = _XGBoostTaskCache()
     
     def get_case_summary(self, symbol: Optional[str] = None, timeframe: Optional[str] = None) -> Dict:
         """
@@ -339,11 +389,11 @@ class XGBoostBatchService:
             all_kline_data = {}
             for sym in symbols:
                 kline_df = await asyncio.to_thread(
-                    self.kline_service.get_kline_data,
+                    self._get_kline_data,
                     symbol=sym,
                     timeframe=timeframe,
                     start_time=start_dt,
-                    end_time=end_dt
+                    end_time=end_dt,
                 )
                 
                 if kline_df is None or kline_df.empty:
@@ -372,10 +422,10 @@ class XGBoostBatchService:
                 sym_feature_names = []
                 
                 for indicator_config in indicators:
-                    strategy_params = StrategyParams(
+                    strategy_params = create_strategy_params(
                         strategy_type=indicator_config['indicator'],
                         params=indicator_config['params'],
-                        data_source=indicator_config.get('data_source', 'close')
+                        data_source=indicator_config.get('data_source', 'close'),
                     )
                     
                     try:
@@ -523,7 +573,7 @@ class XGBoostBatchService:
             y = np.array(y_list)
             if sequence_length is not None and sequence_feature_names is None:
                 raise ValueError("序列特徵生成失敗，無有效案例")
-            feature_names = sequence_feature_names or all_feature_names
+            feature_names = sequence_feature_names or shared_feature_names
 
             if sequence_length is not None:
                 if sequence_feature_mode == "flatten" and not any("_t-" in name for name in feature_names):
@@ -666,7 +716,7 @@ class XGBoostBatchService:
             market_phases = self._resolve_market_phases(valid_cases, case_timestamps)
             if market_phases:
                 try:
-                    analyzer = RegimeAnalyzer()
+                    analyzer = create_regime_analyzer()
                     regime_report = analyzer.analyze_by_phase(
                         y_true=y,
                         y_pred_proba=y_pred_proba,
@@ -1007,19 +1057,63 @@ class XGBoostBatchService:
 
         try:
             from datetime import datetime
-            from momentum.DataExtraction.Market_Screener_Configuration import MarketConfig
 
             phases = []
             for ts in timestamps:
                 ts_int = int(ts)
                 if ts_int > 10 ** 12:
                     ts_int = ts_int // 1000
-                phase = MarketConfig.get_market_phase(datetime.utcfromtimestamp(ts_int))
+                phase = create_market_config().get_market_phase(
+                    datetime.utcfromtimestamp(ts_int)
+                )
                 phases.append(phase)
             return phases
         except Exception as e:
             self.logger.warning(f"市場體制推導失敗: {str(e)}")
             return None
+
+    def _get_kline_data(
+        self,
+        symbol: str,
+        timeframe: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> pd.DataFrame:
+        """Read or download kline data for the requested range."""
+        df = self.kline_storage_manager.read_klines(
+            symbol,
+            timeframe,
+            start_time=start_time,
+            end_time=end_time,
+            validate_continuity=False,
+        )
+
+        if df is not None and not df.empty:
+            return df
+
+        try:
+            self.kline_download_service.download_klines(
+                source="binance",
+                symbol=symbol,
+                start_time=start_time,
+                end_time=end_time,
+                timeframe=timeframe,
+                save_to_storage=True,
+            )
+        except Exception as e:
+            self.logger.warning(
+                f"下載 K 線數據失敗: {symbol}/{timeframe} {e}",
+                exc_info=True,
+            )
+
+        df = self.kline_storage_manager.read_klines(
+            symbol,
+            timeframe,
+            start_time=start_time,
+            end_time=end_time,
+            validate_continuity=False,
+        )
+        return df if df is not None else pd.DataFrame()
 
     def _resolve_case_price_changes(self, cases: List) -> Optional[np.ndarray]:
         """解析案例的 price_change"""

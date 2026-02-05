@@ -18,9 +18,12 @@ import time
 from typing import List, Optional, Dict, Any
 from fastapi import HTTPException
 
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.Indicators import IndicatorEngine
-from momentum.Analysis import SignalDensityAnalyzer
+from momentum.factories import (
+    create_indicator_engine,
+    create_kline_storage_manager,
+    create_signal_density_analyzer,
+    get_data_source_values,
+)
 from api.utils.case_storage import get_case_storage_manager
 from api.core.config import settings
 from api.models.training_window_config import (
@@ -56,12 +59,12 @@ class SignalAnalysisService:
             return
 
         # 依賴注入
-        self.kline_storage = KlineStorageManager(cache_dir=str(settings.kline_cache_dir))
-        self.indicator_engine = IndicatorEngine()
+        self.kline_storage = create_kline_storage_manager(cache_dir=str(settings.kline_cache_dir))
+        self.indicator_engine = create_indicator_engine()
         self.case_storage = get_case_storage_manager()
-        self.analyzer = SignalDensityAnalyzer(
+        self.analyzer = create_signal_density_analyzer(
             kline_storage=self.kline_storage,
-            indicator_engine=self.indicator_engine
+            indicator_engine=self.indicator_engine,
         )
 
         self.logger = logging.getLogger(__name__)
@@ -313,9 +316,7 @@ class SignalAnalysisService:
             raise ValueError("lookforward_bars不能為負數")
 
         # 檢查數據源
-        from momentum.Indicators.types import DataSourceEnum
-
-        valid_sources = [source.value for source in DataSourceEnum]
+        valid_sources = get_data_source_values()
         if request.strategy_config.data_source not in valid_sources:
             raise ValueError(
                 f"無效的data_source: {request.strategy_config.data_source}. "

@@ -12,7 +12,7 @@ import numpy as np
 import xgboost as xgb
 from sklearn.metrics import roc_auc_score
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 

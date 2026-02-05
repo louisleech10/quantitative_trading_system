@@ -28,7 +28,7 @@ sys.path.insert(0, str(project_root))
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.factories import create_kline_storage_manager
 import pandas as pd
 
 logger = get_logger("api.kline_storage_service")
@@ -52,7 +52,7 @@ class KlineStorageService:
         if cache_dir is None:
             cache_dir = str(settings.kline_cache_dir)
 
-        self.storage_manager = KlineStorageManager(cache_dir=cache_dir)
+        self.storage_manager = create_kline_storage_manager(cache_dir=cache_dir)
         logger.info(f"KlineStorageService initialized with cache_dir: {cache_dir}")
 
 

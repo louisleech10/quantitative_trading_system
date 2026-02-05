@@ -52,8 +52,8 @@ def test_multi_range_append():
     logger.info(f"✅ 範圍1下載完成: {len(df1)} K-lines")
     logger.info(f"   時間範圍: {df1['timestamp'].min()} to {df1['timestamp'].max()}")
     
-    # 檢查HDF5數據
-    check1 = storage.read_klines(symbol, timeframe)
+    # 檢查HDF5數據（多區間 append 允許不連續）
+    check1 = storage.read_klines(symbol, timeframe, validate_continuity=False)
     logger.info(f"📊 HDF5檢查1: {len(check1)} K-lines")
     logger.info(f"   時間範圍: {datetime.utcfromtimestamp(check1['timestamp'].min())} to {datetime.utcfromtimestamp(check1['timestamp'].max())}")
     
@@ -71,7 +71,7 @@ def test_multi_range_append():
     logger.info(f"   時間範圍: {df2['timestamp'].min()} to {df2['timestamp'].max()}")
     
     # 檢查HDF5數據 (關鍵檢查：應該包含兩個範圍)
-    check2 = storage.read_klines(symbol, timeframe)
+    check2 = storage.read_klines(symbol, timeframe, validate_continuity=False)
     logger.info(f"📊 HDF5檢查2: {len(check2)} K-lines")
     logger.info(f"   時間範圍: {datetime.utcfromtimestamp(check2['timestamp'].min())} to {datetime.utcfromtimestamp(check2['timestamp'].max())}")
     
@@ -98,21 +98,21 @@ def test_multi_range_append():
     logger.info(f"包含範圍1數據: {'✅' if has_range1 else '❌'}")
     logger.info(f"包含範圍2數據: {'✅' if has_range2 else '❌'}")
     
-    if has_range1 and has_range2 and actual_total >= expected_total * 0.9:
-        logger.info("\n🎉 測試通過！數據沒有被覆蓋，append功能正常")
-        return True
-    else:
+    if not (has_range1 and has_range2 and actual_total >= expected_total * 0.9):
         logger.error("\n❌ 測試失敗！數據可能被覆蓋")
         if not has_range1:
             logger.error("   範圍1數據丟失")
         if not has_range2:
             logger.error("   範圍2數據丟失")
-        return False
+    assert has_range1, "範圍1數據丟失"
+    assert has_range2, "範圍2數據丟失"
+    assert actual_total >= expected_total * 0.9, "總筆數不足，可能發生覆蓋"
+    logger.info("\n🎉 測試通過！數據沒有被覆蓋，append功能正常")
 
 if __name__ == "__main__":
     try:
-        success = test_multi_range_append()
-        sys.exit(0 if success else 1)
+        test_multi_range_append()
+        sys.exit(0)
     except Exception as e:
         logger.error(f"測試異常: {e}", exc_info=True)
         sys.exit(1)

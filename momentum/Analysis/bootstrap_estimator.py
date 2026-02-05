@@ -11,7 +11,7 @@ from typing import Callable, Dict, Optional
 import numpy as np
 from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, brier_score_loss
 
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 

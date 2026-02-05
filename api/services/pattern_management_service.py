@@ -12,9 +12,12 @@ from datetime import datetime
 import uuid
 import logging
 
-from momentum.Analysis.pattern_definition import Pattern, PatternRule
-from momentum.Analysis.pattern_storage import PatternStorage
-from momentum.Analysis.pattern_validator import PatternValidator
+from momentum.factories import (
+    create_pattern,
+    create_pattern_rule,
+    create_pattern_storage,
+    create_pattern_validator,
+)
 from api.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -24,8 +27,8 @@ class PatternManagementService:
     """模式管理服務"""
     
     def __init__(self):
-        self.storage = PatternStorage()
-        self.validator = PatternValidator()
+        self.storage = create_pattern_storage()
+        self.validator = create_pattern_validator()
         self.logger = logger
     
     def create_pattern(
@@ -62,11 +65,11 @@ class PatternManagementService:
         
         try:
             # 轉換規則
-            pattern_rules = [PatternRule(**rule) for rule in rules]
+            pattern_rules = [create_pattern_rule(**rule) for rule in rules]
             
             # 建立模式物件
             now = datetime.now().isoformat()
-            pattern = Pattern(
+            pattern = create_pattern(
                 pattern_id=pattern_id,
                 name=name,
                 description=description,

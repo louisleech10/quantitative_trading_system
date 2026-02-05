@@ -25,12 +25,11 @@ from typing import List, Dict, Any, Tuple, Optional, TYPE_CHECKING
 from scipy import stats
 from datetime import datetime
 
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.Indicators import IndicatorEngine
-from api.models.training_window_config import (
+from momentum.core.protocols import IKlineReader, IIndicatorEngine
+from momentum.core.contracts import (
     TrainingWindowConfig,
     StrategyConfig,
-    SignalDensityResponse
+    SignalDensityResponse,
 )
 
 if TYPE_CHECKING:
@@ -58,8 +57,8 @@ class SignalDensityAnalyzer:
 
     def __init__(
         self,
-        kline_storage: KlineStorageManager,
-        indicator_engine: IndicatorEngine,
+        kline_storage: IKlineReader,
+        indicator_engine: IIndicatorEngine,
         kline_cache: Optional['KlineCache'] = None,
         indicator_cache: Optional['IndicatorCache'] = None
     ):
@@ -67,8 +66,8 @@ class SignalDensityAnalyzer:
         初始化分析引擎
 
         Args:
-            kline_storage: K線數據存儲管理器
-            indicator_engine: 指標計算引擎(來自Task 3.1)
+            kline_storage: K線讀取介面
+            indicator_engine: 指標計算引擎介面
             kline_cache: K線預載入快取（可選，用於加速 Optuna 優化）
             indicator_cache: 指標預計算快取（可選，用於加速 Optuna 優化）
         """
@@ -233,7 +232,11 @@ class SignalDensityAnalyzer:
         }
 
         try:
-            signals = calculator(kline_data, {}, enriched_params)
+            signals = calculator(
+                kline_data,
+                {"indicator_engine": self.indicator_engine},
+                enriched_params
+            )
             return signals
         except Exception as e:
             self.logger.error(
@@ -525,6 +528,11 @@ class SignalDensityAnalyzer:
             raise
 
         # 驗證K線數量
+        if klines is None:
+            raise ValueError(
+                f"未找到完整密度窗口K線數據: case_id={case.case_id}, "
+                f"symbol={case.symbol}, timeframe={case.timeframe}"
+            )
         if len(klines) == 0:
             raise ValueError(
                 f"未找到完整密度窗口K線數據: case_id={case.case_id}, "

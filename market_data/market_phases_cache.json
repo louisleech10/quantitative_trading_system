@@ -1,6 +1,6 @@
 {
-  "EXTREME_GREED_20200803": {
-    "start_date": "2020-08-03",
+  "EXTREME_GREED_20200810": {
+    "start_date": "2020-08-10",
     "end_date": "2020-08-30",
     "description": "EXTREME_GREED"
   },
@@ -461,7 +461,12 @@
   },
   "FEAR_20260105": {
     "start_date": "2026-01-05",
-    "end_date": "2026-02-01",
+    "end_date": "2026-01-25",
     "description": "FEAR"
+  },
+  "EXTREME_FEAR_20260126": {
+    "start_date": "2026-01-26",
+    "end_date": "2026-02-08",
+    "description": "EXTREME_FEAR"
   }
 }

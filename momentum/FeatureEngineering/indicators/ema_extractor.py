@@ -12,7 +12,7 @@ import pandas as pd
 from typing import Dict, List, Tuple
 from momentum.FeatureEngineering.strategy_registry import BaseStrategyExtractor
 from momentum.FeatureEngineering.feature_config import FeatureNamingConfig
-from api.core.logging import get_logger
+from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 
