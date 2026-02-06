@@ -613,12 +613,12 @@ export default function SearchPage() {
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <label className="block text-sm font-medium text-gray-900">
+          <label className="block text-sm font-medium text-slate-200">
             {label}
           </label>
           <div className="group relative">
-            <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
-            <div className="absolute left-0 top-6 hidden group-hover:block bg-gray-800 text-white text-xs rounded px-3 py-2 z-10 w-72 shadow-lg">
+            <HelpCircle className="w-4 h-4 text-slate-500 cursor-help" />
+            <div className="absolute left-0 top-6 hidden group-hover:block bg-[#1a233a] text-slate-100 text-xs rounded px-3 py-2 z-10 w-72 shadow-lg border border-white/10 backdrop-blur-xl">
               {FIELD_DESCRIPTIONS[fieldKey as keyof typeof FIELD_DESCRIPTIONS]}
             </div>
           </div>
@@ -632,7 +632,7 @@ export default function SearchPage() {
               ...prev,
               [fieldKey]: e.target.value
             }))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900"
+            className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm text-slate-100"
           >
             {OPERATORS.map(op => (
               <option key={op.value} value={op.value}>{op.label}</option>
@@ -649,7 +649,7 @@ export default function SearchPage() {
                   ...prev,
                   [fieldKey]: { ...prev[fieldKey as keyof typeof rangeValues], min: e.target.value ? parseFloat(e.target.value) : null }
                 }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
                 placeholder="最小值"
               />
               <input
@@ -659,7 +659,7 @@ export default function SearchPage() {
                   ...prev,
                   [fieldKey]: { ...prev[fieldKey as keyof typeof rangeValues], max: e.target.value ? parseFloat(e.target.value) : null }
                 }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
                 placeholder="最大值"
               />
             </>
@@ -671,7 +671,7 @@ export default function SearchPage() {
                 ...prev,
                 [fieldKey]: e.target.value ? parseFloat(e.target.value) : null
               }))}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="col-span-2 px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100 placeholder:text-slate-500"
               placeholder={placeholder}
             />
           )}
@@ -688,12 +688,12 @@ export default function SearchPage() {
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <label className="block text-sm font-medium text-gray-900">
+          <label className="block text-sm font-medium text-slate-200">
             {label} (反例條件)
           </label>
           <div className="group relative">
-            <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
-            <div className="absolute left-0 top-6 hidden group-hover:block bg-gray-800 text-white text-xs rounded px-3 py-2 z-10 w-72 shadow-lg">
+            <HelpCircle className="w-4 h-4 text-slate-500 cursor-help" />
+            <div className="absolute left-0 top-6 hidden group-hover:block bg-[#1a233a] text-slate-100 text-xs rounded px-3 py-2 z-10 w-72 shadow-lg border border-white/10 backdrop-blur-xl">
               反例條件：用於篩選不符合預期表現的案例。通常與正例條件相反。
             </div>
           </div>
@@ -707,7 +707,7 @@ export default function SearchPage() {
               ...prev,
               [fieldKey]: e.target.value
             }))}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-sm text-gray-900"
+            className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-sm text-slate-100"
           >
             {OPERATORS.map(op => (
               <option key={op.value} value={op.value}>{op.label}</option>
@@ -727,7 +727,7 @@ export default function SearchPage() {
                     min: e.target.value ? parseFloat(e.target.value) : null 
                   }
                 }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100"
                 placeholder="最小值"
               />
               <input
@@ -740,7 +740,7 @@ export default function SearchPage() {
                     max: e.target.value ? parseFloat(e.target.value) : null 
                   }
                 }))}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                className="px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100"
                 placeholder="最大值"
               />
             </>
@@ -752,7 +752,7 @@ export default function SearchPage() {
                 ...prev,
                 [fieldKey]: e.target.value ? parseFloat(e.target.value) : null
               }))}
-              className="col-span-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+              className="col-span-2 px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100 placeholder:text-slate-500"
               placeholder={placeholder}
             />
           )}
@@ -770,34 +770,34 @@ export default function SearchPage() {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         {/* 頁面標題 */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">階段案例搜索</h1>
-          <p className="text-gray-700">
+          <h1 className="text-2xl font-medium text-slate-100 mb-2">階段案例搜索</h1>
+          <p className="text-slate-400">
             設定正例搜索條件，系統將自動生成對應的反例數據集
           </p>
         </div>
 
         {/* 基本設定 */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">基本設定</h3>
+        <div className="glass-panel rounded-xl p-6">
+          <h3 className="text-lg font-medium text-slate-100 mb-4">基本設定</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* 搜索名稱 */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-slate-200 mb-2">
                 搜索名稱
               </label>
               <input
                 type="text"
                 value={searchParams.name}
                 onChange={(e) => setSearchParams(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100 placeholder:text-slate-500"
                 placeholder="例如: USDT突破策略搜索"
               />
             </div>
             
             {/* 交易對輸入 */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-slate-200 mb-2">
                 交易對 (支援多個，用逗號分隔)
               </label>
               <input
@@ -811,23 +811,23 @@ export default function SearchPage() {
               onBlur={() => {
                 setSymbolsInput(searchParams.symbols.join(', '));
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100 placeholder:text-slate-500"
               placeholder="例如: BTCUSDT, ETHUSDT 或 ETHUSDT，BNBUSDT"
             />
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-slate-400 mt-1">
                 支援：加密貨幣 (USDT對), 股票代碼, 期貨合約, RWA 標的等
               </p>
             </div>
             
             {/* 時間框架 */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-slate-200 mb-2">
                 時間框架
               </label>
               <select
                 value={searchParams.timeframe}
                 onChange={(e) => setSearchParams(prev => ({ ...prev, timeframe: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
               >
                 <option value="4h">4小時</option>
                 <option value="12h">12小時</option>
@@ -838,12 +838,12 @@ export default function SearchPage() {
             {/* 價格變動計算方式 */}
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <label className="block text-sm font-medium text-gray-900">
+                <label className="block text-sm font-medium text-slate-200">
                   價格變動計算方式
                 </label>
                 <div className="group relative">
-                  <HelpCircle className="w-4 h-4 text-gray-500 cursor-help" />
-                  <div className="absolute left-0 top-6 hidden group-hover:block bg-gray-800 text-white text-xs rounded px-3 py-2 z-10 w-96 shadow-lg">
+                  <HelpCircle className="w-4 h-4 text-slate-500 cursor-help" />
+                  <div className="absolute left-0 top-6 hidden group-hover:block bg-[#1a233a] text-slate-100 text-xs rounded px-3 py-2 z-10 w-96 shadow-lg border border-white/10 backdrop-blur-xl">
                     <p className="font-semibold mb-2">OPEN_TO_CLOSE (日內交易)：</p>
                     <p className="mb-2">計算當根K線內的價格變化 = (Close - Open) / Open</p>
                     <p className="mb-3">適合日內波動策略，不考慮跳空。</p>
@@ -859,7 +859,7 @@ export default function SearchPage() {
                   ...prev, 
                   priceChangeMethod: e.target.value as PriceChangeMethod 
                 }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
               >
                 <option value={PriceChangeMethod.CLOSE_TO_CLOSE}>
                   前收盤到當收盤 (波段交易，含跳空) - 預設
@@ -868,7 +868,7 @@ export default function SearchPage() {
                   當開盤到當收盤 (日內交易)
                 </option>
               </select>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-slate-400 mt-1">
                 {searchParams.priceChangeMethod === PriceChangeMethod.CLOSE_TO_CLOSE 
                   ? '計算方式：(當根收盤價 - 前根收盤價) / 前根收盤價 * 100%' 
                   : '計算方式：(當根收盤價 - 當根開盤價) / 當根開盤價 * 100%'}
@@ -879,33 +879,33 @@ export default function SearchPage() {
           {/* 時間日期區間 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-slate-200 mb-2">
                 開始日期
               </label>
               <input
                 type="date"
                 value={timeParams.startDate}
                 onChange={(e) => setTimeParams(prev => ({ ...prev, startDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
               />
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-slate-200 mb-2">
                 結束日期
               </label>
               <input
                 type="date"
                 value={timeParams.endDate}
                 onChange={(e) => setTimeParams(prev => ({ ...prev, endDate: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
               />
             </div>
           </div>
           
           {/* 最小交易量 */}
           <div className="mt-6">
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-slate-200 mb-2">
               最小交易量 (USDT)
             </label>
             <input
@@ -915,22 +915,22 @@ export default function SearchPage() {
                 ...prev, 
                 volumeMin: e.target.value ? parseFloat(e.target.value) : null 
               }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100 placeholder:text-slate-500"
               placeholder="留空 = 不限制，例如: 100000"
             />
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-slate-400 mt-1">
               留空表示不對交易量設限制，輸入數值則過濾小於該值的案例
             </p>
           </div>
         </div>
 
         {/* 正例搜索條件 */}
-        <div className="bg-white rounded-lg shadow-sm border">
+        <div className="glass-panel rounded-xl">
           <div 
-            className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+            className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
             onClick={() => toggleSection('positive')}
           >
-            <h3 className="text-lg font-semibold text-gray-900">正例搜索條件</h3>
+            <h3 className="text-lg font-medium text-slate-100">正例搜索條件</h3>
             {expandedSections.positive ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
           </div>
           
@@ -940,8 +940,8 @@ export default function SearchPage() {
                 {renderFieldInput('priceChange', '價格變化 (%)', '例如: 5.0')}
               </div>
               
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-800">
+              <div className="mt-4 p-4 bg-blue-400/10 rounded-xl border border-blue-400/20">
+                <p className="text-sm text-blue-300">
                   <strong>說明：</strong>正例搜索只需設定價格變化條件，其他30個參數會自動計算並輸出到CSV中供您後續分析使用。
                 </p>
               </div>
@@ -950,12 +950,12 @@ export default function SearchPage() {
         </div>
 
         {/* 反例搜索設定 */}
-        <div className="bg-white rounded-lg shadow-sm border">
+        <div className="glass-panel rounded-xl">
           <div 
-            className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+            className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
             onClick={() => toggleSection('negative')}
           >
-            <h3 className="text-lg font-semibold text-gray-900">反例搜索設定</h3>
+            <h3 className="text-lg font-medium text-slate-100">反例搜索設定</h3>
             {expandedSections.negative ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
           </div>
           
@@ -964,7 +964,7 @@ export default function SearchPage() {
               {/* 基本反例設定 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <label className="block text-sm font-medium text-slate-200 mb-2">
                     反例比例
                   </label>
                   <input
@@ -974,12 +974,12 @@ export default function SearchPage() {
                       ...prev, 
                       ratio: parseFloat(e.target.value) || 2.0 
                     }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100"
                     placeholder="2.0"
                     step="1"
                     min="1"
                   />
-                  <p className="text-sm text-gray-600 mt-1">反例數量 = 正例數量 × 比例</p>
+                  <p className="text-sm text-slate-400 mt-1">反例數量 = 正例數量 × 比例</p>
                 </div>
                 
                 <div>
@@ -991,19 +991,19 @@ export default function SearchPage() {
                         ...prev,
                         enableTimeSeparation: e.target.checked
                       }))}
-                      className="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                      className="mr-2 h-4 w-4 text-rose-400 focus:ring-rose-400 border-white/10 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-slate-200">
                       啟用時間分離
                     </span>
                   </label>
-                  <p className="text-sm text-gray-600 mb-2">
+                  <p className="text-sm text-slate-400 mb-2">
                     防止反例與正例在時間上過於接近（按Symbol獨立計算）
                   </p>
 
                   {negativeParams.enableTimeSeparation && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                      <label className="block text-sm font-medium text-slate-200 mb-2">
                         時間分離天數
                       </label>
                       <input
@@ -1015,10 +1015,10 @@ export default function SearchPage() {
                           ...prev,
                           timeSeparationDays: parseInt(e.target.value) || 3
                         }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-gray-900"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-rose-400 text-slate-100"
                         placeholder="3"
                       />
-                      <p className="text-sm text-gray-600 mt-1">
+                      <p className="text-sm text-slate-400 mt-1">
                         反例將排除在同symbol正例前後N天內的案例（預設3天，0=關閉）
                       </p>
                     </div>
@@ -1035,13 +1035,13 @@ export default function SearchPage() {
                         ...prev,
                         enableRandomSampling: e.target.checked
                       }))}
-                      className="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                      className="mr-2 h-4 w-4 text-rose-400 focus:ring-rose-400 border-white/10 rounded"
                     />
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-slate-200">
                       啟用隨機取樣
                     </span>
                   </label>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-slate-400">
                     啟用時根據比例隨機選擇反例；關閉時返回所有符合條件的反例
                   </p>
                 </div>
@@ -1056,13 +1056,13 @@ export default function SearchPage() {
                           ...prev,
                           enabled: e.target.checked 
                         }))}
-                        className="mr-2 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                        className="mr-2 w-4 h-4 text-rose-400 border-white/10 rounded focus:ring-rose-400"
                       />
-                      <span className="text-sm text-gray-900 font-medium">
+                      <span className="text-sm text-slate-200 font-medium">
                         啟用反例搜索
                       </span>
                     </label>
-                    <p className="text-sm text-gray-600 mt-1">關閉則只搜索正例</p>
+                    <p className="text-sm text-slate-400 mt-1">關閉則只搜索正例</p>
                   </div>
                 </div>
               </div>
@@ -1070,10 +1070,10 @@ export default function SearchPage() {
               {/* 反例篩選條件 */}
               {negativeParams.enabled && (
                 <div>
-                  <h4 className="text-md font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">
+                  <h4 className="text-md font-medium text-slate-100 mb-4 border-b border-white/10 pb-2">
                     反例篩選條件 (可選)
                   </h4>
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-slate-400 mb-4">
                     設定反例的具體條件，通常與正例條件相反。留空則由系統自動生成。
                   </p>
                   
@@ -1090,18 +1090,18 @@ export default function SearchPage() {
         </div>
 
         {/* 執行按鈕 */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="glass-panel rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">執行搜索</h3>
+              <h3 className="text-lg font-medium text-slate-100">執行搜索</h3>
               {currentStage && (
-                <p className="text-sm text-blue-600 mt-1 font-medium">{currentStage}</p>
+                <p className="text-sm text-blue-400 mt-1 font-medium">{currentStage}</p>
               )}
             </div>
             <button
               onClick={executeTwoStageSearch}
               disabled={isLoading}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center px-6 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? (
                 <RefreshCw className="w-5 h-5 animate-spin mr-2" />
@@ -1115,8 +1115,8 @@ export default function SearchPage() {
 
         {/* 錯誤顯示 */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 text-red-700">
+          <div className="bg-rose-400/10 border border-rose-400/20 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-rose-400">
               <AlertCircle className="w-5 h-5" />
               <span className="font-medium">錯誤：{error}</span>
             </div>
@@ -1125,8 +1125,8 @@ export default function SearchPage() {
 
         {/* 搜索結果 */}
         {currentResult && (
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">搜索結果</h3>
+          <div className="glass-panel rounded-xl p-6">
+            <h3 className="text-lg font-medium text-slate-100 mb-4">搜索結果</h3>
 
             {(() => {
               // 計算實際統計數據
@@ -1139,48 +1139,48 @@ export default function SearchPage() {
                 <>
                   {/* 統計卡片 */}
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{actualStats.totalCases}</div>
-                      <div className="text-sm text-gray-600">總案例數</div>
+                    <div className="text-center p-4 bg-blue-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-blue-400">{actualStats.totalCases}</div>
+                      <div className="text-sm text-slate-400">總案例數</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{actualStats.positiveCases}</div>
-                      <div className="text-sm text-gray-600">正例案例</div>
-                      <div className="text-xs text-gray-500 mt-1">positive_case=1</div>
+                    <div className="text-center p-4 bg-emerald-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-emerald-400">{actualStats.positiveCases}</div>
+                      <div className="text-sm text-slate-400">正例案例</div>
+                      <div className="text-xs text-slate-500 mt-1">positive_case=1</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-red-50 rounded-lg">
-                      <div className="text-2xl font-bold text-red-600">{actualStats.negativeCases}</div>
-                      <div className="text-sm text-gray-600">反例案例</div>
-                      <div className="text-xs text-gray-500 mt-1">positive_case=0</div>
+                    <div className="text-center p-4 bg-rose-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-rose-400">{actualStats.negativeCases}</div>
+                      <div className="text-sm text-slate-400">反例案例</div>
+                      <div className="text-xs text-slate-500 mt-1">positive_case=0</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">{actualStats.uniqueSymbols}</div>
-                      <div className="text-sm text-gray-600">交易對數</div>
+                    <div className="text-center p-4 bg-purple-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-purple-400">{actualStats.uniqueSymbols}</div>
+                      <div className="text-sm text-slate-400">交易對數</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">{currentResult.execution_time?.toFixed(1) || 'N/A'}s</div>
-                      <div className="text-sm text-gray-600">執行時間</div>
+                    <div className="text-center p-4 bg-orange-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-orange-400">{currentResult.execution_time?.toFixed(1) || 'N/A'}s</div>
+                      <div className="text-sm text-slate-400">執行時間</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                      <div className="text-2xl font-bold text-yellow-600">{actualStats.positiveRatio}</div>
-                      <div className="text-sm text-gray-600">正負比例</div>
+                    <div className="text-center p-4 bg-amber-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-amber-400">{actualStats.positiveRatio}</div>
+                      <div className="text-sm text-slate-400">正負比例</div>
                     </div>
                   </div>
 
                   {/* 交易對詳情 */}
                   {actualStats.symbolsList.length > 0 && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm font-medium text-gray-700 mb-2">
+                    <div className="mt-4 p-3 bg-white/5 rounded-lg">
+                      <div className="text-sm font-medium text-slate-300 mb-2">
                         包含的交易對 ({actualStats.uniqueSymbols} 個)：
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {actualStats.symbolsList.map(symbol => (
-                          <span key={symbol} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          <span key={symbol} className="px-2 py-1 bg-blue-400/15 text-blue-400 text-xs rounded">
                             {symbol}
                           </span>
                         ))}
@@ -1189,16 +1189,16 @@ export default function SearchPage() {
                   )}
 
                   {/* 統計摘要 */}
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="text-sm text-blue-800">
+                  <div className="mt-4 p-3 bg-blue-400/10 rounded-lg border border-blue-400/20">
+                    <div className="text-sm text-blue-300">
                       📊 {getStatisticsSummary(actualStats)}
                     </div>
                   </div>
 
                   {/* 數據一致性驗證 */}
                   {!validation.isConsistent && (
-                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="text-sm text-yellow-800">
+                    <div className="mt-4 p-3 bg-amber-400/10 border border-amber-400/20 rounded-lg">
+                      <div className="text-sm text-amber-300">
                         <div className="font-medium mb-2">⚠️ 數據一致性警告：</div>
                         <ul className="list-disc list-inside space-y-1">
                           {validation.differences.map((diff, index) => (
@@ -1214,8 +1214,8 @@ export default function SearchPage() {
 
                   {/* 市場階段分布 - 圓餅圖顯示 */}
                   {(Object.keys(actualStats.positiveMarketPhases).length > 0 || Object.keys(actualStats.negativeMarketPhases).length > 0) && (
-                    <div className="mt-4 p-4 bg-white rounded-lg border">
-                      <div className="text-lg font-semibold text-gray-800 mb-4">市場階段分布</div>
+                    <div className="mt-4 p-4 glass-panel rounded-xl">
+                      <div className="text-lg font-medium text-slate-100 mb-4">市場階段分布</div>
                       
                       {/* 圓餅圖 */}
                       <MarketPhasePieChart 
@@ -1228,10 +1228,10 @@ export default function SearchPage() {
                         {/* 正例市場階段分布 */}
                         {Object.keys(actualStats.positiveMarketPhases).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-green-700 mb-2">正例市場階段：</div>
+                            <div className="text-sm font-medium text-emerald-400 mb-2">正例市場階段：</div>
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(actualStats.positiveMarketPhases).map(([phase, count]) => (
-                                <span key={`pos-${phase}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                <span key={`pos-${phase}`} className="px-2 py-1 bg-emerald-400/15 text-emerald-400 text-xs rounded">
                                   {phase}: {count}
                                 </span>
                               ))}
@@ -1242,10 +1242,10 @@ export default function SearchPage() {
                         {/* 反例市場階段分布 */}
                         {Object.keys(actualStats.negativeMarketPhases).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-red-700 mb-2">反例市場階段：</div>
+                            <div className="text-sm font-medium text-rose-400 mb-2">反例市場階段：</div>
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(actualStats.negativeMarketPhases).map(([phase, count]) => (
-                                <span key={`neg-${phase}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                <span key={`neg-${phase}`} className="px-2 py-1 bg-rose-400/15 text-rose-400 text-xs rounded">
                                   {phase}: {count}
                                 </span>
                               ))}
@@ -1261,8 +1261,8 @@ export default function SearchPage() {
                     <div className="mt-4 space-y-6">
                       {/* 小時分布圓餅圖 */}
                       {Object.keys(actualStats.hourDistribution).length > 0 && (
-                        <div className="p-4 bg-white rounded-lg border">
-                          <div className="text-lg font-semibold text-gray-800 mb-4">小時分布 (Hour of Day)</div>
+                        <div className="p-4 glass-panel rounded-xl">
+                          <div className="text-lg font-medium text-slate-100 mb-4">小時分布 (Hour of Day)</div>
                           
                           {/* 圓餅圖 */}
                           <HourDistributionPieChart 
@@ -1275,12 +1275,12 @@ export default function SearchPage() {
                             {/* 正例小時分布 */}
                             {Object.keys(actualStats.positiveHourDistribution).length > 0 && (
                               <div>
-                                <div className="text-sm font-medium text-green-700 mb-2">正例：</div>
+                                <div className="text-sm font-medium text-emerald-400 mb-2">正例：</div>
                                 <div className="flex flex-wrap gap-1">
                                   {Object.entries(actualStats.positiveHourDistribution)
                                     .sort(([a], [b]) => Number(a) - Number(b))
                                     .map(([hour, count]) => (
-                                      <span key={`pos-hour-${hour}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                      <span key={`pos-hour-${hour}`} className="px-2 py-1 bg-emerald-400/15 text-emerald-400 text-xs rounded">
                                         {hour}:00 ({count})
                                       </span>
                                     ))}
@@ -1291,12 +1291,12 @@ export default function SearchPage() {
                             {/* 反例小時分布 */}
                             {Object.keys(actualStats.negativeHourDistribution).length > 0 && (
                               <div>
-                                <div className="text-sm font-medium text-red-700 mb-2">反例：</div>
+                                <div className="text-sm font-medium text-rose-400 mb-2">反例：</div>
                                 <div className="flex flex-wrap gap-1">
                                   {Object.entries(actualStats.negativeHourDistribution)
                                     .sort(([a], [b]) => Number(a) - Number(b))
                                     .map(([hour, count]) => (
-                                      <span key={`neg-hour-${hour}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                      <span key={`neg-hour-${hour}`} className="px-2 py-1 bg-rose-400/15 text-rose-400 text-xs rounded">
                                         {hour}:00 ({count})
                                       </span>
                                     ))}
@@ -1309,8 +1309,8 @@ export default function SearchPage() {
                       
                       {/* 星期分布圓餅圖 */}
                       {Object.keys(actualStats.dayOfWeekDistribution).length > 0 && (
-                        <div className="p-4 bg-white rounded-lg border">
-                          <div className="text-lg font-semibold text-gray-800 mb-4">星期分布 (Day of Week)</div>
+                        <div className="p-4 glass-panel rounded-xl">
+                          <div className="text-lg font-medium text-slate-100 mb-4">星期分布 (Day of Week)</div>
                           
                           {/* 圓餅圖 */}
                           <DayOfWeekPieChart 
@@ -1323,7 +1323,7 @@ export default function SearchPage() {
                             {/* 正例星期分布 */}
                             {Object.keys(actualStats.positiveDayOfWeekDistribution).length > 0 && (
                               <div>
-                                <div className="text-sm font-medium text-green-700 mb-2">正例：</div>
+                                <div className="text-sm font-medium text-emerald-400 mb-2">正例：</div>
                                 <div className="flex flex-wrap gap-1">
                                   {Object.entries(actualStats.positiveDayOfWeekDistribution)
                                     .sort(([a], [b]) => Number(a) - Number(b))
@@ -1331,7 +1331,7 @@ export default function SearchPage() {
                                       const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
                                       const normalizedDay = Number(day) === 7 ? 0 : Number(day);
                                       return (
-                                        <span key={`pos-day-${day}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                        <span key={`pos-day-${day}`} className="px-2 py-1 bg-emerald-400/15 text-emerald-400 text-xs rounded">
                                           {dayNames[normalizedDay] || `星期${day}`} ({count})
                                         </span>
                                       );
@@ -1343,7 +1343,7 @@ export default function SearchPage() {
                             {/* 反例星期分布 */}
                             {Object.keys(actualStats.negativeDayOfWeekDistribution).length > 0 && (
                               <div>
-                                <div className="text-sm font-medium text-red-700 mb-2">反例：</div>
+                                <div className="text-sm font-medium text-rose-400 mb-2">反例：</div>
                                 <div className="flex flex-wrap gap-1">
                                   {Object.entries(actualStats.negativeDayOfWeekDistribution)
                                     .sort(([a], [b]) => Number(a) - Number(b))
@@ -1351,7 +1351,7 @@ export default function SearchPage() {
                                       const dayNames = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
                                       const normalizedDay = Number(day) === 7 ? 0 : Number(day);
                                       return (
-                                        <span key={`neg-day-${day}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                        <span key={`neg-day-${day}`} className="px-2 py-1 bg-rose-400/15 text-rose-400 text-xs rounded">
                                           {dayNames[normalizedDay] || `星期${day}`} ({count})
                                         </span>
                                       );
@@ -1367,8 +1367,8 @@ export default function SearchPage() {
 
                   {/* ===== 新增：市場分類分布 - 圓餅圖顯示 ===== */}
                   {(Object.keys(actualStats.positiveMarketClassDistribution).length > 0 || Object.keys(actualStats.negativeMarketClassDistribution).length > 0) && (
-                    <div className="mt-4 p-4 bg-white rounded-lg border">
-                      <div className="text-lg font-semibold text-gray-800 mb-4">市場分類分布</div>
+                    <div className="mt-4 p-4 glass-panel rounded-xl">
+                      <div className="text-lg font-medium text-slate-100 mb-4">市場分類分布</div>
 
                       {/* 圓餅圖 */}
                       <MarketClassPieChart
@@ -1381,10 +1381,10 @@ export default function SearchPage() {
                         {/* 正例市場分類分布 */}
                         {Object.keys(actualStats.positiveMarketClassDistribution).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-green-700 mb-2">正例市場分類：</div>
+                            <div className="text-sm font-medium text-emerald-400 mb-2">正例市場分類：</div>
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(actualStats.positiveMarketClassDistribution).map(([marketClass, count]) => (
-                                <span key={`pos-market-${marketClass}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                <span key={`pos-market-${marketClass}`} className="px-2 py-1 bg-emerald-400/15 text-emerald-400 text-xs rounded">
                                   {marketClass}: {count}
                                 </span>
                               ))}
@@ -1395,10 +1395,10 @@ export default function SearchPage() {
                         {/* 反例市場分類分布 */}
                         {Object.keys(actualStats.negativeMarketClassDistribution).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-red-700 mb-2">反例市場分類：</div>
+                            <div className="text-sm font-medium text-rose-400 mb-2">反例市場分類：</div>
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(actualStats.negativeMarketClassDistribution).map(([marketClass, count]) => (
-                                <span key={`neg-market-${marketClass}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                <span key={`neg-market-${marketClass}`} className="px-2 py-1 bg-rose-400/15 text-rose-400 text-xs rounded">
                                   {marketClass}: {count}
                                 </span>
                               ))}
@@ -1411,8 +1411,8 @@ export default function SearchPage() {
 
                   {/* ===== 新增：難度分布 - 圓餅圖顯示 ===== */}
                   {(Object.keys(actualStats.positiveDifficultyDistribution).length > 0 || Object.keys(actualStats.negativeDifficultyDistribution).length > 0) && (
-                    <div className="mt-4 p-4 bg-white rounded-lg border">
-                      <div className="text-lg font-semibold text-gray-800 mb-4">難度分布</div>
+                    <div className="mt-4 p-4 glass-panel rounded-xl">
+                      <div className="text-lg font-medium text-slate-100 mb-4">難度分布</div>
 
                       {/* 圓餅圖 */}
                       <DifficultyPieChart
@@ -1425,10 +1425,10 @@ export default function SearchPage() {
                         {/* 正例難度分布 */}
                         {Object.keys(actualStats.positiveDifficultyDistribution).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-green-700 mb-2">正例難度：</div>
+                            <div className="text-sm font-medium text-emerald-400 mb-2">正例難度：</div>
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(actualStats.positiveDifficultyDistribution).map(([difficulty, count]) => (
-                                <span key={`pos-difficulty-${difficulty}`} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                                <span key={`pos-difficulty-${difficulty}`} className="px-2 py-1 bg-emerald-400/15 text-emerald-400 text-xs rounded">
                                   {difficulty}: {count}
                                 </span>
                               ))}
@@ -1439,10 +1439,10 @@ export default function SearchPage() {
                         {/* 反例難度分布 */}
                         {Object.keys(actualStats.negativeDifficultyDistribution).length > 0 && (
                           <div>
-                            <div className="text-sm font-medium text-red-700 mb-2">反例難度：</div>
+                            <div className="text-sm font-medium text-rose-400 mb-2">反例難度：</div>
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(actualStats.negativeDifficultyDistribution).map(([difficulty, count]) => (
-                                <span key={`neg-difficulty-${difficulty}`} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">
+                                <span key={`neg-difficulty-${difficulty}`} className="px-2 py-1 bg-rose-400/15 text-rose-400 text-xs rounded">
                                   {difficulty}: {count}
                                 </span>
                               ))}
@@ -1460,7 +1460,7 @@ export default function SearchPage() {
             <div className="mt-6 flex justify-center">
               <button
                 onClick={exportSearchResultsToCSV}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-400 transition-colors"
               >
                 <Download className="w-5 h-5" />
                 導出CSV檔案

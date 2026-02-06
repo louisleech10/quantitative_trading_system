@@ -278,52 +278,52 @@ async function getTaskStatus(taskId: string): Promise<TaskStatus> {
 function CaseSummaryCard({ summary }: { summary: CaseSummary | null }) {
   if (!summary) {
     return (
-      <Card className="bg-white border-gray-200">
+      <Card className="glass-panel border-slate-800/80">
         <CardContent className="p-6">
-          <div className="text-center text-gray-500">載入中...</div>
+          <div className="text-center text-slate-400">載入中...</div>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="glass-panel border-slate-800/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
           <Database className="w-5 h-5" />
           案例資料統計
         </CardTitle>
-        <CardDescription className="text-gray-600">
+        <CardDescription className="text-slate-400">
           從 cases.json 載入的案例數據
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-3xl font-bold text-gray-900">{summary.total_cases}</div>
-            <div className="text-sm text-gray-600">總案例數</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-3xl font-bold text-slate-100">{summary.total_cases}</div>
+            <div className="text-sm text-slate-400">總案例數</div>
           </div>
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="text-3xl font-bold text-green-700">{summary.positive_cases}</div>
-            <div className="text-sm text-gray-600">正例</div>
+          <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-400/30">
+            <div className="text-3xl font-bold text-emerald-200">{summary.positive_cases}</div>
+            <div className="text-sm text-slate-400">正例</div>
           </div>
-          <div className="bg-red-50 rounded-lg p-4">
-            <div className="text-3xl font-bold text-red-700">{summary.negative_cases}</div>
-            <div className="text-sm text-gray-600">反例</div>
+          <div className="bg-rose-500/10 rounded-lg p-4 border border-rose-400/30">
+            <div className="text-3xl font-bold text-rose-200">{summary.negative_cases}</div>
+            <div className="text-sm text-slate-400">反例</div>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <span className="text-sm text-gray-600">可用交易對：</span>
+          <span className="text-sm text-slate-400">可用交易對：</span>
           {summary.symbols.map(s => (
-            <Badge key={s} variant="outline" className="text-gray-700 border-gray-300">
+            <Badge key={s} variant="outline" className="text-slate-200 border-slate-700">
               {s}
             </Badge>
           ))}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="text-sm text-gray-600">案例週期：</span>
+          <span className="text-sm text-slate-400">案例週期：</span>
           {summary.timeframes.map(t => (
-            <Badge key={t} variant="outline" className="text-gray-700 border-gray-300">
+            <Badge key={t} variant="outline" className="text-slate-200 border-slate-700">
               {t}
             </Badge>
           ))}
@@ -366,36 +366,36 @@ function SymbolMultiSelect({
     <div className="space-y-3">
       {/* 全選按鈕 */}
       <div 
-        className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 cursor-pointer hover:bg-gray-100"
+        className="flex items-center gap-2 p-2 rounded-lg bg-slate-900/50 cursor-pointer hover:bg-slate-900/70 border border-slate-800/80"
         onClick={handleSelectAll}
       >
         {allSelected ? (
-          <CheckSquare className="w-5 h-5 text-blue-600" />
+          <CheckSquare className="w-5 h-5 text-emerald-300" />
         ) : someSelected ? (
-          <div className="w-5 h-5 border-2 border-blue-600 rounded flex items-center justify-center">
-            <div className="w-2 h-2 bg-blue-600 rounded-sm" />
+          <div className="w-5 h-5 border-2 border-emerald-300 rounded flex items-center justify-center">
+            <div className="w-2 h-2 bg-emerald-300 rounded-sm" />
           </div>
         ) : (
-          <Square className="w-5 h-5 text-gray-400" />
+          <Square className="w-5 h-5 text-slate-500" />
         )}
-        <span className="text-sm font-medium text-gray-900">
+        <span className="text-sm font-medium text-slate-100">
           全選 ({selectedSymbols.length}/{availableSymbols.length})
         </span>
       </div>
 
       {/* 交易對列表 */}
-      <div className="max-h-40 overflow-y-auto border rounded-lg">
+      <div className="max-h-40 overflow-y-auto border border-slate-800/80 rounded-lg">
         {availableSymbols.map(symbol => (
           <div
             key={symbol}
-            className="flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+            className="flex items-center gap-2 p-2 hover:bg-slate-900/60 cursor-pointer border-b border-slate-800/80 last:border-b-0"
             onClick={() => handleToggle(symbol)}
           >
             <Checkbox 
               checked={selectedSymbols.includes(symbol)}
               className="pointer-events-none"
             />
-            <span className="text-sm text-gray-900">{symbol}</span>
+            <span className="text-sm text-slate-100">{symbol}</span>
           </div>
         ))}
       </div>
@@ -407,7 +407,7 @@ function SymbolMultiSelect({
             <Badge 
               key={s} 
               variant="secondary" 
-              className="text-xs bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200"
+              className="text-xs bg-emerald-500/10 text-emerald-200 cursor-pointer hover:bg-emerald-500/20 border border-emerald-400/30"
               onClick={() => handleToggle(s)}
             >
               {s} ×
@@ -423,9 +423,9 @@ function TaskProgressCard({ task }: { task: TaskStatus | null }) {
   if (!task) return null
 
   const statusColor = {
-    running: 'text-blue-600',
-    completed: 'text-green-600',
-    failed: 'text-red-600'
+    running: 'text-emerald-300',
+    completed: 'text-emerald-300',
+    failed: 'text-rose-300'
   }
 
   const StatusIcon = {
@@ -435,9 +435,9 @@ function TaskProgressCard({ task }: { task: TaskStatus | null }) {
   }[task.status]
 
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="glass-panel border-slate-800/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
           <StatusIcon className={`w-5 h-5 ${statusColor[task.status]} ${task.status === 'running' ? 'animate-spin' : ''}`} />
           任務狀態
         </CardTitle>
@@ -446,20 +446,20 @@ function TaskProgressCard({ task }: { task: TaskStatus | null }) {
         <div className="space-y-4">
           <div>
             <div className="flex justify-between mb-1">
-              <span className="text-sm text-gray-700">{task.current_step}</span>
-              <span className="text-sm text-gray-700">{task.progress}%</span>
+              <span className="text-sm text-slate-300">{task.current_step}</span>
+              <span className="text-sm text-slate-300">{task.progress}%</span>
             </div>
             <Progress value={task.progress} className="h-2" />
           </div>
-          <div className="text-sm text-gray-800">{task.message}</div>
+          <div className="text-sm text-slate-200">{task.message}</div>
           {task.total_cases > 0 && (
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-slate-300">
               處理進度：{task.processed_cases} / {task.total_cases} 個案例
             </div>
           )}
           {task.error && (
-            <Alert variant="destructive" className="bg-red-50 border-red-300">
-              <AlertDescription className="text-red-900 font-medium">{task.error}</AlertDescription>
+            <Alert variant="destructive" className="bg-rose-500/10 border-rose-400/30">
+              <AlertDescription className="text-rose-200 font-medium">{task.error}</AlertDescription>
             </Alert>
           )}
         </div>
@@ -476,80 +476,80 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
     isValidNumber(value) ? `${(value! * 100).toFixed(digits)}%` : 'N/A'
 
   const getAUCColor = (auc: number | null) => {
-    if (!isValidNumber(auc)) return 'text-gray-500'
-    if (auc! >= 0.8) return 'text-green-700'
-    if (auc! >= 0.7) return 'text-yellow-700'
-    return 'text-red-700'
+    if (!isValidNumber(auc)) return 'text-slate-400'
+    if (auc! >= 0.8) return 'text-emerald-300'
+    if (auc! >= 0.7) return 'text-amber-300'
+    return 'text-rose-300'
   }
 
   const getOverfitColor = (score: number | null) => {
-    if (!isValidNumber(score)) return 'text-gray-500'
-    if (score! <= 0.05) return 'text-green-700'
-    if (score! <= 0.1) return 'text-yellow-700'
-    return 'text-red-700'
+    if (!isValidNumber(score)) return 'text-slate-400'
+    if (score! <= 0.05) return 'text-emerald-300'
+    if (score! <= 0.1) return 'text-amber-300'
+    return 'text-rose-300'
   }
 
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="glass-panel border-slate-800/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
           <TrendingUp className="w-5 h-5" />
           模型性能
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
             <div className={`text-2xl font-bold ${getAUCColor(performance.train_auc)}`}>
               {formatPercent(performance.train_auc)}
             </div>
-            <div className="text-xs text-gray-600 flex items-center gap-1">
+            <div className="text-xs text-slate-400 flex items-center gap-1">
               訓練 AUC
               <div className="group relative">
-                <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                <Info className="w-3 h-3 text-slate-500 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                   訓練集上的 AUC，越高代表模型在訓練資料的分類能力越好。
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
             <div className={`text-2xl font-bold ${getAUCColor(performance.cv_auc_mean)}`}>
               {formatPercent(performance.cv_auc_mean)}
             </div>
-            <div className="text-xs text-gray-600 flex items-center gap-1">
+            <div className="text-xs text-slate-400 flex items-center gap-1">
               CV AUC (±{isValidNumber(performance.cv_auc_std) ? `${(performance.cv_auc_std! * 100).toFixed(1)}%` : 'N/A'})
               <div className="group relative">
-                <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                <Info className="w-3 h-3 text-slate-500 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                   交叉驗證平均 AUC，反映泛化能力；± 為標準差，越小越穩定。
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-2xl font-bold text-gray-900">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
+            <div className="text-2xl font-bold text-slate-100">
               {formatPercent(performance.precision)}
             </div>
-            <div className="text-xs text-gray-600 flex items-center gap-1">
+            <div className="text-xs text-slate-400 flex items-center gap-1">
               Precision
               <div className="group relative">
-                <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute left-0 bottom-5 hidden group-hover:block w-60 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                <Info className="w-3 h-3 text-slate-500 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-60 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                   判為正例的樣本中，有多少比例是真的正例（準確度）。
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-2xl font-bold text-gray-900">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
+            <div className="text-2xl font-bold text-slate-100">
               {formatPercent(performance.recall)}
             </div>
-            <div className="text-xs text-gray-600 flex items-center gap-1">
+            <div className="text-xs text-slate-400 flex items-center gap-1">
               Recall
               <div className="group relative">
-                <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                <Info className="w-3 h-3 text-slate-500 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                   真正例中，被模型抓到的比例（覆蓋率）。
                 </div>
               </div>
@@ -557,29 +557,29 @@ function ModelPerformanceCard({ performance }: { performance: ModelPerformance }
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xl font-bold text-gray-900">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
+            <div className="text-xl font-bold text-slate-100">
               {formatPercent(performance.f1_score)}
             </div>
-            <div className="text-xs text-gray-600 flex items-center gap-1">
+            <div className="text-xs text-slate-400 flex items-center gap-1">
               F1 Score
               <div className="group relative">
-                <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                <Info className="w-3 h-3 text-slate-500 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-56 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                   Precision 與 Recall 的調和平均，兼顧準確與覆蓋。
                 </div>
               </div>
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
             <div className={`text-xl font-bold ${getOverfitColor(performance.overfitting_score)}`}>
               {formatPercent(performance.overfitting_score)}
             </div>
-            <div className="text-xs text-gray-600 flex items-center gap-1">
+            <div className="text-xs text-slate-400 flex items-center gap-1">
               過擬合程度
               <div className="group relative">
-                <Info className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                <Info className="w-3 h-3 text-slate-500 cursor-help" />
+                <div className="absolute left-0 bottom-5 hidden group-hover:block w-64 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                   訓練 AUC 與 CV AUC 的差距；越大代表過擬合風險越高。
                 </div>
               </div>
@@ -618,26 +618,26 @@ function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
   const topPermutation = permutation?.items?.slice(0, 6) || []
 
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="glass-panel border-slate-800/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
           <BarChart2 className="w-5 h-5" />
           進階指標
         </CardTitle>
-        <CardDescription className="text-gray-600">
+        <CardDescription className="text-slate-400">
           Precision@K、期望值、信賴區間與穩定性分析
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-2">Precision@K</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-sm font-semibold text-slate-100 mb-2">Precision@K</div>
             {precisionKeys.length === 0 ? (
-              <div className="text-sm text-gray-600">無資料</div>
+              <div className="text-sm text-slate-400">無資料</div>
             ) : (
               <div className="space-y-2">
                 {precisionKeys.map(k => (
-                  <div key={k} className="flex items-center justify-between text-sm text-gray-800">
+                  <div key={k} className="flex items-center justify-between text-sm text-slate-200">
                     <span>P@{k}%</span>
                     <span>
                       {formatPercent(precisionAtK?.precision_at_k[k])} ｜ 閾值 {formatNumber(precisionAtK?.threshold_at_k[k], 3)} ｜ {precisionAtK?.sample_count_at_k[k]} 筆
@@ -645,7 +645,7 @@ function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
                   </div>
                 ))}
                 {precisionAtK?.recommended_k && (
-                  <div className="text-xs text-green-700 mt-2">
+                  <div className="text-xs text-emerald-300 mt-2">
                     推薦 K：{precisionAtK.recommended_k}% ，Precision {formatPercent(precisionAtK.recommended_precision)}
                   </div>
                 )}
@@ -653,12 +653,12 @@ function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-2">期望值估算</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-sm font-semibold text-slate-100 mb-2">期望值估算</div>
             {!expectancy ? (
-              <div className="text-sm text-gray-600">缺少 Price_Change，暫無估算</div>
+              <div className="text-sm text-slate-400">缺少 Price_Change，暫無估算</div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-800">
+              <div className="grid grid-cols-2 gap-2 text-sm text-slate-200">
                 <div>勝率：{formatPercent(expectancy.win_rate)}</div>
                 <div>期望值：{formatNumber(expectancy.expectancy, 6)}</div>
                 <div>平均盈：{formatNumber(expectancy.avg_win, 6)}</div>
@@ -669,12 +669,12 @@ function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-2">Bootstrap 信賴區間</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-sm font-semibold text-slate-100 mb-2">Bootstrap 信賴區間</div>
             {!bootstrap ? (
-              <div className="text-sm text-gray-600">無資料</div>
+              <div className="text-sm text-slate-400">無資料</div>
             ) : (
-              <div className="space-y-2 text-sm text-gray-800">
+              <div className="space-y-2 text-sm text-slate-200">
                 {Object.entries(bootstrap).map(([key, ci]) => (
                   <div key={key} className="flex items-center justify-between">
                     <span>{key.toUpperCase()}</span>
@@ -687,15 +687,15 @@ function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-2">Permutation Importance</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-sm font-semibold text-slate-100 mb-2">Permutation Importance</div>
             {topPermutation.length === 0 ? (
-              <div className="text-sm text-gray-600">無資料</div>
+              <div className="text-sm text-slate-400">無資料</div>
             ) : (
-              <div className="space-y-1 text-sm text-gray-800">
+              <div className="space-y-1 text-sm text-slate-200">
                 {topPermutation.map(item => (
                   <div key={item.feature} className="flex items-center justify-between">
-                    <span className="font-mono text-xs break-all">{item.feature}</span>
+                    <span className="font-mono text-xs break-all text-slate-200">{item.feature}</span>
                     <span>
                       {formatNumber(item.importance, 4)}
                       {item.overfit_flag ? ' ⚠️' : ''}
@@ -706,24 +706,24 @@ function AdvancedMetricsCard({ result }: { result: AnalysisResult }) {
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-2">Fold-level 穩定性</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-sm font-semibold text-slate-100 mb-2">Fold-level 穩定性</div>
             {!foldStability ? (
-              <div className="text-sm text-gray-600">無資料</div>
+              <div className="text-sm text-slate-400">無資料</div>
             ) : (
-              <div className="text-sm text-gray-800 space-y-1">
+              <div className="text-sm text-slate-200 space-y-1">
                 <div>穩定特徵：{foldStability.stable_features.length}</div>
                 <div>不穩定特徵：{foldStability.unstable_features.length}</div>
               </div>
             )}
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="text-sm font-semibold text-gray-900 mb-2">跨幣種泛化</div>
+          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-800/80">
+            <div className="text-sm font-semibold text-slate-100 mb-2">跨幣種泛化</div>
             {!crossSymbol || crossSymbol.length === 0 ? (
-              <div className="text-sm text-gray-600">無資料</div>
+              <div className="text-sm text-slate-400">無資料</div>
             ) : (
-              <div className="space-y-1 text-sm text-gray-800">
+              <div className="space-y-1 text-sm text-slate-200">
                 {crossSymbol.map(item => (
                   <div key={`${item.source_symbol}-${item.target_symbol}`} className="flex items-center justify-between">
                     <span>{item.target_symbol}</span>
@@ -744,14 +744,14 @@ function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) 
   const maxImportance = topFeatures.length > 0 ? Math.max(...topFeatures.map(f => f.importance)) : 0
 
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="glass-panel border-slate-800/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
           <List className="w-5 h-5" />
           特徵重要性 (Top 15)
           <div className="group relative">
-            <Info className="w-4 h-4 text-gray-400 cursor-help" />
-            <div className="absolute left-0 bottom-6 hidden group-hover:block w-72 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+            <Info className="w-4 h-4 text-slate-500 cursor-help" />
+            <div className="absolute left-0 bottom-6 hidden group-hover:block w-72 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
               特徵重要性為模型貢獻比例，% 越高代表模型越依賴此特徵（相對值）。
             </div>
           </div>
@@ -759,29 +759,29 @@ function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) 
       </CardHeader>
       <CardContent>
         {topFeatures.length === 0 || maxImportance <= 0 ? (
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-slate-400">
             無有效特徵重要性（模型可能未產生分裂或重要性為 0）
           </div>
         ) : (
           <div className="space-y-2">
             {topFeatures.map((feature, idx) => (
               <div key={feature.feature} className="flex items-center gap-3">
-                <span className="w-6 text-sm text-gray-600">{idx + 1}</span>
+                <span className="w-6 text-sm text-slate-400">{idx + 1}</span>
                 <div className="flex-1">
                   <div className="grid grid-cols-[1fr_auto] gap-3 mb-1">
                     <span
-                      className="text-sm font-mono text-gray-900 break-all whitespace-normal"
+                      className="text-sm font-mono text-slate-100 break-all whitespace-normal"
                       title={feature.feature}
                     >
                       {feature.feature}
                     </span>
-                    <span className="text-sm text-gray-700 whitespace-nowrap">
+                    <span className="text-sm text-slate-300 whitespace-nowrap">
                       {(feature.importance * 100).toFixed(2)}%
                     </span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-500 rounded-full"
+                      className="h-full bg-emerald-400 rounded-full"
                       style={{ width: `${(feature.importance / maxImportance) * 100}%` }}
                     />
                   </div>
@@ -797,14 +797,14 @@ function FeatureImportanceCard({ features }: { features: FeatureImportance[] }) 
 
 function DecisionRulesCard({ rules }: { rules: DecisionRule[] }) {
   return (
-    <Card className="bg-white border-gray-200">
+    <Card className="glass-panel border-slate-800/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-lg text-slate-100 flex items-center gap-2">
           <Brain className="w-5 h-5" />
           決策規則 (Top 10)
           <div className="group relative">
-            <Info className="w-4 h-4 text-gray-400 cursor-help" />
-            <div className="absolute left-0 bottom-6 hidden group-hover:block w-80 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+            <Info className="w-4 h-4 text-slate-500 cursor-help" />
+            <div className="absolute left-0 bottom-6 hidden group-hover:block w-80 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
               支持度：符合規則的案例數。信心度：符合規則的案例中為正例的比例。提升度：規則正例率 / 全體正例率（>1 表示優於平均）。
             </div>
           </div>
@@ -813,11 +813,11 @@ function DecisionRulesCard({ rules }: { rules: DecisionRule[] }) {
       <CardContent>
         <div className="space-y-3">
           {rules.map(rule => (
-            <div key={rule.rule_id} className="bg-gray-50 rounded-lg p-3">
-              <div className="font-mono text-sm text-gray-900 mb-2">
+            <div key={rule.rule_id} className="bg-slate-900/50 rounded-lg p-3 border border-slate-800/80">
+              <div className="font-mono text-sm text-slate-100 mb-2">
                 {rule.condition}
               </div>
-              <div className="flex gap-4 text-xs text-gray-700">
+              <div className="flex gap-4 text-xs text-slate-300">
                 <span>支持度: {rule.support}</span>
                 <span>信心度: {(rule.confidence * 100).toFixed(1)}%</span>
                 <span>提升度: {rule.lift.toFixed(2)}</span>
@@ -838,33 +838,33 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
   return (
     <div className="space-y-6">
       {/* 摘要資訊 */}
-      <Card className="bg-white border-gray-200">
+      <Card className="glass-panel border-slate-800/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg text-gray-900">分析摘要</CardTitle>
+          <CardTitle className="text-lg text-slate-100">分析摘要</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
             <div>
-              <div className="text-xl font-bold text-gray-900">{displaySymbols}</div>
-              <div className="text-xs text-gray-600">交易對</div>
+              <div className="text-xl font-bold text-slate-100">{displaySymbols}</div>
+              <div className="text-xs text-slate-400">交易對</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-gray-900">{result.timeframe}</div>
-              <div className="text-xs text-gray-600">K 線週期</div>
+              <div className="text-xl font-bold text-slate-100">{result.timeframe}</div>
+              <div className="text-xs text-slate-400">K 線週期</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-gray-900">{result.valid_cases}</div>
-              <div className="text-xs text-gray-600">有效案例</div>
+              <div className="text-xl font-bold text-slate-100">{result.valid_cases}</div>
+              <div className="text-xs text-slate-400">有效案例</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-gray-900">{result.features_generated}</div>
-              <div className="text-xs text-gray-600">生成特徵數</div>
+              <div className="text-xl font-bold text-slate-100">{result.features_generated}</div>
+              <div className="text-xs text-slate-400">生成特徵數</div>
             </div>
             <div>
-              <div className="text-xl font-bold text-green-700">
+              <div className="text-xl font-bold text-emerald-300">
                 {result.model_saved ? '已儲存' : '未儲存'}
               </div>
-              <div className="text-xs text-gray-600">模型狀態</div>
+              <div className="text-xs text-slate-400">模型狀態</div>
             </div>
           </div>
         </CardContent>
@@ -883,14 +883,14 @@ function AnalysisResultView({ result }: { result: AnalysisResult }) {
       </div>
 
       {/* 所有特徵名稱 */}
-      <Card className="bg-white border-gray-200">
+      <Card className="glass-panel border-slate-800/80">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg text-gray-900">所有特徵 ({result.feature_names.length})</CardTitle>
+          <CardTitle className="text-lg text-slate-100">所有特徵 ({result.feature_names.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {result.feature_names.map(name => (
-              <Badge key={name} variant="outline" className="font-mono text-xs text-gray-800">
+              <Badge key={name} variant="outline" className="font-mono text-xs text-slate-200 border-slate-700">
                 {name}
               </Badge>
             ))}
@@ -1266,12 +1266,12 @@ export default function XGBoostAnalysisPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-950/40">
       {/* 頁面標題 */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-slate-950/80 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-6 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">XGBoost 批量分析</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-semibold text-slate-100">XGBoost 批量分析</h1>
+          <p className="text-slate-400 mt-1">
             使用指標配置對所有案例進行機器學習分析，發現獲利模式
           </p>
         </div>
@@ -1285,23 +1285,23 @@ export default function XGBoostAnalysisPage() {
             <CaseSummaryCard summary={caseSummary} />
 
             {/* 數據選擇 */}
-            <Card className="bg-white border-gray-200">
+            <Card className="glass-panel border-slate-800/80">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg text-gray-900">數據選擇</CardTitle>
-                <CardDescription className="text-gray-600">
+                <CardTitle className="text-lg text-slate-100">數據選擇</CardTitle>
+                <CardDescription className="text-slate-400">
                   選擇要分析的交易對和 K 線時間週期
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* 交易對多選 */}
                 <div className="space-y-2">
-                  <Label className="text-gray-800 font-medium">交易對</Label>
+                  <Label className="text-slate-200 font-medium">交易對</Label>
                   <SymbolMultiSelect
                     availableSymbols={caseSummary?.symbols || []}
                     selectedSymbols={selectedSymbols}
                     onChange={setSelectedSymbols}
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     選擇要納入分析的交易對（將合併所有標的的案例訓練單一跨商品模型）
                   </p>
                 </div>
@@ -1309,22 +1309,22 @@ export default function XGBoostAnalysisPage() {
                 {/* K 線時間週期 - 獨立於案例 timeframe */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Label className="text-gray-800 font-medium">K 線時間週期</Label>
+                    <Label className="text-slate-200 font-medium">K 線時間週期</Label>
                     <div className="group relative">
-                      <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-64 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                      <Info className="w-4 h-4 text-slate-500 cursor-help" />
+                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-64 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                         此為計算指標所用的 K 線週期，可與案例搜尋的 timeframe 不同。
                         例如：案例以 12h 搜尋，但指標計算可用 1h 或 4h K 線。
                       </div>
                     </div>
                   </div>
                   <Select value={klineTimeframe} onValueChange={setKlineTimeframe}>
-                    <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
-                      <SelectValue placeholder="選擇 K 線週期" className="text-gray-900" />
+                    <SelectTrigger className="bg-slate-900/60 border-slate-700 text-slate-100 [&>span]:text-slate-100">
+                      <SelectValue placeholder="選擇 K 線週期" className="text-slate-100" />
                     </SelectTrigger>
-                    <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
+                    <SelectContent className="bg-slate-950 border border-slate-800 shadow-lg z-50">
                       {AVAILABLE_KLINE_TIMEFRAMES.map(tf => (
-                        <SelectItem key={tf.value} value={tf.value} className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                        <SelectItem key={tf.value} value={tf.value} className="text-slate-100 hover:bg-slate-900 cursor-pointer">
                           {tf.label}
                         </SelectItem>
                       ))}
@@ -1335,14 +1335,14 @@ export default function XGBoostAnalysisPage() {
                 {/* 回看 K 線數量 */}
                 <div className="space-y-2 relative z-0">
                   <div className="flex items-center gap-2">
-                    <Label className="text-gray-800 font-medium">回看 K 線數量</Label>
+                    <Label className="text-slate-200 font-medium">回看 K 線數量</Label>
                     <div className="group relative">
-                      <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-72 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                      <Info className="w-4 h-4 text-slate-500 cursor-help" />
+                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-72 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                         <p className="mb-1"><strong>回看數量 = Warmup + 學習窗口</strong></p>
                         <p className="mb-1">• Warmup：指標穩定所需（如 EMA_60 需 60 根）</p>
                         <p className="mb-1">• 學習窗口：你想分析的 K 線數（如 36 根）</p>
-                        <p className="text-yellow-300">範例：EMA_60 + 36 根學習 = 填 100</p>
+                        <p className="text-amber-300">範例：EMA_60 + 36 根學習 = 填 100</p>
                       </div>
                     </div>
                   </div>
@@ -1350,9 +1350,9 @@ export default function XGBoostAnalysisPage() {
                     type="number"
                     value={lookbackBars}
                     onChange={(e) => setLookbackBars(parseInt(e.target.value) || 200)}
-                    className="bg-white border-gray-300 text-gray-900"
+                    className="bg-slate-900/60 border-slate-700 text-slate-100"
                   />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     公式：Warmup（最長指標週期）+ 學習窗口（想分析的 K 線數）
                   </p>
                 </div>
@@ -1360,53 +1360,53 @@ export default function XGBoostAnalysisPage() {
                 {/* 序列特徵設定 */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <Label className="text-gray-800 font-medium">序列特徵設定</Label>
+                    <Label className="text-slate-200 font-medium">序列特徵設定</Label>
                     <div className="group relative">
-                      <Info className="w-4 h-4 text-gray-400 cursor-help" />
-                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-80 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
+                      <Info className="w-4 h-4 text-slate-500 cursor-help" />
+                      <div className="absolute left-0 bottom-6 hidden group-hover:block w-80 p-2 bg-slate-950 text-slate-100 text-xs rounded shadow-lg z-50">
                         <p className="mb-1"><strong>TO 前 N 根序列特徵</strong>，不是只取 T0 單根。</p>
                         <p className="mb-1">• 序列長度：TO 往前 N 根</p>
                         <p className="mb-1">• 步長：序列抽樣間隔</p>
                         <p className="mb-1">• 彙總方法：mean/std/min/max/last/slope</p>
-                        <p className="text-yellow-300">建議：序列長度 64，步長 1</p>
+                        <p className="text-amber-300">建議：序列長度 64，步長 1</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label className="text-gray-800 text-sm">序列長度（N）</Label>
+                      <Label className="text-slate-200 text-sm">序列長度（N）</Label>
                       <Input
                         type="number"
                         value={sequenceLength}
                         onChange={(e) => setSequenceLength(parseInt(e.target.value) || 0)}
-                        className="bg-white border-gray-300 text-gray-900"
+                        className="bg-slate-900/60 border-slate-700 text-slate-100"
                         min={1}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-gray-800 text-sm">序列步長</Label>
+                      <Label className="text-slate-200 text-sm">序列步長</Label>
                       <Input
                         type="number"
                         value={sequenceStride}
                         onChange={(e) => setSequenceStride(parseInt(e.target.value) || 1)}
-                        className="bg-white border-gray-300 text-gray-900"
+                        className="bg-slate-900/60 border-slate-700 text-slate-100"
                         min={1}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-gray-800 text-sm">序列模式</Label>
+                    <Label className="text-slate-200 text-sm">序列模式</Label>
                     <Select value={sequenceFeatureMode} onValueChange={(value) => setSequenceFeatureMode(value as 'aggregate' | 'flatten')}>
-                      <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
-                        <SelectValue placeholder="選擇序列模式" className="text-gray-900" />
+                      <SelectTrigger className="bg-slate-900/60 border-slate-700 text-slate-100 [&>span]:text-slate-100">
+                        <SelectValue placeholder="選擇序列模式" className="text-slate-100" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
-                        <SelectItem value="aggregate" className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                      <SelectContent className="bg-slate-950 border border-slate-800 shadow-lg z-50">
+                        <SelectItem value="aggregate" className="text-slate-100 hover:bg-slate-900 cursor-pointer">
                           彙總統計（較省資源）
                         </SelectItem>
-                        <SelectItem value="flatten" className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                        <SelectItem value="flatten" className="text-slate-100 hover:bg-slate-900 cursor-pointer">
                           展平序列（保留形狀）
                         </SelectItem>
                       </SelectContent>
@@ -1415,25 +1415,25 @@ export default function XGBoostAnalysisPage() {
 
                   {sequenceFeatureMode === 'aggregate' && (
                     <div className="space-y-2">
-                      <Label className="text-gray-800 text-sm">彙總方法（逗號分隔）</Label>
+                      <Label className="text-slate-200 text-sm">彙總方法（逗號分隔）</Label>
                       <Input
                         value={aggregationMethodsInput}
                         onChange={(e) => setAggregationMethodsInput(e.target.value)}
-                        className="bg-white border-gray-300 text-gray-900"
+                        className="bg-slate-900/60 border-slate-700 text-slate-100"
                         placeholder="mean,std,min,max,last,slope"
                       />
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <Label className="text-gray-800 text-sm">多時間尺度窗口（逗號分隔）</Label>
+                    <Label className="text-slate-200 text-sm">多時間尺度窗口（逗號分隔）</Label>
                     <Input
                       value={multiScaleWindowsInput}
                       onChange={(e) => setMultiScaleWindowsInput(e.target.value)}
-                      className="bg-white border-gray-300 text-gray-900"
+                      className="bg-slate-900/60 border-slate-700 text-slate-100"
                       placeholder="16,32"
                     />
-                    <p className="text-xs text-gray-500">可留空，僅使用序列長度 N</p>
+                    <p className="text-xs text-slate-500">可留空，僅使用序列長度 N</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1441,18 +1441,18 @@ export default function XGBoostAnalysisPage() {
                       checked={timeSeriesSplit}
                       onCheckedChange={(value) => setTimeSeriesSplit(Boolean(value))}
                     />
-                    <Label className="text-gray-800 text-sm">啟用時間序列切分（避免洩漏）</Label>
+                    <Label className="text-slate-200 text-sm">啟用時間序列切分（避免洩漏）</Label>
                   </div>
                 </div>
 
                 {/* 交叉驗證折數 */}
                 <div className="space-y-2">
-                  <Label className="text-gray-800 font-medium">交叉驗證折數</Label>
+                  <Label className="text-slate-200 font-medium">交叉驗證折數</Label>
                   <Input
                     type="number"
                     value={cvFolds}
                     onChange={(e) => setCvFolds(parseInt(e.target.value) || 5)}
-                    className="bg-white border-gray-300 text-gray-900"
+                    className="bg-slate-900/60 border-slate-700 text-slate-100"
                     min={2}
                     max={10}
                   />
@@ -1461,10 +1461,10 @@ export default function XGBoostAnalysisPage() {
             </Card>
 
             {/* 指標配置 */}
-            <Card className="bg-white border-gray-200">
+            <Card className="glass-panel border-slate-800/80">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg text-gray-900">指標配置</CardTitle>
-                <CardDescription className="text-gray-600">
+                <CardTitle className="text-lg text-slate-100">指標配置</CardTitle>
+                <CardDescription className="text-slate-400">
                   配置用於特徵提取的技術指標。可在 config/indicators.yaml 新增更多指標。
                 </CardDescription>
               </CardHeader>
@@ -1480,7 +1480,7 @@ export default function XGBoostAnalysisPage() {
             <Button
               onClick={handleStartAnalysis}
               disabled={isLoading || selectedSymbols.length === 0}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full bg-emerald-500/20 text-emerald-100 border border-emerald-400/40 hover:bg-emerald-500/30"
               size="lg"
             >
               {isLoading ? (
@@ -1498,9 +1498,9 @@ export default function XGBoostAnalysisPage() {
 
             {/* 錯誤訊息 */}
             {error && (
-              <Alert variant="destructive" className="bg-red-50 border-red-300">
-                <AlertCircle className="w-4 h-4 text-red-700" />
-                <AlertDescription className="text-red-900 font-medium">{error}</AlertDescription>
+              <Alert variant="destructive" className="bg-rose-500/10 border-rose-400/30">
+                <AlertCircle className="w-4 h-4 text-rose-300" />
+                <AlertDescription className="text-rose-200 font-medium">{error}</AlertDescription>
               </Alert>
             )}
           </div>
@@ -1512,16 +1512,16 @@ export default function XGBoostAnalysisPage() {
 
             {/* 儲存成功訊息 */}
             {saveSuccess && (
-              <Alert className="bg-green-50 border-green-300">
-                <CheckCircle className="w-4 h-4 text-green-700" />
-                <AlertDescription className="text-green-900 font-medium flex items-center justify-between">
+              <Alert className="bg-emerald-500/10 border-emerald-400/30">
+                <CheckCircle className="w-4 h-4 text-emerald-300" />
+                <AlertDescription className="text-emerald-200 font-medium flex items-center justify-between">
                   <span>樣式已成功儲存！</span>
                   {savedPatternId && (
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => router.push('/patterns')}
-                      className="ml-4 border-green-600 text-green-700 hover:bg-green-100"
+                      className="ml-4 border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/20"
                     >
                       前往樣式管理
                     </Button>
@@ -1536,7 +1536,7 @@ export default function XGBoostAnalysisPage() {
                 <Button
                   onClick={handleSavePattern}
                   disabled={isSaving}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-emerald-500/20 text-emerald-100 border border-emerald-400/40 hover:bg-emerald-500/30"
                   size="lg"
                 >
                   {isSaving ? (
@@ -1554,7 +1554,7 @@ export default function XGBoostAnalysisPage() {
                 <Button
                   variant="outline"
                   onClick={() => router.push('/patterns')}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                  className="border-slate-700 text-slate-300 hover:bg-slate-900/60"
                   size="lg"
                 >
                   前往樣式管理
@@ -1563,7 +1563,7 @@ export default function XGBoostAnalysisPage() {
                   <Button
                     variant="outline"
                     onClick={() => router.push(`/patterns/xgboost-analysis/${taskId}/details`)}
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                    className="border-emerald-400/40 text-emerald-200 hover:bg-emerald-500/20"
                     size="lg"
                   >
                     開啟深度分析
@@ -1577,14 +1577,14 @@ export default function XGBoostAnalysisPage() {
 
             {/* 空狀態 */}
             {!result && !taskStatus && (
-              <Card className="bg-white border-gray-200">
+              <Card className="glass-panel border-slate-800/80">
                 <CardContent className="py-12">
                   <div className="text-center">
-                    <Brain className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    <Brain className="w-16 h-16 mx-auto text-slate-600 mb-4" />
+                    <h3 className="text-lg font-semibold text-slate-100 mb-2">
                       尚未執行分析
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-slate-400">
                       配置指標參數後，點擊「開始分析」執行 XGBoost 批量分析
                     </p>
                   </div>

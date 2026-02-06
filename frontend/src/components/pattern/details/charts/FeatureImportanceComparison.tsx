@@ -41,14 +41,14 @@ export default function FeatureImportanceComparison({ data, loading }: FeatureIm
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="feature" hide />
             <YAxis />
             <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
             <Legend />
-            <Bar dataKey="gain" fill="#3b82f6" name="Gain" />
-            <Bar dataKey="cover" fill="#10b981" name="Cover" />
-            <Bar dataKey="weight" fill="#f59e0b" name="Weight" />
+            <Bar dataKey="gain" fill="#60a5fa" name="Gain" />
+            <Bar dataKey="cover" fill="#34d399" name="Cover" />
+            <Bar dataKey="weight" fill="#fbbf24" name="Weight" />
           </BarChart>
         </ResponsiveContainer>
       </div>

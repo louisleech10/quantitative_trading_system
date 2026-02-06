@@ -45,9 +45,31 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
     const [min, max] = heatmapData.value_range
     const normalized = (value - min) / (max - min)
 
-    // 從紅色（低）到綠色（高）的漸變
-    const hue = normalized * 120 // 0 (red) to 120 (green)
-    return `hsl(${hue}, 80%, 55%)`
+    const clamp = (val: number) => Math.max(0, Math.min(1, val))
+    const hexToRgb = (hex: string) => {
+      const parsed = hex.replace('#', '')
+      const r = parseInt(parsed.slice(0, 2), 16)
+      const g = parseInt(parsed.slice(2, 4), 16)
+      const b = parseInt(parsed.slice(4, 6), 16)
+      return { r, g, b }
+    }
+    const rgbToHex = (r: number, g: number, b: number) =>
+      `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+    const lerpColor = (start: string, end: string, t: number) => {
+      const s = hexToRgb(start)
+      const e = hexToRgb(end)
+      return rgbToHex(
+        Math.round(s.r + (e.r - s.r) * t),
+        Math.round(s.g + (e.g - s.g) * t),
+        Math.round(s.b + (e.b - s.b) * t)
+      )
+    }
+
+    const clamped = clamp(normalized)
+    if (clamped <= 0.5) {
+      return lerpColor('#fb7185', '#fbbf24', clamped / 0.5)
+    }
+    return lerpColor('#fbbf24', '#34d399', (clamped - 0.5) / 0.5)
   }
 
   // 自定義散點形狀
@@ -61,9 +83,9 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
         r={10}
         fill={color}
         fillOpacity={0.9}
-        stroke="#ffffff"
+        stroke="rgba(255,255,255,0.1)"
         strokeWidth={2}
-        style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.6))' }}
+        style={{ filter: 'drop-shadow(0 0 4px rgba(96,165,250,0.3))' }}
       />
     )
   }
@@ -86,7 +108,7 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
             </p>
             <p className="pt-1 border-t">
               <span className="text-muted-foreground">目標值:</span>{' '}
-              <span className="font-mono font-bold text-green-600">{data.value.toFixed(6)}</span>
+              <span className="font-mono font-bold text-emerald-400">{data.value.toFixed(6)}</span>
             </p>
           </div>
         </div>
@@ -177,7 +199,7 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
         {/* 顏色圖例 */}
         <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-16 h-4 rounded" style={{ background: 'linear-gradient(to right, hsl(0, 70%, 50%), hsl(60, 70%, 50%), hsl(120, 70%, 50%))' }} />
+            <div className="w-16 h-4 rounded" style={{ background: 'linear-gradient(to right, #fb7185, #fbbf24, #34d399)' }} />
             <span className="text-muted-foreground">
               低 ({heatmapData.value_range[0].toFixed(3)}) → 高 ({heatmapData.value_range[1].toFixed(3)})
             </span>
@@ -188,9 +210,9 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
         <div className="mt-4 p-3 bg-muted/30 rounded-lg space-y-2">
           <p className="text-xs font-medium text-foreground">📖 如何閱讀熱力圖</p>
           <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-            <li><span className="text-green-500">●</span> <strong>綠色點</strong>：該參數組合的目標值較高（表現較好）</li>
-            <li><span className="text-yellow-500">●</span> <strong>黃色點</strong>：該參數組合的目標值中等</li>
-            <li><span className="text-red-500">●</span> <strong>紅色點</strong>：該參數組合的目標值較低（表現較差）</li>
+            <li><span className="text-emerald-400">●</span> <strong>綠色點</strong>：該參數組合的目標值較高（表現較好）</li>
+            <li><span className="text-amber-400">●</span> <strong>黃色點</strong>：該參數組合的目標值中等</li>
+            <li><span className="text-rose-400">●</span> <strong>紅色點</strong>：該參數組合的目標值較低（表現較差）</li>
             <li><strong>點的位置</strong>：代表兩個參數的具體數值組合</li>
             <li><strong>分析技巧</strong>：觀察綠色點的聚集區域，找出最佳參數範圍</li>
           </ul>

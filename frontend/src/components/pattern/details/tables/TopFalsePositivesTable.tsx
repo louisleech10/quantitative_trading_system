@@ -19,7 +19,7 @@ export default function TopFalsePositivesTable({ data, loading, onCaseClick }: T
     <div className="overflow-x-auto">
       <table className="min-w-full text-sm">
         <thead>
-          <tr className="text-left text-gray-600 border-b">
+          <tr className="text-left text-slate-400 border-b border-white/10">
             <th className="py-2">時間</th>
             <th className="py-2">Symbol</th>
             <th className="py-2">機率</th>
@@ -29,17 +29,17 @@ export default function TopFalsePositivesTable({ data, loading, onCaseClick }: T
         </thead>
         <tbody>
           {data.map((item) => (
-            <tr key={item.case_id} className="border-b last:border-b-0">
-              <td className="py-2 text-gray-700">{item.timestamp}</td>
-              <td className="py-2 text-gray-700">{item.symbol}</td>
-              <td className="py-2 text-gray-700">{item.predicted_proba.toFixed(4)}</td>
-              <td className={`py-2 ${item.actual_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <tr key={item.case_id} className="border-b border-white/10 last:border-b-0">
+              <td className="py-2 text-slate-300">{item.timestamp}</td>
+              <td className="py-2 text-slate-300">{item.symbol}</td>
+              <td className="py-2 text-slate-300">{item.predicted_proba.toFixed(4)}</td>
+              <td className={`py-2 ${item.actual_return >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {item.actual_return.toFixed(4)}
               </td>
               <td className="py-2">
                 <button
                   onClick={() => onCaseClick?.(item.case_id)}
-                  className="text-blue-600 hover:underline"
+                  className="text-blue-400 hover:underline"
                 >
                   查看
                 </button>

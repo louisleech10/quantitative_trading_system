@@ -215,7 +215,7 @@ export default function CombinedDensityBoxplot({
           y1={maxY}
           x2={x}
           y2={q3Y}
-          stroke="#374151"
+          stroke="#cbd5e1"
           strokeWidth={1.5}
         />
         <line
@@ -223,7 +223,7 @@ export default function CombinedDensityBoxplot({
           y1={maxY}
           x2={x + 10}
           y2={maxY}
-          stroke="#374151"
+          stroke="#cbd5e1"
           strokeWidth={1.5}
         />
 
@@ -246,12 +246,12 @@ export default function CombinedDensityBoxplot({
           y1={medianY}
           x2={x + boxWidth / 2}
           y2={medianY}
-          stroke="#1e293b"
+          stroke="#f1f5f9"
           strokeWidth={3}
         />
 
         {/* Mean marker (circle) */}
-        <circle cx={x} cy={meanY} r={5} fill="#f59e0b" stroke="#fff" strokeWidth={2} />
+        <circle cx={x} cy={meanY} r={5} fill="#fbbf24" stroke="rgba(255,255,255,0.4)" strokeWidth={2} />
 
         {/* Lower whisker */}
         <line
@@ -259,7 +259,7 @@ export default function CombinedDensityBoxplot({
           y1={q1Y}
           x2={x}
           y2={minY}
-          stroke="#374151"
+          stroke="#cbd5e1"
           strokeWidth={1.5}
         />
         <line
@@ -267,7 +267,7 @@ export default function CombinedDensityBoxplot({
           y1={minY}
           x2={x + 10}
           y2={minY}
-          stroke="#374151"
+          stroke="#cbd5e1"
           strokeWidth={1.5}
         />
 
@@ -290,7 +290,7 @@ export default function CombinedDensityBoxplot({
           y={plotHeight + 25}
           textAnchor="middle"
           fontSize={12}
-          fill="#64748b"
+          fill="#94a3b8"
           fontWeight="500"
         >
           {label}
@@ -300,10 +300,10 @@ export default function CombinedDensityBoxplot({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="glass-panel rounded-xl p-6">
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-500">
+        <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
+        <p className="text-sm text-slate-400">
           橫向對比四種密度指標的分佈情況 (各有獨立Y軸): Near (近期密度), Far (遠期密度), Ratio (近遠比), M 值 (歸一化指標)
         </p>
       </div>
@@ -323,7 +323,7 @@ export default function CombinedDensityBoxplot({
               y1={plotHeight}
               x2={plotWidth}
               y2={plotHeight}
-              stroke="#9ca3af"
+              stroke="#64748b"
               strokeWidth={2}
             />
 
@@ -357,7 +357,7 @@ export default function CombinedDensityBoxplot({
                         y1={scaleY(tick)}
                         x2={section.x + sectionWidth}
                         y2={scaleY(tick)}
-                        stroke="#e5e7eb"
+                        stroke="rgba(255,255,255,0.1)"
                         strokeDasharray="3 3"
                       />
                     ))}
@@ -369,7 +369,7 @@ export default function CombinedDensityBoxplot({
                     y1={0}
                     x2={section.x}
                     y2={plotHeight}
-                    stroke="#9ca3af"
+                    stroke="#64748b"
                     strokeWidth={2}
                   />
 
@@ -381,7 +381,7 @@ export default function CombinedDensityBoxplot({
                         y1={scaleY(tick)}
                         x2={section.x}
                         y2={scaleY(tick)}
-                        stroke="#9ca3af"
+                        stroke="#64748b"
                         strokeWidth={1.5}
                       />
                       <text
@@ -390,7 +390,7 @@ export default function CombinedDensityBoxplot({
                         textAnchor="end"
                         dominantBaseline="middle"
                         fontSize={10}
-                        fill="#64748b"
+                        fill="#94a3b8"
                       >
                         {tick.toFixed(2)}
                       </text>
@@ -404,7 +404,7 @@ export default function CombinedDensityBoxplot({
                       y1={0}
                       x2={section.x + sectionWidth}
                       y2={plotHeight}
-                      stroke="#d1d5db"
+                      stroke="rgba(255,255,255,0.15)"
                       strokeWidth={1}
                       strokeDasharray="5 5"
                     />
@@ -416,15 +416,15 @@ export default function CombinedDensityBoxplot({
                     y={plotHeight + 50}
                     textAnchor="middle"
                     fontSize={14}
-                    fill="#1e293b"
+                    fill="#f1f5f9"
                     fontWeight="600"
                   >
                     {section.name}
                   </text>
 
                   {/* Boxplots */}
-                  {renderBoxplot(section.stats.positive, positiveX, "#10b981", "正例", scaleY)}
-                  {renderBoxplot(section.stats.negative, negativeX, "#ef4444", "反例", scaleY)}
+                  {renderBoxplot(section.stats.positive, positiveX, "#34d399", "正例", scaleY)}
+                  {renderBoxplot(section.stats.negative, negativeX, "#fb7185", "反例", scaleY)}
                 </g>
               );
             })}
@@ -432,23 +432,23 @@ export default function CombinedDensityBoxplot({
 
           {/* Legend */}
           <g transform={`translate(${margin.left + 20}, 10)`}>
-            <rect x={0} y={0} width={15} height={15} fill="#10b981" opacity={0.7} />
-            <text x={20} y={12} fontSize={12} fill="#64748b">
+            <rect x={0} y={0} width={15} height={15} fill="#34d399" opacity={0.7} />
+            <text x={20} y={12} fontSize={12} fill="#94a3b8">
               正例 Positive
             </text>
 
-            <rect x={120} y={0} width={15} height={15} fill="#ef4444" opacity={0.7} />
-            <text x={140} y={12} fontSize={12} fill="#64748b">
+            <rect x={120} y={0} width={15} height={15} fill="#fb7185" opacity={0.7} />
+            <text x={140} y={12} fontSize={12} fill="#94a3b8">
               反例 Negative
             </text>
 
-            <line x1={250} y1={7} x2={265} y2={7} stroke="#1e293b" strokeWidth={3} />
-            <text x={270} y={12} fontSize={12} fill="#64748b">
+            <line x1={250} y1={7} x2={265} y2={7} stroke="#f1f5f9" strokeWidth={3} />
+            <text x={270} y={12} fontSize={12} fill="#94a3b8">
               中位數
             </text>
 
-            <circle cx={340} cy={7} r={5} fill="#f59e0b" />
-            <text x={350} y={12} fontSize={12} fill="#64748b">
+            <circle cx={340} cy={7} r={5} fill="#fbbf24" />
+            <text x={350} y={12} fontSize={12} fill="#94a3b8">
               平均值
             </text>
           </g>
@@ -459,12 +459,12 @@ export default function CombinedDensityBoxplot({
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Near Density Stats */}
         <div className="space-y-3">
-          <h4 className="text-center font-semibold text-slate-700 border-b pb-2">
+          <h4 className="text-center font-semibold text-slate-200 border-b border-white/10 pb-2">
             近期密度 (Near)
           </h4>
-          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-green-900">正例</h5>
-            <div className="space-y-0.5 text-xs text-green-700">
+          <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-emerald-200">正例</h5>
+            <div className="space-y-0.5 text-xs text-emerald-300">
               <p>中位數: {allStats.near.positive.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.near.positive.mean.toFixed(4)} (±
@@ -476,9 +476,9 @@ export default function CombinedDensityBoxplot({
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-red-900">反例</h5>
-            <div className="space-y-0.5 text-xs text-red-700">
+          <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-rose-200">反例</h5>
+            <div className="space-y-0.5 text-xs text-rose-300">
               <p>中位數: {allStats.near.negative.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.near.negative.mean.toFixed(4)} (±
@@ -494,12 +494,12 @@ export default function CombinedDensityBoxplot({
 
         {/* Far Density Stats */}
         <div className="space-y-3">
-          <h4 className="text-center font-semibold text-slate-700 border-b pb-2">
+          <h4 className="text-center font-semibold text-slate-200 border-b border-white/10 pb-2">
             遠期密度 (Far)
           </h4>
-          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-green-900">正例</h5>
-            <div className="space-y-0.5 text-xs text-green-700">
+          <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-emerald-200">正例</h5>
+            <div className="space-y-0.5 text-xs text-emerald-300">
               <p>中位數: {allStats.far.positive.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.far.positive.mean.toFixed(4)} (±
@@ -511,9 +511,9 @@ export default function CombinedDensityBoxplot({
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-red-900">反例</h5>
-            <div className="space-y-0.5 text-xs text-red-700">
+          <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-rose-200">反例</h5>
+            <div className="space-y-0.5 text-xs text-rose-300">
               <p>中位數: {allStats.far.negative.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.far.negative.mean.toFixed(4)} (±
@@ -529,12 +529,12 @@ export default function CombinedDensityBoxplot({
 
         {/* Ratio Stats */}
         <div className="space-y-3">
-          <h4 className="text-center font-semibold text-slate-700 border-b pb-2">
+          <h4 className="text-center font-semibold text-slate-200 border-b border-white/10 pb-2">
             近遠比 (Ratio)
           </h4>
-          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-green-900">正例</h5>
-            <div className="space-y-0.5 text-xs text-green-700">
+          <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-emerald-200">正例</h5>
+            <div className="space-y-0.5 text-xs text-emerald-300">
               <p>中位數: {allStats.ratio.positive.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.ratio.positive.mean.toFixed(4)} (±
@@ -546,9 +546,9 @@ export default function CombinedDensityBoxplot({
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-red-900">反例</h5>
-            <div className="space-y-0.5 text-xs text-red-700">
+          <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-rose-200">反例</h5>
+            <div className="space-y-0.5 text-xs text-rose-300">
               <p>中位數: {allStats.ratio.negative.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.ratio.negative.mean.toFixed(4)} (±
@@ -564,12 +564,12 @@ export default function CombinedDensityBoxplot({
 
         {/* M Value Stats (Golden Formula v2.0) */}
         <div className="space-y-3">
-          <h4 className="text-center font-semibold text-slate-700 border-b pb-2">
+          <h4 className="text-center font-semibold text-slate-200 border-b border-white/10 pb-2">
             M 值 (v2.0)
           </h4>
-          <div className="rounded-lg border border-green-200 bg-green-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-green-900">正例</h5>
-            <div className="space-y-0.5 text-xs text-green-700">
+          <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-emerald-200">正例</h5>
+            <div className="space-y-0.5 text-xs text-emerald-300">
               <p>中位數: {allStats.m.positive.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.m.positive.mean.toFixed(4)} (±
@@ -581,9 +581,9 @@ export default function CombinedDensityBoxplot({
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <h5 className="mb-1 text-sm font-semibold text-red-900">反例</h5>
-            <div className="space-y-0.5 text-xs text-red-700">
+          <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 p-3">
+            <h5 className="mb-1 text-sm font-semibold text-rose-200">反例</h5>
+            <div className="space-y-0.5 text-xs text-rose-300">
               <p>中位數: {allStats.m.negative.median.toFixed(4)}</p>
               <p>
                 平均值: {allStats.m.negative.mean.toFixed(4)} (±

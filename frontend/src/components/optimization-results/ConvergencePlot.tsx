@@ -28,7 +28,7 @@ export function ConvergencePlot({ convergenceData }: ConvergencePlotProps) {
         <div className="bg-popover border rounded-lg shadow-lg p-3">
           <p className="font-semibold text-sm">Trial #{data.trial}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            最佳值: <span className="font-mono font-bold text-green-600">{data.value.toFixed(6)}</span>
+            最佳值: <span className="font-mono font-bold text-emerald-400">{data.value.toFixed(6)}</span>
           </p>
         </div>
       )
@@ -45,7 +45,7 @@ export function ConvergencePlot({ convergenceData }: ConvergencePlotProps) {
             <CardTitle className="text-base">收斂曲線</CardTitle>
           </div>
           {convergenceData.converged && (
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+            <Badge variant="outline" className="bg-emerald-400/10 text-emerald-300 border-emerald-400/30">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               已收斂
             </Badge>
@@ -88,12 +88,12 @@ export function ConvergencePlot({ convergenceData }: ConvergencePlotProps) {
               {convergenceData.converged && convergenceData.convergence_trial !== undefined && (
                 <ReferenceLine
                   x={convergenceData.convergence_trial}
-                  stroke="hsl(0, 84%, 60%)"
+                  stroke="#fb7185"
                   strokeDasharray="5 5"
                   label={{
                     value: '收斂點',
                     position: 'top',
-                    className: 'text-xs fill-red-500'
+                    className: 'text-xs fill-rose-400'
                   }}
                 />
               )}
@@ -102,7 +102,7 @@ export function ConvergencePlot({ convergenceData }: ConvergencePlotProps) {
               <Line
                 type="stepAfter"
                 dataKey="value"
-                stroke="hsl(142, 76%, 36%)"
+                stroke="#34d399"
                 strokeWidth={2}
                 dot={false}
                 name="最佳值演進"
@@ -117,7 +117,7 @@ export function ConvergencePlot({ convergenceData }: ConvergencePlotProps) {
             💡 曲線趨於平穩表示優化已收斂，繼續執行可能無明顯改進
           </p>
           {convergenceData.converged && (
-            <p className="text-xs text-green-600 font-medium">
+            <p className="text-xs text-emerald-400 font-medium">
               ✓ 優化已達到收斂狀態，建議停止或減少 trial 數量
             </p>
           )}

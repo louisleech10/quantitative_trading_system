@@ -12,8 +12,8 @@ export default function FeaturesTab() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-medium mb-4">SHAP 特徵重要性</h3>
+      <div className="glass-panel rounded-xl p-4">
+        <h3 className="text-lg font-medium text-slate-100 mb-4">SHAP 特徵重要性</h3>
         <SHAPSummaryChart
           data={shapGlobal}
           loading={deepAnalysisLoading.shap}
@@ -21,13 +21,13 @@ export default function FeaturesTab() {
         />
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-medium mb-4">特徵重要性對比 (Gain/Cover/Weight)</h3>
+      <div className="glass-panel rounded-xl p-4">
+        <h3 className="text-lg font-medium text-slate-100 mb-4">特徵重要性對比 (Gain/Cover/Weight)</h3>
         <FeatureImportanceComparison data={featureImportanceAll} loading={deepAnalysisLoading.shap} />
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-medium mb-4">特徵飄移分析 (PSI)</h3>
+      <div className="glass-panel rounded-xl p-4">
+        <h3 className="text-lg font-medium text-slate-100 mb-4">特徵飄移分析 (PSI)</h3>
         <PSIComparisonChart
           data={driftReport}
           loading={deepAnalysisLoading.drift}

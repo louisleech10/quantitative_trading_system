@@ -112,28 +112,28 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">案例CSV導入</h3>
+    <div className="glass-panel rounded-xl p-6 border border-white/10">
+      <h3 className="text-lg font-semibold text-slate-100 mb-4">案例CSV導入</h3>
 
       {/* File Input */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-slate-300 mb-2">
           選擇CSV/Excel文件
         </label>
         <input
           type="file"
           accept=".csv,.xlsx,.xls,.txt"
           onChange={handleFileChange}
-          className="block w-full text-sm text-gray-700
+          className="block w-full text-sm text-slate-300
             file:mr-4 file:py-2 file:px-4
             file:rounded file:border-0
-            file:text-sm file:font-bold
-            file:bg-blue-100 file:text-blue-800
-            hover:file:bg-blue-200 cursor-pointer"
+            file:text-sm file:font-semibold
+            file:bg-blue-500/20 file:text-blue-200
+            hover:file:bg-blue-500/30 cursor-pointer"
           disabled={uploading}
         />
         {file && (
-          <p className="mt-2 text-sm font-medium text-gray-700">
+          <p className="mt-2 text-sm font-medium text-slate-400">
             已選擇: {file.name} ({(file.size / 1024).toFixed(2)} KB)
           </p>
         )}
@@ -142,13 +142,13 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
       {/* Options */}
       <div className="mb-4 grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             預設時間框架
           </label>
           <select
             value={defaultTimeframe}
             onChange={(e) => setDefaultTimeframe(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-700 rounded px-3 py-2 bg-slate-900/60 text-slate-100 font-medium focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             disabled={uploading}
           >
             <option value="1m">1分鐘</option>
@@ -168,10 +168,10 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
               type="checkbox"
               checked={validateOnly}
               onChange={(e) => setValidateOnly(e.target.checked)}
-              className="mr-2 w-4 h-4"
+              className="mr-2 w-4 h-4 accent-blue-400"
               disabled={uploading}
             />
-            <span className="text-sm font-medium text-gray-700">僅驗證（不導入）</span>
+            <span className="text-sm font-medium text-slate-300">僅驗證（不導入）</span>
           </label>
         </div>
       </div>
@@ -180,10 +180,10 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
       <button
         onClick={() => handleUpload(false)}
         disabled={!file || uploading}
-        className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-colors ${
+        className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors ${
           !file || uploading
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-700 shadow-md"
+            ? "bg-slate-700/60 text-slate-400 cursor-not-allowed"
+            : "bg-blue-500/20 text-blue-100 border border-blue-400/40 hover:bg-blue-500/30"
         }`}
       >
         {uploading ? "上傳中..." : validateOnly ? "驗證CSV" : "上傳並導入"}
@@ -191,8 +191,8 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
 
       {/* Error Message */}
       {error && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-300 rounded">
-          <p className="text-sm font-medium text-red-800">{error}</p>
+        <div className="mt-4 p-3 bg-rose-500/10 border border-rose-400/30 rounded">
+          <p className="text-sm font-medium text-rose-200">{error}</p>
         </div>
       )}
 
@@ -201,32 +201,32 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
         <div
           className={`mt-4 p-4 border rounded ${
             result.success
-              ? "bg-green-50 border-green-300"
-              : "bg-yellow-50 border-yellow-300"
+              ? "bg-emerald-500/10 border-emerald-400/30"
+              : "bg-amber-500/10 border-amber-400/30"
           }`}
         >
           <h4 className={`font-bold mb-3 ${
-            result.success ? "text-green-900" : "text-yellow-900"
+            result.success ? "text-emerald-200" : "text-amber-200"
           }`}>
             {result.success ? "✅ 導入成功" : "⚠️ 部分成功"}
           </h4>
 
-          <div className="grid grid-cols-2 gap-2 text-sm font-medium text-gray-900 mb-3">
-            <div>總行數: <span className="font-bold">{result.total_rows}</span></div>
-            <div>有效案例: <span className="font-bold text-green-700">{result.valid_cases}</span></div>
-            <div>無效案例: <span className="font-bold text-red-700">{result.invalid_cases}</span></div>
-            <div>已導入: <span className="font-bold text-blue-700">{result.imported_cases}</span></div>
+          <div className="grid grid-cols-2 gap-2 text-sm font-medium text-slate-100 mb-3">
+            <div>總行數: <span className="font-semibold">{result.total_rows}</span></div>
+            <div>有效案例: <span className="font-semibold text-emerald-300">{result.valid_cases}</span></div>
+            <div>無效案例: <span className="font-semibold text-rose-300">{result.invalid_cases}</span></div>
+            <div>已導入: <span className="font-semibold text-blue-300">{result.imported_cases}</span></div>
           </div>
 
           {result.warnings.length > 0 && (
             <div className="mb-3">
-              <p className="text-sm font-bold text-yellow-900 mb-1">警告:</p>
-              <ul className="list-disc list-inside text-sm font-medium text-yellow-800">
+              <p className="text-sm font-semibold text-amber-200 mb-1">警告:</p>
+              <ul className="list-disc list-inside text-sm font-medium text-amber-200/80">
                 {result.warnings.slice(0, 5).map((warning, idx) => (
                   <li key={idx}>{warning}</li>
                 ))}
                 {result.warnings.length > 5 && (
-                  <li className="text-gray-700">
+                  <li className="text-slate-400">
                     ...還有 {result.warnings.length - 5} 個警告
                   </li>
                 )}
@@ -236,13 +236,13 @@ export default function CaseImportForm({ onImportSuccess }: CaseImportFormProps)
 
           {result.errors.length > 0 && (
             <div>
-              <p className="text-sm font-bold text-red-900 mb-1">錯誤:</p>
-              <ul className="list-disc list-inside text-sm font-medium text-red-800">
+              <p className="text-sm font-semibold text-rose-200 mb-1">錯誤:</p>
+              <ul className="list-disc list-inside text-sm font-medium text-rose-200/80">
                 {result.errors.slice(0, 5).map((err, idx) => (
                   <li key={idx}>{err}</li>
                 ))}
                 {result.errors.length > 5 && (
-                  <li className="text-gray-700">
+                  <li className="text-slate-400">
                     ...還有 {result.errors.length - 5} 個錯誤
                   </li>
                 )}

@@ -75,18 +75,18 @@ export default function PatternList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">載入中...</div>
+        <div className="text-slate-400">載入中...</div>
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-600">錯誤: {error}</p>
+      <div className="glass-panel border border-rose-500/30 rounded-lg p-4">
+        <p className="text-rose-200">錯誤: {error}</p>
         <button 
           onClick={loadPatterns}
-          className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          className="mt-2 px-4 py-2 bg-rose-500/20 text-rose-100 border border-rose-500/40 rounded hover:bg-rose-500/30"
         >
           重試
         </button>
@@ -97,10 +97,10 @@ export default function PatternList() {
   if (filteredPatterns.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">沒有符合條件的模式</p>
+        <p className="text-slate-400 mb-4">沒有符合條件的模式</p>
         <button 
           onClick={loadPatterns}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="px-4 py-2 bg-blue-500/20 text-blue-100 border border-blue-500/40 rounded hover:bg-blue-500/30"
         >
           重新整理
         </button>
@@ -112,8 +112,8 @@ export default function PatternList() {
     <div className="space-y-4">
       {/* 標題與統計 */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-900">模式列表</h2>
-        <span className="text-sm text-gray-900 font-semibold">共 {filteredPatterns.length} 個模式</span>
+        <h2 className="text-xl font-semibold text-slate-100">模式列表</h2>
+        <span className="text-sm text-slate-300 font-semibold">共 {filteredPatterns.length} 個模式</span>
       </div>
       
       {/* 模式卡片網格 */}
@@ -144,9 +144,9 @@ function PatternCard({
   const router = useRouter();
   
   const statusColors = {
-    active: 'bg-green-100 text-green-800',
-    archived: 'bg-gray-100 text-gray-800',
-    testing: 'bg-yellow-100 text-yellow-800'
+    active: 'bg-emerald-500/20 text-emerald-200',
+    archived: 'bg-slate-500/20 text-slate-200',
+    testing: 'bg-amber-500/20 text-amber-200'
   };
   
   const handleCardClick = () => {
@@ -156,40 +156,40 @@ function PatternCard({
   
   return (
     <div 
-      className="border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer bg-white"
+      className="glass-panel border border-white/10 rounded-lg p-4 hover:shadow-lg hover:border-white/20 transition-shadow cursor-pointer"
       onClick={handleCardClick}
     >
       {/* 標題與狀態 */}
       <div className="flex justify-between items-start mb-2">
-        <h3 className="font-bold text-lg truncate flex-1 text-gray-900">{pattern.name}</h3>
+        <h3 className="font-semibold text-lg truncate flex-1 text-slate-100">{pattern.name}</h3>
         <span className={`text-xs px-2 py-1 rounded font-semibold ${statusColors[pattern.status]}`}>
           {pattern.status}
         </span>
       </div>
       
       {/* 描述 */}
-      <p className="text-sm text-gray-800 mb-3 line-clamp-2 leading-relaxed">
+      <p className="text-sm text-slate-300 mb-3 line-clamp-2 leading-relaxed">
         {pattern.description}
       </p>
       
       {/* 規則數量 */}
-      <div className="text-sm text-gray-800 mb-3">
-        規則數: <span className="font-bold text-gray-900">{pattern.rules.length}</span>
+      <div className="text-sm text-slate-300 mb-3">
+        規則數: <span className="font-semibold text-slate-100">{pattern.rules.length}</span>
       </div>
       
       {/* 效能指標 */}
       <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
         <div className="text-center">
-          <div className="text-gray-700 font-semibold">Precision</div>
-          <div className="font-bold text-gray-900">{(pattern.performance_metrics.precision * 100).toFixed(1)}%</div>
+          <div className="text-slate-400 font-semibold">Precision</div>
+          <div className="font-semibold text-slate-100">{(pattern.performance_metrics.precision * 100).toFixed(1)}%</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-700 font-semibold">Recall</div>
-          <div className="font-bold text-gray-900">{(pattern.performance_metrics.recall * 100).toFixed(1)}%</div>
+          <div className="text-slate-400 font-semibold">Recall</div>
+          <div className="font-semibold text-slate-100">{(pattern.performance_metrics.recall * 100).toFixed(1)}%</div>
         </div>
         <div className="text-center">
-          <div className="text-gray-700 font-semibold">F1</div>
-          <div className="font-bold text-gray-900">{(pattern.performance_metrics.f1_score * 100).toFixed(1)}%</div>
+          <div className="text-slate-400 font-semibold">F1</div>
+          <div className="font-semibold text-slate-100">{(pattern.performance_metrics.f1_score * 100).toFixed(1)}%</div>
         </div>
       </div>
       
@@ -197,24 +197,24 @@ function PatternCard({
       {pattern.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
           {pattern.tags.slice(0, 3).map(tag => (
-            <span key={tag} className="text-xs bg-blue-100 text-blue-900 px-2 py-1 rounded font-semibold">
+            <span key={tag} className="text-xs bg-blue-400/10 text-blue-200 border border-blue-400/20 px-2 py-1 rounded font-semibold">
               {tag}
             </span>
           ))}
           {pattern.tags.length > 3 && (
-            <span className="text-xs text-gray-800 font-semibold">+{pattern.tags.length - 3}</span>
+            <span className="text-xs text-slate-300 font-semibold">+{pattern.tags.length - 3}</span>
           )}
         </div>
       )}
       
       {/* 操作按鈕 */}
-      <div className="flex gap-2 pt-3 border-t">
+      <div className="flex gap-2 pt-3 border-t border-white/10">
         <button
           onClick={(e) => {
             e.stopPropagation();
             handleCardClick();
           }}
-          className="flex-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="flex-1 px-3 py-1 text-sm bg-blue-500/20 text-blue-100 border border-blue-500/40 rounded hover:bg-blue-500/30"
         >
           查看詳情
         </button>
@@ -223,7 +223,7 @@ function PatternCard({
             e.stopPropagation();
             onDelete();
           }}
-          className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+          className="px-3 py-1 text-sm bg-rose-500/20 text-rose-100 border border-rose-500/40 rounded hover:bg-rose-500/30"
         >
           刪除
         </button>

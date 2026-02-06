@@ -39,13 +39,13 @@ export default function SHAPSummaryChart({ data, loading, onFeatureClick }: SHAP
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={topData} layout="vertical" margin={{ top: 10, right: 20, left: 120, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis type="number" domain={[0, maxValue || 'auto']} />
             <YAxis dataKey="feature" type="category" width={110} />
             <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
             <Bar dataKey="mean_abs_shap" onClick={(entry: any) => onFeatureClick?.(entry.feature)}>
               {topData.map((entry) => (
-                <Cell key={entry.feature} fill={entry.rank <= 3 ? '#f59e0b' : '#3b82f6'} />
+                <Cell key={entry.feature} fill={entry.rank <= 3 ? '#fbbf24' : '#60a5fa'} />
               ))}
             </Bar>
           </BarChart>

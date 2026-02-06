@@ -19,7 +19,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      "flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 ring-offset-background placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-white/5 [&>span]:line-clamp-1",
       className
     )}
     {...props}
@@ -75,7 +75,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-white/10 bg-[#1a233a] text-slate-100 shadow-xl shadow-black/30 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         position === "popper" &&
           "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
         className
@@ -118,7 +118,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-white/10 focus:text-slate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
@@ -140,7 +140,7 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    className={cn("-mx-1 my-1 h-px bg-white/10", className)}
     {...props}
   />
 ))
@@ -266,14 +266,14 @@ export function CustomSelect({
   return (
     <div className={`flex flex-col gap-1 ${className}`} ref={containerRef}>
       <div className="flex items-center justify-between">
-        <label className={`text-sm font-medium ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
+        <label className={`text-sm font-medium ${disabled ? 'text-slate-500' : 'text-slate-200'}`}>
           {label}
         </label>
         {allowClear && value && (
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs text-indigo-600 hover:text-indigo-500"
+            className="text-xs text-blue-400 hover:text-blue-300"
           >
             清除
           </button>
@@ -284,10 +284,10 @@ export function CustomSelect({
         type="button"
         onClick={toggleDropdown}
         onKeyDown={handleKeyDown}
-        className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+        className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
           disabled
-            ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
-            : 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+            ? 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed'
+            : 'bg-white/5 text-slate-100 border-white/10 hover:bg-white/10'
         }`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -299,24 +299,24 @@ export function CustomSelect({
               {selectedOption.label}
             </>
           ) : (
-            <span className="text-gray-400">{placeholder}</span>
+            <span className="text-slate-500">{placeholder}</span>
           )}
         </span>
         {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
 
-      {description && <p className="text-xs text-gray-500">{description}</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {description && <p className="text-xs text-slate-400">{description}</p>}
+      {error && <p className="text-xs text-rose-400">{error}</p>}
 
       {isOpen && (
         <div
           className="relative"
           onKeyDown={handleListKeyDown}
         >
-          <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-xl" role="listbox">
+          <div className="absolute z-20 mt-1 w-full rounded-md border border-white/10 bg-[#1a233a] shadow-xl shadow-black/30" role="listbox">
             <div className="max-h-60 overflow-y-auto">
               {options.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-gray-400">沒有可用選項</p>
+                <p className="px-4 py-6 text-center text-sm text-slate-500">沒有可用選項</p>
               ) : (
                 options.map((option, index) => {
                   const isSelected = option.value === value;
@@ -327,9 +327,9 @@ export function CustomSelect({
                       className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition ${
                         option.disabled
                           ? 'opacity-50 cursor-not-allowed'
-                          : 'hover:bg-indigo-50'
+                          : 'hover:bg-white/5'
                       } ${
-                        index === highlightedIndex ? 'bg-indigo-50' : ''
+                        index === highlightedIndex ? 'bg-white/10' : ''
                       }`}
                       onClick={() => handleOptionClick(option.value, option.disabled)}
                       role="option"
@@ -337,14 +337,14 @@ export function CustomSelect({
                       disabled={option.disabled}
                     >
                       <span className={`flex h-4 w-4 items-center justify-center rounded border ${
-                        isSelected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-gray-300'
+                        isSelected ? 'border-blue-400 bg-blue-400 text-white' : 'border-white/20'
                       }`}>
                         {isSelected && <Check className="h-3 w-3" />}
                       </span>
                       {option.icon && (
                         <span className="text-base">{option.icon}</span>
                       )}
-                      <span className="flex-1 truncate text-gray-900">{option.label}</span>
+                      <span className="flex-1 truncate text-slate-100">{option.label}</span>
                     </button>
                   );
                 })

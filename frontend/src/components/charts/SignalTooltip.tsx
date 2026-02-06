@@ -168,9 +168,9 @@ export default function SignalTooltip({
       }}
     >
       {/* 主容器 */}
-      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden min-w-[280px] max-w-[400px]">
+      <div className="bg-[#1a233a] rounded-lg shadow-2xl border border-white/10 overflow-hidden min-w-[280px] max-w-[400px]">
         {/* 標題欄 */}
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-2">
+        <div className="bg-gradient-to-r from-emerald-400 to-emerald-500 px-4 py-2">
           <div className="flex items-center gap-2">
             <span className="text-white text-sm font-semibold">
               📍 策略信號
@@ -186,25 +186,25 @@ export default function SignalTooltip({
           {/* 時間和價格 */}
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">時間</span>
-              <span className="font-mono text-gray-900">
+              <span className="text-slate-400">時間</span>
+              <span className="font-mono text-slate-100">
                 {formatTimestamp(data.timestamp)}
               </span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">價格</span>
-              <span className="font-mono text-gray-900 font-semibold">
+              <span className="text-slate-400">價格</span>
+              <span className="font-mono text-slate-100 font-semibold">
                 ${formatPrice(data.price)}
               </span>
             </div>
           </div>
 
           {/* 分隔線 */}
-          <div className="border-t border-gray-200" />
+          <div className="border-t border-white/10" />
 
           {/* 指標數值 */}
           <div>
-            <div className="text-xs font-semibold text-gray-700 mb-2">
+            <div className="text-xs font-semibold text-slate-200 mb-2">
               指標數值
             </div>
             <div className="space-y-1.5">
@@ -213,10 +213,10 @@ export default function SignalTooltip({
                   key={key}
                   className="flex items-center justify-between text-xs"
                 >
-                  <span className="text-gray-600">
+                  <span className="text-slate-400">
                     {indicatorNameMap[key] || key}
                   </span>
-                  <span className="font-mono text-gray-900 font-medium">
+                  <span className="font-mono text-slate-100 font-medium">
                     {typeof value === "number" ? value.toFixed(2) : value}
                   </span>
                 </div>
@@ -227,25 +227,25 @@ export default function SignalTooltip({
           {/* 信號密度 (如果有) */}
           {data.signal_density !== undefined && (
             <>
-              <div className="border-t border-gray-200" />
+              <div className="border-t border-white/10" />
               <div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">信號密度</span>
+                  <span className="text-slate-400">信號密度</span>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-gray-900 font-medium">
+                    <span className="font-mono text-slate-100 font-medium">
                       {(data.signal_density * 100).toFixed(1)}%
                     </span>
                     {/* 密度條 */}
-                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all duration-300"
                         style={{ width: `${data.signal_density * 100}%` }}
                       />
                     </div>
                   </div>
                 </div>
                 {/* 密度等級文字 */}
-                <div className="text-xs text-gray-500 mt-1 text-right">
+                <div className="text-xs text-slate-400 mt-1 text-right">
                   {data.signal_density > 0.7
                     ? "高密度區域"
                     : data.signal_density > 0.4
@@ -257,13 +257,13 @@ export default function SignalTooltip({
           )}
 
           {/* 提示文字 */}
-          <div className="text-xs text-gray-400 italic pt-2 border-t border-gray-100">
+          <div className="text-xs text-slate-500 italic pt-2 border-t border-white/10">
             點擊信號標記查看詳細分析
           </div>
         </div>
 
         {/* 底部裝飾條 */}
-        <div className="h-1 bg-gradient-to-r from-green-400 via-emerald-500 to-green-600" />
+        <div className="h-1 bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-500" />
       </div>
     </div>
   );
@@ -287,25 +287,25 @@ export function CompactSignalTooltip({
     <div
       className={`
         inline-flex items-center gap-2 px-3 py-1.5
-        bg-green-50 border border-green-200 rounded-md
+        bg-emerald-400/10 border border-emerald-400/30 rounded-md
         text-xs
         ${className}
       `}
     >
-      <span className="text-green-700 font-semibold">📍</span>
+      <span className="text-emerald-300 font-semibold">📍</span>
       {Object.entries(data.indicator_values).map(([key, value], index) => (
-        <span key={key} className="text-gray-700">
-          {key.replace("ema_", "").replace("sma_", "")}:{" "}
-          <span className="font-mono font-medium">
+        <span key={key} className="text-slate-200">
+          {key.replace("ema_", "").replace("sma_", "")}: {" "}
+          <span className="text-emerald-300 font-medium">
             {typeof value === "number" ? value.toFixed(1) : value}
           </span>
           {index < Object.keys(data.indicator_values).length - 1 && (
-            <span className="text-gray-400 ml-1">|</span>
+            <span className="text-slate-500 ml-1">|</span>
           )}
         </span>
       ))}
       {data.signal_density !== undefined && (
-        <span className="text-green-600 font-medium">
+        <span className="text-emerald-300 font-medium">
           {(data.signal_density * 100).toFixed(0)}%
         </span>
       )}

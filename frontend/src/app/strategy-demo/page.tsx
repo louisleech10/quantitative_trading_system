@@ -208,14 +208,14 @@ export default function StrategyDemoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-950/40">
       {/* 頁面標題 */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-slate-950/80 border-b border-slate-800/80">
         <div className="max-w-[1920px] mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-semibold text-slate-100">
             🚀 策略信號完整演示
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-400 mt-1">
             Phase 3.3+3.4: 策略配置 UI + 圖表信號可視化整合
           </p>
         </div>
@@ -227,31 +227,31 @@ export default function StrategyDemoPage() {
           {/* 左側: 配置面板 (緊湊版) */}
           <div className="xl:col-span-3 space-y-4">
             {/* 測試範圍 */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-sm font-bold text-gray-900 mb-3">
+            <div className="glass-panel rounded-xl p-4">
+              <h2 className="text-sm font-semibold text-slate-100 mb-3">
                 🎯 測試範圍
               </h2>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     交易標的
                   </label>
                   <input
                     type="text"
                     value={symbol}
                     onChange={(e) => setSymbol(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+                    className="w-full px-3 py-1.5 border border-slate-700 rounded text-sm bg-slate-900/60 text-slate-100"
                     placeholder="BTCUSDT"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
                     時間框架
                   </label>
                   <select
                     value={timeframe}
                     onChange={(e) => setTimeframe(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-gray-300 rounded text-sm"
+                    className="w-full px-3 py-1.5 border border-slate-700 rounded text-sm bg-slate-900/60 text-slate-100"
                   >
                     <option value="1m">1分鐘</option>
                     <option value="5m">5分鐘</option>
@@ -265,8 +265,8 @@ export default function StrategyDemoPage() {
             </div>
 
             {/* 策略配置 */}
-            <div className="bg-white rounded-lg shadow p-4 space-y-4">
-              <h2 className="text-sm font-bold text-gray-900">⚙️ 策略配置</h2>
+            <div className="glass-panel rounded-xl p-4 space-y-4">
+              <h2 className="text-sm font-semibold text-slate-100">⚙️ 策略配置</h2>
 
               <DataSourceSelector
                 value={config.data_source}
@@ -305,14 +305,11 @@ export default function StrategyDemoPage() {
               type="button"
               onClick={handleRunTest}
               disabled={isLoading || !isConfigValid()}
-              className={`
-                w-full px-4 py-3 rounded-lg text-sm font-medium transition-all
-                ${
-                  isLoading || !isConfigValid()
-                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                    : "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-lg"
-                }
-              `}
+              className={`w-full px-4 py-3 rounded-lg text-sm font-medium transition-all border ${
+                isLoading || !isConfigValid()
+                  ? "bg-slate-700/60 text-slate-400 border-slate-700 cursor-not-allowed"
+                  : "bg-emerald-500/20 text-emerald-100 border-emerald-400/40 hover:bg-emerald-500/30"
+              }`}
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -328,31 +325,31 @@ export default function StrategyDemoPage() {
 
             {/* 測試結果統計 */}
             {testResult && (
-              <div className="bg-white rounded-lg shadow p-4">
-                <h2 className="text-sm font-bold text-gray-900 mb-3">
+              <div className="glass-panel rounded-xl p-4">
+                <h2 className="text-sm font-semibold text-slate-100 mb-3">
                   📊 測試結果
                 </h2>
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">信號數量:</span>
-                    <span className="font-semibold text-green-600">
+                    <span className="text-slate-400">信號數量:</span>
+                    <span className="font-semibold text-emerald-300">
                       {testResult.total_signals}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">K線總數:</span>
-                    <span className="font-semibold text-gray-900">
+                    <span className="text-slate-400">K線總數:</span>
+                    <span className="font-semibold text-slate-100">
                       {testResult.metadata.total_klines}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">計算時間:</span>
-                    <span className="font-semibold text-gray-900">
+                    <span className="text-slate-400">計算時間:</span>
+                    <span className="font-semibold text-slate-100">
                       {testResult.metadata.calculation_time_ms.toFixed(2)} ms
                     </span>
                   </div>
                   {testResult.sampled && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-yellow-700">
+                    <div className="bg-amber-500/10 border border-amber-400/30 rounded p-2 text-amber-200">
                       ⚠️ 已採樣至 500 個標記
                     </div>
                   )}
@@ -362,14 +359,14 @@ export default function StrategyDemoPage() {
 
             {/* 錯誤訊息 */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-rose-500/10 border border-rose-400/30 rounded-lg p-4">
                 <div className="flex items-start gap-2">
-                  <span className="text-red-600">❌</span>
+                  <span className="text-rose-300">❌</span>
                   <div>
-                    <div className="text-xs font-medium text-red-700">
+                    <div className="text-xs font-medium text-rose-200">
                       執行失敗
                     </div>
-                    <div className="text-xs text-red-600 mt-1">{error}</div>
+                    <div className="text-xs text-rose-200/80 mt-1">{error}</div>
                   </div>
                 </div>
               </div>
@@ -378,7 +375,7 @@ export default function StrategyDemoPage() {
 
           {/* 右側: 圖表可視化 */}
           <div className="xl:col-span-9">
-            <div className="bg-white rounded-lg shadow">
+            <div className="glass-panel rounded-xl">
               {klines.length > 0 ? (
                 <TradingChartWithSignals
                   symbol={symbol}
@@ -397,10 +394,10 @@ export default function StrategyDemoPage() {
                 <div className="flex items-center justify-center h-[800px]">
                   <div className="text-center">
                     <div className="text-4xl mb-4">📊</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-slate-400">
                       點擊「執行策略測試」查看信號可視化
                     </div>
-                    <div className="text-xs text-gray-400 mt-2">
+                    <div className="text-xs text-slate-500 mt-2">
                       配置完成後,系統將自動計算並顯示策略信號
                     </div>
                   </div>

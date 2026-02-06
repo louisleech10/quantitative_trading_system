@@ -44,20 +44,20 @@ export default function PatternDetailPage() {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500 text-lg">載入中...</p>
+      <div className="min-h-screen bg-slate-950/40 flex items-center justify-center">
+        <p className="text-slate-400 text-lg">載入中...</p>
       </div>
     );
   }
   
   if (error || !pattern) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950/40 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-red-600 text-lg mb-4">❌ {error || '樣式不存在'}</p>
+          <p className="text-rose-300 text-lg mb-4">❌ {error || '樣式不存在'}</p>
           <Link 
             href="/patterns"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 bg-emerald-500/20 text-emerald-100 rounded border border-emerald-400/40 hover:bg-emerald-500/30"
           >
             返回列表
           </Link>
@@ -67,13 +67,13 @@ export default function PatternDetailPage() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-950/40">
       {/* 頁面標題 */}
-      <div className="bg-white border-b">
+      <div className="bg-slate-950/80 border-b border-slate-800/80">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <Link 
             href="/patterns"
-            className="text-blue-600 hover:text-blue-700 text-sm"
+            className="text-emerald-300 hover:text-emerald-200 text-sm"
           >
             ← 返回樣式列表
           </Link>

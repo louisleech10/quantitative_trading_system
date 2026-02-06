@@ -64,16 +64,16 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
               <BarChart3 className="h-3.5 w-3.5" />
               <span>總 Trials</span>
             </div>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-semibold">{stats.total}</div>
           </div>
 
           {/* 完成數 */}
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
               <span>完成</span>
             </div>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-semibold text-emerald-400">
               {stats.complete}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -84,7 +84,7 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
           {/* 剪枝數 */}
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Scissors className="h-3.5 w-3.5 text-yellow-500" />
+              <Scissors className="h-3.5 w-3.5 text-amber-400" />
               <span>剪枝</span>
               <TooltipProvider>
                 <Tooltip>
@@ -105,7 +105,7 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <div className="text-2xl font-bold text-yellow-600">
+            <div className="text-2xl font-semibold text-amber-400">
               {stats.pruned}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -116,10 +116,10 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
           {/* 失敗數 */}
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <XCircle className="h-3.5 w-3.5 text-red-500" />
+              <XCircle className="h-3.5 w-3.5 text-rose-400" />
               <span>失敗</span>
             </div>
-            <div className="text-2xl font-bold text-red-600">
+            <div className="text-2xl font-semibold text-rose-400">
               {stats.failed}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -131,15 +131,15 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
         {/* 視覺化進度條 */}
         <div className="space-y-2">
           <div className="text-sm font-medium">狀態分佈</div>
-          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/10">
             {/* 完成 */}
             <div
-              className="absolute h-full bg-green-500 transition-all"
+                className="absolute h-full bg-emerald-400 transition-all"
               style={{ width: `${completionRate}%` }}
             />
             {/* 剪枝 */}
             <div
-              className="absolute h-full bg-yellow-500 transition-all"
+                className="absolute h-full bg-amber-400 transition-all"
               style={{
                 left: `${completionRate}%`,
                 width: `${prunedRate}%`
@@ -147,7 +147,7 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
             />
             {/* 失敗 */}
             <div
-              className="absolute h-full bg-red-500 transition-all"
+                className="absolute h-full bg-rose-400 transition-all"
               style={{
                 left: `${completionRate + prunedRate}%`,
                 width: `${failedRate}%`
@@ -158,15 +158,15 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
           {/* 圖例 */}
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1">
-              <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
               <span className="text-muted-foreground">完成</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="h-2.5 w-2.5 rounded-full bg-yellow-500" />
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />
               <span className="text-muted-foreground">剪枝</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+              <div className="h-2.5 w-2.5 rounded-full bg-rose-400" />
               <span className="text-muted-foreground">失敗</span>
             </div>
           </div>
@@ -175,7 +175,7 @@ export function TrialStatsCard({ stats }: TrialStatsCardProps) {
         {/* 說明文字 */}
         <div className="pt-2 border-t">
           <p className="text-xs text-muted-foreground">
-            💡 只有 <strong className="text-green-600">COMPLETE</strong> 狀態的 Trial 會用於分析和優化
+            💡 只有 <strong className="text-emerald-400">COMPLETE</strong> 狀態的 Trial 會用於分析和優化
           </p>
         </div>
       </CardContent>

@@ -161,14 +161,14 @@ export function PriceChart({
           markers.push({
             time: toTimestamp as any,
             position: 'aboveBar' as const,
-            color: '#2196F3',  // 藍色 - TO
+            color: '#60a5fa',  // 藍色 - TO
             shape: 'arrowDown' as const,
             text: 'TO',
           });
           markers.push({
             time: tcTimestamp as any,
             position: 'aboveBar' as const,
-            color: '#FF9800',  // 橙色 - TC
+            color: '#fb923c',  // 橙色 - TC
             shape: 'arrowDown' as const,
             text: 'TC',
           });
@@ -239,27 +239,27 @@ export function PriceChart({
   }, [chartInstance, isReady, klines, caseTimestamp, showCaseMarker, symbol, toTimestamp, tcTimestamp]);
 
   return (
-    <div className="w-full flex flex-col bg-white" style={{ height: `${height}px` }}>
+    <div className="w-full flex flex-col glass-panel" style={{ height: `${height}px` }}>
       {/* 頂部資訊欄 */}
-      <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+      <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className="text-sm font-semibold text-slate-100">
             {symbol} / {timeframe}
           </h3>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-slate-400">
             案例時間點T：{formatTime(caseTimestamp)}
           </span>
         </div>
 
         {/* 懸停資訊框 */}
         {hoveredData && (
-          <div className="flex items-center gap-4 text-xs text-gray-700">
+          <div className="flex items-center gap-4 text-xs text-slate-300">
             <span>時間：{formatTime(hoveredData.timestamp)}</span>
             <span>O：{formatPrice(hoveredData.open)}</span>
             <span>H：{formatPrice(hoveredData.high)}</span>
             <span>L：{formatPrice(hoveredData.low)}</span>
             <span
-              className={hoveredData.close >= hoveredData.open ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}
+              className={hoveredData.close >= hoveredData.open ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}
             >
               C：{formatPrice(hoveredData.close)}
               {' '}
@@ -269,7 +269,7 @@ export function PriceChart({
             <span>V：{formatVolume(hoveredData.volume)}</span>
             {hoveredData.taker_ratio !== undefined && (
               <span
-                className={hoveredData.taker_ratio >= 0.5 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}
+                className={hoveredData.taker_ratio >= 0.5 ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}
               >
                 Taker：{(hoveredData.taker_ratio * 100).toFixed(2)}%
               </span>
@@ -281,18 +281,18 @@ export function PriceChart({
       {/* 圖表容器 */}
       <div className="flex-1 relative">
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10 p-8">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A0F1C]/90 backdrop-blur-xl z-10 p-8">
             <div className="max-w-md text-center">
-              <div className="text-red-500 text-2xl mb-2">⚠️</div>
-              <h4 className="text-sm font-semibold text-gray-900 mb-1">圖表渲染失敗</h4>
-              <p className="text-xs text-red-600">{error}</p>
+              <div className="text-rose-400 text-2xl mb-2">⚠️</div>
+              <h4 className="text-sm font-semibold text-slate-100 mb-1">圖表渲染失敗</h4>
+              <p className="text-xs text-rose-300">{error}</p>
             </div>
           </div>
         )}
 
         {klines.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-            <p className="text-sm text-gray-500">無K線數據</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A0F1C]/90 backdrop-blur-xl z-10">
+            <p className="text-sm text-slate-400">無K線數據</p>
           </div>
         )}
 

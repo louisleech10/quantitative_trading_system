@@ -15,21 +15,21 @@ export default function AnalysisPage() {
   const caseId = params.caseId as string;
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-950/40">
       {/* 頁面標題 */}
-      <div className="bg-white border-b">
+      <div className="bg-slate-950/80 border-b border-slate-800/80">
         <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center gap-4">
             <Link 
               href="/patterns"
-              className="text-gray-500 hover:text-gray-700"
+              className="text-slate-400 hover:text-slate-200"
             >
               ← 返回
             </Link>
-            <div className="border-l h-6" />
+            <div className="border-l border-slate-700 h-6" />
             <div>
-              <h1 className="text-2xl font-bold">XGBoost 樣式分析</h1>
-              <p className="text-sm text-gray-600 mt-1">案例: {caseId}</p>
+              <h1 className="text-2xl font-semibold text-slate-100">XGBoost 樣式分析</h1>
+              <p className="text-sm text-slate-400 mt-1">案例: {caseId}</p>
             </div>
           </div>
         </div>

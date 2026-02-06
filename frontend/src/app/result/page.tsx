@@ -444,22 +444,22 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-transparent p-6">
       <div className="max-w-[100rem] mx-auto">
         {/* 頁面標題 - 更新為擴充版本 */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">搜索結果展示</h1>
-          <p className="text-gray-600">查看和分析案例搜索的結果數據（支援20個新參數）</p>
+          <h1 className="text-3xl font-medium text-slate-100 mb-2">搜索結果展示</h1>
+          <p className="text-slate-400">查看和分析案例搜索的結果數據（支援20個新參數）</p>
         </div>
 
         {/* ===== 保持現有的操作區域，更新導出功能 ===== */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <div className="glass-panel rounded-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">操作面板</h2>
+            <h2 className="text-xl font-medium text-slate-100">操作面板</h2>
             {searchResults && (
               <button
                 onClick={exportToCSV}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-400 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 導出擴充CSV (含20個新參數)
@@ -470,7 +470,7 @@ export default function ResultsPage() {
           <button
             onClick={executeTestSearch}
             disabled={isLoading}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isLoading ? (
               <RefreshCw className="w-5 h-5 animate-spin" />
@@ -483,8 +483,8 @@ export default function ResultsPage() {
 
         {/* ===== 保持現有的錯誤顯示 ===== */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 text-red-700">
+          <div className="bg-rose-400/10 border border-rose-400/20 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-rose-400">
               <AlertCircle className="w-5 h-5" />
               <span className="font-medium">錯誤：{error}</span>
             </div>
@@ -493,31 +493,31 @@ export default function ResultsPage() {
 
         {/* ===== 新增：參數驗證報告 ===== */}
         {searchResults?.validation_report && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-4">參數計算狀態報告</h3>
+          <div className="bg-blue-400/10 border border-blue-400/20 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-medium text-blue-300 mb-4">參數計算狀態報告</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{searchResults.validation_report.basic_trigger_params_count}</div>
-                <div className="text-sm text-blue-700">基礎觸發參數</div>
+                <div className="text-2xl font-semibold text-blue-400">{searchResults.validation_report.basic_trigger_params_count}</div>
+                <div className="text-sm text-blue-300">基礎觸發參數</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{searchResults.validation_report.future_return_params_count}</div>
-                <div className="text-sm text-blue-700">未來收益參數</div>
+                <div className="text-2xl font-semibold text-blue-400">{searchResults.validation_report.future_return_params_count}</div>
+                <div className="text-sm text-blue-300">未來收益參數</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{searchResults.validation_report.future_drawdown_params_count}</div>
-                <div className="text-sm text-blue-700">未來回撤參數</div>
+                <div className="text-2xl font-semibold text-blue-400">{searchResults.validation_report.future_drawdown_params_count}</div>
+                <div className="text-sm text-blue-300">未來回撤參數</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{searchResults.validation_report.completion_rate.toFixed(1)}%</div>
-                <div className="text-sm text-blue-700">參數完整度</div>
+                <div className="text-2xl font-semibold text-blue-400">{searchResults.validation_report.completion_rate.toFixed(1)}%</div>
+                <div className="text-sm text-blue-300">參數完整度</div>
               </div>
             </div>
             
             {searchResults.validation_report.warnings.length > 0 && (
               <div className="mt-4">
-                <h4 className="font-medium text-blue-900 mb-2">警告信息：</h4>
-                <ul className="text-sm text-blue-800 space-y-1">
+                <h4 className="font-medium text-blue-300 mb-2">警告資訊：</h4>
+                <ul className="text-sm text-blue-300 space-y-1">
                   {searchResults.validation_report.warnings.map((warning, idx) => (
                     <li key={idx}>• {warning}</li>
                   ))}
@@ -529,10 +529,10 @@ export default function ResultsPage() {
 
         {/* ===== 基於實際數據的搜索結果摘要 ===== */}
         {searchResults && (
-          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="glass-panel rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">搜索結果摘要</h3>
-              <span className="text-sm text-green-600 font-medium">✓ 基於實際案例數據</span>
+              <h3 className="text-lg font-medium text-slate-100">搜索結果摘要</h3>
+              <span className="text-sm text-emerald-400 font-medium">✓ 基於實際案例數據</span>
             </div>
             
             {(() => {
@@ -542,48 +542,48 @@ export default function ResultsPage() {
               return (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{actualStats.totalCases}</div>
-                      <div className="text-sm text-gray-600">總案例數</div>
+                    <div className="text-center p-4 bg-blue-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-blue-400">{actualStats.totalCases}</div>
+                      <div className="text-sm text-slate-400">總案例數</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{actualStats.positiveCases}</div>
-                      <div className="text-sm text-gray-600">正例案例</div>
-                      <div className="text-xs text-gray-500 mt-1">positive_case=1</div>
+                    <div className="text-center p-4 bg-emerald-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-emerald-400">{actualStats.positiveCases}</div>
+                      <div className="text-sm text-slate-400">正例案例</div>
+                      <div className="text-xs text-slate-500 mt-1">positive_case=1</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-red-50 rounded-lg">
-                      <div className="text-2xl font-bold text-red-600">{actualStats.negativeCases}</div>
-                      <div className="text-sm text-gray-600">反例案例</div>
-                      <div className="text-xs text-gray-500 mt-1">positive_case=0</div>
+                    <div className="text-center p-4 bg-rose-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-rose-400">{actualStats.negativeCases}</div>
+                      <div className="text-sm text-slate-400">反例案例</div>
+                      <div className="text-xs text-slate-500 mt-1">positive_case=0</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">{actualStats.uniqueSymbols}</div>
-                      <div className="text-sm text-gray-600">交易對數</div>
+                    <div className="text-center p-4 bg-purple-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-purple-400">{actualStats.uniqueSymbols}</div>
+                      <div className="text-sm text-slate-400">交易對數</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">{searchResults.execution_time?.toFixed(1) || 'N/A'}s</div>
-                      <div className="text-sm text-gray-600">執行時間</div>
+                    <div className="text-center p-4 bg-orange-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-orange-400">{searchResults.execution_time?.toFixed(1) || 'N/A'}s</div>
+                      <div className="text-sm text-slate-400">執行時間</div>
                     </div>
                     
-                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                      <div className="text-2xl font-bold text-yellow-600">{actualStats.positiveRatio}</div>
-                      <div className="text-sm text-gray-600">正負比例</div>
+                    <div className="text-center p-4 bg-amber-400/10 rounded-lg">
+                      <div className="text-2xl font-semibold text-amber-400">{actualStats.positiveRatio}</div>
+                      <div className="text-sm text-slate-400">正負比例</div>
                     </div>
                   </div>
 
                   {/* 交易對詳情 */}
                   {actualStats.symbolsList.length > 0 && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm font-medium text-gray-700 mb-2">
+                    <div className="mt-4 p-3 bg-white/5 rounded-lg">
+                      <div className="text-sm font-medium text-slate-300 mb-2">
                         包含的交易對 ({actualStats.uniqueSymbols} 個)：
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {actualStats.symbolsList.map(symbol => (
-                          <span key={symbol} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          <span key={symbol} className="px-2 py-1 bg-blue-400/15 text-blue-400 text-xs rounded">
                             {symbol}
                           </span>
                         ))}
@@ -592,8 +592,8 @@ export default function ResultsPage() {
                   )}
 
                   {/* 統計摘要 */}
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <div className="text-sm text-blue-800">
+                  <div className="mt-4 p-3 bg-blue-400/10 rounded-lg border border-blue-400/20">
+                    <div className="text-sm text-blue-300">
                       📊 {getStatisticsSummary(actualStats)}
                     </div>
                   </div>
@@ -608,77 +608,77 @@ export default function ResultsPage() {
           <div className="space-y-6">
             
             {/* 現有的總覽表格 - 保持原有設計 */}
-            <div className="bg-white rounded-lg shadow-sm border">
+            <div className="glass-panel rounded-xl">
               <div 
-                className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
                 onClick={() => toggleSection('overview')}
               >
-                <h3 className="text-lg font-semibold text-gray-900">總覽數據 (原有格式)</h3>
+                <h3 className="text-lg font-medium text-slate-100">總覽數據 (原有格式)</h3>
                 {expandedSections.overview ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </div>
               
               {expandedSections.overview && (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-white/5">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">交易對</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">時間</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">開盤價</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">最高價</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">最低價</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">收盤價</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">成交量</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">價格變化</th>
-                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">市場階段</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">24h回報</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">48h回報</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">最大回報</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">最大回撤</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">交易對</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">時間</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">開盤價</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">最高價</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">最低價</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">收盤價</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">成交量</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">價格變化</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-slate-300">市場階段</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">24h回報</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">48h回報</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">最大回報</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">最大回撤</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-white/10">
                       {searchResults.cases.map((case_, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{case_.symbol}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{case_.timestamp}</td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        <tr key={index} className="hover:bg-white/5">
+                          <td className="px-4 py-3 text-sm font-medium text-slate-100">{case_.symbol}</td>
+                          <td className="px-4 py-3 text-sm text-slate-400">{case_.timestamp}</td>
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">
                             ${typeof case_.open === 'number' ? case_.open.toLocaleString() : 'N/A'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">
                             ${typeof case_.high === 'number' ? case_.high.toLocaleString() : 'N/A'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">
                             ${typeof case_.low === 'number' ? case_.low.toLocaleString() : 'N/A'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">${case_.close.toLocaleString()}</td>
-                          <td className={`px-4 py-3 text-sm text-right font-medium ${case_.price_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">${case_.close.toLocaleString()}</td>
+                          <td className={`px-4 py-3 text-sm text-right font-medium ${case_.price_change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {formatPercentage(case_.price_change)}
                           </td>
                           <td className="px-4 py-3 text-sm text-center">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              case_.market_phase === 'GREED' ? 'bg-red-100 text-red-800' :
-                              case_.market_phase === 'FEAR' ? 'bg-blue-100 text-blue-800' :
-                              case_.market_phase === 'EXTREME' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
+                              case_.market_phase === 'GREED' ? 'bg-rose-400/15 text-rose-400' :
+                              case_.market_phase === 'FEAR' ? 'bg-blue-400/15 text-blue-400' :
+                              case_.market_phase === 'EXTREME' ? 'bg-purple-400/15 text-purple-400' :
+                              'bg-white/10 text-slate-300'
                             }`}>
                               {case_.market_phase}
                             </span>
                           </td>
                           <td className={`px-4 py-3 text-sm text-right font-medium ${
-                            (case_.future24_close_return || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                            (case_.future24_close_return || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
                           }`}>
                             {formatPercentage(case_.future24_close_return)}
                           </td>
                           <td className={`px-4 py-3 text-sm text-right font-medium ${
-                            (case_.future48_close_return || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                            (case_.future48_close_return || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
                           }`}>
                             {formatPercentage(case_.future48_close_return)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">
+                          <td className="px-4 py-3 text-sm text-right text-emerald-400 font-medium">
                             {formatPercentage(case_.future72_max_return || case_.future_max_return)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">
+                          <td className="px-4 py-3 text-sm text-right text-rose-400 font-medium">
                             {formatPercentage(case_.future72_max_drawdown || case_.future_max_drawdown)}
                           </td>
                         </tr>
@@ -690,41 +690,41 @@ export default function ResultsPage() {
             </div>
 
             {/* 基礎觸發條件參數表格 */}
-            <div className="bg-white rounded-lg shadow-sm border">
+            <div className="glass-panel rounded-xl">
               <div 
-                className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
                 onClick={() => toggleSection('basicTrigger')}
               >
-                <h3 className="text-lg font-semibold text-gray-900">基礎觸發條件參數 (5個)</h3>
+                <h3 className="text-lg font-medium text-slate-100">基礎觸發條件參數 (5個)</h3>
                 {expandedSections.basicTrigger ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </div>
               
               {expandedSections.basicTrigger && (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-white/5">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Symbol</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Timestamp</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">價格變化</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">收盤強度</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">價格位置</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">成交量倍數</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-900">主動買入比例</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Symbol</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Timestamp</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">價格變化</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">收盤強度</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">價格位置</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">成交量倍數</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-slate-300">主動買入比例</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-white/10">
                       {searchResults.cases.map((case_, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{case_.symbol}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{case_.timestamp}</td>
-                          <td className={`px-4 py-3 text-sm text-right font-medium ${case_.price_change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <tr key={index} className="hover:bg-white/5">
+                          <td className="px-4 py-3 text-sm font-medium text-slate-100">{case_.symbol}</td>
+                          <td className="px-4 py-3 text-sm text-slate-400">{case_.timestamp}</td>
+                          <td className={`px-4 py-3 text-sm text-right font-medium ${case_.price_change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {formatPercentage(case_.price_change)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">{formatNumber(case_.closing_strength)}</td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">{formatNumber(case_.price_position)}</td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">{formatNumber(case_.volume_multiplier)}</td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">{formatNumber(case_.taker_buy_ratio)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">{formatNumber(case_.closing_strength)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">{formatNumber(case_.price_position)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">{formatNumber(case_.volume_multiplier)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-slate-100">{formatNumber(case_.taker_buy_ratio)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -734,39 +734,39 @@ export default function ResultsPage() {
             </div>
 
             {/* 未來收益參數表格 (1-12根K線) */}
-            <div className="bg-white rounded-lg shadow-sm border">
+            <div className="glass-panel rounded-xl">
               <div 
-                className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
                 onClick={() => toggleSection('futureReturns')}
               >
-                <h3 className="text-lg font-semibold text-gray-900">未來收益參數 (1-12根K線)</h3>
+                <h3 className="text-lg font-medium text-slate-100">未來收益參數 (1-12根K線)</h3>
                 {expandedSections.futureReturns ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </div>
               
               {expandedSections.futureReturns && (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-white/5">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Symbol</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Timestamp</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Symbol</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Timestamp</th>
                         {FUTURE_RETURN_PARAMETERS.map(param => (
-                          <th key={param} className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                          <th key={param} className="px-4 py-3 text-right text-sm font-medium text-slate-300">
                             {param.replace('future_', '').replace('bar_return', 'Bar')}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-white/10">
                       {searchResults.cases.map((case_, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{case_.symbol}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{case_.timestamp}</td>
+                        <tr key={index} className="hover:bg-white/5">
+                          <td className="px-4 py-3 text-sm font-medium text-slate-100">{case_.symbol}</td>
+                          <td className="px-4 py-3 text-sm text-slate-400">{case_.timestamp}</td>
                           {FUTURE_RETURN_PARAMETERS.map((param, paramIndex) => {
                             const value = case_[param as keyof CaseData] as number | undefined;
                             return (
                               <td key={paramIndex} className={`px-4 py-3 text-sm text-right font-medium ${
-                                (value || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                                (value || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
                               }`}>
                                 {formatPercentage(value)}
                               </td>
@@ -781,38 +781,38 @@ export default function ResultsPage() {
             </div>
 
             {/* 未來回撤參數表格 (1-12根K線) */}
-            <div className="bg-white rounded-lg shadow-sm border">
+            <div className="glass-panel rounded-xl">
               <div 
-                className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
                 onClick={() => toggleSection('futureDrawdowns')}
               >
-                <h3 className="text-lg font-semibold text-gray-900">未來回撤參數 (1-12根K線)</h3>
+                <h3 className="text-lg font-medium text-slate-100">未來回撤參數 (1-12根K線)</h3>
                 {expandedSections.futureDrawdowns ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </div>
               
               {expandedSections.futureDrawdowns && (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-white/5">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Symbol</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Timestamp</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Symbol</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Timestamp</th>
                         {FUTURE_DRAWDOWN_PARAMETERS.map(param => (
-                          <th key={param} className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                          <th key={param} className="px-4 py-3 text-right text-sm font-medium text-slate-300">
                             {param.replace('future_', '').replace('bar_max_drawdown', 'Bar')}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-white/10">
                       {searchResults.cases.map((case_, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{case_.symbol}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{case_.timestamp}</td>
+                        <tr key={index} className="hover:bg-white/5">
+                          <td className="px-4 py-3 text-sm font-medium text-slate-100">{case_.symbol}</td>
+                          <td className="px-4 py-3 text-sm text-slate-400">{case_.timestamp}</td>
                           {FUTURE_DRAWDOWN_PARAMETERS.map((param, paramIndex) => {
                             const value = case_[param as keyof CaseData] as number | undefined;
                             return (
-                              <td key={paramIndex} className="px-4 py-3 text-sm text-right text-red-600 font-medium">
+                              <td key={paramIndex} className="px-4 py-3 text-sm text-right text-rose-400 font-medium">
                                 {formatPercentage(value)}
                               </td>
                             );
@@ -826,42 +826,42 @@ export default function ResultsPage() {
             </div>
 
             {/* 時間和市場描述參數表格 */}
-            <div className="bg-white rounded-lg shadow-sm border">
+            <div className="glass-panel rounded-xl">
               <div 
-                className="p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                className="p-4 border-b border-white/10 cursor-pointer hover:bg-white/5 flex items-center justify-between"
                 onClick={() => toggleSection('timeParams')}
               >
-                <h3 className="text-lg font-semibold text-gray-900">時間和市場描述參數</h3>
+                <h3 className="text-lg font-medium text-slate-100">時間和市場描述參數</h3>
                 {expandedSections.timeParams ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </div>
               
               {expandedSections.timeParams && (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-white/5">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Symbol</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Timestamp</th>
-                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">時間框架</th>
-                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">小時 (0-23)</th>
-                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">星期 (1-7)</th>
-                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-900">市場階段</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Symbol</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-slate-300">Timestamp</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-slate-300">時間框架</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-slate-300">小時 (0-23)</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-slate-300">星期 (1-7)</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-slate-300">市場階段</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-white/10">
                       {searchResults.cases.map((case_, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{case_.symbol}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{case_.timestamp}</td>
-                          <td className="px-4 py-3 text-sm text-center text-gray-900">{case_.timeframe || 'N/A'}</td>
-                          <td className="px-4 py-3 text-sm text-center text-gray-900">{formatInteger(case_.hour_of_day)}</td>
-                          <td className="px-4 py-3 text-sm text-center text-gray-900">{formatInteger(case_.day_of_week)}</td>
+                        <tr key={index} className="hover:bg-white/5">
+                          <td className="px-4 py-3 text-sm font-medium text-slate-100">{case_.symbol}</td>
+                          <td className="px-4 py-3 text-sm text-slate-400">{case_.timestamp}</td>
+                          <td className="px-4 py-3 text-sm text-center text-slate-100">{case_.timeframe || 'N/A'}</td>
+                          <td className="px-4 py-3 text-sm text-center text-slate-100">{formatInteger(case_.hour_of_day)}</td>
+                          <td className="px-4 py-3 text-sm text-center text-slate-100">{formatInteger(case_.day_of_week)}</td>
                           <td className="px-4 py-3 text-sm text-center">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              case_.market_phase === 'GREED' ? 'bg-red-100 text-red-800' :
-                              case_.market_phase === 'FEAR' ? 'bg-blue-100 text-blue-800' :
-                              case_.market_phase === 'EXTREME' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
+                              case_.market_phase === 'GREED' ? 'bg-rose-400/15 text-rose-400' :
+                              case_.market_phase === 'FEAR' ? 'bg-blue-400/15 text-blue-400' :
+                              case_.market_phase === 'EXTREME' ? 'bg-purple-400/15 text-purple-400' :
+                              'bg-white/10 text-slate-300'
                             }`}>
                               {case_.market_phase || 'N/A'}
                             </span>
@@ -879,11 +879,11 @@ export default function ResultsPage() {
 
         {/* ===== 保持現有的無數據狀態 ===== */}
         {!searchResults && !isLoading && !error && (
-          <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
-            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">尚無搜索結果</h3>
-            <p className="text-gray-600 mb-6">點擊上方的「執行測試搜索」按鈕開始搜索案例</p>
-            <div className="text-sm text-gray-500">
+          <div className="glass-panel rounded-xl p-12 text-center">
+            <Search className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-100 mb-2">尚無搜索結果</h3>
+            <p className="text-slate-400 mb-6">點擊上方的「執行測試搜索」按鈕開始搜索案例</p>
+            <div className="text-sm text-slate-500">
               <p>新版本支援完整的20個參數：</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs">
                 <div>• 5個基礎觸發參數</div>

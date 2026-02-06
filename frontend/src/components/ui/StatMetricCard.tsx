@@ -56,14 +56,14 @@ export default function StatMetricCard({
   // Calculate coefficient of variation for color coding
   const getStabilityColor = (): string => {
     if (!colorCode || !isValidNumber(std) || !isValidNumber(value) || value === 0) {
-      return "text-gray-900";
+      return "text-slate-100";
     }
 
     const cv = Math.abs(std / value);
 
-    if (cv < 0.3) return "text-green-600"; // Stable
-    if (cv < 0.5) return "text-yellow-600"; // Moderate
-    return "text-red-600"; // Unstable
+    if (cv < 0.3) return "text-emerald-400"; // Stable
+    if (cv < 0.5) return "text-amber-400"; // Moderate
+    return "text-rose-400"; // Unstable
   };
 
   // Calculate 95% confidence interval (mean ± 1.96 * std)
@@ -75,15 +75,15 @@ export default function StatMetricCard({
     : null;
 
   return (
-    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+    <div className="glass-panel rounded-xl p-4">
       {/* Label */}
-      <div className="text-sm font-medium text-gray-600 mb-1">{label}</div>
+      <div className="text-sm font-medium text-slate-400 mb-1">{label}</div>
 
       {/* Value with Standard Deviation */}
-      <div className={`text-2xl font-bold ${getStabilityColor()}`}>
+      <div className={`text-2xl font-semibold ${getStabilityColor()}`}>
         {formatValue(value)}
         {isValidNumber(std) && std > 0 && (
-          <span className="text-base font-normal text-gray-500 ml-2">
+          <span className="text-base font-normal text-slate-400 ml-2">
             (± {formatValue(std)})
           </span>
         )}
@@ -91,21 +91,21 @@ export default function StatMetricCard({
 
       {/* Confidence Interval */}
       {showConfidence && confidenceInterval && (
-        <div className="text-xs text-gray-500 mt-1">
+        <div className="text-xs text-slate-400 mt-1">
           95% CI: [{formatValue(confidenceInterval.lower)}, {formatValue(confidenceInterval.upper)}]
         </div>
       )}
 
       {/* Helper Text / Tooltip */}
       {helper && (
-        <div className="text-xs text-gray-400 mt-2 leading-tight">
+        <div className="text-xs text-slate-500 mt-2 leading-tight">
           {helper}
         </div>
       )}
 
       {/* Source / Formula */}
       {source && (
-        <div className="text-xs text-blue-500 mt-1 leading-tight font-mono">
+        <div className="text-xs text-blue-400 mt-1 leading-tight font-mono">
           {source}
         </div>
       )}
@@ -114,14 +114,14 @@ export default function StatMetricCard({
       {colorCode && isValidNumber(std) && isValidNumber(value) && value !== 0 && (
         <div className="mt-2 flex items-center text-xs">
           <div className="flex-1">
-            <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div
                 className={`h-full ${
                   Math.abs(std / value) < 0.3
-                    ? "bg-green-500"
+                    ? "bg-emerald-400"
                     : Math.abs(std / value) < 0.5
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
+                    ? "bg-amber-400"
+                    : "bg-rose-400"
                 }`}
                 style={{
                   width: `${Math.min(100, (Math.abs(std / value) / 0.5) * 100)}%`,
@@ -129,7 +129,7 @@ export default function StatMetricCard({
               />
             </div>
           </div>
-          <span className="ml-2 text-gray-500">
+          <span className="ml-2 text-slate-400">
             CV: {((Math.abs(std / value)) * 100).toFixed(1)}%
           </span>
         </div>

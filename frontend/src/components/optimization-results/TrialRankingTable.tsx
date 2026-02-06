@@ -172,7 +172,7 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                     {/* 排名 */}
                     <TableCell className="font-medium">
                       {trial.rank === 1 && (
-                        <Badge variant="default" className="bg-yellow-500 text-white">
+                        <Badge variant="default" className="bg-amber-400 text-[#0A0F1C]">
                           🏆 #{trial.rank}
                         </Badge>
                       )}
@@ -199,7 +199,7 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                     </TableCell>
 
                     {/* 目標值 */}
-                    <TableCell className="font-mono text-sm font-semibold text-green-600">
+                    <TableCell className="font-mono text-sm font-semibold text-emerald-400">
                       {trial.value !== null && trial.value !== undefined 
                         ? trial.value.toFixed(6) 
                         : 'N/A'}
@@ -222,7 +222,7 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                         <div className="space-y-0.5">
                           {/* Golden Formula 核心指標 */}
                           {trial.user_attrs.m_separation !== undefined && (
-                            <div className="font-semibold text-blue-600">
+                            <div className="font-semibold text-blue-400">
                               M分離: {trial.user_attrs.m_separation.toFixed(4)}
                             </div>
                           )}
@@ -238,17 +238,17 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                           )}
                           {/* 統計檢驗指標 */}
                           {trial.user_attrs.p_value !== undefined && (
-                            <div className={trial.user_attrs.p_value < 0.05 ? "text-green-500" : trial.user_attrs.p_value < 0.1 ? "text-yellow-500" : "text-muted-foreground"}>
+                            <div className={trial.user_attrs.p_value < 0.05 ? "text-emerald-400" : trial.user_attrs.p_value < 0.1 ? "text-amber-400" : "text-muted-foreground"}>
                               p: {trial.user_attrs.p_value.toFixed(4)}
                             </div>
                           )}
                           {trial.user_attrs.cohens_d !== undefined && (
-                            <div className={trial.user_attrs.cohens_d > 0.8 ? "text-green-500" : trial.user_attrs.cohens_d > 0.5 ? "text-yellow-500" : "text-muted-foreground"}>
+                            <div className={trial.user_attrs.cohens_d > 0.8 ? "text-emerald-400" : trial.user_attrs.cohens_d > 0.5 ? "text-amber-400" : "text-muted-foreground"}>
                               d: {trial.user_attrs.cohens_d.toFixed(3)}
                             </div>
                           )}
                           {trial.user_attrs.stability_cv !== undefined && (
-                            <div className={trial.user_attrs.stability_cv < 0.3 ? "text-green-500" : trial.user_attrs.stability_cv < 0.5 ? "text-yellow-500" : "text-muted-foreground"}>
+                            <div className={trial.user_attrs.stability_cv < 0.3 ? "text-emerald-400" : trial.user_attrs.stability_cv < 0.5 ? "text-amber-400" : "text-muted-foreground"}>
                               cv: {trial.user_attrs.stability_cv.toFixed(3)}
                             </div>
                           )}

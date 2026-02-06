@@ -41,7 +41,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
               <span className="font-mono">{data.n_trials}</span>
             </p>
             {data.is_worst_month && (
-              <p className="pt-1 border-t text-red-600 font-medium">
+              <p className="pt-1 border-t text-rose-400 font-medium">
                 ⚠️ 最差月份
               </p>
             )}
@@ -54,7 +54,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
 
   // 根據是否為最差月份決定顏色
   const getBarColor = (isWorstMonth: boolean) => {
-    return isWorstMonth ? 'hsl(0, 84%, 60%)' : 'hsl(217, 91%, 60%)'
+    return isWorstMonth ? '#fb7185' : '#60a5fa'
   }
 
   return (
@@ -72,7 +72,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
         <CardDescription>
           M Separation 月度穩定性分析 - CV 值衡量每月正反例差異的穩定性
           {stabilityData.worst_month && (
-            <span className="ml-2 text-red-600 font-medium">
+            <span className="ml-2 text-rose-400 font-medium">
               · 最差月份: {stabilityData.worst_month}
             </span>
           )}
@@ -107,7 +107,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
                   dataKey="std_value"
                   width={4}
                   strokeWidth={2}
-                  stroke="hsl(215, 16%, 47%)"
+                  stroke="#64748b"
                 />
                 {stabilityData.monthly_stats.map((entry, index) => (
                   <Cell
@@ -126,7 +126,7 @@ export function StabilityChart({ stabilityData }: StabilityChartProps) {
             💡 CV (變異係數) 越小表示穩定性越好
           </p>
           {stabilityData.overall_cv > 0.3 && (
-            <div className="flex items-start gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            <div className="flex items-start gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded text-xs text-amber-200">
               <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">穩定性警告</p>

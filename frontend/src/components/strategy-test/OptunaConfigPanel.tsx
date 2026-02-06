@@ -127,12 +127,12 @@ export function OptunaConfigPanel({
       {/* 啟用開關 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-500" />
+          <Sparkles className="h-5 w-5 text-violet-300" />
           <div>
-            <Label className="text-base font-semibold">
+            <Label className="text-base font-semibold text-slate-100">
               Optuna 參數優化
             </Label>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-slate-400">
               自動搜索最佳參數組合
             </p>
           </div>
@@ -148,10 +148,10 @@ export function OptunaConfigPanel({
       {config.enabled && (
         <>
           {/* 基礎設定 */}
-          <div className="space-y-4 rounded-lg border p-4">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
+          <div className="space-y-4 rounded-lg border border-white/10 bg-white/5 p-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2 text-slate-100">
               基礎設定
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs border-white/10 text-slate-300">
                 <Clock className="h-3 w-3 mr-1" />
                 {estimatedTime}
               </Badge>
@@ -160,7 +160,7 @@ export function OptunaConfigPanel({
             <div className="grid grid-cols-2 gap-4">
               {/* Trial 次數 */}
               <div className="space-y-2">
-                <Label htmlFor="n_trials">Trial 次數</Label>
+                <Label htmlFor="n_trials" className="text-slate-200">Trial 次數</Label>
                 <Input
                   id="n_trials"
                   type="number"
@@ -169,15 +169,16 @@ export function OptunaConfigPanel({
                   value={config.n_trials}
                   onChange={(e) => updateConfig({ n_trials: parseInt(e.target.value) || 50 })}
                   disabled={disabled}
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   建議 20-100 次
                 </p>
               </div>
 
               {/* 超時時間 */}
               <div className="space-y-2">
-                <Label htmlFor="timeout">超時時間（秒）</Label>
+                <Label htmlFor="timeout" className="text-slate-200">超時時間（秒）</Label>
                 <Input
                   id="timeout"
                   type="number"
@@ -187,15 +188,16 @@ export function OptunaConfigPanel({
                   value={config.timeout}
                   onChange={(e) => updateConfig({ timeout: parseInt(e.target.value) || 1800 })}
                   disabled={disabled}
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   {Math.floor(config.timeout / 60)} 分鐘
                 </p>
               </div>
 
               {/* 隨機種子 */}
               <div className="space-y-2">
-                <Label htmlFor="random_seed">隨機種子</Label>
+                <Label htmlFor="random_seed" className="text-slate-200">隨機種子</Label>
                 <Input
                   id="random_seed"
                   type="number"
@@ -204,17 +206,18 @@ export function OptunaConfigPanel({
                   value={config.random_seed}
                   onChange={(e) => updateConfig({ random_seed: parseInt(e.target.value) || 42 })}
                   disabled={disabled}
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   固定種子可重現結果
                 </p>
               </div>
 
               {/* 初始隨機試驗數 */}
               <div className="space-y-2">
-                <Label htmlFor="n_startup_trials" className="flex items-center gap-2">
+                <Label htmlFor="n_startup_trials" className="flex items-center gap-2 text-slate-200">
                   初始隨機數
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="text-xs border-white/10 text-slate-300">
                     TPE
                   </Badge>
                 </Label>
@@ -230,17 +233,18 @@ export function OptunaConfigPanel({
                     updateConfig({ n_startup_trials: val === '' ? null : parseInt(val) || null })
                   }}
                   disabled={disabled}
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   留空自動計算（建議 n_trials 的 15-25%）
                 </p>
               </div>
 
               {/* 啟用剪枝 */}
               <div className="space-y-2">
-                <Label htmlFor="enable_pruning" className="flex items-center gap-2">
+                <Label htmlFor="enable_pruning" className="flex items-center gap-2 text-slate-200">
                   啟用剪枝
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs bg-white/10 text-slate-300">
                     加速優化
                   </Badge>
                 </Label>
@@ -252,16 +256,16 @@ export function OptunaConfigPanel({
                     disabled={disabled}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   自動終止表現不佳的 trial
                 </p>
               </div>
 
               {/* 並行線程數 */}
               <div className="space-y-2">
-                <Label htmlFor="n_jobs" className="flex items-center gap-2">
+                <Label htmlFor="n_jobs" className="flex items-center gap-2 text-slate-200">
                   並行線程數
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs bg-white/10 text-slate-300">
                     多核加速
                   </Badge>
                 </Label>
@@ -273,8 +277,9 @@ export function OptunaConfigPanel({
                   value={config.n_jobs}
                   onChange={(e) => updateConfig({ n_jobs: parseInt(e.target.value) || 1 })}
                   disabled={disabled}
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-slate-400">
                   建議設置為 CPU 核心數的 50-75%
                 </p>
               </div>
@@ -282,12 +287,12 @@ export function OptunaConfigPanel({
           </div>
 
           {/* 搜索空間配置 */}
-          <div className="space-y-4 rounded-lg border p-4">
-            <h3 className="text-sm font-semibold">搜索空間配置</h3>
+          <div className="space-y-4 rounded-lg border border-white/10 bg-white/5 p-4">
+            <h3 className="text-sm font-semibold text-slate-100">搜索空間配置</h3>
 
             {/* EMA Short */}
             <div className="space-y-2">
-              <Label>EMA Short 範圍</Label>
+              <Label className="text-slate-200">EMA Short 範圍</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   type="number"
@@ -297,6 +302,7 @@ export function OptunaConfigPanel({
                   onChange={(e) => updateRange('ema_short_range', 0, parseInt(e.target.value) || 5)}
                   disabled={disabled}
                   placeholder="Min"
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
                 <Input
                   type="number"
@@ -306,16 +312,17 @@ export function OptunaConfigPanel({
                   onChange={(e) => updateRange('ema_short_range', 1, parseInt(e.target.value) || 15)}
                   disabled={disabled}
                   placeholder="Max"
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-400">
                 當前: {config.ema_short_range[0]} - {config.ema_short_range[1]}
               </p>
             </div>
 
             {/* EMA Mid */}
             <div className="space-y-2">
-              <Label>EMA Mid 範圍</Label>
+              <Label className="text-slate-200">EMA Mid 範圍</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   type="number"
@@ -325,6 +332,7 @@ export function OptunaConfigPanel({
                   onChange={(e) => updateRange('ema_mid_range', 0, parseInt(e.target.value) || 20)}
                   disabled={disabled}
                   placeholder="Min"
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
                 <Input
                   type="number"
@@ -334,16 +342,17 @@ export function OptunaConfigPanel({
                   onChange={(e) => updateRange('ema_mid_range', 1, parseInt(e.target.value) || 40)}
                   disabled={disabled}
                   placeholder="Max"
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-400">
                 當前: {config.ema_mid_range[0]} - {config.ema_mid_range[1]}
               </p>
             </div>
 
             {/* EMA Long */}
             <div className="space-y-2">
-              <Label>EMA Long 範圍</Label>
+              <Label className="text-slate-200">EMA Long 範圍</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   type="number"
@@ -353,6 +362,7 @@ export function OptunaConfigPanel({
                   onChange={(e) => updateRange('ema_long_range', 0, parseInt(e.target.value) || 50)}
                   disabled={disabled}
                   placeholder="Min"
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
                 <Input
                   type="number"
@@ -362,17 +372,18 @@ export function OptunaConfigPanel({
                   onChange={(e) => updateRange('ema_long_range', 1, parseInt(e.target.value) || 100)}
                   disabled={disabled}
                   placeholder="Max"
+                  className="bg-white/5 border-white/10 text-slate-100 placeholder:text-slate-500"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-400">
                 當前: {config.ema_long_range[0]} - {config.ema_long_range[1]}
               </p>
             </div>
 
             {/* 說明 */}
-            <Alert>
+            <Alert className="border-sky-500/30 bg-sky-500/10 text-sky-200">
               <Info className="h-4 w-4" />
-              <AlertDescription className="text-xs">
+              <AlertDescription className="text-xs text-sky-200/80">
                 確保參數範圍不重疊：Short Max &lt; Mid Min &lt; Mid Max &lt; Long Min
               </AlertDescription>
             </Alert>
@@ -380,9 +391,9 @@ export function OptunaConfigPanel({
 
           {/* 驗證警告 */}
           {validationWarnings.length > 0 && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="border-rose-500/30 bg-rose-500/10 text-rose-200">
               <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
+              <AlertDescription className="text-rose-200/90">
                 <div className="space-y-1">
                   <p className="font-semibold text-sm">請修正以下問題：</p>
                   <ul className="list-disc list-inside space-y-1 text-xs">

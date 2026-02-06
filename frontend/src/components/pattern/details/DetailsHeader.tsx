@@ -13,14 +13,14 @@ export default function DetailsHeader({ taskId }: DetailsHeaderProps) {
   const router = useRouter();
 
   return (
-    <div className="bg-white border-b border-gray-200">
+    <div className="glass-panel border-b border-white/10">
       <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">XGBoost 深度分析儀表板</h1>
-          <p className="text-sm text-gray-600 mt-1">Task ID: {taskId}</p>
+          <h1 className="text-2xl font-medium text-slate-100">XGBoost 深度分析儀表板</h1>
+          <p className="text-sm text-slate-400 mt-1">Task ID: {taskId}</p>
         </div>
         <Button variant="outline" onClick={() => router.push('/patterns/xgboost-analysis')}
-          className="border-gray-300 text-gray-700 hover:bg-gray-100">
+          className="border-white/10 text-slate-200 hover:bg-white/5">
           <ArrowLeft className="w-4 h-4 mr-2" />
           返回分析頁
         </Button>

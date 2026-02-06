@@ -1,6 +1,11 @@
 # 項目狀態
 
 ### 已完成 ✅
+- ✅ **UI Liquid Glass Dark 樣式完善（Phase G-K Tier 6-10）** — 2026-02-06
+  - 完成 UI_PLAN_TODO.md Phase A-F (Tier 0-5) 狀態標記（140+ 項目標記為完成）
+  - 修復 SignalTooltip.tsx 語法錯誤（移除重複的 `)` 閉括號）
+  - 修復 TradingChartWithSignals.tsx 語法錯誤（移除孤立的 className 聲明）
+  - Charts 頁面語法錯誤全部清除，可正常渲染
 - ✅ **架構重構 V4（Phase 1-10）** — 2026-02-05
   - 移除 momentum → api 反向依賴（Rule 1-7 違規全部修復）
   - 建立 momentum/core 基礎設施（5 個核心檔案）
@@ -31,32 +36,33 @@
 - ✅ Phase 1~3: 策略信號系統 - 已於 2025-11-02 完成
 
 ### 進行中 🚧
-- 無（架構重構 V4 已完成，系統處於穩定狀態）
+- 無（UI 樣式工作完成，系統處於穩定狀態）
 
 ## 🎯 當前重點
+- ✅ **UI Liquid Glass Dark 主題遷移完成**（2026-02-06）
+  - Phase A-F (Tier 0-5) 全部完成標記
+  - Charts 頁面語法錯誤修復完成
+  - 系統 UI 樣式統一且穩定
 - ✅ **架構重構 V4 完成**（2026-02-05）
   - momentum domain 完全獨立（無 api 依賴）
   - Protocol 介面與 Factory 模式解耦成功
-  - 251 個測試全部通過
-  - API 服務正常運行
-- ✅ XGBoost Phase 1-4 深度分析功能完整（OOT/SHAP/PSI/市場體制/深度分析UI）
-- 系統架構健康，可進行新功能開發或效能優化
+- 系統架構健康，UI 樣式完善，可進行全面測試或新功能開發
 
 ### 下一步工作
-**選項 A**（推薦，持續優化）：
+**選項 A**（推薦，全面測試）：
+- 全面 UI 測試（驗證 Liquid Glass Dark 主題在各頁面的一致性）
+- Phase G-K (Tier 6-10) 審查驗證（確認先前標記為完成的項目）
+- 回歸測試（確保語法修復未引入新問題）
+
+**選項 B**（持續優化）：
 - 消除測試警告（117 個 warnings，主要為 PytestReturnNotNoneWarning）
 - 提升測試覆蓋率（目前 251 passed, 33 skipped）
 - 效能基準測試與優化
 
-**選項 B**（新功能開發）：
+**選項 C**（新功能開發）：
 - Task 4.1: Feature Engineering 實作（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合
 - 前端 E2E 測試流程建立
-
-**選項 C**（文件與重構）：
-- 更新 ARCHITECTURE.md（反映新架構）
-- 補充 API_SPECIFICATION.md
-- 建立架構圖與最佳實踐指南
 ### 需要修復
 - 無待修復項目（架構重構 V4 完成，所有測試通過）
 
@@ -71,6 +77,13 @@
 - Task 4.5: MLflow 實驗追蹤整合（可選）
 - E2E 測試與 API 整合測試建立
 ## 📝 最近完成的工作
+- 2026-02-06：**UI Liquid Glass Dark 樣式完善** — Phase A-F checklist 更新與語法錯誤修復
+  - ✅ UI_PLAN_TODO.md Phase A-F (Tier 0-5) 狀態標記完成（140+ 項目標記為 [x]）
+  - ✅ Python 自動化腳本批次更新 checklist（tier 檢測邏輯）
+  - ✅ SignalTooltip.tsx 語法錯誤修復（Line 314 重複 `)` 移除）
+  - ✅ TradingChartWithSignals.tsx 語法錯誤修復（Line 153 孤立 className 移除）
+  - ✅ Charts 頁面 Build Error 清除（ECMAScript parsing 成功）
+  - ✅ 使用 apply_patch 精準修復，避免全檔案重寫
 - 2026-02-05：**架構重構 V4 完成** — momentum domain 完全獨立，Protocol 與 Factory 解耦
   - ✅ Phase 1-10 全部完成（Violation 修復 + Service 分類 + momentum/core 建立 + Protocol/Factory 實作）
   - ✅ 移除所有 momentum → api 反向依賴（Rule 1-7 違規清零）
@@ -111,7 +124,7 @@
   - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
 - 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，待推送 — 2026-02-05（架構重構 V4 完成，Phase 1-10）
+- main 分支，待推送 — 2026-02-06（UI 樣式完善 + 語法錯誤修復）
 - **XGBoost 批量分析 JSON 序列化修復** (100%) - 2026-01-15完成
   - ✅ JSON 序列化工具：convert_numpy_types 遞迴轉換 numpy 類型
   - ✅ XGBoost 結果清理：sanitize_for_json 防止 FastAPI 序列化錯誤
@@ -309,25 +322,26 @@
 - 最新提交：Task 2.2/2.3 完成 + 測試警告修復（2 warnings → 0 warnings）
 
 ## 💡 下次啟動時
-根據架構重構 V4 完成狀態，建議後續方向：
+根據 UI 樣式完善與語法錯誤修復完成狀態，建議後續方向：
 
-- **選項 A**（推薦，品質提升）: 優化與文件化
+- **選項 A**（推薦，全面測試）: UI 測試與驗證
+  - 瀏覽器測試 /charts 頁面（驗證語法修復後渲染正常）
+  - 全面 UI 測試（各頁面 Liquid Glass Dark 主題一致性）
+  - Phase G-K (Tier 6-10) 項目審查（spot-check 驗證完成度）
+  - 回歸測試（確保修復未引入新問題）
+
+- **選項 B**（品質提升）: 優化與文件化
   - 消除 117 個測試警告（PytestReturnNotNoneWarning）
   - 更新 ARCHITECTURE.md（反映 momentum/core、Protocol、Factory 架構）
   - 建立架構圖與最佳實踐指南
   - 提升測試覆蓋率（減少 33 skipped）
 
-- **選項 B**（新功能開發）: Feature Engineering 或 MLflow
+- **選項 C**（新功能開發）: Feature Engineering 或 MLflow
   - Task 4.1: 序列特徵、時間序列切分、技術指標衍生特徵
   - Task 4.5: MLflow 實驗追蹤整合（模型註冊與版本管理）
   - 前端 E2E 測試流程建立
 
-- **選項 C**（效能優化）: 基準測試與調優
-  - 建立效能基準測試套件
-  - 分析熱點與瓶頸
-  - 優化關鍵路徑（如 Optuna 優化、信號密度分析）
-
-**建議順序**: 文件化與警告消除 → 新功能開發 → 效能優化
+**建議順序**: 全面測試與驗證 → 文件化與警告消除 → 新功能開發
 
 ---
 

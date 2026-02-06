@@ -135,55 +135,55 @@ export default function CreatePatternForm({ prefillData }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* 基本資訊 */}
-      <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-bold mb-4">基本資訊</h2>
+      <div className="glass-panel rounded-xl border border-white/10 p-6">
+        <h2 className="text-lg font-semibold text-slate-100 mb-4">基本資訊</h2>
         
         <div className="space-y-4">
           {/* 樣式名稱 */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">樣式名稱 *</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">樣式名稱 *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：強勢突破樣式"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-white/10 rounded text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             />
-            {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+            {errors.name && <p className="text-rose-300 text-sm mt-1">{errors.name}</p>}
           </div>
           
           {/* 描述 */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">描述</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">描述</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="描述此樣式的特徵與適用場景"
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-white/10 rounded text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             />
           </div>
           
           {/* 案例 ID */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">案例 ID *</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">案例 ID *</label>
             <input
               type="text"
               value={caseId}
               onChange={(e) => setCaseId(e.target.value)}
               placeholder="例如：ETHUSDT_12h"
-              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-white/10 rounded text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             />
-            {errors.case_id && <p className="text-red-600 text-sm mt-1">{errors.case_id}</p>}
+            {errors.case_id && <p className="text-rose-300 text-sm mt-1">{errors.case_id}</p>}
           </div>
           
           {/* 狀態 */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">狀態</label>
+            <label className="block text-sm font-medium text-slate-300 mb-1">狀態</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-white/10 rounded text-slate-100 bg-slate-900/60 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             >
               <option value="testing">測試中</option>
               <option value="active">啟用</option>
@@ -194,30 +194,30 @@ export default function CreatePatternForm({ prefillData }: Props) {
       </div>
       
       {/* 規則列表 */}
-      <div className="bg-white rounded-lg border p-6">
+      <div className="glass-panel rounded-xl border border-white/10 p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold text-gray-900">樣式規則</h2>
+          <h2 className="text-lg font-semibold text-slate-100">樣式規則</h2>
           <button
             type="button"
             onClick={handleAddRule}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            className="px-3 py-1 bg-blue-500/20 text-blue-200 border border-blue-400/40 rounded text-sm hover:bg-blue-500/30"
           >
             + 新增規則
           </button>
         </div>
         
-        {errors.rules && <p className="text-red-600 text-sm mb-3">{errors.rules}</p>}
+        {errors.rules && <p className="text-rose-300 text-sm mb-3">{errors.rules}</p>}
         
         <div className="space-y-4">
           {rules.map((rule, index) => (
-            <div key={index} className="p-4 border rounded bg-gray-50">
+            <div key={index} className="p-4 border border-white/10 rounded bg-white/5">
               <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold text-gray-900">規則 {index + 1}</h3>
+                <h3 className="font-semibold text-slate-100">規則 {index + 1}</h3>
                 {rules.length > 1 && (
                   <button
                     type="button"
                     onClick={() => handleRemoveRule(index)}
-                    className="text-red-600 text-sm hover:text-red-700"
+                    className="text-rose-300 text-sm hover:text-rose-200"
                   >
                     刪除
                   </button>
@@ -227,26 +227,26 @@ export default function CreatePatternForm({ prefillData }: Props) {
               <div className="grid grid-cols-4 gap-3">
                 {/* 特徵 */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">特徵 *</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">特徵 *</label>
                   <input
                     type="text"
                     value={rule.feature}
                     onChange={(e) => handleRuleChange(index, 'feature', e.target.value)}
                     placeholder="例如：ema_20"
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
                   />
                   {errors[`rule_${index}_feature`] && (
-                    <p className="text-red-600 text-xs mt-1">{errors[`rule_${index}_feature`]}</p>
+                    <p className="text-rose-300 text-xs mt-1">{errors[`rule_${index}_feature`]}</p>
                   )}
                 </div>
                 
                 {/* 操作符 */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">操作符 *</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">操作符 *</label>
                   <select
                     value={rule.operator}
                     onChange={(e) => handleRuleChange(index, 'operator', e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 bg-slate-900/60 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
                   >
                     <option value=">">{'>'}</option>
                     <option value="<">{'<'}</option>
@@ -259,28 +259,28 @@ export default function CreatePatternForm({ prefillData }: Props) {
                 
                 {/* 閾值 */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">閾值 *</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">閾值 *</label>
                   <input
                     type="number"
                     step="any"
                     value={rule.threshold}
                     onChange={(e) => handleRuleChange(index, 'threshold', parseFloat(e.target.value))}
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
                   />
                   {errors[`rule_${index}_threshold`] && (
-                    <p className="text-red-600 text-xs mt-1">{errors[`rule_${index}_threshold`]}</p>
+                    <p className="text-rose-300 text-xs mt-1">{errors[`rule_${index}_threshold`]}</p>
                   )}
                 </div>
                 
                 {/* 說明 */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">說明</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">說明</label>
                   <input
                     type="text"
                     value={rule.description || ''}
                     onChange={(e) => handleRuleChange(index, 'description', e.target.value)}
                     placeholder="選填"
-                    className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
                   />
                 </div>
               </div>
@@ -290,8 +290,8 @@ export default function CreatePatternForm({ prefillData }: Props) {
       </div>
       
       {/* 標籤 */}
-      <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-4">標籤</h2>
+      <div className="glass-panel rounded-xl border border-white/10 p-6">
+        <h2 className="text-lg font-semibold text-slate-100 mb-4">標籤</h2>
         
         {/* 標籤輸入 */}
         <div className="flex gap-2 mb-3">
@@ -301,12 +301,12 @@ export default function CreatePatternForm({ prefillData }: Props) {
             onChange={(e) => setNewTag(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
             placeholder="輸入標籤後按 Enter"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="flex-1 px-3 py-2 border border-white/10 rounded text-slate-100 placeholder-slate-500 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
           />
           <button
             type="button"
             onClick={handleAddTag}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            className="px-4 py-2 bg-white/10 text-slate-100 rounded hover:bg-white/15"
           >
             新增
           </button>
@@ -316,12 +316,12 @@ export default function CreatePatternForm({ prefillData }: Props) {
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
-              <span key={tag} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm flex items-center gap-2">
+              <span key={tag} className="px-3 py-1 bg-blue-400/15 text-blue-200 rounded-full text-sm flex items-center gap-2">
                 {tag}
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-blue-200 hover:text-blue-100"
                 >
                   ×
                 </button>
@@ -336,14 +336,14 @@ export default function CreatePatternForm({ prefillData }: Props) {
         <button
           type="button"
           onClick={() => router.back()}
-          className="px-6 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+          className="px-6 py-2 border border-white/10 rounded text-slate-200 hover:bg-white/5"
         >
           取消
         </button>
         <button
           type="submit"
           disabled={isSubmitting}
-          className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500"
+          className="px-6 py-2 bg-blue-500/20 text-blue-100 rounded border border-blue-400/40 hover:bg-blue-500/30 disabled:bg-slate-700/60 disabled:text-slate-400"
         >
           {isSubmitting ? '建立中...' : '建立樣式'}
         </button>
@@ -351,7 +351,7 @@ export default function CreatePatternForm({ prefillData }: Props) {
       
       {/* 錯誤訊息 */}
       {errors.submit && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+        <div className="p-3 bg-rose-500/10 border border-rose-400/30 rounded text-rose-200 text-sm">
           ❌ {errors.submit}
         </div>
       )}

@@ -38,7 +38,7 @@ export default function RegimeRadarChart({ data, loading }: RegimeRadarChartProp
             <PolarAngleAxis dataKey="phase" />
             <PolarRadiusAxis domain={[0, 1]} />
             <Tooltip formatter={(value: any) => Number(value).toFixed(3)} />
-            <Radar name="AUC" dataKey="auc" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+            <Radar name="AUC" dataKey="auc" stroke="#60a5fa" fill="#60a5fa" fillOpacity={0.3} />
           </RadarChart>
         </ResponsiveContainer>
       </div>

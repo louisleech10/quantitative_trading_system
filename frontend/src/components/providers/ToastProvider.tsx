@@ -19,7 +19,7 @@ export function ToastProvider() {
         // 默認選項
         duration: 4000,
         style: {
-          background: '#363636',
+          background: '#1a233a',
           color: '#fff',
           fontSize: '14px',
           borderRadius: '8px',
@@ -29,11 +29,11 @@ export function ToastProvider() {
         success: {
           duration: 3000,
           iconTheme: {
-            primary: '#10b981',
+            primary: '#34d399',
             secondary: '#fff',
           },
           style: {
-            background: '#10b981',
+            background: '#34d399',
             color: '#fff',
           },
         },
@@ -41,22 +41,22 @@ export function ToastProvider() {
         error: {
           duration: 5000,
           iconTheme: {
-            primary: '#ef4444',
+            primary: '#fb7185',
             secondary: '#fff',
           },
           style: {
-            background: '#ef4444',
+            background: '#fb7185',
             color: '#fff',
           },
         },
         // 載入訊息
         loading: {
           iconTheme: {
-            primary: '#3b82f6',
+            primary: '#60a5fa',
             secondary: '#fff',
           },
           style: {
-            background: '#3b82f6',
+            background: '#60a5fa',
             color: '#fff',
           },
         },

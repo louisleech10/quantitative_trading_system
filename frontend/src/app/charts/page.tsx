@@ -89,9 +89,9 @@ type CaseTypeFilter = "all" | "positive" | "negative";
 // ============ 輔助函數 ============
 
 const INDICATOR_COLORS: Record<string, string> = {
-  ema_short: "#10b981",
-  ema_mid: "#3b82f6",
-  ema_long: "#a855f7",
+  ema_short: "#34d399",
+  ema_mid: "#60a5fa",
+  ema_long: "#c084fc",
 };
 
 const hydrationSourceLabel: Record<HydrationSource, string> = {
@@ -598,10 +598,10 @@ export default function ChartsPage() {
 
   if (loadingCases) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950/40 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto mb-3" />
-          <p className="text-slate-600">載入案例數據中...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-400 mx-auto mb-3" />
+          <p className="text-slate-300">載入案例數據中...</p>
         </div>
       </div>
     );
@@ -609,11 +609,11 @@ export default function ChartsPage() {
 
   if (caseListError) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 text-lg font-semibold mb-2">載入失敗</h2>
-          <p className="text-red-600">{caseListError}</p>
-          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+      <div className="min-h-screen bg-slate-950/40 flex items-center justify-center">
+        <div className="glass-panel border border-rose-500/40 rounded-lg p-6 max-w-md">
+          <h2 className="text-rose-200 text-lg font-semibold mb-2">載入失敗</h2>
+          <p className="text-rose-200/80">{caseListError}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-rose-500/20 text-rose-100 rounded border border-rose-400/40 hover:bg-rose-500/30">
             重新載入
           </button>
         </div>
@@ -623,11 +623,11 @@ export default function ChartsPage() {
 
   if (caseList.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md text-center">
-          <h2 className="text-yellow-800 text-lg font-semibold mb-2">暫無數據</h2>
-          <p className="text-yellow-700 mb-4">尚未導入任何案例數據。請先到「數據準備」頁面導入案例 CSV 並下載 K 線數據。</p>
-          <button onClick={() => router.push("/data-preparation")} className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
+      <div className="min-h-screen bg-slate-950/40 flex items-center justify-center">
+        <div className="glass-panel border border-amber-400/40 rounded-lg p-6 max-w-md text-center">
+          <h2 className="text-amber-200 text-lg font-semibold mb-2">暫無數據</h2>
+          <p className="text-amber-200/80 mb-4">尚未導入任何案例數據。請先到「數據準備」頁面導入案例 CSV 並下載 K 線數據。</p>
+          <button onClick={() => router.push("/data-preparation")} className="px-4 py-2 bg-amber-500/20 text-amber-100 rounded border border-amber-400/40 hover:bg-amber-500/30">
             前往數據準備
           </button>
         </div>
@@ -636,23 +636,23 @@ export default function ChartsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-slate-950/40">
+      <header className="border-b border-slate-800/80 bg-slate-950/80">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="flex items-center gap-3 text-sm text-slate-500">
-                <button onClick={handleBack} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100">
+              <div className="flex items-center gap-3 text-sm text-slate-400">
+                <button onClick={handleBack} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-slate-900/60">
                   <ArrowLeft className="h-3.5 w-3.5" /> 返回策略測試
                 </button>
-                <span className="flex items-center gap-1 text-indigo-600">
+                <span className="flex items-center gap-1 text-emerald-300">
                   <LineChart className="h-4 w-4" /> /charts
                 </span>
               </div>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-900">案例圖表查看</h1>
-              <p className="text-sm text-slate-500">選擇案例查看 K 線圖表，包含 EMA 指標和窗口遮罩</p>
+              <h1 className="mt-2 text-2xl font-semibold text-slate-100">案例圖表查看</h1>
+              <p className="text-sm text-slate-400">選擇案例查看 K 線圖表，包含 EMA 指標和窗口遮罩</p>
             </div>
-            <div className="text-right text-xs text-slate-500">
+            <div className="text-right text-xs text-slate-400">
               <p>策略設定來源: {hydrationSourceLabel[hydrationSource]}</p>
             </div>
           </div>
@@ -661,63 +661,63 @@ export default function ChartsPage() {
 
       <main className="px-6 py-6 space-y-6">
         {/* 案例選擇 */}
-        <section className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">案例選擇</h2>
+        <section className="glass-panel rounded-xl border border-slate-800/80 p-5">
+          <h2 className="text-sm font-semibold text-slate-200 mb-4">案例選擇</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">交易對</label>
-              <select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-slate-900 text-sm">
+              <label className="block text-xs font-medium text-slate-400 mb-1">交易對</label>
+              <select value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)} className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 text-sm bg-slate-900/60">
                 {availableSymbols.map((symbol) => (<option key={symbol} value={symbol}>{symbol}</option>))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">案例類型</label>
-              <select value={caseTypeFilter} onChange={(e) => setCaseTypeFilter(e.target.value as CaseTypeFilter)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-slate-900 text-sm">
+              <label className="block text-xs font-medium text-slate-400 mb-1">案例類型</label>
+              <select value={caseTypeFilter} onChange={(e) => setCaseTypeFilter(e.target.value as CaseTypeFilter)} className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 text-sm bg-slate-900/60">
                 <option value="all">全部</option>
                 <option value="positive">正例</option>
                 <option value="negative">反例</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">時間框架（查看用）</label>
-              <select value={selectedTimeframe} onChange={(e) => setSelectedTimeframe(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-slate-900 text-sm">
+              <label className="block text-xs font-medium text-slate-400 mb-1">時間框架（查看用）</label>
+              <select value={selectedTimeframe} onChange={(e) => setSelectedTimeframe(e.target.value)} className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 text-sm bg-slate-900/60">
                 {AVAILABLE_TIMEFRAMES.map((tf) => (<option key={tf} value={tf}>{tf}</option>))}
               </select>
-              <p className="text-[10px] text-slate-400 mt-1">與案例時間框架獨立</p>
+              <p className="text-[10px] text-slate-500 mt-1">與案例時間框架獨立</p>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">案例時間點 ({filteredCases.length} 個)</label>
-              <select value={selectedTimestamp || ""} onChange={(e) => setSelectedTimestamp(Number(e.target.value))} disabled={filteredCases.length === 0} className="w-full px-3 py-2 border border-slate-300 rounded-md text-slate-900 text-sm">
+              <label className="block text-xs font-medium text-slate-400 mb-1">案例時間點 ({filteredCases.length} 個)</label>
+              <select value={selectedTimestamp || ""} onChange={(e) => setSelectedTimestamp(Number(e.target.value))} disabled={filteredCases.length === 0} className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 text-sm bg-slate-900/60">
                 {filteredCases.map((c) => (<option key={c.case_id} value={c.timestamp}>{formatTimestamp(c.timestamp)} {c.positive_case ? "✓" : "✗"}</option>))}
               </select>
             </div>
           </div>
           {currentCase && (
-            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
-              <div><span className="text-slate-500">案例ID：</span><span className="font-mono text-slate-800">{currentCase.case_id}</span></div>
-              <div><span className="text-slate-500">類型：</span><span className={`font-semibold ${currentCase.positive_case ? "text-green-600" : "text-red-600"}`}>{currentCase.positive_case ? "正例 ✓" : "反例 ✗"}</span></div>
-              <div><span className="text-slate-500">案例時間框架：</span><span className="font-mono text-slate-800">{currentCase.timeframe}</span></div>
-              <div><span className="text-slate-500">Lookback：</span><span className="font-mono text-slate-800">{lookbackBars} 根</span></div>
-              <div><span className="text-slate-500">Forward：</span><span className="font-mono text-slate-800">{forwardBars} 根</span></div>
+            <div className="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
+              <div><span className="text-slate-400">案例ID：</span><span className="font-mono text-slate-100">{currentCase.case_id}</span></div>
+              <div><span className="text-slate-400">類型：</span><span className={`font-semibold ${currentCase.positive_case ? "text-emerald-400" : "text-rose-400"}`}>{currentCase.positive_case ? "正例 ✓" : "反例 ✗"}</span></div>
+              <div><span className="text-slate-400">案例時間框架：</span><span className="font-mono text-slate-100">{currentCase.timeframe}</span></div>
+              <div><span className="text-slate-400">Lookback：</span><span className="font-mono text-slate-100">{lookbackBars} 根</span></div>
+              <div><span className="text-slate-400">Forward：</span><span className="font-mono text-slate-100">{forwardBars} 根</span></div>
             </div>
           )}
         </section>
 
         {/* 指標控制 */}
-        <section className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-            <span className="font-semibold text-slate-800">指標顯示：</span>
-            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 font-medium">
+        <section className="glass-panel rounded-xl border border-slate-800/80 p-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+            <span className="font-semibold text-slate-100">指標顯示：</span>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-200 font-medium border border-emerald-400/30">
               EMA: {state.indicatorParams.short_period} / {state.indicatorParams.mid_period} / {state.indicatorParams.long_period}
             </span>
-            <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+            <span className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-200 border border-sky-400/30">
               策略: {state.strategyLogic === 'three_line' ? '三線順勢' : state.strategyLogic}
             </span>
-            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+            <span className="px-2 py-0.5 rounded bg-slate-800/60 text-slate-400 border border-slate-700/60">
               數據源: {dataSource} → {isPriceSource ? "Price圖" : isVolumeSource ? "Volume圖" : "Taker圖"}
             </span>
             {indicatorSeries.map((series) => (
-              <button key={series.id} onClick={() => handleToggleSeries(series.id)} className={`rounded-full border px-3 py-1 font-medium ${indicatorVisibility[series.id] !== false ? "border-indigo-200 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-500"}`}>
+              <button key={series.id} onClick={() => handleToggleSeries(series.id)} className={`rounded-full border px-3 py-1 font-medium ${indicatorVisibility[series.id] !== false ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" : "border-slate-700 text-slate-400"}`}>
                 <span className="inline-flex items-center gap-1">
                   <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: series.color }} />
                   {series.label}
@@ -728,21 +728,21 @@ export default function ChartsPage() {
         </section>
 
         {/* 圖表區域 */}
-        <section className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <section className="glass-panel rounded-xl border border-slate-800/80 p-4">
           {selectedTimestamp !== null ? (
             loadingChartData ? (
-              <div className="flex items-center justify-center bg-slate-50 rounded-lg" style={{ height: "640px" }}>
+              <div className="flex items-center justify-center bg-slate-900/40 rounded-lg" style={{ height: "640px" }}>
                 <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto mb-2" />
-                  <p className="text-slate-600 text-sm">載入 K 線數據中...</p>
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-400 mx-auto mb-2" />
+                  <p className="text-slate-300 text-sm">載入 K 線數據中...</p>
                 </div>
               </div>
             ) : chartDataError ? (
-              <div className="flex items-center justify-center bg-red-50 rounded-lg" style={{ height: "640px" }}>
+              <div className="flex items-center justify-center bg-rose-500/10 rounded-lg border border-rose-500/30" style={{ height: "640px" }}>
                 <div className="text-center">
-                  <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                  <p className="text-red-600 text-sm mb-3">{chartDataError}</p>
-                  <button onClick={handleRetryFetch} className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">
+                  <AlertCircle className="h-8 w-8 text-rose-300 mx-auto mb-2" />
+                  <p className="text-rose-200 text-sm mb-3">{chartDataError}</p>
+                  <button onClick={handleRetryFetch} className="inline-flex items-center gap-2 px-4 py-2 bg-rose-500/20 text-rose-100 rounded-md border border-rose-400/40 hover:bg-rose-500/30 text-sm">
                     <RefreshCcw className="h-4 w-4" /> 重新載入
                   </button>
                 </div>
@@ -751,10 +751,10 @@ export default function ChartsPage() {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{selectedSymbol} / {selectedTimeframe} — Price / Volume / Taker Ratio</p>
-                    <p className="text-xs text-slate-500">{formatTimestampDate(chartData.metadata.time_range.start)} → {formatTimestampDate(chartData.metadata.time_range.end)} ・ {chartData.metadata.total_bars} 根 K 線</p>
+                    <p className="text-sm font-semibold text-slate-100">{selectedSymbol} / {selectedTimeframe} — Price / Volume / Taker Ratio</p>
+                    <p className="text-xs text-slate-400">{formatTimestampDate(chartData.metadata.time_range.start)} → {formatTimestampDate(chartData.metadata.time_range.end)} ・ {chartData.metadata.total_bars} 根 K 線</p>
                   </div>
-                  <button onClick={handleRetryFetch} className="inline-flex items-center gap-2 px-3 py-1 border border-slate-200 rounded-md text-xs text-slate-600 hover:bg-slate-50">
+                  <button onClick={handleRetryFetch} className="inline-flex items-center gap-2 px-3 py-1 border border-slate-700 rounded-md text-xs text-slate-300 hover:bg-slate-900/60">
                     <RefreshCcw className="h-3.5 w-3.5" /> 刷新
                   </button>
                 </div>
@@ -777,21 +777,21 @@ export default function ChartsPage() {
                 />
               </div>
             ) : (
-              <div className="flex items-center justify-center bg-slate-50 rounded-lg" style={{ height: "640px" }}>
-                <div className="text-center"><LineChart className="h-8 w-8 text-slate-300 mx-auto mb-2" /><p className="text-slate-500">無 K 線數據</p></div>
+              <div className="flex items-center justify-center bg-slate-900/40 rounded-lg" style={{ height: "640px" }}>
+                <div className="text-center"><LineChart className="h-8 w-8 text-slate-600 mx-auto mb-2" /><p className="text-slate-400">無 K 線數據</p></div>
               </div>
             )
           ) : (
-            <div className="flex items-center justify-center bg-slate-50 rounded-lg" style={{ height: "640px" }}>
-              <div className="text-center"><LineChart className="h-8 w-8 text-slate-300 mx-auto mb-2" /><p className="text-slate-500">請選擇案例以查看圖表</p></div>
+            <div className="flex items-center justify-center bg-slate-900/40 rounded-lg" style={{ height: "640px" }}>
+              <div className="text-center"><LineChart className="h-8 w-8 text-slate-600 mx-auto mb-2" /><p className="text-slate-400">請選擇案例以查看圖表</p></div>
             </div>
           )}
         </section>
 
         {/* 信號統計 */}
         {chartData && (
-          <section className="bg-slate-100 rounded-lg p-4 text-xs text-slate-600">
-            <p className="font-semibold mb-2">信號統計</p>
+          <section className="glass-panel border border-slate-800/80 rounded-lg p-4 text-xs text-slate-300">
+            <p className="font-semibold mb-2 text-slate-100">信號統計</p>
             {(() => {
               const nearCount = signalPoints.filter(s => s.windowType === 'near').length;
               const farCount = signalPoints.filter(s => s.windowType === 'far').length;
@@ -806,23 +806,23 @@ export default function ChartsPage() {
               return (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#3B82F6' }}></span>
+                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#60a5fa' }}></span>
                     <span>Near 信號: <strong>{nearCount}</strong></span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#CA8A04' }}></span>
+                    <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: '#fbbf24' }}></span>
                     <span>Far 信號: <strong>{farCount}</strong></span>
                   </div>
                   <div>
                     Near 密度: <strong>{nearRatio.toFixed(1)}%</strong>
-                    <span className="text-gray-400 ml-1">({nearCount}/{nearBars} bars)</span>
+                    <span className="text-slate-500 ml-1">({nearCount}/{nearBars} bars)</span>
                   </div>
                   <div>
                     Far 密度: <strong>{farRatio.toFixed(1)}%</strong>
-                    <span className="text-gray-400 ml-1">({farCount}/{farBars} bars)</span>
+                    <span className="text-slate-500 ml-1">({farCount}/{farBars} bars)</span>
                   </div>
                   <div>
-                    Near/Far 密度比: <strong className={parseFloat(String(densityRatio)) > 1 ? 'text-green-600' : parseFloat(String(densityRatio)) < 1 ? 'text-red-600' : ''}>{densityRatio}</strong>
+                    Near/Far 密度比: <strong className={parseFloat(String(densityRatio)) > 1 ? 'text-emerald-400' : parseFloat(String(densityRatio)) < 1 ? 'text-rose-400' : ''}>{densityRatio}</strong>
                   </div>
                 </div>
               );

@@ -47,7 +47,7 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-green-500" />
+            <TrendingUp className="h-5 w-5 text-emerald-400" />
             <CardTitle>最佳優化結果</CardTitle>
           </div>
           <Badge variant="outline" className="text-sm">
@@ -64,7 +64,7 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">最佳目標值</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-2xl font-semibold text-emerald-400">
                 {result.best_value.toFixed(6)}
               </p>
             </div>

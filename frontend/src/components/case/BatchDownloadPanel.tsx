@@ -131,12 +131,12 @@ export default function BatchDownloadPanel({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">批量K線下載</h3>
+    <div className="glass-panel rounded-xl p-6 border border-white/10">
+      <h3 className="text-lg font-semibold text-slate-100 mb-4">批量K線下載</h3>
 
       {totalCases === 0 && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
-          <p className="text-sm font-medium text-yellow-800">
+        <div className="mb-4 p-3 bg-amber-500/10 border border-amber-400/30 rounded">
+          <p className="text-sm font-medium text-amber-200">
             請先導入案例CSV文件
           </p>
         </div>
@@ -146,13 +146,13 @@ export default function BatchDownloadPanel({
       <div className="mb-4 grid grid-cols-2 gap-4">
         {/* K線時間框架選擇器 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             K線時間框架
           </label>
           <select
             value={downloadTimeframe}
             onChange={(e) => setDownloadTimeframe(e.target.value)}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-700 rounded px-3 py-2 bg-slate-900/60 text-slate-100 font-medium focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             disabled={downloading}
           >
             <option value="1m">1 分鐘</option>
@@ -164,14 +164,14 @@ export default function BatchDownloadPanel({
             <option value="12h">12 小時</option>
             <option value="1d">1 天</option>
           </select>
-          <p className="text-xs text-gray-600 mt-1 font-medium">
+          <p className="text-xs text-slate-400 mt-1 font-medium">
             用於ML訓練（與案例搜尋時間框架獨立）
           </p>
         </div>
 
         {/* 新增：Warmup期輸入框 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             Warmup期K線數
           </label>
           <input
@@ -180,17 +180,17 @@ export default function BatchDownloadPanel({
             onChange={(e) => setWarmupBars(Number(e.target.value))}
             min={0}
             max={500}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-700 rounded px-3 py-2 bg-slate-900/60 text-slate-100 font-medium focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             disabled={downloading}
             placeholder="150"
           />
-          <p className="text-xs text-gray-500 mt-1 font-medium">
+          <p className="text-xs text-slate-500 mt-1 font-medium">
             建議：最長EMA週期×4.5 (例如：EMA50 → 225)
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             TO前有效K線數（不含Warmup）
           </label>
           <input
@@ -199,17 +199,17 @@ export default function BatchDownloadPanel({
             onChange={(e) => setLookbackBars(Number(e.target.value))}
             min={1}
             max={1000}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-700 rounded px-3 py-2 bg-slate-900/60 text-slate-100 font-medium focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             disabled={downloading}
             placeholder="100"
           />
-          <p className="text-xs text-blue-600 mt-1 font-medium">
+          <p className="text-xs text-blue-300 mt-1 font-medium">
             密度計算基數（實際有效K線數）
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             往後K線根數 (Forward)
           </label>
           <input
@@ -218,37 +218,37 @@ export default function BatchDownloadPanel({
             onChange={(e) => setForwardBars(Number(e.target.value))}
             min={1}
             max={500}
-            className="w-full border border-gray-300 rounded px-3 py-2 bg-white text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full border border-slate-700 rounded px-3 py-2 bg-slate-900/60 text-slate-100 font-medium focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
             disabled={downloading}
             placeholder="48"
           />
-          <p className="text-xs text-gray-600 mt-1 font-medium">
+          <p className="text-xs text-slate-400 mt-1 font-medium">
             範圍: 1-500（預設: 48）
           </p>
         </div>
       </div>
 
       {/* Download Info */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded">
-        <p className="text-sm font-bold text-blue-900 mb-2">
+      <div className="mb-4 p-3 bg-blue-500/10 border border-blue-400/30 rounded">
+        <p className="text-sm font-semibold text-blue-200 mb-2">
           下載配置
         </p>
-        <p className="text-sm font-medium text-gray-700 mb-1">
-          案例數量：<span className="font-bold text-blue-700">{totalCases}</span> 個
+        <p className="text-sm font-medium text-slate-300 mb-1">
+          案例數量：<span className="font-semibold text-blue-300">{totalCases}</span> 個
         </p>
-        <p className="text-sm font-medium text-gray-700 mb-1">
-          時間框架：<span className="font-bold text-blue-700">{downloadTimeframe}</span>
+        <p className="text-sm font-medium text-slate-300 mb-1">
+          時間框架：<span className="font-semibold text-blue-300">{downloadTimeframe}</span>
         </p>
-        <p className="text-sm font-bold text-gray-900 mt-2 mb-1">
+        <p className="text-sm font-semibold text-slate-100 mt-2 mb-1">
           每個案例下載：
         </p>
-        <p className="text-sm font-medium text-gray-700">
-          <span className="font-bold text-blue-700">{warmupBars + lookbackBars + forwardBars}</span> 根K線
-          <span className="text-gray-500 text-xs ml-2">
+        <p className="text-sm font-medium text-slate-300">
+          <span className="font-semibold text-blue-300">{warmupBars + lookbackBars + forwardBars}</span> 根K線
+          <span className="text-slate-500 text-xs ml-2">
             = {warmupBars} (Warmup) + {lookbackBars} (有效) + {forwardBars} (往後)
           </span>
         </p>
-        <p className="text-xs text-green-600 mt-2 font-medium">
+        <p className="text-xs text-emerald-300 mt-2 font-medium">
           ✓ 密度計算基數：{lookbackBars} 根有效K線
         </p>
       </div>
@@ -257,10 +257,10 @@ export default function BatchDownloadPanel({
       <button
         onClick={handleStartDownload}
         disabled={totalCases === 0 || downloading}
-        className={`w-full py-3 px-4 rounded-lg font-bold text-white transition-colors ${
+        className={`w-full py-3 px-4 rounded-lg font-semibold transition-colors ${
           totalCases === 0 || downloading
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-green-600 hover:bg-green-700 shadow-md"
+            ? "bg-slate-700/60 text-slate-400 cursor-not-allowed"
+            : "bg-emerald-500/20 text-emerald-100 border border-emerald-400/40 hover:bg-emerald-500/30"
         }`}
       >
         {downloading ? "下載中..." : "開始批量下載"}
@@ -268,43 +268,43 @@ export default function BatchDownloadPanel({
 
       {/* Error Message */}
       {error && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-300 rounded">
-          <p className="text-sm font-medium text-red-800">{error}</p>
+        <div className="mt-4 p-3 bg-rose-500/10 border border-rose-400/30 rounded">
+          <p className="text-sm font-medium text-rose-200">{error}</p>
         </div>
       )}
 
       {/* Progress Bar */}
       {progress && (
         <div className="mt-4">
-          <div className="mb-2 flex justify-between text-sm font-medium text-gray-900">
+          <div className="mb-2 flex justify-between text-sm font-medium text-slate-100">
             <span>進度: {progress.completed_cases} / {progress.total_cases}</span>
-            <span className="font-bold">{progress.progress_percent.toFixed(1)}%</span>
+            <span className="font-semibold">{progress.progress_percent.toFixed(1)}%</span>
           </div>
 
-          <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+          <div className="w-full bg-slate-800 rounded-full h-4 overflow-hidden">
             <div
               className={`h-full transition-all duration-300 ${
                 progress.status === "completed"
-                  ? "bg-green-600"
+                  ? "bg-emerald-500"
                   : progress.status === "failed"
-                  ? "bg-red-600"
-                  : "bg-blue-600"
+                  ? "bg-rose-500"
+                  : "bg-blue-400"
               }`}
               style={{ width: `${progress.progress_percent}%` }}
             ></div>
           </div>
 
           {/* Status Info */}
-          <div className="mt-3 text-sm font-medium text-gray-900">
+          <div className="mt-3 text-sm font-medium text-slate-100">
             <div className="grid grid-cols-2 gap-2">
-              <div>狀態: <span className="font-bold">{progress.status}</span></div>
-              <div>當前: <span className="font-bold">{progress.current_symbol || "N/A"}</span></div>
-              <div>成功: <span className="text-green-700 font-bold">{progress.completed_cases}</span></div>
-              <div>失敗: <span className="text-red-700 font-bold">{progress.failed_cases}</span></div>
+              <div>狀態: <span className="font-semibold">{progress.status}</span></div>
+              <div>當前: <span className="font-semibold">{progress.current_symbol || "N/A"}</span></div>
+              <div>成功: <span className="text-emerald-300 font-semibold">{progress.completed_cases}</span></div>
+              <div>失敗: <span className="text-rose-300 font-semibold">{progress.failed_cases}</span></div>
             </div>
 
             {progress.estimated_time_remaining && (
-              <div className="mt-2 text-gray-800 font-medium">
+              <div className="mt-2 text-slate-300 font-medium">
                 預估剩餘時間: {Math.round(progress.estimated_time_remaining / 60)} 分鐘
               </div>
             )}
@@ -312,16 +312,16 @@ export default function BatchDownloadPanel({
 
           {/* Failed Cases */}
           {progress.failed_case_ids.length > 0 && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-300 rounded">
-              <p className="text-sm font-bold text-red-900 mb-2">
+            <div className="mt-4 p-3 bg-rose-500/10 border border-rose-400/30 rounded">
+              <p className="text-sm font-semibold text-rose-200 mb-2">
                 失敗案例 ({progress.failed_case_ids.length}):
               </p>
-              <ul className="list-disc list-inside text-sm font-medium text-red-800">
+              <ul className="list-disc list-inside text-sm font-medium text-rose-200/80">
                 {progress.failed_case_ids.slice(0, 5).map((caseId, idx) => (
                   <li key={idx}>{caseId}</li>
                 ))}
                 {progress.failed_case_ids.length > 5 && (
-                  <li className="text-gray-500">
+                  <li className="text-slate-500">
                     ...還有 {progress.failed_case_ids.length - 5} 個
                   </li>
                 )}
@@ -329,8 +329,8 @@ export default function BatchDownloadPanel({
 
               {progress.error_messages.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-sm font-semibold mb-1">錯誤訊息:</p>
-                  <ul className="list-disc list-inside text-sm text-red-700">
+                  <p className="text-sm font-semibold text-rose-200 mb-1">錯誤訊息:</p>
+                  <ul className="list-disc list-inside text-sm text-rose-200/80">
                     {progress.error_messages.slice(0, 3).map((msg, idx) => (
                       <li key={idx}>{msg}</li>
                     ))}
@@ -342,8 +342,8 @@ export default function BatchDownloadPanel({
 
           {/* Completion Message */}
           {progress.status === "completed" && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-              <p className="text-sm text-green-700 font-semibold">
+            <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-400/30 rounded">
+              <p className="text-sm text-emerald-200 font-semibold">
                 ✅ 批量下載完成！
                 成功: {progress.completed_cases}, 失敗: {progress.failed_cases}
               </p>

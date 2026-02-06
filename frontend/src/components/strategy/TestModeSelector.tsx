@@ -86,10 +86,10 @@ export default function TestModeSelector({
     <div className={`space-y-4 ${className}`}>
       {/* 標題 */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-200 mb-1">
           測試模式
         </label>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-slate-400">
           選擇執行單次測試或參數優化
         </p>
       </div>
@@ -100,10 +100,10 @@ export default function TestModeSelector({
           const isSelected = value.mode === option.value;
           const borderColor =
             option.color === "blue"
-              ? "border-blue-500 bg-blue-50"
-              : "border-purple-500 bg-purple-50";
+              ? "border-sky-400/60 bg-sky-500/10"
+              : "border-violet-400/60 bg-violet-500/10";
           const textColor =
-            option.color === "blue" ? "text-blue-900" : "text-purple-900";
+            option.color === "blue" ? "text-sky-200" : "text-violet-200";
 
           return (
             <button
@@ -116,7 +116,7 @@ export default function TestModeSelector({
                 ${
                   isSelected
                     ? borderColor
-                    : "border-gray-200 bg-white hover:border-gray-300"
+                    : "border-white/10 bg-white/5 hover:border-white/20"
                 }
                 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
               `}
@@ -129,9 +129,9 @@ export default function TestModeSelector({
                     ${
                       isSelected
                         ? option.color === "blue"
-                          ? "bg-blue-100"
-                          : "bg-purple-100"
-                        : "bg-gray-100"
+                          ? "bg-sky-500/20"
+                          : "bg-violet-500/20"
+                        : "bg-white/5"
                     }
                   `}
                 >
@@ -144,7 +144,7 @@ export default function TestModeSelector({
                   <div className="flex items-center justify-between">
                     <div
                       className={`text-sm font-semibold ${
-                        isSelected ? textColor : "text-gray-900"
+                        isSelected ? textColor : "text-slate-100"
                       }`}
                     >
                       {option.label}
@@ -153,9 +153,9 @@ export default function TestModeSelector({
                       className={`text-xs px-2 py-0.5 rounded ${
                         isSelected
                           ? option.color === "blue"
-                            ? "bg-blue-200 text-blue-800"
-                            : "bg-purple-200 text-purple-800"
-                          : "bg-gray-200 text-gray-700"
+                            ? "bg-sky-500/20 text-sky-200"
+                            : "bg-violet-500/20 text-violet-200"
+                          : "bg-white/10 text-slate-300"
                       }`}
                     >
                       {option.estimatedTime}
@@ -167,9 +167,9 @@ export default function TestModeSelector({
                     className={`text-xs mt-1 ${
                       isSelected
                         ? option.color === "blue"
-                          ? "text-blue-700"
-                          : "text-purple-700"
-                        : "text-gray-600"
+                          ? "text-sky-200/80"
+                          : "text-violet-200/80"
+                        : "text-slate-400"
                     }`}
                   >
                     {option.description}
@@ -183,9 +183,9 @@ export default function TestModeSelector({
                         className={`text-xs flex items-start gap-1 ${
                           isSelected
                             ? option.color === "blue"
-                              ? "text-blue-600"
-                              : "text-purple-600"
-                            : "text-gray-500"
+                              ? "text-sky-200/80"
+                              : "text-violet-200/80"
+                            : "text-slate-400"
                         }`}
                       >
                         <span className="text-xs">•</span>
@@ -199,7 +199,7 @@ export default function TestModeSelector({
                 {isSelected && (
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      option.color === "blue" ? "bg-blue-500" : "bg-purple-500"
+                      option.color === "blue" ? "bg-sky-400" : "bg-violet-400"
                     }`}
                   />
                 )}
@@ -211,11 +211,11 @@ export default function TestModeSelector({
 
       {/* Optuna 試驗次數配置 */}
       {value.mode === "optuna" && (
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <label className="block text-sm font-medium text-purple-900 mb-2">
+        <div className="bg-violet-500/10 border border-violet-400/30 rounded-lg p-4">
+          <label className="block text-sm font-medium text-violet-100 mb-2">
             優化試驗次數
           </label>
-          <p className="text-xs text-purple-700 mb-3">
+          <p className="text-xs text-violet-200/80 mb-3">
             試驗次數越多,找到最佳參數的機率越高,但耗時也越長
           </p>
 
@@ -226,12 +226,12 @@ export default function TestModeSelector({
               value={value.optuna_trials || 100}
               onChange={(e) => updateTrials(Number(e.target.value))}
               disabled={disabled}
-              className="flex-1 px-3 py-2 border border-purple-300 rounded-lg text-sm"
+              className="flex-1 px-3 py-2 border border-white/10 rounded-lg text-sm bg-white/5 text-slate-100 focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/30"
               min={10}
               max={1000}
               step={10}
             />
-            <span className="text-sm text-purple-700">次</span>
+            <span className="text-sm text-violet-200">次</span>
           </div>
 
           {/* 快速選擇 */}
@@ -246,8 +246,8 @@ export default function TestModeSelector({
                   px-3 py-1.5 rounded-lg text-xs font-medium transition-colors
                   ${
                     value.optuna_trials === trials
-                      ? "bg-purple-600 text-white"
-                      : "bg-white text-purple-700 border border-purple-300 hover:bg-purple-100"
+                      ? "bg-violet-500 text-white"
+                      : "bg-white/5 text-violet-200 border border-violet-400/40 hover:bg-violet-500/10"
                   }
                 `}
               >
@@ -257,7 +257,7 @@ export default function TestModeSelector({
           </div>
 
           {/* 預估時間 */}
-          <div className="mt-3 text-xs text-purple-600 bg-purple-100 p-2 rounded">
+          <div className="mt-3 text-xs text-violet-200 bg-violet-500/20 p-2 rounded">
             <span className="font-medium">預估執行時間:</span>{" "}
             {Math.round(((value.optuna_trials || 100) / 100) * 3)} - {Math.round(((value.optuna_trials || 100) / 100) * 5)} 分鐘
           </div>
@@ -265,36 +265,36 @@ export default function TestModeSelector({
       )}
 
       {/* 模式對比表格 */}
-      <div className="bg-gray-50 rounded-lg p-3">
-        <div className="text-xs font-medium text-gray-700 mb-2">模式對比</div>
+      <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+        <div className="text-xs font-medium text-slate-200 mb-2">模式對比</div>
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-gray-300">
-              <th className="text-left py-1 text-gray-600">項目</th>
-              <th className="text-center py-1 text-blue-600">單次測試</th>
-              <th className="text-center py-1 text-purple-600">Optuna優化</th>
+            <tr className="border-b border-white/10">
+              <th className="text-left py-1 text-slate-300">項目</th>
+              <th className="text-center py-1 text-sky-300">單次測試</th>
+              <th className="text-center py-1 text-violet-300">Optuna優化</th>
             </tr>
           </thead>
-          <tbody className="text-gray-600">
-            <tr className="border-b border-gray-200">
+          <tbody className="text-slate-300">
+            <tr className="border-b border-white/10">
               <td className="py-1">執行時間</td>
-              <td className="text-center text-blue-600">快 (&lt;5秒)</td>
-              <td className="text-center text-purple-600">慢 (1-5分鐘)</td>
+              <td className="text-center text-sky-300">快 (&lt;5秒)</td>
+              <td className="text-center text-violet-300">慢 (1-5分鐘)</td>
             </tr>
-            <tr className="border-b border-gray-200">
+            <tr className="border-b border-white/10">
               <td className="py-1">參數設定</td>
-              <td className="text-center text-blue-600">手動指定</td>
-              <td className="text-center text-purple-600">自動搜索</td>
+              <td className="text-center text-sky-300">手動指定</td>
+              <td className="text-center text-violet-300">自動搜索</td>
             </tr>
-            <tr className="border-b border-gray-200">
+            <tr className="border-b border-white/10">
               <td className="py-1">結果數量</td>
-              <td className="text-center text-blue-600">單一結果</td>
-              <td className="text-center text-purple-600">多組結果</td>
+              <td className="text-center text-sky-300">單一結果</td>
+              <td className="text-center text-violet-300">多組結果</td>
             </tr>
             <tr>
               <td className="py-1">適用場景</td>
-              <td className="text-center text-blue-600">驗證策略</td>
-              <td className="text-center text-purple-600">發現策略</td>
+              <td className="text-center text-sky-300">驗證策略</td>
+              <td className="text-center text-violet-300">發現策略</td>
             </tr>
           </tbody>
         </table>
@@ -302,13 +302,13 @@ export default function TestModeSelector({
 
       {/* 當前選擇摘要 */}
       {selectedMode && (
-        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-          <span className="font-medium">當前模式:</span>{" "}
-          <span className="text-gray-900">{selectedMode.label}</span>
+        <div className="text-xs text-slate-300 bg-white/5 border border-white/10 p-2 rounded">
+          <span className="font-medium text-slate-200">當前模式:</span>{" "}
+          <span className="text-slate-100">{selectedMode.label}</span>
           {value.mode === "optuna" && value.optuna_trials && (
             <>
               {" - "}
-              <span className="text-purple-600 font-medium">
+              <span className="text-violet-300 font-medium">
                 {value.optuna_trials} 次試驗
               </span>
             </>

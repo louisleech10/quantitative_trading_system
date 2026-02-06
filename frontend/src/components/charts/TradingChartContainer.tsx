@@ -198,7 +198,7 @@ function TradingChartContainerInner({
   return (
     <div 
       ref={containerRef}
-      className="relative w-full bg-white rounded-lg shadow-md overflow-hidden"
+      className="relative w-full glass-panel rounded-xl overflow-hidden"
       style={{ height: `${totalHeight}px` }}
     >
       {/* 十字線疊層（貫穿三個圖表的灰色虛線） */}
@@ -208,7 +208,7 @@ function TradingChartContainerInner({
           style={{
             left: `${crosshairX}px`,
             width: '1px',
-            borderLeft: '1px dashed rgba(128, 128, 128, 0.5)',
+            borderLeft: '1px dashed rgba(255, 255, 255, 0.1)',
           }}
         />
       )}
@@ -217,13 +217,13 @@ function TradingChartContainerInner({
       <div className="relative w-full h-full flex flex-col">
         {!isInitialized ? (
           <div className="flex items-center justify-center w-full h-full">
-            <div className="text-gray-400 text-sm">初始化中...</div>
+            <div className="text-slate-400 text-sm">初始化中...</div>
           </div>
         ) : (
           <>
             {/* 1. Price Chart (K線圖) - 50% 高度 */}
             <div 
-              className="w-full border-b border-gray-200"
+              className="w-full border-b border-white/10"
               style={{ height: `${priceHeight}px` }}
             >
               <PriceChart
@@ -242,7 +242,7 @@ function TradingChartContainerInner({
 
         {/* 2. Volume Chart (成交量圖) - 30% 高度 */}
         <div 
-          className="w-full border-b border-gray-200"
+          className="w-full border-b border-white/10"
           style={{ height: `${volumeHeight}px` }}
         >
           <VolumeChart

@@ -44,13 +44,13 @@ export default function SingleCaseSHAPPanel({ taskId, caseId }: SingleCaseSHAPPa
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-50 rounded p-3">
-          <div className="text-sm text-gray-600">預測機率</div>
-          <div className="text-xl font-bold text-gray-900">{shapSingleCase.predicted_proba.toFixed(4)}</div>
+        <div className="bg-white/5 border border-white/10 rounded p-3">
+          <div className="text-sm text-slate-400">預測機率</div>
+          <div className="text-xl font-semibold text-slate-100">{shapSingleCase.predicted_proba.toFixed(4)}</div>
         </div>
-        <div className="bg-gray-50 rounded p-3">
-          <div className="text-sm text-gray-600">Expected Value</div>
-          <div className="text-xl font-bold text-gray-900">{shapSingleCase.expected_value.toFixed(4)}</div>
+        <div className="bg-white/5 border border-white/10 rounded p-3">
+          <div className="text-sm text-slate-400">Expected Value</div>
+          <div className="text-xl font-semibold text-slate-100">{shapSingleCase.expected_value.toFixed(4)}</div>
         </div>
       </div>
 
@@ -59,8 +59,8 @@ export default function SingleCaseSHAPPanel({ taskId, caseId }: SingleCaseSHAPPa
       <div className="space-y-2">
         {shapSingleCase.contributions.map((item) => (
           <div key={item.feature} className="flex justify-between text-sm">
-            <span className="font-mono text-gray-700 break-all">{item.feature}</span>
-            <span className={item.shap_value >= 0 ? 'text-green-600' : 'text-red-600'}>
+            <span className="font-mono text-slate-300 break-all">{item.feature}</span>
+            <span className={item.shap_value >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
               {item.shap_value.toFixed(4)} ({item.contribution_pct.toFixed(1)}%)
             </span>
           </div>

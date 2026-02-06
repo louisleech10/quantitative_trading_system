@@ -18,9 +18,9 @@ interface PieChartProps {
 
 // 預定義的顏色調色板
 const COLORS = [
-  '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#00ff00',
-  '#ff00ff', '#00ffff', '#ff0000', '#0000ff', '#ffff00',
-  '#ffa500', '#800080', '#008000', '#ff69b4', '#40e0d0'
+  '#60a5fa', '#fb7185', '#34d399', '#fbbf24', '#a78bfa',
+  '#f472b6', '#22d3ee', '#fb923c', '#2dd4bf', '#818cf8',
+  '#a3e635', '#c084fc', '#fb7185', '#38bdf8', '#e879f9'
 ];
 
 export const PieChart: React.FC<PieChartProps> = ({ 
@@ -32,7 +32,7 @@ export const PieChart: React.FC<PieChartProps> = ({
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center" style={{ width, height }}>
-        <p className="text-gray-500 text-sm">無數據</p>
+        <p className="text-slate-400 text-sm">無數據</p>
       </div>
     );
   }
@@ -48,7 +48,7 @@ export const PieChart: React.FC<PieChartProps> = ({
 
   return (
     <div className="w-full" style={{ width, height }}>
-      <h4 className="text-sm font-medium text-gray-700 mb-2 text-center">{title}</h4>
+      <h4 className="text-sm font-medium text-slate-200 mb-2 text-center">{title}</h4>
       {/* 增加上方的 padding 避免被切掉 */}
       <div style={{ paddingTop: '20px' }}>
         <ResponsiveContainer width="100%" height={height - 80}>
@@ -59,9 +59,9 @@ export const PieChart: React.FC<PieChartProps> = ({
               cy="50%"
               outerRadius={75}
               innerRadius={0}
-              fill="#8884d8"
+              fill="#60a5fa"
               dataKey="value"
-              stroke="#fff"
+              stroke="rgba(255,255,255,0.1)"
               strokeWidth={2}
             >
               {significantData.map((entry, index) => (
@@ -75,8 +75,8 @@ export const PieChart: React.FC<PieChartProps> = ({
               ]}
               contentStyle={{ 
                 fontSize: '12px',
-                backgroundColor: '#f9fafb',
-                border: '1px solid #e5e7eb',
+                backgroundColor: '#1a233a',
+                border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: '6px'
               }}
             />
@@ -108,11 +108,11 @@ export const MarketPhasePieChart: React.FC<{
 }> = ({ positiveData, negativeData }) => {
   // 定義市場階段顏色映射
   const marketPhaseColors: Record<string, string> = {
-    'EXTREME_FEAR': '#dc2626',  // 深紅色
-    'FEAR': '#ef4444',          // 紅色
-    'NEUTRAL': '#ffc658',       // 黃色
-    'GREED': '#82ca9d',         // 綠色
-    'EXTREME_GREED': '#22c55e'  // 深綠色
+    'EXTREME_FEAR': '#fb7185',
+    'FEAR': '#f43f5e',
+    'NEUTRAL': '#fbbf24',
+    'GREED': '#34d399',
+    'EXTREME_GREED': '#22c55e'
   };
 
   const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([phase, count]) => ({
@@ -156,12 +156,12 @@ export const HourDistributionPieChart: React.FC<{
 }> = ({ positiveData, negativeData }) => {
   // 定義24小時顏色映射（使用漸變色）
   const hourColors: Record<number, string> = {
-    0: '#1e3a8a', 1: '#1e40af', 2: '#1d4ed8', 3: '#2563eb',
-    4: '#3b82f6', 5: '#60a5fa', 6: '#93c5fd', 7: '#dbeafe',
-    8: '#fef3c7', 9: '#fde68a', 10: '#fcd34d', 11: '#fbbf24',
-    12: '#f59e0b', 13: '#f97316', 14: '#fb923c', 15: '#fdba74',
-    16: '#fed7aa', 17: '#ffedd5', 18: '#fce7f3', 19: '#fbcfe8',
-    20: '#f9a8d4', 21: '#f472b6', 22: '#ec4899', 23: '#db2777'
+    0: '#60a5fa', 1: '#4f8fe8', 2: '#3a7ed6', 3: '#2b6dc4',
+    4: '#60a5fa', 5: '#60a5fa', 6: '#93c5fd', 7: '#22d3ee',
+    8: '#fbbf24', 9: '#fbbf24', 10: '#fb923c', 11: '#fb923c',
+    12: '#fb7185', 13: '#f472b6', 14: '#c084fc', 15: '#a78bfa',
+    16: '#34d399', 17: '#2dd4bf', 18: '#a3e635', 19: '#84cc16',
+    20: '#38bdf8', 21: '#22d3ee', 22: '#818cf8', 23: '#e879f9'
   };
 
   const positiveChartData: PieChartData[] = Object.entries(positiveData)
@@ -211,13 +211,13 @@ export const DayOfWeekPieChart: React.FC<{
 
   // 定義星期顏色映射
   const dayColors: Record<string, string> = {
-    '週日': '#ef4444',  // 紅色
-    '週一': '#f97316',  // 橙色
-    '週二': '#f59e0b',  // 琥珀色
-    '週三': '#84cc16',  // 萊姆色
-    '週四': '#22c55e',  // 綠色
-    '週五': '#06b6d4',  // 青色
-    '週六': '#8b5cf6'   // 紫色
+    '週日': '#fb7185',
+    '週一': '#fb923c',
+    '週二': '#fbbf24',
+    '週三': '#a3e635',
+    '週四': '#34d399',
+    '週五': '#22d3ee',
+    '週六': '#a78bfa'
   };
 
   // 處理星期數，將 7 轉換為 0（週日）
@@ -278,19 +278,19 @@ export const MarketClassPieChart: React.FC<{
 }> = ({ positiveData, negativeData }) => {
   // 定義市場分類顏色映射 (使用中文名稱)
   const marketClassColors: Record<string, string> = {
-    '低位盤整': '#dc2626',   // C1 - 深紅色
-    '穩定震盪': '#ef4444',   // C2 - 紅色
-    '溫和上漲': '#84cc16',   // C3 - 淺綠色
-    '高位震盪': '#fbbf24',   // C4/C9 - 黃色
-    '標準盤整': '#8b5cf6',   // C5 - 紫色
-    '標準上漲': '#22c55e',   // C6 - 綠色
-    '活躍上漲': '#10b981',   // C7 - 深綠色
-    '劇烈震盪': '#f97316',   // C8 - 橙色
-    '強勁上漲': '#fb923c',   // C10 - 淺橙色
-    '強勁下跌': '#b91c1c',   // C11 - 極深紅色
-    '極端波動': '#7c2d12',   // C12 - 棕紅色
-    '其他組合': '#d1d5db',   // C13 - 灰色
-    '混合': '#9ca3af'        // 預設 - 深灰色
+    '低位盤整': '#fb7185',
+    '穩定震盪': '#fb7185',
+    '溫和上漲': '#a3e635',
+    '高位震盪': '#fbbf24',
+    '標準盤整': '#a78bfa',
+    '標準上漲': '#34d399',
+    '活躍上漲': '#2dd4bf',
+    '劇烈震盪': '#fb923c',
+    '強勁上漲': '#fb923c',
+    '強勁下跌': '#fb7185',
+    '極端波動': '#e879f9',
+    '其他組合': '#64748b',
+    '混合': '#64748b'
   };
 
   const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([marketClass, count]) => ({
@@ -334,10 +334,10 @@ export const DifficultyPieChart: React.FC<{
 }> = ({ positiveData, negativeData }) => {
   // 定義難度顏色映射
   const difficultyColors: Record<string, string> = {
-    '簡單': '#82ca9d',  // 綠色
-    '中等': '#ffc658',  // 橙色
-    '困難': '#ff7300',  // 深橙色
-    '混合': '#d1d5db'   // 灰色
+    '簡單': '#34d399',
+    '中等': '#fbbf24',
+    '困難': '#fb923c',
+    '混合': '#64748b'
   };
 
   const positiveChartData: PieChartData[] = Object.entries(positiveData).map(([difficulty, count]) => ({

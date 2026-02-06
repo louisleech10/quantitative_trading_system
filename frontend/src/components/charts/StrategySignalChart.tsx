@@ -318,14 +318,14 @@ export function StrategySignalChart({
           markers.push({
             time: toUtcTime(toTimestamp),
             position: "aboveBar" as const,
-            color: "#2196F3", // 藍色 - TO
+            color: "#60a5fa", // 藍色 - TO
             shape: "arrowDown" as const,
             text: "TO",
           });
           markers.push({
             time: toUtcTime(tcTimestamp),
             position: "aboveBar" as const,
-            color: "#FF9800", // 橙色 - TC
+            color: "#fb923c", // 橙色 - TC
             shape: "arrowDown" as const,
             text: "TC",
           });
@@ -345,7 +345,7 @@ export function StrategySignalChart({
       if (showSignalMarkers && signalPoints.length > 0) {
         signalPoints.forEach((signal) => {
           // 根據 windowType 決定顏色: 近期窗口藍色，遠期窗口土黃色
-          const color = signal.windowType === 'near' ? '#3B82F6' : '#CA8A04';
+          const color = signal.windowType === 'near' ? '#60a5fa' : '#fbbf24';
           const text = signal.windowType === 'near' ? 'N' : 'F';
           
           markers.push({
@@ -548,26 +548,26 @@ export function StrategySignalChart({
 
   return (
     <div
-      className="w-full flex flex-col bg-[#1e1e1e]"
+      className="w-full flex flex-col bg-[#0A0F1C]"
       style={{ height: `${height}px` }}
     >
       {/* 頂部資訊欄 */}
-      <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between">
+      <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-semibold text-gray-100">
+          <h3 className="text-sm font-semibold text-slate-100">
             {symbol} / {timeframe}
           </h3>
-          <span className="text-xs text-gray-400">策略信號圖表</span>
+          <span className="text-xs text-slate-400">策略信號圖表</span>
 
           {/* 信號統計 - 顯示 Near(藍) 和 Far(土黃) 計數 */}
           {showSignalMarkers && signalPoints.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
-                <span style={{ color: '#3B82F6' }}>▼</span>
+              <span className="text-xs px-2 py-0.5 bg-blue-400/15 text-blue-300 rounded flex items-center gap-1">
+                <span style={{ color: '#60a5fa' }}>▼</span>
                 N: {signalPoints.filter(s => s.windowType === 'near').length}
               </span>
-              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded flex items-center gap-1">
-                <span style={{ color: '#CA8A04' }}>▼</span>
+              <span className="text-xs px-2 py-0.5 bg-amber-400/15 text-amber-300 rounded flex items-center gap-1">
+                <span style={{ color: '#fbbf24' }}>▼</span>
                 F: {signalPoints.filter(s => s.windowType === 'far').length}
               </span>
             </div>
@@ -577,28 +577,28 @@ export function StrategySignalChart({
         {/* OHLCV 懸停資訊 */}
         {hoveredData && (
           <div className="flex items-center gap-3 text-xs flex-wrap">
-            <span className="text-gray-300">
+            <span className="text-slate-300">
               O: <span className="font-mono">{formatPrice(hoveredData.open)}</span>
             </span>
-            <span className="text-gray-300">
+            <span className="text-slate-300">
               H: <span className="font-mono">{formatPrice(hoveredData.high)}</span>
             </span>
-            <span className="text-gray-300">
+            <span className="text-slate-300">
               L: <span className="font-mono">{formatPrice(hoveredData.low)}</span>
             </span>
-            <span className="text-gray-300">
+            <span className="text-slate-300">
               C:{" "}
               <span
                 className={`font-mono ${
                   hoveredData.close >= hoveredData.open
-                    ? "text-green-400"
-                    : "text-red-400"
+                    ? "text-emerald-400"
+                    : "text-rose-400"
                 }`}
               >
                 {formatPrice(hoveredData.close)}
               </span>
             </span>
-            <span className="text-gray-300">
+            <span className="text-slate-300">
               V: <span className="font-mono">{formatVolume(hoveredData.volume)}</span>
             </span>
             {/* 指標值顯示 */}
@@ -606,7 +606,7 @@ export function StrategySignalChart({
               const value = hoveredIndicators[series.id];
               if (value === undefined) return null;
               return (
-                <span key={series.id} className="text-gray-300">
+                <span key={series.id} className="text-slate-300">
                   <span style={{ color: series.color }}>●</span>{" "}
                   {series.label || series.id}:{" "}
                   <span className="font-mono" style={{ color: series.color }}>
@@ -615,7 +615,7 @@ export function StrategySignalChart({
                 </span>
               );
             })}
-            <span className="text-gray-500">
+            <span className="text-slate-500">
               {formatTime(hoveredData.timestamp)}
             </span>
           </div>
@@ -631,8 +631,8 @@ export function StrategySignalChart({
 
         {/* 錯誤提示 */}
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e]">
-            <div className="text-sm text-red-400">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A0F1C]">
+            <div className="text-sm text-rose-400">
               <span className="mr-2">⚠️</span>
               {error}
             </div>
@@ -641,26 +641,26 @@ export function StrategySignalChart({
 
         {/* 載入中提示 */}
         {!isReady && !error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e]">
-            <div className="text-sm text-gray-400">載入圖表中...</div>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A0F1C]">
+            <div className="text-sm text-slate-400">載入圖表中...</div>
           </div>
         )}
       </div>
 
       {/* 底部信號詳情 (懸停時顯示) */}
       {hoveredSignal && (
-        <div className="px-4 py-2 border-t border-green-200 bg-green-50">
+        <div className="px-4 py-2 border-t border-emerald-400/30 bg-emerald-400/10">
           <div className="flex items-center gap-4 text-xs">
-            <span className="font-semibold text-green-700">📍 信號詳情:</span>
+            <span className="font-semibold text-emerald-300">📍 信號詳情:</span>
             {Object.entries(hoveredSignal.indicator_values).map(
               ([key, value]) => (
-                <span key={key} className="text-gray-700">
+                <span key={key} className="text-slate-300">
                   {key}: <span className="font-mono">{value.toFixed(2)}</span>
                 </span>
               )
             )}
             {hoveredSignal.signal_density !== undefined && (
-              <span className="text-gray-700">
+              <span className="text-slate-300">
                 密度:{" "}
                 <span className="font-mono">
                   {(hoveredSignal.signal_density * 100).toFixed(1)}%

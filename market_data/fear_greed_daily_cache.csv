@@ -1,5 +1,4 @@
 date,timestamp,value,classification,week_start
-2020-08-15,1597449600,79,Extreme Greed,2020-08-10
 2020-08-16,1597536000,82,Extreme Greed,2020-08-10
 2020-08-17,1597622400,83,Extreme Greed,2020-08-17
 2020-08-18,1597708800,82,Extreme Greed,2020-08-17
@@ -1999,3 +1998,4 @@ date,timestamp,value,classification,week_start
 2026-02-03,1770076800,17,Extreme Fear,2026-02-02
 2026-02-04,1770163200,14,Extreme Fear,2026-02-02
 2026-02-05,1770249600,12,Extreme Fear,2026-02-02
+2026-02-06,1770336000,9,Extreme Fear,2026-02-02

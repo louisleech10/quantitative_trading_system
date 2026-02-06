@@ -53,10 +53,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-[200px] flex items-center justify-center p-6">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 max-w-md">
+          <div className="glass-panel border border-rose-400/30 rounded-lg p-6 max-w-md">
             <div className="flex items-start">
               <svg
-                className="w-6 h-6 text-red-600 dark:text-red-400 mr-3 flex-shrink-0"
+                className="w-6 h-6 text-rose-400 mr-3 flex-shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -69,15 +69,15 @@ export class ErrorBoundary extends Component<Props, State> {
                 />
               </svg>
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1">
+                <h3 className="text-sm font-semibold text-rose-100 mb-1">
                   組件渲染錯誤
                 </h3>
-                <p className="text-sm text-red-700 dark:text-red-300">
+                <p className="text-sm text-rose-200">
                   {this.state.error?.message || '發生未知錯誤'}
                 </p>
                 <button
                   onClick={() => this.setState({ hasError: false, error: null })}
-                  className="mt-3 text-sm text-red-800 dark:text-red-200 underline hover:no-underline"
+                  className="mt-3 text-sm text-rose-200 underline hover:text-rose-100"
                 >
                   重試
                 </button>

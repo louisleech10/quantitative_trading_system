@@ -347,9 +347,9 @@ export default function OptimizationResultPage() {
                   {completedTrials} / {totalTrials} trials ({percentage.toFixed(1)}%)
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
                 <div
-                  className="bg-purple-600 h-full transition-all duration-500 ease-out"
+                  className="bg-emerald-500 h-full transition-all duration-500 ease-out"
                   style={{ width: `${percentage}%` }}
                 />
               </div>
@@ -359,7 +359,7 @@ export default function OptimizationResultPage() {
             {bestValue !== null && bestValue !== undefined && (
               <div className="flex items-center justify-between p-4 bg-muted rounded-md">
                 <span className="text-sm font-medium">當前最佳值</span>
-                <span className="text-lg font-bold text-green-600">{bestValue.toFixed(4)}</span>
+                <span className="text-lg font-bold text-emerald-300">{bestValue.toFixed(4)}</span>
               </div>
             )}
 

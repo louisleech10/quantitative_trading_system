@@ -28,18 +28,18 @@ export default function ValidationTab() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium mb-4">校準曲線</h3>
+        <div className="glass-panel rounded-xl p-4">
+          <h3 className="text-lg font-medium text-slate-100 mb-4">校準曲線</h3>
           <CalibrationCurveChart data={calibrationCurve} loading={deepAnalysisLoading.calibration} />
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium mb-4">PR 曲線</h3>
+        <div className="glass-panel rounded-xl p-4">
+          <h3 className="text-lg font-medium text-slate-100 mb-4">PR 曲線</h3>
           <PRCurveChart data={prCurve} loading={deepAnalysisLoading.pr} />
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-medium mb-4">機率分佈密度</h3>
+      <div className="glass-panel rounded-xl p-4">
+        <h3 className="text-lg font-medium text-slate-100 mb-4">機率分佈密度</h3>
         <ProbabilityDensityChart data={probabilityDensity} loading={deepAnalysisLoading.density} />
       </div>
     </div>

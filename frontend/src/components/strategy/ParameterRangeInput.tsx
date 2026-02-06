@@ -135,7 +135,7 @@ export default function ParameterRangeInput({
       <div className="grid grid-cols-3 gap-4">
         {/* 短期 EMA */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-slate-300 mb-1">
             短期 EMA
           </label>
           <input
@@ -152,20 +152,22 @@ export default function ParameterRangeInput({
               w-full px-3 py-2 border rounded-lg text-sm
               ${
                 hasError("ema_short")
-                  ? "border-red-300 bg-red-50"
-                  : "border-gray-300"
+                  ? "border-rose-400/60 bg-rose-500/10"
+                  : "border-white/10 bg-white/5"
               }
-              ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+              text-slate-100 placeholder:text-slate-500
+              focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/30
+              ${disabled ? "opacity-60 cursor-not-allowed" : ""}
             `}
             min={1}
             max={200}
           />
-          <div className="text-xs text-gray-500 mt-1">建議: 5-10</div>
+          <div className="text-xs text-slate-400 mt-1">建議: 5-10</div>
         </div>
 
         {/* 中期 EMA */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-slate-300 mb-1">
             中期 EMA
           </label>
           <input
@@ -182,17 +184,19 @@ export default function ParameterRangeInput({
               w-full px-3 py-2 border rounded-lg text-sm
               ${
                 hasError("ema_mid")
-                  ? "border-red-300 bg-red-50"
-                  : "border-gray-300"
+                  ? "border-rose-400/60 bg-rose-500/10"
+                  : "border-white/10 bg-white/5"
               }
-              ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+              text-slate-100 placeholder:text-slate-500
+              focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/30
+              ${disabled ? "opacity-60 cursor-not-allowed" : ""}
             `}
             min={1}
             max={200}
           />
-          <div className="text-xs text-gray-500 mt-1">建議: 15-20</div>
+          <div className="text-xs text-slate-400 mt-1">建議: 15-20</div>
           {hasError("ema_mid") && (
-            <div className="text-xs text-red-600 mt-1">
+            <div className="text-xs text-rose-300 mt-1">
               {getError("ema_mid")}
             </div>
           )}
@@ -200,7 +204,7 @@ export default function ParameterRangeInput({
 
         {/* 長期 EMA */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="block text-xs font-medium text-slate-300 mb-1">
             長期 EMA
           </label>
           <input
@@ -217,17 +221,19 @@ export default function ParameterRangeInput({
               w-full px-3 py-2 border rounded-lg text-sm
               ${
                 hasError("ema_long")
-                  ? "border-red-300 bg-red-50"
-                  : "border-gray-300"
+                  ? "border-rose-400/60 bg-rose-500/10"
+                  : "border-white/10 bg-white/5"
               }
-              ${disabled ? "bg-gray-100 cursor-not-allowed" : ""}
+              text-slate-100 placeholder:text-slate-500
+              focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/30
+              ${disabled ? "opacity-60 cursor-not-allowed" : ""}
             `}
             min={1}
             max={200}
           />
-          <div className="text-xs text-gray-500 mt-1">建議: 30-40</div>
+          <div className="text-xs text-slate-400 mt-1">建議: 30-40</div>
           {hasError("ema_long") && (
-            <div className="text-xs text-red-600 mt-1">
+            <div className="text-xs text-rose-300 mt-1">
               {getError("ema_long")}
             </div>
           )}
@@ -248,13 +254,13 @@ export default function ParameterRangeInput({
       range: ParameterRange,
       suggestion: string
     ) => (
-      <div className={hasError(field) ? "bg-red-50 p-3 rounded-lg" : ""}>
-        <label className="block text-xs font-medium text-gray-700 mb-2">
+      <div className={hasError(field) ? "bg-rose-500/10 border border-rose-500/30 p-3 rounded-lg" : ""}>
+        <label className="block text-xs font-medium text-slate-300 mb-2">
           {label}
         </label>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">最小值</label>
+            <label className="block text-xs text-slate-400 mb-1">最小值</label>
             <input
               type="number"
               value={range.min}
@@ -265,13 +271,13 @@ export default function ParameterRangeInput({
                 })
               }
               disabled={disabled}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+              className="w-full px-2 py-1.5 border border-white/10 rounded text-sm bg-white/5 text-slate-100 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
               min={1}
               max={200}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">最大值</label>
+            <label className="block text-xs text-slate-400 mb-1">最大值</label>
             <input
               type="number"
               value={range.max}
@@ -282,13 +288,13 @@ export default function ParameterRangeInput({
                 })
               }
               disabled={disabled}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+              className="w-full px-2 py-1.5 border border-white/10 rounded text-sm bg-white/5 text-slate-100 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
               min={1}
               max={200}
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">步長</label>
+            <label className="block text-xs text-slate-400 mb-1">步長</label>
             <input
               type="number"
               value={range.step}
@@ -299,20 +305,20 @@ export default function ParameterRangeInput({
                 })
               }
               disabled={disabled}
-              className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+              className="w-full px-2 py-1.5 border border-white/10 rounded text-sm bg-white/5 text-slate-100 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400/30"
               min={1}
               max={10}
             />
           </div>
         </div>
         <div className="flex items-center justify-between mt-1">
-          <div className="text-xs text-gray-500">{suggestion}</div>
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-slate-400">{suggestion}</div>
+          <div className="text-xs text-slate-300">
             範圍: {range.min} - {range.max}
           </div>
         </div>
         {hasError(field) && (
-          <div className="text-xs text-red-600 mt-2 font-medium">
+          <div className="text-xs text-rose-300 mt-2 font-medium">
             ⚠️ {getError(field)}
           </div>
         )}
@@ -332,10 +338,10 @@ export default function ParameterRangeInput({
     <div className={`space-y-3 ${className}`}>
       {/* 標題 */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-200 mb-1">
           EMA 參數{mode === "optuna" ? "範圍" : "設定"}
         </label>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-slate-400">
           {mode === "optuna"
             ? "設定 Optuna 優化的參數搜索範圍"
             : "設定固定的 EMA 參數值"}
@@ -347,16 +353,16 @@ export default function ParameterRangeInput({
 
       {/* 驗證狀態 */}
       {errors.length === 0 ? (
-        <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 p-2 rounded">
+        <div className="flex items-center gap-2 text-xs text-emerald-200 bg-emerald-500/10 border border-emerald-500/30 p-2 rounded">
           <span>✅</span>
           <span>參數驗證通過</span>
         </div>
       ) : (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-2">
-          <div className="text-xs font-medium text-red-700 mb-1">
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-2">
+          <div className="text-xs font-medium text-rose-200 mb-1">
             ⚠️ 參數驗證失敗
           </div>
-          <ul className="text-xs text-red-600 space-y-1">
+          <ul className="text-xs text-rose-200/80 space-y-1">
             {errors.map((err, idx) => (
               <li key={idx}>• {err.message}</li>
             ))}
@@ -365,10 +371,10 @@ export default function ParameterRangeInput({
       )}
 
       {/* 約束條件提示 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-        <div className="text-xs text-blue-700">
+      <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-2">
+        <div className="text-xs text-sky-200">
           <div className="font-medium mb-1">參數約束條件:</div>
-          <div className="text-blue-600">
+          <div className="text-sky-200/80">
             {mode === "optuna" ? (
               <>
                 • 短期最大值 &lt; 中期最小值 &lt; 中期最大值 &lt; 長期最小值

@@ -40,16 +40,16 @@ export default function NaiveStrategyEquityChart({ data, loading }: NaiveStrateg
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="ts" tickFormatter={formatTs} />
             <YAxis />
             <Tooltip formatter={(value: any) => Number(value).toFixed(4)} labelFormatter={(label) => formatTs(Number(label))} />
-            <Line type="monotone" dataKey="strategy" stroke="#10b981" dot={false} name="策略" />
-            <Line type="monotone" dataKey="benchmark" stroke="#3b82f6" dot={false} name="基準" />
+            <Line type="monotone" dataKey="strategy" stroke="#34d399" dot={false} name="策略" />
+            <Line type="monotone" dataKey="benchmark" stroke="#60a5fa" dot={false} name="基準" />
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="text-xs text-gray-500 mt-2">
+      <div className="text-xs text-slate-400 mt-2">
         策略報酬: {data.final_return_pct.strategy.toFixed(2)}% ｜ 基準: {data.final_return_pct.benchmark.toFixed(2)}%
       </div>
     </div>

@@ -146,7 +146,7 @@ export function TestChart({
       const tMarker = {
         time: chartData.case_timestamp as any,
         position: 'aboveBar' as const,
-        color: '#ff1744',
+        color: '#fb7185',
         shape: 'arrowDown' as const,
         text: 'T',
       };
@@ -168,15 +168,15 @@ export function TestChart({
   return (
     <div className="w-full h-full flex flex-col">
       {/* 信息欄 */}
-      <div className="p-4 bg-white border-b">
-        <h3 className="text-lg font-semibold text-gray-900">
+      <div className="p-4 glass-panel border-b border-white/10">
+        <h3 className="text-lg font-semibold text-slate-100">
           測試圖表：{symbol} / {timeframe}
         </h3>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-400">
           案例時間點T：{formatTime(caseTimestamp)}
         </p>
         {chartData && (
-          <div className="mt-2 text-sm text-gray-600">
+          <div className="mt-2 text-sm text-slate-400">
             <p>
               數據範圍：{formatTime(chartData.metadata.time_range.start)} 至{' '}
               {formatTime(chartData.metadata.time_range.end)}
@@ -191,23 +191,23 @@ export function TestChart({
       {/* 圖表容器 */}
       <div className="flex-1 relative">
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1a233a]/90 backdrop-blur-xl z-10">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-              <p className="text-gray-600">載入圖表數據中...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-100 mx-auto mb-4"></div>
+              <p className="text-slate-400">載入圖表數據中...</p>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-10 p-8">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#1a233a]/90 backdrop-blur-xl z-10 p-8">
             <div className="max-w-md text-center">
-              <div className="text-red-500 text-4xl mb-4">⚠️</div>
-              <h4 className="text-lg font-semibold text-gray-900 mb-2">載入失敗</h4>
-              <p className="text-red-600">{error}</p>
+              <div className="text-rose-400 text-4xl mb-4">⚠️</div>
+              <h4 className="text-lg font-semibold text-slate-100 mb-2">載入失敗</h4>
+              <p className="text-rose-300">{error}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="mt-4 px-4 py-2 bg-blue-500/20 text-blue-100 border border-blue-500/40 rounded hover:bg-blue-500/30"
               >
                 重試
               </button>

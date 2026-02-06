@@ -72,26 +72,26 @@ export default function PatternsPage() {
   };
   
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-950/40">
       {/* 頁面標題 */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-slate-950/80 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">樣式發現系統</h1>
-              <p className="text-gray-600">Pattern Discovery & Management</p>
+              <h1 className="text-3xl font-semibold text-slate-100 mb-2">樣式發現系統</h1>
+              <p className="text-slate-400">Pattern Discovery & Management</p>
             </div>
             <div className="flex gap-3">
               <Link
                 href="/patterns/xgboost-analysis"
-                className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700"
+                className="px-6 py-3 bg-emerald-500/20 text-emerald-100 rounded-lg font-semibold border border-emerald-400/40 hover:bg-emerald-500/30"
               >
                 🧠 XGBoost 分析
               </Link>
               {patterns.length > 0 && (
                 <button
                   onClick={handleDeleteAll}
-                  className="px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 flex items-center gap-2"
+                  className="px-6 py-3 bg-rose-500/20 text-rose-100 rounded-lg font-semibold border border-rose-400/40 hover:bg-rose-500/30 flex items-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
                   全部刪除
@@ -103,15 +103,15 @@ export default function PatternsPage() {
       </div>
       
       {/* 分頁導航 */}
-      <div className="bg-white border-b">
+      <div className="bg-slate-950/80 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('list')}
               className={`px-6 py-3 font-semibold border-b-2 transition-colors ${
                 activeTab === 'list'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-emerald-400 text-emerald-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               樣式列表
@@ -120,8 +120,8 @@ export default function PatternsPage() {
               onClick={() => setActiveTab('statistics')}
               className={`px-6 py-3 font-semibold border-b-2 transition-colors ${
                 activeTab === 'statistics'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-emerald-400 text-emerald-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               統計分析
@@ -130,8 +130,8 @@ export default function PatternsPage() {
               onClick={() => setActiveTab('comparison')}
               className={`px-6 py-3 font-semibold border-b-2 transition-colors ${
                 activeTab === 'comparison'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-emerald-400 text-emerald-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
               }`}
             >
               樣式比較
@@ -144,7 +144,7 @@ export default function PatternsPage() {
       <div className="max-w-7xl mx-auto px-6 py-6">
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">載入中...</p>
+            <p className="text-slate-400 text-lg">載入中...</p>
           </div>
         ) : (
           <>

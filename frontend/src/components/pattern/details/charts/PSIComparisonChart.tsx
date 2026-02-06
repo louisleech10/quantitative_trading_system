@@ -40,7 +40,7 @@ export default function PSIComparisonChart({ data, loading, selectedFeature, onF
         <select
           value={activeFeature}
           onChange={(e) => onFeatureSelect?.(e.target.value)}
-          className="border rounded px-2 py-1 text-sm"
+          className="border border-white/10 bg-white/5 rounded px-2 py-1 text-sm text-slate-100"
         >
           {featureOptions.map(feature => (
             <option key={feature} value={feature}>{feature}</option>
@@ -51,12 +51,12 @@ export default function PSIComparisonChart({ data, loading, selectedFeature, onF
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="bin" tickFormatter={(v) => Number(v).toFixed(2)} />
             <YAxis />
             <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
-            <Bar dataKey="train_pct" fill="#3b82f6" name="訓練分佈" />
-            <Bar dataKey="test_pct" fill="#f59e0b" name="OOT 分佈" />
+            <Bar dataKey="train_pct" fill="#60a5fa" name="訓練分佈" />
+            <Bar dataKey="test_pct" fill="#fbbf24" name="OOT 分佈" />
           </BarChart>
         </ResponsiveContainer>
       </div>

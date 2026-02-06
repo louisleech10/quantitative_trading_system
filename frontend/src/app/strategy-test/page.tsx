@@ -830,15 +830,15 @@ function StrategyTestPageContent() {
     STRATEGY_GUIDES[state.strategyLogic] ?? STRATEGY_GUIDES.three_line;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-slate-200 bg-white">
+    <div className="min-h-screen bg-slate-950/40">
+      <div className="border-b border-slate-800/80 bg-slate-950/80">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-3 text-sm text-slate-500">
-              <span className="flex items-center gap-1 text-indigo-600">
+            <div className="flex items-center gap-3 text-sm text-slate-400">
+              <span className="flex items-center gap-1 text-emerald-300">
                 <Layers className="h-4 w-4" /> Phase 3.2
               </span>
-              <ChevronRight className="h-4 w-4 text-slate-400" />
+              <ChevronRight className="h-4 w-4 text-slate-500" />
               <span>雙窗口密度 / 策略測試</span>
             </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
@@ -846,13 +846,13 @@ function StrategyTestPageContent() {
                 type="text"
                 value={state.strategyName}
                 onChange={(event) => setField("strategyName", event.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-4 py-2 text-lg font-semibold text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2 text-lg font-semibold text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
                 placeholder="輸入策略名稱"
               />
               <button
                 type="button"
                 onClick={() => setTemplatePanelOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900/60"
               >
                 <Database className="h-4 w-4" /> 管理範本
               </button>
@@ -861,7 +861,7 @@ function StrategyTestPageContent() {
               value={state.strategyDescription ?? ""}
               onChange={(event) => setField("strategyDescription", event.target.value)}
               rows={2}
-              className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm text-slate-200 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/30"
               placeholder="補充策略說明、假設或使用情境..."
             />
           </div>
@@ -869,21 +869,21 @@ function StrategyTestPageContent() {
             <button
               type="button"
               onClick={handleSaveTemplate}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-100"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/20"
             >
               <Save className="h-4 w-4" /> 保存範本
             </button>
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900/60"
             >
               <Trash2 className="h-4 w-4" /> 清除
             </button>
             <button
               type="button"
               onClick={handleViewCharts}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 border border-slate-700 transition hover:bg-slate-800"
             >
               <LineChart className="h-4 w-4" /> 查看圖表
             </button>
@@ -915,16 +915,16 @@ function StrategyTestPageContent() {
                   value={state.strategyLogic}
                   onChange={(value) => setField("strategyLogic", value ?? "three_line")}
                 />
-                <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+                <div className="rounded-lg border border-slate-800/80 bg-slate-900/40 px-3 py-3 text-xs text-slate-300">
                   <div className="flex items-center gap-2">
-                    <p className="font-semibold text-slate-800">
+                    <p className="font-semibold text-slate-100">
                       {currentStrategyGuide.title}
                     </p>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                         currentStrategyGuide.status === "active"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-200 text-slate-600"
+                          ? "bg-emerald-500/20 text-emerald-200"
+                          : "bg-slate-800 text-slate-400"
                       }`}
                     >
                       {currentStrategyGuide.status === "active" ? "已啟用" : "開發中"}
@@ -933,11 +933,11 @@ function StrategyTestPageContent() {
                       <span className="text-[10px] text-slate-500">{currentStrategyGuide.note}</span>
                     )}
                   </div>
-                  <p className="mt-2 leading-relaxed text-slate-600">
+                  <p className="mt-2 leading-relaxed text-slate-300">
                     {currentStrategyGuide.description}
                   </p>
                   {currentStrategyGuide.bullets && (
-                    <ul className="mt-2 list-inside list-disc space-y-1 text-[11px] text-slate-500">
+                    <ul className="mt-2 list-inside list-disc space-y-1 text-[11px] text-slate-400">
                       {currentStrategyGuide.bullets.map((tip, index) => (
                         <li key={`${currentStrategyGuide.title}-${index}`}>{tip}</li>
                       ))}
@@ -986,7 +986,7 @@ function StrategyTestPageContent() {
                 <button
                   type="button"
                   onClick={handleApplyDualWindowPreset}
-                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-medium text-purple-700 transition hover:bg-purple-100"
+                  className="inline-flex items-center gap-2 rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200 transition hover:bg-sky-500/20"
                 >
                   套用 Near 24 / Far 100 預設
                 </button>
@@ -1005,7 +1005,7 @@ function StrategyTestPageContent() {
               <div className="space-y-4">
                 {/* 多選交易對選擇器 */}
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-600">交易對選擇</label>
+                  <label className="text-xs font-medium text-slate-400">交易對選擇</label>
                   <SymbolMultiSelect
                     value={state.symbols}
                     onChange={(symbols) => setField("symbols", symbols)}
@@ -1032,12 +1032,12 @@ function StrategyTestPageContent() {
                     })
                   }
                 />
-                <label className="flex items-center gap-2 text-sm text-slate-600">
+                <label className="flex items-center gap-2 text-sm text-slate-400">
                   <input
                     type="checkbox"
                     checked={state.syncToUrl}
                     onChange={(event) => setField("syncToUrl", event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    className="h-4 w-4 rounded border-slate-600 text-emerald-400 focus:ring-emerald-400"
                   />
                   轉跳 /charts 時同步參數至 URL
                 </label>
@@ -1046,7 +1046,7 @@ function StrategyTestPageContent() {
 
             <AccordionItem id="optimizer" title="優化參數" badge={`${(state.clusteringWeight * 100).toFixed(0)}% 聚集權重`}>
               <div className="space-y-3">
-                <label className="text-sm font-medium text-slate-700">clustering_weight (0=只看區分度, 1=只看聚集度)</label>
+                <label className="text-sm font-medium text-slate-300">clustering_weight (0=只看區分度, 1=只看聚集度)</label>
                 <input
                   type="range"
                   min={0}
@@ -1056,9 +1056,9 @@ function StrategyTestPageContent() {
                   onChange={(event) => setField("clusteringWeight", Number(event.target.value))}
                   className="w-full"
                 />
-                <div className="flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>偏重 Near/Far Ratio</span>
-                  <span className="font-semibold text-slate-700">{state.clusteringWeight.toFixed(2)}</span>
+                  <span className="font-semibold text-slate-200">{state.clusteringWeight.toFixed(2)}</span>
                   <span>偏重 正反例區分</span>
                 </div>
               </div>
@@ -1081,7 +1081,7 @@ function StrategyTestPageContent() {
             type="button"
             disabled={isRunning || isOptimizing}
             onClick={handleRunTest}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-300"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-100 border border-emerald-400/40 shadow-sm transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:bg-slate-700/60 disabled:text-slate-400"
           >
             {isRunning ? (
               <>
@@ -1100,7 +1100,7 @@ function StrategyTestPageContent() {
               type="button"
               disabled={isOptimizing || isRunning}
               onClick={handleStartOptimization}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-purple-300"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-500/20 px-4 py-3 text-sm font-semibold text-sky-100 border border-sky-400/40 shadow-sm transition hover:bg-sky-500/30 disabled:cursor-not-allowed disabled:bg-slate-700/60 disabled:text-slate-400"
             >
               {isOptimizing ? (
                 <>
@@ -1115,7 +1115,7 @@ function StrategyTestPageContent() {
           )}
 
           {validationErrors.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-xs text-amber-200">
               <div className="mb-1 font-semibold">需先修正：</div>
               <ul className="list-inside list-disc space-y-1">
                 {validationErrors.map((error) => (
@@ -1127,17 +1127,17 @@ function StrategyTestPageContent() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="glass-panel rounded-xl border border-slate-800/80 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm uppercase tracking-wide text-slate-500">密度統計</p>
-                <h2 className="text-2xl font-semibold text-slate-900">模型指標</h2>
+                <p className="text-sm uppercase tracking-wide text-slate-400">密度統計</p>
+                <h2 className="text-2xl font-semibold text-slate-100">模型指標</h2>
               </div>
-              <BarChart2 className="h-6 w-6 text-indigo-500" />
+              <BarChart2 className="h-6 w-6 text-emerald-300" />
             </div>
             {/* 正例密度指標 */}
             <div className="mt-5">
-              <div className="text-sm font-semibold text-slate-700 mb-3">正例密度指標</div>
+              <div className="text-sm font-semibold text-slate-200 mb-3">正例密度指標</div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {densityMetrics?.positive_avg_density !== undefined && (
                   <StatMetricCard
@@ -1203,7 +1203,7 @@ function StrategyTestPageContent() {
 
             {/* 反例密度指標 */}
             <div className="mt-5">
-              <div className="text-sm font-semibold text-slate-700 mb-3">反例密度指標</div>
+              <div className="text-sm font-semibold text-slate-200 mb-3">反例密度指標</div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {densityMetrics?.negative_avg_density !== undefined && (
                   <StatMetricCard
@@ -1259,7 +1259,7 @@ function StrategyTestPageContent() {
             {/* M 值優化指標 (Golden Formula v2.0) */}
             {(densityMetrics?.m_separation !== undefined || densityMetrics?.optuna_golden_score !== undefined) && (
               <div className="mt-5">
-                <div className="text-sm font-semibold text-slate-700 mb-3">M 值優化指標</div>
+                <div className="text-sm font-semibold text-slate-200 mb-3">M 值優化指標</div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {densityMetrics?.m_separation !== undefined && (
                     <StatMetricCard
@@ -1314,7 +1314,7 @@ function StrategyTestPageContent() {
 
             {/* 統計檢驗指標 */}
             <div className="mt-5">
-              <div className="text-sm font-semibold text-slate-700 mb-3">統計檢驗指標</div>
+              <div className="text-sm font-semibold text-slate-200 mb-3">統計檢驗指標</div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {densityMetrics?.separation !== undefined && (
                   <StatMetricCard
@@ -1384,20 +1384,20 @@ function StrategyTestPageContent() {
 
             {/* 樣本不足警告 */}
             {densityMetrics?.sample_warnings && densityMetrics.sample_warnings.length > 0 && (
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <div className="flex items-center gap-2 text-amber-800">
+              <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-500/10 p-4">
+                <div className="flex items-center gap-2 text-amber-200">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <span className="text-sm font-medium">樣本警告</span>
                 </div>
-                <ul className="mt-2 list-inside list-disc text-xs text-amber-700">
+                <ul className="mt-2 list-inside list-disc text-xs text-amber-200/80">
                   {densityMetrics.sample_warnings.map((warning, i) => (
                     <li key={i}>{warning}</li>
                   ))}
                 </ul>
                 {densityMetrics.excluded_months_count !== undefined && densityMetrics.excluded_months_count > 0 && (
-                  <p className="mt-2 text-xs text-amber-600">
+                  <p className="mt-2 text-xs text-amber-200/70">
                     {densityMetrics.excluded_months_count} 個月份因樣本不足被排除於穩定性計算
                     {densityMetrics.included_months_count !== undefined && (
                       <span>（納入 {densityMetrics.included_months_count} 個月份）</span>
@@ -1411,53 +1411,53 @@ function StrategyTestPageContent() {
             {(densityMetrics?.positive_far_zero_count !== undefined ||
               densityMetrics?.negative_far_zero_count !== undefined) && (
               <div className="mt-5">
-                <div className="text-sm font-semibold text-slate-700 mb-3">零值統計 (透明化)</div>
+                <div className="text-sm font-semibold text-slate-200 mb-3">零值統計 (透明化)</div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="text-sm font-medium text-gray-600 mb-1">正例 Near=0</div>
-                    <div className="text-2xl font-bold text-gray-900">
+                  <div className="glass-panel p-4 rounded-lg border border-slate-800/80">
+                    <div className="text-sm font-medium text-slate-400 mb-1">正例 Near=0</div>
+                    <div className="text-2xl font-bold text-slate-100">
                       {densityMetrics.positive_near_zero_count ?? 0}
-                      <span className="text-base font-normal text-gray-500 ml-2">
+                      <span className="text-base font-normal text-slate-400 ml-2">
                         ({((densityMetrics.positive_near_zero_ratio ?? 0) * 100).toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-2">策略信號完全未觸發的案例</div>
+                    <div className="text-xs text-slate-500 mt-2">策略信號完全未觸發的案例</div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="text-sm font-medium text-gray-600 mb-1">正例 Far=0</div>
-                    <div className="text-2xl font-bold text-amber-600">
+                  <div className="glass-panel p-4 rounded-lg border border-slate-800/80">
+                    <div className="text-sm font-medium text-slate-400 mb-1">正例 Far=0</div>
+                    <div className="text-2xl font-bold text-amber-300">
                       {densityMetrics.positive_far_zero_count ?? 0}
-                      <span className="text-base font-normal text-gray-500 ml-2">
+                      <span className="text-base font-normal text-slate-400 ml-2">
                         ({((densityMetrics.positive_far_zero_ratio ?? 0) * 100).toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-2">被排除於 ratio 統計的案例</div>
+                    <div className="text-xs text-slate-500 mt-2">被排除於 ratio 統計的案例</div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="text-sm font-medium text-gray-600 mb-1">反例 Near=0</div>
-                    <div className="text-2xl font-bold text-gray-900">
+                  <div className="glass-panel p-4 rounded-lg border border-slate-800/80">
+                    <div className="text-sm font-medium text-slate-400 mb-1">反例 Near=0</div>
+                    <div className="text-2xl font-bold text-slate-100">
                       {densityMetrics.negative_near_zero_count ?? 0}
-                      <span className="text-base font-normal text-gray-500 ml-2">
+                      <span className="text-base font-normal text-slate-400 ml-2">
                         ({((densityMetrics.negative_near_zero_ratio ?? 0) * 100).toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-2">策略信號完全未觸發的案例</div>
+                    <div className="text-xs text-slate-500 mt-2">策略信號完全未觸發的案例</div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="text-sm font-medium text-gray-600 mb-1">反例 Far=0</div>
-                    <div className="text-2xl font-bold text-amber-600">
+                  <div className="glass-panel p-4 rounded-lg border border-slate-800/80">
+                    <div className="text-sm font-medium text-slate-400 mb-1">反例 Far=0</div>
+                    <div className="text-2xl font-bold text-amber-300">
                       {densityMetrics.negative_far_zero_count ?? 0}
-                      <span className="text-base font-normal text-gray-500 ml-2">
+                      <span className="text-base font-normal text-slate-400 ml-2">
                         ({((densityMetrics.negative_far_zero_ratio ?? 0) * 100).toFixed(1)}%)
                       </span>
                     </div>
-                    <div className="text-xs text-gray-400 mt-2">被排除於 ratio 統計的案例</div>
+                    <div className="text-xs text-slate-500 mt-2">被排除於 ratio 統計的案例</div>
                   </div>
                 </div>
               </div>
             )}
             {!densityMetrics && (
-              <p className="mt-4 rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500">
+              <p className="mt-4 rounded-lg bg-slate-900/60 px-3 py-2 text-xs text-slate-400">
                 後端尚未回傳密度統計，或尚未執行測試。
               </p>
             )}
@@ -1476,13 +1476,13 @@ function StrategyTestPageContent() {
               />
             )}
 
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="glass-panel rounded-xl border border-slate-800/80 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm uppercase tracking-wide text-slate-500">時間範圍統計</p>
-                <h2 className="text-2xl font-semibold text-slate-900">測試結果</h2>
+                <p className="text-sm uppercase tracking-wide text-slate-400">時間範圍統計</p>
+                <h2 className="text-2xl font-semibold text-slate-100">測試結果</h2>
               </div>
-              <Share2 className="h-6 w-6 text-indigo-500" />
+              <Share2 className="h-6 w-6 text-emerald-300" />
             </div>
             {testResult ? (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -1499,19 +1499,19 @@ function StrategyTestPageContent() {
                 <SummaryItem label="採樣狀態" value={testResult.is_sampled ? "已抽樣 (500)" : "完整樣本"} />
               </div>
             ) : (
-              <div className="mt-6 rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+              <div className="mt-6 rounded-lg border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">
                 尚未執行測試，執行後會顯示密度統計與資料品質。
               </div>
             )}
             {qualitySummary && (
-              <div className="mt-6 rounded-lg border border-slate-100 bg-slate-50 p-4 text-sm text-slate-600">
-                <div className="font-semibold text-slate-800">案例統計</div>
+              <div className="mt-6 rounded-lg border border-slate-800/80 bg-slate-900/40 p-4 text-sm text-slate-300">
+                <div className="font-semibold text-slate-100">案例統計</div>
                 <div className="mt-2 grid gap-4 md:grid-cols-2">
                   <SummaryItem label="案例總數" value={qualitySummary.total_cases?.toString() ?? "—"} subtle />
                   <SummaryItem label="正例佔比" value={formatPercent(qualitySummary.success_rate)} subtle />
                 </div>
                 {qualitySummary.error_messages && qualitySummary.error_messages.length > 0 && (
-                  <ul className="mt-3 list-inside list-disc text-xs text-amber-700">
+                  <ul className="mt-3 list-inside list-disc text-xs text-amber-200/80">
                     {qualitySummary.error_messages.map((message) => (
                       <li key={message}>{message}</li>
                     ))}
@@ -1520,7 +1520,7 @@ function StrategyTestPageContent() {
               </div>
             )}
             {apiError && (
-              <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+              <div className="mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-200">
                 {apiError}
               </div>
             )}
@@ -1548,10 +1548,10 @@ interface MetricCardProps {
 
 function MetricCard({ label, value, helper }: MetricCardProps) {
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-      {helper && <p className="text-xs text-slate-500">{helper}</p>}
+    <div className="rounded-lg border border-slate-800/80 bg-slate-900/40 p-4">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-slate-100">{value}</p>
+      {helper && <p className="text-xs text-slate-400">{helper}</p>}
     </div>
   );
 }
@@ -1564,9 +1564,9 @@ interface SummaryItemProps {
 
 function SummaryItem({ label, value, subtle = false }: SummaryItemProps) {
   return (
-    <div className={`rounded-lg p-3 ${subtle ? "bg-white" : "bg-slate-50"}`}>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="text-lg font-semibold text-slate-900">{value}</p>
+    <div className={`rounded-lg p-3 ${subtle ? "bg-slate-900/40" : "bg-slate-900/60"}`}>
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-lg font-semibold text-slate-100">{value}</p>
     </div>
   );
 }
@@ -1580,41 +1580,41 @@ interface TemplatePanelProps {
 
 function TemplatePanel({ templates, onClose, onLoad, onDelete }: TemplatePanelProps) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-end bg-black/40">
-      <div className="h-full w-full max-w-md overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-end bg-black/60">
+      <div className="h-full w-full max-w-md overflow-y-auto border-l border-slate-800/80 bg-slate-950/95 shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-800/80 px-5 py-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Templates</p>
-            <h3 className="text-lg font-semibold text-slate-900">策略範本管理</h3>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Templates</p>
+            <h3 className="text-lg font-semibold text-slate-100">策略範本管理</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+            className="rounded-full border border-slate-700 p-2 text-slate-400 transition hover:bg-slate-900/60"
           >
             ✕
           </button>
         </div>
         <div className="space-y-3 px-5 py-4">
           {templates.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">
+            <p className="rounded-lg border border-dashed border-slate-700 p-4 text-center text-sm text-slate-400">
               尚未建立任何範本，保存後即可在此快速載入。
             </p>
           ) : (
             templates.map((template) => (
-              <div key={template.id} className="rounded-lg border border-slate-200 p-4">
+              <div key={template.id} className="rounded-lg border border-slate-800/80 bg-slate-900/40 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-base font-semibold text-slate-900">{template.name}</p>
+                    <p className="text-base font-semibold text-slate-100">{template.name}</p>
                     {template.description && (
-                      <p className="text-xs text-slate-500">{template.description}</p>
+                      <p className="text-xs text-slate-400">{template.description}</p>
                     )}
-                    <p className="mt-1 text-[11px] text-slate-400">更新於 {new Date(template.updatedAt).toLocaleString()}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">更新於 {new Date(template.updatedAt).toLocaleString()}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => onDelete(template.id)}
-                    className="text-xs text-rose-500 hover:underline"
+                    className="text-xs text-rose-300 hover:underline"
                   >
                     移除
                   </button>
@@ -1623,7 +1623,7 @@ function TemplatePanel({ templates, onClose, onLoad, onDelete }: TemplatePanelPr
                   <button
                     type="button"
                     onClick={() => onLoad(template)}
-                    className="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
+                    className="flex-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-100 border border-slate-700"
                   >
                     載入此範本
                   </button>
@@ -1639,7 +1639,7 @@ function TemplatePanel({ templates, onClose, onLoad, onDelete }: TemplatePanelPr
 
 export default function StrategyTestPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="text-gray-500">Loading...</div></div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-slate-950/40"><div className="text-slate-400">Loading...</div></div>}>
       <StrategyTestPageContent />
     </Suspense>
   );

@@ -35,16 +35,16 @@ export default function ProbabilityDensityChart({ data, loading }: ProbabilityDe
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="bin" tickFormatter={(v) => v.toFixed(2)} />
             <YAxis />
             <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
-            <Line type="monotone" dataKey="positive" stroke="#10b981" name="正例密度" dot={false} />
-            <Line type="monotone" dataKey="negative" stroke="#ef4444" name="反例密度" dot={false} />
+            <Line type="monotone" dataKey="positive" stroke="#34d399" name="正例密度" dot={false} />
+            <Line type="monotone" dataKey="negative" stroke="#fb7185" name="反例密度" dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="text-xs text-gray-500 mt-2">重疊分數：{data.overlap_score.toFixed(4)}</div>
+      <div className="text-xs text-slate-400 mt-2">重疊分數：{data.overlap_score.toFixed(4)}</div>
     </div>
   );
 }

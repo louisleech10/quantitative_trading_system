@@ -215,19 +215,19 @@ export default function TrialComparisonPanel({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">最佳 Trial</p>
-                  <p className="text-2xl font-bold text-green-600">#{comparisonData.best_trial_number}</p>
+                  <p className="text-2xl font-semibold text-emerald-400">#{comparisonData.best_trial_number}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">最佳分數</p>
-                  <p className="text-2xl font-bold">{comparisonData.best_value.toFixed(4)}</p>
+                  <p className="text-2xl font-semibold">{comparisonData.best_value.toFixed(4)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">平均分數</p>
-                  <p className="text-2xl font-bold">{comparisonData.value_mean.toFixed(4)}</p>
+                  <p className="text-2xl font-semibold">{comparisonData.value_mean.toFixed(4)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">標準差</p>
-                  <p className="text-2xl font-bold">{comparisonData.value_std.toFixed(4)}</p>
+                  <p className="text-2xl font-semibold">{comparisonData.value_std.toFixed(4)}</p>
                 </div>
               </div>
             </CardContent>

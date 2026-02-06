@@ -66,8 +66,8 @@ export default function ActionButtons({
             relative px-6 py-3 rounded-lg font-medium text-sm transition-all
             ${
               isValid && !isRunning
-                ? "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                ? "bg-sky-500/80 text-white hover:bg-sky-500 active:bg-sky-600"
+                : "bg-white/10 text-slate-500 cursor-not-allowed"
             }
             ${isRunning ? "animate-pulse" : ""}
           `}
@@ -94,8 +94,8 @@ export default function ActionButtons({
             px-6 py-3 rounded-lg font-medium text-sm transition-all
             ${
               isValid && !isRunning
-                ? "bg-green-600 text-white hover:bg-green-700 active:bg-green-800"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                ? "bg-emerald-500/80 text-white hover:bg-emerald-500 active:bg-emerald-600"
+                : "bg-white/10 text-slate-500 cursor-not-allowed"
             }
           `}
         >
@@ -115,8 +115,8 @@ export default function ActionButtons({
             border-2
             ${
               !isRunning
-                ? "border-purple-600 text-purple-600 hover:bg-purple-50 active:bg-purple-100"
-                : "border-gray-300 text-gray-400 cursor-not-allowed"
+                ? "border-violet-400/60 text-violet-200 hover:bg-violet-500/10 active:bg-violet-500/20"
+                : "border-white/10 text-slate-500 cursor-not-allowed"
             }
           `}
         >
@@ -133,8 +133,8 @@ export default function ActionButtons({
             border-2
             ${
               !isRunning
-                ? "border-gray-400 text-gray-600 hover:bg-gray-50 active:bg-gray-100"
-                : "border-gray-300 text-gray-400 cursor-not-allowed"
+                ? "border-white/20 text-slate-200 hover:bg-white/5 active:bg-white/10"
+                : "border-white/10 text-slate-500 cursor-not-allowed"
             }
           `}
         >
@@ -144,8 +144,8 @@ export default function ActionButtons({
 
       {/* 成功訊息 */}
       {showSuccessMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 animate-fadeIn">
-          <div className="flex items-center gap-2 text-green-700">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 animate-fadeIn">
+          <div className="flex items-center gap-2 text-emerald-200">
             <span className="text-lg">✅</span>
             <span className="text-sm font-medium">測試執行成功!</span>
           </div>
@@ -154,12 +154,12 @@ export default function ActionButtons({
 
       {/* 驗證狀態提示 */}
       {!isValid && !isRunning && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
           <div className="flex items-start gap-2">
-            <span className="text-yellow-600 text-sm">⚠️</span>
-            <div className="text-xs text-yellow-700">
+            <span className="text-amber-300 text-sm">⚠️</span>
+            <div className="text-xs text-amber-200">
               <div className="font-medium mb-1">配置驗證失敗</div>
-              <div className="text-yellow-600">
+              <div className="text-amber-200/80">
                 請檢查並修正所有必填欄位和參數約束條件
               </div>
             </div>
@@ -169,12 +169,12 @@ export default function ActionButtons({
 
       {/* 執行中提示 */}
       {isRunning && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-3">
           <div className="flex items-start gap-2">
-            <div className="w-4 h-4 mt-0.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            <div className="text-xs text-blue-700">
+            <div className="w-4 h-4 mt-0.5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+            <div className="text-xs text-sky-200">
               <div className="font-medium mb-1">正在執行測試...</div>
-              <div className="text-blue-600">
+              <div className="text-sky-200/80">
                 請稍候,這可能需要幾秒到幾分鐘時間
               </div>
             </div>
@@ -183,8 +183,8 @@ export default function ActionButtons({
       )}
 
       {/* 快捷鍵提示 */}
-      <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-        <span className="font-medium">快捷鍵:</span>
+      <div className="text-xs text-slate-400 bg-white/5 border border-white/10 p-2 rounded">
+        <span className="font-medium text-slate-300">快捷鍵:</span>
         <span className="ml-2">
           Ctrl+Enter 執行測試 | Ctrl+S 保存範本
         </span>

@@ -79,20 +79,20 @@ export default function DecisionRuleTable({ rules }: Props) {
   
   if (rules.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-slate-400">
         沒有決策規則資料
       </div>
     );
   }
   
   return (
-    <div className="bg-white rounded-lg border">
+    <div className="glass-panel rounded-xl border border-white/10">
       {/* 標題與控制 */}
-      <div className="flex justify-between items-center p-4 border-b">
-        <h3 className="text-lg font-bold">決策規則 (共 {rules.length} 條)</h3>
+      <div className="flex justify-between items-center p-4 border-b border-white/10">
+        <h3 className="text-lg font-semibold text-slate-100">決策規則 (共 {rules.length} 條)</h3>
         <button
           onClick={handleExportCSV}
-          className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+          className="px-3 py-1 bg-emerald-500/20 text-emerald-100 border border-emerald-500/40 text-sm rounded hover:bg-emerald-500/30"
         >
           匯出 CSV
         </button>
@@ -101,24 +101,24 @@ export default function DecisionRuleTable({ rules }: Props) {
       {/* 表格 */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead className="bg-white/5 text-slate-200">
             <tr>
               <th className="px-4 py-2 text-left">#</th>
               <th className="px-4 py-2 text-left">條件</th>
               <th 
-                className="px-4 py-2 text-right cursor-pointer hover:bg-gray-100"
+                className="px-4 py-2 text-right cursor-pointer hover:bg-white/10"
                 onClick={() => handleSort('support')}
               >
                 支持度 {sortBy === 'support' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
               <th 
-                className="px-4 py-2 text-right cursor-pointer hover:bg-gray-100"
+                className="px-4 py-2 text-right cursor-pointer hover:bg-white/10"
                 onClick={() => handleSort('confidence')}
               >
                 信心度 {sortBy === 'confidence' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
               <th 
-                className="px-4 py-2 text-right cursor-pointer hover:bg-gray-100"
+                className="px-4 py-2 text-right cursor-pointer hover:bg-white/10"
                 onClick={() => handleSort('lift')}
               >
                 提升 {sortBy === 'lift' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -129,15 +129,15 @@ export default function DecisionRuleTable({ rules }: Props) {
             {sortedRules.map((rule, index) => {
               // 根據信心度決定背景顏色
               const bgColor = 
-                rule.confidence >= 0.7 ? 'bg-green-50' :
-                rule.confidence >= 0.6 ? 'bg-yellow-50' :
+                rule.confidence >= 0.7 ? 'bg-emerald-500/10' :
+                rule.confidence >= 0.6 ? 'bg-amber-500/10' :
                 '';
               
               return (
-                <tr key={rule.rule_id} className={`border-b hover:bg-gray-50 ${bgColor}`}>
-                  <td className="px-4 py-2">{index + 1}</td>
-                  <td className="px-4 py-2 font-mono text-xs">{rule.condition}</td>
-                  <td className="px-4 py-2 text-right">{rule.support}</td>
+                <tr key={rule.rule_id} className={`border-b border-white/10 hover:bg-white/5 ${bgColor}`}>
+                  <td className="px-4 py-2 text-slate-200">{index + 1}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-slate-200">{rule.condition}</td>
+                  <td className="px-4 py-2 text-right text-slate-200">{rule.support}</td>
                   <td className="px-4 py-2 text-right">
                     <span className={getConfidenceColor(rule.confidence)}>
                       {(rule.confidence * 100).toFixed(1)}%
@@ -156,7 +156,7 @@ export default function DecisionRuleTable({ rules }: Props) {
       </div>
       
       {/* 說明 */}
-      <div className="p-4 text-xs text-gray-500 border-t">
+      <div className="p-4 text-xs text-slate-400 border-t border-white/10">
         <p>💡 信心度: 符合此規則的樣本中盈利的比例</p>
         <p>💡 提升: 相對於基準盈利概率的提升倍數</p>
         <p>💡 支持度: 符合此規則的樣本數量</p>
@@ -167,14 +167,14 @@ export default function DecisionRuleTable({ rules }: Props) {
 
 // 信心度顏色
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.7) return 'text-green-600 font-semibold';
-  if (confidence >= 0.6) return 'text-yellow-600 font-semibold';
-  return 'text-gray-600';
+  if (confidence >= 0.7) return 'text-emerald-300 font-semibold';
+  if (confidence >= 0.6) return 'text-amber-300 font-semibold';
+  return 'text-slate-300';
 }
 
 // 提升顏色
 function getLiftColor(lift: number): string {
-  if (lift >= 1.5) return 'text-green-600 font-semibold';
-  if (lift >= 1.2) return 'text-yellow-600 font-semibold';
-  return 'text-gray-600';
+  if (lift >= 1.5) return 'text-emerald-300 font-semibold';
+  if (lift >= 1.2) return 'text-amber-300 font-semibold';
+  return 'text-slate-300';
 }

@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0A0F1C;
+  --foreground: #f1f5f9;
+
+  --color-glass-bg: #1a233a;
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-success: #34d399;
+  --color-danger: #fb7185;
+  --color-warning: #fbbf24;
+  --color-primary: #60a5fa;
+  --color-text-main: #f1f5f9;
+  --color-text-muted: #94a3b8;
+
+  --popover: #1a233a;
+  --popover-foreground: #f1f5f9;
+  --card: #1a233a;
+  --card-foreground: #f1f5f9;
+  --primary: #60a5fa;
+  --primary-foreground: #0A0F1C;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e293b;
+  --accent-foreground: #f1f5f9;
+  --destructive: #fb7185;
+  --destructive-foreground: #0A0F1C;
+  --ring: #60a5fa;
+  --input: rgba(255, 255, 255, 0.10);
+  --border: rgba(255, 255, 255, 0.08);
+  --radius: 0.75rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-glass-bg: var(--color-glass-bg);
+  --color-glass-border: var(--color-glass-border);
+  --color-success: var(--color-success);
+  --color-danger: var(--color-danger);
+  --color-warning: var(--color-warning);
+  --color-primary: var(--color-primary);
+  --color-text-main: var(--color-text-main);
+  --color-text-muted: var(--color-text-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(96, 165, 250, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 90% 20%, rgba(52, 211, 153, 0.08), transparent 60%),
+    #0A0F1C;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.glass-panel {
+  background-color: rgba(26, 35, 58, 0.4);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-shadow {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+}
+
+.chart-glow-success {
+  box-shadow: 0 0 28px rgba(52, 211, 153, 0.35);
+}
+
+.chart-glow-danger {
+  box-shadow: 0 0 28px rgba(251, 113, 133, 0.35);
 }

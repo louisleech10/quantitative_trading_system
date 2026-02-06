@@ -17,12 +17,12 @@ export const chartColors = {
   downWickColor: '#ef5350', // 下跌影線顏色
 
   // 背景和網格
-  backgroundColor: '#ffffff',
-  gridColor: '#e0e0e0',
-  textColor: '#333333',
+  backgroundColor: '#0A0F1C',
+  gridColor: 'rgba(255, 255, 255, 0.05)',
+  textColor: '#94a3b8',
 
   // 案例標記顏色
-  caseMarkerColor: '#ff1744',  // 紅色虛線標記案例時間點T
+  caseMarkerColor: '#fb7185',  // 紅色虛線標記案例時間點T
 };
 
 /**
@@ -34,11 +34,11 @@ export const darkChartColors = {
   upWickColor: '#26a69a',
   downWickColor: '#ef5350',
 
-  backgroundColor: '#1e1e1e',
-  gridColor: '#2a2a2a',
-  textColor: '#d1d4dc',
+  backgroundColor: '#0A0F1C',
+  gridColor: 'rgba(255, 255, 255, 0.05)',
+  textColor: '#94a3b8',
 
-  caseMarkerColor: '#ff1744',
+  caseMarkerColor: '#fb7185',
 };
 
 /**

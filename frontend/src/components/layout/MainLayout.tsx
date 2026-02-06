@@ -90,12 +90,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="h-screen flex bg-gray-50">
+    <div className="h-screen flex bg-[#0A0F1C]">
       {/* 左側導航 - 桌面版 */}
-      <div className="hidden lg:flex lg:flex-col lg:w-64 lg:bg-white lg:border-r lg:border-gray-200">
+      <div className="hidden lg:flex lg:flex-col lg:w-64 lg:bg-[#1a233a]/40 lg:backdrop-blur-xl lg:border-r lg:border-white/10">
         {/* Logo 區域 */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">交易策略系統</h1>
+        <div className="flex-shrink-0 px-6 py-4 border-b border-white/10">
+          <h1 className="text-xl font-medium text-slate-100">交易策略系統</h1>
         </div>
 
         {/* 導航選單 */}
@@ -109,22 +109,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
                 className={`
                   group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
                   ${isActive(item.href)
-                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-blue-400/10 text-blue-400 border-r-2 border-blue-400'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                   }
                 `}
               >
                 <Icon 
                   className={`
                     mr-3 h-5 w-5 flex-shrink-0
-                    ${isActive(item.href) ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}
+                    ${isActive(item.href) ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}
                   `}
                 />
                 <div className="flex-1">
-                  <div className={`font-medium ${isActive(item.href) ? 'text-blue-700' : ''}`}>
+                  <div className={`font-medium ${isActive(item.href) ? 'text-blue-400' : ''}`}>
                     {item.name}
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                  <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                     {item.description}
                   </div>
                 </div>
@@ -134,10 +134,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </nav>
 
         {/* 底部狀態 */}
-        <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200">
+        <div className="flex-shrink-0 px-4 py-4 border-t border-white/10">
           <div className="flex items-center space-x-3">
-            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span className="text-sm text-gray-600">系統在線</span>
+            <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+            <span className="text-sm text-slate-400">系統在線</span>
           </div>
         </div>
       </div>
@@ -146,12 +146,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div 
-            className="fixed inset-0 bg-gray-600 bg-opacity-75"
+            className="fixed inset-0 bg-black/60"
             onClick={() => setSidebarOpen(false)}
           />
           
           {/* 移動端側邊欄 */}
-          <div className="relative flex flex-col w-64 max-w-xs bg-white h-full shadow-xl">
+          <div className="relative flex flex-col w-64 max-w-xs bg-[#1a233a] backdrop-blur-xl h-full shadow-xl">
             {/* 關閉按鈕 */}
             <div className="absolute top-0 right-0 -mr-12 pt-2">
               <button
@@ -163,8 +163,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </div>
 
             {/* Logo 區域 */}
-            <div className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
-              <h1 className="text-xl font-bold text-gray-900">交易策略系統</h1>
+            <div className="flex-shrink-0 px-6 py-4 border-b border-white/10">
+              <h1 className="text-xl font-medium text-slate-100">交易策略系統</h1>
             </div>
 
             {/* 導航選單 */}
@@ -179,22 +179,22 @@ export default function MainLayout({ children }: MainLayoutProps) {
                     className={`
                       group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
                       ${isActive(item.href)
-                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500'
-                        : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        ? 'bg-blue-400/10 text-blue-400 border-r-2 border-blue-400'
+                        : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                       }
                     `}
                   >
                     <Icon 
                       className={`
                         mr-3 h-5 w-5 flex-shrink-0
-                        ${isActive(item.href) ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}
+                        ${isActive(item.href) ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}
                       `}
                     />
                     <div className="flex-1">
-                      <div className={`font-medium ${isActive(item.href) ? 'text-blue-700' : ''}`}>
+                      <div className={`font-medium ${isActive(item.href) ? 'text-blue-400' : ''}`}>
                         {item.name}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                         {item.description}
                       </div>
                     </div>
@@ -204,10 +204,10 @@ export default function MainLayout({ children }: MainLayoutProps) {
             </nav>
 
             {/* 底部狀態 */}
-            <div className="flex-shrink-0 px-4 py-4 border-t border-gray-200">
+            <div className="flex-shrink-0 px-4 py-4 border-t border-white/10">
               <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-sm text-gray-600">系統在線</span>
+                <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                <span className="text-sm text-slate-400">系統在線</span>
               </div>
             </div>
           </div>
@@ -217,12 +217,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
       {/* 主要內容區域 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 頂部導航欄 - 移動端 */}
-        <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3">
+        <div className="lg:hidden bg-[#1a233a]/60 backdrop-blur-xl border-b border-white/10 px-4 py-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-gray-900">交易策略系統</h1>
+            <h1 className="text-lg font-medium text-slate-100">交易策略系統</h1>
             <button
               onClick={() => setSidebarOpen(true)}
-              className="text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              className="text-slate-400 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-400"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -230,7 +230,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </div>
 
         {/* 內容區域 */}
-        <main className="flex-1 overflow-auto bg-gray-50">
+        <main className="flex-1 overflow-auto bg-transparent">
           <div className="h-full">
             {children}
           </div>

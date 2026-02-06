@@ -94,19 +94,19 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
   return (
     <div className="space-y-6">
       {/* 標題與啟動按鈕 */}
-      <div className="bg-white rounded-lg border p-4">
+      <div className="glass-panel rounded-xl border border-white/10 p-4">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-bold">XGBoost 樣式分析</h2>
-            <p className="text-sm text-gray-500 mt-1">案例 ID: {caseId}</p>
+            <h2 className="text-xl font-semibold text-slate-100">XGBoost 樣式分析</h2>
+            <p className="text-sm text-slate-400 mt-1">案例 ID: {caseId}</p>
           </div>
           <button
             onClick={handleStartAnalysis}
             disabled={status === 'running'}
             className={`px-4 py-2 rounded font-semibold ${
               status === 'running'
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'bg-white/10 text-slate-400 border border-white/10 cursor-not-allowed'
+                : 'bg-blue-500/20 text-blue-100 border border-blue-500/40 hover:bg-blue-500/30'
             }`}
           >
             {status === 'running' ? '分析中...' : '開始分析'}
@@ -116,13 +116,13 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
         {/* 進度條 */}
         {status === 'running' && (
           <div className="mt-4">
-            <div className="flex justify-between text-sm mb-1">
+            <div className="flex justify-between text-sm text-slate-300 mb-1">
               <span>進度</span>
               <span>{progress}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-white/10 rounded-full h-2">
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                className="bg-blue-400 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -131,7 +131,7 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
         
         {/* 錯誤訊息 */}
         {status === 'failed' && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+          <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded text-rose-200 text-sm">
             ❌ {errorMessage}
           </div>
         )}
@@ -141,30 +141,30 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
       {status === 'completed' && currentAnalysis && (
         <div className="space-y-6">
           {/* 模型效能 */}
-          <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-lg font-bold mb-3">模型效能</h3>
+          <div className="glass-panel rounded-xl border border-white/10 p-4">
+            <h3 className="text-lg font-semibold text-slate-100 mb-3">模型效能</h3>
             <div className="grid grid-cols-4 gap-4">
               <div className="text-center">
-                <p className="text-sm text-gray-500">準確度</p>
-                <p className="text-2xl font-bold text-blue-600">
+                <p className="text-sm text-slate-400">準確度</p>
+                <p className="text-2xl font-semibold text-blue-300">
                   {(currentAnalysis.model_performance.test_accuracy * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-500">精確度</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-sm text-slate-400">精確度</p>
+                <p className="text-2xl font-semibold text-emerald-300">
                   {(currentAnalysis.model_performance.test_precision * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-500">召回率</p>
-                <p className="text-2xl font-bold text-yellow-600">
+                <p className="text-sm text-slate-400">召回率</p>
+                <p className="text-2xl font-semibold text-amber-300">
                   {(currentAnalysis.model_performance.test_recall * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-500">F1 分數</p>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-sm text-slate-400">F1 分數</p>
+                <p className="text-2xl font-semibold text-purple-400">
                   {currentAnalysis.model_performance.test_f1.toFixed(3)}
                 </p>
               </div>
@@ -173,8 +173,8 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
             {/* AUC */}
             {currentAnalysis.model_performance.test_auc && (
               <div className="mt-4 text-center">
-                <p className="text-sm text-gray-500">AUC</p>
-                <p className="text-3xl font-bold text-indigo-600">
+                <p className="text-sm text-slate-400">AUC</p>
+                <p className="text-3xl font-semibold text-blue-300">
                   {currentAnalysis.model_performance.test_auc.toFixed(3)}
                 </p>
               </div>
@@ -193,8 +193,8 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
           />
           
           {/* 建立樣式按鈕 */}
-          <div className="bg-white rounded-lg border p-4 text-center">
-            <p className="text-sm text-gray-600 mb-3">
+          <div className="glass-panel rounded-xl border border-white/10 p-4 text-center">
+            <p className="text-sm text-slate-300 mb-3">
               從此分析結果建立新樣式定義
             </p>
             <button
@@ -202,7 +202,7 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
                 // TODO: 導航到樣式建立表單，預填充資料
                 if (onPatternCreated) onPatternCreated();
               }}
-              className="px-6 py-2 bg-green-600 text-white rounded font-semibold hover:bg-green-700"
+              className="px-6 py-2 bg-emerald-500/20 text-emerald-100 border border-emerald-500/40 rounded font-semibold hover:bg-emerald-500/30"
             >
               建立樣式定義
             </button>
@@ -212,8 +212,8 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
       
       {/* 空狀態 */}
       {status === 'idle' && (
-        <div className="bg-gray-50 rounded-lg border-2 border-dashed p-12 text-center">
-          <p className="text-gray-500 text-lg">點擊「開始分析」來執行 XGBoost 樣式發現</p>
+        <div className="glass-panel rounded-xl border-2 border-dashed border-white/10 p-12 text-center">
+          <p className="text-slate-400 text-lg">點擊「開始分析」來執行 XGBoost 樣式發現</p>
         </div>
       )}
     </div>

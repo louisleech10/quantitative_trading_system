@@ -109,7 +109,7 @@ export default function TrialSelectionDialog({
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
             選擇 Trial #{trialNumber}
           </DialogTitle>
           <DialogDescription>
@@ -145,7 +145,7 @@ export default function TrialSelectionDialog({
           {/* 選擇理由（必填） */}
           <div className="space-y-2">
             <Label htmlFor="user-notes" className="flex items-center gap-1">
-              選擇理由 <span className="text-red-500">*</span>
+              選擇理由 <span className="text-rose-400">*</span>
             </Label>
             <Textarea
               id="user-notes"

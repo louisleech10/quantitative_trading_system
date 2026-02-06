@@ -104,10 +104,10 @@ export default function DataSourceSelector({
     <div className={`space-y-3 ${className}`}>
       {/* 標題 */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-200 mb-1">
           數據源選擇
         </label>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-slate-400">
           選擇用於計算指標的數據來源
         </p>
       </div>
@@ -129,9 +129,9 @@ export default function DataSourceSelector({
                 ${
                   isSelected
                     ? isPriceCategory
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-green-500 bg-green-50"
-                    : "border-gray-200 bg-white hover:border-gray-300"
+                      ? "border-sky-400/60 bg-sky-500/10"
+                      : "border-emerald-400/60 bg-emerald-500/10"
+                    : "border-white/10 bg-white/5 hover:border-white/20"
                 }
                 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
               `}
@@ -140,7 +140,7 @@ export default function DataSourceSelector({
               {isSelected && (
                 <div
                   className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
-                    isPriceCategory ? "bg-blue-500" : "bg-green-500"
+                    isPriceCategory ? "bg-sky-400" : "bg-emerald-400"
                   }`}
                 />
               )}
@@ -150,9 +150,9 @@ export default function DataSourceSelector({
                 className={`text-sm font-medium ${
                   isSelected
                     ? isPriceCategory
-                      ? "text-blue-900"
-                      : "text-green-900"
-                    : "text-gray-900"
+                      ? "text-sky-200"
+                      : "text-emerald-200"
+                    : "text-slate-100"
                 }`}
               >
                 {option.label}
@@ -163,9 +163,9 @@ export default function DataSourceSelector({
                 className={`text-xs mt-1 ${
                   isSelected
                     ? isPriceCategory
-                      ? "text-blue-600"
-                      : "text-green-600"
-                    : "text-gray-500"
+                      ? "text-sky-300"
+                      : "text-emerald-300"
+                    : "text-slate-400"
                 }`}
               >
                 {option.description}
@@ -177,11 +177,11 @@ export default function DataSourceSelector({
 
       {/* 當前選擇摘要 */}
       {selectedOption && (
-        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-          <span className="font-medium">當前選擇:</span>{" "}
-          <span className="text-gray-900">{selectedOption.label}</span>
+        <div className="text-xs text-slate-300 bg-white/5 border border-white/10 p-2 rounded">
+          <span className="font-medium text-slate-200">當前選擇:</span>{" "}
+          <span className="text-slate-100">{selectedOption.label}</span>
           {" - "}
-          <span className="text-gray-500">{selectedOption.description}</span>
+          <span className="text-slate-400">{selectedOption.description}</span>
         </div>
       )}
     </div>

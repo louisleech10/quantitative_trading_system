@@ -73,14 +73,14 @@ export function NumberInput({
 
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
-      <label className={`text-sm font-medium ${disabled ? 'text-gray-400' : 'text-gray-700'}`}>
+      <label className={`text-sm font-medium ${disabled ? 'text-slate-500' : 'text-slate-200'}`}>
         {label}
       </label>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => handleStep('dec')}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled || isMinReached}
         >
           <Minus className="h-4 w-4" />
@@ -95,14 +95,14 @@ export function NumberInput({
             max={max}
             step={step}
             disabled={disabled}
-            className={`w-full rounded-md border px-3 py-2 text-center text-base font-semibold text-gray-900 shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+            className={`w-full rounded-md border px-3 py-2 text-center text-base font-semibold text-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
               disabled
-                ? 'border-gray-200 bg-gray-50 text-gray-400'
-                : 'border-gray-300 bg-white'
+                ? 'border-white/10 bg-white/5 text-slate-500'
+                : 'border-white/10 bg-white/5'
             }`}
           />
           {suffix && (
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-500">
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">
               {suffix}
             </span>
           )}
@@ -110,14 +110,14 @@ export function NumberInput({
         <button
           type="button"
           onClick={() => handleStep('inc')}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled || isMaxReached}
         >
           <Plus className="h-4 w-4" />
         </button>
       </div>
-      {description && <p className="text-xs text-gray-500">{description}</p>}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {description && <p className="text-xs text-slate-400">{description}</p>}
+      {error && <p className="text-xs text-rose-400">{error}</p>}
     </div>
   );
 }

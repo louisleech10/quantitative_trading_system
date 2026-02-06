@@ -45,7 +45,7 @@ export default function RollingAUCChart({ data, loading }: RollingAUCChartProps)
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="ts" tickFormatter={formatTs} />
             <YAxis domain={[0, 1]} />
             <Tooltip formatter={(value: any) => value === null ? 'N/A' : Number(value).toFixed(3)} labelFormatter={(label) => formatTs(Number(label))} />
@@ -54,11 +54,11 @@ export default function RollingAUCChart({ data, loading }: RollingAUCChartProps)
                 key={`zone-${idx}`}
                 x1={normalizeZoneTs(zone.start)}
                 x2={normalizeZoneTs(zone.end)}
-                fill="#fee2e2"
+                fill="rgba(251,113,133,0.15)"
                 fillOpacity={0.4}
               />
             ))}
-            <Line type="monotone" dataKey="auc" stroke="#3b82f6" dot={false} />
+            <Line type="monotone" dataKey="auc" stroke="#60a5fa" dot={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

@@ -16,8 +16,8 @@ export default function DiagnosisTab({ taskId }: DiagnosisTabProps) {
   return (
     <div className="p-6 space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium mb-4">Top False Positives</h3>
+        <div className="glass-panel rounded-xl p-4">
+          <h3 className="text-lg font-medium text-slate-100 mb-4">Top False Positives</h3>
           <TopFalsePositivesTable
             data={topFalsePositives}
             loading={deepAnalysisLoading.falsePositives}
@@ -25,10 +25,10 @@ export default function DiagnosisTab({ taskId }: DiagnosisTabProps) {
           />
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4">
-          <h3 className="text-lg font-medium mb-4">
+        <div className="glass-panel rounded-xl p-4">
+          <h3 className="text-lg font-medium text-slate-100 mb-4">
             案例 SHAP 分析
-            {selectedCaseId && <span className="text-sm text-gray-500 ml-2">({selectedCaseId})</span>}
+            {selectedCaseId && <span className="text-sm text-slate-400 ml-2">({selectedCaseId})</span>}
           </h3>
           <SingleCaseSHAPPanel taskId={taskId} caseId={selectedCaseId} />
         </div>

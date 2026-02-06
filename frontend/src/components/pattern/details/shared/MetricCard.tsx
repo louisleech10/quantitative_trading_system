@@ -17,24 +17,24 @@ export default function MetricCard({ title, value, format = 'number', status }: 
   const statusColor = () => {
     switch (status) {
       case 'good':
-        return 'text-green-600';
+        return 'text-emerald-400';
       case 'acceptable':
-        return 'text-yellow-600';
+        return 'text-amber-400';
       case 'warning':
-        return 'text-red-600';
+        return 'text-rose-400';
       default:
-        return 'text-gray-800';
+        return 'text-slate-100';
     }
   };
 
   return (
-    <div className="bg-gray-50 rounded-lg p-4">
-      <div className="text-sm text-gray-600 mb-1">{title}</div>
-      <div className={`text-2xl font-bold ${statusColor()}`}>
+    <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+      <div className="text-sm text-slate-400 mb-1">{title}</div>
+      <div className={`text-2xl font-semibold ${statusColor()}`}>
         {renderValue()}
       </div>
       {status && (
-        <div className="text-xs text-gray-500 mt-1">狀態：{status}</div>
+        <div className="text-xs text-slate-400 mt-1">狀態：{status}</div>
       )}
     </div>
   );

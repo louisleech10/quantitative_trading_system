@@ -134,7 +134,7 @@ export default function PipelineConfigPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
+      <div className="container mx-auto p-6 flex items-center justify-center min-h-screen bg-slate-950/40">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
@@ -142,8 +142,8 @@ export default function PipelineConfigPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert variant="destructive">
+      <div className="container mx-auto p-6 bg-slate-950/40 min-h-screen">
+        <Alert variant="destructive" className="bg-rose-500/10 border-rose-400/30">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>錯誤</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
@@ -157,7 +157,7 @@ export default function PipelineConfigPage() {
   const selectedTrial = result.trials?.find(t => t.number === selectedTrialNumber)
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6 min-h-screen bg-slate-950/40">
       {/* 頁首 */}
       <div className="flex items-center justify-between">
         <div>
@@ -183,10 +183,10 @@ export default function PipelineConfigPage() {
 
       {/* 成功提示 */}
       {success && (
-        <Alert className="bg-green-50 border-green-200">
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-800">配置建立成功</AlertTitle>
-          <AlertDescription className="text-green-700">
+        <Alert className="bg-emerald-500/10 border-emerald-400/30">
+          <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+          <AlertTitle className="text-emerald-200">配置建立成功</AlertTitle>
+          <AlertDescription className="text-emerald-200/80">
             正在跳轉到配置詳情頁...
           </AlertDescription>
         </Alert>
@@ -209,7 +209,7 @@ export default function PipelineConfigPage() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">最佳 Trial</p>
-              <p className="text-2xl font-bold text-green-600">#{result.best_trial?.number}</p>
+              <p className="text-2xl font-bold text-emerald-300">#{result.best_trial?.number}</p>
             </div>
           </div>
         </CardContent>

@@ -241,34 +241,34 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
         const indicatorDef = AVAILABLE_INDICATORS.find(i => i.value === config.indicator)
         
         return (
-          <Card key={config.id} className="bg-white border-gray-200">
+          <Card key={config.id} className="glass-panel border-white/10">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span className="text-base text-gray-900">指標 #{index + 1}</span>
+                <span className="text-base text-slate-100">指標 #{index + 1}</span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleRemoveIndicator(config.id)}
                   disabled={value.length === 1}
                 >
-                  <Trash2 className="h-4 w-4 text-red-500" />
+                  <Trash2 className="h-4 w-4 text-rose-300" />
                 </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* 指標類型 */}
               <div className="space-y-2">
-                <Label className="text-gray-800 font-medium">指標類型</Label>
+                <Label className="text-slate-200 font-medium">指標類型</Label>
                 <Select
                   value={config.indicator}
                   onValueChange={(val) => handleIndicatorChange(config.id, val)}
                 >
-                  <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
+                  <SelectTrigger className="bg-slate-900/60 border-slate-700 text-slate-100 [&>span]:text-slate-100">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
+                  <SelectContent className="bg-slate-950 border border-slate-800 shadow-lg z-50">
                     {AVAILABLE_INDICATORS.map(indicator => (
-                      <SelectItem key={indicator.value} value={indicator.value} className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                      <SelectItem key={indicator.value} value={indicator.value} className="text-slate-100 hover:bg-slate-900 cursor-pointer">
                         {indicator.label}
                       </SelectItem>
                     ))}
@@ -278,17 +278,17 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
 
               {/* 數據源 */}
               <div className="space-y-2">
-                <Label className="text-gray-800">數據源</Label>
+                <Label className="text-slate-200">數據源</Label>
                 <Select
                   value={config.data_source}
                   onValueChange={(val) => handleDataSourceChange(config.id, val)}
                 >
-                  <SelectTrigger className="bg-white border-gray-300 text-gray-900 [&>span]:text-gray-900">
+                  <SelectTrigger className="bg-slate-900/60 border-slate-700 text-slate-100 [&>span]:text-slate-100">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border border-gray-200 shadow-lg z-50">
+                  <SelectContent className="bg-slate-950 border border-slate-800 shadow-lg z-50">
                     {DATA_SOURCES.map(source => (
-                      <SelectItem key={source.value} value={source.value} className="text-gray-900 hover:bg-gray-100 cursor-pointer">
+                      <SelectItem key={source.value} value={source.value} className="text-slate-100 hover:bg-slate-900 cursor-pointer">
                         {source.label}
                       </SelectItem>
                     ))}
@@ -299,11 +299,11 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
               {/* 參數配置 */}
               {indicatorDef && (
                 <div className="space-y-3">
-                  <Label className="text-gray-800 font-medium">參數配置</Label>
+                  <Label className="text-slate-200 font-medium">參數配置</Label>
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(indicatorDef.params).map(([paramKey, paramConfig]) => (
                       <div key={paramKey} className="space-y-1">
-                        <Label className="text-xs text-gray-700">{paramConfig.label}</Label>
+                        <Label className="text-xs text-slate-400">{paramConfig.label}</Label>
                         <Input
                           type="number"
                           value={config.params[paramKey] ?? paramConfig.default}
@@ -329,7 +329,7 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
                           step="any"
                           min={paramConfig.min}
                           max={paramConfig.max}
-                          className="bg-white border-gray-300 text-gray-900"
+                          className="bg-slate-900/60 border-slate-700 text-slate-100"
                         />
                       </div>
                     ))}
@@ -343,11 +343,11 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
 
       {/* 操作按鈕 */}
       <div className="flex gap-2">
-        <Button onClick={handleAddIndicator} variant="outline" className="bg-white border-gray-300 text-gray-900 hover:bg-gray-50">
+        <Button onClick={handleAddIndicator} variant="outline" className="bg-white/10 border-white/10 text-slate-100 hover:bg-white/15">
           <Plus className="h-4 w-4 mr-2" />
           添加指標
         </Button>
-        <Button onClick={handlePreview} variant="outline" className="bg-white border-gray-300 text-gray-900 hover:bg-gray-50">
+        <Button onClick={handlePreview} variant="outline" className="bg-white/10 border-white/10 text-slate-100 hover:bg-white/15">
           <Eye className="h-4 w-4 mr-2" />
           預覽特徵
         </Button>
@@ -355,18 +355,18 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
 
       {/* 特徵預覽 */}
       {showPreview && (
-        <Alert className="bg-white border-gray-200">
+        <Alert className="glass-panel border-white/10">
           <AlertDescription>
             <div className="space-y-2">
-              <p className="font-semibold text-gray-900">將生成 {previewFeatures.length} 個特徵：</p>
-              <div className="text-xs text-gray-600 mb-2">
+              <p className="font-semibold text-slate-100">將生成 {previewFeatures.length} 個特徵：</p>
+              <div className="text-xs text-slate-400 mb-2">
                 包含：8 個價格特徵 + 6 個成交量特徵 + 策略特徵（依配置）
                 <br />
-                <span className="text-green-700 font-medium">✅ 跨標的訓練兼容：所有特徵均為相對值（百分比/比例/標記），無絕對價格/成交量</span>
+                <span className="text-emerald-300 font-medium">✅ 跨標的訓練兼容：所有特徵均為相對值（百分比/比例/標記），無絕對價格/成交量</span>
               </div>
               <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
                 {previewFeatures.map(feature => (
-                  <Badge key={feature} variant="secondary" className="font-mono text-xs bg-gray-100 text-gray-800">
+                  <Badge key={feature} variant="secondary" className="font-mono text-xs bg-white/10 text-slate-200 border border-white/10">
                     {feature}
                   </Badge>
                 ))}

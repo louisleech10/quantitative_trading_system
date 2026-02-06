@@ -37,25 +37,25 @@ export function AccordionItem({
   };
 
   return (
-    <div className={`border border-gray-200 rounded-lg bg-white shadow-sm ${className}`}>
+    <div className={`border border-white/10 rounded-xl bg-white/5 ${className}`}>
       <button
         type="button"
-        className={`w-full flex items-center justify-between px-4 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+        className={`w-full flex items-center justify-between px-4 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
         onClick={handleToggle}
         aria-expanded={isExpanded}
         aria-controls={`${id}-content`}
         disabled={disabled}
       >
         <div className="flex items-center gap-2">
-          <span className="text-base font-medium text-gray-900">{title}</span>
+          <span className="text-base font-medium text-slate-100">{title}</span>
           {badge && (
-            <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+            <span className="inline-flex items-center rounded-full bg-blue-400/10 px-2 py-0.5 text-xs font-semibold text-blue-300">
               {badge}
             </span>
           )}
         </div>
         <ChevronDown
-          className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          className={`h-5 w-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
         />
       </button>
       <div
@@ -65,7 +65,7 @@ export function AccordionItem({
         style={{ height }}
         className="overflow-hidden transition-[height] duration-250 ease-out"
       >
-        <div ref={contentRef} className="px-4 pb-4 pt-1 text-sm text-gray-600">
+        <div ref={contentRef} className="px-4 pb-4 pt-1 text-sm text-slate-400">
           {children}
         </div>
       </div>

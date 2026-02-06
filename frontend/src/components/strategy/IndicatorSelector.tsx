@@ -106,17 +106,17 @@ export default function IndicatorSelector({
     <div className={`space-y-3 ${className}`}>
       {/* 標題 */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-200 mb-1">
           指標類型
         </label>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-slate-400">
           選擇用於策略分析的技術指標
         </p>
       </div>
 
       {/* 可用指標 */}
       <div className="space-y-2">
-        <div className="text-xs font-medium text-gray-600">可用指標</div>
+        <div className="text-xs font-medium text-slate-300">可用指標</div>
         <div className="grid grid-cols-1 gap-2">
           {availableOptions.map((option) => {
             const isSelected = value === option.value;
@@ -131,8 +131,8 @@ export default function IndicatorSelector({
                   relative p-3 rounded-lg border-2 text-left transition-all
                   ${
                     isSelected
-                      ? "border-indigo-500 bg-indigo-50"
-                      : "border-gray-200 bg-white hover:border-gray-300"
+                      ? "border-blue-400/60 bg-blue-400/10"
+                      : "border-white/10 bg-white/5 hover:border-white/20"
                   }
                   ${
                     disabled
@@ -143,7 +143,7 @@ export default function IndicatorSelector({
               >
                 {/* 選中指示器 */}
                 {isSelected && (
-                  <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-indigo-500" />
+                  <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-blue-400" />
                 )}
 
                 <div className="flex items-start gap-3">
@@ -153,8 +153,8 @@ export default function IndicatorSelector({
                     flex items-center justify-center w-10 h-10 rounded-lg
                     ${
                       isSelected
-                        ? "bg-indigo-100 text-indigo-700"
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-blue-400/20 text-blue-200"
+                        : "bg-white/5 text-slate-300"
                     }
                   `}
                   >
@@ -165,14 +165,14 @@ export default function IndicatorSelector({
                   <div className="flex-1 min-w-0">
                     <div
                       className={`text-sm font-medium ${
-                        isSelected ? "text-indigo-900" : "text-gray-900"
+                        isSelected ? "text-blue-100" : "text-slate-100"
                       }`}
                     >
                       {option.fullName}
                     </div>
                     <div
                       className={`text-xs mt-1 ${
-                        isSelected ? "text-indigo-600" : "text-gray-500"
+                        isSelected ? "text-blue-300" : "text-slate-400"
                       }`}
                     >
                       {option.description}
@@ -188,9 +188,9 @@ export default function IndicatorSelector({
       {/* 即將推出的指標 */}
       {comingSoonOptions.length > 0 && (
         <div className="space-y-2">
-          <div className="text-xs font-medium text-gray-600 flex items-center gap-2">
+          <div className="text-xs font-medium text-slate-300 flex items-center gap-2">
             即將推出
-            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+            <span className="text-xs bg-white/5 text-slate-300 px-2 py-0.5 rounded border border-white/10">
               Phase 4+
             </span>
           </div>
@@ -198,12 +198,12 @@ export default function IndicatorSelector({
             {comingSoonOptions.map((option) => (
               <div
                 key={option.value}
-                className="p-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 opacity-60"
+                className="p-2 rounded-lg border border-dashed border-white/10 bg-white/5 opacity-70"
               >
-                <div className="text-xs font-medium text-gray-600">
+                <div className="text-xs font-medium text-slate-300">
                   {option.label}
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">
+                <div className="text-xs text-slate-400 mt-0.5">
                   {option.fullName}
                 </div>
               </div>
@@ -214,11 +214,11 @@ export default function IndicatorSelector({
 
       {/* 當前選擇摘要 */}
       {selectedOption && (
-        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-          <span className="font-medium">當前選擇:</span>{" "}
-          <span className="text-gray-900">{selectedOption.fullName}</span>
+        <div className="text-xs text-slate-300 bg-white/5 border border-white/10 p-2 rounded">
+          <span className="font-medium text-slate-200">當前選擇:</span>{" "}
+          <span className="text-slate-100">{selectedOption.fullName}</span>
           {" - "}
-          <span className="text-gray-500">{selectedOption.description}</span>
+          <span className="text-slate-400">{selectedOption.description}</span>
         </div>
       )}
     </div>

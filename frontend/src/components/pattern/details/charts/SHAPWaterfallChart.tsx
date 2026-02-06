@@ -36,13 +36,13 @@ export default function SHAPWaterfallChart({ contributions }: SHAPWaterfallChart
       <div ref={chartRef}>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 20, left: 120, bottom: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis type="number" />
             <YAxis dataKey="feature" type="category" width={110} />
             <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
             <Bar dataKey="shap_value">
               {chartData.map((entry) => (
-                <Cell key={entry.feature} fill={entry.shap_value >= 0 ? '#10b981' : '#ef4444'} />
+                <Cell key={entry.feature} fill={entry.shap_value >= 0 ? '#34d399' : '#fb7185'} />
               ))}
             </Bar>
           </BarChart>

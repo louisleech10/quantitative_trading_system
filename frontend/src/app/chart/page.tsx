@@ -251,10 +251,10 @@ export default function ChartPage() {
    */
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-slate-950/40">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">加載案例數據中...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-400 mx-auto mb-4"></div>
+          <p className="text-slate-300">加載案例數據中...</p>
         </div>
       </div>
     );
@@ -265,13 +265,13 @@ export default function ChartPage() {
    */
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-red-800 text-lg font-semibold mb-2">加載失敗</h2>
-          <p className="text-red-600">{error}</p>
+      <div className="flex items-center justify-center min-h-screen bg-slate-950/40">
+        <div className="glass-panel border border-rose-500/40 rounded-lg p-6 max-w-md">
+          <h2 className="text-rose-200 text-lg font-semibold mb-2">加載失敗</h2>
+          <p className="text-rose-200/80">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            className="mt-4 px-4 py-2 bg-rose-500/20 text-rose-100 rounded border border-rose-400/40 hover:bg-rose-500/30 transition-colors"
           >
             重新加載
           </button>
@@ -285,10 +285,10 @@ export default function ChartPage() {
    */
   if (caseList.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 max-w-md">
-          <h2 className="text-yellow-800 text-lg font-semibold mb-2">暫無數據</h2>
-          <p className="text-yellow-700">
+      <div className="flex items-center justify-center min-h-screen bg-slate-950/40">
+        <div className="glass-panel border border-amber-400/40 rounded-lg p-6 max-w-md">
+          <h2 className="text-amber-200 text-lg font-semibold mb-2">暫無數據</h2>
+          <p className="text-amber-200/80">
             尚未導入任何案例數據。請先使用 Phase 1 功能導入案例CSV並下載K線數據。
           </p>
         </div>
@@ -300,23 +300,23 @@ export default function ChartPage() {
     <div className="container mx-auto px-4 py-6">
       {/* 頁面標題 */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">圖表查看</h1>
-        <p className="text-gray-600">選擇案例查看K線圖表</p>
+        <h1 className="text-3xl font-semibold text-slate-100 mb-2">圖表查看</h1>
+        <p className="text-slate-400">選擇案例查看K線圖表</p>
       </div>
 
       {/* 控制面板 */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="glass-panel rounded-xl p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
           {/* Symbol選擇器 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               交易對
             </label>
             <select
               value={selectedSymbol}
               onChange={(e) => setSelectedSymbol(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
             >
               {availableSymbols.map(symbol => (
                 <option key={symbol} value={symbol}>{symbol}</option>
@@ -326,13 +326,13 @@ export default function ChartPage() {
 
           {/* 案例類型過濾器 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               案例類型
             </label>
             <select
               value={caseTypeFilter}
               onChange={(e) => setCaseTypeFilter(e.target.value as CaseTypeFilter)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
             >
               <option value="all">全部</option>
               <option value="positive">正例</option>
@@ -342,30 +342,30 @@ export default function ChartPage() {
 
           {/* 時間框架選擇器 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               時間框架（查看用）
             </label>
             <select
               value={selectedTimeframe}
               onChange={(e) => setSelectedTimeframe(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
             >
               {availableTimeframes.map(tf => (
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">與案例搜尋時間框架獨立</p>
+            <p className="text-xs text-slate-500 mt-1">與案例搜尋時間框架獨立</p>
           </div>
 
           {/* 時間戳選擇器 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               案例時間點 ({filteredCases.length} 個可用)
             </label>
             <select
               value={selectedTimestamp || ''}
               onChange={(e) => setSelectedTimestamp(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-700 rounded-md text-slate-100 bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
               disabled={filteredCases.length === 0}
             >
               {filteredCases.map(c => (
@@ -374,34 +374,34 @@ export default function ChartPage() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-1">💡 顯示UTC時間（與API數據一致），非本地時區</p>
+            <p className="text-xs text-slate-500 mt-1">💡 顯示UTC時間（與API數據一致），非本地時區</p>
           </div>
         </div>
 
         {/* 當前案例信息 */}
         {currentCase && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-slate-800/80">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <span className="text-gray-600">案例ID：</span>
-                <span className="font-mono text-gray-800">{currentCase.case_id}</span>
+                <span className="text-slate-400">案例ID：</span>
+                <span className="font-mono text-slate-100">{currentCase.case_id}</span>
               </div>
               <div>
-                <span className="text-gray-600">類型：</span>
-                <span className={`font-semibold ${currentCase.positive_case ? 'text-green-600' : 'text-red-600'}`}>
+                <span className="text-slate-400">類型：</span>
+                <span className={`font-semibold ${currentCase.positive_case ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {currentCase.positive_case ? '正例 ✓' : '反例 ✗'}
                 </span>
               </div>
               {currentCase.details?.close && (
                 <div>
-                  <span className="text-gray-600">收盤價：</span>
-                  <span className="font-mono text-gray-800">{currentCase.details.close}</span>
+                  <span className="text-slate-400">收盤價：</span>
+                  <span className="font-mono text-slate-100">{currentCase.details.close}</span>
                 </div>
               )}
               {currentCase.details?.volume && (
                 <div>
-                  <span className="text-gray-600">成交量：</span>
-                  <span className="font-mono text-gray-800">{currentCase.details.volume.toLocaleString()}</span>
+                  <span className="text-slate-400">成交量：</span>
+                  <span className="font-mono text-slate-100">{currentCase.details.volume.toLocaleString()}</span>
                 </div>
               )}
             </div>
@@ -412,17 +412,17 @@ export default function ChartPage() {
       {/* 圖表區域 - 使用 TradingChartContainer（自帶同步功能） */}
       {selectedTimestamp !== null ? (
         loadingKlines ? (
-          <div className="flex items-center justify-center bg-white rounded-lg shadow-md" style={{ height: '640px' }}>
+          <div className="flex items-center justify-center glass-panel rounded-xl" style={{ height: '640px' }}>
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-              <p className="text-gray-600 text-sm">載入K線數據中...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400 mx-auto mb-2"></div>
+              <p className="text-slate-300 text-sm">載入K線數據中...</p>
             </div>
           </div>
         ) : klineError ? (
-          <div className="flex items-center justify-center bg-white rounded-lg shadow-md" style={{ height: '640px' }}>
+          <div className="flex items-center justify-center glass-panel rounded-xl" style={{ height: '640px' }}>
             <div className="text-center">
-              <div className="text-red-500 text-2xl mb-2">⚠️</div>
-              <p className="text-red-600 text-sm">{klineError}</p>
+              <div className="text-rose-300 text-2xl mb-2">⚠️</div>
+              <p className="text-rose-200 text-sm">{klineError}</p>
             </div>
           </div>
         ) : klineData.length > 0 ? (
@@ -436,13 +436,13 @@ export default function ChartPage() {
             showToMarker={true}
           />
         ) : (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
-            <p className="text-gray-600 text-lg">無K線數據</p>
+          <div className="glass-panel border border-slate-800/80 rounded-lg p-12 text-center">
+            <p className="text-slate-300 text-lg">無K線數據</p>
           </div>
         )
       ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
-          <p className="text-gray-600 text-lg">請選擇案例以查看圖表</p>
+        <div className="glass-panel border border-slate-800/80 rounded-lg p-12 text-center">
+          <p className="text-slate-300 text-lg">請選擇案例以查看圖表</p>
         </div>
       )}
     </div>

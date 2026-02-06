@@ -172,8 +172,6 @@ function TradingChartWithSignalsInner({
 }: TradingChartWithSignalsProps) {
   // 合併 indicatorSeries 和 priceIndicatorSeries（向後兼容）
   const effectivePriceIndicatorSeries = priceIndicatorSeries ?? indicatorSeries;
-  
-  // ===== Refs =====
   const containerRef = useRef<HTMLDivElement>(null);
 
   // ===== Context =====
@@ -252,11 +250,11 @@ function TradingChartWithSignalsInner({
     const lines: Array<{ label: string; color: string; left: number }> = [];
     const toLeft = toPercent(toTimestamp);
     if (toLeft !== null) {
-      lines.push({ label: "TO", color: "#4338ca", left: toLeft });
+      lines.push({ label: "TO", color: "#818cf8", left: toLeft });
     }
     const tcLeft = toPercent(tcTimestamp);
     if (tcLeft !== null) {
-      lines.push({ label: "TC", color: "#ea580c", left: tcLeft });
+      lines.push({ label: "TC", color: "#fb923c", left: tcLeft });
     }
     return lines.filter((line) => line.left >= 0 && line.left <= 100);
   }, [timelineRange, toTimestamp, tcTimestamp]);
@@ -330,7 +328,7 @@ function TradingChartWithSignalsInner({
             width: `${overlay.width}%`,
             backgroundColor:
               overlay.type === "near"
-                ? "rgba(79, 70, 229, 0.08)"
+                ? "rgba(96, 165, 250, 0.08)"
                 : "rgba(168, 85, 247, 0.08)",
           }}
         />
@@ -359,7 +357,7 @@ function TradingChartWithSignalsInner({
           style={{
             left: `${crosshairX}px`,
             width: "1px",
-            borderLeft: "1px dashed rgba(128, 128, 128, 0.6)",
+            borderLeft: "1px dashed rgba(255, 255, 255, 0.1)",
           }}
         />
       )}
@@ -368,13 +366,13 @@ function TradingChartWithSignalsInner({
       <div className="relative z-10 w-full h-full flex flex-col">
         {!isInitialized ? (
           <div className="flex items-center justify-center w-full h-full">
-            <div className="text-gray-400 text-sm">初始化中...</div>
+            <div className="text-slate-400 text-sm">初始化中...</div>
           </div>
         ) : (
           <>
             {/* 1. Strategy Signal Chart (策略信號圖) - 50% 高度 */}
             <div
-              className="w-full border-b border-gray-200"
+              className="w-full border-b border-white/10"
               style={{ height: `${priceHeight}px` }}
             >
               <StrategySignalChart
@@ -397,7 +395,7 @@ function TradingChartWithSignalsInner({
 
             {/* 2. Volume Chart (成交量圖) - 25% 高度 */}
             <div
-              className="w-full border-b border-gray-200"
+              className="w-full border-b border-white/10"
               style={{ height: `${volumeHeight}px` }}
             >
               <VolumeChart

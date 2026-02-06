@@ -190,12 +190,12 @@ export function TakerRatioChart({
 
     const toLeft = toPercent(toTimestamp);
     if (toLeft !== null) {
-      positions.push({ label: 'TO', color: '#4338ca', left: toLeft });
+      positions.push({ label: 'TO', color: '#818cf8', left: toLeft });
     }
 
     const tcLeft = toPercent(tcTimestamp);
     if (tcLeft !== null) {
-      positions.push({ label: 'TC', color: '#ea580c', left: tcLeft });
+      positions.push({ label: 'TC', color: '#fb923c', left: tcLeft });
     }
 
     return positions;
@@ -232,8 +232,8 @@ export function TakerRatioChart({
       // 創建背景色區域 - 賣盤強勢區域（0-0.5，紅色）
       // 修復P1-3: 使用chartColors而非硬編碼
       const sellAreaSeries = chartInstance.addAreaSeries({
-        topColor: `rgba(239, 83, 80, 0.1)`,  // 使用chartColors.downColor的rgba版本
-        bottomColor: `rgba(239, 83, 80, 0.02)`,
+        topColor: `rgba(251, 113, 133, 0.12)`,
+        bottomColor: `rgba(251, 113, 133, 0.04)`,
         lineColor: 'transparent',
         priceScaleId: 'taker_ratio',
         lastValueVisible: false,
@@ -243,8 +243,8 @@ export function TakerRatioChart({
 
       // 創建背景色區域 - 買盤強勢區域（0.5-1，綠色）
       const buyAreaSeries = chartInstance.addAreaSeries({
-        topColor: `rgba(38, 166, 154, 0.1)`,  // 使用chartColors.upColor的rgba版本
-        bottomColor: `rgba(38, 166, 154, 0.02)`,
+        topColor: `rgba(52, 211, 153, 0.12)`,
+        bottomColor: `rgba(52, 211, 153, 0.04)`,
         lineColor: 'transparent',
         priceScaleId: 'taker_ratio',
         lastValueVisible: false,
@@ -254,7 +254,7 @@ export function TakerRatioChart({
 
       // 創建主線圖（Taker Ratio線）
       const lineSeries = chartInstance.addLineSeries({
-        color: '#2962FF',  // 藍色線（TODO: 可考慮加入chartColors）
+        color: '#60a5fa',
         lineWidth: 2,
         priceScaleId: 'taker_ratio',
         priceFormat: {
@@ -289,7 +289,7 @@ export function TakerRatioChart({
         const markers = signalPoints.map((signal) => ({
           time: toUtcTime(signal.timestamp),
           position: 'aboveBar' as const,
-          color: signal.windowType === 'near' ? '#3B82F6' : '#CA8A04',
+          color: signal.windowType === 'near' ? '#60a5fa' : '#fbbf24',
           shape: 'arrowDown' as const,
           text: signal.windowType === 'near' ? 'N' : 'F',
         }));
@@ -300,7 +300,7 @@ export function TakerRatioChart({
       // 添加0.5參考線（中性線，虛線）
       lineSeries.createPriceLine({
         price: 0.5,
-        color: '#999999',
+        color: '#64748b',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
@@ -461,36 +461,36 @@ export function TakerRatioChart({
   }, [chartInstance, indicatorSeries, isReady]);
 
   return (
-    <div className="w-full flex flex-col bg-[#1e1e1e] border-t border-gray-700" style={{ height: `${height}px` }}>
+    <div className="w-full flex flex-col bg-[#0A0F1C] border-t border-white/10" style={{ height: `${height}px` }}>
       {/* 頂部標籤 */}
-      <div className="px-4 py-1 flex items-center justify-between border-b border-gray-700">
+      <div className="px-4 py-1 flex items-center justify-between border-b border-white/10">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-medium text-gray-300">Taker Ratio</span>
+          <span className="text-xs font-medium text-slate-300">Taker Ratio</span>
           
           {/* 信號統計 - 顯示 Near(藍) 和 Far(土黃) 計數 */}
           {signalPoints.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded flex items-center gap-1">
-                <span style={{ color: '#3B82F6' }}>▼</span>
+              <span className="text-xs px-2 py-0.5 bg-blue-400/15 text-blue-300 rounded flex items-center gap-1">
+                <span style={{ color: '#60a5fa' }}>▼</span>
                 N: {signalPoints.filter(s => s.windowType === 'near').length}
               </span>
-              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded flex items-center gap-1">
-                <span style={{ color: '#CA8A04' }}>▼</span>
+              <span className="text-xs px-2 py-0.5 bg-amber-400/15 text-amber-300 rounded flex items-center gap-1">
+                <span style={{ color: '#fbbf24' }}>▼</span>
                 F: {signalPoints.filter(s => s.windowType === 'far').length}
               </span>
             </div>
           )}
           
           {hoveredRatio !== null && (
-            <span className="text-xs text-gray-300">
+            <span className="text-xs text-slate-300">
               {formatPercentage(hoveredRatio)}
               {' - '}
               {hoveredRatio > 0.5 ? (
-                <span className="text-green-400">買盤強</span>
+                <span className="text-emerald-400">買盤強</span>
               ) : hoveredRatio < 0.5 ? (
-                <span className="text-red-400">賣盤強</span>
+                <span className="text-rose-400">賣盤強</span>
               ) : (
-                <span className="text-gray-400">中性</span>
+                <span className="text-slate-400">中性</span>
               )}
             </span>
           )}
@@ -499,7 +499,7 @@ export function TakerRatioChart({
             const value = hoveredIndicators[series.id];
             if (value === undefined) return null;
             return (
-              <span key={series.id} className="text-xs text-gray-300">
+              <span key={series.id} className="text-xs text-slate-300">
                 <span style={{ color: series.color }}>●</span>{" "}
                 {series.label?.replace(/\s*\(\d+\)/, "") || series.id}:{" "}
                 <span className="font-mono" style={{ color: series.color }}>
@@ -514,17 +514,17 @@ export function TakerRatioChart({
       {/* 圖表容器 */}
       <div className="flex-1 relative">
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] z-20">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A0F1C] z-20">
             <div className="text-center">
-              <div className="text-red-400 text-xl mb-1">⚠️</div>
-              <p className="text-xs text-red-400">{error}</p>
+              <div className="text-rose-400 text-xl mb-1">⚠️</div>
+              <p className="text-xs text-rose-300">{error}</p>
             </div>
           </div>
         )}
 
         {klines.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#1e1e1e] z-20">
-            <p className="text-xs text-gray-400">無Taker Ratio數據</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A0F1C] z-20">
+            <p className="text-xs text-slate-400">無Taker Ratio數據</p>
           </div>
         )}
 
@@ -543,8 +543,8 @@ export function TakerRatioChart({
                   width: `${overlay.width}%`,
                   backgroundColor:
                     overlay.type === 'near'
-                      ? 'rgba(79, 70, 229, 0.08)'
-                      : 'rgba(168, 85, 247, 0.08)',
+                      ? 'rgba(96, 165, 250, 0.08)'
+                      : 'rgba(251, 191, 36, 0.08)',
                 }}
               />
             ))}

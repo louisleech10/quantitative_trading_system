@@ -1,7 +1,3 @@
-"use client";'use client';
-
-
-
 "use client";
 
 import React, { useState } from 'react';
@@ -21,7 +17,7 @@ export default function ChartExportButton({ targetRef, filename = 'chart', class
     setExporting(true);
     try {
       const canvas = await html2canvas(targetRef.current, {
-        backgroundColor: '#ffffff',
+        backgroundColor: '#0A0F1C',
         scale: 2,
         logging: false
       });
@@ -38,7 +34,7 @@ export default function ChartExportButton({ targetRef, filename = 'chart', class
     <button
       onClick={handleExport}
       disabled={exporting}
-      className={className || 'px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-60'}
+      className={className || 'px-3 py-1 bg-emerald-500 text-white text-sm rounded hover:bg-emerald-400 disabled:opacity-60'}
     >
       {exporting ? '匯出中...' : '匯出 PNG'}
     </button>

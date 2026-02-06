@@ -1,14 +1,9 @@
-/**
- * StrategyLogicSelector.tsx - 策略邏輯選擇組件
- *
- * Phase 3.3+3.4 - Task B1: 基礎選擇組件
- *
- * 功能:
- * - 提供 3 種策略邏輯選擇 (三線排列/短長交叉/中長交叉)
- * - 單選模式,預設為三線排列
- * - 視覺化策略邏輯圖示
- * - 提供策略說明和適用場景
- *
+                <div
+                  className={`
+                    flex items-center justify-center w-12 h-12 rounded-lg text-2xl
+                    ${isSelected ? "bg-violet-500/20" : "bg-white/5"}
+                  `}
+                >
  * Ultra Think 記錄:
  * - 步驟 1: 初版代碼 (當前)
  * - 步驟 2: 審查優化 (待執行)
@@ -83,10 +78,10 @@ export default function StrategyLogicSelector({
     <div className={`space-y-3 ${className}`}>
       {/* 標題 */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-200 mb-1">
           策略邏輯
         </label>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-slate-400">
           選擇如何判斷策略信號的條件邏輯
         </p>
       </div>
@@ -106,15 +101,15 @@ export default function StrategyLogicSelector({
                 w-full relative p-4 rounded-lg border-2 text-left transition-all
                 ${
                   isSelected
-                    ? "border-purple-500 bg-purple-50"
-                    : "border-gray-200 bg-white hover:border-gray-300"
+                    ? "border-violet-400/60 bg-violet-500/10"
+                    : "border-white/10 bg-white/5 hover:border-white/20"
                 }
                 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
               `}
             >
               {/* 選中指示器 */}
               {isSelected && (
-                <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-purple-500" />
+                <div className="absolute top-4 right-4 w-2 h-2 rounded-full bg-violet-400" />
               )}
 
               <div className="flex gap-3">
@@ -122,11 +117,7 @@ export default function StrategyLogicSelector({
                 <div
                   className={`
                     flex items-center justify-center w-12 h-12 rounded-lg text-2xl
-                    ${
-                      isSelected
-                        ? "bg-purple-100"
-                        : "bg-gray-100"
-                    }
+                    ${isSelected ? "bg-violet-500/20" : "bg-white/5"}
                   `}
                 >
                   {option.icon}
@@ -137,7 +128,7 @@ export default function StrategyLogicSelector({
                   {/* 標籤 */}
                   <div
                     className={`text-sm font-semibold ${
-                      isSelected ? "text-purple-900" : "text-gray-900"
+                      isSelected ? "text-violet-100" : "text-slate-100"
                     }`}
                   >
                     {option.label}
@@ -147,8 +138,8 @@ export default function StrategyLogicSelector({
                   <div
                     className={`text-xs font-mono mt-1 px-2 py-1 rounded inline-block ${
                       isSelected
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-violet-500/20 text-violet-200"
+                        : "bg-white/10 text-slate-300"
                     }`}
                   >
                     {option.condition}
@@ -157,7 +148,7 @@ export default function StrategyLogicSelector({
                   {/* 描述 */}
                   <div
                     className={`text-xs mt-2 ${
-                      isSelected ? "text-purple-600" : "text-gray-500"
+                      isSelected ? "text-violet-300" : "text-slate-400"
                     }`}
                   >
                     {option.description}
@@ -165,15 +156,15 @@ export default function StrategyLogicSelector({
 
                   {/* 所需參數 */}
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-gray-500">需要參數:</span>
+                    <span className="text-xs text-slate-400">需要參數:</span>
                     <div className="flex gap-1">
                       {option.parameters.map((param) => (
                         <span
                           key={param}
                           className={`text-xs px-2 py-0.5 rounded ${
                             isSelected
-                              ? "bg-purple-200 text-purple-800"
-                              : "bg-gray-200 text-gray-700"
+                              ? "bg-violet-500/20 text-violet-200"
+                              : "bg-white/10 text-slate-300"
                           }`}
                         >
                           {param}
@@ -185,7 +176,7 @@ export default function StrategyLogicSelector({
                   {/* 適用場景 */}
                   <div
                     className={`text-xs mt-2 italic ${
-                      isSelected ? "text-purple-600" : "text-gray-500"
+                      isSelected ? "text-violet-300" : "text-slate-400"
                     }`}
                   >
                     💡 {option.recommendedFor}
@@ -198,12 +189,12 @@ export default function StrategyLogicSelector({
       </div>
 
       {/* 策略對比提示 */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+      <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-3">
         <div className="flex items-start gap-2">
-          <span className="text-blue-600 text-sm">ℹ️</span>
-          <div className="text-xs text-blue-700">
+          <span className="text-sky-300 text-sm">ℹ️</span>
+          <div className="text-xs text-sky-200">
             <div className="font-medium mb-1">策略選擇建議:</div>
-            <ul className="space-y-1 text-blue-600">
+            <ul className="space-y-1 text-sky-200/80">
               <li>
                 • <strong>三線排列</strong>: 信號最嚴格,適合高勝率策略
               </li>
@@ -220,11 +211,11 @@ export default function StrategyLogicSelector({
 
       {/* 當前選擇摘要 */}
       {selectedOption && (
-        <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
-          <span className="font-medium">當前策略:</span>{" "}
-          <span className="text-gray-900">{selectedOption.label}</span>
+        <div className="text-xs text-slate-300 bg-white/5 border border-white/10 p-2 rounded">
+          <span className="font-medium text-slate-200">當前策略:</span>{" "}
+          <span className="text-slate-100">{selectedOption.label}</span>
           {" - "}
-          <span className="font-mono text-purple-600">
+          <span className="font-mono text-violet-300">
             {selectedOption.condition}
           </span>
         </div>
