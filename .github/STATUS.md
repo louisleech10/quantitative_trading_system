@@ -1,6 +1,12 @@
 # 項目狀態
 
 ### 已完成 ✅
+- ✅ **Feature Factory 後端系統（Task 1.1-1.5）** — 2026-02-07
+  - 完成 17/18 任務：基礎建設、算子層、進階功能、API、測試（Task 1.4.2 前端待開發）
+  - 建立 momentum/FeatureEngineering/ 完整架構（7 層 Pipeline、Config、Adapter、132 個 TA-Lib 指標）
+  - 建立 14 個測試檔案（E2E、API、原子指標、算子、MCP、多 TF、橫截面處理等）
+  - 遵循 REFACTOR_ARCHITECTURE_V4 全部 7 條解耦規則
+  - Feature_Factory_PLAN.md V7 定案（Frozen 狀態）
 - ✅ **UI Liquid Glass Dark 樣式完善（Phase G-K Tier 6-10）** — 2026-02-06
   - 完成 UI_PLAN_TODO.md Phase A-F (Tier 0-5) 狀態標記（140+ 項目標記為完成）
   - 修復 SignalTooltip.tsx 語法錯誤（移除重複的 `)` 閉括號）
@@ -36,47 +42,84 @@
 - ✅ Phase 1~3: 策略信號系統 - 已於 2025-11-02 完成
 
 ### 進行中 🚧
-- 無（UI 樣式工作完成，系統處於穩定狀態）
+- ⏳ **Task 1.4.2：Feature Factory 前端頁面** — 待開發
+  - 後端 API 完成（preview、generate、task 端點）
+  - 需建立：ConfigPanel、PreviewPanel、GenerationProgress、ResultView 等組件
 
 ## 🎯 當前重點
-- ✅ **UI Liquid Glass Dark 主題遷移完成**（2026-02-06）
-  - Phase A-F (Tier 0-5) 全部完成標記
-  - Charts 頁面語法錯誤修復完成
-  - 系統 UI 樣式統一且穩定
+- ✅ **Feature Factory 後端與測試完成**（2026-02-07）
+  - 7 層 Pipeline 全部實作（Config、Adapter、TA-Lib、原子指標、算子、元特徵、標籤生成）
+  - 14 個測試檔案覆蓋所有組件（E2E、API、單元測試）
+  - Feature_Factory_PLAN.md V7 Frozen（AI Agent 可執行清單）
+- ⏳ **待前端整合**：Task 1.4.2 前端頁面開發（ConfigPanel、預覽、進度、結果展示）
 - ✅ **架構重構 V4 完成**（2026-02-05）
-  - momentum domain 完全獨立（無 api 依賴）
-  - Protocol 介面與 Factory 模式解耦成功
-- 系統架構健康，UI 樣式完善，可進行全面測試或新功能開發
+  - momentum domain 完全獨立，Protocol 與 Factory 解耦
+- 系統架構健康，後端完整，待前端 UI 整合
 
 ### 下一步工作
-**選項 A**（推薦，全面測試）：
-- 全面 UI 測試（驗證 Liquid Glass Dark 主題在各頁面的一致性）
-- Phase G-K (Tier 6-10) 審查驗證（確認先前標記為完成的項目）
-- 回歸測試（確保語法修復未引入新問題）
+**選項 A**（推薦）：
+- **Task 1.4.2：Feature Factory 前端整合** — 完成 UI 開發（預覽、配置、進度、結果展示）
+- **運行測試驗證** — 確認 14 個測試檔案全部通過（pytest tests/test_feature_factory_*.py -v）
+- **效能基準測試** — 驗證 standard preset < 3秒、記憶體 < 4GB（Task 1.5.1 待確認項目）
 
-**選項 B**（持續優化）：
-- 消除測試警告（117 個 warnings，主要為 PytestReturnNotNoneWarning）
-- 提升測試覆蓋率（目前 251 passed, 33 skipped）
-- 效能基準測試與優化
+**選項 B**：
+- **IC 篩選系統開發** — 開始 Information Coefficient 特徵篩選（依據 PRODUCT_VISION.md 路線圖）
+- **Feature Factory 優化** — 向量化優化、記憶體調校、效能 profiling
 
-**選項 C**（新功能開發）：
+**選項 C**（持續改進）：
+- 消除測試警告（117 個 warnings）
 - Task 4.1: Feature Engineering 實作（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合
-- 前端 E2E 測試流程建立
 ### 需要修復
-- 無待修復項目（架構重構 V4 完成，所有測試通過）
+- ⏳ **Task 1.4.2 前端開發** — Feature Factory UI 組件（ConfigPanel、PreviewPanel 等）
+- ⏳ **效能基準測試** — 驗證 standard preset < 3秒、記憶體 < 4GB（Task 1.5.1 待確認）
 
 ### 需要優化
+- **Feature Factory 效能** — 向量化優化、記憶體調校（已在計劃中，待測試驗證）
 - 測試警告消除（117 個 warnings，主要為 PytestReturnNotNoneWarning） — 優先級中
 - SHAP 樣本大小配置（目前 100/200 固定值） — 優先級低
-- API 序列化清理負擔優化 — 優先級低
 
 ### 技術債務
-- 架構文檔更新（ARCHITECTURE.md 需反映 momentum/core 與 Protocol 架構）
+- **Feature Factory 前端整合** — Task 1.4.2（7+ 組件待開發）
+- **架構文檔更新** — docs/ARCHITECTURE.md 需反映 FeatureEngineering 架構
 - Task 4.1: Feature Engineering（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合（可選）
-- E2E 測試與 API 整合測試建立
 ## 📝 最近完成的工作
+- 2026-02-07：**Feature Factory 後端系統完成（Task 1.1-1.5）** — 完整特徵生成 Pipeline
+  - **基礎建設（Task 1.1.1-1.1.6）**：
+    - ✅ ConfigManager 三層配置管理（Default < YAML < API Override）
+    - ✅ DataSource Adapter 插件架構（CryptoSpotAdapter、合成欄位、AdapterRegistry）
+    - ✅ TA-Lib 統一介面（132 個指標、ParameterGenerator 自適應參數）
+    - ✅ 7 類原子指標引擎（Trend、Momentum、Volatility、Volume、Cycle、Pattern、Statistics）
+    - ✅ FeatureFactory 七層骨架（Layer 0-6 調度器）
+    - ✅ scan_config.yaml 完整配置（支援 minimal/standard/extended/full/custom preset）
+  - **算子層（Task 1.2.1-1.2.3）**：
+    - ✅ 衍生算子引擎（Distance、Cross、Ratio、Momentum、Binary）
+    - ✅ 滾動聚合引擎（Slope、Rank、ZScore 等 10 種滾動算子）
+    - ✅ Lag 處理器（adaptive/dense/sparse_log/custom 策略）
+  - **進階功能（Task 1.3.1-1.3.6）**：
+    - ✅ 元特徵引擎（Consensus、Time、Interaction 特徵）
+    - ✅ Label 生成器（binary/return 標籤，防未來洩漏）
+    - ✅ 多時間框架處理（TimeframeAligner 無洩漏對齊）
+    - ✅ 橫截面處理器（relative price、beta、idiosyncratic momentum）
+    - ✅ FeatureStorage + Validator 擴展（HDF5 儲存、完整性驗證）
+    - ✅ MCP Server 骨架（11 個工具、自然語言配置轉換）
+  - **API 與測試（Task 1.4.1、1.5.1）**：
+    - ✅ 後端 API 路由（preview、generate、task 端點 + WebSocket 進度推送）
+    - ✅ FeatureService 服務層（任務管理、FastAPI 整合）
+    - ✅ 端到端測試（test_feature_factory_e2e.py，8 個測試案例，144 行）
+    - ✅ 單元測試（14 個測試檔案，涵蓋所有組件）
+  - **文檔與分析**：
+    - ✅ Feature_Factory_PLAN.md V7 定案（Frozen 狀態，AI Agent 可執行清單）
+    - ✅ frontend_error_handling_analysis.md（863 行，前端錯誤處理分析）
+    - ✅ 未來優化清單.md（1743 行，P0-P3 優化項目 15 個）
+    - ✅ verify_data_integrity.py（347 行，HDF5 數據完整性驗證工具）
+  - **架構遵循**：
+    - ✅ Rule 1-7 全部遵循（momentum/ 無 api/ 依賴、Protocol 注入、Factory 模式）
+    - ✅ V2.0/V3.0 準備（支援未來 Chat/Agent 調用）
+  - **待完成**：
+    - ⏳ Task 1.4.2：前端頁面（ConfigPanel、PreviewPanel、GenerationProgress 等組件）
+    - ⏳ 效能基準測試（standard preset < 3秒、記憶體 < 4GB）
 - 2026-02-06：**UI Liquid Glass Dark 樣式完善** — Phase A-F checklist 更新與語法錯誤修復
   - ✅ UI_PLAN_TODO.md Phase A-F (Tier 0-5) 狀態標記完成（140+ 項目標記為 [x]）
   - ✅ Python 自動化腳本批次更新 checklist（tier 檢測邏輯）
@@ -124,7 +167,13 @@
   - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
 - 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，待推送 — 2026-02-06（UI 樣式完善 + 語法錯誤修復）
+- main 分支，待推送 — 2026-02-07（Feature Factory 後端完成 + 14 測試 + 4 文檔）
+  - 新增：14 個測試檔案（test_feature_factory_*.py，涵蓋 E2E、API、單元測試）
+  - 新增：frontend_error_handling_analysis.md（863 行）
+  - 新增：未來優化清單.md（1743 行）
+  - 新增：integrity_check_output.txt（數據完整性檢查輸出）
+  - 新增：verify_data_integrity.py（347 行）
+  - 待推送檔案數：18 個新增檔案
 - **XGBoost 批量分析 JSON 序列化修復** (100%) - 2026-01-15完成
   - ✅ JSON 序列化工具：convert_numpy_types 遞迴轉換 numpy 類型
   - ✅ XGBoost 結果清理：sanitize_for_json 防止 FastAPI 序列化錯誤

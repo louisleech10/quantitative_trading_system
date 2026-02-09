@@ -89,6 +89,9 @@ api_credentials.json
 *.key
 *.pem
 
+# User config overrides
+config/user_scan_config.yaml
+
 # Data cache
 data_cache/
 temp_data/

@@ -159,6 +159,116 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+// ===== Feature Factory 類型定義 =====
+
+export interface FeatureFactoryConfig {
+  global_settings: {
+    sequence_length: number;
+    max_lag_ratio: number;
+    lag_strategy?: string;
+    custom_lags?: number[] | null;
+  };
+  data_sources: {
+    enabled_sources: string[];
+    synthetic_sources?: string[];
+  };
+  timeframes: {
+    primary: string;
+    training: string[];
+    alignment?: string;
+  };
+  atomic_indicators: Record<
+    string,
+    {
+      enabled: boolean;
+      indicators?: unknown[];
+      data_sources?: string[] | null;
+    }
+  >;
+  operators?: Record<string, { enabled: boolean }>;
+  rolling_aggregation?: {
+    windows: number[];
+    aggregators?: string[];
+    apply_to?: string | string[];
+  };
+  lag_features?: {
+    apply_to?: string | string[];
+    exclude_patterns?: string[];
+  };
+  cross_sectional?: {
+    enabled?: boolean;
+    reference_symbol?: string;
+    features?: string[];
+  };
+  meta_features?: {
+    consensus?: boolean;
+    interaction?: boolean;
+    time_features?: boolean;
+  };
+  labels?: {
+    binary?: { horizons?: number[]; threshold?: number };
+    regression?: { horizons?: number[] };
+  };
+  custom_indicators?: unknown[];
+}
+
+export interface FeaturePreview {
+  total_features: number;
+  estimated_time_seconds: number;
+  memory_mb: number;
+  breakdown: Record<string, number>;
+}
+
+export interface FeatureTask {
+  task_id: string;
+  status: string;
+  progress: number;
+  current_stage: string | null;
+  completed_stages: string[];
+  error: string | null;
+}
+
+export interface FeatureFactoryPreset {
+  name: string;
+  description?: string;
+  config?: FeatureFactoryConfig;
+}
+
+export interface FeatureIndicatorSpec {
+  name: string;
+  category?: string;
+  input_type?: string;
+  output_count?: number;
+}
+
+export interface FeatureGenerationProgress {
+  status?: string;
+  stage?: string;
+  progress?: number;
+  message?: string;
+}
+
+export interface FeatureNLResult {
+  config_patch: Record<string, unknown>;
+  description: string;
+  preview?: FeaturePreview;
+}
+
+export interface FeatureGenerationResult {
+  feature_names?: string[];
+}
+
+export interface AutoResearchStatus {
+  status: string;
+  research_id?: string;
+}
+
+export interface AutoResearchLogEntry {
+  iteration: number;
+  decision: string;
+  next_action: string;
+}
+
 export interface TaskInfo {
   task_id: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';

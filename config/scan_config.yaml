@@ -1,0 +1,371 @@
+version: "2.2"
+
+global:
+  sequence_length: 100
+  max_lag_ratio: 0.5
+  lag_strategy: "adaptive"
+  custom_lags: null
+
+data_sources:
+  enabled_sources:
+    - close
+    - open
+    - high
+    - low
+    - volume
+    - quote_volume
+    - trades
+    - taker_buy_volume
+    - taker_ratio
+  synthetic_sources:
+    - avg_price
+    - med_price
+    - typ_price
+    - wcl_price
+  adapters:
+    crypto_spot:
+      enabled: true
+      class: "CryptoSpotAdapter"
+    crypto_deriv:
+      enabled: false
+      class: "CryptoDerivAdapter"
+
+timeframes:
+  primary: "12h"
+  training: ["12h"]
+  alignment: "point_in_time"
+
+atomic_indicators:
+  trend:
+    enabled: true
+    indicators:
+      - name: EMA
+        periods: fibonacci
+        period_range: [5, 233]
+        industry_standard: [10, 20, 50, 100, 200]
+      - name: SMA
+        periods: fibonacci
+        period_range: [5, 233]
+        industry_standard: [10, 20, 50, 100, 200]
+      - name: WMA
+        periods: fibonacci_short
+      - name: DEMA
+        periods: fibonacci_short
+      - name: TEMA
+        periods: fibonacci_short
+      - name: TRIMA
+        periods: fibonacci_short
+      - name: KAMA
+        periods: fibonacci_short
+      - name: T3
+        periods: fibonacci_short
+        vfactor: [0.7]
+      - name: MAMA
+        fastlimit: [0.5]
+        slowlimit: [0.05]
+      - name: HT_TRENDLINE
+      - name: MIDPOINT
+        periods: fibonacci_short
+      - name: MIDPRICE
+        periods: fibonacci_short
+      - name: SAR
+        acceleration: [0.01, 0.02, 0.03]
+        maximum: [0.1, 0.2, 0.3]
+      - name: SAREXT
+        acceleration: [0.02]
+        maximum: [0.2]
+      - name: BBANDS
+        periods: [13, 20, 21, 34, 55]
+        stddev: [1.0, 1.5, 2.0, 2.5, 3.0]
+      - name: MAVP
+        periods: fibonacci_short
+      - name: MA
+        periods: fibonacci_short
+        matype: [0, 1, 2, 3, 4]
+
+  momentum:
+    enabled: true
+    indicators:
+      - name: RSI
+        periods: fibonacci_short
+        industry_standard: [6, 7, 9, 14, 25]
+      - name: MACD
+        combos: [[8, 17, 9], [12, 26, 9], [5, 35, 5], [5, 13, 1]]
+      - name: MACDEXT
+        combos: [[12, 26, 9]]
+      - name: MACDFIX
+        periods: [9]
+      - name: ADX
+        periods: [8, 13, 14, 21, 34]
+      - name: ADXR
+        periods: [8, 13, 14, 21, 34]
+      - name: DX
+        periods: [8, 13, 14, 21, 34]
+      - name: PLUS_DI
+        periods: [8, 13, 14, 21, 34]
+      - name: MINUS_DI
+        periods: [8, 13, 14, 21, 34]
+      - name: PLUS_DM
+        periods: [8, 13, 14, 21, 34]
+      - name: MINUS_DM
+        periods: [8, 13, 14, 21, 34]
+      - name: CCI
+        periods: fibonacci_short
+        industry_standard: [14, 20]
+      - name: CMO
+        periods: fibonacci_short
+        industry_standard: [14]
+      - name: MOM
+        periods: fibonacci_short
+      - name: ROC
+        periods: fibonacci_short
+        industry_standard: [9, 12]
+      - name: ROCP
+        periods: fibonacci_short
+      - name: ROCR
+        periods: fibonacci_short
+      - name: ROCR100
+        periods: fibonacci_short
+      - name: APO
+        combos: [[12, 26], [5, 35], [8, 17]]
+      - name: PPO
+        combos: [[12, 26], [5, 35], [8, 17]]
+      - name: AROON
+        periods: [13, 14, 21, 25, 34, 55]
+      - name: AROONOSC
+        periods: [13, 14, 21, 25, 34, 55]
+      - name: BOP
+      - name: TRIX
+        periods: [8, 13, 21]
+      - name: ULTOSC
+        combos: [[7, 14, 28], [5, 10, 20]]
+      - name: WILLR
+        periods: fibonacci_short
+        industry_standard: [10, 14, 20]
+      - name: MFI
+        periods: [8, 13, 14, 21, 34]
+      - name: STOCH
+        combos: [[5, 3, 3], [9, 3, 3], [14, 3, 3], [21, 5, 5]]
+      - name: STOCHF
+        combos: [[5, 3], [9, 3], [14, 3], [21, 5]]
+      - name: STOCHRSI
+        combos: [[14, 5, 3], [14, 3, 3]]
+
+  volatility:
+    enabled: true
+    indicators:
+      - name: ATR
+        periods: fibonacci_short
+        industry_standard: [14, 20]
+      - name: NATR
+        periods: fibonacci_short
+        industry_standard: [14, 20]
+      - name: TRANGE
+      - name: Keltner
+        ema_periods: [20]
+        atr_multiplier: [1.0, 1.5, 2.0, 2.5]
+      - name: Donchian
+        periods: [10, 20, 55]
+      - name: Parkinson_Vol
+        periods: [14, 21, 55]
+      - name: GarmanKlass_Vol
+        periods: [14, 21, 55]
+
+  volume:
+    enabled: true
+    indicators:
+      - name: OBV
+      - name: AD
+      - name: ADOSC
+        combos: [[3, 10], [5, 20]]
+      - name: VWAP
+      - name: Volume_MA_Ratio
+        periods: [5, 10, 20, 50]
+      - name: Force_Index
+        ema_periods: [2, 13]
+      - name: Klinger_Volume_Osc
+      - name: Ease_of_Movement
+        periods: [14]
+
+  cycle:
+    enabled: true
+    indicators:
+      - name: HT_DCPERIOD
+      - name: HT_DCPHASE
+      - name: HT_PHASOR
+      - name: HT_SINE
+      - name: HT_TRENDMODE
+
+  pattern:
+    enabled: true
+    indicators:
+      - name: CDL2CROWS
+      - name: CDL3BLACKCROWS
+      - name: CDL3INSIDE
+      - name: CDL3LINESTRIKE
+      - name: CDL3OUTSIDE
+      - name: CDL3STARSINSOUTH
+      - name: CDL3WHITESOLDIERS
+      - name: CDLABANDONEDBABY
+      - name: CDLADVANCEBLOCK
+      - name: CDLBELTHOLD
+      - name: CDLBREAKAWAY
+      - name: CDLCLOSINGMARUBOZU
+      - name: CDLCONCEALBABYSWALL
+      - name: CDLCOUNTERATTACK
+      - name: CDLDARKCLOUDCOVER
+      - name: CDLDOJI
+      - name: CDLDOJISTAR
+      - name: CDLDRAGONFLYDOJI
+      - name: CDLENGULFING
+      - name: CDLEVENINGDOJISTAR
+      - name: CDLEVENINGSTAR
+      - name: CDLGAPSIDESIDEWHITE
+      - name: CDLGRAVESTONEDOJI
+      - name: CDLHAMMER
+      - name: CDLHANGINGMAN
+      - name: CDLHARAMI
+      - name: CDLHARAMICROSS
+      - name: CDLHIGHWAVE
+      - name: CDLHIKKAKE
+      - name: CDLHIKKAKEMOD
+      - name: CDLHOMINGPIGEON
+      - name: CDLIDENTICAL3CROWS
+      - name: CDLINNECK
+      - name: CDLINVERTEDHAMMER
+      - name: CDLKICKING
+      - name: CDLKICKINGBYLENGTH
+      - name: CDLLADDERBOTTOM
+      - name: CDLLONGLEGGEDDOJI
+      - name: CDLLONGLINE
+      - name: CDLMARUBOZU
+      - name: CDLMATCHINGLOW
+      - name: CDLMATHOLD
+      - name: CDLMORNINGDOJISTAR
+      - name: CDLMORNINGSTAR
+      - name: CDLONNECK
+      - name: CDLPIERCING
+      - name: CDLRICKSHAWMAN
+      - name: CDLRISEFALL3METHODS
+      - name: CDLSEPARATINGLINES
+      - name: CDLSHOOTINGSTAR
+      - name: CDLSHORTLINE
+      - name: CDLSPINNINGTOP
+      - name: CDLSTALLEDPATTERN
+      - name: CDLSTICKSANDWICH
+      - name: CDLTAKURI
+      - name: CDLTASUKIGAP
+      - name: CDLTHRUSTING
+      - name: CDLTRISTAR
+      - name: CDLUNIQUE3RIVER
+      - name: CDLUPSIDEGAP2CROWS
+      - name: CDLXSIDEGAP3METHODS
+
+  statistics:
+    enabled: true
+    indicators:
+      - name: LINEARREG
+        periods: [5, 8, 10, 13, 14, 21, 34, 55]
+      - name: LINEARREG_SLOPE
+        periods: [5, 8, 10, 13, 14, 21, 34, 55]
+      - name: LINEARREG_ANGLE
+        periods: [8, 13, 21]
+      - name: LINEARREG_INTERCEPT
+        periods: [8, 13, 21]
+      - name: STDDEV
+        periods: fibonacci_short
+        industry_standard: [14, 20]
+        nbdev: [1, 2]
+      - name: VAR
+        periods: fibonacci_short
+        industry_standard: [14, 20]
+        nbdev: [1, 2]
+      - name: TSF
+        periods: [8, 13, 21]
+      - name: BETA
+        periods: [5, 8, 13, 21, 34, 55]
+      - name: CORREL
+        periods: [5, 8, 13, 21, 34, 55]
+
+operators:
+  distance:
+    enabled: true
+    apply_to: all_trend
+  cross:
+    enabled: true
+    pairs: auto
+  momentum:
+    enabled: true
+    lags: [3, 5, 8]
+    apply_to: all
+  ratio:
+    enabled: true
+    pairs: auto
+  binary_signal:
+    enabled: true
+    rules:
+      - indicator: RSI
+        condition: "> 70"
+        name_suffix: "Overbought"
+      - indicator: RSI
+        condition: "< 30"
+        name_suffix: "Oversold"
+      - indicator: ADX
+        condition: "> 25"
+        name_suffix: "Strong_Trend"
+      - indicator: CCI
+        condition: "> 100"
+        name_suffix: "Overbought"
+      - indicator: CCI
+        condition: "< -100"
+        name_suffix: "Oversold"
+      - indicator: MFI
+        condition: "> 80"
+        name_suffix: "Overbought"
+      - indicator: MFI
+        condition: "< 20"
+        name_suffix: "Oversold"
+  worldquant:
+    enabled: true
+
+rolling_aggregation:
+  enabled: true
+  windows: [5, 13, 21]
+  aggregators:
+    - slope
+    - std
+    - mean
+    - rank
+    - zscore
+    - skew
+    - kurt
+    - min
+    - max
+    - range
+  apply_to: all
+
+lag_features:
+  enabled: true
+  apply_to: layer1_and_raw
+
+cross_sectional:
+  enabled: false
+  reference_symbol: BTCUSDT
+  features: [relative_price, beta, idiosyncratic_momentum]
+
+meta_features:
+  enabled: true
+  trend_consensus: true
+  momentum_divergence: true
+  volume_price_divergence: true
+  time_features: true
+  volatility_regime: true
+
+labels:
+  binary:
+    horizons: [3, 5, 8, 13, 21]
+    threshold: 0.0
+  regression:
+    horizons: [5, 13]
+
+custom_indicators: []

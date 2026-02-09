@@ -117,6 +117,21 @@ def create_feature_validator() -> FeatureValidator:
     return FeatureValidator()
 
 
+def create_feature_factory(cache_dir: Optional[str] = None) -> "FeatureFactory":
+    """Create a FeatureFactory instance with ConfigManager and AdapterRegistry."""
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    from momentum.FeatureEngineering.config_manager import ConfigManager
+    from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
+    from momentum.FeatureEngineering.adapters.crypto_spot_adapter import CryptoSpotAdapter
+
+    storage = create_kline_storage_manager(cache_dir)
+    config_manager = ConfigManager()
+    registry = AdapterRegistry()
+    registry.register(CryptoSpotAdapter(storage))
+
+    return FeatureFactory(config_manager, registry)
+
+
 def create_expectancy_calculator() -> ExpectancyCalculator:
     return ExpectancyCalculator()
 

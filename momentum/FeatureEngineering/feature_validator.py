@@ -12,8 +12,8 @@ Date: 2026-01-10
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple
-from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
 import logging
 
 from momentum.core.logging import get_logger
@@ -29,6 +29,8 @@ class ValidationResult:
     max_correlation: float
     high_correlation_pairs: List[Tuple[str, str, float]]  # (feature1, feature2, corr)
     warnings: List[str]
+    coverage: Optional[float] = None
+    constant_features_removed: List[str] = field(default_factory=list)
     
     def is_valid(self) -> bool:
         """是否通過驗證"""
@@ -97,12 +99,86 @@ class FeatureValidator:
             has_inf=has_inf,
             max_correlation=max_corr,
             high_correlation_pairs=high_corr_pairs,
-            warnings=warnings
+            warnings=warnings,
+            coverage=None,
+            constant_features_removed=[],
         )
         
         self.logger.info(f"驗證完成 - 通過: {result.is_valid()}, 警告數: {len(warnings)}")
         
         return result
+
+    def validate_factory_output(self, result) -> ValidationResult:
+        """工廠專用驗證：NaN/Inf + 常數移除 + 覆蓋率 + Winsorize"""
+        features_df = result.features_df
+        feature_names = list(features_df.columns)
+
+        warnings: List[str] = []
+        if features_df.empty:
+            warnings.append("特徵矩陣為空")
+            return ValidationResult(
+                has_nan=False,
+                has_inf=False,
+                max_correlation=0.0,
+                high_correlation_pairs=[],
+                warnings=warnings,
+                coverage=0.0,
+                constant_features_removed=[],
+            )
+
+        has_nan = self.validate_no_nan(features_df, feature_names)
+        if has_nan:
+            warnings.append("發現 NaN 值")
+
+        has_inf = self.validate_no_inf(features_df, feature_names)
+        if has_inf:
+            warnings.append("發現 Inf 值")
+
+        constant_features = self._check_constant_features(features_df, feature_names)
+        if constant_features:
+            features_df = features_df.drop(columns=constant_features)
+            result.features_df = features_df
+            result.feature_count = features_df.shape[1]
+            warnings.append(f"移除常數特徵: {constant_features}")
+
+        coverage = self.check_coverage(features_df)
+        if coverage < 1.0:
+            warnings.append(f"覆蓋率: {coverage:.4f}")
+
+        result.features_df = self.winsorize(features_df)
+
+        return ValidationResult(
+            has_nan=has_nan,
+            has_inf=has_inf,
+            max_correlation=0.0,
+            high_correlation_pairs=[],
+            warnings=warnings,
+            coverage=coverage,
+            constant_features_removed=constant_features,
+        )
+
+    def check_coverage(self, features_df: pd.DataFrame) -> float:
+        """特徵覆蓋率：非 NaN 比例"""
+        if features_df.empty:
+            return 0.0
+        total = features_df.size
+        if total == 0:
+            return 0.0
+        return float(features_df.notna().sum().sum() / total)
+
+    def winsorize(
+        self,
+        features_df: pd.DataFrame,
+        lower: float = 0.01,
+        upper: float = 0.99,
+    ) -> pd.DataFrame:
+        """極端值截斷"""
+        if features_df.empty:
+            return features_df
+
+        lower_bounds = features_df.quantile(lower)
+        upper_bounds = features_df.quantile(upper)
+        return features_df.clip(lower=lower_bounds, upper=upper_bounds, axis=1)
     
     def validate_no_nan(
         self,
@@ -119,10 +195,13 @@ class FeatureValidator:
         nan_features = nan_counts[nan_counts > 0]
         
         if len(nan_features) > 0:
-            self.logger.warning(f"發現 NaN 值:")
-            for feature, count in nan_features.items():
+            self.logger.warning(f"發現 NaN 值: {len(nan_features)} 個特徵")
+            max_detail = 20
+            for feature, count in nan_features.head(max_detail).items():
                 pct = count / len(features_df) * 100
                 self.logger.warning(f"  {feature}: {count} ({pct:.2f}%)")
+            if len(nan_features) > max_detail:
+                self.logger.warning(f"  ... 其餘 {len(nan_features) - max_detail} 個特徵略")
             return True
         
         return False
@@ -142,10 +221,13 @@ class FeatureValidator:
         inf_features = inf_counts[inf_counts > 0]
         
         if len(inf_features) > 0:
-            self.logger.warning(f"發現 Inf 值:")
-            for feature, count in inf_features.items():
+            self.logger.warning(f"發現 Inf 值: {len(inf_features)} 個特徵")
+            max_detail = 20
+            for feature, count in inf_features.head(max_detail).items():
                 pct = count / len(features_df) * 100
                 self.logger.warning(f"  {feature}: {count} ({pct:.2f}%)")
+            if len(inf_features) > max_detail:
+                self.logger.warning(f"  ... 其餘 {len(inf_features) - max_detail} 個特徵略")
             return True
         
         return False
@@ -241,9 +323,14 @@ class FeatureValidator:
         constant_features = []
         
         for feature in feature_names:
-            std = features_df[feature].std()
-            if std == 0 or np.isnan(std):
-                constant_features.append(feature)
+            series_or_frame = features_df[feature]
+            std = series_or_frame.std()
+            if isinstance(std, pd.Series):
+                if (std == 0).any() or std.isna().any():
+                    constant_features.append(feature)
+            else:
+                if std == 0 or np.isnan(std):
+                    constant_features.append(feature)
         
         return constant_features
     

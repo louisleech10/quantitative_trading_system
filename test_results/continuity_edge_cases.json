@@ -1,0 +1,113 @@
+{
+  "test_suite": "數據連續性邊界情況測試",
+  "timestamp": "2026-02-07T14:15:43.819181",
+  "results": [
+    {
+      "test_name": "不同 symbol 的不同時間框架",
+      "sub_tests": [
+        {
+          "name": "BTCUSDT/1h 寫入",
+          "success": true,
+          "expected": true
+        },
+        {
+          "name": "ETHUSDT/4h 寫入",
+          "success": true,
+          "expected": true
+        },
+        {
+          "name": "SOLUSDT/12h 寫入（有缺口）",
+          "success": false,
+          "expected": false,
+          "note": "驗證系統能偵測到缺口"
+        },
+        {
+          "name": "BTCUSDT/1h 讀取驗證",
+          "success": true,
+          "expected": true,
+          "note": "不應受其他 symbol 影響"
+        }
+      ],
+      "overall_success": true
+    },
+    {
+      "test_name": "append 新時間段的處理",
+      "sub_tests": [
+        {
+          "name": "初始數據寫入",
+          "success": true,
+          "expected": true
+        },
+        {
+          "name": "a) 無縫 append（無缺口）",
+          "success": true,
+          "expected": true
+        },
+        {
+          "name": "a) 驗證總數 (應為 80)",
+          "success": true,
+          "expected": true,
+          "actual": 80
+        },
+        {
+          "name": "b) 有缺口 append",
+          "success": false,
+          "expected": false,
+          "note": "系統應偵測到 10 根 K線的缺口"
+        },
+        {
+          "name": "c) 重疊 append",
+          "success": true,
+          "expected": true,
+          "note": "重疊部分應被去重"
+        },
+        {
+          "name": "c) 驗證去重總數 (應為 75)",
+          "success": true,
+          "expected": true,
+          "actual": 75
+        }
+      ],
+      "overall_success": true
+    },
+    {
+      "test_name": "Warmup 期的連續性",
+      "sub_tests": [
+        {
+          "name": "寫入完整數據",
+          "success": true,
+          "expected": true
+        },
+        {
+          "name": "a) 驗證 warmup 範圍 [150, 250]",
+          "success": true,
+          "expected": true,
+          "error": null
+        },
+        {
+          "name": "b) warmup 不足（案例太早）",
+          "success": false,
+          "expected": false,
+          "error": "範圍內數據不完整: 期望 101 根，實際 51 根，缺少 50 根\n請求範圍: [1640786400, 1641146400]\n實際範圍: [1640966400, 1641146400]",
+          "note": "warmup 期超出數據範圍"
+        },
+        {
+          "name": "c) read_klines_around_timestamp (lookback=200)",
+          "success": true,
+          "expected": true,
+          "actual": 251,
+          "expected_count": 251
+        },
+        {
+          "name": "d) warmup 範圍內有缺口",
+          "success": false,
+          "expected": false,
+          "error": "範圍內數據不完整: 期望 101 根，實際 91 根，缺少 10 根\n請求範圍: [1641506400, 1641866400]\n實際範圍: [1641506400, 1641866400]",
+          "note": "缺口在 [180, 190]"
+        }
+      ],
+      "overall_success": true
+    }
+  ],
+  "all_tests_passed": true
+}

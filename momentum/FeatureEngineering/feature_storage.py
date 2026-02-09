@@ -10,6 +10,7 @@ Date: 2026-01-10
 import h5py
 import pandas as pd
 import numpy as np
+import json
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
@@ -233,6 +234,155 @@ class FeatureStorage:
                 
         except Exception as e:
             self.logger.error(f"特徵讀取失敗: {str(e)}", exc_info=True)
+            raise
+
+    def save_factory_output(self, symbol: str, timeframe: str, result) -> str:
+        """儲存工廠輸出：features.h5 + meta.json"""
+        file_path = self.base_path / f"{symbol}_{timeframe}_factory.h5"
+        meta_path = self.save_metadata_json(symbol, timeframe, result.metadata or {})
+
+        self.logger.info(f"開始儲存工廠輸出 - {symbol}/{timeframe}")
+
+        features_df = result.features_df
+        labels_df = result.labels_df
+
+        feature_names = list(features_df.columns)
+        label_names = list(labels_df.columns) if labels_df is not None else []
+
+        if "timestamp" in features_df.columns:
+            timestamps = features_df["timestamp"].to_numpy(dtype=np.int64)
+        else:
+            timestamps = features_df.index.to_numpy()
+            if isinstance(features_df.index, pd.DatetimeIndex):
+                timestamps = features_df.index.view("int64")
+
+        try:
+            with h5py.File(file_path, "w") as f:
+                group = f.create_group(f"{symbol}/{timeframe}")
+                group.create_dataset(
+                    "features",
+                    data=features_df.to_numpy(dtype=np.float32),
+                    compression="gzip",
+                    compression_opts=4,
+                )
+                group.create_dataset(
+                    "timestamps",
+                    data=timestamps,
+                    compression="gzip",
+                )
+
+                if labels_df is not None and not labels_df.empty:
+                    group.create_dataset(
+                        "labels",
+                        data=labels_df.to_numpy(dtype=np.float32),
+                        compression="gzip",
+                        compression_opts=4,
+                    )
+                    group.attrs["label_names"] = label_names
+
+                str_dtype = h5py.string_dtype(encoding="utf-8")
+                group.create_dataset(
+                    "feature_names",
+                    data=np.array(feature_names, dtype=object),
+                    dtype=str_dtype,
+                )
+
+                if label_names:
+                    group.create_dataset(
+                        "label_names",
+                        data=np.array(label_names, dtype=object),
+                        dtype=str_dtype,
+                    )
+
+                group.attrs["feature_count"] = len(feature_names)
+                group.attrs["label_count"] = len(label_names)
+                group.attrs["metadata_json"] = json.dumps(result.metadata or {})
+
+            self.logger.info(
+                f"工廠輸出儲存完成 - 特徵數: {len(feature_names)}, 標籤數: {len(label_names)}"
+            )
+            return str(file_path)
+        except Exception as e:
+            self.logger.error(f"工廠輸出儲存失敗: {str(e)}", exc_info=True)
+            raise
+
+    def load_factory_output(self, symbol: str, timeframe: str):
+        """載入工廠輸出"""
+        file_path = self.base_path / f"{symbol}_{timeframe}_factory.h5"
+        if not file_path.exists():
+            return None
+
+        try:
+            with h5py.File(file_path, "r") as f:
+                group_path = f"{symbol}/{timeframe}"
+                if group_path not in f:
+                    return None
+                group = f[group_path]
+
+                features = group["features"][:]
+                timestamps = group["timestamps"][:]
+                feature_names = []
+                if "feature_names" in group:
+                    raw_feature_names = list(group["feature_names"][:])
+                    feature_names = [
+                        n.decode("utf-8") if isinstance(n, (bytes, np.bytes_)) else str(n)
+                        for n in raw_feature_names
+                    ]
+                else:
+                    raw_feature_names = list(group.attrs.get("feature_names", []))
+                    feature_names = [
+                        n.decode("utf-8") if isinstance(n, (bytes, np.bytes_)) else str(n)
+                        for n in raw_feature_names
+                    ]
+
+                features_df = pd.DataFrame(features, columns=feature_names)
+                features_df.index = pd.Index(timestamps, name="timestamp")
+
+                labels_df = pd.DataFrame(index=features_df.index)
+                if "labels" in group:
+                    labels = group["labels"][:]
+                    label_names: List[str] = []
+                    if "label_names" in group:
+                        raw_label_names = list(group["label_names"][:])
+                        label_names = [
+                            n.decode("utf-8") if isinstance(n, (bytes, np.bytes_)) else str(n)
+                            for n in raw_label_names
+                        ]
+                    labels_df = pd.DataFrame(labels, columns=label_names, index=features_df.index)
+
+                metadata = {}
+                metadata_json = group.attrs.get("metadata_json")
+                if metadata_json:
+                    try:
+                        metadata = json.loads(metadata_json)
+                    except json.JSONDecodeError:
+                        metadata = {}
+
+            from momentum.FeatureEngineering.feature_factory import FeatureGenerationResult
+
+            return FeatureGenerationResult(
+                features_df=features_df,
+                labels_df=labels_df,
+                metadata=metadata,
+                feature_count=features_df.shape[1],
+                generation_time=metadata.get("generation_time", 0.0),
+                layer_counts=metadata.get("layer_counts", {}),
+                config_used=metadata.get("config_used", {}),
+                hdf5_path=str(file_path),
+            )
+        except Exception as e:
+            self.logger.error(f"工廠輸出讀取失敗: {str(e)}", exc_info=True)
+            raise
+
+    def save_metadata_json(self, symbol: str, timeframe: str, metadata: Dict) -> str:
+        """儲存 features_meta.json"""
+        file_path = self.base_path / f"{symbol}_{timeframe}_factory_meta.json"
+        try:
+            with file_path.open("w", encoding="utf-8") as f:
+                json.dump(metadata, f, ensure_ascii=True, indent=2)
+            return str(file_path)
+        except Exception as e:
+            self.logger.error(f"Metadata 儲存失敗: {str(e)}", exc_info=True)
             raise
     
     def feature_file_exists(self, case_id: str) -> bool:

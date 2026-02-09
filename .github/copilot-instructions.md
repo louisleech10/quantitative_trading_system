@@ -1,7 +1,7 @@
 # AI Agent Instructions for Quantitative Trading System
 
 > Quick reference guide for AI coding agents (GitHub Copilot, Claude, Cursor, etc.)  
-> **Last Updated**: 2026-01-01 | **Version**: 2.0
+> **Last Updated**: 2026-02-09 | **Version**: 2.1
 
 ## 🎯 System Overview
 
@@ -12,6 +12,23 @@
 **Key distinction**: This is a *research platform*, not an execution system. Focus: pattern discovery → ML optimization → backtesting.
 
 **Current Status** (2026 Q1): Phase 3 completed (optimization system, chart signals). Active development on Phase 4 (pattern discovery).
+
+### 📍 Product Vision & Evolution Path
+
+**Long-term goal**: Evolve from tool → assistant → autonomous AI researcher
+
+```
+V1.0 (Current - 2026 Q1-Q2):  Manual UI operation → Export results (CSV/PNG/AI-readable JSON)
+V2.0 (2026 Q3-Q4):            Chat natural language → AI executes research → Conversational analysis
+V3.0 (2027+):                 Fully autonomous AI Agent → Proposes strategies → Human approval
+```
+
+**Implications for development**:
+- All new features must be **backward compatible** (V2.0 won't break V1.0 REST APIs)
+- Architecture must support **independent deployment** (future: Agent service in separate container)
+- **Decoupling rules** apply to all versions (see [docs/PRODUCT_VISION.md](../docs/PRODUCT_VISION.md))
+
+**V1.0 Current Gap**: AI-readable export format (structured JSON/Markdown) - see ADR-002 in PRODUCT_VISION.md
 
 ---
 
@@ -364,6 +381,105 @@ Before submitting code:
 - [ ] **Docs**: Update `docs/` if architecture/API changes (ARCHITECTURE.md, API_SPECIFICATION.md)
 - [ ] **Git**: No large binary files staged (check `.gitignore` for `data_cache/`, `*.h5`)
 - [ ] **Frontend**: TypeScript compilation passes, no console errors, responsive design tested
+- [ ] **Decoupling**: No Rule 1-7 violations (see below) - check with `grep -r "from api\." momentum/`
+
+---
+
+## 🏗️ Decoupling Architecture Quick Reference
+
+**Critical rules** (enforced by REFACTOR_ARCHITECTURE_V4 - see [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)):
+
+### The 7 Rules (Zero Tolerance)
+
+| Rule | Summary | Quick Check |
+|------|---------|-------------|
+| **1** | `momentum/` NEVER imports `api/` | `grep -r "from api\." momentum/` → must be 0 results |
+| **2** | Cross-Domain uses Protocol injection | `from momentum.core.protocols import I*` |
+| **3** | `api/services/` uses `momentum/factories.py` | No `Engine()` or `Analyzer()` direct instantiation |
+| **4** | Services don't import each other | No `from api.services.other_service import` |
+| **5** | Config single source of truth | Read from `momentum/core/config.py` or `api/core/config.py` |
+| **6** | Test config isolation | Tests run without `run_api.py` |
+| **7** | DTOs don't cross domain boundaries | `api/models/` ↔ `momentum/core/contracts.py` no mutual dependency |
+
+### Common Violations & Fixes
+
+**❌ Violation 1: Service directly instantiates engine**
+```python
+# api/services/new_service.py
+from momentum.Analysis.engine import Engine
+self.engine = Engine()  # WRONG
+```
+
+**✅ Fix: Use Factory**
+```python
+# api/services/new_service.py
+from momentum.core.protocols import IEngine
+
+class NewService:
+    def __init__(self, engine: IEngine):  # Inject Protocol
+        self.engine = engine
+
+# api/main.py
+from momentum.factories import create_engine
+service = NewService(engine=create_engine())
+```
+
+**❌ Violation 2: momentum imports api logging**
+```python
+# momentum/SomeDomain/module.py
+from api.core.logging import get_logger  # WRONG
+```
+
+**✅ Fix: Use momentum logging**
+```python
+from momentum.core.logging import get_logger  # CORRECT
+```
+
+**❌ Violation 3: Cross-Domain direct import**
+```python
+# momentum/Analysis/feature_engineer.py
+from momentum.DataExtraction.kline_storage import KlineStorageManager  # WRONG
+self.storage = KlineStorageManager()
+```
+
+**✅ Fix: Protocol injection**
+```python
+from momentum.core.protocols import IKlineReader
+
+class FeatureEngineer:
+    def __init__(self, kline_reader: IKlineReader):  # CORRECT
+        self.kline_reader = kline_reader
+```
+
+### When Adding New Features
+
+**Checklist**:
+1. Is this a new Domain? → Define in `momentum/{NewDomain}/`
+2. Cross-Domain dependency? → Add Protocol to `momentum/core/protocols.py`
+3. Used by API? → Add Factory function to `momentum/factories.py`
+4. New config? → Add to `momentum/core/config.py` (domain-specific) or `api/core/config.py` (API-specific)
+5. New DTO? → Define in `api/models/` (API) or `momentum/core/contracts.py` (momentum), NEVER both
+
+**Example: Adding FeatureFactory (Task 1)**
+- ✅ Lives in `momentum/FeatureEngineering/` (new Domain)
+- ✅ Uses `IKlineReader` Protocol for K-line data (Rule 2)
+- ✅ Built via `create_feature_factory()` in `momentum/factories.py` (Rule 3)
+- ✅ Config from `momentum/core/config.py` (Rule 5)
+- ✅ Tests run with `pytest tests/momentum/` (Rule 6)
+
+### Why Decoupling Matters for V1 → V2 → V3
+
+**Version evolution depends on clean architecture**:
+- V1.0 (UI): `api/routes/` → `api/services/` → `momentum/`
+- V2.0 (Chat): `api/chat/` → `api/services/` → `momentum/` (reuse same engines)
+- V3.0 (Agent): `api/agent/` → `momentum/Agent/` → existing `momentum/` domains
+
+**If violated**:
+- ❌ Cannot deploy V2.0 Chat service independently
+- ❌ Changes to V1.0 break V2.0
+- ❌ Tests become integration tests (slow, brittle)
+
+**Reference**: [docs/PRODUCT_VISION.md](../docs/PRODUCT_VISION.md) - Architecture Evolution Strategy
 
 ---
 
@@ -371,6 +487,7 @@ Before submitting code:
 
 **Start here**:
 - `README.md` - System overview, tech stack, roadmap (in Chinese)
+- `docs/PRODUCT_VISION.md` - V1/V2/V3 evolution plan, version goals, decoupling rationale
 - `docs/ARCHITECTURE.md` - Detailed system architecture (~4000 lines)
 - `docs/DEVELOPMENT_GUIDE.md` - Ultra Think 3-step process, coding standards (~2500 lines)
 

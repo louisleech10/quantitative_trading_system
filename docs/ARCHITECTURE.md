@@ -1,11 +1,12 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 2.0
-- **最後更新**: 2026-01-09
-- **狀態**: 生產中 + 持續開發
+- **版本**: 3.0
+- **最後更新**: 2026-02-08
+- **狀態**: 生產中 + 持續開發（Phase 4 進行中）
 - **更新內容**: 
-  - v2.0 (2026-01-09): 添加 Phase 3 完整架構（Optuna優化系統、WebSocket通訊、9個視覺化組件）
+  - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4 架構變更（解耦架構、Protocol 注入、Factory 模式、KlineDataService 統一資料存取層）；更新模組清單與目錄結構；標記已完成功能
+  - v2.0 (2026-01-09): 添加 Phase 3 完整架構（Optuna 優化系統、WebSocket 通訊、9 個視覺化組件）
   - v1.0 (2025-09-30): 初始版本
 
 ---
@@ -13,14 +14,16 @@
 ## 目錄
 1. [系統概覽](#系統概覽)
 2. [技術棧](#技術棧)
-3. [整體架構](#整體架構)
-4. [已實現功能](#已實現功能)
-5. [待開發功能](#待開發功能)
-6. [數據流設計](#數據流設計)
-7. [模組詳細設計](#模組詳細設計)
-8. [性能考慮](#性能考慮)
-9. [安全性設計](#安全性設計)
-10. [擴展性設計](#擴展性設計)
+3. [解耦架構原則](#解耦架構原則)
+4. [整體架構](#整體架構)
+5. [目錄結構](#目錄結構)
+6. [已實現功能](#已實現功能)
+7. [待開發功能](#待開發功能)
+8. [數據流設計](#數據流設計)
+9. [模組詳細設計](#模組詳細設計)
+10. [性能考慮](#性能考慮)
+11. [安全性設計](#安全性設計)
+12. [擴展性設計](#擴展性設計)
 
 ---
 
@@ -37,15 +40,25 @@
 
 ### 核心價值
 - **案例發現引擎**: 從歷史數據中找出符合特定模式的交易案例
-- **Pattern識別系統**: 自動發現起漲前的共通技術指標特徵
-- **ML優化平台**: 使用機器學習優化交易策略參數
+- **Pattern 識別系統**: 自動發現起漲前的共通技術指標特徵
+- **ML 優化平台**: 使用機器學習（XGBoost）優化交易策略參數
 - **研究工作流**: 支持完整的量化研究流程
 
 ### 系統目標
 1. 降低策略發現門檻（無需編程知識）
-2. 自動化Pattern識別過程
+2. 自動化 Pattern 識別過程
 3. 提供完整的研究到實盤工作流
 4. 支持多市場擴展（加密貨幣 → 台股 → 美股）
+
+### 開發狀態總覽 (2026 Q1)
+| Phase | 內容 | 狀態 |
+|-------|------|------|
+| Phase 1 | 案例搜索系統 + Web UI | ✅ 已完成 |
+| Phase 2 | K 線下載 + 圖表系統 | ✅ 已完成 |
+| Phase 3 | Optuna 優化 + 信號分析 + 視覺化 | ✅ 已完成 |
+| Phase 3.5 | 特徵工程 + XGBoost + Pattern 管理 | ✅ 已完成 |
+| REFACTOR V4 | 架構解耦（7 條規則、Protocol 注入、Factory 模式） | ✅ 已完成 |
+| Phase 4 | Pattern 發現 + 進階分析 | 🔄 進行中 |
 
 ---
 
@@ -53,15 +66,16 @@
 
 ### 前端技術
 ```yaml
-框架: Next.js 14 (App Router)
+框架: Next.js 15 (App Router)
 語言: TypeScript 5.x
 樣式: Tailwind CSS 3.x
 狀態管理: Zustand
 圖表庫:
-  - Lightweight Charts (TradingView開源) - K線圖表
-  - Recharts - Dashboard統計圖表
-組件庫: shadcn/ui (可選)
-HTTP客戶端: Fetch API
+  - Lightweight Charts (TradingView 開源) - K 線圖表
+  - Recharts - Dashboard 統計圖表
+組件庫: shadcn/ui
+HTTP 客戶端: Fetch API
+WebSocket: 原生 WebSocket API
 ```
 
 ### 後端技術
@@ -71,34 +85,32 @@ HTTP客戶端: Fetch API
 數據處理:
   - pandas 2.0+ (數據分析)
   - numpy 1.24+ (數值計算)
-  - polars (可選，大數據場景)
 技術指標:
   - pandas-ta (技術指標庫)
-  - ta-lib (經典指標)
-API交互:
-  - python-binance (幣安API)
-  - ccxt (多交易所支持)
+  - 自建 IndicatorEngine (OOP 指標引擎)
+API 交互:
+  - python-binance (幣安 API)
 機器學習:
-  - XGBoost/LightGBM (分類模型)
-  - PyTorch (深度學習)
+  - XGBoost (分類模型)
+  - SHAP (模型可解釋性)
   - Optuna (參數優化)
 ```
 
 ### 數據存儲
 ```yaml
-時序數據: HDF5 (大量K線數據)
-結構化數據: CSV (搜索結果、案例數據)
+時序數據: HDF5 (K 線數據，gzip 壓縮)
+結構化數據: CSV/JSON (搜索結果、案例數據)
+模型存儲: Pickle (XGBoost 模型)
+特徵存儲: HDF5 (特徵矩陣)
+優化記錄: SQLite (Optuna Study)
 緩存: 內存緩存 (搜索結果臨時存儲)
-未來擴展:
-  - PostgreSQL (正式數據)
-  - Redis (實時緩存)
 ```
 
 ### 開發環境
 ```yaml
 硬件: MacBook M1
-Python版本: 3.11+ (M1原生支持)
-Node版本: 18+
+Python 版本: 3.11+ (M1 原生支持)
+Node 版本: 18+
 包管理:
   - Python: pip + requirements.txt
   - Node: npm
@@ -108,1718 +120,1027 @@ IDE: VS Code
 
 ---
 
+## 解耦架構原則
+
+> 此節源自 REFACTOR_ARCHITECTURE_V4，定義系統的 7 條架構規則。
+
+### 架構規則 (全部已通過驗證)
+
+| 規則 | 描述 | 狀態 |
+|------|------|------|
+| Rule 1 | `momentum/` 不得依賴 `api/` | ✅ 0 violation |
+| Rule 2 | `momentum/` 跨 Domain 不得直接 import（透過 Protocol 注入） | ✅ 0 violation |
+| Rule 3 | `api/services/` 不得直接建構 `momentum/` 物件（使用 `factories.py`） | ✅ 0 violation |
+| Rule 4 | `api/services/` 之間不得互相 import | ✅ 0 violation |
+| Rule 5 | 不得有 Mutable global singleton | ✅ 已修復 |
+| Rule 6 | 無 callback/closure bypass | ✅ 通過 |
+| Rule 7 | `api/models` ↔ `momentum/core` 無互相依賴 | ✅ 通過 |
+
+### Protocol 注入機制
+
+`momentum/` 內跨 Domain 依賴透過 Protocol 介面解耦（`momentum/core/protocols.py`）：
+
+```python
+class IKlineReader(Protocol):
+    """K 線讀取介面 — DataExtraction Domain 實作"""
+    def read_klines(self, symbol, timeframe, start_time, end_time) -> pd.DataFrame: ...
+    def read_klines_around_timestamp(self, symbol, timeframe, timestamp, ...) -> pd.DataFrame: ...
+    def get_metadata(self, symbol, timeframe) -> dict: ...
+
+class IIndicatorEngine(Protocol):
+    """指標計算介面 — Indicators Domain 實作"""
+    def calculate_indicators_from_dataframe(self, df, config) -> pd.DataFrame: ...
+
+class IModelTrainer(Protocol):
+    """模型訓練介面 — Analysis Domain 實作"""
+    def train_model(self, X, y, config) -> Any: ...
+```
+
+### Factory 模式
+
+所有 Domain 物件的建構集中在 `momentum/factories.py`：
+
+```python
+# momentum/factories.py — 涵蓋所有 Domain 的工廠函式
+
+# ── Data ──
+create_kline_storage_manager()
+create_kline_download_service()
+create_binance_provider()
+
+# ── Search ──
+create_momentum_data_loader()
+create_case_search_engine()
+create_search_configuration()
+create_filter_condition()
+
+# ── Market ──
+create_market_config()
+
+# ── Indicators ──
+create_indicator_engine()
+
+# ── Analysis ──
+create_signal_density_analyzer()
+create_xgboost_analyzer()
+create_model_storage()
+create_feature_storage()
+create_feature_extractor()
+create_feature_validator()
+create_strategy_params()
+
+# ── Statistics ──
+create_expectancy_calculator()
+create_bootstrap_estimator()
+create_cross_symbol_validator()
+create_regime_analyzer()
+
+# ── Pattern ──
+create_pattern_extractor()
+create_pattern_storage()
+create_pattern_validator()
+create_pattern_rule()
+create_pattern()
+
+# ── Optimization ──
+create_parameter_ranges()
+create_optuna_optimizer()
+create_optimization_result()
+
+# ── Utility ──
+get_data_source_values()
+```
+
+### 呼叫流程
+
+```
+API Route (thin handler)
+    │
+    ▼
+api/services/ (business logic)
+    │
+    │ 透過 momentum/factories.py 建構物件
+    ▼
+momentum/ Domain 物件 (pure logic)
+    │
+    │ 跨 Domain 透過 Protocol 注入
+    ▼
+Data Layer (HDF5 / API / SQLite)
+```
+
+### Artifact Contract Table
+
+| Domain | 輸入 | 輸出 | 格式 | 路徑 |
+|--------|------|------|------|------|
+| Data | Binance API | K 線資料 | HDF5 | `data_cache/{SYMBOL}_{timeframe}.h5` |
+| Data | SearchConfig | 搜尋結果 | JSON | `search_results/{task_id}.json` |
+| Feature | K 線 HDF5 | 特徵矩陣 | HDF5 | `data_cache/features/{case_id}.h5` |
+| Analysis | 特徵 HDF5 | 模型 | Pickle | `data_cache/models/{case_id}.pkl` |
+| Optimization | 模型+搜尋空間 | Study/Checkpoint | SQLite+Pickle | `data/optuna_{study}.db` |
+
+### 持續解耦要求
+
+> **Authority**: 所有新功能開發、架構演進必須遵循本節要求，參見 [PRODUCT_VISION.md](./PRODUCT_VISION.md) 版本演進策略。
+
+#### 為何需要持續解耦？
+
+**系統演進目標**（參見 [PRODUCT_VISION.md](./PRODUCT_VISION.md)）：
+```
+V1.0（當前）: 手動 UI 操作
+V2.0（2026 Q3-Q4）: Chat 自然語言介面
+V3.0（2027+）: 全自主 AI Agent
+```
+
+每個版本演進都需要：
+- ✅ **不影響既有版本**（V2.0 不能破壞 V1.0 的 REST API）
+- ✅ **可獨立測試**（新增 Chat 功能不應需要完整系統啟動）
+- ✅ **可獨立部署**（未來可能分離 Agent 服務到獨立容器）
+
+#### 解耦規則適用範圍
+
+| 規則 | V1.0 | V2.0 擴展 | V3.0 擴展 |
+|------|------|------------|------------|
+| **Rule 1** | `momentum/` 不依賴 `api/` | 必須保持 | 必須保持 |
+| **Rule 2** | Domain 內用 Protocol | 擴展至 NLU Domain | 擴展至 Agent Domain |
+| **Rule 3** | Service 用 Factory | 新增 `create_chat_service()` | 新增 `create_agent_orchestrator()` |
+| **Rule 4** | Service 間禁止直接調用 | 必須保持 | 必須保持 |
+| **Rule 5** | Config 單一來源 | 擴展至 Prompt Config | 擴展至 Policy Config |
+| **Rule 6** | Test 配置隔離 | 必須保持 | 必須保持 |
+| **Rule 7** | DTO 不跨層 | 必須保持 | 必須保持 |
+
+#### 新模組開發檢查清單
+
+**每個新 Task/Feature 開發前必須確認**：
+
+- [ ] **依賴方向檢查**: 新模組是否依賴了不該依賴的層？
+  - ❌ `momentum/` 內不可 `import api.*`
+  - ❌ `api/routes/` 內不可直接 `import momentum.*.Engine()`
+  - ✅ 透過 `momentum/factories.py` 建構物件
+  
+- [ ] **Protocol 介面設計**: 跨 Domain 依賴是否定義了 Protocol？
+  - ❌ `from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer`
+  - ✅ `from momentum.core.protocols import IModelTrainer`
+  
+- [ ] **Factory 註冊**: 新引擎是否加入 `momentum/factories.py`？
+  ```python
+  # ✅ 範例
+  def create_new_engine(config: Optional[dict] = None) -> NewEngine:
+      return NewEngine(config or {})
+  ```
+  
+- [ ] **Config 管理**: 新配置是否加入 `momentum/core/config.py` 或 `api/core/config.py`？
+  - ❌ 硬編碼在程式碼內
+  - ✅ 從 Config 物件讀取
+  
+- [ ] **測試隔離**: 測試是否可以不啟動完整系統？
+  - ❌ 測試需要 `run_api.py` 啟動後才能跑
+  - ✅ 測試可直接 `pytest tests/momentum/` 執行
+  
+- [ ] **Artifact 契約**: 新資料格式是否記錄在 Artifact Contract Table？
+
+#### 常見違規案例
+
+**❌ 反模式 1: Service 直接建構引擎**
+```python
+# api/services/new_service.py
+from momentum.Analysis.new_engine import NewEngine
+
+class NewService:
+    def __init__(self):
+        self.engine = NewEngine()  # ❌ 違反 Rule 3
+```
+
+**✅ 正確做法**:
+```python
+# api/services/new_service.py
+from momentum.core.protocols import INewEngine
+
+class NewService:
+    def __init__(self, engine: INewEngine):  # ✅ 注入 Protocol
+        self.engine = engine
+
+# api/main.py
+from momentum.factories import create_new_engine
+engine = create_new_engine()
+service = NewService(engine=engine)
+```
+
+**❌ 反模式 2: momentum 依賴 api**
+```python
+# momentum/Analysis/analyzer.py
+from api.core.logging import get_logger  # ❌ 違反 Rule 1
+
+logger = get_logger(__name__)
+```
+
+**✅ 正確做法**:
+```python
+# momentum/Analysis/analyzer.py
+from momentum.core.logging import get_logger  # ✅ 使用 momentum 內部 logging
+
+logger = get_logger(__name__)
+```
+
+**❌ 反模式 3: 跨 Domain 直接 import**
+```python
+# momentum/Analysis/feature_engineer.py
+from momentum.DataExtraction.kline_storage import KlineStorageManager  # ❌ 違反 Rule 2
+
+class FeatureEngineer:
+    def __init__(self):
+        self.kline_storage = KlineStorageManager()
+```
+
+**✅ 正確做法**:
+```python
+# momentum/core/protocols.py
+class IKlineReader(Protocol):
+    def read_klines(...) -> pd.DataFrame: ...
+
+# momentum/Analysis/feature_engineer.py
+from momentum.core.protocols import IKlineReader
+
+class FeatureEngineer:
+    def __init__(self, kline_reader: IKlineReader):  # ✅ Protocol 注入
+        self.kline_reader = kline_reader
+```
+
+#### 解耦驗證工具
+
+**手動檢查命令**（開發過程中使用）:
+```bash
+# 檢查 momentum → api 的違規依賴
+grep -r "from api\." momentum/
+grep -r "import api\." momentum/
+
+# 檢查 Service 直接建構違規
+grep -r "= .*Engine()" api/services/
+grep -r "= .*Analyzer()" api/services/
+
+# 檢查跨 Domain 直接 import
+grep -r "from momentum\.DataExtraction" momentum/Analysis/
+grep -r "from momentum\.Indicators" momentum/Analysis/
+```
+
+**自動化檢查**（CI/CD 整合，未來實作）:
+```bash
+# 未來可加入 pre-commit hook
+python scripts/check_architecture_rules.py
+```
+
+#### 文檔同步要求
+
+**每次架構變更必須同步更新**：
+1. [ARCHITECTURE.md](./ARCHITECTURE.md) - 更新 Domain 定義、Protocol 列表
+2. [PRODUCT_VISION.md](./PRODUCT_VISION.md) - 如影響版本演進路徑
+3. [*.PLAN.md](.) - 更新對應 Task 的 PLAN 文件
+4. [.github/copilot-instructions.md](../.github/copilot-instructions.md) - 更新 AI Agent 快速參考
+
+#### 實例：Task 1 (FeatureFactory) 解耦設計
+
+**符合解耦原則的設計**：
+- ✅ 7 層 Pipeline 每層獨立可測試（Rule 6）
+- ✅ 透過 `create_feature_factory()` 建構（Rule 3）
+- ✅ Config-driven，Preset 從 YAML 讀取（Rule 5）
+- ✅ 不依賴 `api/` 層，純 `momentum/` 內邏輯（Rule 1）
+- ✅ 跨 Domain 依賴（讀取 K 線）透過 `IKlineReader` Protocol（Rule 2）
+
+**參見**: [Feature_Factory_PLAN.md](./Feature_Factory_PLAN.md) V7 的 decoupling 架構對齊章節
+
+---
+
 ## 整體架構
 
 ### 系統層級架構
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    用戶界面層 (Next.js Web UI)               │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │案例搜索  │  │圖表分析  │  │指標測試  │  │ML訓練    │   │
-│  │界面      │  │界面      │  │界面      │  │界面      │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       │             │             │             │          │
-│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐   │
-│  │回測系統  │  │Dashboard │  │配置管理  │  │結果導出  │   │
-│  │界面      │  │界面      │  │界面      │  │界面      │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-└───────┼─────────────┼─────────────┼─────────────┼──────────┘
-        │             │             │             │
-┌───────▼─────────────▼─────────────▼─────────────▼──────────┐
-│                  API 服務層 (FastAPI)                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │Case      │  │Chart     │  │Indicator │  │ML        │   │
-│  │Search    │  │Data      │  │Testing   │  │Training  │   │
-│  │Service   │  │Service   │  │Service   │  │Service   │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       │             │             │             │          │
-│  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐  ┌────┴─────┐   │
-│  │Backtest  │  │Pattern   │  │Config    │  │Export    │   │
-│  │Service   │  │Discovery │  │Service   │  │Service   │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-└───────┼─────────────┼─────────────┼─────────────┼──────────┘
-        │             │             │             │
-┌───────▼─────────────▼─────────────▼─────────────▼──────────┐
-│                    核心業務層 (Python)                       │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  現有核心模組                                         │   │
-│  │  - case_search_engine.py      (案例搜索引擎)        │   │
-│  │  - signal_analyzer.py          (信號分析器)         │   │
-│  │  - data_loader.py              (數據加載器)         │   │
-│  │  - indicator modules           (指標計算模組)       │   │
-│  └──────────────────────────────────────────────────────┘   │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  待開發模組                                           │   │
-│  │  - chart_data_manager.py       (圖表數據管理)       │   │
-│  │  - ml_training_engine.py       (ML訓練引擎)         │   │
-│  │  - backtest_engine.py          (回測引擎)           │   │
-│  │  - pattern_discovery.py        (Pattern發現)        │   │
-│  └──────────────────────────────────────────────────────┘   │
-└───────┼─────────────┼─────────────┼─────────────┼──────────┘
-        │             │             │             │
-┌───────▼─────────────▼─────────────▼─────────────▼──────────┐
-│                    數據層                                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │Binance   │  │OKX       │  │本地緩存  │  │HDF5      │   │
-│  │API       │  │API       │  │(內存)    │  │存儲      │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  未來擴展: 台股API、美股API、鏈上數據               │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                 Frontend (Next.js 15)                 │
+│         Zustand Store + React Components             │
+│  ┌──────────┐┌──────────┐┌──────────┐┌──────────┐   │
+│  │案例搜索  ││圖表分析  ││優化系統  ││XGBoost   │   │
+│  │界面      ││界面      ││界面      ││儀表板    │   │
+│  └────┬─────┘└────┬─────┘└────┬─────┘└────┬─────┘   │
+└───────┼───────────┼───────────┼───────────┼──────────┘
+        │           │           │           │
+    HTTP/WS     HTTP        HTTP/WS      HTTP
+        │           │           │           │
+┌───────▼───────────▼───────────▼───────────▼──────────┐
+│              api/routes/ (Thin Handlers)              │
+│  13 個路由模組, 85+ 端點                              │
+│  case_search │ case │ chart │ chart_signals           │
+│  config │ signal_analysis │ optimization              │
+│  optimization_analysis │ feature_engineering          │
+│  pattern_analysis │ pattern_management                │
+│  ml_pipeline │ two_stage_search                       │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│             api/services/ (Business Logic)            │
+│  20 個服務, 透過 factories.py 建構 Domain 物件        │
+│  Services 之間不互相呼叫 (Rule 4)                     │
+│                                                      │
+│  KlineDataService ─── 統一 K 線存取 (快取+下載)       │
+│  ChartDataService ─── 圖表數據 + 指標計算             │
+│  OptimizationTaskService ── Optuna 優化管理           │
+│  XGBoostTaskService ── XGBoost 分析管理               │
+│  FeatureTaskService ── 特徵擷取管理                   │
+│  SearchTaskService ── 兩階段搜索                      │
+│  SignalAnalysisService ── 信號密度分析                 │
+│  PatternManagementService ── Pattern CRUD             │
+│  SHAPAnalysisService ── SHAP 可解釋性                 │
+│  BatchDownloadService ── 批量 K 線下載                │
+│  CaseImportService ── CSV/Excel 案例匯入              │
+│  ...                                                 │
+└───────────────────────┬──────────────────────────────┘
+                        │ factories.py
+┌───────────────────────▼──────────────────────────────┐
+│           momentum/ (Core Domain Logic)              │
+│  ┌─────────┐ ┌──────────────┐ ┌──────────────┐      │
+│  │ core/   │ │factories.py  │ │DataExtraction│      │
+│  │protocols│ │(唯一建構入口) │ │CaseSearch    │      │
+│  │contracts│ │              │ │KlineStorage  │      │
+│  │config   │ └──────────────┘ │ParallelSearch│      │
+│  └─────────┘                  │Binance       │      │
+│  ┌──────────┐ ┌────────────┐  └──────────────┘      │
+│  │Analysis/ │ │Indicators/ │  ┌──────────────┐      │
+│  │XGBoost   │ │Engine(OOP) │  │FeatureEng/   │      │
+│  │Signal    │ │EMA, MACD...│  │Extractor     │      │
+│  │Pattern   │ └────────────┘  │Storage       │      │
+│  │SHAP      │ ┌────────────┐  │Validator     │      │
+│  │Drift/PSI │ │Optimization│  └──────────────┘      │
+│  │Bootstrap │ │Optuna      │                        │
+│  │Regime    │ │Checkpoint  │                        │
+│  └──────────┘ └────────────┘                        │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│                   Data Layer                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐             │
+│  │ HDF5     │ │ Binance  │ │ SQLite   │             │
+│  │(K線/特徵)│ │ API      │ │ (Optuna) │             │
+│  └──────────┘ └──────────┘ └──────────┘             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐             │
+│  │ Pickle   │ │ JSON/CSV │ │ Memory   │             │
+│  │ (模型)   │ │(搜索結果)│ │ (快取)   │             │
+│  └──────────┘ └──────────┘ └──────────┘             │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## 目錄結構
+
+### Backend (`api/`)
+
+```
+api/
+├── __init__.py
+├── main.py                              # FastAPI app、lifespan、router 註冊
+├── core/
+│   ├── config.py                        # Settings (pydantic-settings)
+│   ├── logging.py                       # ColoredFormatter, get_logger()
+│   └── middleware.py                    # CORS、全域例外處理
+├── models/                              # Pydantic Request/Response Models
+│   ├── requests.py                      # SearchConfigRequest, FilterConditionRequest
+│   ├── responses.py                     # TaskStatusResponse, SearchResponse, CaseData
+│   ├── response_models.py              # EnhancedCaseData (33 參數)
+│   ├── case_models.py                  # CaseRecord, BatchDownloadRequest
+│   ├── training_window_config.py       # TrainingWindowConfig, StrategyConfig, SignalDensityResponse
+│   ├── strategy_test_models.py         # ChartSignalCalculationRequest/Response
+│   ├── feature_engineering_models.py   # FeatureExtractionRequest/Response
+│   ├── pattern_analysis_models.py      # XGBoost/SHAP/OOT/Drift/Regime 模型
+│   └── pattern_management_models.py    # Pattern CRUD 模型
+├── routes/                              # Thin Route Handlers (13 個)
+│   ├── case_search.py                  # /search/* — 案例搜索 (8 endpoints)
+│   ├── case.py                         # /api/v1/case/* + /api/v1/kline/* (6 endpoints)
+│   ├── chart.py                        # /api/v1/chart/data (1 endpoint)
+│   ├── chart_signals.py                # /api/v1/chart/signals + validate (2 endpoints)
+│   ├── config.py                       # /config/* — 範本 + 系統設定 (9 endpoints)
+│   ├── signal_analysis.py              # /api/v1/signal-analysis/* (2 endpoints)
+│   ├── optimization.py                 # /api/v1/optimization/* — 優化核心 (8 endpoints)
+│   ├── optimization_analysis.py        # /api/v1/optimization/* — 分析 (9 endpoints)
+│   ├── feature_engineering.py          # /features/* (4 endpoints)
+│   ├── pattern_analysis.py             # /pattern-analysis/* — XGBoost (21 endpoints)
+│   ├── pattern_management.py           # /patterns/* — Pattern CRUD (8 endpoints)
+│   ├── ml_pipeline.py                  # /api/v1/ml-pipeline/* (4 endpoints)
+│   └── two_stage_search.py             # /two-stage/* (3 endpoints)
+├── services/                            # Business Logic (20 個服務)
+│   ├── kline_data_service.py           # ★ 統一 K 線資料存取層 (快取+下載)
+│   ├── kline_storage_service.py        # HDF5 讀寫操作
+│   ├── chart_data_service.py           # 圖表數據 + 指標計算
+│   ├── chart_signal_service.py         # 策略信號計算
+│   ├── batch_download_service.py       # 批量 K 線下載
+│   ├── standalone_search_service.py    # 獨立搜索服務
+│   ├── search_task_service.py          # 兩階段搜索任務管理
+│   ├── optimization_task_service.py    # Optuna 優化任務 (Singleton)
+│   ├── signal_analysis_service.py      # 信號密度分析 (Singleton)
+│   ├── feature_task_service.py         # 特徵擷取任務
+│   ├── xgboost_task_service.py         # XGBoost 分析任務
+│   ├── xgboost_batch_service.py        # XGBoost 批量分析
+│   ├── xgboost_task_cache.py           # XGBoost 結果快取
+│   ├── shap_analysis_service.py        # SHAP 可解釋性分析
+│   ├── case_import_service.py          # CSV/Excel 案例匯入
+│   ├── case_storage.py                 # 案例記憶體存儲
+│   ├── data_service.py                 # 範本 + 設定管理
+│   ├── pattern_management_service.py   # Pattern CRUD 服務
+│   └── task_manager.py                 # 通用任務狀態管理
+├── websocket/
+│   └── optimization_ws.py              # WebSocket 即時優化進度推送
+└── utils/                               # 工具函式
+```
+
+### Core Engines (`momentum/`)
+
+```
+momentum/
+├── __init__.py
+├── factories.py                         # ★ 所有 Domain 物件工廠 (唯一建構入口)
+├── core/                                # ★ 基礎設施層 (REFACTOR V4 新增)
+│   ├── __init__.py
+│   ├── config.py                        # MomentumConfig dataclass
+│   ├── contracts.py                     # DTO/Enum (TrainingWindowConfig, StrategyConfig 等)
+│   ├── logging.py                       # get_logger()
+│   └── protocols.py                     # ★ IKlineReader, IIndicatorEngine, IModelTrainer
+├── Analysis/                            # 分析引擎
+│   ├── signal_density_analyzer.py       # SignalDensityAnalyzer
+│   ├── xgboost_analyzer.py              # XGBoostAnalyzer
+│   ├── shap_analyzer.py                 # SHAPAnalyzer
+│   ├── prediction_analyzer.py           # PredictionAnalyzer
+│   ├── model_storage.py                 # ModelStorage
+│   ├── drift_analyzer.py               # DriftAnalyzer (PSI)
+│   ├── regime_analyzer.py              # RegimeAnalyzer
+│   ├── expectancy_calculator.py         # ExpectancyCalculator
+│   ├── bootstrap_estimator.py           # BootstrapEstimator
+│   ├── cross_symbol_validator.py        # CrossSymbolValidator
+│   ├── calibration_analyzer.py          # CalibrationAnalyzer
+│   ├── pareto_analyzer.py               # ParetoAnalyzer
+│   ├── time_splitter.py                 # TimeSplitter (Train/Val/OOT)
+│   ├── pattern_definition.py            # Pattern, PatternRule
+│   ├── pattern_extractor.py             # PatternExtractor
+│   ├── pattern_storage.py               # PatternStorage
+│   ├── pattern_validator.py             # PatternValidator
+│   ├── strategy_registry.py             # StrategyRegistry
+│   ├── strategy_cache_registry.py       # StrategyCacheRegistry
+│   ├── indicator_cache.py               # IndicatorCache
+│   ├── kline_cache.py                   # KlineCache
+│   └── strategies/                      # 策略子模組
+│       ├── short_long_cross_strategy.py
+│       ├── mid_long_cross_strategy.py
+│       └── three_line_strategy.py
+├── DataExtraction/                      # 數據擷取層
+│   ├── case_search_engine.py            # CaseSearchEngine (30 參數框架)
+│   ├── parallel_search_engine.py        # ParallelSearchEngine
+│   ├── kline_storage.py                 # KlineStorageManager (HDF5)
+│   ├── kline_download_service.py        # KlineDownloadService
+│   ├── kline_provider_base.py           # Provider 抽象基類
+│   ├── providers/
+│   │   └── binance_provider.py          # BinanceProvider
+│   ├── Momentum_Strategy_Data_Loader.py # MomentumDataLoader
+│   ├── Market_Screener_Configuration.py # MarketConfig
+│   ├── data_provider_base.py            # DataProvider 抽象基類
+│   └── ...
+├── FeatureEngineering/                  # 特徵工程
+│   ├── feature_extractor.py             # FeatureExtractor
+│   ├── feature_storage.py               # FeatureStorage (HDF5)
+│   ├── feature_validator.py             # FeatureValidator
+│   ├── feature_config.py
+│   ├── data_source_registry.py
+│   ├── ml_pipeline_config.py
+│   ├── strategy_registry.py
+│   └── indicators/
+│       ├── ema_extractor.py
+│       ├── macd_extractor.py
+│       └── rsi_extractor.py
+├── Indicator/                           # 純函式技術指標
+│   ├── Base_Indicator_Reference.py
+│   └── Advanced_MA_Reference.py
+├── Indicators/                          # OOP 指標引擎
+│   ├── indicator_engine.py              # IndicatorEngine (主引擎)
+│   ├── base_indicator.py
+│   ├── ema.py / ema_indicator.py
+│   ├── config_loader.py
+│   ├── data_source_manager.py
+│   ├── functional_wrapper.py
+│   └── types.py                         # DataSourceEnum
+├── Optimization/                        # Optuna 優化系統
+│   ├── optuna_optimizer.py              # OptunaOptimizer
+│   ├── checkpoint_manager.py            # CheckpointManager
+│   ├── progress_monitor.py              # ProgressMonitor
+│   ├── result_analyzer.py               # ResultAnalyzer
+│   ├── trial_comparison.py              # TrialComparison
+│   ├── error_handler.py
+│   └── strategy_metadata.py
+└── Utils/
+    └── data_validator.py                # DataValidator
+```
+
+### Frontend (`frontend/src/`)
+
+```
+frontend/src/
+├── app/                                 # Next.js 15 App Router
+│   ├── layout.tsx                       # 主佈局
+│   ├── page.tsx                         # 首頁
+│   ├── search/page.tsx                  # 案例搜索
+│   ├── result/page.tsx                  # 搜索結果
+│   └── optimization/page.tsx            # 優化系統
+├── components/
+│   ├── charts/                          # K 線圖表
+│   │   ├── MultiPaneChartNew.tsx        # 多面板同步圖表 (Lightweight Charts)
+│   │   └── TakerRatioChart.tsx          # Taker Ratio 圖表
+│   ├── optimization/                    # 優化視覺化 (9 個組件)
+│   │   ├── MetricsPanel.tsx
+│   │   ├── DensityComparisonChart.tsx
+│   │   ├── StabilityChart.tsx
+│   │   ├── TrialHistoryTable.tsx
+│   │   ├── ParameterImportanceChart.tsx
+│   │   ├── ParameterDistributionChart.tsx
+│   │   ├── ParallelCoordinatePlot.tsx
+│   │   ├── OptimizationProgress.tsx
+│   │   └── CompareTrialsTable.tsx
+│   ├── search/                          # 搜索組件
+│   ├── case/                            # 案例管理組件
+│   └── layout/
+│       └── MainLayout.tsx               # 主導航佈局
+├── store/
+│   ├── searchStore.ts                   # Zustand 搜索狀態
+│   └── optimizationStore.ts             # Zustand 優化狀態
+├── hooks/
+│   └── useWebSocket.ts                  # WebSocket Hook
+└── lib/
+    └── types.ts                         # TypeScript 介面定義
+```
+
+### Data (`data_cache/`)
+```
+data_cache/
+├── {SYMBOL}_{timeframe}.h5              # K 線數據 (e.g. BTCUSDT_12h.h5)
+├── features/{case_id}.h5               # 特徵矩陣
+└── models/{case_id}.pkl                # XGBoost 模型
 ```
 
 ---
 
 ## 已實現功能
 
-### ✅ 1. Case Search 系統（Web界面 + API）
+### ✅ 1. Case Search 系統
 
 #### 功能概述
-完整的案例搜索系統，支持兩階段正反例搜索。
-
-#### 前端組件
-- **路徑**: `frontend/src/app/search/page.tsx`
-- **功能**:
-  - 20個參數化搜索條件設定
-  - 正例搜索條件輸入（價格變化、成交量、Taker比例等）
-  - 反例搜索條件設定（正負比例、時間分離）
-  - 實時搜索進度顯示
-  - 搜索結果預覽
-
-#### 後端API
-- **基礎路徑**: `api/routes/`
-- **核心端點**:
-  ```python
-  POST /api/v1/search/execute       # 執行搜索
-  GET  /api/v1/search/task/{id}     # 查詢任務狀態
-  GET  /api/v1/search/templates     # 獲取搜索模板
-  POST /api/v1/config               # 更新配置
-  ```
-
-#### 核心業務邏輯
-- **文件**: `momentum/DataExtraction/case_search_engine.py`
-- **功能**:
-  - 30個參數框架（6個觸發條件 + 24個未來表現 + 2個反例參數）
-  - 標的內部採樣策略
-  - 時間分離驗證
-  - 批量搜索優化
+完整的案例搜索系統，支持兩階段正反例搜索、多標的平行搜索。
 
 #### 數據模型
 ```python
-# 搜索參數（32個）
-基礎觸發條件 (6個):
-  - timeframe: 時間框架
-  - price_change: 觸發漲跌幅
-  - closing_strength: 收盤強度
-  - price_position: 價格位置
-  - volume_multiplier: 成交量倍數
-  - taker_buy_ratio: 主動買入比例
+# 搜索參數（32 個）
+基礎觸發條件 (6 個):
+  - timeframe, price_change, closing_strength
+  - price_position, volume_multiplier, taker_buy_ratio
 
-未來表現驗證 (24個):
+未來表現驗證 (24 個):
   - future_1bar_return ~ future_12bar_return
   - future_1bar_max_drawdown ~ future_12bar_max_drawdown
 
-反例專用 (2個):
-  - positive_negative_ratio: 正負比例
-  - time_separation_days: 時間分離天數
+反例專用 (2 個):
+  - positive_negative_ratio, time_separation_days
 ```
+
+#### 核心模組
+- **搜索引擎**: `momentum/DataExtraction/case_search_engine.py`（CaseSearchEngine, SearchConfiguration, FilterCondition）
+- **平行搜索**: `momentum/DataExtraction/parallel_search_engine.py`（非同步多標的併發搜索＋重試邏輯）
+- **API 路由**: `api/routes/case_search.py`（8 個端點）
+- **服務層**: `api/services/standalone_search_service.py`（StandaloneSearchService + TaskManager）
+- **兩階段搜索**: `api/routes/two_stage_search.py`（正例搜索 → 反例搜索 → 合併結果）
 
 #### 已實現的搜索策略
 1. **條件反轉策略**: 設定與正例相反的市場條件
 2. **時間分離策略**: 相同標的不同時間的隨機採樣
 3. **標的內部採樣**: 確保正反例來自相同標的池
+4. **兩階段搜索**: 先搜正例，再基於正例結果搜反例
 
 ---
 
-### ✅ 2. 搜索結果系統
+### ✅ 2. K 線數據系統
 
-#### 功能概述
-完整的結果展示、分析和導出系統。
+#### KlineDataService — 統一資料存取層
+> REFACTOR_ARCHITECTURE_V4 核心變更之一
 
-#### 前端組件
-- **路徑**: `frontend/src/app/result/page.tsx`
-- **功能**:
-  - 案例列表展示（可展開表格）
-  - 統計圖表（市場階段、小時、星期分布）
-  - CSV導出功能
-  - 搜索結果篩選
+`api/services/kline_data_service.py` 作為統一介面，協調快取與下載：
 
-#### 統計圖表
-使用Recharts實現：
-- 市場階段分布圓餅圖
-- 小時分布圓餅圖
-- 星期分布圓餅圖
-- 雙軸圖表（百分比 + 絕對數量）
-
-#### 數據導出
-- **格式**: CSV
-- **內容**: 包含所有20個參數計算結果
-- **標註**: 正反例標記（1/0）
-
----
-
-### ✅ 3. 狀態管理系統
-
-#### Zustand Store
-- **文件**: `frontend/src/store/searchStore.ts`
-- **管理狀態**:
-  - 搜索模板列表
-  - 當前搜索結果
-  - 搜索歷史
-  - 加載狀態和錯誤信息
-
-#### 狀態持久化
-- 搜索結果在頁面跳轉後保持
-- 避免重複搜索
-- 改善用戶體驗
-
----
-
-### ✅ 4. 數據加載系統
-
-#### 核心模組
-- **文件**: `momentum/DataExtraction/Momentum_Strategy_Data_Loader.py`
-- **功能**:
-  - Binance API集成
-  - 批量數據下載
-  - 數據格式標準化
-  - 錯誤處理和重試
-
-#### 數據提供者抽象
-- **文件**: `momentum/DataExtraction/data_provider_base.py`
-- **設計**: 抽象基類，支持未來擴展多個交易所
-
----
-
-### ✅ 5. 信號分析系統
-
-#### 核心模組
-- **文件**: `momentum/signal_analyzer.py`
-- **功能**:
-  - 技術指標計算
-  - 信號密度分析
-  - Pattern識別
-  - 時序關係分析
-
-#### 指標支持
-- 移動平均線（MA, EMA, DEMA, TEMA）
-- 動量指標（RSI, MACD）
-- 波動率指標（ATR, Bollinger Bands）
-- 成交量指標
-- 鏈上數據
-- 持續擴充
-
-
-
----
-
-### ✅ 6. Optuna 參數優化系統 (Phase 3)
-
-#### 功能概述
-完整的參數優化系統，支持多種優化器、斷點續跑(未驗證)、實時進度推送。
-
-#### 核心架構
-
-**優化目標函數**:
 ```python
-# 雙密度模式（v2.0公式）
+class KlineDataService:
+    def get_kline_data()          # 統一入口：先查快取，不足則下載
+    def _check_cache_coverage()    # 檢查 HDF5 快取覆蓋率
+    def _download_and_cache()      # 從 Binance 下載並寫入快取
+    def _handle_partial_cache()    # 處理部分快取情境
+    def _merge_kline_data()        # 合併快取與新下載數據
+    def _validate_data_integrity() # 資料完整性驗證
+```
+
+#### KlineStorageService — HDF5 讀寫操作
+```python
+class KlineStorageService:
+    def write_klines()                    # 寫入 K 線
+    def append_klines()                   # 追加 K 線
+    def read_klines()                     # 讀取指定範圍
+    def read_klines_around_timestamp()    # 圍繞時間點讀取
+    def check_data_integrity()            # 完整性檢查
+    def get_data_quality_report()         # 品質報告
+    def get_stats()                       # 統計資訊
+```
+
+#### 批量下載
+- **服務**: `api/services/batch_download_service.py`
+- **功能**: 平行批量 K 線下載、時間重疊偵測與合併、進度追蹤
+- **API**: `POST /api/v1/kline/batch-download`、`GET /api/v1/kline/download-status/{task_id}`
+
+---
+
+### ✅ 3. 圖表分析系統
+
+#### 多面板同步圖表
+- **組件**: `MultiPaneChartNew.tsx`（Lightweight Charts）
+- **功能**: Price / Volume / Taker Ratio 多面板、時間軸同步、CrossHair 同步
+
+#### 策略信號標記
+- **服務**: `api/services/chart_signal_service.py`（Singleton）
+- **API**: `POST /api/v1/chart/signals`、`POST /api/v1/chart/validate-strategy`
+- **功能**: 計算策略信號點、信號採樣、動態買入/賣出箭頭
+
+#### 圖表數據
+- **服務**: `api/services/chart_data_service.py`
+- **API**: `GET /api/v1/chart/data`
+- **功能**: K 線讀取、指標計算（含 warmup）、支持 TO/TC 邏輯與 center_index 舊邏輯
+
+---
+
+### ✅ 4. Optuna 參數優化系統
+
+#### 優化目標函數（雙密度 v2.0 公式）
+```python
 Score = (μ_pos - μ_neg) - λ × (σ_pos + 0.5 × σ_neg)
 
 其中:
-- M_i = (Near_i - Far_i) / (Near_i + Far_i + ε)  # 信號質量
-- w_i = Near_i + Far_i  # 權重（基於信號數量）
-- μ = Σ(w_i·M_i) / Σw_i  # 加權平均
-- σ = sqrt(Σw_i(M_i-μ)² / Σw_i)  # 加權標準差
-- λ = 1.0  # 穩定性懲罰係數
+- M_i = (Near_i - Far_i) / (Near_i + Far_i + ε)
+- μ = Σ(w_i·M_i) / Σw_i
+- σ = sqrt(Σw_i(M_i-μ)² / Σw_i)
+- λ = 1.0
 ```
 
-#### 支持的優化器 (5種)
-1. **TPESampler** (預設) - Tree-structured Parzen Estimator
-2. **CmaEsSampler** - Covariance Matrix Adaptation Evolution Strategy
-3. **RandomSampler** - 隨機搜索基準
-4. **GPSampler** - Gaussian Process
-5. **NSGAIISampler** - 多目標優化（NSGA-II演算法）
+#### 支持 5 種優化器
+TPESampler（預設）、CmaEsSampler、RandomSampler、GPSampler、NSGAIISampler
 
 #### 容錯機制
+- SQLite 存儲、Pickle 檢查點、3 層錯誤分類、自動重試（指數退避）
 
-**斷點續跑**:(未驗證)
-- SQLite數據庫存儲（`optuna_study.db`）
-- Pickle檢查點（每50次試驗）
-- 自動從中斷點恢復
-- 歷史試驗查詢
-
-**錯誤處理**:
-- 3層錯誤分類（Retryable/NonRetryable/Fatal）
-- 自動重試機制（最多3次）
-- 指數退避策略
-- 詳細錯誤日誌
-
-#### 實時通訊
-
-**WebSocket協議**:
-- **端點**: `ws://localhost:8000/ws/optimization/{task_id}`
-- **功能**: 實時優化進度推送
-- **心跳檢測**: 30秒間隔
-- **自動重連**: 斷線自動恢復
-
-**推送內容**:
-```json
-{
-  "status": "running|completed|failed",
-  "progress": 0.0-1.0,
-  "current_trial": 45,
-  "total_trials": 300,
-  "best_value": 0.35,
-  "best_params": {"ema_short": 7, "ema_mid": 18, "ema_long": 35},
-  "milestone": "25%|50%|75%|100%"
-}
-```
+#### WebSocket 即時通訊
+- **端點**: `ws://localhost:8000/ws/optimization/{task_id}?client_id=xxx`
+- **管理器**: `WebSocketConnectionManager`（Singleton）
+- **功能**: 即時進度推送、心跳檢測（30s ping）、按 task_id 訂閱
 
 #### 核心模組
-- **優化引擎**: `momentum/Optimization/optuna_optimizer.py`
-- **任務服務**: `api/services/optimization_task_service.py`
+- **引擎**: `momentum/Optimization/optuna_optimizer.py`
+- **服務**: `api/services/optimization_task_service.py`（Singleton）
 - **WebSocket**: `api/websocket/optimization_ws.py`
-- **路由**: `api/routes/optimization.py`
-- **模型**: `api/models/training_window_config.py`
 
-#### REST API端點
-```python
-POST   /api/v1/optimization/start       # 啟動優化任務
-GET    /api/v1/optimization/task/{id}   # 查詢任務狀態
-DELETE /api/v1/optimization/task/{id}   # 取消任務
-GET    /api/v1/optimization/tasks       # 列出所有任務
-GET    /api/v1/optimization/analysis    # 參數重要性分析
-GET    /api/v1/optimization/history     # 優化歷史記錄
-```
+#### API 端點（核心 + 分析共 17 個）
+**核心** (`api/routes/optimization.py`):
+- `POST /tasks` — 建立優化任務
+- `POST /tasks/{id}/start` — 啟動任務
+- `GET /tasks/{id}` — 查詢狀態
+- `GET /tasks` — 列出所有任務
+- `POST /tasks/{id}/cancel` — 取消
+- `GET /strategies` — 列出策略
+- `GET /strategies/{id}` — 策略詳情
+- `GET /trials/compare` — 試驗對比
 
-#### 測試與驗證
-- **測試代碼**: ~970行
-- **單元測試**: 優化器、任務管理、WebSocket
-- **整合測試**: 完整優化流程
-- **文檔**: `sessions/PHASE3.5_COMPLETE_SUMMARY.md`
-
----
-
-### ✅ 7. 優化結果視覺化系統 (Phase 3)
-
-#### 功能概述
-9個專業圖表組件，全面展示優化結果與統計分析。
-
-#### 前端組件架構
-
-**核心組件** (`frontend/src/components/optimization/`):
-
-1. **MetricsPanel.tsx** - 指標總覽面板
-   - 最佳分數、μ分離、σ穩定性
-   - 統計顯著性（p-value, Cohen's d）
-   - 顏色編碼（綠=好，黃=中，紅=差）
-   - PNG導出功能
-
-2. **DensityComparisonChart.tsx** - 正反例密度對比
-   - 雙軸條形圖
-   - 正例密度 vs 反例密度
-   - 月度分組對比
-   - 自定義工具提示
-
-3. **StabilityChart.tsx** - 穩定性分析
-   - 折線圖展示月度分數變化
-   - 變異係數（CV）計算
-   - 最佳/最差月份標記
-   - 趨勢線顯示
-
-4. **TrialHistoryTable.tsx** - 試驗歷史表格
-   - 所有試驗詳細記錄
-   - 可排序（分數、參數、時間）
-   - 搜索功能（試驗編號、參數值）
-   - CSV導出
-   - 鍵盤快捷鍵（Ctrl+A全選）
-
-5. **ParameterImportanceChart.tsx** - 參數重要性
-   - 橫向條形圖
-   - FANOVA / MDI 重要性分數
-   - 參數排名
-   - 貢獻百分比
-
-6. **ParameterDistributionChart.tsx** - 參數分布
-   - 多參數散點圖
-   - 顏色映射分數高低
-   - 參數相關性視覺化
-
-7. **ParallelCoordinatePlot.tsx** - 平行坐標圖
-   - 多維參數關係
-   - 高分試驗突出顯示
-   - 互動式篩選
-
-8. **OptimizationProgress.tsx** - 優化進度
-   - 實時進度條
-   - WebSocket連接狀態
-   - 當前最佳值更新
-   - 估計剩餘時間
-
-9. **CompareTrialsTable.tsx** - 試驗對比
-   - 並排對比多個試驗
-   - 參數差異高亮
-   - 性能指標對比
-
-#### UI/UX特性
-
-**統一設計模式**:
-- 空狀態處理（無數據提示）
-- 加載狀態（骨架屏/Spinner）
-- 錯誤狀態（重試按鈕）
-- 響應式設計（手機/平板適配）
-
-**導出功能**:
-- PNG導出（圖表）
-- CSV導出（表格）
-- 一鍵導出所有結果
-
-**交互功能**:
-- 自定義工具提示（詳細資訊）
-- 顏色編碼（直觀判斷）
-- 搜索與篩選
-- 鍵盤快捷鍵
-
-#### 核心頁面
-- **路徑**: `frontend/src/app/optimization/page.tsx`
-- **布局**: 響應式網格系統
-- **路由**: Next.js 15 App Router
+**分析** (`api/routes/optimization_analysis.py`):
+- `GET /tasks/{id}/analysis/importance` — 參數重要性
+- `GET /tasks/{id}/analysis/history` — 優化曲線
+- `GET /tasks/{id}/analysis/param-space` — 參數空間
+- `GET /tasks/{id}/analysis/heatmap` — 參數熱力圖
+- `GET /tasks/{id}/analysis/convergence` — 收斂分析
+- `GET /tasks/{id}/analysis/stability` — 穩定性分析
+- `GET /tasks/{id}/analysis/stability-by-case-month` — 月份穩定性
+- `GET /tasks/{id}/trials` — Top N trials
+- `GET /tasks/{id}/result` — 完整結果
 
 ---
 
-### ✅ 8. 信號密度分析系統 (Phase 3)
+### ✅ 5. 優化結果視覺化系統
 
-#### 功能概述
-計算策略在正反例中的信號密度差異，支持窗口配置與統計分析。
+9 個專業圖表組件（`frontend/src/components/optimization/`）：
 
-#### 核心計算邏輯
+| 組件 | 功能 |
+|------|------|
+| **MetricsPanel** | 指標總覽（分數、μ 分離、σ 穩定性、p-value、Cohen's d） |
+| **DensityComparisonChart** | 正反例密度對比＋月度分組 |
+| **StabilityChart** | 月度分數變化＋變異係數（CV）＋趨勢線 |
+| **TrialHistoryTable** | 所有試驗（排序、搜索、CSV 導出、Ctrl+A） |
+| **ParameterImportanceChart** | FANOVA/MDI 參數重要性排名 |
+| **ParameterDistributionChart** | 多參數散點圖＋分數顏色映射 |
+| **ParallelCoordinatePlot** | 多維參數平行坐標＋高分突顯 |
+| **OptimizationProgress** | 即時進度條＋WebSocket 狀態＋估計剩餘時間 |
+| **CompareTrialsTable** | 多試驗並排對比＋差異高亮 |
 
-**雙窗口密度計算**:
-```python
-# 正例窗口（TO點後0-24小時）
-positive_density = 符合策略的K線數 / 總K線數
+---
 
-# 反例窗口（TO點後24-48小時）
-negative_density = 符合策略的K線數 / 總K線數
+### ✅ 6. 信號密度分析系統
 
-# 分離度
-separation = positive_density - negative_density
-```
-
-**M-Metric計算** (v2.0):
-```python
-M_i = (Near_i - Far_i) / (Near_i + Far_i + ε)
-範圍: [-1, 1]
-```
-
-**統計顯著性**:
-- t檢驗（p-value）
-- Cohen's d（效果量）
-- 按月穩定性分析
-- 變異係數（CV）
+#### 核心計算
+- 雙窗口密度（Near/Far）、M-Metric v2.0
+- 統計顯著性（t 檢驗、Cohen's d）
+- 零值統計透明化（Far=0 排除比例）
+- 樣本警告機制
 
 #### 核心模組
-- **分析引擎**: `momentum/Analysis/signal_density_analyzer.py`
-- **服務層**: `api/services/signal_analysis_service.py`
-- **API路由**: `api/routes/signal_analysis.py`
-- **配置模型**: `api/models/training_window_config.py`
-
-#### API端點
-```python
-POST /api/v1/signal-analysis/density    # 計算信號密度
-POST /api/v1/signal-analysis/batch      # 批量分析
-GET  /api/v1/signal-analysis/windows    # 獲取窗口配置
-```
+- **引擎**: `momentum/Analysis/signal_density_analyzer.py`
+- **服務**: `api/services/signal_analysis_service.py`（Singleton）
+- **API**: `POST /api/v1/signal-analysis/density`、`POST /api/v1/signal-analysis/preview-window`
 
 ---
 
-### ✅ 9. 多指標計算引擎 (Phase 3)
+### ✅ 7. 多指標計算引擎
+
+#### 數據源支持 (7 種)
+close, open, high, low, volume, taker_volume, taker_ratio
+
+#### 指標引擎
+- **OOP 引擎**: `momentum/Indicators/indicator_engine.py`（IndicatorEngine — 主引擎）
+- **純函式**: `momentum/Indicator/Base_Indicator_Reference.py`
+- **支持指標**: EMA, SMA, DEMA, TEMA, RSI, MACD, ATR, Bollinger Bands 等
+- **特性**: 向量化計算、YAML 配置、無未來函數驗證
+
+---
+
+### ✅ 8. 特徵工程系統
 
 #### 功能概述
-靈活的指標計算系統，支持7種數據源和20+種技術指標。
-
-#### 數據源支持 (7種)
-- `close` - 收盤價
-- `open` - 開盤價
-- `high` - 最高價
-- `low` - 最低價
-- `volume` - 成交量
-- `taker_volume` - 主動買入量
-- `taker_ratio` - 主動買入比例
-
-#### 指標類型 (20+種)
-
-**趨勢類**:
-- EMA, SMA, DEMA, TEMA
-- WMA, HMA
-
-**動能類**:
-- RSI, MACD, Stochastic
-- CCI, Williams %R, ROC
-
-**波動類**:
-- ATR, Bollinger Bands
-- Keltner Channel, Donchian Channel
-
-**成交量類**:
-- OBV, Volume MA, VWAP
-- MFI, CMF
-
-**籌碼類** (加密貨幣特有):
-- Taker Ratio MA
-- Taker Strength
-- Taker Volume Delta
-
-#### 技術特性
-- **向量化計算**: pandas/numpy優化
-- **參數可配置**: period, multiplier等
-- **缺失值處理**: 前向填充/線性插值
-- **無未來函數**: 嚴格時序性驗證
+完整特徵擷取 → HDF5 存儲 → 品質驗證流程。
 
 #### 核心模組
-- **指標引擎**: `momentum/Indicator/indicator_engine.py`
-- **趨勢指標**: `momentum/Indicator/trend_indicators.py`
-- **動能指標**: `momentum/Indicator/momentum_indicators.py`
-- **波動指標**: `momentum/Indicator/volatility_indicators.py`
-- **成交量指標**: `momentum/Indicator/volume_indicators.py`
+- **擷取**: `momentum/FeatureEngineering/feature_extractor.py`
+- **存儲**: `momentum/FeatureEngineering/feature_storage.py`（HDF5）
+- **驗證**: `momentum/FeatureEngineering/feature_validator.py`
+- **服務**: `api/services/feature_task_service.py`
+- **API**: `POST /features/extract`、`GET /features/task/{id}`、`GET /features/summary/{case_id}`、`GET /features/health`
+
+#### 特徵指標
+EMA, MACD, RSI 擷取器（`momentum/FeatureEngineering/indicators/`）— 支持多尺度窗口、序列特徵
 
 ---
 
-### ✅ 10. 配置管理系統
+### ✅ 9. XGBoost 分析系統
 
-#### 系統配置
-- **文件**: `api/core/config.py`
-- **管理內容**:
-  - 數據存儲路徑
-  - API密鑰管理
-  - 系統參數範圍
-  - 環境變量
+#### 核心能力
+| 功能 | 模組 |
+|------|------|
+| 模型訓練（Purged CV, 多尺度窗口） | `xgboost_analyzer.py` |
+| SHAP 全域/個案分析 | `shap_analyzer.py` |
+| 機率密度、校準曲線、PR 曲線、滾動 AUC | `prediction_analyzer.py` |
+| OOT (Out-of-Time) 驗證 | `time_splitter.py` |
+| 特徵漂移 PSI | `drift_analyzer.py` |
+| 市場情境分析 | `regime_analyzer.py` |
+| 期望值計算 | `expectancy_calculator.py` |
+| 信賴區間 | `bootstrap_estimator.py` |
+| 跨標的驗證 | `cross_symbol_validator.py` |
 
-#### 市場配置
-- **文件**: `momentum/DataExtraction/Market_Screener_Configuration.py`
-- **功能**:
-  - 市場階段定義（牛市/熊市/震盪）
-  - 交易對篩選
-  - 質量過濾規則
+#### 服務層
+- `api/services/xgboost_task_service.py` — 單案例分析
+- `api/services/xgboost_batch_service.py` — 批量分析
+- `api/services/shap_analysis_service.py` — SHAP 分析
+
+#### API 路由 (`api/routes/pattern_analysis.py` — 21 個端點)
+主要端點：
+- `POST /xgboost/start` — 啟動分析
+- `POST /xgboost/batch/start` — 批量分析
+- `POST /xgboost/validate-oot` — OOT 驗證
+- `GET /xgboost/{id}/predictions` — 預測結果
+- `GET /xgboost/{id}/feature-importance` — 特徵重要性
+- `GET /xgboost/{id}/probability-density` — 機率密度
+- `GET /xgboost/{id}/strategy-equity` — 策略權益曲線
+- `GET /xgboost/{id}/rolling-auc` — 滾動 AUC
+- `GET /xgboost/{id}/calibration-curve` — 校準曲線
+- `GET /xgboost/{id}/pr-curve` — PR 曲線
+- `POST /xgboost/{id}/shap` — SHAP 全域分析
+- `GET /xgboost/{id}/shap/case/{case_id}` — 單案例 SHAP
+- `GET /xgboost/{id}/drift-report` — 漂移報告
+- `GET /xgboost/{id}/regime-analysis` — 情境分析
 
 ---
 
-### ✅ 7. UI佈局系統
+### ✅ 10. Pattern 管理系統
 
-#### 主佈局
-- **文件**: `frontend/src/components/layout/MainLayout.tsx`
-- **功能**:
-  - 左側導航欄
-  - 響應式設計
-  - 路由高亮
-  - 移動端適配
+#### 功能概述
+Pattern 的 CRUD 操作和統計分析。
 
-#### 頁面路由
-- `/` - 首頁概覽
-- `/search` - 案例搜索
-- `/result` - 搜索結果
-- `/dashboard` - 數據儀表板（規劃中）
-- `/settings` - 系統設定
+#### 核心模組
+- **定義**: `momentum/Analysis/pattern_definition.py`（Pattern, PatternRule）
+- **擷取**: `momentum/Analysis/pattern_extractor.py`
+- **存儲**: `momentum/Analysis/pattern_storage.py`
+- **驗證**: `momentum/Analysis/pattern_validator.py`
+- **服務**: `api/services/pattern_management_service.py`
+- **API** (`api/routes/pattern_management.py` — 8 個端點):
+  - `POST /patterns/define` — 建立 Pattern
+  - `GET /patterns/list` — 列出所有
+  - `GET /patterns/statistics` — 統計
+  - `GET /patterns/{id}` — 詳情
+  - `GET /patterns/{id}/summary` — 摘要
+  - `PUT /patterns/{id}` — 更新
+  - `DELETE /patterns/{id}` — 刪除
+  - `DELETE /patterns/batch/delete-all` — 全部刪除
+
+---
+
+### ✅ 11. ML Pipeline 系統
+
+- **API** (`api/routes/ml_pipeline.py`):
+  - `POST /api/v1/ml-pipeline/create` — 從 Optuna trial 建立 pipeline
+  - `GET /api/v1/ml-pipeline/{id}` — 取得詳情
+  - `GET /api/v1/ml-pipeline/list` — 列出所有
+  - `DELETE /api/v1/ml-pipeline/{id}` — 刪除
+
+---
+
+### ✅ 12. 配置管理系統
+
+- **後端設定**: `api/core/config.py`（pydantic-settings, `.env` 載入）
+- **範本管理**: `api/services/data_service.py`（TemplateManager + ConfigManager）
+- **API** (`api/routes/config.py` — 9 個端點):
+  - 範本: CRUD (templates)
+  - 系統: `GET /config/system`、`PATCH /config/system`
+  - 驗證: `GET /config/validation/symbols`
+  - 統計: `GET /config/stats`
+
+---
+
+### ✅ 13. 案例匯入系統
+
+- **服務**: `api/services/case_import_service.py`
+- **功能**: CSV/Excel 匯入、欄位標準化、CSV Injection 防護、時間戳正規化
+- **API** (`api/routes/case.py`):
+  - `POST /api/v1/case/import` — 上傳匯入
+  - `GET /api/v1/case/list` — 案例列表
+  - `GET /api/v1/case/count` — 案例數量
+  - `DELETE /api/v1/case/clear-all` — 清除全部
 
 ---
 
 ## 待開發功能
 
-### ✅ 0. 長時間任務處理機制
+### ⏳ 1. 回測系統（優先級：🔥 中）
 
-#### 任務狀態管理
-- **TaskManager**: 追蹤所有任務的狀態和進度
-- **TaskProgress**: 包含current_step, total_steps, percentage, current_symbol
-- **前端輪詢**: 透過定期查詢獲取實時進度
+基於發現的 Pattern 或 ML 模型進行歷史回測驗證。
 
-#### 超時處理策略
-- 前端不等待長時間HTTP響應
-- 使用task_id追蹤任務執行
-- 每2-3秒輪詢一次狀態和進度
-- 支持任務取消和錯誤恢復
+#### 核心需求
+- 回測引擎（交易模擬、績效計算）
+- 績效指標（Sharpe, Sortino, Max Drawdown, Calmar, Win Rate 等）
+- 權益曲線視覺化
+- PDF 報告生成
 
-#### 效能優化方向
-- batch_size建議值: 10-20（視具體實現而定）
-- ALL_USDT自動展開為所有USDT交易對（200+個）
-- 定期更新進度避免前端超時假象
-- 真正的並行處理可提升5-10倍速度
+### ⏳ 2. 實盤部署（優先級：🟡 低）
 
-### ⏳ 1. 圖表分析系統（優先級：🔥 最高）
-
-#### 技術選擇
-**Lightweight Charts** (TradingView開源庫)
-
-**選擇原因**:
-- ✅ 完全免費開源
-- ✅ 性能極佳，流暢度接近專業版TradingView
-- ✅ 支持自由捲動XY軸
-- ✅ 多圖層同步
-- ✅ React整合簡單
-
-#### 圖表佈局設計
-```
-多層同步圖表：
-┌─────────────────────────────────────────────────────┐
-│ Price K線圖 (OHLC)                                  │
-│ - 標準K線顯示                                       │
-│ - 策略信號箭頭標記（買入↑ 賣出↓）                  │
-│ - 案例時間點高亮背景                                │
-│ - 支持縮放和拖曳                                    │
-├─────────────────────────────────────────────────────┤
-│ Volume 柱狀圖                                       │
-│ - 成交量柱狀圖                                      │
-│ - 對應策略信號箭頭                                  │
-│ - 異常成交量標記                                    │
-├─────────────────────────────────────────────────────┤
-│ Taker_Ratio 柱狀圖                                    │
-│ - 主動買入比例柱狀圖                                │
-│ - 對應策略信號箭頭                                  │
-│ - 關鍵水平線（如50%）                               │
-├─────────────────────────────────────────────────────┤
-│ 技術指標圖層 (可選多個)                             │
-│ - RSI, MACD, EMA等                                  │
-│ - 指標信號標記                                      │
-│ - 可動態添加/移除                                   │
-└─────────────────────────────────────────────────────┘
-
-特性：
-✅ 所有圖表共用時間軸
-✅ 捲動一個全部跟著動
-✅ 同步縮放功能
-✅ 案例時間點特殊高亮
-```
-
-#### 信號標記系統
-**需求**:
-- 一個指標策略會產生多組參數結果
-- 每個數據源（Price, Volume, Taker_Ratio）都會計算指標
-- 用戶選擇策略後，對應箭頭顯示在所有相關圖表
-
-**實現方案**:
-```typescript
-// 信號數據結構
-interface SignalMarker {
-  timestamp: number;           // K線時間戳
-  signalType: 'buy' | 'sell';  // 信號類型
-  strategy: string;            // 策略名稱（如"Price_EMA5>20"）
-  dataSource: 'price' | 'volume' | 'taker_ratio';
-  value: number;               // 對應數值
-  confidence?: number;         // 信號置信度（可選）
-}
-
-// 箭頭顯示邏輯
-- Price圖: 箭頭指向對應K線的Open/Close
-- Volume圖: 箭頭指向對應柱狀圖頂部
-- Taker_Ratio圖: 箭頭指向對應柱狀圖頂部
-```
-
-#### 案例高亮
-- **背景顏色**: 淡黃色或淡藍色半透明
-- **範圍**: 案例時間點前後各數根K線
-- **標註**: 顯示案例ID和類型（正例/反例）
-
-#### 開發任務
-```
-階段1: 基礎圖表（1週）
-  - [ ] 安裝Lightweight Charts
-  - [ ] 實現Price K線圖
-  - [ ] 實現Volume柱狀圖
-  - [ ] 實現Taker_Ratio線圖
-
-階段2: 同步和交互（1週）
-  - [ ] 實現時間軸同步
-  - [ ] 實現縮放和拖曳
-  - [ ] 實現CrossHair同步
-
-階段3: 信號標記（1週）
-  - [ ] 實現箭頭標記系統
-  - [ ] 策略選擇器UI
-  - [ ] 動態顯示/隱藏標記
-
-階段4: 案例高亮（3天）
-  - [ ] 實現背景高亮
-  - [ ] 案例資訊提示框
-  - [ ] 案例導航功能
-```
-
----
-
-### ⏳ 2. K線數據批量獲取系統（優先級：🔥 高）
-
-#### 功能需求
-從搜索到的案例時間點，批量獲取前後K線數據用於圖表展示和ML訓練。
-
-#### 數據範圍
-```
-案例時間點
-     ↓
-[--240根--][案例][--96根--]
-     ↑              ↑
-  lookback      forward
-
-默認值:
-- lookback: 240根（可調整）
-- forward: 96根（可調整）
-
-原因:
-- 240根足夠計算長週期指標
-- 96根足夠觀察未來表現
-- 1小時週期: 240hr = 10天歷史
-```
-
-#### 工作流程
-```
-1. 用戶完成搜索 → 獲得案例列表
-2. 用戶手動篩選案例 → 標記需要的案例
-3. 用戶上傳篩選後的CSV（symbol, timestamp, label）
-4. 系統批量下載K線數據
-5. 數據存儲到本地（HDF5格式）
-```
-
-#### 數據結構
-```python
-# HDF5存儲結構
-/data/klines/
-  /{symbol}/
-    /{case_id}/
-      - timestamp: 案例時間點
-      - lookback_bars: 前240根K線
-      - forward_bars: 後96根K線
-      - metadata: 案例元數據（正反例標記等）
-      - indicators: 預計算指標（可選）
-```
-
-#### 去重和緩存
-```python
-# 時間重疊檢測
-案例A: 2024-01-01 12:00 (需要: 2023-12-22 ~ 2024-01-05)
-案例B: 2024-01-02 12:00 (需要: 2023-12-23 ~ 2024-01-06)
-         ↓
-檢測到重疊 → 合併下載請求 → 避免重複API調用
-```
-
-#### API限制處理
-```python
-# 速率限制
-- Binance: 1200請求/分鐘
-- 批量下載: 每次最多100個案例
-- 失敗重試: 指數退避策略
-- 進度追蹤: WebSocket實時更新
-```
-
-#### 開發任務
-```
-階段1: 核心下載邏輯（1週）
-  - [ ] 實現批量下載引擎
-  - [ ] CSV解析和驗證
-  - [ ] 時間範圍計算
-  - [ ] HDF5存儲實現
-
-階段2: 優化和緩存（1週）
-  - [ ] 時間重疊檢測
-  - [ ] 去重邏輯
-  - [ ] 增量下載支持
-  - [ ] 錯誤處理和重試
-
-階段3: UI和進度（3天）
-  - [ ] 上傳CSV界面
-  - [ ] 下載進度顯示
-  - [ ] 數據預覽功能
-  - [ ] 錯誤報告
-```
-
----
-
-### ⏳ 3. 指標測試系統（優先級：🔥 高）
-
-#### 功能概述
-對搜索到的案例，測試多種技術指標的有效性。
-
-#### 多數據源指標系統
-```python
-# 數據源
-data_sources = [
-    'close',          # 收盤價
-    'open',           # 開盤價
-    'high',           # 最高價
-    'low',            # 最低價
-    'volume',         # 成交量
-    'taker_volume',   # 主動買入量
-    'taker_ratio'     # 主動買入比例
-]
-
-# 指標類型
-indicators = [
-    'EMA',      # 指數移動平均
-    'DEMA',     # 雙重指數移動平均
-    'TEMA',     # 三重指數移動平均
-    'RSI',      # 相對強弱指標
-    'MACD',     # 移動平均收斂發散
-    'ATR',      # 平均真實波幅
-    'BB',       # 布林帶
-    'VWAP',     # 成交量加權平均價
-]
-
-# 生成結果示例
-close_ema_5, close_ema_20, close_ema_50
-volume_rsi_14, volume_rsi_21
-taker_ratio_macd_fast12_slow26
-```
-
-#### 指標參數優化
-使用Optuna進行參數搜索：
-```python
-# 優化目標
-def objective(trial):
-    # 參數空間
-    ema_period = trial.suggest_int('ema_period', 5, 200)
-    rsi_period = trial.suggest_int('rsi_period', 7, 21)
-    
-    # 計算指標
-    signals = calculate_signals(data, ema_period, rsi_period)
-    
-    # 評估指標（正反例分類準確率）
-    accuracy = evaluate_classification(signals, labels)
-    
-    return accuracy
-
-# 執行優化
-study = optuna.create_study(direction='maximize')
-study.optimize(objective, n_trials=100)
-```
-
-#### 指標評分系統
-```python
-# 評估指標有效性
-指標評分維度:
-1. 正反例分類準確率
-2. 信號出現頻率
-3. 信號穩定性
-4. 計算複雜度
-
-評分公式:
-score = (accuracy * 0.5) + 
-        (frequency_score * 0.2) + 
-        (stability_score * 0.2) + 
-        (efficiency_score * 0.1)
-```
-
-#### UI設計
-```
-指標測試界面：
-┌─────────────────────────────────────────────────┐
-│ 數據源選擇                                      │
-│ ☑ Close  ☑ Volume  ☑ Taker_Ratio              │
-├─────────────────────────────────────────────────┤
-│ 指標選擇                                        │
-│ ☑ EMA (參數: [5, 20, 50])                      │
-│ ☑ RSI (參數: [14, 21])                         │
-│ ☑ MACD (參數: 自動優化)                        │
-├─────────────────────────────────────────────────┤
-│ 優化設定                                        │
-│ 優化方法: ⚫ Optuna  ○ Grid Search             │
-│ 試驗次數: [100]                                 │
-├─────────────────────────────────────────────────┤
-│ 執行進度                                        │
-│ ████████░░░░░░░░ 50% (50/100 trials)           │
-├─────────────────────────────────────────────────┤
-│ 結果排名                                        │
-│ 1. close_ema_20 (準確率: 78%)                  │
-│ 2. volume_rsi_14 (準確率: 75%)                 │
-│ 3. taker_ratio_macd (準確率: 72%)              │
-└─────────────────────────────────────────────────┘
-```
-
-#### 開發任務
-```
-階段1: 指標計算引擎（1週）
-  - [ ] 多數據源支持
-  - [ ] 指標庫整合
-  - [ ] 批量計算優化
-
-階段2: Optuna整合（1週）
-  - [ ] 參數空間定義
-  - [ ] 目標函數實現
-  - [ ] 並行優化支持
-
-階段3: UI開發（1週）
-  - [ ] 指標選擇器
-  - [ ] 參數設定界面
-  - [ ] 結果排名展示
-  - [ ] 進度追蹤
-```
-
----
-
-### ⏳ 4. ML訓練系統（優先級：🔥 中高）
-
-#### 訓練目標
-**分類模型**：預測起漲前案例是否會在未來上漲
-
-#### ML階梯策略
-```
-階段1: XGBoost/LightGBM（優先）
-  - 適合小數據集（幾千樣本）
-  - 訓練快速（分鐘級）
-  - 可解釋性強
-  - 作為基線模型
-
-階段2: LSTM（可選）
-  - 需要時序記憶
-  - 適合中等數據集（1萬+）
-  - 捕捉短期依賴
-
-階段3: Transformer（未來）
-  - 需要大數據集（10萬+）
-  - 捕捉長期依賴
-  - 計算資源需求高
-```
-
-#### 特徵工程
-```python
-# 特徵類型
-features = {
-    '價格特徵': [
-        'close', 'open', 'high', 'low',
-        'price_change', 'price_volatility'
-    ],
-    '成交量特徵': [
-        'volume', 'volume_ma', 'volume_std',
-        'volume_spike'
-    ],
-    '籌碼特徵': [
-        'taker_volume', 'taker_ratio',
-        'taker_ratio_ma', 'taker_ratio_change'
-    ],
-    '技術指標特徵': [
-        'ema_5', 'ema_20', 'ema_50',
-        'rsi_14', 'macd', 'atr',
-        'bb_upper', 'bb_lower'
-    ],
-    '時序特徵': [
-        'hour_of_day', 'day_of_week',
-        'market_phase'
-    ]
-}
-
-# 特徵總數：20-30個
-```
-
-#### 訓練流程
-```python
-# 1. 數據準備
-X_train, X_test, y_train, y_test = prepare_data(
-    positive_cases,  # 正例（會漲）
-    negative_cases   # 反例（不會漲）
-)
-
-# 2. 特徵工程
-features = calculate_all_features(X_train)
-
-# 3. 模型訓練
-model = XGBClassifier(
-    n_estimators=100,
-    max_depth=6,
-    learning_rate=0.1
-)
-model.fit(features, y_train)
-
-# 4. 模型評估
-accuracy = model.score(X_test, y_test)
-precision = precision_score(y_test, y_pred)
-recall = recall_score(y_test, y_pred)
-
-# 5. 特徵重要性分析
-feature_importance = model.feature_importances_
-```
-
-#### 輸出結果
-```python
-# 預測結果
-{
-    'prediction': 1,              # 0=不會漲, 1=會漲
-    'probability': 0.78,          # 上漲概率 78%
-    'confidence': 'high',         # 信心水平
-    'expected_return': 0.085,     # 預期收益 8.5%（統計估算）
-    'risk_reward_ratio': 2.5,     # 風險報酬比（統計估算）
-    'top_features': [             # 關鍵特徵
-        ('close_ema_20', 0.15),
-        ('volume_spike', 0.12),
-        ('taker_ratio', 0.10)
-    ]
-}
-```
-
-#### 風險報酬比計算
-```python
-# 從歷史統計計算
-def calculate_risk_reward(model, historical_data):
-    # 找出模型預測為"會漲"的歷史案例
-    predicted_up = historical_data[model.predict(X) == 1]
-    
-    # 計算實際漲跌幅
-    actual_returns = predicted_up['future_return']
-    
-    # 分離盈虧
-    profits = actual_returns[actual_returns > 0]
-    losses = actual_returns[actual_returns < 0]
-    
-    # 計算平均
-    avg_profit = profits.mean()
-    avg_loss = abs(losses.mean())
-    
-    # 風險報酬比
-    risk_reward_ratio = avg_profit / avg_loss
-    
-    return risk_reward_ratio
-```
-
-#### UI設計
-```
-ML訓練界面：
-┌─────────────────────────────────────────────────┐
-│ 數據準備                                        │
-│ 正例案例: [1000] 個                             │
-│ 反例案例: [3000] 個                             │
-│ 特徵數量: [28] 個                               │
-├─────────────────────────────────────────────────┤
-│ 模型選擇                                        │
-│ ⚫ XGBoost  ○ LightGBM  ○ LSTM  ○ Transformer  │
-├─────────────────────────────────────────────────┤
-│ 訓練進度                                        │
-│ ████████████████████ 100% Complete             │
-├─────────────────────────────────────────────────┤
-│ 模型評估                                        │
-│ 準確率: 78.5%                                   │
-│ 精確率: 76.2%                                   │
-│ 召回率: 81.3%                                   │
-│ 風險報酬比: 2.5:1                               │
-├─────────────────────────────────────────────────┤
-│ 特徵重要性                                      │
-│ 1. close_ema_20      ████████░░ 15%            │
-│ 2. volume_spike      ██████░░░░ 12%            │
-│ 3. taker_ratio       █████░░░░░ 10%            │
-└─────────────────────────────────────────────────┘
-```
-
-#### 開發任務
-```
-階段1: XGBoost基線（2週）
-  - [ ] 特徵工程實現
-  - [ ] XGBoost訓練流程
-  - [ ] 模型評估指標
-  - [ ] 風險報酬比計算
-
-階段2: Optuna優化（1週）
-  - [ ] 超參數空間定義
-  - [ ] 自動調參
-  - [ ] 交叉驗證
-
-階段3: UI開發（1週）
-  - [ ] 訓練配置界面
-  - [ ] 進度顯示
-  - [ ] 結果可視化
-  - [ ] 模型保存/載入
-```
-
----
-
-### ⏳ 5. Pattern發現系統（優先級：🔥 中）
-
-#### 功能概述
-自動從高分指標組合中發現交易Pattern。
-
-#### Pattern定義
-```python
-# Pattern示例
-Pattern = {
-    'name': 'EMA金叉 + 成交量放大',
-    'conditions': [
-        'close_ema_5 > close_ema_20',
-        'volume > volume_ma_20 * 1.5',
-        'taker_ratio > 0.6'
-    ],
-    'effectiveness': {
-        'accuracy': 0.75,
-        'sample_size': 150,
-        'avg_return': 0.08,
-        'win_rate': 0.68
-    }
-}
-```
-
-#### 發現流程
-```python
-# 1. 指標過濾
-high_score_indicators = filter_by_score(all_indicators, min_score=0.7)
-
-# 2. 組合測試
-for combo in generate_combinations(high_score_indicators, max_size=3):
-    pattern = test_pattern(combo, historical_cases)
-    if pattern.accuracy > threshold:
-        patterns.append(pattern)
-
-# 3. Pattern排序
-patterns.sort(key=lambda x: x.effectiveness['accuracy'], reverse=True)
-
-# 4. Pattern驗證
-validated_patterns = cross_validate(patterns, validation_set)
-```
-
-#### 開發任務
-```
-階段1: Pattern發現引擎（2週）
-  - [ ] 組合生成邏輯
-  - [ ] Pattern測試框架
-  - [ ] 有效性評估
-
-階段2: UI開發（1週）
-  - [ ] Pattern列表展示
-  - [ ] Pattern詳情頁
-  - [ ] Pattern比較功能
-```
-
----
-
-### ⏳ 6. 回測系統（優先級：🔥 中）
-
-#### 功能概述
-基於發現的Pattern或ML模型，進行歷史回測驗證。
-
-#### 回測引擎
-```python
-# 回測流程
-class BacktestEngine:
-    def __init__(self, strategy, initial_capital):
-        self.strategy = strategy
-        self.capital = initial_capital
-        self.positions = []
-        self.trades = []
-    
-    def run(self, historical_data):
-        for bar in historical_data:
-            # 生成信號
-            signal = self.strategy.generate_signal(bar)
-            
-            # 執行交易
-            if signal == 'buy' and not self.has_position():
-                self.open_position(bar)
-            elif signal == 'sell' and self.has_position():
-                self.close_position(bar)
-            
-            # 記錄
-            self.update_metrics(bar)
-        
-        # 計算績效
-        return self.calculate_performance()
-```
-
-#### 績效指標
-```python
-performance_metrics = {
-    '報酬指標': {
-        'total_return': 0.25,        # 總報酬率 25%
-        'annual_return': 0.15,       # 年化報酬率 15%
-        'excess_return': 0.10        # 超額報酬 10%
-    },
-    '風險指標': {
-        'sharpe_ratio': 1.8,         # 夏普比率
-        'sortino_ratio': 2.2,        # 索提諾比率
-        'max_drawdown': -0.15,       # 最大回撤 -15%
-        'calmar_ratio': 1.0          # 卡瑪比率
-    },
-    '交易指標': {
-        'win_rate': 0.68,            # 勝率 68%
-        'profit_factor': 2.5,        # 賺賠比 2.5
-        'avg_holding_period': 48,    # 平均持倉48小時
-        'total_trades': 150          # 總交易次數
-    },
-    '穩定性指標': {
-        'volatility': 0.12,          # 報酬標準差 12%
-        'max_consecutive_losses': 5, # 最長連敗
-        'var_95': -0.08              # 95% VaR
-    }
-}
-```
-
-#### UI設計
-```
-回測界面：
-┌─────────────────────────────────────────────────┐
-│ 策略選擇                                        │
-│ ⚫ Pattern: EMA金叉+成交量放大                  │
-│ ○ ML模型: XGBoost_v1                            │
-├─────────────────────────────────────────────────┤
-│ 回測設定                                        │
-│ 起始資金: [10000] USDT                          │
-│ 時間範圍: 2023-01-01 ~ 2024-12-31              │
-│ 手續費率: [0.1]%                                │
-├─────────────────────────────────────────────────┤
-│ 權益曲線圖                                      │
-│ (Lightweight Charts顯示)                       │
-├─────────────────────────────────────────────────┤
-│ 績效指標卡片                                    │
-│ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐          │
-│ │總報酬│ │夏普比│ │勝率  │ │最大  │          │
-│ │ 25% │ │ 1.8 │ │ 68% │ │回撤  │          │
-│ └──────┘ └──────┘ └──────┘ │-15% │          │
-│                             └──────┘          │
-├─────────────────────────────────────────────────┤
-│ 交易明細表格                                    │
-│ 時間       │ 類型 │ 價格  │ 盈虧   │ 累計報酬│
-│ 2023-01-05│ 買入 │ 16500│        │         │
-│ 2023-01-07│ 賣出 │ 17200│ +4.2% │ +4.2%   │
-└─────────────────────────────────────────────────┘
-```
-
-#### 開發任務
-```
-階段1: 回測引擎（2週）
-  - [ ] 核心回測邏輯
-  - [ ] 交易執行模擬
-  - [ ] 績效指標計算
-
-階段2: 可視化（1週）
-  - [ ] 權益曲線圖
-  - [ ] 回撤圖
-  - [ ] 績效儀表板
-
-階段3: 報告生成（1週）
-  - [ ] PDF報告導出
-  - [ ] 詳細交易記錄
-  - [ ] 策略對比分析
-```
+策略部署到雲端、實時監控、自動執行交易。
 
 ---
 
 ## 數據流設計
 
 ### 完整數據流向
+
 ```
-使用者操作流程：
+1️⃣ 案例搜索
+   搜索條件 → CaseSearchEngine → ParallelSearchEngine → 案例列表 (CSV/JSON)
 
-1️⃣ 案例搜索階段
-   用戶輸入搜索條件
-        ↓
-   Case Search Engine搜索歷史數據
-        ↓
-   標記符合條件的時間點（symbol + timestamp）
-        ↓
-   生成案例列表（正例/反例）
-        ↓
-   存儲到CSV
+2️⃣ 案例匯入
+   CSV/Excel → CaseImportService → 案例記憶體存儲 → 批量 K 線下載
 
-2️⃣ 數據準備階段
-   用戶手動篩選案例
-        ↓
-   上傳篩選後的CSV
-        ↓
-   系統批量下載K線數據（240前/96後）
-        ↓
-   存儲到HDF5（本地）
+3️⃣ K 線下載
+   案例列表 → KlineDataService (快取優先) → HDF5
+   ※ 不足時透過 BinanceProvider 下載並寫入快取
 
-3️⃣ 指標測試階段
-   用戶選擇指標和數據源
-        ↓
-   系統計算指標（多數據源 × 多參數）
-        ↓
-   Optuna優化參數
-        ↓
-   評估指標有效性
-        ↓
-   生成指標評分排名
+4️⃣ 圖表分析
+   HDF5 → ChartDataService → IndicatorEngine → 多面板圖表
+   用戶選策略 → ChartSignalService → 信號箭頭標記
 
-4️⃣ 圖表分析階段
-   用戶選擇案例查看
-        ↓
-   從HDF5讀取K線數據
-        ↓
-   Lightweight Charts渲染多層圖表
-        ↓
-   用戶選擇策略 → 顯示對應箭頭標記
-        ↓
-   用戶分析Pattern
+5️⃣ 信號密度分析
+   策略配置 → SignalDensityAnalyzer → 密度統計 + M-Metric
 
-5️⃣ Pattern發現階段
-   系統自動組合高分指標
-        ↓
-   測試組合有效性
-        ↓
-   生成Pattern列表
-        ↓
-   用戶驗證Pattern
+6️⃣ 參數優化
+   參數空間 → OptunaOptimizer → 最佳參數 + Trial 分析
+   WebSocket → 即時進度推送 → 前端 9 個視覺化組件
 
-6️⃣ ML訓練階段
-   準備特徵數據（20-30個指標）
-        ↓
-   訓練分類模型（XGBoost）
-        ↓
-   評估模型績效
-        ↓
-   輸出預測概率和風險報酬比
+7️⃣ 特徵工程
+   K 線 HDF5 → FeatureExtractor → 特徵矩陣 HDF5
 
-7️⃣ 回測驗證階段
-   選擇Pattern或ML模型
-        ↓
-   回測引擎模擬交易
-        ↓
-   計算績效指標
-        ↓
-   生成回測報告
+8️⃣ XGBoost 訓練與分析
+   特徵矩陣 → XGBoostAnalyzer → 模型 (Pickle)
+   → SHAP 可解釋性 / OOT 驗證 / 漂移分析 / 情境分析
 
-8️⃣ （未來）實盤部署
-   策略部署到雲端
-        ↓
-   實時監控市場
-        ↓
-   自動執行交易
+9️⃣ Pattern 管理
+   分析結果 → PatternStorage → CRUD → 統計與摘要
 ```
 
 ---
 
 ## 模組詳細設計
 
-### 前端模組
+### 關鍵服務類別
 
-#### 1. 圖表模組（待開發）
-```typescript
-// frontend/src/components/charts/TradingChart.tsx
-interface TradingChartProps {
-  symbol: string;
-  caseId: string;
-  selectedStrategy?: string;
-}
-
-// 功能：
-// - 多層同步圖表（Price/Volume/Taker_Ratio/Indicators）
-// - 信號箭頭標記
-// - 案例時間點高亮
-// - 縮放和拖曳
-// - CrossHair同步
-```
-
-#### 2. 指標測試模組（待開發）
-```typescript
-// frontend/src/app/indicator-testing/page.tsx
-// 功能：
-// - 數據源選擇器
-// - 指標參數配置
-// - Optuna優化設定
-// - 結果排名展示
-// - 進度追蹤
-```
-
-#### 3. ML訓練模組（待開發）
-```typescript
-// frontend/src/app/ml-training/page.tsx
-// 功能：
-// - 數據準備界面
-// - 模型選擇
-// - 訓練配置
-// - 評估指標顯示
-// - 特徵重要性可視化
-```
-
-#### 4. 回測模組（待開發）
-```typescript
-// frontend/src/app/backtest/page.tsx
-// 功能：
-// - 策略選擇
-// - 回測參數設定
-// - 權益曲線圖
-// - 績效指標卡片
-// - 交易明細表格
-```
-
----
-
-### 後端模組
-
-#### 1. 圖表數據服務（待開發）
+#### KlineDataService — 統一 K 線存取
 ```python
-# api/services/chart_data_service.py
-class ChartDataService:
-    def get_kline_data(self, symbol, case_id):
-        """從HDF5讀取K線數據"""
-        
-    def get_signal_markers(self, case_id, strategy):
-        """獲取策略信號標記"""
-        
-    def get_case_highlight(self, case_id):
-        """獲取案例高亮信息"""
+# api/services/kline_data_service.py
+class KlineDataService:
+    """統一 K 線資料介面，協調快取（HDF5）與下載（Binance API）"""
+    def get_kline_data(self, symbol, timeframe, start_time, end_time):
+        # 1. 檢查快取覆蓋率
+        # 2. 不足時下載並寫入快取
+        # 3. 合併數據
+        # 4. 驗證完整性
+        pass
 ```
 
-#### 2. K線下載服務（待開發）
+#### OptimizationTaskService — Optuna 任務管理
 ```python
-# api/services/kline_download_service.py
-class KlineDownloadService:
-    def batch_download(self, cases_csv):
-        """批量下載K線數據"""
-        
-    def check_overlap(self, cases):
-        """檢測時間重疊"""
-        
-    def save_to_hdf5(self, data, case_id):
-        """存儲到HDF5"""
+# api/services/optimization_task_service.py (Singleton)
+class OptimizationTaskService:
+    def create_task(config) → task_id
+    def start_task(task_id) → asyncio.Task
+    def cancel_task(task_id)
+    # 透過 WebSocket callback 推送進度
 ```
 
-#### 3. 指標測試服務（待開發）
+#### XGBoostTaskService — XGBoost 分析
 ```python
-# api/services/indicator_testing_service.py
-class IndicatorTestingService:
-    def calculate_indicators(self, data, indicators, data_sources):
-        """計算多數據源指標"""
-        
-    def optimize_parameters(self, indicator, cases):
-        """使用Optuna優化參數"""
-        
-    def evaluate_effectiveness(self, signals, labels):
-        """評估指標有效性"""
-```
-
-#### 4. ML訓練服務（待開發）
-```python
-# api/services/ml_training_service.py
-class MLTrainingService:
-    def prepare_features(self, cases):
-        """準備特徵數據"""
-        
-    def train_model(self, X, y, model_type='xgboost'):
-        """訓練分類模型"""
-        
-    def evaluate_model(self, model, X_test, y_test):
-        """評估模型性能"""
-        
-    def calculate_risk_reward(self, model, historical_data):
-        """計算風險報酬比"""
-```
-
-#### 5. 回測服務（待開發）
-```python
-# api/services/backtest_service.py
-class BacktestService:
-    def run_backtest(self, strategy, historical_data):
-        """執行回測"""
-        
-    def calculate_metrics(self, trades):
-        """計算績效指標"""
-        
-    def generate_report(self, results):
-        """生成回測報告"""
+# api/services/xgboost_task_service.py
+class XGBoostTaskService:
+    def start_xgboost_analysis_task(request) → task_id
+    # 背景執行：特徵載入 → 模型訓練 → 結果快取
 ```
 
 ---
 
 ## 性能考慮
 
-### M1優化策略
+### M1 優化策略
 
-#### 1. 向量化運算
-```python
-# 慢（循環）
-for i in range(len(df)):
-    df.loc[i, 'ma'] = df['close'][i-20:i].mean()
+**優化層級** (從最佳到最差):
+1. **向量化 pandas/numpy** — 優先使用 `df.rolling()`, `np.where()`, `pd.merge()`
+2. **Numba JIT** — 無法避免的數值迴圈
+3. **Async/multiprocessing** — I/O 密集或平行搜索
+4. **Python 迴圈** — 最後手段，需先 profiling
 
-# 快（向量化）- 100倍以上
-df['ma'] = df['close'].rolling(20).mean()
-```
-
-#### 2. Numba加速
-```python
-from numba import jit
-
-@jit(nopython=True)
-def calculate_signals(prices, ma_short, ma_long):
-    signals = np.zeros(len(prices))
-    for i in range(len(prices)):
-        if ma_short[i] > ma_long[i]:
-            signals[i] = 1
-    return signals
-```
-
-#### 3. 並行處理
-```python
-from multiprocessing import Pool
-
-# M1有8核心，充分利用
-with Pool(8) as p:
-    results = p.map(process_case, case_list)
-```
-
-#### 4. 數據緩存
-```python
-# 使用LRU緩存避免重複計算
-from functools import lru_cache
-
-@lru_cache(maxsize=1000)
-def get_kline_data(symbol, timeframe):
-    # 從HDF5讀取數據
-    pass
-```
+### 數據緩存策略
+- **HDF5 gzip 壓縮**: 減少磁碟 I/O
+- **KlineDataService 快取優先**: 先查本地 HDF5，不足再下載
+- **記憶體快取**: IndicatorCache, KlineCache, StrategyCacheRegistry
 
 ---
 
 ## 安全性設計
 
-### API密鑰管理
-```python
-# 使用環境變量
-import os
-from dotenv import load_dotenv
+### API 密鑰管理
+- `.env` 環境變量（`BINANCE_API_KEY`, `BINANCE_SECRET_KEY`）
+- `pydantic-settings` 自動載入
 
-load_dotenv()
-
-API_KEY = os.getenv('BINANCE_API_KEY')
-API_SECRET = os.getenv('BINANCE_API_SECRET')
-
-# 本地加密存儲
-from cryptography.fernet import Fernet
-
-def encrypt_api_key(key):
-    cipher = Fernet(encryption_key)
-    return cipher.encrypt(key.encode())
-```
-
-### 風險控制
-```python
-class RiskManager:
-    def __init__(self):
-        self.max_position_size = 0.1      # 單筆最大10%資金
-        self.max_drawdown_limit = 0.15    # 最大回撤15%停止
-        self.daily_loss_limit = 0.05      # 單日最大虧損5%
-    
-    def check_order_risk(self, order):
-        """檢查訂單風險"""
-        if order.size > self.max_position_size:
-            raise RiskException("Position size too large")
-    
-    def emergency_stop(self):
-        """緊急平倉機制"""
-        if self.current_drawdown > self.max_drawdown_limit:
-            self.close_all_positions()
-```
+### 資料安全
+- CSV Import 防 Injection 攻擊（`_sanitize_csv_injection`）
+- API 輸入驗證（全部透過 Pydantic Models）
+- 錯誤分類避免洩漏內部堆疊資訊
 
 ---
 
 ## 擴展性設計
 
 ### 多市場支持
-
-#### 數據提供者抽象
-```python
-from abc import ABC, abstractmethod
-
-class DataProvider(ABC):
-    @abstractmethod
-    def fetch_ohlcv(self, symbol, timeframe, start, end):
-        """獲取OHLCV數據"""
-        pass
-    
-    @abstractmethod
-    def fetch_market_info(self, symbol):
-        """獲取市場信息"""
-        pass
-
-class BinanceProvider(DataProvider):
-    """幣安實現（已完成）"""
-    pass
-
-class TWStockProvider(DataProvider):
-    """台股實現（未來）"""
-    pass
-
-class USStockProvider(DataProvider):
-    """美股實現（未來）"""
-    pass
-```
-
-#### 統一數據格式
-```python
-# 標準OHLCV格式
-standard_format = {
-    'timestamp': datetime,
-    'open': float,
-    'high': float,
-    'low': float,
-    'close': float,
-    'volume': float,
-    'quote_volume': float,  # USDT成交額
-    'taker_volume': float,  # 主動買入量（加密貨幣特有）
-    'taker_ratio': float,   # 主動買入比例
-    'metadata': dict        # 市場特定數據
-}
-```
+透過 `DataProvider` / `KlineProviderBase` 抽象基類：
+- ✅ `BinanceProvider` — 幣安加密貨幣
+- ⏳ 台股、美股 Provider（未來）
 
 ### 策略類型擴展
-```python
-class StrategyType(Enum):
-    MOMENTUM = "momentum"              # 單一商品動能（已實現）
-    MEAN_REVERSION = "mean_reversion"  # 均值回歸（未來）
-    ARBITRAGE = "arbitrage"            # 跨市場套利（未來）
-    GRID_TRADING = "grid_trading"      # 網格交易（未來）
-```
+透過 `StrategyRegistry` 動態註冊：
+- ✅ Short-Long Cross, Mid-Long Cross, Three-Line
+- ⏳ 更多策略可透過 YAML 配置新增
+
+### 機器學習模型擴展
+透過 `IModelTrainer` Protocol：
+- ✅ XGBoost
+- ⏳ LightGBM, LSTM, Transformer（未來）
 
 ---
 
-## 開發優先級總覽
+## 相關文檔
 
-### 階段1：圖表和數據系統（4-6週）
-```
-優先級：🔥 最高
-目標：完成K線圖表展示和數據批量獲取
-
-任務：
-1. Lightweight Charts圖表系統（3週）
-   - 多層同步圖表
-   - 信號箭頭標記
-   - 案例高亮
-
-2. K線數據批量下載（2週）
-   - CSV上傳和解析
-   - 批量下載引擎
-   - HDF5存儲
-
-3. 圖表數據API（1週）
-   - 數據讀取接口
-   - 信號標記API
-```
-
-### 階段2：指標測試系統（4-5週）
-```
-優先級：🔥 高
-目標：完成多數據源指標測試和參數優化
-
-任務：
-1. 指標計算引擎（2週）
-   - 多數據源支持
-   - 指標庫整合
-
-2. Optuna參數優化（2週）
-   - 參數空間定義
-   - 並行優化
-
-3. UI開發（1週）
-   - 指標選擇器
-   - 結果展示
-```
-
-### 階段3：ML訓練系統（4-6週）
-```
-優先級：🔥 中高
-目標：完成分類模型訓練和評估
-
-任務：
-1. XGBoost基線模型（2週）
-   - 特徵工程
-   - 訓練流程
-
-2. Optuna超參數調優（1週）
-   - 自動調參
-   - 交叉驗證
-
-3. UI和可視化（1週）
-   - 訓練界面
-   - 結果展示
-
-4. （可選）LSTM模型（2週）
-   - PyTorch實現
-   - 時序特徵學習
-```
-
-### 階段4：Pattern發現（2-3週）
-```
-優先級：🔥 中
-目標：自動發現有效Pattern
-
-任務：
-1. Pattern發現引擎（2週）
-   - 組合生成
-   - 有效性評估
-
-2. UI開發（1週）
-   - Pattern展示
-   - Pattern比較
-```
-
-### 階段5：回測系統（3-4週）
-```
-優先級：🔥 中
-目標：完成策略回測驗證
-
-任務：
-1. 回測引擎（2週）
-   - 核心邏輯
-   - 績效計算
-
-2. 可視化（1週）
-   - 權益曲線
-   - 績效儀表板
-
-3. 報告生成（1週）
-   - PDF導出
-   - 策略對比
-```
+| 文檔 | 說明 |
+|------|------|
+| `docs/API_SPECIFICATION.md` | API 端點規格（85+ 端點） |
+| `docs/DEVELOPMENT_GUIDE.md` | 開發規範（Ultra Think 3 步驟） |
+| `docs/FEATURE_ROADMAP.md` | 功能路線圖 |
+| `docs/REFACTOR_ARCHITECTURE_V4.md` | 架構重構記錄（10 個 Phase） |
+| `docs/KLINE_DATA_SPECIFICATION.md` | HDF5 數據格式規範 |
+| `.github/copilot-instructions.md` | AI Agent 指令 |
 
 ---
 
-## 技術債務和已知限制
-
-### 已知限制
-1. **數據量限制**: 受限於M1內存（16GB/32GB），單次處理案例數量有上限
-2. **API限制**: Binance API有速率限制，批量下載需要速率控制
-3. **圖表性能**: Lightweight Charts在超過10000根K線時可能卡頓
-4. **ML數據量**: 深度學習需要大量數據，初期可能樣本不足
-
-### 優化計劃
-1. **分批處理**: 大數據集分批加載和處理
-2. **懶加載**: 圖表數據按需加載，不一次性加載全部
-3. **數據壓縮**: HDF5使用壓縮減少存儲空間
-4. **增量訓練**: ML模型支持增量學習
-
----
-
-## 文檔維護
-
-### 更新頻率
-- **重大功能完成後**：更新對應模組描述
-- **架構變更時**：更新整體架構圖
-- **每月一次**：檢查並更新開發優先級
-
-### 相關文檔
-- `FEATURE_ROADMAP.md` - 詳細開發計劃
-- `API_SPECIFICATION.md` - API接口文檔
-- `DEVELOPMENT_GUIDE.md` - 開發規範
-- `PROJECT_STATUS.md` - 項目狀態
-
----
-
-## 總結
-
-本系統是一個**完整的量化研究工作平台**，不僅僅是交易系統：
-
-**已實現核心價值**：
-- ✅ 案例發現引擎（20參數框架）
-- ✅ 正反例採樣系統
-- ✅ Web化操作界面
-- ✅ 數據導出和分析
-
-**未來完整能力**：
-- 🎯 專業圖表分析（TradingView風格）
-- 🎯 自動化指標測試
-- 🎯 機器學習優化
-- 🎯 Pattern自動發現
-- 🎯 完整回測驗證
-- 🎯 （遠期）實盤部署
-
-**技術亮點**：
-- M1原生優化
-- 模組化設計
-- 易於擴展多市場
-- 完整的研究工作流
-
----
-
-*文檔版本：1.0*  
-*最後更新：2025-09-30*  
-*維護者：開發團隊*
+*文檔版本：3.0*  
+*最後更新：2026-02-08*  
+*狀態：REFACTOR_ARCHITECTURE_V4 同步完成*
