@@ -1341,12 +1341,12 @@ class CVValidator:
 ```
 
 **驗收標準**：
-- [ ] Time-Series Split 按時間排序，不洩漏未來數據
-- [ ] CV AUC Mean ± Std 正確計算
-- [ ] 每個 Fold 的 AUC 可獨立查看 (`fold_aucs` 列表)
-- [ ] OOT AUC 使用最後 20% 數據
-- [ ] CV-OOT Gap > 0.1 時 `overfit_warning=True`
-- [ ] OOT Precision/Recall/F1 正確計算
+- [ ] [P0] Time-Series Split 按時間排序，不洩漏未來數據
+- [ ] [P0] CV AUC Mean ± Std 正確計算
+- [ ] [P0] 每個 Fold 的 AUC 可獨立查看 (`fold_aucs` 列表)
+- [ ] [P0] OOT AUC 使用最後 20% 數據
+- [ ] [P0] CV-OOT Gap > 0.1 時 `overfit_warning=True`
+- [ ] [P0] OOT Precision/Recall/F1 正確計算
 
 **驗證命令**：
 ```bash
@@ -1400,10 +1400,10 @@ class OOTValidator:
 ```
 
 **驗收標準**：
-- [ ] OOT 切分按時間排序
-- [ ] AUC/Precision/Recall/F1 正確計算
-- [ ] Gap > 0.1 → overfit_warning=True
-- [ ] Gap > 0.2 → severity="severe"
+- [ ] [P0] OOT 切分按時間排序
+- [ ] [P0] AUC/Precision/Recall/F1 正確計算
+- [ ] [P0] Gap > 0.1 → overfit_warning=True
+- [ ] [P0] Gap > 0.2 → severity="severe"
 
 **驗證命令**：
 ```bash
@@ -1452,11 +1452,11 @@ class PSICalculator:
 ```
 
 **驗收標準**：
-- [ ] PSI 公式正確（等頻分箱，處理零值防 log(0)）
-- [ ] PSI < 0.1 → stable
-- [ ] PSI 0.1~0.25 → slight_shift
-- [ ] PSI > 0.25 → significant_shift
-- [ ] 批次計算正確
+- [ ] [P1] PSI 公式正確（等頻分箱，處理零值防 log(0)）
+- [ ] [P1] PSI < 0.1 → stable
+- [ ] [P1] PSI 0.1~0.25 → slight_shift
+- [ ] [P1] PSI > 0.25 → significant_shift
+- [ ] [P1] 批次計算正確
 
 **驗證命令**：
 ```bash
@@ -1514,10 +1514,10 @@ class CaseSHAP:
 ```
 
 **驗收標準**：
-- [ ] Rolling AUC 在每個窗口正確計算
-- [ ] 趨勢判斷 (stable/declining/improving) 合理
-- [ ] 單案例 SHAP 值正確（與 shap.Explanation 一致）
-- [ ] 批次 SHAP 的 mean_abs_shap 排名合理
+- [ ] [P1] Rolling AUC 在每個窗口正確計算
+- [ ] [P1] 趨勢判斷 (stable/declining/improving) 合理
+- [ ] [P1] 單案例 SHAP 值正確（與 shap.Explanation 一致）
+- [ ] [P1] 批次 SHAP 的 mean_abs_shap 排名合理
 
 **驗證命令**：
 ```bash
@@ -1608,13 +1608,13 @@ class ICAnalysisService:
 ```
 
 **驗收標準**：
-- [ ] `POST /api/v1/ic/analyze` 回傳 task_id 且 status="running"
-- [ ] `GET /api/v1/ic/task/{id}` 正確回報進度 (0.0~1.0)
-- [ ] `GET /api/v1/ic/result/{id}` 回傳完整 JSON 報告
-- [ ] `POST /api/v1/ic/refilter` 使用快取不重算（< 1 秒）
-- [ ] WebSocket `/ws/ic-analysis/{task_id}` 推送每階段進度
-- [ ] 所有端點有正確的 error handling
-- [ ] Service 使用 `create_ic_analyzer()` 建構（Rule 3）
+- [ ] [P0] `POST /api/v1/ic/analyze` 回傳 task_id 且 status="running"
+- [ ] [P0] `GET /api/v1/ic/task/{id}` 正確回報進度 (0.0~1.0)
+- [ ] [P0] `GET /api/v1/ic/result/{id}` 回傳完整 JSON 報告
+- [ ] [P0] `POST /api/v1/ic/refilter` 使用快取不重算（< 1 秒）
+- [ ] [P1] WebSocket `/ws/ic-analysis/{task_id}` 推送每階段進度
+- [ ] [P0] 所有端點有正確的 error handling
+- [ ] [P0] Service 使用 `create_ic_analyzer()` 建構（Rule 3）
 
 **驗證命令**：
 ```bash
@@ -1691,17 +1691,17 @@ export interface FilterLogData { [stage: string]: { input: number; output: numbe
 ```
 
 **驗收標準**：
-- [ ] `/ic-analysis` 頁面可訪問，左右欄佈局正確
-- [ ] Config 面板滑桿調整後觸發 refilter API
-- [ ] IC 排名表可按 IC Mean / ICIR / p-value / Monotonicity 排序
-- [ ] IC Decay 圖表選擇特徵後正確渲染折線
-- [ ] 分位數收益圖 (Q1~Q5) 正確顯示
-- [ ] 相關性熱力圖色階正確
-- [ ] 篩選漏斗圖顯示每步特徵數
-- [ ] WebSocket 進度條正確顯示八階段進度
-- [ ] 匯出按鈕 (JSON/CSV/PNG) 正常運作
-- [ ] 空狀態 / 載入狀態 / 錯誤狀態正確處理
-- [ ] TypeScript 編譯通過（`npm run build`）
+- [ ] [P0] `/ic-analysis` 頁面可訪問，左右欄佈局正確
+- [ ] [P0] Config 面板滑桿調整後觸發 refilter API
+- [ ] [P0] IC 排名表可按 IC Mean / ICIR / p-value / Monotonicity 排序
+- [ ] [P0] IC Decay 圖表選擇特徵後正確渲染折線
+- [ ] [P0] 分位數收益圖 (Q1~Q5) 正確顯示
+- [ ] [P0] 相關性熱力圖色階正確
+- [ ] [P0] 篩選漏斗圖顯示每步特徵數
+- [ ] [P1] WebSocket 進度條正確顯示八階段進度
+- [ ] [P0] 匯出按鈕 (JSON/CSV/PNG) 正常運作
+- [ ] [P0] 空狀態 / 載入狀態 / 錯誤狀態正確處理
+- [ ] [P0] TypeScript 編譯通過（`npm run build`）
 
 **驗證命令**：
 ```bash
@@ -1771,12 +1771,12 @@ class TestICGatekeeperE2E:
 ```
 
 **驗收標準**：
-- [ ] 所有單元測試通過 (`pytest tests/momentum/test_ic_*.py -v`)
-- [ ] API 測試通過 (`pytest tests/api/test_ic_analysis_api.py -v`)
-- [ ] 端到端測試通過 (`pytest tests/momentum/test_ic_e2e.py -v`)
-- [ ] 測試覆蓋率 ≥ 80%
-- [ ] 效能: 完整流程 < 30 秒
-- [ ] 前端編譯通過 (`cd frontend && npm run build`)
+- [ ] [P0] 所有單元測試通過 (`pytest tests/momentum/test_ic_*.py -v`)
+- [ ] [P0] API 測試通過 (`pytest tests/api/test_ic_analysis_api.py -v`)
+- [ ] [P0] 端到端測試通過 (`pytest tests/momentum/test_ic_e2e.py -v`)
+- [ ] [P0] 測試覆蓋率 ≥ 80%
+- [ ] [P0] 效能: 完整流程 < 30 秒
+- [ ] [P0] 前端編譯通過 (`cd frontend && npm run build`)
 
 **驗證命令**：
 ```bash
@@ -1807,6 +1807,42 @@ grep -r "from momentum\.Analysis\." api/services/ic_analysis_service.py | grep -
 grep -r "from api.services" api/services/ic_analysis_service.py
 # 預期: 0 結果
 ```
+
+---
+
+### Task 2.4.4：Feature Factory Config 回饋機制（P2 預留）
+
+> **優先級**：P2 — 本 Phase 不實作完整功能，僅定義接口和數據格式，作為 AutoResearch Loop 的基礎。
+
+**檔案**：
+- `momentum/Analysis/ic_reporter.py` (修改 — 新增 `generate_config_suggestions()`)
+
+**需求規格**（規格書 §4.2）：
+
+IC 分析結果可回饋 Feature Factory Config，指導下一輪特徵生成。
+
+```python
+# ic_reporter.py — P2 新增方法
+def generate_config_suggestions(self, report: dict) -> dict:
+    """
+    根據 IC 結果生成 Feature Factory Config 調整建議
+    Returns: {
+        "suggestions": [
+            {"type": "increase_density", "target": "taker_ratio", "reason": "avg IC 0.058 > close 0.040"},
+            {"type": "disable_category", "target": "pattern", "reason": "all CDL_* IC < 0.01"},
+            {"type": "focus_lag", "target": "3-8", "reason": "lag_5 has peak IC"},
+        ],
+        "auto_config_patch": {...}  # 可直接 merge 的 YAML patch
+    }
+    """
+    ...
+```
+
+**驗收標準**：
+- [ ] [P2] `generate_config_suggestions()` 方法存在且簽名正確
+- [ ] [P2] 文件中記錄了 §4.2 的回饋規則表
+
+**備註**：此功能完整實作排定在 V2.0 Chat 模式 + AutoResearch Loop，Phase 2 僅做接口預留。
 
 ---
 
@@ -1863,7 +1899,8 @@ grep -r "from api.services" api/services/ic_analysis_service.py
 | D1 | Rule 1 通過 | `grep -r "from api\." momentum/Analysis/ → 0` |
 | D2 | Rule 2 通過 | Protocol 總量 ≤ 10 |
 | D3 | Rule 3 通過 | API Service 透過 Factory 建構 |
-| D4 | Rule 4 通過 | Service 間無互調 |
+| D4 | Rule 4 通過 | Ser
+  2.4.4 Feature Factory Config 回饋接口 (P2 預留)vice 間無互調 |
 | D5 | Rule 5 通過 | 無 hardcoded 閾值 |
 | D6 | Rule 6 通過 | `pytest tests/momentum/test_ic_*.py` 可獨立運行 |
 | D7 | Rule 7 通過 | DTO 不跨層 |
@@ -2005,6 +2042,7 @@ def sample_metadata():
 pip list | grep -E "scipy|pandas|numpy|scikit-learn|shap|xgboost"
 # scipy >= 1.10.0 (spearmanr, pearsonr, ttest)
 # pandas >= 2.0.0 (eval, qcut, corr)
+└── contracts.py                       【修改】Task 2.1.6 (+ICResult, FilteredFeatureSet DTO)
 # numpy >= 1.24.0 (corrcoef, vectorized)
 # scikit-learn >= 1.3.0 (clustering, VIF)
 # shap (Case SHAP)
