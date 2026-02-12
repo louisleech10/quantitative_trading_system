@@ -91,6 +91,7 @@ api_credentials.json
 
 # User config overrides
 config/user_scan_config.yaml
+config/user_ic_config.yaml
 
 # Data cache
 data_cache/

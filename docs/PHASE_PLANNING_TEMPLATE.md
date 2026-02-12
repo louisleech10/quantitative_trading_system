@@ -374,6 +374,9 @@
 【PLAN 範本】
 8. docs/Feature_Factory_PLAN.md
 
+【規格設計 範本】
+8. docs/Feature Generation Factory.md
+
 【Phase 2 專屬】
 9. momentum/Analysis/xgboost_analyzer.py
 10. momentum/core/protocols.py

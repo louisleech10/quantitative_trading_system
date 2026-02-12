@@ -1,0 +1,107 @@
+# IC Gatekeeper 預設設定
+version: "1.0"  # 設定版本
+
+# 全域預設
+global:
+  default_method: "spearman"  # 預設相關係數方法
+  default_horizon: 5  # 預設 horizon
+  time_duration_mode: false  # 是否使用時間語義
+
+# 預處理
+preprocessing:
+  winsorization:
+    enabled: true  # 是否啟用極端值截斷
+    method: "percentile"  # percentile | mad | zscore | none
+    lower_percentile: 1.0  # 下截斷百分位
+    upper_percentile: 99.0  # 上截斷百分位
+  missing_values:
+    max_fill_forward: 3  # 前向填補上限
+    min_coverage: 0.3  # 最低覆蓋率
+
+# Label 設定
+labels:
+  return_type: "simple"  # simple | log | excess | risk_adjusted | winsorized
+  horizons: [1, 2, 3, 5, 8, 13, 21]  # bar 數 horizon
+  horizons_time: null  # 時間語義 horizon (可選)
+  winsorize_returns: true  # 是否截尾收益
+
+# 事件過濾
+event_filter:
+  enabled: false  # 是否啟用事件過濾
+  query: null  # 事件條件
+  min_events: 30  # 最低事件數
+  sample_size_tiers:
+    sufficient: 200  # 樣本充分
+    marginal: 100  # 樣本邊界
+    low_confidence: 30  # 低信心
+
+# IC 計算
+ic_calculation:
+  methods: ["spearman"]  # 計算方法
+  rolling_windows: [21, 63, 126]  # Rolling 視窗
+  rolling_stride: 1  # Rolling stride
+  ic_decay_horizons: [1, 2, 3, 5, 8, 13, 21]  # IC Decay horizons
+  icir:
+    window: 63  # ICIR Rolling window
+    reference_tf: "12h"  # ICIR 參考 TF
+  grouped_analysis:
+    by_year: true  # 依年份
+    by_quarter: false  # 依季度
+    by_regime: true  # 依市場狀態
+    by_volatility: true  # 依波動度
+    by_category: true  # 依指標類別
+    by_data_source: true  # 依資料來源
+    by_layer: true  # 依 pipeline layer
+    regime_definitions:
+      bull: "close > close_EMA_55"
+      bear: "close < close_EMA_55"
+      high_vol_percentile: 80
+      low_vol_percentile: 20
+
+# 篩選門檻
+thresholds:
+  ic_mean_min: 0.02  # IC 平均下限
+  icir_min: 0.5  # ICIR 下限
+  p_value_max: 0.05  # p-value 上限
+  ic_hit_rate_min: 0.55  # IC 正報率下限
+  monotonicity_score_min: 0.6  # 單調性分數下限
+  coverage_min: 0.5  # 覆蓋率下限
+  long_short_spread:
+    enabled: false  # 是否啟用 Long-Short Spread
+    min_spread: 0.01  # 最低 spread
+
+# 冗餘去除
+redundancy:
+  method: "greedy"  # greedy | hierarchical | vif
+  correlation_threshold: 0.7  # 相關性門檻
+  tiebreaker: "icir"  # icir | ic_mean | monotonicity
+  hierarchical:
+    linkage_method: "average"  # 叢集連結方法
+  vif:
+    max_vif: 10.0  # VIF 上限
+  diversification:
+    min_categories: 3  # 類別最少數
+    min_data_sources: 2  # 資料源最少數
+    max_same_category_pct: 0.4  # 同類別上限比例
+
+# 換手率
+turnover:
+  enabled: true  # 是否啟用換手率
+  transaction_cost: 0.001  # 交易成本
+
+# 報告
+report:
+  top_n_features: 30  # Top N
+  include_decay_analysis: true  # IC Decay
+  include_quantile_curves: true  # 分位數收益曲線
+  include_correlation_heatmap: true  # 相關性熱力圖
+  include_regime_analysis: true  # Regime 分析
+  include_layer_analysis: true  # Layer 分析
+  include_turnover_analysis: true  # 換手率分析
+  ai_summary: true  # AI 摘要
+
+# 效能設定
+performance:
+  max_features_for_correlation: 200  # 相關性矩陣上限
+  parallel_ic_calculation: true  # 平行計算 IC
+  n_jobs: -1  # CPU 併行數

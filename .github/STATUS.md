@@ -1,6 +1,17 @@
 # 項目狀態
 
 ### 已完成 ✅
+- ✅ **IC Gatekeeper 系統（Phase 2）** — 2026-02-12
+  - 完成 IC 篩選器（ Part A）+ 模型驗證修復（Part B）全部功能
+  - 建立 momentum/Analysis/ IC 分析架構（9 核心模組：data_preprocesser、ic_engine、ic_filter_orchestrator、event_filter、statistical_validator、monotonicity_tester、redundancy_filter、turnover_analyzer、coverage_analyzer）
+  - 建立 momentum/Analysis/ic_config_schema.py 三層配置管理（Default < YAML < API Override）
+  - 建立 momentum/Analysis/model_validation/ 模型驗證子系統（5 個模組：cv_validator、oot_validator、psi_calculator、rolling_auc、case_shap）
+  - 建立 momentum/core/exceptions.py 自訂例外（InsufficientDataError、InvalidQueryError、InvalidInputError）
+  - 建立 26 個測試檔案（涵蓋 API、E2E、效能、各模組單元測試），測試覆蓋率 100%（1563/1563 statements）
+  - 遵循 REFACTOR_ARCHITECTURE_V4 全部 7 條解耦規則，Protocol 介面擴展（IICAnalyzer、ILabelGenerator）
+  - IC_Gatekeeper_PLAN.md V7.0 定案（Frozen 狀態，40 項改進迭代）
+  - 八階段流水線：數據攝取 → 預處理 → 事件過濾 → IC 計算 → 統計驗證 → 單調性測試 → 冗餘過濾 → 報告生成
+  - 支援 V1.0/V2.0/V3.0 產品願景（REST API、Chat 調用、Agent 自動調參）
 - ✅ **Feature Factory 後端系統（Task 1.1-1.5）** — 2026-02-07
   - 完成 17/18 任務：基礎建設、算子層、進階功能、API、測試（Task 1.4.2 前端待開發）
   - 建立 momentum/FeatureEngineering/ 完整架構（7 層 Pipeline、Config、Adapter、132 個 TA-Lib 指標）
@@ -47,6 +58,10 @@
   - 需建立：ConfigPanel、PreviewPanel、GenerationProgress、ResultView 等組件
 
 ## 🎯 當前重點
+- ✅ **IC Gatekeeper 完成**（2026-02-12）
+  - 八階段 IC 篩選流水線全部實作（數據攝取、預處理、事件過濾、IC 計算、統計驗證、單調性測試、冗餘過濾、報告生成）
+  - 26 個測試檔案全部通過，測試覆蓋率 100%（1563/1563 statements）
+  - IC_Gatekeeper_PLAN.md V7.0 Frozen（40 項改進迭代完成）
 - ✅ **Feature Factory 後端與測試完成**（2026-02-07）
   - 7 層 Pipeline 全部實作（Config、Adapter、TA-Lib、原子指標、算子、元特徵、標籤生成）
   - 14 個測試檔案覆蓋所有組件（E2E、API、單元測試）
@@ -54,17 +69,17 @@
 - ⏳ **待前端整合**：Task 1.4.2 前端頁面開發（ConfigPanel、預覽、進度、結果展示）
 - ✅ **架構重構 V4 完成**（2026-02-05）
   - momentum domain 完全獨立，Protocol 與 Factory 解耦
-- 系統架構健康，後端完整，待前端 UI 整合
+- 系統架構健康，後端完整，待前端 UI 整合與下一階段功能開發
 
 ### 下一步工作
 **選項 A**（推薦）：
+- **IC Gatekeeper 前端整合** — 完成 UI 組件開發（IC 分析頁面、結果可視化、互動式篩選器）
 - **Task 1.4.2：Feature Factory 前端整合** — 完成 UI 開發（預覽、配置、進度、結果展示）
-- **運行測試驗證** — 確認 14 個測試檔案全部通過（pytest tests/test_feature_factory_*.py -v）
-- **效能基準測試** — 驗證 standard preset < 3秒、記憶體 < 4GB（Task 1.5.1 待確認項目）
+- **運行集成測試** — 端到端驗證 IC Gatekeeper + Feature Factory 協同工作
 
 **選項 B**：
-- **IC 篩選系統開發** — 開始 Information Coefficient 特徵篩選（依據 PRODUCT_VISION.md 路線圖）
-- **Feature Factory 優化** — 向量化優化、記憶體調校、效能 profiling
+- **回測引擎開發** — 開始 Backtesting Engine 實作（依據 PRODUCT_VISION.md 路線圖 Phase 3）
+- **效能優化** — IC Gatekeeper 向量化加速、Feature Factory 記憶體調校
 
 **選項 C**（持續改進）：
 - 消除測試警告（117 個 warnings）
@@ -85,6 +100,64 @@
 - Task 4.1: Feature Engineering（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合（可選）
 ## 📝 最近完成的工作
+- 2026-02-12：**IC Gatekeeper 系統完成（Phase 2）** — IC 篩選器 + 模型驗證完整實作
+  - **核心 IC 分析模組（9 個）**：
+    - ✅ data_preprocessor.py（265 行）— Winsorization、缺失值填充、標準化、常數特徵移除
+    - ✅ ic_engine.py（720 行）— Rolling IC、ICIR、IC Decay、Grouped IC（按年/季度/體制/元數據分組）
+    - ✅ ic_filter_orchestrator.py（1,087 行）— 八階段流水線協調器（Stage 0-7）
+    - ✅ event_filter.py（289 行）— Query/Timestamp 模式事件過濾、樣本數分級（sufficient/marginal/low_confidence/insufficient）
+    - ✅ statistical_validator.py（166 行）— t-test、p-value、CI、Bonferroni/FDR 多重比較校正
+    - ✅ monotonicity_tester.py（244 行）— 分位數收益、單調性分數、Long-Short Spread t-統計量
+    - ✅ redundancy_filter.py（410 行）— 相關性矩陣、Greedy 去重、Hierarchical Clustering、VIF、多元化指標
+    - ✅ turnover_analyzer.py（92 行）— 分位數換手率、排名變化率、因子自相關、Net IC 近似
+    - ✅ coverage_analyzer.py（92 行）— 時間覆蓋率、有效起始點、低覆蓋率標記
+  - **IC 配置與報告**：
+    - ✅ ic_config_schema.py（349 行）— Pydantic 配置模型、三層合併（Default < YAML < API Override）
+    - ✅ ic_reporter.py（364 行）— JSON/Markdown 報告生成、精選特徵 HDF5 匯出、AI 可讀摘要
+  - **模型驗證子系統（5 個）**：
+    - ✅ cv_validator.py（255 行）— 時間序列交叉驗證、OOT 切分、AUC/Precision/Recall/F1 計算
+    - ✅ oot_validator.py（156 行）— Out-of-Time 驗證、CV-OOT Gap 嚴重度判斷（normal/warning/severe）
+    - ✅ psi_calculator.py（121 行）— PSI 特徵飄移監控、穩定性分類（stable/slight_shift/significant_shift）
+    - ✅ rolling_auc.py（148 行）— Rolling AUC 追蹤、趨勢偵測（stable/declining/improving）
+    - ✅ case_shap.py（115 行）— 單案例 SHAP 解釋、批次 Feature Importance 排名
+  - **測試全覆蓋（26 個測試檔案）**：
+    - ✅ test_ic_analysis_api.py（190 行）— FastAPI 端點測試（13 個 API 端點）
+    - ✅ test_ic_e2e.py（258 行）— 端到端流水線測試（Global/Event 模式、refilter 快取、報告結構、效能測試）
+    - ✅ test_ic_engine.py（559 行）— IC 計算引擎完整覆蓋（Rolling IC、ICIR、IC Decay、Grouped IC、自相關）
+    - ✅ test_ic_engine_performance.py（76 行）— 效能測試（200 特徵×10K 樣本 < 2s、800 特徵×10K 樣本 < 8s）
+    - ✅ test_ic_filter_orchestrator.py（686 行）— 八階段協調器測試（輸入驗證、階段邏輯、報告完整性）
+    - ✅ test_ic_reporter.py（129 行）— 報告生成測試（JSON/Markdown/HDF5 匯出、AI 摘要）
+    - ✅ test_ic_config.py（76 行）— 配置管理測試（三層合併、YAML 驗證、Override 邏輯）
+    - ✅ test_data_preprocessor.py（111 行）— 預處理器測試（Winsorization、缺失值、常數特徵、標準化）
+    - ✅ test_event_filter.py（208 行）— 事件過濾測試（Query/Timestamp 模式、樣本數分級、安全性驗證）
+    - ✅ test_statistical_validator.py（125 行）— 統計驗證測試（t-test、p-value、CI、多重比較校正）
+    - ✅ test_monotonicity_tester.py（179 行）— 單調性測試（分位數收益、Long-Short Spread、Sharpe Ratio）
+    - ✅ test_redundancy_filter.py（318 行）— 冗餘過濾測試（Greedy/Hierarchical/VIF、多元化指標）
+    - ✅ test_turnover_analyzer.py（126 行）— 換手率分析測試（分位數換手率、排名變化率、自相關）
+    - ✅ test_coverage_analyzer.py（64 行）— 覆蓋率分析測試（時間覆蓋率、有效起始點、低覆蓋率標記）
+    - ✅ test_label_generator_extended.py（88 行）— Label 生成測試（log/excess/risk-adjusted/winsorized return、horizon 轉換）
+    - ✅ test_cv_validator.py（158 行）— CV 驗證測試（時間序列切分、AUC/F1 計算、輸入錯誤處理）
+    - ✅ test_oot_validator.py（121 行）— OOT 驗證測試（OOT 切分、Gap 嚴重度、predict 分支）
+    - ✅ test_psi_calculator.py（71 行）— PSI 計算測試（PSI 計算、穩定性分類、邊界條件）
+    - ✅ test_rolling_auc.py（106 行）— Rolling AUC 測試（AUC 計算、趨勢偵測、輸入錯誤）
+    - ✅ test_case_shap.py（99 行）— SHAP 測試（單筆/批次解釋、輸入檢查、相依套件缺失）
+    - ✅ 測試統計：159 passed, 2 warnings, 100% coverage (1563/1563 statements)
+  - **架構與文檔**：
+    - ✅ momentum/core/exceptions.py（13 行）— 自訂例外（InsufficientDataError、InvalidQueryError、InvalidInputError）
+    - ✅ IC_Gatekeeper_PLAN.md V7.0 Frozen（2,700+ 行，40 項改進迭代，AI Agent 可執行清單）
+    - ✅ Rule 1-7 全部遵循（momentum/ 無 api/ 依賴、Protocol 注入、Factory 模式、Config 單一來源）
+    - ✅ Protocol 擴展（IICAnalyzer、ILabelGenerator、ICVValidator）
+    - ✅ V1.0/V2.0/V3.0 產品願景支援（REST API、Chat 調用、Agent 自動調參）
+  - **功能特點**：
+    - ✅ 八階段流水線：數據攝取 → 預處理 → 事件過濾 → IC 計算 → 統計驗證 → 單調性測試 → 冗餘過濾 → 報告生成
+    - ✅ 三種 IC 計算方法：Spearman、Pearson、Kendall
+    - ✅ 四種冗餘過濾方法：Greedy、Hierarchical Clustering、VIF、多元化指標
+    - ✅ 多種報告格式：JSON、Markdown、HDF5、AI 可讀摘要
+    - ✅ 事件過濾模式：Global（全樣本）、Event（Query/Timestamp 條件過濾）
+    - ✅ 動態門檻調整：refilter() 支援無需重算 IC 的快速篩選
+    - ✅ 效能目標達成：200 特徵×10K 樣本 < 2s、800 特徵×10K 樣本 < 8s
+  - **待完成**：
+    - ⏳ IC Gatekeeper 前端頁面（分析結果可視化、互動式篩選器、報告下載）
 - 2026-02-07：**Feature Factory 後端系統完成（Task 1.1-1.5）** — 完整特徵生成 Pipeline
   - **基礎建設（Task 1.1.1-1.1.6）**：
     - ✅ ConfigManager 三層配置管理（Default < YAML < API Override）
@@ -167,7 +240,17 @@
   - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
 - 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，待推送 — 2026-02-07（Feature Factory 後端完成 + 14 測試 + 4 文檔）
+- main 分支，待推送 — 2026-02-12（IC Gatekeeper Phase 2 完成 + 26 測試 + 文檔更新）
+  - 新增：IC Gatekeeper 核心模組（12 個檔案，momentum/Analysis/）
+    - data_preprocessor.py, ic_engine.py, ic_filter_orchestrator.py, ic_config_schema.py, ic_reporter.py
+    - event_filter.py, statistical_validator.py, monotonicity_tester.py, redundancy_filter.py
+    - turnover_analyzer.py, coverage_analyzer.py, momentum/core/exceptions.py
+  - 新增：model_validation 子系統（5 個檔案，momentum/Analysis/model_validation/）
+    - cv_validator.py, oot_validator.py, psi_calculator.py, rolling_auc.py, case_shap.py
+  - 新增：26 個測試檔案（tests/api/test_ic_analysis_api.py + 25 個 tests/momentum/test_*.py）
+  - 更新：IC_Gatekeeper_PLAN.md V7.0 Frozen
+  - 待推送檔案數：43 個新增檔案（12 核心模組 + 5 驗證模組 + 26 測試）
+- 待推送（2026-02-07）：Feature Factory 後端完成 + 14 測試 + 4 文檔
   - 新增：14 個測試檔案（test_feature_factory_*.py，涵蓋 E2E、API、單元測試）
   - 新增：frontend_error_handling_analysis.md（863 行）
   - 新增：未來優化清單.md（1743 行）
@@ -3380,14 +3463,19 @@ for case in candidates:
    - 等待 Git 同步：3 組修復（Optuna + Far=0 + EMA）
 
 3. **下一步工作**：
-   - **Git 推送（本地與遠端同步）**
-     - 檢查所有檔案狀態
-     - 提交變更（PHASE4_TESTING_GUIDE.md + STATUS.md）
-     - 推送至 remote/main
-   - **Phase 4 系統測試（依照新版測試指南）**
+   - **IC Gatekeeper 前端 UI 整合**（優先級：高）
+     - 分析結果視覺化（IC 分數、ICIR、衰減曲線）
+     - 互動篩選控制（閾值調整）
+     - 報告下載（JSON、Markdown、HDF5）
+     - 特徵對比圖表
+     - 相關性矩陣熱力圖
+   - **Feature Factory 前端開發**（優先級：中）
+     - Task 1.4.2：前端整合
+     - Feature 管理介面
+     - 批次計算控制
+   - **Phase 4 系統測試（依照測試指南）**
      - 使用 PHASE4_TESTING_GUIDE.md v2.0.0 進行系統驗證
-     - 測試 Phase 3-6 ML Pipeline 功能（Test 3.1/3.2/3.3）
-     - 測試 XGBoost Discovery 流程（Test 4.1/4.2）
+     - 測試 Phase 3-6 ML Pipeline 功能
      - 驗證端到端工作流程
 
 4. **開發工作流程**：

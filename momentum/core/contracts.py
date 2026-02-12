@@ -241,3 +241,31 @@ class ValidationResult(BaseModel):
 
 StrategyCalculator = callable
 StrategyValidator = callable
+
+
+@dataclass
+class ICResult:
+    """IC 分析單一特徵的結果 — momentum 內部 DTO."""
+
+    feature_name: str
+    ic_mean: float
+    ic_std: float
+    icir: float
+    p_value: float
+    ic_hit_rate: float
+    monotonicity_score: Optional[float] = None
+    long_short_spread: Optional[float] = None
+    coverage: Optional[float] = None
+    turnover_rate: Optional[float] = None
+    ic_half_life: Optional[float] = None
+    regime_robust: Optional[bool] = None
+
+
+@dataclass
+class FilteredFeatureSet:
+    """精選特徵集 — momentum 內部 DTO."""
+
+    feature_names: List[str]
+    ic_results: List[ICResult]
+    diversification_metrics: Dict[str, Any] = field(default_factory=dict)
+    filter_log: Dict[str, Any] = field(default_factory=dict)

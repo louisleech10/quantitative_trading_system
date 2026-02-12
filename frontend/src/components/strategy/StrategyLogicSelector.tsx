@@ -1,9 +1,4 @@
-                <div
-                  className={`
-                    flex items-center justify-center w-12 h-12 rounded-lg text-2xl
-                    ${isSelected ? "bg-violet-500/20" : "bg-white/5"}
-                  `}
-                >
+/**
  * Ultra Think 記錄:
  * - 步驟 1: 初版代碼 (當前)
  * - 步驟 2: 審查優化 (待執行)

@@ -41,6 +41,12 @@ const navigationItems = [
     description: '上傳案例CSV並批量下載K線'
   },
   {
+    name: '特徵工廠',
+    href: '/feature-factory',
+    icon: Database,
+    description: '建立特徵組合與產生設定'
+  },
+  {
     name: '圖表查看',
     href: '/charts',
     icon: LineChart,
@@ -65,10 +71,10 @@ const navigationItems = [
     description: 'XGBoost 模式分析與管理（Phase 4）'
   },
   {
-    name: '圖表分析',
-    href: '/dashboard',
+    name: 'IC 分析',
+    href: '/ic-analysis',
     icon: BarChart3,
-    description: '圖表視覺化和技術分析（Phase 2）'
+    description: 'IC Gatekeeper 分析與篩選'
   },
   {
     name: '系統設定',

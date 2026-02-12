@@ -1023,3 +1023,83 @@ export function assessStrategyQuality(
     recommendations,
   };
 }
+
+// ===== Phase 2.4: IC 分析 UI 類型定義 =====
+
+export interface ICAnalysisConfig {
+  features_path: string;
+  labels_path?: string;
+  meta_path?: string;
+  mode: 'global' | 'event';
+  event_query?: string;
+  event_timestamps?: number[];
+  horizons: number[];
+  thresholds: {
+    ic_mean_min: number;
+    icir_min: number;
+    p_value_max: number;
+    monotonicity_score_min?: number;
+    correlation_threshold: number;
+  };
+}
+
+export interface ICFeatureInfo {
+  rank: number;
+  feature_name: string;
+  ic_mean: number;
+  icir: number;
+  p_value: number;
+  ic_hit_rate?: number;
+  monotonicity_score?: number;
+  coverage?: number;
+  turnover_rate?: number;
+}
+
+export interface ICDecayData {
+  horizons: number[];
+  ic_values: number[];
+  half_life?: number;
+  peak_horizon?: number;
+  decay_rate?: number;
+  decay_type?: string;
+}
+
+export interface QuantileReturnData {
+  quantile_mean_returns: Record<string, number>;
+  long_short_spread?: number;
+  cumulative_returns?: Record<string, number[]>;
+}
+
+export interface CorrelationMatrix {
+  features: string[];
+  matrix: number[][];
+}
+
+export interface FilterLogStage {
+  input: number;
+  output: number;
+  removed_reasons?: Record<string, number>;
+}
+
+export interface FilterLogData {
+  [stage: string]: FilterLogStage;
+}
+
+export type RollingICSeries = Record<string, number[]>;
+
+export type GroupedICData = Record<string, Record<string, number> | Record<string, Record<string, number>>>;
+
+export interface ICReport {
+  version?: string;
+  metadata?: Record<string, any>;
+  filter_log?: FilterLogData;
+  summary_table?: ICFeatureInfo[];
+  ic_decay?: Record<string, ICDecayData>;
+  quantile_returns?: Record<string, QuantileReturnData>;
+  correlation_matrix?: CorrelationMatrix;
+  grouped_ic?: GroupedICData;
+  rolling_ic_series?: Record<string, RollingICSeries>;
+  turnover_analysis?: Record<string, Record<string, number>>;
+  diversification_metrics?: Record<string, number>;
+  ai_summary?: string;
+}

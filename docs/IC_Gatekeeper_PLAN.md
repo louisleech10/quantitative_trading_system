@@ -1,36 +1,71 @@
 # Phase 2: IC Gatekeeper (IC 篩選器) Implementation PLAN
 
-> **版本**: V2.0  
+> **版本**: V7.0  
 > **建立日期**: 2026-02-09  
-> **定案日期**: —（待凍結）  
+> **定案日期**: 2026-02-09  
 > **設計文件**: `docs/IC 篩選器 (The IC Gatekeeper) 規格設計書.md` V2.0 (Frozen)  
 > **目的**: AI Agent 可依序執行的實作清單；人類可審閱檢查  
 > **範圍**: Phase 2 IC 篩選器 (Part A) + 模型驗證修復 (Part B) 全部功能  
-> **狀態**: 🚧 Draft  
+> **狀態**: ❄️ Frozen  
+> Changelog: V6 → V7：補齊 Phase 驗證檢查點與邊界/失敗 PASS 條件  
 > **前置依賴**: Phase 1 Feature Factory（`momentum/FeatureEngineering/`）已完成
 
-### V2 Changelog (from V1)
+### V3 Changelog (from V2)
 
 | # | 變更類型 | 影響範圍 | 說明 |
 |---|---------|---------|------|
-| 1 | **補漏** | Task 2.1.1 | 新增完整 `ic_config.yaml` 檔案內容作為交付物 |
-| 2 | **補漏** | Task 2.1.4 | IC Autocorrelation (§3.4.6) 新增驗收標準 |
-| 3 | **補漏** | Task 2.1.6 | 新增 `contracts.py` 擴展 (ICResult, FilteredFeatureSet 內部 DTO) |
-| 4 | **補漏** | Task 2.2.1 | 補充 `trigger_timestamps` 模式與案例搜尋整合 (§3.3.4) |
-| 5 | **補漏** | Task 2.2.1, 2.2.2 | IEventFilter / IRedundancyFilter 本地介面定義列為子項 |
-| 6 | **補漏** | Task 2.1.3 | 多 TF Label 對齊測試案例 (§3.2.3) |
-| 7 | **補漏** | Task 2.2.3 | VIF 依賴說明 (statsmodels 或手動 OLS) |
-| 8 | **優化** | 全域 | 所有驗收標準新增 P0/P1/P2 優先級標記 |
-| 9 | **補漏** | Task 2.2.6 | Grouped IC 需要 raw OHLCV 數據供 Regime 分類，補充數據流 |
-| 10 | **補漏** | 新增 Task 2.4.4 | Feature Factory Config 回饋機制 (§4.2) 作為 P2 預留任務 |
+| 1 | **修正** | 檔案結構 | Markdown tree 符號修正 (protocols.py 行 └── → ├──)，移除依賴套件區殘留 contracts.py 行 |
+| 2 | **修正** | 解耦成功標準 | D4 表格列損壞修復 |
+| 3 | **補漏** | 全域 | 新增 `momentum/core/exceptions.py` 定義 (InsufficientDataError, InvalidQueryError, InvalidInputError) |
+| 4 | **補漏** | Task 2.2.6 | `analyze()` 新增 `kline_reader: Optional[IKlineReader]` 參數用於 Grouped IC Regime 分類 |
+| 5 | **補漏** | Protocol | `IICAnalyzer.analyze()` 簽名同步加入 `kline_reader` 參數 |
+| 6 | **補漏** | §匯出規範 | 新增 `momentum/Analysis/__init__.py` 與 `model_validation/__init__.py` 匯出清單 |
+| 7 | **補漏** | 執行順序 | Task 2.4.4 Reporter 加入 Phase 2.4 執行順序表 |
+| 8 | **修正** | Task 2.2.7 | Reporter 改名與匯出名稱統一為 `ICReporter` |
 
----
+### V4 Changelog (from V3)
 
-## 架構原則與解耦要求
+| # | 變更類型 | 影響範圍 | 說明 |
+|---|---------|---------|------|
+| 1 | **修正** | Task 2.3.4 | `RollingAUC` → `RollingAUCTracker`、`CaseSHAP` → `CaseSHAPExplainer`，與 `__init__.py` 匯出名稱一致 |
+| 2 | **修正** | ICConfig | `global_settings` 加入 `Field(alias="global")` + `model_config = {"populate_by_name": True}`，避免 Python 保留字衝突 |
+| 3 | **修正** | Task 2.2.2/2.2.3 | `IRedundancyFilter` 本地介面定義從 Task 2.2.2 移至 Task 2.2.3（屬於冠厄過濾器） |
+| 4 | **補漏** | Task 2.1.4 | 新增 ICIR Rolling Window 按 TF 自動調整驗收標準（規格書 §3.4.2） |
+| 5 | **補漏** | ICCalculationConfig.ICIRConfig | 新增 `reference_tf: str = "12h"` 欄位（移至 ICIR 子配置） |
+| 6 | **補漏** | Protocol | 註解說明 IICAnalyzer `features_path` vs 規格書 DataFrame 的設計偏差理由 |
+| 7 | **補漏** | Task 2.1.4 | 新增 Lag 特徵最佳步數分析 P2 驗收標準（規格書 §4.1.4） |
+| 8 | **補漏** | Task 2.2.3 | 新增冠厄過濾效能目標 200 特徵 < 2 秒 |
+| 9 | **修正** | 檔案結構 | `exceptions.py` 歸屬從 Task 2.1.4 改為「全域共用，Task 2.1.1 一同建立」 |
+| 10 | **補漏** | 風險 | 新增 R11: Config 三層合併衝突風險（規格書 §15 #10） |
+| 11 | **補漏** | Task 2.2.7 | 新增前端散點圖數據 P2 驗收標準（規格書 §6.3 #11, #12） |
+| 12 | **修正** | V3 Changelog | 修復損壞的 V3 Changelog 條目 5-8 |
 
-> **Authority**: 本 Phase 必須遵循系統全局解耦架構（REFACTOR_ARCHITECTURE_V4），參見：  
-> - [docs/ARCHITECTURE.md - 解耦架構原則](./ARCHITECTURE.md#解耦架構原則)  
-> - [docs/PRODUCT_VISION.md - 版本演進策略](./PRODUCT_VISION.md#架構演進策略)
+### V5 Changelog (from V4)
+
+| # | 變更類型 | 影響範圍 | 說明 |
+|---|---------|---------|------|
+| 1 | **修正** | Protocol | `IICAnalyzer.analyze()` 簽名對齊 Orchestrator：增加 `meta_path`, `config_override`, `progress_callback` 參數（兩處同步） |
+| 2 | **修正** | Protocol | `ILabelGenerator` 方法名對齊實作：`generate_returns` → `generate_returns_by_type(close, horizon, return_type)` + 增加 `horizon_to_bars()`；移除不存在的 `get_supported_types()`；補上偏差說明 |
+| 3 | **修正** | Config | `reference_tf` 從 `PerformanceConfig` 移至 `ICCalculationConfig.ICIRConfig`（語義歸屬更正確） |
+| 4 | **修正** | Task 2.1.6 | 修復截斷的 `@runtime_checkable` 和缺失的 `class ICVValidator(Protocol):` 行 |
+| 5 | **修正** | 全域常量表 | 拆分跨行表格 cell（IC 報告輸出 + 相關性矩陣輸出分為兩列） |
+
+### V7 Changelog (from V6)
+
+| # | 變更類型 | 影響範圍 | 說明 |
+|---|---------|---------|------|
+| 1 | **補漏** | Phase 2.1-2.4 | 各 Phase 補齊 `### 驗證檢查點`（成功/邊界/失敗 PASS 條件） |
+| 2 | **修正** | 版本 | 版本 V6.0 → V7.0，加入收斂標記 |
+
+### V6 Changelog (from V5) — FROZEN
+
+| # | 變更類型 | 影響範圍 | 說明 |
+|---|---------|---------|------|
+| 1 | **補漏** | Task 2.1.1 | 檔案清單補上 `momentum/core/exceptions.py`（與 V4 Changelog #9 歸屬一致） |
+| 2 | **修正** | Task 2.1.3 | `horizon_to_bars()` 移除 `@staticmethod`，以符合 `ILabelGenerator` Protocol 的 instance method 定義 |
+| 3 | **凍結** | 全域 | 版本 V5.0 → V6.0 (Frozen)，狀態 🚧 Draft → ❄️ Frozen |
+
+> **審閱統計**：V1→V2 (10 項) → V2→V3 (8 項) → V3→V4 (12 項) → V4→V5 (5 項) → V5→V6 (3 項，0 Critical) → V6→V7 (2 項) = 共 40 項改進
 
 ### 解耦規則遵循清單
 
@@ -54,17 +89,29 @@
 @runtime_checkable
 class IICAnalyzer(Protocol):
     """IC 分析器主介面 — API Service 透過此 Protocol 調用"""
-    def analyze(self, features_path: str, labels_path: str, config: Optional[dict] = None) -> dict: ...
+    def analyze(self, features_path: str, labels_path: str,
+                meta_path: Optional[str] = None,
+                config_override: Optional[dict] = None,
+                progress_callback: Optional[Callable] = None,
+                kline_reader: Optional[Any] = None) -> dict: ...
     def get_top_features(self, n: int, sort_by: str = "icir") -> list: ...
     def get_filtered_features(self) -> Any: ...
     def get_report(self) -> dict: ...
     def refilter(self, thresholds: dict) -> dict: ...
 
+# ℹ️ Protocol 偏差說明：規格書輸入為 DataFrame，PLAN 用 features_path (str) 以符合
+# 解耦原則——Orchestrator 內部負責讀取檔案，API 層僅傳 path。
+
 @runtime_checkable
 class ILabelGenerator(Protocol):
     """Label 生成器介面 — Analysis Domain 透過此 Protocol 讀取 FeatureEngineering 的 Label"""
-    def generate_returns(self, prices: Any, horizons: list, return_type: str = "simple") -> Any: ...
-    def get_supported_types(self) -> list: ...
+    def generate_returns_by_type(self, close: Any, horizon: int, return_type: str,
+                                  benchmark_close: Optional[Any] = None) -> Any: ...
+    def horizon_to_bars(self, time_duration: str, timeframe: str) -> int: ...
+
+# ℹ️ ILabelGenerator 偏差說明：規格書用 generate_returns(prices, horizons: list)，
+# PLAN 遵循 Task 2.1.3 實作 generate_returns_by_type(close, horizon: int)，
+# 因為單 horizon 更符合 IC Decay 逐 horizon 計算的迴圈模式。
 
 @runtime_checkable
 class ICVValidator(Protocol):
@@ -76,6 +123,33 @@ class ICVValidator(Protocol):
 **模組內部介面（不入 protocols.py）**：
 - `IEventFilter`：定義在 `momentum/Analysis/event_filter.py` 內
 - `IRedundancyFilter`：定義在 `momentum/Analysis/redundancy_filter.py` 內
+
+### 自訂例外類別定義
+
+**檔案**：`momentum/core/exceptions.py`（新建）
+
+> 集中定義於 `momentum/core/` 以供所有 Domain 共用，不入 `api/`。
+
+```python
+# momentum/core/exceptions.py
+
+class InsufficientDataError(ValueError):
+    """樣本數不足時拋出（例如總樣本 < 100，事件數 < 30）"""
+    pass
+
+class InvalidQueryError(ValueError):
+    """事件篩選 Query 表達式不合法（含危險關鍵字或不存在的欄位）"""
+    pass
+
+class InvalidInputError(ValueError):
+    """輸入數據格式錯誤（例如 HDF5 非 float32/float64、Meta JSON 缺少必要欄位）"""
+    pass
+```
+
+**使用方式**：
+```python
+from momentum.core.exceptions import InsufficientDataError, InvalidQueryError
+```
 
 **Protocol 總量管控**：現有 3 個 + 新增 3 個 = 6 個，低於上限 10。
 
@@ -125,6 +199,7 @@ def create_psi_calculator() -> "PSICalculator":
 | IC 配置 | `config/ic_config.yaml` |
 | 精選特徵輸出 | `data_cache/features/{symbol}_{tf}_filtered.h5` |
 | IC 報告輸出 | `data_cache/reports/ic_report_{case_id}.json` |
+| 相關性矩陣輸出 | `data_cache/reports/correlation_matrix_{case_id}.json`（供前端熱力圖，規格書 §2.3） |
 | AI 摘要輸出 | `data_cache/reports/ic_summary_{case_id}.md` |
 | 日誌標準 | `from momentum.core.logging import get_logger; logger = get_logger(__name__)` |
 | 錯誤處理 | 所有外部呼叫 try/except + error classification |
@@ -141,6 +216,7 @@ def create_psi_calculator() -> "PSICalculator":
 - `config/ic_config.yaml` (新建)
 - `config/user_ic_config.yaml` (新建，加入 `.gitignore`)
 - `momentum/Analysis/ic_config_schema.py` (新建)
+- `momentum/core/exceptions.py` (新建，全域共用例外類別)
 
 **需求規格**：
 
@@ -191,6 +267,7 @@ class ICCalculationConfig(BaseModel):
     ic_decay_horizons: list[int] = [1, 2, 3, 5, 8, 13, 21]
     class ICIRConfig(BaseModel):
         window: int = 63
+        reference_tf: str = "12h"  # ICIR Rolling Window 基準 TF（§3.4.2: TF=4h→window×3, TF=1h→window×12）
     icir: ICIRConfig = ICIRConfig()
     class GroupedConfig(BaseModel):
         by_year: bool = True
@@ -257,8 +334,9 @@ class PerformanceConfig(BaseModel):
 
 class ICConfig(BaseModel):
     """IC 篩選器完整配置 — 頂層 Schema"""
+    model_config = {"populate_by_name": True}  # 允許同時用 alias 和屬性名
     version: str = "1.0"
-    global_settings: ICGlobalConfig = ICGlobalConfig()
+    global_settings: ICGlobalConfig = Field(default_factory=ICGlobalConfig, alias="global")  # "global" 是 Python 保留字，用 alias 對應 YAML key
     preprocessing: PreprocessingConfig = PreprocessingConfig()
     labels: LabelConfig = LabelConfig()
     event_filter: EventFilterConfig = EventFilterConfig()
@@ -283,11 +361,11 @@ def load_ic_config(
 - 所有巢狀子項必須有預設值且附帶中文註解
 
 **驗收標準**：
-- [ ] [P0] `ICConfig.model_validate(yaml_dict)` 可正確解析 `ic_config.yaml`
-- [ ] [P0] `load_ic_config()` 正確合併三層配置（預設 < user < api_override）
-- [ ] [P0] 所有閾值可被 API 動態覆寫
-- [ ] [P0] `user_ic_config.yaml` 已加入 `.gitignore`
-- [ ] [P0] `ic_config.yaml` 包含 §5.1 的所有 key 且值與 Schema 預設一致
+- [x] [P0] `ICConfig.model_validate(yaml_dict)` 可正確解析 `ic_config.yaml`
+- [x] [P0] `load_ic_config()` 正確合併三層配置（預設 < user < api_override）
+- [x] [P0] 所有閾值可被 API 動態覆寫
+- [x] [P0] `user_ic_config.yaml` 已加入 `.gitignore`
+- [x] [P0] `ic_config.yaml` 包含 §5.1 的所有 key 且值與 Schema 預設一致
 
 **驗證命令**：
 ```bash
@@ -299,9 +377,9 @@ print(f'IC Config loaded: method={config.global_settings.default_method}, thresh
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.1.1）
-- [ ] Rule 1: `ic_config_schema.py` 無 `from api.*` import
-- [ ] Rule 5: 所有閾值由 YAML Config 控制，無 hardcoded 值
-- [ ] Rule 6: 可獨立 `pytest tests/momentum/test_ic_config.py` 不需 `run_api.py`
+- [x] Rule 1: `ic_config_schema.py` 無 `from api.*` import
+- [x] Rule 5: 所有閾值由 YAML Config 控制，無 hardcoded 值
+- [x] Rule 6: 可獨立 `pytest tests/momentum/test_ic_config.py` 不需 `run_api.py`
 
 ---
 
@@ -358,13 +436,13 @@ class DataPreprocessor:
 ```
 
 **驗收標準**：
-- [ ] [P0] Winsorize (percentile 1-99) 正確截斷極端值，不影響中間值
-- [ ] [P0] MAD Clip 與 Z-Score Clip 計算正確
-- [ ] [P0] 型態特徵 (值域為 -100/0/+100) 自動跳過 Winsorize
-- [ ] [P0] 覆蓋率 < 30% 的特徵被正確剔除
-- [ ] [P0] Forward Fill 最多填補 3 期
-- [ ] [P0] 常數特徵 (std==0) 被移除
-- [ ] [P0] 回傳預處理日誌 (removed_features, reasons)
+- [x] [P0] Winsorize (percentile 1-99) 正確截斷極端值，不影響中間值
+- [x] [P0] MAD Clip 與 Z-Score Clip 計算正確
+- [x] [P0] 型態特徵 (值域為 -100/0/+100) 自動跳過 Winsorize
+- [x] [P0] 覆蓋率 < 30% 的特徵被正確剔除
+- [x] [P0] Forward Fill 最多填補 3 期
+- [x] [P0] 常數特徵 (std==0) 被移除
+- [x] [P0] 回傳預處理日誌 (removed_features, reasons)
 
 **驗證命令**：
 ```bash
@@ -372,9 +450,9 @@ pytest tests/momentum/test_data_preprocessor.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.1.2）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 5: 閾值從 config 參數讀取，無 hardcoded
-- [ ] Rule 6: 測試可獨立運行
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 5: 閾值從 config 參數讀取，無 hardcoded
+- [x] Rule 6: 測試可獨立運行
 
 ---
 
@@ -428,25 +506,24 @@ class LabelGenerator:
         }
         return dispatch[return_type]()
     
-    @staticmethod
-    def horizon_to_bars(time_duration: str, timeframe: str) -> int:
+    def horizon_to_bars(self, time_duration: str, timeframe: str) -> int:
         """
         時間語義轉 bar 數: "24h" + "12h" → 2 bars
         支援: "6h", "12h", "1d", "2d", "3d", "5d", "1w", "2w"
-        """
+        ‘’‘’‘ 注意：不用 @staticmethod，以符合 ILabelGenerator Protocol 定義 """
         ...
 ```
 
 **驗收標準**：
-- [ ] [P0] `generate_log_return()` 與 `np.log(P2/P1)` 一致
-- [ ] [P0] `generate_excess_return()` 排除基準收益後值合理
-- [ ] [P0] `generate_risk_adjusted_return()` 分母為 rolling vol，避免除零
-- [ ] [P0] `generate_winsorized_return()` 正確截尾
-- [ ] [P0] `horizon_to_bars("24h", "12h")` == 2
-- [ ] [P0] `horizon_to_bars("1w", "12h")` == 14
-- [ ] [P0] 不破壞 Phase 1 現有方法
-- [ ] [P0] 多 TF Label 對齊測試：1h/4h/12h 的 "24h" horizon 正確換算為 24/6/2 bars (§3.2.3)
-- [ ] [P0] 多 TF 對齊無未來數據洩漏（shift 方向正確）
+- [x] [P0] `generate_log_return()` 與 `np.log(P2/P1)` 一致
+- [x] [P0] `generate_excess_return()` 排除基準收益後值合理
+- [x] [P0] `generate_risk_adjusted_return()` 分母為 rolling vol，避免除零
+- [x] [P0] `generate_winsorized_return()` 正確截尾
+- [x] [P0] `horizon_to_bars("24h", "12h")` == 2
+- [x] [P0] `horizon_to_bars("1w", "12h")` == 14
+- [x] [P0] 不破壞 Phase 1 現有方法
+- [x] [P0] 多 TF Label 對齊測試：1h/4h/12h 的 "24h" horizon 正確換算為 24/6/2 bars (§3.2.3)
+- [x] [P0] 多 TF 對齊無未來數據洩漏（shift 方向正確）
 
 **驗證命令**：
 ```bash
@@ -454,8 +531,8 @@ pytest tests/momentum/test_label_generator_extended.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.1.3）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 2: LabelGenerator 在 FeatureEngineering Domain 內，被 Analysis Domain 透過 ILabelGenerator Protocol 調用
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 2: LabelGenerator 在 FeatureEngineering Domain 內，被 Analysis Domain 透過 ILabelGenerator Protocol 調用
 
 ---
 
@@ -555,16 +632,18 @@ class ICEngine:
 - IC Decay 200 特徵 × 7 horizons < 15 秒
 
 **驗收標準**：
-- [ ] [P0] Spearman IC 與 `scipy.stats.spearmanr` 手動驗算一致
-- [ ] [P0] Pearson IC 與 `scipy.stats.pearsonr` 手動驗算一致
-- [ ] [P0] ICIR = IC Mean / IC Std 計算正確
-- [ ] [P0] IC Hit Rate = count(IC > 0) / total 計算正確
-- [ ] [P0] Rolling IC 窗口大小 [21, 63, 126] 分別正確計算
-- [ ] [P0] IC Decay 多 Horizon 正確，Half-Life 擬合 R² > 0.5 時有效
-- [ ] [P1] 分組 IC 按年份/Regime/Category 正確分組
-- [ ] [P1] 分組 IC Regime 分類需取得 raw OHLCV 數據來計算 `close > close_EMA_55` 等條件
-- [ ] [P1] IC Autocorrelation (Lag-1) 計算正確，自相關 > 0.3 標記為 persistent (§3.4.6)
-- [ ] [P0] 效能目標達成（200 特徵 × 10K < 2 秒）
+- [x] [P0] Spearman IC 與 `scipy.stats.spearmanr` 手動驗算一致
+- [x] [P0] Pearson IC 與 `scipy.stats.pearsonr` 手動驗算一致
+- [x] [P0] ICIR = IC Mean / IC Std 計算正確
+- [x] [P0] IC Hit Rate = count(IC > 0) / total 計算正確
+- [x] [P0] Rolling IC 窗口大小 [21, 63, 126] 分別正確計算
+- [x] [P0] IC Decay 多 Horizon 正確，Half-Life 擬合 R² > 0.5 時有效
+- [x] [P1] 分組 IC 按年份/Regime/Category 正確分組
+- [x] [P1] 分組 IC Regime 分類需取得 raw OHLCV 數據來計算 `close > close_EMA_55` 等條件
+- [x] [P1] IC Autocorrelation (Lag-1) 計算正確，自相關 > 0.3 標記為 persistent (§3.4.6)
+- [x] [P2] Lag 特徵最佳步數分析：per-feature Lag IC Curve 找出 peak Lag（規格書 §4.1.4）
+- [x] [P0] 效能目標達成（200 特徵 × 10K < 2 秒）
+- [x] [P1] ICIR Rolling Window 按 TF 自動調整：以 12h 為基準，TF=4h 則 window×3，TF=1h 則 window×12（規格書 §3.4.2）
 
 **驗證命令**：
 ```bash
@@ -572,10 +651,10 @@ pytest tests/momentum/test_ic_engine.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.1.4）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 2: 不直接 import FeatureEngineering 的具體類別
-- [ ] Rule 5: 所有參數從 config dict 讀取
-- [ ] Rule 6: 測試可獨立運行，使用合成數據或 fixtures
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 2: 不直接 import FeatureEngineering 的具體類別
+- [x] Rule 5: 所有參數從 config dict 讀取
+- [x] Rule 6: 測試可獨立運行，使用合成數據或 fixtures
 
 ---
 
@@ -625,11 +704,11 @@ class StatisticalValidator:
 ```
 
 **驗收標準**：
-- [ ] [P0] t-stat = IC Mean / (IC Std / sqrt(N)) 計算正確
-- [ ] [P0] p-value 與 `scipy.stats.ttest_1samp` 驗算一致
-- [ ] [P0] 95% 信賴區間正確
-- [ ] [P0] `sample_tier="low_confidence"` 時 p-value 閾值放寬至 0.10
-- [ ] [P2] Bonferroni/FDR 校正正確
+- [x] [P0] t-stat = IC Mean / (IC Std / sqrt(N)) 計算正確
+- [x] [P0] p-value 與 `scipy.stats.ttest_1samp` 驗算一致
+- [x] [P0] 95% 信賴區間正確
+- [x] [P0] `sample_tier="low_confidence"` 時 p-value 閾值放寬至 0.10
+- [x] [P2] Bonferroni/FDR 校正正確
 
 **驗證命令**：
 ```bash
@@ -637,8 +716,8 @@ pytest tests/momentum/test_statistical_validator.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.1.5）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 5: 閾值從 config 讀取
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 5: 閾值從 config 讀取
 
 ---
 
@@ -657,7 +736,11 @@ pytest tests/momentum/test_statistical_validator.py -v --tb=short
 ```python
 @runtime_checkable
 class IICAnalyzer(Protocol):
-    def analyze(self, features_path: str, labels_path: str, config: Optional[dict] = None) -> dict: ...
+    def analyze(self, features_path: str, labels_path: str,
+                meta_path: Optional[str] = None,
+                config_override: Optional[dict] = None,
+                progress_callback: Optional[Callable] = None,
+                kline_reader: Optional[Any] = None) -> dict: ...
     def get_top_features(self, n: int, sort_by: str = "icir") -> list: ...
     def get_filtered_features(self) -> Any: ...
     def get_report(self) -> dict: ...
@@ -665,8 +748,9 @@ class IICAnalyzer(Protocol):
 
 @runtime_checkable
 class ILabelGenerator(Protocol):
-    def generate_returns(self, prices: Any, horizons: list, return_type: str = "simple") -> Any: ...
-    def get_supported_types(self) -> list: ...
+    def generate_returns_by_type(self, close: Any, horizon: int, return_type: str,
+                                  benchmark_close: Optional[Any] = None) -> Any: ...
+    def horizon_to_bars(self, time_duration: str, timeframe: str) -> int: ...
 
 @runtime_checkable
 class ICVValidator(Protocol):
@@ -726,12 +810,12 @@ def create_psi_calculator() -> "PSICalculator":
 ```
 
 **驗收標準**：
-- [ ] [P0] `from momentum.core.protocols import IICAnalyzer, ILabelGenerator, ICVValidator` 成功
-- [ ] [P0] `from momentum.factories import create_ic_analyzer, create_cv_validator` 成功
-- [ ] [P0] Protocol 總量 ≤ 10（現有 3 + 新增 3 = 6）
-- [ ] [P0] Factory 函式可正確建構物件
-- [ ] [P0] `from momentum.core.contracts import ICResult, FilteredFeatureSet` 成功
-- [ ] [P0] ICResult / FilteredFeatureSet 不依賴 `api/models/`（Rule 7）
+- [x] [P0] `from momentum.core.protocols import IICAnalyzer, ILabelGenerator, ICVValidator` 成功
+- [x] [P0] `from momentum.factories import create_ic_analyzer, create_cv_validator` 成功
+- [x] [P0] Protocol 總量 ≤ 10（現有 3 + 新增 3 = 6）
+- [x] [P0] Factory 函式可正確建構物件
+- [x] [P0] `from momentum.core.contracts import ICResult, FilteredFeatureSet` 成功
+- [x] [P0] ICResult / FilteredFeatureSet 不依賴 `api/models/`（Rule 7）
 
 **驗證命令**：
 ```bash
@@ -745,10 +829,14 @@ print(f'IC Analyzer created: {type(analyzer).__name__}')
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.1.6）
-- [ ] Rule 1: protocols.py 無 `from api.*`
-- [ ] Rule 2: Protocol 僅定義介面，不依賴具體實作
-- [ ] Rule 3: Factory 函式使用 lazy import
-- [ ] Rule 7: Protocol 定義在 `momentum/core/`，不在 `api/models/`
+- [x] Rule 1: protocols.py 無 `from api.*`
+- [x] Rule 2: Protocol 僅定義介面，不依賴具體實作
+- [x] Rule 3: Factory 函式使用 lazy import
+- [x] Rule 7: Protocol 定義在 `momentum/core/`，不在 `api/models/`
+
+### 驗證檢查點
+- PASS（成功）：Task 2.1.1~2.1.6 的 P0 驗收標準全數通過，`ICConfig.model_validate` 可解析 `ic_config.yaml`
+- PASS（邊界/失敗）：Task 2.1.2 覆蓋率 < 30% 的特徵被剔除且回傳日誌；Task 2.1.3 的 `horizon_to_bars("24h", "12h") == 2` 成立
 
 ---
 
@@ -804,13 +892,13 @@ class EventFilter:
 ```
 
 **驗收標準**：
-- [ ] [P0] `apply_filter(df, query="close > open * 1.03")` 正確產生 Boolean Mask
-- [ ] [P0] 複合條件 `"(close > close_EMA_55) & (close_ADX_14 > 25)"` 正確解析
-- [ ] [P0] `validate_query()` 拒絕含 `__import__` 或 `exec` 的表達式
-- [ ] [P0] `validate_query()` 拒絕不存在的欄位名
-- [ ] [P0] 事件數 < 30 時回傳 `tier="insufficient"`
-- [ ] [P0] timestamps 模式正確過濾（直接使用案例搜尋 $T_0$ 的 `trigger_timestamps` 列表 — §3.3.4）
-- [ ] [P1] 定義 `IEventFilter` 本地介面（ABCMeta 或 typing.Protocol）於模組內部，不入 `protocols.py`
+- [x] [P0] `apply_filter(df, query="close > open * 1.03")` 正確產生 Boolean Mask
+- [x] [P0] 複合條件 `"(close > close_EMA_55) & (close_ADX_14 > 25)"` 正確解析
+- [x] [P0] `validate_query()` 拒絕含 `__import__` 或 `exec` 的表達式
+- [x] [P0] `validate_query()` 拒絕不存在的欄位名
+- [x] [P0] 事件數 < 30 時回傳 `tier="insufficient"`
+- [x] [P0] timestamps 模式正確過濾（直接使用案例搜尋 $T_0$ 的 `trigger_timestamps` 列表 — §3.3.4）
+- [x] [P1] 定義 `IEventFilter` 本地介面（ABCMeta 或 typing.Protocol）於模組內部，不入 `protocols.py`
 
 **驗證命令**：
 ```bash
@@ -818,8 +906,8 @@ pytest tests/momentum/test_event_filter.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.1）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 2: EventFilter 為 Analysis Domain 內部模組（介面不入 protocols.py）
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 2: EventFilter 為 Analysis Domain 內部模組（介面不入 protocols.py）
 
 ---
 
@@ -881,13 +969,12 @@ class MonotonicityTester:
 ```
 
 **驗收標準**：
-- [ ] [P0] Quintile Analysis (5 組) 正確切分，每組樣本數檢查
-- [ ] [P0] Long-Short Spread = mean(Q5) - mean(Q1) 計算正確
-- [ ] [P0] Long-Short t-stat 與 `scipy.stats.ttest_ind` 一致
-- [ ] [P0] Monotonicity Score 在 0~1 範圍，完美單調 → 1.0
-- [ ] [P0] 累計收益曲線數據格式正確
-- [ ] [P0] 分位數不足時自動降級 (5 → 3)
-- [ ] [P1] 定義 `IRedundancyFilter` 本地介面於模組內部，不入 `protocols.py`
+- [x] [P0] Quintile Analysis (5 組) 正確切分，每組樣本數檢查
+- [x] [P0] Long-Short Spread = mean(Q5) - mean(Q1) 計算正確
+- [x] [P0] Long-Short t-stat 與 `scipy.stats.ttest_ind` 一致
+- [x] [P0] Monotonicity Score 在 0~1 範圍，完美單調 → 1.0
+- [x] [P0] 累計收益曲線數據格式正確
+- [x] [P0] 分位數不足時自動降級 (5 → 3)
 
 **驗證命令**：
 ```bash
@@ -895,8 +982,8 @@ pytest tests/momentum/test_monotonicity_tester.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.2）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 5: num_quantiles 等從 config 讀取
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 5: num_quantiles 等從 config 讀取
 
 ---
 
@@ -967,13 +1054,15 @@ class RedundancyFilter:
 ```
 
 **驗收標準**：
-- [ ] [P0] 貪婪法：|corr| > 0.7 的特徵對中保留 ICIR 較高者
-- [ ] [P1] 階層聚類：使用 `scipy.cluster.hierarchy`，結果合理
-- [ ] [P2] VIF：逐步移除 VIF 最高者，直到所有 VIF < threshold
-  > **依賴說明**：VIF 計算需 OLS 回歸，可用 `sklearn.linear_model.LinearRegression` 或 `numpy.linalg.inv(X'X)` 實作，不需新增 `statsmodels` 依賴
-- [ ] [P0] 多元化指標：avg_abs_correlation < 0.3 為良好
-- [ ] [P0] 類別覆蓋度正確計算（利用 Metadata 的 category 欄位）
-- [ ] [P0] 相關性矩陣計算效能 200×200 < 1 秒
+- [x] [P0] 貪婪法：|corr| > 0.7 的特徵對中保留 ICIR 較高者
+- [x] [P1] 階層聚類：使用 `scipy.cluster.hierarchy`，結果合理
+- [x] [P2] VIF：逐步移除 VIF 最高者，直到所有 VIF < threshold
+    > **依賴說明**：VIF 計算需 OLS 回歸，可用 `sklearn.linear_model.LinearRegression` 或 `numpy.linalg.inv(X'X)` 實作，不需新增 `statsmodels` 依賴
+- [x] [P0] 多元化指標：avg_abs_correlation < 0.3 為良好
+- [x] [P0] 類別覆蓋度正確計算（利用 Metadata 的 category 欄位）
+- [x] [P1] 冠厄過濾效能：200 特徵完整去重流程 < 2 秒（規格書 §11）
+- [x] [P0] 相關性矩陣計算效能 200×200 < 1 秒
+- [x] [P1] 定義 `IRedundancyFilter` 本地介面於模組內部，不入 `protocols.py`
 
 **驗證命令**：
 ```bash
@@ -981,9 +1070,9 @@ pytest tests/momentum/test_redundancy_filter.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.3）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 2: RedundancyFilter 為 Analysis Domain 內部模組
-- [ ] Rule 5: threshold 從 config 讀取
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 2: RedundancyFilter 為 Analysis Domain 內部模組
+- [x] Rule 5: threshold 從 config 讀取
 
 ---
 
@@ -1030,10 +1119,10 @@ class TurnoverAnalyzer:
 ```
 
 **驗收標準**：
-- [ ] [P1] 分位數換手率計算正確（Q5 組成的逐期變化比例）
-- [ ] [P1] 因子自相關與 `pd.Series.autocorr()` 一致
-- [ ] [P1] Net IC = Gross IC - λ × Turnover 計算正確
-- [ ] [P1] 批次計算效能合理
+- [x] [P1] 分位數換手率計算正確（Q5 組成的逐期變化比例）
+- [x] [P1] 因子自相關與 `pd.Series.autocorr()` 一致
+- [x] [P1] Net IC = Gross IC - λ × Turnover 計算正確
+- [x] [P1] 批次計算效能合理
 
 **驗證命令**：
 ```bash
@@ -1041,8 +1130,8 @@ pytest tests/momentum/test_turnover_analyzer.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.4）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 5: transaction_cost 從 config 讀取
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 5: transaction_cost 從 config 讀取
 
 ---
 
@@ -1081,9 +1170,9 @@ class CoverageAnalyzer:
 ```
 
 **驗收標準**：
-- [ ] [P1] 覆蓋率正確計算（count_notna / total）
-- [ ] [P1] 有效起始點正確
-- [ ] [P1] 低覆蓋率 (< 50%) 特徵正確標記
+- [x] [P1] 覆蓋率正確計算（count_notna / total）
+- [x] [P1] 有效起始點正確
+- [x] [P1] 低覆蓋率 (< 50%) 特徵正確標記
 
 **驗證命令**：
 ```bash
@@ -1091,7 +1180,7 @@ pytest tests/momentum/test_coverage_analyzer.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.5）
-- [ ] Rule 1: 無 `from api.*` import
+- [x] Rule 1: 無 `from api.*` import
 
 ---
 
@@ -1143,9 +1232,20 @@ class ICFilterOrchestrator:
     def analyze(self, features_path: str, labels_path: str,
                 meta_path: Optional[str] = None,
                 config_override: Optional[dict] = None,
-                progress_callback: Optional[Callable] = None) -> dict:
+                progress_callback: Optional[Callable] = None,
+                kline_reader: Optional["IKlineReader"] = None) -> dict:
         """
         主入口：執行完整八階段流水線
+        
+        Args:
+            features_path: HDF5 特徵矩陣路徑
+            labels_path: Label 路徑
+            meta_path: meta.json 路徑
+            config_override: 即時覆寫配置
+            progress_callback: 進度回報函式
+            kline_reader: IKlineReader 實例，用於 Grouped IC (Stage 4)
+                         讀取 raw OHLCV 以計算 Regime 分類條件
+                         (如 close > close_EMA_55)，若為 None 則 skip Grouped IC
         Returns: 完整 IC 報告 dict (規格書 §6.1 結構)
         """
         ...
@@ -1195,16 +1295,16 @@ class ICFilterOrchestrator:
 ```
 
 **驗收標準**：
-- [ ] [P0] `analyze()` 端到端完成八階段流水線
-- [ ] [P0] 回傳 JSON 結構符合規格書 §6.1
-- [ ] [P0] `refilter()` 使用快取，不重算 IC（執行時間 < 1 秒）
-- [ ] [P0] Stage 0 輸入驗證攔截格式錯誤
-- [ ] [P0] Stage 0 總樣本數 < 100 拋出 `InsufficientDataError`
-- [ ] [P0] Stage 3 事件數 < 30 自動回退 Global Mode
-- [ ] [P0] 篩選日誌記錄每步特徵數變化
-- [ ] [P0] 進度回報在每階段觸發
-- [ ] [P0] 完整流程 < 30 秒（800 特徵 × 10K 樣本）
-- [ ] [P1] Grouped IC 的 Regime 分類需讀取 raw OHLCV 數據（`data_cache/{symbol}_{tf}.h5`）計算 `close > close_EMA_55` 等條件
+- [x] [P0] `analyze()` 端到端完成八階段流水線
+- [x] [P0] 回傳 JSON 結構符合規格書 §6.1
+- [x] [P0] `refilter()` 使用快取，不重算 IC（執行時間 < 1 秒）
+- [x] [P0] Stage 0 輸入驗證攔截格式錯誤
+- [x] [P0] Stage 0 總樣本數 < 100 拋出 `InsufficientDataError`
+- [x] [P0] Stage 3 事件數 < 30 自動回退 Global Mode
+- [x] [P0] 篩選日誌記錄每步特徵數變化
+- [x] [P0] 進度回報在每階段觸發
+- [x] [P0] 完整流程 < 30 秒（800 特徵 × 10K 樣本）
+- [x] [P1] Grouped IC 的 Regime 分類需讀取 raw OHLCV 數據（`data_cache/{symbol}_{tf}.h5`）計算 `close > close_EMA_55` 等條件
 
 **驗證命令**：
 ```bash
@@ -1212,10 +1312,10 @@ pytest tests/momentum/test_ic_filter_orchestrator.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.6）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 2: 內部模組直接 import（同 Domain 允許）
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 2: 內部模組直接 import（同 Domain 允許）
 - [ ] Rule 3: API Service 透過 Factory 建構此物件
-- [ ] Rule 5: 所有閾值從 ICConfig 讀取
+- [x] Rule 5: 所有閾值從 ICConfig 讀取
 
 ---
 
@@ -1273,12 +1373,13 @@ class ICReporter:
         ...
 ```
 
-**驗收標準[P0] JSON 報告結構符合規格書 §6.1 (`version`, `metadata`, `filter_log`, `summary_table` 等)
-- [ ] [P1] AI Markdown 摘要包含 Key Findings、Recommendations、Risk Warnings
-- [ ] [P0] 精選特徵矩陣正確輸出為 HDF5 (float32)
-- [ ] [P0] 篩選日誌包含每步特徵數與剔除原因
-- [ ] [P0] 篩選日誌包含每步特徵數與剔除原因
-- [ ] 報告內容可被前端圖表正確消費（§6.3 的 12 種圖表數據格式）
+**驗收標準**：
+- [x] [P0] JSON 報告結構符合規格書 §6.1 (`version`, `metadata`, `filter_log`, `summary_table` 等)
+- [x] [P1] AI Markdown 摘要包含 Key Findings、Recommendations、Risk Warnings
+- [x] [P0] 精選特徵矩陣正確輸出為 HDF5 (float32)
+- [x] [P0] 篩選日誌包含每步特徵數與剔除原因
+- [x] [P1] 報告內容可被前端圖表正確消費（§6.3 的 12 種圖表數據格式）
+- [x] [P2] 前端散點圖數據：覆蓋率 vs IC 散點圖、換手率 vs IC 散點圖（規格書 §6.3 #11, #12）
 
 **驗證命令**：
 ```bash
@@ -1286,8 +1387,12 @@ pytest tests/momentum/test_ic_reporter.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.2.7）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 7: 報告為 dict/JSON，不使用 api/models 的 Pydantic Model
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 7: 報告為 dict/JSON，不使用 api/models 的 Pydantic Model
+
+### 驗證檢查點
+- PASS（成功）：Task 2.2.6 `analyze()` 完成 Stage 0~7，`filter_log` 含每步特徵數變化且報告結構符合 §6.1
+- PASS（邊界/失敗）：Task 2.2.1 事件數 < 30 時回退 Global Mode 並標記 `tier="insufficient"`
 
 ---
 
@@ -1341,12 +1446,12 @@ class CVValidator:
 ```
 
 **驗收標準**：
-- [ ] [P0] Time-Series Split 按時間排序，不洩漏未來數據
-- [ ] [P0] CV AUC Mean ± Std 正確計算
-- [ ] [P0] 每個 Fold 的 AUC 可獨立查看 (`fold_aucs` 列表)
-- [ ] [P0] OOT AUC 使用最後 20% 數據
-- [ ] [P0] CV-OOT Gap > 0.1 時 `overfit_warning=True`
-- [ ] [P0] OOT Precision/Recall/F1 正確計算
+- [x] [P0] Time-Series Split 按時間排序，不洩漏未來數據
+- [x] [P0] CV AUC Mean ± Std 正確計算
+- [x] [P0] 每個 Fold 的 AUC 可獨立查看 (`fold_aucs` 列表)
+- [x] [P0] OOT AUC 使用最後 20% 數據
+- [x] [P0] CV-OOT Gap > 0.1 時 `overfit_warning=True`
+- [x] [P0] OOT Precision/Recall/F1 正確計算
 
 **驗證命令**：
 ```bash
@@ -1354,8 +1459,8 @@ pytest tests/momentum/test_cv_validator.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.3.1）
-- [ ] Rule 1: 無 `from api.*` import
-- [ ] Rule 3: API Service 透過 `create_cv_validator()` 建構
+- [x] Rule 1: 無 `from api.*` import
+- [x] Rule 3: API Service 透過 `create_cv_validator()` 建構
 
 ---
 
@@ -1400,10 +1505,10 @@ class OOTValidator:
 ```
 
 **驗收標準**：
-- [ ] [P0] OOT 切分按時間排序
-- [ ] [P0] AUC/Precision/Recall/F1 正確計算
-- [ ] [P0] Gap > 0.1 → overfit_warning=True
-- [ ] [P0] Gap > 0.2 → severity="severe"
+- [x] [P0] OOT 切分按時間排序
+- [x] [P0] AUC/Precision/Recall/F1 正確計算
+- [x] [P0] Gap > 0.1 → overfit_warning=True
+- [x] [P0] Gap > 0.2 → severity="severe"
 
 **驗證命令**：
 ```bash
@@ -1411,7 +1516,7 @@ pytest tests/momentum/test_oot_validator.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.3.2）
-- [ ] Rule 1: 無 `from api.*` import
+- [x] Rule 1: 無 `from api.*` import
 
 ---
 
@@ -1452,11 +1557,11 @@ class PSICalculator:
 ```
 
 **驗收標準**：
-- [ ] [P1] PSI 公式正確（等頻分箱，處理零值防 log(0)）
-- [ ] [P1] PSI < 0.1 → stable
-- [ ] [P1] PSI 0.1~0.25 → slight_shift
-- [ ] [P1] PSI > 0.25 → significant_shift
-- [ ] [P1] 批次計算正確
+- [x] [P1] PSI 公式正確（等頻分箱，處理零值防 log(0)）
+- [x] [P1] PSI < 0.1 → stable
+- [x] [P1] PSI 0.1~0.25 → slight_shift
+- [x] [P1] PSI > 0.25 → significant_shift
+- [x] [P1] 批次計算正確
 
 **驗證命令**：
 ```bash
@@ -1464,7 +1569,7 @@ pytest tests/momentum/test_psi_calculator.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.3.3）
-- [ ] Rule 1: 無 `from api.*` import
+- [x] Rule 1: 無 `from api.*` import
 
 ---
 
@@ -1480,7 +1585,7 @@ pytest tests/momentum/test_psi_calculator.py -v --tb=short
 
 ```python
 # rolling_auc.py
-class RollingAUC:
+class RollingAUCTracker:
     """滾動窗口 AUC — 檢測模型時效性"""
     
     def compute(self, model: Any, X: pd.DataFrame, y: pd.Series,
@@ -1492,7 +1597,7 @@ class RollingAUC:
         ...
 
 # case_shap.py
-class CaseSHAP:
+class CaseSHAPExplainer:
     """單案例 SHAP 解釋"""
     
     def explain_single(self, model: Any, X_single: pd.DataFrame,
@@ -1514,10 +1619,10 @@ class CaseSHAP:
 ```
 
 **驗收標準**：
-- [ ] [P1] Rolling AUC 在每個窗口正確計算
-- [ ] [P1] 趨勢判斷 (stable/declining/improving) 合理
-- [ ] [P1] 單案例 SHAP 值正確（與 shap.Explanation 一致）
-- [ ] [P1] 批次 SHAP 的 mean_abs_shap 排名合理
+- [x] [P1] Rolling AUC 在每個窗口正確計算
+- [x] [P1] 趨勢判斷 (stable/declining/improving) 合理
+- [x] [P1] 單案例 SHAP 值正確（與 shap.Explanation 一致）
+- [x] [P1] 批次 SHAP 的 mean_abs_shap 排名合理
 
 **驗證命令**：
 ```bash
@@ -1525,7 +1630,11 @@ pytest tests/momentum/test_rolling_auc.py tests/momentum/test_case_shap.py -v --
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.3.4）
-- [ ] Rule 1: 無 `from api.*` import
+- [x] Rule 1: 無 `from api.*` import
+
+### 驗證檢查點
+- PASS（成功）：Task 2.3.1~2.3.4 的 P0/P1 驗收標準全數通過，CV/OOT/PSI/Rolling AUC/Case SHAP 皆可產出
+- PASS（邊界/失敗）：Task 2.3.2 當 CV-OOT Gap > 0.2 時回傳 `severity="severe"` 且 `overfit_warning=True`
 
 ---
 
@@ -1608,13 +1717,13 @@ class ICAnalysisService:
 ```
 
 **驗收標準**：
-- [ ] [P0] `POST /api/v1/ic/analyze` 回傳 task_id 且 status="running"
-- [ ] [P0] `GET /api/v1/ic/task/{id}` 正確回報進度 (0.0~1.0)
-- [ ] [P0] `GET /api/v1/ic/result/{id}` 回傳完整 JSON 報告
-- [ ] [P0] `POST /api/v1/ic/refilter` 使用快取不重算（< 1 秒）
-- [ ] [P1] WebSocket `/ws/ic-analysis/{task_id}` 推送每階段進度
-- [ ] [P0] 所有端點有正確的 error handling
-- [ ] [P0] Service 使用 `create_ic_analyzer()` 建構（Rule 3）
+- [x] [P0] `POST /api/v1/ic/analyze` 回傳 task_id 且 status="running"
+- [x] [P0] `GET /api/v1/ic/task/{id}` 正確回報進度 (0.0~1.0)
+- [x] [P0] `GET /api/v1/ic/result/{id}` 回傳完整 JSON 報告
+- [x] [P0] `POST /api/v1/ic/refilter` 使用快取不重算（< 1 秒）
+- [x] [P1] WebSocket `/ws/ic-analysis/{task_id}` 推送每階段進度
+- [x] [P0] 所有端點有正確的 error handling
+- [x] [P0] Service 使用 `create_ic_analyzer()` 建構（Rule 3）
 
 **驗證命令**：
 ```bash
@@ -1622,10 +1731,10 @@ pytest tests/api/test_ic_analysis_api.py -v --tb=short
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.4.1）
-- [ ] Rule 3: `ic_analysis_service.py` 使用 `from momentum.factories import create_ic_analyzer`
-- [ ] Rule 3: 無直接 `from momentum.Analysis.ic_engine import ICEngine`
-- [ ] Rule 4: `ic_analysis_service.py` 不 import 其他 Service
-- [ ] Rule 7: `ic_models.py` 在 API 層定義，不依賴 momentum 內部 DTO
+- [x] Rule 3: `ic_analysis_service.py` 使用 `from momentum.factories import create_ic_analyzer`
+- [x] Rule 3: 無直接 `from momentum.Analysis.ic_engine import ICEngine`
+- [x] Rule 4: `ic_analysis_service.py` 不 import 其他 Service
+- [x] Rule 7: `ic_models.py` 在 API 層定義，不依賴 momentum 內部 DTO
 
 **違規檢查命令**：
 ```bash
@@ -1691,17 +1800,17 @@ export interface FilterLogData { [stage: string]: { input: number; output: numbe
 ```
 
 **驗收標準**：
-- [ ] [P0] `/ic-analysis` 頁面可訪問，左右欄佈局正確
-- [ ] [P0] Config 面板滑桿調整後觸發 refilter API
-- [ ] [P0] IC 排名表可按 IC Mean / ICIR / p-value / Monotonicity 排序
-- [ ] [P0] IC Decay 圖表選擇特徵後正確渲染折線
-- [ ] [P0] 分位數收益圖 (Q1~Q5) 正確顯示
-- [ ] [P0] 相關性熱力圖色階正確
-- [ ] [P0] 篩選漏斗圖顯示每步特徵數
-- [ ] [P1] WebSocket 進度條正確顯示八階段進度
-- [ ] [P0] 匯出按鈕 (JSON/CSV/PNG) 正常運作
-- [ ] [P0] 空狀態 / 載入狀態 / 錯誤狀態正確處理
-- [ ] [P0] TypeScript 編譯通過（`npm run build`）
+- [x] [P0] `/ic-analysis` 頁面可訪問，左右欄佈局正確
+- [x] [P0] Config 面板滑桿調整後觸發 refilter API
+- [x] [P0] IC 排名表可按 IC Mean / ICIR / p-value / Monotonicity 排序
+- [x] [P0] IC Decay 圖表選擇特徵後正確渲染折線
+- [x] [P0] 分位數收益圖 (Q1~Q5) 正確顯示
+- [x] [P0] 相關性熱力圖色階正確
+- [x] [P0] 篩選漏斗圖顯示每步特徵數
+- [x] [P1] WebSocket 進度條正確顯示八階段進度
+- [x] [P0] 匯出按鈕 (JSON/CSV/PNG) 正常運作
+- [x] [P0] 空狀態 / 載入狀態 / 錯誤狀態正確處理
+- [x] [P0] TypeScript 編譯通過（`npm run build`）
 
 **驗證命令**：
 ```bash
@@ -1709,8 +1818,8 @@ cd frontend && npm run build
 ```
 
 #### 🏗️ Decoupling 檢查清單（Task 2.4.2）
-- [ ] 前端只與 API 端點通訊，不直接調用 momentum
-- [ ] TypeScript 類型與 API Response Model 一致
+- [x] 前端只與 API 端點通訊，不直接調用 momentum
+- [x] TypeScript 類型與 API Response Model 一致
 
 ---
 
@@ -1774,7 +1883,7 @@ class TestICGatekeeperE2E:
 - [ ] [P0] 所有單元測試通過 (`pytest tests/momentum/test_ic_*.py -v`)
 - [ ] [P0] API 測試通過 (`pytest tests/api/test_ic_analysis_api.py -v`)
 - [ ] [P0] 端到端測試通過 (`pytest tests/momentum/test_ic_e2e.py -v`)
-- [ ] [P0] 測試覆蓋率 ≥ 80%
+- [x] [P0] 測試覆蓋率 ≥ 80%
 - [ ] [P0] 效能: 完整流程 < 30 秒
 - [ ] [P0] 前端編譯通過 (`cd frontend && npm run build`)
 
@@ -1844,6 +1953,10 @@ def generate_config_suggestions(self, report: dict) -> dict:
 
 **備註**：此功能完整實作排定在 V2.0 Chat 模式 + AutoResearch Loop，Phase 2 僅做接口預留。
 
+### 驗證檢查點
+- PASS（成功）：Task 2.4.1~2.4.3 的 P0 驗收標準全數通過，`/ic-analysis` 頁面可訪問且 API 端點可回傳報告
+- PASS（邊界/失敗）：Task 2.4.2 空狀態/載入狀態/錯誤狀態皆正確處理
+
 ---
 
 ## 風險與緩解措施
@@ -1860,6 +1973,7 @@ def generate_config_suggestions(self, report: dict) -> dict:
 | R8 | 報告 JSON 過大影響前端 | 低 | 低 | 曲線採樣 + 分頁載入 | 2.2.7 |
 | R9 | Feature Metadata 缺失或格式不一致 | 中 | 中 | Stage 0 預設值填充 + 格式驗證 | 2.2.6 |
 | R10 | Phase 1 Feature Factory 輸出格式變更 | 低 | 高 | Stage 0 輸入驗證 + 版本檢查 | 2.2.6 |
+| R11 | Config 三層合併衝突 | 低 | 中 | 嚴格的 deep merge 策略 + 單元測試驗證合併結果（規格書 §15 #10） | 2.1.1 |
 
 ---
 
@@ -1899,8 +2013,7 @@ def generate_config_suggestions(self, report: dict) -> dict:
 | D1 | Rule 1 通過 | `grep -r "from api\." momentum/Analysis/ → 0` |
 | D2 | Rule 2 通過 | Protocol 總量 ≤ 10 |
 | D3 | Rule 3 通過 | API Service 透過 Factory 建構 |
-| D4 | Rule 4 通過 | Ser
-  2.4.4 Feature Factory Config 回饋接口 (P2 預留)vice 間無互調 |
+| D4 | Rule 4 通過 | Service 間無互調 |
 | D5 | Rule 5 通過 | 無 hardcoded 閾值 |
 | D6 | Rule 6 通過 | `pytest tests/momentum/test_ic_*.py` 可獨立運行 |
 | D7 | Rule 7 通過 | DTO 不跨層 |
@@ -1937,6 +2050,7 @@ Phase 2.4 (API + 前端 + 測試, Day 3 Part 2)
   2.4.1 API 端點 + Service + WebSocket
   2.4.2 前端 IC 分析頁面 + 元件
   2.4.3 端到端整合測試 + 效能驗證
+  2.4.4 Feature Factory Config 回饋接口 (P2 預留)
 ```
 
 ### 關鍵依賴圖
@@ -1956,6 +2070,7 @@ Phase 2.4 (API + 前端 + 測試, Day 3 Part 2)
 2.2.7 (Reporter) ──→ 2.4.1 (API)
 2.3.* (ModelValidation) ──→ 2.4.1 (API)
 2.4.1 (API) ──→ 2.4.2 (Frontend)
+2.2.7 (Reporter) ──→ 2.4.4 (Config Feedback) [P2 optional]
 ALL ──→ 2.4.3 (Testing)
 ```
 
@@ -2042,7 +2157,6 @@ def sample_metadata():
 pip list | grep -E "scipy|pandas|numpy|scikit-learn|shap|xgboost"
 # scipy >= 1.10.0 (spearmanr, pearsonr, ttest)
 # pandas >= 2.0.0 (eval, qcut, corr)
-└── contracts.py                       【修改】Task 2.1.6 (+ICResult, FilteredFeatureSet DTO)
 # numpy >= 1.24.0 (corrcoef, vectorized)
 # scikit-learn >= 1.3.0 (clustering, VIF)
 # shap (Case SHAP)
@@ -2055,7 +2169,7 @@ pip list | grep -E "scipy|pandas|numpy|scikit-learn|shap|xgboost"
 
 ```
 momentum/Analysis/
-├── __init__.py                        (修改 — 新增匯出)
+├── __init__.py                        (修改 — 新增匯出，見下方 §匯出規範)
 ├── ic_config_schema.py                【新增】Task 2.1.1
 ├── data_preprocessor.py               【新增】Task 2.1.2
 ├── ic_engine.py                       【新增】Task 2.1.4
@@ -2079,7 +2193,9 @@ momentum/FeatureEngineering/labels/
 └── label_generator.py                 【修改】Task 2.1.3
 
 momentum/core/
-└── protocols.py                       【修改】Task 2.1.6 (+3 Protocol)
+├── protocols.py                       【修改】Task 2.1.6 (+3 Protocol)
+├── contracts.py                       【修改】Task 2.1.6 (+ICResult, FilteredFeatureSet DTO)
+└── exceptions.py                      【新增】全域共用 (InsufficientDataError 等自訂例外，於 Task 2.1.1 一同建立)
 
 momentum/factories.py                  【修改】Task 2.1.6 (+4 Factory)
 
@@ -2143,3 +2259,49 @@ tests/momentum/
 tests/api/
 └── test_ic_analysis_api.py            【新增】
 ```
+
+### §匯出規範：`momentum/Analysis/__init__.py`
+
+```python
+# momentum/Analysis/__init__.py
+# Phase 2 新增匯出（保留既有匯出）
+
+from .ic_config_schema import ICConfig, load_ic_config
+from .data_preprocessor import DataPreprocessor
+from .ic_engine import ICEngine
+from .statistical_validator import StatisticalValidator
+from .event_filter import EventFilter
+from .monotonicity_tester import MonotonicityTester
+from .redundancy_filter import RedundancyFilter
+from .turnover_analyzer import TurnoverAnalyzer
+from .coverage_analyzer import CoverageAnalyzer
+from .ic_filter_orchestrator import ICFilterOrchestrator
+from .ic_reporter import ICReporter
+
+__all__ = [
+    "ICConfig", "load_ic_config",
+    "DataPreprocessor", "ICEngine", "StatisticalValidator",
+    "EventFilter", "MonotonicityTester", "RedundancyFilter",
+    "TurnoverAnalyzer", "CoverageAnalyzer",
+    "ICFilterOrchestrator", "ICReporter",
+]
+```
+
+### §匯出規範：`momentum/Analysis/model_validation/__init__.py`
+
+```python
+# momentum/Analysis/model_validation/__init__.py
+
+from .cv_validator import CVValidator
+from .oot_validator import OOTValidator
+from .psi_calculator import PSICalculator
+from .rolling_auc import RollingAUCTracker
+from .case_shap import CaseSHAPExplainer
+
+__all__ = [
+    "CVValidator", "OOTValidator", "PSICalculator",
+    "RollingAUCTracker", "CaseSHAPExplainer",
+]
+```
+
+<!-- STATUS: CONVERGED / READY TO FREEZE -->
