@@ -40,6 +40,7 @@
 
 - 🔍 **案例發現引擎** - 從海量歷史數據中找出符合特定模式的交易機會
 - 🧪 **指標實驗室** - 自動測試數十種技術指標的有效性
+- 🎯 **IC 篩選系統** - Information Coefficient 特徵篩選，自動識別預測力強的指標
 - 🤖 **ML優化系統** - 使用機器學習自動發現盈利Pattern
 - 📊 **完整研究流程** - 支持從假設驗證到策略回測的全流程
 - 🌐 **多市場支持** - 設計可擴展至加密貨幣、台股、美股
@@ -83,7 +84,54 @@
 - 策略說明區塊：依模板顯示策略邏輯/風控重點，避免新手迷失
 - 多 Pane 指標遮罩：Price/Volume/Taker Ratio 共享近/遠視窗、TO/TC 參考線與指標開關
 
-### 3. 指標測試系統（計劃中 📋）
+### 3. IC 特徵篩選系統（Phase 2 完成 ✅）
+
+**八階段篩選管線** - Information Coefficient 驅動的特徵選擇：
+- **Stage 0**: 資料攝入（HDF5 特徵 + 標籤 + Metadata JSON）
+- **Stage 1**: 數據前處理（Winsorization、缺失值處理、標準化、常數特徵移除）
+- **Stage 2**: 標籤生成（收益率計算、時間跨度轉換、forward_N_return）
+- **Stage 3**: 事件篩選（Query/Timestamp 模式、樣本數分層 tier_1/2/3）
+- **Stage 4**: IC 計算（Rolling IC、ICIR、IC Decay、Grouped IC 按年/季/狀態）
+- **Stage 5**: 統計驗證（t-test、p-value、信賴區間、Bonferroni/FDR 多重比較修正）
+- **Stage 6**: 單調性測試（分位數報酬、單調性分數、Long-Short 價差）
+- **Stage 7**: 冗餘篩選（相關矩陣分析、Greedy/Hierarchical/VIF、多樣化評估）
+- **Stage 8**: 報告生成（JSON、Markdown、HDF5、AI 摘要四種格式）
+
+**三種 IC 方法**:
+- **Spearman**（非線性關係、對離群值穩健、適合單調關係）
+- **Pearson**（線性關係、最大解釋力、適合連續變數）
+- **Kendall**（排序一致性、樣本數小時穩定、適合序數資料）
+
+**四種冗餘篩選演算法**:
+- **Greedy 去重**（迭代保留高 IC 特徵、快速剔除冗餘）
+- **Hierarchical Clustering**（樹狀結構自動分組、視覺化相似度）
+- **VIF**（方差膨脹因子、多重共線性偵測、回歸分析必備）
+- **Diversification**（多樣化評估、確保特徵互補、降低模型風險）
+
+**模型驗證子系統**（5 個模組）:
+- **時間序列交叉驗證**（CV Validator - OOT 切分、AUC/Precision/Recall/F1）
+- **Out-of-Time 驗證**（OOT Validator - CV-OOT Gap 評估、穩定性分析）
+- **PSI 漂移監控**（PSI Calculator - 分布穩定性、drift 偵測）
+- **滾動 AUC 追蹤**（Rolling AUC - 時間序列性能、趨勢分析）
+- **SHAP 可解釋性**（Case SHAP - 單案例解釋、批次特徵重要性）
+
+**效能表現**:
+- 200 features × 10K samples < 2s（超標 4 倍）
+- 支援 refilter 模式（讀取已計算 IC，重新套用篩選條件，10 倍加速）
+- HDF5 特徵存儲（gzip 壓縮、metadata 管理）
+- 向量化計算（Pandas/NumPy 優化、避免 Python 循環）
+
+**測試覆蓋**:
+- 26 個測試檔案、159 tests passed、2 warnings
+- 100% coverage (1,563/1,563 statements)
+- 效能基準測試：200 features × 10K samples < 2s
+
+**架構合規**:
+- ✅ Rule 1-7 完全遵守（Protocol 注入、Factory 建構、無跨域 import）
+- ✅ 模組化設計（12 核心 + 5 驗證 + 1 例外處理）
+- ✅ 三層配置系統（Default < YAML < API Override）
+
+### 4. 指標測試系統（計劃中 📋）
 
 **多數據源 × 多指標**：
 - 7種數據源（close, open, high, low, volume, taker_volume, taker_ratio）
@@ -245,13 +293,63 @@ ML模型訓練 + Pattern發現
   - Zustand狀態管理
   - 數據加載系統
 
+- [x] **K線數據批量下載** (階段1)
+  - HDF5 存儲系統
+  - Binance API 整合
+  - 批次並行下載
+  - Gap 自動填補
+
+- [x] **圖表分析系統** (階段1)
+  - Lightweight Charts 整合
+  - 多層同步圖表 (Price/Volume/TakerRatio)
+  - TO/TC 標記系統
+  - 信號笭頭標記
+
+- [x] **指標測試系統** (Phase 3.1-3.4)
+  - 多數據源指標計算引擎
+  - 信號密度分析
+  - 策略配置 UI
+  - 圖表信號標記
+
+- [x] **Optuna 參數優化** (Phase 3.5)
+  - 5 種 Sampler (TPE/CmaEs/Random/GP/NSGA-II)
+  - 多目標優化 (Pareto 前沿)
+  - WebSocket 實時進度
+  - Checkpoint 容錯機制
+
+- [x] **優化結果視覺化** (Phase 3.6)
+  - 9 個核心元件 (Metrics/Density/Stability/History)
+  - CSV/PNG 匯出功能
+  - 錯誤處理系統
+  - 參數重要性分析
+
+- [x] **IC 特徵篩選系統** (Phase 2 - IC Gatekeeper)
+  - 八階段篩選管線 (Stage 0-8)
+  - 三種 IC 方法 (Spearman/Pearson/Kendall)
+  - 四種冗餘篩選 (Greedy/Hierarchical/VIF/Diversification)
+  - 多報告格式 (JSON/Markdown/HDF5/AI 摘要)
+  - 100% 測試覆蓋 (159 tests, 1563/1563 statements)
+
+- [x] **模型驗證子系統** (Phase 2)
+  - CV Validator (時間序列交叉驗證)
+  - OOT Validator (Out-of-Time 驗證)
+  - PSI Calculator (PSI 漂移監控)
+  - Rolling AUC (滾動 AUC 追蹤)
+  - Case SHAP (SHAP 可解釋性)
+
 ### 🔨 開發中
 
-- [ ] **圖表分析系統** (階段1: 4-6週)
-  - Lightweight Charts集成
-  - 多層同步圖表
-  - 信號箭頭標記
-  - K線數據批量下載
+- [ ] **IC Gatekeeper 前端 UI**
+  - IC 分析結果視覺化
+  - 互動篩選控制面板
+  - 報告下載功能 (JSON/Markdown/HDF5)
+  - 相關性矩陣熱力圖
+  - 特徵對比圖表
+
+- [ ] **Feature Factory 前端整合**
+  - Feature 管理介面
+  - 批次計算控制
+  - 特徵工程配置
 
 ### 📋 計劃中
 

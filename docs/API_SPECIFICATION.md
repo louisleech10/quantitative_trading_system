@@ -1,11 +1,12 @@
 # API 端點規範
 
 ## 文檔資訊
-- **版本**: 3.0
-- **最後更新**: 2026-02-08
+- **版本**: 3.1
+- **最後更新**: 2026-02-13
 - **Base URL**: `http://localhost:8000`（開發環境）
 - **API Prefix**: `/api/v1`
 - **變更記錄**:
+  - v3.1 (2026-02-13): 新增 IC Analysis API（Section 14）- IC Gatekeeper 篩選系統 13 個端點，WebSocket 實時進度推送
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4；完整收錄 13 個路由模組、85+ 端點；新增 Feature Engineering / Pattern Analysis / Pattern Management / ML Pipeline / Two-Stage Search API；更新數據模型與錯誤碼
   - v2.0 (2026-01-09): 新增 Phase 3 API（Optuna 優化、信號分析、WebSocket）
   - v1.1 (2025-12-06): 新增 SignalDensityResponse 零值統計欄位
@@ -28,9 +29,10 @@
 12. [Pattern Management API](#11-pattern-management-api)
 13. [ML Pipeline API](#12-ml-pipeline-api)
 14. [Two-Stage Search API](#13-two-stage-search-api)
-15. [WebSocket API](#websocket-api)
-16. [錯誤處理](#錯誤處理)
-17. [數據模型](#數據模型)
+15. [IC Analysis API](#14-ic-analysis-api)
+16. [WebSocket API](#websocket-api)
+17. [錯誤處理](#錯誤處理)
+18. [數據模型](#數據模型)
 
 ---
 
@@ -762,6 +764,363 @@ POST /api/v1/two-stage/negative/{positive_task_id}
 ### 13.3 取得合併結果
 ```http
 GET /api/v1/two-stage/combined/{positive_task_id}/{negative_task_id}
+```
+
+---
+
+## 14. IC Analysis API
+
+> **路由**: `api/routes/ic_analysis.py` | **Prefix**: `/api/v1/ic-analysis`
+
+IC Gatekeeper 分析 API，提供 Information Coefficient 特徵篩選、八階段管線執行、統計驗證、冗餘篩選、模型驗證等功能。
+
+### 14.1 啟動 IC 分析
+```http
+POST /api/v1/ic-analysis/start
+```
+
+**Request Body**:
+```json
+{
+  "feature_file_path": "data_cache/features/BTCUSDT_12h_features.h5",
+  "label_file_path": "data_cache/labels/BTCUSDT_12h_labels.h5",
+  "metadata_file_path": "data_cache/features/BTCUSDT_12h_metadata.json",
+  "ic_method": "spearman",
+  "min_periods": 20,
+  "event_filter_mode": "query",
+  "event_query": "market_regime == 'bull'",
+  "statistical_test": {
+    "enabled": true,
+    "alpha": 0.05,
+    "method": "fdr"
+  },
+  "monotonicity_test": {
+    "enabled": true,
+    "n_quantiles": 5,
+    "min_score": 0.6
+  },
+  "redundancy_filter": {
+    "enabled": true,
+    "algorithm": "greedy",
+    "correlation_threshold": 0.7
+  },
+  "model_validation": {
+    "enabled": true,
+    "cv_folds": 5,
+    "oot_ratio": 0.2
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "task_id": "ic_task_20260213_143052_abc123",
+  "status": "running",
+  "message": "IC analysis started"
+}
+```
+
+### 14.2 查詢任務狀態
+```http
+GET /api/v1/ic-analysis/status/{task_id}
+```
+
+**Response**:
+```json
+{
+  "task_id": "ic_task_20260213_143052_abc123",
+  "status": "running",
+  "progress": {
+    "current_stage": "Stage 5: 統計驗證",
+    "stage_number": 5,
+    "total_stages": 8,
+    "percentage": 62.5,
+    "elapsed_time": 12.8,
+    "estimated_remaining": 7.2
+  },
+  "result": null
+}
+```
+
+**狀態值**: `pending`, `running`, `completed`, `failed`
+
+### 14.3 下載分析報告
+```http
+GET /api/v1/ic-analysis/report/{task_id}/{format}
+```
+
+**參數**:
+- `format`: `json` | `markdown` | `hdf5` | `ai_summary`
+
+**Response (JSON format)**:
+```json
+{
+  "task_id": "ic_task_20260213_143052_abc123",
+  "timestamp": "2026-02-13T14:32:15",
+  "config": {
+    "ic_method": "spearman",
+    "min_periods": 20
+  },
+  "pipeline_summary": {
+    "stage_0_ingestion": {"features_count": 200, "samples_count": 10000},
+    "stage_1_preprocessing": {"removed_features": 5, "remaining": 195},
+    "stage_4_ic_calculation": {"ic_computed": 195},
+    "stage_5_statistical_test": {"passed": 120, "failed": 75},
+    "stage_6_monotonicity_test": {"passed": 85, "failed": 35},
+    "stage_7_redundancy_filter": {"final_features": 42}
+  },
+  "top_features": [
+    {
+      "feature_name": "rsi_14",
+      "ic_mean": 0.082,
+      "t_statistic": 4.56,
+      "p_value": 0.0001,
+      "monotonicity_score": 0.85,
+      "correlation_cluster": "momentum_group_1"
+    }
+  ],
+  "model_validation": {
+    "cv_auc_mean": 0.68,
+    "oot_auc": 0.65,
+    "psi": 0.12
+  }
+}
+```
+
+### 14.4 下載完整資料（HDF5）
+```http
+GET /api/v1/ic-analysis/download/{task_id}/hdf5
+```
+
+**Response**: Binary HDF5 檔案  
+**Content-Type**: `application/x-hdf5`  
+**檔案內容**:
+- `/ic_values` - IC 時間序列矩陣
+- `/ic_statistics` - 統計指標表
+- `/filtered_features` - 最終篩選特徵清單
+- `/metadata` - 完整配置與執行資訊
+
+### 14.5 Refilter 模式（快速重新篩選）
+```http
+POST /api/v1/ic-analysis/refilter/{task_id}
+```
+
+**Request Body**:
+```json
+{
+  "new_ic_threshold": 0.05,
+  "new_p_value_threshold": 0.01,
+  "new_correlation_threshold": 0.65
+}
+```
+
+**功能**: 不重新計算 IC，直接從快取讀取已計算 IC，套用新的篩選條件（10 倍加速）。
+
+**Response**:
+```json
+{
+  "refilter_task_id": "ic_refilter_20260213_143500_xyz789",
+  "status": "completed",
+  "execution_time_seconds": 0.8,
+  "final_features_count": 38
+}
+```
+
+### 14.6 取得 IC 衰減曲線
+```http
+GET /api/v1/ic-analysis/ic-decay/{task_id}?feature_name=rsi_14
+```
+
+**Response**:
+```json
+{
+  "feature_name": "rsi_14",
+  "ic_decay": [
+    {"period": 1, "ic": 0.082},
+    {"period": 2, "ic": 0.074},
+    {"period": 3, "ic": 0.061},
+    {"period": 5, "ic": 0.042},
+    {"period": 10, "ic": 0.018}
+  ]
+}
+```
+
+### 14.7 取得分組 IC（按市場狀態）
+```http
+GET /api/v1/ic-analysis/grouped-ic/{task_id}?feature_name=rsi_14&group_by=market_regime
+```
+
+**Response**:
+```json
+{
+  "feature_name": "rsi_14",
+  "grouped_ic": {
+    "bull": {"ic_mean": 0.095, "sample_size": 4200},
+    "bear": {"ic_mean": 0.061, "sample_size": 3800},
+    "sideways": {"ic_mean": 0.032, "sample_size": 2000}
+  }
+}
+```
+
+### 14.8 取得分位數報酬分析
+```http
+GET /api/v1/ic-analysis/quantile-returns/{task_id}?feature_name=rsi_14
+```
+
+**Response**:
+```json
+{
+  "feature_name": "rsi_14",
+  "quantile_returns": [
+    {"quantile": "Q1", "mean_return": -0.012, "std": 0.045},
+    {"quantile": "Q2", "mean_return": -0.003, "std": 0.038},
+    {"quantile": "Q3", "mean_return": 0.008, "std": 0.041},
+    {"quantile": "Q4", "mean_return": 0.019, "std": 0.047},
+    {"quantile": "Q5", "mean_return": 0.032, "std": 0.053}
+  ],
+  "long_short_spread": 0.044,
+  "monotonicity_score": 0.85
+}
+```
+
+### 14.9 取得相關性矩陣
+```http
+GET /api/v1/ic-analysis/correlation-matrix/{task_id}?features=rsi_14,macd,ema_cross
+```
+
+**Response**:
+```json
+{
+  "correlation_matrix": [
+    [1.0, 0.23, 0.15],
+    [0.23, 1.0, 0.68],
+    [0.15, 0.68, 1.0]
+  ],
+  "feature_names": ["rsi_14", "macd", "ema_cross"]
+}
+```
+
+### 14.10 取得模型驗證結果
+```http
+GET /api/v1/ic-analysis/model-validation/{task_id}
+```
+
+**Response**:
+```json
+{
+  "cv_results": {
+    "fold_1": {"auc": 0.67, "precision": 0.58, "recall": 0.62},
+    "fold_2": {"auc": 0.69, "precision": 0.61, "recall": 0.64},
+    "mean": {"auc": 0.68, "precision": 0.59, "recall": 0.63}
+  },
+  "oot_results": {
+    "auc": 0.65,
+    "precision": 0.56,
+    "recall": 0.61
+  },
+  "psi_score": 0.12,
+  "rolling_auc": [
+    {"period": "2025-Q1", "auc": 0.67},
+    {"period": "2025-Q2", "auc": 0.69},
+    {"period": "2025-Q3", "auc": 0.66}
+  ]
+}
+```
+
+### 14.11 取得 SHAP 解釋
+```http
+POST /api/v1/ic-analysis/shap-explanation/{task_id}
+```
+
+**Request Body**:
+```json
+{
+  "case_indices": [0, 10, 50, 100],
+  "features": ["rsi_14", "macd", "ema_cross"]
+}
+```
+
+**Response**:
+```json
+{
+  "shap_values": {
+    "case_0": {"rsi_14": 0.12, "macd": -0.05, "ema_cross": 0.08},
+    "case_10": {"rsi_14": 0.08, "macd": -0.02, "ema_cross": 0.11}
+  },
+  "feature_importance": [
+    {"feature": "ema_cross", "mean_abs_shap": 0.095},
+    {"feature": "rsi_14", "mean_abs_shap": 0.087},
+    {"feature": "macd", "mean_abs_shap": 0.042}
+  ]
+}
+```
+
+### 14.12 批次啟動多標的分析
+```http
+POST /api/v1/ic-analysis/batch-start
+```
+
+**Request Body**:
+```json
+{
+  "symbols": ["BTCUSDT", "ETHUSDT", "BNBUSDT"],
+  "feature_template": "data_cache/features/{symbol}_12h_features.h5",
+  "label_template": "data_cache/labels/{symbol}_12h_labels.h5",
+  "shared_config": {
+    "ic_method": "spearman",
+    "min_periods": 20
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "batch_id": "batch_20260213_144500",
+  "task_ids": [
+    "ic_task_BTCUSDT_144501",
+    "ic_task_ETHUSDT_144502",
+    "ic_task_BNBUSDT_144503"
+  ]
+}
+```
+
+### 14.13 WebSocket 實時進度
+```
+ws://localhost:8000/ws/ic-analysis/{task_id}
+```
+
+**推送格式**:
+```json
+{
+  "type": "progress",
+  "task_id": "ic_task_20260213_143052_abc123",
+  "status": "running",
+  "current_stage": "Stage 5: 統計驗證",
+  "stage_number": 5,
+  "total_stages": 8,
+  "percentage": 62.5,
+  "elapsed_time": 12.8,
+  "estimated_remaining": 7.2,
+  "stage_metrics": {
+    "features_processed": 120,
+    "features_passed": 85,
+    "features_failed": 35
+  }
+}
+```
+
+**完成狀態**:
+```json
+{
+  "type": "completed",
+  "task_id": "ic_task_20260213_143052_abc123",
+  "status": "completed",
+  "execution_time": 20.5,
+  "final_features_count": 42,
+  "report_available": true
+}
 ```
 
 ---

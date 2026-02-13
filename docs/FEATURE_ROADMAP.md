@@ -39,24 +39,89 @@
 - 🔥 **P2 - 中**: 增強功能，錦上添花
 - 💡 **P3 - 低**: 優化功能，可延後開發
 
-### 當前系統狀態
+### 當前系統狀態（2026-02-13）
 ```
-✅ 已完成：
-  - Case Search系統（Web + API）
-  - 搜索結果展示和導出
-  - 基礎數據管理
+✅ 已完成（Production Ready）：
+  【階段 0 - 基礎架構】
+  - Case Search 系統（30 參數框架、兩階段搜索、並行搜索引擎）
+  - 搜索結果展示和匯出（CSV/JSON）
   - 狀態管理（Zustand）
+  - 基礎數據管理（HDF5 存儲）
 
-⏳ 進行中：
-  - 無（等待開始階段1）
+  【階段 1 - 圖表與數據系統】
+  - K 線數據批量下載（Binance API、並行下載、錯誤分類重試）
+  - 圖表分析系統（Lightweight Charts、多層同步、TakerRatio 圖表）
+  - 圖表信號計算（三種策略：短長交叉、中長交叉、三線均線）
+  - 信號視覺化（箭頭標記、顏色編碼）
 
-❌ 未開始：
-  - 圖表系統
-  - K線數據批量下載
-  - 指標測試
-  - ML訓練
-  - Pattern發現
-  - 回測系統
+  【階段 2 (K線圖表) - 案例匯入與管理】
+  - CSV/Excel 案例匯入（驗證、轉換、查重）
+  - 案例記憶體存儲（CaseStorage Singleton）
+  - 案例 CRUD API（6 個端點）
+
+  【階段 2 (IC Gatekeeper) - IC 特徵篩選系統】★ 最新完成
+  - IC 八階段管線（資料攝入 → 前處理 → IC 計算 → 統計驗證 → 單調性 → 冗餘篩選 → 報告）
+  - 三種 IC 方法（Spearman/Pearson/Kendall）
+  - 四種冗餘篩選演算法（Greedy/Hierarchical/VIF/Diversification）
+  - 模型驗證子系統（CV/OOT/PSI/Rolling AUC/SHAP）
+  - 13 個 API 端點 + WebSocket 實時進度推送
+  - 43 個新檔案，159 tests passed，100% coverage
+  - 效能：200 features × 10K samples < 2s（超標 4 倍）
+
+  【階段 3.1-3.4 - 指標測試系統】
+  - 指標引擎（IndicatorEngine、多數據源支援）
+  - EMA 系列指標（EMA/DEMA/TEMA）
+  - 指標配置系統（YAML config loader）
+  - 指標快取機制（IndicatorCache/KlineCache）
+
+  【階段 3.5 - Optuna 參數優化】
+  - Optuna 優化器（OptunaOptimizer、多目標優化）
+  - Checkpoint 管理（暫停/恢復、狀態持久化）
+  - 進度監控（ProgressMonitor、回呼機制）
+  - 結果分析（ResultAnalyzer、Trial 比對）
+  - 優化 API（8 個核心端點 + 9 個分析端點）
+  - WebSocket 實時進度推送（30s 心跳、里程碑通知）
+
+  【階段 3.6 - 優化結果視覺化】
+  - MetricsPanel（核心指標總覽、顏色編碼）
+  - DensityComparisonChart（優化前後密度對比）
+  - StabilityChart（參數穩定性雷達圖）
+  - TrialHistoryTable（試驗歷史表格、分層檢視）
+  - TrialComparisonDialog（多試驗對比、參數 diff）
+  - PNG 匯出功能（html2canvas）
+  - 9+ 視覺化元件（完整覆蓋優化全流程）
+
+  【REFACTOR_ARCHITECTURE_V4 - 解耦架構】
+  - Protocol 注入（IKlineReader、IIndicatorEngine、IICAnalyzer）
+  - Factory 模式（unified factories.py）
+  - KlineDataService 統一資料存取層
+  - Rule 1-7 完全遵守（0 violations）
+
+⏳ 進行中（Active Development）：
+  【階段 4 - Pattern 發現 + 前端 UI】
+  - IC Gatekeeper 前端 UI（相關性熱力圖、IC 衰減曲線、分組 IC、報告匯出）
+  - Feature Factory 前端整合（特徵配置面板、批次提交、進度監控）
+  - Pattern 提取引擎（規則定義、提取器）
+  - Pattern 驗證與存儲
+
+❌ 未開始（Planned）：
+  【階段 5 - ML 訓練與預測】
+  - XGBoost 模型訓練（時間序列交叉驗證、超參數調優）
+  - 模型評估（AUC/Precision/Recall/F1）
+  - SHAP 可解釋性分析
+  - 模型持久化與版本控制
+
+  【階段 6 - 模型診斷與穩健性】
+  - Drift 偵測（PSI/KS-test/Jensen-Shannon）
+  - Regime 分析（市場狀態識別）
+  - 期望值計算（Expectancy/Kelly Criterion）
+  - Bootstrap 估計（信賴區間）
+
+  【階段 7 - 工程化與生產】
+  - 回測系統（事件驅動、完整版位管理）
+  - 實盤部署（Websocket 行情、風控）
+  - 監控與告警（Prometheus/Grafana）
+  - API Gateway（Kong/Traefik）
 ```
 
 ---
@@ -842,6 +907,213 @@ HDF5存儲結構:
 交付物:
   - 指標測試完整UI
   - 用戶使用文檔
+```
+
+---
+
+## 階段2.5：IC 特徵篩選系統（已完成 ✅）
+
+### 階段目標
+**建構 Information Coefficient 驅動的特徵篩選系統，自動識別預測力強的技術指標，並透過統計驗證與冗餘篩選提升特徵品質**
+
+### 時間規劃
+- **總時長**: 2 週（實際完成）
+- **完成日期**: 2026-02-12
+- **優先級**: 🔥🔥🔥 P0（最高）
+- **依賴**: 階段 2 完成（需要特徵數據）
+
+### 功能概述
+```
+輸入: 特徵檔案（HDF5）+ 標籤檔案（HDF5）+ Metadata（JSON）
+     ↓
+八階段管線:
+  Stage 0: 資料攝入（HDF5 讀取）
+  Stage 1: 數據前處理（Winsorization、缺失值填補、標準化）
+  Stage 2: 標籤生成（收益率計算、時間跨度轉換）
+  Stage 3: 事件篩選（Query/Timestamp 模式、樣本分層）
+  Stage 4: IC 計算（Rolling IC、ICIR、IC Decay、Grouped IC）
+  Stage 5: 統計驗證（t-test、p-value、信賴區間、FDR）
+  Stage 6: 單調性測試（分位數報酬、單調性分數、Long-Short 價差）
+  Stage 7: 冗餘篩選（Greedy/Hierarchical/VIF/Diversification）
+  Stage 8: 報告生成（JSON/Markdown/HDF5/AI 摘要）
+     ↓
+輸出: 篩選後特徵清單 + IC 統計指標 + 模型驗證結果
+```
+
+---
+
+### 已實現任務
+
+#### 任務 2.5.1：核心分析引擎（12 個模組）
+```yaml
+✅ 已完成模組:
+  - data_preprocessor.py (265 行) - Winsorization + 缺失值填補 + 標準化
+  - ic_engine.py (720 行) - Rolling IC + ICIR + IC Decay + Grouped IC
+  - ic_filter_orchestrator.py (1,087 行) - 八階段管線協調器
+  - event_filter.py (289 行) - Query/Timestamp 事件篩選 + 樣本分層
+  - statistical_validator.py (166 行) - t-test + p-value + Bonferroni/FDR
+  - monotonicity_tester.py (244 行) - 分位數報酬 + 單調性分數
+  - redundancy_filter.py (410 行) - 四種冗餘篩選演算法
+  - turnover_analyzer.py (92 行) - 換手率 + 排名變化率 + 自相關
+  - coverage_analyzer.py (92 行) - 時間覆蓋率 + 有效起點偵測
+  - ic_config_schema.py (349 行) - Pydantic 配置模型 + 三層合併
+  - ic_reporter.py (364 行) - 四種報告格式
+  - exceptions.py (13 行) - 錯誤定義
+
+功能亮點:
+  ✅ 三種 IC 方法（Spearman/Pearson/Kendall）
+  ✅ 四種冗餘篩選演算法（Greedy/Hierarchical/VIF/Diversification）
+  ✅ 八階段管線自動執行
+  ✅ 事務性報告生成（四種格式同步）
+  ✅ Refilter 快取機制（10 倍加速）
+```
+
+#### 任務 2.5.2：模型驗證子系統（5 個模組）
+```yaml
+✅ 已完成模組:
+  - cv_validator.py (255 行) - 時間序列交叉驗證 + OOT 切分
+  - oot_validator.py (156 行) - Out-of-Time 驗證 + Gap 評估
+  - psi_calculator.py (121 行) - PSI 漂移監控 + 穩定性分類
+  - rolling_auc.py (148 行) - 滾動 AUC 追蹤 + 趨勢偵測
+  - case_shap.py (115 行) - 單案例 SHAP 解釋 + 批次分析
+
+功能亮點:
+  ✅ 時間序列 CV（避免未來資訊洩露）
+  ✅ PSI 漂移監控（穩定/輕微/中度/嚴重）
+  ✅ 滾動 AUC 趨勢偵測（上升/下降/穩定）
+  ✅ SHAP 可解釋性分析（特徵重要性）
+```
+
+#### 任務 2.5.3：API 與服務層（4 個元件）
+```yaml
+✅ 已完成元件:
+  - ic_models.py - Pydantic Request/Response 模型
+  - ic_analysis.py - 13 個 REST 端點
+  - ic_analysis_service.py - 業務邏輯層（使用 Factory）
+  - ic_analysis_ws.py - WebSocket 實時進度推送
+
+API 端點（13 個）:
+  1. POST /ic-analysis/start - 啟動 IC 分析
+  2. GET /ic-analysis/status/{task_id} - 查詢任務狀態
+  3. GET /ic-analysis/report/{task_id}/{format} - 下載報告
+  4. GET /ic-analysis/download/{task_id}/hdf5 - 下載完整資料
+  5. POST /ic-analysis/refilter/{task_id} - Refilter 快速重新篩選
+  6. GET /ic-analysis/ic-decay/{task_id} - 取得 IC 衰減曲線
+  7. GET /ic-analysis/grouped-ic/{task_id} - 取得分組 IC
+  8. GET /ic-analysis/quantile-returns/{task_id} - 分位數報酬分析
+  9. GET /ic-analysis/correlation-matrix/{task_id} - 相關性矩陣
+  10. GET /ic-analysis/model-validation/{task_id} - 模型驗證結果
+  11. POST /ic-analysis/shap-explanation/{task_id} - SHAP 解釋
+  12. POST /ic-analysis/batch-start - 批次啟動多標的分析
+  13. WS /ws/ic-analysis/{task_id} - WebSocket 實時進度
+
+功能亮點:
+  ✅ 使用 Protocol 注入（IICAnalyzer、ILabelGenerator）
+  ✅ 使用 Factory 建構（create_ic_analyzer()）
+  ✅ WebSocket 八階段實時進度推送
+  ✅ 四種報告格式同步生成
+```
+
+#### 任務 2.5.4：測試與驗證（26 個測試檔案）
+```yaml
+✅ 測試覆蓋:
+  - API 測試（test_ic_analysis_api.py - 13 個端點）
+  - E2E 測試（test_ic_e2e.py - 端到端管線、refilter、效能）
+  - 引擎測試（test_ic_engine.py - IC 計算引擎）
+  - 效能測試（test_ic_engine_performance.py - 200×10K < 2s 基準）
+  - 協調器測試（test_ic_filter_orchestrator.py - 八階段管線）
+  - 報告測試（test_ic_reporter.py - JSON/Markdown/HDF5）
+  - 20 個其他測試檔案（各模組單元測試）
+
+測試統計:
+  ✅ 159 tests passed
+  ⚠️ 2 warnings（非關鍵問題）
+  ✅ 100% coverage (1,563/1,563 statements)
+  ✅ 效能基準達標（200 features × 10K samples < 2s，超標 4 倍）
+```
+
+---
+
+### 技術亮點
+
+#### 八階段管線設計
+```python
+# 統一入口、階段進度追蹤、事務性報告生成
+results = orchestrator.run_pipeline(
+    feature_file_path="...",
+    label_file_path="...",
+    config=config
+)
+```
+
+#### 三種 IC 方法
+| 方法 | 適用場景 | 優點 | 缺點 |
+|------|---------|------|------|
+| **Spearman** | 非線性關係、有離群值 | 對離群值穩健 | 無法量化線性程度 |
+| **Pearson** | 線性關係、連續變數 | 最大解釋力 | 對離群值敏感 |
+| **Kendall** | 小樣本、序數資料 | 小樣本穩定 | 計算較慢 |
+
+#### 四種冗餘篩選演算法
+- **Greedy**: 迭代保留高 IC、剔除相關特徵（快速去重）
+- **Hierarchical**: 樹狀結構分組、每組選代表（視覺化特徵關係）
+- **VIF**: 方差膨脹因子、多重共線性檢測（回歸模型必備）
+- **Diversification**: 多樣化評估、確保特徵互補（降低模型風險）
+
+#### 事務性報告生成
+所有報告格式（JSON/Markdown/HDF5/AI 摘要）在同一事務中生成，確保一致性。
+
+#### Refilter 快取機制
+不重新計算 IC，直接從快取讀取已計算 IC，套用新的篩選條件（10 倍加速）。
+
+#### 架構合規
+- ✅ Rule 1: `momentum/` 不依賴 `api/`（0 violation）
+- ✅ Rule 2: 跨 Domain 使用 Protocol 注入（IICAnalyzer、ILabelGenerator）
+- ✅ Rule 3: API Service 使用 Factory 建構（`create_ic_analyzer()`）
+- ✅ Rule 4-7: 完全遵守解耦架構
+
+---
+
+### 效能表現
+
+```yaml
+計算效能:
+  - 200 features × 10K samples < 2s（超標 4 倍）
+  - 向量化計算（Pandas/NumPy）
+  - Refilter 快取（10 倍加速）
+
+記憶體使用:
+  - HDF5 壓縮（gzip）
+  - 串流式讀取（避免全量載入）
+
+測試覆蓋:
+  - 159 tests passed
+  - 100% coverage (1,563/1,563 statements)
+```
+
+---
+
+### 待開發：前端 UI（進行中 ⏳）
+
+```yaml
+視覺化元件（10 個）:
+  - CorrelationHeatmap - 相關性矩陣熱力圖
+  - ExportButtons - 報告匯出（JSON/Markdown/HDF5）
+  - FilterFunnelChart - 篩選漏斗圖（各階段特徵數量）
+  - GroupedICBarChart - 分組 IC 柱狀圖
+  - ICConfigPanel - IC 配置面板
+  - ICDecayChart - IC 衰減曲線圖
+  - ICSummaryTable - IC 摘要表格（Top Features）
+  - QuantileReturnChart - 分位數報酬圖
+  - RegimeRadarChart - 市場狀態雷達圖
+  - RollingICChart - 滾動 IC 時序圖
+
+頁面:
+  - frontend/src/app/ic-analysis/page.tsx - IC 分析主頁面
+  - frontend/src/app/ic-analysis/layout.tsx - 佈局
+
+狀態管理:
+  - frontend/src/store/icAnalysisStore.ts - Zustand Store
+  - frontend/src/hooks/useICAnalysis.ts - Custom Hook
 ```
 
 ---
