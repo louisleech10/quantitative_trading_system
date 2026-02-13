@@ -1,10 +1,11 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 3.0
-- **最後更新**: 2026-02-08
+- **版本**: 3.1
+- **最後更新**: 2026-02-13
 - **狀態**: 生產中 + 持續開發（Phase 4 進行中）
 - **更新內容**: 
+  - v3.1 (2026-02-13): 添加回測系統架構規劃（Backtest Domain）；添加平行開發架構指南；添加架構合規檢查腳本
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4 架構變更（解耦架構、Protocol 注入、Factory 模式、KlineDataService 統一資料存取層）；更新模組清單與目錄結構；標記已完成功能
   - v2.0 (2026-01-09): 添加 Phase 3 完整架構（Optuna 優化系統、WebSocket 通訊、9 個視覺化組件）
   - v1.0 (2025-09-30): 初始版本
@@ -24,6 +25,12 @@
 10. [性能考慮](#性能考慮)
 11. [安全性設計](#安全性設計)
 12. [擴展性設計](#擴展性設計)
+
+**相關文檔**:
+- [平行開發架構指南](./PARALLEL_DEVELOPMENT_GUIDE.md) - 多團隊平行開發規範
+- [回測系統架構設計](./BACKTEST_SYSTEM_DESIGN.md) - 回測系統完整設計文檔
+- [產品願景與版本演進](./PRODUCT_VISION.md) - 系統長期演進方向
+- [架構解耦規範](./REFACTOR_ARCHITECTURE_V4.md) - 7 條解耦規則詳細說明
 
 ---
 
@@ -987,15 +994,154 @@ Pattern 的 CRUD 操作和統計分析。
 
 ## 待開發功能
 
-### ⏳ 1. 回測系統（優先級：🔥 中）
+### ⏳ 1. 回測系統（優先級：🔥 高）
+
+> **詳細設計**: 參見 [BACKTEST_SYSTEM_DESIGN.md](./BACKTEST_SYSTEM_DESIGN.md)
 
 基於發現的 Pattern 或 ML 模型進行歷史回測驗證。
 
-#### 核心需求
-- 回測引擎（交易模擬、績效計算）
-- 績效指標（Sharpe, Sortino, Max Drawdown, Calmar, Win Rate 等）
-- 權益曲線視覺化
-- PDF 報告生成
+#### 架構設計（遵循解耦原則）
+
+**模組結構**:
+```
+momentum/Backtest/                    # 新增 Domain（可獨立開發）
+├── backtest_engine.py                # BacktestEngine（向量化回測）
+├── position_manager.py               # PositionManager（部位管理）
+├── trade_executor.py                 # TradeExecutor（交易執行）
+├── performance_calculator.py         # PerformanceCalculator（績效計算）
+├── risk_analyzer.py                  # RiskAnalyzer（風險分析）
+├── report_generator.py               # ReportGenerator（報告生成）
+└── types.py                          # Trade, Position, BacktestResult
+
+api/services/
+└── backtest_service.py               # BacktestService（任務管理）
+
+api/routes/
+└── backtest.py                       # REST API 路由
+
+api/models/
+└── backtest_models.py                # BacktestRequest, BacktestResponse
+```
+
+**Protocol 定義** (添加到 `momentum/core/protocols.py`):
+```python
+class IBacktestEngine(Protocol):
+    def run_backtest(
+        self, symbol, timeframe, start_date, end_date,
+        strategy_params, initial_capital
+    ) -> Dict: ...
+
+class IPositionManager(Protocol):
+    def open_position(...) -> Dict: ...
+    def close_position(...) -> Dict: ...
+    def check_stop_loss_take_profit(...) -> Optional[str]: ...
+
+class IPerformanceCalculator(Protocol):
+    def calculate_metrics(trades, equity_curve) -> Dict: ...
+```
+
+**Factory 函數** (添加到 `momentum/factories.py`):
+```python
+def create_backtest_engine() -> IBacktestEngine:
+    kline_reader = create_kline_storage_manager()
+    position_manager = create_position_manager()
+    performance_calculator = create_performance_calculator()
+    return BacktestEngine(
+        kline_reader=kline_reader,
+        position_manager=position_manager,
+        performance_calculator=performance_calculator
+    )
+```
+
+#### 核心功能
+
+**1. 回測引擎**:
+- 向量化交易執行（pandas/numpy）
+- Numba JIT 優化關鍵路徑
+- 支援多種策略類型（RSI, ML, Pattern）
+- 性能目標：1年 12h 週期 < 1 秒（MacBook M1）
+
+**2. 部位管理**:
+- 開倉/平倉邏輯
+- 止損止盈自動觸發
+- 部位追蹤與歷史記錄
+
+**3. 績效指標** (20+ 指標):
+- **報酬**: 總報酬率、年化報酬、CAGR
+- **風險**: 波動率、最大回撤、最大回撤持續期
+- **風險調整**: 夏普比率、索提諾比率、卡瑪比率
+- **交易**: 勝率、獲利因子、平均獲利/虧損、連續獲利/虧損
+
+**4. 視覺化與報告**:
+- 權益曲線圖表（Recharts）
+- 交易記錄表格
+- 績效指標面板
+- PNG 匯出功能
+
+#### 依賴關係（獨立開發）
+
+```
+回測系統依賴:
+  ✅ IKlineReader (透過 Protocol) → DataExtraction
+  ✅ 無其他業務邏輯依賴
+  ✅ 可獨立測試: pytest tests/momentum/Backtest/
+```
+
+**與其他模組整合**:
+```
+[案例搜尋結果] → 策略參數 → [回測驗證]
+[特徵工程] → XGBoost 預測 → [回測驗證]
+[Optuna 優化] → 最佳參數 → [回測驗證]
+```
+
+#### REST API
+
+```python
+# POST /api/v1/backtest/run
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "12h",
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "strategy_params": {"rsi_buy": 30, "rsi_sell": 70},
+  "initial_capital": 100000.0
+}
+
+# Response
+{
+  "symbol": "BTCUSDT",
+  "trades": [...],           # 交易記錄
+  "equity_curve": [...],      # 權益曲線
+  "metrics": {
+    "total_return": 0.35,
+    "sharpe_ratio": 1.8,
+    "max_drawdown": -0.12,
+    "win_rate": 0.65,
+    ...
+  }
+}
+```
+
+#### 開發時程（可與項目1-2平行）
+
+- Phase 1: 基礎架構（1-2天） — Protocol + Factory + 空類別
+- Phase 2: 核心邏輯（3-5天） — Python 循環版本回測
+- Phase 3: 性能優化（2-3天） — 向量化 + Numba JIT
+- Phase 4: API 整合（2-3天） — REST API + Pydantic Models
+- Phase 5: 前端整合（1-2週，待項目1-3完成後） — 圖表 + 報告
+
+**總計**: 後端 8-13 天，前端 7-10 天（等 API 穩定後）
+
+#### 平行開發可行性分析
+
+✅ **可平行開發**，理由：
+1. 新增模組，不修改現有程式碼
+2. 遵循 Protocol 注入，無違規依賴
+3. 使用 Factory 模式統一創建
+4. 可獨立測試，無需完整系統啟動
+5. API 合約可先定義，前端用 Mock 開發
+
+---
 
 ### ⏳ 2. 實盤部署（優先級：🟡 低）
 
