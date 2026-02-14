@@ -1,6 +1,17 @@
 # 項目狀態
 
 ### 已完成 ✅
+- ✅ **Phase 3：LightGBM/XGBoost 雙引擎 ML 系統** — 2026-02-14
+  - Phase3_LightGBM_XGBoost_PLAN.md V4 (Frozen) 完成（10 主任務，160+ 測試）
+  - Phase3_Frontend_UI_PLAN.md V4 (Frozen) 完成（8 任務群組，前端 UI 升級）
+  - 雙引擎模型訓練系統：LightGBM + XGBoost 完整等價實作（20 方法）
+  - Protocol 架構：IModelTrainer + IOptimizationObjective + 13 個共用 dataclass
+  - 四維參數系統：YAML/Dict/NL/Optuna 配置管理 + 安全護欄
+  - 雙引擎對比：ModelComparison 引擎 A/B 測試 + ComparisonReport
+  - Optuna 重構：可插拔目標架構（SignalDensity/ModelHyperparam/StrategyBacktest）
+  - 前端 UI：引擎選擇、參數配置、對比面板、深度分析內嵌
+  - 完整測試套件：160+ 測試，邊界條件 100% 覆蓋，LightGBM 覆蓋率 ≥95%
+  - 遵循 REFACTOR_ARCHITECTURE_V4 全部 7 條解耦規則
 - ✅ **IC Gatekeeper 系統（Phase 2）** — 2026-02-12
   - 完成 IC 篩選器（ Part A）+ 模型驗證修復（Part B）全部功能
   - 建立 momentum/Analysis/ IC 分析架構（9 核心模組：data_preprocesser、ic_engine、ic_filter_orchestrator、event_filter、statistical_validator、monotonicity_tester、redundancy_filter、turnover_analyzer、coverage_analyzer）
@@ -56,50 +67,82 @@
 - ⏳ **Task 1.4.2：Feature Factory 前端頁面** — 待開發
   - 後端 API 完成（preview、generate、task 端點）
   - 需建立：ConfigPanel、PreviewPanel、GenerationProgress、ResultView 等組件
+- ⏳ **Phase 3 前端 UI 整合** — Phase3_Frontend_UI_PLAN.md 待實作
+  - 後端 Batch Service 多引擎支援（Task B.0）
+  - 前端 TypeScript 型別、API 接線、元件開發（Task F.1-F.8）
 
 ## 🎯 當前重點
+- ✅ **Phase 3 雙引擎 ML 系統計劃完成**（2026-02-14）
+  - Phase3_LightGBM_XGBoost_PLAN.md V4 Frozen（10 主任務，7-9 天預估）
+  - Phase3_Frontend_UI_PLAN.md V4 Frozen（8 任務群組，前端整合）
+  - 完整架構設計：Protocol、雙引擎、對比、Optuna 重構、測試套件
+  - 160+ 測試覆蓋、邊界條件 100%、解耦規則遵循
 - ✅ **IC Gatekeeper 完成**（2026-02-12）
-  - 八階段 IC 篩選流水線全部實作（數據攝取、預處理、事件過濾、IC 計算、統計驗證、單調性測試、冗餘過濾、報告生成）
-  - 26 個測試檔案全部通過，測試覆蓋率 100%（1563/1563 statements）
-  - IC_Gatekeeper_PLAN.md V7.0 Frozen（40 項改進迭代完成）
+  - 八階段 IC 篩選流水線全部實作
+  - 26 個測試檔案全部通過，測試覆蓋率 100%
 - ✅ **Feature Factory 後端與測試完成**（2026-02-07）
-  - 7 層 Pipeline 全部實作（Config、Adapter、TA-Lib、原子指標、算子、元特徵、標籤生成）
-  - 14 個測試檔案覆蓋所有組件（E2E、API、單元測試）
-  - Feature_Factory_PLAN.md V7 Frozen（AI Agent 可執行清單）
-- ⏳ **待前端整合**：Task 1.4.2 前端頁面開發（ConfigPanel、預覽、進度、結果展示）
+  - 7 層 Pipeline 全部實作
+  - 14 個測試檔案覆蓋所有組件
 - ✅ **架構重構 V4 完成**（2026-02-05）
   - momentum domain 完全獨立，Protocol 與 Factory 解耦
-- 系統架構健康，後端完整，待前端 UI 整合與下一階段功能開發
+- 系統架構健康，Phase 3 計劃文件就緒，準備開始後端與前端實作
 
 ### 下一步工作
 **選項 A**（推薦）：
-- **IC Gatekeeper 前端整合** — 完成 UI 組件開發（IC 分析頁面、結果可視化、互動式篩選器）
-- **Task 1.4.2：Feature Factory 前端整合** — 完成 UI 開發（預覽、配置、進度、結果展示）
-- **運行集成測試** — 端到端驗證 IC Gatekeeper + Feature Factory 協同工作
+- **Phase 3 後端實作** — 依據 Phase3_LightGBM_XGBoost_PLAN.md V4 執行（7-9 天）
+  - Task 3.1：Protocol + 型別定義（IModelTrainer, IOptimizationObjective, model_types.py）
+  - Task 3.2：LightGBMAnalyzer 完整實作（20 方法，與 XGBoost 等價）
+  - Task 3.3：XGBoostAnalyzer Protocol 適配（7 個新方法）
+  - Task 3.4-3.10：參數系統、對比引擎、Factory、API、Optuna 重構、測試套件
+- **Phase 3 前端整合** — 依據 Phase3_Frontend_UI_PLAN.md V4 執行
+  - Task B.0：後端 Batch Service 多引擎支援（前端前置條件）
+  - Task F.1-F.8：TypeScript 型別、API、Store、UI 元件開發
 
-**選項 B**：
-- **回測引擎開發** — 開始 Backtesting Engine 實作（依據 PRODUCT_VISION.md 路線圖 Phase 3）
-- **效能優化** — IC Gatekeeper 向量化加速、Feature Factory 記憶體調校
+**選項 B**（持續改進）：
+- **Feature Factory 前端整合** — Task 1.4.2（ConfigPanel、預覽、進度、結果展示）
+- **IC Gatekeeper 前端整合** — IC 分析頁面、結果可視化、互動式篩選器
+- 運行集成測試 — 端到端驗證 IC Gatekeeper + Feature Factory 協同工作
 
-**選項 C**（持續改進）：
+**選項 C**（持續優化）：
 - 消除測試警告（117 個 warnings）
+- 效能基準測試 — 驗證 standard preset < 3秒、記憶體 < 4GB
 - Task 4.1: Feature Engineering 實作（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合
 ### 需要修復
+- ⏳ **Phase 3 前端整合** — 前端 UI 待開發（依據 Phase3_Frontend_UI_PLAN.md V4）
 - ⏳ **Task 1.4.2 前端開發** — Feature Factory UI 組件（ConfigPanel、PreviewPanel 等）
 - ⏳ **效能基準測試** — 驗證 standard preset < 3秒、記憶體 < 4GB（Task 1.5.1 待確認）
 
 ### 需要優化
+- **Phase 3 效能基準** — LightGBM 訓練 1000 樣本×100 特徵 < 5秒（M1 Mac）
 - **Feature Factory 效能** — 向量化優化、記憶體調校（已在計劃中，待測試驗證）
 - 測試警告消除（117 個 warnings，主要為 PytestReturnNotNoneWarning） — 優先級中
 - SHAP 樣本大小配置（目前 100/200 固定值） — 優先級低
 
 ### 技術債務
+- **Phase 3 實作** — 後端 10 主任務 + 前端 8 任務群組（預估 7-9 天）
 - **Feature Factory 前端整合** — Task 1.4.2（7+ 組件待開發）
-- **架構文檔更新** — docs/ARCHITECTURE.md 需反映 FeatureEngineering 架構
+- **IC Gatekeeper 前端整合** — IC 分析頁面、結果可視化、互動式篩選器
+- **架構文檔更新** — docs/ARCHITECTURE.md 需反映 Phase 2/3 架構（FeatureEngineering、IC Gatekeeper、雙引擎 ML）
 - Task 4.1: Feature Engineering（序列特徵、時間序列切分）
 - Task 4.5: MLflow 實驗追蹤整合（可選）
 ## 📝 最近完成的工作
+- 2026-02-14：**Phase 3 雙引擎 ML 系統計劃完成**
+  - **Phase3_LightGBM_XGBoost_PLAN.md V4 (Frozen)**（2,971 行）
+    - 10 主任務：Protocol 定義、雙引擎實作、參數系統、對比引擎、Factory/API 整合、Optuna 重構、測試套件
+    - 160+ 測試覆蓋、邊界條件 100%、LightGBM 覆蓋率 ≥95%
+    - 四維參數系統：YAML/Dict/NL/Optuna 配置管理
+    - 雙引擎對比：ModelComparison A/B 測試 + ComparisonReport
+    - Optuna 重構：可插拔目標架構（SignalDensity/ModelHyperparam/StrategyBacktest）
+    - 遵循 REFACTOR_ARCHITECTURE_V4 全部 7 條解耦規則
+    - 預估工作量：7-9 天
+  - **Phase3_Frontend_UI_PLAN.md V4 (Frozen)**（1,650 行）
+    - 8 任務群組：Protocol、型別、API、Store、UI 元件、頁面整合、深度分析通用化、導覽更新
+    - 後端前置任務：Batch Service 多引擎擴展（Task B.0）
+    - 前端開發：引擎選擇面板、雙引擎對比面板、深度分析內嵌、Tabs 分頁制
+    - 最小改動、最大重用：不新增頁面路由、保留現有 XGBoost UI、12 個深度分析圖表 100% 重用
+    - 向後相容：所有現有 21 個 `/xgboost/*` API 端點完全不變
+    - V1→V2→V3→V4 四輪審查修訂（9+8+5 項修正）
 - 2026-02-12：**IC Gatekeeper 系統完成（Phase 2）** — IC 篩選器 + 模型驗證完整實作
   - **核心 IC 分析模組（9 個）**：
     - ✅ data_preprocessor.py（265 行）— Winsorization、缺失值填充、標準化、常數特徵移除
@@ -240,14 +283,15 @@
   - ✅ 導入驗證通過（無錯誤，僅 Pydantic v2 預期警告）
 - 2026-01-28：Task 1.5 完成 — Purged K-Fold / Embargo 去污染交叉驗證
 ## 🔄 Git狀態
-- main 分支，待推送 — 2026-02-12（IC Gatekeeper Phase 2 完成 + 26 測試 + 文檔更新）
+- main 分支，待推送 — 2026-02-14（Phase 3 雙引擎 ML 系統計劃文件完成）
+  - 新增：Phase3_LightGBM_XGBoost_PLAN.md V4 (Frozen)（2,971 行）
+  - 新增：Phase3_Frontend_UI_PLAN.md V4 (Frozen)（1,650 行）
+  - 更新：.github/STATUS.md（Phase 3 計劃完成記錄）
+  - 待推送檔案數：3 個（2 新增計劃文件 + 1 狀態文件更新）
+- 待推送（2026-02-12）：IC Gatekeeper Phase 2 完成 + 26 測試 + 文檔更新
   - 新增：IC Gatekeeper 核心模組（12 個檔案，momentum/Analysis/）
-    - data_preprocessor.py, ic_engine.py, ic_filter_orchestrator.py, ic_config_schema.py, ic_reporter.py
-    - event_filter.py, statistical_validator.py, monotonicity_tester.py, redundancy_filter.py
-    - turnover_analyzer.py, coverage_analyzer.py, momentum/core/exceptions.py
   - 新增：model_validation 子系統（5 個檔案，momentum/Analysis/model_validation/）
-    - cv_validator.py, oot_validator.py, psi_calculator.py, rolling_auc.py, case_shap.py
-  - 新增：26 個測試檔案（tests/api/test_ic_analysis_api.py + 25 個 tests/momentum/test_*.py）
+  - 新增：26 個測試檔案
   - 更新：IC_Gatekeeper_PLAN.md V7.0 Frozen
   - 待推送檔案數：43 個新增檔案（12 核心模組 + 5 驗證模組 + 26 測試）
 - 待推送（2026-02-07）：Feature Factory 後端完成 + 14 測試 + 4 文檔
@@ -454,26 +498,33 @@
 - 最新提交：Task 2.2/2.3 完成 + 測試警告修復（2 warnings → 0 warnings）
 
 ## 💡 下次啟動時
-根據 UI 樣式完善與語法錯誤修復完成狀態，建議後續方向：
+根據 Phase 3 雙引擎 ML 系統計劃完成狀態，建議後續方向：
 
-- **選項 A**（推薦，全面測試）: UI 測試與驗證
-  - 瀏覽器測試 /charts 頁面（驗證語法修復後渲染正常）
-  - 全面 UI 測試（各頁面 Liquid Glass Dark 主題一致性）
-  - Phase G-K (Tier 6-10) 項目審查（spot-check 驗證完成度）
-  - 回歸測試（確保修復未引入新問題）
+- **選項 A**（推薦，Phase 3 後端實作）: 雙引擎 ML 系統開發
+  - 依據 Phase3_LightGBM_XGBoost_PLAN.md V4 執行 10 主任務（7-9 天）
+  - Task 3.1-3.3：Protocol 定義 + LightGBM 實作 + XGBoost 適配（3 天）
+  - Task 3.4-3.7：參數系統 + 對比引擎 + Factory/API 整合（2 天）
+  - Task 3.8：完整測試套件（160+ 測試，1-2 天）
+  - Task 3.9-3.10：Optuna 重構 + 策略回測（2 天）
+  - 遵循 REFACTOR_ARCHITECTURE_V4 解耦規則
+  - 驗收標準：160+ 測試通過、LightGBM 覆蓋率 ≥95%、邊界條件 100%
 
-- **選項 B**（品質提升）: 優化與文件化
-  - 消除 117 個測試警告（PytestReturnNotNoneWarning）
-  - 更新 ARCHITECTURE.md（反映 momentum/core、Protocol、Factory 架構）
-  - 建立架構圖與最佳實踐指南
-  - 提升測試覆蓋率（減少 33 skipped）
+- **選項 B**（Phase 3 前端整合）: 雙引擎 UI 開發
+  - 依據 Phase3_Frontend_UI_PLAN.md V4 執行 8 任務群組
+  - Task B.0（後端）：Batch Service 多引擎支援（前置條件）
+  - Task F.1-F.3：TypeScript 型別、API 客戶端、Store 擴展
+  - Task F.4-F.5：引擎配置面板、雙引擎對比面板
+  - Task F.6-F.8：主頁整合、深度分析通用化、導覽更新
+  - 向後相容：保留現有 21 個 `/xgboost/*` 端點不變
+  - 最小改動：不新增頁面路由、Tabs 分頁制、12 個圖表 100% 重用
 
-- **選項 C**（新功能開發）: Feature Engineering 或 MLflow
-  - Task 4.1: 序列特徵、時間序列切分、技術指標衍生特徵
-  - Task 4.5: MLflow 實驗追蹤整合（模型註冊與版本管理）
-  - 前端 E2E 測試流程建立
+- **選項 C**（持續改進）: 前端 UI 整合與優化
+  - Task 1.4.2：Feature Factory 前端頁面（ConfigPanel、預覽、進度、結果展示）
+  - IC Gatekeeper 前端整合（IC 分析頁面、結果可視化、互動式篩選器）
+  - 消除測試警告（117 個 warnings）
+  - 更新 ARCHITECTURE.md（反映 FeatureEngineering、IC Gatekeeper 架構）
 
-**建議順序**: 全面測試與驗證 → 文件化與警告消除 → 新功能開發
+**建議順序**: Phase 3 後端實作 → Phase 3 前端整合 → 端到端測試與驗證 → 持續優化
 
 ---
 
