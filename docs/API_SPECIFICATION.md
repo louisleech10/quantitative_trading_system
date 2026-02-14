@@ -1,11 +1,12 @@
 # API 端點規範
 
 ## 文檔資訊
-- **版本**: 3.1
-- **最後更新**: 2026-02-13
+- **版本**: 3.2
+- **最後更新**: 2026-02-14
 - **Base URL**: `http://localhost:8000`（開發環境）
 - **API Prefix**: `/api/v1`
 - **變更記錄**:
+  - v3.2 (2026-02-14): 新增 Dual-Engine ML API（Section 15）- Phase 3.7 雙引擎 ML 系統（LightGBM + XGBoost）7 個端點；通用模型訓練、LightGBM 專屬訓練、雙引擎對比報告、通用批量分析
   - v3.1 (2026-02-13): 新增 IC Analysis API（Section 14）- IC Gatekeeper 篩選系統 13 個端點，WebSocket 實時進度推送
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4；完整收錄 13 個路由模組、85+ 端點；新增 Feature Engineering / Pattern Analysis / Pattern Management / ML Pipeline / Two-Stage Search API；更新數據模型與錯誤碼
   - v2.0 (2026-01-09): 新增 Phase 3 API（Optuna 優化、信號分析、WebSocket）
@@ -29,6 +30,8 @@
 12. [Pattern Management API](#11-pattern-management-api)
 13. [ML Pipeline API](#12-ml-pipeline-api)
 14. [Two-Stage Search API](#13-two-stage-search-api)
+15. [IC Analysis API](#14-ic-analysis-api)
+16. [Dual-Engine ML API (Phase 3.7)](#15-dual-engine-ml-api-phase-37)
 15. [IC Analysis API](#14-ic-analysis-api)
 16. [WebSocket API](#websocket-api)
 17. [錯誤處理](#錯誤處理)
@@ -78,7 +81,7 @@ Accept: application/json
 | `optimization` | `/api/v1/optimization` | Optimization |
 | `optimization_analysis` | `/api/v1/optimization` | Optimization Analysis |
 | `feature_engineering` | `/api/v1/features` | Feature Engineering |
-| `pattern_analysis` | `/api/v1/pattern-analysis` | Pattern Analysis |
+| `pattern_analysis` | `/api/v1/pattern-analysis` | Pattern Analysis（含 Dual-Engine ML） |
 | `pattern_management` | `/api/v1/patterns` | Pattern Management |
 | `ml_pipeline` | `/api/v1/ml-pipeline` | ML Pipeline |
 | `two_stage_search` | `/api/v1/two-stage` | Two-Stage Search |
@@ -536,7 +539,7 @@ GET /api/v1/features/health
 
 ---
 
-## 10. Pattern Analysis API (XGBoost)
+## 10. Pattern Analysis API (XGBoost / LightGBM)
 
 > **路由**: `api/routes/pattern_analysis.py` | **Prefix**: `/api/v1/pattern-analysis`
 
@@ -656,6 +659,229 @@ GET /api/v1/pattern-analysis/model/info/{case_id}
 GET /api/v1/pattern-analysis/model/list
 GET /api/v1/pattern-analysis/model/exists/{case_id}
 ```
+
+---
+
+## 15. Dual-Engine ML API (Phase 3.7)
+
+> **路由**: `api/routes/pattern_analysis.py` | **Prefix**: `/api/v1/pattern-analysis`
+> 
+> Phase 3.7 新增的雙引擎 ML API，支援 LightGBM 與 XGBoost 通用訓練、單引擎專屬訓練、雙引擎對比報告，以及通用批量分析（xgboost / lightgbm / both）。
+
+### 15.1 通用模型訓練
+```http
+POST /api/v1/pattern-analysis/model/train
+```
+
+**Request Body** (`ModelTrainingRequest`):
+```json
+{
+  "engine": "lightgbm",
+  "features_source": "data_cache/features/BTCUSDT_12h_features.h5",
+  "config": {
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "max_depth": 6
+  },
+  "validation": {
+    "cv_folds": 5,
+    "purge_gap": 5,
+    "oot_enabled": true,
+    "oot_ratio": 0.2,
+    "early_stopping_rounds": 50
+  },
+  "run_comparison": false
+}
+```
+
+| 欄位 | 類型 | 必填 | 說明 |
+|------|------|------|------|
+| `engine` | `"lightgbm"` \| `"xgboost"` | 否（預設 lightgbm） | 模型引擎 |
+| `features_source` | `string` | 是 | 特徵數據來源路徑 |
+| `config` | `object` | 否 | 引擎專屬模型參數 |
+| `validation` | `ValidationConfig` | 否 | 驗證配置 |
+| `run_comparison` | `boolean` | 否（預設 false） | 是否同時執行雙引擎對比 |
+
+**Response** (`TaskStartResponse`):
+```json
+{
+  "task_id": "model_task_20260214_103000_abc123",
+  "status": "running",
+  "engine": "lightgbm"
+}
+```
+
+### 15.2 取得模型效能
+```http
+GET /api/v1/pattern-analysis/model/{task_id}/performance
+```
+
+**Response** (`ModelPerformanceResponse`):
+```json
+{
+  "engine_type": "lightgbm",
+  "train_auc": 0.92,
+  "cv_auc_mean": 0.85,
+  "cv_auc_std": 0.03,
+  "precision": 0.78,
+  "recall": 0.72,
+  "f1_score": 0.75,
+  "overfitting_score": 0.07,
+  "brier_score": 0.15,
+  "ece": 0.04,
+  "calibration_quality": "good",
+  "pr_auc": 0.81,
+  "positive_rate": 0.35,
+  "oot_auc": 0.83,
+  "training_time_seconds": 12.5
+}
+```
+
+### 15.3 取得雙引擎對比報告
+```http
+GET /api/v1/pattern-analysis/model/{task_id}/comparison
+```
+
+需要 `run_comparison=true` 才能取得結果。
+
+**Response** (`ComparisonReportResponse`):
+```json
+{
+  "engine_performances": {
+    "xgboost": {
+      "engine_type": "xgboost",
+      "train_auc": 0.94,
+      "cv_auc_mean": 0.86,
+      "cv_auc_std": 0.02,
+      "precision": 0.80,
+      "recall": 0.70,
+      "f1_score": 0.75,
+      "overfitting_score": 0.08
+    },
+    "lightgbm": {
+      "engine_type": "lightgbm",
+      "train_auc": 0.91,
+      "cv_auc_mean": 0.85,
+      "cv_auc_std": 0.03,
+      "precision": 0.78,
+      "recall": 0.74,
+      "f1_score": 0.76,
+      "overfitting_score": 0.06
+    }
+  },
+  "consensus_rate": 0.88,
+  "feature_rank_correlation": 0.72,
+  "recommended_engine": "lightgbm",
+  "recommendation_reason": "CV AUC 相近但過擬合分數較低，泛化能力較佳"
+}
+```
+
+### 15.4 LightGBM 專屬訓練
+```http
+POST /api/v1/pattern-analysis/lightgbm/train
+```
+
+**Request Body** (`LightGBMTrainingRequest`):
+```json
+{
+  "features_source": "data_cache/features/BTCUSDT_12h_features.h5",
+  "config": {
+    "learning_rate": 0.05,
+    "num_leaves": 31
+  },
+  "boosting_type": "gbdt",
+  "categorical_features": ["market_regime", "day_of_week"],
+  "validation": {
+    "cv_folds": 5,
+    "purge_gap": 5,
+    "oot_enabled": true,
+    "oot_ratio": 0.2,
+    "early_stopping_rounds": 50
+  }
+}
+```
+
+| 欄位 | 類型 | 必填 | 說明 |
+|------|------|------|------|
+| `features_source` | `string` | 是 | 特徵數據來源路徑 |
+| `config` | `object` | 否 | LightGBM 參數 |
+| `boosting_type` | `"gbdt"` \| `"dart"` \| `"goss"` | 否（預設 gbdt） | Boosting 策略 |
+| `categorical_features` | `string[]` | 否 | 類別特徵列表（LightGBM 原生支援） |
+| `validation` | `ValidationConfig` | 否 | 驗證配置 |
+
+**Response**: 同 `TaskStartResponse`（engine 固定為 `"lightgbm"`）
+
+### 15.5 取得 LightGBM 結果
+```http
+GET /api/v1/pattern-analysis/lightgbm/{task_id}/results
+```
+
+**Response** (`LightGBMResultsResponse`):
+```json
+{
+  "task_id": "model_task_20260214_103000_abc123",
+  "performance": {
+    "engine_type": "lightgbm",
+    "train_auc": 0.91,
+    "cv_auc_mean": 0.85,
+    "cv_auc_std": 0.03,
+    "precision": 0.78,
+    "recall": 0.74,
+    "f1_score": 0.76,
+    "overfitting_score": 0.06
+  },
+  "feature_importance": [
+    {"feature": "ema_ratio_5_20", "importance": 0.35, "rank": 1},
+    {"feature": "volume_ma_ratio", "importance": 0.22, "rank": 2}
+  ],
+  "predictions_summary": {
+    "total_cases": 1200,
+    "mean_proba": 0.42,
+    "positive_rate": 0.35
+  }
+}
+```
+
+### 15.6 通用批量分析
+```http
+POST /api/v1/pattern-analysis/batch/start
+```
+
+支援 xgboost / lightgbm / both 三種引擎模式的批量分析。
+
+**Request Body** (`BatchAnalysisRequest`，繼承 `XGBoostBatchAnalysisRequest`):
+```json
+{
+  "symbols": ["BTCUSDT", "ETHUSDT"],
+  "timeframe": "12h",
+  "indicators": [
+    {
+      "indicator": "ema",
+      "data_source": "close",
+      "params": {"short_period": 5, "long_period": 20}
+    }
+  ],
+  "engine": "both",
+  "model_params": {"learning_rate": 0.05},
+  "run_comparison": true,
+  "lookback_bars": 200,
+  "cv_folds": 5
+}
+```
+
+| 欄位 | 類型 | 必填 | 說明 |
+|------|------|------|------|
+| `engine` | `"xgboost"` \| `"lightgbm"` \| `"both"` | 否（預設 xgboost） | 模型引擎 |
+| `run_comparison` | `boolean` | 否（預設 false） | 雙引擎模式下執行對比報告 |
+| `model_params` | `object` | 否 | 通用模型參數 |
+| 其餘欄位 | - | - | 同 `XGBoostBatchAnalysisRequest` |
+
+### 15.7 取得通用批量任務狀態
+```http
+GET /api/v1/pattern-analysis/batch/task/{task_id}
+```
+
+回傳任務進度、狀態與結果，格式同批量 XGBoost 任務但包含引擎資訊。
 
 ---
 
@@ -1391,6 +1617,99 @@ interface PatternRuleRequest {
 }
 ```
 
+### ValidationConfig (Phase 3.7)
+```typescript
+interface ValidationConfig {
+  cv_folds: number;                // 2-20, 預設 5
+  purge_gap: number;               // 0-500, 預設 5
+  oot_enabled: boolean;            // 預設 true
+  oot_ratio: number;               // 0.0-1.0, 預設 0.2
+  early_stopping_rounds: number;   // 1-500, 預設 50
+}
+```
+
+### ModelTrainingRequest (Phase 3.7)
+```typescript
+interface ModelTrainingRequest {
+  engine: 'lightgbm' | 'xgboost';         // 預設 lightgbm
+  features_source: string;                  // 特徵數據路徑
+  config?: Record<string, any>;            // 引擎專屬參數
+  validation?: ValidationConfig;
+  run_comparison: boolean;                  // 預設 false
+}
+```
+
+### ModelPerformanceResponse (Phase 3.7)
+```typescript
+interface ModelPerformanceResponse {
+  engine_type?: string;
+  train_auc: number;
+  cv_auc_mean: number;
+  cv_auc_std: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  overfitting_score: number;
+  brier_score?: number;
+  ece?: number;
+  calibration_quality?: string;
+  pr_auc?: number;
+  positive_rate?: number;
+  oot_auc?: number;
+  training_time_seconds?: number;
+}
+```
+
+### ComparisonReportResponse (Phase 3.7)
+```typescript
+interface ComparisonReportResponse {
+  engine_performances: Record<string, ModelPerformanceResponse>;
+  consensus_rate: number;
+  feature_rank_correlation: number;
+  recommended_engine: string;
+  recommendation_reason: string;
+}
+```
+
+### LightGBMTrainingRequest (Phase 3.7)
+```typescript
+interface LightGBMTrainingRequest {
+  features_source: string;
+  config?: Record<string, any>;
+  boosting_type: 'gbdt' | 'dart' | 'goss';  // 預設 gbdt
+  categorical_features?: string[];
+  validation?: ValidationConfig;
+}
+```
+
+### LightGBMResultsResponse (Phase 3.7)
+```typescript
+interface LightGBMResultsResponse {
+  task_id: string;
+  performance: ModelPerformanceResponse;
+  feature_importance: Array<{ feature: string; importance: number; rank: number }>;
+  predictions_summary?: Record<string, any>;
+}
+```
+
+### BatchAnalysisRequest (Phase 3.7)
+```typescript
+interface BatchAnalysisRequest extends XGBoostBatchAnalysisRequest {
+  engine: 'xgboost' | 'lightgbm' | 'both';  // 預設 xgboost
+  run_comparison: boolean;                     // 預設 false
+  model_params?: Record<string, any>;          // 通用模型參數
+}
+```
+
+### TaskStartResponse (Phase 3.7)
+```typescript
+interface TaskStartResponse {
+  task_id: string;
+  status: string;    // "running"
+  engine: string;    // "lightgbm" | "xgboost"
+}
+```
+
 ---
 
 ## 開發環境
@@ -1431,6 +1750,6 @@ resp = requests.post(
 
 ---
 
-*文檔版本：3.0*
-*最後更新：2026-02-08*
-*狀態：REFACTOR_ARCHITECTURE_V4 同步完成*
+*文檔版本：3.2*
+*最後更新：2026-02-14*
+*狀態：Phase 3.7 雙引擎 ML 系統 API 同步完成*

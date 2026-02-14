@@ -3,7 +3,7 @@
 > 基於AI的量化研究工作平台 - 從案例發現到策略優化的完整工作流
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -70,19 +70,13 @@
 - 時間分離驗證（避免相同市場事件影響）
 - 分層採樣（按時間、市場環境、波動度分層）
 
-### 2. 圖表分析系統（開發中 🔨）
+### 2. 圖表分析系統（已完成 ✅）
 
-**TradingView風格圖表**：
-- 多層同步圖表（Price K線、Volume、Taker Ratio、指標）
+**TradingView 風格圖表**：
+- 多層同步圖表（Price K 線、Volume、Taker Ratio、指標）
 - 信號箭頭標記（策略信號可視化）
-- 案例時間點高亮
-- 流暢的縮放和拖曳
-
-**最新進展（Stage 2 - 2025/11/16）**：
-- `/strategy-test → /charts` 狀態沿用：Zustand + URL 雙軌同步、Option B 純網址分享、LocalStorage 快取
-- `/charts` 資料載入 UX：缺參數 CTA、重試按鈕、阻擋訊息（支持 `strategy-demo` 移除後的導流）
-- 策略說明區塊：依模板顯示策略邏輯/風控重點，避免新手迷失
-- 多 Pane 指標遮罩：Price/Volume/Taker Ratio 共享近/遠視窗、TO/TC 參考線與指標開關
+- 案例時間點高亮（TO/TC 標記系統）
+- 流暢的縮放和拖曳（Lightweight Charts）
 
 ### 3. IC 特徵篩選系統（Phase 2 完成 ✅）
 
@@ -131,21 +125,17 @@
 - ✅ 模組化設計（12 核心 + 5 驗證 + 1 例外處理）
 - ✅ 三層配置系統（Default < YAML < API Override）
 
-### 4. 指標測試系統（計劃中 📋）
+### 4. 雙引擎 ML 系統（Phase 3.7 完成 ✅）
 
-**多數據源 × 多指標**：
-- 7種數據源（close, open, high, low, volume, taker_volume, taker_ratio）
-- 20+種技術指標（EMA, RSI, MACD, ATR, BB等）
-- 自動參數優化（Optuna）
-- 指標評分排名
-
-### 4. ML訓練系統（計劃中 📋）
-
-**分類模型**：
-- XGBoost/LightGBM基線模型
-- LSTM時序模型（可選）
-- 30+個特徵工程
-- 輸出：預測概率、風險報酬比、特徵重要性
+**LightGBM + XGBoost 雙引擎訓練**：
+- ✅ XGBoost 引擎（8 個 Protocol 方法，向後相容）
+- ✅ LightGBM 引擎（平行架構，性能對比）
+- ✅ 雙引擎對比系統（自動推薦最佳引擎、共識率分析）
+- ✅ 四維參數系統（YAML / Dict / 自然語言 / Optuna 搜尋空間）
+- ✅ 可插拔 Optuna 目標函式（ModelHyperparam / SignalDensity / StrategyBacktest）
+- ✅ IModelTrainer Protocol 架構（8 個方法、可替換引擎）
+- ✅ 160+ 測試覆蓋（邊界條件 100%）
+- LSTM 時序模型（未來擴展）
 
 ### 5. 回測系統（計劃中 📋）
 
@@ -179,9 +169,10 @@ API交互:
   - ccxt (多交易所支持)
 
 機器學習:
-  - XGBoost/LightGBM (分類模型)
-  - PyTorch (深度學習)
-  - Optuna (參數優化)
+  - XGBoost (分類模型)
+  - LightGBM 4.0+ (雙引擎訓練)
+  - SHAP (模型可解釋性)
+  - Optuna (參數優化、可插拔目標函式)
 
 數據存儲:
   - HDF5 (大量K線數據)
@@ -191,7 +182,7 @@ API交互:
 ### 前端 (TypeScript)
 
 ```yaml
-框架: Next.js 14 (App Router)
+框架: Next.js 15 (App Router)
 語言: TypeScript 5.x
 樣式: Tailwind CSS 3.x
 狀態管理: Zustand
@@ -202,7 +193,7 @@ API交互:
 
 組件:
   - React 18
-  - shadcn/ui (可選)
+  - shadcn/ui
 ```
 
 ### 開發環境
@@ -323,6 +314,16 @@ ML模型訓練 + Pattern發現
   - 錯誤處理系統
   - 參數重要性分析
 
+- [x] **雙引擎 ML 系統** (Phase 3.7) ★ 2026-02-14
+  - LightGBM + XGBoost 雙引擎訓練
+  - IModelTrainer Protocol 架構（8 個方法）
+  - 模型對比系統（A/B 測試 + 共識率分析）
+  - 四維參數系統（YAML/Dict/NL/Optuna）
+  - 可插拔 Optuna 目標函式（3 種目標）
+  - 10 個新 API 端點（/model/*、/lightgbm/*）
+  - 前端雙引擎對比 UI（6 個新元件）
+  - 160+ 測試覆蓋（邊界條件 100%）
+
 - [x] **IC 特徵篩選系統** (Phase 2 - IC Gatekeeper)
   - 八階段篩選管線 (Stage 0-8)
   - 三種 IC 方法 (Spearman/Pearson/Kendall)
@@ -353,10 +354,9 @@ ML模型訓練 + Pattern發現
 
 ### 📋 計劃中
 
-- [ ] **指標測試系統** (階段2: 4-5週)
-- [ ] **ML訓練系統** (階段3: 4-6週)
-- [ ] **Pattern發現** (階段4: 2-3週)
-- [ ] **回測系統** (階段5: 3-4週)
+- [ ] **回測系統** (3-4 週)
+- [ ] **Pattern 精煉與深度分析增強**
+- [ ] **AI 可讀檔案格式（結構化 JSON/Markdown 導出）**
 
 ### 💡 未來擴展
 
@@ -459,13 +459,21 @@ quantitative_trading_system/
 │   └── package.json
 │
 ├── momentum/                   # 核心業務邏輯
-│   ├── DataExtraction/        # 數據獲取
-│   │   ├── case_search_engine.py
-│   │   ├── data_provider_base.py
-│   │   └── Momentum_Strategy_Data_Loader.py
-│   ├── Indicator/             # 技術指標
-│   ├── signal_analyzer.py     # 信號分析
-│   └── Momentum_classifier.py # 分類器
+│   ├── core/                  # 基礎設施（Protocol、Config、Logging）
+│   ├── factories.py           # 所有 Domain 物件工廠（唯一建構入口）
+│   ├── DataExtraction/        # 數據獲取（CaseSearch、HDF5、Binance）
+│   ├── Analysis/              # 分析引擎
+│   │   ├── xgboost_analyzer.py    # XGBoost 引擎
+│   │   ├── lightgbm_analyzer.py   # LightGBM 引擎
+│   │   ├── model_comparison.py    # 雙引擎對比
+│   │   ├── model_config.py        # 四維參數系統
+│   │   ├── model_types.py         # 共用 dataclass
+│   │   └── ...                    # SHAP、PSI、Pattern 等
+│   ├── FeatureEngineering/    # 特徵工程（7 層 Pipeline）
+│   ├── Indicator/             # 純函式技術指標
+│   ├── Indicators/            # OOP 指標引擎
+│   └── Optimization/          # Optuna 優化（可插拔目標）
+│       └── objectives/        # 目標函式套件
 │
 ├── docs/                       # 項目文檔
 │   ├── ARCHITECTURE.md        # 系統架構
@@ -592,43 +600,55 @@ perf: 優化DataFrame操作使用向量化
 
 ## 開發路線圖
 
-### 當前進度（2025 Q1）
+### 當前進度（2026 Q1）
 
 ```
 ✅ 已完成 → 🔨 開發中 → 📋 計劃中
 
-Phase 1: 基礎系統 [✅ 100%]
-  ✅ Case Search系統
+Phase 1: 案例搜索系統 + Web UI [✅ 100%]
+  ✅ Case Search 30 參數框架
   ✅ 搜索結果展示
   ✅ 基礎架構搭建
 
-Phase 2: 圖表和數據 [🔨 0%]
-  🔨 Lightweight Charts集成
-  📋 K線數據批量下載
-  📋 信號標記系統
+Phase 2 (K線圖表): K 線下載 + 圖表系統 [✅ 100%]
+  ✅ Lightweight Charts 整合
+  ✅ K線數據批量下載
+  ✅ 信號標記系統
 
-Phase 3: 指標測試 [📋 0%]
-  📋 指標計算引擎
-  📋 Optuna參數優化
-  📋 指標評分系統
+Phase 2 (IC Gatekeeper): IC 特徵篩選 [✅ 100%]
+  ✅ 八階段 IC 篩選管線
+  ✅ 模型驗證子系統
+  ✅ 159 tests, 100% coverage
 
-Phase 4: ML訓練 [📋 0%]
-  📋 特徵工程
-  📋 XGBoost模型
-  📋 預測和評估
+Phase 3: Optuna + 信號分析 + 視覺化 [✅ 100%]
+  ✅ Optuna 參數優化（5 種 Sampler）
+  ✅ 信號密度分析
+  ✅ 9 個視覺化元件
 
-Phase 5: 回測系統 [📋 0%]
-  📋 回測引擎
-  📋 績效指標
-  📋 報告生成
+Phase 3.5: 特徵工程 + XGBoost [✅ 100%]
+  ✅ Feature Factory 7 層 Pipeline
+  ✅ XGBoost 分析（21 個端點）
+
+Phase 3.7: 雙引擎 ML 系統 [✅ 100%] ★ 2026-02-14
+  ✅ LightGBM + XGBoost 雙引擎
+  ✅ 模型對比 + 四維參數系統
+  ✅ 160+ 測試覆蓋
+
+REFACTOR V4: 架構解耦 [✅ 100%]
+  ✅ 7 條規則、Protocol 注入、Factory 模式
+
+📋 下一步:
+  📋 回測系統
+  📋 Pattern 精煉
 ```
 
-### 時間線（預計）
+### 時間線
 
 ```
-2025 Q1 (Month 1-3): 圖表系統 + 指標測試
-2025 Q2 (Month 4-6): ML訓練 + Pattern發現 + 回測
-2025 Q3+: 系統優化 + 實盤部署（可選）
+2025 Q3-Q4: 案例搜索 + 圖表系統 + 指標引擎
+2026 Q1:    IC Gatekeeper + Feature Factory + 雙引擎 ML + 架構解耦
+2026 Q2:    回測系統 + Pattern 精煉 + AI 導出
+2026 Q3+:   Chat 自然語言介面（V2.0）
 ```
 
 詳細開發計劃見 [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md)
@@ -704,11 +724,11 @@ Phase 5: 回測系統 [📋 0%]
 
 | 功能 | 目標 | 當前 |
 |------|------|------|
-| 案例搜索 | < 10秒/1000個標的 | ✅ 8秒 |
-| K線下載 | < 30秒/1000個案例 | 🔨 開發中 |
-| 指標計算 | < 5秒/10萬根K線 | 📋 計劃中 |
-| ML訓練 | < 10分鐘/1萬樣本 | 📋 計劃中 |
-| 圖表渲染 | 60fps流暢 | 🔨 開發中 |
+| 案例搜索 | < 10 秒/1000 個標的 | ✅ 8 秒 |
+| K 線下載 | < 30 秒/1000 個案例 | ✅ 已完成 |
+| IC 特徵篩選 | < 2 秒/200 features × 10K | ✅ 已達標（超標 4 倍） |
+| XGBoost/LightGBM 訓練 | < 30 秒/案例 | ✅ 已完成 |
+| 圖表渲染 | 60fps 流暢 | ✅ 已完成 |
 
 ### 優化策略
 
@@ -728,7 +748,8 @@ Phase 5: 回測系統 [📋 0%]
 - [Lightweight Charts](https://tradingview.github.io/lightweight-charts/) - TradingView開源圖表
 - [pandas](https://pandas.pydata.org/) - 數據分析
 - [Optuna](https://optuna.org/) - 超參數優化
-- [XGBoost](https://xgboost.readthedocs.io/) - 機器學習
+- [XGBoost](https://xgboost.readthedocs.io/) - 機器學習（分類模型）
+- [LightGBM](https://lightgbm.readthedocs.io/) - 機器學習（雙引擎）
 
 ### 靈感來源
 
@@ -754,25 +775,46 @@ Phase 5: 回測系統 [📋 0%]
 
 ## 更新日誌
 
-### v0.1.0 (2025-09-30)
+### v0.5.0 (2026-02-14) — Phase 3.7 雙引擎 ML 系統
 
 **新功能**：
-- ✅ Case Search系統完整實現
-- ✅ 20參數搜索框架
+- ✅ LightGBM + XGBoost 雙引擎訓練系統
+- ✅ IModelTrainer Protocol 架構（8 個方法）
+- ✅ 模型對比系統（A/B 測試 + 共識率）
+- ✅ 四維參數系統（YAML/Dict/NL/Optuna）
+- ✅ 可插拔 Optuna 目標函式
+- ✅ 前端雙引擎對比 UI（6 個新元件）
+- ✅ 10 個新 API 端點
+- ✅ 160+ 測試覆蓋
+
+### v0.4.0 (2026-02-12) — IC Gatekeeper + Feature Factory
+
+**新功能**：
+- ✅ IC 八階段篩選管線（159 tests, 100% coverage）
+- ✅ Feature Factory 7 層 Pipeline（6514 特徵自動生成）
+- ✅ 模型驗證子系統（CV/OOT/PSI/Rolling AUC/SHAP）
+
+### v0.3.0 (2026-02-05) — 架構解耦 V4
+
+**改進**：
+- ✅ 7 條解耦規則全部通過
+- ✅ Protocol 注入 + Factory 模式
+- ✅ KlineDataService 統一資料存取層
+
+### v0.2.0 (2026-01-09) — Optuna + XGBoost 分析
+
+**新功能**：
+- ✅ Optuna 參數優化（5 種 Sampler、WebSocket）
+- ✅ XGBoost 分析系統（21 個端點）
+- ✅ 9 個視覺化元件
+
+### v0.1.0 (2025-09-30) — Case Search 系統
+
+**新功能**：
+- ✅ Case Search 系統完整實現
+- ✅ 20 參數搜索框架
 - ✅ 正反例採樣策略
-- ✅ Web界面和API
-- ✅ 統計圖表展示
-
-**文檔**：
-- ✅ 完整的系統架構文檔
-- ✅ 24週開發路線圖
-- ✅ API接口規範
-- ✅ 開發指南和規範
-
-**下一步**：
-- 🔨 圖表分析系統（開發中）
-- 📋 K線數據批量下載
-- 📋 指標測試系統
+- ✅ Web 界面和 API
 
 ---
 

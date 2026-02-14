@@ -199,9 +199,34 @@ api/          # FastAPI 層（路由、模型）
 └── models/   # 數據模型
 
 momentum/     # 核心業務邏輯
+├── core/            # Protocol、Config、Contracts
+├── factories.py     # 統一工廠創建函式
 ├── DataExtraction/  # 數據獲取
 ├── Indicator/       # 指標計算
-└── Analysis/        # 分析功能
+├── Analysis/        # 分析功能（XGBoost + LightGBM 雙引擎）
+├── FeatureEngineering/ # 特徵工程
+└── Optimization/    # Optuna 參數優化 + 可插拔 Objective
+```
+
+### Protocol 與 Factory 架構模式（Phase 3.7）
+
+新增 ML 引擎或跨 Domain 依賴必須使用 Protocol + Factory：
+
+```python
+# ✅ 正確：透過 Protocol 協議定義引擎介面
+from momentum.core.protocols import IModelTrainer
+
+class MyService:
+    def __init__(self, trainer: IModelTrainer):  # 注入 Protocol
+        self.trainer = trainer
+
+# ✅ 正確：透過 Factory 創建實例
+from momentum.factories import create_model_trainer
+trainer = create_model_trainer("lightgbm")
+
+# ❌ 錯誤：直接實例化引擎
+from momentum.Analysis.lightgbm_analyzer import LightGBMAnalyzer
+analyzer = LightGBMAnalyzer()  # 違反 Rule 3
 ```
 
 ---

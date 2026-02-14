@@ -1,8 +1,9 @@
 # 產品願景與版本演進規劃
 
 > **Authority**: 本文件定義系統長期演進方向，所有 Phase/Task 規劃須與此願景一致  
-> **Version**: 1.0  
+> **Version**: 1.1  
 > **Created**: 2026-02-09  
+> **Updated**: 2026-02-14  
 > **Owner**: System Architect  
 > **Status**: Living Document（隨系統發展持續更新）
 
@@ -100,7 +101,14 @@ V3.0（夥伴階段）  → AI 自主研究，向用戶提出建議，協作決�
 - ✅ 9 個優化結果組件（已完成）
 - ✅ 信號密度分析圖（已完成）
 
-**6. 導出層 (Export Layer)**
+**6. ML 層 (ML Layer) - Phase 3.7**
+- ✅ XGBoost + LightGBM 雙引擎 ML 系統（已完成）
+- ✅ IModelTrainer Protocol 標準化引擎介面（已完成）
+- ✅ 雙引擎對比報告（consensus_rate、feature_rank_correlation）（已完成）
+- ✅ 四維參數系統（模型/訓練/驗證/運行）（已完成）
+- ✅ 可插拔 Optuna Objective 架構（已完成）
+
+**7. 導出層 (Export Layer)**
 - ✅ CSV 原始資料導出（已完成）
 - ✅ PNG 圖表導出（已完成）
 - ❌ **AI 可讀檔案格式**（未定義）← **V1.0 缺口**
@@ -111,6 +119,7 @@ V3.0（夥伴階段）  → AI 自主研究，向用戶提出建議，協作決�
 |------|------|------|
 | UI 完整性 | 所有功能可透過 UI 操作 | ✅ 已達成 |
 | 資料導出 | 支援 CSV + PNG | ✅ 已達成 |
+| **雙引擎 ML** | **LightGBM + XGBoost 訓練、對比、Protocol 擴展** | **✅ 已達成 (Phase 3.7)** |
 | **AI 可讀檔案** | **結構化 JSON/MD 格式，包含完整分析脈絡** | ❌ **待定義** |
 | 效能 | 標準 Preset < 15s | ✅ 已達成（13.37s）|
 | 文檔 | 使用者操作手冊 + API 文檔 | ⚠️ 進行中 |
@@ -338,7 +347,7 @@ api/agent/
 | 規則 | V1.0 | V2.0 | V3.0 |
 |------|------|------|------|
 | **Rule 1**: `momentum` 不依賴 `api` | ✅ 已達成 | 必須保持 | 必須保持 |
-| **Rule 2**: Domain 內部用 Protocol | ✅ 已達成 | 擴展至 NLU | 擴展至 Agent |
+| **Rule 2**: Domain 內部用 Protocol | ✅ 已達成（IModelTrainer、IOptimizationObjective） | 擴展至 NLU | 擴展至 Agent |
 | **Rule 3**: `api/services` 用 Factory 注入 | ✅ 已達成 | 新增 Chat Service | 新增 Agent Service |
 | **Rule 4**: Service 間禁止直接調用 | ✅ 已達成 | 必須保持 | 必須保持 |
 | **Rule 5**: Config 單一來源 | ✅ 已達成 | 擴展至 Prompt Config | 擴展至 Policy Config |
@@ -524,4 +533,5 @@ V2.0 大版本: 50% 新功能 + 30% 重構 + 20% 基礎設施
 ---
 
 **文檔版本歷史**：
+- v1.1 (2026-02-14): 新增 Phase 3.7 雙引擎 ML 系統至 V1.0 功能層；更新完成標準表；更新 Rule 2 Protocol 狀態
 - v1.0 (2026-02-09): 初始版本，定義 V1/V2/V3 演進路線

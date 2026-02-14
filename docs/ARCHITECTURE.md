@@ -1,10 +1,11 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 3.0
-- **最後更新**: 2026-02-08
-- **狀態**: 生產中 + 持續開發（Phase 4 進行中）
+- **版本**: 4.0
+- **最後更新**: 2026-02-14
+- **狀態**: 生產中 + 持續開發
 - **更新內容**: 
+  - v4.0 (2026-02-14): 新增 Phase 3.7 雙引擎 ML 系統架構（LightGBM + XGBoost、IModelTrainer Protocol 擴展、IOptimizationObjective、模型對比系統、四維參數系統、可插拔 Optuna 目標）
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4 架構變更（解耦架構、Protocol 注入、Factory 模式、KlineDataService 統一資料存取層）；更新模組清單與目錄結構；標記已完成功能
   - v2.0 (2026-01-09): 添加 Phase 3 完整架構（Optuna 優化系統、WebSocket 通訊、9 個視覺化組件）
   - v1.0 (2025-09-30): 初始版本
@@ -41,7 +42,7 @@
 ### 核心價值
 - **案例發現引擎**: 從歷史數據中找出符合特定模式的交易案例
 - **Pattern 識別系統**: 自動發現起漲前的共通技術指標特徵
-- **ML 優化平台**: 使用機器學習（XGBoost）優化交易策略參數
+- **ML 優化平台**: 使用機器學習（XGBoost + LightGBM 雙引擎）優化交易策略參數
 - **研究工作流**: 支持完整的量化研究流程
 
 ### 系統目標
@@ -58,8 +59,9 @@
 | Phase 2 (IC Gatekeeper) | IC 特徵篩選 + 模型驗證 | ✅ 已完成 |
 | Phase 3 | Optuna 優化 + 信號分析 + 視覺化 | ✅ 已完成 |
 | Phase 3.5 | 特徵工程 + XGBoost + Pattern 管理 | ✅ 已完成 |
+| Phase 3.7 | 雙引擎 ML 系統 (LightGBM + XGBoost) | ✅ 已完成 |
 | REFACTOR V4 | 架構解耦（7 條規則、Protocol 注入、Factory 模式） | ✅ 已完成 |
-| Phase 4 | Pattern 發現 + 前端 UI | 🔄 進行中 |
+| Phase 4 | Pattern 精煉 + 回測系統 | 🔄 規劃中 |
 
 ---
 
@@ -93,15 +95,16 @@ API 交互:
   - python-binance (幣安 API)
 機器學習:
   - XGBoost (分類模型)
+  - LightGBM 4.0+ (雙引擎訓練)
   - SHAP (模型可解釋性)
-  - Optuna (參數優化)
+  - Optuna (參數優化、可插拔目標函式)
 ```
 
 ### 數據存儲
 ```yaml
 時序數據: HDF5 (K 線數據，gzip 壓縮)
 結構化數據: CSV/JSON (搜索結果、案例數據)
-模型存儲: Pickle (XGBoost 模型)
+模型存儲: Pickle (XGBoost/LightGBM 模型)
 特徵存儲: HDF5 (特徵矩陣)
 優化記錄: SQLite (Optuna Study)
 緩存: 內存緩存 (搜索結果臨時存儲)
@@ -153,8 +156,24 @@ class IIndicatorEngine(Protocol):
     def calculate_indicators_from_dataframe(self, df, config) -> pd.DataFrame: ...
 
 class IModelTrainer(Protocol):
-    """模型訓練介面 — Analysis Domain 實作"""
+    """模型訓練介面 — Analysis Domain 實作（XGBoost + LightGBM）"""
     def train_model(self, X, y, config) -> Any: ...
+    def predict_proba(self, features) -> Any: ...
+    def get_feature_importance(self, method, top_n) -> Any: ...
+    def save_model(self, path) -> None: ...
+    def load_model(self, path) -> None: ...
+    def get_model_type(self) -> str: ...
+    def get_model_params(self) -> Dict[str, Any]: ...
+    def get_native_model(self) -> Any: ...
+
+class IOptimizationObjective(Protocol):
+    """可插拔優化目標介面 — Optimization Domain 實作"""
+    @property
+    def name(self) -> str: ...
+    @property
+    def direction(self) -> str: ...
+    def create_search_space(self, trial) -> Dict[str, Any]: ...
+    def evaluate(self, params) -> float: ...
 ```
 
 ### Factory 模式
@@ -189,6 +208,10 @@ create_feature_storage()
 create_feature_extractor()
 create_feature_validator()
 create_strategy_params()
+create_lightgbm_analyzer()       # Phase 3.7 新增
+create_model_trainer()           # Phase 3.7 新增（通用引擎建構）
+create_model_comparison()        # Phase 3.7 新增
+create_model_config_manager()    # Phase 3.7 新增
 
 # ── Statistics ──
 create_expectancy_calculator()
@@ -570,6 +593,10 @@ momentum/
 ├── Analysis/                            # 分析引擎
 │   ├── signal_density_analyzer.py       # SignalDensityAnalyzer
 │   ├── xgboost_analyzer.py              # XGBoostAnalyzer
+│   ├── lightgbm_analyzer.py             # LightGBMAnalyzer (Phase 3.7)
+│   ├── model_comparison.py              # ModelComparison 雙引擎對比 (Phase 3.7)
+│   ├── model_config.py                  # ModelConfigManager 四維參數 (Phase 3.7)
+│   ├── model_types.py                   # 共用 dataclass (Phase 3.7)
 │   ├── shap_analyzer.py                 # SHAPAnalyzer
 │   ├── prediction_analyzer.py           # PredictionAnalyzer
 │   ├── model_storage.py                 # ModelStorage
@@ -649,13 +676,18 @@ momentum/
 │   ├── functional_wrapper.py
 │   └── types.py                         # DataSourceEnum
 ├── Optimization/                        # Optuna 優化系統
-│   ├── optuna_optimizer.py              # OptunaOptimizer
+│   ├── optuna_optimizer.py              # OptunaOptimizer (可插拔目標)
 │   ├── checkpoint_manager.py            # CheckpointManager
 │   ├── progress_monitor.py              # ProgressMonitor
 │   ├── result_analyzer.py               # ResultAnalyzer
 │   ├── trial_comparison.py              # TrialComparison
 │   ├── error_handler.py
-│   └── strategy_metadata.py
+│   ├── strategy_metadata.py
+│   └── objectives/                      # Phase 3.7 可插拔目標函式
+│       ├── __init__.py
+│       ├── model_hyperparam.py          # 模型超參數優化目標
+│       ├── signal_density.py            # 信號密度目標（從主優化器抽取）
+│       └── strategy_backtest.py         # 策略回測目標
 └── Utils/
     └── data_validator.py                # DataValidator
 ```
@@ -1191,6 +1223,65 @@ class ICVValidator(Protocol):
 
 ---
 
+### ✅ 15. 雙引擎 ML 系統（Phase 3.7）
+
+#### 架構概觀
+
+```
+              IModelTrainer Protocol (8 個方法)
+                       |
+      +───────────────+───────────────+
+      |                               |
+XGBoostAnalyzer                LightGBMAnalyzer
+(8 methods, 向後相容)         (8 methods, 新引擎)
+      |                               |
+      +───────────────+───────────────+
+                       |
+              ModelComparison
+          (A/B 對比 + 共識率 + 推薦)
+```
+
+#### 核心元件
+
+| 元件 | 檔案 | 功能 |
+|------|------|------|
+| **IModelTrainer** | `momentum/core/protocols.py` | 8 個方法（train_model、predict_proba、get_feature_importance、save/load_model、get_model_type/params/native_model） |
+| **IOptimizationObjective** | `momentum/core/protocols.py` | 6 個方法（name、direction、directions、create_search_space、evaluate、get_pruning_callback） |
+| **LightGBMAnalyzer** | `momentum/Analysis/lightgbm_analyzer.py` | LightGBM 引擎，實作 IModelTrainer Protocol |
+| **XGBoostAnalyzer** | `momentum/Analysis/xgboost_analyzer.py` | XGBoost 引擎，擴展 7 個新 Protocol 方法（向後相容） |
+| **ModelComparison** | `momentum/Analysis/model_comparison.py` | 雙引擎並行訓練 + A/B 對比 + 共識率分析 |
+| **ModelConfigManager** | `momentum/Analysis/model_config.py` | 四維參數系統（YAML → Dict → NL → Optuna） |
+| **model_types** | `momentum/Analysis/model_types.py` | 13 個共用 dataclass（ModelPerformance、FeatureImportance、ComparisonReport 等） |
+| **objectives/** | `momentum/Optimization/objectives/` | 3 個可插拔目標函式（ModelHyperparam、SignalDensity、StrategyBacktest） |
+
+#### API 層
+
+| 模組 | 位置 | 功能 |
+|------|------|------|
+| ModelTaskService | `api/services/model_task_service.py` | 通用模型任務調度（支援 XGBoost/LightGBM/雙引擎對比） |
+| ModelTaskCache | `api/services/xgboost_task_cache.py` | 擴展為多引擎任務快取 |
+| pattern_analysis routes | `api/routes/pattern_analysis.py` | 新增 /model/* 和 /lightgbm/* 端點 |
+| pattern_analysis_models | `api/models/pattern_analysis_models.py` | 新增 7 個 API Model |
+
+#### 前端元件
+
+| 元件 | 位置 | 功能 |
+|------|------|------|
+| EngineConfigPanel | `frontend/src/components/pattern/EngineConfigPanel.tsx` | 引擎選擇 + 模型參數 + Optuna 開關 |
+| ComparisonPanel | `frontend/src/components/pattern/ComparisonPanel.tsx` | 雙引擎對比主容器 |
+| RecommendationBanner | `frontend/src/components/pattern/comparison/` | 推薦引擎 Banner |
+| ComparisonMetricsTable | `frontend/src/components/pattern/comparison/` | 指標並排表格 |
+| ConsensusCard | `frontend/src/components/pattern/comparison/` | 共識率卡片 |
+| ComparisonFeatureChart | `frontend/src/components/pattern/comparison/` | 特徵對比長條圖 |
+
+#### 測試覆蓋
+- 10 個測試檔案，160+ 測試案例
+- 邊界條件：100% 覆蓋
+- Protocol 合規性：100% 通過
+- 架構合規：REFACTOR_ARCHITECTURE_V4 Rule 1-7 全部通過
+
+---
+
 ## 待開發功能
 
 ### ⏳ 1. 回測系統（優先級：🔥 中）
@@ -1329,8 +1420,12 @@ class XGBoostTaskService:
 
 ### 機器學習模型擴展
 透過 `IModelTrainer` Protocol：
-- ✅ XGBoost
-- ⏳ LightGBM, LSTM, Transformer（未來）
+- ✅ XGBoost（8 個 Protocol 方法、向後相容）
+- ✅ LightGBM（8 個 Protocol 方法、Phase 3.7 完成）
+- ✅ 雙引擎對比（ModelComparison、推薦引擎、共識率）
+- ✅ 四維參數系統（YAML/Dict/NL/Optuna）
+- ✅ 可插拔 Optuna 目標（IOptimizationObjective Protocol）
+- ⏳ LSTM, Transformer（未來）
 
 ---
 
@@ -1347,6 +1442,6 @@ class XGBoostTaskService:
 
 ---
 
-*文檔版本：3.0*  
-*最後更新：2026-02-08*  
-*狀態：REFACTOR_ARCHITECTURE_V4 同步完成*
+*文檔版本：4.0*  
+*最後更新：2026-02-14*  
+*狀態：Phase 3.7 雙引擎 ML 系統同步完成*
