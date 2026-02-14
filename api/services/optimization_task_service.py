@@ -20,10 +20,14 @@ from dataclasses import dataclass, field
 import threading
 import json
 from pathlib import Path
+import numpy as np
+import pandas as pd
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from momentum.factories import create_optuna_optimizer
+from momentum.factories import create_model_trainer, create_optuna_optimizer
+from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective
+from momentum.Optimization.objectives.strategy_backtest import StrategyBacktestObjective
 from api.models.training_window_config import TrainingWindowConfig
 from api.utils.case_storage import get_case_storage_manager
 
@@ -171,7 +175,9 @@ class OptimizationTaskService:
         study_name: str,
         positive_cases: List[str],
         negative_cases: List[str],
-        training_window: TrainingWindowConfig,
+        training_window: Optional[TrainingWindowConfig],
+        task_type: str = "signal_density",
+        objective_config: Optional[Dict[str, Any]] = None,
         sampler_type: str = "TPE",
         n_trials: int = 100,
         n_startup_trials: Optional[int] = None,
@@ -203,6 +209,9 @@ class OptimizationTaskService:
         """
         task_id = str(uuid.uuid4())
 
+        if task_type == "signal_density" and training_window is None:
+            raise ValueError("signal_density 任務必須提供 training_window")
+
         # 決定 pruner 類型
         pruner_type = "Median" if enable_pruning else None
 
@@ -213,9 +222,13 @@ class OptimizationTaskService:
             status=OptimizationTaskStatus.PENDING,
             created_at=datetime.now(),
             config={
+                'task_type': task_type,
+                'objective_config': objective_config or {},
                 'positive_cases': positive_cases,
                 'negative_cases': negative_cases,
-                'training_window': training_window.__dict__ if hasattr(training_window, '__dict__') else training_window,
+                'training_window': (
+                    training_window.__dict__ if training_window is not None and hasattr(training_window, '__dict__') else training_window
+                ),
                 'sampler_type': sampler_type,
                 'n_trials': n_trials,
                 'n_startup_trials': n_startup_trials,
@@ -227,7 +240,7 @@ class OptimizationTaskService:
         task_info.progress.total_trials = n_trials
 
         # 創建OptunaOptimizer實例（with ProgressMonitor callback）
-        optimizer = create_optuna_optimizer(
+        optimizer_kwargs = dict(
             study_name=study_name,
             storage=f"sqlite:///data/optuna_{study_name}.db",
             sampler_type=sampler_type,
@@ -239,8 +252,19 @@ class OptimizationTaskService:
             use_multi_objective=use_multi_objective,
             enable_progress_monitor=True,
             progress_notification_callback=self._create_progress_callback(task_id),
-            case_storage_factory=get_case_storage_manager
         )
+
+        if task_type == "signal_density":
+            optimizer_kwargs["case_storage_factory"] = get_case_storage_manager
+            optimizer = create_optuna_optimizer(**optimizer_kwargs)
+        elif task_type == "model_hyperparam":
+            objective = self._build_model_hyperparam_objective(objective_config or {})
+            optimizer = create_optuna_optimizer(objective=objective, **optimizer_kwargs)
+        elif task_type == "strategy_backtest":
+            objective = self._build_strategy_backtest_objective(objective_config or {}, use_multi_objective)
+            optimizer = create_optuna_optimizer(objective=objective, **optimizer_kwargs)
+        else:
+            raise ValueError(f"不支援的 task_type: {task_type}")
 
         # 保存任務
         with self.tasks_lock:
@@ -251,10 +275,69 @@ class OptimizationTaskService:
 
         self.logger.info(
             f"Task created: {task_id}, study={study_name}, "
-            f"sampler={sampler_type}, n_trials={n_trials}"
+            f"task_type={task_type}, sampler={sampler_type}, n_trials={n_trials}"
         )
 
         return task_id
+
+    def _build_model_hyperparam_objective(self, objective_config: Dict[str, Any]) -> ModelHyperparamObjective:
+        engine = str(objective_config.get("engine", "lightgbm"))
+        features = objective_config.get("features")
+        labels = objective_config.get("labels")
+        feature_names = objective_config.get("feature_names")
+
+        if features is None or labels is None:
+            raise ValueError("model_hyperparam task_type 需要 objective_config.features 與 objective_config.labels")
+
+        if isinstance(features, pd.DataFrame):
+            X = features
+            resolved_feature_names = feature_names or X.columns.tolist()
+        elif isinstance(features, list) and len(features) > 0 and isinstance(features[0], dict):
+            X = pd.DataFrame(features)
+            resolved_feature_names = feature_names or X.columns.tolist()
+        else:
+            X = np.asarray(features)
+            if X.ndim != 2:
+                raise ValueError("features 必須是二維資料")
+            if feature_names is None:
+                resolved_feature_names = [f"feature_{idx}" for idx in range(X.shape[1])]
+            else:
+                resolved_feature_names = list(feature_names)
+            X = pd.DataFrame(X, columns=resolved_feature_names)
+
+        y = np.asarray(labels)
+        if len(X) != len(y):
+            raise ValueError("features 與 labels 長度不一致")
+
+        trainer = create_model_trainer(engine, config=objective_config.get("base_model_params"))
+        return ModelHyperparamObjective(
+            trainer=trainer,
+            features=X,
+            labels=y,
+            feature_names=resolved_feature_names,
+            engine=engine,
+            cv_folds=int(objective_config.get("cv_folds", 5)),
+            train_kwargs=objective_config.get("train_kwargs", {}),
+        )
+
+    def _build_strategy_backtest_objective(
+        self,
+        objective_config: Dict[str, Any],
+        use_multi_objective: bool,
+    ) -> StrategyBacktestObjective:
+        model_predictions = objective_config.get("model_predictions")
+        price_data = objective_config.get("price_data")
+
+        if model_predictions is None or price_data is None:
+            raise ValueError(
+                "strategy_backtest task_type 需要 objective_config.model_predictions 與 objective_config.price_data"
+            )
+
+        return StrategyBacktestObjective(
+            model_predictions=model_predictions,
+            price_data=price_data,
+            multi_objective=use_multi_objective,
+        )
 
     def _create_progress_callback(self, task_id: str) -> Callable[[str, Dict[str, Any]], None]:
         """
@@ -369,13 +452,18 @@ class OptimizationTaskService:
                 optimizer = self.optimizers[task_id]
                 config = task_info.config
 
+                training_window_cfg = config.get('training_window')
+                parsed_training_window = None
+                if training_window_cfg is not None:
+                    parsed_training_window = TrainingWindowConfig(**training_window_cfg)
+
             # 執行優化
             self.logger.info(f"Starting optimization for task: {task_id}")
 
             result = await optimizer.optimize(
                 positive_cases=config['positive_cases'],
                 negative_cases=config['negative_cases'],
-                training_window=TrainingWindowConfig(**config['training_window'])
+                    training_window=parsed_training_window,
             )
 
             # 更新任務狀態

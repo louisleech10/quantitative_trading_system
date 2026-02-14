@@ -21,18 +21,19 @@ logger = get_logger(__name__)
 
 
 @dataclass
-class XGBoostTaskResult:
+class ModelTaskResult:
     task_id: str
+    engine: Optional[str]
     predictions_df: Optional[pd.DataFrame]
     calibration_curve: Optional[Dict]
     pr_curve: Optional[Dict]
     created_at: datetime
 
 
-class XGBoostTaskCache:
-    """快取已完成任務結果，供後續 API 使用"""
+class ModelTaskCache:
+    """快取已完成任務結果，供後續 API 使用。"""
 
-    _cache: Dict[str, XGBoostTaskResult] = {}
+    _cache: Dict[str, ModelTaskResult] = {}
 
     def __init__(self):
         self.logger = logger
@@ -40,20 +41,22 @@ class XGBoostTaskCache:
     def store_result(
         self,
         task_id: str,
+        engine: Optional[str],
         predictions_df: Optional[pd.DataFrame],
         calibration_curve: Optional[Dict],
         pr_curve: Optional[Dict]
     ) -> None:
-        self._cache[task_id] = XGBoostTaskResult(
+        self._cache[task_id] = ModelTaskResult(
             task_id=task_id,
+            engine=engine,
             predictions_df=predictions_df,
             calibration_curve=calibration_curve,
             pr_curve=pr_curve,
             created_at=datetime.utcnow()
         )
-        self.logger.info(f"XGBoost 任務快取已更新: {task_id}")
+        self.logger.info(f"模型任務快取已更新: {task_id}, engine={engine}")
 
-    def get_result(self, task_id: str) -> Optional[XGBoostTaskResult]:
+    def get_result(self, task_id: str) -> Optional[ModelTaskResult]:
         return self._cache.get(task_id)
 
     def clear_expired(self, max_age_hours: int = 24) -> None:
@@ -63,3 +66,25 @@ class XGBoostTaskCache:
             self._cache.pop(key, None)
         if expired_keys:
             self.logger.info(f"清理過期快取: {len(expired_keys)} 筆")
+
+
+XGBoostTaskResult = ModelTaskResult
+
+
+class XGBoostTaskCache(ModelTaskCache):
+    """向後相容別名。"""
+
+    def store_result(
+        self,
+        task_id: str,
+        predictions_df: Optional[pd.DataFrame],
+        calibration_curve: Optional[Dict],
+        pr_curve: Optional[Dict]
+    ) -> None:
+        super().store_result(
+            task_id=task_id,
+            engine="xgboost",
+            predictions_df=predictions_df,
+            calibration_curve=calibration_curve,
+            pr_curve=pr_curve,
+        )

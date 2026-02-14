@@ -68,7 +68,7 @@ const navigationItems = [
     name: '模式發現',
     href: '/patterns',
     icon: Target,
-    description: 'XGBoost 模式分析與管理（Phase 4）'
+    description: 'LightGBM/XGBoost 雙引擎 ML 分析（Phase 3+4）'
   },
   {
     name: 'IC 分析',

@@ -85,6 +85,46 @@ def create_xgboost_analyzer() -> XGBoostAnalyzer:
     return XGBoostAnalyzer()
 
 
+def create_model_trainer(
+    engine: str = "lightgbm",
+    config: Optional[Dict[str, Any]] = None,
+) -> "IModelTrainer":
+    normalized_engine = engine.lower().strip()
+    if normalized_engine == "lightgbm":
+        from momentum.Analysis.lightgbm_analyzer import LightGBMAnalyzer
+
+        return LightGBMAnalyzer(params=config)
+
+    if normalized_engine == "xgboost":
+        from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+
+        return XGBoostAnalyzer(params=config)
+
+    raise ValueError(f"不支援的引擎: {engine}")
+
+
+def create_model_comparison(
+    engines: Optional[List[str]] = None,
+    configs: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> "ModelComparison":
+    from momentum.Analysis.model_comparison import ModelComparison
+
+    selected_engines = engines or ["lightgbm", "xgboost"]
+    engine_configs = configs or {}
+
+    trainers = {
+        engine_name: create_model_trainer(engine_name, engine_configs.get(engine_name))
+        for engine_name in selected_engines
+    }
+    return ModelComparison(trainers=trainers)
+
+
+def create_model_config_manager() -> "ModelConfigManager":
+    from momentum.Analysis.model_config import ModelConfigManager
+
+    return ModelConfigManager()
+
+
 def create_model_storage() -> ModelStorage:
     from momentum.Analysis.model_storage import ModelStorage
 
@@ -182,10 +222,24 @@ def create_parameter_ranges(**kwargs: Any) -> ParameterRanges:
     return ParameterRanges(**kwargs)
 
 
-def create_optuna_optimizer(**kwargs: Any) -> OptunaOptimizer:
+def create_optuna_optimizer(
+    objective: Optional["IOptimizationObjective"] = None,
+    sampler_type: str = "tpe",
+    checkpoint_dir: Optional[str] = None,
+    enable_progress: bool = True,
+    **kwargs: Any,
+) -> OptunaOptimizer:
     from momentum.Optimization.optuna_optimizer import OptunaOptimizer
 
-    return OptunaOptimizer(**kwargs)
+    init_kwargs = dict(kwargs)
+    init_kwargs["sampler_type"] = init_kwargs.get("sampler_type", sampler_type)
+    init_kwargs["enable_progress_monitor"] = init_kwargs.get("enable_progress_monitor", enable_progress)
+    if checkpoint_dir is not None:
+        init_kwargs["checkpoint_dir"] = init_kwargs.get("checkpoint_dir", checkpoint_dir)
+    if objective is not None:
+        init_kwargs["objective"] = objective
+
+    return OptunaOptimizer(**init_kwargs)
 
 
 def create_optimization_result(**kwargs: Any) -> OptimizationResult:

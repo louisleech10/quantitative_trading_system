@@ -8,6 +8,12 @@ import type {
   PatternListResponse,
   PatternSummary,
   PatternStatistics,
+  BatchAnalysisRequest,
+  ModelTrainingRequest,
+  TaskStartResponse,
+  ModelPerformanceResponse,
+  ComparisonReportResponse,
+  ModelHyperparamOptimizationRequest,
   XGBoostAnalysisRequest,
   XGBoostAnalysisResult,
   OOTValidationRequest,
@@ -202,7 +208,7 @@ export async function getXGBoostTaskStatus(taskId: string): Promise<{
   return response.json();
 }
 
-export async function getModelInfo(caseId: string): Promise<any> {
+export async function getModelInfo(caseId: string): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-analysis/model/info/${caseId}`);
   
   if (!response.ok) {
@@ -212,7 +218,7 @@ export async function getModelInfo(caseId: string): Promise<any> {
   return response.json();
 }
 
-export async function listModels(): Promise<any[]> {
+export async function listModels(): Promise<unknown[]> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/pattern-analysis/model/list`);
   
   if (!response.ok) {
@@ -220,6 +226,68 @@ export async function listModels(): Promise<any[]> {
   }
   
   return response.json();
+}
+
+export async function getCaseSummary(symbol?: string, timeframe?: string): Promise<{
+  total_cases: number;
+  positive_cases: number;
+  negative_cases: number;
+  symbols: string[];
+  timeframes: string[];
+}> {
+  const params = new URLSearchParams();
+  if (symbol) params.append('symbol', symbol);
+  if (timeframe) params.append('timeframe', timeframe);
+  const query = params.toString();
+  return fetchAPI(`/pattern-analysis/cases/summary${query ? `?${query}` : ''}`);
+}
+
+export async function startBatchAnalysis(config: BatchAnalysisRequest): Promise<{ task_id: string }> {
+  const endpoint = config.engine === 'lightgbm' || config.run_comparison
+    ? '/pattern-analysis/batch/start'
+    : '/pattern-analysis/xgboost/batch/start';
+
+  return fetchAPI(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(config)
+  });
+}
+
+export async function getBatchTaskStatus(taskId: string): Promise<{
+  status: 'running' | 'completed' | 'failed';
+  progress: number;
+  current_step: string;
+  message: string;
+  total_cases: number;
+  processed_cases: number;
+  result?: unknown;
+  error?: string;
+}> {
+  return fetchAPI(`/pattern-analysis/xgboost/batch/task/${taskId}`);
+}
+
+export async function startModelTraining(request: ModelTrainingRequest): Promise<TaskStartResponse> {
+  return fetchAPI('/pattern-analysis/model/train', {
+    method: 'POST',
+    body: JSON.stringify(request)
+  });
+}
+
+export async function getModelPerformance(taskId: string): Promise<ModelPerformanceResponse> {
+  return fetchAPI(`/pattern-analysis/model/${taskId}/performance`);
+}
+
+export async function getModelComparison(taskId: string): Promise<ComparisonReportResponse> {
+  return fetchAPI(`/pattern-analysis/model/${taskId}/comparison`);
+}
+
+export async function startModelHyperparamOptimization(
+  request: ModelHyperparamOptimizationRequest
+): Promise<{ task_id: string }> {
+  return fetchAPI('/optimization/start', {
+    method: 'POST',
+    body: JSON.stringify(request)
+  });
 }
 
 // ===== 深度分析 API =====

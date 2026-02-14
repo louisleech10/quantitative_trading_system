@@ -1,7 +1,7 @@
 """
 Model Storage - 模型儲存管理
 
-使用 Pickle 格式儲存和讀取 XGBoost 模型
+使用 Pickle 格式儲存和讀取模型（XGBoost/LightGBM）
 
 Author: AI Agent
 Date: 2026-01-10
@@ -13,8 +13,6 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 import logging
 
-import xgboost as xgb
-
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +22,7 @@ class ModelStorage:
     """
     模型儲存管理器
     
-    使用 Pickle 格式儲存 XGBoost 模型和相關元數據
+    使用 Pickle 格式儲存模型和相關元數據
     """
     
     def __init__(self, base_path: str = "data_cache/models"):
@@ -39,7 +37,7 @@ class ModelStorage:
     def save_model_to_pickle(
         self,
         case_id: str,
-        model: xgb.XGBClassifier,
+        model: Any,
         feature_names: list,
         performance: Dict,
         params: Dict,

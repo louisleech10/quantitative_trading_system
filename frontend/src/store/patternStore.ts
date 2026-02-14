@@ -5,7 +5,10 @@ import { create } from 'zustand';
 import type { 
   Pattern, 
   XGBoostAnalysisResult, 
+  AnalysisResult,
   PatternStatistics,
+  EngineMode,
+  ComparisonReportResponse,
   OOTValidationResult,
   DriftReport,
   RegimeReport,
@@ -32,7 +35,8 @@ import {
   getProbabilityDensity,
   getStrategyEquity,
   getTopFalsePositives,
-  getRollingAUC
+  getRollingAUC,
+  getModelComparison
 } from '@/lib/api/patternApi';
 
 interface PatternState {
@@ -42,9 +46,12 @@ interface PatternState {
   patternStatistics: PatternStatistics | null;
   
   // XGBoost Analysis 相關
-  currentAnalysis: XGBoostAnalysisResult | null;
+  currentAnalysis: XGBoostAnalysisResult | AnalysisResult | null;
   analysisLoading: boolean;
   analysisTaskId: string | null;
+  selectedEngine: EngineMode;
+  comparisonReport: ComparisonReportResponse | null;
+  comparisonLoading: boolean;
 
   // 深度分析狀態
   ootValidation: OOTValidationResult | null;
@@ -93,9 +100,12 @@ interface PatternState {
   deletePattern: (patternId: string) => void;
   
   // Actions - XGBoost Analysis
-  setCurrentAnalysis: (analysis: XGBoostAnalysisResult | null) => void;
+  setCurrentAnalysis: (analysis: XGBoostAnalysisResult | AnalysisResult | null) => void;
   setAnalysisLoading: (loading: boolean) => void;
   setAnalysisTaskId: (taskId: string | null) => void;
+  setSelectedEngine: (engine: EngineMode) => void;
+  setComparisonReport: (report: ComparisonReportResponse | null) => void;
+  loadComparisonReport: (taskId: string) => Promise<void>;
 
   // Actions - Deep Analysis
   setOOTValidation: (data: OOTValidationResult | null) => void;
@@ -133,6 +143,9 @@ export const usePatternStore = create<PatternState>((set, get) => ({
   currentAnalysis: null,
   analysisLoading: false,
   analysisTaskId: null,
+  selectedEngine: 'xgboost',
+  comparisonReport: null,
+  comparisonLoading: false,
   ootValidation: null,
   driftReport: null,
   regimeAnalysis: null,
@@ -212,6 +225,23 @@ export const usePatternStore = create<PatternState>((set, get) => ({
   setAnalysisLoading: (loading) => set({ analysisLoading: loading }),
   
   setAnalysisTaskId: (taskId) => set({ analysisTaskId: taskId }),
+
+  setSelectedEngine: (engine) => set({ selectedEngine: engine }),
+
+  setComparisonReport: (report) => set({ comparisonReport: report }),
+
+  loadComparisonReport: async (taskId: string) => {
+    set({ comparisonLoading: true });
+    try {
+      const report = await getModelComparison(taskId);
+      set({ comparisonReport: report });
+    } catch (error) {
+      console.error('載入雙引擎對比報告失敗:', error);
+      set({ comparisonReport: null });
+    } finally {
+      set({ comparisonLoading: false });
+    }
+  },
 
   // Deep Analysis Actions
   setOOTValidation: (data) => set({ ootValidation: data }),

@@ -5,9 +5,9 @@ Pytest configuration file
 """
 
 import sys
-import os
 import importlib.util
 from pathlib import Path
+from api.models.training_window_config import TrainingWindowConfig
 
 # 將專案根目錄加入 Python 路徑
 project_root = Path(__file__).parent.absolute()
@@ -29,30 +29,63 @@ print(f"[conftest.py] Python path configured: {project_root}")
 print(f"[conftest.py] sys.path[0]: {sys.path[0]}")
 
 
-def _ensure_package(name: str, package_path: Path) -> None:
-    if not package_path.exists():
+def _patch_numpy_reload_compatibility() -> None:
+    """修補 numpy 重載情境下 _NoValue sentinel 不相容問題。"""
+    import numpy as np
+    from numpy.core import _methods as np_methods
+
+    if getattr(np_methods, "_qts_reload_compat_patched", False):
         return
 
-    if name in sys.modules:
-        del sys.modules[name]
+    original_amax = np_methods._amax
+    original_amin = np_methods._amin
 
-    spec = importlib.util.spec_from_file_location(
-        name,
-        package_path / "__init__.py",
-        submodule_search_locations=[str(package_path)]
-    )
-    if spec and spec.loader:
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        sys.modules[name] = module
+    def _is_default_initial(value) -> bool:
+        return value is np._NoValue or type(value).__name__ == "_NoValueType"
+
+    def _is_default_where(value) -> bool:
+        if value is True:
+            return True
+        if isinstance(value, (bool, np.bool_)):
+            return bool(value)
+        return False
+
+    def _safe_amax(a, axis=None, out=None, keepdims=False, initial=np._NoValue, where=True):
+        if _is_default_initial(initial) and _is_default_where(where):
+            return np_methods.umr_maximum(a, axis, None, out, keepdims)
+        return original_amax(a, axis=axis, out=out, keepdims=keepdims, initial=initial, where=where)
+
+    def _safe_amin(a, axis=None, out=None, keepdims=False, initial=np._NoValue, where=True):
+        if _is_default_initial(initial) and _is_default_where(where):
+            return np_methods.umr_minimum(a, axis, None, out, keepdims)
+        return original_amin(a, axis=axis, out=out, keepdims=keepdims, initial=initial, where=where)
+
+    np_methods._amax = _safe_amax
+    np_methods._amin = _safe_amin
+    np_methods._qts_reload_compat_patched = True
 
 
-_ensure_package("momentum", project_root / "momentum")
-_ensure_package("api", project_root / "api")
+def _patch_numpy_dtypes_compatibility() -> None:
+    """補齊 numpy 1.26/重載情境下缺失的 np.dtypes.*DType 介面。"""
+    import numpy as np
+
+    if not hasattr(np, "dtypes"):
+        return
+
+    float32_dtype_type = type(np.dtype(np.float32))
+    float64_dtype_type = type(np.dtype(np.float64))
+
+    if not hasattr(np.dtypes, "Float32DType"):
+        np.dtypes.Float32DType = float32_dtype_type
+    if not hasattr(np.dtypes, "Float64DType"):
+        np.dtypes.Float64DType = float64_dtype_type
+
+
+_patch_numpy_reload_compatibility()
+_patch_numpy_dtypes_compatibility()
 
 
 import pytest
-from api.models.training_window_config import TrainingWindowConfig
 
 
 @pytest.fixture
@@ -93,3 +126,51 @@ def service(test_cache_dir):
     """提供 kline data service 測試用的服務實例"""
     SimpleKlineDataService = _load_simple_kline_service_class()
     return SimpleKlineDataService(cache_dir=test_cache_dir, default_source="binance")
+
+
+@pytest.fixture(scope="session")
+def synthetic_training_data():
+    """合成二分類訓練資料（測試獨立，不依賴外部資料來源）。"""
+    import numpy as np
+    import pandas as pd
+
+    rng = np.random.default_rng(42)
+    n_samples = 220
+    n_features = 12
+    X = pd.DataFrame(
+        rng.normal(size=(n_samples, n_features)),
+        columns=[f"feature_{i}" for i in range(n_features)],
+    )
+    linear = X["feature_0"] * 0.7 - X["feature_1"] * 0.3 + X["feature_2"] * 0.2
+    y = (linear > np.median(linear)).astype(int).to_numpy()
+    return X, y, X.columns.tolist()
+
+
+@pytest.fixture(scope="session")
+def trained_lightgbm(synthetic_training_data):
+    """已訓練 LightGBM 模型。"""
+    from momentum.Analysis.lightgbm_analyzer import LightGBMAnalyzer
+
+    X, y, feature_names = synthetic_training_data
+    analyzer = LightGBMAnalyzer(params={"n_estimators": 25, "num_leaves": 15})
+    analyzer.train_model(X, y, feature_names=feature_names, cv_folds=3)
+    return analyzer
+
+
+@pytest.fixture(scope="session")
+def trained_xgboost(synthetic_training_data):
+    """已訓練 XGBoost 模型。"""
+    from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+
+    X, y, feature_names = synthetic_training_data
+    analyzer = XGBoostAnalyzer(params={"n_estimators": 25, "max_depth": 4})
+    analyzer.train_model(X, y, feature_names=feature_names, cv_folds=3)
+    return analyzer
+
+
+@pytest.fixture
+def model_config_manager():
+    """ModelConfigManager 實例。"""
+    from momentum.Analysis.model_config import ModelConfigManager
+
+    return ModelConfigManager()

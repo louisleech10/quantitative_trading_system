@@ -21,7 +21,7 @@ Date: 2026-01-13
 import asyncio
 import uuid
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 import logging
 from pathlib import Path
@@ -47,6 +47,7 @@ from momentum.factories import (
     create_strategy_params,
     create_xgboost_analyzer,
     create_market_config,
+    create_model_trainer,
 )
 
 logger = get_logger(__name__)
@@ -225,6 +226,9 @@ class XGBoostBatchService:
         purge_gap: Optional[int] = None,
         embargo_pct: Optional[float] = None,
         xgboost_params: Optional[Dict] = None,
+        engine: str = "xgboost",
+        model_params: Optional[Dict] = None,
+        run_comparison: bool = False,
         cv_folds: int = 5,
         top_n_rules: int = 10,
         min_support: int = 10
@@ -246,6 +250,9 @@ class XGBoostBatchService:
             purge_gap: 標籤用到未來幾根 K 線（Purged CV）
             embargo_pct: Embargo 緩衝比例
             xgboost_params: XGBoost 參數
+            engine: 模型引擎（xgboost / lightgbm）
+            model_params: 通用模型參數（優先於 xgboost_params）
+            run_comparison: 是否執行雙引擎對比（目前僅保留欄位）
             cv_folds: 交叉驗證折數
             top_n_rules: 提取前 N 條規則
             min_support: 最小支持度
@@ -292,6 +299,9 @@ class XGBoostBatchService:
                 purge_gap=purge_gap,
                 embargo_pct=embargo_pct,
                 xgboost_params=xgboost_params,
+                engine=engine,
+                model_params=model_params,
+                run_comparison=run_comparison,
                 cv_folds=cv_folds,
                 top_n_rules=top_n_rules,
                 min_support=min_support
@@ -323,6 +333,9 @@ class XGBoostBatchService:
         purge_gap: Optional[int],
         embargo_pct: Optional[float],
         xgboost_params: Optional[Dict],
+        engine: str,
+        model_params: Optional[Dict],
+        run_comparison: bool,
         cv_folds: int,
         top_n_rules: int,
         min_support: int
@@ -603,13 +616,27 @@ class XGBoostBatchService:
                     f"\n2. 調整案例搜尋的正例判定條件（未來漲幅閾值）"
                     f"\n3. 使用其他標的的案例"
                 )
+
+            analysis_engine = (engine or "xgboost").lower().strip()
+            if analysis_engine == "both":
+                self.logger.warning("批量分析收到 engine=both，將先以 xgboost 執行單引擎流程")
+                analysis_engine = "xgboost"
+            if analysis_engine not in {"xgboost", "lightgbm"}:
+                raise ValueError(f"不支援的引擎: {engine}")
+
+            analyzer = (
+                self.xgboost_analyzer
+                if analysis_engine == "xgboost"
+                else create_model_trainer("lightgbm", config=model_params)
+            )
+            effective_model_params = model_params or xgboost_params
             
             # ===== Step 5: 訓練 XGBoost =====
-            self.task_manager.update_progress(task_id, 60, '訓練模型', 'XGBoost 模型訓練中...')
+            self.task_manager.update_progress(task_id, 60, '訓練模型', f'{analysis_engine} 模型訓練中...')
             
             performance = await asyncio.to_thread(
-                self.xgboost_analyzer.train_model,
-                X, y, feature_names, 10, 0.2, xgboost_params, cv_folds,
+                analyzer.train_model,
+                X, y, feature_names, 10, 0.2, effective_model_params, cv_folds,
                 time_series_split, case_timestamps, purge_gap, embargo_pct
             )
             
@@ -622,48 +649,95 @@ class XGBoostBatchService:
             self.task_manager.update_progress(task_id, 75, '分析特徵', '計算特徵重要性...')
             
             feature_importance = await asyncio.to_thread(
-                self.xgboost_analyzer.calculate_feature_importance,
+                analyzer.calculate_feature_importance,
                 feature_names
             )
 
             feature_importance_all = await asyncio.to_thread(
-                self.xgboost_analyzer.get_all_importance_types,
+                analyzer.get_all_importance_types,
                 feature_names
             )
             
             # ===== Step 7: 提取決策規則 =====
             self.task_manager.update_progress(task_id, 85, '提取規則', '提取決策規則...')
             
-            rules = await asyncio.to_thread(
-                self.pattern_extractor.extract_decision_rules,
-                self.xgboost_analyzer.model,
-                X, y, feature_names,
-                top_n_rules, min_support
-            )
+            if analysis_engine == "lightgbm":
+                rules = []
+            else:
+                rules = await asyncio.to_thread(
+                    self.pattern_extractor.extract_decision_rules,
+                    analyzer.model,
+                    X, y, feature_names,
+                    top_n_rules, min_support
+                )
 
             predictions_output = await asyncio.to_thread(
-                self.xgboost_analyzer.get_predictions,
+                analyzer.get_predictions,
                 X, y, case_ids
             )
 
-            y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions])
+            if hasattr(predictions_output, 'predictions'):
+                y_pred_proba = np.array([p.predicted_proba for p in predictions_output.predictions], dtype=float)
+                predictions_payload = predictions_output.to_dict() if hasattr(predictions_output, 'to_dict') else {
+                    'predictions': [p.__dict__ for p in predictions_output.predictions],
+                    'proba_summary': None,
+                }
+            else:
+                raw_proba = np.asarray(getattr(predictions_output, 'y_pred_proba', []), dtype=float)
+                if raw_proba.ndim == 2 and raw_proba.shape[1] >= 2:
+                    y_pred_proba = raw_proba[:, 1]
+                else:
+                    y_pred_proba = raw_proba.reshape(-1)
+                bins, counts = np.linspace(0.0, 1.0, 6), None
+                if y_pred_proba.size > 0:
+                    counts, _ = np.histogram(y_pred_proba, bins=bins)
+                predictions_payload = {
+                    'predictions': [
+                        {
+                            'case_id': case_ids[idx],
+                            'y_true': int(y[idx]),
+                            'predicted_proba': float(y_pred_proba[idx]),
+                        }
+                        for idx in range(len(y_pred_proba))
+                    ],
+                    'proba_summary': {
+                        'mean': float(np.mean(y_pred_proba)) if y_pred_proba.size else 0.0,
+                        'std': float(np.std(y_pred_proba)) if y_pred_proba.size else 0.0,
+                        'bins': {
+                            f"{bins[i]:.1f}-{bins[i + 1]:.1f}": int(counts[i])
+                            for i in range(len(bins) - 1)
+                        } if counts is not None else {},
+                        'min': float(np.min(y_pred_proba)) if y_pred_proba.size else 0.0,
+                        'max': float(np.max(y_pred_proba)) if y_pred_proba.size else 0.0,
+                    },
+                }
 
             # Precision@K 與推薦 K
             precision_at_k_result = await asyncio.to_thread(
-                self.xgboost_analyzer.calculate_precision_at_k,
+                analyzer.calculate_precision_at_k,
                 X, y
             )
-            recommended = self.xgboost_analyzer.recommend_k(
+            recommended = analyzer.recommend_k(
                 y_true=y,
                 y_pred_proba=y_pred_proba,
                 target_precision=0.75
             )
-            precision_at_k = {
-                **precision_at_k_result.to_dict(),
-                "recommended_k": recommended.get("recommended_k"),
-                "recommended_threshold": recommended.get("threshold"),
-                "recommended_precision": recommended.get("precision")
-            }
+            if hasattr(precision_at_k_result, 'to_dict'):
+                precision_at_k = {
+                    **precision_at_k_result.to_dict(),
+                    "recommended_k": recommended.get("recommended_k"),
+                    "recommended_threshold": recommended.get("threshold"),
+                    "recommended_precision": recommended.get("precision")
+                }
+            else:
+                precision_at_k = {
+                    "precision_at_k": {int(item.k): float(item.precision) for item in precision_at_k_result},
+                    "threshold_at_k": {},
+                    "sample_count_at_k": {int(item.k): int(item.n_total) for item in precision_at_k_result},
+                    "recommended_k": recommended.get("recommended_k"),
+                    "recommended_threshold": recommended.get("threshold"),
+                    "recommended_precision": recommended.get("precision")
+                }
 
             # 期望值估算（若案例包含 price_change）
             expectancy = None
@@ -701,15 +775,21 @@ class XGBoostBatchService:
 
             # Permutation Importance
             permutation_importance = await asyncio.to_thread(
-                self.xgboost_analyzer.calculate_permutation_importance,
+                analyzer.calculate_permutation_importance,
                 X, y, 5
             )
 
             # Fold-level 重要性穩定性
-            fold_importance_stability = await asyncio.to_thread(
-                self.xgboost_analyzer.calculate_fold_importance_stability,
-                X, y, cv_folds, time_series_split, case_timestamps, purge_gap, embargo_pct
-            )
+            if analysis_engine == 'lightgbm':
+                fold_importance_stability = await asyncio.to_thread(
+                    analyzer.calculate_fold_importance_stability,
+                    X, y, cv_folds
+                )
+            else:
+                fold_importance_stability = await asyncio.to_thread(
+                    analyzer.calculate_fold_importance_stability,
+                    X, y, cv_folds, time_series_split, case_timestamps, purge_gap, embargo_pct
+                )
 
             # 市場體制分析（若可取得 Market_Phase）
             regime_analysis = None
@@ -778,12 +858,14 @@ class XGBoostBatchService:
             model_path = await asyncio.to_thread(
                 self.model_storage.save_model_to_pickle,
                 model_id,
-                self.xgboost_analyzer.model,
+                analyzer.model,
                 feature_names,
                 performance.__dict__,
-                xgboost_params or {},
+                effective_model_params or {},
                 {
                     'task_id': task_id,
+                    'engine': analysis_engine,
+                    'run_comparison': run_comparison,
                     'symbols': symbols,  # 改為 symbols 列表
                     'timeframe': timeframe,
                     'total_cases': len(cases),
@@ -810,6 +892,8 @@ class XGBoostBatchService:
 
             result = {
                 'symbols': symbols,  # 改為 symbols 列表
+                'engine': analysis_engine,
+                'run_comparison': run_comparison,
                 'timeframe': timeframe,
                 'total_cases': len(cases),
                 'valid_cases': valid_cases_count,
@@ -823,21 +907,22 @@ class XGBoostBatchService:
                     key: [fi.__dict__ for fi in values]
                     for key, values in feature_importance_all.items()
                 },
-                'decision_rules': [rule.to_dict() for rule in rules],
+                'decision_rules': [rule.to_dict() for rule in rules] if rules else [],
+                'decision_rules_note': 'LightGBM 暫不支援 extract_decision_rules，已略過' if analysis_engine == 'lightgbm' else None,
                 'precision_at_k': precision_at_k,
                 'expectancy': expectancy,
                 'bootstrap_ci': bootstrap_ci,
-                'permutation_importance': permutation_importance.to_dict(),
-                'fold_importance_stability': fold_importance_stability.to_dict(),
+                'permutation_importance': permutation_importance.to_dict() if hasattr(permutation_importance, 'to_dict') else [item.__dict__ for item in permutation_importance],
+                'fold_importance_stability': fold_importance_stability.to_dict() if hasattr(fold_importance_stability, 'to_dict') else [item.__dict__ for item in fold_importance_stability],
                 'cross_symbol_validation': cross_symbol_validation,
-                'predictions': predictions_output.to_dict(),
+                'predictions': predictions_payload,
                 'prediction_meta': prediction_meta,
                 'shap_sample': shap_sample,
                 'calibration_curve': (
-                    self.xgboost_analyzer.last_calibration_curve.to_dict()
-                    if self.xgboost_analyzer.last_calibration_curve else None
+                    analyzer.last_calibration_curve.to_dict()
+                    if getattr(analyzer, 'last_calibration_curve', None) else None
                 ),
-                'pr_curve': self.xgboost_analyzer.last_pr_curve,
+                'pr_curve': getattr(analyzer, 'last_pr_curve', None),
                 'regime_analysis': regime_analysis,
                 'model_saved': True,
                 'model_path': model_path
@@ -870,7 +955,7 @@ class XGBoostBatchService:
             self.task_manager.update_progress(task_id, 100, '完成', '分析完成')
             
             self.logger.info(
-                f"批量 XGBoost 分析完成 - task_id: {task_id}, "
+                f"批量分析完成 - task_id: {task_id}, engine: {analysis_engine}, "
                 f"有效案例: {valid_cases_count}, 特徵數: {len(feature_names)}"
             )
             

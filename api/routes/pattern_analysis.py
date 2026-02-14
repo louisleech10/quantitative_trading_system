@@ -16,6 +16,7 @@ import numpy as np
 from api.models.pattern_analysis_models import (
     XGBoostAnalysisRequest,
     XGBoostBatchAnalysisRequest,
+    BatchAnalysisRequest,
     XGBoostAnalysisResponse,
     XGBoostAnalysisResult,
     XGBoostBatchAnalysisResult,
@@ -50,10 +51,17 @@ from api.models.pattern_analysis_models import (
     RollingAUCResponse,
     CalibrationCurveResponse,
     PRCurveResponse,
-    PRCurveData
+    PRCurveData,
+    ModelTrainingRequest,
+    ComparisonReportResponse,
+    TaskStartResponse,
+    LightGBMTrainingRequest,
+    LightGBMResultsResponse,
 )
+from api.models.pattern_analysis_models import ModelPerformanceResponse as GenericModelPerformanceResponse
 from api.services.xgboost_task_service import XGBoostTaskService
 from api.services.xgboost_batch_service import get_xgboost_batch_service
+from api.services.model_task_service import ModelTaskService
 from api.services.shap_analysis_service import SHAPAnalysisService
 from api.services.xgboost_task_cache import XGBoostTaskCache
 from api.core.logging import get_logger
@@ -69,6 +77,7 @@ xgboost_service = XGBoostTaskService()
 shap_service = SHAPAnalysisService()
 task_cache = XGBoostTaskCache()
 prediction_analyzer = PredictionAnalyzer()
+model_task_service = ModelTaskService()
 
 
 def _get_task_from_services(task_id: str):
@@ -104,6 +113,143 @@ def _build_predictions_df(task_result: dict):
         df['actual_return'] = actual_returns
 
     return df
+
+
+def _build_model_performance_response(performance: dict) -> GenericModelPerformanceResponse:
+    return GenericModelPerformanceResponse(
+        engine_type=performance.get("engine_type"),
+        train_auc=float(performance.get("train_auc", 0.0)),
+        cv_auc_mean=float(performance.get("cv_auc_mean", 0.0)),
+        cv_auc_std=float(performance.get("cv_auc_std", 0.0)),
+        precision=float(performance.get("precision", 0.0)),
+        recall=float(performance.get("recall", 0.0)),
+        f1_score=float(performance.get("f1_score", 0.0)),
+        overfitting_score=float(performance.get("overfitting_score", 0.0)),
+        oot_auc=performance.get("oot_auc"),
+        brier_score=performance.get("brier_score"),
+        ece=performance.get("ece"),
+        calibration_quality=performance.get("calibration_quality"),
+        pr_auc=performance.get("pr_auc"),
+        positive_rate=performance.get("positive_rate"),
+        training_time_seconds=performance.get("training_time_seconds"),
+    )
+
+
+# ==================== 通用模型 API（Task 3.7） ====================
+
+@router.post("/model/train", response_model=TaskStartResponse)
+async def start_model_training(request: ModelTrainingRequest):
+    """啟動通用模型訓練任務。"""
+    try:
+        validation_payload = request.validation.model_dump() if request.validation else {}
+        task_id = await model_task_service.start_training_task(
+            engine=request.engine,
+            config=request.config or {},
+            data_source=request.features_source,
+            validation=validation_payload,
+            run_comparison=request.run_comparison,
+        )
+        return TaskStartResponse(task_id=task_id, status="running", engine=request.engine)
+    except Exception as e:
+        logger.error(f"啟動通用模型訓練失敗: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/model/{task_id}/performance", response_model=GenericModelPerformanceResponse)
+async def get_model_performance(task_id: str):
+    """取得模型效能結果。"""
+    task = model_task_service.get_task_status(task_id)
+    if task.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+    if task.get("status") == "failed":
+        raise HTTPException(status_code=400, detail=f"任務失敗: {task.get('error')}")
+    if task.get("status") != "completed":
+        raise HTTPException(status_code=400, detail=f"任務尚未完成，目前狀態: {task.get('status')}")
+
+    result = task.get("result", {})
+    performance = result.get("performance")
+    if not performance:
+        raise HTTPException(status_code=404, detail="找不到模型效能結果")
+
+    return _build_model_performance_response(performance)
+
+
+@router.get("/model/{task_id}/comparison", response_model=ComparisonReportResponse)
+async def get_model_comparison(task_id: str):
+    """取得雙引擎對比報告。"""
+    task = model_task_service.get_task_status(task_id)
+    if task.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+    if task.get("status") == "failed":
+        raise HTTPException(status_code=400, detail=f"任務失敗: {task.get('error')}")
+    if task.get("status") != "completed":
+        raise HTTPException(status_code=400, detail=f"任務尚未完成，目前狀態: {task.get('status')}")
+
+    comparison = task.get("result", {}).get("comparison")
+    if not comparison:
+        raise HTTPException(status_code=404, detail="任務未啟用或未產生 comparison 結果")
+
+    engine_performances = {
+        engine_name: _build_model_performance_response(perf)
+        for engine_name, perf in comparison.get("engine_performances", {}).items()
+    }
+    return ComparisonReportResponse(
+        engine_performances=engine_performances,
+        consensus_rate=float(comparison.get("consensus_rate", 0.0)),
+        feature_rank_correlation=float(comparison.get("feature_rank_correlation", 0.0)),
+        recommended_engine=str(comparison.get("recommended_engine", "")),
+        recommendation_reason=str(comparison.get("recommendation_reason", "")),
+    )
+
+
+@router.post("/lightgbm/train", response_model=TaskStartResponse)
+async def start_lightgbm_training(request: LightGBMTrainingRequest):
+    """啟動 LightGBM 訓練任務。"""
+    try:
+        config = dict(request.config or {})
+        config["boosting_type"] = request.boosting_type
+        if request.categorical_features:
+            config["categorical_features"] = request.categorical_features
+
+        validation_payload = request.validation.model_dump() if request.validation else {}
+        task_id = await model_task_service.start_training_task(
+            engine="lightgbm",
+            config=config,
+            data_source=request.features_source,
+            validation=validation_payload,
+            run_comparison=False,
+        )
+        return TaskStartResponse(task_id=task_id, status="running", engine="lightgbm")
+    except Exception as e:
+        logger.error(f"啟動 LightGBM 訓練失敗: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/lightgbm/{task_id}/results", response_model=LightGBMResultsResponse)
+async def get_lightgbm_results(task_id: str):
+    """取得 LightGBM 訓練結果。"""
+    task = model_task_service.get_task_status(task_id)
+    if task.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+    if task.get("status") == "failed":
+        raise HTTPException(status_code=400, detail=f"任務失敗: {task.get('error')}")
+    if task.get("status") != "completed":
+        raise HTTPException(status_code=400, detail=f"任務尚未完成，目前狀態: {task.get('status')}")
+
+    result = task.get("result", {})
+    if result.get("engine") != "lightgbm":
+        raise HTTPException(status_code=400, detail="此任務不是 LightGBM 任務")
+
+    performance = result.get("performance")
+    if not performance:
+        raise HTTPException(status_code=404, detail="找不到 LightGBM 效能結果")
+
+    return LightGBMResultsResponse(
+        task_id=task_id,
+        performance=_build_model_performance_response(performance),
+        feature_importance=result.get("feature_importance", []),
+        predictions_summary=result.get("predictions_summary"),
+    )
 
 
 # ==================== OOT 驗證 API ====================
@@ -695,6 +841,52 @@ async def start_batch_xgboost_analysis(request: XGBoostBatchAnalysisRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/batch/start", response_model=XGBoostAnalysisResponse)
+async def start_batch_analysis(request: BatchAnalysisRequest):
+    """
+    啟動通用批量分析任務（xgboost / lightgbm / both）
+    """
+    try:
+        batch_service = get_xgboost_batch_service()
+
+        indicators = [
+            {
+                'indicator': ind.indicator,
+                'data_source': ind.data_source,
+                'params': ind.params
+            }
+            for ind in request.indicators
+        ]
+
+        result = await batch_service.start_batch_analysis(
+            symbols=request.symbols,
+            timeframe=request.timeframe,
+            indicators=indicators,
+            lookback_bars=request.lookback_bars,
+            sequence_length=request.sequence_length,
+            sequence_feature_mode=request.sequence_feature_mode,
+            sequence_stride=request.sequence_stride,
+            aggregation_methods=request.aggregation_methods,
+            multi_scale_windows=request.multi_scale_windows,
+            time_series_split=request.time_series_split,
+            purge_gap=request.purge_gap,
+            embargo_pct=request.embargo_pct,
+            xgboost_params=request.xgboost_params,
+            engine=request.engine,
+            model_params=request.model_params,
+            run_comparison=request.run_comparison,
+            cv_folds=request.cv_folds,
+            top_n_rules=request.top_n_rules,
+            min_support=request.min_support
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"啟動批量分析失敗: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/xgboost/batch/task/{task_id}")
 async def get_batch_xgboost_task_status(task_id: str):
     """
@@ -712,6 +904,18 @@ async def get_batch_xgboost_task_status(task_id: str):
     task = sanitize_for_json(task)
     
     return task
+
+
+@router.get("/batch/task/{task_id}")
+async def get_batch_task_status(task_id: str):
+    """獲取通用批量分析任務狀態"""
+    batch_service = get_xgboost_batch_service()
+    task = batch_service.get_task_status(task_id)
+
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任務不存在: {task_id}")
+
+    return sanitize_for_json(task)
 
 
 # ==================== 預測與特徵重要性 API ====================

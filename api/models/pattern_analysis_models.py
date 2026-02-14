@@ -275,6 +275,23 @@ class XGBoostBatchAnalysisRequest(BaseModel):
         }
 
 
+class BatchAnalysisRequest(XGBoostBatchAnalysisRequest):
+    """通用批量分析請求（支援 XGBoost / LightGBM / 雙引擎）"""
+
+    engine: Literal["xgboost", "lightgbm", "both"] = Field(
+        default="xgboost",
+        description="模型引擎：xgboost / lightgbm / both"
+    )
+    run_comparison: bool = Field(
+        default=False,
+        description="是否在雙引擎模式下執行對比報告"
+    )
+    model_params: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="通用模型參數（依 engine 轉發至 xgboost_params / lightgbm_params）"
+    )
+
+
 class XGBoostAnalysisRequest(BaseModel):
     """XGBoost 分析請求（保留向後相容）"""
     case_id: str = Field(..., description="案例 ID")
@@ -526,6 +543,7 @@ class RollingAUCResponse(BaseModel):
 
 class ModelPerformanceResponse(BaseModel):
     """模型效能回應"""
+    engine_type: Optional[str] = None
     train_auc: float
     cv_auc_mean: float
     cv_auc_std: float
@@ -538,6 +556,59 @@ class ModelPerformanceResponse(BaseModel):
     calibration_quality: Optional[str] = None
     pr_auc: Optional[float] = None
     positive_rate: Optional[float] = None
+    oot_auc: Optional[float] = None
+    training_time_seconds: Optional[float] = None
+
+
+class ValidationConfig(BaseModel):
+    """通用模型驗證配置"""
+    cv_folds: int = Field(default=5, ge=2, le=20)
+    purge_gap: int = Field(default=5, ge=0, le=500)
+    oot_enabled: bool = True
+    oot_ratio: float = Field(default=0.2, gt=0.0, lt=1.0)
+    early_stopping_rounds: int = Field(default=50, ge=1, le=500)
+
+
+class ModelTrainingRequest(BaseModel):
+    """通用模型訓練請求"""
+    engine: Literal["lightgbm", "xgboost"] = "lightgbm"
+    features_source: str
+    config: Optional[Dict[str, Any]] = None
+    validation: Optional[ValidationConfig] = None
+    run_comparison: bool = False
+
+
+class ComparisonReportResponse(BaseModel):
+    """雙引擎對比報告回應"""
+    engine_performances: Dict[str, ModelPerformanceResponse]
+    consensus_rate: float
+    feature_rank_correlation: float
+    recommended_engine: str
+    recommendation_reason: str
+
+
+class TaskStartResponse(BaseModel):
+    """任務啟動回應"""
+    task_id: str
+    status: str = "running"
+    engine: str
+
+
+class LightGBMTrainingRequest(BaseModel):
+    """LightGBM 訓練請求"""
+    features_source: str
+    config: Optional[Dict[str, Any]] = None
+    boosting_type: Literal["gbdt", "dart", "goss"] = "gbdt"
+    categorical_features: Optional[List[str]] = None
+    validation: Optional[ValidationConfig] = None
+
+
+class LightGBMResultsResponse(BaseModel):
+    """LightGBM 訓練結果回應"""
+    task_id: str
+    performance: ModelPerformanceResponse
+    feature_importance: List[Dict[str, Any]]
+    predictions_summary: Optional[Dict[str, Any]] = None
 
 
 class PrecisionAtKResponse(BaseModel):

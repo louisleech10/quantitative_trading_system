@@ -72,7 +72,7 @@ Date: 2025-11-02 (Updated: 2025-11-12)
 """
 
 import logging
-from typing import Dict, Any, Optional, List, Callable, Tuple, TYPE_CHECKING
+from typing import Dict, Any, Optional, List, Callable, Tuple, TYPE_CHECKING, Union
 import asyncio
 from dataclasses import dataclass, field
 import time
@@ -101,6 +101,7 @@ from momentum.Analysis.indicator_cache import IndicatorCache
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.Indicators.indicator_engine import IndicatorEngine
 from momentum.core.config import MomentumConfig
+from momentum.core.protocols import IOptimizationObjective
 
 # 導入新增的容錯機制
 from momentum.Optimization.checkpoint_manager import CheckpointManager
@@ -381,6 +382,7 @@ class OptunaOptimizer:
         retry_base_delay: float = 1.0,
         enable_progress_monitor: bool = True,
         progress_notification_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
+        objective: Optional[IOptimizationObjective] = None,
         case_storage: Optional[Any] = None,
         case_storage_factory: Optional[Callable[[], Any]] = None,
         clustering_weight: float = 0.5,
@@ -437,46 +439,58 @@ class OptunaOptimizer:
         self.use_multi_objective = use_multi_objective
         self.enable_progress_monitor = enable_progress_monitor
         self.progress_notification_callback = progress_notification_callback
+        self.objective = objective
         self.clustering_weight = clustering_weight
         # Golden Formula v2.0 參數
         self.golden_lambda = golden_lambda
         self.min_pos_active_cases = min_pos_active_cases
         self.min_pos_total_weight = min_pos_total_weight
 
-        # 依賴服務
+        # 依賴服務（僅 signal_density 模式需要 case storage / analyzer）
+        self._requires_signal_density_runtime = (
+            self.objective is None or self.objective.name == "signal_density"
+        )
+
         self.case_storage = case_storage
-        if self.case_storage is None and case_storage_factory is not None:
-            self.case_storage = case_storage_factory()
-        if self.case_storage is None and callable(CaseStorage):
-            self.case_storage = CaseStorage()
-        if self.case_storage is None:
-            raise ValueError("case_storage is required for OptunaOptimizer")
-
         self.signal_service = None
-        if callable(SignalAnalysisService):
-            self.signal_service = SignalAnalysisService()
-
-        missing_methods = [
-            name for name in ("case_exists", "get_case")
-            if not hasattr(self.case_storage, name)
-        ]
-        if missing_methods:
-            raise ValueError(
-                "case_storage missing required methods: "
-                + ", ".join(missing_methods)
-            )
         self._analysis_timeframe = "1h"
 
-        # 同步分析器（用於真正的多核並行，繞過 async event loop 瓶頸）
-        self._momentum_config = MomentumConfig.from_project_root()
-        self._kline_storage = KlineStorageManager(
-            cache_dir=str(self._momentum_config.data_cache_path)
-        )
-        self._indicator_engine = IndicatorEngine()
-        self._sync_analyzer = SignalDensityAnalyzer(
-            kline_storage=self._kline_storage,
-            indicator_engine=self._indicator_engine
-        )
+        if self._requires_signal_density_runtime:
+            if self.case_storage is None and case_storage_factory is not None:
+                self.case_storage = case_storage_factory()
+            if self.case_storage is None and callable(CaseStorage):
+                self.case_storage = CaseStorage()
+            if self.case_storage is None:
+                raise ValueError("case_storage is required for OptunaOptimizer")
+
+            if callable(SignalAnalysisService):
+                self.signal_service = SignalAnalysisService()
+
+            missing_methods = [
+                name for name in ("case_exists", "get_case")
+                if not hasattr(self.case_storage, name)
+            ]
+            if missing_methods:
+                raise ValueError(
+                    "case_storage missing required methods: "
+                    + ", ".join(missing_methods)
+                )
+
+            # 同步分析器（用於真正的多核並行，繞過 async event loop 瓶頸）
+            self._momentum_config = MomentumConfig.from_project_root()
+            self._kline_storage = KlineStorageManager(
+                cache_dir=str(self._momentum_config.data_cache_path)
+            )
+            self._indicator_engine = IndicatorEngine()
+            self._sync_analyzer = SignalDensityAnalyzer(
+                kline_storage=self._kline_storage,
+                indicator_engine=self._indicator_engine
+            )
+        else:
+            self._momentum_config = None
+            self._kline_storage = None
+            self._indicator_engine = None
+            self._sync_analyzer = None
 
         # K 線預載入快取（用於加速優化，在 optimize() 時初始化）
         self._kline_cache: Optional[KlineCache] = None
@@ -580,7 +594,10 @@ class OptunaOptimizer:
         # 延遲導入
         from optuna.samplers import TPESampler, CmaEsSampler, RandomSampler, GPSampler, NSGAIISampler
 
-        if self.sampler_type == 'TPE':
+        sampler_type = str(self.sampler_type).strip()
+        sampler_type_upper = sampler_type.upper()
+
+        if sampler_type_upper == 'TPE':
             sampler = TPESampler(
                 seed=self.random_seed,
                 n_startup_trials=self.n_startup_trials,  # 初始隨機試驗數（可由前端設定）
@@ -591,14 +608,14 @@ class OptunaOptimizer:
             if hasattr(sampler, '_rng') and not hasattr(sampler._rng, 'bit_generator'):
                 sampler._rng.bit_generator = np.random.default_rng(self.random_seed).bit_generator
             return sampler
-        elif self.sampler_type == 'CmaEs':
+        elif sampler_type_upper == 'CMAES':
             return CmaEsSampler(
                 seed=self.random_seed,
                 n_startup_trials=25
             )
-        elif self.sampler_type == 'Random':
+        elif sampler_type_upper == 'RANDOM':
             return RandomSampler(seed=self.random_seed)
-        elif self.sampler_type == 'GP':
+        elif sampler_type_upper == 'GP':
             # Gaussian Process Sampler
             # 適用場景: 單次試驗耗時長(>10秒),試驗次數少(<100)
             return GPSampler(
@@ -606,7 +623,7 @@ class OptunaOptimizer:
                 n_startup_trials=10,  # GP前期使用Random採樣
                 independent_sampler=RandomSampler(seed=self.random_seed)
             )
-        elif self.sampler_type == 'NSGA-II':
+        elif sampler_type_upper in ['NSGA-II', 'NSGAII']:
             # 多目標優化遺傳算法
             # 返回Pareto前沿解集(多個非支配解)
             return NSGAIISampler(
@@ -639,18 +656,21 @@ class OptunaOptimizer:
         # 延遲導入
         from optuna.pruners import MedianPruner, PercentilePruner, NopPruner
 
-        if self.pruner_type == 'Median':
+        pruner_type = str(self.pruner_type).strip() if self.pruner_type is not None else 'None'
+        pruner_type_upper = pruner_type.upper()
+
+        if pruner_type_upper == 'MEDIAN':
             return MedianPruner(
                 n_startup_trials=5,  # 前5次不剪枝
                 n_warmup_steps=0,
                 interval_steps=1
             )
-        elif self.pruner_type == 'Percentile':
+        elif pruner_type_upper == 'PERCENTILE':
             return PercentilePruner(
                 percentile=25.0,     # 低於25%時剪枝
                 n_startup_trials=5
             )
-        elif self.pruner_type is None or self.pruner_type == 'None':
+        elif pruner_type_upper == 'NONE':
             return NopPruner()
         else:
             raise ValueError(
@@ -681,8 +701,33 @@ class OptunaOptimizer:
         sampler = self._create_sampler()
         pruner = self._create_pruner()
 
+        objective_directions: Optional[List[str]] = None
+        objective_direction: str = "maximize"
+        if self.objective is not None:
+            objective_directions = self.objective.directions
+            objective_direction = self.objective.direction
+
+        if objective_directions and len(objective_directions) > 1 and self.sampler_type != "NSGA-II":
+            from optuna.samplers import NSGAIISampler
+
+            sampler = NSGAIISampler(seed=self.random_seed)
+            self.logger.info("Multi-objective detected, auto-switch sampler to NSGA-II")
+
         # 多目標優化: separation + stability
-        if self.use_multi_objective:
+        if objective_directions and len(objective_directions) > 1:
+            study = optuna.create_study(
+                study_name=self.study_name,
+                storage=self.storage,
+                sampler=sampler,
+                pruner=pruner,
+                directions=objective_directions,
+                load_if_exists=True
+            )
+            self.logger.info(
+                f"Objective-driven multi-objective study created/loaded: {self.study_name}, "
+                f"previous trials: {len(study.trials)}"
+            )
+        elif self.use_multi_objective:
             study = optuna.create_study(
                 study_name=self.study_name,
                 storage=self.storage,
@@ -702,7 +747,7 @@ class OptunaOptimizer:
                 storage=self.storage,
                 sampler=sampler,
                 pruner=pruner,
-                direction="maximize",  # 最大化separation
+                direction=objective_direction,  # 最大化separation/自訂 objective
                 load_if_exists=True
             )
             self.logger.info(
@@ -1983,11 +2028,145 @@ class OptunaOptimizer:
             f"耗時 {stats.precompute_time_seconds:.1f}s"
         )
 
+    def _infer_is_multi_objective(self) -> bool:
+        if self.objective is not None and self.objective.directions:
+            return len(self.objective.directions) > 1
+        return self.use_multi_objective
+
+    def _pluggable_objective_sync(self, trial: "Trial") -> Union[float, Tuple[float, ...]]:
+        import optuna
+
+        if self.objective is None:
+            raise ValueError("Pluggable objective 未設定")
+
+        attempt = 1
+        while attempt <= self.error_handler.max_retries + 1:
+            try:
+                params = self.objective.create_search_space(trial)
+                result = self.objective.evaluate(params)
+
+                pruning_callback = self.objective.get_pruning_callback(trial)
+                if callable(pruning_callback):
+                    try:
+                        pruning_callback(trial, params, result)
+                    except TypeError:
+                        pruning_callback()
+
+                return result
+            except optuna.TrialPruned:
+                raise
+            except Exception as exc:
+                should_retry, delay = self.error_handler.handle_trial_error(
+                    trial_number=trial.number,
+                    exception=exc,
+                    attempt=attempt,
+                )
+
+                if should_retry and delay is not None:
+                    time.sleep(delay)
+                    attempt += 1
+                    continue
+
+                error_type = self.error_handler.classify_error(exc)
+                if error_type == ErrorType.NON_RETRYABLE:
+                    raise optuna.TrialPruned() from exc
+
+                if self._infer_is_multi_objective():
+                    return (-999.0, 999.0)
+                return -999.0
+
+        if self._infer_is_multi_objective():
+            return (-999.0, 999.0)
+        return -999.0
+
+    async def _optimize_with_pluggable_objective(
+        self,
+        positive_cases: Optional[List[str]],
+        negative_cases: Optional[List[str]],
+        training_window: Optional[TrainingWindowConfig],
+    ) -> OptimizationResult:
+        import optuna
+
+        self.positive_cases = positive_cases or []
+        self.negative_cases = negative_cases or []
+        self.training_window = training_window
+
+        if self.study is None:
+            self.create_study()
+
+        start_time = time.time()
+
+        if self.enable_progress_monitor:
+            self.progress_monitor = ProgressMonitor(
+                total_trials=self.n_trials,
+                notification_callback=self.progress_notification_callback,
+                milestone_percentages=[25, 50, 75],
+                log_interval=100,
+            )
+            self.progress_monitor.start()
+
+        def callback(study: "Study", trial: "optuna.trial.FrozenTrial"):
+            if self.progress_monitor:
+                self.progress_monitor.on_trial_complete(study, trial)
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            self._executor,
+            lambda: self.study.optimize(
+                self._pluggable_objective_sync,
+                n_trials=self.n_trials,
+                n_jobs=self.n_jobs,
+                timeout=self.timeout,
+                callbacks=[callback],
+                show_progress_bar=True,
+            ),
+        )
+
+        if self.progress_monitor:
+            self.progress_monitor.finish(self.study)
+
+        optimization_time = time.time() - start_time
+        is_multi_objective = self._infer_is_multi_objective()
+
+        if is_multi_objective:
+            best_trial = self.study.best_trials[0]
+            best_value = tuple(best_trial.values)
+            best_params = dict(best_trial.params)
+        else:
+            best_trial = self.study.best_trial
+            best_value = float(self.study.best_value)
+            best_params = dict(self.study.best_params)
+
+        completed_trials = [t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+        convergence_history: List[float] = []
+        if not is_multi_objective:
+            current_best = float("-inf")
+            for trial in self.study.trials:
+                if trial.state == optuna.trial.TrialState.COMPLETE and trial.value is not None:
+                    current_best = max(current_best, float(trial.value))
+                convergence_history.append(current_best)
+
+        self.logger.info(
+            f"Pluggable objective optimization completed: objective={self.objective.name if self.objective else 'N/A'}, "
+            f"completed_trials={len(completed_trials)}"
+        )
+
+        return OptimizationResult(
+            best_value=best_value if isinstance(best_value, float) else float(best_value[0]),
+            best_params=best_params,
+            best_trial_number=best_trial.number,
+            total_trials=len(self.study.trials),
+            optimization_time=optimization_time,
+            convergence_history=convergence_history,
+            study_name=self.study_name,
+            study_direction="MULTI_OBJECTIVE" if is_multi_objective else "MAXIMIZE",
+        )
+
     async def optimize(
         self,
-        positive_cases: List[str],
-        negative_cases: List[str],
-        training_window: TrainingWindowConfig
+        positive_cases: Optional[List[str]] = None,
+        negative_cases: Optional[List[str]] = None,
+        training_window: Optional[TrainingWindowConfig] = None
     ) -> OptimizationResult:
         """
         執行Optuna優化
@@ -2016,6 +2195,19 @@ class OptunaOptimizer:
         Raises:
             ValueError: 案例ID無效或不存在
         """
+        if self.objective is not None:
+            return await self._optimize_with_pluggable_objective(
+                positive_cases=positive_cases,
+                negative_cases=negative_cases,
+                training_window=training_window,
+            )
+
+        if training_window is None:
+            raise ValueError("signal_density 模式必須提供 training_window")
+
+        positive_cases = positive_cases or []
+        negative_cases = negative_cases or []
+
         # 步驟1: 數據驗證(數據真實性原則)
         self.logger.info("Validating case IDs...")
         try:

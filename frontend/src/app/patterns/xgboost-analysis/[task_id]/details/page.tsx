@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePatternStore } from '@/store/patternStore';
@@ -9,15 +9,27 @@ import ValidationTab from '@/components/pattern/details/tabs/ValidationTab';
 import FeaturesTab from '@/components/pattern/details/tabs/FeaturesTab';
 import MonitoringTab from '@/components/pattern/details/tabs/MonitoringTab';
 import DiagnosisTab from '@/components/pattern/details/tabs/DiagnosisTab';
+import { getBatchTaskStatus } from '@/lib/api/patternApi';
 
 export default function XGBoostDetailsPage() {
   const params = useParams<{ task_id: string }>();
   const taskId = params.task_id;
   const { loadDeepAnalysis, clearDeepAnalysis } = usePatternStore();
+  const [engineType, setEngineType] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (taskId) {
       loadDeepAnalysis(taskId);
+
+      getBatchTaskStatus(taskId)
+        .then((task) => {
+          const taskResult = task.result as { engine_type?: string } | undefined;
+          const type = taskResult?.engine_type;
+          if (type) setEngineType(String(type));
+        })
+        .catch(() => {
+          setEngineType(undefined);
+        });
     }
     return () => {
       clearDeepAnalysis();
@@ -28,7 +40,7 @@ export default function XGBoostDetailsPage() {
 
   return (
     <div className="min-h-screen bg-slate-950/40">
-      <DetailsHeader taskId={taskId} />
+      <DetailsHeader taskId={taskId} engineType={engineType} />
 
       <div className="max-w-7xl mx-auto px-6 py-6">
         <Tabs defaultValue="validation">

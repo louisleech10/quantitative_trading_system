@@ -10,9 +10,11 @@ Updated: 2026-01-28 - 新增 OOT 驗證功能
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Any, Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass, field
 import logging
+import pickle
+from pathlib import Path
 
 import xgboost as xgb
 from sklearn.model_selection import StratifiedKFold
@@ -29,8 +31,18 @@ from momentum.Analysis.shap_analyzer import (
     SingleCaseSHAPResult,
     InteractionEffect
 )
+from momentum.Analysis.model_types import (
+    ModelPerformance as SharedModelPerformance,
+    FeatureImportance as SharedFeatureImportance,
+    OOTValidationResult as SharedOOTValidationResult,
+)
 
 logger = get_logger(__name__)
+
+# Phase 3 dataclass migration aliases (non-breaking)
+ModelPerformanceV3 = SharedModelPerformance
+FeatureImportanceV3 = SharedFeatureImportance
+OOTValidationResultV3 = SharedOOTValidationResult
 
 
 # ==================== OOT 驗證相關資料結構 ====================
@@ -286,6 +298,16 @@ class XGBoostAnalyzer:
         self.last_pr_curve: Optional[Dict[str, List[float]]] = None
         self._shap_explainer = None
         self._shap_model_id: Optional[int] = None
+
+    def _resolve_model_path(self, path: str) -> Path:
+        allowed_root = Path("data_cache/models").resolve()
+        target = Path(path).expanduser().resolve()
+        if target.suffix != ".pkl":
+            raise ValueError("模型檔案必須為 .pkl")
+        if allowed_root != target and allowed_root not in target.parents:
+            raise ValueError("模型路徑必須在 data_cache/models/ 下")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        return target
     
     def train_model(
         self,
@@ -326,13 +348,27 @@ class XGBoostAnalyzer:
         self.logger.info(
             f"開始訓練 XGBoost 模型 - 樣本數: {len(X)}, 特徵數: {len(self.feature_names)}"
         )
+
+        X_input = X.to_numpy(dtype=float, copy=False) if isinstance(X, pd.DataFrame) else np.asarray(X, dtype=float)
+        y_input = np.asarray(y)
+
+        if len(X_input) == 0:
+            raise ValueError("X 為空")
+        if len(y_input) == 0:
+            raise ValueError("y 為空")
+        if len(X_input) != len(y_input):
+            raise ValueError("X 與 y 長度不一致")
+        if eval_size <= 0:
+            raise ValueError("eval_size 必須 > 0")
+        if eval_size >= 1:
+            raise ValueError("eval_size 必須 < 1")
         
         # 更新參數
         if xgboost_params:
             self.params = {**self.default_params, **xgboost_params}
         
         # 檢查標籤分佈
-        unique, counts = np.unique(y, return_counts=True)
+        unique, counts = np.unique(y_input, return_counts=True)
         label_dist = dict(zip(unique, counts))
         self.logger.info(f"標籤分佈: {label_dist}")
         
@@ -342,15 +378,12 @@ class XGBoostAnalyzer:
         # 分割訓練集和驗證集
         if time_series_split:
             if timestamps is None:
-                order = np.arange(len(y))
+                order = np.arange(len(y_input))
             else:
                 order = np.argsort(np.array(timestamps))
 
-            if isinstance(X, pd.DataFrame):
-                X_sorted = X.iloc[order]
-            else:
-                X_sorted = X[order]
-            y_sorted = y[order]
+            X_sorted = X_input[order]
+            y_sorted = y_input[order]
 
             split_idx = int(len(y_sorted) * (1 - eval_size))
             if split_idx < 1 or split_idx >= len(y_sorted):
@@ -361,10 +394,36 @@ class XGBoostAnalyzer:
             y_train = y_sorted[:split_idx]
             y_val = y_sorted[split_idx:]
         else:
-            from sklearn.model_selection import train_test_split
-            X_train, X_val, y_train, y_val = train_test_split(
-                X, y, test_size=eval_size, random_state=42, stratify=y
-            )
+            y_array = y_input
+            unique_labels = np.unique(y_array)
+            if len(unique_labels) < 2:
+                raise ValueError(f"標籤只有一個類別: {unique_labels}，無法訓練二分類模型")
+
+            rng = np.random.default_rng(42)
+            train_parts = []
+            val_parts = []
+
+            for label in unique_labels:
+                label_idx = np.flatnonzero(y_array == label)
+                if len(label_idx) < 2:
+                    raise ValueError("每個類別至少需要 2 筆樣本以進行分層切分")
+
+                shuffled = rng.permutation(label_idx)
+                n_val = int(round(len(label_idx) * eval_size))
+                n_val = max(1, min(len(label_idx) - 1, n_val))
+                val_parts.append(shuffled[:n_val])
+                train_parts.append(shuffled[n_val:])
+
+            train_idx = np.concatenate(train_parts)
+            val_idx = np.concatenate(val_parts)
+            rng.shuffle(train_idx)
+            rng.shuffle(val_idx)
+
+            X_train = X_input[train_idx]
+            X_val = X_input[val_idx]
+
+            y_train = y_array[train_idx]
+            y_val = y_array[val_idx]
         
         self.logger.info(
             f"訓練集: {len(X_train)} 樣本, 驗證集: {len(X_val)} 樣本"
@@ -391,7 +450,7 @@ class XGBoostAnalyzer:
         
         # 驗證模型
         performance = self.validate_model(
-            X, y, cv_folds=cv_folds,
+            X_input, y_input, cv_folds=cv_folds,
             time_series_split=time_series_split,
             timestamps=timestamps,
             purge_gap=purge_gap,
@@ -757,17 +816,17 @@ class XGBoostAnalyzer:
         if len(X) != len(y):
             raise ValueError("X 與 y 長度不一致")
 
+        X_input = X.to_numpy(dtype=float, copy=False) if isinstance(X, pd.DataFrame) else np.asarray(X, dtype=float)
+        y_input = np.asarray(y)
+
         if time_series_split:
             if timestamps is None:
-                order = np.arange(len(y))
+                order = np.arange(len(y_input))
             else:
                 order = np.argsort(np.array(timestamps))
 
-            if isinstance(X, pd.DataFrame):
-                X_ordered = X.iloc[order]
-            else:
-                X_ordered = X[order]
-            y_ordered = y[order]
+            X_ordered = X_input[order]
+            y_ordered = y_input[order]
 
             if purge_gap is not None or embargo_pct is not None:
                 split_iter = PurgedTimeSeriesSplit(
@@ -1010,19 +1069,19 @@ class XGBoostAnalyzer:
             模型效能指標
         """
         self.logger.info(f"開始交叉驗證 - {cv_folds}-fold CV")
+
+        X_input = X.to_numpy(dtype=float, copy=False) if isinstance(X, pd.DataFrame) else np.asarray(X, dtype=float)
+        y_input = np.asarray(y)
         
         # 建立交叉驗證分割
         if time_series_split:
             if timestamps is None:
-                order = np.arange(len(y))
+                order = np.arange(len(y_input))
             else:
                 order = np.argsort(np.array(timestamps))
 
-            if isinstance(X, pd.DataFrame):
-                X_ordered = X.iloc[order]
-            else:
-                X_ordered = X[order]
-            y_ordered = y[order]
+            X_ordered = X_input[order]
+            y_ordered = y_input[order]
 
             if purge_gap is not None or embargo_pct is not None:
                 split_iter = PurgedTimeSeriesSplit(
@@ -1038,8 +1097,8 @@ class XGBoostAnalyzer:
             if purge_gap is not None or embargo_pct is not None:
                 self.logger.warning("非時間序列切分下忽略 purge/embargo 參數")
             skf = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
-            X_ordered = X
-            y_ordered = y
+            X_ordered = X_input
+            y_ordered = y_input
             split_iter = skf.split(X_ordered, y_ordered)
         
         cv_auc_scores = []
@@ -1048,13 +1107,8 @@ class XGBoostAnalyzer:
         cv_f1_scores = []
         
         for fold, (train_idx, val_idx) in enumerate(split_iter):
-            # 支援 DataFrame 和 numpy array
-            if isinstance(X_ordered, pd.DataFrame):
-                X_train_fold = X_ordered.iloc[train_idx]
-                X_val_fold = X_ordered.iloc[val_idx]
-            else:
-                X_train_fold = X_ordered[train_idx]
-                X_val_fold = X_ordered[val_idx]
+            X_train_fold = X_ordered[train_idx]
+            X_val_fold = X_ordered[val_idx]
             
             y_train_fold = y_ordered[train_idx]
             y_val_fold = y_ordered[val_idx]
@@ -1384,3 +1438,63 @@ class XGBoostAnalyzer:
             status = "warning"
         
         return gap, status
+
+    def predict_proba(self, features: Any) -> np.ndarray:
+        if self.model is None:
+            raise ValueError("模型尚未訓練")
+        return self.model.predict_proba(features)
+
+    def get_feature_importance(
+        self,
+        method: str = 'gain',
+        top_n: Optional[int] = None,
+    ) -> List[FeatureImportance]:
+        if self.feature_names is None:
+            raise ValueError("特徵名稱尚未設定")
+        return self.calculate_feature_importance(
+            feature_names=self.feature_names,
+            method=method,
+            top_n=top_n,
+        )
+
+    def save_model(self, path: str) -> None:
+        if self.model is None:
+            raise ValueError("無模型可儲存")
+        safe_path = self._resolve_model_path(path)
+        payload = {
+            "model_type": "xgboost",
+            "model": self.model,
+            "feature_names": self.feature_names,
+            "params": self.params,
+        }
+        with open(safe_path, "wb") as file:
+            pickle.dump(payload, file, protocol=pickle.HIGHEST_PROTOCOL)
+        self.logger.info(f"XGBoost 模型已儲存: {safe_path}")
+
+    def load_model(self, path: str) -> None:
+        safe_path = self._resolve_model_path(path)
+        if not safe_path.exists():
+            raise FileNotFoundError(f"模型檔案不存在: {safe_path}")
+        with open(safe_path, "rb") as file:
+            payload = pickle.load(file)
+        if not isinstance(payload, dict):
+            raise ValueError("模型檔案格式錯誤")
+        if payload.get("model_type") != "xgboost":
+            raise ValueError("模型類型不匹配")
+        model = payload.get("model")
+        if model is None:
+            raise ValueError("模型檔案格式錯誤")
+        self.model = model
+        self.feature_names = payload.get("feature_names")
+        self.params = payload.get("params", dict(self.default_params))
+        self._shap_explainer = None
+        self._shap_model_id = None
+
+    def get_model_type(self) -> str:
+        return "xgboost"
+
+    def get_model_params(self) -> Dict:
+        return dict(self.params)
+
+    def get_native_model(self) -> Any:
+        return self.model

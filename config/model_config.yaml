@@ -1,0 +1,43 @@
+default_engine: lightgbm
+
+lightgbm:
+  default:
+    objective: binary
+    metric: auc
+    boosting_type: gbdt
+    num_leaves: 31
+    learning_rate: 0.05
+    n_estimators: 200
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_samples: 20
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+    random_state: 42
+    verbose: -1
+    force_col_wise: true
+  dart:
+    boosting_type: dart
+    drop_rate: 0.1
+  goss:
+    boosting_type: goss
+    top_rate: 0.2
+    other_rate: 0.1
+
+xgboost:
+  default:
+    objective: "binary:logistic"
+    eval_metric: auc
+    max_depth: 6
+    learning_rate: 0.05
+    n_estimators: 200
+    subsample: 0.8
+    colsample_bytree: 0.8
+    tree_method: hist
+    random_state: 42
+
+validation:
+  cv_folds: 5
+  purge_gap: 5
+  early_stopping_rounds: 50
+  oot_min_samples: 50

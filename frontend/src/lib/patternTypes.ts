@@ -8,6 +8,16 @@ export interface PatternRule {
   description: string;
 }
 
+export type EngineType = 'lightgbm' | 'xgboost';
+export type EngineMode = EngineType | 'both';
+
+export interface IndicatorConfig {
+  id: string;
+  indicator: string;
+  data_source: string;
+  params: Record<string, unknown>;
+}
+
 export interface Pattern {
   pattern_id: string;
   name: string;
@@ -27,7 +37,7 @@ export interface Pattern {
   updated_at: string;
   status: 'active' | 'archived' | 'testing';
   tags: string[];
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface CreatePatternRequest {
@@ -38,7 +48,7 @@ export interface CreatePatternRequest {
   xgboost_importance: Record<string, number>;
   performance_metrics: Record<string, number>;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdatePatternRequest {
@@ -46,7 +56,7 @@ export interface UpdatePatternRequest {
   description?: string;
   status?: string;
   tags?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PatternListResponse {
@@ -99,6 +109,7 @@ export interface DecisionRule {
 }
 
 export interface ModelPerformance {
+  engine_type?: EngineType;
   train_auc: number;
   cv_auc_mean: number;
   cv_auc_std: number;
@@ -187,9 +198,176 @@ export interface XGBoostAnalysisResult {
   model_path?: string;
 }
 
+export interface ValidationConfig {
+  cv_folds: number;
+  purge_gap: number;
+  oot_enabled: boolean;
+  oot_ratio: number;
+  early_stopping_rounds: number;
+}
+
+export interface ModelTrainingRequest {
+  engine: EngineType;
+  features_source: string;
+  config?: Record<string, unknown>;
+  validation?: ValidationConfig;
+  run_comparison: boolean;
+}
+
+export interface BatchAnalysisRequest {
+  engine?: EngineType;
+  symbols: string[];
+  timeframe: string;
+  indicators: IndicatorConfig[];
+  lookback_bars: number;
+  sequence_length?: number | null;
+  sequence_feature_mode?: 'aggregate' | 'flatten';
+  sequence_stride?: number;
+  aggregation_methods?: string[] | null;
+  multi_scale_windows?: number[] | null;
+  time_series_split?: boolean;
+  model_params?: Record<string, unknown>;
+  cv_folds: number;
+  run_comparison?: boolean;
+}
+
+export interface ModelPerformanceResponse {
+  engine_type?: string;
+  train_auc: number;
+  cv_auc_mean: number;
+  cv_auc_std: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
+  overfitting_score: number;
+  oot_auc?: number | null;
+  brier_score?: number | null;
+  ece?: number | null;
+  calibration_quality?: string | null;
+  pr_auc?: number | null;
+  positive_rate?: number | null;
+  training_time_seconds?: number | null;
+}
+
+export interface ComparisonReportResponse {
+  engine_performances: Record<string, ModelPerformanceResponse>;
+  consensus_rate: number;
+  feature_rank_correlation: number;
+  recommended_engine: string;
+  recommendation_reason: string;
+}
+
+export interface TaskStartResponse {
+  task_id: string;
+  status: string;
+  engine: string;
+}
+
+export interface LightGBMTrainingRequest {
+  features_source: string;
+  config?: Record<string, unknown>;
+  boosting_type: 'gbdt' | 'dart' | 'goss';
+  categorical_features?: string[];
+  validation?: ValidationConfig;
+}
+
+export interface LightGBMResultsResponse {
+  task_id: string;
+  performance: ModelPerformanceResponse;
+  feature_importance: Array<{ feature: string; importance: number; rank: number }>;
+  predictions_summary?: Record<string, unknown>;
+}
+
+export interface LightGBMConfig {
+  boosting_type: 'gbdt' | 'dart' | 'goss';
+  num_leaves: number;
+  max_depth: number;
+  learning_rate: number;
+  n_estimators: number;
+  subsample: number;
+  colsample_bytree: number;
+  min_child_samples: number;
+  reg_alpha: number;
+  reg_lambda: number;
+  min_gain_to_split: number;
+  categorical_features?: string[];
+}
+
+export interface XGBoostConfig {
+  max_depth: number;
+  learning_rate: number;
+  n_estimators: number;
+  subsample: number;
+  colsample_bytree: number;
+  min_child_weight: number;
+  gamma: number;
+  reg_alpha: number;
+  reg_lambda: number;
+}
+
+export interface ModelHyperparamOptimizationRequest {
+  task_type: 'model_hyperparam';
+  engine: EngineType;
+  n_trials: number;
+  objective_config: {
+    engine: EngineType;
+    features_source?: string;
+    cv_folds?: number;
+    base_model_params?: Record<string, unknown>;
+  };
+}
+
+export interface AnalysisResult {
+  symbol: string;
+  symbols?: string[];
+  timeframe: string;
+  total_cases: number;
+  valid_cases: number;
+  positive_cases: number;
+  negative_cases: number;
+  features_generated: number;
+  feature_names: string[];
+  engine_type?: EngineType;
+  model_performance: ModelPerformance;
+  feature_importance: FeatureImportance[];
+  decision_rules: DecisionRule[];
+  precision_at_k?: PrecisionAtKResult | null;
+  expectancy?: ExpectancyResult | null;
+  bootstrap_ci?: Record<string, BootstrapCIResult> | null;
+  permutation_importance?: PermutationImportanceResult | null;
+  fold_importance_stability?: FoldImportanceStabilityResult | null;
+  cross_symbol_validation?: CrossSymbolValidationResult[] | null;
+  model_saved: boolean;
+  model_path?: string;
+  metadata?: {
+    data_selection?: {
+      symbol?: string;
+      symbols?: string[];
+      timeframe: string;
+      lookback_bars: number;
+    };
+    indicator_config?: Array<{
+      indicator: string;
+      data_source: string;
+      params: Record<string, unknown>;
+    }>;
+    sequence_config?: {
+      sequence_length: number;
+      sequence_feature_mode: 'aggregate' | 'flatten';
+      sequence_stride: number;
+      aggregation_methods: string[];
+      multi_scale_windows: number[];
+    };
+    training_config?: {
+      time_series_split: boolean;
+      cv_folds: number;
+    };
+  };
+}
+
 export interface XGBoostAnalysisRequest {
   case_id: string;
-  xgboost_params?: Record<string, any>;
+  xgboost_params?: Record<string, unknown>;
   cv_folds?: number;
   top_n_rules?: number;
   min_support?: number;

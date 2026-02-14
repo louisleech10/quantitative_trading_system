@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Protocol, Iterable, Any, Dict, Optional, Callable, runtime_checkable
+from typing import (
+    Protocol,
+    Iterable,
+    Any,
+    Dict,
+    Optional,
+    Callable,
+    List,
+    Tuple,
+    Union,
+    runtime_checkable,
+)
 
 
 @runtime_checkable
@@ -57,6 +68,57 @@ class IModelTrainer(Protocol):
         *args: Any,
         **kwargs: Any,
     ) -> Any:
+        ...
+
+    def predict_proba(self, features: Any) -> Any:
+        ...
+
+    def get_feature_importance(
+        self,
+        method: str = "gain",
+        top_n: Optional[int] = None,
+    ) -> Any:
+        ...
+
+    def save_model(self, path: str) -> None:
+        ...
+
+    def load_model(self, path: str) -> None:
+        ...
+
+    def get_model_type(self) -> str:
+        ...
+
+    def get_model_params(self) -> Dict[str, Any]:
+        ...
+
+    def get_native_model(self) -> Any:
+        ...
+
+
+@runtime_checkable
+class IOptimizationObjective(Protocol):
+    """Pluggable optimization objective protocol."""
+
+    @property
+    def name(self) -> str:
+        ...
+
+    @property
+    def direction(self) -> str:
+        ...
+
+    @property
+    def directions(self) -> Optional[List[str]]:
+        ...
+
+    def create_search_space(self, trial: Any) -> Dict[str, Any]:
+        ...
+
+    def evaluate(self, params: Dict[str, Any]) -> Union[float, Tuple[float, ...]]:
+        ...
+
+    def get_pruning_callback(self, trial: Any) -> Optional[Any]:
         ...
 
 

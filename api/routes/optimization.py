@@ -12,7 +12,7 @@ Author: Claude (Phase 3.5 Day 5-6)
 Date: 2025-11-02
 """
 
-from typing import Optional, List
+from typing import Optional, List, Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -36,9 +36,13 @@ logger = get_logger("api.routes.optimization")
 class CreateOptimizationTaskRequest(BaseModel):
     """創建優化任務請求"""
     study_name: str = Field(..., description="Optuna Study名稱")
-    positive_cases: List[str] = Field(..., description="正例案例ID列表", min_items=1)
-    negative_cases: List[str] = Field(..., description="反例案例ID列表", min_items=1)
-    training_window: TrainingWindowConfig = Field(..., description="訓練窗口配置")
+    positive_cases: List[str] = Field(default_factory=list, description="正例案例ID列表")
+    negative_cases: List[str] = Field(default_factory=list, description="反例案例ID列表")
+    training_window: Optional[TrainingWindowConfig] = Field(None, description="訓練窗口配置")
+    task_type: Literal["signal_density", "model_hyperparam", "strategy_backtest"] = Field(
+        "signal_density", description="任務類型"
+    )
+    objective_config: Optional[dict] = Field(None, description="可插拔 objective 的配置")
     sampler_type: str = Field("TPE", description="優化器類型（TPE/CmaEs/Random/GP/NSGA-II）")
     n_trials: int = Field(100, description="試驗次數", ge=1, le=10000)
     n_startup_trials: Optional[int] = Field(None, description="TPE 初始隨機試驗數（None 則自動設為 n_trials 的 15-25%）", ge=1, le=1000)
@@ -101,12 +105,20 @@ async def create_optimization_task(request: CreateOptimizationTaskRequest):
         task_id: 任務ID，用於後續查詢和控制
     """
     try:
+        if request.task_type == "signal_density":
+            if request.training_window is None:
+                raise HTTPException(status_code=422, detail="signal_density 任務必須提供 training_window")
+            if not request.positive_cases or not request.negative_cases:
+                raise HTTPException(status_code=422, detail="signal_density 任務必須提供 positive_cases 與 negative_cases")
+
         # 創建任務
         task_id = optimization_task_service.create_task(
             study_name=request.study_name,
             positive_cases=request.positive_cases,
             negative_cases=request.negative_cases,
             training_window=request.training_window,
+            task_type=request.task_type,
+            objective_config=request.objective_config,
             sampler_type=request.sampler_type,
             n_trials=request.n_trials,
             n_startup_trials=request.n_startup_trials,
