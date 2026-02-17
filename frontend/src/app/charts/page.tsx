@@ -236,7 +236,7 @@ export default function ChartsPage() {
       setSelectedTimestamp(null);
       setCurrentCase(null);
     }
-  }, [selectedSymbol, caseTypeFilter, filteredCases.length]);
+  }, [filteredCases]);
 
   // ============ 更新當前案例 ============
   useEffect(() => {
@@ -433,6 +433,7 @@ export default function ChartsPage() {
 
   // ============ 計算近窗口遮罩 (near window overlay) ============
   const windowOverlays = useMemo<WindowOverlayRange[]>(() => {
+  void windowOverlays;
     // 需要 alignedCaseTimestamp (TO 時間戳) 和 timeframe 來計算
     const toTs = alignedCaseTimestamp ?? selectedTimestamp;
     if (!toTs || !selectedTimeframe) return [];
@@ -521,6 +522,7 @@ export default function ChartsPage() {
     
     // 遍歷每個時間點檢查策略條件
     chartData.klines.forEach((kline, index) => {
+    void index;
       const ts = kline.timestamp;
       
       // 查找對應的 EMA 值

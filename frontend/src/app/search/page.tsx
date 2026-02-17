@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import { Search, RefreshCw, AlertCircle, HelpCircle, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics, formatTimestamp } from '@/lib/searchResultUtils';
+void formatTimestamp;
 import { MarketPhasePieChart, HourDistributionPieChart, DayOfWeekPieChart, MarketClassPieChart, DifficultyPieChart } from '@/components/ui/PieChart';
 import { useSearchStore } from '@/store/searchStore';
-import { PriceChangeMethod } from '@/lib/types';
+import { PriceChangeMethod, CaseData } from '@/lib/types';
 
 
 
@@ -85,7 +86,11 @@ export default function SearchPage() {
 
   // 反例範圍值狀態 (用於反例 BETWEEN 運算符)
   const [negativeRangeValues, setNegativeRangeValues] = useState({
-    priceChange: { min: null as number | null, max: null as number | null }
+    priceChange: { min: null as number | null, max: null as number | null },
+    volumeMultiplier: { min: null as number | null, max: null as number | null },
+    closingStrength: { min: null as number | null, max: null as number | null },
+    takerBuyRatio: { min: null as number | null, max: null as number | null },
+    pricePosition: { min: null as number | null, max: null as number | null }
   }); 
 
   // 時間日期和交易量限制狀態
@@ -108,7 +113,7 @@ export default function SearchPage() {
     closingStrength: null as number | null,
     takerBuyRatio: null as number | null,
     pricePosition: null as number | null,
-    customConditions: [] as any[]
+    customConditions: [] as unknown[]
   });
 
   // 反例運算符狀態
@@ -511,18 +516,18 @@ export default function SearchPage() {
       ].join(',');
 
       // 格式化函數
-      const formatNumber = (value: any, decimals: number = 4): string => {
-        if (value === null || value === undefined || isNaN(value)) return '';
+      const formatNumber = (value: number | undefined | null, decimals: number = 4): string => {
+        if (value === null || value === undefined || Number.isNaN(value)) return '';
         return Number(value).toFixed(decimals);
       };
 
-      const formatPercentage = (value: any): string => {
-        if (value === null || value === undefined || isNaN(value)) return '';
+      const formatPercentage = (value: number | undefined | null): string => {
+        if (value === null || value === undefined || Number.isNaN(value)) return '';
         return (Number(value) * 100).toFixed(5);  // 🔥 改為5位小數以顯示連續市場中的細微差異
       };
 
       // 生成CSV內容
-      const csvRows = currentResult.cases.map((case_: any) => [
+      const csvRows = currentResult.cases.map((case_: CaseData) => [
         // 基本資訊
         case_.symbol || '',
         case_.timestamp || '',
@@ -582,7 +587,10 @@ export default function SearchPage() {
         case_.market_class_name || '',
         case_.difficulty_level || '',
         // 正反例標記
-        case_.positive_case !== undefined ? (case_.positive_case ? '1' : '0') : ''
+        (() => {
+          const positiveCase = (case_ as CaseData & { positive_case?: boolean | number }).positive_case;
+          return positiveCase !== undefined ? (positiveCase ? '1' : '0') : '';
+        })()
       ].join(','));
 
       // 組合完整CSV內容
@@ -763,7 +771,7 @@ export default function SearchPage() {
 
   React.useEffect(() => {
     setSymbolsInput(searchParams.symbols.join(', '));
-  }, []);
+  }, [searchParams.symbols]);
 
   return (
     <div className="h-full overflow-auto">

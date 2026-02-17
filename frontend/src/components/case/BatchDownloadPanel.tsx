@@ -95,6 +95,7 @@ export default function BatchDownloadPanel({
 
     // 計算總lookback（warmup + 有效K線）
     const totalLookbackBars = warmupBars + lookbackBars;
+    void totalLookbackBars;
 
     // 保存lookback/forward設定到localStorage，供圖表頁面使用
     localStorage.setItem('kline_warmup_bars', warmupBars.toString());

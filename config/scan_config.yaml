@@ -287,6 +287,83 @@ atomic_indicators:
       - name: CORREL
         periods: [5, 8, 13, 21, 34, 55]
 
+  microstructure:
+    enabled: false
+    windows: [5, 13, 21, 55]
+    epsilon: 1.0e-10
+    min_trades: 1
+    enabled_features: all
+    cs_spread_smooth: [5, 13, 21]
+    ofi_raw: true
+    kyle_lambda_windows: [13, 21, 55]
+    vpin_n_buckets: [30, 50]
+    vpin_zscore_windows: [21, 55]
+
+  entropy:
+    enabled: false
+    windows: [55, 100]
+    n_bins: 10
+    apen_m: 2
+    apen_r_ratio: 0.2
+    hurst_windows: [55, 100, 200]
+    fractal_kmax: 10
+    use_numba: true
+    perm_m: 3
+    perm_windows: [21, 55, 100]
+    apply_to:
+      - close_return
+    shannon_windows: [21, 55, 100]
+
+  tail_risk:
+    enabled: false
+    windows: [21, 55, 100]
+    cvar_alphas: [0.01, 0.05]
+    rv_windows: [13, 21, 55]
+    mdd_windows: [21, 55, 100]
+
+preprocessing:
+  enabled: false
+  mode: append
+
+  winsorization:
+    enabled: true
+    method: sigma
+    sigma_k: 3.0
+    quantile_range: [0.01, 0.99]
+    apply_to: all
+
+  adf_differencing:
+    enabled: false
+    adf_threshold: 0.05
+    max_diff: 2
+    sample_size: 500
+    apply_to: non_stationary
+
+  fractional_differencing:
+    enabled: false
+    d_range: [0.0, 1.0]
+    adf_threshold: 0.05
+    weight_threshold: 1.0e-5
+    precision: 0.01
+    apply_to: non_stationary
+    cache_d_star: true
+
+  rank_transform:
+    enabled: true
+    window: 252
+    apply_to: all
+
+  gaussian_normalize:
+    enabled: false
+    clip_range: [0.001, 0.999]
+    apply_to: all
+
+  adaptive_zscore:
+    enabled: true
+    windows: [100, 252]
+    epsilon: 1.0e-8
+    apply_to: all
+
 operators:
   distance:
     enabled: true

@@ -30,7 +30,7 @@ export interface OptimizationTaskProgress {
   total_trials: number
   completion_percentage: number
   best_value?: number
-  best_params?: Record<string, any>
+  best_params?: Record<string, unknown>
   elapsed_time: number
   estimated_remaining_time?: number
   trials_per_hour: number
@@ -70,7 +70,7 @@ export interface OptimizationConfig {
 
 export interface OptimizationResult {
   best_value: number
-  best_params: Record<string, any>
+  best_params: Record<string, unknown>
   best_trial_number: number
   n_trials: number
   optimization_time: number
@@ -80,6 +80,7 @@ export interface OptimizationResult {
 
 export type WebSocketEventType =
   | 'connected'
+  | 'task_status'
   | 'optimization_started'
   | 'progress_update'
   | 'new_best_value'
@@ -90,7 +91,7 @@ export type WebSocketEventType =
 
 export interface WebSocketMessage {
   event: WebSocketEventType
-  data: any
+  data: unknown
   timestamp: string
 }
 
@@ -109,7 +110,7 @@ export interface NewBestValueData {
   task_id: string
   trial_number: number
   best_value: number
-  best_params: Record<string, any>
+  best_params: Record<string, unknown>
   completion_percentage: number
 }
 
@@ -137,7 +138,7 @@ export interface CreateOptimizationTaskRequest {
   n_trials: number
   n_jobs: number
   use_multi_objective: boolean
-  parameter_ranges?: any
+  parameter_ranges?: unknown
 }
 
 export interface CreateOptimizationTaskResponse {
@@ -180,7 +181,7 @@ export interface OptimizationHistoryPoint {
   value: number
   best_value_so_far: number
   datetime: string
-  params: Record<string, any>
+  params: Record<string, unknown>
   state: string // COMPLETE, PRUNED, FAIL
 }
 
@@ -195,7 +196,7 @@ export interface OptimizationHistoryResponse {
 export interface ParamSpacePoint {
   trial_number: number
   value: number
-  params: Record<string, any>
+  params: Record<string, unknown>
   state: string
 }
 
@@ -288,8 +289,8 @@ export interface TrialDetail {
   value: number
   datetime_start?: string
   datetime_complete?: string
-  params: Record<string, any>
-  user_attrs?: Record<string, any>
+  params: Record<string, unknown>
+  user_attrs?: Record<string, unknown>
   state?: string // COMPLETE, PRUNED, FAIL
 }
 
@@ -303,12 +304,12 @@ export interface TrialsResponse {
 // 完整優化結果
 export interface OptimizationResultDetail {
   best_value: number
-  best_params: Record<string, any>
+  best_params: Record<string, unknown>
   best_trial_number: number
   n_trials: number
   optimization_time: number
   study_direction: string
-  convergence_info?: any
+  convergence_info?: unknown
 }
 
 export interface OptimizationResultResponse {

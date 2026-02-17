@@ -48,7 +48,7 @@ export default function RollingAUCChart({ data, loading }: RollingAUCChartProps)
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="ts" tickFormatter={formatTs} />
             <YAxis domain={[0, 1]} />
-            <Tooltip formatter={(value: any) => value === null ? 'N/A' : Number(value).toFixed(3)} labelFormatter={(label) => formatTs(Number(label))} />
+            <Tooltip formatter={(value: unknown) => value === null ? 'N/A' : Number(value).toFixed(3)} labelFormatter={(label) => formatTs(Number(label))} />
             {data.warning_zones?.map((zone, idx) => (
               <ReferenceArea
                 key={`zone-${idx}`}

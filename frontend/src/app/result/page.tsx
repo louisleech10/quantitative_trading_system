@@ -3,8 +3,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Download, RefreshCw, AlertCircle, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
-import { calculateActualStatistics, getStatisticsSummary, validateBackendStatistics } from '@/lib/searchResultUtils';
+import { Search, Download, RefreshCw, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { calculateActualStatistics, getStatisticsSummary } from '@/lib/searchResultUtils';
 
 // ===== 擴充現有的類型定義 =====
 interface CaseData {
@@ -148,16 +148,12 @@ interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   timestamp: string;
 }
 
 // ===== 參數常數定義 =====
-const BASIC_TRIGGER_PARAMETERS = [
-  'price_change', 'closing_strength', 'price_position', 'volume_multiplier', 'taker_buy_ratio'
-];
-
 const FUTURE_RETURN_PARAMETERS = [
   'future_1bar_return', 'future_2bar_return', 'future_3bar_return', 'future_4bar_return',
   'future_5bar_return', 'future_6bar_return', 'future_7bar_return', 'future_8bar_return',
@@ -174,7 +170,6 @@ export default function ResultsPage() {
   const [searchResults, setSearchResults] = useState<SearchResultData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   
   // ===== 新增：表格展開狀態管理 =====
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -238,7 +233,6 @@ export default function ResultsPage() {
       }
 
       const taskId = executeData.data.task_id;
-      setSelectedTaskId(taskId);
       
       console.log('Search task started with ID:', taskId);
       

@@ -19,10 +19,23 @@ interface StabilityChartProps {
   stabilityData: StabilityAnalysis
 }
 
+interface StabilityTooltipData {
+  month: string
+  mean_value: number
+  std_value: number
+  n_trials: number
+  is_worst_month: boolean
+}
+
+interface StabilityTooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: StabilityTooltipData }>
+}
+
 export function StabilityChart({ stabilityData }: StabilityChartProps) {
   // 自定義 Tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+  const CustomTooltip = ({ active, payload }: StabilityTooltipProps) => {
+    if (active && payload && payload.length > 0) {
       const data = payload[0].payload
       return (
         <div className="bg-popover border rounded-lg shadow-lg p-3">

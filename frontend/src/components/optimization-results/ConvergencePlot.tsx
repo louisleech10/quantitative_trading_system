@@ -19,10 +19,20 @@ interface ConvergencePlotProps {
   convergenceData: ConvergenceAnalysis
 }
 
+interface ConvergenceTooltipPoint {
+  trial: number
+  value: number
+}
+
+interface ConvergenceTooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: ConvergenceTooltipPoint }>
+}
+
 export function ConvergencePlot({ convergenceData }: ConvergencePlotProps) {
   // 自定義 Tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+  const CustomTooltip = ({ active, payload }: ConvergenceTooltipProps) => {
+    if (active && payload && payload.length > 0) {
       const data = payload[0].payload
       return (
         <div className="bg-popover border rounded-lg shadow-lg p-3">

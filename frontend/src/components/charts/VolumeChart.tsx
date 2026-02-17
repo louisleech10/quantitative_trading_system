@@ -20,7 +20,7 @@ import {
   formatVolume,
   chartColors
 } from '../../utils/chartConfig';
-import { ISeriesApi, UTCTimestamp } from 'lightweight-charts';
+import { ISeriesApi, MouseEventParams, Time, UTCTimestamp } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
 import type { WindowOverlayRange, IndicatorLineSeries } from './TradingChartWithSignals';
 import type { SignalPoint } from './StrategySignalChart';
@@ -105,7 +105,7 @@ export interface VolumeChartProps {
  * 成交量柱狀圖數據格式
  */
 interface VolumeBarData {
-  time: any;  // Lightweight Charts Time type
+  time: UTCTimestamp;
   value: number;
   color: string;
 }
@@ -126,6 +126,7 @@ export function VolumeChart({
   indicatorSeries = [],
   signalPoints = []
 }: VolumeChartProps) {
+  void timeframe;
   const { chartContainerRef, chartInstance, isReady } = useChartSync({
     chartId,
     toTimestamp: toTimestamp || (klines.length > 0 ? klines[0].timestamp : Date.now() / 1000),
@@ -257,7 +258,7 @@ export function VolumeChart({
         const color = calculateVolumeColor(kline.close, prevClose, chartColors.upColor, chartColors.downColor);
 
         return {
-          time: kline.timestamp as any,
+          time: toUtcTime(kline.timestamp),
           value: kline.volume,
           color: color,
         };
@@ -275,16 +276,17 @@ export function VolumeChart({
       console.log(`[VolumeChart] Rendered ${volumeData.length} volume bars for ${symbol}`);
 
       // 訂閱懸停事件（用於顯示成交量數值和指標值）
-      const handleCrosshairMove = (param: any) => {
-        if (param.time) {
-          const hoveredKline = klines.find(k => k.timestamp === param.time);
+      const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+        const crosshairTime = typeof param.time === 'number' ? param.time : null
+        if (crosshairTime !== null) {
+          const hoveredKline = klines.find(k => k.timestamp === crosshairTime);
           if (hoveredKline) {
             setHoveredVolume(hoveredKline.volume);
           }
           // 查找指標值（使用 ref 避免閉包問題）
           const indicatorValues: Record<string, number> = {};
           indicatorSeriesRef.current.forEach((series) => {
-            const point = series.data.find((d) => d.time === param.time);
+            const point = series.data.find((d) => d.time === crosshairTime);
             if (point) {
               indicatorValues[series.id] = point.value;
             }

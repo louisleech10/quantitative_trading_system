@@ -31,6 +31,10 @@ from momentum.FeatureEngineering.atomic.cycle_indicators import CycleIndicatorEn
 from momentum.FeatureEngineering.atomic.pattern_indicators import PatternIndicatorEngine
 from momentum.FeatureEngineering.atomic.statistics_indicators import StatisticsIndicatorEngine
 from momentum.FeatureEngineering.atomic.custom_indicators import CustomIndicatorEngine
+from momentum.FeatureEngineering.atomic.microstructure_indicators import MicrostructureIndicatorEngine
+from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicatorEngine
+from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
+from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
 
 logger = get_logger(__name__)
@@ -120,11 +124,18 @@ class FeatureFactory:
         layer5 = self._safe_execute("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
         layer6 = self._safe_execute("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
 
+        layers = [layer1, layer2, layer3, layer4, layer5, layer6]
+        if config.preprocessing.enabled:
+            all_features = self._combine_layers(layers)
+            preprocessed = self._safe_execute("Layer 6.5", self._layer6_5_preprocessing, all_features, config)
+            if not preprocessed.empty:
+                layers = [preprocessed]
+
         result = self._layer7_validate_and_persist(
             symbol,
             timeframe,
             raw_data,
-            [layer1, layer2, layer3, layer4, layer5, layer6],
+            layers,
             config,
             time.time() - start_time,
             config_hash,
@@ -156,6 +167,15 @@ class FeatureFactory:
         sources = list(dict.fromkeys(config.data_sources.enabled_sources + config.data_sources.synthetic_sources))
         data = self._adapter_registry.fetch_aligned(symbol, timeframe, sources)
         data = data.sort_index()
+        if not data.index.is_unique:
+            duplicate_count = int(data.index.duplicated(keep="last").sum())
+            logger.warning(
+                "Layer 0 detected duplicated index for %s/%s, dropping %d rows and keeping last occurrence",
+                symbol,
+                timeframe,
+                duplicate_count,
+            )
+            data = data[~data.index.duplicated(keep="last")]
         return data
 
     def _layer1_atomic_indicators(self, data: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
@@ -192,6 +212,27 @@ class FeatureFactory:
         if config.atomic_indicators.statistics.enabled:
             engine = StatisticsIndicatorEngine(config.atomic_indicators.statistics.model_dump(), sources)
             frames.append(engine.compute_all(data))
+
+        if config.atomic_indicators.microstructure.enabled:
+            try:
+                engine = MicrostructureIndicatorEngine(config.atomic_indicators.microstructure.model_dump(), sources)
+                frames.append(engine.compute_all(data))
+            except Exception as exc:
+                logger.warning("Microstructure engine failed: %s", exc)
+
+        if config.atomic_indicators.entropy.enabled:
+            try:
+                engine = EntropyIndicatorEngine(config.atomic_indicators.entropy.model_dump(), sources)
+                frames.append(engine.compute_all(data))
+            except Exception as exc:
+                logger.warning("Entropy engine failed: %s", exc)
+
+        if config.atomic_indicators.tail_risk.enabled:
+            try:
+                engine = TailRiskIndicatorEngine(config.atomic_indicators.tail_risk.model_dump(), sources)
+                frames.append(engine.compute_all(data))
+            except Exception as exc:
+                logger.warning("Tail risk engine failed: %s", exc)
 
         if config.custom_indicators:
             engine = CustomIndicatorEngine()
@@ -336,6 +377,11 @@ class FeatureFactory:
 
         return pd.concat(frames, axis=1)
 
+    def _layer6_5_preprocessing(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
+        """Layer 6.5: Feature preprocessing and normalization."""
+        preprocessor = FeaturePreprocessor(config.preprocessing.model_dump())
+        return preprocessor.transform(all_features)
+
     def _layer7_validate_and_persist(
         self,
         symbol: str,
@@ -438,16 +484,27 @@ class FeatureFactory:
         valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
         if not valid_layers:
             return pd.DataFrame()
-        return pd.concat(valid_layers, axis=1, copy=False)
+        combined = pd.concat(valid_layers, axis=1, copy=False)
+        if combined.columns.has_duplicates:
+            duplicate_count = int(combined.columns.duplicated(keep="first").sum())
+            logger.warning(
+                "Combined feature layers contain duplicated columns, dropping %d duplicate columns",
+                duplicate_count,
+            )
+            combined = combined.loc[:, ~combined.columns.duplicated(keep="first")]
+        return combined
 
     @staticmethod
     def _ensure_float32(df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:
             return df
-        for idx in range(df.shape[1]):
-            series = df.iloc[:, idx]
-            if pd.api.types.is_numeric_dtype(series):
-                df.iloc[:, idx] = series.astype("float32")
+        numeric_columns = [
+            column_name
+            for column_name in df.columns
+            if pd.api.types.is_numeric_dtype(df[column_name])
+        ]
+        for column_name in numeric_columns:
+            df[column_name] = df[column_name].astype("float32")
         return df
 
     @staticmethod
@@ -490,6 +547,24 @@ class FeatureFactory:
         if config.atomic_indicators.statistics.enabled:
             engine = StatisticsIndicatorEngine(config.atomic_indicators.statistics.model_dump(), sources)
             metadata.update(engine.get_feature_metadata())
+        if config.atomic_indicators.microstructure.enabled:
+            try:
+                engine = MicrostructureIndicatorEngine(config.atomic_indicators.microstructure.model_dump(), sources)
+                metadata.update(engine.get_feature_metadata())
+            except Exception as exc:
+                logger.warning("Microstructure metadata build failed: %s", exc)
+        if config.atomic_indicators.entropy.enabled:
+            try:
+                engine = EntropyIndicatorEngine(config.atomic_indicators.entropy.model_dump(), sources)
+                metadata.update(engine.get_feature_metadata())
+            except Exception as exc:
+                logger.warning("Entropy metadata build failed: %s", exc)
+        if config.atomic_indicators.tail_risk.enabled:
+            try:
+                engine = TailRiskIndicatorEngine(config.atomic_indicators.tail_risk.model_dump(), sources)
+                metadata.update(engine.get_feature_metadata())
+            except Exception as exc:
+                logger.warning("Tail risk metadata build failed: %s", exc)
 
         indicator_specs: Dict[str, Dict] = {}
         for name in layer1.columns:

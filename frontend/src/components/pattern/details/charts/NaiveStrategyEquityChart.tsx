@@ -43,7 +43,7 @@ export default function NaiveStrategyEquityChart({ data, loading }: NaiveStrateg
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="ts" tickFormatter={formatTs} />
             <YAxis />
-            <Tooltip formatter={(value: any) => Number(value).toFixed(4)} labelFormatter={(label) => formatTs(Number(label))} />
+            <Tooltip formatter={(value: unknown) => Number(value).toFixed(4)} labelFormatter={(label) => formatTs(Number(label))} />
             <Line type="monotone" dataKey="strategy" stroke="#34d399" dot={false} name="策略" />
             <Line type="monotone" dataKey="benchmark" stroke="#60a5fa" dot={false} name="基準" />
           </LineChart>

@@ -66,6 +66,11 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
     }
   })
 
+  const getNumericUserAttr = (trial: TrialDetail, key: string): number | undefined => {
+    const value = trial.user_attrs?.[key]
+    return typeof value === 'number' ? value : undefined
+  }
+
   // 匯出 CSV
   const handleExportCSV = () => {
     if (onExport) {
@@ -220,38 +225,51 @@ export function TrialRankingTable({ trials, onExport }: TrialRankingTableProps) 
                     <TableCell className="text-xs">
                       {trial.user_attrs && Object.keys(trial.user_attrs).length > 0 ? (
                         <div className="space-y-0.5">
+                          {(() => {
+                            const mSeparation = getNumericUserAttr(trial, 'm_separation')
+                            const positiveWeightedMeanM = getNumericUserAttr(trial, 'positive_weighted_mean_m')
+                            const negativeWeightedMeanM = getNumericUserAttr(trial, 'negative_weighted_mean_m')
+                            const pValue = getNumericUserAttr(trial, 'p_value')
+                            const cohensD = getNumericUserAttr(trial, 'cohens_d')
+                            const stabilityCv = getNumericUserAttr(trial, 'stability_cv')
+
+                            return (
+                              <>
                           {/* Golden Formula 核心指標 */}
-                          {trial.user_attrs.m_separation !== undefined && (
+                          {mSeparation !== undefined && (
                             <div className="font-semibold text-blue-400">
-                              M分離: {trial.user_attrs.m_separation.toFixed(4)}
+                              M分離: {mSeparation.toFixed(4)}
                             </div>
                           )}
-                          {trial.user_attrs.positive_weighted_mean_m !== undefined && (
+                          {positiveWeightedMeanM !== undefined && (
                             <div className="text-muted-foreground">
-                              μ_pos: {trial.user_attrs.positive_weighted_mean_m.toFixed(4)}
+                              μ_pos: {positiveWeightedMeanM.toFixed(4)}
                             </div>
                           )}
-                          {trial.user_attrs.negative_weighted_mean_m !== undefined && (
+                          {negativeWeightedMeanM !== undefined && (
                             <div className="text-muted-foreground">
-                              μ_neg: {trial.user_attrs.negative_weighted_mean_m.toFixed(4)}
+                              μ_neg: {negativeWeightedMeanM.toFixed(4)}
                             </div>
                           )}
                           {/* 統計檢驗指標 */}
-                          {trial.user_attrs.p_value !== undefined && (
-                            <div className={trial.user_attrs.p_value < 0.05 ? "text-emerald-400" : trial.user_attrs.p_value < 0.1 ? "text-amber-400" : "text-muted-foreground"}>
-                              p: {trial.user_attrs.p_value.toFixed(4)}
+                          {pValue !== undefined && (
+                            <div className={pValue < 0.05 ? "text-emerald-400" : pValue < 0.1 ? "text-amber-400" : "text-muted-foreground"}>
+                              p: {pValue.toFixed(4)}
                             </div>
                           )}
-                          {trial.user_attrs.cohens_d !== undefined && (
-                            <div className={trial.user_attrs.cohens_d > 0.8 ? "text-emerald-400" : trial.user_attrs.cohens_d > 0.5 ? "text-amber-400" : "text-muted-foreground"}>
-                              d: {trial.user_attrs.cohens_d.toFixed(3)}
+                          {cohensD !== undefined && (
+                            <div className={cohensD > 0.8 ? "text-emerald-400" : cohensD > 0.5 ? "text-amber-400" : "text-muted-foreground"}>
+                              d: {cohensD.toFixed(3)}
                             </div>
                           )}
-                          {trial.user_attrs.stability_cv !== undefined && (
-                            <div className={trial.user_attrs.stability_cv < 0.3 ? "text-emerald-400" : trial.user_attrs.stability_cv < 0.5 ? "text-amber-400" : "text-muted-foreground"}>
-                              cv: {trial.user_attrs.stability_cv.toFixed(3)}
+                          {stabilityCv !== undefined && (
+                            <div className={stabilityCv < 0.3 ? "text-emerald-400" : stabilityCv < 0.5 ? "text-amber-400" : "text-muted-foreground"}>
+                              cv: {stabilityCv.toFixed(3)}
                             </div>
                           )}
+                              </>
+                            )
+                          })()}
                         </div>
                       ) : (
                         <div className="text-muted-foreground italic">無統計數據</div>

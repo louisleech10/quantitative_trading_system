@@ -19,6 +19,12 @@ import { usePatternStore } from '@/store/patternStore';
 import { deletePattern, updatePattern } from '@/lib/api/patternApi';
 import type { Pattern, UpdatePatternRequest } from '@/lib/patternTypes';
 
+interface IndicatorConfigItem {
+  indicator?: string;
+  data_source?: string;
+  params?: Record<string, unknown>;
+}
+
 interface Props {
   pattern: Pattern;
   onUpdate?: () => void;
@@ -52,8 +58,8 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
       const request: UpdatePatternRequest = {
         status: newStatus
       };
-      const updated = await updatePattern(pattern.pattern_id, request);
-      updatePatternInStore(updated);
+      await updatePattern(pattern.pattern_id, request);
+      updatePatternInStore(pattern.pattern_id, { status: newStatus as Pattern['status'] });
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error('更新狀態失敗:', error);
@@ -295,7 +301,13 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
                   <span className="text-emerald-300">📈</span> 指標配置
                 </h3>
                 <div className="space-y-2">
-                  {pattern.metadata.indicator_config.map((indicator: any, idx: number) => (
+                  {pattern.metadata.indicator_config.map((rawIndicator, idx: number) => {
+                    const indicator: IndicatorConfigItem =
+                      typeof rawIndicator === 'object' && rawIndicator !== null
+                        ? (rawIndicator as IndicatorConfigItem)
+                        : {}
+
+                    return (
                     <div key={idx} className="bg-slate-900/40 border border-white/10 rounded p-3 text-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="px-2 py-1 bg-blue-400/15 text-blue-200 rounded text-xs font-semibold">
@@ -315,7 +327,7 @@ export default function PatternDetail({ pattern, onUpdate }: Props) {
                         </div>
                       )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
             )}

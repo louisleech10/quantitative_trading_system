@@ -13,7 +13,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, ResponsiveContainer } from 'recharts';
 import { usePatternStore } from '@/store/patternStore';
 import { getPattern } from '@/lib/api/patternApi';
@@ -27,29 +27,33 @@ export default function PatternComparison() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedPatterns, setSelectedPatterns] = useState<Pattern[]>([]);
   const [loading, setLoading] = useState(false);
+  void loading;
   
-  // 載入選中的樣式
-  useEffect(() => {
-    if (selectedIds.length === 0) {
-      setSelectedPatterns([]);
-      return;
-    }
-    
-    loadSelectedPatterns();
-  }, [selectedIds]);
-  
-  const loadSelectedPatterns = async () => {
+  const loadSelectedPatterns = useCallback(async () => {
     try {
       setLoading(true);
       const promises = selectedIds.map(id => getPattern(id));
-      const loaded = await Promise.all(promises);
+      const loadedResponses = await Promise.all(promises);
+      const loaded = loadedResponses
+        .filter((response) => response.success && response.pattern)
+        .map((response) => response.pattern as Pattern);
       setSelectedPatterns(loaded);
     } catch (error) {
       console.error('載入樣式失敗:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedIds]);
+
+  // 載入選中的樣式
+  useEffect(() => {
+    if (selectedIds.length === 0) {
+      setSelectedPatterns([]);
+      return;
+    }
+
+    loadSelectedPatterns();
+  }, [loadSelectedPatterns, selectedIds.length]);
   
   // 新增樣式
   const handleAddPattern = (patternId: string) => {
@@ -172,7 +176,7 @@ export default function PatternComparison() {
                   <td className="px-4 py-3 font-semibold text-slate-100">準確度</td>
                   {selectedPatterns.map(p => (
                     <td key={p.pattern_id} className="px-4 py-3 text-center text-slate-200">
-                      {(p.performance_metrics.accuracy * 100).toFixed(1)}%
+                      {((p.performance_metrics.accuracy ?? 0) * 100).toFixed(1)}%
                     </td>
                   ))}
                 </tr>

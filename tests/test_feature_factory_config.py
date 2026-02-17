@@ -1,4 +1,15 @@
+import pytest
+import yaml
+
 from momentum.FeatureEngineering.config_manager import ConfigManager
+from momentum.FeatureEngineering.feature_config import (
+    AtomicIndicatorConfig,
+    EntropyConfig,
+    FactoryConfig,
+    MicrostructureConfig,
+    PreprocessingConfig,
+    TailRiskConfig,
+)
 
 
 def test_three_layer_merge():
@@ -13,7 +24,7 @@ def test_preset_standard():
     cm = ConfigManager()
     config = cm.apply_preset("standard")
     preview = cm.preview_feature_count(config)
-    assert 500 <= preview.total_features <= 1200
+    assert 500 <= preview.total_features <= 1400
 
 
 def test_validate_rejects_invalid():
@@ -22,3 +33,141 @@ def test_validate_rejects_invalid():
         {"atomic_indicators": {"trend": {"indicators": [{"name": "NONEXIST"}]}}}
     )
     assert result.is_valid is False
+
+
+def test_microstructure_config_defaults():
+    config = MicrostructureConfig()
+    assert config.enabled is False
+    assert config.windows == [5, 13, 21, 55]
+    assert config.epsilon == 1e-10
+
+
+def test_entropy_config_perm_m_validation():
+    with pytest.raises(ValueError):
+        EntropyConfig(perm_m=1)
+
+
+def test_tail_risk_config_alpha_validation():
+    with pytest.raises(ValueError):
+        TailRiskConfig(cvar_alphas=[0.0])
+
+
+def test_preprocessing_config_has_all_subconfigs():
+    config = PreprocessingConfig()
+    assert config.winsorization.enabled is True
+    assert config.adf_differencing.enabled is False
+    assert config.fractional_differencing.enabled is False
+    assert config.rank_transform.enabled is True
+    assert config.gaussian_normalize.enabled is False
+    assert config.adaptive_zscore.enabled is True
+
+
+def test_atomic_indicator_config_has_new_sections():
+    config = AtomicIndicatorConfig()
+    assert config.microstructure.enabled is False
+    assert config.entropy.enabled is False
+    assert config.tail_risk.enabled is False
+
+
+def test_factory_config_backward_compat_defaults():
+    old_yaml_like = {
+        "version": "2.2",
+        "global": {},
+        "data_sources": {},
+        "timeframes": {},
+        "atomic_indicators": {},
+        "operators": {},
+        "rolling_aggregation": {},
+        "lag_features": {},
+        "cross_sectional": {},
+        "meta_features": {},
+        "labels": {},
+    }
+    config = FactoryConfig.model_validate(old_yaml_like)
+    assert config.preprocessing.enabled is False
+    assert config.atomic_indicators.microstructure.enabled is False
+
+
+def test_yaml_with_new_sections_defaults():
+    cm = ConfigManager()
+    config = cm.get_merged_config()
+    assert config.atomic_indicators.microstructure.enabled is False
+    assert config.atomic_indicators.entropy.enabled is False
+    assert config.atomic_indicators.tail_risk.enabled is False
+    assert config.preprocessing.enabled is False
+
+
+def test_yaml_enable_microstructure():
+    cm = ConfigManager()
+    config = cm.get_merged_config(
+        api_override={"atomic_indicators": {"microstructure": {"enabled": True}}}
+    )
+    assert config.atomic_indicators.microstructure.enabled is True
+    assert config.atomic_indicators.microstructure.windows == [5, 13, 21, 55]
+
+
+def test_preview_with_new_engines():
+    cm = ConfigManager()
+    config = cm.get_merged_config(
+        api_override={
+            "atomic_indicators": {
+                "microstructure": {"enabled": True},
+                "entropy": {"enabled": True},
+                "tail_risk": {"enabled": True},
+            }
+        }
+    )
+    preview = cm.preview_feature_count(config)
+    assert preview.breakdown.get("microstructure", 0) == 25
+    assert preview.breakdown.get("entropy", 0) == 15
+    assert preview.breakdown.get("tail_risk", 0) == 26
+
+
+def test_preview_with_preprocessing_added():
+    cm = ConfigManager()
+    config = cm.get_merged_config(
+        api_override={
+            "preprocessing": {
+                "enabled": True,
+                "mode": "append",
+                "rank_transform": {"enabled": True},
+                "gaussian_normalize": {"enabled": True},
+                "adaptive_zscore": {"enabled": True, "windows": [100, 252]},
+            }
+        }
+    )
+    preview = cm.preview_feature_count(config)
+    assert preview.breakdown.get("preprocessing_added", 0) > 0
+
+
+def test_preview_new_engines_add_66_features():
+    cm = ConfigManager()
+    base = cm.get_merged_config()
+    base_preview = cm.preview_feature_count(base)
+
+    enhanced = cm.get_merged_config(
+        api_override={
+            "atomic_indicators": {
+                "microstructure": {"enabled": True},
+                "entropy": {"enabled": True},
+                "tail_risk": {"enabled": True},
+            }
+        }
+    )
+    enhanced_preview = cm.preview_feature_count(enhanced)
+
+    assert enhanced_preview.total_features - base_preview.total_features == 66
+    assert enhanced_preview.breakdown["microstructure"] == 25
+    assert enhanced_preview.breakdown["entropy"] == 15
+    assert enhanced_preview.breakdown["tail_risk"] == 26
+
+
+def test_scan_config_contains_new_sections():
+    with open("config/scan_config.yaml", "r", encoding="utf-8") as file:
+        raw = yaml.safe_load(file)
+
+    assert "atomic_indicators" in raw
+    assert "microstructure" in raw["atomic_indicators"]
+    assert "entropy" in raw["atomic_indicators"]
+    assert "tail_risk" in raw["atomic_indicators"]
+    assert "preprocessing" in raw

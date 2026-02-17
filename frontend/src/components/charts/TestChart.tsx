@@ -15,6 +15,10 @@
 import { useEffect, useState } from 'react';
 import { useChart } from '../../hooks/useChart';
 import { candlestickSeriesOptions, formatTime, formatPrice } from '../../utils/chartConfig';
+import { UTCTimestamp } from 'lightweight-charts';
+void formatPrice;
+
+const toUtcTime = (timestamp: number): UTCTimestamp => timestamp as UTCTimestamp;
 
 /**
  * K線數據接口
@@ -132,7 +136,7 @@ export function TestChart({
 
       // 轉換數據格式
       const formattedKlines = chartData.klines.map(kline => ({
-        time: kline.timestamp as any, // Lightweight Charts使用timestamp作為time
+        time: toUtcTime(kline.timestamp), // Lightweight Charts使用timestamp作為time
         open: kline.open,
         high: kline.high,
         low: kline.low,
@@ -144,7 +148,7 @@ export function TestChart({
 
       // 標記T點（案例時間點）
       const tMarker = {
-        time: chartData.case_timestamp as any,
+        time: toUtcTime(chartData.case_timestamp),
         position: 'aboveBar' as const,
         color: '#fb7185',
         shape: 'arrowDown' as const,

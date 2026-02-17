@@ -206,13 +206,6 @@ const STRATEGY_GUIDES: Record<string, StrategyGuide> = {
   },
 };
 
-const SYMBOL_OPTIONS: SelectOption[] = [
-  { value: "BTCUSDT", label: "BTCUSDT", icon: "₿" },
-  { value: "ETHUSDT", label: "ETHUSDT", icon: "◇" },
-  { value: "SOLUSDT", label: "SOLUSDT", icon: "🌀" },
-  { value: "CUSTOM", label: "自訂交易對", icon: "✏️" },
-];
-
 const TIMEFRAME_OPTIONS: SelectOption[] = [
   { value: "1h", label: "1 小時" },
   { value: "4h", label: "4 小時" },
@@ -226,11 +219,6 @@ const API_BASE_URL =
 const formatPercent = (value?: number) => {
   if (value === undefined || Number.isNaN(value)) return "—";
   return `${(value * 100).toFixed(2)}%`;
-};
-
-const formatNumber = (value?: number, digits = 2) => {
-  if (value === undefined || Number.isNaN(value)) return "—";
-  return value.toFixed(digits);
 };
 
 const formatCount = (value?: number) => {
@@ -620,7 +608,7 @@ function StrategyTestPageContent() {
         const includeAllSymbols = state.symbols?.includes("ALL_SYMBOLS") || false;
 
         if (casesData.cases && Array.isArray(casesData.cases)) {
-          casesData.cases.forEach((c: any) => {
+          casesData.cases.forEach((c: { symbol: string; positive_case: number; case_id: string }) => {
             // 只使用符合 symbols 條件的案例（忽略 timeframe 差異，因為後端會處理）
             const shouldInclude = includeAllSymbols || state.symbols.includes(c.symbol);
             
@@ -1536,22 +1524,6 @@ function StrategyTestPageContent() {
           onDelete={handleDeleteTemplate}
         />
       )}
-    </div>
-  );
-}
-
-interface MetricCardProps {
-  label: string;
-  value: string;
-  helper?: string;
-}
-
-function MetricCard({ label, value, helper }: MetricCardProps) {
-  return (
-    <div className="rounded-lg border border-slate-800/80 bg-slate-900/40 p-4">
-      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-100">{value}</p>
-      {helper && <p className="text-xs text-slate-400">{helper}</p>}
     </div>
   );
 }

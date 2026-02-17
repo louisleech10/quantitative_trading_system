@@ -116,7 +116,7 @@ export interface CaseData {
 export interface CaseSummary {
   total_cases: number;
   positive_cases: number;
-  negative_cases: number;
+    positive_case?: boolean | number;
   unique_symbols: number;
   time_range: {
     start: string;
@@ -143,9 +143,9 @@ export interface SearchResultData {
   // ===== 新增：參數統計和驗證報告 =====
   parameter_statistics?: ParameterStatistics;
   validation_report?: ParameterValidationReport;
-  basic_trigger_stats?: Record<string, any>;
-  future_performance_stats?: Record<string, any>;
-  time_distribution_stats?: Record<string, any>;
+  basic_trigger_stats?: Record<string, unknown>;
+  future_performance_stats?: Record<string, unknown>;
+  time_distribution_stats?: Record<string, unknown>;
 }
 
 export interface ApiResponse<T> {
@@ -154,7 +154,7 @@ export interface ApiResponse<T> {
   error?: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
   timestamp: string;
 }
@@ -210,6 +210,49 @@ export interface FeatureFactoryConfig {
     regression?: { horizons?: number[] };
   };
   custom_indicators?: unknown[];
+  preprocessing?: {
+    enabled?: boolean;
+    mode?: 'append' | 'replace';
+    winsorization?: {
+      enabled?: boolean;
+      method?: 'sigma' | 'quantile';
+      sigma_k?: number;
+      quantile_range?: [number, number] | number[];
+      apply_to?: string | string[];
+    };
+    adf_differencing?: {
+      enabled?: boolean;
+      adf_threshold?: number;
+      max_diff?: number;
+      sample_size?: number;
+      apply_to?: string;
+    };
+    fractional_differencing?: {
+      enabled?: boolean;
+      d_range?: [number, number] | number[];
+      adf_threshold?: number;
+      weight_threshold?: number;
+      precision?: number;
+      apply_to?: string;
+      cache_d_star?: boolean;
+    };
+    rank_transform?: {
+      enabled?: boolean;
+      window?: number;
+      apply_to?: string | string[];
+    };
+    gaussian_normalize?: {
+      enabled?: boolean;
+      clip_range?: [number, number] | number[];
+      apply_to?: string | string[];
+    };
+    adaptive_zscore?: {
+      enabled?: boolean;
+      windows?: number[];
+      epsilon?: number;
+      apply_to?: string | string[];
+    };
+  };
 }
 
 export interface FeaturePreview {
@@ -231,6 +274,7 @@ export interface FeatureTask {
 export interface FeatureFactoryPreset {
   name: string;
   description?: string;
+  level?: 'L1' | 'L2' | 'L3' | 'ML';
   config?: FeatureFactoryConfig;
 }
 
@@ -256,6 +300,124 @@ export interface FeatureNLResult {
 
 export interface FeatureGenerationResult {
   feature_names?: string[];
+}
+
+export type ExplorerTab =
+  | 'overview'
+  | 'table'
+  | 'timeseries'
+  | 'correlation'
+  | 'distribution'
+  | 'nan';
+
+export interface FeatureSummary {
+  total_features: number;
+  total_rows: number;
+  by_category: Record<string, number>;
+  by_level: Record<string, number>;
+  by_layer: Record<string, number>;
+  quality: {
+    nan_ratio_mean: number;
+    nan_ratio_max: number;
+    nan_ratio_distribution: number[];
+    constant_features: string[];
+    high_corr_pairs_count: number;
+    stationary_ratio: number;
+    quality_alerts?: Array<{
+      severity: 'info' | 'warning' | 'error';
+      feature: string;
+      message: string;
+    }>;
+  };
+  generation_info: {
+    task_id: string;
+    symbol?: string;
+    timeframe?: string;
+    generated_at?: string;
+    generation_time?: number;
+    config_hash?: string;
+  };
+}
+
+export interface BrowseFeatureItem {
+  name: string;
+  category: string;
+  level: 'L1' | 'L2' | 'L3';
+  layer: string;
+  nan_ratio: number;
+  mean: number | null;
+  std: number | null;
+  min: number | null;
+  q25: number | null;
+  median: number | null;
+  q75: number | null;
+  max: number | null;
+  skewness: number | null;
+  kurtosis: number | null;
+  is_stationary: boolean | null;
+  adf_pvalue: number | null;
+}
+
+export interface BrowseFeaturesResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  filters_applied: {
+    category?: string | null;
+    level?: string | null;
+    search?: string | null;
+  };
+  features: BrowseFeatureItem[];
+}
+
+export interface FeatureDataRow {
+  timestamp: string | null;
+  [featureName: string]: number | string | null;
+}
+
+export interface BrowseFeatureDataResponse {
+  total_rows: number;
+  offset: number;
+  limit: number;
+  features: string[];
+  rows: FeatureDataRow[];
+}
+
+export interface BrowseCorrelationMatrix {
+  features: string[];
+  method?: 'pearson' | 'spearman' | 'kendall';
+  matrix: number[][];
+}
+
+export interface FeatureStats {
+  count: number;
+  nan_ratio: number;
+  mean: number | null;
+  std: number | null;
+  min: number | null;
+  q25: number | null;
+  median: number | null;
+  q75: number | null;
+  max: number | null;
+  skewness: number | null;
+  kurtosis: number | null;
+  adf_pvalue: number | null;
+  is_stationary: boolean;
+}
+
+export interface DistributionData {
+  feature: string;
+  n_bins: number;
+  bins: number[];
+  edges: number[];
+  stats: FeatureStats;
+}
+
+export interface NanPatternData {
+  features: string[];
+  timestamps: string[];
+  matrix: boolean[][];
+  nan_ratios: number[];
 }
 
 export interface AutoResearchStatus {
@@ -288,9 +450,26 @@ export interface TaskInfo {
 export interface SearchTemplate {
   name: string;
   description: string;
-  config: any;
+  config: unknown;
   is_default: boolean;
   created_at: string;
+}
+
+export type SearchResult = SearchResultData;
+
+export interface SimpleSearchRequest {
+  name: string;
+  symbols: string[];
+  timeframe: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  priceChangeMethod?: PriceChangeMethod;
+  priceChange?: number | null;
+  volumeMultiplier?: number | null;
+  closingStrength?: number | null;
+  takerBuyRatio?: number | null;
+  pricePosition?: number | null;
+  saveResults?: boolean;
 }
 
 export interface SearchRequest {
@@ -384,7 +563,7 @@ export interface ParameterStatus {
   nan_count?: number;
   nan_percentage?: number;
   data_type?: string;
-  sample_values?: any[];
+  sample_values?: unknown[];
 }
 
 // ===== 新增：參數常數定義 =====
@@ -531,7 +710,7 @@ export interface StrategyConfig {
   /** 策略邏輯類型(three_line/crossover/threshold/ma_distance等) */
   strategy_logic: string;
   /** 策略參數字典,包含指標參數(如period)和策略參數(如閾值) */
-  params: Record<string, any>;
+  params: Record<string, unknown>;
 }
 
 /**
@@ -626,7 +805,7 @@ export interface StrategyParameters {
   /** EMA長週期參數 */
   ema_long?: number;
   /** 其他動態參數 */
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -677,7 +856,7 @@ export interface Trial {
   /** 完成時間 */
   datetime: string;
   /** 參數組合 */
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   /** 試驗狀態 */
   state: 'COMPLETE' | 'PRUNED' | 'FAIL';
 }
@@ -824,7 +1003,7 @@ export interface ParamSpaceResponse {
     /** 試驗編號 */
     number: number;
     /** 參數字典 */
-    params: Record<string, any>;
+    params: Record<string, unknown>;
     /** 目標值 */
     value: number;
     /** 狀態 */
@@ -1091,7 +1270,7 @@ export type GroupedICData = Record<string, Record<string, number> | Record<strin
 
 export interface ICReport {
   version?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   filter_log?: FilterLogData;
   summary_table?: ICFeatureInfo[];
   ic_decay?: Record<string, ICDecayData>;

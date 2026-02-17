@@ -35,7 +35,7 @@ interface UseChartReturn {
   /**
    * 圖表容器的ref（綁定到DOM元素）
    */
-  chartContainerRef: React.RefObject<HTMLDivElement>;
+  chartContainerRef: React.RefObject<HTMLDivElement | null>;
 
   /**
    * 圖表實例（在初始化後可用）
@@ -88,6 +88,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
     if (!chartContainerRef.current) {
       return;
     }
+    const container = chartContainerRef.current;
 
     // 合併圖表選項（使用緩存的選項）
     const mergedOptions: DeepPartial<ChartOptions> = {
@@ -96,7 +97,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
     };
 
     // 創建圖表實例
-    const chart = createChart(chartContainerRef.current, mergedOptions);
+    const chart = createChart(container, mergedOptions);
     chartInstanceRef.current = chart;
     setChartInstance(chart);
 
@@ -106,7 +107,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
     // 設置響應式調整
     const handleResize = () => {
       if (chartContainerRef.current && chartInstanceRef.current) {
-        const { width, height } = chartContainerRef.current.getBoundingClientRect();
+        const { width, height } = container.getBoundingClientRect();
         chartInstanceRef.current.applyOptions({
           width,
           height,
@@ -116,7 +117,7 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
 
     // 使用ResizeObserver監聽容器大小變化
     resizeObserverRef.current = new ResizeObserver(handleResize);
-    resizeObserverRef.current.observe(chartContainerRef.current);
+    resizeObserverRef.current.observe(container);
 
     // 初始調整大小
     handleResize();
@@ -124,8 +125,8 @@ export function useChart(options?: UseChartOptions): UseChartReturn {
     // 清理函數
     return () => {
       // 移除ResizeObserver
-      if (resizeObserverRef.current && chartContainerRef.current) {
-        resizeObserverRef.current.unobserve(chartContainerRef.current);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.unobserve(container);
         resizeObserverRef.current.disconnect();
       }
 

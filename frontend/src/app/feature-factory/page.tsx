@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
@@ -10,6 +10,9 @@ import NLInputBox from '@/components/feature-factory/NLInputBox';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
 import AutoResearchPanel from '@/components/feature-factory/AutoResearchPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
+import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
+
+const FeatureExplorer = lazy(() => import('@/components/feature-factory/FeatureExplorer'));
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
@@ -24,6 +27,7 @@ export default function FeatureFactoryPage() {
     isGenerating,
     error,
     setError,
+    updateConfigPartial,
   } = useFeatureFactoryStore();
 
   const {
@@ -156,23 +160,44 @@ export default function FeatureFactoryPage() {
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-          <ConfigPanel
-            config={config}
-            presets={presets}
-            dataSources={dataSources}
-            symbol={symbol}
-            timeframe={timeframe}
-            onSymbolChange={setSymbol}
-            onTimeframeChange={setTimeframe}
-          />
+          <div className="space-y-6">
+            <ConfigPanel
+              config={config}
+              presets={presets}
+              dataSources={dataSources}
+              symbol={symbol}
+              timeframe={timeframe}
+              onSymbolChange={setSymbol}
+              onTimeframeChange={setTimeframe}
+            />
+            <PreprocessingPanel
+              config={config?.preprocessing}
+              onChange={(next) => updateConfigPartial({ preprocessing: next })}
+            />
+          </div>
 
           <div className="space-y-6">
             <PreviewPanel preview={preview} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <NLInputBox onSubmit={requestNL2Config} />
-              <ExportButtons config={config} />
+              <ExportButtons
+                config={config}
+                taskId={currentTask?.task_id}
+                symbol={symbol}
+                timeframe={timeframe}
+              />
             </div>
             <GenerationProgress task={currentTask} />
+
+            {currentTask?.status === 'completed' && (
+              <Suspense
+                fallback={
+                  <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">載入 Feature Explorer 中...</div>
+                }
+              >
+                <FeatureExplorer taskId={currentTask.task_id} />
+              </Suspense>
+            )}
           </div>
         </div>
 

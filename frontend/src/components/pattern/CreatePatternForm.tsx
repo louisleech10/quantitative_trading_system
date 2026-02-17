@@ -23,7 +23,7 @@ interface Props {
   prefillData?: {
     case_id: string;
     rules?: PatternRule[];
-    performance_metrics?: any;
+    performance_metrics?: unknown;
   };
 }
 
@@ -56,7 +56,7 @@ export default function CreatePatternForm({ prefillData }: Props) {
   };
   
   // 更新規則
-  const handleRuleChange = (index: number, field: keyof PatternRule, value: any) => {
+  const handleRuleChange = (index: number, field: keyof PatternRule, value: unknown) => {
     const updated = [...rules];
     updated[index] = { ...updated[index], [field]: value };
     setRules(updated);
@@ -117,13 +117,17 @@ export default function CreatePatternForm({ prefillData }: Props) {
           description: r.description
         })),
         tags: tags.length > 0 ? tags : undefined,
-        status,
-        performance_metrics: prefillData?.performance_metrics
+        xgboost_importance: {},
+        performance_metrics: (prefillData?.performance_metrics as Record<string, number>) ?? {}
       };
       
       const created = await createPattern(request);
-      addPattern(created);
-      router.push(`/patterns/${created.pattern_id}`);
+      if (!created.success || !created.pattern) {
+        throw new Error(created.error || '建立樣式失敗');
+      }
+
+      addPattern(created.pattern);
+      router.push(`/patterns/${created.pattern.pattern_id}`);
     } catch (error) {
       console.error('建立樣式失敗:', error);
       setErrors({ submit: error instanceof Error ? error.message : '未知錯誤' });
@@ -262,7 +266,7 @@ export default function CreatePatternForm({ prefillData }: Props) {
                   <label className="block text-xs font-medium text-slate-300 mb-1">閾值 *</label>
                   <input
                     type="number"
-                    step="any"
+                    step="unknown"
                     value={rule.threshold}
                     onChange={(e) => handleRuleChange(index, 'threshold', parseFloat(e.target.value))}
                     className="w-full px-2 py-1 border border-white/10 rounded text-sm text-slate-100 bg-white/5 focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"

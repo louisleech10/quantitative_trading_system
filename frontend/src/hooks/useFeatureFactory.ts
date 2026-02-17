@@ -7,6 +7,12 @@ import {
   FeatureTask,
   FeatureNLResult,
   FeatureGenerationResult,
+  BrowseFeaturesResponse,
+  FeatureSummary,
+  BrowseCorrelationMatrix,
+  DistributionData,
+  NanPatternData,
+  BrowseFeatureDataResponse,
 } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
@@ -70,6 +76,7 @@ export function useFeatureFactory() {
     setFeatureList,
     setLastNLResult,
     updateConfigPartial,
+    setExplorerSummary,
   } = useFeatureFactoryStore();
 
   const loadInitial = useCallback(async () => {
@@ -94,8 +101,13 @@ export function useFeatureFactory() {
         })
         .filter((source): source is string => Boolean(source));
 
+      const normalizedPresets = presets.map((preset) => ({
+        ...preset,
+        config: preset.config ? normalizeConfig(preset.config) : undefined,
+      }));
+
       setConfig(normalizeConfig(config));
-      setPresets(presets);
+      setPresets(normalizedPresets);
       setIndicators(indicators);
       setDataSources(normalizedSources);
       setError(null);
@@ -191,11 +203,91 @@ export function useFeatureFactory() {
     [setFeatureList, setError]
   );
 
+  const browseFeatures = useCallback(
+    async (
+      taskId: string,
+      params: {
+        offset?: number;
+        limit?: number;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+        category?: string;
+        level?: 'L1' | 'L2' | 'L3';
+        search?: string;
+      }
+    ) => {
+      const query = new URLSearchParams();
+      query.set('offset', String(params.offset ?? 0));
+      query.set('limit', String(params.limit ?? 50));
+      if (params.sortBy) query.set('sort_by', params.sortBy);
+      if (params.sortOrder) query.set('sort_order', params.sortOrder);
+      if (params.category) query.set('category', params.category);
+      if (params.level) query.set('level', params.level);
+      if (params.search) query.set('search', params.search);
+      return requestJson<BrowseFeaturesResponse>(`/browse/${taskId}/features?${query.toString()}`);
+    },
+    []
+  );
+
+  const browseSummary = useCallback(
+    async (taskId: string) => {
+      const summary = await requestJson<FeatureSummary>(`/browse/${taskId}/summary`);
+      setExplorerSummary(summary);
+      return summary;
+    },
+    [setExplorerSummary]
+  );
+
+  const browseCorrelation = useCallback(
+    async (taskId: string, features: string[], method: 'pearson' | 'spearman' | 'kendall' = 'pearson') => {
+      const query = new URLSearchParams({
+        features: features.join(','),
+        method,
+      });
+      return requestJson<BrowseCorrelationMatrix>(`/browse/${taskId}/correlation?${query.toString()}`);
+    },
+    []
+  );
+
+  const browseDistribution = useCallback(
+    async (taskId: string, feature: string, nBins = 50) => {
+      const query = new URLSearchParams({ feature, n_bins: String(nBins) });
+      return requestJson<DistributionData>(`/browse/${taskId}/distribution?${query.toString()}`);
+    },
+    []
+  );
+
+  const browseNanPattern = useCallback(
+    async (taskId: string, sampleFeatures = 50) => {
+      const query = new URLSearchParams({ sample_features: String(sampleFeatures) });
+      return requestJson<NanPatternData>(`/browse/${taskId}/nan-pattern?${query.toString()}`);
+    },
+    []
+  );
+
+  const browseData = useCallback(
+    async (taskId: string, features: string[], offset = 0, limit = 200) => {
+      const query = new URLSearchParams({
+        features: features.join(','),
+        offset: String(offset),
+        limit: String(limit),
+      });
+      return requestJson<BrowseFeatureDataResponse>(`/browse/${taskId}/data?${query.toString()}`);
+    },
+    []
+  );
+
   return {
     loadInitial,
     previewConfig,
     startGeneration,
     requestNL2Config,
     loadTaskResult,
+    browseFeatures,
+    browseSummary,
+    browseCorrelation,
+    browseDistribution,
+    browseNanPattern,
+    browseData,
   };
 }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Literal, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class GlobalSettings(BaseModel):
@@ -76,6 +76,113 @@ class CategoryConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class MicrostructureConfig(BaseModel):
+    enabled: bool = False
+    windows: List[int] = Field(default_factory=lambda: [5, 13, 21, 55])
+    epsilon: float = 1e-10
+    min_trades: int = 1
+    enabled_features: Union[str, List[str]] = "all"
+    cs_spread_smooth: List[int] = Field(default_factory=lambda: [5, 13, 21])
+    ofi_raw: bool = True
+    kyle_lambda_windows: List[int] = Field(default_factory=lambda: [13, 21, 55])
+    vpin_n_buckets: List[int] = Field(default_factory=lambda: [30, 50])
+    vpin_zscore_windows: List[int] = Field(default_factory=lambda: [21, 55])
+
+
+class EntropyConfig(BaseModel):
+    enabled: bool = False
+    windows: List[int] = Field(default_factory=lambda: [55, 100])
+    n_bins: int = 10
+    apen_m: int = 2
+    apen_r_ratio: float = 0.2
+    hurst_windows: List[int] = Field(default_factory=lambda: [55, 100, 200])
+    fractal_kmax: int = 10
+    use_numba: bool = True
+    perm_m: int = 3
+    perm_windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
+    apply_to: List[str] = Field(default_factory=lambda: ["close_return"])
+    shannon_windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
+
+    @field_validator("perm_m")
+    @classmethod
+    def validate_perm_m(cls, value: int) -> int:
+        if value < 2:
+            raise ValueError(f"perm_m must be >= 2, got {value}")
+        return value
+
+
+class TailRiskConfig(BaseModel):
+    enabled: bool = False
+    windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
+    cvar_alphas: List[float] = Field(default_factory=lambda: [0.01, 0.05])
+    rv_windows: List[int] = Field(default_factory=lambda: [13, 21, 55])
+    mdd_windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
+
+    @field_validator("cvar_alphas")
+    @classmethod
+    def validate_alphas(cls, value: List[float]) -> List[float]:
+        for alpha in value:
+            if not 0 < alpha < 1:
+                raise ValueError(f"cvar_alpha must be in (0, 1), got {alpha}")
+        return value
+
+
+class WinsorConfig(BaseModel):
+    enabled: bool = True
+    method: str = "sigma"
+    sigma_k: float = 3.0
+    quantile_range: List[float] = Field(default_factory=lambda: [0.01, 0.99])
+    apply_to: Union[str, List[str]] = "all"
+
+
+class ADFDifferencingConfig(BaseModel):
+    enabled: bool = False
+    adf_threshold: float = 0.05
+    max_diff: int = 2
+    sample_size: int = 500
+    apply_to: str = "non_stationary"
+
+
+class FractionalDifferencingConfig(BaseModel):
+    enabled: bool = False
+    d_range: List[float] = Field(default_factory=lambda: [0.0, 1.0])
+    adf_threshold: float = 0.05
+    weight_threshold: float = 1e-5
+    precision: float = 0.01
+    apply_to: str = "non_stationary"
+    cache_d_star: bool = True
+
+
+class RankTransformConfig(BaseModel):
+    enabled: bool = True
+    window: int = 252
+    apply_to: Union[str, List[str]] = "all"
+
+
+class GaussianNormalizeConfig(BaseModel):
+    enabled: bool = False
+    clip_range: List[float] = Field(default_factory=lambda: [0.001, 0.999])
+    apply_to: Union[str, List[str]] = "all"
+
+
+class AdaptiveZScoreConfig(BaseModel):
+    enabled: bool = True
+    windows: List[int] = Field(default_factory=lambda: [100, 252])
+    epsilon: float = 1e-8
+    apply_to: Union[str, List[str]] = "all"
+
+
+class PreprocessingConfig(BaseModel):
+    enabled: bool = False
+    mode: str = "append"
+    winsorization: WinsorConfig = Field(default_factory=WinsorConfig)
+    adf_differencing: ADFDifferencingConfig = Field(default_factory=ADFDifferencingConfig)
+    fractional_differencing: FractionalDifferencingConfig = Field(default_factory=FractionalDifferencingConfig)
+    rank_transform: RankTransformConfig = Field(default_factory=RankTransformConfig)
+    gaussian_normalize: GaussianNormalizeConfig = Field(default_factory=GaussianNormalizeConfig)
+    adaptive_zscore: AdaptiveZScoreConfig = Field(default_factory=AdaptiveZScoreConfig)
+
+
 class AtomicIndicatorConfig(BaseModel):
     trend: CategoryConfig = Field(default_factory=CategoryConfig)
     momentum: CategoryConfig = Field(default_factory=CategoryConfig)
@@ -84,6 +191,9 @@ class AtomicIndicatorConfig(BaseModel):
     cycle: CategoryConfig = Field(default_factory=CategoryConfig)
     pattern: CategoryConfig = Field(default_factory=CategoryConfig)
     statistics: CategoryConfig = Field(default_factory=CategoryConfig)
+    microstructure: MicrostructureConfig = Field(default_factory=MicrostructureConfig)
+    entropy: EntropyConfig = Field(default_factory=EntropyConfig)
+    tail_risk: TailRiskConfig = Field(default_factory=TailRiskConfig)
 
 
 class OperatorToggle(BaseModel):
@@ -193,6 +303,7 @@ class FactoryConfig(BaseModel):
     meta_features: MetaFeatureConfig
     labels: LabelConfig
     custom_indicators: List[CustomIndicatorDef] = Field(default_factory=list)
+    preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 

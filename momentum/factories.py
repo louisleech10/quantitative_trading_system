@@ -260,6 +260,66 @@ def create_ic_analyzer(config: Optional[dict] = None) -> "ICFilterOrchestrator":
     return ICFilterOrchestrator(ic_config)
 
 
+def create_factor_return_analyzer(config: Optional[dict] = None) -> "FactorReturnAnalyzer":
+    from momentum.Analysis.factor_return_analyzer import FactorReturnAnalyzer
+
+    return FactorReturnAnalyzer(config or {})
+
+
+def create_factor_centrality_analyzer(config: Optional[dict] = None) -> "FactorCentralityAnalyzer":
+    from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
+
+    return FactorCentralityAnalyzer(config or {})
+
+
+def create_trend_analyzer(config: Optional[dict] = None) -> "TrendAnalyzer":
+    from momentum.Analysis.trend_analyzer import TrendAnalyzer
+
+    return TrendAnalyzer(config or {})
+
+
+def create_parameter_sensitivity_analyzer(config: Optional[dict] = None) -> "ParameterSensitivityAnalyzer":
+    from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer
+
+    return ParameterSensitivityAnalyzer(config or {})
+
+
+def create_rolling_oos_validator(config: Optional[dict] = None) -> "RollingOOSValidator":
+    from momentum.Analysis.rolling_oos_validator import RollingOOSValidator
+
+    return RollingOOSValidator(config or {})
+
+
+def create_factor_orthogonalizer(config: Optional[dict] = None) -> "FactorOrthogonalizer":
+    from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+
+    return FactorOrthogonalizer(config or {})
+
+
+def create_factor_exposure_analyzer(config: Optional[dict] = None) -> "FactorExposureAnalyzer":
+    from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
+
+    return FactorExposureAnalyzer(config or {})
+
+
+def create_long_short_analyzer(config: Optional[dict] = None) -> "LongShortAnalyzer":
+    from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
+
+    return LongShortAnalyzer(config or {})
+
+
+def create_feature_quality_diagnostics(config: Optional[dict] = None) -> "FeatureQualityDiagnostics":
+    from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
+
+    return FeatureQualityDiagnostics(config or {})
+
+
+def create_net_ic_analyzer(config: Optional[dict] = None) -> "NetICAnalyzer":
+    from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
+
+    return NetICAnalyzer(config or {})
+
+
 def create_label_generator(config: Optional[dict] = None) -> "LabelGenerator":
     from momentum.FeatureEngineering.labels.label_generator import LabelGenerator
 

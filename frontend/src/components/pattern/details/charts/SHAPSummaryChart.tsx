@@ -42,8 +42,15 @@ export default function SHAPSummaryChart({ data, loading, onFeatureClick }: SHAP
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis type="number" domain={[0, maxValue || 'auto']} />
             <YAxis dataKey="feature" type="category" width={110} />
-            <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
-            <Bar dataKey="mean_abs_shap" onClick={(entry: any) => onFeatureClick?.(entry.feature)}>
+            <Tooltip formatter={(value: unknown) => Number(value).toFixed(4)} />
+            <Bar
+              dataKey="mean_abs_shap"
+              onClick={(entry: { feature?: string }) => {
+                if (entry?.feature) {
+                  onFeatureClick?.(entry.feature)
+                }
+              }}
+            >
               {topData.map((entry) => (
                 <Cell key={entry.feature} fill={entry.rank <= 3 ? '#fbbf24' : '#60a5fa'} />
               ))}

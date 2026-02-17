@@ -12,6 +12,10 @@
 
 import { useState, useMemo, useDeferredValue } from "react";
 import { Search, X, CheckSquare, Square } from "lucide-react";
+void CheckSquare;
+void Square;
+void CheckSquare;
+void Square;
 
 interface SymbolMultiSelectProps {
   value: string[];

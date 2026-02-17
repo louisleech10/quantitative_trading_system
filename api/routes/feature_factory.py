@@ -5,6 +5,7 @@ Feature Factory API Routes
 from typing import Dict, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi.responses import Response, StreamingResponse
 
 from api.core.logging import get_logger
 from api.models.feature_factory_models import (
@@ -112,6 +113,226 @@ async def get_task_result(task_id: str):
         raise
     except Exception as exc:
         logger.error("Failed to get task result: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/export/{task_id}/csv")
+async def export_features_csv(
+    task_id: str,
+    columns: Optional[str] = Query(None, description="逗號分隔的欄位名，空=全部"),
+    max_rows: Optional[int] = Query(None, ge=0, description="最大行數，空=全部"),
+    include_metadata_header: bool = Query(True, description="CSV 前方加入 #metadata 註解行"),
+):
+    """串流匯出特徵數據為 CSV。"""
+    try:
+        selected_columns = [column.strip() for column in columns.split(",") if column.strip()] if columns else None
+        payload = feature_factory_service.export_csv_stream(
+            task_id=task_id,
+            columns=selected_columns,
+            max_rows=max_rows,
+            include_metadata_header=include_metadata_header,
+        )
+        headers = {
+            "Content-Disposition": f"attachment; filename={payload['filename']}",
+            "X-Export-Task-Id": task_id,
+            "X-Export-Feature-Count": str(payload["feature_count"]),
+            "X-Export-Row-Count": str(payload["row_count"]),
+        }
+        return StreamingResponse(
+            payload["generator"],
+            media_type="text/csv; charset=utf-8",
+            headers=headers,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to export CSV: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/export/{task_id}/json")
+async def export_features_json(
+    task_id: str,
+    include_sample_data: bool = Query(True, description="包含前 N 行樣本數據"),
+    sample_rows: int = Query(5, ge=1, le=100, description="樣本行數"),
+    include_statistics: bool = Query(True, description="包含每欄統計摘要"),
+    include_correlation_top_k: int = Query(10, ge=0, le=50, description="Top-K 高相關特徵對"),
+):
+    """匯出 AI Agent / LLM 可消費的結構化 JSON。"""
+    try:
+        return feature_factory_service.export_json_report(
+            task_id=task_id,
+            include_sample_data=include_sample_data,
+            sample_rows=sample_rows,
+            include_statistics=include_statistics,
+            include_correlation_top_k=include_correlation_top_k,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to export JSON: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/export/{task_id}/markdown")
+async def export_features_markdown(
+    task_id: str,
+    max_token_budget: int = Query(4000, ge=500, le=32000, description="Token 預算上限"),
+    sections: Optional[str] = Query(None, description="逗號分隔的 section 名，空=全部"),
+    language: str = Query("zh-TW", description="報告語言"),
+):
+    """匯出 LLM context window 友善的 Markdown 報告。"""
+    try:
+        selected_sections = [section.strip() for section in sections.split(",") if section.strip()] if sections else None
+        content = feature_factory_service.export_markdown_report(
+            task_id=task_id,
+            max_token_budget=max_token_budget,
+            sections=selected_sections,
+            language=language,
+        )
+        headers = {
+            "Content-Disposition": f"attachment; filename=feature_report_{task_id}.md",
+        }
+        return Response(content=content, media_type="text/markdown; charset=utf-8", headers=headers)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to export Markdown: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/features")
+async def browse_features(
+    task_id: str,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    sort_by: Optional[str] = Query(None, description="排序欄位：nan_ratio, std, skewness, kurtosis, mean, name"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+    category: Optional[str] = Query(None, description="篩選類別"),
+    level: Optional[str] = Query(None, pattern="^(L1|L2|L3)$"),
+    search: Optional[str] = Query(None, description="特徵名模糊搜尋"),
+):
+    """分頁瀏覽特徵列表 + 統計摘要。"""
+    try:
+        return feature_factory_service.browse_features(
+            task_id=task_id,
+            offset=offset,
+            limit=limit,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            category=category,
+            level=level,
+            search=search,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse features: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/data")
+async def browse_feature_data(
+    task_id: str,
+    features: str = Query(..., description="逗號分隔的特徵名（最多 20）"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+):
+    """取得指定特徵的原始數據（時間序列）。"""
+    try:
+        selected_features = [feature.strip() for feature in features.split(",") if feature.strip()]
+        return feature_factory_service.browse_feature_data(
+            task_id=task_id,
+            features=selected_features,
+            offset=offset,
+            limit=limit,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse feature data: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/correlation")
+async def browse_correlation(
+    task_id: str,
+    features: str = Query(..., description="逗號分隔的特徵名（最多 50）"),
+    method: str = Query("pearson", pattern="^(pearson|spearman|kendall)$"),
+):
+    """取得指定特徵集合的相關矩陣。"""
+    try:
+        selected_features = [feature.strip() for feature in features.split(",") if feature.strip()]
+        return feature_factory_service.browse_correlation(
+            task_id=task_id,
+            features=selected_features,
+            method=method,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse correlation: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/distribution")
+async def browse_distribution(
+    task_id: str,
+    feature: str = Query(..., description="單一特徵名"),
+    n_bins: int = Query(50, ge=10, le=200),
+):
+    """取得單一特徵的分佈直方圖數據。"""
+    try:
+        return feature_factory_service.browse_distribution(task_id=task_id, feature=feature, n_bins=n_bins)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse distribution: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/nan-pattern")
+async def browse_nan_pattern(
+    task_id: str,
+    sample_features: int = Query(50, ge=10, le=200, description="取樣特徵數"),
+):
+    """取得 NaN 分佈模式矩陣（missingno 風格）。"""
+    try:
+        return feature_factory_service.browse_nan_pattern(task_id=task_id, sample_features=sample_features)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse NaN pattern: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/summary")
+async def browse_summary(task_id: str):
+    """取得整體摘要 Dashboard 數據。"""
+    try:
+        return feature_factory_service.browse_summary(task_id=task_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse summary: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

@@ -30,11 +30,38 @@ export interface ActualStatistics {
   negativeDifficultyDistribution: Record<string, number>;
 }
 
+const toIsoStringOrNull = (value: Date | null): string | null => {
+  if (!(value instanceof Date)) {
+    return null;
+  }
+  return value.toISOString();
+};
+
+interface CaseLike {
+  positive_case?: boolean | number;
+  Positive_Case?: boolean | number;
+  label?: number;
+  symbol?: string;
+  market_phase?: string;
+  hour_of_day?: number | string | null;
+  day_of_week?: number | string | null;
+  market_class_name?: string;
+  difficulty_level?: string;
+  timestamp?: string;
+}
+
+interface BackendSummary {
+  total_cases?: number;
+  positive_cases?: number;
+  negative_cases?: number;
+  unique_symbols?: number;
+}
+
 /**
  * 基於實際案例數據計算準確的統計信息
  * 優先使用這個函數，而不是後端提供的 summary 數據
  */
-export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
+export const calculateActualStatistics = (cases: CaseLike[]): ActualStatistics => {
   if (!cases || cases.length === 0) {
     return {
       totalCases: 0,
@@ -181,6 +208,7 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
           latestTime = caseTime;
         }
       } catch (e) {
+      void e;
         // 忽略無效的時間戳
       }
     }
@@ -203,8 +231,8 @@ export const calculateActualStatistics = (cases: any[]): ActualStatistics => {
     symbolsList: Array.from(symbolsSet).sort(),
     positiveRatio,
     timeRange: {
-      start: earliestTime?.toISOString() || null,
-      end: latestTime?.toISOString() || null
+      start: toIsoStringOrNull(earliestTime),
+      end: toIsoStringOrNull(latestTime)
     },
     marketPhases: marketPhasesCount,
     positiveMarketPhases: positiveMarketPhasesCount,
@@ -238,6 +266,7 @@ export const formatTimestamp = (timestamp: string): string => {
     
     return `${hours}:${minutes}:${seconds}`;
   } catch (e) {
+    void e;
     return timestamp;
   }
 };
@@ -262,7 +291,7 @@ export const getStatisticsSummary = (stats: ActualStatistics): string => {
  */
 export const validateBackendStatistics = (
   actualStats: ActualStatistics, 
-  backendSummary: any
+  backendSummary?: BackendSummary | null
 ): { isConsistent: boolean; differences: string[] } => {
   const differences: string[] = [];
   

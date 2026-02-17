@@ -32,31 +32,43 @@ export interface ErrorInfo {
   retryDelay?: number; // 毫秒
 }
 
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  if (typeof error === 'string') {
+    return new Error(error);
+  }
+  return new Error('發生未知錯誤');
+}
+
 /**
  * 分類錯誤類型
  */
-export function classifyError(error: any): ErrorInfo {
+export function classifyError(error: unknown): ErrorInfo {
+  const normalizedError = toError(error);
+
   // 網絡錯誤
-  if (error instanceof TypeError && error.message.includes('fetch')) {
+  if (normalizedError instanceof TypeError && normalizedError.message.includes('fetch')) {
     return {
       type: ErrorType.NETWORK,
       message: '網絡連接失敗，請檢查您的網絡連接',
-      originalError: error,
+      originalError: normalizedError,
       retryable: true,
       retryDelay: 1000,
     };
   }
 
   // HTTP 錯誤
-  if (error.message) {
-    const msg = error.message.toLowerCase();
+  if (normalizedError.message) {
+    const msg = normalizedError.message.toLowerCase();
 
     // 超時
     if (msg.includes('timeout') || msg.includes('timed out')) {
       return {
         type: ErrorType.TIMEOUT,
         message: '請求超時，請稍後重試',
-        originalError: error,
+        originalError: normalizedError,
         retryable: true,
         retryDelay: 2000,
       };
@@ -67,7 +79,7 @@ export function classifyError(error: any): ErrorInfo {
       return {
         type: ErrorType.RATE_LIMIT,
         message: '請求過於頻繁，請稍後再試',
-        originalError: error,
+        originalError: normalizedError,
         retryable: true,
         retryDelay: 5000,
       };
@@ -78,7 +90,7 @@ export function classifyError(error: any): ErrorInfo {
       return {
         type: ErrorType.UNAUTHORIZED,
         message: '未授權訪問，請重新登入',
-        originalError: error,
+        originalError: normalizedError,
         retryable: false,
       };
     }
@@ -88,7 +100,7 @@ export function classifyError(error: any): ErrorInfo {
       return {
         type: ErrorType.NOT_FOUND,
         message: '請求的資源不存在',
-        originalError: error,
+        originalError: normalizedError,
         retryable: false,
       };
     }
@@ -98,7 +110,7 @@ export function classifyError(error: any): ErrorInfo {
       return {
         type: ErrorType.VALIDATION,
         message: '請求參數錯誤，請檢查輸入',
-        originalError: error,
+        originalError: normalizedError,
         retryable: false,
       };
     }
@@ -108,7 +120,7 @@ export function classifyError(error: any): ErrorInfo {
       return {
         type: ErrorType.SERVER,
         message: '服務器錯誤，請稍後重試',
-        originalError: error,
+        originalError: normalizedError,
         retryable: true,
         retryDelay: 3000,
       };
@@ -118,8 +130,8 @@ export function classifyError(error: any): ErrorInfo {
   // 未知錯誤
   return {
     type: ErrorType.UNKNOWN,
-    message: error.message || '發生未知錯誤',
-    originalError: error,
+    message: normalizedError.message || '發生未知錯誤',
+    originalError: normalizedError,
     retryable: true,
     retryDelay: 2000,
   };
@@ -128,7 +140,7 @@ export function classifyError(error: any): ErrorInfo {
 /**
  * 顯示錯誤 Toast
  */
-export function showErrorToast(error: any, customMessage?: string) {
+export function showErrorToast(error: unknown, customMessage?: string) {
   const errorInfo = classifyError(error);
   const message = customMessage || errorInfo.message;
   
@@ -187,7 +199,7 @@ export async function withRetry<T>(
   } = {}
 ): Promise<T> {
   const { maxRetries = 3, retryDelay = 1000, onRetry } = options;
-  let lastError: any;
+  let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {

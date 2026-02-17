@@ -19,6 +19,11 @@ interface ParamImportanceChartProps {
   evaluator?: string
 }
 
+interface ParamImportanceTooltipProps {
+  active?: boolean
+  payload?: Array<{ payload: ParameterImportance }>
+}
+
 export function ParamImportanceChart({ importances, evaluator = 'fanova' }: ParamImportanceChartProps) {
   // 按重要性降序排序
   const sortedData = [...importances].sort((a, b) => b.importance - a.importance)
@@ -32,8 +37,8 @@ export function ParamImportanceChart({ importances, evaluator = 'fanova' }: Para
   }
 
   // 自定義 Tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+  const CustomTooltip = ({ active, payload }: ParamImportanceTooltipProps) => {
+    if (active && payload && payload.length > 0) {
       const data = payload[0].payload
       return (
         <div className="bg-popover border rounded-lg shadow-lg p-3">

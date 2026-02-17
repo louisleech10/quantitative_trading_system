@@ -28,6 +28,10 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+void useEffect;
+void useState;
+void useEffect;
+void useState;
 import { Sparkles, AlertTriangle, Clock, Info } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'

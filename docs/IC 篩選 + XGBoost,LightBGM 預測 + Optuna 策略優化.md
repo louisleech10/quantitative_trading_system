@@ -1024,7 +1024,7 @@ class ExecutionOptimizer:
         )
 ```
 
-#### 4.3 Kelly Formula 倉位管理（可選）
+#### 4.3 Kelly Formula 倉位管理
 
 ```python
 # 檔案：momentum/Strategy/position_sizing.py (新增)
@@ -1308,6 +1308,43 @@ Phase 4 輸出（預測機率 + 最佳參數）
   - PDF 報告: reports/{strategy_id}_backtest.pdf
   - 數據文件: reports/{strategy_id}_metrics.json
 ```
+
+#### 5.5 Kelly Formula 倉位管理
+
+```python
+# 檔案：momentum/Strategy/position_sizing.py (新增)
+
+class KellyPositionSizing:
+    """基於 Kelly Formula 的倉位管理"""
+    
+    @staticmethod
+    def calculate_kelly_fraction(
+        predicted_proba: float,
+        win_loss_ratio: float = 2.0  # 盈虧比
+    ) -> float:
+        """
+        Kelly Formula: f = (p * b - q) / b
+        f: 下注比例
+        p: 勝率（預測機率）
+        q: 敗率（1 - p）
+        b: 盈虧比
+        """
+        p = predicted_proba
+        q = 1 - p
+        b = win_loss_ratio
+        
+        kelly_f = (p * b - q) / b
+        
+        # 限制最大倉位（避免過度激進）
+        return max(0, min(kelly_f * 0.5, 0.25))  # 半凱利 + 上限 25%
+```
+
+**驗收標準**：
+- [ ] 向量化回測速度 < 0.1 秒/1000 筆交易
+- [ ] Optuna 優化完成 100 次 trial < 5 分鐘
+- [ ] Kelly Formula 倉位計算正確（數學驗證）
+- [ ] 回測結果包含：權益曲線、每筆交易記錄、統計指標
+- [ ] 支援多種目標指標（Sharpe、總報酬、勝率等）
 
 #### 實作架構
 

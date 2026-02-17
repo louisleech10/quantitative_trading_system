@@ -54,7 +54,7 @@ export default function PSIComparisonChart({ data, loading, selectedFeature, onF
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="bin" tickFormatter={(v) => Number(v).toFixed(2)} />
             <YAxis />
-            <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
+            <Tooltip formatter={(value: unknown) => Number(value).toFixed(4)} />
             <Bar dataKey="train_pct" fill="#60a5fa" name="訓練分佈" />
             <Bar dataKey="test_pct" fill="#fbbf24" name="OOT 分佈" />
           </BarChart>

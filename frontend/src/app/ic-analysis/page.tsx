@@ -47,7 +47,7 @@ export default function ICAnalysisPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [isRefiltering, setIsRefiltering] = useState(false);
 
-  const summaryTable = report?.summary_table || [];
+  const summaryTable = useMemo(() => report?.summary_table ?? [], [report?.summary_table]);
 
   const activeFeature = selectedFeature || summaryTable[0]?.feature_name || null;
 

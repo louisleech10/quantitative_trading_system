@@ -54,7 +54,7 @@ interface ChartSignalResponse {
   metadata: {
     total_klines: number;
     calculation_time_ms: number;
-    strategy_config: any;
+    strategy_config: Record<string, unknown>;
   };
 }
 
@@ -78,10 +78,10 @@ export default function StrategyDemoPage() {
   // ========== 測試範圍 ==========
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState("1h");
-  const [startTime, setStartTime] = useState(
+  const [startTime] = useState(
     Date.now() - 30 * 24 * 60 * 60 * 1000
   ); // 最近 30 天
-  const [endTime, setEndTime] = useState(Date.now());
+  const [endTime] = useState(Date.now());
 
   // ========== 圖表數據 ==========
   const [klines, setKlines] = useState<KlineData[]>([]);

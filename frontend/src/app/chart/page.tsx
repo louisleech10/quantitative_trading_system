@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { TradingChartContainer } from '@/components/charts/TradingChartContainer';
+import type { KlineData } from '@/components/charts/PriceChart';
 
 /**
  * 案例數據結構
@@ -69,7 +70,7 @@ export default function ChartPage() {
   const [currentCase, setCurrentCase] = useState<CaseRecord | null>(null);
 
   // K線數據（用於三個圖表組件）
-  const [klineData, setKlineData] = useState<any[]>([]);
+  const [klineData, setKlineData] = useState<KlineData[]>([]);
   const [loadingKlines, setLoadingKlines] = useState(false);
   const [klineError, setKlineError] = useState<string | null>(null);
   const [alignedCaseTimestamp, setAlignedCaseTimestamp] = useState<number | null>(null);
@@ -151,7 +152,7 @@ export default function ChartPage() {
       setSelectedTimestamp(null);
       setCurrentCase(null);
     }
-  }, [selectedSymbol, caseTypeFilter]);
+  }, [filteredCases]);
 
   /**
    * 當timestamp選擇改變時，更新當前案例

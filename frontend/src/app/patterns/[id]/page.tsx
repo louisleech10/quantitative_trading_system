@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getPattern } from '@/lib/api/patternApi';
 import PatternDetail from '@/components/pattern/PatternDetail';
@@ -15,17 +15,14 @@ import type { Pattern } from '@/lib/patternTypes';
 export default function PatternDetailPage() {
   const params = useParams();
   const router = useRouter();
+  void router;
   const patternId = params.id as string;
   
   const [pattern, setPattern] = useState<Pattern | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   
-  useEffect(() => {
-    loadPattern();
-  }, [patternId]);
-  
-  const loadPattern = async () => {
+  const loadPattern = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getPattern(patternId);
@@ -40,7 +37,11 @@ export default function PatternDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [patternId]);
+
+  useEffect(() => {
+    loadPattern();
+  }, [loadPattern]);
   
   if (loading) {
     return (

@@ -7,7 +7,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePatternStore } from '@/store/patternStore';
 import { listPatterns, deleteAllPatterns } from '@/lib/api/patternApi';
@@ -22,15 +22,28 @@ type TabType = 'list' | 'statistics' | 'comparison';
 
 export default function PatternsPage() {
   const router = useRouter();
+  void router;
   const { patterns, setPatterns } = usePatternStore();
   const [activeTab, setActiveTab] = useState<TabType>('list');
   const [loading, setLoading] = useState(true);
   
+  const loadPatterns = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await listPatterns();
+      setPatterns(data.patterns);
+    } catch (error) {
+      console.error('載入樣式失敗:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [setPatterns]);
+
   // 初始載入
   useEffect(() => {
     loadPatterns();
-  }, []);
-  
+  }, [loadPatterns]);
+
   // 監聽頁面可見性變化，重新載入資料
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -43,19 +56,7 @@ export default function PatternsPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
-  
-  const loadPatterns = async () => {
-    try {
-      setLoading(true);
-      const data = await listPatterns();
-      setPatterns(data.patterns);
-    } catch (error) {
-      console.error('載入樣式失敗:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [loadPatterns]);
 
   const handleDeleteAll = async () => {
     if (!confirm('確定要刪除所有模式？此操作無法復原！')) return;
@@ -66,8 +67,9 @@ export default function PatternsPage() {
         alert(`✅ ${result.message}`);
         loadPatterns(); // 重新載入
       }
-    } catch (error: any) {
-      alert('❌ 刪除失敗: ' + (error.message || '未知錯誤'));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知錯誤';
+      alert('❌ 刪除失敗: ' + message);
     }
   };
   

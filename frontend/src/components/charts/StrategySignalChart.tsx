@@ -270,7 +270,7 @@ export function StrategySignalChart({
       container.removeEventListener('mousedown', handleMouseDown);
       container.removeEventListener('dblclick', handleDoubleClick);
     };
-  }, [chartInstance, isReady]);
+  }, [chartContainerRef, chartInstance, isReady]);
 
   /**
    * 渲染 K線數據和信號標記到圖表

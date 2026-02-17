@@ -82,14 +82,29 @@ class FeatureFactoryMCP:
     def get_presets(self) -> List[Dict]:
         """Return preset list with preview summaries."""
         presets = []
-        for preset in ["minimal", "standard", "extended", "full"]:
+        preset_definitions = [
+            {"name": "minimal", "description": "最小化 baseline", "level": "L1"},
+            {"name": "standard", "description": "標準研究配置", "level": "L2"},
+            {"name": "extended", "description": "擴展研究配置", "level": "L2"},
+            {"name": "full", "description": "全量特徵配置", "level": "L3"},
+            {"name": "basic_essential", "description": "🟢 基礎必用 — 業界標配", "level": "L1"},
+            {"name": "intermediate_research", "description": "🟡 中階研究 — 進階策略開發", "level": "L2"},
+            {"name": "professional_full", "description": "🔴 專業全量 — 量化研究全配", "level": "L3"},
+            {"name": "ml_optimized", "description": "🤖 ML 友善 — 去冗餘、已正規化", "level": "ML"},
+        ]
+
+        for preset_info in preset_definitions:
+            preset = preset_info["name"]
             try:
                 config = self._config_manager.apply_preset(preset)
                 preview = self._config_manager.preview_feature_count(config)
                 presets.append(
                     {
                         "name": preset,
+                        "description": preset_info["description"],
+                        "level": preset_info["level"],
                         "preview": preview.model_dump(),
+                        "config": config.model_dump(),
                     }
                 )
             except Exception as exc:

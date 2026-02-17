@@ -34,7 +34,7 @@ export interface StrategyTemplate {
       mode: "single" | "optuna";
       optuna_trials?: number;
     };
-    ema_parameters: any; // ParameterRange | number 依 test_mode 而定
+    ema_parameters: unknown; // ParameterRange | number 依 test_mode 而定
     training_window: {
       reference_point: "TO" | "TC";
       lookback_bars: number;

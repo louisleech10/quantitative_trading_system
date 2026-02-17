@@ -45,7 +45,20 @@ def test_mcp_get_presets():
     mcp = _make_mcp()
     presets = mcp.get_presets()
     names = {item["name"] for item in presets}
-    assert {"minimal", "standard", "extended", "full"}.issubset(names)
+    assert {
+        "minimal",
+        "standard",
+        "extended",
+        "full",
+        "basic_essential",
+        "intermediate_research",
+        "professional_full",
+        "ml_optimized",
+    }.issubset(names)
+
+    preset_map = {item["name"]: item for item in presets}
+    assert isinstance(preset_map["professional_full"].get("config"), dict)
+    assert preset_map["basic_essential"].get("level") == "L1"
 
 
 def test_mcp_get_feature_metadata():

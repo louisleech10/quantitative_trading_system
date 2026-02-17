@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Copy, PlayCircle, TrendingUp } from "lucide-react"
 import { OptimizationResultDetail } from "@/types/optimization"
 import { useState } from "react"
+import type { ReactNode } from "react"
 
 interface BestResultCardProps {
   result: OptimizationResultDetail
@@ -24,6 +25,7 @@ interface BestResultCardProps {
 
 export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCardProps) {
   const [copied, setCopied] = useState(false)
+  const convergenceInfo = result.convergence_info as { converged?: boolean } | undefined
 
   const handleCopy = () => {
     if (onCopyParams) {
@@ -41,6 +43,34 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
     if (seconds < 3600) return `${(seconds / 60).toFixed(1)}m`
     return `${(seconds / 3600).toFixed(1)}h`
   }
+
+  const objectiveFormulaDescription: ReactNode = (() => {
+    const isDualDensity = result.best_value > 0 && result.best_value < 2
+
+    if (isDualDensity) {
+      return (
+        <>
+          <br />• <span className="text-foreground font-semibold">信號聚集分數 (Clustering Score)</span>
+          <br />&nbsp;&nbsp;= positive_near_far_ratio - 1.0
+          <br />• <span className="text-foreground font-semibold">正反例區分度 (Discrimination Score)</span>
+          <br />&nbsp;&nbsp;= positive_near_far_ratio - negative_near_far_ratio
+          <br />• <span className="text-foreground font-semibold">最終目標值</span>
+          <br />&nbsp;&nbsp;= clustering_score × clustering_weight
+          <br />&nbsp;&nbsp;+ discrimination_score × (1 - clustering_weight)
+          <br />• clustering_weight 預設為 <span className="text-foreground">0.5</span>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <br />• <span className="text-foreground font-semibold">公式：Score=區分度−穩定性懲罰</span>
+        <br />&nbsp;&nbsp;區分度 (Separation)：正例的加權平均M - 反例的加權平均M
+        <br />&nbsp;&nbsp;穩定性懲罰 (Penalty)：如果正例的表現忽好忽壞（標準差大），分數會被扣減
+        <br />• Score=(μpos−μneg​)−λ⋅(σpos+0.5⋅σneg​) 其中λ預設為 1.0
+      </>
+    )
+  })()
 
   return (
     <Card className="w-full">
@@ -77,35 +107,7 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
           <div className="pt-2 border-t border-border/50">
             <p className="text-xs text-muted-foreground leading-relaxed">
               <span className="font-medium">計算方式：</span>
-              {/* 檢測是否為雙密度模式（通過檢查 best_params 中是否有 clustering_weight 或相關參數） */}
-              {(() => {
-                // 簡化判斷：如果目標值看起來是加權分數（通常 0-1 之間），可能是雙密度模式
-                const isDualDensity = result.best_value > 0 && result.best_value < 2
-
-                if (isDualDensity) {
-                  return (
-                    <>
-                      <br />• <span className="text-foreground font-semibold">信號聚集分數 (Clustering Score)</span>
-                      <br />&nbsp;&nbsp;= positive_near_far_ratio - 1.0
-                      <br />• <span className="text-foreground font-semibold">正反例區分度 (Discrimination Score)</span>
-                      <br />&nbsp;&nbsp;= positive_near_far_ratio - negative_near_far_ratio
-                      <br />• <span className="text-foreground font-semibold">最終目標值</span>
-                      <br />&nbsp;&nbsp;= clustering_score × clustering_weight
-                      <br />&nbsp;&nbsp;+ discrimination_score × (1 - clustering_weight)
-                      <br />• clustering_weight 預設為 <span className="text-foreground">0.5</span>
-                    </>
-                  )
-                } else {
-                  return (
-                    <>
-                      <br />• <span className="text-foreground font-semibold">公式：Score=區分度−穩定性懲罰</span>
-                      <br />&nbsp;&nbsp;區分度 (Separation)：正例的加權平均M - 反例的加權平均M
-                      <br />&nbsp;&nbsp;穩定性懲罰 (Penalty)：如果正例的表現忽好忽壞（標準差大），分數會被扣減
-                      <br />• Score=(μpos−μneg​)−λ⋅(σpos+0.5⋅σneg​) 其中λ預設為 1.0
-                    </>
-                  )
-                }
-              })()}
+              {objectiveFormulaDescription}
             </p>
           </div>
         </div>
@@ -153,12 +155,12 @@ export function BestResultCard({ result, onCopyParams, onRetest }: BestResultCar
         </div>
 
         {/* 收斂信息（如果有） */}
-        {result.convergence_info && (
+        {convergenceInfo && (
           <div className="pt-2 border-t">
             <p className="text-xs text-muted-foreground">
               收斂狀態：
               <span className="ml-2 font-medium text-foreground">
-                {result.convergence_info.converged ? '已收斂' : '未收斂'}
+                {convergenceInfo.converged ? '已收斂' : '未收斂'}
               </span>
             </p>
           </div>

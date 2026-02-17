@@ -48,7 +48,20 @@ class ICReporter:
             "turnover_analysis": analysis_results.get("turnover_analysis", {}),
             "coverage_analysis": analysis_results.get("coverage_analysis", {}),
         }
+
+        deep_report = analysis_results.get("deep_analysis_report")
+        deep_enabled = bool(analysis_results.get("deep_analysis_enabled", False))
+        if deep_enabled and deep_report is not None:
+            self._append_deep_analysis_fields(report, deep_report)
+
         return report
+
+    def inject_deep_analysis(self, report: dict, deep_report: Any) -> dict:
+        """在既有 report 上注入深度分析欄位（保持向後相容）。"""
+
+        base = dict(report or {})
+        self._append_deep_analysis_fields(base, deep_report)
+        return base
 
     def generate_ai_summary(self, report: dict) -> str:
         """生成 AI 可讀 Markdown 摘要。"""
@@ -194,3 +207,57 @@ class ICReporter:
             sampled[feature] = sampled_windows
 
         return sampled
+
+    def _append_deep_analysis_fields(self, report: dict, deep_report: Any) -> None:
+        serialized = self._serialize_deep_analysis(deep_report)
+        report.update(serialized)
+
+    def _serialize_deep_analysis(self, deep_report: Any) -> dict:
+        data = deep_report
+        if hasattr(deep_report, "__dict__"):
+            data = deep_report.__dict__
+
+        results = data.get("results", {}) if isinstance(data, dict) else {}
+        errors = data.get("deep_analysis_errors", []) if isinstance(data, dict) else []
+        summary = data.get("module_summary", {}) if isinstance(data, dict) else {}
+
+        serialized_errors = []
+        for item in errors:
+            if isinstance(item, dict):
+                serialized_errors.append(item)
+            elif hasattr(item, "__dict__"):
+                serialized_errors.append(dict(item.__dict__))
+
+        output = {
+            "deep_analysis_enabled": True,
+            "deep_analysis_version": "0.1",
+            "deep_analysis_errors": serialized_errors,
+            "module_statuses": [
+                {"module_name": module_name, "status": status}
+                for module_name, status in summary.items()
+            ],
+            "deep_analysis_summary": {
+                "total": int(data.get("total_modules", 10)) if isinstance(data, dict) else 10,
+                "completed": int(data.get("completed_count", 0)) if isinstance(data, dict) else 0,
+                "skipped": int(data.get("skipped_count", 0)) if isinstance(data, dict) else 0,
+                "failed": int(data.get("failed_count", 0)) if isinstance(data, dict) else 0,
+            },
+        }
+
+        module_to_report_key = {
+            "factor_returns": "factor_returns",
+            "factor_centrality": "factor_centrality",
+            "trend_analysis": "trend_analysis",
+            "parameter_sensitivity": "parameter_sensitivity",
+            "rolling_oos": "rolling_oos",
+            "factor_orthogonalization": "factor_orthogonalization",
+            "factor_exposure": "factor_exposure",
+            "long_short_analysis": "long_short_analysis",
+            "feature_quality_diagnostics": "feature_quality_diagnostics",
+            "net_ic_analysis": "net_ic_analysis",
+        }
+        for module_name, key in module_to_report_key.items():
+            if isinstance(results, dict) and module_name in results:
+                output[key] = results[module_name]
+
+        return output

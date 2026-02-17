@@ -19,15 +19,14 @@ const getCellColor = (value: number) => {
 };
 
 export default function CorrelationHeatmap({ matrix, maxFeatures = 18 }: CorrelationHeatmapProps) {
-  const safeMatrix = matrix?.matrix ?? [];
-  const features = matrix?.features ?? [];
-
   const trimmed = useMemo(() => {
+    const safeMatrix = matrix?.matrix ?? [];
+    const features = matrix?.features ?? [];
     const size = Math.min(features.length, maxFeatures);
     const trimmedFeatures = features.slice(0, size);
     const trimmedMatrix = safeMatrix.slice(0, size).map((row) => row.slice(0, size));
     return { trimmedFeatures, trimmedMatrix };
-  }, [features, maxFeatures, safeMatrix]);
+  }, [matrix, maxFeatures]);
 
   return (
     <Card>

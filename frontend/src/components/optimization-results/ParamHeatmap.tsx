@@ -12,7 +12,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis } from 'recharts'
-import { HeatmapData } from "@/types/optimization"
+import { HeatmapData, HeatmapDataPoint } from "@/types/optimization"
 import { useState } from "react"
 import { Map } from "lucide-react"
 
@@ -20,6 +20,19 @@ interface ParamHeatmapProps {
   heatmapData: HeatmapData
   availableParams: string[]
   onParamsChange?: (paramX: string, paramY: string) => void
+}
+
+interface CustomTooltipPayloadItem {
+  payload: HeatmapDataPoint
+}
+
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: CustomTooltipPayloadItem[]
+}
+
+interface ColoredHeatmapPoint extends HeatmapDataPoint {
+  fill: string
 }
 
 export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: ParamHeatmapProps) {
@@ -72,27 +85,14 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
     return lerpColor('#fbbf24', '#34d399', (clamped - 0.5) / 0.5)
   }
 
-  // 自定義散點形狀
-  const renderCustomDot = (props: any) => {
-    const { cx, cy, payload } = props
-    const color = getPointColor(payload.value)
-    return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={10}
-        fill={color}
-        fillOpacity={0.9}
-        stroke="rgba(255,255,255,0.1)"
-        strokeWidth={2}
-        style={{ filter: 'drop-shadow(0 0 4px rgba(96,165,250,0.3))' }}
-      />
-    )
-  }
+  const scatterData: ColoredHeatmapPoint[] = heatmapData.data_points.map((point) => ({
+    ...point,
+    fill: getPointColor(point.value)
+  }))
 
   // 自定義 Tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
+  const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
+    if (active && payload && payload.length > 0) {
       const data = payload[0].payload
       return (
         <div className="bg-popover border rounded-lg shadow-lg p-3">
@@ -187,10 +187,17 @@ export function ParamHeatmap({ heatmapData, availableParams, onParamsChange }: P
                 className="text-xs"
               />
               <ZAxis type="number" dataKey="value" range={[50, 400]} />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={({ active, payload }) => (
+                  <CustomTooltip
+                    active={active}
+                    payload={payload as CustomTooltipPayloadItem[] | undefined}
+                  />
+                )}
+              />
               <Scatter
-                data={heatmapData.data_points}
-                shape={renderCustomDot}
+                data={scatterData}
+                fill="#60a5fa"
               />
             </ScatterChart>
           </ResponsiveContainer>

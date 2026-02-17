@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import hashlib
+import time
+from collections import OrderedDict
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -21,6 +24,7 @@ from momentum.Analysis.redundancy_filter import RedundancyFilter
 from momentum.Analysis.statistical_validator import StatisticalValidator
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
 from momentum.Analysis.ic_config_schema import ICConfig
+from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IKlineReader
@@ -51,6 +55,7 @@ class ICFilterOrchestrator:
         self._config_hash: Optional[str] = None
         self._report: Optional[dict] = None
         self._filtered_features_df: Optional[pd.DataFrame] = None
+        self._deep_analysis_cache: "OrderedDict[str, DeepAnalysisReport]" = OrderedDict()
 
         self._progress_callback: Optional[Callable] = None
 
@@ -67,6 +72,7 @@ class ICFilterOrchestrator:
 
         config = self._apply_config_override(config_override)
         self._progress_callback = progress_callback
+        self._clear_deep_analysis_cache()
 
         self._report_progress(0, "ingestion", 0.02, "loading inputs")
         features_df, labels_df, metadata, stage0_log = self._stage0_ingestion(
@@ -128,6 +134,8 @@ class ICFilterOrchestrator:
         if self._ic_cache is None or self._monotonicity_cache is None:
             raise ValueError("IC cache is empty, run analyze() first")
 
+        self._clear_deep_analysis_cache()
+
         config_data = self._config.model_dump()
         merged = self._deep_merge(config_data, {"thresholds": thresholds or {}})
         config = ICConfig.model_validate(merged)
@@ -160,6 +168,386 @@ class ICFilterOrchestrator:
 
         self._report = report
         return report
+
+    def analyze_full(
+        self,
+        features_path: str,
+        labels_path: str,
+        meta_path: Optional[str] = None,
+        config_override: Optional[dict] = None,
+        progress_callback: Optional[Callable] = None,
+        deep_analysis: bool = False,
+    ) -> dict:
+        """一站式分析：先跑主流程，再依需求追加深度分析。"""
+
+        report = self.analyze(
+            features_path=features_path,
+            labels_path=labels_path,
+            meta_path=meta_path,
+            config_override=config_override,
+            progress_callback=progress_callback,
+        )
+
+        if not deep_analysis:
+            return report
+
+        deep_report = self.run_deep_analysis(
+            config_override=config_override,
+            progress_callback=progress_callback,
+        )
+
+        report_with_deep = self._reporter.inject_deep_analysis(report, deep_report)
+        self._report = report_with_deep
+        return report_with_deep
+
+    def run_deep_analysis(
+        self,
+        selected_features: Optional[list[str]] = None,
+        config_override: Optional[dict] = None,
+        progress_callback: Optional[Callable] = None,
+        force_modules: Optional[list[str]] = None,
+    ) -> DeepAnalysisReport:
+        """執行 Phase 2.4/2.5 十個深度分析模組並彙總結果。"""
+
+        if self._ic_cache is None:
+            raise InvalidInputError("IC cache is empty, run analyze() first")
+
+        config = self._apply_config_override(config_override)
+
+        candidate_features = selected_features or []
+        if not candidate_features:
+            if self._filtered_features_df is not None and not self._filtered_features_df.empty:
+                candidate_features = list(self._filtered_features_df.columns)
+            else:
+                candidate_features = list(self._ic_cache["features_df"].columns)
+        selected = [f for f in candidate_features if f in self._ic_cache["features_df"].columns]
+
+        cache_key = self._compute_deep_cache_key(selected, config)
+        force_set = set(force_modules or [])
+
+        if not force_set and cache_key in self._deep_analysis_cache:
+            cached = deepcopy(self._deep_analysis_cache[cache_key])
+            logger.info("Deep analysis cache hit: key=%s", cache_key)
+            return cached
+
+        base_report = DeepAnalysisReport()
+        if cache_key in self._deep_analysis_cache:
+            base_report = deepcopy(self._deep_analysis_cache[cache_key])
+
+        module_runners: list[tuple[str, Callable[..., dict]]] = [
+            ("factor_returns", self._run_factor_return),
+            ("factor_centrality", self._run_factor_centrality),
+            ("trend_analysis", self._run_trend_analysis),
+            ("parameter_sensitivity", self._run_parameter_sensitivity),
+            ("rolling_oos", self._run_rolling_oos),
+            ("factor_orthogonalization", self._run_factor_orthogonalization),
+            ("factor_exposure", self._run_factor_exposure),
+            ("long_short_analysis", self._run_long_short),
+            ("feature_quality_diagnostics", self._run_feature_quality_diagnostics),
+            ("net_ic_analysis", self._run_net_ic),
+        ]
+
+        run_targets: list[tuple[str, Callable[..., dict]]] = []
+        for module_name, runner in module_runners:
+            if force_set and module_name not in force_set:
+                continue
+            if (not force_set) and (not self._is_module_enabled(module_name, config)):
+                continue
+            run_targets.append((module_name, runner))
+
+        total_targets = max(1, len(run_targets))
+        started = time.perf_counter()
+
+        for idx, (module_name, runner) in enumerate(run_targets, start=1):
+            module_started = time.perf_counter()
+            try:
+                result = runner(selected, config)
+                base_report.results[module_name] = result
+                base_report.module_summary[module_name] = "completed"
+                logger.info(
+                    "Deep module completed: %s in %.2fs",
+                    module_name,
+                    time.perf_counter() - module_started,
+                )
+            except Exception as exc:  # noqa: BLE001
+                skipped = self._classify_and_skip(module_name, exc)
+                base_report.deep_analysis_errors.append(skipped)
+                base_report.results[module_name] = {
+                    "skipped": True,
+                    "reason": skipped.reason,
+                    "error_type": skipped.error_type,
+                }
+                base_report.module_summary[module_name] = "skipped"
+                logger.warning("Deep module skipped: %s, reason=%s", module_name, skipped.reason)
+
+            payload = {
+                "stage": "deep_analysis",
+                "module_name": module_name,
+                "progress": float(idx / total_targets),
+                "message": f"{module_name} completed ({idx}/{total_targets})",
+            }
+            self._emit_deep_progress(progress_callback or self._progress_callback, payload)
+
+        base_report.total_execution_time_s = float(time.perf_counter() - started)
+
+        all_module_names = [name for name, _ in module_runners]
+        for module_name in all_module_names:
+            base_report.module_summary.setdefault(module_name, "not_run")
+
+        base_report.completed_count = sum(
+            1 for status in base_report.module_summary.values() if status == "completed"
+        )
+        base_report.skipped_count = sum(
+            1 for status in base_report.module_summary.values() if status == "skipped"
+        )
+        base_report.failed_count = 0
+
+        self._cache_deep_analysis_result(cache_key, base_report)
+        return deepcopy(base_report)
+
+    def _compute_deep_cache_key(self, selected_features: list[str], config: ICConfig) -> str:
+        deep_cfg = {
+            "factor_return": config.factor_return.model_dump(),
+            "factor_centrality": config.factor_centrality.model_dump(),
+            "trend_analysis": config.trend_analysis.model_dump(),
+            "parameter_sensitivity": config.parameter_sensitivity.model_dump(),
+            "rolling_oos": config.rolling_oos.model_dump(),
+            "factor_orthogonalization": config.factor_orthogonalization.model_dump(),
+            "factor_exposure": config.factor_exposure.model_dump(),
+            "long_short_analysis": config.long_short_analysis.model_dump(),
+            "feature_quality_diagnostics": config.feature_quality_diagnostics.model_dump(),
+            "net_ic_analysis": config.net_ic_analysis.model_dump(),
+            "deep_analysis_global": config.deep_analysis_global.model_dump(),
+        }
+        payload = {
+            "features": sorted(selected_features),
+            "deep_config": deep_cfg,
+        }
+        dump = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+        return hashlib.md5(dump.encode("utf-8")).hexdigest()
+
+    def _is_module_enabled(self, module_name: str, config: ICConfig) -> bool:
+        if module_name == "factor_returns":
+            return bool(config.factor_return.enabled)
+        if module_name == "factor_centrality":
+            return bool(config.factor_centrality.enabled)
+        if module_name == "trend_analysis":
+            return bool(config.trend_analysis.enabled)
+        if module_name == "parameter_sensitivity":
+            return bool(config.parameter_sensitivity.enabled)
+        if module_name == "rolling_oos":
+            return bool(config.rolling_oos.enabled)
+        if module_name == "factor_orthogonalization":
+            return bool(config.factor_orthogonalization.enabled)
+        if module_name == "factor_exposure":
+            return bool(config.factor_exposure.enabled)
+        if module_name == "long_short_analysis":
+            return bool(config.long_short_analysis.enabled)
+        if module_name == "feature_quality_diagnostics":
+            return bool(config.feature_quality_diagnostics.enabled)
+        if module_name == "net_ic_analysis":
+            return bool(config.net_ic_analysis.enabled)
+        return False
+
+    def _classify_and_skip(self, name: str, e: Exception) -> SkippedResult:
+        text = str(e).lower()
+        if isinstance(e, InsufficientDataError):
+            error_type = "INSUFFICIENT_DATA"
+            retryable = False
+        elif isinstance(e, TimeoutError) or "timeout" in text:
+            error_type = "COMPUTATION_TIMEOUT"
+            retryable = True
+        elif isinstance(e, (ValueError, np.linalg.LinAlgError)):
+            if "nan" in text or "singular" in text or "numerical" in text:
+                error_type = "NUMERICAL_ERROR"
+            else:
+                error_type = "INTERNAL_ERROR"
+            retryable = False
+        else:
+            error_type = "INTERNAL_ERROR"
+            retryable = False
+
+        logger.error("Deep module failed: %s", name, exc_info=True)
+        return SkippedResult(
+            module_name=name,
+            reason=str(e),
+            error_type=error_type,
+            retryable=retryable,
+        )
+
+    def _run_factor_return(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.factor_return_analyzer import FactorReturnAnalyzer
+
+        features_df = self._ic_cache["features_df"][selected_features]
+        labels = self._ic_cache["label_series"]
+        analyzer = FactorReturnAnalyzer(config.factor_return.model_dump())
+        return analyzer.compute_batch(features_df, labels, top_n=len(selected_features))
+
+    def _run_factor_centrality(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
+
+        rolling_ic = self._ic_cache.get("rolling_ic") or {}
+        matrix = pd.DataFrame({
+            name: self._extract_rolling_ic_series(value)
+            for name, value in rolling_ic.items()
+            if name in selected_features and isinstance(value, dict)
+        })
+        if matrix.empty:
+            raise InsufficientDataError("rolling_ic matrix unavailable")
+
+        analyzer = FactorCentralityAnalyzer(config.factor_centrality.model_dump())
+        centrality = analyzer.compute_centrality(matrix)
+        if isinstance(centrality, SkippedResult):
+            raise InsufficientDataError(centrality.reason)
+        rolling = analyzer.compute_rolling_centrality(matrix)
+        regimes = {
+            name: analyzer.detect_crowding_regime(rolling, name)
+            for name in list(matrix.columns)
+        }
+        return {
+            **centrality,
+            "rolling_centrality": rolling.to_dict(orient="list"),
+            "regimes": regimes,
+        }
+
+    def _run_trend_analysis(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.trend_analyzer import TrendAnalyzer
+
+        rolling_ic = self._ic_cache.get("rolling_ic") or {}
+        matrix = pd.DataFrame({
+            name: self._extract_rolling_ic_series(value)
+            for name, value in rolling_ic.items()
+            if name in selected_features and isinstance(value, dict)
+        })
+        if matrix.empty:
+            raise InsufficientDataError("rolling_ic matrix unavailable")
+
+        analyzer = TrendAnalyzer(config.trend_analysis.model_dump())
+        return analyzer.batch_analyze(matrix, top_n=len(selected_features))
+
+    def _run_parameter_sensitivity(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer
+
+        features_df = self._ic_cache["features_df"][selected_features]
+        labels = self._ic_cache["label_series"]
+        metadata = self._ic_cache.get("metadata") or {}
+        analyzer = ParameterSensitivityAnalyzer(config.parameter_sensitivity.model_dump())
+        return analyzer.batch_analyze(features_df, labels, metadata=metadata)
+
+    def _run_rolling_oos(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.rolling_oos_validator import RollingOOSValidator
+
+        features_df = self._ic_cache["features_df"][selected_features]
+        labels = self._ic_cache["label_series"]
+        analyzer = RollingOOSValidator(config.rolling_oos.model_dump())
+        return analyzer.validate_batch(features_df, labels, top_n=len(selected_features))
+
+    def _run_factor_orthogonalization(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+
+        factors = self._ic_cache["features_df"][selected_features]
+        analyzer = FactorOrthogonalizer(
+            {
+                **config.factor_orthogonalization.model_dump(),
+                "icir_scores": self._ic_cache.get("icir", {}),
+            }
+        )
+        method = str(config.factor_orthogonalization.method)
+        if method == "pca":
+            transformed, summary = analyzer.pca_orthogonalize(factors)
+        else:
+            transformed, summary = analyzer.gram_schmidt(factors)
+        return {
+            **summary,
+            "transformed_shape": list(transformed.shape),
+        }
+
+    def _run_factor_exposure(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
+
+        analyzer = FactorExposureAnalyzer(config.factor_exposure.model_dump())
+        factor_values = self._ic_cache["features_df"][selected_features]
+        positions = pd.Series(1.0 / max(1, len(factor_values)), index=factor_values.index)
+        exposure = analyzer.calculate_portfolio_exposure(positions, factor_values)
+        concentration = analyzer.monitor_exposure_concentration(
+            exposure,
+            max_single_exposure=config.factor_exposure.max_single_exposure,
+        )
+        return {
+            "factor_betas": exposure.to_dict(),
+            "alpha": np.nan,
+            "r_squared": np.nan,
+            "attribution": {},
+            "unexplained": np.nan,
+            "concentration": concentration,
+        }
+
+    def _run_long_short(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
+
+        features_df = self._ic_cache["features_df"][selected_features]
+        labels = self._ic_cache["label_series"]
+        analyzer = LongShortAnalyzer(config.long_short_analysis.model_dump())
+        return analyzer.batch_analyze(features_df, labels, top_n=len(selected_features))
+
+    def _run_feature_quality_diagnostics(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
+
+        analyzer = FeatureQualityDiagnostics(config.feature_quality_diagnostics.model_dump())
+        features_df = self._ic_cache["features_df"][selected_features]
+        rolling_ic = self._ic_cache.get("rolling_ic") or {}
+        rolling_ic_dict = {
+            name: self._extract_rolling_ic_series(value)
+            for name, value in rolling_ic.items()
+            if name in selected_features and isinstance(value, dict)
+        }
+        return analyzer.run_full_diagnostics(features_df, rolling_ic_dict=rolling_ic_dict)
+
+    def _run_net_ic(self, selected_features: list[str], config: ICConfig) -> dict:
+        from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
+
+        analyzer = NetICAnalyzer(config.net_ic_analysis.model_dump())
+        summary = {
+            row["feature_name"]: {"ic_mean": row.get("ic_mean")}
+            for row in (self._report or {}).get("summary_table", [])
+            if row.get("feature_name") in selected_features
+        }
+        turnover_data = {
+            name: float(data.get("quantile_turnover", 0.0))
+            for name, data in (self._report or {}).get("turnover_analysis", {}).items()
+            if name in selected_features
+        }
+        return analyzer.batch_analyze(summary, turnover_data)
+
+    def _emit_deep_progress(self, callback: Optional[Callable], payload: dict) -> None:
+        if callback is None:
+            return
+        try:
+            callback(payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Deep progress callback failed: %s", exc)
+
+    def _cache_deep_analysis_result(self, key: str, report: DeepAnalysisReport) -> None:
+        if key in self._deep_analysis_cache:
+            self._deep_analysis_cache.pop(key)
+        self._deep_analysis_cache[key] = deepcopy(report)
+        while len(self._deep_analysis_cache) > 5:
+            self._deep_analysis_cache.popitem(last=False)
+
+    def _clear_deep_analysis_cache(self) -> None:
+        self._deep_analysis_cache.clear()
+
+    @staticmethod
+    def _extract_rolling_ic_series(window_dict: dict) -> pd.Series:
+        if not isinstance(window_dict, dict) or not window_dict:
+            return pd.Series(dtype=float)
+
+        best_key = max(
+            window_dict.keys(),
+            key=lambda k: len(window_dict.get(k, [])) if isinstance(window_dict.get(k, []), list) else 0,
+        )
+        values = window_dict.get(best_key, [])
+        return pd.Series(values, dtype=float)
 
     def get_top_features(self, n: int = 30, sort_by: str = "icir") -> list[dict]:
         """取得 Top N 特徵。"""

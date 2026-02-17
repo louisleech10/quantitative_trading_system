@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Download, TrendingUp, Info, CheckCircle2 } from 'lucide-react'
+import { Download, TrendingUp, Info, CheckCircle2, AlertCircle } from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -32,12 +32,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 interface TrialSummary {
   trial_number: number
   value: number
-  params: Record<string, any>
+  params: Record<string, unknown>
   state: string
   duration: number
   datetime_start: string
   datetime_complete: string | null
-  user_attrs: Record<string, any>
+  user_attrs: Record<string, unknown>
 }
 
 interface TrialComparisonData {
@@ -50,7 +50,7 @@ interface TrialComparisonData {
   value_std: number
   value_min: number
   value_max: number
-  param_distributions: Record<string, any>
+  param_distributions: Record<string, unknown>
   recommendation: string | null
 }
 
@@ -69,6 +69,7 @@ export default function TrialComparisonPanel({
   allTrials,
   onSelectTrial
 }: TrialComparisonPanelProps) {
+  void taskId
   const [selectedTrials, setSelectedTrials] = useState<number[]>([])
   const [comparisonData, setComparisonData] = useState<TrialComparisonData | null>(null)
   const [loading, setLoading] = useState(false)
@@ -271,7 +272,7 @@ export default function TrialComparisonPanel({
                         <TableCell className="font-mono">{trial.value.toFixed(4)}</TableCell>
                         <TableCell>{trial.duration.toFixed(2)}s</TableCell>
                         <TableCell>
-                          <Badge variant={trial.state === 'COMPLETE' ? 'success' : 'secondary'}>
+                          <Badge variant={trial.state === 'COMPLETE' ? 'default' : 'secondary'}>
                             {trial.state}
                           </Badge>
                         </TableCell>

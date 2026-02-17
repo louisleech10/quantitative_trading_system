@@ -89,8 +89,9 @@ export const PieChart: React.FC<PieChartProps> = ({
               layout="horizontal"
               align="center"
               verticalAlign="bottom"
-              formatter={(value, entry: any) => {
-                const percentage = ((entry.payload.value / totalValue) * 100).toFixed(0);
+              formatter={(value, entry: { payload?: { value?: number } }) => {
+                const currentValue = entry?.payload?.value ?? 0;
+                const percentage = totalValue > 0 ? ((currentValue / totalValue) * 100).toFixed(0) : '0';
                 return `${value} ${percentage}%`;
               }}
             />

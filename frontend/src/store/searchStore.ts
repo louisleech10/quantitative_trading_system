@@ -2,14 +2,14 @@
 // Global state management for search functionality
 
 import { create } from 'zustand';
-import { CaseData, SearchResult, SearchTemplate } from '@/lib/types';
+import type { SearchResultData, SearchTemplate } from '@/lib/types';
 import { apiClient } from '@/lib/api';
 
 interface SearchState {
   // Data
   templates: SearchTemplate[];
-  currentResult: SearchResult | null;
-  searchHistory: SearchResult[];
+  currentResult: SearchResultData | null;
+  searchHistory: SearchResultData[];
 
   // UI State
   isLoading: boolean;
@@ -22,7 +22,7 @@ interface SearchState {
   pollTaskStatus: (taskId: string) => Promise<void>;
   clearError: () => void;
   setSelectedTemplate: (template: SearchTemplate | null) => void;
-  setSearchResult: (result: any) => void;
+  setSearchResult: (result: SearchResultData | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 }
@@ -44,7 +44,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       const response = await apiClient.getSearchTemplates();
       
       if (response.success && response.data) {
-        set({ templates: response.data });
+        set({ templates: response.data.templates });
       } else {
         throw new Error(response.error?.message || 'Failed to load templates');
       }
@@ -61,7 +61,23 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     
     try {
       // Start search task
-      const response = await apiClient.executeSearch({ template_id: templateId });
+      const response = await apiClient.executeSearch(
+        { name: templateId, symbols: [], timeframe: '12h' },
+        {
+          priceChange: '>=',
+          volumeMultiplier: '>=',
+          closingStrength: '>=',
+          takerBuyRatio: '>=',
+          pricePosition: '>=',
+        },
+        {
+          priceChange: { min: null, max: null },
+          volumeMultiplier: { min: null, max: null },
+          closingStrength: { min: null, max: null },
+          takerBuyRatio: { min: null, max: null },
+          pricePosition: { min: null, max: null },
+        }
+      );
       
       if (response.success && response.data) {
         const taskId = response.data.task_id;
@@ -92,9 +108,6 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         if (response.success && response.data) {
           const result = response.data;
           
-          // Update current result
-          set({ currentResult: result });
-          
           if (result.status === 'completed') {
             // Fetch full result data
             const resultResponse = await apiClient.getTaskResult(taskId);
@@ -112,7 +125,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           }
           
           if (result.status === 'failed') {
-            throw new Error(result.error || 'Search task failed');
+            throw new Error(result.error_message || 'Search task failed');
           }
           
           // Continue polling if still running
@@ -147,7 +160,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   },
 
   // Set search result
-  setSearchResult: (result: any) => {
+  setSearchResult: (result: SearchResultData | null) => {
     set({ currentResult: result });
   },
 

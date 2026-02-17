@@ -8,3 +8,6 @@ from .cycle_indicators import CycleIndicatorEngine
 from .pattern_indicators import PatternIndicatorEngine
 from .statistics_indicators import StatisticsIndicatorEngine
 from .custom_indicators import CustomIndicatorEngine
+from .microstructure_indicators import MicrostructureIndicatorEngine
+from .entropy_indicators import EntropyIndicatorEngine
+from .tail_risk_indicators import TailRiskIndicatorEngine

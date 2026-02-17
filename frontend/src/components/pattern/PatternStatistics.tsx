@@ -30,7 +30,7 @@ export default function PatternStatistics() {
     try {
       setLoading(true);
       const data = await getPatternStatistics();
-      setStats(data);
+      setStats(data.success ? (data.statistics ?? null) : null);
     } catch (error) {
       console.error('載入統計資料失敗:', error);
     } finally {
@@ -63,6 +63,7 @@ export default function PatternStatistics() {
   
   // 效能分布資料（假設有 performance_distribution）
   const performanceData = stats.performance_distribution || [];
+  void performanceData;
   
   return (
     <div className="space-y-6">
@@ -138,7 +139,7 @@ export default function PatternStatistics() {
               <XAxis dataKey="metric" />
               <YAxis domain={[0, 1]} />
               <Tooltip
-                formatter={(value: any) => (value * 100).toFixed(1) + '%'}
+                formatter={(value: number | string) => `${(Number(value) * 100).toFixed(1)}%`}
                 contentStyle={{ backgroundColor: '#1a233a', border: '1px solid rgba(255,255,255,0.1)' }}
                 itemStyle={{ color: '#e2e8f0' }}
                 labelStyle={{ color: '#94a3b8' }}

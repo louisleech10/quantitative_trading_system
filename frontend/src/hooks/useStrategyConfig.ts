@@ -542,10 +542,22 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
       name: STORE_KEY,
       storage: createJSONStorage(() => localStorage),
       version: 2, // 版本升級到 2 以觸發遷移
-      migrate: (persistedState: any, version: number) => {
+      migrate: (persistedState: unknown, version: number) => {
+      void version;
+        if (typeof persistedState !== 'object' || persistedState === null) {
+          return persistedState;
+        }
+
+        const persisted = persistedState as {
+          state?: {
+            symbol?: string;
+            symbols?: string[];
+          };
+        };
+
         // 遷移舊版 symbol (string) 到新版 symbols (string[])
-        if (persistedState?.state) {
-          const oldState = persistedState.state;
+        if (persisted.state) {
+          const oldState = persisted.state;
           
           // 如果有舊的 symbol 欄位且沒有 symbols 欄位
           if (oldState.symbol && !oldState.symbols) {
@@ -559,7 +571,7 @@ export const useStrategyConfig = create<StrategyConfigStore>()(
           }
         }
         
-        return persistedState;
+        return persisted;
       },
       partialize: (store) => ({
         state: store.state,

@@ -24,7 +24,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -56,6 +56,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 // API Base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+interface TaskProgress {
+  completed_trials?: number
+  total_trials?: number
+  best_value?: number
+}
 
 // ==================== API 調用函數 ====================
 
@@ -143,16 +149,12 @@ export default function OptimizationResultPage() {
 
   // 實時進度狀態
   const [taskStatus, setTaskStatus] = useState<string>('unknown')
-  const [progress, setProgress] = useState<any>(null)
-
-  // Selected parameters for heatmap
-  const [selectedParamX, setSelectedParamX] = useState<string>('')
-  const [selectedParamY, setSelectedParamY] = useState<string>('')
+  const [progress, setProgress] = useState<TaskProgress | null>(null)
 
   /**
    * Ultra Think Step 3 優化: 並行載入所有數據
    */
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -212,8 +214,6 @@ export default function OptimizationResultPage() {
           const topTwo = [...importancesData].sort((a, b) => b.importance - a.importance).slice(0, 2)
           const paramX = topTwo[0].parameter_name
           const paramY = topTwo[1].parameter_name
-          setSelectedParamX(paramX)
-          setSelectedParamY(paramY)
 
           // 獲取熱力圖數據
           try {
@@ -259,7 +259,7 @@ export default function OptimizationResultPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [taskId])
 
   /**
    * 重新載入熱力圖
@@ -270,8 +270,6 @@ export default function OptimizationResultPage() {
     try {
       const heatmap = await fetchHeatmap(taskId, paramX, paramY)
       setHeatmapData(heatmap)
-      setSelectedParamX(paramX)
-      setSelectedParamY(paramY)
     } catch (err) {
       console.error('Failed to reload heatmap:', err)
     }
@@ -317,7 +315,7 @@ export default function OptimizationResultPage() {
     }, 3000)
 
     return () => clearInterval(intervalId)
-  }, [taskId, taskStatus])
+  }, [loadAllData, taskId, taskStatus])
 
   // ==================== 渲染 ====================
 

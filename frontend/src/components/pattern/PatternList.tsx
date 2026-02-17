@@ -14,7 +14,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePatternStore } from '@/store/patternStore';
 import { listPatterns, deletePattern } from '@/lib/api/patternApi';
@@ -22,7 +22,6 @@ import type { Pattern } from '@/lib/patternTypes';
 
 export default function PatternList() {
   const {
-    patterns,
     setPatterns,
     selectPattern,
     filters,
@@ -32,12 +31,7 @@ export default function PatternList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // 載入模式列表
-  useEffect(() => {
-    loadPatterns();
-  }, [filters.status, filters.tags]);
-  
-  const loadPatterns = async () => {
+  const loadPatterns = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -55,7 +49,12 @@ export default function PatternList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.status, filters.tags, setPatterns]);
+
+  // 載入模式列表
+  useEffect(() => {
+    loadPatterns();
+  }, [loadPatterns]);
   
   const handleDelete = async (patternId: string) => {
     if (!confirm('確定要刪除此模式嗎？')) return;

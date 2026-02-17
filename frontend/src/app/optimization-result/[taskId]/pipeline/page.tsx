@@ -20,7 +20,6 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
@@ -34,15 +33,26 @@ interface OptimizationResult {
   task_id: string
   study_name: string
   n_trials: number
-  best_trial: any
-  trials: any[]
+  best_trial: {
+    number: number
+  } | null
+  trials: Array<{
+    number: number
+    value: number
+    params: Record<string, unknown>
+    user_attrs?: Record<string, unknown>
+    state?: string
+    duration_seconds?: number
+    datetime_start?: string
+    datetime_complete?: string | null
+  }>
 }
 
 interface IndicatorConfig {
   id: string
   indicator: string
   data_source: string
-  params: Record<string, any>
+  params: Record<string, unknown>
 }
 
 export default function PipelineConfigPage() {
@@ -69,7 +79,6 @@ export default function PipelineConfigPage() {
     }
   ])
   
-  const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
   // 載入優化結果
@@ -97,38 +106,17 @@ export default function PipelineConfigPage() {
   }
 
   // 確認選擇並建立配置
-  const handleConfirmSelection = async (config: any) => {
-    setSubmitting(true)
-    
+  const handleSelectionSuccess = async (pipelineId: string) => {
     try {
-      // 構建請求體
-      const requestBody = {
-        ...config,
-        indicators: configMode === 'multi' ? indicators : null,
-        config_mode: configMode
-      }
-
-      // 調用後端 API 建立 Pipeline 配置
-      const response = await fetch(`${API_BASE_URL}/api/v1/ml-pipeline/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      })
-
-      if (!response.ok) throw new Error('建立配置失敗')
-
-      const result = await response.json()
       setSuccess(true)
       
       // 3 秒後跳轉到配置詳情頁
       setTimeout(() => {
-        router.push(`/ml-pipeline/${result.pipeline_id}`)
+        router.push(`/ml-pipeline/${pipelineId}`)
       }, 3000)
       
     } catch (err) {
       setError(err instanceof Error ? err.message : '提交失敗')
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -154,7 +142,7 @@ export default function PipelineConfigPage() {
 
   if (!result) return null
 
-  const selectedTrial = result.trials?.find(t => t.number === selectedTrialNumber)
+  const selectedTrial = result.trials?.find((trial) => trial.number === selectedTrialNumber)
 
   return (
     <div className="container mx-auto p-6 space-y-6 min-h-screen bg-slate-950/40">
@@ -227,7 +215,7 @@ export default function PipelineConfigPage() {
           <TrialComparisonPanel
             taskId={taskId}
             studyName={result.study_name}
-            allTrials={result.trials?.map(t => t.number) || []}
+            allTrials={result.trials?.map((trial) => trial.number) || []}
             onSelectTrial={handleSelectTrial}
           />
         </TabsContent>
@@ -290,13 +278,22 @@ export default function PipelineConfigPage() {
       {selectedTrial && (
         <TrialSelectionDialog
           open={showSelectionDialog}
-          onOpenChange={setShowSelectionDialog}
+          onClose={() => setShowSelectionDialog(false)}
           studyName={result.study_name}
-          trialNumber={selectedTrial.number}
-          trialValue={selectedTrial.value}
-          trialParams={selectedTrial.params}
-          strategyType={selectedTrial.user_attrs?.strategy_type || 'ema_three_line'}
-          onConfirm={handleConfirmSelection}
+          selectedTrial={{
+            number: selectedTrial.number,
+            value: selectedTrial.value,
+            params: selectedTrial.params,
+            state: selectedTrial.state || 'COMPLETE',
+            duration_seconds: selectedTrial.duration_seconds || 0,
+            user_attrs: selectedTrial.user_attrs || {},
+          }}
+          strategyType={
+            typeof selectedTrial.user_attrs?.strategy_type === 'string'
+              ? selectedTrial.user_attrs.strategy_type
+              : 'ema_three_line'
+          }
+          onSuccess={handleSelectionSuccess}
         />
       )}
     </div>

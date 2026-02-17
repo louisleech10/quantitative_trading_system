@@ -97,6 +97,42 @@ def test_rolling_aggregator_slope_rank_zscore():
     assert np.isclose(rolled[zscore_col].iloc[idx], expected_zscore, equal_nan=True)
 
 
+def test_rolling_aggregator_handles_duplicate_columns():
+    base = pd.Series(np.arange(20, dtype=float))
+    features = pd.concat([base.rename("dup"), (base * 2).rename("dup")], axis=1)
+
+    agg = RollingAggregator({"windows": [5], "aggregators": ["slope"]})
+    rolled = agg.compute_all(features)
+
+    assert rolled.shape[1] >= 2
+    assert all(col == "dup_Slope_W5" for col in rolled.columns)
+    assert np.isfinite(rolled.iloc[-1, 0])
+    assert np.isfinite(rolled.iloc[-1, 1])
+
+
+def test_talib_wrapper_midpoint_registered_and_computable():
+    raw = _load_btcusdt_12h()
+    TALibWrapper.initialize()
+
+    result = TALibWrapper.compute("MIDPOINT", raw, {"timeperiod": 14}, "close")
+
+    assert "close_trend_MIDPOINT_14" in result.columns
+    assert result.iloc[20:, 0].notna().any()
+
+
+def test_talib_wrapper_midprice_and_plus_dm_computable():
+    raw = _load_btcusdt_12h()
+    TALibWrapper.initialize()
+
+    midprice = TALibWrapper.compute("MIDPRICE", raw, {"timeperiod": 14}, "close")
+    plus_dm = TALibWrapper.compute("PLUS_DM", raw, {"timeperiod": 14}, "close")
+
+    assert "hl_trend_MIDPRICE_14" in midprice.columns
+    assert "hl_momentum_PLUS_DM_14" in plus_dm.columns
+    assert midprice.iloc[20:, 0].notna().any()
+    assert plus_dm.iloc[20:, 0].notna().any()
+
+
 def test_lag_processor_layer1_and_raw():
     raw = _load_btcusdt_12h()
     ema_21 = TALibWrapper.compute("EMA", raw, {"timeperiod": 21}, "close")

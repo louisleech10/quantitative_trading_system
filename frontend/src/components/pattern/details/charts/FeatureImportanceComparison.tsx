@@ -44,7 +44,7 @@ export default function FeatureImportanceComparison({ data, loading }: FeatureIm
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="feature" hide />
             <YAxis />
-            <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
+            <Tooltip formatter={(value: unknown) => Number(value).toFixed(4)} />
             <Legend />
             <Bar dataKey="gain" fill="#60a5fa" name="Gain" />
             <Bar dataKey="cover" fill="#34d399" name="Cover" />

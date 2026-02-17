@@ -52,11 +52,17 @@ import type { TrialSummary } from './types';
  * Flatten nested object to dot notation
  * Example: { params: { threshold: 0.5 } } → { 'params.threshold': 0.5 }
  */
-function flattenObject(obj: any, prefix = ''): Record<string, any> {
-  const flattened: Record<string, any> = {};
+function flattenObject(obj: unknown, prefix = ''): Record<string, unknown> {
+  const flattened: Record<string, unknown> = {};
 
-  for (const key in obj) {
-    const value = obj[key];
+  if (typeof obj !== 'object' || obj === null) {
+    return flattened;
+  }
+
+  const objRecord = obj as Record<string, unknown>;
+
+  for (const key in objRecord) {
+    const value = objRecord[key];
     const newKey = prefix ? `${prefix}.${key}` : key;
 
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
@@ -75,7 +81,7 @@ function flattenObject(obj: any, prefix = ''): Record<string, any> {
  * - Wrap in quotes if contains comma, quote, or newline
  * - Escape quotes by doubling them
  */
-function escapeCSVField(field: any): string {
+function escapeCSVField(field: unknown): string {
   if (field == null) return '';
 
   const str = String(field);
@@ -245,6 +251,7 @@ function downloadBlob(blob: Blob, filename: string): void {
  * This is a placeholder for future enhancements
  */
 export function exportComparisonToMarkdown(trials: TrialSummary[]): string {
+void trials;
   // Implementation delegated to ComparisonTool component
   // This function is here for API completeness
   return '';

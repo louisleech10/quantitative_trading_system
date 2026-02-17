@@ -13,7 +13,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { usePatternStore } from '@/store/patternStore';
 import { startXGBoostAnalysis, getXGBoostTaskStatus } from '@/lib/api/patternApi';
 import FeatureImportanceChart from './FeatureImportanceChart';
@@ -28,8 +28,6 @@ interface Props {
 export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props) {
   const { 
     currentAnalysis, 
-    analysisLoading, 
-    analysisTaskId, 
     setCurrentAnalysis 
   } = usePatternStore();
   
@@ -73,7 +71,9 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
         if (statusData.status === 'completed') {
           clearInterval(interval);
           setStatus('completed');
-          setCurrentAnalysis(statusData.result);
+          if (statusData.result) {
+            setCurrentAnalysis(statusData.result);
+          }
           usePatternStore.setState({ analysisLoading: false });
         } else if (statusData.status === 'failed') {
           clearInterval(interval);
@@ -147,25 +147,25 @@ export default function XGBoostAnalysisPanel({ caseId, onPatternCreated }: Props
               <div className="text-center">
                 <p className="text-sm text-slate-400">準確度</p>
                 <p className="text-2xl font-semibold text-blue-300">
-                  {(currentAnalysis.model_performance.test_accuracy * 100).toFixed(1)}%
+                  {((currentAnalysis.model_performance.test_accuracy ?? 0) * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-slate-400">精確度</p>
                 <p className="text-2xl font-semibold text-emerald-300">
-                  {(currentAnalysis.model_performance.test_precision * 100).toFixed(1)}%
+                  {((currentAnalysis.model_performance.test_precision ?? 0) * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-slate-400">召回率</p>
                 <p className="text-2xl font-semibold text-amber-300">
-                  {(currentAnalysis.model_performance.test_recall * 100).toFixed(1)}%
+                  {((currentAnalysis.model_performance.test_recall ?? 0) * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-slate-400">F1 分數</p>
                 <p className="text-2xl font-semibold text-purple-400">
-                  {currentAnalysis.model_performance.test_f1.toFixed(3)}
+                  {(currentAnalysis.model_performance.test_f1 ?? 0).toFixed(3)}
                 </p>
               </div>
             </div>

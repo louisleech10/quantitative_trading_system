@@ -22,7 +22,9 @@ import {
   formatVolume,
   chartColors
 } from '../../utils/chartConfig';
-import { ISeriesApi } from 'lightweight-charts';
+import { ISeriesApi, MouseEventParams, Time, UTCTimestamp } from 'lightweight-charts';
+
+const toUtcTime = (timestamp: number): UTCTimestamp => timestamp as UTCTimestamp;
 
 /**
  * K線數據接口
@@ -142,7 +144,7 @@ export function PriceChart({
 
       // 轉換數據格式（Lightweight Charts格式）
       const formattedKlines = klines.map(kline => ({
-        time: kline.timestamp as any,
+        time: toUtcTime(kline.timestamp),
         open: kline.open,
         high: kline.high,
         low: kline.low,
@@ -159,14 +161,14 @@ export function PriceChart({
         if (toTimestamp && tcTimestamp) {
           // 新邏輯：標記TO和TC兩個點
           markers.push({
-            time: toTimestamp as any,
+            time: toUtcTime(toTimestamp),
             position: 'aboveBar' as const,
             color: '#60a5fa',  // 藍色 - TO
             shape: 'arrowDown' as const,
             text: 'TO',
           });
           markers.push({
-            time: tcTimestamp as any,
+            time: toUtcTime(tcTimestamp),
             position: 'aboveBar' as const,
             color: '#fb923c',  // 橙色 - TC
             shape: 'arrowDown' as const,
@@ -175,7 +177,7 @@ export function PriceChart({
         } else {
           // 舊邏輯：只標記一個T點（向後兼容）
           markers.push({
-            time: caseTimestamp as any,
+            time: toUtcTime(caseTimestamp),
             position: 'aboveBar' as const,
             color: chartColors.caseMarkerColor,
             shape: 'arrowDown' as const,
@@ -191,8 +193,8 @@ export function PriceChart({
         const firstTime = formattedKlines[0].time;
         const lastTime = formattedKlines[formattedKlines.length - 1].time;
         chartInstance.timeScale().setVisibleRange({
-          from: firstTime as any,
-          to: lastTime as any,
+          from: firstTime,
+          to: lastTime,
         });
       }
 
@@ -207,8 +209,8 @@ export function PriceChart({
       });
 
       // 訂閱懸停事件（用於顯示OHLCV資訊）
-      const handleCrosshairMove = (param: any) => {
-        if (param.time) {
+      const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+        if (typeof param.time === 'number') {
           const hoveredKline = klines.find(k => k.timestamp === param.time);
           if (hoveredKline) {
             setHoveredData(hoveredKline);

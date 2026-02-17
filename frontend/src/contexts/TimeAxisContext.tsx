@@ -144,7 +144,7 @@ export function TimeAxisProvider({
 }: TimeAxisProviderProps) {
   // ===== State =====
   // 只保留必要的 state，避免頻繁更新導致整個樹重新渲染
-  const [syncState, setSyncState] = useState<ChartSyncState>({
+  const [syncState] = useState<ChartSyncState>({
     visibleRange: initialRange ?? null,
     crosshairTime: null,
     zoomLevel: 1,
@@ -162,15 +162,6 @@ export function TimeAxisProvider({
   // 緩存 debug 值，避免依賴變化
   const debugRef = useRef(debug);
   debugRef.current = debug;
-
-  /**
-   * 記錄調試日誌
-   */
-  const log = useCallback((message: string, ...args: any[]) => {
-    if (debugRef.current) {
-      console.log(`[TimeAxisContext] ${message}`, ...args);
-    }
-  }, []);
 
   /**
    * 更新可見範圍（即時同步，不使用 RAF 節流）
@@ -215,6 +206,9 @@ export function TimeAxisProvider({
     lookbackBars: number = 100,
     forwardBars: number = 50
   ) => {
+    void toTimestamp;
+    void lookbackBars;
+    void forwardBars;
     // 廣播特殊重置信號
     const resetSignal: TimeRange = { from: -999999, to: -999999 };
 

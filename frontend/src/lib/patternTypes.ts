@@ -26,18 +26,50 @@ export interface Pattern {
   case_id: string;
   xgboost_importance: Record<string, number>;
   performance_metrics: {
+    accuracy?: number;
     precision: number;
     recall: number;
     f1_score: number;
     train_auc?: number;
     cv_auc_mean?: number;
     cv_auc_std?: number;
+    overfitting_score?: number;
+    sample_count?: number;
+    profitable_count?: number;
   };
   created_at: string;
   updated_at: string;
   status: 'active' | 'archived' | 'testing';
   tags: string[];
-  metadata: Record<string, unknown>;
+  metadata: {
+    data_selection?: {
+      symbol?: string;
+      symbols?: string[];
+      timeframe?: string;
+      lookback_bars?: number;
+      [key: string]: unknown;
+    };
+    indicator_config?: Array<{
+      indicator?: string;
+      data_source?: string;
+      params?: Record<string, unknown>;
+      [key: string]: unknown;
+    }>;
+    sequence_config?: {
+      sequence_length?: number;
+      sequence_feature_mode?: 'aggregate' | 'flatten';
+      sequence_stride?: number;
+      aggregation_methods?: string[];
+      multi_scale_windows?: number[];
+      [key: string]: unknown;
+    };
+    training_config?: {
+      time_series_split?: boolean;
+      cv_folds?: number;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
 }
 
 export interface CreatePatternRequest {
@@ -80,12 +112,27 @@ export interface PatternSummary {
 }
 
 export interface PatternStatistics {
-  total: number;
-  active: number;
-  archived: number;
-  testing: number;
-  avg_rules_per_pattern: number;
-  top_tags: [string, number][];
+  total_patterns: number;
+  by_status: {
+    active: number;
+    archived: number;
+    testing: number;
+  };
+  average_performance: {
+    accuracy: number;
+    precision: number;
+    recall: number;
+    f1_score: number;
+  };
+  performance_distribution?: Array<{ bucket: string; count: number }>;
+  by_tags?: Record<string, number>;
+  by_case_id?: Record<string, number>;
+  total?: number;
+  active?: number;
+  archived?: number;
+  testing?: number;
+  avg_rules_per_pattern?: number;
+  top_tags?: [string, number][];
 }
 
 export interface FeatureImportance {
@@ -110,6 +157,11 @@ export interface DecisionRule {
 
 export interface ModelPerformance {
   engine_type?: EngineType;
+  test_accuracy?: number;
+  test_precision?: number;
+  test_recall?: number;
+  test_f1?: number;
+  test_auc?: number;
   train_auc: number;
   cv_auc_mean: number;
   cv_auc_std: number;
@@ -367,6 +419,11 @@ export interface AnalysisResult {
 
 export interface XGBoostAnalysisRequest {
   case_id: string;
+  max_depth?: number;
+  learning_rate?: number;
+  n_estimators?: number;
+  top_n_features?: number;
+  min_rule_support?: number;
   xgboost_params?: Record<string, unknown>;
   cv_folds?: number;
   top_n_rules?: number;

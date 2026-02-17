@@ -15,6 +15,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+void CardDescription;
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,7 +28,7 @@ interface IndicatorConfig {
   id: string
   indicator: string
   data_source: string
-  params: Record<string, any>
+  params: Record<string, unknown>
 }
 
 interface MultiIndicatorConfigProps {
@@ -96,7 +97,7 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
       }
       onChange([defaultIndicator])
     }
-  }, [])
+  }, [onChange, value.length])
 
   // 添加指標
   const handleAddIndicator = () => {
@@ -125,7 +126,7 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
     if (!indicatorDef) return
 
     // 生成默認參數
-    const defaultParams: Record<string, any> = {}
+    const defaultParams: Record<string, unknown> = {}
     Object.entries(indicatorDef.params).forEach(([key, config]) => {
       defaultParams[key] = config.default
     })
@@ -147,7 +148,7 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
   }
 
   // 更新參數
-  const handleParamChange = (id: string, paramKey: string, paramValue: any) => {
+  const handleParamChange = (id: string, paramKey: string, paramValue: unknown) => {
     onChange(value.map(config =>
       config.id === id
         ? { ...config, params: { ...config.params, [paramKey]: paramValue } }
@@ -188,6 +189,11 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
       const { indicator, data_source, params } = config
       
       if (indicator === 'ema_three_line') {
+        const emaShort = Number(params.ema_short ?? 5)
+        const emaMid = Number(params.ema_mid ?? 20)
+        const emaLong = Number(params.ema_long ?? 60)
+        const volumeThreshold = Number(params.volume_threshold ?? 0.6)
+
         // EMA 策略特徵（11個）
         // ✅ 跨標的訓練：只使用相對特徵，不使用 EMA 絕對值
         
@@ -197,20 +203,20 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
         features.push(`${data_source}_price_ema_long_distance_pct`)
         
         // EMA 之間的相對距離（2個，百分比）
-        features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_distance_pct`)
-        features.push(`${data_source}_ema${params.ema_mid}_${params.ema_long}_distance_pct`)
+        features.push(`${data_source}_ema${emaShort}_${emaMid}_distance_pct`)
+        features.push(`${data_source}_ema${emaMid}_${emaLong}_distance_pct`)
         
         // EMA 趨勢特徵（2個）
         features.push(`${data_source}_ema_trend_aligned`)
-        features.push(`${data_source}_ema${params.ema_short}_${params.ema_mid}_cross_signal`)
+        features.push(`${data_source}_ema${emaShort}_${emaMid}_cross_signal`)
         
         // EMA 斜率（2個，百分比變化率）
         features.push(`${data_source}_ema_short_slope_pct`)
         features.push(`${data_source}_ema_mid_slope_pct`)
         
         // 成交量特徵（2個）
-        features.push(`volume_spike_${Math.round(params.volume_threshold * 100)}`)
-        features.push(`taker_ratio_distance_${Math.round(params.volume_threshold * 100)}`)
+        features.push(`volume_spike_${Math.round(volumeThreshold * 100)}`)
+        features.push(`taker_ratio_distance_${Math.round(volumeThreshold * 100)}`)
         
         // 信號組合特徵（3個）
         features.push(`${data_source}_ema_entry_signal_score`)
@@ -326,7 +332,7 @@ export default function MultiIndicatorConfig({ value = [], onChange }: MultiIndi
                               handleParamChange(config.id, paramKey, paramConfig.default)
                             }
                           }}
-                          step="any"
+                          step="unknown"
                           min={paramConfig.min}
                           max={paramConfig.max}
                           className="bg-slate-900/60 border-slate-700 text-slate-100"

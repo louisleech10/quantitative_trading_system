@@ -26,7 +26,7 @@ export default function DataPreparationPage() {
     fetchCaseCount();
   }, [refreshKey]);
 
-  const handleImportSuccess = (result: any) => {
+  const handleImportSuccess = (result: { imported_cases: number }) => {
     // 更新案例總數
     setTotalCases(result.imported_cases);
   };
@@ -182,7 +182,7 @@ export default function DataPreparationPage() {
             <div>
               <h4 className="font-bold text-slate-100 mb-1">步驟 3: 批量下載</h4>
               <p className="text-slate-300 leading-relaxed">
-                點擊"開始批量下載"按鈕，系統將自動下載所有案例的K線數據並存儲到HDF5。下載過程中可查看實時進度。
+                點擊&quot;開始批量下載&quot;按鈕，系統將自動下載所有案例的K線數據並存儲到HDF5。下載過程中可查看實時進度。
               </p>
             </div>
 

@@ -124,11 +124,17 @@ export default function FeatureImportanceChart({ featureImportance, topN = 10 }:
   );
 }
 
+interface FeatureImportanceTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { rank: number; feature: string; importance: number } }>;
+}
+
 // 自訂 Tooltip
-function CustomTooltip({ active, payload }: any) {
-  if (!active || !payload || payload.length === 0) return null;
+function CustomTooltip({ active, payload }: FeatureImportanceTooltipProps) {
+  const typedPayload = payload;
+  if (!active || !typedPayload || typedPayload.length === 0) return null;
   
-  const data = payload[0].payload;
+  const data = typedPayload[0].payload;
   
   return (
     <div className="bg-[#1a233a] p-3 border border-white/10 rounded shadow-xl shadow-black/30">

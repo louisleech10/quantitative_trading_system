@@ -9,6 +9,8 @@ import {
   FeatureNLResult,
   AutoResearchStatus,
   AutoResearchLogEntry,
+  FeatureSummary,
+  ExplorerTab,
 } from '@/lib/types';
 
 interface FeatureFactoryState {
@@ -27,6 +29,11 @@ interface FeatureFactoryState {
   lastNLResult: FeatureNLResult | null;
   autoResearchStatus: AutoResearchStatus | null;
   autoResearchLogs: AutoResearchLogEntry[];
+  explorerTaskId: string | null;
+  explorerActiveTab: ExplorerTab;
+  explorerSelectedFeature: string | null;
+  explorerSelectedFeatures: string[];
+  explorerSummary: FeatureSummary | null;
   setConfig: (config: FeatureFactoryConfig) => void;
   updateConfigPartial: (partial: Record<string, unknown>) => void;
   setPresets: (presets: FeatureFactoryPreset[]) => void;
@@ -43,6 +50,10 @@ interface FeatureFactoryState {
   setLastNLResult: (result: FeatureNLResult | null) => void;
   setAutoResearchStatus: (status: AutoResearchStatus | null) => void;
   setAutoResearchLogs: (logs: AutoResearchLogEntry[]) => void;
+  setExplorerTaskId: (taskId: string | null) => void;
+  setExplorerActiveTab: (tab: ExplorerTab, selectedFeature?: string | null) => void;
+  setExplorerSelectedFeatures: (features: string[]) => void;
+  setExplorerSummary: (summary: FeatureSummary | null) => void;
 }
 
 const mergeDeep = (
@@ -81,12 +92,20 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
   lastNLResult: null,
   autoResearchStatus: null,
   autoResearchLogs: [],
+  explorerTaskId: null,
+  explorerActiveTab: 'overview',
+  explorerSelectedFeature: null,
+  explorerSelectedFeatures: [],
+  explorerSummary: null,
   setConfig: (config) => set({ config }),
   updateConfigPartial: (partial) =>
     set((state) => ({
       config: state.config
-        ? (mergeDeep(state.config as Record<string, unknown>, partial) as FeatureFactoryConfig)
-        : (partial as FeatureFactoryConfig),
+        ? (mergeDeep(
+            state.config as unknown as Record<string, unknown>,
+            partial
+          ) as unknown as FeatureFactoryConfig)
+        : (partial as unknown as FeatureFactoryConfig),
     })),
   setPresets: (presets) => set({ presets }),
   setDataSources: (dataSources) => set({ dataSources }),
@@ -102,4 +121,13 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
   setLastNLResult: (result) => set({ lastNLResult: result }),
   setAutoResearchStatus: (status) => set({ autoResearchStatus: status }),
   setAutoResearchLogs: (logs) => set({ autoResearchLogs: logs }),
+  setExplorerTaskId: (taskId) => set({ explorerTaskId: taskId }),
+  setExplorerActiveTab: (tab, selectedFeature) =>
+    set((state) => ({
+      explorerActiveTab: tab,
+      explorerSelectedFeature:
+        typeof selectedFeature === 'undefined' ? state.explorerSelectedFeature : selectedFeature,
+    })),
+  setExplorerSelectedFeatures: (features) => set({ explorerSelectedFeatures: features }),
+  setExplorerSummary: (summary) => set({ explorerSummary: summary }),
 }));

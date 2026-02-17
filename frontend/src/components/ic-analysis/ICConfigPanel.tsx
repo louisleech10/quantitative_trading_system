@@ -22,6 +22,10 @@ interface ICConfigPanelProps {
   isRunning: boolean;
 }
 
+type ICConfigPatch = Partial<Omit<ICAnalysisConfig, 'thresholds'>> & {
+  thresholds?: Partial<ICAnalysisConfig['thresholds']>;
+};
+
 const horizonOptions = [1, 2, 3, 5, 8, 13, 21].map((value) => ({
   value: String(value),
   label: `${value} 根`,
@@ -35,7 +39,7 @@ export default function ICConfigPanel({
 }: ICConfigPanelProps) {
   const horizonValues = useMemo(() => config.horizons.map((value) => String(value)), [config.horizons]);
 
-  const updateConfig = (patch: Partial<ICAnalysisConfig>) => {
+  const updateConfig = (patch: ICConfigPatch) => {
     onConfigChange({
       ...config,
       ...patch,

@@ -51,7 +51,9 @@ export default function ConfigPanel({
       return;
     }
 
-    setConfig({ ...config });
+    if (config) {
+      setConfig(config);
+    }
   };
 
   const handleConfigOverride = (override: Record<string, unknown>) => {

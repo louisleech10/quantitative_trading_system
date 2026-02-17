@@ -92,6 +92,7 @@ function TradingChartContainerInner({
   totalHeight = 640,
   showToMarker = true
 }: TradingChartContainerProps) {
+  void showToMarker;
   // ===== Refs =====
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -99,9 +100,9 @@ function TradingChartContainerInner({
   const { updateCrosshair } = useTimeAxis();
 
   // ===== State =====
-  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [, setContainerWidth] = useState<number>(0);
   const [crosshairX, setCrosshairX] = useState<number | null>(null); // 十字線 X 座標
-  const [crosshairTime, setCrosshairTime] = useState<number | null>(null); // 十字線時間戳
+  const [, setCrosshairTime] = useState<number | null>(null); // 十字線時間戳
   const [isInitialized, setIsInitialized] = useState(false); // 初始化狀態（避免刷新歪掉）
 
   // ===== 高度分配（5:3:2 比例）=====

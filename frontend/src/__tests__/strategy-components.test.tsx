@@ -282,7 +282,7 @@ describe("Parameter Validation", () => {
     };
 
     // 驗證邏輯
-    const isValid = (params: any) => {
+    const isValid = (params: unknown) => {
       return (
         params.ema_short < params.ema_mid &&
         params.ema_mid < params.ema_long
@@ -308,7 +308,7 @@ describe("Parameter Validation", () => {
     };
 
     // 驗證邏輯
-    const isValid = (ranges: any) => {
+    const isValid = (ranges: unknown) => {
       return (
         ranges.ema_short.max < ranges.ema_mid.min &&
         ranges.ema_mid.max < ranges.ema_long.min

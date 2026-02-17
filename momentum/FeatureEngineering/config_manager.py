@@ -10,8 +10,12 @@ import yaml
 
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.feature_config import (
+    EntropyConfig,
     FactoryConfig,
     FeatureCountPreview,
+    MicrostructureConfig,
+    PreprocessingConfig,
+    TailRiskConfig,
     ValidationResult,
 )
 
@@ -132,14 +136,47 @@ class ConfigManager:
         meta_count = 20 if meta_cfg.get("enabled", True) else 0
         label_count = self._estimate_label_count(labels_cfg)
 
-        total_features = (
+        microstructure_count = 0
+        entropy_count = 0
+        tail_risk_count = 0
+        if config.atomic_indicators.microstructure.enabled:
+            microstructure_count = self._estimate_microstructure_features(
+                config.atomic_indicators.microstructure
+            )
+        if config.atomic_indicators.entropy.enabled:
+            entropy_count = self._estimate_entropy_features(config.atomic_indicators.entropy)
+        if config.atomic_indicators.tail_risk.enabled:
+            tail_risk_count = self._estimate_tail_risk_features(config.atomic_indicators.tail_risk)
+
+        preprocessing_added = 0
+        base_total_before_preprocessing = (
             atomic_total
+            + microstructure_count
+            + entropy_count
+            + tail_risk_count
             + derived_count
             + rolling_count
             + lag_count
             + cross_count
             + meta_count
             + label_count
+        )
+        if config.preprocessing.enabled:
+            preprocess_multiplier = self._estimate_preprocessing_multiplier(config.preprocessing)
+            preprocessing_added = max(0, int(base_total_before_preprocessing * (preprocess_multiplier - 1.0)))
+
+        total_features = (
+            atomic_total
+            + microstructure_count
+            + entropy_count
+            + tail_risk_count
+            + derived_count
+            + rolling_count
+            + lag_count
+            + cross_count
+            + meta_count
+            + label_count
+            + preprocessing_added
         )
 
         estimated_time_seconds = max(0.5, total_features / 200.0)
@@ -155,6 +192,10 @@ class ConfigManager:
             "labels": label_count,
         }
         breakdown.update(atomic_counts)
+        breakdown["microstructure"] = microstructure_count
+        breakdown["entropy"] = entropy_count
+        breakdown["tail_risk"] = tail_risk_count
+        breakdown["preprocessing_added"] = preprocessing_added
 
         return FeatureCountPreview(
             total_features=total_features,
@@ -163,8 +204,59 @@ class ConfigManager:
             breakdown=breakdown,
         )
 
+    @staticmethod
+    def _estimate_microstructure_features(config: MicrostructureConfig) -> int:
+        count = 0
+        count += len(config.windows)
+        count += len(config.kyle_lambda_windows)
+        count += len(config.kyle_lambda_windows)
+        count += len(config.cs_spread_smooth)
+        count += 1 + len(config.windows)
+        count += len(config.kyle_lambda_windows)
+        count += len(config.vpin_n_buckets) + len(config.vpin_zscore_windows)
+        return count
+
+    @staticmethod
+    def _estimate_entropy_features(config: EntropyConfig) -> int:
+        n_sources = len(config.apply_to)
+        count = 0
+        count += len(config.shannon_windows) * n_sources
+        count += len(config.windows)
+        count += len(config.windows)
+        count += len(config.hurst_windows)
+        count += len(config.windows)
+        count += len(config.perm_windows)
+        return count
+
+    @staticmethod
+    def _estimate_tail_risk_features(config: TailRiskConfig) -> int:
+        count = 0
+        count += len(config.cvar_alphas) * len(config.windows)
+        count += 3 * len(config.rv_windows)
+        count += len(config.rv_windows)
+        count += len(config.windows)
+        count += 2
+        count += len(config.mdd_windows)
+        return count
+
+    @staticmethod
+    def _estimate_preprocessing_multiplier(config: PreprocessingConfig) -> float:
+        if config.mode == "replace":
+            return 1.0
+
+        multiplier = 1.0
+        if config.rank_transform.enabled:
+            multiplier += 1.0
+        if config.gaussian_normalize.enabled:
+            multiplier += 1.0
+        if config.adaptive_zscore.enabled:
+            multiplier += len(config.adaptive_zscore.windows)
+        if config.adf_differencing.enabled or config.fractional_differencing.enabled:
+            multiplier += 0.2
+        return multiplier
+
     def apply_preset(self, preset_name: str) -> FactoryConfig:
-        """Apply preset: minimal, standard, extended, full, or custom."""
+        """Apply preset: minimal/standard/extended/full or Phase 3.1 level presets."""
         base_config = self._load_yaml(self._default_config_path, required=True)
         preset = preset_name.lower()
 
@@ -176,6 +268,14 @@ class ConfigManager:
             preset_config = self._apply_extended_preset(base_config)
         elif preset == "full":
             preset_config = base_config
+        elif preset == "basic_essential":
+            preset_config = self._apply_basic_essential_preset(base_config)
+        elif preset == "intermediate_research":
+            preset_config = self._apply_intermediate_research_preset(base_config)
+        elif preset == "professional_full":
+            preset_config = self._apply_professional_full_preset(base_config)
+        elif preset == "ml_optimized":
+            preset_config = self._apply_ml_optimized_preset(base_config)
         elif preset == "custom":
             preset_config = base_config
         else:
@@ -455,4 +555,151 @@ class ConfigManager:
         preset["rolling_aggregation"]["windows"] = [5, 13, 21, 34]
         preset["lag_features"]["enabled"] = True
         preset["global"]["lag_strategy"] = "dense"
+        return preset
+
+    @staticmethod
+    def _set_atomic_levels(
+        preset: Dict[str, Any],
+        enabled_keys: List[str],
+    ) -> None:
+        atomic = preset.get("atomic_indicators", {})
+        for key, value in atomic.items():
+            if isinstance(value, dict):
+                value["enabled"] = key in enabled_keys
+
+    @staticmethod
+    def _ensure_preprocessing_shape(preset: Dict[str, Any]) -> Dict[str, Any]:
+        preprocessing = preset.setdefault("preprocessing", {})
+        if not isinstance(preprocessing, dict):
+            preprocessing = {}
+            preset["preprocessing"] = preprocessing
+
+        preprocessing.setdefault("winsorization", {})
+        preprocessing.setdefault("adf_differencing", {})
+        preprocessing.setdefault("fractional_differencing", {})
+        preprocessing.setdefault("rank_transform", {})
+        preprocessing.setdefault("gaussian_normalize", {})
+        preprocessing.setdefault("adaptive_zscore", {})
+        return preprocessing
+
+    def _apply_basic_essential_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(preset, ["trend", "momentum", "volatility", "volume"])
+
+        preprocessing = self._ensure_preprocessing_shape(preset)
+        preprocessing["enabled"] = True
+        preprocessing["mode"] = "append"
+        preprocessing["winsorization"]["enabled"] = True
+        preprocessing["rank_transform"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["enabled"] = False
+        preprocessing["gaussian_normalize"]["enabled"] = False
+        preprocessing["adf_differencing"]["enabled"] = False
+        preprocessing["fractional_differencing"]["enabled"] = False
+        return preset
+
+    def _apply_intermediate_research_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(
+            preset,
+            [
+                "trend",
+                "momentum",
+                "volatility",
+                "volume",
+                "statistics",
+                "cycle",
+                "pattern",
+                "tail_risk",
+            ],
+        )
+
+        preprocessing = self._ensure_preprocessing_shape(preset)
+        preprocessing["enabled"] = True
+        preprocessing["mode"] = "append"
+        preprocessing["winsorization"]["enabled"] = True
+        preprocessing["rank_transform"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["windows"] = [20, 40, 60, 80, 100]
+        preprocessing["gaussian_normalize"]["enabled"] = True
+        preprocessing["adf_differencing"]["enabled"] = False
+        preprocessing["fractional_differencing"]["enabled"] = False
+        return preset
+
+    def _apply_professional_full_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(
+            preset,
+            [
+                "trend",
+                "momentum",
+                "volatility",
+                "volume",
+                "statistics",
+                "cycle",
+                "pattern",
+                "tail_risk",
+                "microstructure",
+                "entropy",
+            ],
+        )
+
+        preprocessing = self._ensure_preprocessing_shape(preset)
+        preprocessing["enabled"] = True
+        preprocessing["mode"] = "append"
+        preprocessing["winsorization"]["enabled"] = True
+        preprocessing["rank_transform"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["windows"] = [
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            90,
+            100,
+            120,
+            140,
+            160,
+            180,
+            200,
+            220,
+            240,
+            260,
+            280,
+            320,
+            360,
+        ]
+        preprocessing["gaussian_normalize"]["enabled"] = True
+        preprocessing["adf_differencing"]["enabled"] = True
+        preprocessing["fractional_differencing"]["enabled"] = True
+        return preset
+
+    def _apply_ml_optimized_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(
+            preset,
+            [
+                "trend",
+                "momentum",
+                "volatility",
+                "volume",
+                "statistics",
+                "cycle",
+                "pattern",
+                "tail_risk",
+            ],
+        )
+
+        preprocessing = self._ensure_preprocessing_shape(preset)
+        preprocessing["enabled"] = True
+        preprocessing["mode"] = "replace"
+        preprocessing["winsorization"]["enabled"] = True
+        preprocessing["rank_transform"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["windows"] = [20, 40, 60, 80, 100]
+        preprocessing["gaussian_normalize"]["enabled"] = True
+        preprocessing["adf_differencing"]["enabled"] = False
+        preprocessing["fractional_differencing"]["enabled"] = True
         return preset

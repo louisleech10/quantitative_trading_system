@@ -50,6 +50,8 @@ class TALibWrapper:
             "BBANDS",
             "MAVP",
             "MA",
+            "MIDPOINT",
+            "MIDPRICE",
         ],
         "momentum": [
             "RSI",
@@ -170,15 +172,13 @@ class TALibWrapper:
     }
 
     _INPUT_TYPE_MAP = {
-        "hl": {"AROON", "AROONOSC", "MIDPRICE", "SAR", "SAREXT"},
+        "hl": {"AROON", "AROONOSC", "MIDPRICE", "SAR", "SAREXT", "PLUS_DM", "MINUS_DM"},
         "hlc": {
             "ADX",
             "ADXR",
             "DX",
             "PLUS_DI",
             "MINUS_DI",
-            "PLUS_DM",
-            "MINUS_DM",
             "CCI",
             "WILLR",
             "ULTOSC",

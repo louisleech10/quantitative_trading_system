@@ -70,8 +70,8 @@ class RollingAggregator:
 
         frames: List[pd.Series] = []
         agg_label = self._format_agg_label(agg_name)
-        for col in data.columns:
-            series = data[col]
+        for col_index, col in enumerate(data.columns):
+            series = data.iloc[:, col_index]
             for window in self._windows:
                 result = method(series, window)
                 frames.append(result.rename(f"{col}_{agg_label}_W{window}"))

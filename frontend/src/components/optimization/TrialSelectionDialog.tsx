@@ -26,10 +26,10 @@ import { Loader2, CheckCircle2, Info } from 'lucide-react'
 interface TrialInfo {
   number: number
   value: number
-  params: Record<string, any>
+  params: Record<string, unknown>
   state: string
   duration_seconds: number
-  user_attrs: Record<string, any>
+  user_attrs: Record<string, unknown>
 }
 
 interface TrialSelectionDialogProps {
@@ -61,7 +61,6 @@ export default function TrialSelectionDialog({
 }: TrialSelectionDialogProps) {
   const trialNumber = selectedTrial?.number ?? 0
   const trialValue = selectedTrial?.value ?? 0
-  const trialParams = selectedTrial?.params ?? {}
   
   const [pipelineName, setPipelineName] = useState(`pipeline_trial${trialNumber}_${Date.now()}`)
   const [userNotes, setUserNotes] = useState('')
@@ -81,15 +80,16 @@ export default function TrialSelectionDialog({
     setError(null)
 
     try {
-      const config: PipelineConfig = {
+      const _payload: PipelineConfig = {
         study_name: studyName,
         trial_number: trialNumber,
         strategy_type: strategyType,
         pipeline_name: pipelineName,
         user_notes: userNotes,
         selected_by: selectedBy,
-        use_xgboost_tuning: useXGBoostTuning
+        use_xgboost_tuning: useXGBoostTuning,
       }
+      void _payload
 
       // 模擬 API 調用（在實際使用中會調用真實 API）
       const mockPipelineId = `pipeline_${studyName}_trial${trialNumber}_${Date.now()}`

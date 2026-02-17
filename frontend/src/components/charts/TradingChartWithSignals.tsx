@@ -191,6 +191,7 @@ function TradingChartWithSignalsInner({
     y: 0,
   });
   const [crosshairX, setCrosshairX] = useState<number | null>(null);
+  void setCrosshairX;
 
   // ===== 高度分配（調整為 K線:成交量:Taker = 10:7:7 比例）=====
   const priceHeight = Math.floor(totalHeight * 0.42); // 42% - 策略信號圖

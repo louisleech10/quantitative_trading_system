@@ -38,7 +38,7 @@ export default function CalibrationCurveChart({ data, loading }: CalibrationCurv
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="midpoint" tickFormatter={(v) => v.toFixed(2)} />
             <YAxis domain={[0, 1]} tickFormatter={(v) => v.toFixed(2)} />
-            <Tooltip formatter={(value: any) => Number(value).toFixed(3)} />
+            <Tooltip formatter={(value: unknown) => Number(value).toFixed(3)} />
             <Line type="monotone" dataKey="actual" stroke="#34d399" name="實際正例率" />
             <Line type="monotone" dataKey="predicted" stroke="#60a5fa" name="預測平均" />
           </LineChart>

@@ -1,7 +1,7 @@
 // frontend/src/lib/api.ts 
 // API client for connecting to FastAPI backend - 兩階段搜索版本
 
-import { ApiResponse, SearchResultData, SearchTemplate, SearchRequest, TaskInfo } from './types';
+import { ApiResponse, SearchResultData, SearchTemplate, SimpleSearchRequest, TaskInfo } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1';
@@ -24,17 +24,34 @@ interface FilterConditionRequest {
   condition_type: string;
   parameter: string;
   operator: string;
-  value: number | string;
+  value: number | string | number[];
   description?: string;
 }
 
 // 反例搜索請求格式
 interface NegativeCaseRequest {
-  negative_conditions: any[];
+  negative_conditions: unknown[];
   negative_ratio: number;
   enable_time_separation: boolean;
   time_separation_days: number;
   sampling_strategy: string;
+  enable_random_sampling?: boolean;
+}
+
+interface SearchOperators {
+  priceChange: string;
+  volumeMultiplier: string;
+  closingStrength: string;
+  takerBuyRatio: string;
+  pricePosition: string;
+}
+
+interface SearchRangeValues {
+  priceChange: { min: number | null; max: number | null };
+  volumeMultiplier: { min: number | null; max: number | null };
+  closingStrength: { min: number | null; max: number | null };
+  takerBuyRatio: { min: number | null; max: number | null };
+  pricePosition: { min: number | null; max: number | null };
 }
 
 class ApiClient {
@@ -71,10 +88,10 @@ class ApiClient {
       }
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
       
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('請求超時，請檢查網路連接');
       }
       
@@ -85,21 +102,9 @@ class ApiClient {
 
   // 轉換前端搜索請求為後端格式
   private convertToSearchConfig(
-    request: SearchRequest,
-    operators: {
-      priceChange: string;
-      volumeMultiplier: string;
-      closingStrength: string;
-      takerBuyRatio: string;
-      pricePosition: string;
-    },
-    rangeValues: {
-      priceChange: { min: number | null, max: number | null };
-      volumeMultiplier: { min: number | null, max: number | null };
-      closingStrength: { min: number | null, max: number | null };
-      takerBuyRatio: { min: number | null, max: number | null };
-      pricePosition: { min: number | null, max: number | null };
-    }
+    request: SimpleSearchRequest,
+    operators: SearchOperators,
+    rangeValues: SearchRangeValues
   ): SearchConfigRequest {
     const conditions: FilterConditionRequest[] = [];
 
@@ -230,9 +235,9 @@ class ApiClient {
 
   // 原有的單一搜索方法（向後兼容）
   async executeSearch(
-    request: SimpleSearchRequest,  // 使用正確的類型
-    operators: any,                // 新增：運算符參數
-    rangeValues: any              // 新增：範圍值參數
+    request: SimpleSearchRequest,
+    operators: SearchOperators,
+    rangeValues: SearchRangeValues
   ): Promise<ApiResponse<TaskInfo>> {
     // 使用統一的轉換函數
     const searchConfig = this.convertToSearchConfig(request, operators, rangeValues);
@@ -255,9 +260,9 @@ class ApiClient {
 
   // 兩階段搜索 - 步驟1：執行正例搜索
   async executePositiveSearch(
-    request: SearchRequest,
-    operators: any,
-    rangeValues: any
+    request: SimpleSearchRequest,
+    operators: SearchOperators,
+    rangeValues: SearchRangeValues
   ): Promise<ApiResponse<TaskInfo>> {
     const searchConfig = this.convertToSearchConfig(request, operators, rangeValues);
 
@@ -283,9 +288,9 @@ class ApiClient {
     negativeRatio: number = 2.0,
     enableTimeSeparation: boolean = true,
     timeSeparationDays: number = 3,
-    negativeRequest: SimpleSearchRequest,     // 新增：改為接收 SimpleSearchRequest
-    negativeOperators: any,             // 新增：反例運算符
-    negativeRangeValues: any,           // 新增：反例範圍值
+    negativeRequest: SimpleSearchRequest,
+    negativeOperators: SearchOperators,
+    negativeRangeValues: SearchRangeValues,
     enableRandomSampling: boolean = true  // ===== 新增：隨機取樣開關 =====
   ): Promise<ApiResponse<TaskInfo>> {
 
@@ -327,7 +332,9 @@ class ApiClient {
     console.log('獲取合併結果:', { positiveTaskId, negativeTaskId });
 
     try {
-      const result = await this.fetchApi(`/two-stage/combined/${positiveTaskId}/${negativeTaskId}`);
+      const result = await this.fetchApi<SearchResultData>(
+        `/two-stage/combined/${positiveTaskId}/${negativeTaskId}`
+      );
       console.log('合併結果API響應:', result);
       return result;
     } catch (error) {
@@ -335,7 +342,6 @@ class ApiClient {
       throw error;
     }
     
-    return this.fetchApi(`/two-stage/combined/${positiveTaskId}/${negativeTaskId}`);
   }
 
   // 獲取任務狀態
@@ -360,7 +366,7 @@ class ApiClient {
     return this.fetchApi('/config/templates');
   }
 
-  async getSystemConfig(): Promise<ApiResponse<any>> {
+  async getSystemConfig(): Promise<ApiResponse<unknown>> {
     return this.fetchApi('/config/system');
   }
 
@@ -370,6 +376,7 @@ class ApiClient {
       const response = await fetch(`${API_BASE_URL}/health`);
       return await response.json();
     } catch (error) {
+    void error;
       return {
         success: false,
         error: { 
@@ -382,7 +389,7 @@ class ApiClient {
   }
 
   // Preview search
-  async previewSearch(config: any, symbolsLimit: number = 10): Promise<ApiResponse<any>> {
+  async previewSearch(config: unknown, symbolsLimit: number = 10): Promise<ApiResponse<unknown>> {
     return this.fetchApi('/search/preview', {
       method: 'POST',
       body: JSON.stringify({
@@ -438,11 +445,35 @@ class ApiClient {
     enableTimeSeparation: boolean = true,
     timeSeparationDays: number = 3,
     onProgress?: (stage: string, taskId?: string) => void,
-    negativeRequest: SimpleSearchRequest,     // 新增：反例搜索請求
-    negativeOperators: any,             // 新增：反例運算符
-    negativeRangeValues: any,           // 新增：反例範圍值
-    operators: any,                     // 正例運算符
-    rangeValues: any,                   // 正例範圍值
+    negativeRequest: SimpleSearchRequest = request,
+    negativeOperators: SearchOperators = {
+      priceChange: '<=',
+      volumeMultiplier: '<=',
+      closingStrength: '<=',
+      takerBuyRatio: '<=',
+      pricePosition: '<=',
+    },
+    negativeRangeValues: SearchRangeValues = {
+      priceChange: { min: null, max: null },
+      volumeMultiplier: { min: null, max: null },
+      closingStrength: { min: null, max: null },
+      takerBuyRatio: { min: null, max: null },
+      pricePosition: { min: null, max: null },
+    },
+    operators: SearchOperators = {
+      priceChange: '>=',
+      volumeMultiplier: '>=',
+      closingStrength: '>=',
+      takerBuyRatio: '>=',
+      pricePosition: '>=',
+    },
+    rangeValues: SearchRangeValues = {
+      priceChange: { min: null, max: null },
+      volumeMultiplier: { min: null, max: null },
+      closingStrength: { min: null, max: null },
+      takerBuyRatio: { min: null, max: null },
+      pricePosition: { min: null, max: null },
+    },
     enableRandomSampling: boolean = true  // ===== 新增：隨機取樣開關 =====
   ): Promise<SearchResultData> {
 
@@ -943,5 +974,6 @@ export async function exportTrialsCSV(taskId: string): Promise<Blob> {
  * 匯出PDF報告（暫緩實作）
  */
 export async function exportPdfReport(taskId: string): Promise<Blob> {
+  void taskId;
   throw new Error('PDF報告匯出功能已暫緩至Phase 4實作');
 }

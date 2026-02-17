@@ -27,6 +27,49 @@ import {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'
 
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null
+}
+
+const isOptimizationTaskInfo = (value: unknown): value is OptimizationTaskInfo => {
+  return (
+    isRecord(value) &&
+    typeof value.task_id === 'string' &&
+    typeof value.study_name === 'string' &&
+    typeof value.status === 'string' &&
+    isRecord(value.progress)
+  )
+}
+
+const isProgressUpdateData = (value: unknown): value is ProgressUpdateData => {
+  return (
+    isRecord(value) &&
+    typeof value.task_id === 'string' &&
+    typeof value.completed_trials === 'number' &&
+    typeof value.total_trials === 'number' &&
+    typeof value.completion_percentage === 'number'
+  )
+}
+
+const isNewBestValueData = (value: unknown): value is NewBestValueData => {
+  return (
+    isRecord(value) &&
+    typeof value.task_id === 'string' &&
+    typeof value.trial_number === 'number' &&
+    typeof value.best_value === 'number'
+  )
+}
+
+const isMilestoneReachedData = (value: unknown): value is MilestoneReachedData => {
+  return (
+    isRecord(value) &&
+    typeof value.task_id === 'string' &&
+    typeof value.milestone_percentage === 'number' &&
+    typeof value.completed_trials === 'number' &&
+    typeof value.total_trials === 'number'
+  )
+}
+
 // ==================== API Functions ====================
 
 /**
@@ -165,56 +208,67 @@ export function useOptimization(options: UseOptimizationOptions = {}) {
 
             case 'task_status':
               // 當前任務狀態
-              setTaskInfo(message.data)
+              if (isOptimizationTaskInfo(message.data)) {
+                setTaskInfo(message.data)
+              }
               break
 
             case 'progress_update':
               // 進度更新
-              setTaskInfo(prev =>
-                prev
-                  ? {
-                      ...prev,
-                      progress: {
-                        ...prev.progress,
-                        ...message.data
+              if (isProgressUpdateData(message.data)) {
+                const progressData = message.data
+                setTaskInfo(prev =>
+                  prev
+                    ? {
+                        ...prev,
+                        progress: {
+                          ...prev.progress,
+                          ...progressData
+                        }
                       }
-                    }
-                  : null
-              )
-              onProgressUpdate?.(message.data)
+                    : null
+                )
+                onProgressUpdate?.(progressData)
+              }
               break
 
             case 'new_best_value':
               // 新最佳值
-              setTaskInfo(prev =>
-                prev
-                  ? {
-                      ...prev,
-                      progress: {
-                        ...prev.progress,
-                        best_value: message.data.best_value,
-                        best_params: message.data.best_params
+              if (isNewBestValueData(message.data)) {
+                const newBestValueData = message.data
+                setTaskInfo(prev =>
+                  prev
+                    ? {
+                        ...prev,
+                        progress: {
+                          ...prev.progress,
+                          best_value: newBestValueData.best_value,
+                          best_params: newBestValueData.best_params
+                        }
                       }
-                    }
-                  : null
-              )
-              onNewBestValue?.(message.data)
+                    : null
+                )
+                onNewBestValue?.(newBestValueData)
+              }
               break
 
             case 'milestone_reached':
               // 里程碑達成
-              setTaskInfo(prev =>
-                prev
-                  ? {
-                      ...prev,
-                      progress: {
-                        ...prev.progress,
-                        current_milestone: message.data.milestone_percentage
+              if (isMilestoneReachedData(message.data)) {
+                const milestoneData = message.data
+                setTaskInfo(prev =>
+                  prev
+                    ? {
+                        ...prev,
+                        progress: {
+                          ...prev.progress,
+                          current_milestone: milestoneData.milestone_percentage
+                        }
                       }
-                    }
-                  : null
-              )
-              onMilestoneReached?.(message.data)
+                    : null
+                )
+                onMilestoneReached?.(milestoneData)
+              }
               break
 
             case 'optimization_finished':
@@ -232,7 +286,9 @@ export function useOptimization(options: UseOptimizationOptions = {}) {
                     }
                   : null
               )
-              onCompleted?.(message.data)
+              if (isOptimizationTaskInfo(message.data)) {
+                onCompleted?.(message.data)
+              }
               break
 
             case 'ping':
@@ -242,7 +298,11 @@ export function useOptimization(options: UseOptimizationOptions = {}) {
 
             case 'error':
               // 錯誤
-              const err = new Error(message.data.message || 'Optimization error')
+              const errorMessage =
+                isRecord(message.data) && typeof message.data.message === 'string'
+                  ? message.data.message
+                  : 'Optimization error'
+              const err = new Error(errorMessage)
               setError(err)
               onError?.(err)
               break

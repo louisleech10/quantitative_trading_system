@@ -46,7 +46,7 @@ export function useAvailableSymbols(): UseAvailableSymbolsReturn {
 
       // 過濾空值並排序
       const validSymbols = data.symbols
-        .filter((s: any) => typeof s === "string" && s.trim().length > 0)
+        .filter((s: unknown) => typeof s === "string" && s.trim().length > 0)
         .sort();
 
       setSymbols(validSymbols);

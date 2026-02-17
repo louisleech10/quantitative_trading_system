@@ -20,9 +20,8 @@ import { darkChartOptions } from '../../utils/chartConfig';
 import { useTimeAxis } from '@/contexts/TimeAxisContext';
 import {
   formatPercentage,
-  chartColors
 } from '../../utils/chartConfig';
-import { ISeriesApi, LineStyle, UTCTimestamp } from 'lightweight-charts';
+import { ISeriesApi, LineStyle, MouseEventParams, Time, UTCTimestamp } from 'lightweight-charts';
 import { KlineData } from './PriceChart';
 import type { WindowOverlayRange, IndicatorLineSeries } from './TradingChartWithSignals';
 import type { SignalPoint } from './StrategySignalChart';
@@ -106,6 +105,7 @@ export function TakerRatioChart({
   indicatorSeries = [],
   signalPoints = []
 }: TakerRatioChartProps) {
+  void timeframe;
   const { chartContainerRef, chartInstance, isReady } = useChartSync({
     chartId,
     toTimestamp: toTimestamp || (klines.length > 0 ? klines[0].timestamp : Date.now() / 1000),
@@ -218,7 +218,7 @@ export function TakerRatioChart({
       const takerRatioData = klines
         .filter(k => k.taker_ratio !== undefined && k.taker_ratio !== null)
         .map(kline => ({
-          time: kline.timestamp as any,
+          time: toUtcTime(kline.timestamp),
           value: kline.taker_ratio!,
         }));
 
@@ -326,16 +326,17 @@ export function TakerRatioChart({
       console.log(`[TakerRatioChart] Rendered ${takerRatioData.length} taker ratio data for ${symbol}`);
 
       // 訂閱懸停事件（用於顯示 Taker Ratio 和指標值）
-      const handleCrosshairMove = (param: any) => {
-        if (param.time) {
-          const hoveredKline = klines.find(k => k.timestamp === param.time);
+      const handleCrosshairMove = (param: MouseEventParams<Time>) => {
+        const crosshairTime = typeof param.time === 'number' ? param.time : null
+        if (crosshairTime !== null) {
+          const hoveredKline = klines.find(k => k.timestamp === crosshairTime);
           if (hoveredKline && hoveredKline.taker_ratio !== undefined) {
             setHoveredRatio(hoveredKline.taker_ratio);
           }
           // 查找指標值（使用 ref 避免閉包問題）
           const indicatorValues: Record<string, number> = {};
           indicatorSeriesRef.current.forEach((series) => {
-            const point = series.data.find((d) => d.time === param.time);
+            const point = series.data.find((d) => d.time === crosshairTime);
             if (point) {
               indicatorValues[series.id] = point.value;
             }
@@ -394,7 +395,7 @@ export function TakerRatioChart({
       console.error('[TakerRatioChart] Failed to render chart:', err);
       setError(err instanceof Error ? err.message : 'Failed to render taker ratio chart');
     }
-  }, [chartInstance, isReady, klines, symbol, signalPoints]);
+  }, [chartId, chartInstance, enableSync, isReady, klines, signalPoints, subscribeCrosshairChange, symbol]);
 
   // 指標線渲染 refs
   const indicatorLineRefs = useRef<ISeriesApi<'Line'>[]>([]);

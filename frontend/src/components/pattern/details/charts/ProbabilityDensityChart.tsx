@@ -38,7 +38,7 @@ export default function ProbabilityDensityChart({ data, loading }: ProbabilityDe
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
             <XAxis dataKey="bin" tickFormatter={(v) => v.toFixed(2)} />
             <YAxis />
-            <Tooltip formatter={(value: any) => Number(value).toFixed(4)} />
+            <Tooltip formatter={(value: unknown) => Number(value).toFixed(4)} />
             <Line type="monotone" dataKey="positive" stroke="#34d399" name="正例密度" dot={false} />
             <Line type="monotone" dataKey="negative" stroke="#fb7185" name="反例密度" dot={false} />
           </LineChart>
