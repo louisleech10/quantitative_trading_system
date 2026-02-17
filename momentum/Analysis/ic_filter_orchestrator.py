@@ -34,6 +34,37 @@ from momentum.factories import create_label_generator
 logger = get_logger(__name__)
 
 
+MODULE_ENABLED_PATHS: dict[str, tuple[str, str]] = {
+    "factor_return": ("factor_return", "enabled"),
+    "factor_centrality": ("factor_centrality", "enabled"),
+    "trend_analysis": ("trend_analysis", "enabled"),
+    "parameter_sensitivity": ("parameter_sensitivity", "enabled"),
+    "rolling_oos": ("rolling_oos", "enabled"),
+    "factor_orthogonalization": ("factor_orthogonalization", "enabled"),
+    "factor_exposure": ("factor_exposure", "enabled"),
+    "long_short_analysis": ("long_short_analysis", "enabled"),
+    "feature_quality_diagnostics": ("feature_quality_diagnostics", "enabled"),
+    "net_ic_analysis": ("net_ic_analysis", "enabled"),
+}
+
+LOCKED_STAGE_KEYS: set[str] = {
+    "ic_calculation",
+    "preprocessing",
+    "statistical_validation",
+    "redundancy_filter",
+    "report_generation",
+    "ai_summary",
+}
+
+STAGE_OVERRIDE_PATHS: dict[str, tuple[str, str]] = {
+    "event_filtering": ("event_filter", "enabled"),
+    "ic_decay": ("report", "include_decay_analysis"),
+    "grouped_ic": ("report", "include_regime_analysis"),
+    "turnover_analysis": ("turnover", "enabled"),
+    "ai_summary": ("report", "ai_summary"),
+}
+
+
 class ICFilterOrchestrator:
     """IC 篩選協調器 — 八階段流水線 + 快取策略 + 篩選日誌。"""
 
@@ -70,7 +101,7 @@ class ICFilterOrchestrator:
     ) -> dict:
         """主入口：執行完整八階段流水線。"""
 
-        config = self._apply_config_override(config_override)
+        config = self._apply_tier_config(self._apply_config_override(config_override))
         self._progress_callback = progress_callback
         self._clear_deep_analysis_cache()
 
@@ -191,6 +222,11 @@ class ICFilterOrchestrator:
         if not deep_analysis:
             return report
 
+        effective_config = self._apply_tier_config(self._apply_config_override(config_override))
+        if not self._is_deep_analysis_enabled(effective_config):
+            logger.info("Deep analysis skipped by tier preset: %s", effective_config.feature_tiers.active_preset)
+            return report
+
         deep_report = self.run_deep_analysis(
             config_override=config_override,
             progress_callback=progress_callback,
@@ -212,7 +248,24 @@ class ICFilterOrchestrator:
         if self._ic_cache is None:
             raise InvalidInputError("IC cache is empty, run analyze() first")
 
-        config = self._apply_config_override(config_override)
+        config = self._apply_tier_config(self._apply_config_override(config_override))
+
+        if not self._is_deep_analysis_enabled(config):
+            report = DeepAnalysisReport()
+            report.module_summary = {
+                "factor_returns": "not_run",
+                "factor_centrality": "not_run",
+                "trend_analysis": "not_run",
+                "parameter_sensitivity": "not_run",
+                "rolling_oos": "not_run",
+                "factor_orthogonalization": "not_run",
+                "factor_exposure": "not_run",
+                "long_short_analysis": "not_run",
+                "feature_quality_diagnostics": "not_run",
+                "net_ic_analysis": "not_run",
+            }
+            logger.info("Deep analysis disabled by tier preset: %s", config.feature_tiers.active_preset)
+            return report
 
         candidate_features = selected_features or []
         if not candidate_features:
@@ -1313,6 +1366,67 @@ class ICFilterOrchestrator:
     def _hash_config(self, config: ICConfig) -> str:
         payload = json.dumps(config.model_dump(), sort_keys=True)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
+
+    def _apply_tier_config(self, config: ICConfig) -> ICConfig:
+        data = config.model_dump(by_alias=True)
+        tier_cfg = (data.get("feature_tiers") or {})
+        active_preset = str(tier_cfg.get("active_preset", "intermediate"))
+        presets = tier_cfg.get("presets") or {}
+        custom = tier_cfg.get("custom_overrides") or {}
+
+        if active_preset == "custom":
+            stage_overrides = custom.get("stage_overrides") or {}
+            module_overrides = custom.get("module_overrides") or {}
+
+            for key, enabled in stage_overrides.items():
+                if key in LOCKED_STAGE_KEYS:
+                    continue
+                path = STAGE_OVERRIDE_PATHS.get(key)
+                if path is None:
+                    continue
+                section, field = path
+                if isinstance(data.get(section), dict):
+                    data[section][field] = bool(enabled)
+
+            for key, enabled in module_overrides.items():
+                path = MODULE_ENABLED_PATHS.get(key)
+                if path is None:
+                    continue
+                section, field = path
+                if isinstance(data.get(section), dict):
+                    data[section][field] = bool(enabled)
+        else:
+            preset = presets.get(active_preset) or presets.get("intermediate") or {}
+            deep_enabled = bool(preset.get("deep_analysis", True))
+            disabled_modules = preset.get("disabled_modules") or []
+
+            if not deep_enabled:
+                for section, field in MODULE_ENABLED_PATHS.values():
+                    if isinstance(data.get(section), dict):
+                        data[section][field] = False
+            else:
+                for section, field in MODULE_ENABLED_PATHS.values():
+                    if isinstance(data.get(section), dict):
+                        data[section][field] = True
+                for module_name in disabled_modules:
+                    path = MODULE_ENABLED_PATHS.get(module_name)
+                    if path is None:
+                        continue
+                    section, field = path
+                    if isinstance(data.get(section), dict):
+                        data[section][field] = False
+
+        return ICConfig.model_validate(data)
+
+    @staticmethod
+    def _is_deep_analysis_enabled(config: ICConfig) -> bool:
+        tier = config.feature_tiers
+        if tier.active_preset == "custom":
+            return True
+        preset = tier.presets.get(tier.active_preset)
+        if preset is None:
+            return True
+        return bool(preset.deep_analysis)
 
     def _deep_merge(self, base: dict, override: dict) -> dict:
         result = dict(base)

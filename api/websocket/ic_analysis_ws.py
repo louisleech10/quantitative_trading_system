@@ -91,9 +91,13 @@ async def ic_analysis_websocket(
     await connection_manager.connect(websocket, task_id, client_id)
 
     async def send_payload(payload: Dict) -> None:
+        current_step = payload.get("current_step") or payload.get("module_name") or payload.get("stage")
         await connection_manager.broadcast(task_id, {
             "event": "progress",
-            "data": payload,
+            "data": {
+                **payload,
+                "current_step": current_step,
+            },
             "timestamp": datetime.now().isoformat(),
         })
 

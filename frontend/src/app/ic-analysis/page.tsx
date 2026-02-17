@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Sparkles, AlertTriangle, Activity } from 'lucide-react';
 import ICConfigPanel from '@/components/ic-analysis/ICConfigPanel';
 import ICSummaryTable from '@/components/ic-analysis/ICSummaryTable';
@@ -12,14 +13,30 @@ import RollingICChart from '@/components/ic-analysis/RollingICChart';
 import GroupedICBarChart from '@/components/ic-analysis/GroupedICBarChart';
 import RegimeRadarChart from '@/components/ic-analysis/RegimeRadarChart';
 import ExportButtons from '@/components/ic-analysis/ExportButtons';
+import FeatureFilterPanel from '@/components/ic-analysis/FeatureFilterPanel';
+import DeepAnalysisConfigPanel from '@/components/ic-analysis/DeepAnalysisConfigPanel';
+import FactorReturnChart from '@/components/ic-analysis/FactorReturnChart';
+import FactorCentralityChart from '@/components/ic-analysis/FactorCentralityChart';
+import PCAExplainedChart from '@/components/ic-analysis/PCAExplainedChart';
+import TrendDashboard from '@/components/ic-analysis/TrendDashboard';
+import ParameterSensitivityHeatmap from '@/components/ic-analysis/ParameterSensitivityHeatmap';
+import OOSDistributionChart from '@/components/ic-analysis/OOSDistributionChart';
+import LongShortComparisonChart from '@/components/ic-analysis/LongShortComparisonChart';
+import FactorExposureRadar from '@/components/ic-analysis/FactorExposureRadar';
+import FeatureQualityDashboard from '@/components/ic-analysis/FeatureQualityDashboard';
+import NetICChart from '@/components/ic-analysis/NetICChart';
+import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
+import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
 
 const EXPORT_TARGET_ID = 'ic-analysis-export';
 
-export default function ICAnalysisPage() {
+function ICAnalysisPageContent() {
+  const searchParams = useSearchParams();
   const {
     config,
     taskId,
@@ -29,16 +46,40 @@ export default function ICAnalysisPage() {
     error,
     report,
     selectedFeature,
+    availableFeatures,
+    featureFilter,
+    selectedFeatures,
+    deepAnalysisModules,
+    deepAnalysisStatus,
+    deepAnalysisProgress,
+    deepAnalysisReport,
+    activeTab,
+    featureTier,
+    featureToggles,
     setConfig,
     setError,
     setReport,
     setSelectedFeature,
+    setAvailableFeatures,
+    setFeatureFilter,
+    setSelectedFeatures,
+    setDeepAnalysisModules,
+    setDeepAnalysisStatus,
+    setDeepAnalysisProgress,
+    setDeepAnalysisReport,
+    setDeepAnalysisModuleStatus,
+    setActiveTab,
+    setFeatureTier,
+    toggleFeature,
   } = useICAnalysisStore();
 
   const {
     startAnalysis,
     fetchResult,
     fetchSummary,
+    fetchAvailableFeatures,
+    startDeepAnalysis,
+    fetchDeepAnalysisResult,
     refilter,
     connectProgress,
   } = useICAnalysis();
@@ -46,16 +87,55 @@ export default function ICAnalysisPage() {
   const [summaryText, setSummaryText] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
   const [isRefiltering, setIsRefiltering] = useState(false);
+  const [isDeepRunning, setIsDeepRunning] = useState(false);
 
   const summaryTable = useMemo(() => report?.summary_table ?? [], [report?.summary_table]);
 
   const activeFeature = selectedFeature || summaryTable[0]?.feature_name || null;
+
+  const deepTabVisible = Boolean(report?.deep_analysis_enabled || deepAnalysisReport?.deep_analysis_enabled);
+
+  const deepSummary = deepAnalysisReport?.deep_analysis_summary;
 
   useEffect(() => {
     if (!selectedFeature && summaryTable.length > 0) {
       setSelectedFeature(summaryTable[0].feature_name);
     }
   }, [selectedFeature, setSelectedFeature, summaryTable]);
+
+  useEffect(() => {
+    if (!config.features_path?.trim()) {
+      setAvailableFeatures([]);
+      return;
+    }
+
+    fetchAvailableFeatures(config.features_path.trim(), config.meta_path?.trim() || undefined)
+      .then((features) => setAvailableFeatures(features))
+      .catch(() => setAvailableFeatures([]));
+  }, [config.features_path, config.meta_path, fetchAvailableFeatures, setAvailableFeatures]);
+
+  useEffect(() => {
+    if (summaryTable.length === 0) return;
+    if (selectedFeatures.length > 0) return;
+    setSelectedFeatures(
+      summaryTable.slice(0, 30).map((item: { feature_name: string }) => item.feature_name)
+    );
+  }, [selectedFeatures.length, setSelectedFeatures, summaryTable]);
+
+  useEffect(() => {
+    const includeFeaturesRaw = searchParams.get('include_features');
+    if (!includeFeaturesRaw) {
+      return;
+    }
+    const parsed = includeFeaturesRaw
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (parsed.length > 0) {
+      setSelectedFeatures(parsed);
+      setSelectedFeature(parsed[0]);
+    }
+  }, [searchParams, setSelectedFeature, setSelectedFeatures]);
 
   useEffect(() => {
     if (!taskId || status !== 'running') {
@@ -132,6 +212,70 @@ export default function ICAnalysisPage() {
     }
   };
 
+  const handleStartDeepAnalysis = async () => {
+    if (!taskId) {
+      setError('請先完成 IC 分析');
+      return;
+    }
+
+    const candidates = selectedFeatures.length > 0
+      ? selectedFeatures
+      : summaryTable.slice(0, 30).map((item: { feature_name: string }) => item.feature_name);
+
+    setDeepAnalysisStatus('running');
+    setDeepAnalysisProgress(0);
+    setIsDeepRunning(true);
+    setError(null);
+
+    try {
+      await startDeepAnalysis(taskId, {
+        selected_features: candidates,
+        top_n: candidates.length,
+        modules: deepAnalysisModules,
+      });
+
+      let done = false;
+      while (!done) {
+        const response = await fetchDeepAnalysisResult(taskId);
+        setDeepAnalysisProgress(response.progress ?? 0);
+
+        if (response.summary) {
+          const merged = {
+            deep_analysis_enabled: true,
+            deep_analysis_summary: {
+              total: response.summary.total_modules,
+              completed: response.summary.completed_count,
+              skipped: response.summary.skipped_count,
+              failed: response.summary.failed_count,
+            },
+            ...(response.results || {}),
+          };
+          setDeepAnalysisReport(merged);
+        }
+
+        setDeepAnalysisModuleStatus(response.module_status || []);
+
+        if (response.status === 'completed') {
+          setDeepAnalysisStatus('completed');
+          setActiveTab('deep');
+          done = true;
+        } else if (response.status === 'failed') {
+          setDeepAnalysisStatus('failed');
+          setError(response.error || '深度分析失敗');
+          done = true;
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '啟動深度分析失敗';
+      setError(message);
+      setDeepAnalysisStatus('failed');
+    } finally {
+      setIsDeepRunning(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-auto">
       <div className="relative px-6 py-8 max-w-[1500px] mx-auto space-y-6">
@@ -176,6 +320,10 @@ export default function ICAnalysisPage() {
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <ICConfigPanel
             config={config}
+            featureTier={featureTier}
+            featureToggles={featureToggles}
+            onChangeFeatureTier={setFeatureTier}
+            onToggleFeature={toggleFeature}
             onConfigChange={setConfig}
             onRunAnalysis={handleRunAnalysis}
             isRunning={isRunning || status === 'running'}
@@ -189,7 +337,7 @@ export default function ICAnalysisPage() {
                   {isRefiltering ? '重新篩選中...' : '門檻變更會觸發即時 refilter'}
                 </p>
               </div>
-              <ExportButtons report={report} summaryTable={summaryTable} targetId={EXPORT_TARGET_ID} />
+              <ExportButtons taskId={taskId} report={report} summaryTable={summaryTable} targetId={EXPORT_TARGET_ID} />
             </div>
 
             {summaryText && (
@@ -200,40 +348,138 @@ export default function ICAnalysisPage() {
             )}
 
             <div id={EXPORT_TARGET_ID} className="space-y-6">
-              <FilterFunnelChart filterLog={report?.filter_log} />
+              <FeatureFilterPanel
+                availableFeatures={availableFeatures}
+                filter={featureFilter}
+                onFilterChange={setFeatureFilter}
+                onFilteredFeaturesChange={setSelectedFeatures}
+              />
+
               <ICSummaryTable
                 data={summaryTable}
                 selectedFeature={activeFeature}
                 onSelectFeature={setSelectedFeature}
+                selectable
+                selectedFeatures={selectedFeatures}
+                onSelectFeatures={setSelectedFeatures}
               />
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ICDecayChart data={report?.ic_decay?.[activeFeature || ''] || null} featureName={activeFeature} />
-                <QuantileReturnChart
-                  data={report?.quantile_returns?.[activeFeature || ''] || null}
-                  featureName={activeFeature}
-                />
-              </div>
+              <DeepAnalysisConfigPanel
+                selectedFeatureCount={selectedFeatures.length}
+                modules={deepAnalysisModules}
+                onModulesChange={setDeepAnalysisModules}
+                onStart={handleStartDeepAnalysis}
+                isRunning={isDeepRunning}
+              />
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <RollingICChart
-                  series={report?.rolling_ic_series?.[activeFeature || ''] || null}
-                  featureName={activeFeature}
-                />
-                <GroupedICBarChart
-                  groupedIC={report?.grouped_ic || null}
-                  featureName={activeFeature}
-                />
-              </div>
+              {deepAnalysisStatus === 'running' && (
+                <div className="glass-panel rounded-xl border border-cyan-400/30 p-4 text-cyan-100">
+                  深度分析執行中... {(deepAnalysisProgress * 100).toFixed(0)}%
+                </div>
+              )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <RegimeRadarChart groupedIC={report?.grouped_ic || null} featureName={activeFeature} />
-                <CorrelationHeatmap matrix={report?.correlation_matrix || null} />
-              </div>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'basic' | 'deep')}>
+                <TabsList>
+                  <TabsTrigger value="basic">基礎分析</TabsTrigger>
+                  {deepTabVisible && <TabsTrigger value="deep">深度分析</TabsTrigger>}
+                </TabsList>
+
+                <TabsContent value="basic" className="space-y-6">
+                  <FilterFunnelChart filterLog={report?.filter_log} />
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ICDecayChart data={report?.ic_decay?.[activeFeature || ''] || null} featureName={activeFeature} />
+                    <QuantileReturnChart
+                      data={report?.quantile_returns?.[activeFeature || ''] || null}
+                      featureName={activeFeature}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <RollingICChart
+                      series={report?.rolling_ic_series?.[activeFeature || ''] || null}
+                      featureName={activeFeature}
+                    />
+                    <GroupedICBarChart
+                      groupedIC={report?.grouped_ic || null}
+                      featureName={activeFeature}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <RegimeRadarChart groupedIC={report?.grouped_ic || null} featureName={activeFeature} />
+                    <CorrelationHeatmap matrix={report?.correlation_matrix || null} />
+                  </div>
+                </TabsContent>
+
+                {deepTabVisible && (
+                  <TabsContent value="deep" className="space-y-6">
+                    <PartialFailureBanner
+                      completed={deepSummary?.completed || 0}
+                      skipped={deepSummary?.skipped || 0}
+                      failed={deepSummary?.failed || 0}
+                      errors={deepAnalysisReport?.deep_analysis_errors || []}
+                    />
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ChartErrorBoundary title="C13 Factor Return">
+                        <FactorReturnChart data={deepAnalysisReport?.factor_returns} />
+                      </ChartErrorBoundary>
+                      <ChartErrorBoundary title="C14 Factor Centrality">
+                        <FactorCentralityChart data={deepAnalysisReport?.factor_centrality} />
+                      </ChartErrorBoundary>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ChartErrorBoundary title="C15 PCA Explained">
+                        <PCAExplainedChart data={deepAnalysisReport?.factor_centrality} />
+                      </ChartErrorBoundary>
+                      <ChartErrorBoundary title="C16 Trend Dashboard">
+                        <TrendDashboard data={deepAnalysisReport?.trend_analysis} />
+                      </ChartErrorBoundary>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ChartErrorBoundary title="C17 Parameter Sensitivity">
+                        <ParameterSensitivityHeatmap data={deepAnalysisReport?.parameter_sensitivity} />
+                      </ChartErrorBoundary>
+                      <ChartErrorBoundary title="C18 OOS Distribution">
+                        <OOSDistributionChart data={deepAnalysisReport?.rolling_oos} />
+                      </ChartErrorBoundary>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ChartErrorBoundary title="C19 Long Short">
+                        <LongShortComparisonChart data={deepAnalysisReport?.long_short_analysis} />
+                      </ChartErrorBoundary>
+                      <ChartErrorBoundary title="C20 Exposure Radar">
+                        <FactorExposureRadar data={deepAnalysisReport?.factor_exposure} />
+                      </ChartErrorBoundary>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ChartErrorBoundary title="C21 Quality Dashboard">
+                        <FeatureQualityDashboard data={deepAnalysisReport?.feature_quality_diagnostics} />
+                      </ChartErrorBoundary>
+                      <ChartErrorBoundary title="C22 Net IC">
+                        <NetICChart data={deepAnalysisReport?.net_ic_analysis} />
+                      </ChartErrorBoundary>
+                    </div>
+                  </TabsContent>
+                )}
+              </Tabs>
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ICAnalysisPage() {
+  return (
+    <Suspense fallback={<div className="h-full overflow-auto"><div className="relative px-6 py-8 max-w-[1500px] mx-auto text-slate-400">載入中...</div></div>}>
+      <ICAnalysisPageContent />
+    </Suspense>
   );
 }

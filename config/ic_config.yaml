@@ -178,6 +178,26 @@ net_ic_analysis:
   cost_scenarios: [1, 3, 5, 10, 20]
   participation_rate: 0.01
 
+# === 功能層級管理 ===
+feature_tiers:
+  active_preset: "intermediate"  # foundation | intermediate | advanced | custom
+  presets:
+    foundation:
+      description: "基礎分析：IC/ICIR/篩選核心流程"
+      deep_analysis: false
+      disabled_modules: []
+    intermediate:
+      description: "進階分析：含深度分析常用模組"
+      deep_analysis: true
+      disabled_modules: [factor_orthogonalization, factor_exposure]
+    advanced:
+      description: "完整分析：全部功能"
+      deep_analysis: true
+      disabled_modules: []
+  custom_overrides:
+    stage_overrides: {}
+    module_overrides: {}
+
 # --- Global ---
 deep_analysis_global:
   timeout_overrides: {}

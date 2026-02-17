@@ -1220,6 +1220,27 @@ export interface ICAnalysisConfig {
     monotonicity_score_min?: number;
     correlation_threshold: number;
   };
+  feature_tiers?: FeatureTierConfig;
+}
+
+export type FeatureTierLevel = 'foundation' | 'intermediate' | 'advanced' | 'custom';
+
+export interface FeatureTierConfig {
+  active_preset: FeatureTierLevel;
+  custom_overrides?: {
+    stage_overrides?: Record<string, boolean>;
+    module_overrides?: Record<string, boolean>;
+  };
+}
+
+export interface FeatureToggleItem {
+  key: string;
+  label: string;
+  tier: 'L1' | 'L2' | 'L3';
+  locked: boolean;
+  enabled: boolean;
+  tooltip: string;
+  category: 'stage' | 'module';
 }
 
 export interface ICFeatureInfo {
@@ -1281,4 +1302,457 @@ export interface ICReport {
   turnover_analysis?: Record<string, Record<string, number>>;
   diversification_metrics?: Record<string, number>;
   ai_summary?: string;
+  deep_analysis_enabled?: boolean;
+  deep_analysis_version?: string;
+  deep_analysis_errors?: SkippedResult[];
+  module_statuses?: ModuleStatus[];
+  deep_analysis_summary?: {
+    total: number;
+    completed: number;
+    skipped: number;
+    failed: number;
+  };
+  factor_returns?: FactorReturnData;
+  factor_centrality?: FactorCentralityData;
+  trend_analysis?: TrendAnalysisData;
+  parameter_sensitivity?: ParameterSensitivityData;
+  rolling_oos?: RollingOOSData;
+  factor_orthogonalization?: FactorOrthogonalizationData;
+  factor_exposure?: FactorExposureData;
+  long_short_analysis?: LongShortAnalysisData;
+  feature_quality_diagnostics?: FeatureQualityDiagnosticsData;
+  net_ic_analysis?: NetICAnalysisData;
 }
+
+export interface FeatureListItem {
+  feature_name: string;
+  category?: string | null;
+  data_source?: string | null;
+  family?: string | null;
+  layer?: number | null;
+}
+
+export interface FeatureFilterConfig {
+  include_features?: string[];
+  exclude_features?: string[];
+  include_pattern?: string;
+  include_categories?: string[];
+  include_data_sources?: string[];
+  include_families?: string[];
+  max_features?: number;
+}
+
+export interface DeepAnalysisModules {
+  factor_return: boolean;
+  factor_centrality: boolean;
+  trend_analysis: boolean;
+  parameter_sensitivity: boolean;
+  rolling_oos: boolean;
+  factor_orthogonalization: boolean;
+  factor_exposure: boolean;
+  long_short_analysis: boolean;
+  feature_quality_diagnostics: boolean;
+  net_ic_analysis: boolean;
+}
+
+export interface DeepAnalysisConfig {
+  selected_features?: string[];
+  top_n?: number;
+  modules: DeepAnalysisModules;
+  config_override?: Record<string, unknown>;
+}
+
+export interface ModuleStatus {
+  module_name: string;
+  status: string;
+  reason?: string;
+  error_type?: string;
+}
+
+export interface DeepAnalysisResponse {
+  task_id: string;
+  status: string;
+  progress: number;
+  current_step?: string | null;
+  applied_tier?: string | null;
+  summary?: {
+    total_modules: number;
+    completed_count: number;
+    skipped_count: number;
+    failed_count: number;
+    total_execution_time_s: number;
+  } | null;
+  module_status?: ModuleStatus[] | null;
+  results?: Record<string, unknown> | null;
+  error?: string | null;
+}
+
+export interface SkippedResult {
+  module_name: string;
+  reason: string;
+  error_type: string;
+  retryable?: boolean;
+  timestamp?: string;
+}
+
+export type FactorReturnData = Record<string, {
+  quantile_returns_summary?: Record<string, number>;
+  long_short_mean_return?: number;
+  risk_metrics?: Record<string, number>;
+  cumulative_returns_sampled?: Record<string, number[]>;
+  ls_cumulative_sampled?: number[];
+  num_quantiles_used?: number;
+  skipped?: boolean;
+  reason?: string;
+}>;
+
+export interface FactorCentralityData {
+  pca_summary?: {
+    explained_variance_ratio?: number[];
+    total_variance_explained?: number;
+    effective_rank?: number;
+    n_components_used?: number;
+    crowded_threshold?: number;
+  };
+  features?: Record<string, {
+    centrality?: number;
+    crowded?: boolean;
+    risk_level?: string;
+    percentile_rank?: number;
+    trend?: string;
+  }>;
+  crowded_features?: string[];
+  independent_features?: string[];
+}
+
+export interface TrendResult {
+  slope?: number;
+  p_value?: number;
+  r_squared?: number;
+  tail_estimate?: number;
+  trend?: 'up' | 'down' | 'flat' | 'indeterminate' | string;
+  interpretation?: string;
+}
+
+export type TrendAnalysisData = Record<string, {
+  ic_trend?: TrendResult;
+  centrality_trend?: TrendResult;
+  factor_return_trend?: TrendResult;
+  ls_spread_trend?: TrendResult;
+  combined_signal?: {
+    recommendation?: string;
+    reason?: string;
+    action?: string;
+  };
+}>;
+
+export interface ParameterSensitivityFamily {
+  variants?: string[];
+  param_axis?: string;
+  sensitivity_table?: Array<{
+    variant: string;
+    param_value: string | number;
+    ic_mean: number;
+    icir: number;
+  }>;
+  stability_metrics?: {
+    ic_std_across_params?: number;
+    icir_std_across_params?: number;
+    overfitting_risk?: 'low' | 'medium' | 'high' | string;
+    best_param?: string | number;
+  };
+}
+
+export interface ParameterSensitivityData {
+  families?: Record<string, ParameterSensitivityFamily>;
+  summary?: {
+    total_families?: number;
+    high_risk_count?: number;
+    robust_count?: number;
+  };
+  high_risk_families?: string[];
+  robust_families?: string[];
+}
+
+export interface RollingOOSFeatureResult {
+  oos_stability?: {
+    mean_oos_ic?: number;
+    std_oos_ic?: number;
+    oos_hit_rate?: number;
+    mean_is_oos_gap?: number;
+    oos_icir?: number;
+    degradation_ratio?: number;
+  };
+  assessment?: 'robust' | 'moderate' | 'overfitting' | string;
+  splits_sampled?: Array<{
+    split_id: number;
+    is_ic: number;
+    oos_ic: number;
+  }>;
+  skipped?: boolean;
+  reason?: string;
+}
+
+export interface RollingOOSData {
+  config?: {
+    train_window?: number;
+    test_window?: number;
+    step?: number;
+    n_splits?: number;
+  };
+  features?: Record<string, RollingOOSFeatureResult>;
+  summary?: {
+    total_validated?: number;
+    robust_count?: number;
+    moderate_count?: number;
+    overfitting_count?: number;
+  };
+}
+
+export type LongShortFeatureResult = {
+  long_analysis?: {
+    mean_return?: number;
+    ic?: number;
+    hit_rate?: number;
+    sharpe?: number;
+    side?: string;
+    samples?: number;
+  };
+  short_analysis?: {
+    mean_return?: number;
+    ic?: number;
+    hit_rate?: number;
+    sharpe?: number;
+    side?: string;
+    samples?: number;
+  };
+  asymmetry?: {
+    type?: string;
+    long_contribution?: number;
+    short_contribution?: number;
+    ratio?: number;
+  };
+  recommendation?: string;
+  num_quantiles_used?: number;
+  skipped?: boolean;
+  reason?: string;
+};
+
+export type LongShortAnalysisData = Record<string, LongShortFeatureResult>;
+
+export interface FactorOrthogonalizationData {
+  orthogonalization_matrix?: number[][];
+  feature_names?: string[];
+  residual_variance_ratio?: Record<string, number>;
+}
+
+export interface FactorExposureData {
+  portfolio_exposure?: Record<string, number>;
+  factor_attribution?: {
+    factor_betas?: Record<string, number>;
+    alpha?: number;
+    r_squared?: number;
+    attribution?: Record<string, number>;
+    unexplained?: number;
+  };
+  concentration?: {
+    max_exposure_factor?: string | null;
+    max_exposure_value?: number;
+    hhi?: number;
+    concentrated?: boolean;
+    warnings?: string[];
+  };
+}
+
+export interface FeatureQualityDiagnosticsData {
+  adf_results?: Record<string, {
+    adf_statistic?: number;
+    p_value?: number;
+    is_stationary?: boolean;
+    skipped?: boolean;
+    reason?: string;
+  }>;
+  autocorrelation_results?: Record<string, {
+    ljungbox_stat?: number;
+    p_value?: number;
+    significant_autocorrelation?: boolean;
+    effective_sample_ratio?: number;
+    skipped?: boolean;
+    reason?: string;
+  }>;
+  drift_results?: Record<string, {
+    cusum_breakpoint?: string | null;
+    psi_score?: number;
+    drifted?: boolean;
+    skipped?: boolean;
+    reason?: string;
+  }>;
+  coverage_stats?: Record<string, {
+    coverage?: number;
+    nan_count?: number;
+    total?: number;
+  }>;
+  redundancy_scan?: {
+    high_correlation_pairs?: [string, string, number][];
+    threshold?: number;
+    method?: string;
+    skipped?: boolean;
+  };
+  quality_flags?: {
+    non_stationary?: string[];
+    high_autocorrelation?: string[];
+    low_coverage?: string[];
+    drifted?: string[];
+  };
+  summary?: {
+    total_features?: number;
+    stationary_rate?: number;
+    mean_coverage?: number;
+    low_quality_count?: number;
+  };
+}
+
+export interface NetICAnalysisData {
+  skipped?: boolean;
+  reason?: string;
+  features?: Record<string, {
+    gross_ic?: number;
+    net_ic?: number;
+    turnover?: number;
+    cost_bps?: number;
+    profitable_after_cost?: boolean;
+    breakeven_cost_bps?: number;
+    cost_sensitivity?: Array<{ cost_bps: number; net_ic: number }>;
+    capacity?: {
+      estimated_capacity_usd?: number;
+      capacity_tier?: string;
+    };
+    skipped?: boolean;
+    reason?: string;
+  }>;
+  summary?: {
+    total_analyzed?: number;
+    profitable_count?: number;
+    avg_ic_loss_pct?: number;
+    rank_correlation_gross_vs_net?: number;
+  };
+}
+
+export interface FeatureBrowserCatalogItem {
+  name: string;
+  category: string;
+  source: string;
+  layer: string;
+  family: string;
+  params: Record<string, unknown>;
+  coverage: number;
+  mean: number | null;
+  std: number | null;
+  nan_pct: number;
+}
+
+export interface FeatureBrowserCatalogSummary {
+  total_features: number;
+  total_categories: number;
+  avg_coverage: number;
+  stationary_ratio: number;
+  low_quality_count: number;
+  redundant_pairs: number;
+}
+
+export interface FeatureBrowserCatalogResponse {
+  items: FeatureBrowserCatalogItem[];
+  summary: FeatureBrowserCatalogSummary;
+}
+
+export interface FeatureBrowserHistogramBin {
+  left: number;
+  right: number;
+  count: number;
+  density: number;
+}
+
+export interface FeatureBrowserDistributionStatistics {
+  mean: number | null;
+  std: number | null;
+  skew: number | null;
+  kurtosis: number | null;
+  min: number | null;
+  max: number | null;
+  median: number | null;
+  q25: number | null;
+  q75: number | null;
+  nan_pct: number;
+  unique_count: number;
+  zero_count: number;
+  jb_stat: number | null;
+  jb_pvalue: number | null;
+}
+
+export interface FeatureBrowserDistributionResponse {
+  feature_name: string;
+  bins: number;
+  histogram: FeatureBrowserHistogramBin[];
+  kde_x: number[];
+  kde_y: number[];
+  statistics: FeatureBrowserDistributionStatistics;
+}
+
+export interface FeatureBrowserTimeSeriesPoint {
+  timestamp: string | null;
+  values: Record<string, number | null>;
+}
+
+export interface FeatureBrowserACFItem {
+  lag: number;
+  value: number;
+}
+
+export interface FeatureBrowserFrequencyItem {
+  frequency: number;
+  amplitude: number;
+}
+
+export interface FeatureBrowserTimeSeriesResponse {
+  features: string[];
+  sample_rate: number;
+  points: FeatureBrowserTimeSeriesPoint[];
+  acf: Record<string, FeatureBrowserACFItem[]>;
+  periodicity: Record<string, FeatureBrowserFrequencyItem[]>;
+}
+
+export interface FeatureBrowserCorrelationResponse {
+  method: 'pearson' | 'spearman' | 'kendall';
+  features: string[];
+  matrix: number[][];
+  mode: string;
+}
+
+export interface FeatureBrowserQualityItem {
+  feature: string;
+  adf_pvalue: number | null;
+  is_stationary: boolean;
+  coverage: number;
+  nan_pct: number;
+}
+
+export interface FeatureBrowserQualityResponse {
+  results: FeatureBrowserQualityItem[];
+}
+
+export interface FeatureBrowserDataTableResponse {
+  total_rows: number;
+  page: number;
+  page_size: number;
+  columns: string[];
+  rows: Record<string, unknown>[];
+}
+
+export type FeatureBrowserTab =
+  | 'overview'
+  | 'catalog'
+  | 'distribution'
+  | 'timeseries'
+  | 'correlation'
+  | 'quality'
+  | 'datatable';

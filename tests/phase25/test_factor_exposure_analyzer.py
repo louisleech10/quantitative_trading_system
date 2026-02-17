@@ -45,3 +45,32 @@ def test_zero_r_squared():
     result = analyzer.calculate_factor_attribution(portfolio, factors)
     assert np.isfinite(result["alpha"])
     assert np.isfinite(result["r_squared"])
+
+
+def test_empty_factor_values_returns_empty_series():
+    analyzer = FactorExposureAnalyzer(config={})
+    exposure = analyzer.calculate_portfolio_exposure(pd.Series({"A": 1.0}), pd.DataFrame())
+    assert exposure.empty
+
+
+def test_zero_absolute_weights_returns_zero_exposure():
+    analyzer = FactorExposureAnalyzer(config={})
+    positions = pd.Series({"A": 0.0, "B": 0.0})
+    factor_values = pd.DataFrame({"f1": [0.3, -0.1], "f2": [0.2, 0.5]}, index=["A", "B"])
+    exposure = analyzer.calculate_portfolio_exposure(positions, factor_values)
+    assert (exposure == 0.0).all()
+
+
+def test_factor_attribution_insufficient_rows():
+    analyzer = FactorExposureAnalyzer(config={})
+    portfolio = pd.Series(np.random.randn(5))
+    factors = pd.DataFrame(np.random.randn(5, 2), columns=["f1", "f2"])
+    result = analyzer.calculate_factor_attribution(portfolio, factors)
+    assert np.isnan(result["r_squared"])
+
+
+def test_monitor_near_zero_exposures_warning():
+    analyzer = FactorExposureAnalyzer(config={})
+    exposures = pd.Series({f"f{i}": 1.0 for i in range(30)})
+    result = analyzer.monitor_exposure_concentration(exposures, max_single_exposure=0.9)
+    assert "near_zero_exposures" in result["warnings"]

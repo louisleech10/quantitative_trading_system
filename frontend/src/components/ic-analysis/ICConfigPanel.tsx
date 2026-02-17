@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 import { ICAnalysisConfig } from '@/lib/types';
+import { FeatureTierLevel } from '@/lib/types';
+import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,10 @@ import {
 
 interface ICConfigPanelProps {
   config: ICAnalysisConfig;
+  featureTier: FeatureTierLevel;
+  featureToggles: Record<string, boolean>;
+  onChangeFeatureTier: (tier: FeatureTierLevel) => void;
+  onToggleFeature: (key: string) => void;
   onConfigChange: (next: ICAnalysisConfig) => void;
   onRunAnalysis: () => void;
   isRunning: boolean;
@@ -33,6 +39,10 @@ const horizonOptions = [1, 2, 3, 5, 8, 13, 21].map((value) => ({
 
 export default function ICConfigPanel({
   config,
+  featureTier,
+  featureToggles,
+  onChangeFeatureTier,
+  onToggleFeature,
   onConfigChange,
   onRunAnalysis,
   isRunning,
@@ -57,6 +67,13 @@ export default function ICConfigPanel({
         <h2 className="mt-2 text-xl font-semibold text-slate-100">分析配置</h2>
         <p className="text-sm text-slate-400 mt-1">調整門檻後將自動重新篩選。</p>
       </div>
+
+      <FeatureTierPanel
+        featureTier={featureTier}
+        featureToggles={featureToggles}
+        onChangeTier={onChangeFeatureTier}
+        onToggleFeature={onToggleFeature}
+      />
 
       <div className="space-y-4">
         <Input

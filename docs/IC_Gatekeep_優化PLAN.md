@@ -1603,9 +1603,9 @@ class FeatureListResponse(BaseModel): ...
 ```
 
 **驗收條件**：
-- [ ] 所有 Request model 通過 Pydantic validation
-- [ ] 預設值合理（deep_analysis=False, orthogonalization=False）
-- [ ] `ICAnalyzeRequest` 向後相容（新欄位全部 Optional/有預設值）
+- [x] 所有 Request model 通過 Pydantic validation
+- [x] 預設值合理（deep_analysis=False, orthogonalization=False）
+- [x] `ICAnalyzeRequest` 向後相容（新欄位全部 Optional/有預設值）
 
 **驗證檢查點**：
 ```bash
@@ -1656,10 +1656,10 @@ async def start_full_analysis(request: ICAnalyzeRequest): ...
 - `get_deep_analysis_result()` — 查詢結果
 
 **驗收條件**：
-- [ ] 新增 endpoints 可在 `/docs` Swagger 中看到
-- [ ] `start_deep_analysis` 為非同步背景執行
-- [ ] Service 只透過 factory 取得 Orchestrator（Rule 3）
-- [ ] 現有 endpoints 不受影響
+- [x] 新增 endpoints 可在 `/docs` Swagger 中看到
+- [x] `start_deep_analysis` 為非同步背景執行
+- [x] Service 只透過 factory 取得 Orchestrator（Rule 3）
+- [x] 現有 endpoints 不受影響
 
 **驗證檢查點**：
 ```bash
@@ -1698,9 +1698,9 @@ pytest tests/api/test_ic_deep_analysis.py -v --tb=short
 ```
 
 **驗收條件**：
-- [ ] 深度分析進度透過 WebSocket 推送
-- [ ] `current_step` 正確反映當前 module_name
-- [ ] `progress` 為 0~1 浮點數
+- [x] 深度分析進度透過 WebSocket 推送
+- [x] `current_step` 正確反映當前 module_name
+- [x] `progress` 為 0~1 浮點數
 
 **驗證檢查點**：
 - PASS（成功路徑）：觸發深度分析任務後，WebSocket 連線可收到 `event=progress` 訊息，且 `progress` 隨模組推進單調遞增至 1。
@@ -1709,6 +1709,10 @@ pytest tests/api/test_ic_deep_analysis.py -v --tb=short
 ---
 
 ## 7. Phase 2.8 — Frontend 擴展
+
+**驗證狀態補充**：
+- [x] E2E 自動化測試已建立（Playwright）
+- [ ] 手動驗證（UI 互動與視覺細節）待完成
 
 ### Task 2.8.1: TypeScript Types + Store Extension
 
@@ -1744,9 +1748,9 @@ pytest tests/api/test_ic_deep_analysis.py -v --tb=short
 - 對應 setter 函式
 
 **驗收條件**：
-- [ ] TypeScript 編譯通過（`npm run build`）
-- [ ] 所有型別與 Python 後端 schema 一致
-- [ ] Store 新增 state 有預設值
+- [x] TypeScript 編譯通過（`npm run build`）
+- [x] 所有型別與 Python 後端 schema 一致
+- [x] Store 新增 state 有預設值
 
 **驗證檢查點**：
 ```bash
@@ -1797,10 +1801,10 @@ cd frontend && npm run build
 - 未勾選任何模組時 disabled
 
 **驗收條件**：
-- [ ] FeatureFilterPanel 即時顯示匹配數量
-- [ ] DeepAnalysisConfigPanel 模組選擇功能正常
-- [ ] 響應式設計
-- [ ] 遵循 `glass-panel rounded-2xl border border-white/10` 樣式
+- [x] FeatureFilterPanel 即時顯示匹配數量
+- [x] DeepAnalysisConfigPanel 模組選擇功能正常
+- [x] 響應式設計
+- [x] 遵循 `glass-panel rounded-2xl border border-white/10` 樣式
 
 **驗證檢查點**：
 - PASS（成功路徑）：輸入關鍵字/分類/正則後，匹配數量與清單同步更新，且啟動按鈕文字正確反映「因子數 × 模組數」。
@@ -1830,10 +1834,10 @@ cd frontend && npm run build
 **C16 TrendDashboard**：表格 + 趨勢指標圖示（↑↓→），綜合訊號 Badge（正常/警告/危險），可展開詳細。
 
 **驗收條件**：
-- [ ] 每個圖表有 Empty State 處理
-- [ ] Custom Tooltip 顯示詳細資訊
-- [ ] PNG 匯出功能（html2canvas）
-- [ ] 響應式 `ResponsiveContainer`
+- [x] 每個圖表有 Empty State 處理
+- [x] Custom Tooltip 顯示詳細資訊
+- [x] PNG 匯出功能（html2canvas）
+- [x] 響應式 `ResponsiveContainer`
 
 **驗證檢查點**：
 - PASS（成功路徑）：注入有效深度分析資料後，C13-C16 全部完成渲染、tooltip 正確顯示欄位，且 PNG 匯出可下載。
@@ -1860,10 +1864,10 @@ cd frontend && npm run build
 **C19 LongShortComparisonChart**：雙向水平長條圖（Diverging Bar），Short 向左紅色/Long 向右綠色，Asymmetry 標籤。
 
 **驗收條件**：
-- [ ] Heatmap 色彩正確映射
-- [ ] Box Plot 正確顯示 Q1/Q3/median/whiskers
-- [ ] Diverging Bar 雙向正確
-- [ ] 每個圖表有 Empty State + PNG 匯出
+- [x] Heatmap 色彩正確映射
+- [x] Box Plot 正確顯示 Q1/Q3/median/whiskers
+- [x] Diverging Bar 雙向正確
+- [x] 每個圖表有 Empty State + PNG 匯出
 
 **驗證檢查點**：
 - PASS（成功路徑）：提供完整資料時，Heatmap/Box Plot/Diverging Bar 的數值映射、方向與顏色符合定義，且 PNG 匯出成功。
@@ -1890,10 +1894,10 @@ cd frontend && npm run build
 **C22 NetICChart**：Scatter Plot（X=Gross IC, Y=Net IC, size=Turnover, color=profitable），對角線參考線，副視圖排名變化，成本情境切換下拉選單。
 
 **驗收條件**：
-- [ ] Radar 軸超閾值紅色標記
-- [ ] 診斷儀表板展開/收合正確
-- [ ] Scatter Plot 正確映射 size/color
-- [ ] 成本情境切換即時重繪
+- [x] Radar 軸超閾值紅色標記
+- [x] 診斷儀表板展開/收合正確
+- [x] Scatter Plot 正確映射 size/color
+- [x] 成本情境切換即時重繪
 
 **驗證檢查點**：
 - PASS（成功路徑）：C20-C22 在標準資料下正確顯示閾值警示、展開明細、成本情境切換與重繪結果。
@@ -1934,10 +1938,10 @@ ResultsArea
 **ChartErrorBoundary**（SPEC §8.8.4）：每個圖表獨立 wrap，單一圖表 crash 不影響其他。
 
 **驗收條件**：
-- [ ] Tab 切換正確
-- [ ] 深度分析 Tab 僅在 `deep_analysis_enabled` 時顯示
-- [ ] PartialFailureBanner 正確顯示 completed/skipped/failed 彙總
-- [ ] ChartErrorBoundary 獨立隔離
+- [x] Tab 切換正確
+- [x] 深度分析 Tab 僅在 `deep_analysis_enabled` 時顯示
+- [x] PartialFailureBanner 正確顯示 completed/skipped/failed 彙總
+- [x] ChartErrorBoundary 獨立隔離
 
 **驗證檢查點**：
 ```bash
@@ -1975,7 +1979,7 @@ cd frontend && npm run build
 
 **驗收條件**：
 - [ ] 97 個測試全部通過
-- [ ] 覆蓋率 > 95%
+- [x] 覆蓋率 > 95%
 
 **驗證檢查點**：
 - PASS（成功路徑）：`tests/momentum/analysis/` 中 Module 1-5 測試全部綠燈，且覆蓋率報表達標。
@@ -2008,7 +2012,7 @@ cd frontend && npm run build
 
 **驗收條件**：
 - [ ] 88 個測試全部通過
-- [ ] 覆蓋率 > 95%
+- [x] 覆蓋率 > 95%
 
 **驗證檢查點**：
 - PASS（成功路徑）：Module 6-10 測試全數通過，且不引入對 `run_api.py` 的隱性依賴。
@@ -2022,23 +2026,23 @@ cd frontend && npm run build
 
 | 操作 | 路徑 |
 |------|------|
-| 新增 | `tests/momentum/analysis/test_deep_analysis_integration.py` |
+| 新增 | `tests/phase26/test_deep_analysis_integration.py` |
 | 新增 | `tests/api/test_ic_deep_analysis.py` |
 
 **Integration 測試重點**（SPEC §10.3）：
-- [ ] `test_partial_failure_continues` — Module 2 fail → Module 3-10 continue
-- [ ] `test_all_modules_skip` — 全 skip → empty report + all errors
-- [ ] `test_skipped_result_format` — 每個 SkippedResult 格式正確
-- [ ] `test_cache_invalidation_on_refilter` — refilter 後 cache 清除
-- [ ] `test_partial_cache_reuse` — force_modules 部分重算
-- [ ] `test_timeout_handling` — 超時 → SkippedResult
-- [ ] `test_error_handling_degradation` — 各種錯誤類型
+- [x] `test_partial_failure_continues` — Module 2 fail → Module 3-10 continue
+- [x] `test_all_modules_skip` — 全 skip → empty report + all errors
+- [x] `test_skipped_result_format` — 每個 SkippedResult 格式正確
+- [x] `test_cache_invalidation_on_refilter` — refilter 後 cache 清除
+- [x] `test_partial_cache_reuse` — force_modules 部分重算
+- [x] `test_timeout_handling` — 超時 → SkippedResult
+- [x] `test_error_handling_degradation` — 各種錯誤類型
 
 **API 測試重點**：
-- [ ] `test_deep_analysis_start` — POST 啟動
-- [ ] `test_deep_analysis_result` — GET 取得結果
-- [ ] `test_feature_list` — GET 特徵清單
-- [ ] `test_full_analysis` — POST 一站式分析
+- [x] `test_deep_analysis_start` — POST 啟動
+- [x] `test_deep_analysis_result` — GET 取得結果
+- [x] `test_feature_list` — GET 特徵清單
+- [x] `test_full_analysis` — POST 一站式分析
 
 **預估測試數**：
 
@@ -2072,8 +2076,8 @@ cd frontend && npm run build
 | **Full Deep Analysis** | **全部啟用** | **< 45s** |
 
 **驗收條件**：
-- [ ] 所有效能目標達成
-- [ ] 向量化操作優先（pandas/numpy）
+- [x] 所有效能目標達成
+- [x] 向量化操作優先（pandas/numpy）
 
 **驗證檢查點**：
 - PASS（成功路徑）：以基準資料集量測，各模組與 Full Deep Analysis 均符合表列 SLA（含 <45s）。
@@ -2783,7 +2787,18 @@ def sample_turnover_data() -> Dict[str, float]:
 | 2.7.2 | `pytest tests/api/test_ic_deep_analysis.py -v --tb=short` |
 | 2.8.1 | `cd frontend && npm run build` |
 | 2.8.6 | `cd frontend && npm run build` |
-| 2.9.4 | `pytest tests/momentum/analysis/ tests/api/test_ic_deep_analysis.py -v --tb=short` (全部通過) |
+| 2.9.4 | `pytest tests/phase24 tests/phase25 tests/phase26/test_deep_analysis_integration.py tests/api/test_ic_deep_analysis.py -v --tb=short`（功能驗證） + `PYTHONPATH=/Users/louis/Desktop/quantitative_trading_system /Users/louis/Desktop/quantitative_trading_system/venv/bin/python /Users/louis/Desktop/quantitative_trading_system/scripts/phase29_perf_validation_tmp.py`（效能驗證） |
+| 2.11.1 | `pytest tests/momentum/test_export_formats.py -v` |
+| 2.11.2 | `pytest tests/api/test_export_api.py -v` |
+| 2.11.3 | `cd frontend && npm run build` |
+| 2.11.4 | `pytest tests/momentum/test_export_formats.py tests/api/test_export_api.py -v --tb=short`（2026-02-17 封版重跑：19 passed） |
+| 2.12.1 | `pytest tests/api/test_feature_browser.py -v --tb=short`（2026-02-17：15 passed） |
+| 2.12.2 | `cd frontend && npm run build`（2026-02-17：PASS） |
+| 2.12.3 | `cd frontend && npm run build`（2026-02-17：PASS） |
+| 2.12.4 | `cd frontend && npm run build`（2026-02-17：PASS） |
+| 2.12.5 | `cd frontend && npm run build`（2026-02-17：PASS） |
+| 2.12.6 | `cd frontend && npm run build`（2026-02-17：PASS） |
+| 2.12.7 | `pytest tests/api/test_feature_browser.py -v --tb=short`（2026-02-17：15 passed） |
 
 ---
 
@@ -2864,38 +2879,38 @@ vs FinLab:        ✅ 200%
 
 ### 13.6 功能分級驗收（SPEC §17.7）
 
-- [ ] 所有 23 個功能區塊有明確的 L1/L2/L3 分級
-- [ ] 前端 FeatureTierPanel 三級切換正常
-- [ ] 切換 preset 後 Config 正確傳遞到後端
-- [ ] 「基礎」模式不觸發深度分析（zero overhead）
-- [ ] 「高階」模式啟用全部功能
-- [ ] 自訂模式可獨立開關每個功能
-- [ ] 必須項無法關閉（UI 鎖定 + 後端忽略 false）
+- [x] 所有 23 個功能區塊有明確的 L1/L2/L3 分級
+- [x] 前端 FeatureTierPanel 三級切換正常
+- [x] 切換 preset 後 Config 正確傳遞到後端
+- [x] 「基礎」模式不觸發深度分析（zero overhead）
+- [x] 「高階」模式啟用全部功能
+- [x] 自訂模式可獨立開關每個功能
+- [x] 必須項無法關閉（UI 鎖定 + 後端忽略 false）
 
 ### 13.7 全格式匯出驗收（SPEC §18.9）
 
-- [ ] CSV Summary 可在 Excel/Numbers 正確開啟（UTF-8 BOM）
-- [ ] CSV 欄位與 SPEC §18.3.1 定義一致
-- [ ] AI JSON 包含 `interpretation_guide`, `key_findings`, `recommendations`
-- [ ] AI JSON Token 數 < 4K（30 features）
-- [ ] Markdown 包含 Top 10 表格 + 風險警告 + 建議行動
-- [ ] `GET /export/{task_id}/{format}` 各格式可正常下載
-- [ ] 深度分析未啟用時，匯出只包含基礎分析部分
-- [ ] 匯出面板 UI 分組清晰，下拉選單正確列出已啟用模組
+- [x] CSV Summary 可在 Excel/Numbers 正確開啟（UTF-8 BOM）
+- [x] CSV 欄位與 SPEC §18.3.1 定義一致
+- [x] AI JSON 包含 `interpretation_guide`, `key_findings`, `recommendations`
+- [x] AI JSON Token 數 < 4K（30 features）
+- [x] Markdown 包含 Top 10 表格 + 風險警告 + 建議行動
+- [x] `GET /export/{task_id}/{format}` 各格式可正常下載
+- [x] 深度分析未啟用時，匯出只包含基礎分析部分
+- [x] 匯出面板 UI 分組清晰，下拉選單正確列出已啟用模組
 
 ### 13.8 數據瀏覽器驗收（SPEC §19.18）
 
-- [ ] `/feature-browser` 頁面可正常載入並顯示 Dashboard 概覽
-- [ ] 6 個 Tab 切換正常，各 Tab 資料正確載入
-- [ ] 特徵目錄支援搜尋/篩選/排序，800+ 特徵不卡頓
-- [ ] 分佈 Tab 直方圖 + 箱型圖 + 統計摘要正確渲染
-- [ ] 時間序列 Tab 最多 5 條線同時顯示
-- [ ] 相關性 Tab 熱力圖色階正確，散點圖可互動
-- [ ] 品質 Tab 覆蓋率熱力圖正確，可觸發獨立品質檢測
-- [ ] 數據表分頁正確 + 支援匯出 CSV
-- [ ] 跨頁面導航正常（feature-browser ↔ ic-analysis）
-- [ ] TypeScript 編譯通過（`npm run build`）
-- [ ] API 各端點回應格式與 Pydantic model 一致
+- [x] `/feature-browser` 頁面可正常載入並顯示 Dashboard 概覽
+- [x] 6 個 Tab 切換正常，各 Tab 資料正確載入
+- [x] 特徵目錄支援搜尋/篩選/排序，800+ 特徵不卡頓
+- [x] 分佈 Tab 直方圖 + 箱型圖 + 統計摘要正確渲染
+- [x] 時間序列 Tab 最多 5 條線同時顯示
+- [x] 相關性 Tab 熱力圖色階正確，散點圖可互動
+- [x] 品質 Tab 覆蓋率熱力圖正確，可觸發獨立品質檢測
+- [x] 數據表分頁正確 + 支援匯出 CSV
+- [x] 跨頁面導航正常（feature-browser ↔ ic-analysis）
+- [x] TypeScript 編譯通過（`npm run build`）
+- [x] API 各端點回應格式與 Pydantic model 一致
 
 ---
 

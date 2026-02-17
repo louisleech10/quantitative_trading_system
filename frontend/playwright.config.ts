@@ -11,5 +11,11 @@ export default defineConfig({
     actionTimeout: 30_000,
     navigationTimeout: 60_000,
   },
-  reporter: [['list']]
+  reporter: [['list']],
+  webServer: {
+    command: 'npm run dev -- --port 3001',
+    port: 3001,
+    timeout: 120_000,
+    reuseExistingServer: true,
+  },
 });

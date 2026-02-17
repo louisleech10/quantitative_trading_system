@@ -263,6 +263,51 @@ class ShapleyConfig(BaseModel):
     use_approximation: bool = True
 
 
+class FeatureTierPreset(BaseModel):
+    description: str
+    deep_analysis: bool = False
+    disabled_modules: list[str] = Field(default_factory=list)
+
+
+class FeatureTierConfig(BaseModel):
+    active_preset: Literal["foundation", "intermediate", "advanced", "custom"] = "intermediate"
+    presets: dict[str, FeatureTierPreset] = Field(
+        default_factory=lambda: {
+            "foundation": FeatureTierPreset(
+                description="基礎分析：IC/ICIR/篩選核心流程",
+                deep_analysis=False,
+                disabled_modules=[],
+            ),
+            "intermediate": FeatureTierPreset(
+                description="進階分析：含深度分析常用模組",
+                deep_analysis=True,
+                disabled_modules=["factor_orthogonalization", "factor_exposure"],
+            ),
+            "advanced": FeatureTierPreset(
+                description="完整分析：全部功能",
+                deep_analysis=True,
+                disabled_modules=[],
+            ),
+        }
+    )
+    custom_overrides: dict[str, dict[str, bool]] = Field(
+        default_factory=lambda: {
+            "stage_overrides": {},
+            "module_overrides": {},
+        }
+    )
+
+    @model_validator(mode="after")
+    def _validate_presets(self) -> "FeatureTierConfig":
+        required = {"foundation", "intermediate", "advanced"}
+        missing = required.difference(set(self.presets.keys()))
+        if missing:
+            raise ValueError(f"feature_tiers.presets missing required keys: {sorted(missing)}")
+        if self.active_preset != "custom" and self.active_preset not in self.presets:
+            raise ValueError(f"active_preset not found in presets: {self.active_preset}")
+        return self
+
+
 class ICConfig(BaseModel):
     """IC 篩選器完整配置 — 頂層 Schema."""
 
@@ -297,6 +342,7 @@ class ICConfig(BaseModel):
     net_ic_analysis: NetICAnalysisConfig = Field(default_factory=NetICAnalysisConfig)
     deep_analysis_global: DeepAnalysisGlobalConfig = Field(default_factory=DeepAnalysisGlobalConfig)
     shapley: ShapleyConfig = Field(default_factory=ShapleyConfig)
+    feature_tiers: FeatureTierConfig = Field(default_factory=FeatureTierConfig)
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

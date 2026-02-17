@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ICAnalysisConfig, ICReport } from '@/lib/types';
+import {
+  DeepAnalysisConfig,
+  DeepAnalysisResponse,
+  FeatureListItem,
+  ICAnalysisConfig,
+  ICReport,
+} from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -121,11 +127,17 @@ export function useICAnalysis() {
         throw new Error('請提供特徵檔案路徑');
       }
 
+      const effectiveConfig = useICAnalysisStore.getState().getEffectiveConfig();
+
       const payload = {
         features_path: featuresPath,
         labels_path: config.labels_path?.trim() || undefined,
         meta_path: config.meta_path?.trim() || undefined,
-        config_override: buildConfigOverride(config),
+        config_override: {
+          ...buildConfigOverride(config),
+          ...(effectiveConfig.feature_tiers ? { feature_tiers: effectiveConfig.feature_tiers } : {}),
+        },
+        feature_tiers: effectiveConfig.feature_tiers,
         event_query: config.mode === 'event' ? config.event_query?.trim() || undefined : undefined,
       };
 
@@ -169,6 +181,41 @@ export function useICAnalysis() {
     return data.summary;
   }, []);
 
+  const fetchAvailableFeatures = useCallback(async (featuresPath: string, metaPath?: string) => {
+    const params = new URLSearchParams({ features_path: featuresPath });
+    if (metaPath) {
+      params.set('meta_path', metaPath);
+    }
+    const data = await requestJson<{ total: number; features: FeatureListItem[] }>(`/features/list?${params.toString()}`);
+    return data.features;
+  }, []);
+
+  const startDeepAnalysis = useCallback(
+    async (taskId: string, config: DeepAnalysisConfig) => {
+      const payload = {
+        selected_features: config.selected_features,
+        top_n: config.top_n ?? 30,
+        modules: config.modules,
+        config_override: config.config_override,
+      };
+      const result = await requestJson<{ task_id: string; status: string }>(`/deep-analysis/${taskId}`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      setTask(result.task_id, result.status === 'running' ? 'running' : 'pending');
+      setStatus(result.status === 'running' ? 'running' : 'pending');
+      connectProgress(result.task_id);
+
+      return result.task_id;
+    },
+    [connectProgress, setStatus, setTask]
+  );
+
+  const fetchDeepAnalysisResult = useCallback(async (taskId: string) => {
+    return requestJson<DeepAnalysisResponse>(`/deep-analysis/${taskId}/result`);
+  }, []);
+
   const refilter = useCallback(
     async (taskId: string, thresholds: ICAnalysisConfig['thresholds']) => {
       const result = await requestJson<ICReport>(`/refilter?task_id=${taskId}`, {
@@ -197,6 +244,9 @@ export function useICAnalysis() {
     fetchTaskStatus,
     fetchResult,
     fetchSummary,
+    fetchAvailableFeatures,
+    startDeepAnalysis,
+    fetchDeepAnalysisResult,
     refilter,
     connectProgress,
   };

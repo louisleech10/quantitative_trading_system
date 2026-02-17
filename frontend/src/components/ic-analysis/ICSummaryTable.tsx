@@ -1,16 +1,21 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { ICFeatureInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { ArrowUpDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ICSummaryTableProps {
   data: ICFeatureInfo[];
   selectedFeature?: string | null;
   onSelectFeature?: (featureName: string) => void;
+  selectable?: boolean;
+  selectedFeatures?: string[];
+  onSelectFeatures?: (featureNames: string[]) => void;
 }
 
 type SortField = 'rank' | 'ic_mean' | 'icir' | 'p_value' | 'monotonicity_score';
@@ -21,6 +26,9 @@ export default function ICSummaryTable({
   data,
   selectedFeature,
   onSelectFeature,
+  selectable = false,
+  selectedFeatures = [],
+  onSelectFeatures,
 }: ICSummaryTableProps) {
   const [sortField, setSortField] = useState<SortField>('icir');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -60,6 +68,26 @@ export default function ICSummaryTable({
     </Button>
   );
 
+  const allSelected = sortedData.length > 0 && sortedData.every((item) => selectedFeatures.includes(item.feature_name));
+
+  const handleSelectAll = (checked: boolean) => {
+    if (!onSelectFeatures) return;
+    if (!checked) {
+      onSelectFeatures([]);
+      return;
+    }
+    onSelectFeatures(sortedData.map((item) => item.feature_name));
+  };
+
+  const toggleFeature = (featureName: string, checked: boolean) => {
+    if (!onSelectFeatures) return;
+    if (checked) {
+      onSelectFeatures(Array.from(new Set([...selectedFeatures, featureName])));
+      return;
+    }
+    onSelectFeatures(selectedFeatures.filter((item) => item !== featureName));
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -76,6 +104,11 @@ export default function ICSummaryTable({
             <Table>
               <TableHeader>
                 <TableRow>
+                  {selectable && (
+                    <TableHead className="w-[42px]">
+                      <Checkbox checked={allSelected} onCheckedChange={(checked) => handleSelectAll(Boolean(checked))} />
+                    </TableHead>
+                  )}
                   <TableHead className="w-[70px]">排名</TableHead>
                   <TableHead>特徵</TableHead>
                   <TableHead className="w-[120px]">
@@ -101,9 +134,23 @@ export default function ICSummaryTable({
                       className={isSelected ? 'bg-cyan-500/10' : ''}
                       onClick={() => onSelectFeature?.(item.feature_name)}
                     >
+                      {selectable && (
+                        <TableCell onClick={(event) => event.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedFeatures.includes(item.feature_name)}
+                            onCheckedChange={(checked) => toggleFeature(item.feature_name, Boolean(checked))}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="text-sm text-slate-300">#{item.rank ?? index + 1}</TableCell>
                       <TableCell className="font-medium text-slate-100">
-                        {item.feature_name}
+                        <Link
+                          href={`/feature-browser?feature=${encodeURIComponent(item.feature_name)}&tab=distribution`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="text-cyan-300 hover:text-cyan-200 underline-offset-2 hover:underline"
+                        >
+                          {item.feature_name}
+                        </Link>
                       </TableCell>
                       <TableCell className="font-mono text-xs text-slate-200">
                         {item.ic_mean?.toFixed(4)}

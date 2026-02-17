@@ -49,3 +49,30 @@ def test_asymmetric_quantile_def():
     result = analyzer.analyze(feature, returns, num_quantiles=5)
     assert isinstance(result, dict)
     assert result["asymmetry"]["type"] in ["long_dominant", "short_dominant", "symmetric"]
+
+
+def test_compute_side_metrics_empty_branch():
+    metrics = LongShortAnalyzer._compute_side_metrics(pd.Series([], dtype=float), pd.Series([], dtype=float), "long")
+    assert metrics["samples"] == 0
+    assert np.isnan(metrics["ic"])
+
+
+def test_recommendation_all_branches():
+    assert LongShortAnalyzer._recommendation(0.1, 0.1) == "雙向交易"
+    assert LongShortAnalyzer._recommendation(0.1, -0.1) == "只做多"
+    assert LongShortAnalyzer._recommendation(-0.1, 0.1) == "只做空"
+    assert LongShortAnalyzer._recommendation(-0.1, -0.1) == "不建議"
+
+
+def test_classify_asymmetry_total_zero_and_short_dominant():
+    zero = LongShortAnalyzer._classify_asymmetry(np.nan, np.nan)
+    assert zero["type"] == "symmetric"
+
+    short_dom = LongShortAnalyzer._classify_asymmetry(0.01, 0.2)
+    assert short_dom["type"] == "short_dominant"
+
+
+def test_assign_quantiles_none_for_constant_feature():
+    bins, used = LongShortAnalyzer._assign_quantiles_with_fallback(pd.Series([1.0] * 60), requested=5)
+    assert bins is None
+    assert used == 0

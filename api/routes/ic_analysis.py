@@ -7,12 +7,17 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from api.core.logging import get_logger
 from api.models.ic_models import (
+    DeepAnalysisRequest,
+    DeepAnalysisResponse,
+    FeatureListItem,
+    FeatureListResponse,
     ICAnalyzeRequest,
     ICAnalyzeResponse,
+    ICFullAnalysisRequest,
     ICTaskStatusResponse,
     ICRefilterRequest,
 )
@@ -64,6 +69,99 @@ async def get_result(task_id: str):
         raise
     except Exception as exc:
         logger.error("Failed to get result: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/features/list", response_model=FeatureListResponse)
+async def list_available_features(
+    features_path: str,
+    meta_path: Optional[str] = None,
+):
+    """List available features from HDF5 + optional metadata."""
+    try:
+        features = ic_analysis_service.list_features(features_path, meta_path)
+        return {
+            "total": len(features),
+            "features": [FeatureListItem(**item) for item in features],
+        }
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to list features: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/deep-analysis/{task_id}", response_model=ICAnalyzeResponse)
+async def start_deep_analysis(task_id: str, request: DeepAnalysisRequest):
+    """Start deep analysis for an existing IC task."""
+    try:
+        return await ic_analysis_service.start_deep_analysis(task_id, request)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "Task not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message)
+    except Exception as exc:
+        logger.error("Failed to start deep analysis: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/deep-analysis/{task_id}/result", response_model=DeepAnalysisResponse)
+async def get_deep_analysis_result(task_id: str):
+    """Get deep analysis result for task."""
+    try:
+        status = ic_analysis_service.get_task_status(task_id)
+        if not status:
+            raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+        result = ic_analysis_service.get_deep_analysis_result(task_id)
+        summary = None
+        module_status = None
+        if isinstance(result, dict):
+            summary = {
+                "total_modules": int(result.get("total_modules", 10)),
+                "completed_count": int(result.get("completed_count", 0)),
+                "skipped_count": int(result.get("skipped_count", 0)),
+                "failed_count": int(result.get("failed_count", 0)),
+                "total_execution_time_s": float(result.get("total_execution_time_s", 0.0)),
+            }
+            module_status = [
+                {
+                    "module_name": module_name,
+                    "status": module_state,
+                }
+                for module_name, module_state in (result.get("module_summary") or {}).items()
+            ]
+
+        return {
+            "task_id": task_id,
+            "status": status.get("status", "running"),
+            "progress": float(status.get("progress", 0.0)),
+            "current_step": status.get("current_step"),
+            "summary": summary,
+            "module_status": module_status,
+            "results": result,
+            "applied_tier": status.get("applied_tier", "intermediate"),
+            "error": status.get("error"),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to get deep analysis result: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/full-analysis", response_model=ICAnalyzeResponse)
+async def start_full_analysis(request: ICFullAnalysisRequest):
+    """Start one-shot full analysis workflow."""
+    try:
+        return await ic_analysis_service.start_full_analysis(request)
+    except ValueError as exc:
+        logger.error("Invalid full analysis request: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to start full analysis: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -223,6 +321,52 @@ async def export_filtered_features(task_id: str):
         raise
     except Exception as exc:
         logger.error("Failed to export filtered features: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/export/{task_id}/{format}")
+async def export_analysis(
+    task_id: str,
+    format: str,
+    module: Optional[str] = Query(default=None),
+):
+    """Export analysis report in multi-format outputs."""
+    try:
+        export_result = ic_analysis_service.export_analysis(
+            task_id=task_id,
+            format_type=format,
+            module_name=module,
+        )
+        logger.info("Export success: task_id=%s, format=%s, module=%s", task_id, format, module)
+
+        if export_result["type"] == "file":
+            return FileResponse(
+                path=export_result["path"],
+                media_type=export_result["media_type"],
+                filename=export_result["filename"],
+            )
+
+        headers = {
+            "Content-Disposition": f"attachment; filename=\"{export_result['filename']}\"",
+        }
+        return StreamingResponse(
+            export_result["content"],
+            media_type=export_result["media_type"],
+            headers=headers,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if "Task not found" in message or "Result not found" in message:
+            raise HTTPException(status_code=404, detail=message)
+        raise HTTPException(status_code=422, detail=message)
+    except TypeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to export analysis: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

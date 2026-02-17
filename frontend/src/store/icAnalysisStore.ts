@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import { ICAnalysisConfig, ICReport } from '@/lib/types';
+import {
+  DeepAnalysisConfig,
+  FeatureTierLevel,
+  FeatureFilterConfig,
+  FeatureListItem,
+  ICAnalysisConfig,
+  ICReport,
+  ModuleStatus,
+} from '@/lib/types';
 
 type ICAnalysisStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
 
@@ -12,6 +20,17 @@ interface ICAnalysisState {
   error: string | null;
   report: ICReport | null;
   selectedFeature: string | null;
+  availableFeatures: FeatureListItem[];
+  featureFilter: FeatureFilterConfig;
+  selectedFeatures: string[];
+  deepAnalysisModules: DeepAnalysisConfig['modules'];
+  deepAnalysisStatus: 'idle' | 'running' | 'completed' | 'failed';
+  deepAnalysisProgress: number;
+  deepAnalysisReport: ICReport | null;
+  deepAnalysisModuleStatus: ModuleStatus[];
+  activeTab: 'basic' | 'deep';
+  featureTier: FeatureTierLevel;
+  featureToggles: Record<string, boolean>;
   setConfig: (config: ICAnalysisConfig) => void;
   updateConfig: (patch: Partial<ICAnalysisConfig>) => void;
   setTask: (taskId: string | null, status?: ICAnalysisStatus) => void;
@@ -20,8 +39,116 @@ interface ICAnalysisState {
   setReport: (report: ICReport | null) => void;
   setError: (error: string | null) => void;
   setSelectedFeature: (featureName: string | null) => void;
+  setAvailableFeatures: (features: FeatureListItem[]) => void;
+  setFeatureFilter: (filter: FeatureFilterConfig) => void;
+  setSelectedFeatures: (featureNames: string[]) => void;
+  setDeepAnalysisModules: (modules: DeepAnalysisConfig['modules']) => void;
+  setDeepAnalysisStatus: (status: ICAnalysisState['deepAnalysisStatus']) => void;
+  setDeepAnalysisProgress: (progress: number) => void;
+  setDeepAnalysisReport: (report: ICReport | null) => void;
+  setDeepAnalysisModuleStatus: (moduleStatus: ModuleStatus[]) => void;
+  setActiveTab: (tab: 'basic' | 'deep') => void;
+  setFeatureTier: (tier: FeatureTierLevel) => void;
+  toggleFeature: (key: string) => void;
+  getEffectiveConfig: () => Partial<ICAnalysisConfig>;
   resetReport: () => void;
 }
+
+const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<string, boolean>> = {
+  foundation: {
+    ic_calculation: true,
+    ic_method_selection: true,
+    winsorization_method: true,
+    monotonicity_test: true,
+    ai_summary: true,
+    return_type_selection: false,
+    ic_decay: false,
+    grouped_ic: false,
+    ic_autocorrelation: false,
+    event_filtering: false,
+    redundancy_method_selection: false,
+    turnover_analysis: false,
+    factor_return: false,
+    trend_analysis: false,
+    parameter_sensitivity: false,
+    rolling_oos: false,
+    long_short_analysis: false,
+    feature_quality_diagnostics: false,
+    net_ic_analysis: false,
+    fdr_correction: false,
+    vif_filter: false,
+    factor_centrality: false,
+    factor_orthogonalization: false,
+    factor_exposure: false,
+  },
+  intermediate: {
+    ic_calculation: true,
+    ic_method_selection: true,
+    winsorization_method: true,
+    monotonicity_test: true,
+    ai_summary: true,
+    return_type_selection: true,
+    ic_decay: true,
+    grouped_ic: true,
+    ic_autocorrelation: true,
+    event_filtering: true,
+    redundancy_method_selection: true,
+    turnover_analysis: true,
+    factor_return: true,
+    trend_analysis: true,
+    parameter_sensitivity: true,
+    rolling_oos: true,
+    long_short_analysis: true,
+    feature_quality_diagnostics: true,
+    net_ic_analysis: true,
+    fdr_correction: false,
+    vif_filter: false,
+    factor_centrality: true,
+    factor_orthogonalization: false,
+    factor_exposure: false,
+  },
+  advanced: {
+    ic_calculation: true,
+    ic_method_selection: true,
+    winsorization_method: true,
+    monotonicity_test: true,
+    ai_summary: true,
+    return_type_selection: true,
+    ic_decay: true,
+    grouped_ic: true,
+    ic_autocorrelation: true,
+    event_filtering: true,
+    redundancy_method_selection: true,
+    turnover_analysis: true,
+    factor_return: true,
+    trend_analysis: true,
+    parameter_sensitivity: true,
+    rolling_oos: true,
+    long_short_analysis: true,
+    feature_quality_diagnostics: true,
+    net_ic_analysis: true,
+    fdr_correction: true,
+    vif_filter: true,
+    factor_centrality: true,
+    factor_orthogonalization: true,
+    factor_exposure: true,
+  },
+};
+
+const LOCKED_TOGGLES = new Set(['ic_calculation', 'monotonicity_test', 'ai_summary']);
+
+const defaultDeepAnalysisModules: DeepAnalysisConfig['modules'] = {
+  factor_return: true,
+  factor_centrality: true,
+  trend_analysis: true,
+  parameter_sensitivity: true,
+  rolling_oos: true,
+  factor_orthogonalization: false,
+  factor_exposure: false,
+  long_short_analysis: true,
+  feature_quality_diagnostics: true,
+  net_ic_analysis: true,
+};
 
 const defaultConfig: ICAnalysisConfig = {
   features_path: '',
@@ -39,7 +166,7 @@ const defaultConfig: ICAnalysisConfig = {
   },
 };
 
-export const useICAnalysisStore = create<ICAnalysisState>((set) => ({
+export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   config: defaultConfig,
   taskId: null,
   status: 'idle',
@@ -48,6 +175,23 @@ export const useICAnalysisStore = create<ICAnalysisState>((set) => ({
   error: null,
   report: null,
   selectedFeature: null,
+  availableFeatures: [],
+  featureFilter: {
+    include_pattern: '',
+    include_categories: [],
+    include_data_sources: [],
+    include_families: [],
+    max_features: 30,
+  },
+  selectedFeatures: [],
+  deepAnalysisModules: defaultDeepAnalysisModules,
+  deepAnalysisStatus: 'idle',
+  deepAnalysisProgress: 0,
+  deepAnalysisReport: null,
+  deepAnalysisModuleStatus: [],
+  activeTab: 'basic',
+  featureTier: 'intermediate',
+  featureToggles: { ...PRESET_TOGGLES.intermediate },
   setConfig: (config) => set({ config }),
   updateConfig: (patch) =>
     set((state) => ({
@@ -72,6 +216,99 @@ export const useICAnalysisStore = create<ICAnalysisState>((set) => ({
   setReport: (report) => set({ report }),
   setError: (error) => set({ error }),
   setSelectedFeature: (featureName) => set({ selectedFeature: featureName }),
+  setAvailableFeatures: (features) => set({ availableFeatures: features }),
+  setFeatureFilter: (filter) =>
+    set((state) => ({ featureFilter: { ...state.featureFilter, ...filter } })),
+  setSelectedFeatures: (featureNames) => set({ selectedFeatures: featureNames }),
+  setDeepAnalysisModules: (modules) => set({ deepAnalysisModules: modules }),
+  setDeepAnalysisStatus: (deepAnalysisStatus) => set({ deepAnalysisStatus }),
+  setDeepAnalysisProgress: (deepAnalysisProgress) => set({ deepAnalysisProgress }),
+  setDeepAnalysisReport: (deepAnalysisReport) => set({ deepAnalysisReport }),
+  setDeepAnalysisModuleStatus: (deepAnalysisModuleStatus) => set({ deepAnalysisModuleStatus }),
+  setActiveTab: (activeTab) => set({ activeTab }),
+  setFeatureTier: (featureTier) =>
+    set((state) => {
+      if (featureTier === 'custom') {
+        return { featureTier };
+      }
+      const preset = PRESET_TOGGLES[featureTier];
+      return {
+        featureTier,
+        featureToggles: { ...preset },
+        deepAnalysisModules: {
+          ...state.deepAnalysisModules,
+          factor_return: Boolean(preset.factor_return),
+          factor_centrality: Boolean(preset.factor_centrality),
+          trend_analysis: Boolean(preset.trend_analysis),
+          parameter_sensitivity: Boolean(preset.parameter_sensitivity),
+          rolling_oos: Boolean(preset.rolling_oos),
+          factor_orthogonalization: Boolean(preset.factor_orthogonalization),
+          factor_exposure: Boolean(preset.factor_exposure),
+          long_short_analysis: Boolean(preset.long_short_analysis),
+          feature_quality_diagnostics: Boolean(preset.feature_quality_diagnostics),
+          net_ic_analysis: Boolean(preset.net_ic_analysis),
+        },
+      };
+    }),
+  toggleFeature: (key) =>
+    set((state) => {
+      if (LOCKED_TOGGLES.has(key)) {
+        return state;
+      }
+
+      const nextEnabled = !Boolean(state.featureToggles[key]);
+      const nextToggles = { ...state.featureToggles, [key]: nextEnabled };
+      const nextDeepModules = {
+        ...state.deepAnalysisModules,
+      };
+
+      if (key in nextDeepModules) {
+        (nextDeepModules as Record<string, boolean>)[key] = nextEnabled;
+      }
+
+      return {
+        featureTier: 'custom',
+        featureToggles: nextToggles,
+        deepAnalysisModules: nextDeepModules,
+      };
+    }),
+  getEffectiveConfig: () => {
+    const state = get();
+    const stageOverrides: Record<string, boolean> = {
+      ic_decay: Boolean(state.featureToggles.ic_decay),
+      grouped_ic: Boolean(state.featureToggles.grouped_ic),
+      turnover_analysis: Boolean(state.featureToggles.turnover_analysis),
+      event_filtering: Boolean(state.featureToggles.event_filtering),
+      ai_summary: Boolean(state.featureToggles.ai_summary),
+    };
+
+    const moduleOverrides: Record<string, boolean> = {
+      factor_return: Boolean(state.featureToggles.factor_return),
+      factor_centrality: Boolean(state.featureToggles.factor_centrality),
+      trend_analysis: Boolean(state.featureToggles.trend_analysis),
+      parameter_sensitivity: Boolean(state.featureToggles.parameter_sensitivity),
+      rolling_oos: Boolean(state.featureToggles.rolling_oos),
+      factor_orthogonalization: Boolean(state.featureToggles.factor_orthogonalization),
+      factor_exposure: Boolean(state.featureToggles.factor_exposure),
+      long_short_analysis: Boolean(state.featureToggles.long_short_analysis),
+      feature_quality_diagnostics: Boolean(state.featureToggles.feature_quality_diagnostics),
+      net_ic_analysis: Boolean(state.featureToggles.net_ic_analysis),
+    };
+
+    return {
+      feature_tiers: {
+        active_preset: state.featureTier,
+        ...(state.featureTier === 'custom'
+          ? {
+              custom_overrides: {
+                stage_overrides: stageOverrides,
+                module_overrides: moduleOverrides,
+              },
+            }
+          : {}),
+      },
+    };
+  },
   resetReport: () =>
     set({
       report: null,
@@ -79,5 +316,12 @@ export const useICAnalysisStore = create<ICAnalysisState>((set) => ({
       progress: 0,
       currentStage: null,
       error: null,
+      deepAnalysisStatus: 'idle',
+      deepAnalysisProgress: 0,
+      deepAnalysisReport: null,
+      deepAnalysisModuleStatus: [],
+      activeTab: 'basic',
+      featureTier: 'intermediate',
+      featureToggles: { ...PRESET_TOGGLES.intermediate },
     }),
 }));
