@@ -1,10 +1,11 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 4.0
-- **最後更新**: 2026-02-14
+- **版本**: 5.0
+- **最後更新**: 2026-02-18
 - **狀態**: 生產中 + 持續開發
 - **更新內容**: 
+  - v5.0 (2026-02-18): 同步全部已完成 PLAN — Phase 1 Feature Factory（7 層 Pipeline）、Phase 1.5 Feature Factory 優化（微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理）、Phase 2.4-2.12 IC Deep Analysis（10 個深度分析模組 + 特徵難度分級 + 匯出系統 + 資料瀏覽器）、Phase 3.5 模型增強（6 個增強模組：校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線）、Phase 4 Optuna 重構 + Strategy Domain（VectorizedBacktest + PerformanceMetrics + PositionSizing + RiskManager + IBacktestEngine/IPositionSizer Protocol）
   - v4.0 (2026-02-14): 新增 Phase 3.7 雙引擎 ML 系統架構（LightGBM + XGBoost、IModelTrainer Protocol 擴展、IOptimizationObjective、模型對比系統、四維參數系統、可插拔 Optuna 目標）
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4 架構變更（解耦架構、Protocol 注入、Factory 模式、KlineDataService 統一資料存取層）；更新模組清單與目錄結構；標記已完成功能
   - v2.0 (2026-01-09): 添加 Phase 3 完整架構（Optuna 優化系統、WebSocket 通訊、9 個視覺化組件）
@@ -59,9 +60,13 @@
 | Phase 2 (IC Gatekeeper) | IC 特徵篩選 + 模型驗證 | ✅ 已完成 |
 | Phase 3 | Optuna 優化 + 信號分析 + 視覺化 | ✅ 已完成 |
 | Phase 3.5 | 特徵工程 + XGBoost + Pattern 管理 | ✅ 已完成 |
+| Phase 3.5 | 模型增強系統（校準、Walk-Forward、對抗驗證、CPCV、學習曲線） | ✅ 已完成 |
 | Phase 3.7 | 雙引擎 ML 系統 (LightGBM + XGBoost) | ✅ 已完成 |
 | REFACTOR V4 | 架構解耦（7 條規則、Protocol 注入、Factory 模式） | ✅ 已完成 |
-| Phase 4 | Pattern 精煉 + 回測系統 | 🔄 規劃中 |
+| Phase 4 | Optuna 重構 + Strategy Domain（回測引擎、績效指標、部位管理） | ✅ 已完成 |
+| Phase 1 (Feature Factory) | 7 層特徵工程 Pipeline + Config 驅動 + 七段式命名 | ✅ 已完成 |
+| Phase 1.5 (Feature Factory 優化) | 微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理 | ✅ 已完成 |
+| Phase 2.4-2.12 (IC Deep Analysis) | 10 個深度分析模組 + 特徵難度分級 + 匯出系統 | ✅ 已完成 |
 
 ---
 
@@ -174,6 +179,15 @@ class IOptimizationObjective(Protocol):
     def direction(self) -> str: ...
     def create_search_space(self, trial) -> Dict[str, Any]: ...
     def evaluate(self, params) -> float: ...
+
+class IBacktestEngine(Protocol):
+    """回測引擎介面 — Strategy Domain 實作（Phase 4）"""
+    def run_backtest(self, signals, kline_data, config) -> Any: ...
+    def get_performance_metrics(self) -> Dict[str, float]: ...
+
+class IPositionSizer(Protocol):
+    """部位管理介面 — Strategy Domain 實作（Phase 4）"""
+    def calculate_position_size(self, signal, equity, risk_params) -> float: ...
 ```
 
 ### Factory 模式
@@ -213,6 +227,32 @@ create_model_trainer()           # Phase 3.7 新增（通用引擎建構）
 create_model_comparison()        # Phase 3.7 新增
 create_model_config_manager()    # Phase 3.7 新增
 
+# ── IC Gatekeeper ──
+create_ic_analyzer()             # Phase 2
+
+# ── IC Deep Analysis（Phase 2.4-2.12）──
+create_factor_return_analyzer()
+create_factor_centrality_analyzer()
+create_trend_analyzer()
+create_parameter_sensitivity_analyzer()
+create_rolling_oos_validator()
+create_factor_orthogonalizer()
+create_factor_exposure_analyzer()
+create_long_short_analyzer()
+create_feature_quality_diagnostics()
+create_net_ic_analyzer()
+
+# ── Model Enhancement（Phase 3.5）──
+create_probability_calibrator()
+create_walk_forward_validator()
+create_sample_weight_calculator()
+create_adversarial_validator()
+create_combinatorial_purged_cv()
+create_learning_curve_analyzer()
+
+# ── Feature Factory（Phase 1）──
+create_feature_factory()
+
 # ── Statistics ──
 create_expectancy_calculator()
 create_bootstrap_estimator()
@@ -230,6 +270,10 @@ create_pattern()
 create_parameter_ranges()
 create_optuna_optimizer()
 create_optimization_result()
+
+# ── Strategy（Phase 4）──
+create_backtest_engine()
+create_position_sizer()
 
 # ── Utility ──
 get_data_source_values()
@@ -451,17 +495,19 @@ python scripts/check_architecture_rules.py
         │           │           │           │
 ┌───────▼───────────▼───────────▼───────────▼──────────┐
 │              api/routes/ (Thin Handlers)              │
-│  13 個路由模組, 85+ 端點                              │
+│  21+ 個路由模組, 120+ 端點                            │
 │  case_search │ case │ chart │ chart_signals           │
 │  config │ signal_analysis │ optimization              │
 │  optimization_analysis │ feature_engineering          │
 │  pattern_analysis │ pattern_management                │
 │  ml_pipeline │ two_stage_search                       │
+│  model_enhancement │ hyperparameter_optimization     │
+│  execution_optimization                               │
 └───────────────────────┬──────────────────────────────┘
                         │
 ┌───────────────────────▼──────────────────────────────┐
 │             api/services/ (Business Logic)            │
-│  20 個服務, 透過 factories.py 建構 Domain 物件        │
+│  28+ 個服務, 透過 factories.py 建構 Domain 物件       │
 │  Services 之間不互相呼叫 (Rule 4)                     │
 │                                                      │
 │  KlineDataService ─── 統一 K 線存取 (快取+下載)       │
@@ -489,13 +535,16 @@ python scripts/check_architecture_rules.py
 │  ┌──────────┐ ┌────────────┐  └──────────────┘      │
 │  │Analysis/ │ │Indicators/ │  ┌──────────────┐      │
 │  │XGBoost   │ │Engine(OOP) │  │FeatureEng/   │      │
-│  │Signal    │ │EMA, MACD...│  │Extractor     │      │
-│  │Pattern   │ └────────────┘  │Storage       │      │
-│  │SHAP      │ ┌────────────┐  │Validator     │      │
-│  │Drift/PSI │ │Optimization│  └──────────────┘      │
-│  │Bootstrap │ │Optuna      │                        │
-│  │Regime    │ │Checkpoint  │                        │
-│  └──────────┘ └────────────┘                        │
+│  │LightGBM  │ │EMA, MACD...│  │Factory(7層)  │      │
+│  │Signal    │ └────────────┘  │Extractor     │      │
+│  │Pattern   │ ┌────────────┐  │Storage       │      │
+│  │SHAP      │ │Optimization│  │Validator     │      │
+│  │Drift/PSI │ │Optuna      │  └──────────────┘      │
+│  │Bootstrap │ │Checkpoint  │  ┌──────────────┐      │
+│  │DeepAnaly │ │Objectives/ │  │★ Strategy/   │      │
+│  │ModelEnhc │ └────────────┘  │Backtest      │      │
+│  │Regime    │                 │Metrics       │      │
+│  └──────────┘                 └──────────────┘      │
 └───────────────────────┬──────────────────────────────┘
                         │
 ┌───────────────────────▼──────────────────────────────┐
@@ -533,10 +582,16 @@ api/
 │   ├── training_window_config.py       # TrainingWindowConfig, StrategyConfig, SignalDensityResponse
 │   ├── strategy_test_models.py         # ChartSignalCalculationRequest/Response
 │   ├── feature_engineering_models.py   # FeatureExtractionRequest/Response
+│   ├── ★ feature_factory_models.py      # ★ Feature Factory 模型（Phase 1）
+│   ├── ★ feature_browser_models.py      # ★ Feature Browser 模型
+│   ├── ★ feature_toggle_models.py       # ★ Feature Toggle 模型
+│   ├── ★ export_models.py               # ★ 匯出模型
 │   ├── pattern_analysis_models.py      # XGBoost/SHAP/OOT/Drift/Regime 模型
 │   ├── pattern_management_models.py    # Pattern CRUD 模型
-│   └── ★ ic_models.py                  # ★ ICAnalysisRequest/Response（IC 配置 + 結果）
-├── routes/                              # Thin Route Handlers (13 個)
+│   ├── ★ ic_models.py                  # ★ ICAnalysisRequest/Response（IC 配置 + 結果）
+│   ├── ★ model_enhancement.py          # ★ Model Enhancement Request/Response（Phase 3.5）
+│   └── ★ optimization_models.py        # ★ Hyperparameter/Execution Optimization 模型（Phase 4）
+├── routes/                              # Thin Route Handlers (21 個)
 │   ├── case_search.py                  # /search/* — 案例搜索 (8 endpoints)
 │   ├── case.py                         # /api/v1/case/* + /api/v1/kline/* (6 endpoints)
 │   ├── chart.py                        # /api/v1/chart/data (1 endpoint)
@@ -546,12 +601,19 @@ api/
 │   ├── optimization.py                 # /api/v1/optimization/* — 優化核心 (8 endpoints)
 │   ├── optimization_analysis.py        # /api/v1/optimization/* — 分析 (9 endpoints)
 │   ├── feature_engineering.py          # /features/* (4 endpoints)
+│   ├── ★ feature_factory.py             # ★ /api/v1/feature-factory/* （Phase 1）
+│   ├── ★ feature_browser.py             # ★ /api/v1/feature-browser/* （Phase 2.12）
+│   ├── ★ feature_toggles.py             # ★ /api/v1/feature-toggles/*
+│   ├── ★ export.py                      # ★ /api/v1/export/*
 │   ├── pattern_analysis.py             # /pattern-analysis/* — XGBoost (21 endpoints)
 │   ├── pattern_management.py           # /patterns/* — Pattern CRUD (8 endpoints)
 │   ├── ml_pipeline.py                  # /api/v1/ml-pipeline/* (4 endpoints)
 │   ├── two_stage_search.py             # /two-stage/* (3 endpoints)
-│   └── ★ ic_analysis.py                # ★ /api/v1/ic-analysis/* — IC Gatekeeper (13 endpoints)
-├── services/                            # Business Logic (20 個服務)
+│   ├── ★ ic_analysis.py                # ★ /api/v1/ic-analysis/* — IC Gatekeeper (13 endpoints)
+│   ├── ★ model_enhancement.py          # ★ /api/v1/model-enhancement/* — 模型增強（Phase 3.5, 8 endpoints）
+│   ├── ★ hyperparameter_optimization.py # ★ 超參數優化（Phase 4）
+│   └── ★ execution_optimization.py      # ★ 執行優化（Phase 4）
+├── services/                            # Business Logic (28 個服務)
 │   ├── kline_data_service.py           # ★ 統一 K 線資料存取層 (快取+下載)
 │   ├── kline_storage_service.py        # HDF5 讀寫操作
 │   ├── chart_data_service.py           # 圖表數據 + 指標計算
@@ -562,6 +624,11 @@ api/
 │   ├── optimization_task_service.py    # Optuna 優化任務 (Singleton)
 │   ├── signal_analysis_service.py      # 信號密度分析 (Singleton)
 │   ├── feature_task_service.py         # 特徵擷取任務
+│   ├── ★ feature_factory_service.py    # ★ Feature Factory 服務（Phase 1）
+│   ├── ★ feature_browser_service.py    # ★ 特徵瀏覽服務（Phase 2.12）
+│   ├── ★ feature_export_service.py     # ★ 特徵匯出服務
+│   ├── ★ feature_toggle_service.py     # ★ Feature Toggle 服務
+│   ├── ★ export_service.py             # ★ 通用匯出服務
 │   ├── xgboost_task_service.py         # XGBoost 分析任務
 │   ├── xgboost_batch_service.py        # XGBoost 批量分析
 │   ├── xgboost_task_cache.py           # XGBoost 結果快取
@@ -571,10 +638,14 @@ api/
 │   ├── data_service.py                 # 範本 + 設定管理
 │   ├── pattern_management_service.py   # Pattern CRUD 服務
 │   ├── task_manager.py                 # 通用任務狀態管理
-│   └── ★ ic_analysis_service.py        # ★ IC 分析任務服務（使用 Factory 建構）
+│   ├── ★ ic_analysis_service.py        # ★ IC 分析任務服務（使用 Factory 建構）
+│   ├── ★ model_enhancement_service.py  # ★ 模型增強服務（Phase 3.5, 6 模組平行執行）
+│   ├── ★ model_task_service.py         # ★ 模型任務服務
+│   └── ★ optimization_output_service.py # ★ 優化輸出服務（Phase 4, JSON/CSV/HTML/AI 報告）
 ├── websocket/
 │   ├── optimization_ws.py              # WebSocket 即時優化進度推送
-│   └── ★ ic_analysis_ws.py             # ★ IC 分析實時進度推送（八階段狀態）
+│   ├── ★ ic_analysis_ws.py             # ★ IC 分析實時進度推送（八階段狀態）
+│   └── ★ feature_factory_ws.py         # ★ Feature Factory 實時進度推送
 └── utils/                               # 工具函式
 ```
 
@@ -589,7 +660,7 @@ momentum/
 │   ├── config.py                        # MomentumConfig dataclass
 │   ├── contracts.py                     # DTO/Enum (TrainingWindowConfig, StrategyConfig 等)
 │   ├── logging.py                       # get_logger()
-│   └── protocols.py                     # ★ IKlineReader, IIndicatorEngine, IModelTrainer
+│   └── protocols.py                     # ★ IKlineReader, IIndicatorEngine, IModelTrainer, IBacktestEngine, IPositionSizer
 ├── Analysis/                            # 分析引擎
 │   ├── signal_density_analyzer.py       # SignalDensityAnalyzer
 │   ├── xgboost_analyzer.py              # XGBoostAnalyzer
@@ -634,12 +705,31 @@ momentum/
 │   ├── ic_config_schema.py             # Pydantic 配置模型 + 三層合併 (349 行)
 │   ├── ic_reporter.py                  # JSON/Markdown/HDF5/AI 摘要 (364 行)
 │   ├── exceptions.py                   # InsufficientDataError 等錯誤定義 (13 行)
-│   └── model_validation/               # ★ 模型驗證子系統（5 個模組）
+│   ├── ★ IC Deep Analysis（Phase 2.4-2.12）# ★ 10 個深度分析模組
+│   ├── factor_return_analyzer.py       # 因子報酬分析
+│   ├── factor_centrality_analyzer.py   # PCA 因子中心性
+│   ├── trend_analyzer.py               # 趨勢分析（IC/Centrality/FactorReturn/LS-Spread）
+│   ├── parameter_sensitivity_analyzer.py # 參數敏感度分析
+│   ├── rolling_oos_validator.py        # 滾動 OOS 驗證
+│   ├── factor_orthogonalizer.py        # 因子正交化（Gram-Schmidt/PCA）
+│   ├── factor_exposure_analyzer.py     # 因子曝露與歸因
+│   ├── long_short_analyzer.py          # 多空分離分析
+│   ├── feature_quality_diagnostics.py  # ADF/Ljung-Box/CUSUM/PSI/Coverage 診斷
+│   ├── net_ic_analyzer.py              # Net IC / 交易成本分析
+│   ├── deep_analysis_types.py          # 共用型別（SkippedResult, DeepAnalysisReport）
+│   ├── ★ Model Enhancement（Phase 3.5）  # ★ 6 個模型增強模組
+│   ├── probability_calibrator.py       # 機率校準（Platt/Isotonic/Beta/Venn-ABERS）
+│   ├── sample_weight_calculator.py     # 樣本加權（time_decay/class_balance/return_based/uniqueness）
+│   ├── adversarial_validator.py        # 對抗驗證（分布測試 + KS/PSI + 洩漏偵測）
+│   ├── learning_curve_analyzer.py      # 學習曲線（data/feature curves + bias-variance）
+│   └── model_validation/               # ★ 模型驗證子系統（5 個 + 2 個新增模組）
 │       ├── cv_validator.py             # 時間序列交叉驗證 + OOT 切分 (255 行)
 │       ├── oot_validator.py            # Out-of-Time 驗證 + Gap 評估 (156 行)
 │       ├── psi_calculator.py           # PSI 漂移監控 + 穩定性分類 (121 行)
 │       ├── rolling_auc.py              # 滾動 AUC 追蹤 + 趨勢偵測 (148 行)
-│       └── case_shap.py                # 單案例 SHAP 解釋 + 批次分析 (115 行)
+│       ├── case_shap.py                # 單案例 SHAP 解釋 + 批次分析 (115 行)
+│       ├── walk_forward_validator.py   # Walk-Forward 驗證（Rolling/Expanding）（Phase 3.5）
+│       └── combinatorial_purged_cv.py  # CPCV（López de Prado）（Phase 3.5）
 ├── DataExtraction/                      # 數據擷取層
 │   ├── case_search_engine.py            # CaseSearchEngine (30 參數框架)
 │   ├── parallel_search_engine.py        # ParallelSearchEngine
@@ -660,6 +750,15 @@ momentum/
 │   ├── data_source_registry.py
 │   ├── ml_pipeline_config.py
 │   ├── strategy_registry.py
+│   ├── ★ feature_factory.py             # ★ FeatureFactory 7 層 Pipeline（Phase 1）
+│   ├── ★ config_manager.py              # ★ ConfigManager YAML 讀取（Phase 1）
+│   ├── atomic/                          # ★ Layer 1 原子引擎（Phase 1 + 1.5）
+│   │   ├── ta_lib_engine.py             # TA-Lib 指標引擎
+│   │   ├── microstructure_engine.py     # ★ 微觀結構引擎（Phase 1.5）
+│   │   ├── entropy_engine.py            # ★ 資訊理論引擎（Phase 1.5）
+│   │   └── tail_risk_engine.py          # ★ 尾部風險引擎（Phase 1.5）
+│   ├── preprocessing/                   # ★ Layer 6.5 前處理層（Phase 1.5）
+│   │   └── feature_preprocessor.py      # rank/gaussian/zscore/diff/fracdiff
 │   └── indicators/
 │       ├── ema_extractor.py
 │       ├── macd_extractor.py
@@ -685,9 +784,14 @@ momentum/
 │   ├── strategy_metadata.py
 │   └── objectives/                      # Phase 3.7 可插拔目標函式
 │       ├── __init__.py
-│       ├── model_hyperparam.py          # 模型超參數優化目標
+│       ├── model_hyperparam.py          # 模型超參數優化目標（Phase 4 增強：過擬合偵測）
 │       ├── signal_density.py            # 信號密度目標（從主優化器抽取）
-│       └── strategy_backtest.py         # 策略回測目標
+│       └── strategy_backtest.py         # 策略回測目標（Phase 4 增強：9 參數搜索空間 + 約束剪枝）
+├── ★ Strategy/                          # ★ 策略回測 Domain（Phase 4 新增）
+│   ├── vectorized_backtest.py           # VectorizedBacktest（信號生成 + 交易執行 + SL/TP/Trailing Stop）
+│   ├── performance_metrics.py           # PerformanceMetrics（12+ 指標：Sharpe/Sortino/Calmar/MaxDD/SQN 等）
+│   ├── position_sizing.py              # KellyPositionSizer / FixedPositionSizer / ProbabilityScaledSizer
+│   └── risk_manager.py                 # RiskManager（SL/TP/Trailing 計算）
 └── Utils/
     └── data_validator.py                # DataValidator
 ```
@@ -701,32 +805,106 @@ frontend/src/
 │   ├── page.tsx                         # 首頁
 │   ├── search/page.tsx                  # 案例搜索
 │   ├── result/page.tsx                  # 搜索結果
-│   └── optimization/page.tsx            # 優化系統
+│   ├── chart/page.tsx                   # 圖表分析
+│   ├── ic-analysis/page.tsx             # IC 深度分析
+│   ├── feature-factory/page.tsx         # Feature Factory
+│   ├── feature-browser/page.tsx         # 特徵瀏覽器
+│   ├── optimization-execution/page.tsx  # 執行優化
+│   ├── optimization-hyperparameter/page.tsx # 超參數優化
+│   ├── optimization-result/page.tsx     # 優化結果
+│   ├── patterns/page.tsx                # Pattern 管理
+│   ├── strategy-test/page.tsx           # 策略測試
+│   ├── strategy-demo/page.tsx           # 策略展示
+│   └── data-preparation/page.tsx        # 資料準備
 ├── components/
-│   ├── charts/                          # K 線圖表
-│   │   ├── MultiPaneChartNew.tsx        # 多面板同步圖表 (Lightweight Charts)
-│   │   └── TakerRatioChart.tsx          # Taker Ratio 圖表
-│   ├── optimization/                    # 優化視覺化 (9 個組件)
-│   │   ├── MetricsPanel.tsx
-│   │   ├── DensityComparisonChart.tsx
-│   │   ├── StabilityChart.tsx
-│   │   ├── TrialHistoryTable.tsx
-│   │   ├── ParameterImportanceChart.tsx
-│   │   ├── ParameterDistributionChart.tsx
-│   │   ├── ParallelCoordinatePlot.tsx
-│   │   ├── OptimizationProgress.tsx
-│   │   └── CompareTrialsTable.tsx
-│   ├── search/                          # 搜索組件
-│   ├── case/                            # 案例管理組件
-│   └── layout/
-│       └── MainLayout.tsx               # 主導航佈局
+│   ├── charts/                          # 圖表組件
+│   │   ├── PriceChart.tsx               # K 線價格圖表
+│   │   ├── TakerRatioChart.tsx          # Taker Ratio 圖表
+│   │   ├── TradingChartWithSignals.tsx  # 信號標記交易圖表
+│   │   ├── DensityDistributionChart.tsx # 密度分布圖
+│   │   ├── StrategySignalChart.tsx      # 策略信號圖
+│   │   ├── VolumeChart.tsx              # 成交量圖表
+│   │   └── CombinedDensityBoxplot.tsx   # 密度箱型圖
+│   ├── optimization/                    # Optuna 優化 UI
+│   │   ├── TrialComparisonPanel.tsx     # 試驗對比面板
+│   │   ├── CalibrationPlot.tsx          # 校準圖
+│   │   ├── WalkForwardTimeline.tsx      # Walk-Forward 時間線
+│   │   ├── CPCVPathChart.tsx            # CPCV 路徑圖
+│   │   ├── LearningCurveChart.tsx       # 學習曲線圖
+│   │   ├── AdversarialFeatureChart.tsx  # 對抗驗證圖
+│   │   ├── MultiIndicatorConfig.tsx     # 多指標配置
+│   │   ├── common/                      # 共用（OptunaProgressBar, SamplerSelector 等）
+│   │   ├── execution/                   # 執行優化（EquityCurveChart, ParetoFrontChart 等）
+│   │   └── hyperparameter/              # 超參數（OverfittingCheckChart, ParameterImportanceChart 等）
+│   ├── results/                         # 優化結果展示
+│   │   ├── MetricsPanel.tsx             # 指標總覽
+│   │   ├── DensityComparisonChart.tsx   # 密度對比
+│   │   ├── StabilityChart.tsx           # 穩定性分析
+│   │   ├── TrialHistoryTable.tsx        # 試驗歷史表
+│   │   ├── ParameterImportanceChart.tsx # 參數重要性
+│   │   └── ExportButton.tsx             # 匯出按鈕
+│   ├── optimization-results/            # 最佳結果展示
+│   │   ├── BestResultCard.tsx           # 最佳結果卡
+│   │   ├── ConvergencePlot.tsx          # 收斂圖
+│   │   ├── ParamHeatmap.tsx             # 參數熱力圖
+│   │   └── StabilityChart.tsx           # 穩定性圖
+│   ├── ic-analysis/                     # IC 深度分析（25 個元件）
+│   │   ├── RollingICChart.tsx           # 滾動 IC 時序圖
+│   │   ├── CorrelationHeatmap.tsx       # 相關性矩陣
+│   │   ├── FactorReturnChart.tsx        # 因子報酬圖
+│   │   ├── FactorCentralityChart.tsx    # 因子中心性
+│   │   ├── FeatureQualityDashboard.tsx  # 品質儀表板
+│   │   ├── DeepAnalysisConfigPanel.tsx  # 配置面板
+│   │   └── ...                          # 20+ 其他元件
+│   ├── feature-factory/                 # Feature Factory UI（23 個元件）
+│   │   ├── ConfigPanel.tsx              # 配置面板
+│   │   ├── FeatureExplorer.tsx          # 特徵瀏覽器
+│   │   ├── PreprocessingPanel.tsx       # 前處理面板
+│   │   ├── OverviewDashboard.tsx        # 總覽儀表板
+│   │   └── ...                          # 19+ 其他元件
+│   ├── feature-browser/                 # 特徵瀏覽器（14 個元件）
+│   │   ├── FeatureCatalogTable.tsx      # 特徵目錄表
+│   │   ├── DriftMonitor.tsx             # 漂移監控
+│   │   ├── QualityScorecard.tsx         # 品質計分卡
+│   │   └── ...                          # 11+ 其他元件
+│   ├── pattern/                         # Pattern 分析（11 個元件）
+│   │   ├── PatternList.tsx              # Pattern 列表
+│   │   ├── PatternDetail.tsx            # Pattern 詳情
+│   │   ├── XGBoostAnalysisPanel.tsx     # XGBoost 面板
+│   │   └── FeatureImportanceChart.tsx   # 特徵重要性
+│   ├── strategy/                        # 策略配置（8 個元件）
+│   ├── strategy-test/                   # 策略測試
+│   ├── case/                            # 案例管理
+│   ├── common/                          # 共用元件
+│   ├── layout/                          # 佈局元件
+│   ├── providers/                       # Context Providers
+│   ├── settings/                        # 設定面板
+│   └── ui/                              # shadcn/ui 基礎元件
 ├── store/
-│   ├── searchStore.ts                   # Zustand 搜索狀態
-│   └── optimizationStore.ts             # Zustand 優化狀態
+│   ├── searchStore.ts                   # 搜索狀態
+│   ├── optimizationStore.ts             # 優化狀態
+│   ├── icAnalysisStore.ts               # IC 分析狀態
+│   ├── modelEnhancementStore.ts         # 模型增強狀態
+│   ├── featureFactoryStore.ts           # Feature Factory 狀態
+│   ├── featureBrowserStore.ts           # 特徵瀏覽狀態
+│   ├── featureToggleStore.ts            # Feature Toggle 狀態
+│   ├── patternStore.ts                  # Pattern 管理狀態
+│   └── strategyTestStore.ts             # 策略測試狀態
 ├── hooks/
-│   └── useWebSocket.ts                  # WebSocket Hook
+│   ├── useICAnalysis.ts                 # IC 分析 Hook
+│   ├── useOptimization.ts               # 優化 Hook
+│   ├── useFeatureFactory.ts             # Feature Factory Hook
+│   ├── useChart.ts                      # 圖表 Hook
+│   ├── useChartSync.ts                  # 圖表同步 Hook
+│   ├── useAutoResearch.ts               # 自動研究 Hook
+│   ├── useAvailableSymbols.ts           # 可用標的 Hook
+│   └── useStrategyConfig.ts             # 策略配置 Hook
 └── lib/
-    └── types.ts                         # TypeScript 介面定義
+    ├── types.ts                         # TypeScript 介面定義
+    ├── api.ts                           # API 客戶端
+    ├── utils.ts                         # 工具函式
+    ├── exportUtils.ts                   # 匯出工具
+    └── errorHandler.ts                  # 錯誤處理
 ```
 
 ### Data (`data_cache/`)
@@ -815,7 +993,7 @@ class KlineStorageService:
 ### ✅ 3. 圖表分析系統
 
 #### 多面板同步圖表
-- **組件**: `MultiPaneChartNew.tsx`（Lightweight Charts）
+- **組件**: `PriceChart.tsx` / `TradingChartWithSignals.tsx`（Lightweight Charts）
 - **功能**: Price / Volume / Taker Ratio 多面板、時間軸同步、CrossHair 同步
 
 #### 策略信號標記
@@ -932,14 +1110,16 @@ close, open, high, low, volume, taker_volume, taker_ratio
 ### ✅ 8. 特徵工程系統
 
 #### 功能概述
-完整特徵擷取 → HDF5 存儲 → 品質驗證流程。
+完整特徵擷取 → HDF5 存儲 → 品質驗證流程。新增 FeatureFactory 7 層 Pipeline（Phase 1）與三大擴充引擎（Phase 1.5）。
 
 #### 核心模組
-- **擷取**: `momentum/FeatureEngineering/feature_extractor.py`
+- **7 層 Pipeline**: `momentum/FeatureEngineering/feature_factory.py`（FeatureFactory — Phase 1）
+- **擷取**: `momentum/FeatureEngineering/feature_extractor.py`（Legacy）
 - **存儲**: `momentum/FeatureEngineering/feature_storage.py`（HDF5）
 - **驗證**: `momentum/FeatureEngineering/feature_validator.py`
+- **配置**: `momentum/FeatureEngineering/config_manager.py` + `config/scan_config.yaml`
 - **服務**: `api/services/feature_task_service.py`
-- **API**: `POST /features/extract`、`GET /features/task/{id}`、`GET /features/summary/{case_id}`、`GET /features/health`
+- **API**: `POST /features/extract`、`POST /features/generate`、`GET /features/task/{id}`、`GET /features/summary/{case_id}`、`GET /features/health`
 
 #### 特徵指標
 EMA, MACD, RSI 擷取器（`momentum/FeatureEngineering/indicators/`）— 支持多尺度窗口、序列特徵
@@ -1085,26 +1265,28 @@ Pattern 的 CRUD 操作和統計分析。
 | ic_analysis_service | `api/services/ic_analysis_service.py` | 業務邏輯層、使用 `create_ic_analyzer()` Factory 建構 |
 | ic_analysis_ws | `api/websocket/ic_analysis_ws.py` | WebSocket 實時進度推送（階段狀態、進度百分比） |
 
-**前端（14 個元件）**：
+**前端（25+ 元件）**：
 
 | 類別 | 元件數量 | 位置 |
 |------|----------|------|
 | 頁面 | 2 | `frontend/src/app/ic-analysis/` (page.tsx, layout.tsx) |
-| 視覺化元件 | 10 | `frontend/src/components/ic-analysis/` |
+| 視覺化元件 | 25 | `frontend/src/components/ic-analysis/` |
 | Hooks | 1 | `frontend/src/hooks/useICAnalysis.ts` |
 | Store | 1 | `frontend/src/store/icAnalysisStore.ts` |
 
-**視覺化元件清單**：
+**視覺化元件清單**（主要元件）：
+- `RollingICChart` - 滾動 IC 時序圖
 - `CorrelationHeatmap` - 相關性矩陣熱力圖
-- `ExportButtons` - 報告匯出（JSON/Markdown/HDF5）
-- `FilterFunnelChart` - 篩選漏斗圖（各階段特徵數量）
-- `GroupedICBarChart` - 分組 IC 柱狀圖（按年/季/市場狀態）
-- `ICConfigPanel` - IC 配置面板（方法選擇、閾值設定）
-- `ICDecayChart` - IC 衰減曲線圖（不同預測週期的 IC）
-- `ICSummaryTable` - IC 摘要表格（Top Features 排名）
-- `QuantileReturnChart` - 分位數報酬圖（單調性測試視覺化）
-- `RegimeRadarChart` - 市場狀態雷達圖（不同市場狀態的 IC）
-- `RollingICChart` - 滾動 IC 時序圖（時間穩定性分析）
+- `FactorReturnChart` - 因子報酬圖
+- `FactorCentralityChart` - 因子中心性
+- `FactorExposureRadar` - 因子曝露雷達圖
+- `LongShortComparisonChart` - 多空對比
+- `FeatureQualityDashboard` - 品質儀表板
+- `TrendDashboard` - 趨勢儀表板
+- `ParameterSensitivityHeatmap` - 參數敏感度
+- `DeepAnalysisConfigPanel` - 深度分析配置面板
+- `NetICChart` - Net IC 分析圖
+- …及其他 14 個元件
 
 **配置檔案**：
 - `config/ic_config.yaml` - IC 配置檔案（方法、閾值、篩選器參數）
@@ -1282,17 +1464,166 @@ XGBoostAnalyzer                LightGBMAnalyzer
 
 ---
 
+### ✅ 16. Feature Factory 特徵工程系統（Phase 1 + 1.5）
+
+#### 系統概述
+**7 層 Feature Pipeline** — Config-Driven 特徵生成工廠，支持七段式命名規範與增量生成。
+
+#### 7 層 Pipeline 架構
+
+| Layer | 名稱 | 功能 |
+|-------|------|------|
+| Layer 0 | 數據標準化 | HDF5 欄位映射、Adapter 轉換 |
+| Layer 1 | 原子指標 | TA-Lib 引擎 + 微觀結構 + 資訊理論 + 尾部風險 |
+| Layer 2 | 衍生特徵 | Distance / Cross / Divergence 算子 |
+| Layer 3 | Rolling 統計 | Slope / ZScore / RollingAgg 窗口特徵 |
+| Layer 4 | Lag 延遲 | 時間序列延遲特徵 |
+| Layer 5 | 多時間框架 | MTF 對齊（1h/4h → 主 TF） |
+| Layer 6 | 元特徵 | Trend Consensus / Volatility Regime |
+| Layer 6.5 | 前處理 | rank/gaussian/zscore/diff/fracdiff（Phase 1.5） |
+| Layer 7 | Label | binary/regression 標籤生成 |
+
+#### 核心模組
+- **工廠**: `momentum/FeatureEngineering/feature_factory.py`（FeatureFactory — 7 層 Pipeline 協調）
+- **配置**: `momentum/FeatureEngineering/config_manager.py`（ConfigManager — YAML Preset 管理）
+- **原子引擎**: `momentum/FeatureEngineering/atomic/`（TA-Lib + 微觀結構 + 資訊理論 + 尾部風險）
+- **前處理**: `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`
+- **工廠函式**: `momentum/factories.py` → `create_feature_factory()`
+- **Config**: `config/scan_config.yaml`
+
+#### Phase 1.5 擴充引擎
+
+| 引擎 | Prefix | 功能 |
+|------|--------|------|
+| MicrostructureIndicatorEngine | `ms_` | Amihud 流動性、Kyle Lambda、VPIN 等 |
+| EntropyIndicatorEngine | `ent_` | Shannon/Permutation Entropy、Hurst 指數、ApEn/SampEn |
+| TailRiskIndicatorEngine | `tr_` | CVaR、上下行波動率、最大回撤、極值統計 |
+| FeaturePreprocessor (Layer 6.5) | `_rank/_zscore/...` | 排名轉換、Gaussian 轉換、Z-Score、差分、分數差分 |
+
+#### 架構特色
+- ✅ Rule 1-7 完全遵守（Protocol 注入 `IKlineReader`、Factory 建構）
+- ✅ Config-Driven（所有特徵由 `scan_config.yaml` 控制）
+- ✅ 七段式命名規範（`{source}_{timeframe}_{category}_{indicator}_{params}_{operator}_{window}`）
+- ✅ 增量生成機制（`force_regenerate` 控制）
+
+---
+
+### ✅ 17. IC 深度分析系統（Phase 2.4-2.12）
+
+#### 系統概述
+**10 個深度分析模組**擴展 IC Gatekeeper 系統，提供因子報酬、中心性、趨勢、敏感度、OOS 等進階分析。
+
+#### 10 個深度分析模組
+
+| # | 模組 | 功能 |
+|---|------|------|
+| 1 | factor_return_analyzer | 因子報酬分析（多空價差、IC 加權報酬） |
+| 2 | factor_centrality_analyzer | PCA 因子中心性（主成分解釋力） |
+| 3 | trend_analyzer | 趨勢分析（IC/Centrality/FactorReturn/LS-Spread 時序） |
+| 4 | parameter_sensitivity_analyzer | 參數敏感度（窗口/閾值/分位數影響） |
+| 5 | rolling_oos_validator | 滾動 OOS 驗證（樣本外穩定性） |
+| 6 | factor_orthogonalizer | 因子正交化（Gram-Schmidt / PCA 去冗餘） |
+| 7 | factor_exposure_analyzer | 因子曝露與歸因（因子載荷分析） |
+| 8 | long_short_analyzer | 多空分離分析（獨立 IC/報酬分析） |
+| 9 | feature_quality_diagnostics | ADF/Ljung-Box/CUSUM/PSI/Coverage 診斷 |
+| 10 | net_ic_analyzer | Net IC / 交易成本分析（考慮換手率的淨 IC） |
+
+#### 其他擴展功能
+- **Phase 2.10**: 特徵難度分級系統（自動標記特徵品質等級）
+- **Phase 2.11**: 全格式匯出系統（JSON/CSV/Markdown/HDF5/AI-readable）
+- **Phase 2.12**: 特徵工程資料瀏覽器（前端互動探索）
+- **前端元件**: 10 個新圖表元件（C13-C22）
+
+---
+
+### ✅ 18. 模型增強系統（Phase 3.5）
+
+#### 系統概述
+**6 個模型增強模組**（M1-M6），為 ML 模型（XGBoost/LightGBM）提供機率校準、Walk-Forward 驗證、樣本加權等進階功能。
+
+#### 核心模組
+
+| # | 模組 | 功能 |
+|---|------|------|
+| M1 | ProbabilityCalibrator | 機率校準（Platt Scaling / Isotonic Regression / Beta Calibration / Venn-ABERS） |
+| M2 | WalkForwardValidator | Walk-Forward 驗證（Rolling / Expanding 窗口） |
+| M3 | SampleWeightCalculator | 樣本加權（time_decay / class_balance / return_based / uniqueness） |
+| M4 | AdversarialValidator | 對抗驗證（分布測試 + feature-level KS/PSI + 洩漏偵測） |
+| M5 | CombinatorialPurgedCV | CPCV（López de Prado 組合式 Purged 交叉驗證） |
+| M6 | LearningCurveAnalyzer | 學習曲線（data/feature curves + bias-variance 診斷） |
+
+#### API 端點
+- `POST /api/v1/model-enhancement/calibrate` — 機率校準
+- `POST /api/v1/model-enhancement/walk-forward` — Walk-Forward 驗證
+- `POST /api/v1/model-enhancement/sample-weights` — 樣本加權計算
+- `POST /api/v1/model-enhancement/adversarial-validate` — 對抗驗證
+- `POST /api/v1/model-enhancement/cpcv` — CPCV 驗證
+- `POST /api/v1/model-enhancement/learning-curve` — 學習曲線
+- `GET /api/v1/model-enhancement/task/{task_id}` — 查詢任務
+- `POST /api/v1/model-enhancement/full-enhancement` — 全量增強
+
+#### 前端元件
+- CalibrationPlot (C23) — 校準曲線圖
+- WalkForwardTimeline (C24) — Walk-Forward 時間線
+- AdversarialFeatureChart (C25) — 對抗驗證特徵圖
+- CPCVPathChart (C26) — CPCV 路徑圖
+- LearningCurveChart (C27) — 學習曲線圖
+
+---
+
+### ✅ 19. Strategy 回測與優化系統（Phase 4）
+
+#### 系統概述
+**新 Domain `momentum/Strategy/`** — 提供向量化回測引擎、12+ 績效指標、部位管理、風險管理功能。同時重構 Optuna 優化系統為可插拔架構。
+
+#### 核心模組
+
+| 模組 | 功能 |
+|------|------|
+| VectorizedBacktest | 向量化回測引擎（信號生成 + 交易執行 + SL/TP/Trailing Stop） |
+| PerformanceMetrics | 12+ 績效指標（Sharpe / Sortino / Calmar / MaxDD / Expectancy / SQN / Win Rate / Profit Factor） |
+| KellyPositionSizer | Kelly 公式部位管理 |
+| FixedPositionSizer | 固定比例部位管理 |
+| ProbabilityScaledSizer | 機率加權部位管理 |
+| RiskManager | 風險管理（SL/TP/Trailing Stop 計算） |
+
+#### 新 Protocol
+```python
+class IBacktestEngine(Protocol):
+    def run_backtest(self, signals, kline_data, config) -> Any: ...
+    def get_performance_metrics(self) -> Dict[str, float]: ...
+
+class IPositionSizer(Protocol):
+    def calculate_position_size(self, signal, equity, risk_params) -> float: ...
+```
+
+#### Optuna 重構
+- **StrategyBacktestObjective**: 增強（新建構子 + 9 參數搜索空間 + 約束剪枝）
+- **ModelHyperparamObjective**: 增強（過擬合偵測、搜索空間驗證）
+- **SignalDensityObjective**: 歸檔至 `archived/momentum/Optimization/objectives/`
+- **optimization_config.yaml**: 新配置檔案（execution + hyperparameter + archived 區段）
+
+#### API 端點
+- `api/routes/hyperparameter_optimization.py` — 超參數優化端點
+- `api/routes/execution_optimization.py` — 執行優化端點
+- `api/services/optimization_output_service.py` — 輸出服務（JSON/CSV/HTML/AI-readable 報告）
+
+#### WebSocket 新事件
+- `backtest_progress` — 回測進度
+- `pareto_update` — Pareto 前沿更新
+- `overfitting_alert` — 過擬合警報
+
+---
+
 ## 待開發功能
 
-### ⏳ 1. 回測系統（優先級：🔥 中）
+### ⏳ 1. 前端 UI 整合（優先級：🔥 高）
 
-基於發現的 Pattern 或 ML 模型進行歷史回測驗證。
-
-#### 核心需求
-- 回測引擎（交易模擬、績效計算）
-- 績效指標（Sharpe, Sortino, Max Drawdown, Calmar, Win Rate 等）
-- 權益曲線視覺化
-- PDF 報告生成
+各系統前端視覺化頁面開發與整合：
+- IC Deep Analysis 前端互動面板
+- Model Enhancement 前端儀表板
+- Strategy 回測結果視覺化
+- Feature Factory 管理介面
 
 ### ⏳ 2. 實盤部署（優先級：🟡 低）
 
@@ -1335,6 +1666,21 @@ XGBoostAnalyzer                LightGBMAnalyzer
 
 9️⃣ Pattern 管理
    分析結果 → PatternStorage → CRUD → 統計與摘要
+
+🔟 Feature Factory 特徵生成
+   Config (scan_config.yaml) → FeatureFactory 7 層 Pipeline → 特徵矩陣 HDF5
+   ※ 支持微觀結構/資訊理論/尾部風險三大擴充引擎
+
+1️⃣1️⃣ IC 深度分析
+   IC Gatekeeper 結果 → 10 個深度分析模組 → 因子報酬/趨勢/OOS/正交化等報告
+
+1️⃣2️⃣ 模型增強
+   訓練完成模型 → 6 個增強模組 → 校準/Walk-Forward/對抗驗證/CPCV/學習曲線
+
+1️⃣3️⃣ 策略回測
+   信號 + K 線資料 → VectorizedBacktest → 績效指標 (Sharpe/Sortino/Calmar/MaxDD/SQN)
+   → PositionSizer (Kelly/Fixed/機率加權)
+   → RiskManager (SL/TP/Trailing Stop)
 ```
 
 ---
@@ -1425,7 +1771,15 @@ class XGBoostTaskService:
 - ✅ 雙引擎對比（ModelComparison、推薦引擎、共識率）
 - ✅ 四維參數系統（YAML/Dict/NL/Optuna）
 - ✅ 可插拔 Optuna 目標（IOptimizationObjective Protocol）
+- ✅ 模型增強（6 個模組：校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線）
 - ⏳ LSTM, Transformer（未來）
+
+### 回測系統擴展
+透過 `IBacktestEngine` + `IPositionSizer` Protocol：
+- ✅ VectorizedBacktest（向量化回測、SL/TP/Trailing Stop）
+- ✅ PerformanceMetrics（12+ 指標）
+- ✅ 3 種部位管理（Kelly/Fixed/機率加權）
+- ⏳ Event-Driven Backtest（未來）
 
 ---
 
@@ -1433,15 +1787,15 @@ class XGBoostTaskService:
 
 | 文檔 | 說明 |
 |------|------|
-| `docs/API_SPECIFICATION.md` | API 端點規格（85+ 端點） |
+| `docs/API_SPECIFICATION.md` | API 端點規格（100+ 端點） |
 | `docs/DEVELOPMENT_GUIDE.md` | 開發規範（Ultra Think 3 步驟） |
-| `docs/FEATURE_ROADMAP.md` | 功能路線圖 |
 | `docs/REFACTOR_ARCHITECTURE_V4.md` | 架構重構記錄（10 個 Phase） |
-| `docs/KLINE_DATA_SPECIFICATION.md` | HDF5 數據格式規範 |
+| `docs/FRONTEND_INTEGRATION_GUIDE.md` | 前端整合指南 |
+| `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` | 動態指標系統指南 |
 | `.github/copilot-instructions.md` | AI Agent 指令 |
 
 ---
 
-*文檔版本：4.0*  
-*最後更新：2026-02-14*  
-*狀態：Phase 3.7 雙引擎 ML 系統同步完成*
+*文檔版本：5.0*  
+*最後更新：2026-02-18*  
+*狀態：Phase 1-4 全部完成，前端 UI 整合進行中*

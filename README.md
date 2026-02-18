@@ -40,8 +40,10 @@
 
 - 🔍 **案例發現引擎** - 從海量歷史數據中找出符合特定模式的交易機會
 - 🧪 **指標實驗室** - 自動測試數十種技術指標的有效性
-- 🎯 **IC 篩選系統** - Information Coefficient 特徵篩選，自動識別預測力強的指標
-- 🤖 **ML優化系統** - 使用機器學習自動發現盈利Pattern
+- 🎯 **IC 篩選系統** - Information Coefficient 特徵篩選 + 10 個深度分析模組
+- 🤖 **ML優化系統** - XGBoost + LightGBM 雙引擎 + 6 個模型增強模組
+- 📈 **回測系統** - 向量化回測引擎 + 12+ 績效指標 + 部位/風險管理
+- 🏭 **特徵工廠** - 7 層 Config-Driven Pipeline + 微觀結構/資訊理論/尾部風險引擎
 - 📊 **完整研究流程** - 支持從假設驗證到策略回測的全流程
 - 🌐 **多市場支持** - 設計可擴展至加密貨幣、台股、美股
 
@@ -137,13 +139,46 @@
 - ✅ 160+ 測試覆蓋（邊界條件 100%）
 - LSTM 時序模型（未來擴展）
 
-### 5. 回測系統（計劃中 📋）
+### 5. 回測系統（Phase 4 完成 ✅）
 
 **完整績效評估**：
-- Sharpe Ratio、Sortino Ratio、Calmar Ratio
-- 最大回撤、勝率、賺賠比
-- 權益曲線、交易明細
-- 策略對比分析
+- ✅ VectorizedBacktest 向量化回測引擎（信號生成 + 交易執行 + SL/TP/Trailing Stop）
+- ✅ 12+ 績效指標（Sharpe / Sortino / Calmar / MaxDD / Expectancy / SQN / Win Rate / Profit Factor）
+- ✅ 3 種部位管理（Kelly / Fixed / ProbabilityScaled）
+- ✅ RiskManager（SL/TP/Trailing Stop 計算）
+- ✅ IBacktestEngine + IPositionSizer Protocol 架構
+- ✅ Optuna 重構（可插拔目標架構、約束剪枝、過擬合偵測）
+- ✅ optimization_config.yaml 配置系統
+
+### 6. 特徵工廠系統（Phase 1 + 1.5 完成 ✅）
+
+**7 層 Config-Driven Feature Pipeline**：
+- ✅ Layer 0-7 Pipeline（數據標準化 → 原子指標 → 衍生 → Rolling → Lag → MTF → 元特徵 → Label）
+- ✅ 七段式命名規範
+- ✅ scan_config.yaml Config-Driven
+- ✅ 微觀結構引擎（Amihud / Kyle Lambda / VPIN）
+- ✅ 資訊理論引擎（Shannon / Permutation Entropy / Hurst / ApEn）
+- ✅ 尾部風險引擎（CVaR / 上下行波動率 / 最大回撒）
+- ✅ Layer 6.5 前處理（rank / gaussian / zscore / diff / fracdiff）
+
+### 7. IC 深度分析系統（Phase 2.4-2.12 完成 ✅）
+
+**10 個深度分析模組**：
+- ✅ 因子報酬分析 / PCA 因子中心性
+- ✅ 趨勢分析 / 參數敏感度 / 滾動 OOS 驗證
+- ✅ 因子正交化 / 因子曝露 / 多空分離
+- ✅ 特徵品質診斷 / Net IC 交易成本分析
+- ✅ 特徵難度分級 + 全格式匯出 + 資料瀏覽器
+
+### 8. 模型增強系統（Phase 3.5 完成 ✅）
+
+**6 個模型增強模組**：
+- ✅ ProbabilityCalibrator（Platt / Isotonic / Beta / Venn-ABERS）
+- ✅ WalkForwardValidator（Rolling / Expanding）
+- ✅ SampleWeightCalculator（時間衰減 / 類別平衡 / 報酬加權 / uniqueness）
+- ✅ AdversarialValidator（分布測試 + KS/PSI + 洩漏偵測）
+- ✅ CombinatorialPurgedCV（López de Prado CPCV）
+- ✅ LearningCurveAnalyzer（data/feature curves + bias-variance）
 
 ---
 
@@ -173,6 +208,8 @@ API交互:
   - LightGBM 4.0+ (雙引擎訓練)
   - SHAP (模型可解釋性)
   - Optuna (參數優化、可插拔目標函式)
+  - betacal (Beta 校準)
+  - scikit-learn (交叉驗證、校準)
 
 數據存儲:
   - HDF5 (大量K線數據)
@@ -321,8 +358,35 @@ ML模型訓練 + Pattern發現
   - 四維參數系統（YAML/Dict/NL/Optuna）
   - 可插拔 Optuna 目標函式（3 種目標）
   - 10 個新 API 端點（/model/*、/lightgbm/*）
-  - 前端雙引擎對比 UI（6 個新元件）
+  - 前端雙引擎對比 UIﾈ6 個新元件）
   - 160+ 測試覆蓋（邊界條件 100%）
+
+- [x] **特徵工廠系統** (Phase 1 + 1.5) ★ 2026-02-17
+  - 7 層 Config-Driven Feature Pipeline
+  - 七段式特徵命名規範
+  - 微觀結構 / 資訊理論 / 尾部風險三大擴充引擎
+  - Layer 6.5 前處理層（rank/gaussian/zscore/diff/fracdiff）
+  - scan_config.yaml 配置驅動
+
+- [x] **IC 深度分析系統** (Phase 2.4-2.12) ★ 2026-02-18
+  - 10 個深度分析模組（因子報酬/中心性/趨勢/敏感度/OOS/正交化/曝露/多空/診斷/Net IC）
+  - 特徵難度分級系統
+  - 全格式匯出系統（JSON/CSV/Markdown/HDF5/AI-readable）
+  - 特徵工程資料瀏覽器
+  - 10 個新前端圖表元件
+
+- [x] **模型增強系統** (Phase 3.5) ★ 2026-02-19
+  - 6 個增強模組（校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線）
+  - 8 個 API 端點（/model-enhancement/*）
+  - 5 個新前端圖表元件
+
+- [x] **策略回測 + Optuna 重構** (Phase 4) ★ 2026-02-20
+  - VectorizedBacktest 向量化回測引擎
+  - 12+ 績效指標（Sharpe/Sortino/Calmar/MaxDD/SQN 等）
+  - 3 種部位管理 + RiskManager
+  - IBacktestEngine + IPositionSizer Protocol
+  - Optuna 可插拔目標重構 + 約束剪枝 + 過擬合偵測
+  - optimization_config.yaml 配置系統
 
 - [x] **IC 特徵篩選系統** (Phase 2 - IC Gatekeeper)
   - 八階段篩選管線 (Stage 0-8)
@@ -340,22 +404,14 @@ ML模型訓練 + Pattern發現
 
 ### 🔨 開發中
 
-- [ ] **IC Gatekeeper 前端 UI**
-  - IC 分析結果視覺化
-  - 互動篩選控制面板
-  - 報告下載功能 (JSON/Markdown/HDF5)
-  - 相關性矩陣熱力圖
-  - 特徵對比圖表
-
-- [ ] **Feature Factory 前端整合**
-  - Feature 管理介面
-  - 批次計算控制
-  - 特徵工程配置
+- [ ] **前端 UI 整合**
+  - IC Deep Analysis 前端互動面板
+  - Model Enhancement 前端儀表板
+  - Strategy 回測結果視覺化
+  - Feature Factory 管理介面
 
 ### 📋 計劃中
 
-- [ ] **回測系統** (3-4 週)
-- [ ] **Pattern 精煉與深度分析增強**
 - [ ] **AI 可讀檔案格式（結構化 JSON/Markdown 導出）**
 
 ### 💡 未來擴展
@@ -468,18 +524,30 @@ quantitative_trading_system/
 │   │   ├── model_comparison.py    # 雙引擎對比
 │   │   ├── model_config.py        # 四維參數系統
 │   │   ├── model_types.py         # 共用 dataclass
+│   │   ├── ic_*.py                # IC Gatekeeper + Deep Analysis
+│   │   ├── probability_calibrator.py # 機率校準 (Phase 3.5)
+│   │   ├── adversarial_validator.py  # 對抗驗證 (Phase 3.5)
 │   │   └── ...                    # SHAP、PSI、Pattern 等
-│   ├── FeatureEngineering/    # 特徵工程（7 層 Pipeline）
+│   ├── FeatureEngineering/    # 特徵工程ﾈ7 層 Pipeline）
+│   │   ├── feature_factory.py     # FeatureFactory 主引擎
+│   │   ├── atomic/                # Layer 1 原子引擎
+│   │   ├── preprocessing/         # Layer 6.5 前處理
+│   │   └── indicators/            # EMA/MACD/RSI 擷取器
+│   ├── Strategy/              # 策略回測 (Phase 4)
+│   │   ├── vectorized_backtest.py # 向量化回測引擎
+│   │   ├── performance_metrics.py # 12+ 績效指標
+│   │   ├── position_sizing.py    # 部位管理
+│   │   └── risk_manager.py       # 風險管理
 │   ├── Indicator/             # 純函式技術指標
 │   ├── Indicators/            # OOP 指標引擎
 │   └── Optimization/          # Optuna 優化（可插拔目標）
-│       └── objectives/        # 目標函式套件
-│
+│       └── objectives/        # 目標函式套件│
 ├── docs/                       # 項目文檔
 │   ├── ARCHITECTURE.md        # 系統架構
-│   ├── FEATURE_ROADMAP.md     # 開發路線圖
 │   ├── API_SPECIFICATION.md   # API規範
-│   └── DEVELOPMENT_GUIDE.md   # 開發指南
+│   ├── DEVELOPMENT_GUIDE.md   # 開發指南
+│   ├── PRODUCT_VISION.md      # 產品願景規劃
+│   └── FRONTEND_INTEGRATION_GUIDE.md # 前端整合指南
 │
 ├── data_cache/                 # 數據緩存（.gitignore）
 ├── results/                    # 搜索結果（.gitignore）
@@ -575,10 +643,10 @@ perf: 優化DataFrame操作使用向量化
 
 | 文檔 | 說明 | 行數 |
 |------|------|------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系統整體架構設計 | ~4000 |
-| [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md) | 24週開發計劃 | ~2500 |
-| [API_SPECIFICATION.md](docs/API_SPECIFICATION.md) | API接口規範 | ~700 |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系統整體架構設計 | ~1800 |
+| [API_SPECIFICATION.md](docs/API_SPECIFICATION.md) | API接口規範 | ~1800 |
 | [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) | 開發規範和指南 | ~3500 |
+| [PRODUCT_VISION.md](docs/PRODUCT_VISION.md) | V1/V2/V3 產品願景 | - |
 
 ### 快速鏈接
 
@@ -586,15 +654,14 @@ perf: 優化DataFrame操作使用向量化
 - **理解架構** → [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **開始開發** → [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md)
 - **API使用** → [API_SPECIFICATION.md](docs/API_SPECIFICATION.md)
-- **功能規劃** → [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md)
 
 ### 其他文檔
 
 | 文檔 | 說明 |
 |------|------|
-| [程式碼生成規範](docs/standards/coding_standards.md) | Ultra Think三步驟 |
-| [Git工作流程](docs/guides/git_workflow.md) | Git使用指南 |
-| [GitHub清理指南](docs/guides/github_cleanup.md) | 倉庫容量管理 |
+| [FRONTEND_INTEGRATION_GUIDE.md](docs/FRONTEND_INTEGRATION_GUIDE.md) | 前端整合指南 |
+| [DYNAMIC_INDICATOR_SYSTEM_GUIDE.md](docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md) | 動態指標系統指南 |
+| [REFACTOR_ARCHITECTURE_V4.md](docs/REFACTOR_ARCHITECTURE_V4.md) | 架構重構記錄 |
 
 ---
 
@@ -638,20 +705,20 @@ REFACTOR V4: 架構解耦 [✅ 100%]
   ✅ 7 條規則、Protocol 注入、Factory 模式
 
 📋 下一步:
-  📋 回測系統
-  📋 Pattern 精煉
+  📋 前端 UI 整合
+  📋 AI 可讀檔案格式
 ```
 
 ### 時間線
 
 ```
 2025 Q3-Q4: 案例搜索 + 圖表系統 + 指標引擎
-2026 Q1:    IC Gatekeeper + Feature Factory + 雙引擎 ML + 架構解耦
-2026 Q2:    回測系統 + Pattern 精煉 + AI 導出
+2026 Q1:    IC Gatekeeper + Feature Factory + 雙引擎 ML + 架構解耦 + 回測 + 模型增強
+2026 Q2:    前端 UI 整合 + AI 可讀導出
 2026 Q3+:   Chat 自然語言介面（V2.0）
 ```
 
-詳細開發計劃見 [FEATURE_ROADMAP.md](docs/FEATURE_ROADMAP.md)
+詳細開發計劃見 [PRODUCT_VISION.md](docs/PRODUCT_VISION.md)
 
 ---
 

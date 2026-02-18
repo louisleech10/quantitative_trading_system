@@ -1,7 +1,7 @@
 # 架構擴充性 - 快速參考指南
 
-> **3 個問題，3 個解決方案**  
-> **版本**: 2.0 | **日期**: 2026-01-11
+> **3 個問題，3 個解決方案 + 新增系統概覽**  
+> **版本**: 3.0 | **日期**: 2026-02-18
 
 ## ✅ 問題 1: 數據源擴充（Glassnode, 台股, 美股）
 
@@ -296,6 +296,73 @@ python test_data_source_simple.py
 
 ---
 
-**最後更新**: 2026-01-11  
-**版本**: 2.0  
+**最後更新**: 2026-02-18  
+**版本**: 3.0  
 **維護者**: AI Agent
+
+---
+
+## ✅ 新增系統概覽（2026-02-18）
+
+### 已完成的主要系統擴展
+
+| 系統 | Phase | 核心功能 | Protocol |
+|------|-------|---------|----------|
+| **Feature Factory** | Phase 1 + 1.5 | 7 層 Config-Driven Pipeline + 微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理 | `IKlineReader` |
+| **IC Deep Analysis** | Phase 2.4-2.12 | 10 個深度分析模組 + 特徵難度分級 + 全格式匯出 + 資料瀏覽器 | `IICAnalyzer` |
+| **Model Enhancement** | Phase 3.5 | 6 個增強模組（校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線） | `IModelTrainer` |
+| **Strategy/Backtest** | Phase 4 | VectorizedBacktest + 12+ 績效指標 + 3 種部位管理 + RiskManager | `IBacktestEngine`, `IPositionSizer` |
+| **Optuna 重構** | Phase 4 | 可插拔目標架構 + 約束剪枝 + 過擬合偵測 + optimization_config.yaml | `IOptimizationObjective` |
+
+### 新增 Factory 函式（`momentum/factories.py`）
+
+```python
+# Phase 1
+create_feature_factory()
+
+# Phase 2.4-2.12 (10 個深度分析)
+create_factor_return_analyzer()
+create_factor_centrality_analyzer()
+create_trend_analyzer()
+create_parameter_sensitivity_analyzer()
+create_rolling_oos_validator()
+create_factor_orthogonalizer()
+create_factor_exposure_analyzer()
+create_long_short_analyzer()
+create_feature_quality_diagnostics()
+create_net_ic_analyzer()
+
+# Phase 3.5 (6 個模型增強)
+create_probability_calibrator()
+create_walk_forward_validator()
+create_sample_weight_calculator()
+create_adversarial_validator()
+create_combinatorial_purged_cv()
+create_learning_curve_analyzer()
+
+# Phase 4 (策略回測)
+create_backtest_engine()
+create_position_sizer()
+```
+
+### 新增 API 路由
+
+| 路由 | Prefix | Phase |
+|------|--------|-------|
+| `feature_factory` | `/api/v1/features` | Phase 1 |
+| `feature_browser` | `/api/v1` | Phase 2.12 |
+| `feature_toggles` | `/api/v1/feature-toggles` | Phase 6 |
+| `export` | `/api/v1/export` | Phase 7 |
+| `model_enhancement` | `/api/v1/model-enhancement` | Phase 3.5 |
+| `hyperparameter_optimization` | `/api/v1/hyperparameter-optimization` | Phase 4 |
+| `execution_optimization` | `/api/v1/execution-optimization` | Phase 4 |
+
+### 新增 Domain
+
+```
+momentum/Strategy/           # Phase 4 新增
+├── vectorized_backtest.py   # 向量化回測引擎
+├── performance_metrics.py   # 12+ 績效指標
+├── position_sizing.py       # Kelly/Fixed/ProbabilityScaled
+└── risk_manager.py          # SL/TP/Trailing Stop
+```

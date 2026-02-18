@@ -1,11 +1,12 @@
 # API 端點規範
 
 ## 文檔資訊
-- **版本**: 3.2
-- **最後更新**: 2026-02-14
+- **版本**: 4.0
+- **最後更新**: 2026-02-18
 - **Base URL**: `http://localhost:8000`（開發環境）
 - **API Prefix**: `/api/v1`
 - **變更記錄**:
+  - v4.0 (2026-02-18): 新增 Model Enhancement API（Section 16）- Phase 3.5 模型增強系統 8 個端點；新增 Hyperparameter Optimization API（Section 17）及 Execution Optimization API（Section 18）- Phase 4 回測系統優化；更新 Router 註冊對照表
   - v3.2 (2026-02-14): 新增 Dual-Engine ML API（Section 15）- Phase 3.7 雙引擎 ML 系統（LightGBM + XGBoost）7 個端點；通用模型訓練、LightGBM 專屬訓練、雙引擎對比報告、通用批量分析
   - v3.1 (2026-02-13): 新增 IC Analysis API（Section 14）- IC Gatekeeper 篩選系統 13 個端點，WebSocket 實時進度推送
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4；完整收錄 13 個路由模組、85+ 端點；新增 Feature Engineering / Pattern Analysis / Pattern Management / ML Pipeline / Two-Stage Search API；更新數據模型與錯誤碼
@@ -32,10 +33,12 @@
 14. [Two-Stage Search API](#13-two-stage-search-api)
 15. [IC Analysis API](#14-ic-analysis-api)
 16. [Dual-Engine ML API (Phase 3.7)](#15-dual-engine-ml-api-phase-37)
-15. [IC Analysis API](#14-ic-analysis-api)
-16. [WebSocket API](#websocket-api)
-17. [錯誤處理](#錯誤處理)
-18. [數據模型](#數據模型)
+17. [Model Enhancement API (Phase 3.5)](#16-model-enhancement-api-phase-35)
+18. [Hyperparameter Optimization API (Phase 4)](#17-hyperparameter-optimization-api-phase-4)
+19. [Execution Optimization API (Phase 4)](#18-execution-optimization-api-phase-4)
+20. [WebSocket API](#websocket-api)
+21. [錯誤處理](#錯誤處理)
+22. [數據模型](#數據模型)
 
 ---
 
@@ -85,6 +88,13 @@ Accept: application/json
 | `pattern_management` | `/api/v1/patterns` | Pattern Management |
 | `ml_pipeline` | `/api/v1/ml-pipeline` | ML Pipeline |
 | `two_stage_search` | `/api/v1/two-stage` | Two-Stage Search |
+| `model_enhancement` | `/api/v1/model-enhancement` | Model Enhancement (Phase 3.5) |
+| `hyperparameter_optimization` | `/api/v1/hyperparameter-optimization` | Hyperparameter Optimization (Phase 4) |
+| `feature_factory` | `/api/v1/features` | Feature Factory |
+| `feature_browser` | `/api/v1` | Feature Browser |
+| `feature_toggles` | `/api/v1/feature-toggles` | Feature Toggles |
+| `export` | `/api/v1/export` | Export |
+| `execution_optimization` | `/api/v1/execution-optimization` | Execution Optimization (Phase 4) |
 
 ---
 
@@ -996,13 +1006,13 @@ GET /api/v1/two-stage/combined/{positive_task_id}/{negative_task_id}
 
 ## 14. IC Analysis API
 
-> **路由**: `api/routes/ic_analysis.py` | **Prefix**: `/api/v1/ic-analysis`
+> **路由**: `api/routes/ic_analysis.py` | **Prefix**: `/api/v1/ic`
 
 IC Gatekeeper 分析 API，提供 Information Coefficient 特徵篩選、八階段管線執行、統計驗證、冗餘篩選、模型驗證等功能。
 
 ### 14.1 啟動 IC 分析
 ```http
-POST /api/v1/ic-analysis/start
+POST /api/v1/ic/analyze
 ```
 
 **Request Body**:
@@ -1049,7 +1059,7 @@ POST /api/v1/ic-analysis/start
 
 ### 14.2 查詢任務狀態
 ```http
-GET /api/v1/ic-analysis/status/{task_id}
+GET /api/v1/ic/task/{task_id}
 ```
 
 **Response**:
@@ -1073,7 +1083,7 @@ GET /api/v1/ic-analysis/status/{task_id}
 
 ### 14.3 下載分析報告
 ```http
-GET /api/v1/ic-analysis/report/{task_id}/{format}
+GET /api/v1/ic/export/{task_id}/{format}
 ```
 
 **參數**:
@@ -1116,7 +1126,7 @@ GET /api/v1/ic-analysis/report/{task_id}/{format}
 
 ### 14.4 下載完整資料（HDF5）
 ```http
-GET /api/v1/ic-analysis/download/{task_id}/hdf5
+GET /api/v1/ic/export/{task_id}/hdf5
 ```
 
 **Response**: Binary HDF5 檔案  
@@ -1129,7 +1139,7 @@ GET /api/v1/ic-analysis/download/{task_id}/hdf5
 
 ### 14.5 Refilter 模式（快速重新篩選）
 ```http
-POST /api/v1/ic-analysis/refilter/{task_id}
+POST /api/v1/ic/refilter
 ```
 
 **Request Body**:
@@ -1155,7 +1165,7 @@ POST /api/v1/ic-analysis/refilter/{task_id}
 
 ### 14.6 取得 IC 衰減曲線
 ```http
-GET /api/v1/ic-analysis/ic-decay/{task_id}?feature_name=rsi_14
+GET /api/v1/ic/decay/{feature_name}
 ```
 
 **Response**:
@@ -1174,7 +1184,7 @@ GET /api/v1/ic-analysis/ic-decay/{task_id}?feature_name=rsi_14
 
 ### 14.7 取得分組 IC（按市場狀態）
 ```http
-GET /api/v1/ic-analysis/grouped-ic/{task_id}?feature_name=rsi_14&group_by=market_regime
+GET /api/v1/ic/grouped?feature_name=rsi_14&group_by=market_regime
 ```
 
 **Response**:
@@ -1191,7 +1201,7 @@ GET /api/v1/ic-analysis/grouped-ic/{task_id}?feature_name=rsi_14&group_by=market
 
 ### 14.8 取得分位數報酬分析
 ```http
-GET /api/v1/ic-analysis/quantile-returns/{task_id}?feature_name=rsi_14
+GET /api/v1/ic/quantile/{feature_name}
 ```
 
 **Response**:
@@ -1212,7 +1222,7 @@ GET /api/v1/ic-analysis/quantile-returns/{task_id}?feature_name=rsi_14
 
 ### 14.9 取得相關性矩陣
 ```http
-GET /api/v1/ic-analysis/correlation-matrix/{task_id}?features=rsi_14,macd,ema_cross
+GET /api/v1/ic/correlation?features=rsi_14,macd,ema_cross
 ```
 
 **Response**:
@@ -1229,7 +1239,7 @@ GET /api/v1/ic-analysis/correlation-matrix/{task_id}?features=rsi_14,macd,ema_cr
 
 ### 14.10 取得模型驗證結果
 ```http
-GET /api/v1/ic-analysis/model-validation/{task_id}
+GET /api/v1/ic/result/{task_id}
 ```
 
 **Response**:
@@ -1256,7 +1266,7 @@ GET /api/v1/ic-analysis/model-validation/{task_id}
 
 ### 14.11 取得 SHAP 解釋
 ```http
-POST /api/v1/ic-analysis/shap-explanation/{task_id}
+POST /api/v1/ic/deep-analysis/{task_id}
 ```
 
 **Request Body**:
@@ -1284,7 +1294,7 @@ POST /api/v1/ic-analysis/shap-explanation/{task_id}
 
 ### 14.12 批次啟動多標的分析
 ```http
-POST /api/v1/ic-analysis/batch-start
+POST /api/v1/ic/full-analysis
 ```
 
 **Request Body**:
@@ -1389,6 +1399,18 @@ ws://localhost:8000/ws/optimization/{task_id}?client_id={client_id}
   "best_params": {}
 }
 ```
+
+### IC Analysis 即時進度
+```
+ws://localhost:8000/ws/ic-analysis/{task_id}?client_id={client_id}
+```
+推送 IC Gatekeeper 八階段管線進度（stage_number, percentage, stage_metrics 等）。
+
+### Feature Factory 即時進度
+```
+ws://localhost:8000/ws/features/{task_id}?client_id={client_id}
+```
+推送 Feature Factory 七層 pipeline 執行進度。
 
 ---
 
@@ -1712,6 +1734,93 @@ interface TaskStartResponse {
 
 ---
 
+## 16. Model Enhancement API (Phase 3.5)
+
+> **路由**: `api/routes/model_enhancement.py` | **Prefix**: `/api/v1/model-enhancement`
+
+### 16.1 機率校準
+```http
+POST /api/v1/model-enhancement/calibrate
+```
+**功能**: 執行機率校準（Platt Scaling / Isotonic Regression / Beta Calibration / Venn-ABERS）
+
+### 16.2 Walk-Forward 驗證
+```http
+POST /api/v1/model-enhancement/walk-forward
+```
+**功能**: 執行 Walk-Forward 驗證（Rolling / Expanding 窗口模式）
+
+### 16.3 樣本加權計算
+```http
+POST /api/v1/model-enhancement/sample-weights
+```
+**功能**: 計算樣本權重（time_decay / class_balance / return_based / uniqueness）
+
+### 16.4 對抗驗證
+```http
+POST /api/v1/model-enhancement/adversarial-validate
+```
+**功能**: 執行對抗驗證（分布測試 + feature-level KS/PSI + 洩漏偵測）
+
+### 16.5 CPCV 驗證
+```http
+POST /api/v1/model-enhancement/cpcv
+```
+**功能**: 執行 Combinatorial Purged Cross-Validation（López de Prado 方法）
+
+### 16.6 學習曲線
+```http
+POST /api/v1/model-enhancement/learning-curve
+```
+**功能**: 計算學習曲線（data curves + feature curves + bias-variance 診斷）
+
+### 16.7 查詢任務
+```http
+GET /api/v1/model-enhancement/task/{task_id}
+```
+**功能**: 查詢模型增強任務狀態與結果
+
+### 16.8 全量增強
+```http
+POST /api/v1/model-enhancement/full-enhancement
+```
+**功能**: 執行所有 6 個增強模組（平行執行，per-module timeout）
+
+---
+
+## 17. Hyperparameter Optimization API (Phase 4)
+
+> **路由**: `api/routes/hyperparameter_optimization.py` | **Prefix**: `/api/v1/hyperparameter-optimization`
+
+**功能**: 模型超參數優化端點（基於重構後的 Optuna 可插拔目標架構）
+
+#### 端點概要
+- 超參數優化任務建立（ModelHyperparamObjective + StrategyBacktestObjective）
+- 任務狀態查詢
+- 優化結果輸出（JSON/CSV/HTML/AI-readable 報告）
+- 過擬合偵測結果
+
+---
+
+## 18. Execution Optimization API (Phase 4)
+
+> **路由**: `api/routes/execution_optimization.py` | **Prefix**: `/api/v1/execution-optimization`
+
+**功能**: 策略執行面優化端點（回測引擎 + 績效指標 + 部位管理）
+
+#### 端點概要
+- 回測任務建立（VectorizedBacktest + SL/TP/Trailing Stop 配置）
+- 績效指標查詢（Sharpe / Sortino / Calmar / MaxDD / Expectancy / SQN / Win Rate / Profit Factor）
+- 部位管理配置（Kelly / Fixed / ProbabilityScaled）
+- 優化結果輸出
+
+#### 新 WebSocket 事件
+- `backtest_progress` — 回測進度更新
+- `pareto_update` — Pareto 前沿更新（多目標優化）
+- `overfitting_alert` — 過擬合警報
+
+---
+
 ## 開發環境
 
 ### 啟動後端
@@ -1750,6 +1859,6 @@ resp = requests.post(
 
 ---
 
-*文檔版本：3.2*
-*最後更新：2026-02-14*
-*狀態：Phase 3.7 雙引擎 ML 系統 API 同步完成*
+*文檔版本：4.0*
+*最後更新：2026-02-18*
+*狀態：Phase 1-4 全部完成，API 同步更新*

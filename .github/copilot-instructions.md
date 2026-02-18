@@ -1,7 +1,7 @@
 # AI Agent Instructions for Quantitative Trading System
 
 > Quick reference guide for AI coding agents (GitHub Copilot, Claude, Cursor, etc.)  
-> **Last Updated**: 2026-02-09 | **Version**: 2.1
+> **Last Updated**: 2026-02-18 | **Version**: 3.0
 
 ## 🎯 System Overview
 
@@ -11,7 +11,7 @@
 
 **Key distinction**: This is a *research platform*, not an execution system. Focus: pattern discovery → ML optimization → backtesting.
 
-**Current Status** (2026 Q1): Phase 3 completed (optimization system, chart signals). Active development on Phase 4 (pattern discovery).
+**Current Status** (2026 Q1): Phase 1-4 all completed (Feature Factory, IC Deep Analysis, Model Enhancement, Strategy/Backtest, Optuna restructuring). Active development on frontend UI integration.
 
 ### 📍 Product Vision & Evolution Path
 
@@ -36,37 +36,79 @@ V3.0 (2027+):                 Fully autonomous AI Agent → Proposes strategies 
 
 ### Backend (`api/`)
 - **`api/main.py`** - FastAPI app entry, lifespan management, router registration
-- **`api/routes/`** - Thin route handlers (case_search.py, chart.py, config.py, optimization.py, signal_analysis.py)
+- **`api/routes/`** - Thin route handlers (case_search.py, case.py, chart.py, chart_signals.py, config.py, export.py, feature_browser.py, feature_engineering.py, feature_factory.py, feature_toggles.py, ic_analysis.py, ml_pipeline.py, model_enhancement.py, optimization.py, optimization_analysis.py, hyperparameter_optimization.py, execution_optimization.py, pattern_analysis.py, pattern_management.py, signal_analysis.py, two_stage_search.py)
 - **`api/services/`** - Heavy business logic:
   - `search_task_service.py` - Async case search orchestration
   - `optimization_task_service.py` - Optuna hyperparameter optimization
   - `chart_data_service.py`, `chart_signal_service.py` - Chart data & signal generation
   - `batch_download_service.py` - Parallel kline data download
   - `signal_analysis_service.py` - Signal statistics & density analysis
+  - `ic_analysis_service.py` - IC Gatekeeper analysis tasks
+  - `model_enhancement_service.py` - Model enhancement (6 modules, parallel execution)
+  - `optimization_output_service.py` - Optimization output (JSON/CSV/HTML/AI report)
+  - `feature_factory_service.py`, `feature_task_service.py` - Feature Factory orchestration
+  - `feature_browser_service.py`, `feature_export_service.py` - Feature browsing & export
+  - `feature_toggle_service.py` - Feature toggles management
+  - `pattern_management_service.py` - Pattern CRUD operations
+  - `xgboost_task_service.py`, `xgboost_batch_service.py` - XGBoost ML tasks
+  - `shap_analysis_service.py` - SHAP feature importance
+  - `export_service.py` - General export service
+  - `kline_data_service.py`, `kline_storage_service.py` - Kline data management
+  - `task_manager.py` - Global async task tracking
 - **`api/core/`** - Config (Settings from pydantic-settings), logging (ColoredFormatter), middleware
 - **`api/models/`** - Pydantic request/response models
-- **`api/websocket/`** - WebSocket handlers (optimization_ws.py - real-time optimization progress)
+- **`api/websocket/`** - WebSocket handlers (optimization_ws.py, ic_analysis_ws.py, feature_factory_ws.py - real-time progress)
 
 ### Core Engines (`momentum/`)
 - **`momentum/DataExtraction/`** - Case search engine, parallel search, kline download, HDF5 storage
   - `case_search_engine.py` - 30-parameter search framework (6 trigger + 24 future performance + 2 counter-example)
   - `parallel_search_engine.py` - Async multi-symbol concurrent search with retry logic
   - `kline_storage.py` - HDF5 read/write/append operations with metadata management
-- **`momentum/Indicator/`** - Technical indicator modules (pure functions, accept/return DataFrames)
-- **`momentum/Optimization/`** - Optuna-based parameter optimization system
-- **`momentum/Analysis/`** - Signal analysis, density calculation, statistical testing
+- **`momentum/Indicator/`** - Legacy technical indicator modules (pure functions, accept/return DataFrames)
+- **`momentum/Indicators/`** - Dynamic indicator system (config-driven, indicator_engine.py, EMA etc.)
+- **`momentum/Optimization/`** - Optuna-based parameter optimization system (pluggable objectives: ModelHyperparam, StrategyBacktest)
+- **`momentum/Analysis/`** - Signal analysis, IC Gatekeeper (12+10 modules), model enhancement (6 modules), ML engines (XGBoost+LightGBM)
+- **`momentum/Utils/`** - Shared utilities (data_validator.py)
+- **`momentum/FeatureEngineering/`** - Feature Factory (7-layer pipeline, atomic engines, preprocessing)
+  - `feature_factory.py` - 7-layer Config-driven pipeline
+  - `config_manager.py`, `feature_config.py` - Configuration management
+  - `feature_extractor.py`, `feature_validator.py`, `feature_storage.py` - Core pipeline
+  - `data_source_registry.py`, `ml_pipeline_config.py` - Data & ML config
+  - `atomic/` - TA-Lib + Microstructure + Entropy + TailRisk engines
+  - `preprocessing/` - Layer 6.5 (rank/gaussian/zscore/diff/fracdiff)
+  - `adapters/`, `cross_sectional/`, `indicators/`, `labels/`, `mcp/`, `meta_features/`, `operators/`, `timeframe/` - Extended pipeline modules
+- **`momentum/Strategy/`** - ★ Strategy domain (Phase 4)
+  - `vectorized_backtest.py` - Vectorized backtesting engine (SL/TP/Trailing Stop)
+  - `performance_metrics.py` - 12+ metrics (Sharpe/Sortino/Calmar/MaxDD/SQN etc.)
+  - `position_sizing.py` - Kelly/Fixed/ProbabilityScaled position sizing
+  - `risk_manager.py` - Risk management calculations
 
 ### Frontend (`frontend/src/`)
-- **`app/`** - Next.js 15 App Router pages (page.tsx, layout.tsx)
+- **`app/`** - Next.js 15 App Router pages (search/, chart/, ic-analysis/, feature-factory/, feature-browser/, optimization-execution/, optimization-hyperparameter/, optimization-result/, patterns/, strategy-test/, strategy-demo/, data-preparation/, result/)
 - **`components/`** - React components:
-  - `charts/` - Lightweight Charts integration (TakerRatioChart, MultiPaneChartNew)
-  - `optimization/` - 9+ components (MetricsPanel, DensityComparisonChart, StabilityChart, TrialHistoryTable)
-  - `search/`, `case/` - Search interface and case management
+  - `charts/` - Chart components (PriceChart, TakerRatioChart, TradingChartWithSignals, DensityDistributionChart, StrategySignalChart)
+  - `optimization/` - Optuna optimization UI (TrialComparisonPanel, CalibrationPlot, WalkForwardTimeline, CPCVPathChart; sub: common/, execution/, hyperparameter/)
+  - `results/` - Optimization results display (MetricsPanel, DensityComparisonChart, StabilityChart, TrialHistoryTable, ExportButton)
+  - `optimization-results/` - Best result cards, convergence plots, param heatmaps
+  - `ic-analysis/` - 25 IC deep analysis components (RollingICChart, CorrelationHeatmap, FactorReturnChart, etc.)
+  - `feature-factory/` - 23 Feature Factory UI components (ConfigPanel, FeatureExplorer, PreprocessingPanel, etc.)
+  - `feature-browser/` - 14 Feature browser components (FeatureCatalogTable, DriftMonitor, QualityScorecard, etc.)
+  - `pattern/` - Pattern analysis (PatternList, PatternDetail, XGBoostAnalysisPanel, FeatureImportanceChart)
+  - `strategy/`, `strategy-test/` - Strategy configuration & testing
+  - `case/` - Case management
+  - `common/`, `layout/`, `providers/`, `settings/`, `ui/` - Shared utilities & UI primitives
 - **`store/`** - Zustand state management:
   - `searchStore.ts` - Global search results/config
   - `optimizationStore.ts` - Optimization task state & results
+  - `icAnalysisStore.ts` - IC analysis state
+  - `modelEnhancementStore.ts` - Model enhancement state
+  - `featureFactoryStore.ts` - Feature Factory pipeline state
+  - `featureBrowserStore.ts` - Feature browsing state
+  - `featureToggleStore.ts` - Feature toggle flags
+  - `patternStore.ts` - Pattern management state
+  - `strategyTestStore.ts` - Strategy testing state
 - **`lib/types.ts`** - TypeScript interfaces matching backend models
-- **`hooks/`** - Custom React hooks (useWebSocket for optimization progress)
+- **`hooks/`** - Custom React hooks (useICAnalysis, useOptimization, useFeatureFactory, useChart, useChartSync, useAutoResearch, useAvailableSymbols, useStrategyConfig)
 
 ### Data (`data_cache/`)
 - **HDF5 files** - `{SYMBOL}_{timeframe}.h5` (e.g., BTCUSDT_12h.h5)
@@ -241,7 +283,7 @@ const { currentResult, setSearchResult } = useSearchStore();
 
 ### 8. WebSocket Real-Time Updates
 ```python
-# Pattern from api/websocket/optimization_ws.py
+# Pattern from api/websocket/optimization_ws.py, ic_analysis_ws.py
 from fastapi import WebSocket
 
 @router.websocket("/ws/optimization/{task_id}")
@@ -261,6 +303,7 @@ async def optimization_progress(websocket: WebSocket, task_id: str):
 ### 9. Frontend Component Patterns (Ultra Think)
 ```typescript
 // Pattern from frontend/src/components/optimization/*.tsx
+// Also used in ic-analysis/*.tsx and model-enhancement/*.tsx
 // All major components follow this structure:
 
 /**
@@ -460,12 +503,14 @@ class FeatureEngineer:
 4. New config? → Add to `momentum/core/config.py` (domain-specific) or `api/core/config.py` (API-specific)
 5. New DTO? → Define in `api/models/` (API) or `momentum/core/contracts.py` (momentum), NEVER both
 
-**Example: Adding FeatureFactory (Task 1)**
+**Example: Adding FeatureFactory (Phase 1 — completed)**
 - ✅ Lives in `momentum/FeatureEngineering/` (new Domain)
 - ✅ Uses `IKlineReader` Protocol for K-line data (Rule 2)
 - ✅ Built via `create_feature_factory()` in `momentum/factories.py` (Rule 3)
 - ✅ Config from `momentum/core/config.py` (Rule 5)
 - ✅ Tests run with `pytest tests/momentum/` (Rule 6)
+
+**Completed systems following this pattern**: Feature Factory, IC Deep Analysis, Model Enhancement, Strategy/Backtest, Optuna restructuring. See `momentum/factories.py` for all factory functions (~20+).
 
 ### Why Decoupling Matters for V1 → V2 → V3
 
@@ -493,8 +538,8 @@ class FeatureEngineer:
 
 **Reference**:
 - `docs/API_SPECIFICATION.md` - API endpoints and models
-- `docs/FEATURE_ROADMAP.md` - 24-week development plan
-- `docs/KLINE_DATA_SPECIFICATION.md` - HDF5 data format specification
+- `docs/FRONTEND_INTEGRATION_GUIDE.md` - Frontend integration guide
+- `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` - Dynamic indicator system guide
 
 ---
 
@@ -614,6 +659,26 @@ export const CHART_COLORS = {
 7. Export available (CSV for trials, PNG for charts)
 ```
 
+### Feature Factory Flow (Phase 1+1.5)
+```
+1. Config loaded from scan_config.yaml → FeatureFactory
+2. 7-layer pipeline: Kline → TA-Lib → Microstructure → Entropy → TailRisk → Cross → Preprocessing
+3. Atomic engines generate features with 7-segment naming
+4. Layer 6.5 preprocessor applies rank/gaussian/zscore/diff transforms
+5. Output: feature DataFrame ready for IC analysis or ML training
+```
+
+### Strategy Backtest Flow (Phase 4)
+```
+1. User selects objective (ModelHyperparam / StrategyBacktest)
+2. POST /api/v1/hyperparameter-optimization/start → Optuna study
+3. VectorizedBacktest.run() → momentum/Strategy/vectorized_backtest.py
+4. PerformanceMetrics calculates Sharpe/Sortino/Calmar/MaxDD/SQN
+5. PositionSizing (Kelly/Fixed/ProbabilityScaled) integrated
+6. Results via WebSocket → frontend optimization dashboard
+7. Export: JSON/CSV/HTML/AI-readable report
+```
+
 ---
 
 ## 🔍 Finding Examples
@@ -625,15 +690,24 @@ export const CHART_COLORS = {
 → Copy pattern from [api/routes/optimization.py](api/routes/optimization.py), implement service in `api/services/`
 
 **Need to add a chart component?**  
-→ [frontend/src/components/charts/MultiPaneChartNew.tsx](frontend/src/components/charts/MultiPaneChartNew.tsx) (Lightweight Charts with synchronized panes)
+→ [frontend/src/components/charts/PriceChart.tsx](frontend/src/components/charts/PriceChart.tsx) (Chart component pattern with responsive container)
 
 **Need to add an optimization component?**  
-→ [frontend/src/components/optimization/MetricsPanel.tsx](frontend/src/components/optimization/MetricsPanel.tsx) (responsive grid, color-coded metrics, tooltips)
+→ [frontend/src/components/results/MetricsPanel.tsx](frontend/src/components/results/MetricsPanel.tsx) (responsive grid, color-coded metrics, tooltips)
 
 **Need to add a technical indicator?**  
 → [momentum/Indicator/Base_Indicator_Reference.py](momentum/Indicator/Base_Indicator_Reference.py) (pure function pattern)
 
+**Need to add a feature factory engine?**  
+→ [momentum/FeatureEngineering/atomic/](momentum/FeatureEngineering/atomic/) (Microstructure/Entropy/TailRisk engine pattern)
+
+**Need to add a model enhancement module?**  
+→ [momentum/Analysis/probability_calibrator.py](momentum/Analysis/probability_calibrator.py) (Phase 3.5 module pattern)
+
+**Need to add a backtest strategy?**  
+→ [momentum/Strategy/vectorized_backtest.py](momentum/Strategy/vectorized_backtest.py) (VectorizedBacktest + PerformanceMetrics)
+
 **Need WebSocket real-time updates?**  
-→ [api/websocket/optimization_ws.py](api/websocket/optimization_ws.py) + [frontend/src/hooks/useWebSocket.ts](frontend/src/hooks/useWebSocket.ts)
+→ [api/websocket/optimization_ws.py](api/websocket/optimization_ws.py) + [frontend/src/hooks/useOptimization.ts](frontend/src/hooks/useOptimization.ts)
 
 **Questions?** → Search `docs/` for detailed explanations or ask for specific file examples.
