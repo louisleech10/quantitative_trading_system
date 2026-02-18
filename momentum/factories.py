@@ -336,3 +336,73 @@ def create_psi_calculator() -> "PSICalculator":
     from momentum.Analysis.model_validation.psi_calculator import PSICalculator
 
     return PSICalculator()
+
+
+def create_probability_calibrator(
+    config: Optional[Dict] = None,
+) -> "ProbabilityCalibrator":
+    """Factory — M1 機率校準器。"""
+    from momentum.Analysis.probability_calibrator import ProbabilityCalibrator
+
+    return ProbabilityCalibrator(config=config)
+
+
+def create_walk_forward_validator(
+    config: Optional[Dict] = None,
+) -> "WalkForwardValidator":
+    """Factory — M2 Walk-Forward 驗證器。"""
+    from momentum.Analysis.model_validation.walk_forward_validator import WalkForwardValidator
+
+    return WalkForwardValidator(config=config)
+
+
+def create_sample_weight_calculator(
+    config: Optional[Dict] = None,
+) -> "SampleWeightCalculator":
+    """Factory — M3 樣本加權計算器。"""
+    from momentum.Analysis.sample_weight_calculator import SampleWeightCalculator
+
+    return SampleWeightCalculator(config=config)
+
+
+def create_adversarial_validator(
+    config: Optional[Dict] = None,
+) -> "AdversarialValidator":
+    """Factory — M4 Adversarial 驗證器。"""
+    from momentum.Analysis.adversarial_validator import AdversarialValidator
+
+    return AdversarialValidator(config=config)
+
+
+def create_combinatorial_purged_cv(
+    config: Optional[Dict] = None,
+) -> "CombinatorialPurgedCV":
+    """Factory — M5 CPCV。"""
+    from momentum.Analysis.model_validation.combinatorial_purged_cv import CombinatorialPurgedCV
+
+    return CombinatorialPurgedCV(config=config)
+
+
+def create_learning_curve_analyzer(
+    config: Optional[Dict] = None,
+) -> "LearningCurveAnalyzer":
+    """Factory — M6 Learning Curve 分析器。"""
+    from momentum.Analysis.learning_curve_analyzer import LearningCurveAnalyzer
+
+    return LearningCurveAnalyzer(config=config)
+
+
+def create_feature_toggle_registry(
+    yaml_path: Optional[str] = None,
+) -> "FeatureToggleRegistry":
+    """Factory — M7 Feature Toggle Registry。"""
+    from momentum.Analysis.feature_toggle_registry import FeatureToggleRegistry
+
+    return FeatureToggleRegistry(yaml_path=yaml_path)
+
+
+def create_analysis_exporter() -> "AnalysisExporter":
+    """Factory — M8 多格式匯出器。"""
+    from momentum.Analysis.analysis_exporter import AnalysisExporter
+
+    return AnalysisExporter()

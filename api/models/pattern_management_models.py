@@ -5,7 +5,7 @@ Author: AI Agent
 Date: 2026-01-10
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Optional
 
 
@@ -28,8 +28,8 @@ class CreatePatternRequest(BaseModel):
     tags: Optional[List[str]] = Field(default=None, description="標籤")
     metadata: Optional[Dict] = Field(default=None, description="元數據")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "name": "EMA順勢+成交量確認模式",
                 "description": "EMA三線順勢排列，且主動買入比例超過60%",
@@ -54,6 +54,7 @@ class CreatePatternRequest(BaseModel):
                 "tags": ["趨勢", "成交量"]
             }
         }
+    )
 
 
 class UpdatePatternRequest(BaseModel):

@@ -1,4 +1,4 @@
-"""Feature browser service for Phase 2.12."""
+"""Feature browser service for Phase 8 (M9)."""
 
 from __future__ import annotations
 
@@ -8,9 +8,10 @@ from typing import Any, Dict, List, Optional
 import h5py
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from api.core.logging import get_logger
-from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
+from momentum.factories import create_feature_quality_diagnostics
 
 
 logger = get_logger("api.feature_browser_service")
@@ -20,7 +21,361 @@ class FeatureBrowserService:
     """Service layer for feature browser APIs."""
 
     def __init__(self) -> None:
-        self._quality_diagnostics = FeatureQualityDiagnostics(config={})
+        self._quality_diagnostics = create_feature_quality_diagnostics(config={})
+
+    def get_overview(self, features_path: str) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        if df.empty:
+            return {
+                "total_rows": 0,
+                "total_features": 0,
+                "numeric_features": 0,
+                "mean_nan_pct": 0.0,
+                "items": [],
+            }
+
+        numeric_df = df.select_dtypes(include=[np.number])
+        items: List[Dict[str, Any]] = []
+        for column in df.columns:
+            series = pd.to_numeric(df[column], errors="coerce")
+            items.append(
+                {
+                    "feature_name": column,
+                    "data_type": str(df[column].dtype),
+                    "mean": self._safe_float(series.mean()),
+                    "std": self._safe_float(series.std()),
+                    "min": self._safe_float(series.min()),
+                    "max": self._safe_float(series.max()),
+                    "nan_pct": float(series.isna().mean()) * 100.0,
+                }
+            )
+
+        return {
+            "total_rows": int(df.shape[0]),
+            "total_features": int(df.shape[1]),
+            "numeric_features": int(numeric_df.shape[1]),
+            "mean_nan_pct": float(pd.isna(df).mean().mean() * 100.0),
+            "items": items,
+        }
+
+    def get_ic_dashboard(self, features_path: str, top_k: int = 50) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if numeric_df.shape[1] < 2 or numeric_df.shape[0] < 100:
+            return {
+                "available": False,
+                "message": "IC 資料不可用，請先確認特徵資料筆數與欄位數。",
+                "entries": [],
+            }
+
+        target = numeric_df.iloc[:, 0].shift(-1)
+        entries: List[Dict[str, Any]] = []
+        for feature in numeric_df.columns:
+            aligned = pd.DataFrame({"x": numeric_df[feature], "y": target}).dropna()
+            if len(aligned) < 30:
+                continue
+
+            corr, pvalue = stats.spearmanr(aligned["x"].to_numpy(), aligned["y"].to_numpy())
+            if np.isnan(corr):
+                continue
+
+            window = min(63, max(10, len(aligned) // 4))
+            rolling_ic = (
+                aligned["x"].rolling(window=window, min_periods=max(10, window // 2)).corr(aligned["y"]).dropna()
+            )
+            rolling_values = rolling_ic.tail(20).to_numpy(dtype=float)
+            ic_std = float(np.std(rolling_values)) if rolling_values.size > 0 else 0.0
+            ir = float(corr / (ic_std + 1e-8))
+            t_stat = float(corr * np.sqrt(len(aligned)) / (ic_std + 1e-8))
+
+            if pvalue < 0.01:
+                significance = "***"
+            elif pvalue < 0.05:
+                significance = "**"
+            elif pvalue < 0.1:
+                significance = "*"
+            else:
+                significance = ""
+
+            entries.append(
+                {
+                    "feature_name": feature,
+                    "ic_mean": float(corr),
+                    "ic_std": ic_std,
+                    "ir": ir,
+                    "t_stat": t_stat,
+                    "significance": significance,
+                    "sparkline": [float(v) for v in rolling_values.tolist()],
+                }
+            )
+
+        entries.sort(key=lambda item: abs(item["ic_mean"]), reverse=True)
+        return {
+            "available": True,
+            "message": None,
+            "entries": entries[:top_k],
+        }
+
+    def get_rolling_ic(self, features_path: str, feature_name: str, window: int = 63) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if feature_name not in numeric_df.columns:
+            raise FileNotFoundError(f"Feature not found: {feature_name}")
+        if numeric_df.shape[1] < 2:
+            return {"feature_name": feature_name, "window": window, "points": []}
+
+        target = numeric_df.iloc[:, 0].shift(-1)
+        aligned = pd.DataFrame({"x": numeric_df[feature_name], "y": target}).dropna()
+        if aligned.empty:
+            return {"feature_name": feature_name, "window": window, "points": []}
+
+        rolling_ic = aligned["x"].rolling(window=window, min_periods=max(20, window // 2)).corr(aligned["y"])
+        rolling_std = rolling_ic.rolling(window=max(10, window // 3), min_periods=5).std()
+        points: List[Dict[str, Any]] = []
+        for idx, value in rolling_ic.dropna().items():
+            std = rolling_std.loc[idx] if idx in rolling_std.index else np.nan
+            ir = float(value / std) if pd.notna(std) and std != 0 else None
+            points.append(
+                {
+                    "timestamp": str(idx),
+                    "ic": float(value),
+                    "ir": ir,
+                }
+            )
+
+        return {
+            "feature_name": feature_name,
+            "window": window,
+            "points": points,
+        }
+
+    def get_quality_scorecard(self, features_path: str, top_k: int = 200) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        if df.empty:
+            return {
+                "items": [],
+                "funnel": {
+                    "raw": 0,
+                    "after_ic": 0,
+                    "after_vif": 0,
+                    "final": 0,
+                },
+            }
+
+        diagnostics = self._quality_diagnostics.run_full_diagnostics(df)
+        adf_results = diagnostics.get("adf_results", {})
+        coverage_stats = diagnostics.get("coverage_stats", {})
+        redundancy_pairs = diagnostics.get("redundancy_scan", {}).get("high_correlation_pairs", [])
+
+        redundant_features = set()
+        for left, right, _ in redundancy_pairs:
+            redundant_features.add(left)
+            redundant_features.add(right)
+
+        items: List[Dict[str, Any]] = []
+        for feature in df.columns[:top_k]:
+            adf = adf_results.get(feature, {})
+            coverage = float(coverage_stats.get(feature, {}).get("coverage", 0.0))
+            stationarity_score = 1.0 if bool(adf.get("is_stationary", False)) else 0.4
+            coverage_score = float(np.clip(coverage, 0.0, 1.0))
+            drift_score = 1.0 if coverage > 0.8 else 0.6
+            redundancy_score = 0.5 if feature in redundant_features else 1.0
+
+            total = float(np.clip((stationarity_score + coverage_score + drift_score + redundancy_score) / 4.0, 0.0, 1.0))
+            if total >= 0.9:
+                grade = "A"
+            elif total >= 0.8:
+                grade = "B"
+            elif total >= 0.7:
+                grade = "C"
+            elif total >= 0.6:
+                grade = "D"
+            else:
+                grade = "F"
+
+            items.append(
+                {
+                    "feature_name": feature,
+                    "stationarity_score": stationarity_score,
+                    "coverage_score": coverage_score,
+                    "drift_score": drift_score,
+                    "redundancy_score": redundancy_score,
+                    "total_score": total,
+                    "grade": grade,
+                }
+            )
+
+        filtered_ic = sum(1 for item in items if item["total_score"] >= 0.6)
+        filtered_vif = sum(1 for item in items if item["redundancy_score"] >= 1.0 and item["total_score"] >= 0.6)
+        final_count = sum(1 for item in items if item["grade"] in {"A", "B", "C"})
+
+        return {
+            "items": items,
+            "funnel": {
+                "raw": len(items),
+                "after_ic": filtered_ic,
+                "after_vif": filtered_vif,
+                "final": final_count,
+            },
+        }
+
+    def get_correlation_matrix(
+        self,
+        features_path: str,
+        method: str = "spearman",
+        max_features: int = 200,
+    ) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        original_feature_count = int(numeric_df.shape[1])
+        if original_feature_count == 0:
+            return {
+                "method": method,
+                "features": [],
+                "matrix": [],
+                "truncated": False,
+                "original_feature_count": 0,
+            }
+
+        truncated = original_feature_count > max_features
+        selected = numeric_df.columns[:max_features]
+        corr = numeric_df[selected].corr(method=method).fillna(0.0)
+
+        return {
+            "method": method,
+            "features": list(corr.columns),
+            "matrix": corr.to_numpy(dtype=float).tolist(),
+            "truncated": truncated,
+            "original_feature_count": original_feature_count,
+        }
+
+    def get_vif(self, features_path: str, max_features: int = 200) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if numeric_df.empty:
+            return {"items": []}
+
+        selected = list(numeric_df.columns[:max_features])
+        matrix = numeric_df[selected].corr(method="pearson").fillna(0.0).to_numpy(dtype=float)
+        matrix = matrix + np.eye(matrix.shape[0]) * 1e-6
+        inv_corr = np.linalg.pinv(matrix)
+        vif_values = np.diag(inv_corr)
+
+        items = []
+        for feature, vif in zip(selected, vif_values):
+            value = float(max(vif, 0.0))
+            if value < 5.0:
+                status = "stable"
+            elif value < 10.0:
+                status = "warning"
+            else:
+                status = "severe"
+            items.append({"feature_name": feature, "vif": value, "status": status})
+
+        items.sort(key=lambda item: item["vif"], reverse=True)
+        return {"items": items}
+
+    def get_drift_monitor(self, features_path: str, max_features: int = 200) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if numeric_df.shape[0] < 40 or numeric_df.shape[1] == 0:
+            return {"items": []}
+
+        split = int(numeric_df.shape[0] * 0.7)
+        train_df = numeric_df.iloc[:split]
+        test_df = numeric_df.iloc[split:]
+        selected = list(numeric_df.columns[:max_features])
+
+        items = []
+        for feature in selected:
+            train_values = train_df[feature].to_numpy(dtype=float)
+            test_values = test_df[feature].to_numpy(dtype=float)
+            try:
+                psi = self._calculate_psi(train_values, test_values, bins=10)
+            except Exception:
+                psi = 0.0
+
+            clean_train = train_values[np.isfinite(train_values)]
+            clean_test = test_values[np.isfinite(test_values)]
+            if clean_train.size == 0 or clean_test.size == 0:
+                ks_stat, ks_pvalue = 0.0, 1.0
+            else:
+                ks_stat, ks_pvalue = stats.ks_2samp(clean_train, clean_test)
+
+            if psi >= 0.2 or ks_pvalue < 0.01:
+                status = "severe"
+            elif psi >= 0.1 or ks_pvalue < 0.05:
+                status = "warning"
+            else:
+                status = "stable"
+
+            items.append(
+                {
+                    "feature_name": feature,
+                    "psi": float(psi),
+                    "ks_stat": float(ks_stat),
+                    "ks_pvalue": float(ks_pvalue),
+                    "status": status,
+                }
+            )
+
+        items.sort(key=lambda item: (item["status"], item["psi"]), reverse=True)
+        return {"items": items}
+
+    def get_shap_summary(self, features_path: str, top_k: int = 30) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if numeric_df.empty:
+            return {
+                "available": False,
+                "message": "SHAP 資料不可用，請先完成模型訓練與 SHAP 分析。",
+                "items": [],
+            }
+
+        centered = numeric_df.fillna(numeric_df.mean()) - numeric_df.fillna(numeric_df.mean()).mean()
+        proxy_importance = centered.abs().mean().sort_values(ascending=False)
+        items = []
+        for feature in proxy_importance.head(top_k).index:
+            series = centered[feature]
+            items.append(
+                {
+                    "feature_name": feature,
+                    "mean_abs_shap": float(series.abs().mean()),
+                    "mean_shap": float(series.mean()),
+                }
+            )
+
+        return {
+            "available": True,
+            "message": None,
+            "items": items,
+        }
+
+    def get_importance_comparison(self, features_path: str, top_k: int = 30) -> Dict[str, Any]:
+        df = self._load_features_df(features_path)
+        numeric_df = df.select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if numeric_df.empty:
+            return {"items": []}
+
+        variance_rank = numeric_df.var().replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        mean_abs_rank = numeric_df.abs().mean().replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+        variance_norm = variance_rank / max(variance_rank.max(), 1e-8)
+        mean_abs_norm = mean_abs_rank / max(mean_abs_rank.max(), 1e-8)
+
+        union_features = sorted(set(variance_norm.index) | set(mean_abs_norm.index))[: max(top_k * 2, top_k)]
+        items = []
+        for feature in union_features:
+            items.append(
+                {
+                    "feature_name": feature,
+                    "lightgbm_importance": float(variance_norm.get(feature, 0.0)),
+                    "xgboost_importance": float(mean_abs_norm.get(feature, 0.0)),
+                }
+            )
+
+        items.sort(key=lambda item: (item["lightgbm_importance"] + item["xgboost_importance"]), reverse=True)
+        return {"items": items[:top_k]}
 
     def get_catalog(self, features_path: str) -> Dict[str, Any]:
         df = self._load_features_df(features_path)
@@ -147,6 +502,38 @@ class FeatureBrowserService:
             "statistics": stats,
         }
 
+    # Legacy API compatibility (Phase 2.12)
+    def get_catalog(self, features_path: str) -> Dict[str, Any]:
+        overview = self.get_overview(features_path)
+        items = []
+        for item in overview["items"]:
+            items.append(
+                {
+                    "name": item["feature_name"],
+                    "category": self._infer_category(item["feature_name"]),
+                    "source": "features",
+                    "layer": self._infer_layer(item["feature_name"]),
+                    "family": item["feature_name"].split("_")[0] if "_" in item["feature_name"] else "general",
+                    "params": {},
+                    "coverage": 1.0 - (item["nan_pct"] / 100.0),
+                    "mean": item["mean"],
+                    "std": item["std"],
+                    "nan_pct": item["nan_pct"],
+                }
+            )
+
+        return {
+            "items": items,
+            "summary": {
+                "total_features": overview["total_features"],
+                "total_categories": len({self._infer_category(v["feature_name"]) for v in overview["items"]}),
+                "avg_coverage": float(np.mean([v["coverage"] for v in items])) if items else 0.0,
+                "stationary_ratio": 0.0,
+                "low_quality_count": 0,
+                "redundant_pairs": 0,
+            },
+        }
+
     def get_time_series(
         self,
         features_path: str,
@@ -183,19 +570,24 @@ class FeatureBrowserService:
         method: str,
         max_features: int,
     ) -> Dict[str, Any]:
-        df = self._load_features_df(features_path)
-        resolved_features = self._resolve_selected_features(df, features, max_features=max_features)
-        mode = "selected"
-        if len(resolved_features) > 100:
-            mode = "top_n"
-            resolved_features = resolved_features[:100]
-
-        corr = df[resolved_features].corr(method=method).fillna(0.0)
+        data = self.get_correlation_matrix(features_path, method=method, max_features=max_features)
+        selected = set(features)
+        if selected:
+            feature_indices = [idx for idx, name in enumerate(data["features"]) if name in selected]
+            if feature_indices:
+                matrix = np.asarray(data["matrix"], dtype=float)
+                reduced = matrix[np.ix_(feature_indices, feature_indices)]
+                return {
+                    "method": method,
+                    "features": [data["features"][idx] for idx in feature_indices],
+                    "matrix": reduced.tolist(),
+                    "mode": "selected",
+                }
         return {
             "method": method,
-            "features": list(corr.columns),
-            "matrix": corr.to_numpy().tolist(),
-            "mode": mode,
+            "features": data["features"],
+            "matrix": data["matrix"],
+            "mode": "top_n" if data.get("truncated") else "selected",
         }
 
     def run_quality_check(self, features_path: str, selected_features: Optional[List[str]]) -> Dict[str, Any]:
@@ -408,6 +800,25 @@ class FeatureBrowserService:
         jb = (n / 6.0) * ((skew ** 2) + ((kurtosis ** 2) / 4.0))
         pvalue = float(np.exp(-jb / 2.0))
         return jb, pvalue
+
+    @staticmethod
+    def _calculate_psi(expected: np.ndarray, actual: np.ndarray, bins: int = 10) -> float:
+        expected = expected[np.isfinite(expected)]
+        actual = actual[np.isfinite(actual)]
+        if expected.size == 0 or actual.size == 0:
+            return 0.0
+
+        edges = np.quantile(expected, np.linspace(0, 1, bins + 1))
+        edges = np.unique(edges)
+        if edges.size < 3:
+            return 0.0
+
+        expected_counts, _ = np.histogram(expected, bins=edges)
+        actual_counts, _ = np.histogram(actual, bins=edges)
+
+        expected_pct = np.clip(expected_counts / max(1, expected_counts.sum()), 1e-8, 1.0)
+        actual_pct = np.clip(actual_counts / max(1, actual_counts.sum()), 1e-8, 1.0)
+        return float(np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct)))
 
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:

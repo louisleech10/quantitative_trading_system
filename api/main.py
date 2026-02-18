@@ -153,7 +153,7 @@ def setup_basic_routes(app: FastAPI):
 def register_routes(app: FastAPI):
     """Register all API routes"""
     try:
-        from api.routes import case_search, config, case, chart, signal_analysis, chart_signals, optimization, optimization_analysis, feature_engineering, pattern_analysis, pattern_management, ml_pipeline, feature_factory, ic_analysis, feature_browser
+        from api.routes import case_search, config, case, chart, signal_analysis, chart_signals, optimization, optimization_analysis, feature_engineering, pattern_analysis, pattern_management, ml_pipeline, feature_factory, ic_analysis, feature_browser, model_enhancement, feature_toggles, export
         from api.websocket import optimization_ws, feature_factory_ws, ic_analysis_ws
 
         # 新增導入兩階段搜索路由
@@ -255,6 +255,24 @@ def register_routes(app: FastAPI):
         app.include_router(
             feature_browser.router,
             tags=["Feature Browser"]
+        )
+
+        # Register model enhancement routes (Phase 3.5 Task 3.2)
+        app.include_router(
+            model_enhancement.router,
+            tags=["Model Enhancement"]
+        )
+
+        # Register feature toggles routes (Phase 6 Task 6.3)
+        app.include_router(
+            feature_toggles.router,
+            tags=["Feature Toggles"]
+        )
+
+        # Register export routes (Phase 7 Task 7.2)
+        app.include_router(
+            export.router,
+            tags=["Export"]
         )
 
         # Register IC analysis routes (Phase 2 Task 2.4.1)

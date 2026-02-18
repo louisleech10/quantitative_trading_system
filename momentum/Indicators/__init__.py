@@ -58,10 +58,6 @@ from .functional_wrapper import register_functional_indicator, unregister_functi
 # 導出配置載入器
 from .config_loader import ConfigLoader, get_global_loader, load_indicator_config
 
-# 導入函數式 EMA（觸發自動註冊）
-# 注意：這會自動註冊 "ema" 到 IndicatorEngine
-import momentum.Indicators.ema  # noqa: F401
-
 __all__ = [
     # 類型
     "DataSourceEnum",

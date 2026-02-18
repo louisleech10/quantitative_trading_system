@@ -13,7 +13,7 @@ Date: 2026-01-11
 
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 import json
 from pathlib import Path
@@ -38,8 +38,8 @@ class IndicatorConfigRequest(BaseModel):
     params: Dict[str, Any] = Field(..., description="指標參數字典")
     data_source: str = Field("close", description="資料來源（close/open/high/low/volume/taker_ratio）")
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "indicator_type": "ema_three_line",
                 "params": {
@@ -51,6 +51,7 @@ class IndicatorConfigRequest(BaseModel):
                 "data_source": "close"
             }
         }
+    )
 
 
 class CreatePipelineRequest(BaseModel):
@@ -67,8 +68,8 @@ class CreatePipelineRequest(BaseModel):
         description="多指標配置（可選，None 則使用單一指標繼承自 Trial）"
     )
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "study_name": "momentum_optimization_001",
                 "trial_number": 5,
@@ -91,6 +92,7 @@ class CreatePipelineRequest(BaseModel):
                 ]
             }
         }
+    )
 
 
 class CreatePipelineResponse(BaseModel):

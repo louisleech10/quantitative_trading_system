@@ -1,5 +1,5 @@
 from typing import Optional, List, Union, Dict, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo, ConfigDict
 from datetime import datetime, date
 from enum import Enum
 
@@ -37,7 +37,7 @@ class FilterConditionRequest(BaseModel):
     value: Union[float, int, List[Union[float, int]]] = Field(..., description="閾值")
     description: Optional[str] = Field(None, description="條件描述")
     
-    @validator('parameter')
+    @field_validator('parameter')
     def validate_parameter_for_filtering(cls, v):
         """驗證參數是否可用於篩選"""
         # 只允許 price_change 用於篩選
@@ -48,10 +48,10 @@ class FilterConditionRequest(BaseModel):
         
         return v
     
-    @validator('value')
-    def validate_value(cls, v, values):
+    @field_validator('value')
+    def validate_value(cls, v, info: ValidationInfo):
         """驗證值的格式"""
-        operator = values.get('operator')
+        operator = info.data.get('operator') if info.data else None
         
         if operator == OperatorEnum.BETWEEN:
             if not isinstance(v, list) or len(v) != 2:
@@ -128,9 +128,9 @@ class SearchConfigRequest(BaseModel):
         # logger.info(f"Final end_date: {self.end_date}")
         # logger.info(f"Final time_range: {self.time_range}")
     
-    model_config = {
-        "populate_by_name": True,  # 允許使用字段名或別名
-        "json_schema_extra": {
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_json_schema_extra={
             "example": {
                 "name": "動能突破搜索",
                 "description": "尋找大漲前的動能訊號",
@@ -150,7 +150,7 @@ class SearchConfigRequest(BaseModel):
                 ]
             }
         }
-    }
+    )
 
 # 新增 NegativeCaseRequest 模型
 
@@ -175,8 +175,8 @@ class NegativeCaseRequest(BaseModel):
         description="是否啟用隨機取樣（True=啟用，False=返回所有符合條件的反例）"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "search_config": {
                     "name": "negative_example_search",
@@ -190,7 +190,7 @@ class NegativeCaseRequest(BaseModel):
                 "enable_random_sampling": True
             }
         }
-
+    )
 class SearchPreviewRequest(BaseModel):
     """搜索預覽請求模型"""
     config: SearchConfigRequest = Field(..., description="搜索配置")
@@ -211,7 +211,7 @@ class SearchTemplateRequest(BaseModel):
 
 class BulkSearchRequest(BaseModel):
     """批量搜索請求模型"""
-    configs: List[SearchConfigRequest] = Field(..., description="多個搜索配置", min_items=1, max_items=5)
+    configs: List[SearchConfigRequest] = Field(..., description="多個搜索配置", min_length=1, max_length=5)
     parallel_execution: bool = Field(False, description="是否並行執行")
 
 # 配置更新相關模型

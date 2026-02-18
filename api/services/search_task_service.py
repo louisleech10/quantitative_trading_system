@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from ..core.config import settings
 from ..core.logging import get_logger
 from ..models.requests import SearchConfigRequest, NegativeCaseRequest
@@ -934,8 +934,8 @@ class NegativeCaseRequest(BaseModel):
         description="是否啟用隨機取樣（True=啟用，False=返回所有符合條件的反例）"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "search_config": {
                     "name": "negative_example_search",
@@ -949,6 +949,7 @@ class NegativeCaseRequest(BaseModel):
                 "enable_random_sampling": True
             }
         }
+    )
 
 # 新增 API 路由: api/routes/two_stage_search.py
 

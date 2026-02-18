@@ -14,7 +14,7 @@ Date: 2025-11-02
 
 from typing import Optional, List, Literal
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from api.core.logging import get_logger
 from api.services.optimization_task_service import (
@@ -51,8 +51,8 @@ class CreateOptimizationTaskRequest(BaseModel):
     enable_pruning: bool = Field(True, description="是否啟用 Pruner（MedianPruner）")
     parameter_ranges: Optional[ParameterRanges] = Field(None, description="參數搜索範圍（None使用預設）")
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "study_name": "momentum_optimization_001",
                 "positive_cases": ["case_001", "case_002"],
@@ -69,6 +69,7 @@ class CreateOptimizationTaskRequest(BaseModel):
                 "use_multi_objective": False
             }
         }
+    )
 
 
 class CreateOptimizationTaskResponse(BaseModel):

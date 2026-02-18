@@ -16,7 +16,7 @@ Ultra Think 記錄:
 """
 
 from typing import Dict, Any, List, Optional, Literal, Tuple
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo, ConfigDict
 from api.models.training_window_config import StrategyConfig, TrainingWindowConfig
 
 
@@ -46,29 +46,30 @@ class ParameterRange(BaseModel):
         description="步長(可選,預設1)"
     )
 
-    @validator('max')
-    def validate_max_greater_than_min(cls, v, values):
+    @field_validator('max')
+    def validate_max_greater_than_min(cls, v, info: ValidationInfo):
         """驗證max > min"""
-        min_val = values.get('min')
+        min_val = info.data.get('min') if info.data else None
         if min_val is not None and v <= min_val:
             raise ValueError(f"max({v})必須大於min({min_val})")
         return v
 
-    @validator('step')
+    @field_validator('step')
     def validate_step_positive(cls, v):
         """驗證step > 0"""
         if v is not None and v <= 0:
             raise ValueError(f"step({v})必須大於0")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "min": 5,
                 "max": 10,
                 "step": 1
             }
         }
+    )
 
 
 class EMAParameterRanges(BaseModel):
@@ -100,10 +101,10 @@ class EMAParameterRanges(BaseModel):
         description="長期EMA參數範圍(30-40)"
     )
 
-    @validator('ema_mid')
-    def validate_mid_greater_than_short(cls, v, values):
+    @field_validator('ema_mid')
+    def validate_mid_greater_than_short(cls, v, info: ValidationInfo):
         """驗證中期最小值 > 短期最大值"""
-        ema_short = values.get('ema_short')
+        ema_short = info.data.get('ema_short') if info.data else None
         if ema_short is not None:
             if v.min <= ema_short.max:
                 raise ValueError(
@@ -111,10 +112,10 @@ class EMAParameterRanges(BaseModel):
                 )
         return v
 
-    @validator('ema_long')
-    def validate_long_greater_than_mid(cls, v, values):
+    @field_validator('ema_long')
+    def validate_long_greater_than_mid(cls, v, info: ValidationInfo):
         """驗證長期最小值 > 中期最大值"""
-        ema_mid = values.get('ema_mid')
+        ema_mid = info.data.get('ema_mid') if info.data else None
         if ema_mid is not None:
             if v.min <= ema_mid.max:
                 raise ValueError(
@@ -122,14 +123,15 @@ class EMAParameterRanges(BaseModel):
                 )
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "ema_short": {"min": 5, "max": 10, "step": 1},
                 "ema_mid": {"min": 15, "max": 20, "step": 1},
                 "ema_long": {"min": 30, "max": 40, "step": 5}
             }
         }
+    )
 
 
 # ==================== 策略配置範本 ====================
@@ -174,8 +176,8 @@ class StrategyConfigTemplate(BaseModel):
         description="創建時間(ISO格式)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "template_name": "EMA三線排列策略",
                 "template_description": "基於收盤價的EMA(7,18,35)三線排列策略",
@@ -203,6 +205,7 @@ class StrategyConfigTemplate(BaseModel):
                 "created_at": "2025-11-01T10:00:00Z"
             }
         }
+    )
 
 
 # ==================== 圖表信號計算 (Task 3.4) ====================
@@ -246,15 +249,15 @@ class ChartSignalCalculationRequest(BaseModel):
         description="策略配置"
     )
 
-    @validator('end_time')
-    def validate_end_after_start(cls, v, values):
+    @field_validator('end_time')
+    def validate_end_after_start(cls, v, info: ValidationInfo):
         """驗證結束時間 > 開始時間"""
-        start_time = values.get('start_time')
+        start_time = info.data.get('start_time') if info.data else None
         if start_time is not None and v <= start_time:
             raise ValueError(f"end_time({v})必須大於start_time({start_time})")
         return v
 
-    @validator('timeframe')
+    @field_validator('timeframe')
     def validate_timeframe_format(cls, v):
         """驗證時間週期格式"""
         # 簡單驗證,實際支援的週期由系統決定
@@ -263,8 +266,8 @@ class ChartSignalCalculationRequest(BaseModel):
             raise ValueError(f"無效的timeframe: {v}, 必須以m/h/d結尾")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "symbol": "BTCUSDT",
                 "timeframe": "1h",
@@ -282,6 +285,7 @@ class ChartSignalCalculationRequest(BaseModel):
                 }
             }
         }
+    )
 
 
 class SignalPoint(BaseModel):
@@ -306,8 +310,8 @@ class SignalPoint(BaseModel):
         le=1.0
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "timestamp": 1704067200000,
                 "indicator_values": {
@@ -318,6 +322,7 @@ class SignalPoint(BaseModel):
                 "signal_density": 0.75
             }
         }
+    )
 
 
 class ChartSignalCalculationResponse(BaseModel):
@@ -360,11 +365,11 @@ class ChartSignalCalculationResponse(BaseModel):
         description="策略名稱(用於UI顯示)"
     )
 
-    @validator('signal_count')
-    def validate_signal_count_matches(cls, v, values):
+    @field_validator('signal_count')
+    def validate_signal_count_matches(cls, v, info: ValidationInfo):
         """驗證signal_count與signal_points長度一致(未採樣時)"""
-        signal_points = values.get('signal_points', [])
-        is_sampled = values.get('is_sampled', False)
+        signal_points = info.data.get('signal_points', []) if info.data else []
+        is_sampled = info.data.get('is_sampled', False) if info.data else False
 
         if not is_sampled and len(signal_points) != v:
             raise ValueError(
@@ -372,8 +377,8 @@ class ChartSignalCalculationResponse(BaseModel):
             )
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "signal_points": [
                     {
@@ -393,6 +398,7 @@ class ChartSignalCalculationResponse(BaseModel):
                 "strategy_name": "EMA(7,18,35)三線排列"
             }
         }
+    )
 
 
 # ==================== 策略測試 (Task 3.3) ====================
@@ -423,12 +429,12 @@ class StrategyTestRequest(BaseModel):
     positive_cases: List[str] = Field(
         ...,
         description="正例案例ID列表",
-        min_items=1
+        min_length=1
     )
     negative_cases: List[str] = Field(
         ...,
         description="反例案例ID列表",
-        min_items=1
+        min_length=1
     )
     test_mode: Literal["single", "optuna"] = Field(
         "single",
@@ -445,18 +451,18 @@ class StrategyTestRequest(BaseModel):
         le=1000
     )
 
-    @validator('parameter_ranges')
-    def validate_parameter_ranges_for_optuna(cls, v, values):
+    @field_validator('parameter_ranges')
+    def validate_parameter_ranges_for_optuna(cls, v, info: ValidationInfo):
         """驗證Optuna模式必須提供parameter_ranges"""
-        test_mode = values.get('test_mode')
+        test_mode = info.data.get('test_mode') if info.data else None
         if test_mode == 'optuna' and v is None:
             raise ValueError("test_mode='optuna'時,必須提供parameter_ranges")
         if test_mode == 'single' and v is not None:
             raise ValueError("test_mode='single'時,不應提供parameter_ranges")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "strategy_config": {
                     "data_source": "close",
@@ -479,6 +485,7 @@ class StrategyTestRequest(BaseModel):
                 "test_mode": "single"
             }
         }
+    )
 
 
 class StrategyTestResponse(BaseModel):
@@ -524,8 +531,8 @@ class StrategyTestResponse(BaseModel):
         description="優化試驗次數(僅Optuna模式)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "positive_avg_density": 0.75,
                 "negative_avg_density": 0.35,
@@ -541,6 +548,7 @@ class StrategyTestResponse(BaseModel):
                 "test_mode": "single"
             }
         }
+    )
 
 
 # ==================== 策略配置驗證 ====================
@@ -557,8 +565,8 @@ class StrategyConfigValidationRequest(BaseModel):
         description="待驗證的策略配置"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "strategy_config": {
                     "data_source": "close",
@@ -572,6 +580,7 @@ class StrategyConfigValidationRequest(BaseModel):
                 }
             }
         }
+    )
 
 
 class StrategyConfigValidationResponse(BaseModel):
@@ -593,11 +602,12 @@ class StrategyConfigValidationResponse(BaseModel):
         description="警告訊息列表(若有)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "is_valid": True,
                 "errors": [],
                 "warnings": ["建議ema_short與ema_mid間距不要過小"]
             }
         }
+    )

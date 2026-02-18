@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import threading
 import uuid
 from io import BytesIO
@@ -163,7 +164,15 @@ class ICAnalysisService:
             task_info = self._tasks.get(task_id)
             if not task_info:
                 return None
-            return task_info.get("result")
+            result = task_info.get("result")
+
+        if result is None:
+            return None
+
+        normalized = self._to_json_compatible(result)
+        if isinstance(normalized, dict):
+            return normalized
+        return {"raw": normalized}
 
     def export_analysis(self, task_id: str, format_type: str, module_name: Optional[str] = None) -> Dict[str, Any]:
         """Export IC analysis result into requested format."""
@@ -702,11 +711,20 @@ class ICAnalysisService:
     def _to_json_compatible(self, value: Any) -> Any:
         """Recursively normalize nested values for FastAPI/Pydantic serialization."""
 
-        if value is None or isinstance(value, (str, int, float, bool)):
+        if value is None:
+            return value
+
+        if isinstance(value, float):
+            return value if math.isfinite(value) else None
+
+        if isinstance(value, (str, int, bool)):
             return value
 
         if isinstance(value, np.generic):
-            return value.item()
+            scalar = value.item()
+            if isinstance(scalar, float):
+                return scalar if math.isfinite(scalar) else None
+            return scalar
 
         if isinstance(value, np.ndarray):
             return [self._to_json_compatible(item) for item in value.tolist()]

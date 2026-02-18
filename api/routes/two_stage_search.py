@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from ..models.requests import SearchConfigRequest, FilterConditionRequest
 from ..models.responses import TaskStartResponse, SearchResponse
@@ -29,8 +29,8 @@ class NegativeCaseRequest(BaseModel):
         description="是否啟用隨機取樣（True=啟用，False=返回所有符合條件的反例）"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "negative_conditions": [
                     {
@@ -48,6 +48,7 @@ class NegativeCaseRequest(BaseModel):
                 "enable_random_sampling": True
             }
         }
+    )
 
 # MockSearchTaskService 定義
 class MockSearchTaskService:

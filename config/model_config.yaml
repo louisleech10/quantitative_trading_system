@@ -41,3 +41,59 @@ validation:
   purge_gap: 5
   early_stopping_rounds: 50
   oot_min_samples: 50
+
+# === Phase 3.5 新增：模型訓練增強 ===
+
+probability_calibration:
+  enabled: true
+  method: auto
+  cv: 5
+  min_samples_isotonic: 1000
+  fallback_on_degradation: true
+
+walk_forward:
+  enabled: true
+  mode: rolling
+  train_size: 500
+  test_size: 100
+  step_size: null
+  purge_gap: 5
+  embargo_pct: 0.01
+  auc_threshold: 0.55
+  min_periods: 3
+
+sample_weight:
+  enabled: true
+  strategies:
+    - time_decay
+    - class_balance
+  combination: multiply
+  time_decay_half_life: 180
+  time_decay_type: exponential
+  class_balance_method: balanced
+  min_weight: 0.01
+
+adversarial_validation:
+  enabled: true
+  n_estimators: 100
+  cv: 5
+  auc_warning_threshold: 0.55
+  auc_severe_threshold: 0.70
+  include_feature_tests: true
+  include_leakage_detection: true
+
+cpcv:
+  enabled: true
+  n_groups: 6
+  n_test_groups: 2
+  purge_gap: 5
+  embargo_pct: 0.01
+  max_paths: 50
+  compute_backtest_paths: true
+
+learning_curve:
+  enabled: true
+  cv: 5
+  metric: auc
+  train_fractions: [0.1, 0.2, 0.4, 0.6, 0.8, 1.0]
+  ranking_method: gain

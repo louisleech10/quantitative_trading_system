@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -269,3 +270,15 @@ class FilteredFeatureSet:
     ic_results: List[ICResult]
     diversification_metrics: Dict[str, Any] = field(default_factory=dict)
     filter_log: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SkippedResult:
+    """模組執行跳過或失敗時的結構化結果（SPEC §1.5.3）"""
+
+    module_name: str
+    reason: str
+    error_type: str  # INSUFFICIENT_DATA | SINGLE_CLASS | TIMEOUT | NUMERICAL_ERROR | ZERO_VARIANCE | UNEXPECTED
+    details: Optional[Dict] = None
+    retryable: bool = False
+    timestamp: str = field(default_factory=lambda: datetime.now().isoformat())

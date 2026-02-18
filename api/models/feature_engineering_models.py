@@ -7,7 +7,7 @@ Author: AI Agent
 Date: 2026-01-10
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Dict, List, Optional
 
 
@@ -30,9 +30,9 @@ class FeatureExtractionRequest(BaseModel):
         alias="validate"
     )
     
-    class Config:
-        populate_by_name = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_json_schema_extra={
             "example": {
                 "case_id": "ETHUSDT_1735905600_1",
                 "symbol": "ETHUSDT",
@@ -48,6 +48,7 @@ class FeatureExtractionRequest(BaseModel):
                 "validate": True
             }
         }
+    )
 
 
 # Response Models
@@ -99,8 +100,9 @@ class FeatureStats(BaseModel):
     percentile_50: float = Field(..., alias='50%')
     percentile_75: float = Field(..., alias='75%')
     
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
 
 
 class CorrelationPair(BaseModel):

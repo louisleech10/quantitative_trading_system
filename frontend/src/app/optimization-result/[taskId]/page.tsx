@@ -53,6 +53,7 @@ import {
 import { Loader2, AlertCircle, Home, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import ExportButton from '@/components/common/ExportButton'
 
 // API Base URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -474,14 +475,21 @@ export default function OptimizationResultPage() {
               Task ID: {taskId} · Study: {result.study_direction}
             </p>
           </div>
-          <Button asChild size="lg">
-            <Link href={`/optimization-result/${taskId}/pipeline`}>
-              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              配置 Pipeline
-            </Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <ExportButton
+              modelTaskId={taskId}
+              scope="optimization"
+              availableFormats={['csv', 'json', 'markdown']}
+            />
+            <Button asChild size="lg">
+              <Link href={`/optimization-result/${taskId}/pipeline`}>
+                <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                配置 Pipeline
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
@@ -92,11 +92,11 @@ class EnhancedCaseData(BaseModel):
     # 時間範圍
     time_range: Optional[Dict[str, str]] = None
     
-    class Config:
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             datetime: lambda dt: dt.isoformat()
         }
-
+    )
 
 class EnhancedSearchRequest(BaseModel):
     """擴充的搜索請求模型"""

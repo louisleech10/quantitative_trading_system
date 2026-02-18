@@ -11,7 +11,7 @@ Ultra Think 優化記錄:
 """
 
 from typing import Dict, Any, List, Optional, Literal
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict, ValidationInfo
 import math
 from momentum.Indicators.types import DataSourceEnum
 
@@ -77,40 +77,41 @@ class TrainingWindowConfig(BaseModel):
         description="自定義時間戳(僅當reference_point='custom'時使用)"
     )
 
-    @validator('far_lookback_bars')
-    def validate_far_lookback_bars(cls, v, values):
+    @field_validator('far_lookback_bars')
+    def validate_far_lookback_bars(cls, v, info: ValidationInfo):
         """驗證far_lookback_bars > lookback_bars"""
         if v is not None:
-            lookback = values.get('lookback_bars')
+            lookback = info.data.get('lookback_bars') if info.data else None
             if lookback is not None and v <= lookback:
                 raise ValueError(
                     f"far_lookback_bars ({v}) 必須大於 lookback_bars ({lookback})"
                 )
         return v
 
-    @validator('custom_timestamp')
-    def validate_custom_timestamp(cls, v, values):
+    @field_validator('custom_timestamp')
+    def validate_custom_timestamp(cls, v, info: ValidationInfo):
         """驗證custom_timestamp與reference_point的一致性"""
-        if values.get('reference_point') == 'custom' and v is None:
+        reference_point = info.data.get('reference_point') if info.data else None
+        if reference_point == 'custom' and v is None:
             raise ValueError("當reference_point='custom'時,必須提供custom_timestamp")
-        if values.get('reference_point') != 'custom' and v is not None:
+        if reference_point != 'custom' and v is not None:
             raise ValueError("當reference_point不是'custom'時,不應提供custom_timestamp")
         return v
 
-    @root_validator(skip_on_failure=True)
-    def validate_lookback_or_date_range(cls, values):
+    @model_validator(mode='after')
+    def validate_lookback_or_date_range(self):
         """驗證 lookback_bars 或日期區間至少提供一種"""
-        lookback = values.get('lookback_bars')
-        start_date = values.get('start_date')
-        end_date = values.get('end_date')
-        timeframe = values.get('timeframe')
+        lookback = self.lookback_bars
+        start_date = self.start_date
+        end_date = self.end_date
+        timeframe = self.timeframe
 
         if lookback is None and not (start_date and end_date and timeframe):
             raise ValueError("必須提供 lookback_bars 或 (start_date, end_date, timeframe)")
-        return values
+        return self
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "reference_point": "TO",
                 "lookback_bars": 24,
@@ -119,6 +120,7 @@ class TrainingWindowConfig(BaseModel):
                 "mode": "relative"
             }
         }
+    )
 
 
 class StrategyConfig(BaseModel):
@@ -157,11 +159,11 @@ class StrategyConfig(BaseModel):
         description="策略參數字典,包含指標參數(如period)和策略參數(如閾值)"
     )
 
-    @validator('params')
-    def validate_params(cls, v, values):
+    @field_validator('params')
+    def validate_params(cls, v, info: ValidationInfo):
         """驗證params中的型別（不強制要求完整參數）"""
-        indicator_type = values.get('indicator_type')
-        strategy_logic = values.get('strategy_logic')
+        indicator_type = info.data.get('indicator_type') if info.data else None
+        strategy_logic = info.data.get('strategy_logic') if info.data else None
 
         if indicator_type == 'ema' and strategy_logic == 'three_line':
             numeric_keys = [
@@ -174,8 +176,8 @@ class StrategyConfig(BaseModel):
 
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "data_source": "close",
                 "indicator_type": "ema",
@@ -187,6 +189,7 @@ class StrategyConfig(BaseModel):
                 }
             }
         }
+    )
 
 
 class SignalDensityRequest(BaseModel):
@@ -210,8 +213,8 @@ class SignalDensityRequest(BaseModel):
         description="反例案例ID列表"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "strategy_config": {
                     "data_source": "close",
@@ -233,6 +236,7 @@ class SignalDensityRequest(BaseModel):
                 "negative_cases": ["ETHUSDT_1736946000_0"]
             }
         }
+    )
 
 
 class TrainingWindowPreviewRequest(BaseModel):
@@ -241,8 +245,8 @@ class TrainingWindowPreviewRequest(BaseModel):
     case_id: str = Field(..., description="案例ID")
     window_config: TrainingWindowConfig = Field(..., description="訓練窗口配置")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "case_id": "BTCUSDT_1736942400_1",
                 "window_config": {
@@ -253,6 +257,7 @@ class TrainingWindowPreviewRequest(BaseModel):
                 }
             }
         }
+    )
 
 
 class SignalDensityResponse(BaseModel):
@@ -361,7 +366,7 @@ class SignalDensityResponse(BaseModel):
         description="Cohen's d效果量,>0.2小效果,>0.5中效果,>0.8大效果"
     )
 
-    @validator('p_value', pre=True)
+    @field_validator('p_value', mode='before')
     def handle_nan_p_value(cls, v):
         """
         處理NaN p-value
@@ -373,7 +378,7 @@ class SignalDensityResponse(BaseModel):
             return 1.0
         return v
 
-    @validator('cohens_d', pre=True)
+    @field_validator('cohens_d', mode='before')
     def handle_nan_cohens_d(cls, v):
         """
         處理NaN Cohen's d
@@ -563,8 +568,8 @@ class SignalDensityResponse(BaseModel):
         description="每個案例的信號密度字典(case_id → density)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 # 單密度模式範例
                 "positive_avg_density": 0.75,
@@ -615,3 +620,4 @@ class SignalDensityResponse(BaseModel):
                 }
             }
         }
+    )

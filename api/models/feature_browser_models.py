@@ -1,37 +1,10 @@
-"""Pydantic models for Feature Browser API."""
+"""Pydantic models for Feature Browser API (Phase 8 / M9)."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-
-
-class FeatureCatalogItem(BaseModel):
-    name: str
-    category: str = "unknown"
-    source: str = "features"
-    layer: str = "L1"
-    family: str = "general"
-    params: Dict[str, Any] = Field(default_factory=dict)
-    coverage: float
-    mean: Optional[float] = None
-    std: Optional[float] = None
-    nan_pct: float
-
-
-class FeatureCatalogSummary(BaseModel):
-    total_features: int
-    total_categories: int
-    avg_coverage: float
-    stationary_ratio: float
-    low_quality_count: int
-    redundant_pairs: int
-
-
-class FeatureCatalogResponse(BaseModel):
-    items: List[FeatureCatalogItem]
-    summary: FeatureCatalogSummary
 
 
 class HistogramBin(BaseModel):
@@ -67,42 +40,117 @@ class FeatureDistributionResponse(BaseModel):
     statistics: FeatureDistributionStatistics
 
 
-class FeatureTimeSeriesPoint(BaseModel):
-    timestamp: Optional[str] = None
-    values: Dict[str, Optional[float]]
+class FeatureOverviewItem(BaseModel):
+    feature_name: str
+    data_type: str
+    mean: Optional[float] = None
+    std: Optional[float] = None
+    min: Optional[float] = None
+    max: Optional[float] = None
+    nan_pct: float
 
 
-class FeatureACFItem(BaseModel):
-    lag: int
-    value: float
+class FeatureOverviewResponse(BaseModel):
+    total_rows: int
+    total_features: int
+    numeric_features: int
+    mean_nan_pct: float
+    items: List[FeatureOverviewItem]
 
 
-class FeatureFrequencyItem(BaseModel):
-    frequency: float
-    amplitude: float
+class ICDashboardEntry(BaseModel):
+    feature_name: str
+    ic_mean: float
+    ic_std: float
+    ir: float
+    t_stat: float
+    significance: str
+    sparkline: List[float]
 
 
-class FeatureTimeSeriesResponse(BaseModel):
-    features: List[str]
-    sample_rate: int
-    points: List[FeatureTimeSeriesPoint]
-    acf: Dict[str, List[FeatureACFItem]]
-    periodicity: Dict[str, List[FeatureFrequencyItem]]
+class ICDashboardResponse(BaseModel):
+    available: bool
+    message: Optional[str] = None
+    entries: List[ICDashboardEntry] = Field(default_factory=list)
+
+
+class RollingICPoint(BaseModel):
+    timestamp: str
+    ic: float
+    ir: Optional[float] = None
+
+
+class RollingICResponse(BaseModel):
+    feature_name: str
+    window: int
+    points: List[RollingICPoint]
+
+
+class FeatureQualityScore(BaseModel):
+    feature_name: str
+    stationarity_score: float
+    coverage_score: float
+    drift_score: float
+    redundancy_score: float
+    total_score: float
+    grade: str
+
+
+class QualityScorecardResponse(BaseModel):
+    items: List[FeatureQualityScore]
+    funnel: Dict[str, int]
 
 
 class CorrelationMatrixResponse(BaseModel):
     method: str
     features: List[str]
     matrix: List[List[float]]
-    mode: str
+    truncated: bool = False
+    original_feature_count: int = 0
 
 
-class FeatureQualityItem(BaseModel):
-    feature: str
-    adf_pvalue: Optional[float] = None
-    is_stationary: bool
-    coverage: float
-    nan_pct: float
+class VIFEntry(BaseModel):
+    feature_name: str
+    vif: float
+    status: str
+
+
+class VIFResponse(BaseModel):
+    items: List[VIFEntry]
+
+
+class DriftMonitorEntry(BaseModel):
+    feature_name: str
+    psi: float
+    ks_stat: float
+    ks_pvalue: float
+    status: str
+
+
+class DriftMonitorResponse(BaseModel):
+    items: List[DriftMonitorEntry]
+
+
+class SHAPSummaryEntry(BaseModel):
+    feature_name: str
+    mean_abs_shap: float
+    mean_shap: float
+
+
+class SHAPSummaryResponse(BaseModel):
+    available: bool
+    message: Optional[str] = None
+    items: List[SHAPSummaryEntry] = Field(default_factory=list)
+
+
+class ImportanceComparisonEntry(BaseModel):
+    feature_name: str
+    lightgbm_importance: float
+    xgboost_importance: float
+
+
+class ImportanceComparisonResponse(BaseModel):
+    items: List[ImportanceComparisonEntry]
 
 
 class FeatureQualityCheckRequest(BaseModel):
@@ -111,7 +159,7 @@ class FeatureQualityCheckRequest(BaseModel):
 
 
 class FeatureQualityCheckResponse(BaseModel):
-    results: List[FeatureQualityItem]
+    results: List[Dict[str, Any]]
 
 
 class FeatureDataTableResponse(BaseModel):

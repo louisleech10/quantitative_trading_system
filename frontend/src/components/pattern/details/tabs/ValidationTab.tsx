@@ -7,8 +7,13 @@ import CalibrationCurveChart from '../charts/CalibrationCurveChart';
 import PRCurveChart from '../charts/PRCurveChart';
 import ProbabilityDensityChart from '../charts/ProbabilityDensityChart';
 import MetricCard from '../shared/MetricCard';
+import ExportButton from '@/components/common/ExportButton';
 
-export default function ValidationTab() {
+interface ValidationTabProps {
+  taskId: string;
+}
+
+export default function ValidationTab({ taskId }: ValidationTabProps) {
   const {
     ootValidation,
     calibrationCurve,
@@ -19,6 +24,11 @@ export default function ValidationTab() {
 
   return (
     <div className="p-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <ExportButton modelTaskId={taskId} scope="performance" availableFormats={['csv', 'json', 'markdown']} />
+        <ExportButton modelTaskId={taskId} scope="calibration" availableFormats={['csv', 'json', 'markdown']} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <OOTValidationPanel data={ootValidation} loading={deepAnalysisLoading.oot} />
         <div className="grid grid-cols-2 gap-4">

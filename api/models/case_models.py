@@ -5,7 +5,7 @@
 """
 
 from typing import Optional, List, Dict
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 from enum import Enum
 
@@ -26,7 +26,7 @@ class CaseRecord(BaseModel):
     source_file: Optional[str] = Field(None, description="來源CSV文件名")
     import_time: Optional[datetime] = Field(None, description="導入時間")
 
-    @validator('timeframe')
+    @field_validator('timeframe')
     def validate_timeframe(cls, v):
         """驗證timeframe格式"""
         valid_timeframes = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w']
@@ -34,15 +34,15 @@ class CaseRecord(BaseModel):
             raise ValueError(f"Invalid timeframe: {v}. Must be one of {valid_timeframes}")
         return v
 
-    @validator('symbol')
+    @field_validator('symbol')
     def validate_symbol(cls, v):
         """驗證symbol格式"""
         if not v or not v.isupper():
             raise ValueError(f"Symbol must be uppercase: {v}")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "case_id": "BTCUSDT_1736942400_1",
                 "symbol": "BTCUSDT",
@@ -53,6 +53,7 @@ class CaseRecord(BaseModel):
                 "import_time": "2025-01-15T12:00:00"
             }
         }
+    )
 
 
 class CaseImportRequest(BaseModel):
@@ -64,13 +65,14 @@ class CaseImportRequest(BaseModel):
     default_timeframe: Optional[str] = Field("1h", description="預設時間框架（CSV缺少時使用）")
     validate_only: bool = Field(False, description="僅驗證不導入")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "default_timeframe": "1h",
                 "validate_only": False
             }
         }
+    )
 
 
 class CaseImportResponse(BaseModel):
@@ -90,8 +92,8 @@ class CaseImportResponse(BaseModel):
     need_confirmation: bool = Field(False, description="是否需要用戶確認清空現有案例")
     existing_count: int = Field(0, description="現有案例數量")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "success": True,
                 "total_rows": 100,
@@ -103,6 +105,7 @@ class CaseImportResponse(BaseModel):
                 "case_ids": ["BTCUSDT_1736942400_1", "ETHUSDT_1736946000_1"]
             }
         }
+    )
 
 
 class BatchDownloadRequest(BaseModel):
@@ -124,21 +127,21 @@ class BatchDownloadRequest(BaseModel):
     force_redownload: bool = Field(False, description="強制重新下載（覆蓋已有數據）")
     timeframe: str = Field("1h", description="K線時間框架（預設1h用於ML訓練，可選1m/5m/15m/30m/1h/4h/12h/1d）")
 
-    @validator('lookback_bars')
+    @field_validator('lookback_bars')
     def validate_lookback(cls, v):
         """驗證lookback_bars範圍"""
         if not 1 <= v <= 1000:
             raise ValueError("lookback_bars must be between 1 and 1000")
         return v
 
-    @validator('forward_bars')
+    @field_validator('forward_bars')
     def validate_forward(cls, v):
         """驗證forward_bars範圍"""
         if not 1 <= v <= 500:
             raise ValueError("forward_bars must be between 1 and 500")
         return v
 
-    @validator('timeframe')
+    @field_validator('timeframe')
     def validate_timeframe(cls, v):
         """驗證timeframe有效性"""
         valid_timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '12h', '1d']
@@ -146,8 +149,8 @@ class BatchDownloadRequest(BaseModel):
             raise ValueError(f"timeframe must be one of {valid_timeframes}")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "case_ids": None,
                 "lookback_bars": 240,
@@ -156,6 +159,7 @@ class BatchDownloadRequest(BaseModel):
                 "timeframe": "1h"
             }
         }
+    )
 
 
 class TaskStatus(str, Enum):
@@ -187,8 +191,8 @@ class DownloadProgress(BaseModel):
     start_time: datetime = Field(..., description="開始時間")
     end_time: Optional[datetime] = Field(None, description="結束時間")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "task_id": "batch_download_20250115_120000",
                 "status": "running",
@@ -204,6 +208,7 @@ class DownloadProgress(BaseModel):
                 "end_time": None
             }
         }
+    )
 
 
 class DownloadResult(BaseModel):
@@ -226,8 +231,8 @@ class DownloadResult(BaseModel):
     total_bars_downloaded: int = Field(0, description="總下載K線根數")
     total_download_time: float = Field(0.0, description="總下載時間（秒）")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "task_id": "batch_download_20250115_120000",
                 "success": True,
@@ -244,6 +249,7 @@ class DownloadResult(BaseModel):
                 "total_download_time": 125.5
             }
         }
+    )
 
 
 class CaseListResponse(BaseModel):
@@ -259,8 +265,8 @@ class CaseListResponse(BaseModel):
     symbols: List[str] = Field(..., description="涉及的symbol列表")
     timeframes: List[str] = Field(..., description="涉及的timeframe列表")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "total": 100,
                 "cases": [],
@@ -270,3 +276,4 @@ class CaseListResponse(BaseModel):
                 "timeframes": ["1h", "4h"]
             }
         }
+    )

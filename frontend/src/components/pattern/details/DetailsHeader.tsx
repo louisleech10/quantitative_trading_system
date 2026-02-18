@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft } from 'lucide-react';
+import ExportButton from '@/components/common/ExportButton';
 
 interface DetailsHeaderProps {
   taskId: string;
@@ -29,6 +30,11 @@ export default function DetailsHeader({ taskId, engineType }: DetailsHeaderProps
           <ArrowLeft className="w-4 h-4 mr-2" />
           返回分析頁
         </Button>
+        <ExportButton
+          modelTaskId={taskId}
+          scope="full"
+          availableFormats={['csv', 'json', 'markdown']}
+        />
       </div>
     </div>
   );

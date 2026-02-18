@@ -52,10 +52,10 @@ export default function XGBoostDetailsPage() {
           </TabsList>
 
           <TabsContent value="validation">
-            <ValidationTab />
+            <ValidationTab taskId={taskId} />
           </TabsContent>
           <TabsContent value="features">
-            <FeaturesTab />
+            <FeaturesTab taskId={taskId} />
           </TabsContent>
           <TabsContent value="monitoring">
             <MonitoringTab taskId={taskId} />

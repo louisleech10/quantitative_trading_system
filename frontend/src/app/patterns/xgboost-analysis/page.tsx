@@ -524,8 +524,8 @@ export default function XGBoostAnalysisPage() {
                         <TabsTrigger value="monitoring">監控</TabsTrigger>
                         <TabsTrigger value="diagnosis">診斷</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="validation"><ValidationTab /></TabsContent>
-                      <TabsContent value="features"><FeaturesTab /></TabsContent>
+                      <TabsContent value="validation"><ValidationTab taskId={effectiveDeepTaskId} /></TabsContent>
+                      <TabsContent value="features"><FeaturesTab taskId={effectiveDeepTaskId} /></TabsContent>
                       <TabsContent value="monitoring"><MonitoringTab taskId={effectiveDeepTaskId} /></TabsContent>
                       <TabsContent value="diagnosis"><DiagnosisTab taskId={effectiveDeepTaskId} /></TabsContent>
                     </Tabs>

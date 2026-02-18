@@ -85,7 +85,7 @@
 
 ### 2.1 SkippedResult 結構（SPEC §1.5.3）
 
-> **⚠️ 尚未存在於程式碼中**：`momentum/core/contracts.py` 目前無 `SkippedResult`，需在 **Task 0.1** 中新增。
+> **✅ 已完成（2026-02-17）**：`momentum/core/contracts.py` 已新增 `SkippedResult`（Task 0.1）。
 
 ```python
 @dataclass
@@ -168,6 +168,11 @@ class ProbabilityCalibrator:
 
 ## 3. Phase 0：前置條件
 
+**目前狀態（2026-02-18）**
+- [x] Task 0.1：`SkippedResult` dataclass 已新增並可 import
+- [x] Task 0.2：`requirements.txt` 已新增 `betacal>=0.2.7`
+- [x] Task 0.3：`tests/momentum/Analysis/model_validation/__init__.py` 已建立
+
 ### 驗證檢查點
 
 - PASS: Task 0.1-0.3 全部完成後，可成功 import `SkippedResult` 並確認測試目錄存在。
@@ -198,8 +203,8 @@ class SkippedResult:
 **依賴**：無
 
 **驗收條件**：
-- [ ] `SkippedResult` 可從 `momentum.core.contracts` import
-- [ ] 不影響現有 contracts.py 中的 `TrainingWindowConfig`, `StrategyConfig` 等
+- [x] `SkippedResult` 可從 `momentum.core.contracts` import
+- [x] 不影響現有 contracts.py 中的 `TrainingWindowConfig`, `StrategyConfig` 等
 
 **驗證檢查點**：
 - PASS: `python -c "from momentum.core.contracts import SkippedResult; print(SkippedResult('m1','test','TIMEOUT'))"` 輸出正常
@@ -227,8 +232,8 @@ betacal>=0.2.7
 **依賴**：無
 
 **驗收條件**：
-- [ ] `pip install betacal` 成功
-- [ ] import 不報錯
+- [x] `pip install betacal` 成功
+- [x] import 不報錯
 
 **驗證檢查點**：
 - PASS: `pip install betacal` 成功且 `python -c "import betacal"` 無錯誤
@@ -253,7 +258,7 @@ touch tests/momentum/Analysis/model_validation/__init__.py
 ```
 
 **驗收條件**：
-- [ ] `tests/momentum/Analysis/model_validation/__init__.py` 存在
+- [x] `tests/momentum/Analysis/model_validation/__init__.py` 存在
 
 **驗證檢查點**：
 - PASS: `ls tests/momentum/Analysis/model_validation/__init__.py` 存在
@@ -342,9 +347,9 @@ class LearningCurveConfig(BaseModel):
 ```
 
 **驗收條件**：
-- [ ] 所有 Config 使用 `pydantic.Field` 含 `ge`/`le`/`pattern` 驗證
-- [ ] `CPCVConfig` 含 `model_validator` 確保 `n_test_groups < n_groups`
-- [ ] 所有 Config 有 `enabled: bool = True` 開關
+- [x] 所有 Config 使用 `pydantic.Field` 含 `ge`/`le`/`pattern` 驗證
+- [x] `CPCVConfig` 含 `model_validator` 確保 `n_test_groups < n_groups`
+- [x] 所有 Config 有 `enabled: bool = True` 開關
 
 **驗證檢查點**：
 - PASS: `CPCVConfig(n_groups=6, n_test_groups=2)` 成功建立
@@ -434,9 +439,9 @@ learning_curve:
 ```
 
 **驗收條件**：
-- [ ] 不修改現有 `lightgbm`/`xgboost`/`validation` section
-- [ ] 所有預設值與 SPEC 一致
-- [ ] YAML 格式可被 `yaml.safe_load()` 正常解析
+- [x] 不修改現有 `lightgbm`/`xgboost`/`validation` section
+- [x] 所有預設值與 SPEC 一致
+- [x] YAML 格式可被 `yaml.safe_load()` 正常解析
 
 **驗證檢查點**：
 - PASS: `yaml.safe_load()` 後同時存在 `probability_calibration` 與 `learning_curve` key。
@@ -504,9 +509,9 @@ def create_learning_curve_analyzer(
 **依賴**：Task 2.1-2.6（所有 M1-M6 模組必須先存在才能 import）
 
 **驗收條件**：
-- [ ] 使用 lazy import（`from ... import` 在函式內部）
-- [ ] 不直接 import `api.*`
-- [ ] 參數統一為 `config: Optional[Dict] = None`
+- [x] 使用 lazy import（`from ... import` 在函式內部）
+- [x] 不直接 import `api.*`
+- [x] 參數統一為 `config: Optional[Dict] = None`
 
 **驗證檢查點**：
 - PASS: `from momentum.factories import create_*` 可成功 import 並建立 6 個模組實例。
@@ -616,9 +621,9 @@ class FullEnhancementResponse(BaseModel):
 ```
 
 **驗收條件**：
-- [ ] 不 import `momentum.*`（Rule 7）
-- [ ] 所有 Field 含驗證約束
-- [ ] `FullEnhancementRequest.modules` 有預設值
+- [x] 不 import `momentum.*`（Rule 7）
+- [x] 所有 Field 含驗證約束
+- [x] `FullEnhancementRequest.modules` 有預設值
 
 **驗證檢查點**：
 - PASS: 以最小 payload 建立 `CalibrateRequest(model_task_id='test-123')` 成功且預設值正確。
@@ -737,16 +742,16 @@ class ProbabilityCalibrator:
 ```
 
 **驗收條件**：
-- [ ] `fit()` 和 `fit_from_predictions()` 兩種入口皆可使用
-- [ ] `method='auto'` 時自動比較所有合格方法，選 ECE 最低
-- [ ] 校準後 ECE ≤ 校準前 ECE（合成資料驗證）
-- [ ] 11 個邊界條件全部有對應測試
-- [ ] 不 import `api.*`
+- [x] `fit()` 和 `fit_from_predictions()` 兩種入口皆可使用
+- [x] `method='auto'` 時自動比較所有合格方法，選 ECE 最低
+- [x] 校準後 ECE ≤ 校準前 ECE（合成資料驗證）
+- [x] 11 個邊界條件全部有對應測試
+- [x] 不 import `api.*`
 
 **驗證檢查點**：
 - PASS: `fit_from_predictions()` 合成資料 → `ECE_after < ECE_before`
 - PASS: 11 個邊界條件測試全部綠燈
-- FAIL: `fit()` 後 `calibration_failed=True` 時原始機率被正確保留
+- PASS: `fit()` 後 `calibration_failed=True` 時原始機率被正確保留
 
 **驗證命令**：
 ```bash
@@ -849,11 +854,11 @@ class WalkForwardReport:
 | W10 | expanding train OOM | 不在本模組處理 | `test_W10_expanding_memory_warning` |
 
 **驗收條件**：
-- [ ] Rolling / Expanding 兩種模式均可正常運作
-- [ ] Purge gap + embargo 與 `PurgedTimeSeriesSplit` 邏輯一致
-- [ ] `_assess_stability()` 按 SPEC 標準判定 robust/moderate/unstable
-- [ ] 10 個邊界條件全部有對應測試
-- [ ] feature_stability 統計頻率正確
+- [x] Rolling / Expanding 兩種模式均可正常運作
+- [x] Purge gap + embargo 與 `PurgedTimeSeriesSplit` 邏輯一致
+- [x] `_assess_stability()` 按 SPEC 標準判定 robust/moderate/unstable
+- [x] 10 個邊界條件全部有對應測試
+- [x] feature_stability 統計頻率正確
 
 **輸出 Schema**（SPEC §4.7）：
 
@@ -966,10 +971,10 @@ class SampleWeightCalculator:
 | S10 | timestamps 含 NaN | drop NaN + 重算 | `test_S10_nan_timestamps` |
 
 **驗收條件**：
-- [ ] 所有權重歸一化至均值 1.0
-- [ ] `compute_combined_weights()` 支援 multiply / additive 兩種組合
-- [ ] uniqueness 無 label_spans 時自動 fallback 至 time_decay
-- [ ] `get_weight_summary()` 含 effective_n 和 efficiency_ratio
+- [x] 所有權重歸一化至均值 1.0
+- [x] `compute_combined_weights()` 支援 multiply / additive 兩種組合
+- [x] uniqueness 無 label_spans 時自動 fallback 至 time_decay
+- [x] `get_weight_summary()` 含 effective_n 和 efficiency_ratio
 
 **輸出 Schema**（SPEC §5.7）：
 
@@ -1067,10 +1072,10 @@ class AdversarialValidator:
 | A8 | X_train 或 X_test 為空 | skip + `SkippedResult` | `test_A8_empty_dataset` |
 
 **驗收條件**：
-- [ ] 內建輕量 LightGBM 做分佈辨識（`n_estimators=100`）
-- [ ] 同時支援 KS test 和 PSI 兩種 feature-level 測試
-- [ ] temporal leakage detection 檢查 autocorrelation
-- [ ] 不依賴外部訓練模型
+- [x] 內建輕量 LightGBM 做分佈辨識（`n_estimators=100`）
+- [x] 同時支援 KS test 和 PSI 兩種 feature-level 測試
+- [x] temporal leakage detection 檢查 autocorrelation
+- [x] 不依賴外部訓練模型
 
 **輸出 Schema**（SPEC §6.6）：
 
@@ -1165,10 +1170,10 @@ class CombinatorialPurgedCV:
 | P9 | embargo 導致 train 為空 | auto 降低 embargo_pct | `test_P9_embargo_empties_train` |
 
 **驗收條件**：
-- [ ] `split()` 產出 Iterator 可用於 sklearn 風格 CV
-- [ ] `validate()` 回傳含 `path_aucs`, `backtest_paths`, `feature_stability`
-- [ ] C(6,2) = 15 paths 驗證數量正確
-- [ ] purge/embargo 邏輯復用 `time_splitter.py`
+- [x] `split()` 產出 Iterator 可用於 sklearn 風格 CV
+- [x] `validate()` 回傳含 `path_aucs`, `backtest_paths`, `feature_stability`
+- [x] C(6,2) = 15 paths 驗證數量正確
+- [x] purge/embargo 邏輯復用 `time_splitter.py`
 
 **輸出 Schema**（SPEC §7.5）：
 
@@ -1266,10 +1271,10 @@ class LearningCurveAnalyzer:
 | L8 | n_samples < 200 | 警告 | `test_L8_small_dataset` |
 
 **驗收條件**：
-- [ ] `analyze_data_curve()` 在多比例上訓練，回傳 train/cv scores
-- [ ] `analyze_feature_curve()` 按 importance 排名逐步增加特徵
-- [ ] `diagnose_bias_variance()` 正確判定 high_bias / high_variance / good_fit
-- [ ] `full_analysis()` 同時執行資料量 + 特徵量 + Bias-Variance
+- [x] `analyze_data_curve()` 在多比例上訓練，回傳 train/cv scores
+- [x] `analyze_feature_curve()` 按 importance 排名逐步增加特徵
+- [x] `diagnose_bias_variance()` 正確判定 high_bias / high_variance / good_fit
+- [x] `full_analysis()` 同時執行資料量 + 特徵量 + Bias-Variance
 
 **輸出 Schema**（SPEC §8.6）：
 
@@ -1477,12 +1482,12 @@ def _request_to_config(self, request: CalibrateRequest) -> Dict:
 ```
 
 **驗收條件**：
-- [ ] 全部透過 Factory 建立模組（Rule 3）
-- [ ] 不直接 import `momentum.Analysis.*` 的 concrete class
-- [ ] 不 import 其他 `api/services/*`（Rule 4）
-- [ ] `execute_full_enhancement()` 併行化無依賴模組
-- [ ] 每個模組有 per-module timeout 保護
-- [ ] `SkippedResult` 轉換為 `ModelEnhancementResponse(status='skipped')`
+- [x] 全部透過 Factory 建立模組（Rule 3）
+- [x] 不直接 import `momentum.Analysis.*` 的 concrete class
+- [x] 不 import 其他 `api/services/*`（Rule 4）
+- [x] `execute_full_enhancement()` 併行化無依賴模組
+- [x] 每個模組有 per-module timeout 保護
+- [x] `SkippedResult` 轉換為 `ModelEnhancementResponse(status='skipped')`
 
 **驗證檢查點**：
 - PASS: `execute_full_enhancement()` 回傳 6 個模組結果，且成功模組狀態為 `completed`。
@@ -1542,10 +1547,10 @@ app.include_router(model_enhancement_router)
 ```
 
 **驗收條件**：
-- [ ] Route handler 為薄層（≤ 5 行），業務邏輯在 Service
-- [ ] 8 個端點均回應 2xx（功能驗收 F7）
-- [ ] router prefix = `/api/v1/model-enhancement`
-- [ ] 在 `api/main.py` 中正確註冊
+- [x] Route handler 為薄層（≤ 5 行），業務邏輯在 Service
+- [x] 8 個端點均回應 2xx（功能驗收 F7）
+- [x] router prefix = `/api/v1/model-enhancement`
+- [x] 在 `api/main.py` 中正確註冊
 
 **驗證檢查點**：
 - PASS: 8 個端點在 OpenAPI 文件可見且對應 request/response model 正常註冊。
@@ -1611,9 +1616,9 @@ export const useModelEnhancementStore = create<ModelEnhancementState>((set) => (
 ```
 
 **驗收條件**：
-- [ ] 所有 TypeScript interface 與 SPEC §12.3 一致
-- [ ] Zustand store pattern 與現有 `searchStore.ts` / `optimizationStore.ts` 一致
-- [ ] TypeScript 編譯無錯誤
+- [x] 所有 TypeScript interface 與 SPEC §12.3 一致
+- [x] Zustand store pattern 與現有 `searchStore.ts` / `optimizationStore.ts` 一致
+- [x] TypeScript 編譯無錯誤
 
 **驗證檢查點**：
 - PASS: `npx tsc --noEmit` 通過，型別可正確約束 `ModelEnhancementResult`。
@@ -1643,10 +1648,10 @@ interface CalibrationPlotProps {
 ```
 
 **驗收條件**：
-- [ ] Line Chart 顯示 diagonal + original + calibrated 三條線
-- [ ] 空資料顯示 EmptyState
-- [ ] 支援 PNG 匯出
-- [ ] 自適應容器寬度（`ResponsiveContainer`）
+- [x] Line Chart 顯示 diagonal + original + calibrated 三條線
+- [x] 空資料顯示 EmptyState
+- [x] 支援 PNG 匯出
+- [x] 自適應容器寬度（`ResponsiveContainer`）
 
 **驗證檢查點**：
 - PASS: `data` 完整時可渲染三條曲線且 tooltip 顯示對應點資訊。
@@ -1671,9 +1676,9 @@ interface WalkForwardTimelineProps {
 ```
 
 **驗收條件**：
-- [ ] Bar 顯示各 period AUC + Line 顯示 moving average
-- [ ] 紅/黃/綠色標依 AUC 值
-- [ ] Tooltip 顯示 period 詳情（train/test 範圍、IS-OOS gap）
+- [x] Bar 顯示各 period AUC + Line 顯示 moving average
+- [x] 紅/黃/綠色標依 AUC 值
+- [x] Tooltip 顯示 period 詳情（train/test 範圍、IS-OOS gap）
 
 **驗證檢查點**：
 - PASS: 多 period 資料時可同時渲染 bar 與 moving average。
@@ -1690,9 +1695,9 @@ interface WalkForwardTimelineProps {
 **檔案**（新建）：`frontend/src/components/optimization/AdversarialFeatureChart.tsx`
 
 **驗收條件**：
-- [ ] Bar Chart 顯示各特徵 KS statistic
-- [ ] 顏色依 status（stable=green, warning=yellow, severe=red）
-- [ ] 支援排序（by KS statistic / by name）
+- [x] Bar Chart 顯示各特徵 KS statistic
+- [x] 顏色依 status（stable=green, warning=yellow, severe=red）
+- [x] 支援排序（by KS statistic / by name）
 
 **驗證檢查點**：
 - PASS: 提供 feature-level 資料時可依 KS 值與名稱切換排序。
@@ -1709,9 +1714,9 @@ interface WalkForwardTimelineProps {
 **檔案**（新建）：`frontend/src/components/optimization/CPCVPathChart.tsx`
 
 **驗收條件**：
-- [ ] Box/Violin Plot 顯示 path AUC 分佈
-- [ ] 顯示 mean/std/min/max 統計
-- [ ] 支援 PNG 匯出
+- [x] Box/Violin Plot 顯示 path AUC 分佈
+- [x] 顯示 mean/std/min/max 統計
+- [x] 支援 PNG 匯出
 
 **驗證檢查點**：
 - PASS: path AUC 陣列存在時可渲染分佈圖與四項摘要統計。
@@ -1728,9 +1733,9 @@ interface WalkForwardTimelineProps {
 **檔案**（新建）：`frontend/src/components/optimization/LearningCurveChart.tsx`
 
 **驗收條件**：
-- [ ] Dual Line Chart：train score + CV score
-- [ ] Shaded area 顯示 CV std
-- [ ] 支援切換 data curve / feature curve
+- [x] Dual Line Chart：train score + CV score
+- [x] Shaded area 顯示 CV std
+- [x] 支援切換 data curve / feature curve
 
 **驗證檢查點**：
 - PASS: 可在 data curve / feature curve 間切換且保持軸與圖例一致。
@@ -1780,10 +1785,10 @@ class TestProbabilityCalibrator:
 ```
 
 **驗收條件**：
-- [ ] 56 個邊界條件 100% 覆蓋
-- [ ] 每個模組至少 5 個功能測試
-- [ ] fixture 使用合成資料（`np.random.seed(42)` 確保可重現）
-- [ ] 所有測試獨立於 `run_api.py`（Rule 6）
+- [x] 56 個邊界條件 100% 覆蓋
+- [x] 每個模組至少 5 個功能測試
+- [x] fixture 使用合成資料（`np.random.seed(42)` 確保可重現）
+- [x] 所有測試獨立於 `run_api.py`（Rule 6）
 
 **驗證檢查點**：
 - PASS: 指定 6 個測試檔可全部通過，且 C/W/S/A/P/L 邊界條件命名一一對應。
@@ -1808,9 +1813,9 @@ pytest tests/momentum/Analysis/test_probability_calibrator.py tests/momentum/Ana
 | `tests/api/test_model_enhancement_routes.py` | API 端點 + Request Validation |
 
 **驗收條件**：
-- [ ] `full_enhancement` 全模組執行回傳 6 個結果
-- [ ] 資料不足時部分模組正確跳過
-- [ ] API 端點 8 個全回應 2xx
+- [x] `full_enhancement` 全模組執行回傳 6 個結果
+- [x] 資料不足時部分模組正確跳過
+- [x] API 端點 8 個全回應 2xx
 
 **驗證檢查點**：
 - PASS: service 測試中 `full_enhancement` 結果包含 6 個模組鍵值且任務狀態可查詢。
@@ -2533,6 +2538,13 @@ cd frontend && npx tsc --noEmit && npm run build
 pytest tests/momentum/Analysis/test_feature_toggle_registry.py tests/api/test_feature_toggle_routes.py -v --tb=short
 ```
 
+**Phase 6 完成狀態（2026-02-18）**
+- [x] Task 6.1: FeatureToggleRegistry 核心實作
+- [x] Task 6.2: YAML 配置 + Preset 系統
+- [x] Task 6.3: Feature Toggle API + Service
+- [x] Task 6.4: Frontend FeatureTogglePanel
+- [x] Task 6.5: M7 測試
+
 ---
 
 ## Phase 7: 多格式匯出系統 (M8)
@@ -2655,6 +2667,12 @@ cd frontend && npx tsc --noEmit && npm run build
 ```bash
 pytest tests/momentum/Analysis/test_analysis_exporter.py tests/api/test_export_routes.py -v --tb=short
 ```
+
+**Phase 7 完成狀態（2026-02-18）**
+- [x] Task 7.1: AnalysisExporter 核心實作
+- [x] Task 7.2: Export API + Service
+- [x] Task 7.3: Frontend ExportButton 整合
+- [x] Task 7.4: M8 測試
 
 ---
 
@@ -2791,6 +2809,13 @@ cd frontend && npx tsc --noEmit && npm run build
 # 架構合規
 grep -rn "from api\." momentum/ | wc -l  # 期望 0
 ```
+
+**Phase 8 完成狀態（2026-02-18）**
+- [x] Task 8.1: FeatureBrowserService + Backend API
+- [x] Task 8.2: Frontend Tab 1-2 (Overview + IC Dashboard)
+- [x] Task 8.3: Frontend Tab 3-4 (Quality + Correlation)
+- [x] Task 8.4: Frontend Tab 5-6 (Drift + Attribution)
+- [x] Task 8.5: Zustand Store + TypeScript + 整合測試
 
 ---
 

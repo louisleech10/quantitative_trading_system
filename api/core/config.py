@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     """應用程式配置設定"""
@@ -10,29 +10,29 @@ class Settings(BaseSettings):
     # 應用基本設定
     app_name: str = "Case Search API"
     app_version: str = "1.0.0"
-    debug: bool = Field(default=False, env="DEBUG")  # 關閉 reload 以避免 sklearn 導入問題
+    debug: bool = Field(default=False, validation_alias="DEBUG")  # 關閉 reload 以避免 sklearn 導入問題
     
     # API設定
     api_prefix: str = "/api/v1"
-    host: str = Field(default="127.0.0.1", env="API_HOST")
-    port: int = Field(default=8000, env="API_PORT")
+    host: str = Field(default="127.0.0.1", validation_alias="API_HOST")
+    port: int = Field(default=8000, validation_alias="API_PORT")
     
     # 幣安API設定
-    binance_api_key: Optional[str] = Field(default=None, env="BINANCE_API_KEY")
-    binance_secret_key: Optional[str] = Field(default=None, env="BINANCE_SECRET_KEY")
+    binance_api_key: Optional[str] = Field(default=None, validation_alias="BINANCE_API_KEY")
+    binance_secret_key: Optional[str] = Field(default=None, validation_alias="BINANCE_SECRET_KEY")
     
     # 資料路徑設定
     project_root: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent)
     data_cache_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache")
     kline_cache_dir: Path = Field(
         default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache",
-        env="KLINE_CACHE_DIR"
+        validation_alias="KLINE_CACHE_DIR"
     )
     results_output_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "search_results")
     logs_path: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "logs")
     
     # 日誌設定
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     # CORS設定
@@ -47,26 +47,27 @@ class Settings(BaseSettings):
     ]
     
     # 搜索任務設定
-    max_concurrent_searches: int = Field(default=3, env="MAX_CONCURRENT_SEARCHES")
-    search_timeout_seconds: int = Field(default=600, env="SEARCH_TIMEOUT")  # 10分鐘
+    max_concurrent_searches: int = Field(default=3, validation_alias="MAX_CONCURRENT_SEARCHES")
+    search_timeout_seconds: int = Field(default=600, validation_alias="SEARCH_TIMEOUT")  # 10分鐘
     
     # 快取設定
-    enable_cache: bool = Field(default=True, env="ENABLE_CACHE")
-    cache_ttl_seconds: int = Field(default=3600, env="CACHE_TTL")  # 1小時
+    enable_cache: bool = Field(default=True, validation_alias="ENABLE_CACHE")
+    cache_ttl_seconds: int = Field(default=3600, validation_alias="CACHE_TTL")  # 1小時
 
     # Phase 0: HDF5緩存配置
-    enable_hdf5_cache: bool = Field(default=True, env="ENABLE_HDF5_CACHE")
+    enable_hdf5_cache: bool = Field(default=True, validation_alias="ENABLE_HDF5_CACHE")
     hdf5_cache_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache" / "hdf5_cache")
-    hdf5_cache_compression: str = Field(default="blosc", env="HDF5_CACHE_COMPRESSION")
+    hdf5_cache_compression: str = Field(default="blosc", validation_alias="HDF5_CACHE_COMPRESSION")
     
     # 資料庫設定（未來擴展用）
-    database_url: Optional[str] = Field(default=None, env="DATABASE_URL")
+    database_url: Optional[str] = Field(default=None, validation_alias="DATABASE_URL")
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-        extra = "allow"  # 新增這行，允許額外欄位
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="allow",
+    )
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

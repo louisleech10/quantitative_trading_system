@@ -9,7 +9,7 @@ Updated: 2026-01-13 - 新增批量分析模型，支援指標配置
 Updated: 2026-01-28 - 新增 OOT 驗證模型
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Optional, Any, Literal, Union
 
 
@@ -39,8 +39,8 @@ class OOTValidationRequest(BaseModel):
         description="時間欄位名稱（None 時自動偵測）"
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "task_id": "task_20260128_123456",
                 "oot_start_date": "2024-07-01",
@@ -48,6 +48,7 @@ class OOTValidationRequest(BaseModel):
                 "validation_ratio": 0.1
             }
         }
+    )
 
 
 class TimePeriodInfo(BaseModel):
@@ -181,8 +182,8 @@ class IndicatorParamsConfig(BaseModel):
     data_source: str = Field(default="close", description="數據源：close, open, high, low, volume, taker_ratio")
     params: Dict[str, Any] = Field(..., description="指標參數")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "indicator": "ema_three_line",
                 "data_source": "close",
@@ -194,6 +195,7 @@ class IndicatorParamsConfig(BaseModel):
                 }
             }
         }
+    )
 
 
 class XGBoostBatchAnalysisRequest(BaseModel):
@@ -241,8 +243,8 @@ class XGBoostBatchAnalysisRequest(BaseModel):
     top_n_rules: int = Field(default=10, description="提取前 N 條規則")
     min_support: int = Field(default=10, description="最小支持度")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "symbols": ["ETHUSDT", "BTCUSDT"],
                 "timeframe": "12h",
@@ -273,6 +275,7 @@ class XGBoostBatchAnalysisRequest(BaseModel):
                 "cv_folds": 5
             }
         }
+    )
 
 
 class BatchAnalysisRequest(XGBoostBatchAnalysisRequest):
@@ -303,8 +306,8 @@ class XGBoostAnalysisRequest(BaseModel):
     top_n_rules: int = Field(default=10, description="提取前 N 條規則")
     min_support: int = Field(default=10, description="最小支持度")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_json_schema_extra={
             "example": {
                 "case_id": "case_20260110_123456",
                 "xgboost_params": {
@@ -317,6 +320,7 @@ class XGBoostAnalysisRequest(BaseModel):
                 "min_support": 10
             }
         }
+    )
 
 
 class FeatureCondition(BaseModel):

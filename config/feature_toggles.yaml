@@ -1,0 +1,37 @@
+presets:
+  essential-only:
+    description: "僅啟用 L1 基礎功能"
+    enabled_levels: ["L1"]
+  recommended:
+    description: "啟用 L1 + L2（初次使用建議）"
+    enabled_levels: ["L1", "L2"]
+  full:
+    description: "啟用所有功能"
+    enabled_levels: ["L1", "L2", "L3"]
+
+feature_toggles:
+  F-001: { enabled: true, locked: true }
+  F-002: { enabled: true, locked: true }
+  F-003: { enabled: true, locked: true }
+  F-004: { enabled: true, locked: true }
+
+  F-005: { enabled: true }
+  F-006: { enabled: true }
+  F-007: { enabled: true }
+  F-008: { enabled: false }
+  F-009: { enabled: false }
+  F-010: { enabled: true }
+  F-101: { enabled: true }
+  F-103: { enabled: true }
+  F-105: { enabled: true }
+  F-109: { enabled: true }
+
+  F-011: { enabled: false }
+  F-012: { enabled: false }
+  F-013: { enabled: false }
+  F-102: { enabled: false }
+  F-104: { enabled: false }
+  F-106: { enabled: false }
+  F-107: { enabled: false }
+  F-108: { enabled: false }
+  F-110: { enabled: false }

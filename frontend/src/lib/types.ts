@@ -951,6 +951,237 @@ export interface OptimizationResult {
   completed_at?: string;
 }
 
+// ===== Phase 4: Model Enhancement UI 類型定義 =====
+
+export interface CalibrationReliabilityCurve {
+  bin_midpoints: number[];
+  original_freq: number[];
+  calibrated_freq: number[];
+}
+
+export interface CalibrationMethodMetric {
+  ece: number;
+  brier: number;
+}
+
+export interface CalibrationResult {
+  method: string;
+  best_method: string;
+  improvement_pct: number;
+  calibration_failed: boolean;
+  reliability_curve: CalibrationReliabilityCurve;
+  comparison: Record<string, CalibrationMethodMetric>;
+  sample_size: number;
+  cv_folds: number;
+  status?: 'skipped';
+  skipped?: SkippedResult;
+}
+
+export interface WalkForwardPeriod {
+  period_index: number;
+  train_start_idx: number;
+  train_end_idx: number;
+  test_start_idx: number;
+  test_end_idx: number;
+  train_samples: number;
+  test_samples: number;
+  test_auc: number | null;
+  test_precision_at_k: number | null;
+  test_brier_score: number | null;
+  is_auc: number | null;
+  is_oos_gap: number | null;
+  top_features: string[];
+}
+
+export interface WalkForwardResult {
+  mode: 'rolling' | 'expanding';
+  n_periods: number;
+  period_results: WalkForwardPeriod[];
+  mean_oos_auc: number;
+  std_oos_auc: number;
+  min_oos_auc: number;
+  max_oos_auc: number;
+  oos_hit_rate: number;
+  mean_is_oos_gap: number;
+  auc_trend: 'improving' | 'degrading' | 'stable';
+  degradation_periods: number[];
+  feature_stability: Record<string, number>;
+  assessment: 'robust' | 'moderate' | 'unstable';
+}
+
+export interface WalkForwardMultiModeResult {
+  rolling?: WalkForwardResult;
+  expanding?: WalkForwardResult;
+}
+
+export interface AdversarialFeatureTest {
+  ks_statistic?: number;
+  ks_pvalue?: number;
+  psi?: number;
+  status: 'stable' | 'warning' | 'severe';
+  method?: string;
+}
+
+export interface AdversarialDistributionTest {
+  auc: number;
+  std: number;
+  status: 'good' | 'warning' | 'severe';
+  top_discriminating_features: string[];
+}
+
+export interface AdversarialLeakageDetection {
+  suspicious_features: string[];
+  autocorrelation_flags: Record<string, {
+    future_corr: number;
+    lag_1_corr: number;
+    is_suspicious: boolean;
+  }>;
+  status: 'ok' | 'skipped';
+}
+
+export interface AdversarialResult {
+  distribution_test: AdversarialDistributionTest;
+  feature_level_tests: Record<string, AdversarialFeatureTest>;
+  leakage_detection: AdversarialLeakageDetection;
+  overall_status: 'good' | 'warning' | 'severe';
+  recommendations: string[];
+}
+
+export interface CPCVPathResult {
+  path_index: number;
+  test_groups: number[];
+  auc: number | null;
+  n_train: number;
+  n_test: number;
+}
+
+export interface CPCVResult {
+  config: {
+    n_groups: number;
+    n_test_groups: number;
+    purge_gap: number;
+    embargo_pct: number;
+  };
+  n_paths: number;
+  summary: {
+    mean_auc: number;
+    std_auc: number;
+    min_auc: number;
+    max_auc: number;
+    hit_rate: number;
+  };
+  path_results: CPCVPathResult[];
+  path_aucs: number[];
+  backtest_paths: number[][];
+  feature_stability: Record<string, number>;
+  status?: 'skipped';
+  skipped?: SkippedResult;
+}
+
+export interface LearningCurveDataCurve {
+  fractions: number[];
+  train_scores: number[];
+  cv_scores: number[];
+  cv_stds?: number[];
+  feature_names?: string[];
+}
+
+export interface LearningCurveFeatureCurve {
+  feature_counts: number[];
+  cv_scores: number[];
+  optimal_n_features: number;
+  feature_ranking: string[];
+}
+
+export interface LearningCurveDiagnosis {
+  type: 'high_bias' | 'high_variance' | 'good_fit' | 'no_predictive_power' | 'insufficient_data';
+  description: string;
+  train_cv_gap: number;
+  convergence: boolean;
+  recommendation: string;
+}
+
+export interface LearningCurveResult {
+  data_curve: LearningCurveDataCurve;
+  feature_curve: LearningCurveFeatureCurve;
+  diagnosis: LearningCurveDiagnosis;
+}
+
+export interface ModelEnhancementModuleResponse {
+  task_id: string;
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  module: 'calibration' | 'walk_forward' | 'sample_weight' | 'adversarial' | 'cpcv' | 'learning_curve';
+  result?: Record<string, unknown>;
+  skipped_reason?: string | null;
+  execution_time_seconds?: number;
+  created_at: string;
+}
+
+export interface ModelEnhancementResult {
+  modules: {
+    calibration?: CalibrationResult;
+    walk_forward?: WalkForwardResult | WalkForwardMultiModeResult;
+    adversarial?: AdversarialResult;
+    cpcv?: CPCVResult;
+    learning_curve?: LearningCurveResult;
+    sample_weight?: Record<string, unknown>;
+  };
+  module_statuses?: Record<string, ModelEnhancementModuleResponse>;
+  task_id?: string;
+  status?: 'running' | 'completed' | 'failed' | 'skipped';
+  total_execution_time_seconds?: number;
+}
+
+// ===== Phase 6: Feature Toggle 類型定義 =====
+
+export interface FeatureToggle {
+  feature_id: string;
+  name: string;
+  description: string;
+  difficulty: 'L1' | 'L2' | 'L3';
+  is_enabled: boolean;
+  is_locked: boolean;
+  engine_types: string[];
+  dependencies: string[];
+  phase: string;
+  module?: string | null;
+  estimated_time?: string | null;
+  tags: string[];
+}
+
+export interface FeatureToggleSummaryResponse {
+  total: number;
+  enabled: number;
+  by_difficulty: Record<string, { total: number; enabled: number }>;
+  estimated_total_seconds: number;
+}
+
+export interface FeatureToggleListResponse {
+  toggles: FeatureToggle[];
+  summary: FeatureToggleSummaryResponse;
+  presets: string[];
+}
+
+export interface FeatureToggleUpdateRequest {
+  enabled: boolean;
+}
+
+export interface FeatureToggleResponse {
+  toggle: FeatureToggle;
+  cascaded: string[];
+  summary: FeatureToggleSummaryResponse;
+}
+
+export interface BatchToggleUpdateRequest {
+  updates: Record<string, boolean>;
+}
+
+export interface BatchToggleResponse {
+  updated: Record<string, boolean>;
+  cascaded: string[];
+  summary: FeatureToggleSummaryResponse;
+}
+
 /**
  * 參數重要性分析響應
  * 後端API返回的參數重要性數據
@@ -1748,11 +1979,100 @@ export interface FeatureBrowserDataTableResponse {
   rows: Record<string, unknown>[];
 }
 
+export interface FeatureOverviewItem {
+  feature_name: string;
+  data_type: string;
+  mean: number | null;
+  std: number | null;
+  min: number | null;
+  max: number | null;
+  nan_pct: number;
+}
+
+export interface FeatureOverview {
+  total_rows: number;
+  total_features: number;
+  numeric_features: number;
+  mean_nan_pct: number;
+  items: FeatureOverviewItem[];
+}
+
+export interface ICDashboardEntry {
+  feature_name: string;
+  ic_mean: number;
+  ic_std: number;
+  ir: number;
+  t_stat: number;
+  significance: string;
+  sparkline: number[];
+}
+
+export interface ICDashboardResult {
+  available: boolean;
+  message: string | null;
+  entries: ICDashboardEntry[];
+}
+
+export interface RollingICPoint {
+  timestamp: string;
+  ic: number;
+  ir: number | null;
+}
+
+export interface RollingIC {
+  feature_name: string;
+  window: number;
+  points: RollingICPoint[];
+}
+
+export interface FeatureQualityScore {
+  feature_name: string;
+  stationarity_score: number;
+  coverage_score: number;
+  drift_score: number;
+  redundancy_score: number;
+  total_score: number;
+  grade: string;
+}
+
+export interface CorrelationMatrix {
+  method?: 'pearson' | 'spearman' | 'kendall';
+  features: string[];
+  matrix: number[][];
+  truncated?: boolean;
+  original_feature_count?: number;
+}
+
+export interface DriftMonitorEntry {
+  feature_name: string;
+  psi: number;
+  ks_stat: number;
+  ks_pvalue: number;
+  status: 'stable' | 'warning' | 'severe';
+}
+
+export interface SHAPSummary {
+  available: boolean;
+  message: string | null;
+  items: Array<{
+    feature_name: string;
+    mean_abs_shap: number;
+    mean_shap: number;
+  }>;
+}
+
+export interface ImportanceComparison {
+  items: Array<{
+    feature_name: string;
+    lightgbm_importance: number;
+    xgboost_importance: number;
+  }>;
+}
+
 export type FeatureBrowserTab =
   | 'overview'
-  | 'catalog'
-  | 'distribution'
-  | 'timeseries'
-  | 'correlation'
+  | 'ic_dashboard'
   | 'quality'
-  | 'datatable';
+  | 'correlation'
+  | 'drift'
+  | 'attribution';
