@@ -1,0 +1,6 @@
+field,value
+task_id,hyper_bd68476c50084411a4a6a857dbb77a2c
+task_type,hyperparameter
+status,completed
+best_trial_number,1
+best_value,0.9

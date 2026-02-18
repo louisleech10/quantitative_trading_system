@@ -12,7 +12,6 @@ import pandas as pd
 import pytest
 
 from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective
-from momentum.Optimization.objectives.signal_density import SignalDensityObjective
 from momentum.Optimization.objectives.strategy_backtest import StrategyBacktestObjective
 from momentum.Optimization.optuna_optimizer import OptunaOptimizer
 
@@ -26,6 +25,27 @@ class DummyTrainer:
         self.last_params = dict(params)
         score = 0.6 + min(float(params.get("learning_rate", 0.01)), 0.2) * 0.1
         return SimpleNamespace(cv_auc_mean=score)
+
+
+class DummyBacktestEngine:
+    def run_backtest(self, prices, predicted_proba, atr_values, strategy_params):
+        equity_curve = pd.Series([1.0, 1.02, 1.01, 1.03])
+        trades = [
+            {
+                "pnl": 0.02,
+                "pnl_pct": 0.02,
+            },
+            {
+                "pnl": -0.01,
+                "pnl_pct": -0.01,
+            },
+        ]
+        return SimpleNamespace(
+            equity_curve=equity_curve,
+            trades=trades,
+            metrics={},
+            config=strategy_params,
+        )
 
 
 class DummyObjective:
@@ -108,29 +128,54 @@ def test_model_hyperparam_objective_search_space_and_evaluate():
 
 
 def test_strategy_backtest_objective_single_and_multi():
-    predictions = np.linspace(0.1, 0.9, 80)
-    prices = 100 + np.cumsum(np.random.randn(80) * 0.3)
+    predicted_proba = pd.Series(np.linspace(0.1, 0.9, 80))
+    close = 100 + np.cumsum(np.random.randn(80) * 0.3)
+    prices = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1,
+            "low": close - 1,
+            "close": close,
+        }
+    )
+    atr_values = pd.Series(np.full(80, 1.0))
 
     trial = optuna.trial.FixedTrial(
         {
             "entry_threshold": 0.65,
             "exit_threshold": 0.35,
-            "stop_loss": 0.03,
-            "take_profit": 0.06,
-            "max_holding_bars": 10,
-            "position_size": 0.6,
+            "stop_loss_atr": 2.0,
+            "take_profit_ratio": 2.0,
+            "position_sizing_method": "fixed",
+            "kelly_fraction": 0.5,
+            "max_position_size": 0.2,
             "cooldown_bars": 1,
-            "transaction_cost": 0.001,
-            "min_signal_gap": 1,
+            "trailing_stop_activation": 0.03,
         }
     )
 
-    single = StrategyBacktestObjective(predictions, prices, multi_objective=False)
+    single = StrategyBacktestObjective(
+        backtest_engine=DummyBacktestEngine(),
+        prices=prices,
+        predicted_proba=predicted_proba,
+        atr_values=atr_values,
+        target_metric="expectancy",
+        constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 0},
+        multi_objective=False,
+    )
     params_single = single.create_search_space(trial)
     value_single = single.evaluate(params_single)
     assert isinstance(value_single, float)
 
-    multi = StrategyBacktestObjective(predictions, prices, multi_objective=True)
+    multi = StrategyBacktestObjective(
+        backtest_engine=DummyBacktestEngine(),
+        prices=prices,
+        predicted_proba=predicted_proba,
+        atr_values=atr_values,
+        target_metric="expectancy",
+        constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 0},
+        multi_objective=True,
+    )
     params_multi = multi.create_search_space(trial)
     value_multi = multi.evaluate(params_multi)
     assert isinstance(value_multi, tuple)
@@ -139,9 +184,26 @@ def test_strategy_backtest_objective_single_and_multi():
 
 @pytest.mark.asyncio
 async def test_multi_objective_auto_nsga2_sampler():
-    predictions = np.linspace(0.1, 0.9, 60)
-    prices = 100 + np.cumsum(np.random.randn(60) * 0.2)
-    objective = StrategyBacktestObjective(predictions, prices, multi_objective=True)
+    predicted_proba = pd.Series(np.linspace(0.1, 0.9, 60))
+    close = 100 + np.cumsum(np.random.randn(60) * 0.2)
+    prices = pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1,
+            "low": close - 1,
+            "close": close,
+        }
+    )
+    atr_values = pd.Series(np.full(60, 1.0))
+    objective = StrategyBacktestObjective(
+        backtest_engine=DummyBacktestEngine(),
+        prices=prices,
+        predicted_proba=predicted_proba,
+        atr_values=atr_values,
+        target_metric="expectancy",
+        constraints={"max_drawdown": -1.0, "min_win_rate": 0.0, "min_trades": 0},
+        multi_objective=True,
+    )
 
     with tempfile.NamedTemporaryFile(suffix=".db") as f:
         optimizer = OptunaOptimizer(
@@ -157,22 +219,3 @@ async def test_multi_objective_auto_nsga2_sampler():
 
     assert len(study.directions) == 2
     assert result.total_trials >= 3
-
-
-def test_signal_density_objective_adapter_contract():
-    objective = SignalDensityObjective(
-        search_space_factory=lambda trial: {"x": trial.suggest_float("x", 0.0, 1.0)},
-        evaluator=lambda params: float(params["x"]),
-        pruning_callback_factory=lambda trial: None,
-        multi_objective=False,
-    )
-
-    trial = optuna.trial.FixedTrial({"x": 0.3})
-    params = objective.create_search_space(trial)
-    score = objective.evaluate(params)
-
-    assert objective.name == "signal_density"
-    assert objective.direction == "maximize"
-    assert objective.directions is None
-    assert params["x"] == 0.3
-    assert score == 0.3

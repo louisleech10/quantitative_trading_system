@@ -248,6 +248,37 @@ def create_optimization_result(**kwargs: Any) -> OptimizationResult:
     return OptimizationResult(**kwargs)
 
 
+def create_backtest_engine(
+    commission: float = 0.001,
+    slippage: float = 0.0005,
+) -> "IBacktestEngine":
+    from momentum.Strategy.vectorized_backtest import VectorizedBacktest
+
+    return VectorizedBacktest(commission=commission, slippage=slippage)
+
+
+def create_position_sizer(
+    method: str = "kelly",
+    **kwargs: Any,
+) -> "IPositionSizer":
+    from momentum.Strategy.position_sizing import (
+        KellyPositionSizer,
+        FixedPositionSizer,
+        ProbabilityScaledSizer,
+    )
+
+    sizers = {
+        "kelly": KellyPositionSizer,
+        "fixed": FixedPositionSizer,
+        "probability_scaled": ProbabilityScaledSizer,
+    }
+    if method not in sizers:
+        raise ValueError(
+            f"Unknown position sizing method: {method}. Options: {list(sizers.keys())}"
+        )
+    return sizers[method](**kwargs)
+
+
 def get_data_source_values() -> List[str]:
     return [source.value for source in DataSourceEnum]
 

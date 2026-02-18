@@ -144,9 +144,9 @@ class IPositionSizer(Protocol):
 ```
 
 **驗收條件**：
-- [ ] `IBacktestEngine` 和 `IPositionSizer` 定義在 `momentum/core/protocols.py`
-- [ ] 使用 `@runtime_checkable` 裝飾
-- [ ] 參數型別使用 `Any` 對齊現有慣例（避免 Protocol 層引入 pandas 依賴）
+- [x] `IBacktestEngine` 和 `IPositionSizer` 定義在 `momentum/core/protocols.py`
+- [x] 使用 `@runtime_checkable` 裝飾
+- [x] 參數型別使用 `Any` 對齊現有慣例（避免 Protocol 層引入 pandas 依賴）
 
 **驗證命令**：
 ```bash
@@ -154,9 +154,9 @@ python -c "from momentum.core.protocols import IBacktestEngine, IPositionSizer; 
 ```
 
 **Checklist**：
-- [ ] `IBacktestEngine` Protocol 定義
-- [ ] `IPositionSizer` Protocol 定義
-- [ ] 不破壞現有 Protocol（IKlineReader, IIndicatorEngine, IModelTrainer, IOptimizationObjective, etc.）
+- [x] `IBacktestEngine` Protocol 定義
+- [x] `IPositionSizer` Protocol 定義
+- [x] 不破壞現有 Protocol（IKlineReader, IIndicatorEngine, IModelTrainer, IOptimizationObjective, etc.）
 
 ---
 
@@ -192,8 +192,8 @@ def create_position_sizer(
 ```
 
 **驗收條件**：
-- [ ] `create_backtest_engine()` 和 `create_position_sizer()` 可成功匯入
-- [ ] 無效 method 字串 raise ValueError
+- [x] `create_backtest_engine()` 和 `create_position_sizer()` 可成功匯入
+- [x] 無效 method 字串 raise ValueError
 
 **驗證命令**：
 ```bash
@@ -203,9 +203,9 @@ python -c "from momentum.factories import create_backtest_engine, create_positio
 > ⚠️ 注意：此 Task 的 import 在 Phase 4.1 完成後才能實際執行（延遲 import 模式）。建立時先確認語法正確即可。
 
 **Checklist**：
-- [ ] `create_backtest_engine()` factory
-- [ ] `create_position_sizer()` factory
-- [ ] 不破壞現有 factory functions
+- [x] `create_backtest_engine()` factory
+- [x] `create_position_sizer()` factory
+- [x] 不破壞現有 factory functions
 
 ---
 
@@ -220,10 +220,10 @@ python -c "from momentum.factories import create_backtest_engine, create_positio
 - `archived` 區段：signal_density 標記 disabled
 
 **驗收條件**：
-- [ ] YAML 語法正確
-- [ ] 包含 execution / hyperparameter / archived 三大區段
-- [ ] 每個參數含 type, low, high, step (或 log, choices)
-- [ ] `python -c "import yaml; yaml.safe_load(open('config/optimization_config.yaml'))"` 成功
+- [x] YAML 語法正確
+- [x] 包含 execution / hyperparameter / archived 三大區段
+- [x] 每個參數含 type, low, high, step (或 log, choices)
+- [x] `python -c "import yaml; yaml.safe_load(open('config/optimization_config.yaml'))"` 成功
 
 **驗證命令**：
 ```bash
@@ -231,14 +231,14 @@ python -c "import yaml; c = yaml.safe_load(open('config/optimization_config.yaml
 ```
 
 **Checklist**：
-- [ ] execution.search_space 9 參數
-- [ ] execution.constraints (max_drawdown, min_win_rate, min_trades)
-- [ ] execution.backtest (commission, slippage)
-- [ ] execution.optimization (target_metric, n_trials, timeout, sampler, multi_objective)
-- [ ] hyperparameter.lightgbm 8 參數
-- [ ] hyperparameter.xgboost 8 參數
-- [ ] hyperparameter.constraints (max_train_val_gap)
-- [ ] archived.signal_density.enabled=false
+- [x] execution.search_space 9 參數
+- [x] execution.constraints (max_drawdown, min_win_rate, min_trades)
+- [x] execution.backtest (commission, slippage)
+- [x] execution.optimization (target_metric, n_trials, timeout, sampler, multi_objective)
+- [x] hyperparameter.lightgbm 8 參數
+- [x] hyperparameter.xgboost 8 參數
+- [x] hyperparameter.constraints (max_train_val_gap)
+- [x] archived.signal_density.enabled=false
 
 ---
 
@@ -252,10 +252,10 @@ python -c "import yaml; c = yaml.safe_load(open('config/optimization_config.yaml
 **封存腳本內容**: 對齊 SPEC §15.5
 
 **驗收條件**：
-- [ ] `archived/momentum/Optimization/objectives/signal_density.py` 存在
-- [ ] `archived/momentum/Optimization/objectives/README.md` 存在
-- [ ] `momentum/Optimization/objectives/signal_density.py` 不存在
-- [ ] `momentum/Optimization/objectives/__init__.py` 不含 `signal_density`
+- [x] `archived/momentum/Optimization/objectives/signal_density.py` 存在
+- [x] `archived/momentum/Optimization/objectives/README.md` 存在
+- [x] `momentum/Optimization/objectives/signal_density.py` 不存在
+- [x] `momentum/Optimization/objectives/__init__.py` 不含 `signal_density`
 
 **驗證命令**：
 ```bash
@@ -265,10 +265,10 @@ grep -c "signal_density" momentum/Optimization/objectives/__init__.py
 ```
 
 **Checklist**：
-- [ ] 封存腳本建立
-- [ ] 執行封存
-- [ ] README.md 含回復指示
-- [ ] `__init__.py` 清理
+- [x] 封存腳本建立
+- [x] 執行封存
+- [x] README.md 含回復指示
+- [x] `__init__.py` 清理
 
 ---
 
@@ -290,8 +290,8 @@ from .risk_manager import RiskManager
 ```
 
 **驗收條件**：
-- [ ] 目錄 `momentum/Strategy/` 存在且含 5 個 `.py` 檔案
-- [ ] `__init__.py` 匯出列表正確
+- [x] 目錄 `momentum/Strategy/` 存在且含 5 個 `.py` 檔案
+- [x] `__init__.py` 匯出列表正確
 
 **驗證命令**：
 ```bash
@@ -300,11 +300,11 @@ ls momentum/Strategy/*.py | wc -l
 ```
 
 **Checklist**：
-- [ ] `__init__.py`
-- [ ] `vectorized_backtest.py` 骨架 (class + `raise NotImplementedError`)
-- [ ] `performance_metrics.py` 骨架
-- [ ] `position_sizing.py` 骨架 (3 classes)
-- [ ] `risk_manager.py` 骨架
+- [x] `__init__.py`
+- [x] `vectorized_backtest.py` 骨架 (class + `raise NotImplementedError`)
+- [x] `performance_metrics.py` 骨架
+- [x] `position_sizing.py` 骨架 (3 classes)
+- [x] `risk_manager.py` 骨架
 
 ---
 
@@ -323,8 +323,8 @@ def load_optimization_config() -> dict:
 ```
 
 **驗收條件**：
-- [ ] `MomentumConfig.load_optimization_config()` 回傳 dict
-- [ ] 不 import `api.*`
+- [x] `MomentumConfig.load_optimization_config()` 回傳 dict
+- [x] 不 import `api.*`
 
 **驗證命令**：
 ```bash
@@ -332,8 +332,8 @@ python -c "from momentum.core.config import MomentumConfig; c = MomentumConfig.l
 ```
 
 **Checklist**：
-- [ ] `load_optimization_config()` 實作
-- [ ] 無 `api.*` import
+- [x] `load_optimization_config()` 實作
+- [x] 無 `api.*` import
 
 ### Phase 4.0 驗證檢查點
 ```bash
@@ -381,8 +381,8 @@ class BacktestResult:
 ```
 
 **驗收條件**：
-- [ ] `Trade` 和 `BacktestResult` 可被 import 和實例化
-- [ ] 所有欄位有正確型別註解
+- [x] `Trade` 和 `BacktestResult` 可被 import 和實例化
+- [x] 所有欄位有正確型別註解
 
 **驗證命令**：
 ```bash
@@ -390,9 +390,9 @@ python -c "from momentum.Strategy.vectorized_backtest import Trade, BacktestResu
 ```
 
 **Checklist**：
-- [ ] `Trade` dataclass (11 欄位)
-- [ ] `BacktestResult` dataclass (4 欄位)
-- [ ] 型別註解完整
+- [x] `Trade` dataclass (11 欄位)
+- [x] `BacktestResult` dataclass (4 欄位)
+- [x] 型別註解完整
 
 ---
 
@@ -438,11 +438,11 @@ class VectorizedBacktest:
 **邊界條件覆蓋**: BC-VB-01, BC-VB-02, BC-VB-05, BC-VB-06, BC-VB-09, BC-VB-13, BC-VB-14
 
 **驗收條件**：
-- [ ] 空 prices → 回傳空 BacktestResult
-- [ ] 長度不一致 → raise ValueError
-- [ ] 價格含 0 → raise ValueError
-- [ ] entry ≤ exit threshold → raise ValueError
-- [ ] 高手續費 → warning log
+- [x] 空 prices → 回傳空 BacktestResult
+- [x] 長度不一致 → raise ValueError
+- [x] 價格含 0 → raise ValueError
+- [x] entry ≤ exit threshold → raise ValueError
+- [x] 高手續費 → warning log
 
 **驗證命令**：
 ```bash
@@ -457,9 +457,9 @@ print(f'Empty: {len(r.trades)} trades')
 ```
 
 **Checklist**：
-- [ ] `__init__` 含 commission/slippage 驗證 (BC-VB-09)
-- [ ] `_validate_inputs` 覆蓋 7 個邊界條件
-- [ ] `run_backtest` 方法骨架
+- [x] `__init__` 含 commission/slippage 驗證 (BC-VB-09)
+- [x] `_validate_inputs` 覆蓋 7 個邊界條件
+- [x] `run_backtest` 方法骨架
 
 ---
 
@@ -491,10 +491,10 @@ def _apply_cooldown(self, signals: pd.Series, cooldown_bars: int) -> pd.Series:
 **邊界條件覆蓋**: BC-VB-03, BC-VB-04, BC-VB-05, BC-VB-11
 
 **驗收條件**：
-- [ ] proba 全為 0 → 無進場信號 (BC-VB-03)
-- [ ] proba 全為 1 → 冷卻期生效抑制連續進場 (BC-VB-04)
-- [ ] threshold > 1.0 → 永無信號 (BC-VB-05)
-- [ ] cooldown_bars > 數據長度 → 僅第一筆交易 (BC-VB-11)
+- [x] proba 全為 0 → 無進場信號 (BC-VB-03)
+- [x] proba 全為 1 → 冷卻期生效抑制連續進場 (BC-VB-04)
+- [x] threshold > 1.0 → 永無信號 (BC-VB-05)
+- [x] cooldown_bars > 數據長度 → 僅第一筆交易 (BC-VB-11)
 
 **驗證命令**：
 ```bash
@@ -502,10 +502,10 @@ pytest tests/momentum/Strategy/test_vectorized_backtest.py -k "signal" -v --tb=s
 ```
 
 **Checklist**：
-- [ ] `_generate_entry_signals` 向量化
-- [ ] `_generate_exit_signals` 向量化
-- [ ] `_apply_cooldown` 向量化
-- [ ] 4 個邊界條件覆蓋
+- [x] `_generate_entry_signals` 向量化
+- [x] `_generate_exit_signals` 向量化
+- [x] `_apply_cooldown` 向量化
+- [x] 4 個邊界條件覆蓋
 
 ---
 
@@ -538,14 +538,14 @@ def _calculate_equity_curve(self, trades: List[Trade], prices: pd.DataFrame) -> 
 **邊界條件覆蓋**: BC-VB-07, BC-VB-08, BC-VB-10, BC-VB-12
 
 **驗收條件**：
-- [ ] ATR 含 NaN → SL/TP fallback 或 skip (BC-VB-07)
-- [ ] ATR 全為 0 → 僅信號出場 (BC-VB-08)
-- [ ] 持倉跨越數據結尾 → 強制平倉 exit_reason='data_end' (BC-VB-10)
-- [ ] 連續 SL → 每筆獨立觸發 (BC-VB-12)
-- [ ] Take Profit 正確觸發
-- [ ] Stop Loss 正確觸發
-- [ ] Trailing Stop 啟動條件正確
-- [ ] 手續費 + 滑點正確扣除
+- [x] ATR 含 NaN → SL/TP fallback 或 skip (BC-VB-07)
+- [x] ATR 全為 0 → 僅信號出場 (BC-VB-08)
+- [x] 持倉跨越數據結尾 → 強制平倉 exit_reason='data_end' (BC-VB-10)
+- [x] 連續 SL → 每筆獨立觸發 (BC-VB-12)
+- [x] Take Profit 正確觸發
+- [x] Stop Loss 正確觸發
+- [x] Trailing Stop 啟動條件正確
+- [x] 手續費 + 滑點正確扣除
 
 **驗證命令**：
 ```bash
@@ -553,11 +553,11 @@ pytest tests/momentum/Strategy/test_vectorized_backtest.py -k "trade or tp or sl
 ```
 
 **Checklist**：
-- [ ] `_calculate_position_sizes` 整合 3 種 PositionSizer
-- [ ] `_execute_trades` 含 SL/TP/Trailing Stop 完整邏輯
-- [ ] `_calculate_equity_curve` 向量化
-- [ ] MAE/MFE 計算
-- [ ] exit_reason 正確標記 5 種類型
+- [x] `_calculate_position_sizes` 整合 3 種 PositionSizer
+- [x] `_execute_trades` 含 SL/TP/Trailing Stop 完整邏輯
+- [x] `_calculate_equity_curve` 向量化
+- [x] MAE/MFE 計算
+- [x] exit_reason 正確標記 5 種類型
 
 ---
 
@@ -616,10 +616,10 @@ class PerformanceMetrics:
 **邊界條件覆蓋**: BC-PM-01 ~ BC-PM-13（全部 13 個）
 
 **驗收條件**：
-- [ ] 12+ 指標全部實作且公式正確
-- [ ] 13 個邊界條件全覆蓋
-- [ ] `calculate_all()` 回傳含所有指標的 dict
-- [ ] `periods_per_year=0` raise ValueError (BC-PM-13)
+- [x] 12+ 指標全部實作且公式正確
+- [x] 13 個邊界條件全覆蓋
+- [x] `calculate_all()` 回傳含所有指標的 dict
+- [x] `periods_per_year=0` raise ValueError (BC-PM-13)
 
 **驗證命令**：
 ```bash
@@ -631,14 +631,14 @@ pytest tests/momentum/Strategy/test_performance_metrics.py -v --tb=short
 - PASS: 分母為 0 時所有比率指標回傳 0.0 而非拋例外
 
 **Checklist**：
-- [ ] `total_return`, `cagr`
-- [ ] `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`
-- [ ] `max_drawdown`, `max_drawdown_duration`
-- [ ] `expectancy`, `system_quality_number`
-- [ ] `win_rate`, `profit_factor`
-- [ ] `avg_win`, `avg_loss`
-- [ ] `calculate_all()` 彙整
-- [ ] 13 邊界條件全覆蓋
+- [x] `total_return`, `cagr`
+- [x] `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`
+- [x] `max_drawdown`, `max_drawdown_duration`
+- [x] `expectancy`, `system_quality_number`
+- [x] `win_rate`, `profit_factor`
+- [x] `avg_win`, `avg_loss`
+- [x] `calculate_all()` 彙整
+- [x] 13 邊界條件全覆蓋
 
 ---
 
@@ -673,10 +673,10 @@ class ProbabilityScaledSizer:
 - ProbabilityScaled: BC-PS-01 ~ BC-PS-05（5 個）
 
 **驗收條件**：
-- [ ] Kelly: proba=0 → 0, proba=1 → max_position, b=0 → raise ValueError
-- [ ] Fixed: 永遠回傳 fixed_size
-- [ ] ProbScaled: proba=threshold → 0, proba=1.0 → max_position
-- [ ] 3 種方法均符合 `IPositionSizer` Protocol
+- [x] Kelly: proba=0 → 0, proba=1 → max_position, b=0 → raise ValueError
+- [x] Fixed: 永遠回傳 fixed_size
+- [x] ProbScaled: proba=threshold → 0, proba=1.0 → max_position
+- [x] 3 種方法均符合 `IPositionSizer` Protocol
 
 **驗證命令**：
 ```bash
@@ -688,10 +688,10 @@ pytest tests/momentum/Strategy/test_position_sizing.py -v --tb=short
 - PASS: `ProbabilityScaledSizer` raise ValueError 當 `threshold=1.0` (BC-PS-04)
 
 **Checklist**：
-- [ ] `KellyPositionSizer` 完整實作 + 10 邊界
-- [ ] `FixedPositionSizer` 完整實作
-- [ ] `ProbabilityScaledSizer` 完整實作 + 5 邊界
-- [ ] 3 者均符合 `IPositionSizer` Protocol
+- [x] `KellyPositionSizer` 完整實作 + 10 邊界
+- [x] `FixedPositionSizer` 完整實作
+- [x] `ProbabilityScaledSizer` 完整實作 + 5 邊界
+- [x] 3 者均符合 `IPositionSizer` Protocol
 
 ---
 
@@ -721,12 +721,12 @@ class RiskManager:
 **邊界條件覆蓋**: BC-RM-01 ~ BC-RM-06（6 個）
 
 **驗收條件**：
-- [ ] atr=0 → SL/TP = entry_price + warn (BC-RM-01)
-- [ ] atr<0 → raise ValueError (BC-RM-02)
-- [ ] multiplier=0 → SL = entry_price + warn (BC-RM-03)
-- [ ] entry_price=0 → raise ValueError (BC-RM-04)
-- [ ] trailing 未達啟動條件 → None (BC-RM-05)
-- [ ] TP < entry → raise ValueError (BC-RM-06)
+- [x] atr=0 → SL/TP = entry_price + warn (BC-RM-01)
+- [x] atr<0 → raise ValueError (BC-RM-02)
+- [x] multiplier=0 → SL = entry_price + warn (BC-RM-03)
+- [x] entry_price=0 → raise ValueError (BC-RM-04)
+- [x] trailing 未達啟動條件 → None (BC-RM-05)
+- [x] TP < entry → raise ValueError (BC-RM-06)
 
 **驗證命令**：
 ```bash
@@ -734,9 +734,9 @@ pytest tests/momentum/Strategy/test_risk_manager.py -v --tb=short
 ```
 
 **Checklist**：
-- [ ] `calculate_stop_loss` 含 3 邊界
-- [ ] `calculate_take_profit` 含 1 邊界
-- [ ] `calculate_trailing_stop` 含 2 邊界
+- [x] `calculate_stop_loss` 含 3 邊界
+- [x] `calculate_take_profit` 含 1 邊界
+- [x] `calculate_trailing_stop` 含 2 邊界
 
 ---
 
@@ -836,8 +836,8 @@ def mock_strategy_params():
 ```
 
 **驗收條件**：
-- [ ] 所有 ~110 tests 通過
-- [ ] 覆蓋率 100%
+- [x] 所有 ~110 tests 通過
+- [x] 覆蓋率 100%
 
 **驗證命令**：
 ```bash
@@ -845,12 +845,12 @@ pytest tests/momentum/Strategy/ -v --tb=short --cov=momentum.Strategy --cov-repo
 ```
 
 **Checklist**：
-- [ ] 25 VectorizedBacktest 測試（14 邊界 + 11 功能/整合/性能）
-- [ ] 50 PerformanceMetrics 測試（13 指標 × ~4 邊界）
-- [ ] 20 PositionSizer 測試（15 邊界 + 5 正常）
-- [ ] 15 RiskManager 測試（6 邊界 + 9 正常/功能）
-- [ ] conftest.py fixtures 更新
-- [ ] `--cov-fail-under=100` 通過
+- [x] 25 VectorizedBacktest 測試（14 邊界 + 11 功能/整合/性能）
+- [x] 50 PerformanceMetrics 測試（13 指標 × ~4 邊界）
+- [x] 20 PositionSizer 測試（15 邊界 + 5 正常）
+- [x] 15 RiskManager 測試（6 邊界 + 9 正常/功能）
+- [x] conftest.py fixtures 更新
+- [x] `--cov-fail-under=100` 通過
 
 ---
 
@@ -895,10 +895,10 @@ def __init__(
 | 3 | `tests/*/test_optuna_objectives.py` (測試 2) | 更新建構參數 |
 
 **驗收條件**：
-- [ ] 新建構子接受 `IBacktestEngine` Protocol
-- [ ] `target_metric` 不在支援列表 → raise ValueError (BC-SO-02)
-- [ ] 舊的 3 個呼叫點全部更新
-- [ ] 所有現有測試通過
+- [x] 新建構子接受 `IBacktestEngine` Protocol
+- [x] `target_metric` 不在支援列表 → raise ValueError (BC-SO-02)
+- [x] 舊的 3 個呼叫點全部更新
+- [x] 所有現有測試通過
 
 **驗證命令**：
 ```bash
@@ -906,10 +906,10 @@ pytest tests/ -k "strategy_backtest" -v --tb=short
 ```
 
 **Checklist**：
-- [ ] 建構子重構
-- [ ] `target_metric` 驗證 (BC-SO-02)
-- [ ] 遷移 3 個呼叫點
-- [ ] 移除內嵌 `_run_backtest()` → 委託 VectorizedBacktest
+- [x] 建構子重構
+- [x] `target_metric` 驗證 (BC-SO-02)
+- [x] 遷移 3 個呼叫點
+- [x] 移除內嵌 `_run_backtest()` → 委託 VectorizedBacktest
 
 ---
 
@@ -958,10 +958,10 @@ def evaluate(self, params: Dict[str, Any]) -> float:
 **邊界條件覆蓋**: BC-SO-01 ~ BC-SO-05
 
 **驗收條件**：
-- [ ] 搜索空間含 9 參數
-- [ ] SL/TP 使用 ATR 倍數（非百分比）
-- [ ] 約束觸發時 raise TrialPruned
-- [ ] 全部 Pruned → 特殊空結果處理 (BC-SO-01)
+- [x] 搜索空間含 9 參數
+- [x] SL/TP 使用 ATR 倍數（非百分比）
+- [x] 約束觸發時 raise TrialPruned
+- [x] 全部 Pruned → 特殊空結果處理 (BC-SO-01)
 
 **驗證命令**：
 ```bash
@@ -969,12 +969,12 @@ pytest tests/momentum/Optimization/test_strategy_backtest_enhanced.py -v --tb=sh
 ```
 
 **Checklist**：
-- [ ] 搜索空間 9 參數
-- [ ] evaluate 委託 VectorizedBacktest + PerformanceMetrics
-- [ ] MaxDD/WinRate/MinTrades 約束 Pruning
-- [ ] target_metric 可選 (5 種)
-- [ ] 多目標模式支援 (BC-SO-05)
-- [ ] trial.user_attrs 記錄所有 metrics
+- [x] 搜索空間 9 參數
+- [x] evaluate 委託 VectorizedBacktest + PerformanceMetrics
+- [x] MaxDD/WinRate/MinTrades 約束 Pruning
+- [x] target_metric 可選 (5 種)
+- [x] 多目標模式支援 (BC-SO-05)
+- [x] trial.user_attrs 記錄所有 metrics
 
 ---
 
@@ -1015,13 +1015,13 @@ def _validate_search_space(self, space: dict):
 **邊界條件覆蓋**: BC-HO-01 ~ BC-HO-07
 
 **驗收條件**：
-- [ ] Train-Val Gap > threshold → TrialPruned (BC-HO-02)
-- [ ] 搜索空間 min > max → raise ValueError (BC-HO-01)
-- [ ] 模型訓練失敗 → FATAL (BC-HO-03)
-- [ ] AUC < 0.5 → WARNING 不 Prune (BC-HO-04)
-- [ ] 特徵數=0 → raise ValueError (BC-HO-05)
-- [ ] 樣本數 < 100 → WARNING (BC-HO-06)
-- [ ] 無效 model_type → raise ValueError (BC-HO-07)
+- [x] Train-Val Gap > threshold → TrialPruned (BC-HO-02)
+- [x] 搜索空間 min > max → raise ValueError (BC-HO-01)
+- [x] 模型訓練失敗 → FATAL (BC-HO-03)
+- [x] AUC < 0.5 → WARNING 不 Prune (BC-HO-04)
+- [x] 特徵數=0 → raise ValueError (BC-HO-05)
+- [x] 樣本數 < 100 → WARNING (BC-HO-06)
+- [x] 無效 model_type → raise ValueError (BC-HO-07)
 
 **驗證命令**：
 ```bash
@@ -1029,11 +1029,11 @@ pytest tests/momentum/Optimization/test_model_hyperparam_enhanced.py -v --tb=sho
 ```
 
 **Checklist**：
-- [ ] 過擬合檢測 (Train-Val Gap)
-- [ ] 搜索空間驗證 (LightGBM + XGBoost)
-- [ ] trial.user_attrs 記錄
-- [ ] 前端搜索空間 JSON Schema 提供
-- [ ] 7 個邊界條件覆蓋
+- [x] 過擬合檢測 (Train-Val Gap)
+- [x] 搜索空間驗證 (LightGBM + XGBoost)
+- [x] trial.user_attrs 記錄
+- [x] 前端搜索空間 JSON Schema 提供
+- [x] 7 個邊界條件覆蓋
 
 ---
 
@@ -1095,9 +1095,9 @@ pytest tests/momentum/Optimization/ -v --tb=short --cov=momentum.Optimization.ob
 ```
 
 **Checklist**：
-- [ ] 20 StrategyBacktestObjective tests
-- [ ] 15 ModelHyperparamObjective tests
-- [ ] 覆蓋率 100%
+- [x] 20 StrategyBacktestObjective tests
+- [x] 15 ModelHyperparamObjective tests
+- [x] 覆蓋率 100%
 
 ### 驗證檢查點
 - PASS（成功路徑）：`tests/momentum/Optimization/` 全部通過，且 `StrategyBacktestObjective` 能回傳選定 `target_metric`（含 `trial.user_attrs` 記錄）。
@@ -1161,8 +1161,8 @@ class OptimizationConfigResponse(BaseModel):
 ```
 
 **驗收條件**：
-- [ ] 所有 Request/Response Model 定義完整
-- [ ] 不 import `momentum.*`（Rule 7）
+- [x] 所有 Request/Response Model 定義完整
+- [x] 不 import `momentum.*`（Rule 7）
 
 **驗證命令**：
 ```bash
@@ -1170,11 +1170,11 @@ python -c "from api.models.optimization_models import ExecutionOptimizationReque
 ```
 
 **Checklist**：
-- [ ] `ExecutionOptimizationRequest` / Response
-- [ ] `HyperparamOptimizationRequest` / Response
-- [ ] `OptimizationResultResponse`
-- [ ] `OptimizationConfigResponse`
-- [ ] 不違反 Rule 7
+- [x] `ExecutionOptimizationRequest` / Response
+- [x] `HyperparamOptimizationRequest` / Response
+- [x] `OptimizationResultResponse`
+- [x] `OptimizationConfigResponse`
+- [x] 不違反 Rule 7
 
 ---
 
@@ -1202,11 +1202,11 @@ router = APIRouter(prefix="/api/v1/optimization", tags=["Execution Optimization"
 ```
 
 **驗收條件**：
-- [ ] `POST /api/v1/optimization/hyperparameter` 回傳 task_id
-- [ ] `POST /api/v1/optimization/execution` 回傳 task_id
-- [ ] `GET /api/v1/optimization/config` 回傳 YAML 配置
-- [ ] `GET /api/v1/optimization/{task_id}/result` 回傳結果
-- [ ] `POST /api/v1/optimization/{task_type}/{task_id}/export` 匯出
+- [x] `POST /api/v1/optimization/hyperparameter` 回傳 task_id
+- [x] `POST /api/v1/optimization/execution` 回傳 task_id
+- [x] `GET /api/v1/optimization/config` 回傳 YAML 配置
+- [x] `GET /api/v1/optimization/{task_id}/result` 回傳結果
+- [x] `POST /api/v1/optimization/{task_type}/{task_id}/export` 匯出
 
 **驗證命令**：
 ```bash
@@ -1215,12 +1215,12 @@ python -c "from api.routes.execution_optimization import router; print(f'{len(ro
 ```
 
 **Checklist**：
-- [ ] hyperparameter 路由
-- [ ] execution 路由
-- [ ] config 路由
-- [ ] result 路由
-- [ ] export 路由
-- [ ] `api/main.py` 註冊
+- [x] hyperparameter 路由
+- [x] execution 路由
+- [x] config 路由
+- [x] result 路由
+- [x] export 路由
+- [x] `api/main.py` 註冊
 
 ---
 
@@ -1253,9 +1253,9 @@ def _build_strategy_backtest_objective(self, objective_config: dict):
 - `overfitting_alert` — 過擬合警告
 
 **驗收條件**：
-- [ ] `_build_strategy_backtest_objective()` 使用 Factory (Rule 3)
-- [ ] 3 個新 WebSocket 事件正確推送
-- [ ] 現有 task_type 不受影響
+- [x] `_build_strategy_backtest_objective()` 使用 Factory (Rule 3)
+- [x] 3 個新 WebSocket 事件正確推送
+- [x] 現有 task_type 不受影響
 
 **驗證命令**：
 ```bash
@@ -1263,12 +1263,12 @@ pytest tests/api/ -k "optimization" -v --tb=short
 ```
 
 **Checklist**：
-- [ ] `_build_strategy_backtest_objective` 增強
-- [ ] `_build_model_hyperparam_objective` 增強
-- [ ] WebSocket `backtest_progress` 事件
-- [ ] WebSocket `pareto_update` 事件
-- [ ] WebSocket `overfitting_alert` 事件
-- [ ] 向後相容（現有 task 可繼續查詢）
+- [x] `_build_strategy_backtest_objective` 增強
+- [x] `_build_model_hyperparam_objective` 增強
+- [x] WebSocket `backtest_progress` 事件
+- [x] WebSocket `pareto_update` 事件
+- [x] WebSocket `overfitting_alert` 事件
+- [x] 向後相容（現有 task 可繼續查詢）
 
 ### 驗證檢查點
 - PASS（成功路徑）：`POST /api/v1/optimization/hyperparameter` 與 `POST /api/v1/optimization/execution` 可回傳 `task_id`，`GET /api/v1/optimization/{task_id}/result` 依任務狀態回傳一致欄位。
@@ -1326,10 +1326,10 @@ export interface OverfittingAlertEvent { trial_number: number; train_val_gap: nu
 ```
 
 **Checklist**：
-- [ ] Execution config + result 型別
-- [ ] Hyperparameter config + result 型別
-- [ ] WebSocket 3 新事件型別
-- [ ] 與後端 Pydantic Model 一致
+- [x] Execution config + result 型別
+- [x] Hyperparameter config + result 型別
+- [x] WebSocket 3 新事件型別
+- [x] 與後端 Pydantic Model 一致
 
 ---
 
@@ -1357,10 +1357,10 @@ export interface OverfittingAlertEvent { trial_number: number; train_val_gap: nu
 5. Trial 比較表
 
 **驗收條件**：
-- [ ] `/optimization-hyperparameter` 頁面可訪問
-- [ ] 搜索空間表格從 API 讀取配置
-- [ ] 啟動後 WebSocket 進度正確顯示
-- [ ] 結果頁圖表正確渲染
+- [x] `/optimization-hyperparameter` 頁面可訪問
+- [x] 搜索空間表格從 API 讀取配置
+- [x] 啟動後 WebSocket 進度正確顯示
+- [x] 結果頁圖表正確渲染
 
 **驗證命令**：
 ```bash
@@ -1368,12 +1368,12 @@ cd frontend && npm run build
 ```
 
 **Checklist**：
-- [ ] 配置頁 `page.tsx`
-- [ ] 結果頁 `result/[taskId]/page.tsx`
-- [ ] `HyperparamConfigForm` 元件
-- [ ] `ParameterImportanceChart` 元件
-- [ ] `OverfittingCheckChart` 元件
-- [ ] 空/載入/錯誤狀態處理
+- [x] 配置頁 `page.tsx`
+- [x] 結果頁 `result/[taskId]/page.tsx`
+- [x] `HyperparamConfigForm` 元件
+- [x] `ParameterImportanceChart` 元件
+- [x] `OverfittingCheckChart` 元件
+- [x] 空/載入/錯誤狀態處理
 
 ---
 
@@ -1409,10 +1409,10 @@ cd frontend && npm run build
 10. 匯出功能
 
 **驗收條件**：
-- [ ] `/optimization-execution` 頁面可訪問
-- [ ] 配置表格可編輯搜索空間
-- [ ] 結果頁 10 個元件全部渲染
-- [ ] 匯出 JSON/CSV/PNG 功能正常
+- [x] `/optimization-execution` 頁面可訪問
+- [x] 配置表格可編輯搜索空間
+- [x] 結果頁 10 個元件全部渲染
+- [x] 匯出 JSON/CSV/PNG 功能正常
 
 **驗證命令**：
 ```bash
@@ -1420,14 +1420,14 @@ cd frontend && npm run build
 ```
 
 **Checklist**：
-- [ ] 配置頁 `page.tsx`
-- [ ] 結果頁 `result/[taskId]/page.tsx`
-- [ ] `ExecutionConfigForm` 元件
-- [ ] `EquityCurveChart` 元件 (Recharts LineChart)
-- [ ] `DrawdownChart` 元件 (Recharts AreaChart)
-- [ ] `ParetoFrontChart` 元件 (Recharts ScatterChart)
-- [ ] 空/載入/錯誤狀態處理
-- [ ] 響應式設計
+- [x] 配置頁 `page.tsx`
+- [x] 結果頁 `result/[taskId]/page.tsx`
+- [x] `ExecutionConfigForm` 元件
+- [x] `EquityCurveChart` 元件 (Recharts LineChart)
+- [x] `DrawdownChart` 元件 (Recharts AreaChart)
+- [x] `ParetoFrontChart` 元件 (Recharts ScatterChart)
+- [x] 空/載入/錯誤狀態處理
+- [x] 響應式設計
 
 ---
 
@@ -1464,17 +1464,17 @@ export const exportOptimizationResult = (taskType: string, taskId: string, forma
 ```
 
 **驗收條件**：
-- [ ] 4 個共用元件可渲染
-- [ ] Store 正確管理 hyperparameter/execution 狀態
-- [ ] API 函式與後端端點對應
+- [x] 4 個共用元件可渲染
+- [x] Store 正確管理 hyperparameter/execution 狀態
+- [x] API 函式與後端端點對應
 
 **Checklist**：
-- [ ] `OptunaProgressBar` (WebSocket 驅動進度條)
-- [ ] `ParameterRangeSlider` (min/max/step 滑桿)
-- [ ] `SamplerSelector` (TPE/CmaEs/Random 下拉)
-- [ ] `TrialComparisonTable` (可排序/篩選/匯出)
-- [ ] `optimizationStore.ts` 增強
-- [ ] `optimizationApi.ts` 增強
+- [x] `OptunaProgressBar` (WebSocket 驅動進度條)
+- [x] `ParameterRangeSlider` (min/max/step 滑桿)
+- [x] `SamplerSelector` (TPE/CmaEs/Random 下拉)
+- [x] `TrialComparisonTable` (可排序/篩選/匯出)
+- [x] `optimizationStore.ts` 增強
+- [x] `optimizationApi.ts` 增強
 
 ### 驗證檢查點
 - PASS（成功路徑）：`/optimization-hyperparameter` 與 `/optimization-execution` 皆可載入配置、啟動任務、並在結果頁渲染對應圖表與表格。
@@ -1497,9 +1497,9 @@ export const exportOptimizationResult = (taskType: string, taskId: string, forma
 - 目錄結構: `optimization_results/{execution|hyperparameter}/{task_id}/`
 
 **驗收條件**：
-- [ ] `summary.json` 包含 meta, best_trial, performance_metrics, constraint_satisfaction, parameter_importance, benchmark_comparison
-- [ ] `trades.csv` 含 12 欄位
-- [ ] `equity_curve.csv` 含 5 欄位
+- [x] `summary.json` 包含 meta, best_trial, performance_metrics, constraint_satisfaction, parameter_importance, benchmark_comparison
+- [x] `trades.csv` 含 12 欄位
+- [x] `equity_curve.csv` 含 5 欄位
 
 **驗證命令**：
 ```bash
@@ -1507,11 +1507,11 @@ python -c "from api.services.optimization_output_service import OptimizationOutp
 ```
 
 **Checklist**：
-- [ ] `summary.json` 生成 (execution + hyperparameter)
-- [ ] `trades.csv` 生成
-- [ ] `equity_curve.csv` 生成
-- [ ] `trials.csv` 生成
-- [ ] 目錄自動建立
+- [x] `summary.json` 生成 (execution + hyperparameter)
+- [x] `trades.csv` 生成
+- [x] `equity_curve.csv` 生成
+- [x] `trials.csv` 生成
+- [x] 目錄自動建立
 
 ---
 
@@ -1532,14 +1532,14 @@ python -c "from api.services.optimization_output_service import OptimizationOutp
 ```
 
 **驗收條件**：
-- [ ] `ai_readable_report.md` 包含所有 Section
-- [ ] RECOMMENDED_ACTION 根據 metrics 自動判斷
-- [ ] 每個優化任務完成後自動生成
+- [x] `ai_readable_report.md` 包含所有 Section
+- [x] RECOMMENDED_ACTION 根據 metrics 自動判斷
+- [x] 每個優化任務完成後自動生成
 
 **Checklist**：
-- [ ] MD 報告模板
-- [ ] RECOMMENDED_ACTION 邏輯
-- [ ] 自動生成觸發（任務完成時）
+- [x] MD 報告模板
+- [x] RECOMMENDED_ACTION 邏輯
+- [x] 自動生成觸發（任務完成時）
 
 ---
 
@@ -1556,13 +1556,13 @@ Body: { "format": "json" | "csv" | "html" | "charts" | "full" }
 ```
 
 **驗收條件**：
-- [ ] HTML Report 含績效表格、參數區塊、約束檢查、equity curve 圖表
-- [ ] Export API 5 種格式全支援
+- [x] HTML Report 含績效表格、參數區塊、約束檢查、equity curve 圖表
+- [x] Export API 5 種格式全支援
 
 **Checklist**：
-- [ ] Jinja2 HTML 模板
-- [ ] Export API endpoint
-- [ ] JSON/CSV/HTML/Charts/Full 格式
+- [x] Jinja2 HTML 模板
+- [x] Export API endpoint
+- [x] JSON/CSV/HTML/Charts/Full 格式
 
 ### 驗證檢查點
 - PASS（成功路徑）：每個完成任務均可在 `optimization_results/{execution|hyperparameter}/{task_id}/` 產生 `summary.json`、必要 CSV，且 `ai_readable_report.md` 含既定 Section。
@@ -1598,17 +1598,17 @@ async def test_execution_optimization_end_to_end(mock_prices, mock_proba, mock_a
 ```
 
 **驗收條件**：
-- [ ] 20 整合測試全通過
-- [ ] E2E execution: API → Optuna → BacktestResult → JSON/CSV
-- [ ] E2E hyperparameter: API → Optuna → ModelResult → JSON
-- [ ] Checkpoint: 中斷 → 載入 → 繼續
-- [ ] Multi-objective: Pareto 前沿 + 膝點推薦
+- [x] 20 整合測試全通過
+- [x] E2E execution: API → Optuna → BacktestResult → JSON/CSV
+- [x] E2E hyperparameter: API → Optuna → ModelResult → JSON
+- [x] Checkpoint: 中斷 → 載入 → 繼續
+- [x] Multi-objective: Pareto 前沿 + 膝點推薦
 
 **Checklist**：
-- [ ] 5 execution E2E tests
-- [ ] 5 hyperparameter E2E tests
-- [ ] 5 checkpoint recovery tests
-- [ ] 5 multi-objective tests
+- [x] 5 execution E2E tests
+- [x] 5 hyperparameter E2E tests
+- [x] 5 checkpoint recovery tests
+- [x] 5 multi-objective tests
 
 ---
 
@@ -1636,10 +1636,10 @@ pytest tests/momentum/Strategy/ --no-header -q
 ```
 
 **驗收條件**：
-- [ ] Rule 1 違規 = 0
-- [ ] Rule 2 有 Protocol 引用
-- [ ] Rule 3 有 Factory 函式
-- [ ] Rule 6 獨立測試通過
+- [x] Rule 1 違規 = 0
+- [x] Rule 2 有 Protocol 引用
+- [x] Rule 3 有 Factory 函式
+- [x] Rule 6 獨立測試通過
 
 **驗證命令**：
 ```bash

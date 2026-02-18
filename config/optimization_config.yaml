@@ -1,0 +1,151 @@
+execution:
+  search_space:
+    entry_threshold:
+      type: float
+      low: 0.5
+      high: 0.95
+      step: 0.05
+    exit_threshold:
+      type: float
+      low: 0.3
+      high: 0.6
+      step: 0.05
+    stop_loss_atr:
+      type: float
+      low: 1.0
+      high: 5.0
+      step: 0.5
+    take_profit_ratio:
+      type: float
+      low: 1.0
+      high: 5.0
+      step: 0.5
+    position_sizing_method:
+      type: categorical
+      choices:
+        - fixed
+        - kelly
+        - probability_scaled
+    kelly_fraction:
+      type: float
+      low: 0.25
+      high: 0.75
+      step: 0.05
+    max_position_size:
+      type: float
+      low: 0.1
+      high: 0.5
+      step: 0.1
+    cooldown_bars:
+      type: int
+      low: 0
+      high: 20
+      step: 5
+    trailing_stop_activation:
+      type: float
+      low: 0.01
+      high: 0.1
+      step: 0.01
+  constraints:
+    max_drawdown: -0.3
+    min_win_rate: 0.4
+    min_trades: 10
+  backtest:
+    commission: 0.001
+    slippage: 0.0005
+  optimization:
+    target_metric: expectancy
+    n_trials: 100
+    timeout: 300
+    sampler: tpe
+    multi_objective: false
+
+hyperparameter:
+  lightgbm:
+    n_estimators:
+      type: int
+      low: 100
+      high: 1000
+      step: 50
+    learning_rate:
+      type: float
+      low: 0.005
+      high: 0.3
+      log: true
+    num_leaves:
+      type: int
+      low: 15
+      high: 150
+      step: 5
+    max_depth:
+      type: int
+      low: 3
+      high: 12
+      step: 1
+    min_child_samples:
+      type: int
+      low: 10
+      high: 200
+      step: 5
+    subsample:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    colsample_bytree:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    reg_alpha:
+      type: float
+      low: 0.0
+      high: 10.0
+      step: 0.1
+  xgboost:
+    n_estimators:
+      type: int
+      low: 100
+      high: 1000
+      step: 50
+    learning_rate:
+      type: float
+      low: 0.005
+      high: 0.3
+      log: true
+    max_depth:
+      type: int
+      low: 3
+      high: 12
+      step: 1
+    min_child_weight:
+      type: float
+      low: 1.0
+      high: 20.0
+      step: 1.0
+    subsample:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    colsample_bytree:
+      type: float
+      low: 0.5
+      high: 1.0
+      step: 0.05
+    gamma:
+      type: float
+      low: 0.0
+      high: 5.0
+      step: 0.1
+    reg_alpha:
+      type: float
+      low: 0.0
+      high: 10.0
+      step: 0.1
+  constraints:
+    max_train_val_gap: 0.1
+
+archived:
+  signal_density:
+    enabled: false

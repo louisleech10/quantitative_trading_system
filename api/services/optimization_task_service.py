@@ -25,7 +25,8 @@ import pandas as pd
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from momentum.factories import create_model_trainer, create_optuna_optimizer
+from api.services.optimization_output_service import get_optimization_output_service
+from momentum.factories import create_backtest_engine, create_model_trainer, create_optuna_optimizer
 from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective
 from momentum.Optimization.objectives.strategy_backtest import StrategyBacktestObjective
 from api.models.training_window_config import TrainingWindowConfig
@@ -180,6 +181,7 @@ class OptimizationTaskService:
         objective_config: Optional[Dict[str, Any]] = None,
         sampler_type: str = "TPE",
         n_trials: int = 100,
+        timeout_seconds: Optional[int] = None,
         n_startup_trials: Optional[int] = None,
         n_jobs: int = 1,
         parameter_ranges: Optional[Any] = None,
@@ -231,6 +233,7 @@ class OptimizationTaskService:
                 ),
                 'sampler_type': sampler_type,
                 'n_trials': n_trials,
+                'timeout_seconds': timeout_seconds,
                 'n_startup_trials': n_startup_trials,
                 'n_jobs': n_jobs,
                 'use_multi_objective': use_multi_objective,
@@ -246,6 +249,7 @@ class OptimizationTaskService:
             sampler_type=sampler_type,
             pruner_type=pruner_type,
             n_trials=n_trials,
+            timeout=timeout_seconds,
             n_startup_trials=n_startup_trials,
             n_jobs=n_jobs,
             parameter_ranges=parameter_ranges,
@@ -317,6 +321,8 @@ class OptimizationTaskService:
             feature_names=resolved_feature_names,
             engine=engine,
             cv_folds=int(objective_config.get("cv_folds", 5)),
+            max_train_val_gap=float(objective_config.get("max_train_val_gap", 0.1)),
+            search_space_override=objective_config.get("search_space_override"),
             train_kwargs=objective_config.get("train_kwargs", {}),
         )
 
@@ -325,18 +331,77 @@ class OptimizationTaskService:
         objective_config: Dict[str, Any],
         use_multi_objective: bool,
     ) -> StrategyBacktestObjective:
-        model_predictions = objective_config.get("model_predictions")
-        price_data = objective_config.get("price_data")
+        csv_path = objective_config.get("model_predictions_path")
+        prices = objective_config.get("prices")
+        predicted_proba = objective_config.get("predicted_proba")
+        atr_values = objective_config.get("atr_values")
 
-        if model_predictions is None or price_data is None:
+        # Breaking Change migration compatibility:
+        # legacy fields from pre-Phase 4.2 constructor
+        legacy_predictions = objective_config.get("model_predictions")
+        legacy_price_data = objective_config.get("price_data")
+
+        if predicted_proba is None and legacy_predictions is not None:
+            predicted_proba = legacy_predictions
+        if prices is None and legacy_price_data is not None:
+            legacy_close = pd.Series(legacy_price_data).astype(float)
+            prices = pd.DataFrame(
+                {
+                    "open": legacy_close,
+                    "high": legacy_close,
+                    "low": legacy_close,
+                    "close": legacy_close,
+                }
+            )
+        if atr_values is None and prices is not None:
+            close_series = pd.Series(prices["close"]).astype(float)
+            atr_values = close_series.diff().abs().fillna(0.0)
+
+        if csv_path:
+            csv_file = Path(csv_path)
+            if not csv_file.exists():
+                raise ValueError(f"model_predictions_path not found: {csv_file}")
+
+            data = pd.read_csv(csv_file)
+            required_columns = {"open", "high", "low", "close", "atr"}
+            if not required_columns.issubset(set(data.columns)):
+                raise ValueError(
+                    f"CSV missing required columns: {sorted(required_columns - set(data.columns))}"
+                )
+
+            proba_column = objective_config.get("predicted_proba_column", "predicted_proba_lgb")
+            if proba_column not in data.columns:
+                raise ValueError(f"CSV missing predicted proba column: {proba_column}")
+
+            prices = data[["open", "high", "low", "close"]].copy()
+            if "timestamp" in data.columns:
+                prices["timestamp"] = data["timestamp"]
+
+            predicted_proba = data[proba_column]
+            atr_values = data["atr"]
+
+        if prices is None or predicted_proba is None or atr_values is None:
             raise ValueError(
-                "strategy_backtest task_type 需要 objective_config.model_predictions 與 objective_config.price_data"
+                "strategy_backtest task_type 需要 objective_config.model_predictions_path，"
+                "或同時提供 prices/predicted_proba/atr_values"
             )
 
+        if not isinstance(prices, pd.DataFrame):
+            prices = pd.DataFrame(prices)
+
+        backtest_engine = create_backtest_engine(
+            commission=float(objective_config.get("commission", 0.001)),
+            slippage=float(objective_config.get("slippage", 0.0005)),
+        )
+
         return StrategyBacktestObjective(
-            model_predictions=model_predictions,
-            price_data=price_data,
-            multi_objective=use_multi_objective,
+            backtest_engine=backtest_engine,
+            prices=prices,
+            predicted_proba=pd.Series(predicted_proba),
+            atr_values=pd.Series(atr_values),
+            target_metric=str(objective_config.get("target_metric", "expectancy")),
+            constraints=objective_config.get("constraints") or {},
+            multi_objective=bool(objective_config.get("multi_objective", use_multi_objective)),
         )
 
     def _create_progress_callback(self, task_id: str) -> Callable[[str, Dict[str, Any]], None]:
@@ -367,6 +432,7 @@ class OptimizationTaskService:
                         return
 
                     task_info = self.tasks[task_id]
+                    task_type = str(task_info.config.get("task_type", ""))
 
                     # 根據事件類型更新進度
                     if event_type == "optimization_started":
@@ -400,10 +466,71 @@ class OptimizationTaskService:
                         **data
                     })
 
+                    # Phase 4.3 新事件: backtest_progress
+                    if task_type == "strategy_backtest" and event_type in {"progress_update", "new_best_value"}:
+                        callback("backtest_progress", {
+                            "task_id": task_id,
+                            "trial_number": data.get("completed_trials"),
+                            "best_value": data.get("best_value"),
+                            "completion_percentage": data.get("completion_percentage"),
+                            "sharpe": data.get("sharpe_ratio"),
+                            "max_dd": data.get("max_drawdown"),
+                            "win_rate": data.get("win_rate"),
+                            "expectancy": data.get("expectancy"),
+                        })
+
+                    # Phase 4.3 新事件: pareto_update（多目標）
+                    use_multi_objective = bool(task_info.config.get("use_multi_objective", False))
+                    if task_type == "strategy_backtest" and use_multi_objective and event_type in {"progress_update", "new_best_value", "optimization_finished"}:
+                        callback("pareto_update", {
+                            "task_id": task_id,
+                            "pareto_front": self._get_pareto_front(task_id),
+                        })
+
+                    # Phase 4.3 新事件: overfitting_alert
+                    if task_type == "model_hyperparam":
+                        train_val_gap = data.get("train_val_gap")
+                        threshold = float(task_info.config.get("objective_config", {}).get("max_train_val_gap", 0.1))
+                        if isinstance(train_val_gap, (float, int)) and float(train_val_gap) > threshold:
+                            callback("overfitting_alert", {
+                                "task_id": task_id,
+                                "trial_number": data.get("trial_number") or data.get("completed_trials"),
+                                "train_val_gap": float(train_val_gap),
+                                "threshold": threshold,
+                            })
+
             except Exception as e:
                 self.logger.error(f"Progress callback error for task {task_id}: {e}", exc_info=True)
 
         return progress_callback
+
+    def _get_pareto_front(self, task_id: str) -> List[Dict[str, float]]:
+        """取得多目標優化 Pareto front（若不可用則回傳空列表）。"""
+        optimizer = self.optimizers.get(task_id)
+        if optimizer is None:
+            return []
+
+        study = getattr(optimizer, "study", None)
+        if study is None:
+            return []
+
+        best_trials = getattr(study, "best_trials", None)
+        if not best_trials:
+            return []
+
+        pareto_front: List[Dict[str, float]] = []
+        for trial in best_trials:
+            values = getattr(trial, "values", None)
+            if not values or len(values) < 2:
+                continue
+            pareto_front.append(
+                {
+                    "sharpe": float(values[0]),
+                    "max_dd": float(values[1]),
+                }
+            )
+
+        return pareto_front
 
     async def start_task(self, task_id: str) -> bool:
         """
@@ -474,6 +601,21 @@ class OptimizationTaskService:
 
             # 保存結果到文件
             self._save_result(task_id, result)
+
+            # Phase 4.5: 任務完成後自動生成輸出檔案
+            try:
+                output_service = get_optimization_output_service()
+                output_service.generate_outputs(
+                    task_type=str(config.get("task_type", "unknown")),
+                    task_id=task_id,
+                    task_info=task_info,
+                    optimizer=optimizer,
+                )
+            except Exception as output_error:
+                self.logger.error(
+                    f"Failed to generate optimization outputs for task {task_id}: {output_error}",
+                    exc_info=True,
+                )
 
             # Ultra Think Step 3 優化: 任務完成後清理舊任務
             self._cleanup_old_tasks(keep_latest=100)

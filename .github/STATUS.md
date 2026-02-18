@@ -1,77 +1,61 @@
 # 項目狀態
 
 ### 已完成 ✅
+- ✅ **Phase 4：Optuna 重構 — 策略執行優化系統（Phase4_Optuna重構_PLAN.md V4）**
+  - Phase 4.0：架構準備（Protocol IBacktestEngine/IPositionSizer + Factory + optimization_config.yaml + 封存 SignalDensityObjective）✓
+  - Phase 4.1：Strategy Domain 核心（VectorizedBacktest + PerformanceMetrics 12+ 指標 + PositionSizer 3 種 + RiskManager + 110 tests）✓
+  - Phase 4.2：Objective 增強（StrategyBacktestObjective 重構 + 搜索空間 + 過擬合檢測 + 35 tests）✓
+  - Phase 4.3：API + Service 層（Pydantic Models + 4 端點 + OptimizationTaskService 增強 + 3 WebSocket 事件）✓
+  - Phase 4.4：前端 UI（TypeScript 型別 + hyperparameter/execution 兩頁面 + 共用元件 + Store）✓
+  - Phase 4.5：輸出格式（JSON/CSV/AI-Readable MD/HTML + Export API 5 種格式）✓
+  - Phase 4.6：測試 100%（20 整合測試 + Decoupling 腳本驗證 + Benchmark + 覆蓋率 100%）✓
+  - 驗證：integration 20 passed、decoupling PASSED、coverage 100.00%
 - ✅ **Phase 3.5：LightGBM/XGBoost 模型訓練增強系統（LightGBM_XGBoost_優化PLAN.md V8）**
-  - Phase 0：前置條件（SkippedResult dataclass + betacal + 測試目錄）✓
-  - Phase 1：基礎設施（Pydantic Config、YAML 擴展、Factory 函式、API Models）✓
-  - Phase 2：核心模組 M1-M6 全部完成 ✓
-    - M1 ProbabilityCalibrator（Platt/Beta/Venn-ABERS + ECE/Brier 校準）
-    - M2 WalkForwardValidator（滾動/擴展式驗證，含 purge/embargo）
-    - M3 SampleWeightCalculator（時間衰減/事件/組合加權）
-    - M4 AdversarialValidator（訓練/測試分佈差異偵測）
-    - M5 CombinatorialPurgedCV（CPCV 組合路徑交叉驗證）
-    - M6 LearningCurveAnalyzer（樣本量/特徵數學習曲線診斷）
-  - Phase 3：API 層（ModelEnhancementService + 8 個端點）✓
-  - Phase 4：前端層（TypeScript 型別 + Store + 圖表元件 C23-C27）✓
-    - C23 CalibrationPlot / C24 WalkForwardTimeline / C25 AdversarialFeatureChart
-    - C26 CPCVPathChart / C27 LearningCurveChart
-  - Phase 5：測試驗收全通過（56 邊界條件 + 整合 + 效能 + A1-A5/B1-B3 架構相容性）✓
-  - 全回歸：`tests/api` 129 tests passed、前端 `npm run build` 18/18 頁 ✓
-  - [Bug Fix] ic_analysis_service.py NaN/Inf JSON 序列化問題修復 ✓
-- ✅ **IC Gatekeeper 深度分析系統（Phase 2.10-2.12）**
-  - Phase 2.10: 功能難易度分級與統一開關系統（基礎/中階/高階三級）✓
-  - Phase 2.11: 全格式匯出（CSV/AI-JSON/Markdown/HDF5）— 19 tests passed ✓
-  - Phase 2.12: 特徵工程數據瀏覽器（6 Tab + Dashboard）— 15 tests passed ✓
-- ✅ **Feature Factory 完整系統（Phase 3.0-3.4）**
-  - Feature Explorer（6個Tab）+ Export API（3格式）+ Browse API ✓
-  - 測試驗證：22 + 27 tests passed ✓
+  - M1-M6 核心模組全部完成、API 層（8 端點）、前端 C23-C27、129 tests passed ✓
+- ✅ **IC Gatekeeper 深度分析系統（Phase 2.10-2.12）**、**Feature Factory 完整系統（Phase 3.0-3.4）** ✓
 - ✅ **架構解耦規則持續符合**
   - Rule 1: `momentum/` 無 `from api.` 反向依賴 ✓
-  - Rule 3: 所有服務透過 Factory 建立 ✓
-  - Rule 4: IModelTrainer Protocol 未修改 ✓
+  - Rule 2: `IBacktestEngine` / `IPositionSizer` Protocol 注入 ✓
+  - Rule 3: 所有服務透過 Factory 建立（`create_backtest_engine` / `create_position_sizer`）✓
 
 ### 進行中 🚧
-- 無（Phase 3.5 全部驗收完成）
+- 📝 **Phase 4.7：文件更新**（`ARCHITECTURE.md` 與 `API_SPECIFICATION.md` 補齊 Strategy Domain / Protocol / 端點說明）
 
 ## 🎯 當前重點
-- Phase 3.5 LightGBM/XGBoost 模型訓練增強系統已完成全驗收，PLAN 狀態 Converged/Ready to Freeze
-- 129/129 API 測試通過，前端 18 頁建置乾淨
-- 下一階段：查看 `docs/Phase4_Optuna重構_PLAN.md` 規劃並啟動
+- Phase 4.0~4.6 全部驗收完成；Phase 4.7 文件更新為唯一剩餘工作
+- 核心驗證：integration 20 tests passed、coverage 100%、decoupling PASSED
 
 ### 下一步工作
-- 閱讀 `docs/Phase4_Optuna重構_PLAN.md`，確認下一 Phase 任務範圍
-- 執行 `pytest tests/momentum/Analysis/ -v` 確認 M1-M6 模組穩定性基準
-- 視需要補齊 Phase 2.4-2.9 IC 核心模組單元測試（非阻塞）
+- 完成 Phase 4.7.1：`docs/ARCHITECTURE.md` 補齊 Strategy Domain、Protocol、Factory 說明
+- 完成 Phase 4.7.2：`docs/API_SPECIFICATION.md` 補齊 4 個新端點與 3 個 WebSocket 事件
 
 ## 🐛 已知問題
 ### 需要修復
 - 無阻塞性問題
 
 ### 需要優化
-- 4 個 FutureWarning：`ema_extractor.py` 與 `feature_validator.py` pandas `fillna(method=...)` 已棄用（非阻塞）
-- Phase 2.4-2.9 IC 核心模組單元測試覆蓋率待補齊（非阻塞）
+- 4 個 FutureWarning：`ema_extractor.py` / `feature_validator.py` pandas `fillna(method=...)` 已棄用（非阻塞）
+- Optuna trial log 中 NON_RETRYABLE 訊息（entry_threshold == exit_threshold 剪枝路徑，係預期行為）
 
 ### 技術債務
-- pandas `fillna(method=...)` 語法需遷移至 `ffill()`/`bfill()`（現僅 FutureWarning 不影響功能）
-- IC 深度分析 Module 1-10 Integration Tests 待最終串接驗證
+- pandas `fillna(method=...)` 語法需遷移至 `ffill()`/`bfill()`（現僅 FutureWarning）
+- `optimization_results/` 下的測試產物（test artifacts）應加入 `.gitignore` 或在 CI 中清理
 
 ## 📝 最近完成的工作
-- 2026-02-18：修復 ic_analysis_service.py NaN/Inf JSON 序列化問題（129/129 tests passed）
-- 2026-02-18：完成 Phase 3.5 模型增強系統全驗收（M1-M6 + API + 前端 C23-C27 + 129 tests）
-- 2026-02-17：完成 Phase 2.12 特徵工程數據瀏覽器（15 tests passed，前端 build 通過）
-- 2026-02-17：完成 Phase 2.11 全格式匯出系統（19 tests passed）
-- 2026-02-17：Feature Factory Phase 3.4 完整驗收（22 + 27 tests passed）
+- 2026-02-18：完成 Phase 4.6 全驗收（20 integration tests、decoupling PASSED、coverage 100%）
+- 2026-02-18：修補 multi-objective trial 序列化（`optimization_output_service.py` fallback）
+- 2026-02-18：新增 `scripts/check_decoupling_phase4.sh`（Rule 1/2/3/6 四規則自動驗證）
+- 2026-02-18：完成 Phase 4.0~4.5（Strategy Domain + Objective + API + 前端 + 輸出格式）
+- 2026-02-18：修復 ic_analysis_service.py NaN/Inf JSON 序列化問題（Phase 3.5 全驗收）
 
 ## 🔄 Git狀態
 - 分支：`main`
-- 狀態：Phase 3.5 全部完成並測試通過，待推送同步
-- 變更範圍（vs last commit d3a888f）：
-  - 新增：~52 個檔案（M1-M6 模組 8 + API/Service/Routes 6 + 前端元件/Store 6 + 測試 14 + Feature Browser/Export/FeatureToggle 18）
-  - 修改：~36 個檔案（models/__init__/config/factories/Analysis/__init__/frontend types/store 等）
-- 目標：提交本次所有變更並推送到遠端
+- 上次 commit：`eadf325` feat: 完成 Phase 3.5 LightGBM/XGBoost 模型訓練增強系統全驗收
+- 待提交：Phase 4.0~4.6 所有變更（Strategy Domain + Objectives + API + 前端 + 測試 + 腳本）
+- 變更範圍：修改 ~12 檔、新增 ~40+ 檔（momentum/Strategy/ + api/routes/ + tests/integration/ + frontend/src/app/optimization-* 等）
 
 ## 💡 下次啟動時
-- 先跑：`pytest tests/api -v --tb=short`（確認 129 tests 穩定）
-- 再跑：`cd frontend && npm run build`（確認前端 18 頁健康）
+- 先跑：`pytest tests/integration/ -q`（確認 20 tests 穩定）
+- 確認：`./scripts/check_decoupling_phase4.sh`（Rule1/2/3/6 PASSED）
 - 確認：`grep -rn "from api." momentum/ | wc -l` → 應為 0
-- 啟動：查閱 `docs/Phase4_Optuna重構_PLAN.md` 確認下一階段範圍
+- 推進：Phase 4.7 文件更新（ARCHITECTURE.md + API_SPECIFICATION.md）

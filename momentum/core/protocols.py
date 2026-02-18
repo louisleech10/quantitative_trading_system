@@ -123,6 +123,33 @@ class IOptimizationObjective(Protocol):
 
 
 @runtime_checkable
+class IBacktestEngine(Protocol):
+    """Backtest engine protocol."""
+
+    def run_backtest(
+        self,
+        prices: Any,
+        predicted_proba: Any,
+        atr_values: Any,
+        strategy_params: Dict[str, Any],
+    ) -> Any:
+        ...
+
+
+@runtime_checkable
+class IPositionSizer(Protocol):
+    """Position sizing protocol."""
+
+    def calculate_position_size(
+        self,
+        predicted_proba: float,
+        equity: float,
+        risk_params: Dict[str, Any],
+    ) -> float:
+        ...
+
+
+@runtime_checkable
 class IICAnalyzer(Protocol):
     """IC analyzer interface for cross-domain usage."""
 

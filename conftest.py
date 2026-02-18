@@ -174,3 +174,64 @@ def model_config_manager():
     from momentum.Analysis.model_config import ModelConfigManager
 
     return ModelConfigManager()
+
+
+@pytest.fixture
+def mock_prices():
+    """Phase 4.1 Strategy 測試用 OHLC。"""
+    import numpy as np
+    import pandas as pd
+
+    dates = pd.date_range("2025-01-01", periods=100, freq="12h")
+    np.random.seed(42)
+    close = 40000 + np.cumsum(np.random.randn(100) * 500)
+    open_prices = close + np.random.randn(100) * 100
+    highs = np.maximum(open_prices, close) + np.abs(np.random.randn(100) * 300)
+    lows = np.minimum(open_prices, close) - np.abs(np.random.randn(100) * 300)
+
+    return pd.DataFrame(
+        {
+            "timestamp": dates,
+            "open": open_prices,
+            "high": highs,
+            "low": lows,
+            "close": close,
+        }
+    )
+
+
+@pytest.fixture
+def mock_predicted_proba():
+    """Phase 4.1 Strategy 測試用機率序列。"""
+    import numpy as np
+    import pandas as pd
+
+    np.random.seed(42)
+    return pd.Series(np.random.uniform(0.3, 0.9, 100))
+
+
+@pytest.fixture
+def mock_atr():
+    """Phase 4.1 Strategy 測試用 ATR 序列。"""
+    import numpy as np
+    import pandas as pd
+
+    np.random.seed(42)
+    return pd.Series(np.random.uniform(500, 2000, 100))
+
+
+@pytest.fixture
+def mock_strategy_params():
+    """Phase 4.1 Strategy 測試用預設參數。"""
+    return {
+        "entry_threshold": 0.7,
+        "exit_threshold": 0.4,
+        "stop_loss_atr": 2.0,
+        "take_profit_ratio": 3.0,
+        "position_sizing_method": "fixed",
+        "position_size": 0.1,
+        "kelly_fraction": 0.5,
+        "max_position_size": 0.25,
+        "cooldown_bars": 5,
+        "trailing_stop_activation": 0.05,
+    }

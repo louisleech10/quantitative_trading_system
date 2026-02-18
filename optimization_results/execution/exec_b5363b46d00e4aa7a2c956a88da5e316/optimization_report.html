@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Optimization Report - exec_b5363b46d00e4aa7a2c956a88da5e316</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px; color: #111827; }
+    h1, h2 { margin: 0 0 12px 0; }
+    .section { margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+    th { background: #f3f4f6; }
+    .code { background: #f9fafb; border: 1px solid #e5e7eb; padding: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Optimization Report - exec_b5363b46d00e4aa7a2c956a88da5e316</h1>
+
+  <div class="section">
+    <h2>Meta</h2>
+    <table>
+      <tbody>
+        <tr><th>Task Type</th><td>execution</td></tr>
+        <tr><th>Status</th><td>completed</td></tr>
+        <tr><th>Study Name</th><td>phase4_execution_e2e</td></tr>
+        <tr><th>Completed At</th><td>2026-01-01T00:00:02+00:00</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Best Trial</h2>
+    <table>
+      <tbody>
+        <tr><th>Trial Number</th><td>0</td></tr>
+        <tr><th>Value</th><td>0.0013083467493690767</td></tr>
+      </tbody>
+    </table>
+    <div class="code">{&#39;entry_threshold&#39;: 0.65, &#39;exit_threshold&#39;: 0.6, &#39;stop_loss_atr&#39;: 4.0, &#39;take_profit_ratio&#39;: 3.5, &#39;position_sizing_method&#39;: &#39;fixed&#39;, &#39;kelly_fraction&#39;: 0.7, &#39;max_position_size&#39;: 0.4, &#39;cooldown_bars&#39;: 15, &#39;trailing_stop_activation&#39;: 0.01}</div>
+  </div>
+
+  <div class="section">
+    <h2>Performance Metrics</h2>
+    <table>
+      <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+      <tbody>
+      
+        <tr><td>total_return</td><td>0.08089430501784722</td></tr>
+      
+        <tr><td>cagr</td><td>0.7746334191455246</td></tr>
+      
+        <tr><td>sharpe_ratio</td><td>5.531082030162886</td></tr>
+      
+        <tr><td>sortino_ratio</td><td>0.0</td></tr>
+      
+        <tr><td>calmar_ratio</td><td>0.0</td></tr>
+      
+        <tr><td>max_drawdown</td><td>0.0</td></tr>
+      
+        <tr><td>max_drawdown_duration</td><td>0.0</td></tr>
+      
+        <tr><td>expectancy</td><td>0.0013083467493690767</td></tr>
+      
+        <tr><td>sqn</td><td>3.8321697795533542</td></tr>
+      
+        <tr><td>win_rate</td><td>1.0</td></tr>
+      
+        <tr><td>profit_factor</td><td>0.0</td></tr>
+      
+        <tr><td>avg_win</td><td>0.0013083467493690767</td></tr>
+      
+        <tr><td>avg_loss</td><td>0.0</td></tr>
+      
+        <tr><td>total_trades</td><td>6.0</td></tr>
+      
+      
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Constraint Satisfaction</h2>
+    <table>
+      <thead><tr><th>Constraint</th><th>Limit</th><th>Actual</th><th>Satisfied</th></tr></thead>
+      <tbody>
+      
+        <tr>
+          <td>max_drawdown</td>
+          <td>-0.3</td>
+          <td>0.0</td>
+          <td>True</td>
+        </tr>
+      
+        <tr>
+          <td>min_win_rate</td>
+          <td>0.4</td>
+          <td>1.0</td>
+          <td>True</td>
+        </tr>
+      
+        <tr>
+          <td>min_trades</td>
+          <td>5</td>
+          <td>6.0</td>
+          <td>True</td>
+        </tr>
+      
+      
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Benchmark Comparison</h2>
+    <div class="code">{&#39;strategy&#39;: {&#39;total_return&#39;: 0.08089430501784722, &#39;sharpe_ratio&#39;: 5.531082030162886, &#39;max_drawdown&#39;: 0.0}, &#39;benchmark&#39;: {&#39;total_return&#39;: None, &#39;sharpe_ratio&#39;: None, &#39;max_drawdown&#39;: None}, &#39;difference&#39;: {&#39;total_return&#39;: None, &#39;sharpe_ratio&#39;: None, &#39;max_drawdown&#39;: None}}</div>
+  </div>
+
+  <div class="section">
+    <h2>Equity Curve Chart Data</h2>
+    <table>
+      <thead><tr><th>Timestamp</th><th>Strategy Equity</th><th>Benchmark Equity</th><th>Drawdown</th><th>Returns</th></tr></thead>
+      <tbody>
+      
+        <tr>
+          <td>0</td>
+          <td>1.0</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>1</td>
+          <td>1.0</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>2</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.01274892830915575</td>
+        </tr>
+      
+        <tr>
+          <td>3</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>4</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>5</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>6</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>7</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>8</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>9</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>10</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>11</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>12</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>13</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>14</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>15</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>16</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>17</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>18</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>19</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>20</td>
+          <td>1.0127489283091557</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>21</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.008281415133945869</td>
+        </tr>
+      
+        <tr>
+          <td>22</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>23</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>24</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>25</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>26</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>27</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>28</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>29</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>30</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>31</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>32</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>33</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>34</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>35</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>36</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>37</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>38</td>
+          <td>1.0211359226109427</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>39</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.006641699593450179</td>
+        </tr>
+      
+        <tr>
+          <td>40</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>41</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>42</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>43</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>44</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>45</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>46</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>47</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>48</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+        <tr>
+          <td>49</td>
+          <td>1.027918000653005</td>
+          <td>1.0</td>
+          <td>0.0</td>
+          <td>0.0</td>
+        </tr>
+      
+      
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

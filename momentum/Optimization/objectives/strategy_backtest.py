@@ -4,27 +4,71 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple, Union
 
-import numpy as np
+import optuna
 import pandas as pd
 
+from momentum.Strategy.performance_metrics import PerformanceMetrics
 from momentum.core.logging import get_logger
-from momentum.core.protocols import IOptimizationObjective
+from momentum.core.protocols import IBacktestEngine, IOptimizationObjective
 
 logger = get_logger(__name__)
 
 
 class StrategyBacktestObjective(IOptimizationObjective):
-    """策略回測參數優化目標（Sharpe 最大化，可選 MaxDD 最小化）。"""
+    """策略回測參數優化目標。"""
 
-    def __init__(self, model_predictions: Any, price_data: Any, multi_objective: bool = False):
-        self.predictions = np.asarray(model_predictions, dtype=float)
-        self.prices = pd.Series(np.asarray(price_data, dtype=float))
+    SUPPORTED_TARGET_METRICS = [
+        "expectancy",
+        "sharpe_ratio",
+        "sortino_ratio",
+        "calmar_ratio",
+        "sqn",
+    ]
+
+    def __init__(
+        self,
+        backtest_engine: IBacktestEngine,
+        prices: pd.DataFrame,
+        predicted_proba: pd.Series,
+        atr_values: pd.Series,
+        target_metric: str = "expectancy",
+        constraints: Optional[Dict[str, float]] = None,
+        multi_objective: bool = False,
+    ):
+        self.backtest_engine = backtest_engine
+        self.prices = prices.copy()
+        self.predicted_proba = pd.Series(predicted_proba).astype(float)
+        self.atr_values = pd.Series(atr_values).astype(float)
+        self.target_metric = str(target_metric).strip()
+        self.constraints = constraints or {}
         self.multi_objective = multi_objective
+        self._current_trial = None
 
-        if len(self.predictions) != len(self.prices):
-            raise ValueError("model_predictions 與 price_data 長度必須一致")
-        if len(self.predictions) < 3:
-            raise ValueError("資料筆數不足，至少需要 3 筆")
+        if self.target_metric not in self.SUPPORTED_TARGET_METRICS:
+            raise ValueError(
+                f"Unsupported target_metric: {self.target_metric}. "
+                f"Options: {self.SUPPORTED_TARGET_METRICS}"
+            )
+
+        if len(self.prices) != len(self.predicted_proba):
+            raise ValueError(
+                f"prices length {len(self.prices)} != "
+                f"predicted_proba length {len(self.predicted_proba)}"
+            )
+        if len(self.prices) != len(self.atr_values):
+            raise ValueError(
+                f"prices length {len(self.prices)} != "
+                f"atr_values length {len(self.atr_values)}"
+            )
+
+        if self.predicted_proba.isna().any():
+            logger.warning("predicted_proba contains NaN, filling with 0.5")
+            self.predicted_proba = self.predicted_proba.fillna(0.5)
+
+        if "timestamp" in self.prices.columns:
+            ts = pd.to_datetime(self.prices["timestamp"], errors="coerce")
+            if ts.notna().all() and not ts.is_monotonic_increasing:
+                logger.warning("timestamp is not monotonic increasing")
 
     @property
     def name(self) -> str:
@@ -41,81 +85,69 @@ class StrategyBacktestObjective(IOptimizationObjective):
         return None
 
     def create_search_space(self, trial: Any) -> Dict[str, Any]:
+        self._current_trial = trial
         return {
-            "entry_threshold": trial.suggest_float("entry_threshold", 0.50, 0.90),
-            "exit_threshold": trial.suggest_float("exit_threshold", 0.10, 0.50),
-            "stop_loss": trial.suggest_float("stop_loss", 0.005, 0.10),
-            "take_profit": trial.suggest_float("take_profit", 0.01, 0.20),
-            "max_holding_bars": trial.suggest_int("max_holding_bars", 1, 30),
-            "position_size": trial.suggest_float("position_size", 0.10, 1.00),
-            "cooldown_bars": trial.suggest_int("cooldown_bars", 0, 10),
-            "transaction_cost": trial.suggest_float("transaction_cost", 0.0, 0.005),
-            "min_signal_gap": trial.suggest_int("min_signal_gap", 0, 5),
+            "entry_threshold": trial.suggest_float("entry_threshold", 0.5, 0.95, step=0.05),
+            "exit_threshold": trial.suggest_float("exit_threshold", 0.3, 0.6, step=0.05),
+            "stop_loss_atr": trial.suggest_float("stop_loss_atr", 1.0, 5.0, step=0.5),
+            "take_profit_ratio": trial.suggest_float("take_profit_ratio", 1.0, 5.0, step=0.5),
+            "position_sizing_method": trial.suggest_categorical(
+                "position_sizing_method", ["fixed", "kelly", "probability_scaled"]
+            ),
+            "kelly_fraction": trial.suggest_float("kelly_fraction", 0.25, 0.75, step=0.05),
+            "max_position_size": trial.suggest_float("max_position_size", 0.1, 0.5, step=0.1),
+            "cooldown_bars": trial.suggest_int("cooldown_bars", 0, 20, step=5),
+            "trailing_stop_activation": trial.suggest_float(
+                "trailing_stop_activation", 0.01, 0.10, step=0.01
+            ),
         }
 
     def evaluate(self, params: Dict[str, Any]) -> Union[float, Tuple[float, float]]:
-        signals = self._generate_signals(params)
-        metrics = self._run_backtest(signals, params)
+        result = self.backtest_engine.run_backtest(
+            prices=self.prices,
+            predicted_proba=self.predicted_proba,
+            atr_values=self.atr_values,
+            strategy_params=params,
+        )
+
+        metrics = PerformanceMetrics(result.equity_curve, result.trades).calculate_all()
+        self._record_trial_metrics(metrics)
+        self._apply_constraints(metrics)
+
+        target_value = float(metrics.get(self.target_metric, 0.0))
         if self.multi_objective:
-            return float(metrics["sharpe_ratio"]), float(metrics["max_drawdown"])
-        return float(metrics["sharpe_ratio"])
+            max_drawdown_abs = abs(float(metrics.get("max_drawdown", 0.0)))
+            return target_value, max_drawdown_abs
+        return target_value
 
     def get_pruning_callback(self, trial: Any) -> Optional[Any]:
         return None
 
-    def _generate_signals(self, params: Dict[str, Any]) -> pd.Series:
-        entry_threshold = float(params["entry_threshold"])
-        exit_threshold = float(params["exit_threshold"])
+    def _apply_constraints(self, metrics: Dict[str, float]) -> None:
+        max_drawdown_limit = float(self.constraints.get("max_drawdown", -0.30))
+        min_win_rate = float(self.constraints.get("min_win_rate", 0.40))
+        min_trades = float(self.constraints.get("min_trades", 10))
 
-        if entry_threshold <= exit_threshold:
-            raise ValueError("entry_threshold 必須大於 exit_threshold")
+        max_drawdown = float(metrics.get("max_drawdown", 0.0))
+        win_rate = float(metrics.get("win_rate", 0.0))
+        total_trades = float(metrics.get("total_trades", 0.0))
 
-        raw_signal = np.where(
-            self.predictions >= entry_threshold,
-            1.0,
-            np.where(self.predictions <= exit_threshold, 0.0, np.nan),
-        )
-        signal_series = pd.Series(raw_signal).ffill().fillna(0.0)
+        if max_drawdown < max_drawdown_limit:
+            raise optuna.TrialPruned(
+                f"max_drawdown {max_drawdown:.4f} < threshold {max_drawdown_limit:.4f}"
+            )
+        if win_rate < min_win_rate:
+            raise optuna.TrialPruned(f"win_rate {win_rate:.4f} < threshold {min_win_rate:.4f}")
+        if total_trades < min_trades:
+            raise optuna.TrialPruned(
+                f"total_trades {total_trades:.0f} < threshold {min_trades:.0f}"
+            )
 
-        min_signal_gap = int(params.get("min_signal_gap", 0))
-        if min_signal_gap > 0:
-            changed = signal_series.diff().abs().fillna(signal_series.abs())
-            cooldown_mask = changed.rolling(window=min_signal_gap + 1, min_periods=1).max().shift(1).fillna(0) > 0
-            signal_series = signal_series.where(~cooldown_mask, signal_series.shift(1).fillna(0.0))
-
-        return signal_series.astype(float)
-
-    def _run_backtest(self, signals: pd.Series, params: Dict[str, Any]) -> Dict[str, float]:
-        returns = self.prices.pct_change().fillna(0.0)
-
-        position_size = float(params["position_size"])
-        stop_loss = float(params["stop_loss"])
-        take_profit = float(params["take_profit"])
-        transaction_cost = float(params["transaction_cost"])
-
-        position = signals.shift(1).fillna(0.0) * position_size
-        gross_returns = position * returns
-        bounded_returns = gross_returns.clip(lower=-stop_loss, upper=take_profit)
-
-        turnover = position.diff().abs().fillna(position.abs())
-        costs = turnover * transaction_cost
-        net_returns = bounded_returns - costs
-
-        mean_ret = float(net_returns.mean())
-        std_ret = float(net_returns.std(ddof=0))
-        sharpe_ratio = (np.sqrt(252.0) * mean_ret / std_ret) if std_ret > 0 else -999.0
-
-        equity_curve = (1.0 + net_returns).cumprod()
-        running_peak = equity_curve.cummax()
-        drawdown = 1.0 - (equity_curve / running_peak.replace(0, np.nan))
-        max_drawdown = float(drawdown.fillna(0.0).max())
-
-        logger.info(
-            f"StrategyBacktestObjective result: sharpe={sharpe_ratio:.6f}, "
-            f"max_drawdown={max_drawdown:.6f}"
-        )
-
-        return {
-            "sharpe_ratio": sharpe_ratio,
-            "max_drawdown": max_drawdown,
-        }
+    def _record_trial_metrics(self, metrics: Dict[str, float]) -> None:
+        if self._current_trial is None:
+            return
+        for key, value in metrics.items():
+            try:
+                self._current_trial.set_user_attr(key, float(value))
+            except (TypeError, ValueError):
+                self._current_trial.set_user_attr(key, value)
