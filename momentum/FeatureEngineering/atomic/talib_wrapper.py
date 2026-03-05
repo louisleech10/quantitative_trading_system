@@ -207,6 +207,10 @@ class TALibWrapper:
         "MACD": ["fastperiod", "slowperiod", "signalperiod"],
         "MACDEXT": ["fastperiod", "slowperiod", "signalperiod"],
         "MACDFIX": ["signalperiod"],
+        "MAVP": ["periods"],
+        "APO": ["fastperiod", "slowperiod", "matype"],
+        "PPO": ["fastperiod", "slowperiod", "matype"],
+        "ULTOSC": ["timeperiod1", "timeperiod2", "timeperiod3"],
         "STOCH": [
             "fastk_period",
             "slowk_period",
@@ -275,6 +279,9 @@ class TALibWrapper:
         func = getattr(talib, spec.talib_func)
         params = dict(params or {})
 
+        # Snapshot params before _prepare_inputs, because MAVP uses params.pop()
+        # which would destroy the dict before _to_dataframe uses it for column naming.
+        params_for_naming = dict(params)
         inputs, source_label = cls._prepare_inputs(spec, data, data_source, params)
         output = func(*inputs, **params)
 
@@ -283,7 +290,7 @@ class TALibWrapper:
             index=cls._get_index(data),
             source_label=source_label,
             spec=spec,
-            params=params,
+            params=params_for_naming,
         )
 
     @classmethod

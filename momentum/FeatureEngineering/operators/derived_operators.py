@@ -35,6 +35,7 @@ class DerivedOperatorEngine:
 
     def __init__(self, config: Dict | None) -> None:
         self._config = self._normalize_config(config)
+        self._duplicate_series_warnings: set[str] = set()
 
     def compute_all(
         self,
@@ -86,8 +87,14 @@ class DerivedOperatorEngine:
 
     def compute_distance(self, price: pd.Series, indicator: pd.Series, name_prefix: str) -> pd.Series:
         """(Price - Indicator) / Indicator"""
-        denom = indicator.replace(0, np.nan)
-        return (price - indicator) / denom
+        aligned_price, aligned_indicator = self._align_pair_series(
+            left=price,
+            right=indicator,
+            left_name=f"{name_prefix}:price",
+            right_name=f"{name_prefix}:indicator",
+        )
+        denom = aligned_indicator.replace(0, np.nan)
+        return (aligned_price - aligned_indicator) / denom
 
     def compute_cross(self, fast: pd.Series, slow: pd.Series, name_prefix: str) -> pd.Series:
         """fast - slow"""
@@ -174,7 +181,7 @@ class DerivedOperatorEngine:
                 continue
             if info.source not in raw_data.columns:
                 continue
-            series = layer1_df[col]
+            series = self._select_feature_series(layer1_df, col)
             price = raw_data[info.source]
             distance = self.compute_distance(price, series, col)
             frames.append(distance.rename(f"{col}_Distance"))
@@ -199,10 +206,12 @@ class DerivedOperatorEngine:
         for key, infos in grouped.items():
             infos_sorted = sorted(infos, key=lambda item: item.params[0])
             for fast, slow in zip(infos_sorted[:-1], infos_sorted[1:]):
+                fast_series = self._select_feature_series(layer1_df, fast.name)
+                slow_series = self._select_feature_series(layer1_df, slow.name)
                 if operator_name == "Cross":
-                    series = self.compute_cross(layer1_df[fast.name], layer1_df[slow.name], fast.name)
+                    series = self.compute_cross(fast_series, slow_series, fast.name)
                 else:
-                    series = self.compute_ratio(layer1_df[fast.name], layer1_df[slow.name], fast.name)
+                    series = self.compute_ratio(fast_series, slow_series, fast.name)
                 param_str = self._format_params([fast.params[0], slow.params[0]])
                 col_name = f"{fast.source}_{fast.category}_{fast.indicator}_{param_str}_{operator_name}"
                 frames.append(series.rename(col_name))
@@ -223,7 +232,8 @@ class DerivedOperatorEngine:
         for col, info in feature_info.items():
             if not self._matches_apply_to(info, apply_to):
                 continue
-            frames.append(self.compute_momentum(layer1_df[col], lags, col))
+            series = self._select_feature_series(layer1_df, col)
+            frames.append(self.compute_momentum(series, lags, col))
         frames = [frame for frame in frames if not frame.empty]
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
@@ -248,7 +258,8 @@ class DerivedOperatorEngine:
                     continue
                 if info.indicator != indicator and not info.indicator.startswith(f"{indicator}_"):
                     continue
-                series = self.compute_binary_signal(layer1_df[col], condition, col)
+                feature_series = self._select_feature_series(layer1_df, col)
+                series = self.compute_binary_signal(feature_series, condition, col)
                 name_suffix = f"_{suffix}" if suffix else ""
                 frames.append(series.rename(f"{col}_BinarySignal{name_suffix}"))
 
@@ -267,7 +278,8 @@ class DerivedOperatorEngine:
         for col, info in feature_info.items():
             if not self._matches_apply_to(info, apply_to):
                 continue
-            series = self.transform_sign(layer1_df[col]) * self.transform_abs(layer1_df[col])
+            feature_series = self._select_feature_series(layer1_df, col)
+            series = self.transform_sign(feature_series) * self.transform_abs(feature_series)
             frames.append(series.rename(f"{col}_SignedStrength"))
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
@@ -294,7 +306,7 @@ class DerivedOperatorEngine:
         for col, info in feature_info.items():
             if not self._matches_apply_to(info, apply_to):
                 continue
-            series = layer1_df[col]
+            series = self._select_feature_series(layer1_df, col)
             for window in windows:
                 if "ts_argmax" in operators:
                     frames.append(self.ts_argmax(series, window).rename(f"{col}_TsArgmax_W{window}"))
@@ -305,7 +317,13 @@ class DerivedOperatorEngine:
                 if "decay_linear" in operators:
                     frames.append(self.decay_linear(series, window).rename(f"{col}_DecayLinear_W{window}"))
                 if "ts_corr" in operators and corr_with in raw_data.columns:
-                    corr_series = self.ts_corr(series, raw_data[corr_with], window)
+                    aligned_ref, aligned_series = self._align_pair_series(
+                        left=raw_data[corr_with],
+                        right=series,
+                        left_name=f"{col}:corr_ref:{corr_with}",
+                        right_name=f"{col}:corr_base",
+                    )
+                    corr_series = self.ts_corr(aligned_series, aligned_ref, window)
                     frames.append(corr_series.rename(f"{col}_TsCorr_{corr_with}_W{window}"))
 
             if "sign" in transforms:
@@ -432,3 +450,57 @@ class DerivedOperatorEngine:
                 continue
             output.append(value)
         return output
+
+    def _select_feature_series(self, frame: pd.DataFrame, column_name: str) -> pd.Series:
+        """Return a single feature series even when duplicate column names exist."""
+        selected = frame[column_name]
+        if isinstance(selected, pd.Series):
+            return selected
+
+        if column_name not in self._duplicate_series_warnings:
+            logger.warning(
+                "Feature '%s' has duplicated columns (%d copies), using last column for derived operations",
+                column_name,
+                selected.shape[1],
+            )
+            self._duplicate_series_warnings.add(column_name)
+
+        series = selected.iloc[:, -1]
+        series.name = column_name
+        return series
+
+    def _align_pair_series(
+        self,
+        left: pd.Series,
+        right: pd.Series,
+        left_name: str,
+        right_name: str,
+    ) -> tuple[pd.Series, pd.Series]:
+        """Deduplicate indexes and align left series to right series index."""
+        left_normalized = self._deduplicate_index(left, left_name)
+        right_normalized = self._deduplicate_index(right, right_name)
+
+        if not left_normalized.index.equals(right_normalized.index):
+            logger.warning(
+                "Index mismatch between %s and %s, aligning %s to %s index",
+                left_name,
+                right_name,
+                left_name,
+                right_name,
+            )
+            left_normalized = left_normalized.reindex(right_normalized.index)
+
+        return left_normalized, right_normalized
+
+    def _deduplicate_index(self, series: pd.Series, series_name: str) -> pd.Series:
+        """Drop duplicated index labels consistently using keep='last'."""
+        if not series.index.has_duplicates:
+            return series
+
+        duplicate_count = int(series.index.duplicated(keep="last").sum())
+        logger.warning(
+            "%s contains duplicated index labels, dropping %d rows (keep='last')",
+            series_name,
+            duplicate_count,
+        )
+        return series[~series.index.duplicated(keep="last")]

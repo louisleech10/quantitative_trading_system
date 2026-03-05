@@ -6,6 +6,7 @@ import re
 
 import numpy as np
 import pandas as pd
+from scipy.stats import rankdata
 
 from momentum.core.logging import get_logger
 
@@ -65,19 +66,10 @@ class RollingAggregator:
         method: callable,
         agg_name: str,
     ) -> pd.DataFrame:
-        if agg_name in {"mean", "std", "min", "max", "skew", "kurt", "range", "zscore"}:
-            return self._apply_vectorized_aggregator(data, agg_name)
-
-        frames: List[pd.Series] = []
-        agg_label = self._format_agg_label(agg_name)
-        for col_index, col in enumerate(data.columns):
-            series = data.iloc[:, col_index]
-            for window in self._windows:
-                result = method(series, window)
-                frames.append(result.rename(f"{col}_{agg_label}_W{window}"))
-        if not frames:
-            return pd.DataFrame(index=data.index)
-        return pd.concat(frames, axis=1)
+        # All aggregators are routed through the vectorized path.
+        # "rank" and "slope" are handled inside _apply_vectorized_aggregator
+        # using raw=True callbacks, which avoids per-row Python object creation.
+        return self._apply_vectorized_aggregator(data, agg_name)
 
     def _apply_vectorized_aggregator(self, data: pd.DataFrame, agg_name: str) -> pd.DataFrame:
         frames: List[pd.DataFrame] = []
@@ -103,6 +95,36 @@ class RollingAggregator:
                 mean = data.rolling(window).mean()
                 std = data.rolling(window).std().replace(0, np.nan)
                 result = (data - mean) / std
+            elif agg_name == "rank":
+                # raw=True passes a numpy array to the lambda — no pd.Series construction.
+                # rankdata runs in C via scipy, giving ~100-1000× speedup over raw=False.
+                n = window
+
+                def _rank_pct(arr: np.ndarray, _n: int = n) -> float:
+                    return rankdata(arr)[-1] / _n
+
+                result = data.rolling(window).apply(_rank_pct, raw=True)
+            elif agg_name == "slope":
+                # Pre-compute OLS constants once per window; apply as raw=True lambda.
+                x = np.arange(window, dtype=float)
+                sum_x = float(x.sum())
+                sum_x2 = float(np.dot(x, x))
+                denom = window * sum_x2 - sum_x ** 2
+                if denom == 0:
+                    result = pd.DataFrame(
+                        np.nan, index=data.index, columns=data.columns
+                    )
+                else:
+                    def _slope_fn(
+                        arr: np.ndarray,
+                        _w: int = window,
+                        _sum_x: float = sum_x,
+                        _denom: float = denom,
+                        _x: np.ndarray = x,
+                    ) -> float:
+                        return (_w * float(np.dot(_x, arr)) - _sum_x * arr.sum()) / _denom
+
+                    result = data.rolling(window).apply(_slope_fn, raw=True)
             else:
                 continue
             frames.append(result.add_suffix(f"_{agg_label}_W{window}"))
@@ -133,9 +155,13 @@ class RollingAggregator:
         return series.rolling(window).mean()
 
     def _compute_rank(self, series: pd.Series, window: int) -> pd.Series:
-        return series.rolling(window).apply(
-            lambda x: pd.Series(x).rank(pct=True).iloc[-1], raw=False
-        )
+        # raw=True avoids per-row pd.Series construction; scipy.stats.rankdata runs in C.
+        n = window
+
+        def _rank_pct(arr: np.ndarray, _n: int = n) -> float:
+            return rankdata(arr)[-1] / _n
+
+        return series.rolling(window).apply(_rank_pct, raw=True)
 
     def _compute_zscore(self, series: pd.Series, window: int) -> pd.Series:
         mean = series.rolling(window).mean()

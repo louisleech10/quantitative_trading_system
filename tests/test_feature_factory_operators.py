@@ -162,3 +162,69 @@ def test_lag_processor_layer1_and_raw():
     assert lag_col in lagged.columns
     idx = max(lag + 1, 10)
     assert np.isclose(lagged[lag_col].iloc[idx], raw["close"].iloc[idx - lag], equal_nan=True)
+
+
+def test_derived_distance_handles_duplicate_raw_index():
+    layer1 = pd.DataFrame(
+        {"close_trend_EMA_3": [10.0, 11.0, 12.0]},
+        index=pd.Index([1, 2, 3], name="ts"),
+    )
+    raw_data = pd.DataFrame(
+        {"close": [10.0, 11.0, 11.5, 12.0]},
+        index=pd.Index([1, 2, 2, 3], name="ts"),
+    )
+
+    engine = DerivedOperatorEngine(
+        {
+            "distance": {"enabled": True, "apply_to": "all"},
+            "cross": {"enabled": False},
+            "ratio": {"enabled": False},
+            "momentum": {"enabled": False},
+            "binary_signal": {"enabled": False},
+            "signed_strength": {"enabled": False},
+            "worldquant": {"enabled": False},
+        }
+    )
+    derived = engine.compute_all(layer1, raw_data)
+
+    distance_col = "close_trend_EMA_3_Distance"
+    assert distance_col in derived.columns
+    assert derived.index.equals(layer1.index)
+    expected_idx_2 = (11.5 - 11.0) / 11.0  # duplicate ts=2 should keep last raw value (11.5)
+    assert np.isclose(derived.loc[2, distance_col], expected_idx_2, equal_nan=True)
+
+
+def test_derived_worldquant_tscorr_handles_duplicate_corr_index():
+    layer1 = pd.DataFrame(
+        {"close_momentum_RSI_3": [1.0, 2.0, 3.0, 4.0]},
+        index=pd.Index([1, 2, 3, 4], name="ts"),
+    )
+    raw_data = pd.DataFrame(
+        {"close": [2.0, 2.2, 2.4, 2.6, 2.8]},
+        index=pd.Index([1, 2, 2, 3, 4], name="ts"),
+    )
+
+    engine = DerivedOperatorEngine(
+        {
+            "distance": {"enabled": False},
+            "cross": {"enabled": False},
+            "ratio": {"enabled": False},
+            "momentum": {"enabled": False},
+            "binary_signal": {"enabled": False},
+            "signed_strength": {"enabled": False},
+            "worldquant": {
+                "enabled": True,
+                "apply_to": "all",
+                "windows": [2],
+                "operators": ["ts_corr"],
+                "transforms": [],
+                "corr_with": "close",
+            },
+        }
+    )
+    derived = engine.compute_all(layer1, raw_data)
+
+    corr_col = "close_momentum_RSI_3_TsCorr_close_W2"
+    assert corr_col in derived.columns
+    assert derived.index.equals(layer1.index)
+    assert derived[corr_col].notna().sum() >= 1

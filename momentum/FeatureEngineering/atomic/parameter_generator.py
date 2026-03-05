@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import List, Dict
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class ParameterGenerator:
@@ -73,11 +76,17 @@ class ParameterGenerator:
                 if isinstance(combo, dict):
                     combos.append(combo)
                 elif isinstance(combo, (list, tuple)):
-                    combos.append(ParameterGenerator._combo_list_to_dict(combo_type, combo))
+                    try:
+                        entry = ParameterGenerator._combo_list_to_dict(combo_type, combo)
+                        combos.append(entry)
+                    except ValueError as exc:
+                        logger.warning("Skipping invalid combo for %s: %s", combo_type, exc)
             return combos
 
         combo_type_lower = combo_type.lower()
         if combo_type_lower == "macd":
+            return [{"fastperiod": 12, "slowperiod": 26, "signalperiod": 9}]
+        if combo_type_lower == "macdext":
             return [{"fastperiod": 12, "slowperiod": 26, "signalperiod": 9}]
         if combo_type_lower == "stoch":
             return [
@@ -106,24 +115,123 @@ class ParameterGenerator:
     @staticmethod
     def _combo_list_to_dict(combo_type: str, combo: List) -> Dict:
         combo_type_lower = combo_type.lower()
-        if combo_type_lower == "macd" and len(combo) >= 3:
+
+        if combo_type_lower == "macd":
+            if len(combo) < 3:
+                raise ValueError(
+                    f"MACD combo requires [fastperiod, slowperiod, signalperiod], got {combo!r}"
+                )
             return {"fastperiod": combo[0], "slowperiod": combo[1], "signalperiod": combo[2]}
-        if combo_type_lower == "stoch" and len(combo) >= 5:
+
+        if combo_type_lower == "macdext":
+            if len(combo) < 3:
+                raise ValueError(
+                    f"MACDEXT combo requires [fastperiod, slowperiod, signalperiod], got {combo!r}"
+                )
+            return {"fastperiod": combo[0], "slowperiod": combo[1], "signalperiod": combo[2]}
+
+        if combo_type_lower == "stoch":
+            # Semantic: [fastk_period, slowk_period, slowd_period, slowk_matype, slowd_matype]
+            # Config typically provides [fastk, slowk, slowd] with matype defaulting to 0.
+            if len(combo) < 1:
+                raise ValueError(f"STOCH combo requires at least [fastk_period], got {combo!r}")
+            fastk = combo[0]
+            slowk = combo[1] if len(combo) > 1 else 3
+            slowd = combo[2] if len(combo) > 2 else 3
+            slowk_matype = combo[3] if len(combo) > 3 else 0
+            slowd_matype = combo[4] if len(combo) > 4 else 0
+            if len(combo) < 5:
+                logger.warning(
+                    "STOCH combo %r is missing %d parameter(s); using defaults "
+                    "slowk=%s slowd=%s slowk_matype=%s slowd_matype=%s",
+                    combo,
+                    5 - len(combo),
+                    slowk,
+                    slowd,
+                    slowk_matype,
+                    slowd_matype,
+                )
             return {
-                "fastk_period": combo[0],
-                "slowk_period": combo[1],
-                "slowk_matype": combo[2],
-                "slowd_period": combo[3],
-                "slowd_matype": combo[4],
-            }
-        if combo_type_lower == "stochf" and len(combo) >= 3:
-            return {"fastk_period": combo[0], "fastd_period": combo[1], "fastd_matype": combo[2]}
-        if combo_type_lower == "stochrsi" and len(combo) >= 4:
-            return {
-                "timeperiod": combo[0],
-                "fastk_period": combo[1],
-                "fastd_period": combo[2],
-                "fastd_matype": combo[3],
+                "fastk_period": fastk,
+                "slowk_period": slowk,
+                "slowk_matype": slowk_matype,
+                "slowd_period": slowd,
+                "slowd_matype": slowd_matype,
             }
 
-        return {}
+        if combo_type_lower == "stochf":
+            # Semantic: [fastk_period, fastd_period, fastd_matype]
+            if len(combo) < 1:
+                raise ValueError(f"STOCHF combo requires at least [fastk_period], got {combo!r}")
+            fastk = combo[0]
+            fastd = combo[1] if len(combo) > 1 else 3
+            fastd_matype = combo[2] if len(combo) > 2 else 0
+            if len(combo) < 3:
+                logger.warning(
+                    "STOCHF combo %r is missing %d parameter(s); using defaults "
+                    "fastd_period=%s fastd_matype=%s",
+                    combo,
+                    3 - len(combo),
+                    fastd,
+                    fastd_matype,
+                )
+            return {"fastk_period": fastk, "fastd_period": fastd, "fastd_matype": fastd_matype}
+
+        if combo_type_lower == "stochrsi":
+            # Semantic: [timeperiod, fastk_period, fastd_period, fastd_matype]
+            if len(combo) < 1:
+                raise ValueError(f"STOCHRSI combo requires at least [timeperiod], got {combo!r}")
+            timeperiod = combo[0]
+            fastk = combo[1] if len(combo) > 1 else 5
+            fastd = combo[2] if len(combo) > 2 else 3
+            fastd_matype = combo[3] if len(combo) > 3 else 0
+            if len(combo) < 4:
+                logger.warning(
+                    "STOCHRSI combo %r is missing %d parameter(s); using defaults "
+                    "fastk_period=%s fastd_period=%s fastd_matype=%s",
+                    combo,
+                    4 - len(combo),
+                    fastk,
+                    fastd,
+                    fastd_matype,
+                )
+            return {
+                "timeperiod": timeperiod,
+                "fastk_period": fastk,
+                "fastd_period": fastd,
+                "fastd_matype": fastd_matype,
+            }
+
+        if combo_type_lower == "apo":
+            if len(combo) < 2:
+                raise ValueError(
+                    f"APO combo requires [fastperiod, slowperiod], got {combo!r}"
+                )
+            return {
+                "fastperiod": combo[0],
+                "slowperiod": combo[1],
+                "matype": combo[2] if len(combo) > 2 else 0,
+            }
+
+        if combo_type_lower == "ppo":
+            if len(combo) < 2:
+                raise ValueError(
+                    f"PPO combo requires [fastperiod, slowperiod], got {combo!r}"
+                )
+            return {
+                "fastperiod": combo[0],
+                "slowperiod": combo[1],
+                "matype": combo[2] if len(combo) > 2 else 0,
+            }
+
+        if combo_type_lower == "ultosc":
+            if len(combo) < 3:
+                raise ValueError(
+                    f"ULTOSC combo requires [timeperiod1, timeperiod2, timeperiod3], got {combo!r}"
+                )
+            return {"timeperiod1": combo[0], "timeperiod2": combo[1], "timeperiod3": combo[2]}
+
+        raise ValueError(
+            f"Unknown combo_type: {combo_type!r} with combo {combo!r}. "
+            "Supported types: macd, macdext, stoch, stochf, stochrsi, apo, ppo, ultosc."
+        )

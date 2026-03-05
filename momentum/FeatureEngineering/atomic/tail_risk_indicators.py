@@ -27,6 +27,13 @@ class TailRiskIndicatorEngine:
                 raise ValueError(f"cvar_alpha must be in (0, 1), got {alpha}")
 
     def compute_all(self, data: pd.DataFrame) -> pd.DataFrame:
+        if "close" not in data.columns:
+            logger.warning(
+                "TailRiskIndicatorEngine requires 'close' column but it is missing, skipping "
+                "(available columns: %s)",
+                list(data.columns),
+            )
+            return pd.DataFrame(index=data.index)
         close = data["close"].astype(float)
         returns = close.pct_change().replace([np.inf, -np.inf], np.nan)
 

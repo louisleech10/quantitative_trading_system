@@ -126,7 +126,7 @@ class FeatureFactory:
 
         layers = [layer1, layer2, layer3, layer4, layer5, layer6]
         if config.preprocessing.enabled:
-            all_features = self._combine_layers(layers)
+            all_features = self._combine_layers(layers, context="layer6_5_input")
             preprocessed = self._safe_execute("Layer 6.5", self._layer6_5_preprocessing, all_features, config)
             if not preprocessed.empty:
                 layers = [preprocessed]
@@ -151,6 +151,16 @@ class FeatureFactory:
                 result = pd.DataFrame()
             if not result.empty:
                 result = self._ensure_float32(result)
+                if result.columns.has_duplicates:
+                    duplicate_counts = result.columns[result.columns.duplicated(keep=False)].value_counts()
+                    duplicate_total = int(result.columns.duplicated(keep="first").sum())
+                    logger.warning(
+                        "%s output contains duplicated columns (%d duplicates across %d names): %s",
+                        layer_name,
+                        duplicate_total,
+                        len(duplicate_counts),
+                        duplicate_counts.head(20).to_dict(),
+                    )
             self._report_progress(
                 layer_name,
                 1.0,
@@ -161,10 +171,20 @@ class FeatureFactory:
             logger.error("%s failed: %s", layer_name, exc, exc_info=True)
             return pd.DataFrame()
 
+    _BASE_OHLCV = ["open", "high", "low", "close", "volume"]
+
     def _layer0_data_ingestion(
         self, symbol: str, timeframe: str, config: "FactoryConfig"
     ) -> pd.DataFrame:
-        sources = list(dict.fromkeys(config.data_sources.enabled_sources + config.data_sources.synthetic_sources))
+        # Always include base OHLCV columns so non-single indicators (ADX, ATR, STOCH, CDL...)
+        # can access high/low/close/open/volume even when user's enabled_sources omits them.
+        # _select_single_series_sources still reads only config.data_sources.enabled_sources,
+        # so OHLCV columns are never added to the single-series iteration scope.
+        sources = list(dict.fromkeys(
+            self._BASE_OHLCV
+            + config.data_sources.enabled_sources
+            + config.data_sources.synthetic_sources
+        ))
         data = self._adapter_registry.fetch_aligned(symbol, timeframe, sources)
         data = data.sort_index()
         if not data.index.is_unique:
@@ -257,7 +277,11 @@ class FeatureFactory:
     def _layer3_rolling_aggregation(
         self, layer1: pd.DataFrame, layer2: pd.DataFrame, config: "FactoryConfig"
     ) -> pd.DataFrame:
-        base = self._combine_layers([layer1, layer2])
+        # Only apply rolling aggregation to Layer 1 atomic indicators.
+        # Layer 2 derived features (e.g. %change, log_return) must NOT be included here:
+        # feeding them into rolling aggregation would create semantically redundant features
+        # and inflate the feature space by ~20× unnecessarily.
+        base = self._combine_layers([layer1], context="layer3_input")
         if base.empty:
             return pd.DataFrame(index=base.index)
         aggregator = RollingAggregator(config.rolling_aggregation)
@@ -271,7 +295,7 @@ class FeatureFactory:
         data: pd.DataFrame,
         config: "FactoryConfig",
     ) -> pd.DataFrame:
-        base = self._combine_layers([data, layer1, layer2, layer3])
+        base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")
         if base.empty:
             return pd.DataFrame(index=base.index)
         processor = LagProcessor(config)
@@ -392,7 +416,7 @@ class FeatureFactory:
         elapsed: float,
         config_hash: str,
     ) -> FeatureGenerationResult:
-        features_df = self._combine_layers(layers)
+        features_df = self._combine_layers(layers, context="layer7_final")
         features_df = features_df.reindex(raw_data.index)
         if not features_df.empty:
             features_df = features_df.astype("float32")
@@ -480,16 +504,21 @@ class FeatureFactory:
         return cached
 
     @staticmethod
-    def _combine_layers(layers: List[pd.DataFrame]) -> pd.DataFrame:
+    def _combine_layers(layers: List[pd.DataFrame], context: str = "unknown") -> pd.DataFrame:
         valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
         if not valid_layers:
             return pd.DataFrame()
         combined = pd.concat(valid_layers, axis=1, copy=False)
         if combined.columns.has_duplicates:
             duplicate_count = int(combined.columns.duplicated(keep="first").sum())
+            duplicate_series = combined.columns.to_series()
+            duplicate_counts = duplicate_series[duplicate_series.duplicated(keep=False)].value_counts()
             logger.warning(
-                "Combined feature layers contain duplicated columns, dropping %d duplicate columns",
+                "[%s] Combined feature layers contain duplicated columns, dropping %d duplicate columns across %d names. Top duplicates: %s",
+                context,
                 duplicate_count,
+                len(duplicate_counts),
+                duplicate_counts.head(30).to_dict(),
             )
             combined = combined.loc[:, ~combined.columns.duplicated(keep="first")]
         return combined
@@ -586,4 +615,4 @@ class FeatureFactory:
             return []
         preferred = [source for source in ["close", "volume", "taker_ratio"] if source in enabled]
         ordered = preferred + [source for source in enabled if source not in preferred]
-        return ordered[:2] if len(ordered) > 2 else ordered
+        return ordered
