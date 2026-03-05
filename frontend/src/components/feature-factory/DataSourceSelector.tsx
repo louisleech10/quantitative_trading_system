@@ -41,6 +41,11 @@ export default function DataSourceSelector({
           );
         })}
       </div>
+      {enabledSources.length > 2 && (
+        <p className="text-xs text-amber-400/70 mt-1">
+          建議最多選 2 個數據源。選擇過多會大幅增加特徵量，可能導致計算時間顯著延長。
+        </p>
+      )}
     </div>
   );
 }

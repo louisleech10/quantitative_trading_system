@@ -135,7 +135,9 @@ export default function FeatureFactoryPage() {
             </div>
           </div>
 
-          {headerStats.length > 0 && (
+          {currentTask ? (
+            <GenerationProgress task={currentTask} naked />
+          ) : headerStats.length > 0 ? (
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               {headerStats.map((item) => (
                 <div
@@ -149,7 +151,7 @@ export default function FeatureFactoryPage() {
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
 
         {error && (
@@ -187,8 +189,6 @@ export default function FeatureFactoryPage() {
                 timeframe={timeframe}
               />
             </div>
-            <GenerationProgress task={currentTask} />
-
             {currentTask?.status === 'completed' && (
               <Suspense
                 fallback={

@@ -144,63 +144,61 @@ class FeatureExportService:
         }
 
     def _build_statistics(self, features_df: pd.DataFrame, include_statistics: bool) -> Dict[str, Any]:
-        if not include_statistics:
-            return {
-                "summary": {
-                    "nan_ratio_mean": 0.0,
-                    "nan_ratio_max": 0.0,
-                    "inf_count": 0,
-                    "constant_features": 0,
-                    "high_correlation_pairs": 0,
-                },
-                "per_feature": [],
-            }
+        _EMPTY_SUMMARY = {
+            "summary": {
+                "nan_ratio_mean": 0.0,
+                "nan_ratio_max": 0.0,
+                "inf_count": 0,
+                "constant_features": 0,
+                "high_correlation_pairs": 0,
+            },
+            "per_feature": [],
+        }
+        if not include_statistics or features_df.empty:
+            return _EMPTY_SUMMARY
 
-        if features_df.empty:
-            return {
-                "summary": {
-                    "nan_ratio_mean": 0.0,
-                    "nan_ratio_max": 0.0,
-                    "inf_count": 0,
-                    "constant_features": 0,
-                    "high_correlation_pairs": 0,
-                },
-                "per_feature": [],
-            }
-
+        import warnings
         nan_ratios = features_df.isna().mean()
         numeric_df = features_df.select_dtypes(include=[np.number])
         inf_count = int(np.isinf(numeric_df.to_numpy()).sum()) if not numeric_df.empty else 0
         constant_features = int((numeric_df.nunique(dropna=True) <= 1).sum()) if not numeric_df.empty else 0
 
-        high_corr_pairs = 0
-        if numeric_df.shape[1] >= 2:
+        # Skip full correlation matrix for large datasets (O(N²) memory + time).
+        # Returns None when skipped so callers can show "not computed" instead of misleading 0.
+        HIGH_CORR_COL_LIMIT = 500
+        high_corr_pairs: Optional[int] = None
+        if numeric_df.shape[1] >= 2 and numeric_df.shape[1] <= HIGH_CORR_COL_LIMIT:
             corr_df = numeric_df.corr().abs()
             upper = corr_df.where(np.triu(np.ones(corr_df.shape), k=1).astype(bool))
             high_corr_pairs = int((upper > 0.95).sum().sum())
 
+        # Vectorized per-feature stats — one pass per operation instead of per-column loop.
+        # describe/skew/kurt are C-level vectorized; the subsequent loop only builds dicts.
         per_feature: List[Dict[str, Any]] = []
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            desc = features_df.describe(percentiles=[]).T  # count/mean/std/min/max
+            skewness_s = features_df.skew()
+            kurtosis_s = features_df.kurt()
         for column in features_df.columns:
-            series = features_df[column]
             category = self._infer_category(column)
             level = self._infer_level(category)
-
-            entry = {
+            col_desc = desc.loc[column] if column in desc.index else {}
+            per_feature.append({
                 "name": column,
                 "category": category,
                 "level": level,
                 "layer": self._infer_layer(column),
-                "dtype": str(series.dtype),
-                "nan_ratio": float(series.isna().mean()),
-                "mean": self._safe_float(series.mean()),
-                "std": self._safe_float(series.std()),
-                "min": self._safe_float(series.min()),
-                "max": self._safe_float(series.max()),
-                "skewness": self._safe_float(series.skew()),
-                "kurtosis": self._safe_float(series.kurt()),
+                "dtype": str(features_df[column].dtype),
+                "nan_ratio": self._safe_float(nan_ratios.get(column, 0.0)),
+                "mean": self._safe_float(col_desc.get("mean")),
+                "std": self._safe_float(col_desc.get("std")),
+                "min": self._safe_float(col_desc.get("min")),
+                "max": self._safe_float(col_desc.get("max")),
+                "skewness": self._safe_float(skewness_s.get(column)),
+                "kurtosis": self._safe_float(kurtosis_s.get(column)),
                 "description": f"{category} feature: {column}",
-            }
-            per_feature.append(entry)
+            })
 
         return {
             "summary": {
@@ -238,34 +236,42 @@ class FeatureExportService:
         }
 
     def _build_quality_alerts(self, features_df: pd.DataFrame) -> List[Dict[str, Any]]:
+        MAX_ALERTS = 100
         alerts: List[Dict[str, Any]] = []
-        for column in features_df.columns:
-            series = features_df[column]
-            nan_ratio = float(series.isna().mean())
-            if nan_ratio > 0.1:
-                alerts.append({
-                    "severity": "warning",
-                    "feature": column,
-                    "message": f"NaN ratio {nan_ratio:.2%} exceeds 10% threshold",
-                })
 
-            unique_count = int(series.nunique(dropna=True))
-            if unique_count <= 1:
-                alerts.append({
-                    "severity": "warning",
-                    "feature": column,
-                    "message": "Constant feature detected",
-                })
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            nan_ratios = features_df.isna().mean()
+            unique_counts = features_df.nunique(dropna=True)
 
-            warmup_rows = int(series.isna().cumprod().sum())
+        # NaN ratio alerts — vectorized, capped
+        for col, ratio in nan_ratios[nan_ratios > 0.1].head(MAX_ALERTS).items():
+            alerts.append({
+                "severity": "warning",
+                "feature": col,
+                "message": f"NaN ratio {float(ratio):.2%} exceeds 10% threshold",
+            })
+
+        # Constant feature alerts — vectorized, capped
+        for col in unique_counts[unique_counts <= 1].head(MAX_ALERTS).index:
+            alerts.append({
+                "severity": "warning",
+                "feature": col,
+                "message": "Constant feature detected",
+            })
+
+        # Warmup detection — only columns with any NaN, capped at 50 to avoid large loops
+        for col in nan_ratios[nan_ratios > 0].index[:50]:
+            warmup_rows = int(features_df[col].isna().cumprod().sum())
             if warmup_rows > 0:
                 alerts.append({
                     "severity": "info",
-                    "feature": column,
+                    "feature": col,
                     "message": f"Warmup detected: first {warmup_rows} rows are NaN",
                 })
 
-        return alerts
+        return alerts[:MAX_ALERTS]
 
     def _build_correlation_hotspots(self, features_df: pd.DataFrame, top_k: int) -> List[Dict[str, Any]]:
         if top_k <= 0:
@@ -389,7 +395,11 @@ class FeatureExportService:
             "",
             f"- NaN 平均比例: {summary.get('nan_ratio_mean', 0.0):.2%}",
             f"- 常量特徵: {summary.get('constant_features', 0)}",
-            f"- 高相關特徵對: {summary.get('high_correlation_pairs', 0)}",
+            "- 高相關特徵對: " + (
+                str(summary['high_correlation_pairs'])
+                if summary.get('high_correlation_pairs') is not None
+                else "未計算（特徵數 > 500 時跳過，避免 O(N²) 記憶體消耗）"
+            ),
         ]
         return "\n".join(lines)
 

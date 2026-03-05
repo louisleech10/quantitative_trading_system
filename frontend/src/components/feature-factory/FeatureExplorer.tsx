@@ -26,21 +26,15 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
 
 export default function FeatureExplorer({ taskId }: FeatureExplorerProps) {
   const { browseSummary } = useFeatureFactory();
-  const {
-    explorerTaskId,
-    explorerActiveTab,
-    explorerSummary,
-    setExplorerTaskId,
-    setExplorerActiveTab,
-    setExplorerSelectedFeatures,
-  } = useFeatureFactoryStore((state) => ({
-    explorerTaskId: state.explorerTaskId,
-    explorerActiveTab: state.explorerActiveTab,
-    explorerSummary: state.explorerSummary,
-    setExplorerTaskId: state.setExplorerTaskId,
-    setExplorerActiveTab: state.setExplorerActiveTab,
-    setExplorerSelectedFeatures: state.setExplorerSelectedFeatures,
-  }));
+  // Use individual selectors to return stable primitives/references.
+  // A combined object selector `(state) => ({ ... })` creates a new object every render,
+  // which triggers React 18 concurrent-mode's "getSnapshot should be cached" infinite loop.
+  const explorerTaskId = useFeatureFactoryStore((state) => state.explorerTaskId);
+  const explorerActiveTab = useFeatureFactoryStore((state) => state.explorerActiveTab);
+  const explorerSummary = useFeatureFactoryStore((state) => state.explorerSummary);
+  const setExplorerTaskId = useFeatureFactoryStore((state) => state.setExplorerTaskId);
+  const setExplorerActiveTab = useFeatureFactoryStore((state) => state.setExplorerActiveTab);
+  const setExplorerSelectedFeatures = useFeatureFactoryStore((state) => state.setExplorerSelectedFeatures);
 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);

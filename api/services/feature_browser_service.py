@@ -690,7 +690,10 @@ class FeatureBrowserService:
             if timestamps_ds is not None:
                 ts_values = timestamps_ds[:]
                 if np.issubdtype(ts_values.dtype, np.number):
-                    idx = pd.to_datetime(ts_values, unit="ms", errors="coerce")
+                    # Auto-detect unit: Binance ms timestamps are ~1.7e12;
+                    # feature factory stores Unix seconds (~1.7e9).
+                    unit = "ms" if len(ts_values) > 0 and ts_values[0] > 1e12 else "s"
+                    idx = pd.to_datetime(ts_values, unit=unit, errors="coerce")
                 else:
                     idx = pd.to_datetime(ts_values, errors="coerce")
                 df.index = idx

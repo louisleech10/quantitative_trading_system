@@ -36,25 +36,31 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
   };
 
   const downloadFromApi = async (path: string, filename: string) => {
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`);
-    if (!response.ok) {
-      let message = `下載失敗 (${response.status})`;
-      try {
-        const payload = await response.json();
-        message = payload?.detail || message;
-      } catch {
-        // no-op
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600_000); // 10-min guard for large datasets
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, { signal: controller.signal });
+      if (!response.ok) {
+        let message = `下載失敗 (${response.status})`;
+        try {
+          const payload = await response.json();
+          message = payload?.detail || message;
+        } catch {
+          // no-op
+        }
+        throw new Error(message);
       }
-      throw new Error(message);
-    }
 
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   };
 
   const exportConfig = () => {

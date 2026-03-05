@@ -2,6 +2,8 @@
 Feature Factory API Routes
 """
 
+import asyncio
+from functools import partial
 from typing import Dict, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
@@ -126,11 +128,16 @@ async def export_features_csv(
     """串流匯出特徵數據為 CSV。"""
     try:
         selected_columns = [column.strip() for column in columns.split(",") if column.strip()] if columns else None
-        payload = feature_factory_service.export_csv_stream(
-            task_id=task_id,
-            columns=selected_columns,
-            max_rows=max_rows,
-            include_metadata_header=include_metadata_header,
+        loop = asyncio.get_running_loop()
+        payload = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.export_csv_stream,
+                task_id=task_id,
+                columns=selected_columns,
+                max_rows=max_rows,
+                include_metadata_header=include_metadata_header,
+            ),
         )
         headers = {
             "Content-Disposition": f"attachment; filename={payload['filename']}",
@@ -162,13 +169,19 @@ async def export_features_json(
 ):
     """匯出 AI Agent / LLM 可消費的結構化 JSON。"""
     try:
-        return feature_factory_service.export_json_report(
-            task_id=task_id,
-            include_sample_data=include_sample_data,
-            sample_rows=sample_rows,
-            include_statistics=include_statistics,
-            include_correlation_top_k=include_correlation_top_k,
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.export_json_report,
+                task_id=task_id,
+                include_sample_data=include_sample_data,
+                sample_rows=sample_rows,
+                include_statistics=include_statistics,
+                include_correlation_top_k=include_correlation_top_k,
+            ),
         )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -188,11 +201,16 @@ async def export_features_markdown(
     """匯出 LLM context window 友善的 Markdown 報告。"""
     try:
         selected_sections = [section.strip() for section in sections.split(",") if section.strip()] if sections else None
-        content = feature_factory_service.export_markdown_report(
-            task_id=task_id,
-            max_token_budget=max_token_budget,
-            sections=selected_sections,
-            language=language,
+        loop = asyncio.get_running_loop()
+        content = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.export_markdown_report,
+                task_id=task_id,
+                max_token_budget=max_token_budget,
+                sections=selected_sections,
+                language=language,
+            ),
         )
         headers = {
             "Content-Disposition": f"attachment; filename=feature_report_{task_id}.md",
@@ -220,16 +238,22 @@ async def browse_features(
 ):
     """分頁瀏覽特徵列表 + 統計摘要。"""
     try:
-        return feature_factory_service.browse_features(
-            task_id=task_id,
-            offset=offset,
-            limit=limit,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            category=category,
-            level=level,
-            search=search,
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.browse_features,
+                task_id=task_id,
+                offset=offset,
+                limit=limit,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                category=category,
+                level=level,
+                search=search,
+            ),
         )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -249,12 +273,18 @@ async def browse_feature_data(
     """取得指定特徵的原始數據（時間序列）。"""
     try:
         selected_features = [feature.strip() for feature in features.split(",") if feature.strip()]
-        return feature_factory_service.browse_feature_data(
-            task_id=task_id,
-            features=selected_features,
-            offset=offset,
-            limit=limit,
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.browse_feature_data,
+                task_id=task_id,
+                features=selected_features,
+                offset=offset,
+                limit=limit,
+            ),
         )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -273,11 +303,17 @@ async def browse_correlation(
     """取得指定特徵集合的相關矩陣。"""
     try:
         selected_features = [feature.strip() for feature in features.split(",") if feature.strip()]
-        return feature_factory_service.browse_correlation(
-            task_id=task_id,
-            features=selected_features,
-            method=method,
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.browse_correlation,
+                task_id=task_id,
+                features=selected_features,
+                method=method,
+            ),
         )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -295,7 +331,12 @@ async def browse_distribution(
 ):
     """取得單一特徵的分佈直方圖數據。"""
     try:
-        return feature_factory_service.browse_distribution(task_id=task_id, feature=feature, n_bins=n_bins)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(feature_factory_service.browse_distribution, task_id=task_id, feature=feature, n_bins=n_bins),
+        )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -312,7 +353,12 @@ async def browse_nan_pattern(
 ):
     """取得 NaN 分佈模式矩陣（missingno 風格）。"""
     try:
-        return feature_factory_service.browse_nan_pattern(task_id=task_id, sample_features=sample_features)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(feature_factory_service.browse_nan_pattern, task_id=task_id, sample_features=sample_features),
+        )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
@@ -326,7 +372,12 @@ async def browse_nan_pattern(
 async def browse_summary(task_id: str):
     """取得整體摘要 Dashboard 數據。"""
     try:
-        return feature_factory_service.browse_summary(task_id=task_id)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(feature_factory_service.browse_summary, task_id=task_id),
+        )
+        return result
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
