@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import Callable, Dict, List, Optional, TYPE_CHECKING, Tuple, Any
 
 import pandas as pd
 
@@ -77,6 +79,7 @@ class FeatureFactory:
         self._current_symbol: Optional[str] = None
         self._current_timeframe: Optional[str] = None
         self._current_raw_data: Optional[pd.DataFrame] = None
+        self._reference_data_cache: Dict[Tuple[str, str], pd.DataFrame] = {}
 
     def generate_features(
         self,
@@ -203,66 +206,193 @@ class FeatureFactory:
             return pd.DataFrame(index=data.index)
 
         sources = self._select_single_series_sources(config)
-        frames: List[pd.DataFrame] = []
+        tasks: List[Tuple[str, bool, Callable[[], pd.DataFrame]]] = []
 
         if config.atomic_indicators.trend.enabled:
-            engine = TrendIndicatorEngine(config.atomic_indicators.trend.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "trend",
+                    True,
+                    lambda: TrendIndicatorEngine(
+                        config.atomic_indicators.trend.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.momentum.enabled:
-            engine = MomentumIndicatorEngine(config.atomic_indicators.momentum.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "momentum",
+                    True,
+                    lambda: MomentumIndicatorEngine(
+                        config.atomic_indicators.momentum.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.volatility.enabled:
-            engine = VolatilityIndicatorEngine(config.atomic_indicators.volatility.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "volatility",
+                    True,
+                    lambda: VolatilityIndicatorEngine(
+                        config.atomic_indicators.volatility.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.volume.enabled:
-            engine = VolumeIndicatorEngine(config.atomic_indicators.volume.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "volume",
+                    True,
+                    lambda: VolumeIndicatorEngine(
+                        config.atomic_indicators.volume.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.cycle.enabled:
-            engine = CycleIndicatorEngine(config.atomic_indicators.cycle.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "cycle",
+                    True,
+                    lambda: CycleIndicatorEngine(
+                        config.atomic_indicators.cycle.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.pattern.enabled:
-            engine = PatternIndicatorEngine(config.atomic_indicators.pattern.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "pattern",
+                    True,
+                    lambda: PatternIndicatorEngine(
+                        config.atomic_indicators.pattern.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.statistics.enabled:
-            engine = StatisticsIndicatorEngine(config.atomic_indicators.statistics.model_dump(), sources)
-            frames.append(engine.compute_all(data))
+            tasks.append(
+                (
+                    "statistics",
+                    True,
+                    lambda: StatisticsIndicatorEngine(
+                        config.atomic_indicators.statistics.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.microstructure.enabled:
-            try:
-                engine = MicrostructureIndicatorEngine(config.atomic_indicators.microstructure.model_dump(), sources)
-                frames.append(engine.compute_all(data))
-            except Exception as exc:
-                logger.warning("Microstructure engine failed: %s", exc)
+            tasks.append(
+                (
+                    "microstructure",
+                    False,
+                    lambda: MicrostructureIndicatorEngine(
+                        config.atomic_indicators.microstructure.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.entropy.enabled:
-            try:
-                engine = EntropyIndicatorEngine(config.atomic_indicators.entropy.model_dump(), sources)
-                frames.append(engine.compute_all(data))
-            except Exception as exc:
-                logger.warning("Entropy engine failed: %s", exc)
+            tasks.append(
+                (
+                    "entropy",
+                    False,
+                    lambda: EntropyIndicatorEngine(
+                        config.atomic_indicators.entropy.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.atomic_indicators.tail_risk.enabled:
-            try:
-                engine = TailRiskIndicatorEngine(config.atomic_indicators.tail_risk.model_dump(), sources)
-                frames.append(engine.compute_all(data))
-            except Exception as exc:
-                logger.warning("Tail risk engine failed: %s", exc)
+            tasks.append(
+                (
+                    "tail_risk",
+                    False,
+                    lambda: TailRiskIndicatorEngine(
+                        config.atomic_indicators.tail_risk.model_dump(),
+                        sources,
+                    ).compute_all(data),
+                )
+            )
 
         if config.custom_indicators:
-            engine = CustomIndicatorEngine()
-            frames.append(engine.compute_all(data, [item.model_dump() for item in config.custom_indicators]))
+            custom_payload = [item.model_dump() for item in config.custom_indicators]
+            tasks.append(
+                (
+                    "custom",
+                    True,
+                    lambda: CustomIndicatorEngine().compute_all(data, custom_payload),
+                )
+            )
+
+        frames: List[pd.DataFrame] = []
+        use_parallel = self._layer1_parallel_enabled() and len(tasks) > 1
+
+        if use_parallel:
+            max_workers = min(self._layer1_max_workers(), len(tasks))
+            ordered_results: Dict[int, pd.DataFrame] = {}
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_map: Dict[Any, Tuple[int, str, bool]] = {}
+                for idx, (task_name, required, builder) in enumerate(tasks):
+                    future = executor.submit(builder)
+                    future_map[future] = (idx, task_name, required)
+
+                for future in as_completed(future_map):
+                    idx, task_name, required = future_map[future]
+                    try:
+                        frame = future.result()
+                    except Exception as exc:
+                        if required:
+                            raise
+                        logger.warning("%s engine failed: %s", task_name.capitalize(), exc)
+                        frame = pd.DataFrame(index=data.index)
+                    ordered_results[idx] = frame
+
+            for idx in range(len(tasks)):
+                frames.append(ordered_results.get(idx, pd.DataFrame(index=data.index)))
+        else:
+            for task_name, required, builder in tasks:
+                try:
+                    frames.append(builder())
+                except Exception as exc:
+                    if required:
+                        raise
+                    logger.warning("%s engine failed: %s", task_name.capitalize(), exc)
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:
             return pd.DataFrame(index=data.index)
 
         return pd.concat(frames, axis=1)
+
+    @staticmethod
+    def _layer1_parallel_enabled() -> bool:
+        # Default off to preserve strict deterministic behavior against golden baseline.
+        # Can be enabled explicitly via FFACT_LAYER1_PARALLEL=1 for controlled experiments.
+        raw = os.getenv("FFACT_LAYER1_PARALLEL", "0").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
+
+    @staticmethod
+    def _layer1_max_workers() -> int:
+        raw = os.getenv("FFACT_LAYER1_MAX_WORKERS", "4").strip()
+        try:
+            workers = int(raw)
+        except ValueError:
+            workers = 4
+        return max(1, workers)
 
     def _layer2_derived_features(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
@@ -317,7 +447,11 @@ class FeatureFactory:
             return pd.DataFrame(index=layer1.index)
 
         try:
-            ref_data = self._layer0_data_ingestion(reference_symbol, timeframe, config)
+            cache_key = (reference_symbol, timeframe)
+            ref_data = self._reference_data_cache.get(cache_key)
+            if ref_data is None:
+                ref_data = self._layer0_data_ingestion(reference_symbol, timeframe, config)
+                self._reference_data_cache[cache_key] = ref_data
         except Exception as exc:
             logger.error("Cross-sectional reference fetch failed: %s", exc, exc_info=True)
             return pd.DataFrame(index=layer1.index)
@@ -482,7 +616,16 @@ class FeatureFactory:
     def _resolve_config(self, config_override: Optional[dict]) -> "FactoryConfig":
         if isinstance(config_override, dict) and "preset" in config_override:
             preset_name = config_override.get("preset")
-            return self._config_manager.apply_preset(preset_name)
+            preset_config = self._config_manager.apply_preset(preset_name)
+            override_without_preset = {k: v for k, v in config_override.items() if k != "preset"}
+            if not override_without_preset:
+                return preset_config
+
+            merged_payload = self._config_manager.deep_merge(
+                preset_config.model_dump(by_alias=True),
+                override_without_preset,
+            )
+            return preset_config.__class__.model_validate(merged_payload)
         return self._config_manager.get_merged_config(config_override)
 
     def _compute_config_hash(self, config: "FactoryConfig") -> str:
@@ -532,9 +675,12 @@ class FeatureFactory:
             for column_name in df.columns
             if pd.api.types.is_numeric_dtype(df[column_name])
         ]
-        for column_name in numeric_columns:
-            df[column_name] = df[column_name].astype("float32")
-        return df
+        if not numeric_columns:
+            return df
+
+        # Batched conversion avoids costly per-column block fragmentation on very wide DataFrames.
+        dtype_map = {column_name: "float32" for column_name in numeric_columns}
+        return df.astype(dtype_map, copy=False)
 
     @staticmethod
     def _data_range(raw_data: pd.DataFrame) -> List[str]:

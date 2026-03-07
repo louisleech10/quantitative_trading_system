@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { exportChartToPNG } from '@/lib/exportUtils';
+import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
 
 interface FeatureCorrelationHeatmapProps {
   taskId: string;
@@ -16,6 +17,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
   const { browseCorrelation, browseFeatures } = useFeatureFactory();
   const [method, setMethod] = useState<'pearson' | 'spearman' | 'kendall'>('pearson');
   const [available, setAvailable] = useState<string[]>([]);
+  const [filteredAvailable, setFilteredAvailable] = useState<string[]>([]);
   const [matrix, setMatrix] = useState<number[][]>([]);
   const [labels, setLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,7 +91,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
         <div className="text-sm text-slate-300">Correlation Heatmap（最多 50）</div>
         <button
           onClick={() => {
-            const picks = available.filter((name) => name.startsWith('ms_')).slice(0, 50);
+            const picks = filteredAvailable.filter((name) => name.startsWith('ms_')).slice(0, 50);
             setExplorerSelectedFeatures(picks);
           }}
           className="text-xs px-2 py-1 rounded border border-white/10 text-slate-200"
@@ -98,7 +100,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
         </button>
         <button
           onClick={() => {
-            setExplorerSelectedFeatures(available.slice(0, 20));
+            setExplorerSelectedFeatures(filteredAvailable.slice(0, 20));
           }}
           className="text-xs px-2 py-1 rounded border border-white/10 text-slate-200"
         >
@@ -123,8 +125,10 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
         </button>
       </div>
 
+      <FeatureNameSegmentFilter features={available} onFilteredFeaturesChange={setFilteredAvailable} />
+
       <div className="flex flex-wrap gap-2 max-h-28 overflow-auto">
-        {available.slice(0, 200).map((name) => (
+        {filteredAvailable.slice(0, 500).map((name) => (
           <button
             key={name}
             onClick={() => toggleFeature(name)}

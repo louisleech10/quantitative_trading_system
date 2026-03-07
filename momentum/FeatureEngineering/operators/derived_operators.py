@@ -104,8 +104,9 @@ class DerivedOperatorEngine:
         """(Value[t] - Value[t-n]) / Value[t-n]"""
         frames: List[pd.Series] = []
         for lag in lags:
-            denom = series.shift(lag).replace(0, np.nan)
-            momentum = (series - series.shift(lag)) / denom
+            shifted = series.shift(lag)
+            denom = shifted.replace(0, np.nan)
+            momentum = (series - shifted) / denom
             frames.append(momentum.rename(f"{name_prefix}_Momentum_L{lag}"))
         if not frames:
             return pd.DataFrame(index=series.index)
@@ -147,7 +148,7 @@ class DerivedOperatorEngine:
 
     def ts_rank(self, series: pd.Series, window: int) -> pd.Series:
         """Rolling percentile rank (0-1)."""
-        return series.rolling(window).apply(lambda x: pd.Series(x).rank(pct=True).iloc[-1], raw=False)
+        return series.rolling(window).apply(self._rolling_last_rank_pct, raw=True)
 
     def decay_linear(self, series: pd.Series, window: int) -> pd.Series:
         """Linearly decaying weighted average."""
@@ -228,16 +229,23 @@ class DerivedOperatorEngine:
     ) -> pd.DataFrame:
         apply_to = config.get("apply_to", "all")
         lags = [int(lag) for lag in config.get("lags", [3, 5, 8])]
-        frames: List[pd.DataFrame] = []
-        for col, info in feature_info.items():
-            if not self._matches_apply_to(info, apply_to):
-                continue
-            series = self._select_feature_series(layer1_df, col)
-            frames.append(self.compute_momentum(series, lags, col))
-        frames = [frame for frame in frames if not frame.empty]
-        if not frames:
+        selected_cols = [
+            col for col, info in feature_info.items() if self._matches_apply_to(info, apply_to)
+        ]
+        if not selected_cols:
             return pd.DataFrame(index=layer1_df.index)
-        return pd.concat(frames, axis=1)
+
+        selected = self._build_selected_frame(layer1_df, selected_cols)
+        frames: List[pd.DataFrame] = []
+        for lag in lags:
+            shifted = selected.shift(lag)
+            denom = shifted.replace(0, np.nan)
+            momentum = (selected - shifted) / denom
+            momentum.columns = [f"{col}_Momentum_L{lag}" for col in selected_cols]
+            frames.append(momentum)
+        result = pd.concat(frames, axis=1)
+        expected_cols = [f"{col}_Momentum_L{lag}" for col in selected_cols for lag in lags]
+        return result.loc[:, expected_cols]
 
     def _apply_binary_signal(
         self,
@@ -299,47 +307,113 @@ class DerivedOperatorEngine:
             "operators",
             ["ts_argmax", "ts_argmin", "ts_rank", "decay_linear"],
         )
+        operator_set = set(operators)
+        transform_set = set(transforms)
         corr_with = config.get("corr_with")
         clip_bounds = config.get("clip", {"lower": -3.0, "upper": 3.0})
+        lower = float(clip_bounds.get("lower", -3.0))
+        upper = float(clip_bounds.get("upper", 3.0))
+        has_corr = "ts_corr" in operator_set and corr_with in raw_data.columns
 
-        frames: List[pd.Series] = []
-        for col, info in feature_info.items():
-            if not self._matches_apply_to(info, apply_to):
-                continue
-            series = self._select_feature_series(layer1_df, col)
-            for window in windows:
-                if "ts_argmax" in operators:
-                    frames.append(self.ts_argmax(series, window).rename(f"{col}_TsArgmax_W{window}"))
-                if "ts_argmin" in operators:
-                    frames.append(self.ts_argmin(series, window).rename(f"{col}_TsArgmin_W{window}"))
-                if "ts_rank" in operators:
-                    frames.append(self.ts_rank(series, window).rename(f"{col}_TsRank_W{window}"))
-                if "decay_linear" in operators:
-                    frames.append(self.decay_linear(series, window).rename(f"{col}_DecayLinear_W{window}"))
-                if "ts_corr" in operators and corr_with in raw_data.columns:
-                    aligned_ref, aligned_series = self._align_pair_series(
-                        left=raw_data[corr_with],
-                        right=series,
-                        left_name=f"{col}:corr_ref:{corr_with}",
-                        right_name=f"{col}:corr_base",
-                    )
-                    corr_series = self.ts_corr(aligned_series, aligned_ref, window)
-                    frames.append(corr_series.rename(f"{col}_TsCorr_{corr_with}_W{window}"))
+        selected_cols = [
+            col for col, info in feature_info.items() if self._matches_apply_to(info, apply_to)
+        ]
+        if not selected_cols:
+            return pd.DataFrame(index=layer1_df.index)
 
-            if "sign" in transforms:
-                frames.append(self.transform_sign(series).rename(f"{col}_Sign"))
-            if "log1p" in transforms:
-                frames.append(self.transform_log1p(series).rename(f"{col}_Log1p"))
-            if "abs" in transforms:
-                frames.append(self.transform_abs(series).rename(f"{col}_Abs"))
-            if "clip" in transforms:
-                lower = float(clip_bounds.get("lower", -3.0))
-                upper = float(clip_bounds.get("upper", 3.0))
-                frames.append(self.transform_clip(series, lower, upper).rename(f"{col}_Clip"))
+        selected = self._build_selected_frame(layer1_df, selected_cols)
+
+        frames: List[pd.DataFrame] = []
+        for window in windows:
+            rolling = selected.rolling(window)
+
+            if "ts_argmax" in operator_set:
+                argmax_df = rolling.apply(np.argmax, raw=True)
+                argmax_df.columns = [f"{col}_TsArgmax_W{window}" for col in selected_cols]
+                frames.append(argmax_df)
+
+            if "ts_argmin" in operator_set:
+                argmin_df = rolling.apply(np.argmin, raw=True)
+                argmin_df.columns = [f"{col}_TsArgmin_W{window}" for col in selected_cols]
+                frames.append(argmin_df)
+
+            if "ts_rank" in operator_set:
+                # rolling.rank keeps pandas rank(method='average', pct=True) semantics.
+                rank_df = rolling.rank(method="average", pct=True)
+                rank_df.columns = [f"{col}_TsRank_W{window}" for col in selected_cols]
+                frames.append(rank_df)
+
+            if "decay_linear" in operator_set:
+                weights = np.arange(1, window + 1, dtype=float)
+                weights /= weights.sum()
+
+                def _decay_fn(arr: np.ndarray, _weights: np.ndarray = weights) -> float:
+                    return float(np.dot(arr, _weights))
+
+                decay_df = rolling.apply(_decay_fn, raw=True)
+                decay_df.columns = [f"{col}_DecayLinear_W{window}" for col in selected_cols]
+                frames.append(decay_df)
+
+            if has_corr and corr_with is not None:
+                corr_ref = raw_data[corr_with].reindex(selected.index)
+                corr_df = rolling.corr(corr_ref)
+                corr_df.columns = [f"{col}_TsCorr_{corr_with}_W{window}" for col in selected_cols]
+                frames.append(corr_df)
+
+        if "sign" in transform_set:
+            sign_df = np.sign(selected)
+            sign_df.columns = [f"{col}_Sign" for col in selected_cols]
+            frames.append(sign_df)
+
+        if "log1p" in transform_set:
+            log1p_df = np.log1p(np.abs(selected)) * np.sign(selected)
+            log1p_df.columns = [f"{col}_Log1p" for col in selected_cols]
+            frames.append(log1p_df)
+
+        if "abs" in transform_set:
+            abs_df = np.abs(selected)
+            abs_df.columns = [f"{col}_Abs" for col in selected_cols]
+            frames.append(abs_df)
+
+        if "clip" in transform_set:
+            clip_df = selected.clip(lower=lower, upper=upper)
+            clip_df.columns = [f"{col}_Clip" for col in selected_cols]
+            frames.append(clip_df)
 
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
-        return pd.concat(frames, axis=1)
+        result = pd.concat(frames, axis=1)
+
+        expected_cols: List[str] = []
+        for col in selected_cols:
+            for window in windows:
+                if "ts_argmax" in operator_set:
+                    expected_cols.append(f"{col}_TsArgmax_W{window}")
+                if "ts_argmin" in operator_set:
+                    expected_cols.append(f"{col}_TsArgmin_W{window}")
+                if "ts_rank" in operator_set:
+                    expected_cols.append(f"{col}_TsRank_W{window}")
+                if "decay_linear" in operator_set:
+                    expected_cols.append(f"{col}_DecayLinear_W{window}")
+                if has_corr and corr_with is not None:
+                    expected_cols.append(f"{col}_TsCorr_{corr_with}_W{window}")
+
+            if "sign" in transform_set:
+                expected_cols.append(f"{col}_Sign")
+            if "log1p" in transform_set:
+                expected_cols.append(f"{col}_Log1p")
+            if "abs" in transform_set:
+                expected_cols.append(f"{col}_Abs")
+            if "clip" in transform_set:
+                expected_cols.append(f"{col}_Clip")
+
+        return result.loc[:, expected_cols]
+
+    def _build_selected_frame(self, frame: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
+        series_list = [self._select_feature_series(frame, col) for col in columns]
+        selected = pd.concat(series_list, axis=1)
+        selected.columns = columns
+        return selected
 
     def _normalize_config(self, config: Dict | None) -> Dict:
         if config is None:
@@ -450,6 +524,25 @@ class DerivedOperatorEngine:
                 continue
             output.append(value)
         return output
+
+    def _rolling_last_rank_pct(self, values: np.ndarray) -> float:
+        """Return pandas-equivalent percentile rank of the last value in the rolling window."""
+        last = values[-1]
+        if np.isnan(last):
+            return np.nan
+
+        valid_mask = ~np.isnan(values)
+        valid_count = int(valid_mask.sum())
+        if valid_count == 0:
+            return np.nan
+
+        valid_values = values[valid_mask]
+        less_count = int(np.sum(valid_values < last))
+        equal_count = int(np.sum(valid_values == last))
+
+        # pandas rank(method='average', pct=True) for the last value.
+        average_rank = less_count + (equal_count + 1) / 2.0
+        return average_rank / float(valid_count)
 
     def _select_feature_series(self, frame: pd.DataFrame, column_name: str) -> pd.Series:
         """Return a single feature series even when duplicate column names exist."""

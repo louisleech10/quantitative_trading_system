@@ -9,13 +9,7 @@ global:
 data_sources:
   enabled_sources:
     - close
-    - open
-    - high
-    - low
     - volume
-    - quote_volume
-    - trades
-    - taker_buy_volume
     - taker_ratio
   synthetic_sources:
     - avg_price

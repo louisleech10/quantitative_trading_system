@@ -24,6 +24,30 @@ interface OverviewDashboardProps {
 
 const PIE_COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#f472b6', '#a78bfa'];
 
+const LEVEL_LABELS: Record<string, string> = {
+  L1: 'L1 基礎',
+  L2: 'L2 中階',
+  L3: 'L3 高階',
+  L1_basic: 'L1 基礎',
+  L2_intermediate: 'L2 中階',
+  L3_advanced: 'L3 高階',
+};
+
+function DarkTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number }[]; label?: string }) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-white/20 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-xl">
+      {label && <div className="mb-1 font-medium text-slate-300">{label}</div>}
+      {payload.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <span className="text-slate-400">{entry.name}:</span>
+          <span className="font-semibold">{entry.value.toLocaleString()}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const qualityClass = (score: number) => {
   if (score >= 80) return 'text-emerald-300';
   if (score >= 60) return 'text-amber-300';
@@ -55,12 +79,17 @@ export default function OverviewDashboard({ summary, loading, error, taskId }: O
 
   const levelData = useMemo(() => {
     if (!summary) return [];
-    return Object.entries(summary.by_level).map(([name, value]) => ({ name, value }));
+    return Object.entries(summary.by_level).map(([name, value]) => ({
+      name: LEVEL_LABELS[name] ?? name,
+      value,
+    }));
   }, [summary]);
 
   const layerData = useMemo(() => {
     if (!summary) return [];
-    return Object.entries(summary.by_layer).map(([name, value]) => ({ name, value }));
+    return Object.entries(summary.by_layer)
+      .filter(([, value]) => value > 0)
+      .map(([name, value]) => ({ name, value }));
   }, [summary]);
 
   const alerts = useMemo(() => {
@@ -104,39 +133,43 @@ export default function OverviewDashboard({ summary, loading, error, taskId }: O
           <div className="text-sm text-slate-300 mb-2">By Category</div>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={categoryData}>
-              <XAxis dataKey="name" hide />
+              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <YAxis hide />
-              <Tooltip />
+              <Tooltip content={<DarkTooltip />} />
               <Bar dataKey="value" fill="#60a5fa" />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="glass-panel rounded-2xl p-4 h-[320px]">
-          <div className="text-sm text-slate-300 mb-2">By Level</div>
+          <div className="text-sm text-slate-300 mb-2">By Level（L1 = Atomic 基礎、L2 = 中階、L3 = 高階）</div>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={levelData} dataKey="value" nameKey="name" outerRadius={100}>
+              <Pie data={levelData} dataKey="value" nameKey="name" outerRadius={100} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
                 {levelData.map((entry, idx) => (
                   <Cell key={`${entry.name}-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip content={<DarkTooltip />} />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       <div className="glass-panel rounded-2xl p-4 h-[280px]">
-        <div className="text-sm text-slate-300 mb-2">By Layer</div>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={layerData}>
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="value" fill="#34d399" />
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="text-sm text-slate-300 mb-2">By Layer（管道層次分布）</div>
+        {layerData.length === 0 ? (
+          <div className="flex h-full items-center justify-center text-xs text-slate-500">暫無資料</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={layerData}>
+              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <Tooltip content={<DarkTooltip />} />
+              <Bar dataKey="value" fill="#34d399" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       <div className="glass-panel rounded-2xl p-4">

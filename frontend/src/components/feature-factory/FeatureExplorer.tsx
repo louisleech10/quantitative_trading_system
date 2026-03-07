@@ -112,6 +112,7 @@ export default function FeatureExplorer({ taskId }: FeatureExplorerProps) {
         {explorerActiveTab === 'table' && (
           <FeatureTable
             taskId={taskId}
+            totalCount={summary?.total_features}
             onOpenDistribution={(feature) => {
               setExplorerActiveTab('distribution', feature);
             }}

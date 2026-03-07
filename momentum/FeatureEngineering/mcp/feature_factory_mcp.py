@@ -70,10 +70,14 @@ class FeatureFactoryMCP:
         ]
 
     def list_data_sources(self) -> List[Dict]:
-        """List enabled and synthetic data sources."""
+        """List all available and synthetic data sources."""
+        _ALL_RAW_SOURCES = [
+            "close", "open", "high", "low", "volume",
+            "quote_volume", "trades", "taker_buy_volume", "taker_ratio",
+        ]
         config = self._config_manager.get_merged_config()
         sources = []
-        for name in config.data_sources.enabled_sources:
+        for name in _ALL_RAW_SOURCES:
             sources.append({"name": name, "source_type": "raw"})
         for name in config.data_sources.synthetic_sources:
             sources.append({"name": name, "source_type": "synthetic"})

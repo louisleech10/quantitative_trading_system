@@ -7,6 +7,7 @@ Author: AI Agent
 Date: 2026-01-10
 """
 
+import os
 import h5py
 import pandas as pd
 import numpy as np
@@ -45,6 +46,9 @@ class FeatureStorage:
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
         self.logger = logger
+        self._chunk_rows = self._resolve_positive_env("FFACT_HDF5_CHUNK_ROWS", 256)
+        self._chunk_cols = self._resolve_positive_env("FFACT_HDF5_CHUNK_COLS", 512)
+        self._gzip_level = self._resolve_bounded_env("FFACT_HDF5_GZIP_LEVEL", 4, 0, 9)
     
     def save_features_to_hdf5(
         self,
@@ -259,24 +263,35 @@ class FeatureStorage:
         try:
             with h5py.File(file_path, "w") as f:
                 group = f.create_group(f"{symbol}/{timeframe}")
+
+                features_arr = features_df.to_numpy(dtype=np.float32)
+                feature_chunks = self._build_2d_chunks(features_arr.shape)
                 group.create_dataset(
                     "features",
-                    data=features_df.to_numpy(dtype=np.float32),
+                    data=features_arr,
                     compression="gzip",
-                    compression_opts=4,
+                    compression_opts=self._gzip_level,
+                    chunks=feature_chunks,
                 )
+
+                timestamp_chunks = self._build_1d_chunks(timestamps.shape)
                 group.create_dataset(
                     "timestamps",
                     data=timestamps,
                     compression="gzip",
+                    compression_opts=self._gzip_level,
+                    chunks=timestamp_chunks,
                 )
 
                 if labels_df is not None and not labels_df.empty:
+                    labels_arr = labels_df.to_numpy(dtype=np.float32)
+                    label_chunks = self._build_2d_chunks(labels_arr.shape)
                     group.create_dataset(
                         "labels",
-                        data=labels_df.to_numpy(dtype=np.float32),
+                        data=labels_arr,
                         compression="gzip",
-                        compression_opts=4,
+                        compression_opts=self._gzip_level,
+                        chunks=label_chunks,
                     )
                     group.attrs["label_names"] = label_names
 
@@ -305,6 +320,40 @@ class FeatureStorage:
         except Exception as e:
             self.logger.error(f"工廠輸出儲存失敗: {str(e)}", exc_info=True)
             raise
+
+    def _build_2d_chunks(self, shape: Tuple[int, int]) -> Optional[Tuple[int, int]]:
+        if len(shape) != 2:
+            return None
+        rows, cols = int(shape[0]), int(shape[1])
+        if rows <= 0 or cols <= 0:
+            return None
+        return (min(rows, self._chunk_rows), min(cols, self._chunk_cols))
+
+    def _build_1d_chunks(self, shape: Tuple[int, ...]) -> Optional[Tuple[int]]:
+        if len(shape) != 1:
+            return None
+        rows = int(shape[0])
+        if rows <= 0:
+            return None
+        return (min(rows, self._chunk_rows),)
+
+    @staticmethod
+    def _resolve_positive_env(env_name: str, default_value: int) -> int:
+        raw = os.getenv(env_name, str(default_value)).strip()
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = default_value
+        return max(1, parsed)
+
+    @staticmethod
+    def _resolve_bounded_env(env_name: str, default_value: int, lower: int, upper: int) -> int:
+        raw = os.getenv(env_name, str(default_value)).strip()
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = default_value
+        return max(lower, min(upper, parsed))
 
     def load_factory_output(self, symbol: str, timeframe: str):
         """載入工廠輸出"""

@@ -229,7 +229,7 @@ async def export_features_markdown(
 async def browse_features(
     task_id: str,
     offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=5000),
     sort_by: Optional[str] = Query(None, description="排序欄位：nan_ratio, std, skewness, kurtosis, mean, name"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     category: Optional[str] = Query(None, description="篩選類別"),

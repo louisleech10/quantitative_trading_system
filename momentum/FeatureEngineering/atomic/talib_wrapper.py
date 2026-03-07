@@ -32,6 +32,19 @@ class TALibWrapper:
     """Unified TA-Lib interface with multi-source support."""
 
     INDICATOR_REGISTRY: Dict[str, IndicatorSpec] = {}
+    # Naming rule:
+    # '_' separates major segments, while '-' separates values inside Params.
+    PARAM_VALUE_DELIMITER = "-"
+
+    @staticmethod
+    def normalize_source_label(source_label: str) -> str:
+        """Normalize source segment: use '-' inside segment, keep '_' for segment boundaries."""
+        return str(source_label).replace("_", "-")
+
+    @staticmethod
+    def normalize_indicator_name(indicator_name: str) -> str:
+        """Normalize indicator segment: use '-' inside segment, keep '_' for segment boundaries."""
+        return str(indicator_name).replace("_", "-")
 
     _CATEGORY_MAP = {
         "trend": [
@@ -437,7 +450,9 @@ class TALibWrapper:
                 indicator_name = spec.name
             else:
                 indicator_name = spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
-            parts = [source_label, spec.category, indicator_name]
+            normalized_source = cls.normalize_source_label(source_label)
+            normalized_indicator = cls.normalize_indicator_name(indicator_name)
+            parts = [normalized_source, spec.category, normalized_indicator]
             if param_str:
                 parts.append(param_str)
             col_name = "_".join(parts)
@@ -466,7 +481,7 @@ class TALibWrapper:
             else:
                 parts.append(str(value))
 
-        return "_".join(parts)
+        return cls.PARAM_VALUE_DELIMITER.join(parts)
 
     @staticmethod
     def _get_index(data: pd.DataFrame | pd.Series) -> pd.Index:

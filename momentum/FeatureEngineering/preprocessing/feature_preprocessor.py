@@ -82,26 +82,33 @@ class FeaturePreprocessor:
             return df
 
         result = df.copy()
-        for column in columns:
-            series = result[column].astype(float)
-            if method == "sigma":
-                sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-                mean = series.mean(skipna=True)
-                std = series.std(skipna=True)
-                if pd.isna(std) or std == 0.0:
-                    continue
-                lower = mean - sigma_k * std
-                upper = mean + sigma_k * std
-                result[column] = series.clip(lower=lower, upper=upper)
-            elif method == "quantile":
-                quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
-                lower_q = float(quantile_range[0])
-                upper_q = float(quantile_range[1])
-                lower = series.quantile(lower_q)
-                upper = series.quantile(upper_q)
-                result[column] = series.clip(lower=lower, upper=upper)
-            else:
-                raise ValueError(f"Unsupported winsorization method: {method}")
+        selected = result.loc[:, columns].astype(float)
+
+        if method == "sigma":
+            sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
+            means = selected.mean(skipna=True)
+            stds = selected.std(skipna=True)
+            valid_std = (~stds.isna()) & (stds != 0.0)
+            if not valid_std.any():
+                return result
+
+            valid_columns = valid_std[valid_std].index.tolist()
+            lowers = means.loc[valid_columns] - sigma_k * stds.loc[valid_columns]
+            uppers = means.loc[valid_columns] + sigma_k * stds.loc[valid_columns]
+            clipped = selected.loc[:, valid_columns].clip(lower=lowers, upper=uppers, axis=1)
+            for column in valid_columns:
+                result[column] = clipped[column]
+        elif method == "quantile":
+            quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            lower_q = float(quantile_range[0])
+            upper_q = float(quantile_range[1])
+            lowers = selected.quantile(lower_q)
+            uppers = selected.quantile(upper_q)
+            clipped = selected.clip(lower=lowers, upper=uppers, axis=1)
+            for column in columns:
+                result[column] = clipped[column]
+        else:
+            raise ValueError(f"Unsupported winsorization method: {method}")
 
         return result
 
@@ -222,26 +229,50 @@ class FeaturePreprocessor:
             return df
 
         result = df.copy()
-        new_columns: Dict[str, pd.Series] = {}
+        selected = result.loc[:, columns].astype(float)
 
-        def _rank_last(values: pd.Series) -> float:
-            if values.isna().all():
-                return np.nan
-            if values.nunique(dropna=True) <= 1:
-                return 0.5
-            return float(values.rank(pct=True).iloc[-1])
+        # Use pandas' vectorized rolling.rank fast path and patch constant windows
+        # to keep legacy behavior exactly (constant window -> 0.5).
+        rolling = selected.rolling(window, min_periods=1)
+        ranked_df = rolling.rank(
+            method="average",
+            pct=True,
+        )
+        rolling_max = rolling.max()
+        rolling_min = rolling.min()
+        # all-NaN windows naturally produce False here (NaN == NaN is False).
+        constant_mask = rolling_max == rolling_min
+        ranked_df = ranked_df.mask(constant_mask, 0.5)
+        ranked_df = ranked_df.where(~selected.isna(), np.nan)
 
-        for column in columns:
-            ranked = result[column].astype(float).rolling(window, min_periods=1).apply(_rank_last, raw=False)
-            if self.mode == "replace":
-                result[column] = ranked
-            else:
-                new_columns[f"{column}_rank"] = ranked
-
-        if self.mode != "replace" and new_columns:
-            result = pd.concat([result, pd.DataFrame(new_columns, index=result.index)], axis=1)
+        if self.mode == "replace":
+            result.loc[:, columns] = ranked_df
+        else:
+            ranked_df = ranked_df.rename(columns={column: f"{column}_rank" for column in columns})
+            result = pd.concat([result, ranked_df], axis=1)
 
         return result
+
+    def _rolling_last_rank_pct_for_preprocess(self, values: np.ndarray) -> float:
+        """Rolling percentile rank for the last value, preserving legacy constant-window behavior."""
+        last = values[-1]
+        if np.isnan(last):
+            return np.nan
+
+        valid_mask = ~np.isnan(values)
+        valid_count = int(valid_mask.sum())
+        if valid_count == 0:
+            return np.nan
+
+        valid_values = values[valid_mask]
+        # Keep legacy behavior: constant windows map to 0.5 exactly.
+        if np.nanmax(valid_values) == np.nanmin(valid_values):
+            return 0.5
+
+        less_count = int(np.sum(valid_values < last))
+        equal_count = int(np.sum(valid_values == last))
+        average_rank = less_count + (equal_count + 1) / 2.0
+        return average_rank / float(valid_count)
 
     def _apply_gaussian_normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         if not HAS_SCIPY:
@@ -288,30 +319,30 @@ class FeaturePreprocessor:
             return df
 
         result = df.copy()
-        new_columns: Dict[str, pd.Series] = {}
+        selected = result.loc[:, columns].astype(float)
         primary_window = int(windows[0]) if windows else 100
 
-        for column in columns:
-            series = result[column].astype(float)
-            if self.mode == "replace":
-                mean = series.rolling(primary_window, min_periods=1).mean()
-                std = series.rolling(primary_window, min_periods=1).std()
-                zscore = (series - mean) / (std + epsilon)
+        if self.mode == "replace":
+            mean = selected.rolling(primary_window, min_periods=1).mean()
+            std = selected.rolling(primary_window, min_periods=1).std()
+            zscore = (selected - mean) / (std + epsilon)
+            zscore = zscore.where(std > 0.0, 0.0)
+            zscore = zscore.where(~selected.isna(), np.nan)
+            result.loc[:, columns] = zscore
+        else:
+            append_frames: List[pd.DataFrame] = []
+            for window in windows:
+                window_int = int(window)
+                mean = selected.rolling(window_int, min_periods=1).mean()
+                std = selected.rolling(window_int, min_periods=1).std()
+                zscore = (selected - mean) / (std + epsilon)
                 zscore = zscore.where(std > 0.0, 0.0)
-                zscore = zscore.where(~series.isna(), np.nan)
-                result[column] = zscore
-            else:
-                for window in windows:
-                    window_int = int(window)
-                    mean = series.rolling(window_int, min_periods=1).mean()
-                    std = series.rolling(window_int, min_periods=1).std()
-                    zscore = (series - mean) / (std + epsilon)
-                    zscore = zscore.where(std > 0.0, 0.0)
-                    zscore = zscore.where(~series.isna(), np.nan)
-                    new_columns[f"{column}_zscore_{window_int}"] = zscore
+                zscore = zscore.where(~selected.isna(), np.nan)
+                zscore = zscore.rename(columns={column: f"{column}_zscore_{window_int}" for column in columns})
+                append_frames.append(zscore)
 
-        if self.mode != "replace" and new_columns:
-            result = pd.concat([result, pd.DataFrame(new_columns, index=result.index)], axis=1)
+            if append_frames:
+                result = pd.concat([result] + append_frames, axis=1)
 
         return result
 

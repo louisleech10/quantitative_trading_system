@@ -96,7 +96,9 @@ class VolumeIndicatorEngine:
                         indicator_name = (
                             spec.name if name_suffix == spec.name else f"{spec.name}_{name_suffix}"
                         )
-                    parts = [source_label, spec.category, indicator_name]
+                    normalized_source = TALibWrapper.normalize_source_label(source_label)
+                    normalized_indicator = TALibWrapper.normalize_indicator_name(indicator_name)
+                    parts = [normalized_source, spec.category, normalized_indicator]
                     if param_str:
                         parts.append(param_str)
                     col_name = "_".join(parts)

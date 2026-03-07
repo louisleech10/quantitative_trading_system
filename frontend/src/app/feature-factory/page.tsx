@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
@@ -63,27 +63,6 @@ export default function FeatureFactoryPage() {
     }
   }, [currentTask, loadTaskResult]);
 
-  const headerStats = useMemo(() => {
-    if (!preview) {
-      return [];
-    }
-
-    return [
-      {
-        label: '預計特徵數',
-        value: preview.total_features.toLocaleString('en-US'),
-      },
-      {
-        label: '估算耗時',
-        value: `${preview.estimated_time_seconds.toFixed(1)}s`,
-      },
-      {
-        label: '記憶體需求',
-        value: `${preview.memory_mb.toFixed(0)}MB`,
-      },
-    ];
-  }, [preview]);
-
   const handleGenerate = async () => {
     if (!config) {
       setError('尚未載入設定，請稍後再試');
@@ -135,23 +114,9 @@ export default function FeatureFactoryPage() {
             </div>
           </div>
 
-          {currentTask ? (
+          {currentTask && (
             <GenerationProgress task={currentTask} naked />
-          ) : headerStats.length > 0 ? (
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {headerStats.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-xl border border-white/10 bg-white/5 px-4 py-3"
-                >
-                  <div className="text-xs text-slate-400 tracking-wide">{item.label}</div>
-                  <div className="text-xl font-semibold text-slate-100 mt-1">
-                    {item.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
+          )}
         </div>
 
         {error && (

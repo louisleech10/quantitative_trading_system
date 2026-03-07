@@ -227,9 +227,9 @@ timeframes:
 1. **預設展開**：指標表中標記為「Single Series」輸入型態的指標，自動對上述所有**已啟用**的數據源分別計算
 2. **特殊輸入**：需要 (H, L, C) 或 (H, L, C, V) 的指標只計算一次（如 ADX, CCI, MFI）
 3. **使用者可控**：每個指標可在 Config 中指定 `data_sources: [close, volume]` 限縮範圍，不指定則全展開
-4. **物理意義**：`volume_RSI_14` = 成交量的 RSI(14)，反映「交易活躍度的超買超賣」；`taker_ratio_EMA_21` = 主動買入比率的 EMA(21)，反映「買賣力道趨勢」
+4. **物理意義**：`volume_RSI_14` = 成交量的 RSI(14)，反映「交易活躍度的超買超賣」；`taker-ratio_EMA_21` = 主動買入比率的 EMA(21)，反映「買賣力道趨勢」
 
-**命名規則**：`{source}_{indicator}_{params}`，如 `volume_RSI_14`、`taker_ratio_EMA_21`、`open_interest_ROC_5`
+**命名規則**：`{source}_{indicator}_{params}`，其中段內命名使用 `-`。例如 `volume_RSI_14`、`taker-ratio_EMA_21`、`open-interest_ROC_5`
 
 **估算影響**：若啟用 9 個數據源 × 70 個單序列指標 × 平均 6 參數 = ~3780 個 Layer 1 特徵（full 模式下）。使用者可依需求縮減 data_sources 清單。
 
@@ -311,7 +311,7 @@ timeframes:
 | STOCHRSI | `STOCHRSI` | Single Series | timeperiod, fastk, fastd | 2 | 隨機 RSI |
 
 > **「Single Series」** 類指標（RSI, MACD, CMO, MOM, ROC 等）會對所有啟用數據源分別計算。
-> 例如 `volume_RSI_14`（量的超買超賣）、`taker_ratio_MACD_12_26_9`（買賣力道的趨勢變化）。
+> 例如 `volume_RSI_14`（量的超買超賣）、`taker-ratio_MACD_12-26-9`（買賣力道的趨勢變化）。
 
 **參數擴展策略**（含業界標準值 ⭐）：
 - 單週期指標（RSI, ADX, CCI, CMO, MOM, ROC, MFI, WILLR, TRIX）：
@@ -438,7 +438,7 @@ timeframes:
 | BETA | `BETA` | (Series, Benchmark) | timeperiod | Beta 係數（需基準） |
 | CORREL | `CORREL` | (Series, Benchmark) | timeperiod | 相關係數（需基準） |
 
-> **Single Series** 類統計函式適用於所有數據源，如 `volume_LINEARREG_SLOPE_21`（量能趨勢斜率）、`taker_ratio_STDDEV_14`（買賣力道波動）。
+> **Single Series** 類統計函式適用於所有數據源，如 `volume_LINEARREG-SLOPE_21`（量能趨勢斜率）、`taker-ratio_STDDEV_14`（買賣力道波動）。
 
 **參數擴展**（含業界標準值 ⭐）：
 - 主序列：Fibonacci `[5, 8, 13, 21, 34, 55]` + 業界標準 `[10, 14, 20]` ⭐
@@ -677,13 +677,25 @@ timeframes:
 {Source}_{Indicator}_{Params}_{Operator}_{OpParams}_{Window}_{Suffix}
 ```
 
+**V2.3 命名分隔規則（強制）**：
+- `"_"` 僅能用於「七段式主段落分隔」
+- `Params` 內部多參數值必須使用 `"-"` 分隔（不可再使用 `_`）
+- `OpParams` 若為多值，建議同樣使用 `"-"`
+
+範例：
+- `close_BBANDS_21-2_Upper`
+- `close_MACD_12-26-9_Hist`
+- `close_EMA_8-21_Cross`
+
+> 設計目的：避免 parser 無法分辨「段落分隔」與「參數內部分隔」，確保新指標擴充時可穩定解析。
+
 每一段的意義：
 
 | 段位 | 含義 | 可省略 | 範例 |
 |:----:|------|:------:|------|
-| Source | 數據源 | ✗ | `close`, `volume`, `taker_ratio`, `funding_rate` |
+| Source | 數據源 | ✗ | `close`, `volume`, `taker-ratio`, `funding-rate` |
 | Indicator | 指標名稱 | ✗ | `EMA`, `RSI`, `BBANDS`, `ADX` |
-| Params | 指標參數 | ✗ | `21`, `14_70_30` (RSI period_overbought_oversold) |
+| Params | 指標參數 | ✗ | `21`, `14-70-30` (RSI period-overbought-oversold) |
 | Operator | 算子/變換 | ✓ | `Distance`, `Cross`, `Slope`, `Lag`, `Rank` |
 | OpParams | 算子參數 | ✓ | 對於 Cross: 交叉對象；對於 Lag: lag 步數 |
 | Window | 聚合視窗 | ✓ | `W21` (rolling window 21) |
@@ -695,10 +707,10 @@ timeframes:
 # Layer 1: 原子指標（多數據源）
 close_EMA_21                        → Close 的 EMA(21) 值
 volume_EMA_21                       → Volume 的 EMA(21) 值 ⭐ 多數據源
-taker_ratio_RSI_14                  → Taker Ratio 的 RSI(14) ⭐ 多數據源
+taker-ratio_RSI_14                  → Taker Ratio 的 RSI(14) ⭐ 多數據源
 close_RSI_14                        → Close 的 RSI(14) 值
-close_BBANDS_21_2_Upper             → BB(21, 2σ) 上軌
-close_MACD_12_26_9_Hist             → MACD(12,26,9) 柱狀圖
+close_BBANDS_21-2_Upper             → BB(21, 2σ) 上軌
+close_MACD_12-26-9_Hist             → MACD(12,26,9) 柱狀圖
 open_interest_ROC_5                 → 未平倉量的 5 期變化率 ⭐ 衍生品數據
 
 # Layer 1: 多時間框架 ⭐
@@ -709,7 +721,7 @@ close_12h_ADX_14                    → 12h 框架（主框架，可省略 TF �
 
 # Layer 2: 衍生特徵
 close_EMA_21_Distance               → 價格距離 EMA(21) 的乖離率
-close_EMA_8_21_Cross                → EMA(8) 與 EMA(21) 的交叉差值
+close_EMA_8-21_Cross                → EMA(8) 與 EMA(21) 的交叉差值
 close_RSI_14_Momentum_3             → RSI(14) 的 3 期動量
 volume_RSI_14_Momentum_3            → 量能 RSI(14) 的 3 期動量 ⭐
 
@@ -720,7 +732,7 @@ close_ADX_14_Rank_W55               → ADX(14) 在過去 55 根中的百分比�
 
 # Layer 4: 滯後展開（全量）
 close_RSI_14_Lag_1                  → RSI(14) 在 T-1 的值
-close_MACD_12_26_9_Hist_Lag_3       → MACD Histogram 在 T-3 的值
+close_MACD_12-26-9_Hist_Lag_3       → MACD Histogram 在 T-3 的值
 volume_EMA_21_Lag_5                 → Volume EMA(21) 在 T-5 的值 ⭐
 close_RSI_14_Slope_W21_Lag_2        → RSI Slope 在 T-2 的值 ⭐ Rolling 的 Lag
 

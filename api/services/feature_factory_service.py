@@ -5,7 +5,10 @@ Feature Factory Service - Feature Factory 任務與配置管理
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import hashlib
 import io
+import os
 import threading
 import uuid
 from datetime import datetime
@@ -52,6 +55,16 @@ class FeatureFactoryService:
         # Per-task pre-computed feature stats (for browse_features).
         # Shape: list of dicts with name/category/level/layer/nan_ratio/mean/std/…
         self._stats_cache: Dict[str, List[Dict[str, Any]]] = {}
+        # Pre-sorted name-ascending view for default pagination fast-path.
+        self._stats_name_sorted_cache: Dict[str, List[Dict[str, Any]]] = {}
+        # Task IDs currently warming stats in background to avoid duplicate warm threads.
+        self._stats_warming_tasks: set[str] = set()
+        # Per-task ADF cache: task_id -> feature_name -> pvalue (or None if unavailable).
+        self._adf_cache: Dict[str, Dict[str, Optional[float]]] = {}
+        # Task IDs currently warming ADF cache in background.
+        self._adf_warming_tasks: set[str] = set()
+        # Per-task inferred metadata cache: task_id -> feature_name -> {category, layer, level}
+        self._feature_metadata_cache: Dict[str, Dict[str, Dict[str, str]]] = {}
 
     async def start_generation(self, request: Any) -> Dict[str, str]:
         """Start feature generation task."""
@@ -120,7 +133,8 @@ class FeatureFactoryService:
             # Offload the blocking call to a thread pool worker.
             result = await loop.run_in_executor(
                 None,
-                lambda: self._factory.generate_features(
+                lambda: self._generate_features_with_phase_d(
+                    task_id=task_id,
                     symbol=symbol,
                     timeframe=timeframe,
                     config_override=resolved_override,
@@ -137,6 +151,10 @@ class FeatureFactoryService:
                     task_info["status"] = "completed"
                     task_info["progress"] = 1.0
                     task_info["result"] = summary
+
+            # Precompute Feature Table stats as soon as generation completes.
+            # This keeps first table open responsive without changing any metrics.
+            self._start_stats_cache_warmup(task_id, reason="generation_completed")
 
             self._notify_callbacks(task_id, {
                 "stage": "completed",
@@ -164,6 +182,237 @@ class FeatureFactoryService:
                 "progress": 1.0,
                 "message": str(exc),
             })
+
+    def _generate_features_with_phase_d(
+        self,
+        task_id: str,
+        symbol: str,
+        timeframe: str,
+        config_override: Optional[dict],
+        force_regenerate: bool,
+        progress_callback: Optional[Callable],
+    ) -> FeatureGenerationResult:
+        """Phase D governance: old/new compute path toggle, shadow compare, and rollback fallback."""
+        new_path_enabled = self._is_new_compute_path_enabled()
+        if not new_path_enabled:
+            logger.info("Phase D: new_compute_path disabled, using old path for task %s", task_id)
+            return self._run_with_env_overrides(
+                self._factory,
+                symbol=symbol,
+                timeframe=timeframe,
+                config_override=config_override,
+                force_regenerate=force_regenerate,
+                progress_callback=progress_callback,
+                env_overrides=self._old_path_env_overrides(),
+            )
+
+        new_result = self._factory.generate_features(
+            symbol=symbol,
+            timeframe=timeframe,
+            config_override=config_override,
+            force_regenerate=force_regenerate,
+            progress_callback=progress_callback,
+        )
+
+        if not self._should_run_dual_path_check(task_id):
+            self._attach_phase_d_metadata(
+                new_result,
+                {
+                    "new_compute_path": True,
+                    "dual_run": False,
+                    "fallback_triggered": False,
+                    "reason": "sampling_skipped",
+                },
+            )
+            return new_result
+
+        logger.info("Phase D: running dual-path shadow compare for task %s", task_id)
+        old_shadow_result = self._run_shadow_old_path(
+            symbol=symbol,
+            timeframe=timeframe,
+            config_override=config_override,
+        )
+        equal, reason = self._compare_generation_results(old_shadow_result, new_result)
+
+        if equal:
+            self._attach_phase_d_metadata(
+                new_result,
+                {
+                    "new_compute_path": True,
+                    "dual_run": True,
+                    "fallback_triggered": False,
+                    "compare_passed": True,
+                    "compare_reason": "ok",
+                },
+            )
+            return new_result
+
+        logger.error("Phase D gate failed for task %s, rollback to old path: %s", task_id, reason)
+        fallback_result = self._run_with_env_overrides(
+            self._factory,
+            symbol=symbol,
+            timeframe=timeframe,
+            config_override=config_override,
+            # Bypass cache to guarantee old path output is persisted after rollback.
+            force_regenerate=True,
+            progress_callback=progress_callback,
+            env_overrides=self._old_path_env_overrides(),
+        )
+        self._attach_phase_d_metadata(
+            fallback_result,
+            {
+                "new_compute_path": True,
+                "dual_run": True,
+                "fallback_triggered": True,
+                "compare_passed": False,
+                "compare_reason": reason,
+            },
+        )
+        return fallback_result
+
+    def _run_shadow_old_path(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_override: Optional[dict],
+    ) -> FeatureGenerationResult:
+        shadow_factory = create_feature_factory()
+        # Shadow path must not overwrite persisted output.
+        shadow_factory._storage.save_factory_output = lambda *_args, **_kwargs: ""
+        return self._run_with_env_overrides(
+            shadow_factory,
+            symbol=symbol,
+            timeframe=timeframe,
+            config_override=config_override,
+            force_regenerate=True,
+            progress_callback=None,
+            env_overrides=self._old_path_env_overrides(),
+        )
+
+    def _run_with_env_overrides(
+        self,
+        factory,
+        symbol: str,
+        timeframe: str,
+        config_override: Optional[dict],
+        force_regenerate: bool,
+        progress_callback: Optional[Callable],
+        env_overrides: Dict[str, str],
+    ) -> FeatureGenerationResult:
+        with self._temporary_environ(env_overrides):
+            return factory.generate_features(
+                symbol=symbol,
+                timeframe=timeframe,
+                config_override=config_override,
+                force_regenerate=force_regenerate,
+                progress_callback=progress_callback,
+            )
+
+    @staticmethod
+    def _is_new_compute_path_enabled() -> bool:
+        raw = os.getenv("FFACT_NEW_COMPUTE_PATH", "0").strip().lower()
+        return raw in {"1", "true", "yes", "on"}
+
+    def _should_run_dual_path_check(self, task_id: str) -> bool:
+        sample_rate = self._dual_run_sample_rate()
+        if sample_rate <= 0:
+            return False
+        if sample_rate >= 1:
+            return True
+
+        # Deterministic sampling by task_id to keep behavior reproducible across retries.
+        digest = hashlib.md5(task_id.encode("utf-8")).hexdigest()
+        sample_value = int(digest[:8], 16) / float(0xFFFFFFFF)
+        return sample_value < sample_rate
+
+    @staticmethod
+    def _dual_run_sample_rate() -> float:
+        raw = os.getenv("FFACT_NEW_COMPUTE_DUALRUN_SAMPLE_RATE", "0").strip()
+        try:
+            parsed = float(raw)
+        except ValueError:
+            parsed = 0.0
+        return max(0.0, min(1.0, parsed))
+
+    @staticmethod
+    def _old_path_env_overrides() -> Dict[str, str]:
+        # Keep old behavior: no Layer1 parallel, no Layer3 chunking.
+        # Layer4 chunk/batch use large values to approximate non-chunked flow.
+        return {
+            "FFACT_LAYER1_PARALLEL": "0",
+            "FFACT_LAYER3_CHUNK_SIZE": "0",
+            "FFACT_LAYER4_CHUNK_SIZE": "1000000000",
+            "FFACT_LAYER4_LAG_BATCH_SIZE": "1000000000",
+        }
+
+    @staticmethod
+    def _compare_generation_results(old_result: FeatureGenerationResult, new_result: FeatureGenerationResult) -> tuple[bool, str]:
+        old_features = old_result.features_df
+        new_features = new_result.features_df
+        if list(old_features.columns) != list(new_features.columns):
+            return False, "feature_columns_mismatch"
+        if not old_features.index.equals(new_features.index):
+            return False, "feature_index_mismatch"
+        if old_features.shape != new_features.shape:
+            return False, "feature_shape_mismatch"
+        if not np.array_equal(old_features.to_numpy(), new_features.to_numpy(), equal_nan=True):
+            return False, "feature_values_mismatch"
+
+        old_labels = old_result.labels_df
+        new_labels = new_result.labels_df
+        if list(old_labels.columns) != list(new_labels.columns):
+            return False, "label_columns_mismatch"
+        if not old_labels.index.equals(new_labels.index):
+            return False, "label_index_mismatch"
+        if old_labels.shape != new_labels.shape:
+            return False, "label_shape_mismatch"
+        if not np.array_equal(old_labels.to_numpy(), new_labels.to_numpy(), equal_nan=True):
+            return False, "label_values_mismatch"
+
+        metadata_ok, metadata_reason = FeatureFactoryService._compare_metadata_contract(
+            old_result.metadata,
+            new_result.metadata,
+        )
+        if not metadata_ok:
+            return False, metadata_reason
+        return True, "ok"
+
+    @staticmethod
+    def _compare_metadata_contract(old_metadata: Dict[str, Any], new_metadata: Dict[str, Any]) -> tuple[bool, str]:
+        keys = [
+            "feature_names",
+            "feature_count",
+            "layer_counts",
+            "symbol",
+            "timeframe",
+            "data_range",
+        ]
+        for key in keys:
+            if old_metadata.get(key) != new_metadata.get(key):
+                return False, f"metadata_mismatch:{key}"
+        return True, "ok"
+
+    @staticmethod
+    def _attach_phase_d_metadata(result: FeatureGenerationResult, payload: Dict[str, Any]) -> None:
+        if not isinstance(result.metadata, dict):
+            result.metadata = {}
+        result.metadata["phase_d_governance"] = payload
+
+    @staticmethod
+    @contextlib.contextmanager
+    def _temporary_environ(overrides: Dict[str, str]):
+        previous: Dict[str, Optional[str]] = {}
+        try:
+            for key, value in overrides.items():
+                previous[key] = os.environ.get(key)
+                os.environ[key] = str(value)
+            yield
+        finally:
+            for key, old in previous.items():
+                if old is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = old
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get task status by task id."""
@@ -302,11 +551,14 @@ class FeatureFactoryService:
             kurtosis_s = features_df.kurt()
         nan_ratio_s = features_df.isna().mean()
 
+        feature_meta = self._get_feature_metadata_map(task_id, list(features_df.columns))
+
         rows: List[Dict[str, Any]] = []
         for column in features_df.columns:
-            inferred_category = self._export_service._infer_category(column)
-            inferred_layer = self._export_service._infer_layer(column)
-            inferred_level = self._to_simple_level(self._export_service._infer_level(inferred_category))
+            meta = feature_meta.get(column)
+            inferred_category = (meta or {}).get("category", "other")
+            inferred_layer = (meta or {}).get("layer", "layer1")
+            inferred_level = (meta or {}).get("level", "L1")
             col_desc = desc.loc[column] if column in desc.index else {}
             rows.append(
                 {
@@ -330,6 +582,7 @@ class FeatureFactoryService:
             )
 
         self._stats_cache[task_id] = rows
+        self._stats_name_sorted_cache[task_id] = sorted(rows, key=lambda item: str(item.get("name", "")))
         logger.info("Stats cached for task %s (%d features)", task_id, len(rows))
         return rows
 
@@ -349,6 +602,56 @@ class FeatureFactoryService:
             raise ValueError(f"Invalid sort_by: {sort_by}")
         if sort_order not in {"asc", "desc"}:
             raise ValueError(f"Invalid sort_order: {sort_order}")
+
+        normalized_category = (category or "").strip()
+        normalized_level = (level or "").strip()
+        normalized_search = (search or "").strip()
+
+        # Fast path for the most common first-load pattern:
+        # no filters + name ascending pagination.  This avoids repeated O(N log N)
+        # sorting on each chunk request and keeps full accuracy/data unchanged.
+        if (
+            (not normalized_category)
+            and (not normalized_level)
+            and (not normalized_search)
+            and ((sort_by is None) or (sort_by == "name"))
+            and (sort_order == "asc")
+        ):
+            if task_id not in self._stats_cache:
+                self._build_stats_rows(task_id)
+
+            base_rows = self._stats_name_sorted_cache.get(task_id)
+            if base_rows is None:
+                base_rows = sorted(self._stats_cache.get(task_id, []), key=lambda item: str(item.get("name", "")))
+                self._stats_name_sorted_cache[task_id] = base_rows
+
+            total = len(base_rows)
+            page_rows = base_rows[offset: offset + limit]
+
+            ADF_PAGE_LIMIT = 100
+            if HAS_STATSMODELS and len(page_rows) <= ADF_PAGE_LIMIT:
+                features_df, _ = self._load_task_features(task_id)
+                page_rows = self._enrich_rows_with_adf(
+                    task_id=task_id,
+                    rows=page_rows,
+                    features_df=features_df,
+                    compute_if_missing=False,
+                )
+
+            # Warm additional ADF results in background for follow-up pagination.
+            self._start_adf_cache_warmup(task_id, reason="browse_features_fast_path")
+
+            return {
+                "total": total,
+                "offset": offset,
+                "limit": limit,
+                "filters_applied": {
+                    "category": category,
+                    "level": level,
+                    "search": search,
+                },
+                "features": page_rows,
+            }
 
         # Use cached vectorized stats (first call builds and caches, subsequent calls are instant)
         rows = list(self._build_stats_rows(task_id))  # shallow copy so filters don't mutate cache
@@ -372,12 +675,20 @@ class FeatureFactoryService:
 
         page_rows = rows[offset: offset + limit]
 
-        if HAS_STATSMODELS:
+        # ADF test is expensive (~50-100 ms/feature). Skip when the page is large to
+        # avoid blocking the response for bulk requests (e.g. limit=5000 initial load).
+        ADF_PAGE_LIMIT = 100
+        if HAS_STATSMODELS and len(page_rows) <= ADF_PAGE_LIMIT:
             features_df, _ = self._load_task_features(task_id)
-            for item in page_rows:
-                adf_pvalue = self._compute_adf_pvalue(features_df[item["name"]])
-                item["adf_pvalue"] = adf_pvalue
-                item["is_stationary"] = adf_pvalue is not None and adf_pvalue < 0.05
+            page_rows = self._enrich_rows_with_adf(
+                task_id=task_id,
+                rows=page_rows,
+                features_df=features_df,
+                compute_if_missing=False,
+            )
+
+        # Warm additional ADF results in background for follow-up pagination.
+        self._start_adf_cache_warmup(task_id, reason="browse_features")
 
         return {
             "total": total,
@@ -454,7 +765,7 @@ class FeatureFactoryService:
         else:
             bins, edges = np.histogram(series.to_numpy(), bins=n_bins)
 
-        adf_pvalue = self._compute_adf_pvalue(df[feature]) if HAS_STATSMODELS else None
+        adf_pvalue = self._get_adf_pvalue(task_id=task_id, feature_name=feature, features_df=df) if HAS_STATSMODELS else None
 
         return {
             "feature": feature,
@@ -507,28 +818,28 @@ class FeatureFactoryService:
         """
         import warnings
         features_df, export_meta = self._load_task_features(task_id)
+        stats_rows = self._build_stats_rows(task_id)
 
-        # --- Category / layer / level breakdown (fast string parsing) ----------
+        # --- Category / layer / level breakdown (reused metadata) ----------
         by_category: Dict[str, int] = {}
-        by_level_raw: Dict[str, int] = {}
+        by_level: Dict[str, int] = {}
         by_layer_raw: Dict[str, int] = {}
-        for col in features_df.columns:
-            cat = self._export_service._infer_category(col)
-            layer = self._export_service._infer_layer(col)
-            level_raw = self._export_service._infer_level(cat)
+        for item in stats_rows:
+            cat = str(item.get("category") or "other")
+            layer = str(item.get("layer") or "layer1")
+            simple_level = str(item.get("level") or "L1")
             by_category[cat] = by_category.get(cat, 0) + 1
             by_layer_raw[layer] = by_layer_raw.get(layer, 0) + 1
-            by_level_raw[level_raw] = by_level_raw.get(level_raw, 0) + 1
-
-        by_level = {self._to_simple_level(k): v for k, v in by_level_raw.items()}
+            by_level[simple_level] = by_level.get(simple_level, 0) + 1
+        # Keys match _infer_layer() return values exactly.
         by_layer = {
-            "layer1": by_layer_raw.get("layer1_atomic", 0),
-            "layer2": by_layer_raw.get("layer2_derived", 0),
-            "layer3": by_layer_raw.get("layer3_rolling", 0),
-            "layer4": by_layer_raw.get("layer4_lag", 0),
-            "layer5": by_layer_raw.get("layer5_cross_sectional", 0),
-            "layer6": by_layer_raw.get("layer6_meta", 0),
-            "layer6_5": by_layer_raw.get("layer6_5_preprocessing", 0),
+            "Layer 1 (Atomic)": by_layer_raw.get("layer1", 0),
+            "Layer 2 (Derived)": by_layer_raw.get("layer2", 0),
+            "Layer 3 (Rolling)": by_layer_raw.get("layer3", 0),
+            "Layer 4 (Lag)": by_layer_raw.get("layer4", 0),
+            "Layer 5 (Cross-Sect)": by_layer_raw.get("layer5", 0),
+            "Layer 6 (Meta)": by_layer_raw.get("layer6", 0),
+            "Layer 6.5 (Preproc)": by_layer_raw.get("layer6_5", 0),
         }
 
         # --- Vectorized quality metrics ----------------------------------------
@@ -558,6 +869,12 @@ class FeatureFactoryService:
         # Quality alerts: limit to a sample to avoid O(N) loop on 36k features
         quality_alerts = self._fast_quality_alerts(features_df, nan_ratios)
 
+        # Warm the expensive per-feature stats cache asynchronously.  The summary
+        # API is usually called before users open Feature Table, so this hides
+        # first-load latency without reducing data completeness.
+        self._start_stats_cache_warmup(task_id, reason="browse_summary")
+        self._start_adf_cache_warmup(task_id, reason="browse_summary")
+
         return {
             "total_features": int(features_df.shape[1]),
             "total_rows": int(features_df.shape[0]),
@@ -582,6 +899,30 @@ class FeatureFactoryService:
                 "config_hash": (export_meta.get("metadata") or {}).get("config_hash"),
             },
         }
+
+    def _start_stats_cache_warmup(self, task_id: str, reason: str) -> None:
+        """Warm per-feature stats cache in background if not already available."""
+        with self._lock:
+            if task_id in self._stats_cache or task_id in self._stats_warming_tasks:
+                return
+            self._stats_warming_tasks.add(task_id)
+
+        def _worker() -> None:
+            try:
+                self._build_stats_rows(task_id)
+            except Exception as exc:
+                logger.warning("Stats warmup failed for task %s: %s", task_id, exc, exc_info=True)
+            finally:
+                with self._lock:
+                    self._stats_warming_tasks.discard(task_id)
+
+        thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f"stats-warm-{task_id[:8]}",
+        )
+        thread.start()
+        logger.info("Stats cache warming started for task %s (reason=%s)", task_id, reason)
 
     def _fast_quality_alerts(self, features_df: pd.DataFrame, nan_ratios: "pd.Series") -> List[Dict[str, Any]]:
         """Return quality alerts using the pre-computed nan_ratios series.
@@ -810,6 +1151,128 @@ class FeatureFactoryService:
         """Remove cached data for a task (called when task is deleted or regenerated)."""
         self._df_cache.pop(task_id, None)
         self._stats_cache.pop(task_id, None)
+        self._stats_name_sorted_cache.pop(task_id, None)
+        self._adf_cache.pop(task_id, None)
+        self._feature_metadata_cache.pop(task_id, None)
+        with self._lock:
+            self._stats_warming_tasks.discard(task_id)
+            self._adf_warming_tasks.discard(task_id)
+
+    def _get_feature_metadata_map(self, task_id: str, feature_names: List[str]) -> Dict[str, Dict[str, str]]:
+        cache = self._feature_metadata_cache.setdefault(task_id, {})
+        for name in feature_names:
+            if name in cache:
+                continue
+            inferred_category = self._export_service._infer_category(name)
+            inferred_layer = self._export_service._infer_layer(name)
+            inferred_level = self._to_simple_level(self._export_service._infer_level(inferred_category))
+            cache[name] = {
+                "category": inferred_category,
+                "layer": inferred_layer,
+                "level": inferred_level,
+            }
+        return cache
+
+    def _start_adf_cache_warmup(self, task_id: str, reason: str) -> None:
+        """Warm per-feature ADF cache in batches to improve browse responsiveness."""
+        if not HAS_STATSMODELS:
+            return
+
+        with self._lock:
+            if task_id in self._adf_warming_tasks:
+                return
+            self._adf_warming_tasks.add(task_id)
+
+        def _worker() -> None:
+            try:
+                rows = self._build_stats_rows(task_id)
+                if not rows:
+                    return
+
+                features_df, _ = self._load_task_features(task_id)
+                feature_cache = self._adf_cache.setdefault(task_id, {})
+
+                # Prioritize deterministic name-ascending order (same as default browse).
+                ordered_names = [str(item.get("name", "")) for item in self._stats_name_sorted_cache.get(task_id, rows)]
+                ordered_names = [name for name in ordered_names if name]
+
+                WARM_TOP_K = 300
+                BATCH_SIZE = 30
+                pending_names = [name for name in ordered_names[:WARM_TOP_K] if name not in feature_cache]
+
+                warmed = 0
+                for idx in range(0, len(pending_names), BATCH_SIZE):
+                    batch_names = pending_names[idx : idx + BATCH_SIZE]
+                    for feature_name in batch_names:
+                        if feature_name not in features_df.columns:
+                            feature_cache[feature_name] = None
+                            continue
+                        feature_cache[feature_name] = self._compute_adf_pvalue(features_df[feature_name])
+                        warmed += 1
+
+                if warmed > 0:
+                    logger.info(
+                        "ADF cache warmed for task %s (%d features, reason=%s)",
+                        task_id,
+                        warmed,
+                        reason,
+                    )
+            except Exception as exc:
+                logger.warning("ADF warmup failed for task %s: %s", task_id, exc, exc_info=True)
+            finally:
+                with self._lock:
+                    self._adf_warming_tasks.discard(task_id)
+
+        thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f"adf-warm-{task_id[:8]}",
+        )
+        thread.start()
+
+    def _enrich_rows_with_adf(
+        self,
+        task_id: str,
+        rows: List[Dict[str, Any]],
+        features_df: pd.DataFrame,
+        compute_if_missing: bool = True,
+    ) -> List[Dict[str, Any]]:
+        enriched_rows: List[Dict[str, Any]] = []
+        for item in rows:
+            row = dict(item)
+            feature_name = str(row.get("name", ""))
+            adf_pvalue = self._get_adf_pvalue(
+                task_id=task_id,
+                feature_name=feature_name,
+                features_df=features_df,
+                compute_if_missing=compute_if_missing,
+            )
+            row["adf_pvalue"] = adf_pvalue
+            row["is_stationary"] = adf_pvalue is not None and adf_pvalue < 0.05
+            enriched_rows.append(row)
+        return enriched_rows
+
+    def _get_adf_pvalue(
+        self,
+        task_id: str,
+        feature_name: str,
+        features_df: pd.DataFrame,
+        compute_if_missing: bool = True,
+    ) -> Optional[float]:
+        feature_cache = self._adf_cache.setdefault(task_id, {})
+        if feature_name in feature_cache:
+            return feature_cache[feature_name]
+
+        if not compute_if_missing:
+            return None
+
+        if feature_name not in features_df.columns:
+            feature_cache[feature_name] = None
+            return None
+
+        pvalue = self._compute_adf_pvalue(features_df[feature_name])
+        feature_cache[feature_name] = pvalue
+        return pvalue
 
     def _load_task_context(self, task_id: str) -> Dict[str, Any]:
         task_result = self.get_result(task_id)

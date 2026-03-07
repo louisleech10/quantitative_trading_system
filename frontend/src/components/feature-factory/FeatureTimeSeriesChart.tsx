@@ -15,6 +15,7 @@ import {
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { exportChartToPNG } from '@/lib/exportUtils';
+import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
 
 interface FeatureTimeSeriesChartProps {
   taskId: string;
@@ -26,6 +27,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
   const { explorerSelectedFeatures, explorerSelectedFeature, setExplorerSelectedFeatures } = useFeatureFactoryStore();
   const { browseData, browseFeatures } = useFeatureFactory();
   const [options, setOptions] = useState<string[]>([]);
+  const [filteredOptions, setFilteredOptions] = useState<string[]>([]);
   const [rows, setRows] = useState<Array<Record<string, string | number | null>>>([]);
   const [showCloseOverlay, setShowCloseOverlay] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,9 +54,10 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     const uniq = Array.from(new Set(explorerSelectedFeatures)).slice(0, 5);
     if (uniq.length > 0) return uniq;
     if (explorerSelectedFeature) return [explorerSelectedFeature];
-    if (options.length > 0) return [options[0]];
+    const candidate = filteredOptions.length > 0 ? filteredOptions[0] : options[0];
+    if (candidate) return [candidate];
     return [];
-  }, [explorerSelectedFeatures, explorerSelectedFeature, options]);
+  }, [explorerSelectedFeatures, explorerSelectedFeature, filteredOptions, options]);
 
   useEffect(() => {
     if (selected.length === 0) {
@@ -116,8 +119,10 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
         </button>
       </div>
 
+      <FeatureNameSegmentFilter features={options} onFilteredFeaturesChange={setFilteredOptions} />
+
       <div className="flex flex-wrap gap-2 max-h-28 overflow-auto">
-        {options.slice(0, 200).map((name) => {
+        {filteredOptions.slice(0, 500).map((name) => {
           const active = selected.includes(name);
           return (
             <button

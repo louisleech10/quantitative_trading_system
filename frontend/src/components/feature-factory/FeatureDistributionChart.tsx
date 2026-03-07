@@ -17,6 +17,7 @@ import {
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { exportChartToPNG } from '@/lib/exportUtils';
+import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
 
 interface FeatureDistributionChartProps {
   taskId: string;
@@ -27,6 +28,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
   const { browseDistribution, browseFeatures } = useFeatureFactory();
   const [feature, setFeature] = useState<string>('');
   const [featureOptions, setFeatureOptions] = useState<string[]>([]);
+  const [filteredFeatureOptions, setFilteredFeatureOptions] = useState<string[]>([]);
   const [bins, setBins] = useState(50);
   const [payload, setPayload] = useState<{
     bins: number[];
@@ -54,6 +56,16 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
       active = false;
     };
   }, [browseFeatures, taskId, explorerSelectedFeature]);
+
+  useEffect(() => {
+    if (!feature && filteredFeatureOptions.length > 0) {
+      setFeature(filteredFeatureOptions[0]);
+      return;
+    }
+    if (feature && filteredFeatureOptions.length > 0 && !filteredFeatureOptions.includes(feature)) {
+      setFeature(filteredFeatureOptions[0]);
+    }
+  }, [feature, filteredFeatureOptions]);
 
   useEffect(() => {
     if (!feature) return;
@@ -128,7 +140,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
           }}
           className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
         >
-          {featureOptions.map((name) => (
+          {filteredFeatureOptions.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>
@@ -150,6 +162,8 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
           匯出 PNG
         </button>
       </div>
+
+      <FeatureNameSegmentFilter features={featureOptions} onFilteredFeaturesChange={setFilteredFeatureOptions} />
 
       {loading ? (
         <div className="text-xs text-slate-400">載入中...</div>

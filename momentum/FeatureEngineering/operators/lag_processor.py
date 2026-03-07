@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Dict, List
 import fnmatch
 import re
@@ -25,6 +26,8 @@ class LagProcessor:
         self._apply_to = config.lag_features.apply_to
         self._exclude_patterns = config.lag_features.exclude_patterns
         self._enabled = config.lag_features.enabled
+        self._column_chunk_size = self._resolve_positive_env("FFACT_LAYER4_CHUNK_SIZE", 200)
+        self._lag_batch_size = self._resolve_positive_env("FFACT_LAYER4_LAG_BATCH_SIZE", 8)
 
     def compute_all(self, features_df: pd.DataFrame) -> pd.DataFrame:
         if not self._enabled or features_df.empty:
@@ -43,20 +46,26 @@ class LagProcessor:
             return pd.DataFrame(index=features_df.index)
 
         frames: List[pd.DataFrame] = []
-        chunk_size = 200
+        chunk_size = self._column_chunk_size
         for start in range(0, len(columns), chunk_size):
             chunk = columns[start : start + chunk_size]
             chunk_df = features_df[chunk]
-            lag_frames: List[pd.DataFrame] = []
-            for lag in lag_steps:
-                lagged = self._apply_lag(chunk_df, lag)
-                lag_frames.append(lagged.add_suffix(f"_Lag_{lag}"))
-            if lag_frames:
-                frames.append(pd.concat(lag_frames, axis=1))
+            chunk_frames: List[pd.DataFrame] = []
+            for lag_start in range(0, len(lag_steps), self._lag_batch_size):
+                lag_subset = lag_steps[lag_start : lag_start + self._lag_batch_size]
+                lag_frames: List[pd.DataFrame] = []
+                for lag in lag_subset:
+                    lagged = self._apply_lag(chunk_df, lag)
+                    lag_frames.append(lagged.add_suffix(f"_Lag_{lag}"))
+                if lag_frames:
+                    chunk_frames.append(pd.concat(lag_frames, axis=1, copy=False))
+
+            if chunk_frames:
+                frames.append(pd.concat(chunk_frames, axis=1, copy=False))
 
         if not frames:
             return pd.DataFrame(index=features_df.index)
-        return pd.concat(frames, axis=1)
+        return pd.concat(frames, axis=1, copy=False)
 
     def _apply_lag(self, data: pd.DataFrame, lag: int) -> pd.DataFrame:
         return data.shift(lag)
@@ -135,3 +144,12 @@ class LagProcessor:
                     normalized.append(lag)
             normalized = sorted(set(normalized))
         return normalized
+
+    @staticmethod
+    def _resolve_positive_env(env_name: str, default_value: int) -> int:
+        raw = os.getenv(env_name, str(default_value)).strip()
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = default_value
+        return max(1, parsed)

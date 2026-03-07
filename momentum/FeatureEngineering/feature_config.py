@@ -25,13 +25,7 @@ class DataSourceConfig(BaseModel):
     enabled_sources: List[str] = Field(
         default_factory=lambda: [
             "close",
-            "open",
-            "high",
-            "low",
             "volume",
-            "quote_volume",
-            "trades",
-            "taker_buy_volume",
             "taker_ratio",
         ]
     )
@@ -310,6 +304,8 @@ class FactoryConfig(BaseModel):
 class FeatureNamingConfig:
     """Legacy naming helpers used by FeatureExtractor and indicators."""
 
+    PARAM_VALUE_DELIMITER = "-"
+
     @staticmethod
     def make_feature_name(
         data_source: str,
@@ -328,7 +324,7 @@ class FeatureNamingConfig:
                 param_values.append(str(int(value)))
             else:
                 param_values.append(str(value))
-        param_str = "_".join(param_values)
+        param_str = FeatureNamingConfig.PARAM_VALUE_DELIMITER.join(param_values)
         return f"{prefix}{param_str}_{feature_type}"
 
     @staticmethod

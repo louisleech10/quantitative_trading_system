@@ -23,7 +23,7 @@ class ConsensusFeatureEngine:
 
         ema_fast = self._find_column(layer1, ["close_trend_EMA_8", "EMA_8"])
         ema_slow = self._find_column(layer1, ["close_trend_EMA_21", "EMA_21"])
-        macd_hist = self._find_column(layer1, ["MACD_Hist"])
+        macd_hist = self._find_column(layer1, ["MACD-Hist", "MACD_Hist"])
         adx = self._find_column(layer1, ["ADX_14"])
 
         signals: list[pd.Series] = []
@@ -49,7 +49,7 @@ class ConsensusFeatureEngine:
 
         rsi = self._find_column(layer1, ["RSI_14", "RSI"])
         cci = self._find_column(layer1, ["CCI_14", "CCI"])
-        stoch = self._find_column(layer1, ["STOCH_slowk", "STOCH"])
+        stoch = self._find_column(layer1, ["STOCH-slowk", "STOCH_slowk", "STOCH"])
 
         series_list = [s for s in [rsi, cci, stoch] if s is not None]
         if len(series_list) < 2:
