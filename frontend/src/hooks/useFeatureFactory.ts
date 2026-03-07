@@ -209,21 +209,25 @@ export function useFeatureFactory() {
       params: {
         offset?: number;
         limit?: number;
+        cursor?: string;
         sortBy?: string;
         sortOrder?: 'asc' | 'desc';
         category?: string;
         level?: 'L1' | 'L2' | 'L3';
         search?: string;
+        detailLevel?: 'full' | 'table';
       }
     ) => {
       const query = new URLSearchParams();
       query.set('offset', String(params.offset ?? 0));
       query.set('limit', String(params.limit ?? 50));
+      if (params.cursor) query.set('cursor', params.cursor);
       if (params.sortBy) query.set('sort_by', params.sortBy);
       if (params.sortOrder) query.set('sort_order', params.sortOrder);
       if (params.category) query.set('category', params.category);
       if (params.level) query.set('level', params.level);
       if (params.search) query.set('search', params.search);
+      if (params.detailLevel) query.set('detail_level', params.detailLevel);
       return requestJson<BrowseFeaturesResponse>(`/browse/${taskId}/features?${query.toString()}`);
     },
     []

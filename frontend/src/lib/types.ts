@@ -362,6 +362,9 @@ export interface BrowseFeaturesResponse {
   total: number;
   offset: number;
   limit: number;
+  cursor?: string | null;
+  next_cursor?: string | null;
+  has_more?: boolean;
   filters_applied: {
     category?: string | null;
     level?: string | null;

@@ -24,6 +24,12 @@
   - Phase D：Runtime Governance（`FFACT_NEW_COMPUTE_PATH` 旗標 + Shadow Compare + 自動 Rollback）✓
   - 驗證：`l23_phased_fix_compare_1run.json` all_passed=true，delta_ratio=-0.9064（**90.6% 加速**，基線 2224.7s → 208.1s）
   - 單元測試：`tests/api/test_feature_factory_service_phase_d.py` 6 tests passed ✓
+- ✅ **Feature Explorer / Feature Table 載入效能優化（Phase 2 完成）**
+  - 前端：`FeatureTable.tsx` 完成視窗化虛擬渲染（windowed rendering）、首屏快載 + 背景續載、穩定 callback/row memoization ✓
+  - 前端：`FeatureNameSegmentFilter.tsx` 加入解析快取 + Web Worker（`frontend/src/workers/featureNameParser.worker.ts`）離線批次解析 ✓
+  - 前端：修復段落篩選回歸（共用參照污染）與 Category 缺漏（`ms_/ent_/tr_` → `microstructure/entropy/tail_risk`）✓
+  - 後端：`browse_features` 支援 `detail_level=table`、cursor/keyset 分頁（保留 offset 相容），並優化 ADF 快取路徑 ✓
+  - 驗證：`tests/test_feature_factory_api.py` 擴充後通過，相關測試組合共 11 passed ✓
 
 ### 進行中 🚧
 - 📝 **Phase 4.7：文件更新**（`ARCHITECTURE.md` 與 `API_SPECIFICATION.md` 補齊 Strategy Domain / Protocol / 端點說明）
@@ -31,6 +37,7 @@
 ## 🎯 當前重點
 - Phase 4.0~4.6 全部驗收完成；Phase 4.7 文件更新為唯一剩餘工作
 - **Feature Engineering Pipeline 效能最佳化全部完成（Phase B/C/D）**：all_passed=true，90.6% 加速
+- **Feature Explorer Phase 2 已完成**：大資料表載入改為「首屏快載 + 背景續載 + 虛擬渲染 + Worker 解析」
 - 核心驗證：integration 20 tests passed、coverage 100%、decoupling PASSED
 
 ### 下一步工作
@@ -46,6 +53,7 @@
 - 4 個 FutureWarning：`ema_extractor.py` / `feature_validator.py` pandas `fillna(method=...)` 已棄用（非阻塞）
 - Optuna trial log 中 NON_RETRYABLE 訊息（entry_threshold == exit_threshold 剪枝路徑，係預期行為）
 - Layer1 並行模式（`FFACT_LAYER1_PARALLEL=1`）：ThreadPoolExecutor 完成順序不穩定 → concat 欄位不一致 → 品質閘失敗（39 欄位 checksum 漂移，均為 `volume_momentum_MACD-Signal_*`）；目前預設關閉，待後續修復
+- FeatureName 段落解析仍以命名規範推導，若未來新增前綴家族需同步更新 parser 規則（目前已補 `ms_/ent_/tr_`）
 
 ### 技術債務
 - pandas `fillna(method=...)` 語法需遷移至 `ffill()`/`bfill()`（現僅 FutureWarning）
@@ -57,14 +65,19 @@
 - 2026-03-07：新增 `tests/api/test_feature_factory_service_phase_d.py`（6 tests，全部通過）
 - 2026-03-07：完成 Phase C（Layer4 分塊 + HDF5 分塊 + float32 批次轉換）；strict compare all_passed=true，210s/基線 2224s
 - 2026-03-07：完成 Phase B（Layer2 `derived_operators.py` 向量化 + Layer3 `rolling_aggregator.py` 視窗快取）
+- 2026-03-08：完成 Feature Explorer Phase 2（`FeatureTable.tsx` 虛擬渲染 + cursor 背景續載 + `detail_level=table`）
+- 2026-03-08：完成段落解析效能與穩定性修復（`FeatureNameSegmentFilter.tsx` 解析快取 + Worker；修復 shared reference 汙染）
+- 2026-03-08：修復 Category 缺漏（`featureNameParser.ts` 新增 `ms_/ent_/tr_` 對應 `microstructure/entropy/tail_risk`）
+- 2026-03-08：更新 API/型別與測試（`api/routes/feature_factory.py`、`api/services/feature_factory_service.py`、`frontend/src/hooks/useFeatureFactory.ts`、`frontend/src/lib/types.ts`、`tests/test_feature_factory_api.py`）
 - 2026-02-18：完成 Phase 4.6 全驗收（20 integration tests、decoupling PASSED、coverage 100%）
 - 2026-02-18：修補 multi-objective trial 序列化（`optimization_output_service.py` fallback）
 
 ## 🔄 Git狀態
 - 分支：`main`
 - 上次 push：Phase B/C/D Feature Engineering 效能最佳化全部完成（2026-03-07）
-- 最新變更：`momentum/FeatureEngineering/` 多層向量化、`api/services/feature_factory_service.py` Phase D Governance、`tests/api/test_feature_factory_service_phase_d.py`
-- 驗證結果：all_passed=true，delta_ratio=-0.9064（90.6% 加速）
+- 最新變更：Feature Explorer Phase 2 前後端優化（`api/routes/feature_factory.py`、`api/services/feature_factory_service.py`、`frontend/src/components/feature-factory/FeatureTable.tsx`、`frontend/src/components/feature-factory/FeatureNameSegmentFilter.tsx`、`frontend/src/workers/featureNameParser.worker.ts`、`frontend/src/lib/featureNameParser.ts`）
+- 最新驗證：`tests/test_feature_factory_api.py` + `tests/api/test_feature_factory_service_phase_d.py` 共 11 passed
+- 歷史驗證（Phase B/C/D）：all_passed=true，delta_ratio=-0.9064（90.6% 加速）
 
 ## 💡 下次啟動時
 - 先跑：`pytest tests/integration/ -q`（確認 20 tests 穩定）
@@ -73,3 +86,4 @@
 - 確認：`grep -rn "from api." momentum/ | wc -l` → 應為 0
 - 推進：Phase 4.7 文件更新（ARCHITECTURE.md + API_SPECIFICATION.md）
 - 可選：研究 `FFACT_LAYER1_PARALLEL=1` 欄位排序問題（engines 結果 concat 前需按引擎名稱穩定排序）
+- 可選：把段落分類來源改為優先使用後端 `row.category`，降低前端 parser 規則維護成本

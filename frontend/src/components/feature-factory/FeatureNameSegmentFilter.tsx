@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { FeatureSegmentKey, parseFeatureNameSegments } from '@/lib/featureNameParser';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FeatureSegmentKey, FeatureSegments, parseFeatureNameSegments } from '@/lib/featureNameParser';
 
 interface FeatureNameSegmentFilterProps {
   features: string[];
@@ -9,6 +9,11 @@ interface FeatureNameSegmentFilterProps {
 }
 
 type SelectMode = 'single' | 'multi';
+
+interface ParsedFeatureItem {
+  name: string;
+  segments: FeatureSegments;
+}
 
 const SEGMENT_DEFS: Array<{ key: FeatureSegmentKey; label: string }> = [
   { key: 'source', label: 'Source' },
@@ -21,44 +26,121 @@ const SEGMENT_DEFS: Array<{ key: FeatureSegmentKey; label: string }> = [
   { key: 'suffix', label: 'Suffix' },
 ];
 
-function emptySelectionMap<T>(value: T): Record<FeatureSegmentKey, T> {
+function buildSegmentMap<T>(factory: () => T): Record<FeatureSegmentKey, T> {
   return {
-    source: value,
-    category: value,
-    indicator: value,
-    params: value,
-    operator: value,
-    opParams: value,
-    window: value,
-    suffix: value,
+    source: factory(),
+    category: factory(),
+    indicator: factory(),
+    params: factory(),
+    operator: factory(),
+    opParams: factory(),
+    window: factory(),
+    suffix: factory(),
   };
 }
 
 export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesChange }: FeatureNameSegmentFilterProps) {
   const [freeText, setFreeText] = useState('');
-  const [selected, setSelected] = useState<Record<FeatureSegmentKey, string[]>>(emptySelectionMap<string[]>([]));
-  const [modes, setModes] = useState<Record<FeatureSegmentKey, SelectMode>>(emptySelectionMap<SelectMode>('multi'));
-
-  const parsed = useMemo(
-    () => features.map((name) => ({ name, segments: parseFeatureNameSegments(name) })),
-    [features]
+  const [selected, setSelected] = useState<Record<FeatureSegmentKey, string[]>>(
+    buildSegmentMap<string[]>(() => []),
   );
+  const [modes, setModes] = useState<Record<FeatureSegmentKey, SelectMode>>(
+    buildSegmentMap<SelectMode>(() => 'multi'),
+  );
+  const parseCacheRef = useRef(new Map<string, ReturnType<typeof parseFeatureNameSegments>>());
+  const workerRef = useRef<Worker | null>(null);
+  const [parsed, setParsed] = useState<ParsedFeatureItem[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const cache = parseCacheRef.current;
+    const missing: string[] = [];
+
+    for (const name of features) {
+      if (!cache.has(name)) {
+        missing.push(name);
+      }
+    }
+
+    const projectFromCache = () => {
+      if (!active) return;
+      const projected: ParsedFeatureItem[] = features
+        .map((name) => {
+          const segments = cache.get(name);
+          return segments ? { name, segments } : null;
+        })
+        .filter((item): item is ParsedFeatureItem => item !== null);
+      setParsed(projected);
+    };
+
+    if (missing.length === 0) {
+      projectFromCache();
+      return () => {
+        active = false;
+      };
+    }
+
+    const parseSynchronously = () => {
+      for (const name of missing) {
+        cache.set(name, parseFeatureNameSegments(name));
+      }
+      projectFromCache();
+    };
+
+    const WORKER_THRESHOLD = 200;
+    if (missing.length < WORKER_THRESHOLD || typeof Worker === 'undefined') {
+      parseSynchronously();
+      return () => {
+        active = false;
+      };
+    }
+
+    try {
+      if (!workerRef.current) {
+        workerRef.current = new Worker(new URL('../../workers/featureNameParser.worker.ts', import.meta.url));
+      }
+
+      workerRef.current.onmessage = (event: MessageEvent<ParsedFeatureItem[]>) => {
+        const payload = Array.isArray(event.data) ? event.data : [];
+        for (const item of payload) {
+          cache.set(item.name, item.segments);
+        }
+        projectFromCache();
+      };
+
+      workerRef.current.postMessage(missing);
+    } catch {
+      // Fallback for environments where Worker URL bundling is unavailable.
+      parseSynchronously();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [features]);
+
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    };
+  }, []);
 
   const optionsBySegment = useMemo(() => {
-    const result = emptySelectionMap<string[]>([]);
+    const sets = buildSegmentMap<Set<string>>(() => new Set<string>());
     for (const item of parsed) {
       for (const seg of SEGMENT_DEFS) {
         const value = item.segments[seg.key];
         if (!value) continue;
-        if (!result[seg.key].includes(value)) {
-          result[seg.key] = [...result[seg.key], value];
-        }
+        sets[seg.key].add(value);
       }
     }
 
+    const result = buildSegmentMap<string[]>(() => []);
     for (const seg of SEGMENT_DEFS) {
-      result[seg.key].sort((a, b) => a.localeCompare(b));
+      result[seg.key] = Array.from(sets[seg.key]).sort((a, b) => a.localeCompare(b));
     }
+
     return result;
   }, [parsed]);
 

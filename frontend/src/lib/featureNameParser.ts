@@ -256,6 +256,45 @@ export function parseFeatureNameSegments(name: string): FeatureSegments {
     return emptySegments();
   }
 
+  // Prefix families that do not use source_category_indicator naming.
+  // Keep category aligned with backend _infer_category() behavior.
+  if (tokens[0] === 'ms') {
+    return {
+      source: '',
+      category: 'microstructure',
+      indicator: tokens.slice(1).join('_'),
+      params: '',
+      operator: '',
+      opParams: '',
+      window: '',
+      suffix: '',
+    };
+  }
+  if (tokens[0] === 'ent') {
+    return {
+      source: '',
+      category: 'entropy',
+      indicator: tokens.slice(1).join('_'),
+      params: '',
+      operator: '',
+      opParams: '',
+      window: '',
+      suffix: '',
+    };
+  }
+  if (tokens[0] === 'tr') {
+    return {
+      source: '',
+      category: 'tail_risk',
+      indicator: tokens.slice(1).join('_'),
+      params: '',
+      operator: '',
+      opParams: '',
+      window: '',
+      suffix: '',
+    };
+  }
+
   // meta / label families do not follow source_category_... format.
   if (tokens[0] === 'meta' || tokens[0] === 'label') {
     return {

@@ -11,6 +11,7 @@ import io
 import os
 import threading
 import uuid
+from bisect import bisect_right
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional
@@ -57,6 +58,8 @@ class FeatureFactoryService:
         self._stats_cache: Dict[str, List[Dict[str, Any]]] = {}
         # Pre-sorted name-ascending view for default pagination fast-path.
         self._stats_name_sorted_cache: Dict[str, List[Dict[str, Any]]] = {}
+        # Pre-built name keys aligned with _stats_name_sorted_cache for bisect cursor lookup.
+        self._stats_name_keys_cache: Dict[str, List[str]] = {}
         # Task IDs currently warming stats in background to avoid duplicate warm threads.
         self._stats_warming_tasks: set[str] = set()
         # Per-task ADF cache: task_id -> feature_name -> pvalue (or None if unavailable).
@@ -582,7 +585,9 @@ class FeatureFactoryService:
             )
 
         self._stats_cache[task_id] = rows
-        self._stats_name_sorted_cache[task_id] = sorted(rows, key=lambda item: str(item.get("name", "")))
+        name_sorted_rows = sorted(rows, key=lambda item: str(item.get("name", "")))
+        self._stats_name_sorted_cache[task_id] = name_sorted_rows
+        self._stats_name_keys_cache[task_id] = [str(item.get("name", "")) for item in name_sorted_rows]
         logger.info("Stats cached for task %s (%d features)", task_id, len(rows))
         return rows
 
@@ -596,16 +601,21 @@ class FeatureFactoryService:
         category: Optional[str],
         level: Optional[str],
         search: Optional[str],
+        detail_level: str = "full",
+        cursor: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Browse feature list with pagination/filter/sorting."""
         if sort_by and sort_by not in {"nan_ratio", "std", "skewness", "kurtosis", "name", "mean"}:
             raise ValueError(f"Invalid sort_by: {sort_by}")
         if sort_order not in {"asc", "desc"}:
             raise ValueError(f"Invalid sort_order: {sort_order}")
+        if detail_level not in {"full", "table"}:
+            raise ValueError(f"Invalid detail_level: {detail_level}")
 
         normalized_category = (category or "").strip()
         normalized_level = (level or "").strip()
         normalized_search = (search or "").strip()
+        normalized_cursor = (cursor or "").strip() or None
 
         # Fast path for the most common first-load pattern:
         # no filters + name ascending pagination.  This avoids repeated O(N log N)
@@ -624,27 +634,46 @@ class FeatureFactoryService:
             if base_rows is None:
                 base_rows = sorted(self._stats_cache.get(task_id, []), key=lambda item: str(item.get("name", "")))
                 self._stats_name_sorted_cache[task_id] = base_rows
+            name_keys = self._stats_name_keys_cache.get(task_id)
+            if name_keys is None:
+                name_keys = [str(item.get("name", "")) for item in base_rows]
+                self._stats_name_keys_cache[task_id] = name_keys
+
+            start_index = offset
+            if normalized_cursor is not None:
+                start_index = bisect_right(name_keys, normalized_cursor) + offset
 
             total = len(base_rows)
-            page_rows = base_rows[offset: offset + limit]
+            page_rows = base_rows[start_index: start_index + limit]
 
             ADF_PAGE_LIMIT = 100
-            if HAS_STATSMODELS and len(page_rows) <= ADF_PAGE_LIMIT:
-                features_df, _ = self._load_task_features(task_id)
-                page_rows = self._enrich_rows_with_adf(
-                    task_id=task_id,
-                    rows=page_rows,
-                    features_df=features_df,
-                    compute_if_missing=False,
-                )
+            if detail_level == "full" and HAS_STATSMODELS and len(page_rows) <= ADF_PAGE_LIMIT:
+                # Fast-path browse only uses already-warmed ADF cache.
+                # Avoid loading the full DataFrame when compute_if_missing=False.
+                if self._adf_cache.get(task_id):
+                    page_rows = self._enrich_rows_with_adf(
+                        task_id=task_id,
+                        rows=page_rows,
+                        features_df=None,
+                        compute_if_missing=False,
+                    )
 
             # Warm additional ADF results in background for follow-up pagination.
-            self._start_adf_cache_warmup(task_id, reason="browse_features_fast_path")
+            if detail_level == "full":
+                self._start_adf_cache_warmup(task_id, reason="browse_features_fast_path")
+
+            page_rows = self._project_browse_rows(page_rows, detail_level)
+
+            has_more = (start_index + len(page_rows)) < total
+            next_cursor = str(page_rows[-1].get("name", "")) if (page_rows and has_more) else None
 
             return {
                 "total": total,
-                "offset": offset,
+                "offset": start_index,
                 "limit": limit,
+                "cursor": normalized_cursor,
+                "next_cursor": next_cursor,
+                "has_more": has_more,
                 "filters_applied": {
                     "category": category,
                     "level": level,
@@ -652,6 +681,9 @@ class FeatureFactoryService:
                 },
                 "features": page_rows,
             }
+
+        if normalized_cursor is not None:
+            raise ValueError("cursor is only supported for name-asc browse without filters")
 
         # Use cached vectorized stats (first call builds and caches, subsequent calls are instant)
         rows = list(self._build_stats_rows(task_id))  # shallow copy so filters don't mutate cache
@@ -678,22 +710,31 @@ class FeatureFactoryService:
         # ADF test is expensive (~50-100 ms/feature). Skip when the page is large to
         # avoid blocking the response for bulk requests (e.g. limit=5000 initial load).
         ADF_PAGE_LIMIT = 100
-        if HAS_STATSMODELS and len(page_rows) <= ADF_PAGE_LIMIT:
-            features_df, _ = self._load_task_features(task_id)
-            page_rows = self._enrich_rows_with_adf(
-                task_id=task_id,
-                rows=page_rows,
-                features_df=features_df,
-                compute_if_missing=False,
-            )
+        if detail_level == "full" and HAS_STATSMODELS and len(page_rows) <= ADF_PAGE_LIMIT:
+            if self._adf_cache.get(task_id):
+                page_rows = self._enrich_rows_with_adf(
+                    task_id=task_id,
+                    rows=page_rows,
+                    features_df=None,
+                    compute_if_missing=False,
+                )
 
         # Warm additional ADF results in background for follow-up pagination.
-        self._start_adf_cache_warmup(task_id, reason="browse_features")
+        if detail_level == "full":
+            self._start_adf_cache_warmup(task_id, reason="browse_features")
+
+        page_rows = self._project_browse_rows(page_rows, detail_level)
+
+        has_more = (offset + len(page_rows)) < total
+        next_cursor = str(page_rows[-1].get("name", "")) if (page_rows and has_more and order_key == "name" and not reverse) else None
 
         return {
             "total": total,
             "offset": offset,
             "limit": limit,
+            "cursor": normalized_cursor,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
             "filters_applied": {
                 "category": category,
                 "level": level,
@@ -701,6 +742,27 @@ class FeatureFactoryService:
             },
             "features": page_rows,
         }
+
+    @staticmethod
+    def _project_browse_rows(rows: List[Dict[str, Any]], detail_level: str) -> List[Dict[str, Any]]:
+        if detail_level == "full":
+            return rows
+
+        # table: only return columns currently required by Feature Table.
+        keys = {
+            "name",
+            "category",
+            "level",
+            "layer",
+            "nan_ratio",
+            "std",
+            "skewness",
+            "kurtosis",
+        }
+        projected: List[Dict[str, Any]] = []
+        for row in rows:
+            projected.append({k: row.get(k) for k in keys})
+        return projected
 
     def browse_feature_data(
         self,
@@ -818,16 +880,16 @@ class FeatureFactoryService:
         """
         import warnings
         features_df, export_meta = self._load_task_features(task_id)
-        stats_rows = self._build_stats_rows(task_id)
 
-        # --- Category / layer / level breakdown (reused metadata) ----------
+        # --- Category / layer / level breakdown (name parsing fast-path) ---
         by_category: Dict[str, int] = {}
         by_level: Dict[str, int] = {}
         by_layer_raw: Dict[str, int] = {}
-        for item in stats_rows:
-            cat = str(item.get("category") or "other")
-            layer = str(item.get("layer") or "layer1")
-            simple_level = str(item.get("level") or "L1")
+        for col in features_df.columns:
+            cat = self._export_service._infer_category(col)
+            layer = self._export_service._infer_layer(col)
+            level_raw = self._export_service._infer_level(cat)
+            simple_level = self._to_simple_level(level_raw)
             by_category[cat] = by_category.get(cat, 0) + 1
             by_layer_raw[layer] = by_layer_raw.get(layer, 0) + 1
             by_level[simple_level] = by_level.get(simple_level, 0) + 1
@@ -1152,6 +1214,7 @@ class FeatureFactoryService:
         self._df_cache.pop(task_id, None)
         self._stats_cache.pop(task_id, None)
         self._stats_name_sorted_cache.pop(task_id, None)
+        self._stats_name_keys_cache.pop(task_id, None)
         self._adf_cache.pop(task_id, None)
         self._feature_metadata_cache.pop(task_id, None)
         with self._lock:
@@ -1234,7 +1297,7 @@ class FeatureFactoryService:
         self,
         task_id: str,
         rows: List[Dict[str, Any]],
-        features_df: pd.DataFrame,
+        features_df: Optional[pd.DataFrame],
         compute_if_missing: bool = True,
     ) -> List[Dict[str, Any]]:
         enriched_rows: List[Dict[str, Any]] = []
@@ -1256,7 +1319,7 @@ class FeatureFactoryService:
         self,
         task_id: str,
         feature_name: str,
-        features_df: pd.DataFrame,
+        features_df: Optional[pd.DataFrame],
         compute_if_missing: bool = True,
     ) -> Optional[float]:
         feature_cache = self._adf_cache.setdefault(task_id, {})
@@ -1264,6 +1327,9 @@ class FeatureFactoryService:
             return feature_cache[feature_name]
 
         if not compute_if_missing:
+            return None
+
+        if features_df is None:
             return None
 
         if feature_name not in features_df.columns:

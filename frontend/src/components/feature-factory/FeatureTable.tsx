@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowseFeatureItem } from '@/lib/types';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
@@ -14,8 +14,11 @@ interface FeatureTableProps {
 
 const levelTabs: Array<'All' | 'L1' | 'L2' | 'L3'> = ['All', 'L1', 'L2', 'L3'];
 const PAGE_SIZE = 100;
-const SERVER_PAGE_LIMIT = 5000;
-const PARALLEL_BATCH_SIZE = 4;
+const INITIAL_LOAD_LIMIT = 500;
+const BACKGROUND_PAGE_LIMIT = 2000;
+const TABLE_VIEWPORT_HEIGHT = 520;
+const TABLE_ROW_HEIGHT = 34;
+const VIRTUAL_OVERSCAN = 12;
 
 export default function FeatureTable({ taskId, totalCount, onOpenDistribution, onOpenCorrelation }: FeatureTableProps) {
   const { browseFeatures } = useFeatureFactory();
@@ -36,8 +39,12 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
   const [segmentFilteredNames, setSegmentFilteredNames] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [isSegmentFilterOpen, setIsSegmentFilterOpen] = useState(false);
+  const [tableScrollTop, setTableScrollTop] = useState(0);
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -58,18 +65,23 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     setAllRows([]);
     setLoadedCount(0);
     setServerTotal(0);
+    setSelected([]);
+    setSegmentFilteredNames([]);
+    setIsBackgroundLoading(false);
+    setIsSegmentFilterOpen(false);
 
     const loadAllFeatures = async () => {
       try {
         let total = 0;
         const merged: BrowseFeatureItem[] = [];
 
-        // First request gets total count and initial data block.
+        // First request uses a smaller payload for faster first paint.
         const firstResp = await browseFeatures(taskId, {
           offset: 0,
-          limit: SERVER_PAGE_LIMIT,
+          limit: INITIAL_LOAD_LIMIT,
           sortBy: 'name',
           sortOrder: 'asc',
+          detailLevel: 'table',
         });
         if (!active) return;
 
@@ -82,47 +94,43 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
           setLoadedCount(merged.length);
         }
 
+        // Allow users to interact with the first page immediately.
+        setLoading(false);
+
         if (merged.length >= total || firstResp.features.length === 0) {
           return;
         }
 
-        const offsets: number[] = [];
-        for (let nextOffset = merged.length; nextOffset < total; nextOffset += SERVER_PAGE_LIMIT) {
-          offsets.push(nextOffset);
-        }
+        setIsBackgroundLoading(true);
 
-        for (let i = 0; i < offsets.length && active; i += PARALLEL_BATCH_SIZE) {
-          const batchOffsets = offsets.slice(i, i + PARALLEL_BATCH_SIZE);
-          const batchResponses = await Promise.all(
-            batchOffsets.map((offset) =>
-              browseFeatures(taskId, {
-                offset,
-                limit: SERVER_PAGE_LIMIT,
-                sortBy: 'name',
-                sortOrder: 'asc',
-              })
-            )
-          );
+        let cursor = firstResp.next_cursor ?? null;
+        while (active && cursor) {
+          const resp = await browseFeatures(taskId, {
+            cursor,
+            limit: BACKGROUND_PAGE_LIMIT,
+            sortBy: 'name',
+            sortOrder: 'asc',
+            detailLevel: 'table',
+          });
 
           if (!active) return;
+          if (resp.features.length === 0) break;
 
-          // Promise.all keeps batch order aligned with batchOffsets.
-          for (const resp of batchResponses) {
-            if (resp.features.length === 0) continue;
-            merged.push(...resp.features);
-          }
-
+          merged.push(...resp.features);
           setAllRows([...merged]);
           setLoadedCount(Math.min(merged.length, total));
+          cursor = resp.next_cursor ?? null;
         }
 
         setLoadedCount(Math.min(merged.length, total));
+        setIsBackgroundLoading(false);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : '載入特徵列表失敗');
       } finally {
         if (!active) return;
         setLoading(false);
+        setIsBackgroundLoading(false);
       }
     };
 
@@ -137,11 +145,13 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     };
   }, [browseFeatures, taskId]);
 
+  const featureNames = useMemo(() => allRows.map((row) => row.name), [allRows]);
+
   // Client-side filter + sort (instant, no network)
   const filteredRows = useMemo(() => {
     let result = allRows;
 
-    if (segmentFilteredNames.length > 0) {
+    if (isSegmentFilterOpen && segmentFilteredNames.length > 0) {
       const allowed = new Set(segmentFilteredNames);
       result = result.filter((r) => allowed.has(r.name));
     }
@@ -165,14 +175,43 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       const bVal = getSortableMetric(b, sortBy);
       return mul * (aVal - bVal);
     });
-  }, [allRows, category, level, search, sortBy, sortOrder, segmentFilteredNames]);
+  }, [allRows, category, level, search, sortBy, sortOrder, segmentFilteredNames, isSegmentFilterOpen]);
 
   const visibleRows = filteredRows.slice(0, visibleCount);
   const hasMore = visibleCount < filteredRows.length;
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
 
-  const toggleSelect = (name: string) => {
+  const virtualStartIndex = Math.max(0, Math.floor(tableScrollTop / TABLE_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
+  const viewportRowCount = Math.ceil(TABLE_VIEWPORT_HEIGHT / TABLE_ROW_HEIGHT) + VIRTUAL_OVERSCAN * 2;
+  const virtualEndIndex = Math.min(visibleRows.length, virtualStartIndex + viewportRowCount);
+  const virtualRows = visibleRows.slice(virtualStartIndex, virtualEndIndex);
+  const topSpacerHeight = virtualStartIndex * TABLE_ROW_HEIGHT;
+  const bottomSpacerHeight = Math.max(0, (visibleRows.length - virtualEndIndex) * TABLE_ROW_HEIGHT);
+
+  const toggleSelect = useCallback((name: string) => {
     setSelected((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
-  };
+  }, []);
+
+  const openDistribution = useCallback(
+    (name: string) => {
+      onOpenDistribution(name);
+    },
+    [onOpenDistribution]
+  );
+
+  const handleTableScroll = useCallback(() => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    setTableScrollTop(el.scrollTop);
+  }, []);
+
+  useEffect(() => {
+    const el = tableContainerRef.current;
+    if (el) {
+      el.scrollTop = 0;
+    }
+    setTableScrollTop(0);
+  }, [search, category, level, sortBy, sortOrder, isSegmentFilterOpen, segmentFilteredNames, taskId]);
 
   const selectAllCurrentPage = () => {
     const pageNames = visibleRows.map((row) => row.name);
@@ -248,10 +287,29 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
         </button>
       </div>
 
-      <FeatureNameSegmentFilter
-        features={allRows.map((row) => row.name)}
-        onFilteredFeaturesChange={setSegmentFilteredNames}
-      />
+      <div className="rounded-xl border border-white/10 bg-white/5 p-2">
+        <button
+          type="button"
+          onClick={() => {
+            setIsSegmentFilterOpen((prev) => {
+              if (prev) {
+                setSegmentFilteredNames([]);
+              }
+              return !prev;
+            });
+          }}
+          className="w-full text-left text-xs text-slate-300 hover:text-slate-100"
+        >
+          {isSegmentFilterOpen ? '收合進階命名段落篩選' : '展開進階命名段落篩選（較耗時計算）'}
+        </button>
+      </div>
+
+      {isSegmentFilterOpen && (
+        <FeatureNameSegmentFilter
+          features={featureNames}
+          onFilteredFeaturesChange={setSegmentFilteredNames}
+        />
+      )}
 
       <div className="text-[11px] text-slate-400">
         提示：ADF 指標會在背景預熱，首次載入後同任務的後續分頁與查詢會更快。
@@ -272,7 +330,11 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       ) : filteredRows.length === 0 ? (
         <div className="text-xs text-slate-400">沒有符合條件的特徵。</div>
       ) : (
-        <div className="overflow-auto border border-white/10 rounded-xl">
+        <div
+          ref={tableContainerRef}
+          onScroll={handleTableScroll}
+          className="overflow-auto border border-white/10 rounded-xl max-h-[520px]"
+        >
           <table className="min-w-full text-xs">
             <thead className="bg-white/5 text-slate-300">
               <tr>
@@ -290,31 +352,25 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((row) => (
-                <tr key={row.name} className="border-t border-white/5 text-slate-100">
-                  <td className="px-2 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(row.name)}
-                      onChange={() => toggleSelect(row.name)}
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <button className="text-cyan-300 hover:underline" onClick={() => onOpenDistribution(row.name)}>
-                      {row.name}
-                    </button>
-                  </td>
-                  <td className="px-2 py-2">{row.category}</td>
-                  <td className="px-2 py-2">{row.level}</td>
-                  <td className="px-2 py-2">{row.layer}</td>
-                  <td className={`px-2 py-2 ${ratioColor(row.nan_ratio, 0.05, 0.1)}`}>
-                    {(row.nan_ratio * 100).toFixed(2)}%
-                  </td>
-                  <td className="px-2 py-2">{formatNum(row.std)}</td>
-                  <td className={`px-2 py-2 ${absColor(row.skewness, 1, 3)}`}>{formatNum(row.skewness)}</td>
-                  <td className={`px-2 py-2 ${absColor(row.kurtosis, 5, 10)}`}>{formatNum(row.kurtosis)}</td>
+              {topSpacerHeight > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={9} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
+              )}
+              {virtualRows.map((row) => (
+                <FeatureTableRow
+                  key={row.name}
+                  row={row}
+                  checked={selectedSet.has(row.name)}
+                  onToggle={toggleSelect}
+                  onOpenDistribution={openDistribution}
+                />
               ))}
+              {bottomSpacerHeight > 0 && (
+                <tr aria-hidden="true">
+                  <td colSpan={9} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -323,6 +379,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       <div className="flex items-center justify-between text-xs text-slate-300">
         <div>
           顯示 {visibleRows.length.toLocaleString()} / 篩選 {filteredRows.length.toLocaleString()} / 總計 {serverTotal.toLocaleString()}
+          {isBackgroundLoading && <span className="ml-2 text-cyan-300">（背景載入中：{loadedCount.toLocaleString()}）</span>}
         </div>
         {hasMore && (
           <button
@@ -363,3 +420,43 @@ function getSortableMetric(item: BrowseFeatureItem, sortBy: string): number {
   if (sortBy === 'mean') return item.mean ?? 0;
   return 0;
 }
+
+interface FeatureTableRowProps {
+  row: BrowseFeatureItem;
+  checked: boolean;
+  onToggle: (name: string) => void;
+  onOpenDistribution: (name: string) => void;
+}
+
+const FeatureTableRow = memo(function FeatureTableRow({
+  row,
+  checked,
+  onToggle,
+  onOpenDistribution,
+}: FeatureTableRowProps) {
+  return (
+    <tr className="border-t border-white/5 text-slate-100">
+      <td className="px-2 py-2">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(row.name)}
+        />
+      </td>
+      <td className="px-2 py-2">
+        <button className="text-cyan-300 hover:underline" onClick={() => onOpenDistribution(row.name)}>
+          {row.name}
+        </button>
+      </td>
+      <td className="px-2 py-2">{row.category}</td>
+      <td className="px-2 py-2">{row.level}</td>
+      <td className="px-2 py-2">{row.layer}</td>
+      <td className={`px-2 py-2 ${ratioColor(row.nan_ratio, 0.05, 0.1)}`}>
+        {(row.nan_ratio * 100).toFixed(2)}%
+      </td>
+      <td className="px-2 py-2">{formatNum(row.std)}</td>
+      <td className={`px-2 py-2 ${absColor(row.skewness, 1, 3)}`}>{formatNum(row.skewness)}</td>
+      <td className={`px-2 py-2 ${absColor(row.kurtosis, 5, 10)}`}>{formatNum(row.kurtosis)}</td>
+    </tr>
+  );
+});

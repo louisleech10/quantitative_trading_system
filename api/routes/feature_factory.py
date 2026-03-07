@@ -230,11 +230,13 @@ async def browse_features(
     task_id: str,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=5000),
+    cursor: Optional[str] = Query(None, description="游標分頁：前一頁最後一筆 name"),
     sort_by: Optional[str] = Query(None, description="排序欄位：nan_ratio, std, skewness, kurtosis, mean, name"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     category: Optional[str] = Query(None, description="篩選類別"),
     level: Optional[str] = Query(None, pattern="^(L1|L2|L3)$"),
     search: Optional[str] = Query(None, description="特徵名模糊搜尋"),
+    detail_level: str = Query("full", pattern="^(full|table)$", description="回傳欄位等級：full 或 table"),
 ):
     """分頁瀏覽特徵列表 + 統計摘要。"""
     try:
@@ -246,11 +248,13 @@ async def browse_features(
                 task_id=task_id,
                 offset=offset,
                 limit=limit,
+                cursor=cursor,
                 sort_by=sort_by,
                 sort_order=sort_order,
                 category=category,
                 level=level,
                 search=search,
+                detail_level=detail_level,
             ),
         )
         return result
