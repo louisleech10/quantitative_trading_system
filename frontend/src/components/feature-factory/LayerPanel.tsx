@@ -149,6 +149,7 @@ export default function LayerPanel({ schema }: LayerPanelProps) {
       {/* Layer content */}
       <LayerContent
         schema={schema}
+        config={config}
         layerKey={activeLayer}
         layerEnabled={isLayerEnabled(activeLayer)}
         searchFilter={indicatorSearch}
@@ -171,6 +172,7 @@ export default function LayerPanel({ schema }: LayerPanelProps) {
 
 interface LayerContentProps {
   schema: FeatureSchema;
+  config: ReturnType<typeof useFeatureFactoryStore.getState>['config'];
   layerKey: LayerKey;
   layerEnabled: boolean;
   searchFilter: string;
@@ -194,6 +196,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function LayerContent({
   schema,
+  config,
   layerKey,
   layerEnabled,
   searchFilter,
@@ -237,6 +240,7 @@ function LayerContent({
       {layerKey === 'layer1' && (
         <Layer1Content
           categories={schema.layers.layer1.categories}
+          config={config}
           layerDisabled={!layerEnabled}
           searchFilter={searchFilter}
           preview={preview}
@@ -248,6 +252,7 @@ function LayerContent({
       {layerKey === 'layer2' && (
         <Layer2Content
           operators={schema.layers.layer2.operators}
+          config={config}
           layerDisabled={!layerEnabled}
           onOperatorToggle={onOperatorToggle}
         />
@@ -255,6 +260,7 @@ function LayerContent({
       {layerKey === 'layer3' && (
         <Layer3Content
           aggregators={schema.layers.layer3.aggregators}
+          config={config}
           windows={schema.layers.layer3.windows}
           layerDisabled={!layerEnabled}
           onAggregatorToggle={onAggregatorToggle}
@@ -267,6 +273,7 @@ function LayerContent({
       {layerKey === 'layer5' && (
         <Layer5Content
           features={schema.layers.layer5.features}
+          config={config}
           layerDisabled={!layerEnabled}
           onFeatureToggle={onCrossFeatureToggle}
         />
@@ -274,6 +281,7 @@ function LayerContent({
       {layerKey === 'layer6' && (
         <Layer6Content
           subEngines={schema.layers.layer6.sub_engines}
+          config={config}
           layerDisabled={!layerEnabled}
           onToggle={onMetaToggle}
         />
@@ -289,6 +297,7 @@ function LayerContent({
 
 function Layer1Content({
   categories,
+  config,
   layerDisabled,
   searchFilter,
   preview,
@@ -297,6 +306,7 @@ function Layer1Content({
   onSelectAll,
 }: {
   categories: FeatureSchema['layers']['layer1']['categories'];
+  config: ReturnType<typeof useFeatureFactoryStore.getState>['config'];
   layerDisabled: boolean;
   searchFilter: string;
   preview: FeaturePreview | null;
@@ -315,7 +325,25 @@ function Layer1Content({
       {categoryOrder.map((catKey) => {
         const cat = categories[catKey];
         if (!cat) return null;
-        const items: SchemaIndicator[] = cat.indicators || cat.features || [];
+        const catConfig = config?.atomic_indicators?.[catKey];
+        const baseItems: SchemaIndicator[] = cat.indicators || cat.features || [];
+        const items: SchemaIndicator[] = baseItems.map((item) => {
+          if (catConfig?.indicators) {
+            const matched = catConfig.indicators.find((ind) => ind.name === item.name);
+            return {
+              ...item,
+              enabled: matched?.enabled ?? item.enabled,
+            };
+          }
+          if (catConfig?.features) {
+            return {
+              ...item,
+              enabled: catConfig.features[item.name]?.enabled ?? item.enabled,
+            };
+          }
+          return item;
+        });
+
         return (
           <CategorySection
             key={catKey}
@@ -323,7 +351,7 @@ function Layer1Content({
             label={CATEGORY_LABELS[catKey] || catKey}
             description={cat.description}
             level={cat.level}
-            enabled={cat.enabled}
+            enabled={catConfig?.enabled ?? cat.enabled}
             items={items}
             layerDisabled={layerDisabled}
             featureCount={preview?.breakdown?.[catKey]}
@@ -343,33 +371,38 @@ function Layer1Content({
 
 function Layer2Content({
   operators,
+  config,
   layerDisabled,
   onOperatorToggle,
 }: {
   operators: FeatureSchema['layers']['layer2']['operators'];
+  config: ReturnType<typeof useFeatureFactoryStore.getState>['config'];
   layerDisabled: boolean;
   onOperatorToggle: (name: string, enabled: boolean) => void;
 }) {
   return (
     <div className={`space-y-1 ${layerDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
-      {Object.entries(operators).map(([name, op]) => (
-        <label
-          key={name}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition cursor-pointer ${
-            op.enabled ? 'bg-cyan-400/10 text-slate-100' : 'text-slate-400 hover:bg-white/5'
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={op.enabled}
-            disabled={layerDisabled}
-            onChange={(e) => onOperatorToggle(name, e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-cyan-400"
-          />
-          <span className="font-medium">{name}</span>
-          <span className="text-[10px] text-slate-500 ml-auto">{op.description}</span>
-        </label>
-      ))}
+      {Object.entries(operators).map(([name, op]) => {
+        const enabled = config?.operators?.[name]?.enabled ?? op.enabled;
+        return (
+          <label
+            key={name}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition cursor-pointer ${
+              enabled ? 'bg-cyan-400/10 text-slate-100' : 'text-slate-400 hover:bg-white/5'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={enabled}
+              disabled={layerDisabled}
+              onChange={(e) => onOperatorToggle(name, e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-cyan-400"
+            />
+            <span className="font-medium">{name}</span>
+            <span className="text-[10px] text-slate-500 ml-auto">{op.description}</span>
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -378,18 +411,30 @@ function Layer2Content({
 
 function Layer3Content({
   aggregators,
+  config,
   windows,
   layerDisabled,
   onAggregatorToggle,
   onAllToggle,
 }: {
   aggregators: FeatureSchema['layers']['layer3']['aggregators'];
+  config: ReturnType<typeof useFeatureFactoryStore.getState>['config'];
   windows: number[];
   layerDisabled: boolean;
   onAggregatorToggle: (name: string, enabled: boolean) => void;
   onAllToggle: (enabled: boolean) => void;
 }) {
-  const allEnabled = Object.values(aggregators).every((a) => a.enabled);
+  const resolvedAggregators = Object.fromEntries(
+    Object.entries(aggregators).map(([name, agg]) => {
+      const cfgAgg =
+        config?.rolling_aggregation?.aggregators && !Array.isArray(config.rolling_aggregation.aggregators)
+          ? config.rolling_aggregation.aggregators[name]
+          : undefined;
+      return [name, { ...agg, enabled: cfgAgg?.enabled ?? agg.enabled }];
+    })
+  ) as FeatureSchema['layers']['layer3']['aggregators'];
+
+  const allEnabled = Object.values(resolvedAggregators).every((a) => a.enabled);
 
   return (
     <div className={`space-y-2 ${layerDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -400,7 +445,7 @@ function Layer3Content({
         </span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
-        {Object.entries(aggregators).map(([name, agg]) => (
+        {Object.entries(resolvedAggregators).map(([name, agg]) => (
           <IndicatorCheckbox
             key={name}
             name={name}
@@ -443,25 +488,33 @@ function Layer4Content({
 
 function Layer5Content({
   features,
+  config,
   layerDisabled,
   onFeatureToggle,
 }: {
   features: FeatureSchema['layers']['layer5']['features'];
+  config: ReturnType<typeof useFeatureFactoryStore.getState>['config'];
   layerDisabled: boolean;
   onFeatureToggle: (name: string, enabled: boolean) => void;
 }) {
   return (
     <div className={`space-y-1 ${layerDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
-      {Object.entries(features).map(([name, feat]) => (
-        <IndicatorCheckbox
-          key={name}
-          name={name}
-          enabled={feat.enabled}
-          description={feat.description}
-          disabled={layerDisabled}
-          onChange={(val) => onFeatureToggle(name, val)}
-        />
-      ))}
+      {Object.entries(features).map(([name, feat]) => {
+        const enabled =
+          config?.cross_sectional?.features && !Array.isArray(config.cross_sectional.features)
+            ? (config.cross_sectional.features[name]?.enabled ?? feat.enabled)
+            : feat.enabled;
+        return (
+          <IndicatorCheckbox
+            key={name}
+            name={name}
+            enabled={enabled}
+            description={feat.description}
+            disabled={layerDisabled}
+            onChange={(val) => onFeatureToggle(name, val)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -470,33 +523,40 @@ function Layer5Content({
 
 function Layer6Content({
   subEngines,
+  config,
   layerDisabled,
   onToggle,
 }: {
   subEngines: FeatureSchema['layers']['layer6']['sub_engines'];
+  config: ReturnType<typeof useFeatureFactoryStore.getState>['config'];
   layerDisabled: boolean;
   onToggle: (name: string, enabled: boolean) => void;
 }) {
   return (
     <div className={`space-y-1 ${layerDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
-      {Object.entries(subEngines).map(([name, engine]) => (
-        <label
-          key={name}
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition cursor-pointer ${
-            engine.enabled ? 'bg-cyan-400/10 text-slate-100' : 'text-slate-400 hover:bg-white/5'
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={engine.enabled}
-            disabled={layerDisabled}
-            onChange={(e) => onToggle(name, e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-cyan-400"
-          />
-          <span className="font-medium">{name}</span>
-          <span className="text-[10px] text-slate-500 ml-auto">{engine.description}</span>
-        </label>
-      ))}
+      {Object.entries(subEngines).map(([name, engine]) => {
+        const enabled =
+          (config?.meta_features as Record<string, unknown> | undefined)?.[name] as boolean | undefined;
+        const resolvedEnabled = enabled ?? engine.enabled;
+        return (
+          <label
+            key={name}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition cursor-pointer ${
+              resolvedEnabled ? 'bg-cyan-400/10 text-slate-100' : 'text-slate-400 hover:bg-white/5'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={resolvedEnabled}
+              disabled={layerDisabled}
+              onChange={(e) => onToggle(name, e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-cyan-400"
+            />
+            <span className="font-medium">{name}</span>
+            <span className="text-[10px] text-slate-500 ml-auto">{engine.description}</span>
+          </label>
+        );
+      })}
     </div>
   );
 }
