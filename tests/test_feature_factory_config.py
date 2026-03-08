@@ -24,7 +24,10 @@ def test_preset_standard():
     cm = ConfigManager()
     config = cm.apply_preset("standard")
     preview = cm.preview_feature_count(config)
-    assert 500 <= preview.total_features <= 1400
+    # B4 改善後 preview 準確度大幅提升
+    # rolling = atomic(866) * n_agg(10) * n_windows(3) = 25,980
+    # 加上 atomic + derived + lag + meta + labels ≈ 30,000+
+    assert 20000 <= preview.total_features <= 50000
 
 
 def test_validate_rejects_invalid():

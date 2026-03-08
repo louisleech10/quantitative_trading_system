@@ -40,11 +40,52 @@ class ConfigManager:
         merged = self.deep_merge(base_config, user_config)
         if api_override:
             merged = self.deep_merge(merged, api_override)
+        merged = self.migrate_config(merged)
         try:
             return FactoryConfig.model_validate(merged)
         except Exception as exc:
             logger.error("Failed to validate merged config", exc_info=True)
             raise exc
+
+    @staticmethod
+    def migrate_config(raw_config: Dict[str, Any]) -> Dict[str, Any]:
+        """將舊格式 config 自動轉為新格式（向後相容遷移）。
+
+        Transformations:
+        1. rolling_aggregation.aggregators: list[str] → dict[str, {enabled: True}]
+        2. cross_sectional.features: list[str] → dict[str, {enabled: True}]
+        3. microstructure.enabled_features: list → features dict
+        4. entropy 舊格式 → 新增 features dict (pass-through, Pydantic handles default)
+        5. tail_risk 同上
+        """
+        config = raw_config  # in-place is fine; caller already deep-copied
+
+        # 1. Rolling aggregation aggregators: list → dict
+        rolling = config.get("rolling_aggregation")
+        if isinstance(rolling, dict):
+            agg = rolling.get("aggregators")
+            if isinstance(agg, list):
+                rolling["aggregators"] = {name: {"enabled": True} for name in agg}
+
+        # 2. Cross-sectional features: list → dict
+        cs = config.get("cross_sectional")
+        if isinstance(cs, dict):
+            feats = cs.get("features")
+            if isinstance(feats, list):
+                cs["features"] = {name: {"enabled": True} for name in feats}
+
+        # 3. Microstructure enabled_features → features dict
+        atomic = config.get("atomic_indicators")
+        if isinstance(atomic, dict):
+            ms = atomic.get("microstructure")
+            if isinstance(ms, dict) and "features" not in ms:
+                ef = ms.get("enabled_features")
+                if isinstance(ef, list):
+                    ms["features"] = {name: {"enabled": True} for name in ef}
+                elif ef == "all":
+                    pass  # features 預設空 dict 時 Engine 沿用 enabled_features="all" 邏輯
+
+        return config
 
     def validate_config(self, config: Dict[str, Any]) -> ValidationResult:
         """Validate config keys, indicator names, and period ranges."""
@@ -129,24 +170,33 @@ class ConfigManager:
         cross_cfg = config_dict.get("cross_sectional", {})
         labels_cfg = config_dict.get("labels", {})
 
-        derived_count = int(atomic_total * 0.1) if self._any_enabled(operators_cfg) else 0
-        rolling_count = int(atomic_total * 0.1) if rolling_cfg.get("enabled", True) else 0
-        lag_count = int(atomic_total * 0.1) if lag_cfg.get("enabled", True) else 0
-        cross_count = int(atomic_total * 0.05) if cross_cfg.get("enabled", False) else 0
-        meta_count = 20 if meta_cfg.get("enabled", True) else 0
+        derived_count = self._estimate_derived_count(atomic_total, operators_cfg)
+        rolling_count = self._estimate_rolling_count(atomic_total, rolling_cfg)
+        lag_count = self._estimate_lag_count(atomic_total, lag_cfg, config_dict)
+        cross_count = self._estimate_cross_count(cross_cfg)
+        meta_count = self._estimate_meta_count(meta_cfg)
         label_count = self._estimate_label_count(labels_cfg)
 
         microstructure_count = 0
         entropy_count = 0
         tail_risk_count = 0
         if config.atomic_indicators.microstructure.enabled:
-            microstructure_count = self._estimate_microstructure_features(
+            full_ms = self._estimate_microstructure_features(
                 config.atomic_indicators.microstructure
             )
+            microstructure_count = self._apply_feature_filter_ratio(
+                full_ms, config.atomic_indicators.microstructure.features, 7
+            )
         if config.atomic_indicators.entropy.enabled:
-            entropy_count = self._estimate_entropy_features(config.atomic_indicators.entropy)
+            full_ent = self._estimate_entropy_features(config.atomic_indicators.entropy)
+            entropy_count = self._apply_feature_filter_ratio(
+                full_ent, config.atomic_indicators.entropy.features, 6
+            )
         if config.atomic_indicators.tail_risk.enabled:
-            tail_risk_count = self._estimate_tail_risk_features(config.atomic_indicators.tail_risk)
+            full_tr = self._estimate_tail_risk_features(config.atomic_indicators.tail_risk)
+            tail_risk_count = self._apply_feature_filter_ratio(
+                full_tr, config.atomic_indicators.tail_risk.features, 8
+            )
 
         preprocessing_added = 0
         base_total_before_preprocessing = (
@@ -276,6 +326,14 @@ class ConfigManager:
             preset_config = self._apply_professional_full_preset(base_config)
         elif preset == "ml_optimized":
             preset_config = self._apply_ml_optimized_preset(base_config)
+        elif preset == "trend_focused":
+            preset_config = self._apply_trend_focused_preset(base_config)
+        elif preset == "momentum_focused":
+            preset_config = self._apply_momentum_focused_preset(base_config)
+        elif preset == "microstructure_focused":
+            preset_config = self._apply_microstructure_focused_preset(base_config)
+        elif preset == "lightweight_ml":
+            preset_config = self._apply_lightweight_ml_preset(base_config)
         elif preset == "custom":
             preset_config = base_config
         else:
@@ -397,6 +455,8 @@ class ConfigManager:
             for indicator in indicators:
                 if not isinstance(indicator, dict) or not indicator.get("name"):
                     continue
+                if not indicator.get("enabled", True):
+                    continue
                 name = indicator["name"]
                 count = self._estimate_indicator_params(indicator)
                 if name not in multi_input:
@@ -462,6 +522,109 @@ class ConfigManager:
             if isinstance(value, dict) and value.get("enabled", True):
                 return True
         return False
+
+    @staticmethod
+    def _apply_feature_filter_ratio(
+        full_count: int,
+        features_dict: Dict[str, Any],
+        total_feature_types: int,
+    ) -> int:
+        """Scale full_count by the ratio of enabled features in an advanced config."""
+        if not features_dict:
+            return full_count
+        enabled_count = sum(
+            1 for v in features_dict.values()
+            if (isinstance(v, dict) and v.get("enabled", True))
+            or (hasattr(v, "enabled") and v.enabled)
+        )
+        ratio = enabled_count / max(1, total_feature_types)
+        return max(0, int(full_count * ratio))
+
+    def _estimate_derived_count(self, atomic_total: int, operators_cfg: Dict[str, Any]) -> int:
+        """Estimate Layer 2 derived feature count based on enabled operators."""
+        if not self._any_enabled(operators_cfg):
+            return 0
+        count = 0
+        for key in ["distance", "cross", "momentum", "ratio"]:
+            op = operators_cfg.get(key, {})
+            if isinstance(op, dict) and op.get("enabled", True):
+                count += int(atomic_total * 0.15)
+        bs = operators_cfg.get("binary_signal", {})
+        if isinstance(bs, dict) and bs.get("enabled", True):
+            rules = bs.get("rules", [])
+            if isinstance(rules, list):
+                count += sum(1 for r in rules if isinstance(r, dict) and r.get("enabled", True))
+        wq = operators_cfg.get("worldquant", {})
+        if isinstance(wq, dict) and wq.get("enabled", True):
+            wq_ops = wq.get("operators") or {}
+            if isinstance(wq_ops, dict):
+                wq_enabled = sum(1 for v in wq_ops.values() if isinstance(v, dict) and v.get("enabled", True))
+                count += int(atomic_total * 0.05 * max(1, wq_enabled))
+        return count
+
+    def _estimate_rolling_count(self, atomic_total: int, rolling_cfg: Dict[str, Any]) -> int:
+        """Estimate Layer 3 rolling feature count based on enabled aggregators and windows."""
+        if not rolling_cfg.get("enabled", True):
+            return 0
+        agg_dict = rolling_cfg.get("aggregators", {})
+        if isinstance(agg_dict, dict):
+            n_enabled_agg = sum(
+                1 for v in agg_dict.values()
+                if isinstance(v, dict) and v.get("enabled", True)
+            )
+        elif isinstance(agg_dict, list):
+            n_enabled_agg = len(agg_dict)
+        else:
+            n_enabled_agg = 0
+        n_windows = len(rolling_cfg.get("windows", [5, 13, 21]))
+        return atomic_total * n_enabled_agg * n_windows
+
+    def _estimate_lag_count(
+        self, atomic_total: int, lag_cfg: Dict[str, Any], config_dict: Dict[str, Any]
+    ) -> int:
+        """Estimate Layer 4 lag feature count based on lag strategy."""
+        if not lag_cfg.get("enabled", True):
+            return 0
+        strategy = config_dict.get("global", {}).get("lag_strategy", "adaptive")
+        custom_lags = config_dict.get("global", {}).get("custom_lags")
+        if strategy == "adaptive":
+            lags_per_feature = 3
+        elif strategy == "dense":
+            lags_per_feature = 5
+        elif strategy == "sparse_log":
+            lags_per_feature = 4
+        elif strategy == "custom" and isinstance(custom_lags, list):
+            lags_per_feature = len(custom_lags)
+        else:
+            lags_per_feature = 3
+        return atomic_total * lags_per_feature
+
+    @staticmethod
+    def _estimate_cross_count(cross_cfg: Dict[str, Any]) -> int:
+        """Estimate Layer 5 cross-sectional feature count."""
+        if not cross_cfg.get("enabled", False):
+            return 0
+        features = cross_cfg.get("features", {})
+        if isinstance(features, dict):
+            return sum(
+                1 for v in features.values()
+                if isinstance(v, dict) and v.get("enabled", True)
+            )
+        if isinstance(features, list):
+            return len(features)
+        return 0
+
+    @staticmethod
+    def _estimate_meta_count(meta_cfg: Dict[str, Any]) -> int:
+        """Estimate Layer 6 meta feature count based on enabled sub-engines."""
+        if not meta_cfg.get("enabled", True):
+            return 0
+        sub_keys = [
+            "consensus", "interaction", "time_features", "trend_consensus",
+            "momentum_divergence", "volume_price_divergence", "volatility_regime",
+        ]
+        n_enabled = sum(1 for k in sub_keys if meta_cfg.get(k, True))
+        return n_enabled * 3
 
     def _apply_minimal_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
         preset = copy.deepcopy(base_config)
@@ -702,4 +865,109 @@ class ConfigManager:
         preprocessing["gaussian_normalize"]["enabled"] = True
         preprocessing["adf_differencing"]["enabled"] = False
         preprocessing["fractional_differencing"]["enabled"] = True
+        return preset
+
+    def _apply_trend_focused_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        """趨勢策略研究: Trend 全開 + Momentum 只 RSI/MACD/ADX + Volatility 全開"""
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(preset, ["trend", "momentum", "volatility"])
+
+        # Momentum: disable all except RSI, MACD, ADX
+        momentum_keep = {"RSI", "MACD", "ADX"}
+        atomic = preset.get("atomic_indicators", {})
+        mom = atomic.get("momentum", {})
+        for ind in mom.get("indicators", []):
+            if isinstance(ind, dict):
+                ind["enabled"] = ind.get("name") in momentum_keep
+
+        preset["rolling_aggregation"]["enabled"] = True
+        preset["rolling_aggregation"]["windows"] = [5, 13, 21]
+        preset["lag_features"]["enabled"] = True
+        return preset
+
+    def _apply_momentum_focused_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        """動量策略: Momentum 全開 + Volume 全開"""
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(preset, ["momentum", "volume"])
+
+        preset["rolling_aggregation"]["enabled"] = True
+        preset["rolling_aggregation"]["windows"] = [5, 13, 21]
+        preset["lag_features"]["enabled"] = True
+        return preset
+
+    def _apply_microstructure_focused_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        """微觀結構研究: Microstructure 全開 + Volume + Entropy"""
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(preset, ["volume", "microstructure", "entropy"])
+
+        preset["rolling_aggregation"]["enabled"] = True
+        preset["rolling_aggregation"]["windows"] = [5, 13, 21]
+        preset["lag_features"]["enabled"] = False
+
+        preprocessing = self._ensure_preprocessing_shape(preset)
+        preprocessing["enabled"] = True
+        preprocessing["mode"] = "append"
+        preprocessing["winsorization"]["enabled"] = True
+        preprocessing["rank_transform"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["enabled"] = False
+        preprocessing["gaussian_normalize"]["enabled"] = False
+        preprocessing["adf_differencing"]["enabled"] = False
+        preprocessing["fractional_differencing"]["enabled"] = False
+        return preset
+
+    def _apply_lightweight_ml_preset(self, base_config: Dict[str, Any]) -> Dict[str, Any]:
+        """輕量 ML: 精選 ~30 核心指標 + adaptive lag + rank preprocessing"""
+        preset = copy.deepcopy(base_config)
+        self._set_atomic_levels(preset, ["trend", "momentum", "volatility", "volume"])
+
+        atomic = preset.get("atomic_indicators", {})
+        # Trend: only EMA, SMA, BBANDS
+        trend_keep = {"EMA", "SMA", "BBANDS"}
+        for ind in atomic.get("trend", {}).get("indicators", []):
+            if isinstance(ind, dict):
+                ind["enabled"] = ind.get("name") in trend_keep
+
+        # Momentum: only RSI, MACD, ADX, CCI, MFI, STOCH
+        mom_keep = {"RSI", "MACD", "ADX", "CCI", "MFI", "STOCH"}
+        for ind in atomic.get("momentum", {}).get("indicators", []):
+            if isinstance(ind, dict):
+                ind["enabled"] = ind.get("name") in mom_keep
+
+        # Volatility: only ATR, NATR
+        vol_keep = {"ATR", "NATR"}
+        for ind in atomic.get("volatility", {}).get("indicators", []):
+            if isinstance(ind, dict):
+                ind["enabled"] = ind.get("name") in vol_keep
+
+        # Volume: only OBV, VWAP
+        vol_ind_keep = {"OBV", "VWAP"}
+        for ind in atomic.get("volume", {}).get("indicators", []):
+            if isinstance(ind, dict):
+                ind["enabled"] = ind.get("name") in vol_ind_keep
+
+        preset["rolling_aggregation"]["enabled"] = True
+        preset["rolling_aggregation"]["windows"] = [13, 21]
+        # Keep only mean, std, rank aggregators
+        agg = preset.get("rolling_aggregation", {}).get("aggregators", {})
+        if isinstance(agg, dict):
+            for agg_name, agg_cfg in agg.items():
+                if isinstance(agg_cfg, dict):
+                    agg_cfg["enabled"] = agg_name in {"mean", "std", "rank"}
+        elif isinstance(agg, list):
+            preset["rolling_aggregation"]["aggregators"] = {
+                name: {"enabled": name in {"mean", "std", "rank"}} for name in agg
+            }
+
+        preset["lag_features"]["enabled"] = True
+        preset["global"]["lag_strategy"] = "adaptive"
+
+        preprocessing = self._ensure_preprocessing_shape(preset)
+        preprocessing["enabled"] = True
+        preprocessing["mode"] = "replace"
+        preprocessing["winsorization"]["enabled"] = True
+        preprocessing["rank_transform"]["enabled"] = True
+        preprocessing["adaptive_zscore"]["enabled"] = False
+        preprocessing["gaussian_normalize"]["enabled"] = False
+        preprocessing["adf_differencing"]["enabled"] = False
+        preprocessing["fractional_differencing"]["enabled"] = False
         return preset

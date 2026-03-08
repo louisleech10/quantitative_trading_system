@@ -912,10 +912,202 @@ chmod 755 data_cache/ml_pipelines
 
 ---
 
+## Feature Factory Granular Control — 前端整合
+
+> **依據**: FEATURE_FACTORY_GRANULAR_CONTROL_PLAN V1.2  
+> **新增於**: v2.0 (2026-03-08)  
+> **狀態**: ✅ Phase A~D 完成
+
+### 概述
+
+Feature Factory 細粒度控制支援 Layer 1~6.5 所有層級的指標/聚合器/運算子獨立啟用/關閉，提供即時特徵數預覽與預設配置。
+
+### 架構概覽
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              前端 (Next.js 15) — Granular Control               │
+├─────────────────────────────────────────────────────────────────┤
+│  LayerPanel.tsx                                                 │
+│  → 7 個分頁（Layer 1~6, 6.5），含層級總開關                      │
+│  → 包含多個 CategorySection                                     │
+│                                                                  │
+│  CategorySection.tsx                                            │
+│  → 類別折疊面板 + Select All / Deselect All                     │
+│  → 三態 Checkbox（checked / unchecked / indeterminate）          │
+│  → 包含多個 IndicatorCheckbox                                   │
+│                                                                  │
+│  IndicatorCheckbox.tsx                                          │
+│  → 單一指標的勾選框（帶描述、參數、狀態圖標）                     │
+│  → 變更時觸發 toggleIndicator store action                       │
+│                                                                  │
+│  FeaturePreviewBar.tsx                                          │
+│  → 底部固定的即時特徵數預覽列                                    │
+│  → 顯示：預估總數 │ 預估時間 │ 預估記憶體                        │
+│  → 超過 10,000 則顯示黃色警告                                    │
+│                                                                  │
+│  ConfigIOButtons.tsx                                            │
+│  → 配置導入（JSON 上傳）/ 導出（JSON 下載）                      │
+│  → 支援拖放上傳                                                 │
+│                                                                  │
+│  PresetSelector.tsx                                             │
+│  → 預設 Preset 下拉選擇 + 一鍵套用                              │
+│  → 10 個內建預設 + 自訂預設                                     │
+└─────────────────────────────────────────────────────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    後端 API (FastAPI)                            │
+├─────────────────────────────────────────────────────────────────┤
+│  GET  /api/v1/features/schema                                   │
+│  → 回傳 7 層完整 Schema（指標清單 + enabled 狀態）               │
+│                                                                  │
+│  PUT  /api/v1/features/config/batch-toggle                      │
+│  → 批量切換指標 enabled 狀態，回傳更新後 config + preview        │
+│                                                                  │
+│  POST /api/v1/features/config/presets/{preset_name}             │
+│  → 套用預設配置，回傳更新後 config + preview                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 核心元件
+
+#### 1. LayerPanel
+
+**路徑**: `frontend/src/components/feature-factory/LayerPanel.tsx`
+
+7 個分頁面板（Layer 1 Atomic Indicators ~ Layer 6.5 Preprocessing），每層包含：
+- **層級總開關**: 關閉時整層灰化（disabled UI），不影響子項目 enabled 記憶值
+- **多個 CategorySection**: 依類別分組顯示指標
+
+```typescript
+// 使用方式
+<LayerPanel schema={schema} config={config} onToggle={handleToggle} />
+```
+
+#### 2. IndicatorCheckbox
+
+**路徑**: `frontend/src/components/feature-factory/IndicatorCheckbox.tsx`
+
+單一指標的勾選框，顯示名稱、描述與參數資訊。
+
+```typescript
+<IndicatorCheckbox
+  name="EMA"
+  enabled={true}
+  description="指數移動平均"
+  onChange={(enabled) => toggleIndicator('trend', 'EMA', enabled)}
+/>
+```
+
+#### 3. CategorySection
+
+**路徑**: `frontend/src/components/feature-factory/CategorySection.tsx`
+
+類別折疊面板，三態 Checkbox 邏輯：
+- ☑ checked — 所有 indicators enabled
+- ☐ unchecked — 所有 indicators disabled
+- 🔲 indeterminate — 部分 indicators enabled
+
+提供 `[全選]` / `[全取消]` 快捷按鈕。
+
+#### 4. FeaturePreviewBar
+
+**路徑**: `frontend/src/components/feature-factory/FeaturePreviewBar.tsx`
+
+底部固定的即時預覽列，debounced 更新（config 變更後立即估算，不等 API）。
+
+```
+預估特徵總數: 2,345 │ 預估時間: ~12s │ 預估記憶體: ~45MB
+```
+
+效能預警閾值：
+| 特徵數 | 行為 |
+|--------|------|
+| ≤ 10,000 | 正常顯示 |
+| > 10,000 | ⚠️ 黃色警告 |
+| > 50,000 | 🚫 禁止操作 |
+
+#### 5. ConfigIOButtons
+
+**路徑**: `frontend/src/components/feature-factory/ConfigIOButtons.tsx`
+
+- **導出**: 將當前 config 下載為 JSON 檔
+- **導入**: 上傳 JSON 檔更新 config（支援拖放）
+- **重置**: 恢復預設配置
+
+### Zustand Store 擴展
+
+**路徑**: `frontend/src/store/featureFactoryStore.ts`
+
+Phase C 新增的 store actions：
+
+| Action | 說明 |
+|--------|------|
+| `setSchema(schema)` | 從 Schema API 載入完整 schema |
+| `toggleIndicator(category, name, enabled)` | 切換單一指標 |
+| `toggleAllInCategory(category, enabled)` | Category 全選/全取消 |
+| `toggleCategory(category, enabled)` | 切換 Category 本身 |
+| `toggleAggregator(name, enabled)` | 切換 Layer 3 aggregator |
+| `toggleAllAggregators(enabled)` | 全部 aggregators 開關 |
+| `toggleMetaSubEngine(name, enabled)` | 切換 Layer 6 子引擎 |
+| `toggleCrossFeature(name, enabled)` | 切換 Layer 5 特徵 |
+| `toggleOperator(name, enabled)` | 切換 Layer 2 operator |
+
+### useFeatureFactory Hook
+
+**路徑**: `frontend/src/hooks/useFeatureFactory.ts`
+
+封裝 API 呼叫的 4 個關鍵函式：
+
+```typescript
+const { loadSchema, batchToggle, applyPreset, previewConfig } = useFeatureFactory();
+
+// 1. 載入 Schema — 用於動態渲染前端 UI
+const schema = await loadSchema();
+
+// 2. 批量切換指標啟用狀態
+const result = await batchToggle([
+  { path: 'atomic_indicators.trend.indicators.EMA.enabled', value: true },
+  { path: 'atomic_indicators.trend.indicators.SMA.enabled', value: false },
+]);
+
+// 3. 套用預設配置（同時重新載入 schema）
+await applyPreset('basic_essential');
+
+// 4. 預覽配置特徵數
+await previewConfig(currentConfig);
+```
+
+### Schema API 整合流程
+
+```
+頁面載入
+  → loadSchema() 取得完整 schema
+  → setSchema(schema) 存入 Zustand store
+  → LayerPanel 根據 schema.layers 動態渲染 7 層 UI
+
+使用者操作（勾選/取消個別指標）
+  → toggleIndicator() 更新 local store
+  → FeaturePreviewBar debounced 更新預估數字
+
+使用者確認批量修改
+  → batchToggle(toggles) 送到後端
+  → 取得更新後 config + preview
+  → setConfig() + setPreview() 同步更新
+
+套用預設
+  → applyPreset(presetName) 呼叫後端
+  → 取得更新後 config + preview
+  → 自動重新 loadSchema() 同步 enabled 狀態
+```
+
+---
+
 ## 文件更新記錄
 
 | 日期 | 版本 | 變更內容 | 作者 |
 |------|------|----------|------|
+| 2026-03-08 | 2.0 | 新增 Feature Factory Granular Control 前端整合指南 | Claude |
 | 2026-01-11 | 1.0 | 初始版本，記錄 Phase 3-6 前端整合 | Claude |
 
 ---

@@ -208,124 +208,44 @@ class FeatureFactory:
         sources = self._select_single_series_sources(config)
         tasks: List[Tuple[str, bool, Callable[[], pd.DataFrame]]] = []
 
-        if config.atomic_indicators.trend.enabled:
+        # --- 7 TA-Lib categories: filter enabled indicators (Strategy A) ---
+        _CATEGORY_ENGINE_MAP: List[Tuple[str, bool, type]] = [
+            ("trend", True, TrendIndicatorEngine),
+            ("momentum", True, MomentumIndicatorEngine),
+            ("volatility", True, VolatilityIndicatorEngine),
+            ("volume", True, VolumeIndicatorEngine),
+            ("cycle", True, CycleIndicatorEngine),
+            ("pattern", True, PatternIndicatorEngine),
+            ("statistics", True, StatisticsIndicatorEngine),
+        ]
+        for cat_name, required, engine_cls in _CATEGORY_ENGINE_MAP:
+            cat_cfg = getattr(config.atomic_indicators, cat_name)
+            if not cat_cfg.enabled:
+                continue
+            filtered = self._filter_category_config(cat_cfg)
+            if filtered is None:
+                continue
             tasks.append(
-                (
-                    "trend",
-                    True,
-                    lambda: TrendIndicatorEngine(
-                        config.atomic_indicators.trend.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
+                (cat_name, required, lambda c=filtered, e=engine_cls: e(c, sources).compute_all(data))
             )
 
-        if config.atomic_indicators.momentum.enabled:
-            tasks.append(
-                (
-                    "momentum",
-                    True,
-                    lambda: MomentumIndicatorEngine(
-                        config.atomic_indicators.momentum.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
-            )
-
-        if config.atomic_indicators.volatility.enabled:
-            tasks.append(
-                (
-                    "volatility",
-                    True,
-                    lambda: VolatilityIndicatorEngine(
-                        config.atomic_indicators.volatility.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
-            )
-
-        if config.atomic_indicators.volume.enabled:
-            tasks.append(
-                (
-                    "volume",
-                    True,
-                    lambda: VolumeIndicatorEngine(
-                        config.atomic_indicators.volume.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
-            )
-
-        if config.atomic_indicators.cycle.enabled:
-            tasks.append(
-                (
-                    "cycle",
-                    True,
-                    lambda: CycleIndicatorEngine(
-                        config.atomic_indicators.cycle.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
-            )
-
-        if config.atomic_indicators.pattern.enabled:
-            tasks.append(
-                (
-                    "pattern",
-                    True,
-                    lambda: PatternIndicatorEngine(
-                        config.atomic_indicators.pattern.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
-            )
-
-        if config.atomic_indicators.statistics.enabled:
-            tasks.append(
-                (
-                    "statistics",
-                    True,
-                    lambda: StatisticsIndicatorEngine(
-                        config.atomic_indicators.statistics.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
-            )
-
+        # --- 3 Advanced categories: Microstructure / Entropy / TailRisk ---
         if config.atomic_indicators.microstructure.enabled:
+            ms_cfg = self._filter_advanced_config(config.atomic_indicators.microstructure)
             tasks.append(
-                (
-                    "microstructure",
-                    False,
-                    lambda: MicrostructureIndicatorEngine(
-                        config.atomic_indicators.microstructure.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
+                ("microstructure", False, lambda c=ms_cfg: MicrostructureIndicatorEngine(c, sources).compute_all(data))
             )
 
         if config.atomic_indicators.entropy.enabled:
+            ent_cfg = self._filter_advanced_config(config.atomic_indicators.entropy)
             tasks.append(
-                (
-                    "entropy",
-                    False,
-                    lambda: EntropyIndicatorEngine(
-                        config.atomic_indicators.entropy.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
+                ("entropy", False, lambda c=ent_cfg: EntropyIndicatorEngine(c, sources).compute_all(data))
             )
 
         if config.atomic_indicators.tail_risk.enabled:
+            tr_cfg = self._filter_advanced_config(config.atomic_indicators.tail_risk)
             tasks.append(
-                (
-                    "tail_risk",
-                    False,
-                    lambda: TailRiskIndicatorEngine(
-                        config.atomic_indicators.tail_risk.model_dump(),
-                        sources,
-                    ).compute_all(data),
-                )
+                ("tail_risk", False, lambda c=tr_cfg: TailRiskIndicatorEngine(c, sources).compute_all(data))
             )
 
         if config.custom_indicators:
@@ -394,13 +314,78 @@ class FeatureFactory:
             workers = 4
         return max(1, workers)
 
+    # ── Strategy A: Centralized filter helpers ─────────────────────────
+
+    @staticmethod
+    def _filter_category_config(cat_cfg: Any) -> Optional[dict]:
+        """Filter a CategoryConfig to only include enabled indicators.
+
+        Returns a config dict with only enabled indicators, or None if none enabled.
+        """
+        enabled_indicators = [ind for ind in cat_cfg.indicators if ind.enabled]
+        if not enabled_indicators:
+            return None
+        config_dict = cat_cfg.model_dump()
+        config_dict["indicators"] = [ind.model_dump() for ind in enabled_indicators]
+        return config_dict
+
+    @staticmethod
+    def _filter_advanced_config(config_model: Any) -> dict:
+        """Filter Microstructure/Entropy/TailRisk config via features dict.
+
+        Converts features dict {name: {enabled: bool}} → enabled_features list
+        for backward compatibility with engines.
+        """
+        config_dict = config_model.model_dump()
+        features = config_model.features  # Dict[str, AdvancedFeatureItemConfig]
+        if features:
+            enabled_names = [name for name, cfg in features.items() if cfg.enabled]
+            config_dict["enabled_features"] = enabled_names
+        return config_dict
+
+    @staticmethod
+    def _filter_operators_config(operators: Any) -> dict:
+        """Filter OperatorConfig: remove disabled binary_signal rules and worldquant operators."""
+        config_dict = operators.model_dump(by_alias=True)
+
+        # Filter binary_signal rules
+        bs = config_dict.get("binary_signal", {})
+        if isinstance(bs.get("rules"), list):
+            bs["rules"] = [r for r in bs["rules"] if r.get("enabled", True)]
+
+        # Filter worldquant operators: dict → list of enabled names
+        wq = config_dict.get("worldquant", {})
+        wq_ops = wq.get("operators")
+        if isinstance(wq_ops, dict):
+            wq["operators"] = [
+                name for name, cfg in wq_ops.items()
+                if isinstance(cfg, dict) and cfg.get("enabled", True)
+            ]
+        elif wq_ops is None:
+            wq.pop("operators", None)  # Let engine use its built-in defaults
+
+        return config_dict
+
+    @staticmethod
+    def _filter_rolling_config(rolling_cfg: Any) -> dict:
+        """Filter RollingAggConfig: convert dict aggregators to list of enabled names."""
+        config_dict = rolling_cfg.model_dump()
+        aggregators = config_dict.get("aggregators", {})
+        if isinstance(aggregators, dict):
+            config_dict["aggregators"] = [
+                name for name, cfg in aggregators.items()
+                if isinstance(cfg, dict) and cfg.get("enabled", True)
+            ]
+        return config_dict
+
     def _layer2_derived_features(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
     ) -> pd.DataFrame:
         if layer1.empty:
             return pd.DataFrame(index=layer1.index)
 
-        engine = DerivedOperatorEngine(config.operators)
+        filtered_ops = self._filter_operators_config(config.operators)
+        engine = DerivedOperatorEngine(filtered_ops)
         indicator_specs = self._build_indicator_specs(layer1, config)
         return engine.compute_all(layer1, data, indicator_specs)
 
@@ -414,7 +399,8 @@ class FeatureFactory:
         base = self._combine_layers([layer1], context="layer3_input")
         if base.empty:
             return pd.DataFrame(index=base.index)
-        aggregator = RollingAggregator(config.rolling_aggregation)
+        filtered_config = self._filter_rolling_config(config.rolling_aggregation)
+        aggregator = RollingAggregator(filtered_config)
         return aggregator.compute_all(base)
 
     def _layer4_lag_features(
@@ -480,12 +466,12 @@ class FeatureFactory:
 
         frames: List[pd.Series] = []
         features = config.cross_sectional.features
-        if "relative_price" in features:
+        if "relative_price" in features and features["relative_price"].enabled:
             frames.append(processor.compute_relative_price(symbol_close, btc_close).rename("cs_relative_price"))
-        if "beta" in features:
+        if "beta" in features and features["beta"].enabled:
             beta = processor.compute_beta(symbol_returns, btc_returns)
             frames.append(beta.rename("cs_beta"))
-        if "idiosyncratic_momentum" in features:
+        if "idiosyncratic_momentum" in features and features["idiosyncratic_momentum"].enabled:
             beta = processor.compute_beta(symbol_returns, btc_returns)
             frames.append(
                 processor.compute_idiosyncratic_momentum(symbol_returns, btc_returns, beta).rename(

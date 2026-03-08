@@ -17,6 +17,12 @@
   - Rule 1: `momentum/` 無 `from api.` 反向依賴 ✓
   - Rule 2: `IBacktestEngine` / `IPositionSizer` Protocol 注入 ✓
   - Rule 3: 所有服務透過 Factory 建立（`create_backtest_engine` / `create_position_sizer`）✓
+- ✅ **Feature Factory Granular Control（FEATURE_FACTORY_GRANULAR_CONTROL_PLAN V1.2）**
+  - Phase A：Config & Backend（`IndicatorDef.enabled` + per-feature Micro/Entropy/TailRisk + `migrate_config()` + filter 邏輯 + 向後相容 40 tests）✓
+  - Phase B：API 層（`GET /features/schema` + `PUT /config/batch-toggle` + `POST /features/config/presets/{name}` + Preview 精確度 52 tests）✓
+  - Phase C：Frontend（`LayerPanel` + `IndicatorCheckbox` + `CategorySection` + `FeaturePreviewBar` + `ConfigIOButtons` + Zustand store 9 actions + `useFeatureFactory` hook 53 tests）✓
+  - Phase D：測試 & 文件（30 tests + D3 E2E + `API_SPECIFICATION.md` v5.0 §19 Granular Control API + `FRONTEND_INTEGRATION_GUIDE.md` v2.0）✓
+  - 驗證：Phase A+B+C+D 合計 **175 tests passed**，`npm run build` 成功
 
 - ✅ **Feature Engineering Pipeline 效能最佳化（Phase B/C/D）**
   - Phase B：Layer2/3 向量化（`derived_operators.py` worldquant/ts_rank/decay_linear + `rolling_aggregator.py` 視窗快取）✓
@@ -32,17 +38,16 @@
   - 驗證：`tests/test_feature_factory_api.py` 擴充後通過，相關測試組合共 11 passed ✓
 
 ### 進行中 🚧
-- 📝 **Phase 4.7：文件更新**（`ARCHITECTURE.md` 與 `API_SPECIFICATION.md` 補齊 Strategy Domain / Protocol / 端點說明）
+- 📝 **Phase 4.7.1：文件更新**（`docs/ARCHITECTURE.md` 補齊 Strategy Domain / Protocol / Factory 說明；`API_SPECIFICATION.md` 已由 D4 更新至 v5.0）
 
 ## 🎯 當前重點
-- Phase 4.0~4.6 全部驗收完成；Phase 4.7 文件更新為唯一剩餘工作
-- **Feature Engineering Pipeline 效能最佳化全部完成（Phase B/C/D）**：all_passed=true，90.6% 加速
-- **Feature Explorer Phase 2 已完成**：大資料表載入改為「首屏快載 + 背景續載 + 虛擬渲染 + Worker 解析」
+- **Feature Factory Granular Control 全部完成（Phase A+B+C+D）**：175 tests passed，per-indicator 細粒度控制上線
+- Phase 4.0~4.6 全部驗收完成；Phase 4.7.1（`ARCHITECTURE.md`）為唯一剩餘文件工作
+- Feature Engineering Pipeline 效能最佳化全部完成（90.6% 加速）
 - 核心驗證：integration 20 tests passed、coverage 100%、decoupling PASSED
 
 ### 下一步工作
 - 完成 Phase 4.7.1：`docs/ARCHITECTURE.md` 補齊 Strategy Domain、Protocol、Factory 說明
-- 完成 Phase 4.7.2：`docs/API_SPECIFICATION.md` 補齊 4 個新端點與 3 個 WebSocket 事件
 - （可選）研究 Layer1 並行（`FFACT_LAYER1_PARALLEL=1`）欄位排序確定性問題，修復後可再增 ~0.6% 加速
 
 ## 🐛 已知問題
@@ -60,6 +65,10 @@
 - `optimization_results/` 下的測試產物（test artifacts）應加入 `.gitignore` 或在 CI 中清理
 
 ## 📝 最近完成的工作
+- 2026-03-08：完成 Feature Factory Granular Control Phase D（30 tests；`API_SPECIFICATION.md` v5.0 新增 §19；`FRONTEND_INTEGRATION_GUIDE.md` v2.0 新增前端整合指南）
+- 2026-03-08：完成 Feature Factory Granular Control Phase C（前端 5 元件 + Zustand 9 actions + `useFeatureFactory` hook 4 函式；53 tests）
+- 2026-03-08：完成 Feature Factory Granular Control Phase B（3 API 端點：Schema / Batch-Toggle / Preset；52 tests）
+- 2026-03-08：完成 Feature Factory Granular Control Phase A（Config model 全面 per-indicator 化 + `migrate_config()` + filter；40 tests）
 - 2026-03-07：完成 Feature Engineering Pipeline Phase D Governance（`api/services/feature_factory_service.py`：FFACT_NEW_COMPUTE_PATH 旗標、Shadow Compare、Rollback、_temporary_environ）
 - 2026-03-07：修復 Layer1 並行 checksum 漂移（`feature_factory.py` `FFACT_LAYER1_PARALLEL` 預設改為 `"0"`；old-path override 同步強制關閉）
 - 2026-03-07：新增 `tests/api/test_feature_factory_service_phase_d.py`（6 tests，全部通過）
@@ -74,16 +83,17 @@
 
 ## 🔄 Git狀態
 - 分支：`main`
-- 上次 push：Phase B/C/D Feature Engineering 效能最佳化全部完成（2026-03-07）
-- 最新變更：Feature Explorer Phase 2 前後端優化（`api/routes/feature_factory.py`、`api/services/feature_factory_service.py`、`frontend/src/components/feature-factory/FeatureTable.tsx`、`frontend/src/components/feature-factory/FeatureNameSegmentFilter.tsx`、`frontend/src/workers/featureNameParser.worker.ts`、`frontend/src/lib/featureNameParser.ts`）
-- 最新驗證：`tests/test_feature_factory_api.py` + `tests/api/test_feature_factory_service_phase_d.py` 共 11 passed
-- 歷史驗證（Phase B/C/D）：all_passed=true，delta_ratio=-0.9064（90.6% 加速）
+- 上次 push：Feature Explorer Phase 2 前後端優化（2026-03-08）
+- 待推送：Feature Factory Granular Control Phase A~D 全部完成（2026-03-08）
+  - 核心後端：`momentum/FeatureEngineering/feature_config.py`、`config_manager.py`、`feature_factory.py` + engines
+  - API 層：`api/routes/feature_factory.py`、`api/services/feature_factory_service.py`、`api/models/`
+  - 前端：`featureFactoryStore.ts`、5 新元件、`useFeatureFactory.ts`、`types.ts`
+  - 文件：`docs/API_SPECIFICATION.md` v5.0、`docs/FRONTEND_INTEGRATION_GUIDE.md` v2.0
+  - 測試：`tests/test_phase_a/b/c/d_granular_control.py`（175 tests passed）
 
 ## 💡 下次啟動時
+- 先跑：`./venv/bin/pytest tests/test_phase_a_granular_control.py tests/test_phase_b_granular_control.py tests/test_phase_c_granular_control.py tests/test_phase_d_granular_control.py -q`（確認 175 tests 穩定）
 - 先跑：`pytest tests/integration/ -q`（確認 20 tests 穩定）
-- 先跑：`./venv/bin/pytest -q tests/api/test_feature_factory_service_phase_d.py`（Phase D Governance 6 tests）
 - 確認：`./scripts/check_decoupling_phase4.sh`（Rule1/2/3/6 PASSED）
-- 確認：`grep -rn "from api." momentum/ | wc -l` → 應為 0
-- 推進：Phase 4.7 文件更新（ARCHITECTURE.md + API_SPECIFICATION.md）
-- 可選：研究 `FFACT_LAYER1_PARALLEL=1` 欄位排序問題（engines 結果 concat 前需按引擎名稱穩定排序）
-- 可選：把段落分類來源改為優先使用後端 `row.category`，降低前端 parser 規則維護成本
+- 推進：Phase 4.7.1（`docs/ARCHITECTURE.md` 補齊 Strategy Domain / Protocol / Factory）
+- 可選：研究 `FFACT_LAYER1_PARALLEL=1` 欄位排序問題（engines concat 前需穩定排序）

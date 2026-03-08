@@ -1066,6 +1066,388 @@ class FeatureFactoryService:
         """Get feature metadata."""
         return self._mcp.get_feature_metadata(feature_name)
 
+    # ------ Phase B: Schema / Batch Toggle / Preset Apply ------
+
+    def get_schema(self) -> Dict[str, Any]:
+        """Build complete feature factory schema for frontend UI rendering.
+
+        Returns a layered view of all available indicators, operators,
+        aggregators, etc. with current enabled state and descriptions.
+        """
+        config = self._resolve_config(None)
+        config_dict = config.model_dump(by_alias=True)
+        return self._build_schema(config_dict)
+
+    def batch_toggle(self, toggles: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Apply batch toggle operations and return updated config + preview."""
+        config = self._resolve_config(None)
+        config_dict = config.model_dump(by_alias=True)
+
+        results = []
+        for toggle in toggles:
+            path = toggle.get("path", "")
+            value = toggle.get("value", True)
+            success = self._apply_toggle_to_dict(config_dict, path, value)
+            results.append({"path": path, "value": value, "success": success})
+
+        updated_config = self._config_manager.get_merged_config(config_dict)
+        preview = self._config_manager.preview_feature_count(updated_config)
+        return {
+            "results": results,
+            "config": updated_config.model_dump(by_alias=True),
+            "preview": preview.model_dump(),
+        }
+
+    def apply_preset_config(self, preset_name: str) -> Dict[str, Any]:
+        """Apply a named preset and return the resulting config + preview."""
+        config = self._config_manager.apply_preset(preset_name)
+        preview = self._config_manager.preview_feature_count(config)
+        return {
+            "config": config.model_dump(by_alias=True),
+            "preview": preview.model_dump(),
+        }
+
+    # ------ Schema Builder Internals ------
+
+    _CATEGORY_DESCRIPTIONS: Dict[str, str] = {
+        "trend": "趨勢指標",
+        "momentum": "動量指標",
+        "volatility": "波動率指標",
+        "volume": "成交量指標",
+        "cycle": "週期指標",
+        "pattern": "K 線形態指標",
+        "statistics": "統計指標",
+        "microstructure": "微觀結構特徵",
+        "entropy": "資訊熵特徵",
+        "tail_risk": "尾部風險特徵",
+    }
+
+    _CATEGORY_LEVELS: Dict[str, str] = {
+        "trend": "L1",
+        "momentum": "L1",
+        "volatility": "L1",
+        "volume": "L1",
+        "cycle": "L2",
+        "pattern": "L2",
+        "statistics": "L2",
+        "microstructure": "L3",
+        "entropy": "L3",
+        "tail_risk": "L3",
+    }
+
+    _INDICATOR_DESCRIPTIONS: Dict[str, str] = {
+        # Trend
+        "EMA": "指數移動平均", "SMA": "簡單移動平均", "WMA": "加權移動平均",
+        "DEMA": "雙指數移動平均", "TEMA": "三指數移動平均", "TRIMA": "三角移動平均",
+        "KAMA": "Kaufman 自適應", "T3": "T3 移動平均", "MAMA": "Mesa 自適應",
+        "HT_TRENDLINE": "Hilbert 趨勢線", "MIDPOINT": "中點", "MIDPRICE": "中價",
+        "SAR": "Parabolic SAR", "SAREXT": "SAR 擴展", "BBANDS": "Bollinger Bands",
+        "MAVP": "可變期間移動平均", "MA": "通用移動平均",
+        # Momentum
+        "RSI": "相對強弱指標", "MACD": "移動平均收斂散度", "MACDEXT": "MACD 擴展",
+        "MACDFIX": "MACD 固定", "ADX": "平均趨勢方向指標", "ADXR": "ADX 評級",
+        "DX": "方向運動指標", "PLUS_DI": "正向方向指標", "MINUS_DI": "負向方向指標",
+        "PLUS_DM": "正向方向運動", "MINUS_DM": "負向方向運動", "CCI": "商品通道指標",
+        "CMO": "Chande 動量振盪器", "MOM": "Momentum", "ROC": "變化率",
+        "ROCP": "變化率百分比", "ROCR": "變化率比率", "ROCR100": "變化率比率 ×100",
+        "APO": "絕對價格振盪器", "PPO": "百分比價格振盪器", "AROON": "Aroon 指標",
+        "AROONOSC": "Aroon 振盪器", "BOP": "Balance of Power", "TRIX": "三重指數平均",
+        "ULTOSC": "Ultimate Oscillator", "WILLR": "Williams %R", "MFI": "Money Flow Index",
+        "STOCH": "隨機指標", "STOCHF": "快速隨機指標", "STOCHRSI": "RSI 隨機指標",
+        # Volatility
+        "ATR": "平均真實波幅", "NATR": "正規化 ATR", "TRANGE": "True Range",
+        "Keltner": "Keltner 通道", "Donchian": "Donchian 通道",
+        "Parkinson_Vol": "Parkinson 波動率", "GarmanKlass_Vol": "Garman-Klass 波動率",
+        # Volume
+        "OBV": "On-Balance Volume", "AD": "Accumulation/Distribution",
+        "ADOSC": "AD 振盪器", "VWAP": "成交量加權平均價",
+        "Volume_MA_Ratio": "量均比", "Force_Index": "力度指標",
+        "Klinger_Volume_Osc": "Klinger 量振盪器", "Ease_of_Movement": "移動便捷度",
+        # Cycle
+        "HT_DCPERIOD": "主導期間", "HT_DCPHASE": "相位", "HT_PHASOR": "相位器",
+        "HT_SINE": "正弦波", "HT_TRENDMODE": "趨勢模式",
+        # Statistics
+        "LINEARREG": "線性回歸", "LINEARREG_SLOPE": "回歸斜率",
+        "LINEARREG_ANGLE": "回歸角度", "LINEARREG_INTERCEPT": "回歸截距",
+        "STDDEV": "標準差", "VAR": "方差", "TSF": "時間序列預測",
+        "BETA": "Beta 係數", "CORREL": "相關性",
+        # Microstructure
+        "amihud": "Amihud 非流動性", "kyle_lambda": "Kyle's Lambda",
+        "roll_spread": "Roll 隱含價差", "cs_spread": "Corwin-Schultz 價差",
+        "ofi": "訂單流失衡", "large_trade_ratio": "大單比率", "vpin": "VPIN",
+        # Entropy
+        "shannon": "Shannon 資訊熵", "approximate": "近似熵", "sample": "樣本熵",
+        "hurst": "Hurst 指數", "fractal": "碎形維度", "permutation": "排列熵",
+        # Tail Risk
+        "cvar": "條件風險值", "realized_vol_up": "上行已實現波動率",
+        "realized_vol_down": "下行已實現波動率", "rsj": "跳躍非對稱",
+        "updown_vol_ratio": "上下波動比", "gain_pain_ratio": "盈虧比",
+        "jarque_bera": "常態性檢定", "max_drawdown": "最大回撤",
+    }
+
+    _OPERATOR_DESCRIPTIONS: Dict[str, str] = {
+        "distance": "距離運算元（指標間差距）",
+        "cross": "交叉運算元（指標交叉信號）",
+        "momentum": "動量變化運算元",
+        "ratio": "比率運算元（指標間比率）",
+        "binary_signal": "二元信號運算元（閾值觸發）",
+        "worldquant": "WorldQuant Alpha 運算元",
+    }
+
+    _AGG_DESCRIPTIONS: Dict[str, str] = {
+        "slope": "線性回歸斜率", "std": "標準差", "mean": "平均值",
+        "rank": "百分位排名", "zscore": "Z 分數", "skew": "偏態",
+        "kurt": "峰態", "min": "最小值", "max": "最大值", "range": "極差",
+    }
+
+    _META_DESCRIPTIONS: Dict[str, str] = {
+        "consensus": "多指標共識信號",
+        "interaction": "特徵交互作用",
+        "time_features": "時間特徵（日期/小時等）",
+        "trend_consensus": "趨勢共識信號",
+        "momentum_divergence": "動量背離信號",
+        "volume_price_divergence": "量價背離信號",
+        "volatility_regime": "波動率區間狀態",
+    }
+
+    _PREPROCESSING_DESCRIPTIONS: Dict[str, str] = {
+        "winsorization": "極值截斷（Winsorization）",
+        "rank_transform": "百分位排名轉換",
+        "adaptive_zscore": "自適應 Z-Score 標準化",
+        "gaussian_normalize": "高斯正規化",
+        "adf_differencing": "ADF 差分",
+        "fractional_differencing": "分數階差分",
+    }
+
+    def _build_schema(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Build layered schema dict from a config dump."""
+        layers: Dict[str, Any] = {}
+
+        # --- Layer 1: Atomic Indicators ---
+        atomic = config_dict.get("atomic_indicators", {})
+        categories: Dict[str, Any] = {}
+        for cat_key in ["trend", "momentum", "volatility", "volume",
+                        "cycle", "pattern", "statistics"]:
+            cat_cfg = atomic.get(cat_key, {})
+            indicators = []
+            for ind in cat_cfg.get("indicators", []):
+                if not isinstance(ind, dict):
+                    continue
+                name = ind.get("name", "")
+                params = {k: v for k, v in ind.items() if k not in ("name", "enabled")}
+                desc = self._INDICATOR_DESCRIPTIONS.get(name, "")
+                if not desc and name.startswith("CDL"):
+                    desc = "K 線形態"
+                indicators.append({
+                    "name": name,
+                    "enabled": ind.get("enabled", True),
+                    "description": desc,
+                    "params": params,
+                })
+            categories[cat_key] = {
+                "enabled": cat_cfg.get("enabled", True),
+                "level": self._CATEGORY_LEVELS.get(cat_key, "L1"),
+                "description": self._CATEGORY_DESCRIPTIONS.get(cat_key, ""),
+                "indicators": indicators,
+            }
+
+        for special_key in ["microstructure", "entropy", "tail_risk"]:
+            special_cfg = atomic.get(special_key, {})
+            features_list = []
+            for feat_name, feat_cfg in (special_cfg.get("features") or {}).items():
+                features_list.append({
+                    "name": feat_name,
+                    "enabled": feat_cfg.get("enabled", True) if isinstance(feat_cfg, dict) else True,
+                    "description": self._INDICATOR_DESCRIPTIONS.get(feat_name, ""),
+                })
+            # Build params excluding structural keys
+            special_params = {
+                k: v for k, v in special_cfg.items()
+                if k not in ("enabled", "features", "enabled_features")
+            }
+            categories[special_key] = {
+                "enabled": special_cfg.get("enabled", False),
+                "level": self._CATEGORY_LEVELS.get(special_key, "L3"),
+                "description": self._CATEGORY_DESCRIPTIONS.get(special_key, ""),
+                "features": features_list,
+                "params": special_params,
+            }
+
+        layers["layer1"] = {
+            "name": "Atomic Indicators",
+            "enabled": True,
+            "categories": categories,
+        }
+
+        # --- Layer 2: Derived Operators ---
+        operators_cfg = config_dict.get("operators", {})
+        operators: Dict[str, Any] = {}
+        for op_key in ["distance", "cross", "momentum", "ratio",
+                        "binary_signal", "worldquant"]:
+            op_cfg = operators_cfg.get(op_key, {})
+            if not isinstance(op_cfg, dict):
+                op_cfg = {}
+            op_info: Dict[str, Any] = {
+                "enabled": op_cfg.get("enabled", True),
+                "description": self._OPERATOR_DESCRIPTIONS.get(op_key, ""),
+            }
+            if op_key == "binary_signal":
+                op_info["rules"] = [
+                    {
+                        "indicator": r.get("indicator", ""),
+                        "condition": r.get("condition", ""),
+                        "name_suffix": r.get("name_suffix", ""),
+                        "enabled": r.get("enabled", True),
+                    }
+                    for r in op_cfg.get("rules", [])
+                    if isinstance(r, dict)
+                ]
+            elif op_key == "worldquant":
+                wq_ops = op_cfg.get("operators") or {}
+                op_info["operators"] = {
+                    name: {"enabled": cfg.get("enabled", True) if isinstance(cfg, dict) else True}
+                    for name, cfg in wq_ops.items()
+                }
+            operators[op_key] = op_info
+
+        layers["layer2"] = {
+            "name": "Derived Operators",
+            "enabled": any(
+                isinstance(v, dict) and v.get("enabled", True)
+                for v in operators_cfg.values()
+            ),
+            "operators": operators,
+        }
+
+        # --- Layer 3: Rolling Aggregation ---
+        rolling_cfg = config_dict.get("rolling_aggregation", {})
+        aggregators: Dict[str, Any] = {}
+        agg_dict = rolling_cfg.get("aggregators", {})
+        if isinstance(agg_dict, dict):
+            for agg_name, agg_cfg in agg_dict.items():
+                aggregators[agg_name] = {
+                    "enabled": agg_cfg.get("enabled", True) if isinstance(agg_cfg, dict) else True,
+                    "description": self._AGG_DESCRIPTIONS.get(agg_name, ""),
+                }
+
+        layers["layer3"] = {
+            "name": "Rolling Aggregation",
+            "enabled": rolling_cfg.get("enabled", True),
+            "windows": rolling_cfg.get("windows", []),
+            "aggregators": aggregators,
+            "apply_to": rolling_cfg.get("apply_to", "all"),
+        }
+
+        # --- Layer 4: Lag Features ---
+        lag_cfg = config_dict.get("lag_features", {})
+        layers["layer4"] = {
+            "name": "Lag Features",
+            "enabled": lag_cfg.get("enabled", True),
+            "apply_to": lag_cfg.get("apply_to", "layer1_and_raw"),
+            "exclude_patterns": lag_cfg.get("exclude_patterns", []),
+        }
+
+        # --- Layer 5: Cross-Sectional ---
+        cross_cfg = config_dict.get("cross_sectional", {})
+        cross_features: Dict[str, Any] = {}
+        feat_dict = cross_cfg.get("features", {})
+        if isinstance(feat_dict, dict):
+            for feat_name, feat_cfg in feat_dict.items():
+                cross_features[feat_name] = {
+                    "enabled": feat_cfg.get("enabled", True) if isinstance(feat_cfg, dict) else True,
+                    "description": "",
+                }
+
+        layers["layer5"] = {
+            "name": "Cross-Sectional",
+            "enabled": cross_cfg.get("enabled", False),
+            "reference_symbol": cross_cfg.get("reference_symbol", "BTCUSDT"),
+            "features": cross_features,
+        }
+
+        # --- Layer 6: Meta Features ---
+        meta_cfg = config_dict.get("meta_features", {})
+        sub_engines: Dict[str, Any] = {}
+        for sub_key in ["consensus", "interaction", "time_features", "trend_consensus",
+                        "momentum_divergence", "volume_price_divergence", "volatility_regime"]:
+            sub_engines[sub_key] = {
+                "enabled": meta_cfg.get(sub_key, True),
+                "description": self._META_DESCRIPTIONS.get(sub_key, ""),
+            }
+
+        layers["layer6"] = {
+            "name": "Meta Features",
+            "enabled": meta_cfg.get("enabled", True),
+            "sub_engines": sub_engines,
+        }
+
+        # --- Layer 6.5: Preprocessing ---
+        prep_cfg = config_dict.get("preprocessing", {})
+        methods: Dict[str, Any] = {}
+        for method_key in ["winsorization", "rank_transform", "adaptive_zscore",
+                           "gaussian_normalize", "adf_differencing", "fractional_differencing"]:
+            method_cfg = prep_cfg.get(method_key, {})
+            if not isinstance(method_cfg, dict):
+                method_cfg = {}
+            methods[method_key] = {
+                "enabled": method_cfg.get("enabled", False),
+                "description": self._PREPROCESSING_DESCRIPTIONS.get(method_key, ""),
+                "params": {k: v for k, v in method_cfg.items() if k != "enabled"},
+            }
+
+        layers["layer6_5"] = {
+            "name": "Preprocessing",
+            "enabled": prep_cfg.get("enabled", False),
+            "mode": prep_cfg.get("mode", "append"),
+            "methods": methods,
+        }
+
+        return {"layers": layers}
+
+    @staticmethod
+    def _apply_toggle_to_dict(config: Dict[str, Any], path: str, value: Any) -> bool:
+        """Apply a single toggle to a config dict using dot-path notation.
+
+        Handles both dict navigation and list-by-name lookups:
+        - ``atomic_indicators.trend.indicators.EMA.enabled`` → list lookup by name
+        - ``rolling_aggregation.aggregators.zscore.enabled`` → dict key navigation
+        """
+        parts = path.split(".")
+        if len(parts) < 2:
+            return False
+
+        current: Any = config
+        i = 0
+        while i < len(parts) - 1:
+            part = parts[i]
+            if not isinstance(current, dict) or part not in current:
+                return False
+            child = current[part]
+
+            if isinstance(child, list):
+                # Next part is a name to find in the list
+                i += 1
+                if i >= len(parts):
+                    return False
+                name_to_find = parts[i]
+                found = None
+                for item in child:
+                    if isinstance(item, dict):
+                        if item.get("name") == name_to_find or item.get("name_suffix") == name_to_find:
+                            found = item
+                            break
+                if found is None:
+                    return False
+                current = found
+            else:
+                current = child
+            i += 1
+
+        if isinstance(current, dict):
+            current[parts[-1]] = value
+            return True
+        return False
+
     def start_research(self, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Start a lightweight AutoResearch task."""
         task_id = str(uuid.uuid4())

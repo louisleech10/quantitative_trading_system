@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Literal, Union
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_serializer
 
 
 class GlobalSettings(BaseModel):
@@ -50,6 +50,7 @@ class TimeframeConfig(BaseModel):
 
 class IndicatorDef(BaseModel):
     name: str
+    enabled: bool = True
     params: Optional[Dict[str, Any]] = None
     param_strategy: Optional[str] = None
     data_sources: Optional[List[str]] = None
@@ -70,8 +71,15 @@ class CategoryConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class AdvancedFeatureItemConfig(BaseModel):
+    """Microstructure/Entropy/TailRisk 子特徵配置"""
+    enabled: bool = True
+    model_config = ConfigDict(extra="allow")
+
+
 class MicrostructureConfig(BaseModel):
     enabled: bool = False
+    features: Dict[str, AdvancedFeatureItemConfig] = Field(default_factory=dict)
     windows: List[int] = Field(default_factory=lambda: [5, 13, 21, 55])
     epsilon: float = 1e-10
     min_trades: int = 1
@@ -85,6 +93,7 @@ class MicrostructureConfig(BaseModel):
 
 class EntropyConfig(BaseModel):
     enabled: bool = False
+    features: Dict[str, AdvancedFeatureItemConfig] = Field(default_factory=dict)
     windows: List[int] = Field(default_factory=lambda: [55, 100])
     n_bins: int = 10
     apen_m: int = 2
@@ -107,6 +116,7 @@ class EntropyConfig(BaseModel):
 
 class TailRiskConfig(BaseModel):
     enabled: bool = False
+    features: Dict[str, AdvancedFeatureItemConfig] = Field(default_factory=dict)
     windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
     cvar_alphas: List[float] = Field(default_factory=lambda: [0.01, 0.05])
     rv_windows: List[int] = Field(default_factory=lambda: [13, 21, 55])
@@ -196,35 +206,75 @@ class OperatorToggle(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class BinarySignalRule(BaseModel):
+    """Binary signal 規則定義"""
+    indicator: str
+    condition: str
+    name_suffix: str
+    enabled: bool = True
+
+
+class BinarySignalToggle(OperatorToggle):
+    """Binary signal operator 配置（含 per-rule 控制）"""
+    rules: List[BinarySignalRule] = Field(default_factory=list)
+
+
+class OperatorItemConfig(BaseModel):
+    """WorldQuant / 通用 per-operator 配置"""
+    enabled: bool = True
+    model_config = ConfigDict(extra="allow")
+
+
+class WorldQuantToggle(OperatorToggle):
+    """WorldQuant operator 配置（含 per-sub-operator 控制）"""
+    operators: Optional[Dict[str, OperatorItemConfig]] = None
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Any) -> Dict[str, Any]:
+        d = handler(self)
+        if d.get("operators") is None:
+            d.pop("operators", None)
+        return d
+
+
 class OperatorConfig(BaseModel):
     distance: OperatorToggle = Field(default_factory=OperatorToggle)
     cross: OperatorToggle = Field(default_factory=OperatorToggle)
     momentum_change: OperatorToggle = Field(default_factory=OperatorToggle, alias="momentum")
     ratio: OperatorToggle = Field(default_factory=OperatorToggle)
-    binary_signal: OperatorToggle = Field(default_factory=OperatorToggle)
-    worldquant: OperatorToggle = Field(default_factory=OperatorToggle)
+    binary_signal: BinarySignalToggle = Field(default_factory=BinarySignalToggle)
+    worldquant: WorldQuantToggle = Field(default_factory=WorldQuantToggle)
     model_config = ConfigDict(populate_by_name=True)
+
+
+class AggregatorConfig(BaseModel):
+    """Rolling aggregation 單一聚合器配置"""
+    enabled: bool = True
+    model_config = ConfigDict(extra="allow")
 
 
 class RollingAggConfig(BaseModel):
     enabled: bool = True
     windows: List[int] = Field(default_factory=lambda: [5, 13, 21])
-    aggregators: List[str] = Field(
-        default_factory=lambda: [
-            "slope",
-            "std",
-            "mean",
-            "rank",
-            "zscore",
-            "skew",
-            "kurt",
-            "min",
-            "max",
-            "range",
-        ]
+    aggregators: Dict[str, AggregatorConfig] = Field(
+        default_factory=lambda: {
+            name: AggregatorConfig()
+            for name in [
+                "slope", "std", "mean", "rank", "zscore",
+                "skew", "kurt", "min", "max", "range",
+            ]
+        }
     )
     apply_to: Union[str, List[str]] = "all"
     model_config = ConfigDict(extra="allow")
+
+    @field_validator("aggregators", mode="before")
+    @classmethod
+    def normalize_aggregators(cls, v: Any) -> Any:
+        """向後相容：list[str] → dict[str, AggregatorConfig]"""
+        if isinstance(v, list):
+            return {name: {"enabled": True} for name in v}
+        return v
 
 
 class LagConfig(BaseModel):
@@ -234,13 +284,30 @@ class LagConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class CrossFeatureConfig(BaseModel):
+    """Cross-sectional 單一特徵配置"""
+    enabled: bool = True
+    model_config = ConfigDict(extra="allow")
+
+
 class CrossSectionalConfig(BaseModel):
     enabled: bool = True
     reference_symbol: str = "BTCUSDT"
-    features: List[str] = Field(
-        default_factory=lambda: ["relative_price", "beta", "idiosyncratic_momentum"]
+    features: Dict[str, CrossFeatureConfig] = Field(
+        default_factory=lambda: {
+            name: CrossFeatureConfig()
+            for name in ["relative_price", "beta", "idiosyncratic_momentum"]
+        }
     )
     model_config = ConfigDict(extra="allow")
+
+    @field_validator("features", mode="before")
+    @classmethod
+    def normalize_features(cls, v: Any) -> Any:
+        """向後相容：list[str] → dict[str, CrossFeatureConfig]"""
+        if isinstance(v, list):
+            return {name: {"enabled": True} for name in v}
+        return v
 
 
 class MetaFeatureConfig(BaseModel):

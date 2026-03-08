@@ -13,6 +13,8 @@ import {
   DistributionData,
   NanPatternData,
   BrowseFeatureDataResponse,
+  FeatureSchema,
+  BatchToggleItem,
 } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
@@ -77,15 +79,17 @@ export function useFeatureFactory() {
     setLastNLResult,
     updateConfigPartial,
     setExplorerSummary,
+    setSchema,
   } = useFeatureFactoryStore();
 
   const loadInitial = useCallback(async () => {
     try {
-      const [config, presets, indicators, dataSources] = await Promise.all([
+      const [config, presets, indicators, dataSources, schema] = await Promise.all([
         requestJson<FeatureFactoryConfig>('/config'),
         requestJson<FeatureFactoryPreset[]>('/presets'),
         requestJson<FeatureIndicatorSpec[]>('/indicators'),
         requestJson<unknown[]>('/data-sources'),
+        requestJson<FeatureSchema>('/schema'),
       ]);
 
       const normalizedSources = dataSources
@@ -110,12 +114,13 @@ export function useFeatureFactory() {
       setPresets(normalizedPresets);
       setIndicators(indicators);
       setDataSources(normalizedSources);
+      setSchema(schema);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : '載入初始化資料失敗';
       setError(message);
     }
-  }, [setConfig, setPresets, setIndicators, setDataSources, setError]);
+  }, [setConfig, setPresets, setIndicators, setDataSources, setSchema, setError]);
 
   const previewConfig = useCallback(
     async (configOverride: FeatureFactoryConfig) => {
@@ -281,6 +286,63 @@ export function useFeatureFactory() {
     []
   );
 
+  const loadSchema = useCallback(async () => {
+    try {
+      const schema = await requestJson<FeatureSchema>('/schema');
+      setSchema(schema);
+      return schema;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Schema 載入失敗';
+      setError(message);
+      return null;
+    }
+  }, [setSchema, setError]);
+
+  const batchToggle = useCallback(
+    async (toggles: BatchToggleItem[]) => {
+      try {
+        const result = await requestJson<{
+          results: Array<{ path: string; value: boolean; success: boolean }>;
+          config: FeatureFactoryConfig;
+          preview: FeaturePreview;
+        }>('/config/batch-toggle', {
+          method: 'PUT',
+          body: JSON.stringify({ toggles }),
+        });
+        setConfig(normalizeConfig(result.config));
+        setPreview(result.preview);
+        return result;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '批量切換失敗';
+        setError(message);
+        return null;
+      }
+    },
+    [setConfig, setPreview, setError]
+  );
+
+  const applyPreset = useCallback(
+    async (presetName: string) => {
+      try {
+        const result = await requestJson<{
+          config: FeatureFactoryConfig;
+          preview: FeaturePreview;
+        }>(`/config/presets/${encodeURIComponent(presetName)}`, { method: 'POST' });
+        setConfig(normalizeConfig(result.config));
+        setPreview(result.preview);
+        // Reload schema to reflect preset changes
+        const schema = await requestJson<FeatureSchema>('/schema');
+        setSchema(schema);
+        return result;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '套用 Preset 失敗';
+        setError(message);
+        return null;
+      }
+    },
+    [setConfig, setPreview, setSchema, setError]
+  );
+
   return {
     loadInitial,
     previewConfig,
@@ -293,5 +355,8 @@ export function useFeatureFactory() {
     browseDistribution,
     browseNanPattern,
     browseData,
+    loadSchema,
+    batchToggle,
+    applyPreset,
   };
 }

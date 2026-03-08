@@ -1,11 +1,12 @@
 # API 端點規範
 
 ## 文檔資訊
-- **版本**: 4.0
-- **最後更新**: 2026-02-18
+- **版本**: 5.0
+- **最後更新**: 2026-03-08
 - **Base URL**: `http://localhost:8000`（開發環境）
 - **API Prefix**: `/api/v1`
 - **變更記錄**:
+  - v5.0 (2026-03-08): 新增 Feature Factory Granular Control API（Section 19）- Per-Indicator 細粒度控制 3 個端點（Schema / Batch Toggle / Preset）；基於 FEATURE_FACTORY_GRANULAR_CONTROL_PLAN V1.2
   - v4.0 (2026-02-18): 新增 Model Enhancement API（Section 16）- Phase 3.5 模型增強系統 8 個端點；新增 Hyperparameter Optimization API（Section 17）及 Execution Optimization API（Section 18）- Phase 4 回測系統優化；更新 Router 註冊對照表
   - v3.2 (2026-02-14): 新增 Dual-Engine ML API（Section 15）- Phase 3.7 雙引擎 ML 系統（LightGBM + XGBoost）7 個端點；通用模型訓練、LightGBM 專屬訓練、雙引擎對比報告、通用批量分析
   - v3.1 (2026-02-13): 新增 IC Analysis API（Section 14）- IC Gatekeeper 篩選系統 13 個端點，WebSocket 實時進度推送
@@ -36,9 +37,10 @@
 17. [Model Enhancement API (Phase 3.5)](#16-model-enhancement-api-phase-35)
 18. [Hyperparameter Optimization API (Phase 4)](#17-hyperparameter-optimization-api-phase-4)
 19. [Execution Optimization API (Phase 4)](#18-execution-optimization-api-phase-4)
-20. [WebSocket API](#websocket-api)
-21. [錯誤處理](#錯誤處理)
-22. [數據模型](#數據模型)
+20. [Feature Factory Granular Control API](#19-feature-factory-granular-control-api)
+21. [WebSocket API](#websocket-api)
+22. [錯誤處理](#錯誤處理)
+23. [數據模型](#數據模型)
 
 ---
 
@@ -1356,6 +1358,201 @@ ws://localhost:8000/ws/ic-analysis/{task_id}
   "execution_time": 20.5,
   "final_features_count": 42,
   "report_available": true
+}
+```
+
+---
+
+## 19. Feature Factory Granular Control API
+
+> **路由**: `api/routes/feature_factory.py` | **Prefix**: `/api/v1/features`  
+> **依據**: FEATURE_FACTORY_GRANULAR_CONTROL_PLAN V1.2  
+> **新增於**: v5.0 (2026-03-08)
+
+Per-Indicator 細粒度控制 — 支援 Layer 1~6.5 所有層級的指標/聚合器/運算子獨立啟用/關閉。
+
+### 19.1 取得完整 Schema
+```http
+GET /api/v1/features/schema
+```
+
+回傳 7 層架構的完整 Schema，包含所有可用指標、描述與當前 enabled 狀態，供前端動態渲染 UI。
+
+**Response** (200 OK):
+```json
+{
+  "layers": {
+    "layer1": {
+      "name": "Atomic Indicators",
+      "enabled": true,
+      "categories": {
+        "trend": {
+          "enabled": true,
+          "level": "L1",
+          "description": "趨勢指標",
+          "indicators": [
+            {
+              "name": "EMA",
+              "enabled": true,
+              "description": "指數移動平均",
+              "params": { "periods": "fibonacci", "period_range": [5, 233] }
+            }
+          ]
+        }
+      }
+    },
+    "layer2": {
+      "name": "Derived Operators",
+      "enabled": true,
+      "operators": {
+        "distance": { "enabled": true, "description": "距離運算" },
+        "cross": { "enabled": true, "description": "交叉運算" },
+        "momentum": { "enabled": true, "description": "動量運算" },
+        "ratio": { "enabled": true, "description": "比率運算" },
+        "binary_signal": { "enabled": true, "description": "二元信號" },
+        "worldquant": { "enabled": true, "description": "WorldQuant 算子" }
+      }
+    },
+    "layer3": {
+      "name": "Rolling Aggregation",
+      "enabled": true,
+      "aggregators": {
+        "mean": { "enabled": true },
+        "std": { "enabled": true },
+        "rank": { "enabled": true }
+      },
+      "windows": [5, 13, 21, 34, 55]
+    },
+    "layer4": { "name": "Lag Features", "enabled": true },
+    "layer5": {
+      "name": "Cross-Sectional",
+      "enabled": true,
+      "features": {
+        "relative_price": { "enabled": true },
+        "beta": { "enabled": true },
+        "idiosyncratic_momentum": { "enabled": true }
+      }
+    },
+    "layer6": {
+      "name": "Meta Features",
+      "enabled": true,
+      "sub_engines": {
+        "consensus": { "enabled": true },
+        "interaction": { "enabled": true },
+        "time_features": { "enabled": true },
+        "trend_consensus": { "enabled": true },
+        "momentum_divergence": { "enabled": true },
+        "volume_price_divergence": { "enabled": true },
+        "volatility_regime": { "enabled": true }
+      }
+    },
+    "layer6_5": {
+      "name": "Preprocessing",
+      "enabled": false,
+      "methods": {
+        "winsorization": { "enabled": true },
+        "rank_transform": { "enabled": true },
+        "adaptive_zscore": { "enabled": true },
+        "gaussian_normalize": { "enabled": false },
+        "adf_differencing": { "enabled": false },
+        "fractional_differencing": { "enabled": false }
+      }
+    }
+  }
+}
+```
+
+### 19.2 批量切換啟用狀態
+```http
+PUT /api/v1/features/config/batch-toggle
+```
+
+批量切換指標/聚合器/運算子的 enabled 狀態。支援任意深度路徑。
+
+**Request Body** (`BatchToggleRequest`):
+```json
+{
+  "toggles": [
+    { "path": "atomic_indicators.trend.indicators.EMA.enabled", "value": true },
+    { "path": "atomic_indicators.trend.indicators.SMA.enabled", "value": false },
+    { "path": "rolling_aggregation.aggregators.zscore.enabled", "value": false },
+    { "path": "operators.distance.enabled", "value": false }
+  ]
+}
+```
+
+**Response** (200 OK):
+```json
+{
+  "results": [
+    { "path": "atomic_indicators.trend.indicators.EMA.enabled", "success": true },
+    { "path": "atomic_indicators.trend.indicators.SMA.enabled", "success": true },
+    { "path": "rolling_aggregation.aggregators.zscore.enabled", "success": true },
+    { "path": "operators.distance.enabled", "success": true }
+  ],
+  "config": { },
+  "preview": {
+    "total_features": 2345,
+    "estimated_time_seconds": 12.5,
+    "memory_mb": 45.0,
+    "breakdown": {
+      "atomic": 800,
+      "derived": 200,
+      "rolling": 1000,
+      "lag": 100,
+      "cross_sectional": 3,
+      "meta": 42,
+      "labels": 200
+    }
+  }
+}
+```
+
+**錯誤**：無效路徑時該項 `success: false`，其餘正常項仍執行。
+
+### 19.3 套用預設配置
+```http
+POST /api/v1/features/config/presets/{preset_name}
+```
+
+套用具名預設配置，回傳更新後的 config 和 preview。
+
+**Path Parameters**:
+| 參數 | 類型 | 說明 |
+|------|------|------|
+| `preset_name` | string | 預設名稱（見下表） |
+
+**可用預設**:
+| 預設名 | 說明 |
+|--------|------|
+| `minimal` | 最小配置（Trend + Momentum） |
+| `standard` | 標準配置（全部 TA-Lib） |
+| `basic_essential` | 基礎精選（4 核心 + Winsor + Rank） |
+| `intermediate_research` | 進階研究（+ Stats, Cycle, Pattern） |
+| `professional_full` | 完整專業（+ Micro + Entropy） |
+| `ml_optimized` | ML 專用 |
+| `trend_focused` | 趨勢策略（Trend 全開 + Momentum 精選） |
+| `momentum_focused` | 動量策略（Momentum + Volume 全開） |
+| `microstructure_focused` | 微觀結構研究（Micro + Volume + Entropy） |
+| `lightweight_ml` | 輕量 ML（~30 核心指標 + rank preprocessing） |
+
+**Response** (200 OK):
+```json
+{
+  "config": { },
+  "preview": {
+    "total_features": 1234,
+    "estimated_time_seconds": 8.0,
+    "memory_mb": 30.0,
+    "breakdown": { }
+  }
+}
+```
+
+**Error** (400 Bad Request):
+```json
+{
+  "detail": "Unknown preset: invalid_name"
 }
 ```
 

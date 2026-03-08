@@ -95,6 +95,10 @@ class FeatureFactoryMCP:
             {"name": "intermediate_research", "description": "🟡 中階研究 — 進階策略開發", "level": "L2"},
             {"name": "professional_full", "description": "🔴 專業全量 — 量化研究全配", "level": "L3"},
             {"name": "ml_optimized", "description": "🤖 ML 友善 — 去冗餘、已正規化", "level": "ML"},
+            {"name": "trend_focused", "description": "📈 趨勢策略 — Trend 全開 + RSI/MACD/ADX", "level": "L1"},
+            {"name": "momentum_focused", "description": "⚡ 動量策略 — Momentum + Volume 全開", "level": "L1"},
+            {"name": "microstructure_focused", "description": "🔬 微觀結構 — Micro + Volume + Entropy", "level": "L3"},
+            {"name": "lightweight_ml", "description": "🪶 輕量 ML — ~30 精選指標 + Rank 預處理", "level": "ML"},
         ]
 
         for preset_info in preset_definitions:

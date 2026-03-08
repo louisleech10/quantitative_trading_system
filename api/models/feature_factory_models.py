@@ -4,7 +4,7 @@ Feature Factory API Models
 Pydantic models for Feature Factory endpoints.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -56,3 +56,16 @@ class NL2ConfigResponse(BaseModel):
     config_patch: Dict
     description: str
     preview: FeaturePreviewResponse
+
+
+class BatchToggleItem(BaseModel):
+    """Single toggle operation."""
+
+    path: str = Field(..., description="點分路徑，例如 atomic_indicators.trend.indicators.EMA.enabled")
+    value: bool = Field(..., description="啟用或關閉")
+
+
+class BatchToggleRequest(BaseModel):
+    """Batch toggle request."""
+
+    toggles: List[BatchToggleItem] = Field(..., description="批量切換操作列表")

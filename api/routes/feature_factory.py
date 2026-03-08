@@ -11,6 +11,7 @@ from fastapi.responses import Response, StreamingResponse
 
 from api.core.logging import get_logger
 from api.models.feature_factory_models import (
+    BatchToggleRequest,
     FeatureGenerateRequest,
     FeaturePreviewRequest,
     FeaturePreviewResponse,
@@ -62,6 +63,41 @@ async def validate_config(config: Dict = Body(...)):
         return feature_factory_service.validate_config(config)
     except Exception as exc:
         logger.error("Failed to validate config: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/schema")
+async def get_schema():
+    """Get complete schema with all available indicators, descriptions, and current enabled state."""
+    try:
+        return feature_factory_service.get_schema()
+    except Exception as exc:
+        logger.error("Failed to get schema: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.put("/config/batch-toggle")
+async def batch_toggle(request: BatchToggleRequest):
+    """Batch toggle indicator/aggregator/operator enabled states."""
+    try:
+        return feature_factory_service.batch_toggle(
+            [t.model_dump() for t in request.toggles]
+        )
+    except Exception as exc:
+        logger.error("Failed to batch toggle: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/config/presets/{preset_name}")
+async def apply_preset(preset_name: str):
+    """Apply a named preset and return the resulting config + preview."""
+    try:
+        return feature_factory_service.apply_preset_config(preset_name)
+    except ValueError as exc:
+        logger.error("Invalid preset name: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to apply preset: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

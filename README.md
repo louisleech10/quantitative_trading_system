@@ -60,6 +60,33 @@
 
 ## 核心特色
 
+## 開發一鍵啟停（前後端）
+
+可使用腳本 [scripts/dev_stack.sh](scripts/dev_stack.sh) 一鍵管理前後端。
+
+```bash
+# 專案根目錄
+./scripts/dev_stack.sh dev       # 前景模式：同一 terminal 即時看 backend + frontend（Ctrl+C 一次全停）
+./scripts/dev_stack.sh start     # 一鍵啟動 backend + frontend
+./scripts/dev_stack.sh stop      # 一鍵停止 backend + frontend
+./scripts/dev_stack.sh stop-force # 強制清掉 8000/3000 監聽程序（包含外部啟動）
+./scripts/dev_stack.sh restart   # 一鍵重啟
+./scripts/dev_stack.sh status    # 查看狀態
+./scripts/dev_stack.sh watch     # 即時監看狀態（每秒刷新）
+./scripts/dev_stack.sh logs      # 查看雙端 log
+./scripts/dev_stack.sh logs-live # 即時追蹤雙端 log
+./scripts/dev_stack.sh logs-back # 只看 backend log
+./scripts/dev_stack.sh logs-back-live  # 即時追蹤 backend log
+./scripts/dev_stack.sh logs-front# 只看 frontend log
+./scripts/dev_stack.sh logs-front-live # 即時追蹤 frontend log
+```
+
+Log 與 PID 位置：
+- `.run/dev/backend.log`
+- `.run/dev/frontend.log`
+- `.run/dev/backend.pid`
+- `.run/dev/frontend.pid`
+
 ### 1. 案例搜索引擎（已完成 ✅）
 
 **20參數框架** - 精確定義搜索條件：

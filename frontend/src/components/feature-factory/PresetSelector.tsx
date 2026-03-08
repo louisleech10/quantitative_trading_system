@@ -1,6 +1,7 @@
 'use client';
 
 import { FeatureFactoryPreset } from '@/lib/types';
+import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 
 interface PresetSelectorProps {
   presets: FeatureFactoryPreset[];
@@ -17,6 +18,7 @@ export default function PresetSelector({
   onPresetChange,
 }: PresetSelectorProps) {
   const selected = presets.find((item) => item.name === selectedPreset);
+  const { applyPreset } = useFeatureFactory();
 
   const levelLabel: Record<string, string> = {
     L1: '🟢 基礎',
@@ -25,16 +27,24 @@ export default function PresetSelector({
     ML: '🤖 ML',
   };
 
+  const handleChange = async (presetName: string) => {
+    // Try server-side apply first (includes new Phase B presets)
+    const result = await applyPreset(presetName);
+    if (result) {
+      onPresetChange(presetName, result.config);
+      return;
+    }
+    // Fallback: use locally-cached preset config
+    const preset = presets.find((item) => item.name === presetName);
+    onPresetChange(presetName, preset?.config);
+  };
+
   return (
     <div className="space-y-3">
       <label className="text-xs uppercase tracking-[0.2em] text-slate-400">Preset</label>
       <select
         value={selectedPreset ?? ''}
-        onChange={(event) => {
-          const presetName = event.target.value;
-          const preset = presets.find((item) => item.name === presetName);
-          onPresetChange(presetName, preset?.config);
-        }}
+        onChange={(event) => handleChange(event.target.value)}
         className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-300/40"
       >
         <option value="">選擇 Preset</option>

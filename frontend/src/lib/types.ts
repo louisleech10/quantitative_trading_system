@@ -181,29 +181,37 @@ export interface FeatureFactoryConfig {
     string,
     {
       enabled: boolean;
-      indicators?: unknown[];
+      indicators?: Array<{ name: string; enabled?: boolean; [key: string]: unknown }>;
+      features?: Record<string, { enabled: boolean; [key: string]: unknown }>;
       data_sources?: string[] | null;
     }
   >;
-  operators?: Record<string, { enabled: boolean }>;
+  operators?: Record<string, { enabled: boolean; [key: string]: unknown }>;
   rolling_aggregation?: {
+    enabled?: boolean;
     windows: number[];
-    aggregators?: string[];
+    aggregators?: Record<string, { enabled: boolean; [key: string]: unknown }> | string[];
     apply_to?: string | string[];
   };
   lag_features?: {
+    enabled?: boolean;
     apply_to?: string | string[];
     exclude_patterns?: string[];
   };
   cross_sectional?: {
     enabled?: boolean;
     reference_symbol?: string;
-    features?: string[];
+    features?: Record<string, { enabled: boolean; [key: string]: unknown }> | string[];
   };
   meta_features?: {
+    enabled?: boolean;
     consensus?: boolean;
     interaction?: boolean;
     time_features?: boolean;
+    trend_consensus?: boolean;
+    momentum_divergence?: boolean;
+    volume_price_divergence?: boolean;
+    volatility_regime?: boolean;
   };
   labels?: {
     binary?: { horizons?: number[]; threshold?: number };
@@ -253,6 +261,102 @@ export interface FeatureFactoryConfig {
       apply_to?: string | string[];
     };
   };
+}
+
+// ===== Feature Factory Schema Types =====
+
+export interface SchemaIndicator {
+  name: string;
+  enabled: boolean;
+  description: string;
+  params?: Record<string, unknown>;
+}
+
+export interface SchemaCategory {
+  enabled: boolean;
+  level: string;
+  description: string;
+  indicators?: SchemaIndicator[];
+  features?: SchemaIndicator[];
+  params?: Record<string, unknown>;
+}
+
+export interface SchemaOperator {
+  enabled: boolean;
+  description: string;
+  rules?: Array<{
+    indicator: string;
+    condition: string;
+    name_suffix: string;
+    enabled: boolean;
+  }>;
+  operators?: Record<string, { enabled: boolean }>;
+}
+
+export interface SchemaAggregator {
+  enabled: boolean;
+  description: string;
+}
+
+export interface SchemaSubEngine {
+  enabled: boolean;
+  description: string;
+}
+
+export interface SchemaMethod {
+  enabled: boolean;
+  description: string;
+  params?: Record<string, unknown>;
+}
+
+export interface FeatureSchema {
+  layers: {
+    layer1: {
+      name: string;
+      enabled: boolean;
+      categories: Record<string, SchemaCategory>;
+    };
+    layer2: {
+      name: string;
+      enabled: boolean;
+      operators: Record<string, SchemaOperator>;
+    };
+    layer3: {
+      name: string;
+      enabled: boolean;
+      windows: number[];
+      aggregators: Record<string, SchemaAggregator>;
+      apply_to: string;
+    };
+    layer4: {
+      name: string;
+      enabled: boolean;
+      apply_to: string;
+      exclude_patterns: string[];
+    };
+    layer5: {
+      name: string;
+      enabled: boolean;
+      reference_symbol: string;
+      features: Record<string, { enabled: boolean; description: string }>;
+    };
+    layer6: {
+      name: string;
+      enabled: boolean;
+      sub_engines: Record<string, SchemaSubEngine>;
+    };
+    layer6_5: {
+      name: string;
+      enabled: boolean;
+      mode: string;
+      methods: Record<string, SchemaMethod>;
+    };
+  };
+}
+
+export interface BatchToggleItem {
+  path: string;
+  value: boolean;
 }
 
 export interface FeaturePreview {

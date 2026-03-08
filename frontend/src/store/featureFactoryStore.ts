@@ -11,6 +11,7 @@ import {
   AutoResearchLogEntry,
   FeatureSummary,
   ExplorerTab,
+  FeatureSchema,
 } from '@/lib/types';
 
 interface FeatureFactoryState {
@@ -34,6 +35,9 @@ interface FeatureFactoryState {
   explorerSelectedFeature: string | null;
   explorerSelectedFeatures: string[];
   explorerSummary: FeatureSummary | null;
+  // Phase C: schema and search
+  schema: FeatureSchema | null;
+  indicatorSearch: string;
   setConfig: (config: FeatureFactoryConfig) => void;
   updateConfigPartial: (partial: Record<string, unknown>) => void;
   setPresets: (presets: FeatureFactoryPreset[]) => void;
@@ -54,6 +58,17 @@ interface FeatureFactoryState {
   setExplorerActiveTab: (tab: ExplorerTab, selectedFeature?: string | null) => void;
   setExplorerSelectedFeatures: (features: string[]) => void;
   setExplorerSummary: (summary: FeatureSummary | null) => void;
+  // Phase C: new actions
+  setSchema: (schema: FeatureSchema | null) => void;
+  setIndicatorSearch: (search: string) => void;
+  toggleIndicator: (category: string, indicatorName: string, enabled: boolean) => void;
+  toggleAllInCategory: (category: string, enabled: boolean) => void;
+  toggleCategory: (category: string, enabled: boolean) => void;
+  toggleAggregator: (name: string, enabled: boolean) => void;
+  toggleAllAggregators: (enabled: boolean) => void;
+  toggleMetaSubEngine: (name: string, enabled: boolean) => void;
+  toggleCrossFeature: (name: string, enabled: boolean) => void;
+  toggleOperator: (name: string, enabled: boolean) => void;
 }
 
 const mergeDeep = (
@@ -97,6 +112,8 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
   explorerSelectedFeature: null,
   explorerSelectedFeatures: [],
   explorerSummary: null,
+  schema: null,
+  indicatorSearch: '',
   setConfig: (config) => set({ config }),
   updateConfigPartial: (partial) =>
     set((state) => ({
@@ -130,4 +147,176 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
     })),
   setExplorerSelectedFeatures: (features) => set({ explorerSelectedFeatures: features }),
   setExplorerSummary: (summary) => set({ explorerSummary: summary }),
+  // Phase C: new actions
+  setSchema: (schema) => set({ schema }),
+  setIndicatorSearch: (indicatorSearch) => set({ indicatorSearch }),
+  toggleIndicator: (category, indicatorName, enabled) =>
+    set((state) => {
+      if (!state.config) return {};
+      const catCfg = state.config.atomic_indicators[category];
+      if (!catCfg) return {};
+      // For categories with indicators array (TA-Lib types)
+      if (catCfg.indicators) {
+        const updatedIndicators = catCfg.indicators.map((ind) =>
+          ind.name === indicatorName ? { ...ind, enabled } : ind
+        );
+        return {
+          config: {
+            ...state.config,
+            atomic_indicators: {
+              ...state.config.atomic_indicators,
+              [category]: { ...catCfg, indicators: updatedIndicators },
+            },
+          },
+        };
+      }
+      // For categories with features dict (microstructure/entropy/tail_risk)
+      if (catCfg.features) {
+        const feat = catCfg.features[indicatorName];
+        if (!feat) return {};
+        return {
+          config: {
+            ...state.config,
+            atomic_indicators: {
+              ...state.config.atomic_indicators,
+              [category]: {
+                ...catCfg,
+                features: { ...catCfg.features, [indicatorName]: { ...feat, enabled } },
+              },
+            },
+          },
+        };
+      }
+      return {};
+    }),
+  toggleAllInCategory: (category, enabled) =>
+    set((state) => {
+      if (!state.config) return {};
+      const catCfg = state.config.atomic_indicators[category];
+      if (!catCfg) return {};
+      if (catCfg.indicators) {
+        const updatedIndicators = catCfg.indicators.map((ind) => ({ ...ind, enabled }));
+        return {
+          config: {
+            ...state.config,
+            atomic_indicators: {
+              ...state.config.atomic_indicators,
+              [category]: { ...catCfg, indicators: updatedIndicators },
+            },
+          },
+        };
+      }
+      if (catCfg.features) {
+        const updatedFeatures: Record<string, { enabled: boolean; [key: string]: unknown }> = {};
+        for (const [k, v] of Object.entries(catCfg.features)) {
+          updatedFeatures[k] = { ...v, enabled };
+        }
+        return {
+          config: {
+            ...state.config,
+            atomic_indicators: {
+              ...state.config.atomic_indicators,
+              [category]: { ...catCfg, features: updatedFeatures },
+            },
+          },
+        };
+      }
+      return {};
+    }),
+  toggleCategory: (category, enabled) =>
+    set((state) => {
+      if (!state.config) return {};
+      const catCfg = state.config.atomic_indicators[category];
+      if (!catCfg) return {};
+      return {
+        config: {
+          ...state.config,
+          atomic_indicators: {
+            ...state.config.atomic_indicators,
+            [category]: { ...catCfg, enabled },
+          },
+        },
+      };
+    }),
+  toggleAggregator: (name, enabled) =>
+    set((state) => {
+      if (!state.config?.rolling_aggregation) return {};
+      const aggs = state.config.rolling_aggregation.aggregators;
+      if (!aggs || Array.isArray(aggs)) return {};
+      const aggCfg = aggs[name];
+      if (!aggCfg) return {};
+      return {
+        config: {
+          ...state.config,
+          rolling_aggregation: {
+            ...state.config.rolling_aggregation,
+            aggregators: { ...aggs, [name]: { ...aggCfg, enabled } },
+          },
+        },
+      };
+    }),
+  toggleAllAggregators: (enabled) =>
+    set((state) => {
+      if (!state.config?.rolling_aggregation) return {};
+      const aggs = state.config.rolling_aggregation.aggregators;
+      if (!aggs || Array.isArray(aggs)) return {};
+      const updated: Record<string, { enabled: boolean; [key: string]: unknown }> = {};
+      for (const [k, v] of Object.entries(aggs)) {
+        updated[k] = { ...v, enabled };
+      }
+      return {
+        config: {
+          ...state.config,
+          rolling_aggregation: {
+            ...state.config.rolling_aggregation,
+            aggregators: updated,
+          },
+        },
+      };
+    }),
+  toggleMetaSubEngine: (name, enabled) =>
+    set((state) => {
+      if (!state.config) return {};
+      return {
+        config: {
+          ...state.config,
+          meta_features: {
+            ...state.config.meta_features,
+            [name]: enabled,
+          },
+        },
+      };
+    }),
+  toggleCrossFeature: (name, enabled) =>
+    set((state) => {
+      if (!state.config?.cross_sectional) return {};
+      const feats = state.config.cross_sectional.features;
+      if (!feats || Array.isArray(feats)) return {};
+      const feat = feats[name];
+      if (!feat) return {};
+      return {
+        config: {
+          ...state.config,
+          cross_sectional: {
+            ...state.config.cross_sectional,
+            features: { ...feats, [name]: { ...feat, enabled } },
+          },
+        },
+      };
+    }),
+  toggleOperator: (name, enabled) =>
+    set((state) => {
+      if (!state.config?.operators) return {};
+      const opCfg = state.config.operators[name];
+      if (!opCfg) return {};
+      return {
+        config: {
+          ...state.config,
+          operators: {
+            ...state.config.operators,
+            [name]: { ...opCfg, enabled },
+          },
+        },
+      };
+    }),
 }));
