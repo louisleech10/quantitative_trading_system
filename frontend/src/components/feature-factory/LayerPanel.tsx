@@ -347,7 +347,6 @@ function Layer1Content({
         return (
           <CategorySection
             key={catKey}
-            categoryKey={catKey}
             label={CATEGORY_LABELS[catKey] || catKey}
             description={cat.description}
             level={cat.level}

@@ -1219,6 +1219,36 @@ class FeatureFactoryService:
         "fractional_differencing": "分數階差分",
     }
 
+    _SPECIAL_CATEGORY_DEFAULTS: Dict[str, List[str]] = {
+        "microstructure": [
+            "amihud",
+            "kyle_lambda",
+            "roll_spread",
+            "cs_spread",
+            "ofi",
+            "large_trade_ratio",
+            "vpin",
+        ],
+        "entropy": [
+            "shannon",
+            "approximate",
+            "sample",
+            "hurst",
+            "fractal",
+            "permutation",
+        ],
+        "tail_risk": [
+            "cvar",
+            "realized_vol_up",
+            "realized_vol_down",
+            "rsj",
+            "updown_vol_ratio",
+            "gain_pain_ratio",
+            "jarque_bera",
+            "max_drawdown",
+        ],
+    }
+
     def _build_schema(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Build layered schema dict from a config dump."""
         layers: Dict[str, Any] = {}
@@ -1254,7 +1284,22 @@ class FeatureFactoryService:
         for special_key in ["microstructure", "entropy", "tail_risk"]:
             special_cfg = atomic.get(special_key, {})
             features_list = []
-            for feat_name, feat_cfg in (special_cfg.get("features") or {}).items():
+            features_dict = special_cfg.get("features") or {}
+            if not isinstance(features_dict, dict):
+                features_dict = {}
+
+            # Backward compatibility: if special category has no explicit features dict,
+            # expose a complete default list so frontend can render toggles.
+            if not features_dict:
+                default_names = self._SPECIAL_CATEGORY_DEFAULTS.get(special_key, [])
+                enabled_features = special_cfg.get("enabled_features")
+                for name in default_names:
+                    enabled = True
+                    if isinstance(enabled_features, list):
+                        enabled = name in enabled_features
+                    features_dict[name] = {"enabled": enabled}
+
+            for feat_name, feat_cfg in features_dict.items():
                 features_list.append({
                     "name": feat_name,
                     "enabled": feat_cfg.get("enabled", True) if isinstance(feat_cfg, dict) else True,

@@ -27,7 +27,7 @@ class CryptoSpotAdapter(DataSourceAdapter):
         "trades",
     ]
 
-    _SYNTHETIC_FIELDS = ["avg_price", "med_price", "typ_price", "wcl_price"]
+    _SYNTHETIC_FIELDS = ["avg-price", "med-price", "typ-price", "wcl-price"]
 
     def __init__(self, storage_manager: KlineStorageManager) -> None:
         self._storage = storage_manager
@@ -122,10 +122,10 @@ class CryptoSpotAdapter(DataSourceAdapter):
         l = df["low"].astype("float64")
         c = df["close"].astype("float64")
 
-        df["avg_price"] = (o + h + l + c) / 4.0
-        df["med_price"] = (h + l) / 2.0
-        df["typ_price"] = (h + l + c) / 3.0
-        df["wcl_price"] = (h + l + c + c) / 4.0
+        df["avg-price"] = (o + h + l + c) / 4.0
+        df["med-price"] = (h + l) / 2.0
+        df["typ-price"] = (h + l + c) / 3.0
+        df["wcl-price"] = (h + l + c + c) / 4.0
 
         for field in self._SYNTHETIC_FIELDS:
             df[field] = df[field].astype("float32")
@@ -167,29 +167,29 @@ class CryptoSpotAdapter(DataSourceAdapter):
                 "Number of trades",
                 True,
             ),
-            "avg_price": FieldMeta(
-                "avg_price",
+            "avg-price": FieldMeta(
+                "avg-price",
                 "float32",
                 "price",
                 "Average price (O+H+L+C)/4",
                 True,
             ),
-            "med_price": FieldMeta(
-                "med_price",
+            "med-price": FieldMeta(
+                "med-price",
                 "float32",
                 "price",
                 "Median price (H+L)/2",
                 True,
             ),
-            "typ_price": FieldMeta(
-                "typ_price",
+            "typ-price": FieldMeta(
+                "typ-price",
                 "float32",
                 "price",
                 "Typical price (H+L+C)/3",
                 True,
             ),
-            "wcl_price": FieldMeta(
-                "wcl_price",
+            "wcl-price": FieldMeta(
+                "wcl-price",
                 "float32",
                 "price",
                 "Weighted close price (H+L+2C)/4",

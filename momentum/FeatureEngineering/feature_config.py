@@ -30,7 +30,7 @@ class DataSourceConfig(BaseModel):
         ]
     )
     synthetic_sources: List[str] = Field(
-        default_factory=lambda: ["avg_price", "med_price", "typ_price", "wcl_price"]
+        default_factory=lambda: ["avg-price", "med-price", "typ-price", "wcl-price"]
     )
     adapters: Dict[str, AdapterConfig] = Field(default_factory=dict)
 

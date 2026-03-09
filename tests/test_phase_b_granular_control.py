@@ -72,6 +72,16 @@ class TestB1SchemaAPI:
         }
         assert set(categories.keys()) == expected_cats
 
+    def test_layer1_special_categories_have_features(self, config_manager):
+        """microstructure/entropy/tail_risk 在 schema 中不應為空"""
+        from api.services.feature_factory_service import FeatureFactoryService
+        svc = FeatureFactoryService()
+        schema = svc.get_schema()
+
+        categories = schema["layers"]["layer1"]["categories"]
+        for cat in ["microstructure", "entropy", "tail_risk"]:
+            assert len(categories[cat]["features"]) > 0, f"{cat} features 不應為空"
+
     def test_layer1_indicator_has_enabled_field(self, config_manager):
         """每個指標都有 enabled 欄位"""
         from api.services.feature_factory_service import FeatureFactoryService

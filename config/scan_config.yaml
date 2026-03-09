@@ -12,10 +12,10 @@ data_sources:
     - volume
     - taker_ratio
   synthetic_sources:
-    - avg_price
-    - med_price
-    - typ_price
-    - wcl_price
+    - avg-price
+    - med-price
+    - typ-price
+    - wcl-price
   adapters:
     crypto_spot:
       enabled: true

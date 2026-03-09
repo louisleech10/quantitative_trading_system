@@ -12,8 +12,6 @@ import AutoResearchPanel from '@/components/feature-factory/AutoResearchPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
 import LayerPanel from '@/components/feature-factory/LayerPanel';
-import FeaturePreviewBar from '@/components/feature-factory/FeaturePreviewBar';
-import ConfigIOButtons from '@/components/feature-factory/ConfigIOButtons';
 
 const FeatureExplorer = lazy(() => import('@/components/feature-factory/FeatureExplorer'));
 
@@ -26,13 +24,11 @@ export default function FeatureFactoryPage() {
     preview,
     presets,
     dataSources,
+    schema,
     currentTask,
     isGenerating,
-    isPreviewLoading,
     error,
-    schema,
     setError,
-    setConfig,
     updateConfigPartial,
   } = useFeatureFactoryStore();
 
@@ -42,7 +38,6 @@ export default function FeatureFactoryPage() {
     startGeneration,
     requestNL2Config,
     loadTaskResult,
-    loadSchema,
   } = useFeatureFactory();
 
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
@@ -63,15 +58,6 @@ export default function FeatureFactoryPage() {
 
     return () => clearTimeout(timer);
   }, [config, previewConfig]);
-
-  // Reload schema when config changes (debounced)
-  useEffect(() => {
-    if (!config) return;
-    const timer = setTimeout(() => {
-      loadSchema();
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [config, loadSchema]);
 
   useEffect(() => {
     if (currentTask?.status === 'completed') {
@@ -123,7 +109,6 @@ export default function FeatureFactoryPage() {
                 <PlayCircle className="w-5 h-5" />
                 {isGenerating ? '生成中...' : '啟動生成'}
               </button>
-              <ConfigIOButtons config={config} onImport={(imported) => setConfig(imported)} />
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <Wand2 className="w-4 h-4" />
                 支援多時間框架與自動對齊
@@ -143,9 +128,6 @@ export default function FeatureFactoryPage() {
           </div>
         )}
 
-        {/* Feature preview bar (C5+C9) */}
-        <FeaturePreviewBar preview={preview} isLoading={isPreviewLoading} />
-
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <div className="space-y-6">
             <ConfigPanel
@@ -164,9 +146,7 @@ export default function FeatureFactoryPage() {
           </div>
 
           <div className="space-y-6">
-            {/* Granular control panel (C2-C4, C6) */}
             <LayerPanel schema={schema} />
-
             <PreviewPanel preview={preview} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <NLInputBox onSubmit={requestNL2Config} />

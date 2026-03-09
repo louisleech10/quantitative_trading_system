@@ -25,10 +25,10 @@ def test_synthetic_sources():
     expected_typ = (row["high"] + row["low"] + row["close"]) / 3.0
     expected_wcl = (row["high"] + row["low"] + row["close"] + row["close"]) / 4.0
 
-    assert np.isclose(row["avg_price"], expected_avg)
-    assert np.isclose(row["med_price"], expected_med)
-    assert np.isclose(row["typ_price"], expected_typ)
-    assert np.isclose(row["wcl_price"], expected_wcl)
+    assert np.isclose(row["avg-price"], expected_avg)
+    assert np.isclose(row["med-price"], expected_med)
+    assert np.isclose(row["typ-price"], expected_typ)
+    assert np.isclose(row["wcl-price"], expected_wcl)
 
 
 def test_adapter_registry():

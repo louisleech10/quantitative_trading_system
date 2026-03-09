@@ -6,7 +6,6 @@ import IndicatorCheckbox from './IndicatorCheckbox';
 import { SchemaIndicator } from '@/lib/types';
 
 interface CategorySectionProps {
-  categoryKey: string;
   label: string;
   description: string;
   level: string;
@@ -41,7 +40,6 @@ const LEVEL_STYLE: Record<string, { badge: string; border: string }> = {
 };
 
 export default function CategorySection({
-  categoryKey,
   label,
   description,
   level,
@@ -55,9 +53,8 @@ export default function CategorySection({
   onSelectAll,
   onDeselectAll,
 }: CategorySectionProps) {
-  // Pattern category has 61 items — default collapsed
-  const defaultExpanded = categoryKey !== 'pattern';
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  // Default all categories to collapsed for cleaner initial view.
+  const [expanded, setExpanded] = useState(false);
 
   const filteredItems = useMemo(() => {
     if (!searchFilter) return items;

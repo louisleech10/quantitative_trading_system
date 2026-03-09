@@ -21,6 +21,43 @@ from momentum.FeatureEngineering.feature_config import (
 
 logger = get_logger(__name__)
 
+LEGACY_SOURCE_ALIASES = {
+    "avg_price": "avg-price",
+    "med_price": "med-price",
+    "typ_price": "typ-price",
+    "wcl_price": "wcl-price",
+}
+
+SPECIAL_CATEGORY_FEATURE_DEFAULTS = {
+    "microstructure": [
+        "amihud",
+        "kyle_lambda",
+        "roll_spread",
+        "cs_spread",
+        "ofi",
+        "large_trade_ratio",
+        "vpin",
+    ],
+    "entropy": [
+        "shannon",
+        "approximate",
+        "sample",
+        "hurst",
+        "fractal",
+        "permutation",
+    ],
+    "tail_risk": [
+        "cvar",
+        "realized_vol_up",
+        "realized_vol_down",
+        "rsj",
+        "updown_vol_ratio",
+        "gain_pain_ratio",
+        "jarque_bera",
+        "max_drawdown",
+    ],
+}
+
 
 class ConfigManager:
     """Three-layer configuration manager: default < user < API override."""
@@ -41,6 +78,7 @@ class ConfigManager:
         if api_override:
             merged = self.deep_merge(merged, api_override)
         merged = self.migrate_config(merged)
+        merged = self._normalize_data_source_aliases(merged)
         try:
             return FactoryConfig.model_validate(merged)
         except Exception as exc:
@@ -55,8 +93,7 @@ class ConfigManager:
         1. rolling_aggregation.aggregators: list[str] → dict[str, {enabled: True}]
         2. cross_sectional.features: list[str] → dict[str, {enabled: True}]
         3. microstructure.enabled_features: list → features dict
-        4. entropy 舊格式 → 新增 features dict (pass-through, Pydantic handles default)
-        5. tail_risk 同上
+        4. entropy/tail_risk/microstructure 若缺少 features，補齊預設 features dict
         """
         config = raw_config  # in-place is fine; caller already deep-copied
 
@@ -83,7 +120,39 @@ class ConfigManager:
                 if isinstance(ef, list):
                     ms["features"] = {name: {"enabled": True} for name in ef}
                 elif ef == "all":
-                    pass  # features 預設空 dict 時 Engine 沿用 enabled_features="all" 邏輯
+                    ms["features"] = {
+                        name: {"enabled": True}
+                        for name in SPECIAL_CATEGORY_FEATURE_DEFAULTS["microstructure"]
+                    }
+
+            # 4. Entropy/TailRisk (and fallback for microstructure) ensure features dict is present
+            for special_key, default_names in SPECIAL_CATEGORY_FEATURE_DEFAULTS.items():
+                special_cfg = atomic.get(special_key)
+                if not isinstance(special_cfg, dict):
+                    continue
+                features = special_cfg.get("features")
+                if not isinstance(features, dict):
+                    features = {}
+
+                # Keep legacy microstructure allow-list semantics:
+                # when enabled_features is a list, features should contain only listed items.
+                if special_key == "microstructure":
+                    ef = special_cfg.get("enabled_features")
+                    if isinstance(ef, list):
+                        special_cfg["features"] = {name: {"enabled": True} for name in ef}
+                        continue
+
+                # Default behavior: ensure the category has a complete features map for UI/schema.
+                merged_features: Dict[str, Dict[str, Any]] = {
+                    name: {"enabled": True} for name in default_names
+                }
+                for name, cfg in features.items():
+                    if isinstance(cfg, dict):
+                        merged_features[name] = {"enabled": cfg.get("enabled", True), **cfg}
+                    else:
+                        merged_features[name] = {"enabled": True}
+
+                special_cfg["features"] = merged_features
 
         return config
 
@@ -94,6 +163,7 @@ class ConfigManager:
 
         base_config = self._load_yaml(self._default_config_path, required=True)
         merged = self.deep_merge(base_config, config or {})
+        merged = self._normalize_data_source_aliases(merged)
 
         errors.extend(self._validate_json_schema(merged))
 
@@ -107,10 +177,10 @@ class ConfigManager:
             "trades",
             "taker_buy_volume",
             "taker_ratio",
-            "avg_price",
-            "med_price",
-            "typ_price",
-            "wcl_price",
+            "avg-price",
+            "med-price",
+            "typ-price",
+            "wcl-price",
             "funding_rate",
             "open_interest",
         }
@@ -353,6 +423,38 @@ class ConfigManager:
             else:
                 merged[key] = copy.deepcopy(value)
         return merged
+
+    def _normalize_data_source_aliases(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize legacy underscore synthetic source names to canonical hyphen format."""
+        normalized = copy.deepcopy(config)
+
+        data_sources = normalized.get("data_sources")
+        if isinstance(data_sources, dict):
+            enabled_sources = data_sources.get("enabled_sources")
+            if isinstance(enabled_sources, list):
+                data_sources["enabled_sources"] = [LEGACY_SOURCE_ALIASES.get(src, src) for src in enabled_sources]
+
+            synthetic_sources = data_sources.get("synthetic_sources")
+            if isinstance(synthetic_sources, list):
+                data_sources["synthetic_sources"] = [
+                    LEGACY_SOURCE_ALIASES.get(src, src) for src in synthetic_sources
+                ]
+
+        atomic = normalized.get("atomic_indicators")
+        if isinstance(atomic, dict):
+            for category_cfg in atomic.values():
+                if not isinstance(category_cfg, dict):
+                    continue
+                for indicator in category_cfg.get("indicators", []) or []:
+                    if not isinstance(indicator, dict):
+                        continue
+                    indicator_sources = indicator.get("data_sources")
+                    if isinstance(indicator_sources, list):
+                        indicator["data_sources"] = [
+                            LEGACY_SOURCE_ALIASES.get(src, src) for src in indicator_sources
+                        ]
+
+        return normalized
 
     def _load_yaml(self, path: str, required: bool) -> Dict[str, Any]:
         if not os.path.exists(path):
@@ -709,10 +811,10 @@ class ConfigManager:
             "trades",
             "taker_buy_volume",
             "taker_ratio",
-            "avg_price",
-            "med_price",
-            "typ_price",
-            "wcl_price",
+            "avg-price",
+            "med-price",
+            "typ-price",
+            "wcl-price",
         ]
         preset["rolling_aggregation"]["enabled"] = True
         preset["rolling_aggregation"]["windows"] = [5, 13, 21, 34]
