@@ -2,6 +2,7 @@ import sys
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -16,6 +17,19 @@ from api.core.config import settings
 from api.core.logging import init_logging, get_logger
 from api.core.middleware import setup_middleware
 from api.utils.exceptions import setup_exception_handlers
+from api.services.feature_factory_batch_service import (
+    FeatureFactoryBatchService,
+    get_feature_factory_batch_service,
+    set_feature_factory_batch_service,
+)
+
+
+batch_service: Optional[FeatureFactoryBatchService] = None
+
+
+def get_batch_service() -> FeatureFactoryBatchService:
+    """DI provider for FeatureFactoryBatchService singleton."""
+    return get_feature_factory_batch_service()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,6 +46,12 @@ async def lifespan(app: FastAPI):
     
     # 檢查必要配置
     _check_configuration()
+
+    # 初始化 Feature Factory 批次服務單例
+    global batch_service
+    if batch_service is None:
+        batch_service = FeatureFactoryBatchService()
+        set_feature_factory_batch_service(batch_service)
     
     logger.info(f"API 服務器啟動成功 - {settings.app_name} v{settings.app_version}")
     logger.info(f"運行環境: {'Production' if settings.is_production() else 'Development'}")

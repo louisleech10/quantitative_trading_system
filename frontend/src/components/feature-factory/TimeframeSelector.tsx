@@ -7,13 +7,45 @@ interface TimeframeSelectorProps {
   onChange: (next: FeatureFactoryConfig['timeframes']) => void;
 }
 
-const AVAILABLE_TFS = ['1h', '4h', '12h', '1d'];
+const AVAILABLE_TFS = ['1m', '5m', '15m', '30m', '1h', '4h', '12h', '1d', '1w'];
+
+const ALIGNMENT_MODE_OPTIONS = [
+  {
+    value: 'open_minus',
+    label: 'B-b 開盤事件對齊 (open - 1ns)',
+    description: '本系統預設。在 T0 開盤時預測，特徵不含 T0 bar 本身資料。',
+  },
+  {
+    value: 'close_time',
+    label: 'A / B-a 收盤對齊 (close_time)',
+    description: '收盤後決策。特徵可包含當前 bar 完整資料。',
+  },
+] as const;
 
 export default function TimeframeSelector({ timeframes, onChange }: TimeframeSelectorProps) {
+  const primaryTf = timeframes.primary;
+  const trainingTfs = Array.from(new Set(timeframes.training));
+
+  const handlePrimaryChange = (nextPrimary: string) => {
+    const nextTraining = trainingTfs.includes(nextPrimary)
+      ? trainingTfs
+      : [...trainingTfs, nextPrimary];
+
+    onChange({
+      ...timeframes,
+      primary: nextPrimary,
+      training: nextTraining,
+    });
+  };
+
   const toggleTraining = (tf: string) => {
-    const nextTraining = timeframes.training.includes(tf)
-      ? timeframes.training.filter((item) => item !== tf)
-      : [...timeframes.training, tf];
+    if (tf === primaryTf) {
+      return;
+    }
+
+    const nextTraining = trainingTfs.includes(tf)
+      ? trainingTfs.filter((item) => item !== tf)
+      : [...trainingTfs, tf];
 
     onChange({
       ...timeframes,
@@ -28,13 +60,8 @@ export default function TimeframeSelector({ timeframes, onChange }: TimeframeSel
         <div>
           <div className="text-xs text-slate-400 mb-2">主框架</div>
           <select
-            value={timeframes.primary}
-            onChange={(event) =>
-              onChange({
-                ...timeframes,
-                primary: event.target.value,
-              })
-            }
+            value={primaryTf}
+            onChange={(event) => handlePrimaryChange(event.target.value)}
             className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
           >
             {AVAILABLE_TFS.map((tf) => (
@@ -47,24 +74,59 @@ export default function TimeframeSelector({ timeframes, onChange }: TimeframeSel
 
         <div>
           <div className="text-xs text-slate-400 mb-2">訓練框架</div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/5 p-3">
             {AVAILABLE_TFS.map((tf) => {
-              const active = timeframes.training.includes(tf);
+              const active = trainingTfs.includes(tf);
+              const isPrimary = tf === primaryTf;
               return (
-                <button
+                <label
                   key={tf}
-                  type="button"
-                  onClick={() => toggleTraining(tf)}
-                  className={`px-3 py-1 rounded-full text-xs border transition ${
+                  className={`flex items-center gap-2 rounded-lg px-2 py-1 text-xs border transition ${
                     active
                       ? 'bg-amber-400/20 text-amber-100 border-amber-300/40'
                       : 'bg-white/5 text-slate-400 border-white/10 hover:border-amber-300/40'
                   }`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    disabled={isPrimary}
+                    onChange={() => toggleTraining(tf)}
+                    className="accent-amber-300"
+                  />
                   {tf}
-                </button>
+                  {isPrimary && <span className="text-[10px] text-slate-300">(primary)</span>}
+                </label>
               );
             })}
+          </div>
+          <div className="mt-2 text-xs text-slate-400">Primary TF 會固定勾選且不可取消</div>
+        </div>
+
+        <div>
+          <div className="text-xs text-slate-400 mb-2">對齊模式</div>
+          <select
+            value={timeframes.alignment_mode ?? 'open_minus'}
+            onChange={(event) =>
+              onChange({
+                ...timeframes,
+                alignment_mode: event.target.value as 'open_minus' | 'close_time',
+              })
+            }
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+          >
+            {ALIGNMENT_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <div className="mt-2 space-y-1">
+            {ALIGNMENT_MODE_OPTIONS.map((option) => (
+              <p key={option.value} className="text-xs text-slate-400">
+                {option.label}: {option.description}
+              </p>
+            ))}
           </div>
         </div>
       </div>

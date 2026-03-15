@@ -5,13 +5,13 @@
 """
 
 import pandas as pd
-import h5py
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple
 import json
 
 from momentum.core.logging import get_logger
+from momentum.DataExtraction.kline_storage import KlineStorageManager
 
 logger = get_logger(__name__)
 
@@ -21,6 +21,7 @@ class DataIntegrityChecker:
     
     def __init__(self, data_cache_path: Path = None):
         self.data_cache_path = data_cache_path or Path(__file__).parent / "data_cache"
+        self.storage_manager = KlineStorageManager(cache_dir=str(self.data_cache_path))
         
     def check_file_continuity(
         self, 
@@ -42,19 +43,29 @@ class DataIntegrityChecker:
                 'is_continuous': bool
             }
         """
-        file_path = self.data_cache_path / f"{symbol}_{timeframe}.h5"
-        
-        if not file_path.exists():
+        try:
+            df = self.storage_manager.read_klines(
+                symbol=symbol,
+                timeframe=timeframe,
+                validate_continuity=False
+            )
+        except Exception as e:
             return {
                 'symbol': symbol,
                 'timeframe': timeframe,
-                'error': 'File not found',
-                'file_path': str(file_path)
+                'error': str(e),
+                'storage_path': str(self.storage_manager.hdf5_path)
             }
-        
+
+        if df is None:
+            return {
+                'symbol': symbol,
+                'timeframe': timeframe,
+                'error': 'Data not found in kline_cache.h5',
+                'storage_path': str(self.storage_manager.hdf5_path)
+            }
+
         try:
-            # 讀取數據（這些檔案使用 pandas HDFStore 格式）
-            df = pd.read_hdf(file_path, key='data')
             
             if df.empty:
                 return {
@@ -63,29 +74,31 @@ class DataIntegrityChecker:
                     'error': 'Empty dataframe'
                 }
             
-            #確保索引是 datetime
-            if not isinstance(df.index, pd.DatetimeIndex):
-                # 嘗試轉換
-                try:
-                    df.index = pd.to_datetime(df.index)
-                except Exception as e:
-                    return {
-                        'symbol': symbol,
-                        'timeframe': timeframe,
-                        'error': f'Cannot convert index to datetime: {str(e)}',
-                        'index_type': str(type(df.index))
-                    }
+            if 'timestamp' not in df.columns:
+                return {
+                    'symbol': symbol,
+                    'timeframe': timeframe,
+                    'error': 'Missing timestamp column in kline_cache.h5 dataset'
+                }
+
+            df['datetime'] = pd.to_datetime(df['timestamp'], unit='s', errors='coerce')
+            if df['datetime'].isna().all():
+                return {
+                    'symbol': symbol,
+                    'timeframe': timeframe,
+                    'error': 'Cannot convert timestamp to datetime'
+                }
             
             # 轉換索引為每秒時間戳（用於計算）
-            df = df.sort_index()
-            timestamps = df.index.astype('int64') // 10**9  # 轉換為秒級時間戳
+            df = df.sort_values('timestamp').reset_index(drop=True)
+            timestamps = df['timestamp'].astype('int64')
             
             # 計算時間間隔（秒）
             interval_seconds = self._timeframe_to_seconds(timeframe)
             
             # 檢查連續性
-            start_time = df.index[0]
-            end_time = df.index[-1]
+            start_time = df['datetime'].iloc[0]
+            end_time = df['datetime'].iloc[-1]
             total_rows = len(df)
             
             # 預期的 K 線數量
@@ -106,8 +119,8 @@ class DataIntegrityChecker:
                     
                     gaps.append({
                         'position': i,
-                        'gap_start': df.index[i].isoformat(),
-                        'gap_end': df.index[i + 1].isoformat(),
+                        'gap_start': df['datetime'].iloc[i].isoformat(),
+                        'gap_end': df['datetime'].iloc[i + 1].isoformat(),
                         'missing_count': int(missing_count),
                         'duration_hours': gap_seconds / 3600
                     })
@@ -117,7 +130,7 @@ class DataIntegrityChecker:
             result = {
                 'symbol': symbol,
                 'timeframe': timeframe,
-                'file_path': str(file_path),
+                'storage_path': str(self.storage_manager.hdf5_path),
                 'total_rows': total_rows,
                 'time_range': {
                     'start': start_time.isoformat(),
@@ -286,21 +299,28 @@ def main():
     # 初始化檢查器
     checker = DataIntegrityChecker()
     
-    # 從 data_cache 獲取所有幣種
-    data_cache_path = Path(__file__).parent / "data_cache"
-    h5_files = list(data_cache_path.glob(f"*_{timeframe}.h5"))
-    
-    if len(h5_files) == 0:
-        logger.error(f"未找到任何 {timeframe} 數據檔案在 {data_cache_path}")
-        print(f"❌ 錯誤: 未找到任何 {timeframe} 數據檔案")
-        print(f"   路徑: {data_cache_path}")
+    # 從 kline_cache.h5 讀取 cache index，取得指定 timeframe 的 symbol 清單
+    cache_index = checker.storage_manager.get_cache_index()
+    if not cache_index:
+        checker.storage_manager.rebuild_cache_index()
+        cache_index = checker.storage_manager.get_cache_index()
+
+    symbols = sorted([
+        symbol
+        for symbol, timeframes in cache_index.items()
+        if timeframe in timeframes
+    ])
+
+    if len(symbols) == 0:
+        logger.error(
+            f"未找到任何 {timeframe} 數據於 {checker.storage_manager.hdf5_path}"
+        )
+        print(f"❌ 錯誤: 未找到任何 {timeframe} 數據")
+        print(f"   路徑: {checker.storage_manager.hdf5_path}")
         print(f"   請確認數據已下載")
         return 1
-    
-    # 提取幣種
-    symbols = [f.stem.replace(f"_{timeframe}", "") for f in h5_files]
-    
-    logger.info(f"找到 {len(symbols)} 個 {timeframe} 數據檔案")
+
+    logger.info(f"在 kline_cache.h5 找到 {len(symbols)} 個 {timeframe} symbol")
     
     # 批量檢查
     result = checker.batch_check(symbols, timeframe)

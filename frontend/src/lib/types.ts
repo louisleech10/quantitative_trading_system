@@ -176,6 +176,7 @@ export interface FeatureFactoryConfig {
     primary: string;
     training: string[];
     alignment?: string;
+    alignment_mode?: 'open_minus' | 'close_time';
   };
   atomic_indicators: Record<
     string,
@@ -357,6 +358,26 @@ export interface FeatureSchema {
 export interface BatchToggleItem {
   path: string;
   value: boolean;
+}
+
+export interface BatchGenerateRequest {
+  symbols: string[];
+  timeframe: string;
+  config_override?: Record<string, unknown>;
+  force_regenerate?: boolean;
+  max_workers?: number;
+}
+
+export interface BatchTaskStatus {
+  task_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'partial';
+  total: number;
+  completed: number;
+  failed: number;
+  progress: number;
+  current_symbol?: string | null;
+  results?: Record<string, string>;
+  errors?: Record<string, string>;
 }
 
 export interface FeaturePreview {

@@ -1,14 +1,18 @@
 import pytest
 import yaml
 
+from momentum.factories import create_feature_factory
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_config import (
+    AlignmentMode,
     AtomicIndicatorConfig,
     EntropyConfig,
     FactoryConfig,
     MicrostructureConfig,
     PreprocessingConfig,
+    SUPPORTED_TIMEFRAMES,
     TailRiskConfig,
+    TimeframeConfig,
 )
 
 
@@ -89,6 +93,73 @@ def test_factory_config_backward_compat_defaults():
     config = FactoryConfig.model_validate(old_yaml_like)
     assert config.preprocessing.enabled is False
     assert config.atomic_indicators.microstructure.enabled is False
+    assert config.timeframes.alignment_mode == AlignmentMode.OPEN_MINUS
+
+
+def test_timeframe_config_supported_timeframes():
+    assert SUPPORTED_TIMEFRAMES == ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
+
+
+def test_timeframe_config_rejects_unsupported_values():
+    with pytest.raises(ValueError):
+        TimeframeConfig(primary="2h", training=["12h"])
+
+    with pytest.raises(ValueError):
+        TimeframeConfig(primary="12h", training=["2h"])
+
+
+def test_migrate_config_adds_alignment_mode_default():
+    migrated = ConfigManager.migrate_config({"timeframes": {"primary": "12h", "training": ["12h"]}})
+    assert migrated["timeframes"]["alignment_mode"] == "open_minus"
+
+
+def test_migrate_config_fallback_on_unknown_alignment_mode():
+    migrated = ConfigManager.migrate_config(
+        {"timeframes": {"primary": "12h", "training": ["12h"], "alignment_mode": "unknown"}}
+    )
+    assert migrated["timeframes"]["alignment_mode"] == "open_minus"
+
+
+def test_config_hash_changes_when_alignment_mode_changes():
+    factory = create_feature_factory()
+    config_open = ConfigManager().get_merged_config(
+        {"timeframes": {"primary": "12h", "training": ["12h", "1h"], "alignment_mode": "open_minus"}}
+    )
+    config_close = ConfigManager().get_merged_config(
+        {"timeframes": {"primary": "12h", "training": ["12h", "1h"], "alignment_mode": "close_time"}}
+    )
+
+    hash_open = factory._compute_config_hash(config_open)
+    hash_close = factory._compute_config_hash(config_close)
+    assert hash_open != hash_close
+
+
+def test_config_hash_same_for_reordered_training_timeframes():
+    factory = create_feature_factory()
+    config_a = ConfigManager().get_merged_config(
+        {"timeframes": {"primary": "12h", "training": ["12h", "1h"], "alignment_mode": "open_minus"}}
+    )
+    config_b = ConfigManager().get_merged_config(
+        {"timeframes": {"primary": "12h", "training": ["1h", "12h"], "alignment_mode": "open_minus"}}
+    )
+
+    hash_a = factory._compute_config_hash(config_a)
+    hash_b = factory._compute_config_hash(config_b)
+    assert hash_a == hash_b
+
+
+def test_config_hash_changes_when_training_timeframes_change():
+    factory = create_feature_factory()
+    config_a = ConfigManager().get_merged_config(
+        {"timeframes": {"primary": "12h", "training": ["12h", "1h"], "alignment_mode": "open_minus"}}
+    )
+    config_b = ConfigManager().get_merged_config(
+        {"timeframes": {"primary": "12h", "training": ["12h", "4h"], "alignment_mode": "open_minus"}}
+    )
+
+    hash_a = factory._compute_config_hash(config_a)
+    hash_b = factory._compute_config_hash(config_b)
+    assert hash_a != hash_b
 
 
 def test_yaml_with_new_sections_defaults():
@@ -174,3 +245,4 @@ def test_scan_config_contains_new_sections():
     assert "entropy" in raw["atomic_indicators"]
     assert "tail_risk" in raw["atomic_indicators"]
     assert "preprocessing" in raw
+    assert raw["timeframes"]["alignment_mode"] == "open_minus"

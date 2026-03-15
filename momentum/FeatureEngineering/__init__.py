@@ -45,7 +45,9 @@ def _read_hdf_compat(path_or_buf: Any, key: str = None, *args, **kwargs):
 		raise
 
 
-pd.read_hdf = _read_hdf_compat
+# 保留此相容補丁：既有模組仍可能以 pd.read_hdf(..., key='SYMBOL/TF') 讀取 kline_cache.h5。
+if pd.read_hdf is not _read_hdf_compat:
+	pd.read_hdf = _read_hdf_compat
 
 __all__ = [
 	'FeatureExtractor',

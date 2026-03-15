@@ -1,10 +1,11 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 5.0
-- **最後更新**: 2026-02-18
+- **版本**: 6.0
+- **最後更新**: 2026-03-15
 - **狀態**: 生產中 + 持續開發
 - **更新內容**: 
+  - v6.0 (2026-03-15): 同步 Feature Factory MultiTF 整合 + 多標的批次計算 — MultiTF 路由策略、AlignmentMode paradigm、FeatureFactoryBatchService 架構（ProcessPoolExecutor + TTL 清理）
   - v5.0 (2026-02-18): 同步全部已完成 PLAN — Phase 1 Feature Factory（7 層 Pipeline）、Phase 1.5 Feature Factory 優化（微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理）、Phase 2.4-2.12 IC Deep Analysis（10 個深度分析模組 + 特徵難度分級 + 匯出系統 + 資料瀏覽器）、Phase 3.5 模型增強（6 個增強模組：校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線）、Phase 4 Optuna 重構 + Strategy Domain（VectorizedBacktest + PerformanceMetrics + PositionSizing + RiskManager + IBacktestEngine/IPositionSizer Protocol）
   - v4.0 (2026-02-14): 新增 Phase 3.7 雙引擎 ML 系統架構（LightGBM + XGBoost、IModelTrainer Protocol 擴展、IOptimizationObjective、模型對比系統、四維參數系統、可插拔 Optuna 目標）
   - v3.0 (2026-02-08): 同步 REFACTOR_ARCHITECTURE_V4 架構變更（解耦架構、Protocol 注入、Factory 模式、KlineDataService 統一資料存取層）；更新模組清單與目錄結構；標記已完成功能
@@ -67,6 +68,7 @@
 | Phase 1 (Feature Factory) | 7 層特徵工程 Pipeline + Config 驅動 + 七段式命名 | ✅ 已完成 |
 | Phase 1.5 (Feature Factory 優化) | 微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理 | ✅ 已完成 |
 | Phase 2.4-2.12 (IC Deep Analysis) | 10 個深度分析模組 + 特徵難度分級 + 匯出系統 | ✅ 已完成 |
+| Feature Factory MultiTF + Batch | MultiTF 路由、AlignmentMode、多標的批次計算服務 | ✅ 已完成 |
 
 ---
 
@@ -1615,6 +1617,94 @@ class IPositionSizer(Protocol):
 
 ---
 
+### ✅ 20. Feature Factory MultiTF 整合 + 多標的批次計算
+
+#### 系統概述
+本系統解決兩個核心缺口：
+1. **MultiTF 路由**：`generate_features()` 對 `config.timeframes.training` 中列出的外加時幅計算對齊特徵
+2. **多標的批次**：`FeatureFactoryBatchService` 將單標的任務並行化，支持 100+ 標的
+
+#### MultiTF 路由策略
+
+```python
+# momentum/FeatureEngineering/feature_factory.py
+def generate_features(self, symbol: str, timeframe: str) -> pd.DataFrame:
+    # 主 TF：第一輪 Kline 讀取 + 7 層 Pipeline
+    base_df = self._run_pipeline(symbol, timeframe)
+
+    # 委託 MultiTFGenerator 計算訓練 TF
+    training_tfs = self.config.timeframes.training
+    if len(training_tfs) > 1:
+        for tf in training_tfs:
+            if tf != timeframe:
+                extra_df = multi_tf_gen.generate(symbol, tf)  # 各自 7 層
+                aligned_df = aligner.align(extra_df, base_df)  # OPEN_MINUS / CLOSE_TIME
+                base_df = pd.concat([base_df, aligned_df], axis=1)
+    return base_df
+```
+
+#### AlignmentMode Paradigm
+
+| 模式 | 定義 | 適用情境 |
+|------|------|----------|
+| `OPEN_MINUS` | 現標時幅屬於 `open_time[i]（下一標的 open_time）` 的 bar | 預設，防起 look-ahead bias |
+| `CLOSE_TIME` | 現標時幅以 `close_time` 對齊 | 高頻對齊至低頻，當低頻 K 線收盤就可知 |
+
+```python
+# momentum/FeatureEngineering/feature_config.py
+class AlignmentMode(str, Enum):
+    OPEN_MINUS = "open_minus"   # 預設：第 i+1 根 bar 的 open
+    CLOSE_TIME = "close_time"   # 高頻時幅特徵修正
+```
+
+#### FeatureFactoryBatchService 架構
+
+```python
+# api/services/feature_factory_batch_service.py
+class FeatureFactoryBatchService:
+    """ProcessPoolExecutor 並行發出庫所有標的的特徵計算任務。"""
+
+    MAX_CONCURRENT = 2          # 同時執行批次任務上限
+    TASK_TTL_SECONDS = 3600     # TTL 清理已完成任務
+
+    async def start_batch(self, request: BatchGenerateRequest) -> str:
+        task_id = str(uuid.uuid4())
+        asyncio.create_task(self._run_batch(task_id, request))
+        return task_id
+
+    async def _run_batch(self, task_id: str, request: BatchGenerateRequest):
+        loop = asyncio.get_event_loop()
+        with ProcessPoolExecutor(max_workers=request.max_workers) as pool:
+            futures = [
+                loop.run_in_executor(pool, _generate_one, sym, request)
+                for sym in request.symbols
+            ]
+            for sym, future in zip(request.symbols, asyncio.as_completed(futures)):
+                try:
+                    result_task_id = await future
+                    self._update_status(task_id, sym, success=True, result=result_task_id)
+                except Exception as exc:
+                    self._update_status(task_id, sym, success=False, error=str(exc))
+
+    def get_status(self, task_id: str) -> BatchTaskStatusResponse | None:
+        return self._tasks.get(task_id)
+```
+
+#### 已實作 API 端點
+| 方法 | 路徑 | 說明 |
+|------|------|------|
+| POST | `/api/v1/features/generate` | 單標的生成（8 種 TF 驗證）|
+| POST | `/api/v1/features/batch` | 啟動批次生成 |
+| GET | `/api/v1/features/batch/{task_id}` | 查詢批次狀態 |
+| WS | `ws/features/batch/{task_id}` | 批次進度推送 |
+
+#### Tests
+- `tests/feature_factory/` 下 54 個測試全部通過（Phase 0 ~ Phase 4）
+- `tests/feature_factory/test_batch_generation.py` — BatchService 單元測試
+- `tests/feature_factory/test_multi_tf_alignment.py` — AlignmentMode 測試
+
+---
+
 ## 待開發功能
 
 ### ⏳ 1. 前端 UI 整合（優先級：🔥 高）
@@ -1670,6 +1760,12 @@ class IPositionSizer(Protocol):
 🔟 Feature Factory 特徵生成
    Config (scan_config.yaml) → FeatureFactory 7 層 Pipeline → 特徵矩陣 HDF5
    ※ 支持微觀結構/資訊理論/尾部風險三大擴充引擎
+
+1️⃣1️⃣ MultiTF 特徵批次生成
+   BatchGenerateRequest (1–200 標的) → FeatureFactoryBatchService (ProcessPoolExecutor)
+   → 對每標的發出 FeatureFactory.generate_features()
+   → MultiTFGenerator 計算外加 TF，依 AlignmentMode 對齊
+   → 結果儲存至 HDF5，WebSocket 推送進度
 
 1️⃣1️⃣ IC 深度分析
    IC Gatekeeper 結果 → 10 個深度分析模組 → 因子報酬/趨勢/OOS/正交化等報告
@@ -1796,6 +1892,6 @@ class XGBoostTaskService:
 
 ---
 
-*文檔版本：5.0*  
-*最後更新：2026-02-18*  
-*狀態：Phase 1-4 全部完成，前端 UI 整合進行中*
+*文檔版本：6.0*  
+*最後更新：2026-03-15*  
+*狀態：Phase 1-4 + Feature Factory MultiTF/Batch 全部完成，前端 UI 整合進行中*

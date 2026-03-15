@@ -4,10 +4,13 @@
 定義案例導入、批量下載的請求和響應模型
 """
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 from enum import Enum
+
+
+SUPPORTED_TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '12h', '1d', '1w']
 
 
 class CaseRecord(BaseModel):
@@ -125,7 +128,10 @@ class BatchDownloadRequest(BaseModel):
         le=500
     )
     force_redownload: bool = Field(False, description="強制重新下載（覆蓋已有數據）")
-    timeframe: str = Field("1h", description="K線時間框架（預設1h用於ML訓練，可選1m/5m/15m/30m/1h/4h/12h/1d）")
+    timeframe: Union[str, List[str]] = Field(
+        "1h",
+        description="K線時間框架（可傳單一字串或多TF列表，支援1m/5m/15m/30m/1h/4h/12h/1d/1w）"
+    )
 
     @field_validator('lookback_bars')
     def validate_lookback(cls, v):
@@ -141,12 +147,28 @@ class BatchDownloadRequest(BaseModel):
             raise ValueError("forward_bars must be between 1 and 500")
         return v
 
+    @field_validator('timeframe', mode='before')
+    def normalize_timeframe(cls, v):
+        """向後相容：單字串統一轉為列表。"""
+        if isinstance(v, str):
+            return [v]
+        if isinstance(v, list):
+            return v
+        raise ValueError("timeframe must be a string or a list of strings")
+
     @field_validator('timeframe')
     def validate_timeframe(cls, v):
         """驗證timeframe有效性"""
-        valid_timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '12h', '1d']
-        if v not in valid_timeframes:
-            raise ValueError(f"timeframe must be one of {valid_timeframes}")
+        if not v:
+            raise ValueError("timeframe list cannot be empty")
+
+        invalid_timeframes = [tf for tf in v if tf not in SUPPORTED_TIMEFRAMES]
+        if invalid_timeframes:
+            raise ValueError(
+                f"timeframe contains invalid values: {invalid_timeframes}. "
+                f"Must be within {SUPPORTED_TIMEFRAMES}"
+            )
+
         return v
 
     model_config = ConfigDict(
@@ -156,7 +178,7 @@ class BatchDownloadRequest(BaseModel):
                 "lookback_bars": 240,
                 "forward_bars": 96,
                 "force_redownload": False,
-                "timeframe": "1h"
+                "timeframe": ["1h", "4h", "12h"]
             }
         }
     )

@@ -28,6 +28,7 @@ timeframes:
   primary: "12h"
   training: ["12h"]
   alignment: "point_in_time"
+  alignment_mode: "open_minus"
 
 atomic_indicators:
   trend:

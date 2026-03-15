@@ -111,6 +111,19 @@ class ConfigManager:
             if isinstance(feats, list):
                 cs["features"] = {name: {"enabled": True} for name in feats}
 
+        # 2.5 Timeframes alignment_mode backward compatibility
+        timeframes = config.get("timeframes")
+        if isinstance(timeframes, dict):
+            alignment_mode = timeframes.get("alignment_mode")
+            if alignment_mode is None:
+                timeframes["alignment_mode"] = "open_minus"
+            elif alignment_mode not in {"open_minus", "close_time"}:
+                logger.warning(
+                    "Unknown alignment_mode '%s', fallback to open_minus",
+                    alignment_mode,
+                )
+                timeframes["alignment_mode"] = "open_minus"
+
         # 3. Microstructure enabled_features → features dict
         atomic = config.get("atomic_indicators")
         if isinstance(atomic, dict):

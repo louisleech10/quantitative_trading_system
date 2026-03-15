@@ -3,6 +3,7 @@ import {
   FeatureFactoryConfig,
   FeaturePreview,
   FeatureTask,
+  BatchTaskStatus,
   FeatureFactoryPreset,
   FeatureIndicatorSpec,
   FeatureGenerationProgress,
@@ -38,6 +39,9 @@ interface FeatureFactoryState {
   // Phase C: schema and search
   schema: FeatureSchema | null;
   indicatorSearch: string;
+  batchTask: BatchTaskStatus | null;
+  alignmentMode: 'open_minus' | 'close_time';
+  trainingTimeframes: string[];
   setConfig: (config: FeatureFactoryConfig) => void;
   updateConfigPartial: (partial: Record<string, unknown>) => void;
   setPresets: (presets: FeatureFactoryPreset[]) => void;
@@ -58,6 +62,16 @@ interface FeatureFactoryState {
   setExplorerActiveTab: (tab: ExplorerTab, selectedFeature?: string | null) => void;
   setExplorerSelectedFeatures: (features: string[]) => void;
   setExplorerSummary: (summary: FeatureSummary | null) => void;
+  setBatchTask: (task: BatchTaskStatus | null) => void;
+  startBatchGeneration: (
+    symbols: string[],
+    timeframe: string,
+    config?: Record<string, unknown>,
+    options?: { forceRegenerate?: boolean; maxWorkers?: number }
+  ) => Promise<void>;
+  pollBatchStatus: (taskId: string) => Promise<void>;
+  setAlignmentMode: (mode: 'open_minus' | 'close_time') => void;
+  setTrainingTimeframes: (tfs: string[]) => void;
   // Phase C: new actions
   setSchema: (schema: FeatureSchema | null) => void;
   setIndicatorSearch: (search: string) => void;
@@ -91,7 +105,10 @@ const mergeDeep = (
   return output;
 };
 
-export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_PREFIX = '/api/v1/features';
+
+export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => ({
   config: null,
   presets: [],
   dataSources: [],
@@ -114,7 +131,15 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
   explorerSummary: null,
   schema: null,
   indicatorSearch: '',
-  setConfig: (config) => set({ config }),
+  batchTask: null,
+  alignmentMode: 'open_minus',
+  trainingTimeframes: ['12h'],
+  setConfig: (config) =>
+    set({
+      config,
+      alignmentMode: config.timeframes.alignment_mode ?? 'open_minus',
+      trainingTimeframes: config.timeframes.training,
+    }),
   updateConfigPartial: (partial) =>
     set((state) => ({
       config: state.config
@@ -147,6 +172,119 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set) => ({
     })),
   setExplorerSelectedFeatures: (features) => set({ explorerSelectedFeatures: features }),
   setExplorerSummary: (summary) => set({ explorerSummary: summary }),
+  setBatchTask: (batchTask) => set({ batchTask }),
+  startBatchGeneration: async (symbols, timeframe, config, options) => {
+    const normalizedSymbols = Array.from(
+      new Set(
+        symbols
+          .map((symbol) => symbol.trim().toUpperCase())
+          .filter((symbol) => symbol.length > 0)
+      )
+    );
+
+    if (normalizedSymbols.length === 0) {
+      set({ error: '請至少提供一個標的' });
+      return;
+    }
+
+    try {
+      set({ error: null });
+
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbols: normalizedSymbols,
+          timeframe,
+          config_override: config,
+          force_regenerate: options?.forceRegenerate ?? false,
+          max_workers: options?.maxWorkers ?? 4,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.detail || payload?.error || response.statusText);
+      }
+
+      const payload = (await response.json()) as {
+        task_id: string;
+        status: 'pending' | 'running' | 'completed' | 'failed' | 'partial';
+        total: number;
+      };
+
+      set({
+        batchTask: {
+          task_id: payload.task_id,
+          status: payload.status,
+          total: payload.total,
+          completed: 0,
+          failed: 0,
+          progress: 0,
+          results: {},
+          errors: {},
+        },
+      });
+
+      await get().pollBatchStatus(payload.task_id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '批次任務啟動失敗';
+      set({ error: message });
+    }
+  },
+  pollBatchStatus: async (taskId) => {
+    const pollIntervalMs = 1200;
+    const maxAttempts = 600;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/batch/${taskId}`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.detail || payload?.error || response.statusText);
+      }
+
+      const status = (await response.json()) as BatchTaskStatus;
+      set({ batchTask: status });
+
+      if (['completed', 'failed', 'partial'].includes(status.status)) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+
+    set({ error: '批次任務輪詢逾時' });
+  },
+  setAlignmentMode: (mode) =>
+    set((state) => ({
+      alignmentMode: mode,
+      config: state.config
+        ? {
+            ...state.config,
+            timeframes: {
+              ...state.config.timeframes,
+              alignment_mode: mode,
+            },
+          }
+        : state.config,
+    })),
+  setTrainingTimeframes: (tfs) => {
+    const uniqueTfs = Array.from(new Set(tfs));
+    set((state) => ({
+      trainingTimeframes: uniqueTfs,
+      config: state.config
+        ? {
+            ...state.config,
+            timeframes: {
+              ...state.config.timeframes,
+              training: uniqueTfs,
+            },
+          }
+        : state.config,
+    }));
+  },
   // Phase C: new actions
   setSchema: (schema) => set({ schema }),
   setIndicatorSearch: (indicatorSearch) => set({ indicatorSearch }),

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from api.core.logging import get_logger
+from api.services.feature_factory_batch_service import get_feature_factory_batch_service
 from api.services.feature_factory_service import feature_factory_service
 
 
@@ -78,6 +79,46 @@ class FeatureFactoryConnectionManager:
 connection_manager = FeatureFactoryConnectionManager()
 
 
+class FeatureFactoryBatchConnectionManager:
+    """WebSocket connection manager for Feature Factory batch tasks."""
+
+    def __init__(self):
+        self._connections: Dict[str, Set[WebSocket]] = {}
+        self._lock = asyncio.Lock()
+
+    async def connect(self, websocket: WebSocket, task_id: str) -> None:
+        await websocket.accept()
+        async with self._lock:
+            self._connections.setdefault(task_id, set()).add(websocket)
+
+    async def disconnect(self, websocket: WebSocket, task_id: str) -> None:
+        async with self._lock:
+            if task_id in self._connections:
+                self._connections[task_id].discard(websocket)
+                if not self._connections[task_id]:
+                    del self._connections[task_id]
+
+    async def broadcast(self, task_id: str, message: Dict) -> None:
+        async with self._lock:
+            subscribers = list(self._connections.get(task_id, set()))
+
+        disconnected = []
+        for websocket in subscribers:
+            try:
+                if websocket.client_state == WebSocketState.CONNECTED:
+                    await websocket.send_json(message)
+                else:
+                    disconnected.append(websocket)
+            except Exception:
+                disconnected.append(websocket)
+
+        for websocket in disconnected:
+            await self.disconnect(websocket, task_id)
+
+
+batch_manager = FeatureFactoryBatchConnectionManager()
+
+
 @router.websocket("/features/{task_id}")
 async def feature_factory_websocket(
     websocket: WebSocket,
@@ -137,3 +178,52 @@ async def _send_heartbeat(websocket: WebSocket, interval: int = 30) -> None:
         pass
     except Exception as exc:
         logger.error("Heartbeat error: %s", exc, exc_info=True)
+
+
+@router.websocket("/features/batch/{task_id}")
+async def feature_factory_batch_websocket(websocket: WebSocket, task_id: str):
+    """Feature Factory batch progress WebSocket endpoint."""
+    batch_service = get_feature_factory_batch_service()
+    status = batch_service.get_status(task_id)
+    if not status:
+        await websocket.close(code=4004, reason=f"Task not found: {task_id}")
+        return
+
+    await batch_manager.connect(websocket, task_id)
+
+    async def send_payload(payload: Dict) -> None:
+        await batch_manager.broadcast(task_id, {
+            "event": "batch_progress",
+            "data": {
+                "task_id": payload.get("task_id"),
+                "total": payload.get("total", 0),
+                "completed": payload.get("completed", 0),
+                "failed": payload.get("failed", 0),
+                "current_symbol": payload.get("current_symbol"),
+                "progress": payload.get("progress", 0.0),
+                "status": payload.get("status"),
+            },
+            "timestamp": datetime.now().isoformat(),
+        })
+
+    def notification_callback(payload: Dict) -> None:
+        asyncio.create_task(send_payload(payload))
+
+    batch_service.register_notification_callback(task_id, notification_callback)
+    await send_payload(status)
+
+    try:
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+                if data == "ping":
+                    await websocket.send_json({"event": "pong"})
+            except asyncio.TimeoutError:
+                await websocket.send_json({"event": "ping"})
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.error("Batch WebSocket error: %s", exc, exc_info=True)
+    finally:
+        await batch_manager.disconnect(websocket, task_id)
+        batch_service.unregister_notification_callback(task_id, notification_callback)

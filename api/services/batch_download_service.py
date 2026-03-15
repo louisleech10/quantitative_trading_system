@@ -161,11 +161,14 @@ class BatchDownloadService:
         else:
             cases = self.case_storage.get_cases()
 
-        # 初始化進度
+        # 初始化進度（多TF下載以 case × timeframe 作為進度單位）
+        requested_timeframes = self._normalize_request_timeframes(request)
+        total_units = len(cases) * len(requested_timeframes)
+
         progress = DownloadProgress(
             task_id=task_id,
             status=TaskStatus.PENDING,
-            total_cases=len(cases),
+            total_cases=total_units,
             completed_cases=0,
             failed_cases=0,
             progress_percent=0.0,
@@ -176,6 +179,7 @@ class BatchDownloadService:
 
         logger.info(
             f"Created download task {task_id} for {len(cases)} cases "
+            f"across {len(requested_timeframes)} timeframe(s) {requested_timeframes} "
             f"(lookback={request.lookback_bars}, forward={request.forward_bars})"
         )
 
@@ -221,7 +225,10 @@ class BatchDownloadService:
                 f"{warmup_bars} bars (30% of lookback_bars={request.lookback_bars})"
             )
 
-        # 按symbol分組（使用request.timeframe作為K線下載時間框架）
+        # 向後相容：request.timeframe 允許 str | List[str]
+        timeframes = self._normalize_request_timeframes(request)
+
+        # 按symbol分組
         grouped_cases = self._group_cases_by_symbol(cases)
 
         # 初始化結果統計
@@ -239,16 +246,13 @@ class BatchDownloadService:
         # 注意：已改為串行下載（HDF5 不支援並行寫入同一檔案）
         # 保留 semaphore 結構以便將來改用每 symbol 獨立 HDF5 檔案時可以恢復並行
 
-        async def download_group(symbol: str, group_cases: List[CaseRecord]):
+        async def download_group(symbol: str, group_cases: List[CaseRecord], timeframe: str):
             """下載單個分組"""
             nonlocal downloaded_case_ids, failed_case_ids, error_details, skipped_cases, total_bars, warmup_bars
 
-            # 使用request.timeframe作為K線下載時間框架（與案例的timeframe獨立）
-            timeframe = request.timeframe
-
             logger.info(
                 f"Processing {len(group_cases)} cases for {symbol}/{timeframe} "
-                f"(download timeframe={request.timeframe}, cases may have different timeframes)"
+                f"(download timeframe={timeframe}, cases may have different timeframes)"
             )
 
             try:
@@ -488,6 +492,7 @@ class BatchDownloadService:
                             async with stats_lock:
                                 failed_case_ids.append(case.case_id)
                                 error_details[case.case_id] = "No klines data after download"
+                                progress.failed_cases += 1
                             continue
 
                         # 驗證案例範圍的連續性
@@ -516,6 +521,7 @@ class BatchDownloadService:
                             async with stats_lock:
                                 failed_case_ids.append(case.case_id)
                                 error_details[case.case_id] = f"數據不連續: {continuity_error}"
+                                progress.failed_cases += 1
                             continue
 
                         # [優化] 不再保存案例切片，只驗證數據可讀取
@@ -568,12 +574,24 @@ class BatchDownloadService:
 
         # 串行執行下載任務（HDF5 不支援並行寫入同一檔案）
         # 注意：即使不同 symbol 也會寫入同一個 kline_cache.h5，因此必須串行處理
-        for symbol, group_cases in grouped_cases.items():
-            try:
-                await download_group(symbol, group_cases)
-            except Exception as e:
-                logger.error(f"Download group {symbol} failed: {e}", exc_info=True)
-                # 錯誤已在 download_group 內部處理，這裡只記錄日誌
+        for timeframe_index, timeframe in enumerate(timeframes, start=1):
+            logger.info(
+                f"Starting sequential download for timeframe {timeframe} "
+                f"({timeframe_index}/{len(timeframes)})"
+            )
+            for symbol, group_cases in grouped_cases.items():
+                try:
+                    await download_group(symbol, group_cases, timeframe)
+                except Exception as e:
+                    logger.error(
+                        f"Download group {symbol}/{timeframe} failed: {e}",
+                        exc_info=True
+                    )
+                    # 錯誤已在 download_group 內部處理，這裡只記錄日誌
+
+            # 每個 TF 完成後更新一次整體進度（需求：每個 TF 完成後推送進度）
+            progress.current_symbol = f"TF {timeframe} completed"
+            progress.progress_percent = timeframe_index / len(timeframes) * 100
 
         # 完成任務
         end_time = datetime.utcnow()
@@ -587,7 +605,7 @@ class BatchDownloadService:
         result = DownloadResult(
             task_id=task_id,
             success=(len(failed_case_ids) == 0),
-            total_cases=len(cases),
+            total_cases=progress.total_cases,
             successful_downloads=len(downloaded_case_ids),
             failed_downloads=len(failed_case_ids),
             skipped_cases=skipped_cases,
@@ -646,6 +664,13 @@ class BatchDownloadService:
 
         logger.debug(f"Grouped {len(cases)} cases into {len(grouped)} groups by symbol")
         return dict(grouped)
+
+
+    def _normalize_request_timeframes(self, request: BatchDownloadRequest) -> List[str]:
+        """向後相容：統一取得請求中的 timeframe 列表。"""
+        if isinstance(request.timeframe, str):
+            return [request.timeframe]
+        return request.timeframe
 
 
     def _calculate_time_ranges(

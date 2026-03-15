@@ -80,7 +80,8 @@ def test_multi_timeframe_alignment():
         {"timeframes": {"primary": "12h", "training": timeframes}}
     )
     generator = MultiTFGenerator(factory, config)
-    aligned = generator.generate_multi_tf(symbol)
+    result = generator.generate_multi_tf(symbol)
+    aligned = result.features_df
     assert not aligned.empty
     assert any("_1h_" in col for col in aligned.columns) or any(
         col.startswith("close_1h_") for col in aligned.columns

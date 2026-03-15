@@ -15,6 +15,8 @@ import {
   BrowseFeatureDataResponse,
   FeatureSchema,
   BatchToggleItem,
+  BatchGenerateRequest,
+  BatchTaskStatus,
 } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
@@ -80,6 +82,8 @@ export function useFeatureFactory() {
     updateConfigPartial,
     setExplorerSummary,
     setSchema,
+    setBatchTask,
+    pollBatchStatus,
   } = useFeatureFactoryStore();
 
   const loadInitial = useCallback(async () => {
@@ -343,6 +347,53 @@ export function useFeatureFactory() {
     [setConfig, setPreview, setSchema, setError]
   );
 
+  const startBatchGeneration = useCallback(
+    async (request: BatchGenerateRequest): Promise<string | null> => {
+      try {
+        const payload = await requestJson<{ task_id: string; status: string; total: number }>('/batch', {
+          method: 'POST',
+          body: JSON.stringify(request),
+        });
+
+        setBatchTask({
+          task_id: payload.task_id,
+          status: (payload.status as BatchTaskStatus['status']) ?? 'pending',
+          total: payload.total,
+          completed: 0,
+          failed: 0,
+          progress: 0,
+          results: {},
+          errors: {},
+        });
+
+        await pollBatchStatus(payload.task_id);
+        setError(null);
+        return payload.task_id;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '批次任務啟動失敗';
+        setError(message);
+        return null;
+      }
+    },
+    [setBatchTask, pollBatchStatus, setError]
+  );
+
+  const getBatchStatus = useCallback(
+    async (taskId: string) => {
+      try {
+        const status = await requestJson<BatchTaskStatus>(`/batch/${taskId}`);
+        setBatchTask(status);
+        setError(null);
+        return status;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '批次狀態查詢失敗';
+        setError(message);
+        return null;
+      }
+    },
+    [setBatchTask, setError]
+  );
+
   return {
     loadInitial,
     previewConfig,
@@ -358,5 +409,7 @@ export function useFeatureFactory() {
     loadSchema,
     batchToggle,
     applyPreset,
+    startBatchGeneration,
+    getBatchStatus,
   };
 }

@@ -1,11 +1,12 @@
 # API 端點規範
 
 ## 文檔資訊
-- **版本**: 5.0
-- **最後更新**: 2026-03-08
+- **版本**: 6.0
+- **最後更新**: 2026-03-15
 - **Base URL**: `http://localhost:8000`（開發環境）
 - **API Prefix**: `/api/v1`
 - **變更記錄**:
+  - v6.0 (2026-03-15): 新增 Feature Factory MultiTF + Batch API（Section 20）- 單標的 generate（含 timeframe 驗證）、多標的 batch 啟動（BatchGenerateRequest）、批次任務查詢（BatchTaskStatusResponse）、WebSocket 批次進度推送；基於 Feature_Factory_MultiTF_MultiSymbol_TODO V7
   - v5.0 (2026-03-08): 新增 Feature Factory Granular Control API（Section 19）- Per-Indicator 細粒度控制 3 個端點（Schema / Batch Toggle / Preset）；基於 FEATURE_FACTORY_GRANULAR_CONTROL_PLAN V1.2
   - v4.0 (2026-02-18): 新增 Model Enhancement API（Section 16）- Phase 3.5 模型增強系統 8 個端點；新增 Hyperparameter Optimization API（Section 17）及 Execution Optimization API（Section 18）- Phase 4 回測系統優化；更新 Router 註冊對照表
   - v3.2 (2026-02-14): 新增 Dual-Engine ML API（Section 15）- Phase 3.7 雙引擎 ML 系統（LightGBM + XGBoost）7 個端點；通用模型訓練、LightGBM 專屬訓練、雙引擎對比報告、通用批量分析
@@ -38,9 +39,10 @@
 18. [Hyperparameter Optimization API (Phase 4)](#17-hyperparameter-optimization-api-phase-4)
 19. [Execution Optimization API (Phase 4)](#18-execution-optimization-api-phase-4)
 20. [Feature Factory Granular Control API](#19-feature-factory-granular-control-api)
-21. [WebSocket API](#websocket-api)
-22. [錯誤處理](#錯誤處理)
-23. [數據模型](#數據模型)
+21. [Feature Factory MultiTF + Batch API](#20-feature-factory-multitf--batch-api)
+22. [WebSocket API](#websocket-api)
+23. [錯誤處理](#錯誤處理)
+24. [數據模型](#數據模型)
 
 ---
 
@@ -1558,6 +1560,147 @@ POST /api/v1/features/config/presets/{preset_name}
 
 ---
 
+## 20. Feature Factory MultiTF + Batch API
+
+> **路由**: `api/routes/feature_factory.py` | **Prefix**: `/api/v1/features`  
+> **新增於**: v6.0 (2026-03-15)
+
+### 20.1 單標的特徵生成
+```http
+POST /api/v1/features/generate
+```
+
+啟動單一標的的特徵生成任務。`timeframe` 必須是 `SUPPORTED_TIMEFRAMES` 之一，否則回傳 422。
+
+**Request Body** (`FeatureGenerateRequest`):
+```json
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "12h",
+  "config_override": null,
+  "force_regenerate": false
+}
+```
+
+| 欄位 | 類型 | 必填 | 說明 |
+|------|------|------|------|
+| `symbol` | string | ✅ | 交易標的（例如 `BTCUSDT`）|
+| `timeframe` | string | ✅ | 主時間週期（需在 `SUPPORTED_TIMEFRAMES` 中）|
+| `config_override` | object \| null | ❌ | 覆寫預設特徵工廠配置 |
+| `force_regenerate` | boolean | ❌ | `true` 跳過快取，強制重算（預設 `false`）|
+
+**SUPPORTED_TIMEFRAMES**：`["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]`
+
+**Response** (202 Accepted):
+```json
+{
+  "task_id": "3f4a1b2c-...",
+  "status": "pending"
+}
+```
+
+**錯誤**：
+| 狀態碼 | 情境 |
+|--------|------|
+| `422` | `timeframe` 不在 `SUPPORTED_TIMEFRAMES` 中 |
+| `400` | 請求參數語意錯誤（例如無效 config 路徑）|
+| `500` | 伺服器內部錯誤 |
+
+---
+
+### 20.2 啟動批次特徵生成
+```http
+POST /api/v1/features/batch
+```
+
+啟動多標的並行特徵生成。後端使用 `FeatureFactoryBatchService`（`ProcessPoolExecutor`，`max_concurrent=2`）。
+
+**Request Body** (`BatchGenerateRequest`):
+```json
+{
+  "symbols": ["BTCUSDT", "ETHUSDT", "BNBUSDT"],
+  "timeframe": "12h",
+  "config_override": null,
+  "force_regenerate": false,
+  "max_workers": 4
+}
+```
+
+| 欄位 | 類型 | 必填 | 約束 | 說明 |
+|------|------|------|------|------|
+| `symbols` | array\<string\> | ✅ | 1–200 個；自動去重 | 目標標的清單 |
+| `timeframe` | string | ❌ | 必須在 `SUPPORTED_TIMEFRAMES` 中 | 主時間週期（預設 `"12h"`）|
+| `config_override` | object \| null | ❌ | — | 覆寫特徵工廠配置 |
+| `force_regenerate` | boolean | ❌ | — | 是否跳過快取（預設 `false`）|
+| `max_workers` | integer | ❌ | 1–8 | ProcessPool 工作行程數（預設 `4`）|
+
+**Validators**:
+- `symbols`：自動去重並保留順序；每個元素需符合 `^[A-Za-z0-9_]+$`
+- `timeframe`：不在 `SUPPORTED_TIMEFRAMES` 列表則回傳 422
+
+**Response** (202 Accepted):
+```json
+{
+  "task_id": "a9b3c2d1-...",
+  "status": "pending",
+  "total": 3
+}
+```
+
+**錯誤**：
+| 狀態碼 | 情境 |
+|--------|------|
+| `422` | `timeframe` 不合法或 `symbols` 含非法字元 |
+| `400` | 請求語意錯誤 |
+| `500` | 伺服器內部錯誤 |
+
+---
+
+### 20.3 查詢批次任務狀態
+```http
+GET /api/v1/features/batch/{task_id}
+```
+
+輪詢批次任務當前進度。
+
+**Path Parameters**:
+| 參數 | 類型 | 說明 |
+|------|------|------|
+| `task_id` | string (UUID) | 由 `POST /batch` 回傳的任務 ID |
+
+**Response** (`BatchTaskStatusResponse`):
+```json
+{
+  "task_id": "a9b3c2d1-...",
+  "status": "running",
+  "total": 3,
+  "completed": 1,
+  "failed": 0,
+  "progress": 0.33,
+  "results": {
+    "BTCUSDT": "task_id_btc"
+  },
+  "errors": {}
+}
+```
+
+**`status` 可能值**:
+| 狀態 | 說明 |
+|------|------|
+| `pending` | 等待排隊中 |
+| `running` | 批次進行中 |
+| `completed` | 全部標的完成 |
+| `partial` | 部分標的失敗，其餘完成 |
+| `failed` | 全部標的失敗或任務啟動失敗 |
+
+**錯誤**：
+| 狀態碼 | 情境 |
+|--------|------|
+| `404` | `task_id` 不存在或已 TTL 清理 |
+| `500` | 伺服器內部錯誤 |
+
+---
+
 ## WebSocket API
 
 ### 即時優化進度
@@ -1608,6 +1751,43 @@ ws://localhost:8000/ws/ic-analysis/{task_id}?client_id={client_id}
 ws://localhost:8000/ws/features/{task_id}?client_id={client_id}
 ```
 推送 Feature Factory 七層 pipeline 執行進度。
+
+### Feature Factory 批次生成即時進度
+```
+ws://localhost:8000/ws/features/batch/{task_id}?client_id={client_id}
+```
+
+推送多標的批次特徵生成的逐標的完成進度。
+
+**推送格式**（每完成一個標的）:
+```json
+{
+  "type": "batch_progress",
+  "task_id": "a9b3c2d1-...",
+  "status": "running",
+  "total": 10,
+  "completed": 3,
+  "failed": 0,
+  "progress": 0.30,
+  "latest_symbol": "ETHUSDT",
+  "latest_result": "task_id_eth"
+}
+```
+
+**最終狀態**:
+```json
+{
+  "type": "batch_completed",
+  "task_id": "a9b3c2d1-...",
+  "status": "completed",
+  "total": 10,
+  "completed": 10,
+  "failed": 0,
+  "progress": 1.0,
+  "results": {"BTCUSDT": "task_btc", "ETHUSDT": "task_eth"},
+  "errors": {}
+}
+```
 
 ---
 
@@ -2056,6 +2236,6 @@ resp = requests.post(
 
 ---
 
-*文檔版本：4.0*
-*最後更新：2026-02-18*
-*狀態：Phase 1-4 全部完成，API 同步更新*
+*文檔版本：6.0*
+*最後更新：2026-03-15*
+*狀態：Phase 1-4 + Feature Factory MultiTF/Batch 全部完成，API 同步更新*

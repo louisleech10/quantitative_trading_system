@@ -8,6 +8,7 @@ import pandas as pd
 
 from momentum.core.logging import get_logger
 from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.FeatureEngineering.feature_config import AlignmentMode, SUPPORTED_TIMEFRAMES
 
 
 logger = get_logger(__name__)
@@ -22,6 +23,7 @@ class TimeframeAligner:
         source_tf: str,
         primary_timestamps: pd.Series,
         primary_tf: str,
+        alignment_mode: AlignmentMode = AlignmentMode.OPEN_MINUS,
     ) -> pd.DataFrame:
         """Align source DataFrame to primary timestamps using point-in-time merge."""
         if source_df is None or source_df.empty:
@@ -44,7 +46,14 @@ class TimeframeAligner:
             elif source_seconds > primary_seconds:
                 logger.info("Aligning lower-frequency %s to %s", source_tf, primary_tf)
 
-        aligned = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        if alignment_mode == AlignmentMode.OPEN_MINUS and source_tf != primary_tf:
+            # OPEN_MINUS only shifts anchor for non-primary TFs to avoid same-open bar leakage.
+            anchor_index = primary_index - pd.Timedelta(nanoseconds=1)
+        else:
+            anchor_index = primary_index
+
+        aligned = TimeframeAligner._merge_asof_align(source_values, source_index, anchor_index)
+        aligned.index = primary_index
         return aligned
 
     @staticmethod
@@ -128,10 +137,14 @@ class TimeframeAligner:
                 return value * 3600
             if unit == "d":
                 return value * 86400
+            if unit == "w":
+                return value * 604800
         except ValueError:
             return None
         return None
 
     @staticmethod
     def _timeframe_seconds_keys() -> list[str]:
-        return list(KlineStorageManager.TIMEFRAME_SECONDS.keys())
+        keys = set(KlineStorageManager.TIMEFRAME_SECONDS.keys())
+        keys.update(SUPPORTED_TIMEFRAMES)
+        return list(keys)

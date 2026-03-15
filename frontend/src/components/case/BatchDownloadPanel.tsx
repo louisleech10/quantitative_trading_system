@@ -2,6 +2,18 @@
 
 import { useState, useEffect } from "react";
 
+const SUPPORTED_TIMEFRAMES = [
+  { value: "1m", label: "1 分鐘" },
+  { value: "5m", label: "5 分鐘" },
+  { value: "15m", label: "15 分鐘" },
+  { value: "30m", label: "30 分鐘" },
+  { value: "1h", label: "1 小時" },
+  { value: "4h", label: "4 小時" },
+  { value: "12h", label: "12 小時" },
+  { value: "1d", label: "1 天" },
+  { value: "1w", label: "1 週" },
+] as const;
+
 interface BatchDownloadPanelProps {
   totalCases: number;
   onDownloadComplete?: () => void;
@@ -27,11 +39,20 @@ export default function BatchDownloadPanel({
   const [warmupBars, setWarmupBars] = useState(150); // 新增：Warmup期K線數
   const [lookbackBars, setLookbackBars] = useState(100);
   const [forwardBars, setForwardBars] = useState(48);
-  const [downloadTimeframe, setDownloadTimeframe] = useState("1h"); // 新增：K線下載時間框架（預設1h）
+  const [downloadTimeframes, setDownloadTimeframes] = useState<string[]>(["12h"]); // 多TF下載（預設12h）
   const [downloading, setDownloading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleToggleTimeframe = (timeframe: string) => {
+    setDownloadTimeframes((prev) => {
+      if (prev.includes(timeframe)) {
+        return prev.filter((tf) => tf !== timeframe);
+      }
+      return [...prev, timeframe];
+    });
+  };
 
   // 輪詢進度（優化版：動態間隔）
   useEffect(() => {
@@ -93,9 +114,11 @@ export default function BatchDownloadPanel({
     setError(null);
     setProgress(null);
 
-    // 計算總lookback（warmup + 有效K線）
-    const totalLookbackBars = warmupBars + lookbackBars;
-    void totalLookbackBars;
+    if (downloadTimeframes.length === 0) {
+      setError("請至少選擇一個時間框架");
+      setDownloading(false);
+      return;
+    }
 
     // 保存lookback/forward設定到localStorage，供圖表頁面使用
     localStorage.setItem('kline_warmup_bars', warmupBars.toString());
@@ -114,7 +137,7 @@ export default function BatchDownloadPanel({
           warmup_bars: warmupBars, // 明確傳送 warmup_bars
           forward_bars: forwardBars,
           force_redownload: false,
-          timeframe: downloadTimeframe, // 新增：K線下載時間框架
+          timeframe: downloadTimeframes, // 支援多TF下載
         }),
       });
 
@@ -145,26 +168,25 @@ export default function BatchDownloadPanel({
 
       {/* Configuration */}
       <div className="mb-4 grid grid-cols-2 gap-4">
-        {/* K線時間框架選擇器 */}
+        {/* K線時間框架多選 */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            K線時間框架
+            K線時間框架（可多選）
           </label>
-          <select
-            value={downloadTimeframe}
-            onChange={(e) => setDownloadTimeframe(e.target.value)}
-            className="w-full border border-slate-700 rounded px-3 py-2 bg-slate-900/60 text-slate-100 font-medium focus:border-blue-400/40 focus:ring-1 focus:ring-blue-400/40"
-            disabled={downloading}
-          >
-            <option value="1m">1 分鐘</option>
-            <option value="5m">5 分鐘</option>
-            <option value="15m">15 分鐘</option>
-            <option value="30m">30 分鐘</option>
-            <option value="1h">1 小時 (預設)</option>
-            <option value="4h">4 小時</option>
-            <option value="12h">12 小時</option>
-            <option value="1d">1 天</option>
-          </select>
+          <div className="grid grid-cols-3 gap-2 rounded border border-slate-700 p-3 bg-slate-900/60">
+            {SUPPORTED_TIMEFRAMES.map((tf) => (
+              <label key={tf.value} className="flex items-center gap-2 text-sm text-slate-100">
+                <input
+                  type="checkbox"
+                  checked={downloadTimeframes.includes(tf.value)}
+                  onChange={() => handleToggleTimeframe(tf.value)}
+                  disabled={downloading}
+                  className="rounded border-slate-600 bg-slate-800"
+                />
+                <span>{tf.label}</span>
+              </label>
+            ))}
+          </div>
           <p className="text-xs text-slate-400 mt-1 font-medium">
             用於ML訓練（與案例搜尋時間框架獨立）
           </p>
@@ -238,7 +260,7 @@ export default function BatchDownloadPanel({
           案例數量：<span className="font-semibold text-blue-300">{totalCases}</span> 個
         </p>
         <p className="text-sm font-medium text-slate-300 mb-1">
-          時間框架：<span className="font-semibold text-blue-300">{downloadTimeframe}</span>
+          時間框架：<span className="font-semibold text-blue-300">{downloadTimeframes.join(", ")}</span>
         </p>
         <p className="text-sm font-semibold text-slate-100 mt-2 mb-1">
           每個案例下載：

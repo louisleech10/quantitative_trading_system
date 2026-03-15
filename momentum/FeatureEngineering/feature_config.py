@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, Dict, List, Optional, Literal, Union
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_serializer
@@ -42,10 +43,40 @@ class FeatureCountPreview(BaseModel):
     breakdown: Dict[str, int]
 
 
+class AlignmentMode(str, Enum):
+    """Timeframe alignment mode."""
+
+    CLOSE_TIME = "close_time"
+    OPEN_MINUS = "open_minus"
+
+
+SUPPORTED_TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"]
+
+
 class TimeframeConfig(BaseModel):
     primary: str = "12h"
     training: List[str] = Field(default_factory=lambda: ["12h"])
-    alignment: Optional[str] = None
+    alignment: str = "point_in_time"
+    alignment_mode: AlignmentMode = AlignmentMode.OPEN_MINUS
+
+    @field_validator("training")
+    @classmethod
+    def validate_training_tf(cls, value: List[str]) -> List[str]:
+        for timeframe in value:
+            if timeframe not in SUPPORTED_TIMEFRAMES:
+                raise ValueError(
+                    f"Unsupported timeframe: {timeframe}, available: {SUPPORTED_TIMEFRAMES}"
+                )
+        return value
+
+    @field_validator("primary")
+    @classmethod
+    def validate_primary_tf(cls, value: str) -> str:
+        if value not in SUPPORTED_TIMEFRAMES:
+            raise ValueError(
+                f"Unsupported primary timeframe: {value}, available: {SUPPORTED_TIMEFRAMES}"
+            )
+        return value
 
 
 class IndicatorDef(BaseModel):

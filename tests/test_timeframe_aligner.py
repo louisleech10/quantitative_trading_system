@@ -1,5 +1,6 @@
 import pandas as pd
 
+from momentum.FeatureEngineering.feature_config import AlignmentMode
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
 
@@ -8,7 +9,13 @@ def test_align_high_frequency_to_primary():
     source_df = pd.DataFrame({"value": list(range(13))}, index=source_ts)
     primary_ts = pd.Series([0, 12 * 3600 * 1000, 24 * 3600 * 1000])
 
-    aligned = TimeframeAligner.align_to_primary(source_df, "1h", primary_ts, "12h")
+    aligned = TimeframeAligner.align_to_primary(
+        source_df,
+        "1h",
+        primary_ts,
+        "12h",
+        alignment_mode=AlignmentMode.CLOSE_TIME,
+    )
     assert aligned.index.size == 3
     assert aligned["value"].iloc[1] == 12
     assert aligned["value"].iloc[2] == 12

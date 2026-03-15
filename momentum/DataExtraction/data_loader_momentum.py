@@ -25,6 +25,11 @@ try:
 except ImportError:
     from data_provider_base import DataProviderBase
 
+try:
+    from momentum.DataExtraction.kline_storage import KlineStorageManager
+except ImportError:
+    from kline_storage import KlineStorageManager
+
 # 設置日誌
 logging.basicConfig(
     level=logging.DEBUG,
@@ -79,6 +84,14 @@ class DataLoader(DataProviderBase):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
 
+        # V6 Legacy 清理：統一K線讀寫到 kline_cache.h5
+        self.kline_storage_manager = None
+        try:
+            self.kline_storage_manager = KlineStorageManager(cache_dir=str(self.cache_dir))
+            self.logger.info("KlineStorageManager 已啟用 (kline_cache.h5)")
+        except Exception as e:
+            self.logger.warning(f"無法初始化 KlineStorageManager: {e}")
+
         # Phase 0: HDF5緩存管理器（新增）
         self.enable_hdf5_cache = enable_hdf5_cache
         self.hdf5_cache_manager = None
@@ -104,12 +117,6 @@ class DataLoader(DataProviderBase):
 
         if enable_chart_downloader:
             try:
-                # 導入KlineStorageManager（任務1.1）
-                try:
-                    from .kline_storage import KlineStorageManager
-                except ImportError:
-                    from momentum.DataExtraction.kline_storage import KlineStorageManager
-
                 # 導入下載服務（任務1.2）
                 try:
                     from .kline_download_service import KlineDownloadService
@@ -513,41 +520,28 @@ class DataLoader(DataProviderBase):
             mask = (cached_data.index >= start_dt) & (cached_data.index <= end_dt)
             if mask.sum() > 0:  # 有數據
                 return cached_data[mask]
-            
-        # 檢查文件緩存
-        cache_path = self._get_cache_path(symbol, interval)
-        if cache_path.exists():
-            try:
-                with pd.HDFStore(cache_path, mode='r') as store:
-                    # 檢查有無metadata來確定緩存的範圍
-                    if '/metadata' in store:
-                        metadata = store.get('metadata')
-                        cached_start = pd.Timestamp(metadata['start_time'][0])
-                        cached_end = pd.Timestamp(metadata['end_time'][0])
-                        
-                        # 如果請求的範圍在緩存範圍內，則讀取
-                        if cached_start <= start_dt and cached_end >= end_dt:
-                            df = store.get('data')
-                            mask = (df.index >= start_dt) & (df.index <= end_dt)
-                            result = df[mask]
-                            
-                            # 如果結果非空，添加到內存緩存
-                            if not result.empty:
-                                self._add_to_memory_cache(cache_key, result)
-                                return result
-                    else:
-                        # 舊格式的緩存，嘗試直接讀取
-                        df = pd.read_hdf(cache_path, 'data')
-                        mask = (df.index >= start_dt) & (df.index <= end_dt)
-                        result = df[mask]
-                        
-                        if not result.empty and len(result) == (end_dt - start_dt).total_seconds() / self._interval_to_seconds(interval) + 1:
-                            # 數據完整，添加到內存緩存
-                            self._add_to_memory_cache(cache_key, result)
-                            return result
-                        
-            except Exception as e:
-                self.logger.warning(f"讀取緩存失敗: {str(e)}")
+
+        # 統一從 kline_cache.h5 讀取
+        if self.kline_storage_manager is None:
+            return None
+
+        try:
+            storage_df = self.kline_storage_manager.read_klines(
+                symbol=symbol,
+                timeframe=interval,
+                start_time=start_dt,
+                end_time=end_dt,
+                validate_continuity=False,
+            )
+            if storage_df is None or storage_df.empty:
+                return None
+
+            result = self._from_storage_format(storage_df)
+            if not result.empty:
+                self._add_to_memory_cache(cache_key, result)
+                return result
+        except Exception as e:
+            self.logger.warning(f"從 kline_cache.h5 讀取緩存失敗: {str(e)}")
                 
         return None
         
@@ -556,61 +550,124 @@ class DataLoader(DataProviderBase):
         try:
             if data.empty:
                 return
-                
-            cache_path = self._get_cache_path(symbol, interval)
-            
+
+            if self.kline_storage_manager is None:
+                self.logger.warning("KlineStorageManager 未啟用，略過緩存寫入")
+                return
+
             # 優化數據類型
             data = self._optimize_dtypes(data)
-            
-            # 檢查現有緩存
-            if cache_path.exists():
-                try:
-                    # 讀取現有數據
-                    existing_data = pd.read_hdf(cache_path, 'data')
-                    
-                    # 合併數據，保留索引唯一性
-                    combined = pd.concat([existing_data, data])
-                    combined = combined[~combined.index.duplicated(keep='last')]
-                    
-                    # 按時間排序
-                    combined = combined.sort_index()
-                    
-                    # 保存合併後的數據
-                    combined.to_hdf(cache_path, 'data', mode='w', format='table')
-                    
-                    # 更新元數據
-                    metadata = pd.DataFrame({
-                        'symbol': [symbol],
-                        'interval': [interval],
-                        'start_time': [combined.index.min().strftime('%Y-%m-%d %H:%M:%S')],
-                        'end_time': [combined.index.max().strftime('%Y-%m-%d %H:%M:%S')],
-                        'last_update': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
-                    })
-                    metadata.to_hdf(cache_path, 'metadata', mode='a', format='table')
-                    
-                    self.logger.info(f"更新緩存: {symbol}_{interval}, 總計 {len(combined)} 行")
-                    return
-                    
-                except Exception as e:
-                    self.logger.warning(f"讀取現有緩存失敗，創建新緩存: {str(e)}")
-            
-            # 創建新緩存
-            data.to_hdf(cache_path, 'data', mode='w', format='table')
-            
-            # 添加元數據
-            metadata = pd.DataFrame({
-                'symbol': [symbol],
-                'interval': [interval],
-                'start_time': [data.index.min().strftime('%Y-%m-%d %H:%M:%S')],
-                'end_time': [data.index.max().strftime('%Y-%m-%d %H:%M:%S')],
-                'last_update': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
-            })
-            metadata.to_hdf(cache_path, 'metadata', mode='a', format='table')
-            
-            self.logger.info(f"數據已緩存到: {cache_path}, {len(data)} 行")
+            incoming_df = self._to_storage_format(data)
+
+            existing_df = self.kline_storage_manager.read_klines(
+                symbol=symbol,
+                timeframe=interval,
+                validate_continuity=False,
+            )
+
+            if existing_df is not None and not existing_df.empty:
+                combined_df = pd.concat([existing_df, incoming_df], ignore_index=True)
+                combined_df = combined_df.drop_duplicates(subset=['timestamp'], keep='last')
+                combined_df = combined_df.sort_values('timestamp').reset_index(drop=True)
+            else:
+                combined_df = incoming_df
+
+            write_ok = self.kline_storage_manager.write_klines(
+                symbol=symbol,
+                timeframe=interval,
+                df=combined_df,
+                data_source="binance",
+            )
+
+            if write_ok:
+                self.logger.info(f"數據已緩存到 kline_cache.h5: {symbol}/{interval}, {len(combined_df)} 行")
+            else:
+                self.logger.error(f"寫入 kline_cache.h5 失敗: {symbol}/{interval}")
             
         except Exception as e:
             self.logger.error(f"保存緩存失敗: {str(e)}")
+
+    def _to_storage_format(self, data: pd.DataFrame) -> pd.DataFrame:
+        """將 DataLoader 格式轉為 KlineStorageManager 所需格式。"""
+        if data.empty:
+            return pd.DataFrame(columns=[
+                'timestamp', 'open', 'high', 'low', 'close', 'volume',
+                'taker_buy_volume', 'taker_ratio', 'quote_volume', 'number_of_trades'
+            ])
+
+        df = data.copy()
+
+        if isinstance(df.index, pd.DatetimeIndex):
+            timestamps = np.asarray(df.index.astype('int64') // 1_000_000_000, dtype='int64')
+        elif 'timestamp' in df.columns:
+            ts_series = pd.to_datetime(df['timestamp'])
+            timestamps = np.asarray(ts_series.astype('int64') // 1_000_000_000, dtype='int64')
+        else:
+            raise ValueError("無法轉換為 storage 格式：缺少 timestamp")
+
+        quote_col = 'quote_asset_volume' if 'quote_asset_volume' in df.columns else 'quote_volume'
+        taker_base_col = (
+            'taker_buy_base_asset_volume'
+            if 'taker_buy_base_asset_volume' in df.columns
+            else 'taker_buy_volume'
+        )
+        trades_col = 'number_of_trades' if 'number_of_trades' in df.columns else None
+
+        def _as_numeric(col_name: str, default: float = 0.0) -> pd.Series:
+            if col_name in df.columns:
+                return pd.to_numeric(df[col_name], errors='coerce')
+            return pd.Series(default, index=df.index, dtype='float64')
+
+        out = pd.DataFrame({
+            'timestamp': timestamps,
+            'open': _as_numeric('open').to_numpy(),
+            'high': _as_numeric('high').to_numpy(),
+            'low': _as_numeric('low').to_numpy(),
+            'close': _as_numeric('close').to_numpy(),
+            'volume': _as_numeric('volume').to_numpy(),
+            'taker_buy_volume': _as_numeric(taker_base_col, default=0.0).fillna(0.0).to_numpy(),
+            'quote_volume': _as_numeric(quote_col, default=np.nan).to_numpy(),
+            'number_of_trades': _as_numeric(trades_col, default=0.0).fillna(0).to_numpy(),
+        })
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            out['taker_ratio'] = np.where(out['volume'] > 0, out['taker_buy_volume'] / out['volume'], 0.5)
+        out['taker_ratio'] = out['taker_ratio'].clip(0, 1)
+
+        out = out.dropna(subset=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        out = out.drop_duplicates(subset=['timestamp'], keep='last')
+        out = out.sort_values('timestamp').reset_index(drop=True)
+        out['timestamp'] = out['timestamp'].astype('int64')
+        out['number_of_trades'] = out['number_of_trades'].astype('int64')
+
+        return out
+
+    def _from_storage_format(self, storage_df: pd.DataFrame) -> pd.DataFrame:
+        """將 KlineStorageManager 讀取結果轉為 DataLoader 對外格式。"""
+        if storage_df is None or storage_df.empty:
+            return pd.DataFrame()
+
+        df = storage_df.copy()
+        if 'timestamp' not in df.columns:
+            return pd.DataFrame()
+
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
+        df = df.set_index('timestamp').sort_index()
+
+        if 'quote_volume' in df.columns and 'quote_asset_volume' not in df.columns:
+            df['quote_asset_volume'] = df['quote_volume']
+        if 'taker_buy_volume' in df.columns and 'taker_buy_base_asset_volume' not in df.columns:
+            df['taker_buy_base_asset_volume'] = df['taker_buy_volume']
+        if 'taker_buy_quote_asset_volume' not in df.columns:
+            if 'quote_asset_volume' in df.columns and 'taker_ratio' in df.columns:
+                df['taker_buy_quote_asset_volume'] = (
+                    pd.to_numeric(df['quote_asset_volume'], errors='coerce').fillna(0.0)
+                    * pd.to_numeric(df['taker_ratio'], errors='coerce').fillna(0.0)
+                )
+            else:
+                df['taker_buy_quote_asset_volume'] = 0.0
+
+        return df
             
     def _add_to_memory_cache(self, key: str, data: pd.DataFrame):
         """添加數據到內存緩存"""

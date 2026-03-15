@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
@@ -12,8 +12,9 @@ import AutoResearchPanel from '@/components/feature-factory/AutoResearchPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
 import LayerPanel from '@/components/feature-factory/LayerPanel';
-
-const FeatureExplorer = lazy(() => import('@/components/feature-factory/FeatureExplorer'));
+import FeatureExplorer from '@/components/feature-factory/FeatureExplorer';
+import BatchGenerationPanel from '@/components/feature-factory/BatchGenerationPanel';
+import BatchProgressPanel from '@/components/feature-factory/BatchProgressPanel';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
@@ -26,6 +27,7 @@ export default function FeatureFactoryPage() {
     dataSources,
     schema,
     currentTask,
+    batchTask,
     isGenerating,
     error,
     setError,
@@ -42,6 +44,7 @@ export default function FeatureFactoryPage() {
 
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME);
+  const [batchSymbols, setBatchSymbols] = useState<string[]>([]);
 
   useEffect(() => {
     loadInitial();
@@ -146,6 +149,12 @@ export default function FeatureFactoryPage() {
           </div>
 
           <div className="space-y-6">
+            <BatchGenerationPanel
+              timeframe={timeframe}
+              config={config}
+              onSymbolsCommitted={setBatchSymbols}
+            />
+            <BatchProgressPanel batchTask={batchTask} symbols={batchSymbols} />
             <LayerPanel schema={schema} />
             <PreviewPanel preview={preview} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -158,13 +167,7 @@ export default function FeatureFactoryPage() {
               />
             </div>
             {currentTask?.status === 'completed' && (
-              <Suspense
-                fallback={
-                  <div className="glass-panel rounded-2xl p-6 text-sm text-slate-300">載入 Feature Explorer 中...</div>
-                }
-              >
-                <FeatureExplorer taskId={currentTask.task_id} />
-              </Suspense>
+              <FeatureExplorer taskId={currentTask.task_id} />
             )}
           </div>
         </div>

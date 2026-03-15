@@ -33,6 +33,7 @@ import json
 import h5py
 import time
 import os
+import warnings
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +395,13 @@ class KlineStorageManager:
 
     def _import_from_legacy_cache(self, symbol: str, timeframe: str) -> bool:
         """嘗試從舊版data_cache結構導入K線數據。"""
+        warnings.warn(
+            "_import_from_legacy_cache() is deprecated and will be removed in a future release. "
+            "Please migrate data access to kline_cache.h5 directly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         legacy_files = [
             self.legacy_cache_dir / f"{symbol}_{timeframe}.h5",
             self.legacy_cache_dir / "hdf5_cache" / f"{symbol}_{timeframe}.h5"

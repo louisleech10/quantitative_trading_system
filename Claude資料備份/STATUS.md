@@ -1,14 +1,23 @@
 # 項目狀態
 
-**最後更新**: 2026-01-03 16:45
-**當前階段**: Optuna優化系統完善 - CSV導出增強
-**整體進度**: Phase 1: 5/5任務完成 (100%) ✅ | Phase 2: 4/4任務完成 (100%) ✅ | Phase 3: 6/6任務完成 (100%) ✅
+**最後更新**: 2026-03-15 00:00
+**當前階段**: Feature Factory MultiTF + 多標的批次計算 — 全部完成（Step 7 文件 + Legacy 歸檔）
+**整體進度**: Phase 0~4 (Feature Factory MultiTF) 54/54 測試通過 ✅ | Phase 5 (文件更新) 5/5 完成 ✅ | P0-9 (Legacy 歸檔) ✅
 
 ---
 
 ## 📊 整體狀態
 
 ### 已完成 ✅
+- **Feature Factory MultiTF 整合 + 多標的批次計算** (100%) - 2026-03-15完成
+  - ✅ Phase 0 前置作業：kline_cache.h5 資料覆蓋驗證、BTCUSDT 4h 補下載、BatchDownload 多 TF checkbox
+  - ✅ Phase 0.5 Legacy 清理：data_loader_momentum.py 寫入/讀取遷移、DeprecationWarning 標記、legacy .h5 歸檔（432 個）
+  - ✅ Phase 1 MultiTF Backend Core：AlignmentMode enum、SUPPORTED_TIMEFRAMES、tf_aligner、multi_tf_generator、feature_factory MultiTF 路由
+  - ✅ Phase 2 批次計算 Service + API：BatchGenerateRequest/Response Pydantic models、FeatureFactoryBatchService（ProcessPoolExecutor）、batch endpoints + DI、WebSocket 進度推送
+  - ✅ Phase 3 前端 UI：TypeScript 類型定義、featureFactoryStore 擴展、ConfigPanel AlignmentMode 選單、TimeframeSelector 多選 TF、BatchGenerationPanel、BatchProgressPanel、useFeatureFactory hook、page.tsx 整合
+  - ✅ Phase 4 測試：54/54 通過（MultiTF 對齊、Look-ahead bias、批次計算、邊界 E1-E19、效能基準）
+  - ✅ Phase 5 文件更新：API_SPECIFICATION.md v6.0（Section 20）、ARCHITECTURE.md v6.0（Section 20）、FRONTEND_INTEGRATION_GUIDE.md v3.0（Phase D）、PLAN.md 標記已實作
+  - ✅ P0-9 Legacy 歸檔：432 個 `*_12h.h5` 移至 `data_cache_legacy/`，data_cache/ 已清空
 - **Optuna CSV導出增強：完整統計欄位** (100%) - 2026-01-03完成
   - ✅ CSV包含20+統計欄位：p_value、cohens_d、stability_cv、M值、分離度等
   - ✅ 與NEW.csv格式一致：完整導出所有trial的user_attrs數據

@@ -30,7 +30,14 @@ export default function ConfigPanel({
   onSymbolChange,
   onTimeframeChange,
 }: ConfigPanelProps) {
-  const { selectedPreset, setSelectedPreset, setConfig, updateConfigPartial } =
+  const {
+    selectedPreset,
+    setSelectedPreset,
+    setConfig,
+    updateConfigPartial,
+    setAlignmentMode,
+    setTrainingTimeframes,
+  } =
     useFeatureFactoryStore();
 
   const availableSources = useMemo(() => {
@@ -143,12 +150,14 @@ export default function ConfigPanel({
 
       <TimeframeSelector
         timeframes={config.timeframes}
-        onChange={(next) =>
+        onChange={(next) => {
+          setAlignmentMode(next.alignment_mode ?? 'open_minus');
+          setTrainingTimeframes(next.training);
           setConfig({
             ...config,
             timeframes: next,
-          })
-        }
+          });
+        }}
       />
 
       <JsonOverrideEditor onApply={handleConfigOverride} />

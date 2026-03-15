@@ -1103,10 +1103,287 @@ await previewConfig(currentConfig);
 
 ---
 
+## Phase D — Feature Factory MultiTF + 批次生成 UI
+
+> **新增於**: v3.0 (2026-03-15)  
+> **對應後端**: `POST /api/v1/features/batch`、`GET /api/v1/features/batch/{task_id}`、`ws/features/batch/{task_id}`  
+> **對應 TODO**: Feature_Factory_MultiTF_MultiSymbol_TODO.md Phase 5
+
+### 新增 TypeScript 類型定義
+
+**路徑**: `frontend/src/lib/types.ts`
+
+```typescript
+// --- Feature Factory MultiTF + Batch 類型 ---
+
+/** 批次特徵生成請求 */
+export interface BatchGenerateRequest {
+  symbols: string[];          // 1–200 個標的，自動去重
+  timeframe?: string;         // 主時間週期，預設 "12h"
+  config_override?: Record<string, unknown> | null;
+  force_regenerate?: boolean; // 預設 false
+  max_workers?: number;       // 1–8，預設 4
+}
+
+/** 批次任務啟動回應 */
+export interface BatchStartResponse {
+  task_id: string;
+  status: "pending";
+  total: number;
+}
+
+/** 批次任務狀態（輪詢或 WebSocket） */
+export interface BatchTaskStatus {
+  task_id: string;
+  status: "pending" | "running" | "completed" | "partial" | "failed";
+  total: number;
+  completed: number;
+  failed: number;
+  progress: number;           // 0.0 – 1.0
+  results?: Record<string, string>;  // symbol → sub_task_id
+  errors?: Record<string, string>;   // symbol → error message
+}
+
+/** WebSocket 批次進度推送訊息 */
+export interface BatchProgressMessage {
+  type: "batch_progress" | "batch_completed";
+  task_id: string;
+  status: BatchTaskStatus["status"];
+  total: number;
+  completed: number;
+  failed: number;
+  progress: number;
+  latest_symbol?: string;
+  latest_result?: string;
+  results?: Record<string, string>;
+  errors?: Record<string, string>;
+}
+
+/** AlignmentMode 選項 */
+export type AlignmentMode = "open_minus" | "close_time";
+
+/** SUPPORTED_TIMEFRAMES 常數（與後端同步） */
+export const SUPPORTED_TIMEFRAMES = [
+  "1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"
+] as const;
+export type SupportedTimeframe = typeof SUPPORTED_TIMEFRAMES[number];
+```
+
+---
+
+### featureFactoryStore.ts — 新增狀態
+
+**路徑**: `frontend/src/store/featureFactoryStore.ts`
+
+Phase D 在原有狀態基礎上新增以下欄位與 actions：
+
+```typescript
+interface FeatureFactoryState {
+  // ... 既有狀態 ...
+
+  // Phase D 新增
+  alignmentMode: AlignmentMode;
+  trainingTimeframes: SupportedTimeframe[];     // 多選 TF（預設 ["12h"]）
+  batchTask: BatchTaskStatus | null;
+  isBatchRunning: boolean;
+
+  // Phase D actions
+  setAlignmentMode: (mode: AlignmentMode) => void;
+  setTrainingTimeframes: (tfs: SupportedTimeframe[]) => void;
+  setBatchTask: (task: BatchTaskStatus | null) => void;
+  clearBatchTask: () => void;
+}
+```
+
+---
+
+### 新元件：BatchGenerationPanel
+
+**路徑**: `frontend/src/components/feature-factory/BatchGenerationPanel.tsx`
+
+多標的批次特徵生成的啟動面板。
+
+**Props**:
+```typescript
+interface BatchGenerationPanelProps {
+  onBatchStarted?: (taskId: string) => void;
+}
+```
+
+**輸入欄位**:
+| 欄位 | 元件 | 說明 |
+|------|------|------|
+| 標的清單 | `<Textarea>` | 每行一個標的名稱，最多 200 個 |
+| 主時間週期 | `<Select>` | SUPPORTED_TIMEFRAMES 下拉選單 |
+| max_workers | `<Slider min=1 max=8>` | 並行工作程序數 |
+| force_regenerate | `<Switch>` | 是否跳過快取 |
+
+**送出後行為**:
+```
+POST /api/v1/features/batch
+→ 取得 task_id
+→ 展示 BatchProgressPanel（TaskId、進度條、各標的狀態列表）
+→ 訂閱 ws/features/batch/{task_id} 獲取即時進度
+```
+
+---
+
+### 新元件：BatchProgressPanel
+
+**路徑**: `frontend/src/components/feature-factory/BatchProgressPanel.tsx`
+
+批次任務執行期間的進度顯示面板，透過 WebSocket 接收即時更新。
+
+**Props**:
+```typescript
+interface BatchProgressPanelProps {
+  taskId: string;
+  onCompleted?: (status: BatchTaskStatus) => void;
+}
+```
+
+**顯示內容**:
+- 整體進度條（`progress * 100%`）
+- 統計數字：`已完成 {completed}/{total}`、`失敗 {failed}`  
+- 各標的狀態列表（pending / running / done / error）
+- 完成後顯示「匯出 CSV」按鈕（呼叫 `/api/v1/features/export/{sub_task_id}/csv`）
+
+**WebSocket 訂閱範例**:
+```typescript
+const ws = new WebSocket(
+  `ws://localhost:8000/ws/features/batch/${taskId}?client_id=${clientId}`
+);
+ws.onmessage = (event) => {
+  const msg: BatchProgressMessage = JSON.parse(event.data);
+  setBatchTask({
+    task_id: msg.task_id,
+    status: msg.status,
+    total: msg.total,
+    completed: msg.completed,
+    failed: msg.failed,
+    progress: msg.progress,
+    results: msg.results,
+    errors: msg.errors,
+  });
+  if (msg.type === "batch_completed") {
+    ws.close();
+    onCompleted?.(store.batchTask!);
+  }
+};
+```
+
+---
+
+### 既有元件修改：ConfigPanel 新增 AlignmentMode 選單
+
+**路徑**: `frontend/src/components/feature-factory/ConfigPanel.tsx`
+
+在「時間週期」設定區塊新增 AlignmentMode 下拉選單：
+
+```tsx
+<FormField label="對齊模式 (AlignmentMode)">
+  <Select
+    value={alignmentMode}
+    onValueChange={(v) => setAlignmentMode(v as AlignmentMode)}
+  >
+    <SelectItem value="open_minus">
+      OPEN_MINUS（預設，防止 look-ahead bias）
+    </SelectItem>
+    <SelectItem value="close_time">
+      CLOSE_TIME（高頻對齊低頻，以收盤時間對齊）
+    </SelectItem>
+  </Select>
+</FormField>
+```
+
+---
+
+### 既有元件修改：TimeframeSelector 支援多選訓練 TF
+
+**路徑**: `frontend/src/components/feature-factory/TimeframeSelector.tsx`（或相應元件）
+
+在主時間週期選擇器下方新增「訓練時間週期」多選區塊：
+
+```tsx
+<FormField label="訓練時間週期 (Training TFs)">
+  <div className="flex flex-wrap gap-2">
+    {SUPPORTED_TIMEFRAMES.map((tf) => (
+      <Badge
+        key={tf}
+        variant={trainingTimeframes.includes(tf) ? "default" : "outline"}
+        className={tf === primaryTimeframe ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+        onClick={() => {
+          if (tf === primaryTimeframe) return; // 主 TF 不可取消
+          toggleTrainingTF(tf);
+        }}
+      >
+        {tf}
+      </Badge>
+    ))}
+  </div>
+  <p className="text-xs text-gray-500 mt-1">
+    主時間週期 ({primaryTimeframe}) 已預設包含，點擊其他 TF 新增多時框架特徵
+  </p>
+</FormField>
+```
+
+---
+
+### API 呼叫 — useFeatureFactory Hook 新增函式
+
+**路徑**: `frontend/src/hooks/useFeatureFactory.ts`
+
+```typescript
+/** 啟動批次特徵生成 */
+const startBatch = async (request: BatchGenerateRequest): Promise<BatchStartResponse> => {
+  const response = await fetch("/api/v1/features/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || "批次任務啟動失敗");
+  }
+  return response.json();
+};
+
+/** 輪詢批次任務狀態（WebSocket 不可用時的備援） */
+const getBatchStatus = async (taskId: string): Promise<BatchTaskStatus> => {
+  const response = await fetch(`/api/v1/features/batch/${taskId}`);
+  if (!response.ok) throw new Error("任務不存在或已過期");
+  return response.json();
+};
+```
+
+---
+
+### 資料流說明
+
+```
+使用者在 BatchGenerationPanel 輸入標的清單 + 設定
+  → 點擊「開始批次生成」
+  → POST /api/v1/features/batch
+  → 取得 task_id，setBatchTask({ status: "pending", ... })
+
+WebSocket 連線 ws/features/batch/{task_id}
+  → 後端每完成一個標的，推送 batch_progress 訊息
+  → 前端更新 batchTask（completed++、progress 更新）
+  → BatchProgressPanel 重新渲染進度條和標的列表
+
+全部完成
+  → 後端推送 batch_completed，status = "completed" | "partial"
+  → ws.close()
+  → 顯示完成摘要，提供個別標的的 CSV 匯出連結
+```
+
+---
+
 ## 文件更新記錄
 
 | 日期 | 版本 | 變更內容 | 作者 |
 |------|------|----------|------|
+| 2026-03-15 | 3.0 | 新增 Feature Factory MultiTF + 批次生成 UI 整合（Phase D） | Claude |
 | 2026-03-08 | 2.0 | 新增 Feature Factory Granular Control 前端整合指南 | Claude |
 | 2026-01-11 | 1.0 | 初始版本，記錄 Phase 3-6 前端整合 | Claude |
 

@@ -106,6 +106,17 @@ class FeatureFactory:
             if cached:
                 return cached
 
+        training_tfs = list(dict.fromkeys(config.timeframes.training))
+        if len(training_tfs) > 1:
+            from momentum.FeatureEngineering.timeframe import MultiTFGenerator
+
+            multi_generator = MultiTFGenerator(
+                feature_factory=self,
+                config=config,
+                progress_callback=progress_callback,
+            )
+            return multi_generator.generate_multi_tf(symbol)
+
         try:
             raw_data = self._layer0_data_ingestion(symbol, timeframe, config)
         except Exception as exc:
@@ -615,7 +626,12 @@ class FeatureFactory:
         return self._config_manager.get_merged_config(config_override)
 
     def _compute_config_hash(self, config: "FactoryConfig") -> str:
-        payload = json.dumps(config.model_dump(by_alias=True), sort_keys=True, default=str)
+        config_payload = config.model_dump(by_alias=True)
+        timeframes = config_payload.get("timeframes")
+        if isinstance(timeframes, dict) and isinstance(timeframes.get("training"), list):
+            # Canonicalize list order so semantically identical training TF sets share cache key.
+            timeframes["training"] = sorted(timeframes["training"])
+        payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
     def _try_load_cache(self, symbol: str, timeframe: str, config_hash: str) -> Optional[FeatureGenerationResult]:

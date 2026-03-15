@@ -6,11 +6,14 @@ import asyncio
 from functools import partial
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 
+from api.main import get_batch_service
 from api.core.logging import get_logger
 from api.models.feature_factory_models import (
+    BatchGenerateRequest,
+    BatchTaskStatusResponse,
     BatchToggleRequest,
     FeatureGenerateRequest,
     FeaturePreviewRequest,
@@ -18,6 +21,9 @@ from api.models.feature_factory_models import (
     FeatureTaskStatusResponse,
     NL2ConfigRequest,
     NL2ConfigResponse,
+)
+from api.services.feature_factory_batch_service import (
+    FeatureFactoryBatchService,
 )
 from api.services.feature_factory_service import feature_factory_service
 
@@ -121,6 +127,45 @@ async def generate_features(request: FeatureGenerateRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to start generation: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/batch")
+async def start_batch_generation(
+    request: BatchGenerateRequest,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """啟動批次特徵生成。"""
+    try:
+        task_id = await service.start_batch(request)
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "total": len(request.symbols),
+        }
+    except ValueError as exc:
+        logger.error("Invalid batch request: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to start batch generation: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/batch/{task_id}", response_model=BatchTaskStatusResponse)
+async def get_batch_status(
+    task_id: str,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """查詢批次任務狀態。"""
+    try:
+        status = service.get_status(task_id)
+        if not status:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return status
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to get batch task status: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

@@ -1,12 +1,14 @@
-"""
-Feature Factory API Models
+"""Feature Factory API Models.
 
 Pydantic models for Feature Factory endpoints.
 """
 
-from typing import Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from momentum.FeatureEngineering.feature_config import SUPPORTED_TIMEFRAMES
 
 
 class FeatureGenerateRequest(BaseModel):
@@ -16,6 +18,16 @@ class FeatureGenerateRequest(BaseModel):
     timeframe: str = Field("12h", description="時間週期")
     config_override: Optional[Dict] = Field(default=None, description="配置覆寫")
     force_regenerate: bool = Field(default=False, description="是否跳過快取")
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe(cls, value: str) -> str:
+        """驗證時間週期。"""
+        if value not in SUPPORTED_TIMEFRAMES:
+            raise ValueError(
+                f"Unsupported timeframe: {value}, available: {SUPPORTED_TIMEFRAMES}"
+            )
+        return value
 
 
 class FeaturePreviewRequest(BaseModel):
@@ -69,3 +81,51 @@ class BatchToggleRequest(BaseModel):
     """Batch toggle request."""
 
     toggles: List[BatchToggleItem] = Field(..., description="批量切換操作列表")
+
+
+class BatchGenerateRequest(BaseModel):
+    """批次特徵生成請求。"""
+
+    symbols: List[str] = Field(..., min_length=1, max_length=200)
+    timeframe: str = Field(default="12h", description="primary TF")
+    config_override: Optional[Dict[str, Any]] = None
+    force_regenerate: bool = False
+    max_workers: int = Field(default=4, ge=1, le=8)
+
+    @field_validator("symbols")
+    @classmethod
+    def deduplicate_symbols(cls, value: List[str]) -> List[str]:
+        """自動去重且保留順序。"""
+        return list(dict.fromkeys(value))
+
+    @field_validator("symbols")
+    @classmethod
+    def validate_symbol_format(cls, value: List[str]) -> List[str]:
+        """驗證標的名稱格式（英數與底線）。"""
+        for symbol in value:
+            if not re.match(r"^[A-Za-z0-9_]+$", symbol):
+                raise ValueError(f"無效標的名稱: {symbol}")
+        return value
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe(cls, value: str) -> str:
+        """驗證主時間週期。"""
+        if value not in SUPPORTED_TIMEFRAMES:
+            raise ValueError(
+                f"Unsupported timeframe: {value}, available: {SUPPORTED_TIMEFRAMES}"
+            )
+        return value
+
+
+class BatchTaskStatusResponse(BaseModel):
+    """批次任務狀態。"""
+
+    task_id: str
+    status: str
+    total: int
+    completed: int
+    failed: int
+    progress: float
+    results: Optional[Dict[str, str]] = None
+    errors: Optional[Dict[str, str]] = None
