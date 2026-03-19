@@ -111,8 +111,7 @@ class MultiTFGenerator:
                 self._config.timeframes.alignment_mode,
             )
             aligned.attrs = {}
-            if timeframe != self._primary_tf:
-                aligned = self._apply_timeframe_tag(aligned, timeframe)
+            aligned = self._apply_timeframe_tag(aligned, timeframe)
             aligned_outputs.append(aligned)
 
         if self._primary_tf in skipped_tfs:

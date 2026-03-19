@@ -1,4 +1,299 @@
 {
+  "FEAR_20180129": {
+    "start_date": "2018-01-29",
+    "end_date": "2018-02-11",
+    "description": "FEAR"
+  },
+  "GREED_20180212": {
+    "start_date": "2018-02-12",
+    "end_date": "2018-02-18",
+    "description": "GREED"
+  },
+  "NEUTRAL_20180219": {
+    "start_date": "2018-02-19",
+    "end_date": "2018-02-25",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20180226": {
+    "start_date": "2018-02-26",
+    "end_date": "2018-03-25",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20180326": {
+    "start_date": "2018-03-26",
+    "end_date": "2018-04-15",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20180416": {
+    "start_date": "2018-04-16",
+    "end_date": "2018-04-22",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20180423": {
+    "start_date": "2018-04-23",
+    "end_date": "2018-04-29",
+    "description": "NEUTRAL"
+  },
+  "GREED_20180430": {
+    "start_date": "2018-04-30",
+    "end_date": "2018-05-06",
+    "description": "GREED"
+  },
+  "NEUTRAL_20180507": {
+    "start_date": "2018-05-07",
+    "end_date": "2018-05-13",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20180514": {
+    "start_date": "2018-05-14",
+    "end_date": "2018-06-10",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20180611": {
+    "start_date": "2018-06-11",
+    "end_date": "2018-06-17",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20180618": {
+    "start_date": "2018-06-18",
+    "end_date": "2018-06-24",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20180625": {
+    "start_date": "2018-06-25",
+    "end_date": "2018-07-01",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20180702": {
+    "start_date": "2018-07-02",
+    "end_date": "2018-07-22",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20180723": {
+    "start_date": "2018-07-23",
+    "end_date": "2018-07-29",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20180730": {
+    "start_date": "2018-07-30",
+    "end_date": "2018-08-05",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20180806": {
+    "start_date": "2018-08-06",
+    "end_date": "2018-09-16",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20180917": {
+    "start_date": "2018-09-17",
+    "end_date": "2018-10-07",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20181008": {
+    "start_date": "2018-10-08",
+    "end_date": "2018-10-21",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20181022": {
+    "start_date": "2018-10-22",
+    "end_date": "2018-11-04",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20181105": {
+    "start_date": "2018-11-05",
+    "end_date": "2018-11-11",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20181112": {
+    "start_date": "2018-11-12",
+    "end_date": "2018-11-18",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20181119": {
+    "start_date": "2018-11-19",
+    "end_date": "2018-12-16",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20181217": {
+    "start_date": "2018-12-17",
+    "end_date": "2019-01-27",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20190128": {
+    "start_date": "2019-01-28",
+    "end_date": "2019-02-03",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20190204": {
+    "start_date": "2019-02-04",
+    "end_date": "2019-02-17",
+    "description": "FEAR"
+  },
+  "GREED_20190218": {
+    "start_date": "2019-02-18",
+    "end_date": "2019-02-24",
+    "description": "GREED"
+  },
+  "FEAR_20190225": {
+    "start_date": "2019-02-25",
+    "end_date": "2019-03-03",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20190304": {
+    "start_date": "2019-03-04",
+    "end_date": "2019-03-31",
+    "description": "NEUTRAL"
+  },
+  "GREED_20190401": {
+    "start_date": "2019-04-01",
+    "end_date": "2019-04-21",
+    "description": "GREED"
+  },
+  "NEUTRAL_20190422": {
+    "start_date": "2019-04-22",
+    "end_date": "2019-05-05",
+    "description": "NEUTRAL"
+  },
+  "GREED_20190506": {
+    "start_date": "2019-05-06",
+    "end_date": "2019-06-02",
+    "description": "GREED"
+  },
+  "NEUTRAL_20190603": {
+    "start_date": "2019-06-03",
+    "end_date": "2019-06-09",
+    "description": "NEUTRAL"
+  },
+  "GREED_20190610": {
+    "start_date": "2019-06-10",
+    "end_date": "2019-06-16",
+    "description": "GREED"
+  },
+  "EXTREME_GREED_20190617": {
+    "start_date": "2019-06-17",
+    "end_date": "2019-06-30",
+    "description": "EXTREME_GREED"
+  },
+  "GREED_20190701": {
+    "start_date": "2019-07-01",
+    "end_date": "2019-07-14",
+    "description": "GREED"
+  },
+  "FEAR_20190715": {
+    "start_date": "2019-07-15",
+    "end_date": "2019-08-04",
+    "description": "FEAR"
+  },
+  "GREED_20190805": {
+    "start_date": "2019-08-05",
+    "end_date": "2019-08-11",
+    "description": "GREED"
+  },
+  "FEAR_20190812": {
+    "start_date": "2019-08-12",
+    "end_date": "2019-10-27",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20191028": {
+    "start_date": "2019-10-28",
+    "end_date": "2019-11-10",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20191111": {
+    "start_date": "2019-11-11",
+    "end_date": "2019-12-08",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20191209": {
+    "start_date": "2019-12-09",
+    "end_date": "2019-12-22",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20191223": {
+    "start_date": "2019-12-23",
+    "end_date": "2020-01-12",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20200113": {
+    "start_date": "2020-01-13",
+    "end_date": "2020-02-02",
+    "description": "NEUTRAL"
+  },
+  "GREED_20200203": {
+    "start_date": "2020-02-03",
+    "end_date": "2020-02-16",
+    "description": "GREED"
+  },
+  "NEUTRAL_20200217": {
+    "start_date": "2020-02-17",
+    "end_date": "2020-02-23",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20200224": {
+    "start_date": "2020-02-24",
+    "end_date": "2020-03-08",
+    "description": "FEAR"
+  },
+  "EXTREME_FEAR_20200309": {
+    "start_date": "2020-03-09",
+    "end_date": "2020-04-26",
+    "description": "EXTREME_FEAR"
+  },
+  "FEAR_20200427": {
+    "start_date": "2020-04-27",
+    "end_date": "2020-05-03",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20200504": {
+    "start_date": "2020-05-04",
+    "end_date": "2020-05-10",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20200511": {
+    "start_date": "2020-05-11",
+    "end_date": "2020-05-17",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20200518": {
+    "start_date": "2020-05-18",
+    "end_date": "2020-05-24",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20200525": {
+    "start_date": "2020-05-25",
+    "end_date": "2020-05-31",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20200601": {
+    "start_date": "2020-06-01",
+    "end_date": "2020-06-14",
+    "description": "NEUTRAL"
+  },
+  "FEAR_20200615": {
+    "start_date": "2020-06-15",
+    "end_date": "2020-07-19",
+    "description": "FEAR"
+  },
+  "NEUTRAL_20200720": {
+    "start_date": "2020-07-20",
+    "end_date": "2020-07-26",
+    "description": "NEUTRAL"
+  },
+  "GREED_20200727": {
+    "start_date": "2020-07-27",
+    "end_date": "2020-08-02",
+    "description": "GREED"
+  },
+  "EXTREME_GREED_20200803": {
+    "start_date": "2020-08-03",
+    "end_date": "2020-08-30",
+    "description": "EXTREME_GREED"
+  },
+  "GREED_20200831": {
+    "start_date": "2020-08-31",
+    "end_date": "2020-09-06",
+    "description": "GREED"
+  },
   "FEAR_20200907": {
     "start_date": "2020-09-07",
     "end_date": "2020-09-13",
@@ -456,7 +751,7 @@
   },
   "EXTREME_FEAR_20260126": {
     "start_date": "2026-01-26",
-    "end_date": "2026-03-08",
+    "end_date": "2026-03-22",
     "description": "EXTREME_FEAR"
   }
 }

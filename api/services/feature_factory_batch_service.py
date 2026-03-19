@@ -6,6 +6,7 @@ import asyncio
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 
 from api.core.logging import get_logger
@@ -208,6 +209,110 @@ class FeatureFactoryBatchService:
         for task_id in expired_task_ids:
             self._tasks.pop(task_id, None)
             self._notification_callbacks.pop(task_id, None)
+
+    async def get_batch_quality_summary(self, batch_task_id: str) -> Optional[Dict[str, Any]]:
+        """計算批次任務中所有成功標的的快速品質彙整（NaN/常數/警告，跳過 ADF）。"""
+        task = self._tasks.get(batch_task_id)
+        if not task:
+            return None
+
+        results: Dict[str, str] = dict(task.get("results", {}))
+        if not results:
+            return {
+                "batch_task_id": batch_task_id,
+                "summaries": [],
+                "total_symbols": 0,
+                "pass_count": 0,
+                "watch_count": 0,
+                "reject_count": 0,
+                "computed_at": datetime.now().isoformat(),
+            }
+
+        loop = asyncio.get_running_loop()
+
+        async def _compute_one(symbol: str, hdf5_path: str) -> Optional[Dict[str, Any]]:
+            try:
+                return await loop.run_in_executor(
+                    None, self._compute_symbol_quality, symbol, hdf5_path
+                )
+            except Exception as exc:
+                logger.warning("Quality check failed for %s: %s", symbol, exc)
+                return None
+
+        raw = await asyncio.gather(*[_compute_one(sym, path) for sym, path in results.items()])
+        summaries = [r for r in raw if r is not None]
+
+        grade_order = {"reject": 0, "watch": 1, "pass": 2}
+        summaries.sort(key=lambda x: grade_order.get(x["grade"], 3))
+
+        pass_count = sum(1 for s in summaries if s["grade"] == "pass")
+        watch_count = sum(1 for s in summaries if s["grade"] == "watch")
+        reject_count = sum(1 for s in summaries if s["grade"] == "reject")
+
+        return {
+            "batch_task_id": batch_task_id,
+            "summaries": summaries,
+            "total_symbols": len(summaries),
+            "pass_count": pass_count,
+            "watch_count": watch_count,
+            "reject_count": reject_count,
+            "computed_at": datetime.now().isoformat(),
+        }
+
+    @staticmethod
+    def _compute_symbol_quality(symbol: str, hdf5_path: str) -> Optional[Dict[str, Any]]:
+        """在 thread executor 中直接讀取 HDF5 計算品質指標（向量化，不含 ADF）。"""
+        import h5py
+        import numpy as np
+        from pathlib import Path
+
+        file_path = Path(hdf5_path)
+        if not file_path.exists():
+            return None
+
+        with h5py.File(file_path, "r") as h5f:
+            top_keys = list(h5f.keys())
+            if not top_keys:
+                return None
+            sym_key = top_keys[0]
+            tf_keys = list(h5f[sym_key].keys())
+            if not tf_keys:
+                return None
+            tf_key = tf_keys[0]
+            group = h5f[f"{sym_key}/{tf_key}"]
+            if "features" not in group:
+                return None
+            features = group["features"][:]  # shape: (bars, feature_count)
+
+        bar_count = int(features.shape[0])
+        feature_count = int(features.shape[1])
+
+        nan_ratios = np.isnan(features).mean(axis=0)  # per-feature NaN ratio
+        nan_ratio_mean = float(nan_ratios.mean())
+        nan_ratio_max = float(nan_ratios.max())
+
+        stds = np.nanstd(features, axis=0)
+        constant_feature_count = int((stds == 0).sum())
+        alert_count = int((nan_ratios > 0.1).sum())
+
+        # 量化業界標準評級
+        if nan_ratio_mean > 0.3 or constant_feature_count > 0 or bar_count < 200:
+            grade = "reject"
+        elif nan_ratio_mean > 0.1 or alert_count > 5 or bar_count < 500:
+            grade = "watch"
+        else:
+            grade = "pass"
+
+        return {
+            "symbol": symbol,
+            "bar_count": bar_count,
+            "feature_count": feature_count,
+            "nan_ratio_mean": round(nan_ratio_mean, 6),
+            "nan_ratio_max": round(nan_ratio_max, 6),
+            "constant_feature_count": constant_feature_count,
+            "alert_count": alert_count,
+            "grade": grade,
+        }
 
     def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """取得任務狀態。"""

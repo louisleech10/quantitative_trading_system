@@ -312,6 +312,7 @@ class StandaloneSearchService:
             self.logger.info(f"=== 轉換請求到搜索配置 ===")
             self.logger.info(f"請求的 price_change_method: {request.price_change_method}")
             self.logger.info(f"price_change_method.value: {request.price_change_method.value}")
+            self.logger.info(f"search_mode: {request.search_mode.value}")
             
             from momentum.factories import create_filter_condition, create_search_configuration
             
@@ -332,7 +333,8 @@ class StandaloneSearchService:
                 min_volume=request.min_volume,
                 exclude_new_listing_days=request.exclude_new_listing_days,
                 time_range=time_range,  # 添加時間範圍參數
-                price_change_method=request.price_change_method.value  # 新增：價格計算方式
+                price_change_method=request.price_change_method.value,  # 新增：價格計算方式
+                search_mode=request.search_mode.value,
             )
             
             # DEBUG: 記錄創建的配置
@@ -713,7 +715,8 @@ class StandaloneSearchService:
                     "name": request.name,
                     "description": request.description,
                     "start_date": request.start_date,
-                    "end_date": request.end_date
+                    "end_date": request.end_date,
+                    "search_mode": request.search_mode.value,
                 },
                 symbols_processed=symbols,
                 total_cases=len(real_cases),

@@ -290,6 +290,7 @@ class SearchTaskService:
 
             # === 獲取正例配置的所有必要參數 ===
             price_change_method = "CLOSE_TO_CLOSE"  # 默認值
+            search_mode = "research"  # 默認值
             
             if positive_task_id and positive_task_id in self.positive_configs:
                 positive_config = self.positive_configs[positive_task_id]
@@ -298,13 +299,18 @@ class SearchTaskService:
                 # 🔥 繼承正例的價格計算方法
                 if hasattr(positive_config, 'price_change_method'):
                     price_change_method = positive_config.price_change_method
+                if hasattr(positive_config, 'search_mode'):
+                    # Pydantic enum/string 皆轉為字串處理
+                    search_mode = str(getattr(positive_config.search_mode, 'value', positive_config.search_mode))
                 self.logger.info(f"📋 從正例配置繼承參數:")
                 self.logger.info(f"   - 時間範圍: {search_start_date} 到 {search_end_date}")
                 self.logger.info(f"   - price_change_method: {price_change_method}")
+                self.logger.info(f"   - search_mode: {search_mode}")
             else:
                 self.logger.warning(f"⚠️ 無法從正例配置獲取參數，使用默認值:")
                 self.logger.warning(f"   - 時間範圍: {search_start_date} 到 {search_end_date}")
                 self.logger.warning(f"   - price_change_method: {price_change_method}")
+                self.logger.warning(f"   - search_mode: {search_mode}")
 
             # 轉換為datetime對象以便處理
             try:
@@ -327,7 +333,8 @@ class SearchTaskService:
                 advanced_conditions=[],
                 start_date=search_start_date,  # 使用正例搜索相同的開始日期
                 end_date=search_end_date,      # 使用正例搜索相同的結束日期
-                price_change_method=price_change_method  # 🔥 使用正例搜索相同的價格計算方法
+                price_change_method=price_change_method,  # 🔥 使用正例搜索相同的價格計算方法
+                search_mode=search_mode,
             )
             
             self.logger.info(f"✅ 反例配置已創建，price_change_method={negative_config.price_change_method}")

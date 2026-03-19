@@ -135,7 +135,8 @@ class SearchConfiguration:
                 min_volume: float = 0,
                 exclude_new_listing_days: int = 7,
                 time_range: Tuple[str, str] = None,
-                price_change_method: str = 'CLOSE_TO_CLOSE'):
+                price_change_method: str = 'CLOSE_TO_CLOSE',
+                search_mode: str = 'research'):
         """
         初始化搜索配置
         
@@ -164,6 +165,7 @@ class SearchConfiguration:
         self.min_volume = min_volume
         self.exclude_new_listing_days = exclude_new_listing_days
         self.price_change_method = price_change_method
+        self.search_mode = (search_mode or 'research').lower()
         
         # 設置時間範圍，如果沒有提供則使用默認值
         if time_range:
@@ -191,6 +193,7 @@ class SearchConfiguration:
             'timeframe': self.timeframe,
             'lookback_periods': self.lookback_periods,
             'forward_periods': self.forward_periods,
+            'search_mode': self.search_mode,
             'initial_conditions': [c.to_dict() for c in self.initial_conditions],
             'advanced_conditions': [c.to_dict() for c in self.advanced_conditions],
             'sample_limit': self.sample_limit,
@@ -208,6 +211,7 @@ class SearchConfiguration:
             timeframe=data.get('timeframe', '4h'),
             lookback_periods=data.get('lookback_periods', 100),
             forward_periods=data.get('forward_periods', 20),
+            search_mode=data.get('search_mode', 'research'),
             sample_limit=data.get('sample_limit', 500),
             min_volume=data.get('min_volume', 0),
             exclude_new_listing_days=data.get('exclude_new_listing_days', 7),
@@ -1519,9 +1523,16 @@ class CaseSearchEngine:
                 
             # 符合條件的索引列表
             candidates = []
+
+            # research 模式需要完整未來標籤；realtime 模式允許最新樣本
+            if getattr(config, 'search_mode', 'research') == 'realtime':
+                end_idx = len(data)
+            else:
+                end_idx = len(data) - config.forward_periods
+            end_idx = max(1, end_idx)
             
             # 遍歷每一行（跳過第一行，因為無法計算漲跌幅）
-            for i in range(1, len(data) - config.forward_periods):
+            for i in range(1, end_idx):
                 # 檢查是否滿足所有初始條件
                 all_conditions_met = True
                 

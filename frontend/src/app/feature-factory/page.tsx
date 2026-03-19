@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
@@ -13,11 +13,22 @@ import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
 import LayerPanel from '@/components/feature-factory/LayerPanel';
 import FeatureExplorer from '@/components/feature-factory/FeatureExplorer';
-import BatchGenerationPanel from '@/components/feature-factory/BatchGenerationPanel';
-import BatchProgressPanel from '@/components/feature-factory/BatchProgressPanel';
+import BatchQualityOverview from '@/components/feature-factory/BatchQualityOverview';
+import { useAvailableSymbols } from '@/hooks/useAvailableSymbols';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
+
+function parseSymbols(input: string): string[] {
+  return Array.from(
+    new Set(
+      input
+        .split(/[\s,]+/)
+        .map((item) => item.trim().toUpperCase())
+        .filter((item) => item.length > 0)
+    )
+  );
+}
 
 export default function FeatureFactoryPage() {
   const {
@@ -31,6 +42,8 @@ export default function FeatureFactoryPage() {
     isGenerating,
     error,
     setError,
+    setCurrentTask,
+    setBatchTask,
     updateConfigPartial,
   } = useFeatureFactoryStore();
 
@@ -38,13 +51,75 @@ export default function FeatureFactoryPage() {
     loadInitial,
     previewConfig,
     startGeneration,
+    startBatchGeneration,
     requestNL2Config,
     loadTaskResult,
   } = useFeatureFactory();
 
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME);
-  const [batchSymbols, setBatchSymbols] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedBatchSymbol, setSelectedBatchSymbol] = useState<string | null>(null);
+  const [browseTaskIds, setBrowseTaskIds] = useState<Record<string, string>>({});
+  const [registeringSymbol, setRegisteringSymbol] = useState<string | null>(null);
+  const { symbols: importedSymbols, isLoading: isImportedSymbolsLoading } = useAvailableSymbols();
+
+  const batchResults = batchTask?.results ?? {};
+  const batchSuccessSymbols = Object.keys(batchResults);
+
+  // 批次完成後自動選擇第一個成功的 symbol
+  useEffect(() => {
+    if (
+      (batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
+      batchSuccessSymbols.length > 0 &&
+      !selectedBatchSymbol
+    ) {
+      setSelectedBatchSymbol(batchSuccessSymbols[0]);
+    }
+  }, [batchTask?.status, batchSuccessSymbols, selectedBatchSymbol]);
+
+  const handleSelectBatchSymbol = async (sym: string) => {
+    setSelectedBatchSymbol(sym);
+    if (browseTaskIds[sym]) return; // 已登錄，無需重複呼叫
+    const hdf5Path = batchResults[sym];
+    if (!hdf5Path) return;
+    setRegisteringSymbol(sym);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/features/browse/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: sym, timeframe, hdf5_path: hdf5Path }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json() as { task_id: string };
+      setBrowseTaskIds((prev) => ({ ...prev, [sym]: data.task_id }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `登錄 ${sym} 失敗`);
+    } finally {
+      setRegisteringSymbol(null);
+    }
+  };
+
+  const normalizedSymbols = useMemo(() => parseSymbols(symbol), [symbol]);
+  const isBatchMode = normalizedSymbols.length > 1;
+
+  useEffect(() => {
+    if (importedSymbols.length === 0) {
+      return;
+    }
+
+    const allowed = new Set(importedSymbols);
+    const validSymbols = normalizedSymbols.filter((item) => allowed.has(item));
+
+    if (validSymbols.length === 0) {
+      setSymbol(importedSymbols[0]);
+      return;
+    }
+
+    if (validSymbols.length !== normalizedSymbols.length) {
+      setSymbol(validSymbols.join(', '));
+    }
+  }, [importedSymbols, normalizedSymbols]);
 
   useEffect(() => {
     loadInitial();
@@ -74,11 +149,40 @@ export default function FeatureFactoryPage() {
       return;
     }
 
+    if (normalizedSymbols.length === 0) {
+      setError('請輸入至少一個標的');
+      return;
+    }
+
+    if (importedSymbols.length > 0) {
+      const allowed = new Set(importedSymbols);
+      const invalidSymbols = normalizedSymbols.filter((item) => !allowed.has(item));
+      if (invalidSymbols.length > 0) {
+        setError(`以下標的不在案例清單中：${invalidSymbols.join(', ')}`);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
     try {
-      await startGeneration(symbol, timeframe, config);
+      if (normalizedSymbols.length === 1) {
+        setBatchTask(null);
+        await startGeneration(normalizedSymbols[0], timeframe, config);
+      } else {
+        setCurrentTask(null);
+        await startBatchGeneration({
+          symbols: normalizedSymbols,
+          timeframe,
+          config_override: config as unknown as Record<string, unknown>,
+          force_regenerate: false,
+          max_workers: 4,
+        });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : '生成任務啟動失敗';
       setError(message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -106,21 +210,21 @@ export default function FeatureFactoryPage() {
             <div className="flex flex-col gap-3 min-w-[240px]">
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating}
+                disabled={isGenerating || isSubmitting}
                 className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 bg-amber-400/20 text-amber-100 border border-amber-300/30 hover:bg-amber-400/30 transition disabled:opacity-50"
               >
                 <PlayCircle className="w-5 h-5" />
-                {isGenerating ? '生成中...' : '啟動生成'}
+                {isSubmitting ? '啟動中...' : isBatchMode ? '啟動批次生成' : '啟動生成'}
               </button>
               <div className="text-xs text-slate-400 flex items-center gap-2">
                 <Wand2 className="w-4 h-4" />
-                支援多時間框架與自動對齊
+                支援多標的批次、多時間框架與自動對齊
               </div>
             </div>
           </div>
 
-          {currentTask && (
-            <GenerationProgress task={currentTask} naked />
+          {(currentTask || batchTask) && (
+            <GenerationProgress task={currentTask} batchTask={batchTask} symbols={normalizedSymbols} naked />
           )}
         </div>
 
@@ -137,6 +241,9 @@ export default function FeatureFactoryPage() {
               config={config}
               presets={presets}
               dataSources={dataSources}
+              importedSymbols={importedSymbols}
+              isImportedSymbolsLoading={isImportedSymbolsLoading}
+              lockSymbolInput={importedSymbols.length > 0}
               symbol={symbol}
               timeframe={timeframe}
               onSymbolChange={setSymbol}
@@ -149,12 +256,6 @@ export default function FeatureFactoryPage() {
           </div>
 
           <div className="space-y-6">
-            <BatchGenerationPanel
-              timeframe={timeframe}
-              config={config}
-              onSymbolsCommitted={setBatchSymbols}
-            />
-            <BatchProgressPanel batchTask={batchTask} symbols={batchSymbols} />
             <LayerPanel schema={schema} />
             <PreviewPanel preview={preview} />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -162,13 +263,53 @@ export default function FeatureFactoryPage() {
               <ExportButtons
                 config={config}
                 taskId={currentTask?.task_id}
-                symbol={symbol}
+                symbol={normalizedSymbols[0] ?? symbol}
                 timeframe={timeframe}
               />
             </div>
-            {currentTask?.status === 'completed' && (
-              <FeatureExplorer taskId={currentTask.task_id} />
+            {currentTask && (
+              <FeatureExplorer taskId={currentTask.task_id} taskStatus={currentTask.status} />
             )}
+            {(batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
+              batchSuccessSymbols.length > 0 && (
+                <>
+                  <BatchQualityOverview batchTaskId={batchTask.task_id} />
+                  {/* 批次模式 Symbol 選擇器 */}
+                  <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
+                    <div className="text-sm font-medium text-slate-300">Feature Explorer — 選擇標的</div>
+                    <div className="flex flex-wrap gap-2">
+                      {batchSuccessSymbols.map((sym) => (
+                        <button
+                          key={sym}
+                          onClick={() => handleSelectBatchSymbol(sym)}
+                          disabled={registeringSymbol === sym}
+                          className={`rounded-full px-3 py-1 text-xs border transition ${
+                            selectedBatchSymbol === sym
+                              ? 'bg-cyan-400/20 border-cyan-300/40 text-cyan-200'
+                              : 'border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                          } disabled:opacity-50`}
+                        >
+                          {registeringSymbol === sym ? (
+                            <span className="flex items-center gap-1">
+                              <span className="inline-block w-3 h-3 rounded-full border-2 border-cyan-400/60 border-t-cyan-300 animate-spin" />
+                              {sym}
+                            </span>
+                          ) : sym}
+                        </button>
+                      ))}
+                    </div>
+                    {selectedBatchSymbol && browseTaskIds[selectedBatchSymbol] && (
+                      <FeatureExplorer taskId={browseTaskIds[selectedBatchSymbol]} />
+                    )}
+                    {selectedBatchSymbol && !browseTaskIds[selectedBatchSymbol] && registeringSymbol === selectedBatchSymbol && (
+                      <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                        <span className="inline-block w-3 h-3 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin" />
+                        載入 {selectedBatchSymbol} 特徵資料中…
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
           </div>
         </div>
 

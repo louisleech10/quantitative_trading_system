@@ -28,6 +28,12 @@ class PriceChangeMethodEnum(str, Enum):
     OPEN_TO_CLOSE = "OPEN_TO_CLOSE"    # K線實體漲幅（日內策略）
     CLOSE_TO_CLOSE = "CLOSE_TO_CLOSE"  # 實質漲跌幅（波段策略，預設）
 
+
+class SearchModeEnum(str, Enum):
+    """搜索模式"""
+    RESEARCH = "research"
+    REALTIME = "realtime"
+
 # 修復 FilterConditionRequest 驗證邏輯
 class FilterConditionRequest(BaseModel):
     """篩選條件請求模型"""
@@ -94,6 +100,11 @@ class SearchConfigRequest(BaseModel):
     price_change_method: PriceChangeMethodEnum = Field(
         default=PriceChangeMethodEnum.CLOSE_TO_CLOSE,
         description="價格變動計算方式"
+    )
+    search_mode: SearchModeEnum = Field(
+        default=SearchModeEnum.RESEARCH,
+        alias="searchMode",
+        description="搜索模式：research=保留完整forward標籤, realtime=允許最新時間樣本"
     )
     
     def model_post_init(self, __context):
@@ -233,6 +244,7 @@ __all__ = [
     "TimeframeEnum",
     "OperatorEnum", 
     "ConditionTypeEnum",
+    "SearchModeEnum",
     "FilterConditionRequest",
     "SearchConfigRequest",
     "SearchPreviewRequest",

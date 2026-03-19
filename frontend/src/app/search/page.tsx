@@ -16,6 +16,7 @@ interface SimpleSearchRequest {
   name: string;
   symbols: string[];
   timeframe: string;
+  searchMode?: 'research' | 'realtime';
   startDate?: string | null;     // 新增：開始日期
   endDate?: string | null;       // 新增：結束日期
   priceChangeMethod?: PriceChangeMethod; // 價格變動計算方式
@@ -55,6 +56,7 @@ export default function SearchPage() {
     name: '兩階段搜索測試',
     symbols: [],
     timeframe: '12h',
+    searchMode: 'research',
     priceChangeMethod: PriceChangeMethod.CLOSE_TO_CLOSE, // 預設使用 CLOSE_TO_CLOSE (波段交易)
     priceChange: null,
     volumeMultiplier: null,
@@ -65,6 +67,12 @@ export default function SearchPage() {
   });
 
   const [symbolsInput, setSymbolsInput] = useState('');
+
+  const parseSymbolsInput = (input: string): string[] =>
+    input
+      .split(/[,，]/)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
 
   // 運算符狀態
   const [operators, setOperators] = useState({
@@ -147,6 +155,8 @@ export default function SearchPage() {
       setLoading(true);
       setError(null);
       setSearchResult(null);
+
+      const normalizedSymbols = parseSymbolsInput(symbolsInput);
 
       
       console.log('開始執行搜索...');
@@ -262,7 +272,7 @@ export default function SearchPage() {
 
       // 如果有條件，必須提供必要參數
       if (hasConditions) {
-        if (searchParams.symbols.length === 0) {
+        if (normalizedSymbols.length === 0) {
           setError('設定搜索條件時必須選擇至少一個交易對');
           return;
         }
@@ -277,12 +287,13 @@ export default function SearchPage() {
         config: {
           name: searchParams.name,
           timeframe: searchParams.timeframe,
+          search_mode: searchParams.searchMode,
           start_date: timeParams.startDate || null,
           end_date: timeParams.endDate || null,
           initial_conditions: buildConditions(),
           min_volume: timeParams.volumeMin || 100000
         },
-        symbols: searchParams.symbols,
+        symbols: normalizedSymbols,
         save_results: searchParams.saveResults || false
       };
 
@@ -295,8 +306,9 @@ export default function SearchPage() {
         // ✅ 新增：使用統一架構 - 構建反例搜索請求對象
         const negativeSearchRequest: SimpleSearchRequest = {
           name: '反例搜索',
-          symbols: searchParams.symbols,  // 使用相同的交易對
+          symbols: normalizedSymbols,  // 使用相同的交易對
           timeframe: searchParams.timeframe,  // 使用相同的時間框架
+          searchMode: searchParams.searchMode,
           priceChangeMethod: searchParams.priceChangeMethod, // 使用相同的價格計算方式
           priceChange: negativeParams.priceChange,
           volumeMultiplier: negativeParams.volumeMultiplier,
@@ -316,6 +328,7 @@ export default function SearchPage() {
           {
             name: apiRequest.config.name,
             timeframe: apiRequest.config.timeframe,
+            searchMode: searchParams.searchMode,
             startDate: apiRequest.config.start_date,
             endDate: apiRequest.config.end_date,
             priceChangeMethod: searchParams.priceChangeMethod, // 價格計算方式
@@ -366,6 +379,7 @@ export default function SearchPage() {
           {
             name: apiRequest.config.name,
             timeframe: apiRequest.config.timeframe,
+            searchMode: searchParams.searchMode,
             startDate: apiRequest.config.start_date,
             endDate: apiRequest.config.end_date,
             priceChangeMethod: searchParams.priceChangeMethod, // 價格計算方式
@@ -769,10 +783,6 @@ export default function SearchPage() {
     );
   };
 
-  React.useEffect(() => {
-    setSymbolsInput(searchParams.symbols.join(', '));
-  }, [searchParams.symbols]);
-
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -813,11 +823,11 @@ export default function SearchPage() {
               value={symbolsInput}
               onChange={(e) => {
                 setSymbolsInput(e.target.value);
-                const symbols = e.target.value.split(/[,，]/).map(s => s.trim()).filter(s => s);
-                setSearchParams(prev => ({ ...prev, symbols }));
               }}
               onBlur={() => {
-                setSymbolsInput(searchParams.symbols.join(', '));
+                const symbols = parseSymbolsInput(symbolsInput);
+                setSearchParams(prev => ({ ...prev, symbols }));
+                setSymbolsInput(symbols.join(', '));
               }}
               className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100 placeholder:text-slate-500"
               placeholder="例如: BTCUSDT, ETHUSDT 或 ETHUSDT，BNBUSDT"
@@ -880,6 +890,31 @@ export default function SearchPage() {
                 {searchParams.priceChangeMethod === PriceChangeMethod.CLOSE_TO_CLOSE 
                   ? '計算方式：(當根收盤價 - 前根收盤價) / 前根收盤價 * 100%' 
                   : '計算方式：(當根收盤價 - 當根開盤價) / 當根開盤價 * 100%'}
+              </p>
+            </div>
+
+            {/* 搜索模式 */}
+            <div>
+              <label className="block text-sm font-medium text-slate-200 mb-2">
+                搜索模式
+              </label>
+              <select
+                value={searchParams.searchMode || 'research'}
+                onChange={(e) =>
+                  setSearchParams((prev) => ({
+                    ...prev,
+                    searchMode: e.target.value as 'research' | 'realtime',
+                  }))
+                }
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-100"
+              >
+                <option value="research">Research（保留完整 future 標籤）</option>
+                <option value="realtime">Realtime（允許最新時間樣本）</option>
+              </select>
+              <p className="text-sm text-slate-400 mt-1">
+                {searchParams.searchMode === 'realtime'
+                  ? '即時模式會包含尾端最新案例，部分 future 欄位可能為空。'
+                  : '研究模式會略過尾端 forward 期間，確保 future 欄位完整。'}
               </p>
             </div>
           </div>

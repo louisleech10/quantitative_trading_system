@@ -589,6 +589,7 @@ export interface SimpleSearchRequest {
   name: string;
   symbols: string[];
   timeframe: string;
+  searchMode?: 'research' | 'realtime';
   startDate?: string | null;
   endDate?: string | null;
   priceChangeMethod?: PriceChangeMethod;

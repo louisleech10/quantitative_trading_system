@@ -53,6 +53,13 @@ async def execute_search(
             timeframe=request.config.timeframe,
             start_date=request.config.start_date,
             end_date=request.config.end_date,
+            lookback_periods=request.config.lookback_periods,
+            forward_periods=request.config.forward_periods,
+            sample_limit=request.config.sample_limit,
+            min_volume=request.config.min_volume,
+            exclude_new_listing_days=request.config.exclude_new_listing_days,
+            price_change_method=request.config.price_change_method,
+            search_mode=request.config.search_mode,
             initial_conditions=request.config.initial_conditions,
             advanced_conditions=getattr(request.config, 'advanced_conditions', [])
         )

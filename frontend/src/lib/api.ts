@@ -13,6 +13,7 @@ interface SearchConfigRequest {
   initial_conditions: FilterConditionRequest[];
   symbols?: string[];
   save_results?: boolean;
+  searchMode?: string;
   // ✅ 修復：添加時間範圍字段
   startDate?: string | null;
   endDate?: string | null;
@@ -218,6 +219,7 @@ class ApiClient {
     console.log('  - startDate:', request.startDate);
     console.log('  - endDate:', request.endDate);
     console.log('  - priceChangeMethod:', request.priceChangeMethod);
+    console.log('  - searchMode:', request.searchMode);
 
     return {
       name: request.name || `搜索_${new Date().toISOString().slice(0, 19)}`,
@@ -225,6 +227,7 @@ class ApiClient {
       initial_conditions: conditions,
       symbols: request.symbols,
       save_results: request.saveResults || false,
+      searchMode: request.searchMode || 'research',
       // ✅ 修復：添加時間範圍字段
       startDate: request.startDate || null,
       endDate: request.endDate || null,
@@ -244,11 +247,8 @@ class ApiClient {
     
     console.log('單一搜索配置:', searchConfig);
 
-    // ✅ 修復：使用與 executePositiveSearch 相同的包裝格式
-    const apiRequest = {
-      request: searchConfig,    // 包裝在 request 字段中
-      symbols: request.symbols  // 添加 symbols 字段
-    };
+    // 後端 /two-stage/positive 直接接收 SearchConfigRequest
+    const apiRequest = searchConfig;
 
     console.log('單一搜索API請求格式:', apiRequest);
 
@@ -268,11 +268,8 @@ class ApiClient {
 
     console.log('執行正例搜索，配置:', searchConfig);
     
-    // 包裝成後端期望的格式
-    const apiRequest = {
-      request: searchConfig,
-      symbols: request.symbols
-    };
+    // 後端 /two-stage/positive 直接接收 SearchConfigRequest
+    const apiRequest = searchConfig;
     
     console.log('API請求格式:', apiRequest);
     

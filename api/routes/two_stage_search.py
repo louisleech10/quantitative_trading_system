@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, Query
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
@@ -294,12 +294,26 @@ logger = get_logger("api.routes.two_stage_search")
 
 @router.post("/positive", response_model=TaskStartResponse)
 async def start_positive_search(
-    request: SearchConfigRequest,
     background_tasks: BackgroundTasks,
-    symbols: Optional[List[str]] = None
+    http_request: Request,
+    symbols: Optional[List[str]] = Query(default=None)
 ):
     """開始正例搜索（第一階段）"""
     try:
+        payload = await http_request.json()
+        # 向後相容：支援兩種payload格式
+        # 1) {"request": {...}, "symbols": [...]}
+        # 2) {...SearchConfigRequest fields...}
+        if "request" in payload and isinstance(payload.get("request"), dict):
+            request_data = payload["request"]
+            request_symbols = payload.get("symbols")
+        else:
+            request_data = payload
+            request_symbols = payload.get("symbols") if isinstance(payload, dict) else None
+
+        request = SearchConfigRequest.model_validate(request_data)
+        merged_symbols = symbols if symbols is not None else request_symbols
+
         # 簡化的請求確認log（生產環境可移除）
         logger.info(f"Positive search request: {request.name}, timeframe: {request.timeframe}, dates: {request.start_date} to {request.end_date}")
         # DEBUG LOG - 需要debug時取消註釋
@@ -312,7 +326,7 @@ async def start_positive_search(
         # logger.info(f"Request symbols: {request.symbols}")
         # logger.info(f"Function symbols param: {symbols}")
 
-        task_id = await search_task_service.execute_positive_search(request, symbols)
+        task_id = await search_task_service.execute_positive_search(request, merged_symbols)
         
         task_info = {
             "task_id": task_id,

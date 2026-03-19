@@ -129,3 +129,44 @@ class BatchTaskStatusResponse(BaseModel):
     progress: float
     results: Optional[Dict[str, str]] = None
     errors: Optional[Dict[str, str]] = None
+
+
+class SymbolQualitySummary(BaseModel):
+    """單一標的特徵品質摘要（批次彙整用）。"""
+
+    symbol: str
+    bar_count: int
+    feature_count: int
+    nan_ratio_mean: float
+    nan_ratio_max: float
+    constant_feature_count: int
+    alert_count: int
+    grade: str  # 'pass' | 'watch' | 'reject'
+
+
+class BatchQualityResponse(BaseModel):
+    """批次品質彙整回應。"""
+
+    batch_task_id: str
+    summaries: List[SymbolQualitySummary]
+    total_symbols: int
+    pass_count: int
+    watch_count: int
+    reject_count: int
+    computed_at: str
+
+
+class RegisterPathRequest(BaseModel):
+    """將批次結果的 HDF5 路徑登錄為可瀏覽的虛擬任務。"""
+
+    symbol: str
+    timeframe: str
+    hdf5_path: str
+
+
+class RegisterPathResponse(BaseModel):
+    """登錄成功後回傳的 browse task_id。"""
+
+    task_id: str
+    symbol: str
+    timeframe: str

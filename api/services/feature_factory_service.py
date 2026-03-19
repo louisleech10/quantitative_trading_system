@@ -440,6 +440,48 @@ class FeatureFactoryService:
                 return None
             return task_info.get("result")
 
+    def register_hdf5_for_browse(self, symbol: str, timeframe: str, hdf5_path: str) -> str:
+        """將批次模式的 HDF5 檔案登錄為可瀏覽的虛擬任務，回傳可供 FeatureExplorer 使用的 task_id。
+
+        批次任務結果以 {symbol: hdf5_path} 儲存，沒有單獨的 task_id，
+        透過此方法建立虛擬任務記錄讓 browse endpoints 可以正常運作。
+        """
+        file_path = Path(hdf5_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"HDF5 file not found: {hdf5_path}")
+
+        # 使用固定格式的 task_id，相同 symbol+timeframe 重複呼叫回傳同一個 id（冪等）
+        task_id = f"browse_{symbol}_{timeframe}"
+        result = {
+            "hdf5_path": str(hdf5_path),
+            "metadata": {"symbol": symbol, "timeframe": timeframe},
+            "feature_count": None,
+            "generation_time": None,
+            "layer_counts": {},
+        }
+
+        with self._lock:
+            if task_id not in self._tasks:
+                self._tasks[task_id] = {
+                    "task_id": task_id,
+                    "status": "completed",
+                    "progress": 1.0,
+                    "current_stage": None,
+                    "completed_stages": [],
+                    "error": None,
+                    "result": result,
+                    "created_at": datetime.now().isoformat(),
+                }
+            else:
+                # 更新 hdf5_path 以反映最新批次結果
+                self._tasks[task_id]["result"] = result
+
+        logger.info(
+            "Registered HDF5 for browse: task_id=%s symbol=%s timeframe=%s",
+            task_id, symbol, timeframe,
+        )
+        return task_id
+
     def export_csv_stream(
         self,
         task_id: str,

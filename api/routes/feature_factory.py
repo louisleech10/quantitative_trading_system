@@ -13,6 +13,7 @@ from api.main import get_batch_service
 from api.core.logging import get_logger
 from api.models.feature_factory_models import (
     BatchGenerateRequest,
+    BatchQualityResponse,
     BatchTaskStatusResponse,
     BatchToggleRequest,
     FeatureGenerateRequest,
@@ -21,6 +22,8 @@ from api.models.feature_factory_models import (
     FeatureTaskStatusResponse,
     NL2ConfigRequest,
     NL2ConfigResponse,
+    RegisterPathRequest,
+    RegisterPathResponse,
 )
 from api.services.feature_factory_batch_service import (
     FeatureFactoryBatchService,
@@ -169,6 +172,24 @@ async def get_batch_status(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/batch/{task_id}/quality", response_model=BatchQualityResponse)
+async def get_batch_quality(
+    task_id: str,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """取得批次任務中所有成功標的的品質彙整摘要。"""
+    try:
+        result = await service.get_batch_quality_summary(task_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail="Batch task not found")
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to get batch quality summary: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/task/{task_id}", response_model=FeatureTaskStatusResponse)
 async def get_task_status(task_id: str):
     """Get task status."""
@@ -303,6 +324,23 @@ async def export_features_markdown(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to export Markdown: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/browse/register", response_model=RegisterPathResponse)
+async def register_hdf5_for_browse(
+    request: RegisterPathRequest,
+):
+    """將批次任務的 HDF5 結果登錄為可瀏覽虛擬任務，回傳 FeatureExplorer 使用的 task_id。"""
+    try:
+        task_id = feature_factory_service.register_hdf5_for_browse(
+            request.symbol, request.timeframe, request.hdf5_path
+        )
+        return RegisterPathResponse(task_id=task_id, symbol=request.symbol, timeframe=request.timeframe)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to register HDF5 for browse: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

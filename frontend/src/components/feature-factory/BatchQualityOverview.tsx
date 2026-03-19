@@ -1,0 +1,347 @@
+'use client';
+
+/**
+ * BatchQualityOverview.tsx
+ *
+ * 批次特徵生成完成後的 Symbol 品質彙整總覽。
+ * 量化業界標準：NaN 率 / Bar 數 / 常數特徵 / 警告數 → 交通燈評級。
+ *
+ * 評級標準：
+ *   Pass   : NaN 均值 < 10%、常數特徵 = 0、bar ≥ 500
+ *   Watch  : NaN 均值 10-30% 或 警告數 > 5 或 bar 500↓200
+ *   Reject : NaN 均值 > 30% 或 常數特徵 > 0 或 bar < 200
+ */
+
+import { useEffect, useState, useCallback } from 'react';
+import { ChevronUp, ChevronDown, RefreshCw, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+/* ---------- Types ---------- */
+
+interface SymbolQualitySummary {
+  symbol: string;
+  bar_count: number;
+  feature_count: number;
+  nan_ratio_mean: number;
+  nan_ratio_max: number;
+  constant_feature_count: number;
+  alert_count: number;
+  grade: 'pass' | 'watch' | 'reject';
+}
+
+interface BatchQualityResponse {
+  batch_task_id: string;
+  summaries: SymbolQualitySummary[];
+  total_symbols: number;
+  pass_count: number;
+  watch_count: number;
+  reject_count: number;
+  computed_at: string;
+}
+
+type SortKey = keyof Pick<
+  SymbolQualitySummary,
+  'symbol' | 'bar_count' | 'feature_count' | 'nan_ratio_mean' | 'nan_ratio_max' | 'constant_feature_count' | 'alert_count' | 'grade'
+>;
+
+/* ---------- Helpers ---------- */
+
+const GRADE_ORDER: Record<string, number> = { reject: 0, watch: 1, pass: 2 };
+
+function CriteriaLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.03] text-xs">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 text-slate-400 hover:text-slate-200 transition"
+      >
+        <span className="flex items-center gap-1.5">
+          <Info className="w-3.5 h-3.5" />
+          評級標準說明
+        </span>
+        {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-3">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="text-left py-1 pr-2 text-slate-400 font-medium">評級</th>
+                <th className="text-left py-1 pr-2 text-slate-400 font-medium">NaN 均值</th>
+                <th className="text-left py-1 pr-2 text-slate-400 font-medium">Bar 數</th>
+                <th className="text-left py-1 pr-2 text-slate-400 font-medium">常數特徵</th>
+                <th className="text-left py-1 text-slate-400 font-medium">警告數</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              <tr>
+                <td className="py-1 pr-2"><GradeBadge grade="pass" /></td>
+                <td className="py-1 pr-2 text-emerald-300">&lt; 10%</td>
+                <td className="py-1 pr-2 text-emerald-300">≥ 500</td>
+                <td className="py-1 pr-2 text-emerald-300">= 0</td>
+                <td className="py-1 text-emerald-300">= 0</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-2"><GradeBadge grade="watch" /></td>
+                <td className="py-1 pr-2 text-amber-300">10–30%</td>
+                <td className="py-1 pr-2 text-amber-300">200–500</td>
+                <td className="py-1 pr-2 text-amber-300">-</td>
+                <td className="py-1 text-amber-300">&gt; 5</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-2"><GradeBadge grade="reject" /></td>
+                <td className="py-1 pr-2 text-rose-300">&gt; 30%</td>
+                <td className="py-1 pr-2 text-rose-300">&lt; 200</td>
+                <td className="py-1 pr-2 text-rose-300">&gt; 0</td>
+                <td className="py-1 text-rose-300">-</td>
+              </tr>
+            </tbody>
+          </table>
+          <div className="space-y-1.5 border-t border-white/10 pt-2">
+            <div className="text-slate-400 font-medium mb-1">欄位說明</div>
+            <div className="flex gap-2">
+              <span className="text-slate-300 w-16 shrink-0">Bar 數</span>
+              <span className="text-slate-500">此 symbol 的 K 線根數。因各幣種上市時間不同，新幣 bar 數天然較少，bar &lt; 200 或 bar &lt; 500 將影響指標計算完整性。</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-slate-300 w-16 shrink-0">NaN 均</span>
+              <span className="text-slate-500">所有特徵的缺值率平均值。代表整體資料覆蓋程度，過高表示多數指標因 bar 不足而無法計算。</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-slate-300 w-16 shrink-0">NaN 峰</span>
+              <span className="text-slate-500">所有特徵中缺值率最高的特徵值。峰值高代表有特定長週期指標（如 200MA）完全失效，即使均值尚可。</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-slate-300 w-16 shrink-0">常數特徵</span>
+              <span className="text-slate-500">標準差 = 0 的特徵數，即所有時間點都是同一個值。對 ML 完全無資訊量，需在訓練前過濾。</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="text-slate-300 w-16 shrink-0">警告數</span>
+              <span className="text-slate-500">缺值率 &gt; 10% 的特徵個數。補充 NaN 均的盲點：均值低但警告數高表示少數特徵嚴重缺值。</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatPct(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function GradeBadge({ grade }: { grade: 'pass' | 'watch' | 'reject' }) {
+  if (grade === 'pass') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-300 border border-emerald-400/30">
+        <CheckCircle className="w-3 h-3" />
+        Pass
+      </span>
+    );
+  }
+  if (grade === 'watch') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs text-amber-300 border border-amber-400/30">
+        <AlertTriangle className="w-3 h-3" />
+        Watch
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-rose-400/15 px-2 py-0.5 text-xs text-rose-300 border border-rose-400/30">
+      <XCircle className="w-3 h-3" />
+      Reject
+    </span>
+  );
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
+  const cls = `w-3 h-3 ${active ? 'text-amber-300' : 'text-slate-500'}`;
+  return dir === 'asc' ? <ChevronUp className={cls} /> : <ChevronDown className={cls} />;
+}
+
+function nanColor(ratio: number): string {
+  if (ratio > 0.3) return 'text-rose-300';
+  if (ratio > 0.1) return 'text-amber-300';
+  return 'text-emerald-300';
+}
+
+/* ---------- Component ---------- */
+
+interface BatchQualityOverviewProps {
+  batchTaskId: string;
+}
+
+export default function BatchQualityOverview({ batchTaskId }: BatchQualityOverviewProps) {
+  const [data, setData] = useState<BatchQualityResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('grade');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const fetchQuality = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/features/batch/${batchTaskId}/quality`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as BatchQualityResponse;
+      setData(json);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '品質分析失敗');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [batchTaskId]);
+
+  useEffect(() => {
+    fetchQuality();
+  }, [fetchQuality]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const sorted = data
+    ? [...data.summaries].sort((a, b) => {
+        let va: string | number = a[sortKey];
+        let vb: string | number = b[sortKey];
+        if (sortKey === 'grade') {
+          va = GRADE_ORDER[va as string] ?? 3;
+          vb = GRADE_ORDER[vb as string] ?? 3;
+        }
+        const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+        return sortDir === 'asc' ? cmp : -cmp;
+      })
+    : [];
+
+  const thCls =
+    'px-3 py-2 text-left text-xs text-slate-400 font-medium cursor-pointer select-none hover:text-slate-200 transition whitespace-nowrap';
+
+  const tdCls = 'px-3 py-2 text-xs';
+
+  const renderTh = (key: SortKey, label: string) => (
+    <th className={thCls} onClick={() => handleSort(key)}>
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <SortIcon active={sortKey === key} dir={sortDir} />
+      </span>
+    </th>
+  );
+
+  return (
+    <div className="glass-panel rounded-xl p-5 border border-white/10 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-100">批次品質彙整</h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            依 NaN 率、Bar 數、常數特徵評級 — 問題標的優先顯示
+          </p>
+        </div>
+        <button
+          onClick={fetchQuality}
+          disabled={isLoading}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition disabled:opacity-40"
+          title="重新計算"
+        >
+          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Loading skeleton */}
+      {isLoading && (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-8 rounded-lg bg-white/5 animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {!isLoading && error && (
+        <div className="rounded-lg bg-rose-500/10 border border-rose-400/30 px-4 py-3 text-xs text-rose-200 flex items-center gap-2">
+          <XCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Summary cards */}
+      {!isLoading && data && (
+        <>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg bg-emerald-400/10 border border-emerald-400/20 px-3 py-2 text-center">
+              <div className="text-lg font-semibold text-emerald-300">{data.pass_count}</div>
+              <div className="text-slate-400">Pass</div>
+            </div>
+            <div className="rounded-lg bg-amber-400/10 border border-amber-400/20 px-3 py-2 text-center">
+              <div className="text-lg font-semibold text-amber-300">{data.watch_count}</div>
+              <div className="text-slate-400">Watch</div>
+            </div>
+            <div className="rounded-lg bg-rose-400/10 border border-rose-400/20 px-3 py-2 text-center">
+              <div className="text-lg font-semibold text-rose-300">{data.reject_count}</div>
+              <div className="text-slate-400">Reject</div>
+            </div>
+          </div>
+
+          <CriteriaLegend />
+
+          {/* Table */}
+          {sorted.length === 0 ? (
+            <div className="text-xs text-slate-500 text-center py-4">無可分析的標的</div>
+          ) : (
+            <div className="overflow-auto rounded-xl border border-white/10 bg-white/[0.03] max-h-72">
+              <table className="w-full min-w-[560px]">
+                <thead className="sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm border-b border-white/10">
+                  <tr>
+                    {renderTh('grade', '評級')}
+                    {renderTh('symbol', 'Symbol')}
+                    {renderTh('bar_count', 'Bar 數')}
+                    {renderTh('feature_count', '特徵數')}
+                    {renderTh('nan_ratio_mean', 'NaN 均')}
+                    {renderTh('nan_ratio_max', 'NaN 峰')}
+                    {renderTh('constant_feature_count', '常數特徵')}
+                    {renderTh('alert_count', '警告數')}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {sorted.map((s) => (
+                    <tr key={s.symbol} className="hover:bg-white/5 transition">
+                      <td className={tdCls}>
+                        <GradeBadge grade={s.grade} />
+                      </td>
+                      <td className={`${tdCls} text-slate-200 font-mono font-medium`}>{s.symbol}</td>
+                      <td className={`${tdCls} ${s.bar_count < 200 ? 'text-rose-300' : s.bar_count < 500 ? 'text-amber-300' : 'text-slate-300'}`}>
+                        {s.bar_count.toLocaleString()}
+                      </td>
+                      <td className={`${tdCls} text-slate-400`}>{s.feature_count.toLocaleString()}</td>
+                      <td className={`${tdCls} ${nanColor(s.nan_ratio_mean)}`}>{formatPct(s.nan_ratio_mean)}</td>
+                      <td className={`${tdCls} ${nanColor(s.nan_ratio_max)}`}>{formatPct(s.nan_ratio_max)}</td>
+                      <td className={`${tdCls} ${s.constant_feature_count > 0 ? 'text-rose-300' : 'text-slate-400'}`}>
+                        {s.constant_feature_count}
+                      </td>
+                      <td className={`${tdCls} ${s.alert_count > 5 ? 'text-rose-300' : s.alert_count > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+                        {s.alert_count}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="text-xs text-slate-500">
+            計算時間：{new Date(data.computed_at).toLocaleString('zh-TW')}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

@@ -13,6 +13,8 @@ import NaNPatternChart from '@/components/feature-factory/NaNPatternChart';
 
 interface FeatureExplorerProps {
   taskId: string;
+  /** 傳入目前任務狀態；若為 'completed' 或省略才開始載入資料 */
+  taskStatus?: string | null;
 }
 
 const TABS: Array<{ key: ExplorerTab; label: string }> = [
@@ -24,7 +26,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
   { key: 'nan', label: 'NaN Pattern' },
 ];
 
-export default function FeatureExplorer({ taskId }: FeatureExplorerProps) {
+export default function FeatureExplorer({ taskId, taskStatus }: FeatureExplorerProps) {
   const { browseSummary } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
@@ -40,6 +42,8 @@ export default function FeatureExplorer({ taskId }: FeatureExplorerProps) {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryCache, setSummaryCache] = useState<Record<string, FeatureSummary>>({});
   const hasCachedSummary = Boolean(summaryCache[taskId]);
+  // 只有在任務已完成（或未傳 taskStatus）時才允許載入
+  const isTaskReady = !taskStatus || taskStatus === 'completed';
 
   useEffect(() => {
     if (explorerTaskId !== taskId) {
@@ -51,7 +55,7 @@ export default function FeatureExplorer({ taskId }: FeatureExplorerProps) {
 
   useEffect(() => {
     let active = true;
-    if (hasCachedSummary) {
+    if (hasCachedSummary || !isTaskReady) {
       return;
     }
 
@@ -75,9 +79,22 @@ export default function FeatureExplorer({ taskId }: FeatureExplorerProps) {
     return () => {
       active = false;
     };
-  }, [browseSummary, taskId, hasCachedSummary]);
+  }, [browseSummary, taskId, hasCachedSummary, isTaskReady]);
 
   const summary = useMemo(() => summaryCache[taskId] || explorerSummary, [summaryCache, taskId, explorerSummary]);
+
+  // ——— 生成中：顯示等待狀態 ———
+  if (!isTaskReady) {
+    return (
+      <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-3">
+        <div className="text-lg font-semibold text-slate-100">Feature Explorer</div>
+        <div className="flex items-center gap-3 text-slate-400 text-sm">
+          <span className="inline-block w-4 h-4 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin shrink-0" />
+          特徵生成中，完成後自動載入…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel rounded-2xl p-6 space-y-4">

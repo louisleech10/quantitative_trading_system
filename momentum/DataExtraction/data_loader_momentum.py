@@ -278,6 +278,9 @@ class DataLoader(DataProviderBase):
             if end_time:
                 if isinstance(end_time, str):
                     end_dt = pd.to_datetime(end_time)
+                    # 若只提供日期（YYYY-MM-DD），視為當天結束而非 00:00:00
+                    if len(end_time) == 10 and " " not in end_time and "T" not in end_time:
+                        end_dt = end_dt + timedelta(days=1) - timedelta(milliseconds=1)
                 else:
                     end_dt = end_time
             else:
@@ -300,13 +303,25 @@ class DataLoader(DataProviderBase):
             # 嘗試從原有緩存獲取（兼容性保留）
             cached_data = self._get_from_cache(symbol, start_dt, end_dt, interval)
             if cached_data is not None and not cached_data.empty:
-                # 如果原有緩存命中，也更新到HDF5緩存
-                if self.hdf5_cache_manager:
-                    try:
-                        self.hdf5_cache_manager.save_to_cache(symbol, cached_data, interval)
-                    except Exception as e:
-                        self.logger.debug(f"更新HDF5緩存失敗: {e}")
-                return cached_data
+                interval_seconds = self._interval_to_seconds(interval)
+                stale_threshold = end_dt - timedelta(seconds=interval_seconds * 2)
+                cached_last = cached_data.index.max()
+                # 快取末端落後太多時，不直接返回，交給後續下載補齊
+                if cached_last >= stale_threshold:
+                    # 如果原有緩存命中，也更新到HDF5緩存
+                    if self.hdf5_cache_manager:
+                        try:
+                            self.hdf5_cache_manager.save_to_cache(symbol, cached_data, interval)
+                        except Exception as e:
+                            self.logger.debug(f"更新HDF5緩存失敗: {e}")
+                    return cached_data
+
+                self.logger.info(
+                    f"快取數據末端較舊，改為補下載: {symbol} {interval}, "
+                    f"cached_last={cached_last}, expected_end={end_dt}"
+                )
+
+
 
             # 計算時間範圍大小以決定是否分批獲取
             time_range = (end_dt - start_dt).total_seconds()
@@ -369,6 +384,8 @@ class DataLoader(DataProviderBase):
                 
             # 創建DataFrame
             df = self._process_klines_to_dataframe(all_klines)
+            # 僅在最後一根尚未收盤時才移除，避免固定少一根已完成K線
+            df = self._drop_incomplete_last_candle(df, interval)
 
             # 緩存數據（更新到兩個緩存系統）
             if not df.empty:
@@ -438,12 +455,25 @@ class DataLoader(DataProviderBase):
             df[col] = pd.to_numeric(df[col])
             
         df.set_index('timestamp', inplace=True)
-        
-        # 移除最後一根可能不完整的K線
-        if not df.empty:
-            df = df.iloc[:-1]
-            
+
         return df
+
+    def _drop_incomplete_last_candle(self, df: pd.DataFrame, interval: str) -> pd.DataFrame:
+        """只在最後一根K線尚未收盤時移除，避免不必要地丟失最新完整K線。"""
+        if df is None or df.empty:
+            return df
+
+        try:
+            interval_seconds = self._interval_to_seconds(interval)
+            last_ts = df.index.max()
+            now_utc = pd.Timestamp.utcnow().tz_localize(None)
+            # 若最後一根的收盤時間仍在未來，代表尚未收盤
+            if last_ts + timedelta(seconds=interval_seconds) > now_utc:
+                return df.iloc[:-1]
+            return df
+        except Exception as e:
+            self.logger.debug(f"檢查最後一根K線完整性失敗，保守移除最後一根: {e}")
+            return df.iloc[:-1]
     
     def _interval_to_seconds(self, interval):
         """將時間間隔轉換為秒數"""

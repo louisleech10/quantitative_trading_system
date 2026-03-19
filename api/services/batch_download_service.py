@@ -231,6 +231,19 @@ class BatchDownloadService:
         # 按symbol分組
         grouped_cases = self._group_cases_by_symbol(cases)
 
+        # 對每個 timeframe 預先計算全局時間視窗（所有 symbol 共用）
+        # 目的：消除「案例分布不均」造成的人為 bar 數差異；listing date 差異由 3-gate 過濾
+        global_time_ranges: Dict[str, TimeRange] = {
+            tf: self._compute_global_time_range(
+                cases,
+                tf,
+                request.lookback_bars,
+                request.forward_bars,
+                warmup_bars,
+            )
+            for tf in timeframes
+        }
+
         # 初始化結果統計
         downloaded_case_ids = []
         failed_case_ids = []
@@ -256,21 +269,19 @@ class BatchDownloadService:
             )
 
             try:
-                # Step 1: 計算時間範圍（包含 warmup）
-                time_ranges = self._calculate_time_ranges(
-                    group_cases,
-                    timeframe,
-                    request.lookback_bars,
-                    request.forward_bars,
-                    warmup_bars
-                )
-
-                # Step 2: 合併重疊時間範圍
-                merged_ranges = self._merge_overlapping_ranges(time_ranges)
+                # Step 1: 使用全局時間視窗（所有 symbol / 所有案例共用同一段）
+                # 原本的逐案例計算 (_calculate_time_ranges) 會因案例分布不均
+                # 而使不同 symbol 下載到不同長度的時間段，引入人為的 bar 數差異。
+                # 全局視窗確保：相同 listing date 的 symbol 必然得到相同 bar 數。
+                global_range = global_time_ranges[timeframe]
+                merged_ranges = [global_range]  # 已是單一視窗，無需 merge
 
                 logger.info(
-                    f"Merged {len(time_ranges)} ranges into {len(merged_ranges)} "
-                    f"for {symbol}/{timeframe}"
+                    "Using global time window for %s/%s: %s → %s",
+                    symbol,
+                    timeframe,
+                    global_range.start.strftime("%Y-%m-%d %H:%M"),
+                    global_range.end.strftime("%Y-%m-%d %H:%M"),
                 )
 
                 # Step 3: 下載合併後的時間範圍
@@ -672,6 +683,63 @@ class BatchDownloadService:
             return [request.timeframe]
         return request.timeframe
 
+
+    def _compute_global_time_range(
+        self,
+        cases: List[CaseRecord],
+        timeframe: str,
+        lookback_bars: int,
+        forward_bars: int,
+        warmup_bars: int = 0,
+    ) -> TimeRange:
+        """所有案例共用的全局時間視窗，確保每個 symbol 下載相同的時間段。
+
+        公式（以 download timeframe 的 K 線數為單位）：
+          global_start = min(TO) - (lookback_bars + warmup_bars) × tf_seconds
+          global_end   = max(TO + case_bars × tf_seconds) + forward_bars × tf_seconds
+
+        如此消除「案例分布不均」帶來的人為 bar 數差異；
+        上市日期後自然缺失的 bars 由 3-gate 篩選，屬物理限制非人為引入。
+
+        多 timeframe 場景：每個 timeframe 各自呼叫此方法，因 tf_seconds 不同，
+        計算出的絕對時間範圍也不同（正確行為）。
+        """
+        if not cases:
+            raise ValueError("cases list is empty, cannot compute global time range")
+
+        download_tf_seconds = self.TIMEFRAME_SECONDS.get(timeframe, 3600)
+        total_lookback = lookback_bars + warmup_bars
+
+        min_to: Optional[datetime] = None
+        max_case_end: Optional[datetime] = None
+
+        for case in cases:
+            case_time = datetime.utcfromtimestamp(case.timestamp)
+            case_tf_seconds = self.TIMEFRAME_SECONDS.get(case.timeframe, 43200)
+            # 案例在下載 timeframe 下佔幾根 bar（確保至少 1 根）
+            case_bars = max(1, case_tf_seconds // download_tf_seconds)
+            case_end = case_time + timedelta(seconds=case_bars * download_tf_seconds)
+
+            if min_to is None or case_time < min_to:
+                min_to = case_time
+            if max_case_end is None or case_end > max_case_end:
+                max_case_end = case_end
+
+        global_start = min_to - timedelta(seconds=total_lookback * download_tf_seconds)  # type: ignore[operator]
+        global_end = max_case_end + timedelta(seconds=forward_bars * download_tf_seconds)  # type: ignore[operator]
+
+        logger.info(
+            "Global time range for %s: %s → %s "
+            "(lookback=%d warmup=%d forward=%d bars, %d cases)",
+            timeframe,
+            global_start.strftime("%Y-%m-%d %H:%M"),
+            global_end.strftime("%Y-%m-%d %H:%M"),
+            lookback_bars,
+            warmup_bars,
+            forward_bars,
+            len(cases),
+        )
+        return TimeRange(global_start, global_end)
 
     def _calculate_time_ranges(
         self,

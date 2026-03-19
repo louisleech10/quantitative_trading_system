@@ -91,15 +91,15 @@ def test_multi_tf_generator_aligns_and_tags():
     df = result.features_df
 
     assert len(df) == 3
-    assert "close_trend_EMA_21" in df.columns
+    assert "close_12h_trend_EMA_21" in df.columns
     assert "close_1h_trend_EMA_21" in df.columns
     assert df.columns.is_unique
 
     # OPEN_MINUS: for 12h open at 12:00, lower TF uses 11:00 bar (value=11), not 12:00 bar (value=12).
     assert df["close_1h_trend_EMA_21"].iloc[1] == 11
 
-    # Primary timeframe columns must keep original names (no TF tag).
-    assert "close_12h_trend_EMA_21" not in df.columns
+    # MultiTF mode: primary timeframe columns are also tagged for explicit TF identity.
+    assert "close_trend_EMA_21" not in df.columns
 
 
 def test_apply_timeframe_tag_format_and_skip_prefixes():

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { FeatureTask } from '@/lib/types';
+import { useEffect, useMemo, useRef } from 'react';
+import { BatchTaskStatus, FeatureTask } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
@@ -10,12 +10,20 @@ const API_PREFIX = '/api/v1/features';
 
 interface GenerationProgressProps {
   task: FeatureTask | null;
+  batchTask?: BatchTaskStatus | null;
+  symbols?: string[];
   /** When true, renders without the outer glass-panel wrapper (for embedding inside another panel). */
   naked?: boolean;
 }
 
-export default function GenerationProgress({ task, naked = false }: GenerationProgressProps) {
+export default function GenerationProgress({
+  task,
+  batchTask = null,
+  symbols = [],
+  naked = false,
+}: GenerationProgressProps) {
   const { progress, setProgress, setCurrentTask } = useFeatureFactoryStore();
+  const isBatchMode = Boolean(batchTask);
 
   // Stable refs so the useEffect closure always has the latest callbacks/task
   // without needing them in the dependency array (which would re-create the WS on every update).
@@ -27,6 +35,8 @@ export default function GenerationProgress({ task, naked = false }: GenerationPr
   useEffect(() => { taskRef.current = task; }, [task]);
 
   useEffect(() => {
+    if (isBatchMode) return;
+
     const taskId = task?.task_id;
     if (!taskId) return;
 
@@ -133,7 +143,123 @@ export default function GenerationProgress({ task, naked = false }: GenerationPr
       ws.close();
       stopPolling();
     };
-  }, [task?.task_id]); // Only re-create WS when the task_id changes — NOT on every status update.
+  }, [task?.task_id, isBatchMode]); // Only re-create WS when the task_id changes — NOT on every status update.
+
+  const statusBySymbol = useMemo(() => {
+    if (!batchTask) {
+      return [] as Array<[string, 'pending' | 'running' | 'completed' | 'failed']>;
+    }
+
+    const map = new Map<string, 'pending' | 'running' | 'completed' | 'failed'>();
+
+    symbols.forEach((symbol) => map.set(symbol, 'pending'));
+
+    Object.keys(batchTask.results ?? {}).forEach((symbol) => {
+      map.set(symbol, 'completed');
+    });
+
+    Object.keys(batchTask.errors ?? {}).forEach((symbol) => {
+      if (symbol !== '__batch__') {
+        map.set(symbol, 'failed');
+      }
+    });
+
+    if (batchTask.current_symbol && map.get(batchTask.current_symbol) === 'pending') {
+      map.set(batchTask.current_symbol, 'running');
+    }
+
+    return Array.from(map.entries());
+  }, [batchTask, symbols]);
+
+  if (!task && !batchTask) return null;
+
+  if (batchTask) {
+    const pct = Math.round((batchTask.progress ?? 0) * 100);
+    const failedEntries = Object.entries(batchTask.errors ?? {}).filter(([symbol]) => symbol !== '__batch__');
+    const isFailed = batchTask.status === 'failed';
+    const isCompleted = batchTask.status === 'completed' || batchTask.status === 'partial';
+    const pctColor = isFailed ? 'text-rose-300' : isCompleted ? 'text-emerald-300' : 'text-amber-200';
+    const barColor = isFailed
+      ? 'bg-rose-400/70'
+      : 'bg-gradient-to-r from-amber-400/70 to-emerald-400/60';
+
+    const inner = (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          {naked ? (
+            <span className="text-sm text-slate-300">批次進度（{batchTask.status}）</span>
+          ) : (
+            <div>
+              <div className="text-lg font-semibold text-slate-100">生成進度</div>
+              <div className="text-xs text-slate-400">批次模式（{batchTask.status}）</div>
+            </div>
+          )}
+          <span className={`${naked ? 'text-sm' : 'text-xl'} font-semibold ${pctColor}`}>{pct}%</span>
+        </div>
+
+        <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          <div className="rounded-lg bg-white/5 p-2 text-slate-300">狀態：{batchTask.status}</div>
+          <div className="rounded-lg bg-white/5 p-2 text-slate-300">總數：{batchTask.total}</div>
+          <div className="rounded-lg bg-white/5 p-2 text-emerald-300">完成：{batchTask.completed}</div>
+          <div className="rounded-lg bg-white/5 p-2 text-rose-300">失敗：{batchTask.failed}</div>
+          <div className="rounded-lg bg-white/5 p-2 text-slate-300">目前：{batchTask.current_symbol ?? 'N/A'}</div>
+        </div>
+
+        {statusBySymbol.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs text-slate-400">逐標的狀態</div>
+            <div className="max-h-44 overflow-auto rounded-xl border border-white/10 bg-white/5 p-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+              {statusBySymbol.map(([symbol, status]) => (
+                <div key={symbol} className="flex items-center justify-between text-xs rounded-md bg-white/5 px-2 py-1">
+                  <span className="text-slate-200">{symbol}</span>
+                  <span
+                    className={
+                      status === 'completed'
+                        ? 'text-emerald-300'
+                        : status === 'failed'
+                        ? 'text-rose-300'
+                        : status === 'running'
+                        ? 'text-amber-300'
+                        : 'text-slate-400'
+                    }
+                  >
+                    {status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {failedEntries.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs text-rose-300">失敗標的</div>
+            <div className="max-h-40 overflow-auto rounded-xl border border-rose-400/30 bg-rose-500/10 p-3 space-y-2">
+              {failedEntries.map(([symbol, message]) => (
+                <div key={symbol} className="text-xs">
+                  <div className="text-rose-200 font-medium">{symbol}</div>
+                  <div className="text-rose-100/90">{message}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+
+    if (naked) {
+      return <div className="mt-6 pt-5 border-t border-white/10">{inner}</div>;
+    }
+
+    return <div className="glass-panel rounded-2xl p-6">{inner}</div>;
+  }
 
   if (!task) return null;
 
