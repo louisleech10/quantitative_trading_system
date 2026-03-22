@@ -14,14 +14,23 @@ import {
   Home,
   LineChart,
   Target,
-  TrendingUp
+  TrendingUp,
+  Brain
 } from 'lucide-react';
+
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  badge?: string;
+}
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const navigationItems = [
+const navigationItems: NavItem[] = [
   {
     name: '首頁',
     href: '/',
@@ -83,6 +92,13 @@ const navigationItems = [
     description: 'IC Gatekeeper 分析與篩選'
   },
   {
+    name: '序列模型',
+    href: '/lstm-model',
+    icon: Brain,
+    description: 'LSTM/Transformer 時序預測模型',
+    badge: '待硬體升級'
+  },
+  {
     name: '系統設定',
     href: '/settings',
     icon: Settings,
@@ -114,6 +130,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {navigationItems.map((item) => {
             const Icon = item.icon;
+            const hasBadge = !!item.badge;
             return (
               <Link
                 key={item.name}
@@ -122,24 +139,33 @@ export default function MainLayout({ children }: MainLayoutProps) {
                   group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
                   ${isActive(item.href)
                     ? 'bg-blue-400/10 text-blue-400 border-r-2 border-blue-400'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                    : hasBadge
+                      ? 'text-amber-400/70 hover:bg-amber-400/5 hover:text-amber-300 border border-amber-400/20'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                   }
                 `}
               >
                 <Icon 
                   className={`
                     mr-3 h-5 w-5 flex-shrink-0
-                    ${isActive(item.href) ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}
+                    ${isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/60' : 'text-slate-500 group-hover:text-slate-400'}
                   `}
                 />
-                <div className="flex-1">
-                  <div className={`font-medium ${isActive(item.href) ? 'text-blue-400' : ''}`}>
+                <div className="flex-1 min-w-0">
+                  <div className={`font-medium flex items-center gap-1.5 ${
+                    isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/80' : ''
+                  }`}>
                     {item.name}
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                     {item.description}
                   </div>
                 </div>
+                {hasBadge && (
+                  <span className="ml-1 flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/30 whitespace-nowrap">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -183,6 +209,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
+                const hasBadge = !!item.badge;
                 return (
                   <Link
                     key={item.name}
@@ -192,24 +219,33 @@ export default function MainLayout({ children }: MainLayoutProps) {
                       group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
                       ${isActive(item.href)
                         ? 'bg-blue-400/10 text-blue-400 border-r-2 border-blue-400'
-                        : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                        : hasBadge
+                          ? 'text-amber-400/70 hover:bg-amber-400/5 hover:text-amber-300 border border-amber-400/20'
+                          : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                       }
                     `}
                   >
                     <Icon 
                       className={`
                         mr-3 h-5 w-5 flex-shrink-0
-                        ${isActive(item.href) ? 'text-blue-400' : 'text-slate-500 group-hover:text-slate-400'}
+                        ${isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/60' : 'text-slate-500 group-hover:text-slate-400'}
                       `}
                     />
-                    <div className="flex-1">
-                      <div className={`font-medium ${isActive(item.href) ? 'text-blue-400' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-medium ${
+                        isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/80' : ''
+                      }`}>
                         {item.name}
                       </div>
                       <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                         {item.description}
                       </div>
                     </div>
+                    {hasBadge && (
+                      <span className="ml-1 flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/30 whitespace-nowrap">
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
