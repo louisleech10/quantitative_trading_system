@@ -576,7 +576,7 @@ class ValidationConfig(BaseModel):
 class ModelTrainingRequest(BaseModel):
     """通用模型訓練請求"""
     engine: Literal["lightgbm", "xgboost"] = "lightgbm"
-    features_source: str
+    features_source: str = Field(..., description="特徵來源；支援 case_id 或 library:{symbol}:{timeframe}")
     config: Optional[Dict[str, Any]] = None
     validation: Optional[ValidationConfig] = None
     run_comparison: bool = False
@@ -600,7 +600,7 @@ class TaskStartResponse(BaseModel):
 
 class LightGBMTrainingRequest(BaseModel):
     """LightGBM 訓練請求"""
-    features_source: str
+    features_source: str = Field(..., description="特徵來源；支援 case_id 或 library:{symbol}:{timeframe}")
     config: Optional[Dict[str, Any]] = None
     boosting_type: Literal["gbdt", "dart", "goss"] = "gbdt"
     categorical_features: Optional[List[str]] = None

@@ -26,6 +26,7 @@ try:
 except Exception:
     HAS_STATSMODELS = False
 
+from api.core.config import settings
 from api.core.logging import get_logger
 from momentum.DataExtraction.parallel_search_engine import FailureType, classify_error
 from momentum.factories import create_feature_factory
@@ -36,12 +37,16 @@ from api.services.feature_export_service import FeatureExportService
 
 logger = get_logger("api.feature_factory_service")
 
+# Feature Factory 使用獨立的 K 線儲存目錄（與案例 K 線分離）
+# 對應 FeatureKlineDownloadPanel 的下載目標路徑
+_FEATURE_KLINE_CACHE_DIR = str(settings.data_cache_path / "feature_klines")
+
 
 class FeatureFactoryService:
     """Feature Factory service for task management and config operations."""
 
     def __init__(self):
-        self._factory = create_feature_factory()
+        self._factory = create_feature_factory(cache_dir=_FEATURE_KLINE_CACHE_DIR)
         self._config_manager = self._factory.config_manager
         self._mcp = FeatureFactoryMCP(self._factory, self._config_manager)
         self._export_service = FeatureExportService()
@@ -127,6 +132,8 @@ class FeatureFactoryService:
             force_regenerate = bool(getattr(request, "force_regenerate", False))
             timeframe = getattr(request, "timeframe", "12h")
             symbol = getattr(request, "symbol", None)
+            start_date = getattr(request, "start_date", None)
+            end_date = getattr(request, "end_date", None)
 
             if not symbol:
                 raise ValueError("symbol is required")
@@ -143,6 +150,8 @@ class FeatureFactoryService:
                     config_override=resolved_override,
                     force_regenerate=force_regenerate,
                     progress_callback=progress_callback,
+                    start_date=start_date,
+                    end_date=end_date,
                 ),
             )
 
@@ -194,6 +203,8 @@ class FeatureFactoryService:
         config_override: Optional[dict],
         force_regenerate: bool,
         progress_callback: Optional[Callable],
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> FeatureGenerationResult:
         """Phase D governance: old/new compute path toggle, shadow compare, and rollback fallback."""
         new_path_enabled = self._is_new_compute_path_enabled()
@@ -207,6 +218,8 @@ class FeatureFactoryService:
                 force_regenerate=force_regenerate,
                 progress_callback=progress_callback,
                 env_overrides=self._old_path_env_overrides(),
+                start_date=start_date,
+                end_date=end_date,
             )
 
         new_result = self._factory.generate_features(
@@ -215,6 +228,8 @@ class FeatureFactoryService:
             config_override=config_override,
             force_regenerate=force_regenerate,
             progress_callback=progress_callback,
+            start_date=start_date,
+            end_date=end_date,
         )
 
         if not self._should_run_dual_path_check(task_id):
@@ -234,6 +249,8 @@ class FeatureFactoryService:
             symbol=symbol,
             timeframe=timeframe,
             config_override=config_override,
+            start_date=start_date,
+            end_date=end_date,
         )
         equal, reason = self._compare_generation_results(old_shadow_result, new_result)
 
@@ -260,6 +277,8 @@ class FeatureFactoryService:
             force_regenerate=True,
             progress_callback=progress_callback,
             env_overrides=self._old_path_env_overrides(),
+            start_date=start_date,
+            end_date=end_date,
         )
         self._attach_phase_d_metadata(
             fallback_result,
@@ -278,6 +297,8 @@ class FeatureFactoryService:
         symbol: str,
         timeframe: str,
         config_override: Optional[dict],
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> FeatureGenerationResult:
         shadow_factory = create_feature_factory()
         # Shadow path must not overwrite persisted output.
@@ -290,6 +311,8 @@ class FeatureFactoryService:
             force_regenerate=True,
             progress_callback=None,
             env_overrides=self._old_path_env_overrides(),
+            start_date=start_date,
+            end_date=end_date,
         )
 
     def _run_with_env_overrides(
@@ -301,6 +324,8 @@ class FeatureFactoryService:
         force_regenerate: bool,
         progress_callback: Optional[Callable],
         env_overrides: Dict[str, str],
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> FeatureGenerationResult:
         with self._temporary_environ(env_overrides):
             return factory.generate_features(
@@ -309,6 +334,8 @@ class FeatureFactoryService:
                 config_override=config_override,
                 force_regenerate=force_regenerate,
                 progress_callback=progress_callback,
+                start_date=start_date,
+                end_date=end_date,
             )
 
     @staticmethod
@@ -582,6 +609,15 @@ class FeatureFactoryService:
             return self._stats_cache[task_id]
 
         features_df, _ = self._load_task_features(task_id)
+
+        # Guard: pandas.describe() raises on DataFrame without columns.
+        if features_df.shape[1] == 0:
+            rows: List[Dict[str, Any]] = []
+            self._stats_cache[task_id] = rows
+            self._stats_name_sorted_cache[task_id] = rows
+            self._stats_name_keys_cache[task_id] = []
+            logger.info("Stats cached for task %s (0 features)", task_id)
+            return rows
 
         # --- One-pass vectorized stats ------------------------------------------
         # df.describe() computes count/mean/std/min/25%/50%/75%/max in one sweep.
@@ -950,7 +986,7 @@ class FeatureFactoryService:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
             nan_ratios = features_df.isna().mean()
-            nan_ratio_mean = float(nan_ratios.mean())
+            nan_ratio_mean = self._safe_float(nan_ratios.mean()) or 0.0
             nan_ratio_max = float(nan_ratios.max()) if len(nan_ratios) else 0.0
 
         # Constant features: nunique <= 1 (vectorized)

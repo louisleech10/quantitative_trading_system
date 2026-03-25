@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import ConfigPanel from '@/components/feature-factory/ConfigPanel';
+import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKlineDownloadPanel';
 import PreviewPanel from '@/components/feature-factory/PreviewPanel';
 import NLInputBox from '@/components/feature-factory/NLInputBox';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
@@ -14,10 +15,11 @@ import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel'
 import LayerPanel from '@/components/feature-factory/LayerPanel';
 import FeatureExplorer from '@/components/feature-factory/FeatureExplorer';
 import BatchQualityOverview from '@/components/feature-factory/BatchQualityOverview';
-import { useAvailableSymbols } from '@/hooks/useAvailableSymbols';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 function parseSymbols(input: string): string[] {
   return Array.from(
@@ -58,11 +60,36 @@ export default function FeatureFactoryPage() {
 
   const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
   const [timeframe, setTimeframe] = useState(DEFAULT_TIMEFRAME);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedBatchSymbol, setSelectedBatchSymbol] = useState<string | null>(null);
   const [browseTaskIds, setBrowseTaskIds] = useState<Record<string, string>>({});
   const [registeringSymbol, setRegisteringSymbol] = useState<string | null>(null);
-  const { symbols: importedSymbols, isLoading: isImportedSymbolsLoading } = useAvailableSymbols();
+  // 已下載的 Feature K 線標的（來自 FeatureKlineDownloadPanel 下載的資料）
+  const [featureKlineSymbols, setFeatureKlineSymbols] = useState<string[]>([]);
+  const [featureKlineSymbolsLoading, setFeatureKlineSymbolsLoading] = useState(false);
+
+  const refreshFeatureKlineSymbols = useCallback(async () => {
+    setFeatureKlineSymbolsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/feature-data/kline/list`);
+      if (res.ok) {
+        const data = await res.json();
+        const symbols = Array.from(
+          new Set<string>((data.entries ?? []).map((e: { symbol: string }) => e.symbol))
+        ) as string[];
+        setFeatureKlineSymbols(symbols);
+      }
+    } catch {
+      // 靜默失敗，不影響主功能
+    } finally {
+      setFeatureKlineSymbolsLoading(false);
+    }
+  }, []);
+
+  // 頁面載入時抓一次；FeatureKlineDownloadPanel 下載完成後也會刷新
+  useEffect(() => { refreshFeatureKlineSymbols(); }, [refreshFeatureKlineSymbols]);
 
   const batchResults = batchTask?.results ?? {};
   const batchSuccessSymbols = Object.keys(batchResults);
@@ -104,24 +131,6 @@ export default function FeatureFactoryPage() {
   const isBatchMode = normalizedSymbols.length > 1;
 
   useEffect(() => {
-    if (importedSymbols.length === 0) {
-      return;
-    }
-
-    const allowed = new Set(importedSymbols);
-    const validSymbols = normalizedSymbols.filter((item) => allowed.has(item));
-
-    if (validSymbols.length === 0) {
-      setSymbol(importedSymbols[0]);
-      return;
-    }
-
-    if (validSymbols.length !== normalizedSymbols.length) {
-      setSymbol(validSymbols.join(', '));
-    }
-  }, [importedSymbols, normalizedSymbols]);
-
-  useEffect(() => {
     loadInitial();
   }, [loadInitial]);
 
@@ -154,20 +163,11 @@ export default function FeatureFactoryPage() {
       return;
     }
 
-    if (importedSymbols.length > 0) {
-      const allowed = new Set(importedSymbols);
-      const invalidSymbols = normalizedSymbols.filter((item) => !allowed.has(item));
-      if (invalidSymbols.length > 0) {
-        setError(`以下標的不在案例清單中：${invalidSymbols.join(', ')}`);
-        return;
-      }
-    }
-
     setIsSubmitting(true);
     try {
       if (normalizedSymbols.length === 1) {
         setBatchTask(null);
-        await startGeneration(normalizedSymbols[0], timeframe, config);
+        await startGeneration(normalizedSymbols[0], timeframe, config, startDate || undefined, endDate || undefined);
       } else {
         setCurrentTask(null);
         await startBatchGeneration({
@@ -237,17 +237,22 @@ export default function FeatureFactoryPage() {
 
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <div className="space-y-6">
+            <FeatureKlineDownloadPanel onDownloadComplete={refreshFeatureKlineSymbols} />
             <ConfigPanel
               config={config}
               presets={presets}
               dataSources={dataSources}
-              importedSymbols={importedSymbols}
-              isImportedSymbolsLoading={isImportedSymbolsLoading}
-              lockSymbolInput={importedSymbols.length > 0}
+              importedSymbols={featureKlineSymbols}
+              isImportedSymbolsLoading={featureKlineSymbolsLoading}
+              lockSymbolInput={false}
               symbol={symbol}
               timeframe={timeframe}
+              startDate={startDate}
+              endDate={endDate}
               onSymbolChange={setSymbol}
               onTimeframeChange={setTimeframe}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
             />
             <PreprocessingPanel
               config={config?.preprocessing}

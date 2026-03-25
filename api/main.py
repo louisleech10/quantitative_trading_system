@@ -173,7 +173,7 @@ def setup_basic_routes(app: FastAPI):
 def register_routes(app: FastAPI):
     """Register all API routes"""
     try:
-        from api.routes import case_search, config, case, chart, signal_analysis, chart_signals, optimization, optimization_analysis, feature_engineering, pattern_analysis, pattern_management, ml_pipeline, feature_factory, ic_analysis, feature_browser, model_enhancement, feature_toggles, export, hyperparameter_optimization, execution_optimization
+        from api.routes import case_search, config, case, chart, signal_analysis, chart_signals, optimization, optimization_analysis, feature_engineering, pattern_analysis, pattern_management, ml_pipeline, feature_factory, ic_analysis, feature_browser, model_enhancement, feature_toggles, export, hyperparameter_optimization, execution_optimization, feature_registry, cross_symbol, feature_data
         from api.websocket import optimization_ws, feature_factory_ws, ic_analysis_ws
 
         # 新增導入兩階段搜索路由
@@ -281,6 +281,13 @@ def register_routes(app: FastAPI):
             tags=["Feature Factory"]
         )
 
+        # Register feature registry routes (Feature Library Phase 2)
+        app.include_router(
+            feature_registry.router,
+            prefix=settings.api_prefix,
+            tags=["Feature Registry"]
+        )
+
         # Register feature browser routes (Phase 2 Task 2.12)
         app.include_router(
             feature_browser.router,
@@ -329,6 +336,19 @@ def register_routes(app: FastAPI):
         app.include_router(
             ml_pipeline.router,
             tags=["ML Pipeline"]
+        )
+
+        # Register cross symbol routes (Feature Library Phase 5)
+        app.include_router(
+            cross_symbol.router,
+            prefix=settings.api_prefix,
+            tags=["Cross Symbol"]
+        )
+
+        # Register Feature Data routes (Feature Factory 獨立 K 線下載)
+        app.include_router(
+            feature_data.router,
+            tags=["Feature Data"]
         )
 
         # Register debug routes if available

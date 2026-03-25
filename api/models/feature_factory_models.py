@@ -17,6 +17,8 @@ class FeatureGenerateRequest(BaseModel):
     symbol: str = Field(..., description="交易標的")
     timeframe: str = Field("12h", description="時間週期")
     config_override: Optional[Dict] = Field(default=None, description="配置覆寫")
+    start_date: Optional[str] = Field(default=None, description="起始日期 (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(default=None, description="結束日期 (YYYY-MM-DD)")
     force_regenerate: bool = Field(default=False, description="是否跳過快取")
 
     @field_validator("timeframe")
@@ -91,6 +93,17 @@ class BatchGenerateRequest(BaseModel):
     config_override: Optional[Dict[str, Any]] = None
     force_regenerate: bool = False
     max_workers: int = Field(default=4, ge=1, le=8)
+
+
+class FeatureGenerationRequest(BaseModel):
+    """Feature generation request with optional date range."""
+
+    config: Optional[Dict[str, Any]] = None
+    symbols: List[str]
+    timeframe: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    force_regenerate: bool = False
 
     @field_validator("symbols")
     @classmethod

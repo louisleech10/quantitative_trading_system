@@ -264,6 +264,30 @@ export interface FeatureFactoryConfig {
   };
 }
 
+export interface FeatureRegistryEntry {
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+  feature_count: number;
+  row_count: number;
+  created_at: number;
+  hdf5_relative_path: string;
+}
+
+export interface FeatureRegistryResponse {
+  entries: FeatureRegistryEntry[];
+  total: number;
+}
+
+export interface FeatureGenerationRequest {
+  config?: Record<string, unknown>;
+  symbols: string[];
+  timeframe: string;
+  start_date?: string;
+  end_date?: string;
+  force_regenerate?: boolean;
+}
+
 // ===== Feature Factory Schema Types =====
 
 export interface SchemaIndicator {
@@ -1567,6 +1591,8 @@ export function assessStrategyQuality(
 
 export interface ICAnalysisConfig {
   features_path: string;
+  symbol?: string;
+  timeframe?: string;
   labels_path?: string;
   meta_path?: string;
   mode: 'global' | 'event';

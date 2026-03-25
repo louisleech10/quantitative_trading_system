@@ -206,6 +206,15 @@ async def get_model_comparison(task_id: str):
 async def start_lightgbm_training(request: LightGBMTrainingRequest):
     """啟動 LightGBM 訓練任務。"""
     try:
+        features_source = request.features_source
+        if features_source.startswith("library:"):
+            parts = features_source.split(":")
+            if len(parts) != 3 or not parts[1] or not parts[2]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="features_source 格式錯誤，應為 library:{symbol}:{timeframe}",
+                )
+
         config = dict(request.config or {})
         config["boosting_type"] = request.boosting_type
         if request.categorical_features:
@@ -215,7 +224,7 @@ async def start_lightgbm_training(request: LightGBMTrainingRequest):
         task_id = await model_task_service.start_training_task(
             engine="lightgbm",
             config=config,
-            data_source=request.features_source,
+            data_source=features_source,
             validation=validation_payload,
             run_comparison=False,
         )

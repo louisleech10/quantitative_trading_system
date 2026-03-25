@@ -11,7 +11,7 @@ import pandas as pd
 from scipy import stats
 
 from api.core.logging import get_logger
-from momentum.factories import create_feature_quality_diagnostics
+from momentum.factories import create_feature_library, create_feature_quality_diagnostics
 
 
 logger = get_logger("api.feature_browser_service")
@@ -22,6 +22,7 @@ class FeatureBrowserService:
 
     def __init__(self) -> None:
         self._quality_diagnostics = create_feature_quality_diagnostics(config={})
+        self._feature_library = create_feature_library()
 
     def get_overview(self, features_path: str) -> Dict[str, Any]:
         df = self._load_features_df(features_path)
@@ -647,6 +648,13 @@ class FeatureBrowserService:
         }
 
     def _load_features_df(self, features_path: str) -> pd.DataFrame:
+        if features_path.startswith("library:"):
+            parts = features_path.split(":")
+            if len(parts) == 3:
+                _, symbol, timeframe = parts
+                return self._normalize_df_index(self._feature_library.load(symbol, timeframe))
+            raise ValueError("Invalid FeatureLibrary source format, expected library:{symbol}:{timeframe}")
+
         path = Path(features_path)
         if not path.exists():
             raise FileNotFoundError(f"features_path not found: {features_path}")

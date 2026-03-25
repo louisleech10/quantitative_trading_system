@@ -282,3 +282,28 @@ class SkippedResult:
     details: Optional[Dict] = None
     retryable: bool = False
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass(frozen=True)
+class FeatureLibraryEntry:
+    """A single entry in the Feature Library registry."""
+
+    symbol: str
+    timeframe: str
+    config_hash: str
+    feature_count: int
+    row_count: int
+    created_at: float
+    hdf5_relative_path: str
+
+
+class FeatureNotFoundError(Exception):
+    """Raised when requested features are not found in the library."""
+
+    def __init__(self, symbol: str, timeframe: str, detail: str = ""):
+        self.symbol = symbol
+        self.timeframe = timeframe
+        msg = f"Features not found for {symbol}/{timeframe}"
+        if detail:
+            msg += f": {detail}"
+        super().__init__(msg)

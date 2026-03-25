@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,7 @@ class CryptoSpotAdapter(DataSourceAdapter):
         "trades",
     ]
 
-    _SYNTHETIC_FIELDS = ["avg-price", "med-price", "typ-price", "wcl-price"]
+    _SYNTHETIC_FIELDS = ["avg-price", "med-price", "typ-price", "wcl-price", "log-volume", "log-quote-volume"]
 
     def __init__(self, storage_manager: KlineStorageManager) -> None:
         self._storage = storage_manager
@@ -116,6 +116,10 @@ class CryptoSpotAdapter(DataSourceAdapter):
 
         return True
 
+    def get_last_timestamp(self, symbol: str, timeframe: str) -> Optional[int]:
+        """Delegate timestamp lookup to storage manager."""
+        return self._storage.get_last_timestamp(symbol, timeframe)
+
     def _add_synthetic_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         o = df["open"].astype("float64")
         h = df["high"].astype("float64")
@@ -126,6 +130,15 @@ class CryptoSpotAdapter(DataSourceAdapter):
         df["med-price"] = (h + l) / 2.0
         df["typ-price"] = (h + l + c) / 3.0
         df["wcl-price"] = (h + l + c + c) / 4.0
+
+        vol = df["volume"].astype("float64")
+        df["log-volume"] = np.log1p(vol).astype("float32")
+
+        if "quote_volume" in df.columns:
+            qvol = df["quote_volume"].astype("float64")
+            df["log-quote-volume"] = np.log1p(qvol).astype("float32")
+        else:
+            df["log-quote-volume"] = np.float32(0.0)
 
         for field in self._SYNTHETIC_FIELDS:
             df[field] = df[field].astype("float32")
@@ -193,6 +206,20 @@ class CryptoSpotAdapter(DataSourceAdapter):
                 "float32",
                 "price",
                 "Weighted close price (H+L+2C)/4",
+                True,
+            ),
+            "log-volume": FieldMeta(
+                "log-volume",
+                "float32",
+                "volume",
+                "Log-transformed base volume (log1p)",
+                True,
+            ),
+            "log-quote-volume": FieldMeta(
+                "log-quote-volume",
+                "float32",
+                "volume",
+                "Log-transformed quote volume (log1p)",
                 True,
             ),
         }

@@ -12,6 +12,7 @@ import pandas as pd
 
 from api.core.logging import get_logger
 from momentum.factories import (
+    create_feature_library,
     create_feature_storage,
     create_model_comparison,
     create_model_trainer,
@@ -26,6 +27,7 @@ class ModelTaskService:
     def __init__(self):
         self.logger = logger
         self.feature_storage = create_feature_storage()
+        self.feature_library = create_feature_library()
         self.tasks: Dict[str, Dict[str, Any]] = {}
 
     async def start_training_task(
@@ -122,13 +124,22 @@ class ModelTaskService:
         return task
 
     async def _load_data(self, data_source: str) -> Tuple[pd.DataFrame, np.ndarray, List[str]]:
-        try:
-            features_df, feature_names, _ = await asyncio.to_thread(
-                self.feature_storage.load_features_from_hdf5,
-                data_source,
-            )
-        except FileNotFoundError as exc:
-            raise ValueError(f"找不到特徵資料來源: {data_source}") from exc
+        if data_source.startswith("library:"):
+            parts = data_source.split(":")
+            if len(parts) != 3:
+                raise ValueError("library 資料來源格式錯誤，應為 library:{symbol}:{timeframe}")
+
+            _, symbol, timeframe = parts
+            features_df = await asyncio.to_thread(self.feature_library.load, symbol, timeframe)
+            feature_names = features_df.columns.tolist()
+        else:
+            try:
+                features_df, feature_names, _ = await asyncio.to_thread(
+                    self.feature_storage.load_features_from_hdf5,
+                    data_source,
+                )
+            except FileNotFoundError as exc:
+                raise ValueError(f"找不到特徵資料來源: {data_source}") from exc
 
         if "label" not in features_df.columns:
             raise ValueError("特徵資料缺少 label 欄位")

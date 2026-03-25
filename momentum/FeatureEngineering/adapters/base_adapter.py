@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import pandas as pd
 
@@ -51,6 +51,11 @@ class DataSourceAdapter(ABC):
 
     @abstractmethod
     def validate(self, df: pd.DataFrame) -> bool:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def get_last_timestamp(self, symbol: str, timeframe: str) -> Optional[int]:
+        """Return the last data timestamp, or None when unavailable."""
         raise NotImplementedError()
 
     def get_single_series_fields(self) -> List[str]:

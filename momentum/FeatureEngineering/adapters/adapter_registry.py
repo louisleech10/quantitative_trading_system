@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -65,3 +65,12 @@ class AdapterRegistry:
             f"Aligned data for {symbol}/{timeframe}: {len(aligned)} rows, {len(aligned.columns)} columns"
         )
         return aligned
+
+    def get_last_timestamp(self, symbol: str, timeframe: str) -> Optional[int]:
+        """Return the latest timestamp across all registered adapters."""
+        latest: Optional[int] = None
+        for adapter in self._adapters.values():
+            ts = adapter.get_last_timestamp(symbol, timeframe)
+            if ts is not None and (latest is None or ts > latest):
+                latest = ts
+        return latest

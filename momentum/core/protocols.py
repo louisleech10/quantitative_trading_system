@@ -43,6 +43,9 @@ class IKlineReader(Protocol):
     def get_metadata(self, symbol: str, timeframe: str) -> Optional[Dict[str, Any]]:
         ...
 
+    def get_last_timestamp(self, symbol: str, timeframe: str) -> Optional[int]:
+        ...
+
 
 @runtime_checkable
 class IIndicatorEngine(Protocol):

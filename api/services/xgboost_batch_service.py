@@ -33,12 +33,14 @@ from api.core.config import settings
 from api.core.logging import get_logger
 from api.utils.case_storage import get_case_storage_manager
 from api.utils.json_serializer import sanitize_for_json
+from momentum.core.contracts import FeatureNotFoundError
 from momentum.factories import (
     create_binance_provider,
     create_bootstrap_estimator,
     create_cross_symbol_validator,
     create_expectancy_calculator,
     create_feature_extractor,
+    create_feature_library,
     create_kline_download_service,
     create_kline_storage_manager,
     create_model_storage,
@@ -167,6 +169,7 @@ class XGBoostBatchService:
         except Exception:
             logger.debug("Binance provider already registered", exc_info=True)
         self.feature_extractor = create_feature_extractor()
+        self._feature_library = create_feature_library()
         self.xgboost_analyzer = create_xgboost_analyzer()
         self.pattern_extractor = create_pattern_extractor()
         self.model_storage = create_model_storage()
@@ -430,6 +433,36 @@ class XGBoostBatchService:
             
             for sym, kline_df in all_kline_data.items():
                 self.logger.info(f"開始為 {sym} 計算特徵...")
+
+                try:
+                    library_df = self._feature_library.load(sym, timeframe)
+                    if "timestamp" not in library_df.columns:
+                        library_df = library_df.copy()
+                        if isinstance(library_df.index, pd.DatetimeIndex):
+                            library_df["timestamp"] = (library_df.index.astype("int64") // 10**6).astype(int)
+                        else:
+                            library_df["timestamp"] = pd.to_numeric(library_df.index, errors="coerce")
+                    all_symbol_features[sym] = library_df.copy()
+
+                    numeric_columns = library_df.select_dtypes(include=[np.number]).columns.tolist()
+                    if shared_feature_names is None:
+                        shared_feature_names = [
+                            column_name
+                            for column_name in numeric_columns
+                            if column_name not in {"label", "open_time", "timestamp"}
+                        ]
+
+                    self.logger.info("從 FeatureLibrary 載入 %s/%s 預計算特徵", sym, timeframe)
+                    continue
+                except FeatureNotFoundError:
+                    self.logger.info("FeatureLibrary 無資料，改用即時計算 %s/%s", sym, timeframe)
+                except Exception as exc:
+                    self.logger.warning(
+                        "FeatureLibrary 載入失敗，改用即時計算 %s/%s: %s",
+                        sym,
+                        timeframe,
+                        exc,
+                    )
                 
                 sym_features = []
                 sym_feature_names = []

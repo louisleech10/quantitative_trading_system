@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   FeatureFactoryConfig,
+  FeatureRegistryEntry,
   FeaturePreview,
   FeatureTask,
   BatchTaskStatus,
@@ -40,6 +41,8 @@ interface FeatureFactoryState {
   schema: FeatureSchema | null;
   indicatorSearch: string;
   batchTask: BatchTaskStatus | null;
+  registryEntries: FeatureRegistryEntry[];
+  registryLoading: boolean;
   alignmentMode: 'open_minus' | 'close_time';
   trainingTimeframes: string[];
   setConfig: (config: FeatureFactoryConfig) => void;
@@ -63,6 +66,7 @@ interface FeatureFactoryState {
   setExplorerSelectedFeatures: (features: string[]) => void;
   setExplorerSummary: (summary: FeatureSummary | null) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
+  fetchRegistry: () => Promise<void>;
   startBatchGeneration: (
     symbols: string[],
     timeframe: string,
@@ -132,6 +136,8 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   schema: null,
   indicatorSearch: '',
   batchTask: null,
+  registryEntries: [],
+  registryLoading: false,
   alignmentMode: 'open_minus',
   trainingTimeframes: ['12h'],
   setConfig: (config) =>
@@ -173,6 +179,20 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   setExplorerSelectedFeatures: (features) => set({ explorerSelectedFeatures: features }),
   setExplorerSummary: (summary) => set({ explorerSummary: summary }),
   setBatchTask: (batchTask) => set({ batchTask }),
+  fetchRegistry: async () => {
+    set({ registryLoading: true });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/feature-registry/entries`);
+      if (!response.ok) {
+        throw new Error(response.statusText);
+      }
+
+      const payload = (await response.json()) as { entries?: FeatureRegistryEntry[] };
+      set({ registryEntries: payload.entries || [], registryLoading: false });
+    } catch {
+      set({ registryLoading: false });
+    }
+  },
   startBatchGeneration: async (symbols, timeframe, config, options) => {
     const normalizedSymbols = Array.from(
       new Set(

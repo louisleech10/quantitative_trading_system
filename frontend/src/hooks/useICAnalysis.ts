@@ -123,14 +123,17 @@ export function useICAnalysis() {
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {
       const featuresPath = config.features_path.trim();
-      if (!featuresPath) {
-        throw new Error('請提供特徵檔案路徑');
+      const hasLibrarySelection = Boolean(config.symbol && config.timeframe);
+      if (!featuresPath && !hasLibrarySelection) {
+        throw new Error('請提供特徵檔案路徑，或選擇 Symbol/Timeframe');
       }
 
       const effectiveConfig = useICAnalysisStore.getState().getEffectiveConfig();
 
       const payload = {
-        features_path: featuresPath,
+        features_path: featuresPath || undefined,
+        symbol: config.symbol || undefined,
+        timeframe: config.timeframe || undefined,
         labels_path: config.labels_path?.trim() || undefined,
         meta_path: config.meta_path?.trim() || undefined,
         config_override: {

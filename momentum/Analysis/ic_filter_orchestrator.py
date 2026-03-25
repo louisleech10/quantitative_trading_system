@@ -159,6 +159,161 @@ class ICFilterOrchestrator:
         self._report = report
         return report
 
+    def analyze_cross_sectional(
+        self,
+        features: pd.DataFrame,
+        labels_path: Optional[str] = None,
+        config_override: Optional[dict] = None,
+        progress_callback: Optional[Callable] = None,
+    ) -> dict:
+        """Cross-sectional IC: rank corr(feature_{i,t}, return_{i,t+1}) across symbols at each timestamp."""
+
+        config = self._apply_tier_config(self._apply_config_override(config_override))
+        self._progress_callback = progress_callback
+        self._clear_deep_analysis_cache()
+
+        if features is None or features.empty:
+            raise InvalidInputError("features is empty")
+        if not isinstance(features.index, pd.MultiIndex) or features.index.nlevels < 2:
+            raise InvalidInputError("cross-sectional features must use MultiIndex (timestamp, symbol)")
+
+        index_names = list(features.index.names)
+        symbol_level_idx = features.index.nlevels - 1
+        if "_symbol" in index_names:
+            symbol_level_idx = index_names.index("_symbol")
+        elif "symbol" in index_names:
+            symbol_level_idx = index_names.index("symbol")
+
+        label_col: Optional[str] = None
+        labels_df = self._load_labels_hdf5(labels_path) if labels_path else None
+
+        if labels_df is not None and not labels_df.empty:
+            label_series = self._select_label_series(labels_df, config)
+            timestamp_index = features.index.droplevel(symbol_level_idx)
+            aligned = label_series.reindex(timestamp_index)
+            working_df = features.copy()
+            working_df["_label"] = aligned.to_numpy()
+            label_col = "_label"
+        else:
+            working_df = features.copy()
+            for candidate in ["label", "return_1", "future_return", "target", "y"]:
+                if candidate in working_df.columns:
+                    label_col = candidate
+                    break
+
+        if label_col is None:
+            raise InvalidInputError("cross_sectional mode requires a label column or labels_path")
+
+        numeric_df = working_df.select_dtypes(include=[np.number]).copy()
+        if label_col not in numeric_df.columns:
+            if label_col not in working_df.columns:
+                raise InvalidInputError(f"label column missing: {label_col}")
+            numeric_df[label_col] = pd.to_numeric(working_df[label_col], errors="coerce")
+
+        feature_cols = [column for column in numeric_df.columns if column != label_col]
+        if not feature_cols:
+            raise InvalidInputError("no numeric feature columns found for cross-sectional analysis")
+
+        self._report_progress(0, "cross_sectional", 0.2, "preparing grouped slices")
+
+        time_levels = [idx for idx in range(numeric_df.index.nlevels) if idx != symbol_level_idx]
+        if not time_levels:
+            raise InvalidInputError("cannot infer timestamp level for cross-sectional analysis")
+
+        grouped = numeric_df.groupby(level=time_levels, sort=True)
+        ic_series: dict[str, list[float]] = {column: [] for column in feature_cols}
+        n_slices = 0
+
+        for _, group in grouped:
+            if len(group) < 2:
+                continue
+            n_slices += 1
+            y = group[label_col]
+            for feature_name in feature_cols:
+                pair = pd.concat([group[feature_name], y], axis=1).dropna()
+                if len(pair) < 2:
+                    continue
+                ranked_x = pair.iloc[:, 0].rank(method="average")
+                ranked_y = pair.iloc[:, 1].rank(method="average")
+                corr = ranked_x.corr(ranked_y, method="pearson")
+                if pd.notna(corr):
+                    ic_series[feature_name].append(float(corr))
+
+        self._report_progress(1, "cross_sectional", 0.8, "building cross-sectional report")
+
+        summary_table: list[dict[str, Any]] = []
+        for feature_name in feature_cols:
+            values = np.array(ic_series.get(feature_name, []), dtype=float)
+            if values.size == 0:
+                ic_mean = np.nan
+                ic_std = np.nan
+                icir = np.nan
+                ic_hit_rate = np.nan
+            else:
+                ic_mean = float(np.nanmean(values))
+                ic_std = float(np.nanstd(values))
+                icir = float(ic_mean / ic_std) if ic_std > 0 else np.nan
+                ic_hit_rate = float(np.mean(values > 0))
+
+            summary_table.append(
+                {
+                    "feature_name": feature_name,
+                    "ic_mean": ic_mean,
+                    "ic_std": ic_std,
+                    "icir": icir,
+                    "p_value": None,
+                    "ic_hit_rate": ic_hit_rate,
+                    "monotonicity_score": None,
+                    "long_short_spread": None,
+                    "coverage": None,
+                    "turnover_rate": None,
+                    "ic_half_life": None,
+                    "regime_robust": None,
+                }
+            )
+
+        summary_table = sorted(
+            summary_table,
+            key=lambda item: (
+                item.get("icir")
+                if isinstance(item.get("icir"), (int, float)) and np.isfinite(item.get("icir"))
+                else float("-inf")
+            ),
+            reverse=True,
+        )
+
+        metadata = {
+            "mode": "cross_sectional",
+            "n_symbols": int(features.index.get_level_values(symbol_level_idx).nunique()),
+            "n_timestamps": int(n_slices),
+            "total_features_input": len(feature_cols),
+            "total_features_output": len(feature_cols),
+        }
+
+        analysis_results = {
+            "filter_log": {
+                "mode": "cross_sectional",
+                "n_timestamps": n_slices,
+            },
+            "summary_table": summary_table,
+            "ic_decay": {},
+            "quantile_returns": {},
+            "grouped_ic": {},
+            "correlation_matrix": {"features": [], "matrix": []},
+            "diversification_metrics": {},
+            "rolling_ic_series": {
+                name: {"window_cross_sectional": values}
+                for name, values in ic_series.items()
+            },
+            "turnover_analysis": {},
+            "coverage_analysis": {},
+        }
+
+        report = self._reporter.generate_json_report(analysis_results, metadata)
+        self._report = report
+        self._report_progress(2, "cross_sectional", 1.0, "completed")
+        return report
+
     def refilter(self, thresholds: dict) -> dict:
         """使用新門檻重新篩選（不重算 IC）。"""
 

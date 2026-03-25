@@ -162,6 +162,17 @@ def create_feature_factory(cache_dir: Optional[str] = None) -> "FeatureFactory":
     return FeatureFactory(config_manager, registry)
 
 
+def create_feature_library() -> "FeatureLibrary":
+    """Create a FeatureLibrary instance."""
+    from momentum.FeatureEngineering.feature_library import FeatureLibrary
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    registry = FeatureRegistry()
+    storage = FeatureStorage()
+    return FeatureLibrary(registry, storage)
+
+
 def create_expectancy_calculator() -> ExpectancyCalculator:
     from momentum.Analysis.expectancy_calculator import ExpectancyCalculator
 

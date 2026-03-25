@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { useICAnalysis } from '@/hooks/useICAnalysis';
+import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
 const EXPORT_TARGET_ID = 'ic-analysis-export';
 
@@ -83,6 +84,8 @@ function ICAnalysisPageContent() {
     refilter,
     connectProgress,
   } = useICAnalysis();
+  const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
+  const fetchRegistry = useFeatureFactoryStore((state) => state.fetchRegistry);
 
   const [summaryText, setSummaryText] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
@@ -102,6 +105,10 @@ function ICAnalysisPageContent() {
       setSelectedFeature(summaryTable[0].feature_name);
     }
   }, [selectedFeature, setSelectedFeature, summaryTable]);
+
+  useEffect(() => {
+    fetchRegistry().catch(() => undefined);
+  }, [fetchRegistry]);
 
   useEffect(() => {
     if (!config.features_path?.trim()) {
@@ -320,6 +327,7 @@ function ICAnalysisPageContent() {
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <ICConfigPanel
             config={config}
+              registryEntries={registryEntries}
             featureTier={featureTier}
             featureToggles={featureToggles}
             onChangeFeatureTier={setFeatureTier}

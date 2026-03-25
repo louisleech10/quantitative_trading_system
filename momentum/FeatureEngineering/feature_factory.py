@@ -15,6 +15,7 @@ import pandas as pd
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
+from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
 from momentum.FeatureEngineering.labels.label_generator import LabelGenerator
@@ -75,6 +76,7 @@ class FeatureFactory:
         self._adapter_registry = adapter_registry
         self._progress_callback: Optional[Callable] = None
         self._storage = FeatureStorage()
+        self._registry = FeatureRegistry()
         self._validator = FeatureValidator()
         self._current_symbol: Optional[str] = None
         self._current_timeframe: Optional[str] = None
@@ -88,6 +90,8 @@ class FeatureFactory:
         config_override: Optional[dict] = None,
         force_regenerate: bool = False,
         progress_callback: Optional[Callable] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> FeatureGenerationResult:
         """Run the seven-layer pipeline.
 
@@ -100,7 +104,13 @@ class FeatureFactory:
         self._current_timeframe = timeframe
         start_time = time.time()
 
-        config_hash = self._compute_config_hash(config)
+        config_hash = self._compute_config_hash(
+            config,
+            symbol,
+            timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
         if not force_regenerate:
             cached = self._try_load_cache(symbol, timeframe, config_hash)
             if cached:
@@ -115,10 +125,20 @@ class FeatureFactory:
                 config=config,
                 progress_callback=progress_callback,
             )
-            return multi_generator.generate_multi_tf(symbol)
+            return multi_generator.generate_multi_tf(
+                symbol,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
         try:
-            raw_data = self._layer0_data_ingestion(symbol, timeframe, config)
+            raw_data = self._layer0_data_ingestion(
+                symbol,
+                timeframe,
+                config,
+                start_date=start_date,
+                end_date=end_date,
+            )
         except Exception as exc:
             logger.error(
                 "Layer 0 failed for %s/%s: %s",
@@ -188,7 +208,12 @@ class FeatureFactory:
     _BASE_OHLCV = ["open", "high", "low", "close", "volume"]
 
     def _layer0_data_ingestion(
-        self, symbol: str, timeframe: str, config: "FactoryConfig"
+        self,
+        symbol: str,
+        timeframe: str,
+        config: "FactoryConfig",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> pd.DataFrame:
         # Always include base OHLCV columns so non-single indicators (ADX, ATR, STOCH, CDL...)
         # can access high/low/close/open/volume even when user's enabled_sources omits them.
@@ -201,6 +226,19 @@ class FeatureFactory:
         ))
         data = self._adapter_registry.fetch_aligned(symbol, timeframe, sources)
         data = data.sort_index()
+
+        if start_date is not None or end_date is not None:
+            index_as_datetime = self._coerce_index_to_datetime(data.index)
+
+            if start_date is not None:
+                start_ts = pd.Timestamp(start_date)
+                start_mask = (index_as_datetime >= start_ts).to_numpy()
+                data = data[start_mask]
+                index_as_datetime = index_as_datetime[start_mask]
+            if end_date is not None:
+                end_ts = pd.Timestamp(end_date)
+                end_mask = (index_as_datetime <= end_ts).to_numpy()
+                data = data[end_mask]
         if not data.index.is_unique:
             duplicate_count = int(data.index.duplicated(keep="last").sum())
             logger.warning(
@@ -551,6 +589,10 @@ class FeatureFactory:
         features_df = features_df.reindex(raw_data.index)
         if not features_df.empty:
             features_df = features_df.astype("float32")
+        # Add timeframe tag to all feature columns so single-TF and multi-TF outputs
+        # share the same naming convention (e.g. ema_20 → ema_12h_20).
+        if not features_df.empty:
+            features_df = self._apply_timeframe_tag(features_df, timeframe)
 
         labels_df = pd.DataFrame(index=raw_data.index)
         if "close" in raw_data.columns:
@@ -597,6 +639,21 @@ class FeatureFactory:
         result.feature_count = int(result.features_df.shape[1])
 
         result.hdf5_path = self._storage.save_factory_output(symbol, timeframe, result)
+
+        try:
+            self._registry.add(
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "feature_count": len(result.features_df.columns),
+                    "row_count": len(result.features_df.index),
+                    "hdf5_relative_path": result.hdf5_path,
+                }
+            )
+        except Exception as exc:
+            logger.warning("Failed to update feature registry: %s", exc)
+
         return result
 
     def _report_progress(self, stage: str, progress: float, message: str) -> None:
@@ -625,12 +682,25 @@ class FeatureFactory:
             return preset_config.__class__.model_validate(merged_payload)
         return self._config_manager.get_merged_config(config_override)
 
-    def _compute_config_hash(self, config: "FactoryConfig") -> str:
+    def _compute_config_hash(
+        self,
+        config: "FactoryConfig",
+        symbol: str,
+        timeframe: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> str:
         config_payload = config.model_dump(by_alias=True)
         timeframes = config_payload.get("timeframes")
         if isinstance(timeframes, dict) and isinstance(timeframes.get("training"), list):
             # Canonicalize list order so semantically identical training TF sets share cache key.
             timeframes["training"] = sorted(timeframes["training"])
+        kline_last_ts = self._adapter_registry.get_last_timestamp(symbol, timeframe)
+        config_payload["_kline_last_ts"] = kline_last_ts
+        config_payload["_start_date"] = start_date
+        config_payload["_end_date"] = end_date
+        # Explicitly include timeframe kwarg in hash to ensure 12h/1h results never share cache.
+        config_payload["_timeframe"] = timeframe
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
@@ -647,6 +717,31 @@ class FeatureFactory:
             return None
         logger.info("Cache hit for %s/%s [hash=%s]", symbol, timeframe, config_hash[:8])
         return cached
+
+    @staticmethod
+    def _apply_timeframe_tag(features_df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
+        """Add timeframe tag to feature column names (e.g. ``ema_20`` → ``ema_12h_20``).
+
+        Columns that already carry a timeframe tag or start with reserved prefixes
+        (``meta_``, ``label_``) are left unchanged.  The convention matches
+        ``MultiTFGenerator._apply_timeframe_tag`` so single-TF and multi-TF outputs
+        share the same naming scheme.
+        """
+        from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+        tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
+
+        def _rename(col: str) -> str:
+            if col.startswith("meta_") or col.startswith("label_"):
+                return col
+            parts = col.split("_")
+            if len(parts) < 2:
+                return col
+            if parts[1] in tf_keys:
+                return col  # already tagged
+            return "_".join([parts[0], timeframe] + parts[1:])
+
+        rename_map = {col: _rename(col) for col in features_df.columns}
+        return features_df.rename(columns=rename_map)
 
     @staticmethod
     def _combine_layers(layers: List[pd.DataFrame], context: str = "unknown") -> pd.DataFrame:
@@ -688,16 +783,47 @@ class FeatureFactory:
     def _data_range(raw_data: pd.DataFrame) -> List[str]:
         if raw_data is None or raw_data.empty:
             return []
-        index = raw_data.index
-        try:
-            start = pd.to_datetime(index.min(), unit="ms")
-            end = pd.to_datetime(index.max(), unit="ms")
-        except Exception:
-            start = pd.to_datetime(index.min(), errors="coerce")
-            end = pd.to_datetime(index.max(), errors="coerce")
+        dt_index = FeatureFactory._coerce_index_to_datetime(raw_data.index)
+        valid = dt_index[dt_index.notna()]
+        if valid.empty:
+            return []
+        start = valid.min()
+        end = valid.max()
         if pd.isna(start) or pd.isna(end):
             return []
         return [start.isoformat(), end.isoformat()]
+
+    @staticmethod
+    def _coerce_index_to_datetime(index: pd.Index) -> pd.Series:
+        """Convert an index to datetime with robust epoch unit inference.
+
+        Kline timestamps in this project may be stored in seconds or milliseconds.
+        Always forcing unit="ms" can silently shift second-based epochs to 1970,
+        which then causes date-range filtering to drop all rows.
+        """
+        if index is None:
+            return pd.Series(dtype="datetime64[ns]")
+
+        index_series = pd.Series(index)
+
+        if pd.api.types.is_numeric_dtype(index_series):
+            numeric = pd.to_numeric(index_series, errors="coerce")
+            max_abs = numeric.abs().max(skipna=True)
+            if pd.notna(max_abs):
+                if max_abs >= 1_000_000_000_000_000_000:
+                    unit = "ns"
+                elif max_abs >= 1_000_000_000_000_000:
+                    unit = "us"
+                elif max_abs >= 1_000_000_000_000:
+                    unit = "ms"
+                else:
+                    unit = "s"
+
+                parsed = pd.to_datetime(numeric, unit=unit, errors="coerce")
+                fallback = pd.to_datetime(index_series, errors="coerce")
+                return parsed.where(parsed.notna(), fallback)
+
+        return pd.to_datetime(index_series, errors="coerce")
 
     def _build_indicator_specs(self, layer1: pd.DataFrame, config: "FactoryConfig") -> Dict[str, Dict]:
         sources = self._select_single_series_sources(config)

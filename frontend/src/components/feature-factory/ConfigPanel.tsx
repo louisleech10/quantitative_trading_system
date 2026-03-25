@@ -20,8 +20,12 @@ interface ConfigPanelProps {
   lockSymbolInput?: boolean;
   symbol: string;
   timeframe: string;
+  startDate: string;
+  endDate: string;
   onSymbolChange: (value: string) => void;
   onTimeframeChange: (value: string) => void;
+  onStartDateChange: (value: string) => void;
+  onEndDateChange: (value: string) => void;
 }
 
 function parseSymbolsInput(value: string): string[] {
@@ -44,8 +48,12 @@ export default function ConfigPanel({
   lockSymbolInput = false,
   symbol,
   timeframe,
+  startDate,
+  endDate,
   onSymbolChange,
   onTimeframeChange,
+  onStartDateChange,
+  onEndDateChange,
 }: ConfigPanelProps) {
   const {
     selectedPreset,
@@ -132,14 +140,12 @@ export default function ConfigPanel({
             disabled={lockSymbolInput}
           />
           <div className="text-xs text-slate-400">
-            {lockSymbolInput
-              ? '已鎖定為案例清單模式：請用下方勾選標的。'
-              : '單一標的會執行一般生成；輸入多標的（逗號或空白分隔）會自動啟用批次生成。'}
+            {'單一標的會執行一般生成；輸入多標的（逗號或空白分隔）會自動啟用批次生成。'}
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="text-xs text-slate-300">案例檔案標的清單</div>
+              <div className="text-xs text-slate-300">快速填入：從已下載的 K 線標的選取</div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -162,7 +168,7 @@ export default function ConfigPanel({
 
             <div className="text-[11px] text-slate-400">
               {isImportedSymbolsLoading
-                ? '載入案例標的中...'
+                ? '載入已下載標的中...'
                 : `可勾選 ${importedSymbols.length} 個，已選 ${selectedSymbols.length} 個`}
             </div>
 
@@ -183,7 +189,7 @@ export default function ConfigPanel({
               })}
 
               {!isImportedSymbolsLoading && importedSymbols.length === 0 && (
-                <div className="col-span-2 text-[11px] text-slate-400">尚未偵測到案例檔案標的，請先到資料準備頁導入 CSV。</div>
+                <div className="col-span-2 text-[11px] text-slate-400">尚未下載任何 K 線資料（請先使用上方的「K 線下載」下載標的資料）。</div>
               )}
             </div>
           </div>
@@ -196,6 +202,33 @@ export default function ConfigPanel({
               className="w-full rounded-xl border border-white/10 bg-white/5 px-9 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-300/40"
               placeholder="12h"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs uppercase tracking-[0.2em] text-slate-400">時間範圍（可選）</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">開始日期</div>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(event) => onStartDateChange(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-300/40 [color-scheme:dark]"
+                />
+              </div>
+              <div>
+                <div className="text-[11px] text-slate-500 mb-1">結束日期</div>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => onEndDateChange(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-300/40 [color-scheme:dark]"
+                />
+              </div>
+            </div>
+            <div className="text-[11px] text-slate-500">
+              留空則使用 K 線全部資料範圍
+            </div>
           </div>
         </div>
       </div>
@@ -245,6 +278,11 @@ export default function ConfigPanel({
         onChange={(next) => {
           setAlignmentMode(next.alignment_mode ?? 'open_minus');
           setTrainingTimeframes(next.training);
+          // Sync the outer timeframe text input so it always matches config.timeframes.primary.
+          // This prevents the API call from using a stale timeframe value.
+          if (next.primary !== timeframe) {
+            onTimeframeChange(next.primary);
+          }
           setConfig({
             ...config,
             timeframes: next,

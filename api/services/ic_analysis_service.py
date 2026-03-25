@@ -15,10 +15,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 import h5py
 import numpy as np
+import pandas as pd
 
 from api.core.logging import get_logger
 from api.models.ic_models import DeepAnalysisRequest, ICAnalyzeRequest, ICFullAnalysisRequest
-from momentum.factories import create_ic_analyzer
+from momentum.factories import create_feature_library, create_ic_analyzer
 from momentum.Analysis.ic_reporter import ICReporter
 
 
@@ -33,6 +34,7 @@ class ICAnalysisService:
         self._callbacks: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
         self._lock = threading.Lock()
         self._last_task_id: Optional[str] = None
+        self._feature_library = create_feature_library()
 
     async def start_analysis(self, request: ICAnalyzeRequest) -> Dict[str, str]:
         """Start IC analysis task."""
@@ -97,14 +99,56 @@ class ICAnalysisService:
             })
 
         try:
-            report = analyzer.analyze(
-                features_path=request.features_path,
-                labels_path=request.labels_path,
-                meta_path=request.meta_path,
-                config_override=config_override,
-                progress_callback=progress_callback,
-                kline_reader=None,
-            )
+            if request.mode == "cross_sectional":
+                if not request.timeframe:
+                    raise ValueError("timeframe is required for cross_sectional mode")
+                if not request.symbols or len(request.symbols) < 2:
+                    raise ValueError("cross_sectional mode requires at least 2 symbols")
+
+                multi_features = self._feature_library.load_multi(request.symbols, request.timeframe)
+                frames: List[pd.DataFrame] = []
+                for symbol, frame in multi_features.items():
+                    if frame is None or frame.empty:
+                        raise ValueError(f"Feature data is empty for {symbol}/{request.timeframe}")
+                    symbol_frame = frame.copy()
+                    symbol_frame["_symbol"] = symbol
+                    frames.append(symbol_frame)
+
+                cross_df = pd.concat(frames, axis=0)
+                cross_df = cross_df.set_index("_symbol", append=True)
+
+                report = analyzer.analyze_cross_sectional(
+                    features=cross_df,
+                    labels_path=request.labels_path,
+                    config_override=config_override,
+                    progress_callback=progress_callback,
+                )
+            else:
+                features_path = request.features_path
+                if not features_path and request.symbol and request.timeframe:
+                    try:
+                        entry = self._feature_library._registry.find_latest(request.symbol, request.timeframe)
+                    except Exception as exc:
+                        logger.warning("FeatureLibrary lookup failed: %s", exc)
+                        entry = None
+
+                    if entry:
+                        resolved_path = str(entry.get("hdf5_relative_path") or "")
+                        if resolved_path and not Path(resolved_path).is_absolute():
+                            resolved_path = str((Path.cwd() / resolved_path).resolve())
+                        features_path = resolved_path
+
+                if not features_path:
+                    raise ValueError("features_path is required when FeatureLibrary symbol/timeframe is unavailable")
+
+                report = analyzer.analyze(
+                    features_path=features_path,
+                    labels_path=request.labels_path,
+                    meta_path=request.meta_path,
+                    config_override=config_override,
+                    progress_callback=progress_callback,
+                    kline_reader=None,
+                )
 
             with self._lock:
                 task_info = self._tasks.get(task_id)

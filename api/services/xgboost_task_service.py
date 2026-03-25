@@ -19,6 +19,7 @@ import numpy as np
 from momentum.factories import (
     create_bootstrap_estimator,
     create_expectancy_calculator,
+    create_feature_library,
     create_feature_storage,
     create_model_storage,
     create_pattern_extractor,
@@ -119,6 +120,7 @@ class XGBoostTaskService:
         self.pattern_extractor = create_pattern_extractor()
         self.model_storage = create_model_storage()
         self.feature_storage = create_feature_storage()
+        self._feature_library = create_feature_library()
         self.expectancy_calculator = create_expectancy_calculator()
         self.bootstrap_estimator = create_bootstrap_estimator()
         self.logger = logger

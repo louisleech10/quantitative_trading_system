@@ -332,6 +332,31 @@ class KlineStorageManager:
         """
         return f"{symbol}/{timeframe}/data"
 
+    def _get_hdf5_path(self, symbol: str, timeframe: str) -> Path:
+        """Return underlying HDF5 path for the symbol/timeframe dataset."""
+        return self.hdf5_path
+
+    def get_last_timestamp(self, symbol: str, timeframe: str) -> Optional[int]:
+        """Return last kline timestamp for symbol/timeframe, or None if unavailable."""
+        try:
+            hdf5_path = self._get_hdf5_path(symbol, timeframe)
+            if not hdf5_path.exists():
+                return None
+
+            dataset_path = self._get_timeframe_dataset_path(symbol, timeframe)
+            with h5py.File(hdf5_path, "r") as f:
+                if dataset_path not in f:
+                    return None
+                ds = f[dataset_path]
+                if len(ds) == 0:
+                    return None
+
+                last_row = ds[-1]
+                ts = int(last_row[0]) if hasattr(last_row, "__len__") else int(last_row)
+                return ts
+        except Exception:
+            return None
+
 
     def _ensure_dataset(self, symbol: str, timeframe: str) -> bool:
         """

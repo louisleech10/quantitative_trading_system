@@ -147,16 +147,25 @@ export function useFeatureFactory() {
   );
 
   const startGeneration = useCallback(
-    async (symbol: string, timeframe: string, configOverride: FeatureFactoryConfig) => {
+    async (
+      symbol: string,
+      timeframe: string,
+      configOverride: FeatureFactoryConfig,
+      startDate?: string,
+      endDate?: string,
+    ) => {
       setIsGenerating(true);
       try {
+        const body: Record<string, unknown> = {
+          symbol,
+          timeframe,
+          config_override: configOverride,
+        };
+        if (startDate) body.start_date = startDate;
+        if (endDate) body.end_date = endDate;
         const payload = await requestJson<{ task_id: string; status: string }>('/generate', {
           method: 'POST',
-          body: JSON.stringify({
-            symbol,
-            timeframe,
-            config_override: configOverride,
-          }),
+          body: JSON.stringify(body),
         });
 
         const task: FeatureTask = {

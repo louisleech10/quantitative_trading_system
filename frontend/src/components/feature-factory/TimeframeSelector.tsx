@@ -27,9 +27,11 @@ export default function TimeframeSelector({ timeframes, onChange }: TimeframeSel
   const trainingTfs = Array.from(new Set(timeframes.training));
 
   const handlePrimaryChange = (nextPrimary: string) => {
-    const nextTraining = trainingTfs.includes(nextPrimary)
-      ? trainingTfs
-      : [...trainingTfs, nextPrimary];
+    // Swap old primary out of training, add new primary.
+    // This prevents stale old-primary TF from accidentally triggering MultiTFGenerator.
+    const nextTraining = Array.from(
+      new Set([...trainingTfs.filter((tf) => tf !== primaryTf), nextPrimary])
+    );
 
     onChange({
       ...timeframes,

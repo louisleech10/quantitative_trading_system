@@ -29,12 +29,23 @@ class MultiTFGenerator:
         self._training_tfs = self._ensure_primary(list(dict.fromkeys(config.timeframes.training)))
         self._progress_callback = progress_callback
 
-    def generate_multi_tf(self, symbol: str) -> "FeatureGenerationResult":
+    def generate_multi_tf(
+        self,
+        symbol: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> "FeatureGenerationResult":
         """Generate features across training timeframes and align to primary."""
         start_time = time.time()
 
         try:
-            primary_raw = self._factory._layer0_data_ingestion(symbol, self._primary_tf, self._config)
+            primary_raw = self._factory._layer0_data_ingestion(
+                symbol,
+                self._primary_tf,
+                self._config,
+                start_date=start_date,
+                end_date=end_date,
+            )
         except FileNotFoundError as exc:
             logger.error(
                 "Primary TF ingestion failed for %s/%s: %s",
@@ -70,7 +81,13 @@ class MultiTFGenerator:
                 raw_data = (
                     primary_raw
                     if timeframe == self._primary_tf
-                    else self._factory._layer0_data_ingestion(symbol, timeframe, self._config)
+                    else self._factory._layer0_data_ingestion(
+                        symbol,
+                        timeframe,
+                        self._config,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
                 )
             except FileNotFoundError:
                 logger.warning("MultiTF: missing data for %s/%s, skipping timeframe", symbol, timeframe)
@@ -133,7 +150,13 @@ class MultiTFGenerator:
             merged_df = self._factory._layer6_5_preprocessing(merged_df, self._config)
 
         self._report_progress("persist", 0.9, "Running Layer 7 validate and persist")
-        config_hash = self._factory._compute_config_hash(self._config)
+        config_hash = self._factory._compute_config_hash(
+            self._config,
+            symbol,
+            self._primary_tf,
+            start_date=start_date,
+            end_date=end_date,
+        )
         elapsed = time.time() - start_time
         result = self._factory._layer7_validate_and_persist(
             symbol=symbol,

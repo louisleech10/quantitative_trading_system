@@ -86,7 +86,7 @@ class FeatureStorage:
                 group = f.create_group(group_path)
                 
                 # 儲存特徵矩陣
-                feature_matrix = features_df[feature_names].values.astype(np.float64)
+                feature_matrix = features_df[feature_names].values.astype(np.float32)
                 group.create_dataset(
                     'features',
                     data=feature_matrix,
@@ -409,7 +409,7 @@ class FeatureStorage:
 
             from momentum.FeatureEngineering.feature_factory import FeatureGenerationResult
 
-            return FeatureGenerationResult(
+            result = FeatureGenerationResult(
                 features_df=features_df,
                 labels_df=labels_df,
                 metadata=metadata,
@@ -419,6 +419,12 @@ class FeatureStorage:
                 config_used=metadata.get("config_used", {}),
                 hdf5_path=str(file_path),
             )
+
+            numeric_cols = result.features_df.select_dtypes(include=["float64"]).columns
+            if len(numeric_cols) > 0:
+                result.features_df[numeric_cols] = result.features_df[numeric_cols].astype(np.float32)
+
+            return result
         except Exception as e:
             self.logger.error(f"工廠輸出讀取失敗: {str(e)}", exc_info=True)
             raise

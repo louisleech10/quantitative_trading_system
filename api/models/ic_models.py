@@ -42,7 +42,14 @@ class FeatureTierRequest(BaseModel):
 
 
 class ICAnalyzeRequest(BaseModel):
-    features_path: str = Field(..., description="Path to features HDF5")
+    features_path: Optional[str] = Field(None, description="Path to features HDF5 (deprecated, optional)")
+    symbol: Optional[str] = Field(None, description="Feature Library symbol")
+    symbols: Optional[List[str]] = Field(None, description="Feature Library symbols for cross-sectional mode")
+    timeframe: Optional[str] = Field(None, description="Feature Library timeframe")
+    mode: Literal["longitudinal", "cross_sectional"] = Field(
+        "longitudinal",
+        description="IC analysis mode",
+    )
     labels_path: Optional[str] = Field(None, description="Path to labels HDF5")
     meta_path: Optional[str] = Field(None, description="Path to metadata JSON")
     config_override: Optional[Dict[str, Any]] = Field(None, description="Config override")

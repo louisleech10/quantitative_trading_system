@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { ICAnalysisConfig } from '@/lib/types';
 import { FeatureTierLevel } from '@/lib/types';
+import { FeatureRegistryEntry } from '@/lib/types';
 import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +20,7 @@ import {
 
 interface ICConfigPanelProps {
   config: ICAnalysisConfig;
+  registryEntries?: FeatureRegistryEntry[];
   featureTier: FeatureTierLevel;
   featureToggles: Record<string, boolean>;
   onChangeFeatureTier: (tier: FeatureTierLevel) => void;
@@ -39,6 +41,7 @@ const horizonOptions = [1, 2, 3, 5, 8, 13, 21].map((value) => ({
 
 export default function ICConfigPanel({
   config,
+  registryEntries = [],
   featureTier,
   featureToggles,
   onChangeFeatureTier,
@@ -48,6 +51,22 @@ export default function ICConfigPanel({
   isRunning,
 }: ICConfigPanelProps) {
   const horizonValues = useMemo(() => config.horizons.map((value) => String(value)), [config.horizons]);
+  const symbolOptions = useMemo(
+    () => Array.from(new Set(registryEntries.map((entry) => entry.symbol))).sort(),
+    [registryEntries]
+  );
+  const timeframeOptions = useMemo(() => {
+    if (!config.symbol) {
+      return Array.from(new Set(registryEntries.map((entry) => entry.timeframe))).sort();
+    }
+    return Array.from(
+      new Set(
+        registryEntries
+          .filter((entry) => entry.symbol === config.symbol)
+          .map((entry) => entry.timeframe)
+      )
+    ).sort();
+  }, [config.symbol, registryEntries]);
 
   const updateConfig = (patch: ICConfigPatch) => {
     onConfigChange({
@@ -91,6 +110,40 @@ export default function ICConfigPanel({
           value={config.meta_path}
           onChange={(event) => updateConfig({ meta_path: event.target.value })}
         />
+
+        <div className="rounded-lg border border-white/10 p-3 space-y-3">
+          <p className="text-xs text-slate-400">或從 Feature Library 選擇</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Select
+              value={config.symbol}
+              onValueChange={(value) => updateConfig({ symbol: value, timeframe: undefined })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="選擇 Symbol" />
+              </SelectTrigger>
+              <SelectContent>
+                {symbolOptions.map((symbol) => (
+                  <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={config.timeframe}
+              onValueChange={(value) => updateConfig({ timeframe: value })}
+              disabled={!config.symbol}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="選擇 Timeframe" />
+              </SelectTrigger>
+              <SelectContent>
+                {timeframeOptions.map((timeframe) => (
+                  <SelectItem key={timeframe} value={timeframe}>{timeframe}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-3">

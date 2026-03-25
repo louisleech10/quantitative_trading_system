@@ -73,6 +73,13 @@ class FeatureFactoryBatchService:
             task["status"] = "running"
             self._notify_progress(task_id)
 
+            # 計算 feature_klines 的 cache_dir，確保子進程使用相同路徑
+            try:
+                from api.core.config import settings
+                batch_cache_dir: Optional[str] = str(settings.data_cache_path / "feature_klines")
+            except Exception:
+                batch_cache_dir = None
+
             loop = asyncio.get_running_loop()
             with ProcessPoolExecutor(max_workers=request.max_workers) as executor:
                 async def _wait_one(symbol: str, future: asyncio.Future):
@@ -91,6 +98,7 @@ class FeatureFactoryBatchService:
                         request.timeframe,
                         request.config_override,
                         request.force_regenerate,
+                        batch_cache_dir,
                     )
                     wrapped_futures.append(_wait_one(symbol, future))
 
@@ -148,11 +156,20 @@ class FeatureFactoryBatchService:
         timeframe: str,
         config_override: Optional[Dict[str, Any]],
         force_regenerate: bool,
+        cache_dir: Optional[str] = None,
     ) -> str:
         """在子進程中執行單一標的特徵計算。"""
         from momentum.factories import create_feature_factory
 
-        factory = create_feature_factory()
+        # 子進程無法存取父進程的 module-level 單例，必須重新計算 cache_dir
+        if cache_dir is None:
+            try:
+                from api.core.config import settings
+                cache_dir = str(settings.data_cache_path / "feature_klines")
+            except Exception:
+                pass  # 使用 create_feature_factory 預設值（data_cache/）
+
+        factory = create_feature_factory(cache_dir=cache_dir)
         try:
             result = factory.generate_features(
                 symbol=symbol,

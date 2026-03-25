@@ -24,7 +24,7 @@ class StubFactory:
     def __init__(self, data_by_tf):
         self._data_by_tf = data_by_tf
 
-    def _layer0_data_ingestion(self, symbol, timeframe, config):
+    def _layer0_data_ingestion(self, symbol, timeframe, config, start_date=None, end_date=None):
         if timeframe not in self._data_by_tf:
             raise FileNotFoundError(timeframe)
         return self._data_by_tf[timeframe]
@@ -62,7 +62,7 @@ class StubFactory:
             combined = combined.loc[:, ~combined.columns.duplicated(keep="first")]
         return combined
 
-    def _compute_config_hash(self, config):
+    def _compute_config_hash(self, config, symbol=None, timeframe=None, start_date=None, end_date=None):
         return "dummy_hash"
 
     def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash):
@@ -257,3 +257,47 @@ def test_open_minus_does_not_shift_primary_self_alignment():
     )
 
     assert aligned["feature"].tolist() == [10, 11, 12]
+
+
+def test_multi_tf_generator_propagates_date_range_to_all_layer0_calls():
+    class SpyFactory(StubFactory):
+        def __init__(self, data_by_tf):
+            super().__init__(data_by_tf)
+            self.calls = []
+
+        def _layer0_data_ingestion(self, symbol, timeframe, config, start_date=None, end_date=None):
+            self.calls.append(
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                }
+            )
+            return super()._layer0_data_ingestion(
+                symbol,
+                timeframe,
+                config,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+    primary_ts = [0, 12 * 3600 * 1000, 24 * 3600 * 1000]
+    primary_data = pd.DataFrame({"timestamp": primary_ts, "value": [10, 11, 12]})
+    hourly_ts = [i * 3600 * 1000 for i in range(25)]
+    hourly_data = pd.DataFrame({"timestamp": hourly_ts, "value": list(range(25))})
+
+    factory = SpyFactory({"12h": primary_data, "1h": hourly_data})
+    generator = MultiTFGenerator(factory, DummyConfig())
+
+    result = generator.generate_multi_tf(
+        "BTCUSDT",
+        start_date="2024-01-02",
+        end_date="2024-01-03",
+    )
+
+    assert result.features_df is not None
+    assert len(factory.calls) == 2
+    assert {call["timeframe"] for call in factory.calls} == {"12h", "1h"}
+    assert all(call["start_date"] == "2024-01-02" for call in factory.calls)
+    assert all(call["end_date"] == "2024-01-03" for call in factory.calls)
