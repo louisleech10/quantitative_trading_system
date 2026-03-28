@@ -90,12 +90,28 @@ class ConfigManager:
         """將舊格式 config 自動轉為新格式（向後相容遷移）。
 
         Transformations:
+        0. global_settings → global  (API/frontend 使用 field name；YAML 使用 alias)
         1. rolling_aggregation.aggregators: list[str] → dict[str, {enabled: True}]
         2. cross_sectional.features: list[str] → dict[str, {enabled: True}]
         3. microstructure.enabled_features: list → features dict
         4. entropy/tail_risk/microstructure 若缺少 features，補齊預設 features dict
         """
         config = raw_config  # in-place is fine; caller already deep-copied
+
+        # 0. Normalize Pydantic field-name key "global_settings" → alias "global"
+        #    FactoryConfig uses Field(alias="global"), so YAML stores it under "global".
+        #    The frontend/API sends the TypeScript camelCase key "global_settings".
+        #    After deep_merge both keys coexist; Pydantic would silently use the alias
+        #    and ignore "global_settings", making slider changes ineffective.
+        #    Fix: merge "global_settings" into "global" so user overrides take effect.
+        if "global_settings" in config:
+            override_gs = config.pop("global_settings")
+            if isinstance(override_gs, dict):
+                base_gs = config.get("global")
+                if isinstance(base_gs, dict):
+                    config["global"] = {**base_gs, **override_gs}
+                else:
+                    config["global"] = override_gs
 
         # 1. Rolling aggregation aggregators: list → dict
         rolling = config.get("rolling_aggregation")

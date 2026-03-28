@@ -515,8 +515,11 @@ class FeatureFactoryService:
         columns: Optional[List[str]] = None,
         max_rows: Optional[int] = None,
         include_metadata_header: bool = True,
+        include_datasource: bool = False,
     ) -> Dict[str, Any]:
         """Build CSV export stream payload for API route."""
+        from momentum.DataExtraction.kline_storage import KlineStorageManager
+
         context = self._load_task_context(task_id)
         schema = self._load_hdf5_schema(context)
 
@@ -537,6 +540,35 @@ class FeatureFactoryService:
         timeframe = context["timeframe"]
         filename = f"{symbol}_{timeframe}_features_{task_id}.csv"
 
+        # Load raw kline DataFrame indexed by datetime if requested
+        raw_df: Optional[pd.DataFrame] = None
+        raw_columns: List[str] = []
+        if include_datasource:
+            try:
+                storage = KlineStorageManager(cache_dir=_FEATURE_KLINE_CACHE_DIR)
+                kline_df = storage.read_klines(symbol, timeframe, validate_continuity=False)
+                if kline_df is not None and not kline_df.empty and "timestamp" in kline_df.columns:
+                    ts_val = kline_df["timestamp"].iloc[0]
+                    kline_unit = "ms" if ts_val > 1e12 else "s"
+                    kline_df = kline_df.set_index(
+                        pd.to_datetime(kline_df["timestamp"], unit=kline_unit, errors="coerce")
+                    )
+                    kline_df.index.name = "timestamp"
+                    # Keep only numeric raw OHLCV columns; drop the original timestamp column
+                    raw_cols_candidates = [
+                        "open", "high", "low", "close", "volume",
+                        "taker_buy_volume", "taker_ratio", "quote_volume", "trades",
+                    ]
+                    raw_columns = [c for c in raw_cols_candidates if c in kline_df.columns]
+                    raw_df = kline_df[raw_columns]
+                    logger.info(f"Loaded {len(raw_df)} kline rows for datasource export ({raw_columns})")
+                else:
+                    logger.warning(f"No kline data found for {symbol}/{timeframe}; skipping datasource columns")
+            except Exception as exc:
+                logger.warning(f"Failed to load kline data for datasource export: {exc}")
+                raw_df = None
+                raw_columns = []
+
         export_meta = {
             "task_id": task_id,
             "symbol": symbol,
@@ -544,6 +576,7 @@ class FeatureFactoryService:
             "generated_at": context["generated_at"],
             "feature_count": len(selected_columns),
             "row_count": row_count,
+            "datasource_columns": raw_columns,
         }
 
         generator = self._csv_chunk_generator_from_hdf5(
@@ -552,6 +585,8 @@ class FeatureFactoryService:
             max_rows=row_count,
             export_meta=export_meta,
             include_metadata_header=include_metadata_header,
+            raw_df=raw_df,
+            raw_columns=raw_columns,
         )
 
         return {
@@ -2069,8 +2104,12 @@ class FeatureFactoryService:
         max_rows: int,
         export_meta: Dict[str, Any],
         include_metadata_header: bool,
+        raw_df: Optional[pd.DataFrame] = None,
+        raw_columns: Optional[List[str]] = None,
     ) -> Generator[str, None, None]:
         task_id = context["task_id"]
+        _raw_columns: List[str] = raw_columns or []
+
         if include_metadata_header:
             yield f"# task_id: {task_id}\n"
             yield f"# symbol: {export_meta.get('symbol', 'unknown')}\n"
@@ -2078,8 +2117,10 @@ class FeatureFactoryService:
             yield f"# feature_count: {export_meta.get('feature_count', 0)}\n"
             yield f"# row_count: {export_meta.get('row_count', 0)}\n"
             yield f"# generated_at: {export_meta.get('generated_at', '')}\n"
+            if _raw_columns:
+                yield f"# datasource_columns: {','.join(_raw_columns)}\n"
 
-        header = "timestamp," + ",".join(selected_columns) + "\n"
+        header = "timestamp," + (",".join(_raw_columns) + "," if _raw_columns else "") + ",".join(selected_columns) + "\n"
         yield header
 
         file_path = context["file_path"]
@@ -2119,6 +2160,15 @@ class FeatureFactoryService:
                     index = pd.Index(range(start, end), name="timestamp")
 
                 chunk_df = pd.DataFrame(chunk_values, columns=selected_columns, index=index)
+
+                # Prepend raw datasource columns when requested
+                if raw_df is not None and _raw_columns:
+                    try:
+                        raw_chunk = raw_df.reindex(chunk_df.index)[_raw_columns]
+                    except Exception:
+                        raw_chunk = pd.DataFrame(index=chunk_df.index, columns=_raw_columns)
+                    chunk_df = pd.concat([raw_chunk, chunk_df], axis=1)
+
                 buffer = io.StringIO()
                 chunk_df.to_csv(buffer, header=False, index=True)
                 yield buffer.getvalue()

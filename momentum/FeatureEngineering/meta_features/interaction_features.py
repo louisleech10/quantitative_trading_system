@@ -1,4 +1,15 @@
-"""Interaction meta features."""
+"""
+Interaction meta features — Layer 6 Sub-engine E.
+
+設計說明：
+  計算 Layer 1 指標兩兩乘積，捕捉「趨勢方向 × 動量強度」等非線性交互效應。
+  目前僅使用三組組合（EMA×RSI、ATR×方向、成交量×價格）。
+
+未來擴充方向（TODO）：
+  - 納入更多 L1 指標的乘積（如 ADX×RSI、BBANDS_width×Volume_MA_Ratio）
+  - 支援由 config 動態定義交互對（meta_features.interaction_pairs）
+  - 考慮三元交互（Trend × Momentum × Volume），但需注意特徵爆炸問題
+"""
 
 from __future__ import annotations
 

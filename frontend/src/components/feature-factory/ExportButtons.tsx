@@ -21,6 +21,7 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
   const [csvColumns, setCsvColumns] = useState('all');
   const [csvMaxRows, setCsvMaxRows] = useState('all');
   const [includeMetadataHeader, setIncludeMetadataHeader] = useState(true);
+  const [includeDatasource, setIncludeDatasource] = useState(false);
   const [tokenBudget, setTokenBudget] = useState(4000);
   const [language, setLanguage] = useState('zh-TW');
   const [isDownloading, setIsDownloading] = useState(false);
@@ -111,6 +112,9 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
         query.set('max_rows', csvMaxRows);
       }
       query.set('include_metadata_header', includeMetadataHeader ? 'true' : 'false');
+      if (includeDatasource) {
+        query.set('include_datasource', 'true');
+      }
 
       await downloadFromApi(
         `/export/${taskId}/csv?${query.toString()}`,
@@ -270,6 +274,14 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
               onChange={(event) => setIncludeMetadataHeader(event.target.checked)}
             />
             包含 Metadata header
+          </label>
+          <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              checked={includeDatasource}
+              onChange={(event) => setIncludeDatasource(event.target.checked)}
+            />
+            包含原始數據源欄位（OHLCV 等）
           </label>
         </div>
 

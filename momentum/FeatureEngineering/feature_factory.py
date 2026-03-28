@@ -540,6 +540,57 @@ class FeatureFactory:
         data: pd.DataFrame,
         config: "FactoryConfig",
     ) -> pd.DataFrame:
+        """
+        Layer 6 — Meta Features（元特徵層）
+
+        本層為「二階特徵」：不從原始 K 線計算，而是整合 Layer 1 技術指標的輸出，
+        提煉出更高維度的市場狀態訊號（趨勢共識、動量分歧、量價背離、波動率狀態等）。
+
+        ┌────────────────────────────────────────────────────────────────┐
+        │ 重要：Layer 6 與 IC/SHAP 篩選的關係                          │
+        │                                                                │
+        │  Layer 6 並非「要先跑 IC 篩選才能啟用」，而是與 L1~L5 同步   │
+        │  計算後，再由 IC Analysis 和 SHAP 一起評估哪些 meta 特徵有用。│
+        │                                                                │
+        │  建議工作流程：                                               │
+        │   1. 首次跑全套（L1~L6 全開）→ 取得完整 feature set          │
+        │   2. IC Analysis / SHAP 篩選出高品質特徵                      │
+        │   3. 若某 sub-engine 所有特徵 IC 皆低 → 可在 config 關閉       │
+        │      以節省計算資源（如:對日線資料關閉 time_features）         │
+        └────────────────────────────────────────────────────────────────┘
+
+        Sub-engines（各自可在 scan_config.yaml 獨立開關）：
+          - trend_consensus       : mean(sign(EMA8>EMA21), sign(MACD_Hist), ADX>25)
+          - momentum_divergence   : std(rank(RSI), rank(CCI), rank(STOCH))  → 分歧度
+          - volume_price_divergence: sign(ΔPrice) != sign(ΔVolume) → 量價背離
+          - volatility_regime     : ATR_14 / ATR_55  → 短長期 ATR 比值
+          - interaction           : EMA×RSI 交互、ATR×方向、成交量×價格變化
+          - time_features         : HourOfDay / DayOfWeek / IsWeekend / MonthOfYear
+
+        設計限制（已知）：
+          - 每個 sub-engine 的指標欄位名稱均為 **hardcode**，透過 _find_column() 模糊
+            比對 Layer 1 欄位。若 scan_config.yaml 未啟用對應指標，該 sub-engine
+            會優雅地略過（回傳 NaN 或空欄位），不會報錯。
+          - 目前 interaction 子引擎僅使用 EMA_8/21、RSI_14、ATR_14。
+            其他 L1 指標（BBANDS、OBV、Keltner 等）尚未納入交互組合。
+
+        未來待實作（Future Work）：
+          TODO(layer6-redundancy): 加入特徵相關係數矩陣去冗餘
+            → 對 L1~L6 全部特徵計算 Pearson 相關 > 0.85 的群，同群只留 IC 最高者
+            → 工具: scipy.cluster.hierarchy / sklearn.AgglomerativeClustering
+
+          TODO(layer6-mutual-info): 加入 Mutual Information 排序（非線性版 IC）
+            → MI(feature, return) 能捕捉 Pearson 無法偵測的非線性關係
+            → 工具: sklearn.feature_selection.mutual_info_regression
+
+          TODO(layer6-multiple-testing): 加入多重比較校正（Bonferroni / BHY）
+            → 測試 N 個特徵時，顯著性門檻需從 0.05 降為 0.05/N
+            → 參考: Lopez de Prado《Advances in Financial ML》MinSharpe 公式
+
+          TODO(layer6-dynamic-candidates): 讓 _find_column 候選列表可由 config 動態注入
+            → 使用者可在 scan_config.yaml 指定 meta_features.consensus_indicators
+            → 無需改 Python 程式碼即可擴展 sub-engine 使用的指標集
+        """
         if not config.meta_features.enabled:
             return pd.DataFrame(index=layer1.index)
 
@@ -561,8 +612,19 @@ class FeatureFactory:
             frames.append(interaction_engine.compute_all(layer1, data))
 
         if config.meta_features.time_features:
-            timestamps = pd.Series(data.index, index=data.index)
-            frames.append(time_engine.compute_all(timestamps))
+            # data.index 在本專案中存儲的是 Unix 秒（int64）。
+            # 必須先用 _coerce_index_to_datetime()（可自動偵測 s/ms/us/ns 單位）
+            # 轉換為 datetime64 Series，再傳入 TimeFeatureEngine，
+            # 否則 unit="ms" 會把秒當毫秒，將所有日期錯誤映射到 1970-01-21，
+            # 導致 DayOfWeek/IsWeekend/MonthOfYear 全為常數並被 Layer 7 丟棄。
+            #
+            # 重要：_coerce_index_to_datetime 內部使用 pd.Series(index)，
+            # 回傳的 Series 帶有預設 RangeIndex(0,1,2...)。
+            # 必須將其 index 重設回 data.index，
+            # 才能在 pd.concat(frames, axis=1) 時與其他 frames 正確對齊。
+            dt_index = self._coerce_index_to_datetime(data.index)
+            dt_index.index = data.index  # 恢復原始 index，避免 concat 時全行變 NaN
+            frames.append(time_engine.compute_all(dt_index))
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:
@@ -874,11 +936,18 @@ class FeatureFactory:
             info = metadata.get(name)
             if not info:
                 continue
+            raw_params = info.get("params") or {}
+            # params from _build_metadata_entries is a dict e.g. {"timeperiod": 21}.
+            # list(dict) iterates keys, not values — extract values explicitly.
+            if isinstance(raw_params, dict):
+                params_list = [v for v in raw_params.values() if isinstance(v, (int, float))]
+            else:
+                params_list = [v for v in raw_params if isinstance(v, (int, float))]
             indicator_specs[name] = {
                 "source": info.get("source"),
                 "category": info.get("category"),
                 "indicator": info.get("indicator"),
-                "params": list(info.get("params") or []),
+                "params": params_list,
             }
         return indicator_specs
 

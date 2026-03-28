@@ -19,7 +19,7 @@ export default function IndicatorCheckbox({
 }: IndicatorCheckboxProps) {
   return (
     <label
-      className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition cursor-pointer select-none ${
+      className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[11px] transition cursor-pointer select-none ${
         disabled
           ? 'opacity-40 cursor-not-allowed'
           : enabled
@@ -33,7 +33,7 @@ export default function IndicatorCheckbox({
         checked={enabled}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 accent-cyan-400"
+        className="h-3 w-3 rounded border-white/20 bg-white/5 accent-cyan-400 flex-shrink-0"
       />
       <span className="truncate">{name}</span>
     </label>

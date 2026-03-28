@@ -445,7 +445,13 @@ class DerivedOperatorEngine:
         for name in columns:
             if indicator_specs and name in indicator_specs:
                 spec = indicator_specs[name]
-                params = self._coerce_params(spec.get("params"))
+                raw_params = spec.get("params")
+                # indicator_specs passes params as a dict (e.g. {"timeperiod": 21});
+                # _coerce_params needs numeric values, not key strings.
+                if isinstance(raw_params, dict):
+                    params = self._coerce_params(raw_params.values())
+                else:
+                    params = self._coerce_params(raw_params)
                 info_map[name] = FeatureInfo(
                     name=name,
                     source=spec.get("source", ""),

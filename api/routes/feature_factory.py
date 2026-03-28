@@ -226,6 +226,7 @@ async def export_features_csv(
     columns: Optional[str] = Query(None, description="逗號分隔的欄位名，空=全部"),
     max_rows: Optional[int] = Query(None, ge=0, description="最大行數，空=全部"),
     include_metadata_header: bool = Query(True, description="CSV 前方加入 #metadata 註解行"),
+    include_datasource: bool = Query(False, description="在 CSV 前方加入原始數據源欄位（open/high/low/close/volume 等）"),
 ):
     """串流匯出特徵數據為 CSV。"""
     try:
@@ -239,6 +240,7 @@ async def export_features_csv(
                 columns=selected_columns,
                 max_rows=max_rows,
                 include_metadata_header=include_metadata_header,
+                include_datasource=include_datasource,
             ),
         )
         headers = {

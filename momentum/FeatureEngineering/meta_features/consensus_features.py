@@ -1,4 +1,21 @@
-"""Consensus meta features."""
+"""
+Consensus meta features — Layer 6 Sub-engines A~D.
+
+設計說明：
+  本模組計算四種「共識型」元特徵，將 Layer 1 多個指標整合為單一訊號。
+  所有指標名稱均為 hardcode，透過 _find_column() 模糊比對 Layer 1 DataFrame 欄位。
+  若 scan_config.yaml 未啟用對應指標，該計算會優雅略過（回傳空 Series）。
+
+選用指標根據（為何是這幾個）：
+  - 均選自 scan_config.yaml 中 industry_standard 欄位標記的業界通用參數
+  - 三大類別各自選語義最互補的代表：趨勢(EMA/ADX)、動量(RSI/CCI/STOCH)、波動率(ATR)
+  - 設計目的是提供「教科書級別」的快速基準，而非窮舉所有指標組合
+
+使用限制：
+  Layer 6 元特徵本身仍需經過 IC Analysis 和 SHAP 評估其有效性，
+  並非所有 sub-engine 對所有標的或時間框架都有預測力。
+  高粒度時間框架（如 1h）的 time_features 較有意義；12h 以上建議關閉 HourOfDay。
+"""
 
 from __future__ import annotations
 
