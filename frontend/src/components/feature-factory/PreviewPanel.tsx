@@ -22,7 +22,7 @@ export default function PreviewPanel({ preview }: PreviewPanelProps) {
         </div>
         <div>
           <div className="text-lg font-semibold text-slate-100">特徵預覽</div>
-          <div className="text-xs text-slate-400">預估數量、耗時與分類分佈</div>
+          <div className="text-xs text-slate-400">預估數量與分類分佈</div>
         </div>
       </div>
 

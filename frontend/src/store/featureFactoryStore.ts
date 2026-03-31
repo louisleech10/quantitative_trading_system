@@ -52,6 +52,7 @@ interface FeatureFactoryState {
   setIndicators: (indicators: FeatureIndicatorSpec[]) => void;
   setPreview: (preview: FeaturePreview | null) => void;
   setCurrentTask: (task: FeatureTask | null) => void;
+  updateCurrentTaskPartial: (patch: Partial<FeatureTask>) => void;
   setProgress: (progress: FeatureGenerationProgress | null) => void;
   setFeatureList: (features: string[]) => void;
   setIsGenerating: (value: boolean) => void;
@@ -160,6 +161,10 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   setIndicators: (indicators) => set({ indicators }),
   setPreview: (preview) => set({ preview }),
   setCurrentTask: (task) => set({ currentTask: task }),
+  updateCurrentTaskPartial: (patch) =>
+    set((state) => ({
+      currentTask: state.currentTask ? { ...state.currentTask, ...patch } : null,
+    })),
   setProgress: (progress) => set({ progress }),
   setFeatureList: (features) => set({ featureList: features }),
   setIsGenerating: (value) => set({ isGenerating: value }),
@@ -466,7 +471,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
     set((state) => {
       if (!state.config?.operators) return {};
       const opCfg = state.config.operators[name];
-      if (!opCfg) return {};
+      if (!opCfg || typeof opCfg !== 'object') return {};
       return {
         config: {
           ...state.config,

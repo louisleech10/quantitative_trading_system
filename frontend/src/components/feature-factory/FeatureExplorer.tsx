@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureSummary, ExplorerTab } from '@/lib/types';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
@@ -12,7 +12,7 @@ import FeatureDistributionChart from '@/components/feature-factory/FeatureDistri
 import NaNPatternChart from '@/components/feature-factory/NaNPatternChart';
 
 interface FeatureExplorerProps {
-  taskId: string;
+  taskId?: string | null;
   /** 傳入目前任務狀態；若為 'completed' 或省略才開始載入資料 */
   taskStatus?: string | null;
 }
@@ -26,7 +26,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
   { key: 'nan', label: 'NaN Pattern' },
 ];
 
-export default function FeatureExplorer({ taskId, taskStatus }: FeatureExplorerProps) {
+export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: FeatureExplorerProps) {
   const { browseSummary } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
@@ -38,14 +38,20 @@ export default function FeatureExplorer({ taskId, taskStatus }: FeatureExplorerP
   const setExplorerActiveTab = useFeatureFactoryStore((state) => state.setExplorerActiveTab);
   const setExplorerSelectedFeatures = useFeatureFactoryStore((state) => state.setExplorerSelectedFeatures);
 
+  // 允許使用者在沒有進行中任務時手動輸入 task ID 瀏覽歷史結果
+  const [manualTaskId, setManualTaskId] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const taskId: string = propTaskId || manualTaskId;
+
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryCache, setSummaryCache] = useState<Record<string, FeatureSummary>>({});
-  const hasCachedSummary = Boolean(summaryCache[taskId]);
+  const hasCachedSummary = Boolean(taskId && summaryCache[taskId]);
   // 只有在任務已完成（或未傳 taskStatus）時才允許載入
   const isTaskReady = !taskStatus || taskStatus === 'completed';
 
   useEffect(() => {
+    if (!taskId) return;
     if (explorerTaskId !== taskId) {
       setExplorerTaskId(taskId);
       setExplorerSelectedFeatures([]);
@@ -55,7 +61,7 @@ export default function FeatureExplorer({ taskId, taskStatus }: FeatureExplorerP
 
   useEffect(() => {
     let active = true;
-    if (hasCachedSummary || !isTaskReady) {
+    if (!taskId || hasCachedSummary || !isTaskReady) {
       return;
     }
 
@@ -81,30 +87,58 @@ export default function FeatureExplorer({ taskId, taskStatus }: FeatureExplorerP
     };
   }, [browseSummary, taskId, hasCachedSummary, isTaskReady]);
 
-  const summary = useMemo(() => summaryCache[taskId] || explorerSummary, [summaryCache, taskId, explorerSummary]);
+  const summary = useMemo(() => (taskId ? summaryCache[taskId] : null) || explorerSummary, [summaryCache, taskId, explorerSummary]);
 
-  // ——— 生成中：顯示等待狀態 ———
-  if (!isTaskReady) {
-    return (
-      <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-3">
-        <div className="text-lg font-semibold text-slate-100">Feature Explorer</div>
+  return (
+    <div className="glass-panel rounded-2xl p-6 space-y-4">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div className="flex-1">
+          <div className="text-lg font-semibold text-slate-100">Feature Explorer</div>
+          {taskId
+            ? <div className="text-xs text-slate-400">Task: {taskId}</div>
+            : <div className="text-xs text-slate-500">尚無進行中的任務，可貼入 Task ID 瀏覽歷史結果</div>
+          }
+        </div>
+        {/* 手動輸入 Task ID（無進行中任務時顯示） */}
+        {!propTaskId && (
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={manualTaskId}
+              onChange={(e) => setManualTaskId(e.target.value.trim())}
+              placeholder="貼入 Task ID…"
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
+            />
+            {manualTaskId && (
+              <button
+                type="button"
+                onClick={() => { setManualTaskId(''); setSummaryError(null); }}
+                className="text-slate-500 hover:text-slate-300 text-xs"
+              >✕</button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ——— 生成中：顯示等待狀態 ——— */}
+      {!isTaskReady && (
         <div className="flex items-center gap-3 text-slate-400 text-sm">
           <span className="inline-block w-4 h-4 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin shrink-0" />
           特徵生成中，完成後自動載入…
         </div>
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div className="glass-panel rounded-2xl p-6 space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-2">
-        <div>
-          <div className="text-lg font-semibold text-slate-100">Feature Explorer</div>
-          <div className="text-xs text-slate-400">Task: {taskId}</div>
+      {/* ——— 無任務且無手動輸入：空白提示 ——— */}
+      {!taskId && (
+        <div className="rounded-xl border border-white/5 bg-white/3 p-6 text-center text-xs text-slate-500">
+          生成特徵後結果將自動顯示，或貼入過去的 Task ID 直接瀏覽
         </div>
-      </div>
+      )}
 
+      {/* ——— 有 taskId 且任務已完成：顯示 Tabs 與內容 ——— */}
+      {taskId && isTaskReady && (
+        <>
       <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => (
           <button
@@ -145,6 +179,8 @@ export default function FeatureExplorer({ taskId, taskStatus }: FeatureExplorerP
         {explorerActiveTab === 'distribution' && <FeatureDistributionChart taskId={taskId} />}
         {explorerActiveTab === 'nan' && <NaNPatternChart taskId={taskId} />}
       </div>
+        </>
+      )}
     </div>
   );
 }

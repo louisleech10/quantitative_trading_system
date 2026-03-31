@@ -86,6 +86,12 @@ class TailRiskIndicatorEngine:
 
         return metadata
 
+    def get_data_warnings(self, data: pd.DataFrame) -> List[str]:
+        """回傳此引擎在給定資料上可能遇到的缺欄位警告。"""
+        if "close" not in data.columns:
+            return ["尾部風險：缺少 close 欄位，整個引擎已跳過"]
+        return []
+
     def _meta(self, indicator: str, params: Dict) -> Dict:
         return {
             "layer": "layer1",

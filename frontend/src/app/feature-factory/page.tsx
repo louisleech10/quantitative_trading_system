@@ -7,7 +7,6 @@ import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import ConfigPanel from '@/components/feature-factory/ConfigPanel';
 import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKlineDownloadPanel';
 import PreviewPanel from '@/components/feature-factory/PreviewPanel';
-import NLInputBox from '@/components/feature-factory/NLInputBox';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
 import AutoResearchPanel from '@/components/feature-factory/AutoResearchPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
@@ -54,7 +53,6 @@ export default function FeatureFactoryPage() {
     previewConfig,
     startGeneration,
     startBatchGeneration,
-    requestNL2Config,
     loadTaskResult,
   } = useFeatureFactory();
 
@@ -235,6 +233,25 @@ export default function FeatureFactoryPage() {
           </div>
         )}
 
+        {currentTask?.status === 'completed' &&
+          currentTask.compute_warnings &&
+          currentTask.compute_warnings.length > 0 && (
+            <div className="glass-panel rounded-xl p-4 border border-amber-400/30 space-y-2">
+              <div className="flex items-center gap-2 font-medium text-amber-300">
+                <AlertCircle className="w-5 h-5" />
+                <span>計算警告（{currentTask.compute_warnings.length} 項）— 部分指標因數據源缺失而降級或跳過</span>
+              </div>
+              <ul className="space-y-1 text-sm text-amber-100/80">
+                {currentTask.compute_warnings.map((w, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="mt-0.5 shrink-0 text-amber-400">•</span>
+                    <span>{w}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <div className="space-y-6">
             <FeatureKlineDownloadPanel onDownloadComplete={refreshFeatureKlineSymbols} />
@@ -263,18 +280,13 @@ export default function FeatureFactoryPage() {
           <div className="space-y-6">
             <LayerPanel schema={schema} />
             <PreviewPanel preview={preview} />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <NLInputBox onSubmit={requestNL2Config} />
-              <ExportButtons
-                config={config}
-                taskId={currentTask?.task_id}
-                symbol={normalizedSymbols[0] ?? symbol}
-                timeframe={timeframe}
-              />
-            </div>
-            {currentTask && (
-              <FeatureExplorer taskId={currentTask.task_id} taskStatus={currentTask.status} />
-            )}
+            <ExportButtons
+              config={config}
+              taskId={currentTask?.task_id}
+              symbol={normalizedSymbols[0] ?? symbol}
+              timeframe={timeframe}
+            />
+            <FeatureExplorer taskId={currentTask?.task_id} taskStatus={currentTask?.status} />
             {(batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
               batchSuccessSymbols.length > 0 && (
                 <>

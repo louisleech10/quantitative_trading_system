@@ -75,6 +75,33 @@ class MicrostructureIndicatorEngine:
         metadata["ms_ofi_raw"] = self._meta("ofi_raw", {})
         return metadata
 
+    def get_data_warnings(self, data: pd.DataFrame) -> List[str]:
+        """回傳此引擎在給定資料上可能遇到的缺欄位警告。"""
+        warns: List[str] = []
+        ef = self.enabled_features
+        ofi_enabled = ef == "all" or "ofi" in ef
+        if ofi_enabled:
+            if "taker_ratio" not in data.columns and "taker_buy_volume" not in data.columns:
+                warns.append(
+                    "微觀結構 OFI：缺少 taker_ratio 與 taker_buy_volume，指標已跳過"
+                    "（請在數據源設定中啟用 taker_ratio）"
+                )
+            elif "taker_ratio" not in data.columns:
+                warns.append(
+                    "微觀結構 OFI：缺少 taker_ratio，已改用 taker_buy_volume / volume 近似（精度較低）"
+                )
+        ltr_enabled = ef == "all" or "large_trade_ratio" in ef
+        if ltr_enabled and "trades" not in data.columns:
+            warns.append(
+                "微觀結構 Large Trade Ratio：缺少 trades 欄位，特徵輸出全為 NaN"
+            )
+        amihud_enabled = ef == "all" or "amihud" in ef
+        if amihud_enabled and "quote_volume" not in data.columns:
+            warns.append(
+                "微觀結構 Amihud：缺少 quote_volume，已改用 close × volume 代替（精度較低）"
+            )
+        return warns
+
     def _meta(self, indicator: str, params: Dict) -> Dict:
         return {
             "layer": "layer1",

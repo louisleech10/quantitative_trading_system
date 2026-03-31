@@ -410,6 +410,9 @@ export default function LayerPanel({ schema }: LayerPanelProps) {
   const handleLayerToggle = useCallback(
     (layerKey: LayerKey, enabled: boolean) => {
       switch (layerKey) {
+        case 'layer2':
+          updateConfigPartial({ operators: { ...(config?.operators ?? {}), enabled } });
+          break;
         case 'layer3':
           updateConfigPartial({ rolling_aggregation: { ...(config?.rolling_aggregation ?? {}), enabled } });
           break;
@@ -437,6 +440,7 @@ export default function LayerPanel({ schema }: LayerPanelProps) {
       if (!schema) return true;
       const layer = schema.layers[layerKey];
       if (!layer) return true;
+      if (layerKey === 'layer2') return (config?.operators?.enabled as boolean | undefined) !== false;
       if (layerKey === 'layer3') return config?.rolling_aggregation?.enabled !== false;
       if (layerKey === 'layer4') return config?.lag_features?.enabled !== false;
       if (layerKey === 'layer5') return config?.cross_sectional?.enabled === true;
@@ -563,6 +567,36 @@ const CATEGORY_LABELS: Record<string, string> = {
   microstructure: '微觀結構', entropy: '資訊熵', tail_risk: '尾部風險',
 };
 
+const LAYER1_ENGINE_TOOLTIPS: Record<string, string> = {
+  microstructure:
+    '量化市場微觀結構，衡量流動性與交易摩擦成本\n\n指標與數據源：\n' +
+    '• Amihud 流動性（close, volume/quote_volume）\n  → 值越高，流動性越差、衝擊成本越大\n' +
+    '• Kyle Lambda（close, volume）\n  → 每單位成交量造成的價格衝擊\n' +
+    '• Roll 隱含價差（close）\n  → 從序列共變異數估計買賣價差\n' +
+    '• CS 價差（high, low）\n  → 從高低價估計買賣價差\n' +
+    '• OFI 訂單流失衡（taker_ratio 必要，範圍 -1~+1）\n  → 正值=買方主導；負值=賣方主導\n' +
+    '• Large Trade Ratio（quote_volume, trades）\n  → >1 機構資金入場訊號\n' +
+    '• VPIN 知情交易概率（close, volume，範圍 0~1）\n  → 越高，知情交易風險越高',
+
+  entropy:
+    '量化價格序列的可預測性與複雜度\n\n指標與數據源：\n' +
+    '• Shannon 熵（close_return, volume, taker_ratio）\n  → 值越低，序列規律性越強（可預測）\n' +
+    '• 近似熵 ApEn（close_return）\n  → 值越低，序列越可預測\n' +
+    '• 樣本熵 SampEn（close_return）\n  → 比 ApEn 更穩健，低=可預測\n' +
+    '• Hurst 指數（close_return，範圍 0~1）\n  → >0.5 動量持續；<0.5 均值回歸；≈0.5 隨機遊走\n' +
+    '• 碎形維度（close_return，範圍 1~2）\n  → ≈1 強趨勢；≈1.5 隨機；≈2 高頻震盪\n' +
+    '• 排列熵（close_return，範圍 0~1）\n  → 越高，序列越隨機',
+
+  tail_risk:
+    '量化報酬分布的極端風險與偏態特性\n\n指標與數據源：\n' +
+    '• CVaR 條件風險值（close）\n  → 超過 VaR 的平均損失；負值越大，尾部風險越高\n' +
+    '• RV 分解 上行/下行/RSJ（close）\n  → RSJ>0 正偏態（漲多跌少）；RSJ<0 負偏態\n' +
+    '• 上下行波動比（close）\n  → >1 表示上漲波動大於下跌波動\n' +
+    '• 利潤概率比 GPR（close）\n  → >1 正期望值；<1 負期望值\n' +
+    '• JB 常態性統計量（close）\n  → 越大，偏離常態分布越嚴重\n' +
+    '• 最大回撤 MDD（close，範圍 0~-∞）\n  → 近 0 表示近期無大回撤',
+};
+
 function LayerContent({
   schema,
   config,
@@ -584,7 +618,7 @@ function LayerContent({
   const layer = schema.layers[layerKey];
   if (!layer) return <div className="text-xs text-slate-500">未知 Layer</div>;
 
-  const showLayerToggle = ['layer3', 'layer4', 'layer5', 'layer6', 'layer6_5'].includes(layerKey);
+  const showLayerToggle = ['layer2', 'layer3', 'layer4', 'layer5', 'layer6', 'layer6_5'].includes(layerKey);
 
   return (
     <div className="space-y-3">
@@ -742,6 +776,7 @@ function Layer1Content({
             layerDisabled={layerDisabled}
             featureCount={preview?.breakdown?.[catKey]}
             searchFilter={searchFilter}
+            engineTooltip={LAYER1_ENGINE_TOOLTIPS[catKey]}
             onCategoryToggle={(enabled) => onCategoryToggle(catKey, enabled)}
             onItemToggle={(name, enabled) => onItemToggle(catKey, name, enabled)}
             onSelectAll={() => onSelectAll(catKey, true)}
@@ -770,7 +805,10 @@ function Layer2Content({
     <div className={`space-y-0.5 ${layerDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="grid grid-cols-3 gap-1">
         {Object.entries(operators).map(([name, op]) => {
-          const enabled = config?.operators?.[name]?.enabled ?? op.enabled;
+          const enabled =
+            (config?.operators?.[name] && typeof config.operators![name] === 'object'
+              ? (config.operators![name] as { enabled?: boolean }).enabled
+              : undefined) ?? op.enabled;
           const rich = RICH_DESCRIPTIONS.layer2?.[name];
           const displayDesc = rich?.short || op.description;
           const tooltipText = rich?.detail || op.description;

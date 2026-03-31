@@ -74,6 +74,7 @@ export function useFeatureFactory() {
     setIndicators,
     setPreview,
     setCurrentTask,
+    updateCurrentTaskPartial,
     setIsGenerating,
     setIsPreviewLoading,
     setError,
@@ -213,12 +214,16 @@ export function useFeatureFactory() {
       try {
         const result = await requestJson<FeatureGenerationResult>(`/result/${taskId}`);
         setFeatureList(result.feature_names || []);
+        const warnings = result.metadata?.compute_warnings;
+        if (warnings && warnings.length > 0) {
+          updateCurrentTaskPartial({ compute_warnings: warnings });
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : '結果載入失敗';
         setError(message);
       }
     },
-    [setFeatureList, setError]
+    [setFeatureList, setError, updateCurrentTaskPartial]
   );
 
   const browseFeatures = useCallback(

@@ -181,139 +181,128 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
     }
   };
 
+  const btnBase = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 hover:bg-white/10 transition whitespace-nowrap disabled:opacity-50';
+
   return (
-    <div id="feature-factory-export-target" className="glass-panel rounded-2xl p-6 space-y-4">
-      <div>
-        <div className="text-lg font-semibold text-slate-100">匯出</div>
-        <div className="text-xs text-slate-400">快速保存當前設定與特徵清單</div>
-      </div>
-
-      <div className="space-y-3">
-        <button
-          onClick={exportConfig}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition"
-        >
-          <Download className="w-4 h-4" />
-          匯出 Config
-        </button>
-        <button
-          onClick={exportFeatureList}
-          disabled={!featureList.length}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" />
-          匯出特徵清單
-        </button>
-
-        <div className="text-xs text-slate-400 pt-2">數據（需先完成生成）</div>
-        <div className="grid grid-cols-1 gap-2">
-          <button
-            onClick={exportCsv}
-            disabled={!canExportData || isDownloading}
-            title={canExportData ? '匯出特徵 CSV' : '請先完成特徵生成任務'}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            匯出特徵 CSV
-          </button>
-          <button
-            onClick={exportJson}
-            disabled={!canExportData || isDownloading}
-            title={canExportData ? '匯出 AI JSON' : '請先完成特徵生成任務'}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            匯出 AI JSON
-          </button>
-          <button
-            onClick={exportMarkdown}
-            disabled={!canExportData || isDownloading}
-            title={canExportData ? '匯出 Markdown 報告' : '請先完成特徵生成任務'}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            匯出 Markdown 報告
-          </button>
-          <button
-            onClick={exportPng}
-            disabled={!canExportData || isDownloading}
-            title={canExportData ? '匯出 PNG' : '請先完成特徵生成任務'}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100 hover:bg-white/10 transition disabled:opacity-50"
-          >
-            <Download className="w-4 h-4" />
-            匯出 PNG
-          </button>
+    <div id="feature-factory-export-target" className="glass-panel rounded-2xl p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-sm font-semibold text-slate-100">匯出</span>
+          <span className="ml-2 text-xs text-slate-400">快速保存當前設定與特徵清單</span>
         </div>
-
-        <div className="pt-2 space-y-2">
-          <div className="text-xs text-slate-400">CSV 選項</div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <select
-              value={csvColumns}
-              onChange={(event) => setCsvColumns(event.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-slate-100"
-            >
-              <option value="all">欄位：全部</option>
-              <option value="ms_amihud_illiq_21,ent_shannon_close_return_21,tr_cvar_5pct_21">欄位：示例三欄</option>
-            </select>
-            <select
-              value={csvMaxRows}
-              onChange={(event) => setCsvMaxRows(event.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-slate-100"
-            >
-              <option value="all">行數：全部</option>
-              <option value="100">行數：100</option>
-              <option value="500">行數：500</option>
-              <option value="1000">行數：1000</option>
-            </select>
-          </div>
-          <label className="inline-flex items-center gap-2 text-xs text-slate-300">
-            <input
-              type="checkbox"
-              checked={includeMetadataHeader}
-              onChange={(event) => setIncludeMetadataHeader(event.target.checked)}
-            />
-            包含 Metadata header
-          </label>
-          <label className="inline-flex items-center gap-2 text-xs text-slate-300">
-            <input
-              type="checkbox"
-              checked={includeDatasource}
-              onChange={(event) => setIncludeDatasource(event.target.checked)}
-            />
-            包含原始數據源欄位（OHLCV 等）
-          </label>
-        </div>
-
-        <div className="pt-2 space-y-2">
-          <div className="text-xs text-slate-400">Markdown 選項</div>
-          <div className="space-y-2">
-            <div className="text-xs text-slate-300">Token 預算：{tokenBudget}</div>
-            <input
-              type="range"
-              min={500}
-              max={32000}
-              step={100}
-              value={tokenBudget}
-              onChange={(event) => setTokenBudget(Number(event.target.value))}
-              className="w-full"
-            />
-            <select
-              value={language}
-              onChange={(event) => setLanguage(event.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
-            >
-              <option value="zh-TW">zh-TW</option>
-              <option value="en">en</option>
-            </select>
-          </div>
-        </div>
-
         {downloadError && (
-          <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+          <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">
             {downloadError}
           </div>
         )}
+      </div>
+
+      {/* 按鈕列 */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* 設定類 */}
+        <button onClick={exportConfig} className={btnBase}>
+          <Download className="w-3.5 h-3.5" />匯出 Config
+        </button>
+        <button onClick={exportFeatureList} disabled={!featureList.length} className={btnBase}>
+          <Download className="w-3.5 h-3.5" />匯出特徵清單
+        </button>
+
+        <div className="h-4 w-px bg-white/10 mx-1" aria-hidden />
+
+        {/* 數據類（需先完成生成） */}
+        <button
+          onClick={exportCsv}
+          disabled={!canExportData || isDownloading}
+          title={canExportData ? '匯出特徵 CSV' : '請先完成特徵生成任務'}
+          className={btnBase}
+        >
+          <Download className="w-3.5 h-3.5" />CSV
+        </button>
+        <button
+          onClick={exportJson}
+          disabled={!canExportData || isDownloading}
+          title={canExportData ? '匯出 AI JSON' : '請先完成特徵生成任務'}
+          className={btnBase}
+        >
+          <Download className="w-3.5 h-3.5" />AI JSON
+        </button>
+        <button
+          onClick={exportMarkdown}
+          disabled={!canExportData || isDownloading}
+          title={canExportData ? '匯出 Markdown 報告' : '請先完成特徵生成任務'}
+          className={btnBase}
+        >
+          <Download className="w-3.5 h-3.5" />Markdown
+        </button>
+        <button
+          onClick={exportPng}
+          disabled={!canExportData || isDownloading}
+          title={canExportData ? '匯出 PNG' : '請先完成特徵生成任務'}
+          className={btnBase}
+        >
+          <Download className="w-3.5 h-3.5" />PNG
+        </button>
+        {!canExportData && (
+          <span className="text-[10px] text-slate-500">（CSV / JSON / Markdown / PNG 需先完成生成）</span>
+        )}
+      </div>
+
+      {/* 選項列 */}
+      <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1 border-t border-white/5">
+        {/* CSV 選項 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] text-slate-400 shrink-0">CSV：</span>
+          <select
+            value={csvColumns}
+            onChange={(e) => setCsvColumns(e.target.value)}
+            className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-100"
+          >
+            <option value="all">欄位：全部</option>
+            <option value="ms_amihud_illiq_21,ent_shannon_close_return_21,tr_cvar_5pct_21">欄位：示例三欄</option>
+          </select>
+          <select
+            value={csvMaxRows}
+            onChange={(e) => setCsvMaxRows(e.target.value)}
+            className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-100"
+          >
+            <option value="all">行數：全部</option>
+            <option value="100">100 行</option>
+            <option value="500">500 行</option>
+            <option value="1000">1000 行</option>
+          </select>
+          <label className="inline-flex items-center gap-1 text-[11px] text-slate-300">
+            <input type="checkbox" checked={includeMetadataHeader} onChange={(e) => setIncludeMetadataHeader(e.target.checked)} className="accent-cyan-400" />
+            Metadata header
+          </label>
+          <label className="inline-flex items-center gap-1 text-[11px] text-slate-300">
+            <input type="checkbox" checked={includeDatasource} onChange={(e) => setIncludeDatasource(e.target.checked)} className="accent-cyan-400" />
+            原始數據源欄位
+          </label>
+        </div>
+
+        {/* Markdown 選項 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] text-slate-400 shrink-0">Markdown：</span>
+          <span className="text-[11px] text-slate-300 shrink-0">Token {tokenBudget}</span>
+          <input
+            type="range"
+            min={500}
+            max={32000}
+            step={100}
+            value={tokenBudget}
+            onChange={(e) => setTokenBudget(Number(e.target.value))}
+            className="w-28"
+          />
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[11px] text-slate-100"
+          >
+            <option value="zh-TW">zh-TW</option>
+            <option value="en">en</option>
+          </select>
+        </div>
       </div>
     </div>
   );

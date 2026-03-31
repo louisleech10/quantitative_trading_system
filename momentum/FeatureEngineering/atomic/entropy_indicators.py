@@ -89,6 +89,19 @@ class EntropyIndicatorEngine:
 
         return metadata
 
+    def get_data_warnings(self, data: pd.DataFrame) -> List[str]:
+        """回傳此引擎在給定資料上可能遇到的缺欄位警告。"""
+        warns: List[str] = []
+        for source in self.apply_to:
+            if source == "close_return":
+                continue  # close 由 _BASE_OHLCV 保證一定存在
+            if source not in data.columns:
+                warns.append(
+                    f"資訊熵 Shannon：數據源 '{source}' 不在資料欄位中，已跳過"
+                    f"（請確認 data_sources.enabled_sources 包含 '{source}'）"
+                )
+        return warns
+
     def _meta(self, indicator: str, source: str, params: Dict) -> Dict:
         return {
             "layer": "layer1",

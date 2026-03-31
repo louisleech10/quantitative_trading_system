@@ -187,7 +187,10 @@ export interface FeatureFactoryConfig {
       data_sources?: string[] | null;
     }
   >;
-  operators?: Record<string, { enabled: boolean; [key: string]: unknown }>;
+  operators?: {
+    enabled?: boolean;
+    [key: string]: { enabled: boolean; [key: string]: unknown } | boolean | undefined;
+  };
   rolling_aggregation?: {
     enabled?: boolean;
     windows: number[];
@@ -418,6 +421,7 @@ export interface FeatureTask {
   current_stage: string | null;
   completed_stages: string[];
   error: string | null;
+  compute_warnings?: string[];
 }
 
 export interface FeatureFactoryPreset {
@@ -449,6 +453,12 @@ export interface FeatureNLResult {
 
 export interface FeatureGenerationResult {
   feature_names?: string[];
+  metadata?: {
+    compute_warnings?: string[];
+    feature_count?: number;
+    layer_counts?: Record<string, number>;
+    [key: string]: unknown;
+  };
 }
 
 export type ExplorerTab =

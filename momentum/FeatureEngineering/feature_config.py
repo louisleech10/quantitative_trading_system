@@ -134,7 +134,7 @@ class EntropyConfig(BaseModel):
     use_numba: bool = True
     perm_m: int = 3
     perm_windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
-    apply_to: List[str] = Field(default_factory=lambda: ["close_return"])
+    apply_to: List[str] = Field(default_factory=lambda: ["close_return", "volume", "taker_ratio"])
     shannon_windows: List[int] = Field(default_factory=lambda: [21, 55, 100])
 
     @field_validator("perm_m")
@@ -164,7 +164,7 @@ class TailRiskConfig(BaseModel):
 
 class WinsorConfig(BaseModel):
     enabled: bool = True
-    method: str = "sigma"
+    method: str = "quantile"
     sigma_k: float = 3.0
     quantile_range: List[float] = Field(default_factory=lambda: [0.01, 0.99])
     apply_to: Union[str, List[str]] = "all"
@@ -172,7 +172,8 @@ class WinsorConfig(BaseModel):
 
 class ADFDifferencingConfig(BaseModel):
     enabled: bool = False
-    adf_threshold: float = 0.05
+    # 0.10 為業界常用顯著水準；金融序列難以通過嚴格的 0.05（如長週期 EMA）
+    adf_threshold: float = 0.10
     max_diff: int = 2
     sample_size: int = 500
     apply_to: str = "non_stationary"
@@ -181,7 +182,8 @@ class ADFDifferencingConfig(BaseModel):
 class FractionalDifferencingConfig(BaseModel):
     enabled: bool = False
     d_range: List[float] = Field(default_factory=lambda: [0.0, 1.0])
-    adf_threshold: float = 0.05
+    # 0.10 同上，避免長週期 EMA（EMA_89/100）在 d*=1.0 仍無法通過 0.05 檢定
+    adf_threshold: float = 0.10
     weight_threshold: float = 1e-5
     precision: float = 0.01
     apply_to: str = "non_stationary"
@@ -209,7 +211,9 @@ class AdaptiveZScoreConfig(BaseModel):
 
 class PreprocessingConfig(BaseModel):
     enabled: bool = False
-    mode: str = "append"
+    # replace：原地覆蓋，確保跨標的欄位名稱一致（業界標準）
+    # append 會產生 _diff1/_diff2/_fracdiff，不同標的欄位名可能不同 → 多標的訓練 schema 錯誤
+    mode: str = "replace"
     winsorization: WinsorConfig = Field(default_factory=WinsorConfig)
     adf_differencing: ADFDifferencingConfig = Field(default_factory=ADFDifferencingConfig)
     fractional_differencing: FractionalDifferencingConfig = Field(default_factory=FractionalDifferencingConfig)
@@ -269,6 +273,7 @@ class WorldQuantToggle(OperatorToggle):
 
 
 class OperatorConfig(BaseModel):
+    enabled: bool = True
     distance: OperatorToggle = Field(default_factory=OperatorToggle)
     cross: OperatorToggle = Field(default_factory=OperatorToggle)
     momentum_change: OperatorToggle = Field(default_factory=OperatorToggle, alias="momentum")

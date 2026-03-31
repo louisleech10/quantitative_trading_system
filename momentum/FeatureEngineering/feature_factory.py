@@ -56,6 +56,11 @@ class FeatureGenerationResult:
     layer_counts: Dict[str, int]
     config_used: Dict
     hdf5_path: Optional[str] = None
+    compute_warnings: List[str] = None
+
+    def __post_init__(self):
+        if self.compute_warnings is None:
+            self.compute_warnings = []
 
 
 class FeatureFactory:
@@ -151,6 +156,7 @@ class FeatureFactory:
 
         self._current_raw_data = raw_data
 
+        compute_warnings = self._collect_layer1_warnings(raw_data, config)
         layer1 = self._safe_execute("Layer 1", self._layer1_atomic_indicators, raw_data, config)
         layer2 = self._safe_execute("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
         layer3 = self._safe_execute("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
@@ -173,6 +179,7 @@ class FeatureFactory:
             config,
             time.time() - start_time,
             config_hash,
+            compute_warnings=compute_warnings,
         )
         return result
 
@@ -365,6 +372,28 @@ class FeatureFactory:
 
     # ── Strategy A: Centralized filter helpers ─────────────────────────
 
+    def _collect_layer1_warnings(self, data: pd.DataFrame, config: "FactoryConfig") -> List[str]:
+        """在 Layer 1 執行前，預先檢查各進階引擎的必要欄位，回傳使用者可見的警告訊息清單。"""
+        warnings: List[str] = []
+        ai = config.atomic_indicators
+
+        if ai.microstructure.enabled:
+            ms_cfg = self._filter_advanced_config(ai.microstructure)
+            engine = MicrostructureIndicatorEngine(ms_cfg, [])
+            warnings.extend(engine.get_data_warnings(data))
+
+        if ai.entropy.enabled:
+            ent_cfg = self._filter_advanced_config(ai.entropy)
+            engine = EntropyIndicatorEngine(ent_cfg, [])
+            warnings.extend(engine.get_data_warnings(data))
+
+        if ai.tail_risk.enabled:
+            tr_cfg = self._filter_advanced_config(ai.tail_risk)
+            engine = TailRiskIndicatorEngine(tr_cfg, [])
+            warnings.extend(engine.get_data_warnings(data))
+
+        return warnings
+
     @staticmethod
     def _filter_category_config(cat_cfg: Any) -> Optional[dict]:
         """Filter a CategoryConfig to only include enabled indicators.
@@ -431,6 +460,8 @@ class FeatureFactory:
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
     ) -> pd.DataFrame:
         if layer1.empty:
+            return pd.DataFrame(index=layer1.index)
+        if not getattr(config.operators, 'enabled', True):
             return pd.DataFrame(index=layer1.index)
 
         filtered_ops = self._filter_operators_config(config.operators)
@@ -646,6 +677,7 @@ class FeatureFactory:
         config: "FactoryConfig",
         elapsed: float,
         config_hash: str,
+        compute_warnings: Optional[List[str]] = None,
     ) -> FeatureGenerationResult:
         features_df = self._combine_layers(layers, context="layer7_final")
         features_df = features_df.reindex(raw_data.index)
@@ -677,6 +709,7 @@ class FeatureFactory:
             "layer_counts": layer_counts,
             "config_hash": config_hash,
             "generation_time": float(elapsed),
+            "compute_warnings": compute_warnings or [],
             "symbol": symbol,
             "timeframe": timeframe,
             "data_range": data_range,
@@ -691,6 +724,7 @@ class FeatureFactory:
             generation_time=float(elapsed),
             layer_counts=layer_counts,
             config_used=config.model_dump(by_alias=True),
+            compute_warnings=compute_warnings or [],
         )
 
         validation = self._validator.validate_factory_output(result)

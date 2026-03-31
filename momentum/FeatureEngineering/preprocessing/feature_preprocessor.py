@@ -43,7 +43,8 @@ class FeaturePreprocessor:
         self.zscore_config = self._config.get("adaptive_zscore", {})
         self.winsor_config = self._config.get("winsorization", {})
         self.fracdiff_config = self._config.get("fractional_differencing", {})
-        self.mode = self._config.get("mode", "append")
+        # 預設 replace：確保跨標的欄位名稱一致
+        self.mode = self._config.get("mode", "replace")
 
         self._fracdiff_processed_columns: set[str] = set()
 
@@ -127,6 +128,10 @@ class FeaturePreprocessor:
         adf_threshold = float(self.fracdiff_config.get("adf_threshold", 0.05))
         weight_threshold = float(self.fracdiff_config.get("weight_threshold", 1e-5))
         precision = float(self.fracdiff_config.get("precision", 0.01))
+        # 限制 weight 寬度：最多序列長度的 10%（上限 252），避免 d≈0.5 時產生大量 NaN
+        max_lag = int(self.fracdiff_config.get("max_lag", 0))
+        if max_lag <= 0:
+            max_lag = min(max(2, len(df) // 10), 252)
 
         cache = {}
         if self.fracdiff_config.get("cache_d_star", True):
@@ -147,13 +152,14 @@ class FeaturePreprocessor:
                         adf_threshold=adf_threshold,
                         d_range=(float(d_range[0]), float(d_range[1])),
                         precision=precision,
+                        max_lag=max_lag,
                     )
                     cache[column] = d_star
             except Exception as exc:
                 logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
                 d_star = 1.0
 
-            frac = self._frac_diff_ffd(series, d_star, threshold=weight_threshold)
+            frac = self._frac_diff_ffd(series, d_star, threshold=weight_threshold, max_width=max_lag)
 
             if self.mode == "replace":
                 result[column] = frac
@@ -395,30 +401,57 @@ class FeaturePreprocessor:
         return non_stationary
 
     @staticmethod
-    def _get_weights_ffd(d: float, threshold: float = 1e-5) -> np.ndarray:
+    def _get_weights_ffd(d: float, threshold: float = 1e-5, max_width: int = 0) -> np.ndarray:
+        """計算 FFD 權重序列。
+
+        max_width > 0 時強制截斷，防止 d ≈ 0.5 時產生幾百個權重（導致同等數量的 NaN）。
+        """
         weights = [1.0]
         k = 1
         while True:
             w = -weights[-1] * (d - k + 1) / k
             if abs(w) < threshold:
                 break
+            if max_width > 0 and len(weights) >= max_width:
+                break
             weights.append(w)
             k += 1
         return np.array(weights[::-1], dtype=np.float64)
 
     @staticmethod
-    def _frac_diff_ffd(series: pd.Series, d: float, threshold: float = 1e-5) -> pd.Series:
+    def _frac_diff_ffd(
+        series: pd.Series,
+        d: float,
+        threshold: float = 1e-5,
+        max_width: int = 0,
+    ) -> pd.Series:
+        """Fixed-Width Window Fractional Differencing。
+
+        只對第一個有效值之後的區間做卷積，初始 NaN 區間（如 EMA warmup）
+        保持 NaN，不做 bfill，避免常數區差分後出現假 0 值。
+        """
         values = series.astype(float)
-        weights = FeaturePreprocessor._get_weights_ffd(d, threshold)
+        weights = FeaturePreprocessor._get_weights_ffd(d, threshold, max_width=max_width)
         width = len(weights)
 
-        if len(values) < width:
-            return pd.Series(np.nan, index=series.index)
+        out = np.full(len(values), np.nan, dtype=np.float64)
 
-        filled = values.ffill().bfill().to_numpy(dtype=np.float64)
-        conv = np.convolve(filled, weights, mode="valid")
-        out = np.full(len(filled), np.nan, dtype=np.float64)
-        out[width - 1 :] = conv
+        # 找第一個有效位置，避免 bfill 把 EMA warmup NaN 填成常數
+        arr = values.to_numpy(dtype=np.float64)
+        valid_mask = ~np.isnan(arr)
+        if valid_mask.sum() < width:
+            return pd.Series(out, index=series.index)
+
+        first_valid = int(np.argmax(valid_mask))
+        # 只在有效區間內做 ffill（處理中途偶發 NaN）
+        valid_slice = pd.Series(arr[first_valid:], dtype=float).ffill().to_numpy(dtype=np.float64)
+
+        if len(valid_slice) < width:
+            return pd.Series(out, index=series.index)
+
+        conv = np.convolve(valid_slice, weights, mode="valid")
+        # 結果起始位置：first_valid + width - 1
+        out[first_valid + width - 1 : first_valid + len(valid_slice)] = conv
         return pd.Series(out, index=series.index)
 
     def _find_min_d(
@@ -427,6 +460,7 @@ class FeaturePreprocessor:
         adf_threshold: float = 0.05,
         d_range: Tuple[float, float] = (0.0, 1.0),
         precision: float = 0.01,
+        max_lag: int = 0,
     ) -> float:
         if not HAS_STATSMODELS:
             return 1.0
@@ -439,7 +473,12 @@ class FeaturePreprocessor:
         best = right
 
         def _is_stationary(d_value: float) -> bool:
-            frac = self._frac_diff_ffd(clean, d_value, threshold=float(self.fracdiff_config.get("weight_threshold", 1e-5)))
+            frac = self._frac_diff_ffd(
+                clean,
+                d_value,
+                threshold=float(self.fracdiff_config.get("weight_threshold", 1e-5)),
+                max_width=max_lag,
+            )
             frac_clean = frac.dropna()
             if len(frac_clean) < 20:
                 return False

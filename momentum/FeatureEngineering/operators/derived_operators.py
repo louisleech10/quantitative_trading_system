@@ -190,12 +190,24 @@ class DerivedOperatorEngine:
             return pd.DataFrame(index=layer1_df.index)
         return pd.concat(frames, axis=1)
 
+    # Multipliers used for cross-scale pairing.
+    # For each parameter X, we look for a "slow" partner near m*X (m in this list).
+    # Selection rule: nearest available param >= m*X (minimum gap, must be strictly larger).
+    # Example: EMA_5 → 3x≥15→20, 5x≥25→34, 10x≥50→50, 20x≥100→100, 40x≥200→200
+    _PAIR_MULTIPLIERS: List[int] = [3, 5, 10, 20, 40]
+
     def _apply_pair_operator(
         self,
         layer1_df: pd.DataFrame,
         feature_info: Dict[str, FeatureInfo],
         operator_name: str,
     ) -> pd.DataFrame:
+        """Pair each feature with cross-scale partners (multiplier-based, not consecutive).
+
+        For each parameter X, find partners at ≥ 3X, ≥ 5X, ≥ 10X, ≥ 20X, ≥ 40X using the
+        nearest available param that satisfies the threshold.  This ensures meaningful
+        signal gap (e.g. EMA_5 vs EMA_20, not EMA_5 vs EMA_8).
+        """
         grouped: Dict[tuple, List[FeatureInfo]] = {}
         for info in feature_info.values():
             if not info.params or len(info.params) != 1:
@@ -206,16 +218,37 @@ class DerivedOperatorEngine:
         frames: List[pd.Series] = []
         for key, infos in grouped.items():
             infos_sorted = sorted(infos, key=lambda item: item.params[0])
-            for fast, slow in zip(infos_sorted[:-1], infos_sorted[1:]):
-                fast_series = self._select_feature_series(layer1_df, fast.name)
-                slow_series = self._select_feature_series(layer1_df, slow.name)
-                if operator_name == "Cross":
-                    series = self.compute_cross(fast_series, slow_series, fast.name)
-                else:
-                    series = self.compute_ratio(fast_series, slow_series, fast.name)
-                param_str = self._format_params([fast.params[0], slow.params[0]])
-                col_name = f"{fast.source}_{fast.category}_{fast.indicator}_{param_str}_{operator_name}"
-                frames.append(series.rename(col_name))
+            all_params: List[float] = [i.params[0] for i in infos_sorted]
+            param_to_info: Dict[float, FeatureInfo] = {i.params[0]: i for i in infos_sorted}
+
+            seen_pairs: set = set()
+            for fast in infos_sorted:
+                x = fast.params[0]
+                for m in self._PAIR_MULTIPLIERS:
+                    threshold = m * x
+                    # Pick nearest param that is >= threshold (must differ from x)
+                    candidates = [p for p in all_params if p >= threshold]
+                    if not candidates:
+                        continue
+                    slow_param = min(candidates)  # nearest-above
+                    pair_key = (x, slow_param)
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
+
+                    slow = param_to_info[slow_param]
+                    fast_series = self._select_feature_series(layer1_df, fast.name)
+                    slow_series = self._select_feature_series(layer1_df, slow.name)
+                    if operator_name == "Cross":
+                        series = self.compute_cross(fast_series, slow_series, fast.name)
+                    else:
+                        series = self.compute_ratio(fast_series, slow_series, fast.name)
+                    param_str = self._format_params([x, slow_param])
+                    col_name = (
+                        f"{fast.source}_{fast.category}_{fast.indicator}"
+                        f"_{param_str}_{operator_name}"
+                    )
+                    frames.append(series.rename(col_name))
 
         if not frames:
             return pd.DataFrame(index=layer1_df.index)

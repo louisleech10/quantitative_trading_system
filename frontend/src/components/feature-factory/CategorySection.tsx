@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronRight, Info } from 'lucide-react';
 import IndicatorCheckbox from './IndicatorCheckbox';
 import { SchemaIndicator } from '@/lib/types';
 
@@ -18,6 +19,8 @@ interface CategorySectionProps {
   featureCount?: number;
   /** Search filter string */
   searchFilter?: string;
+  /** Optional rich tooltip content for the category engine card (Layer 1 engines) */
+  engineTooltip?: string;
   onCategoryToggle: (enabled: boolean) => void;
   onItemToggle: (name: string, enabled: boolean) => void;
   onSelectAll: () => void;
@@ -48,6 +51,7 @@ export default function CategorySection({
   layerDisabled = false,
   featureCount,
   searchFilter,
+  engineTooltip,
   onCategoryToggle,
   onItemToggle,
   onSelectAll,
@@ -55,6 +59,7 @@ export default function CategorySection({
 }: CategorySectionProps) {
   // Default all categories to collapsed for cleaner initial view.
   const [expanded, setExpanded] = useState(false);
+  const [engineTip, setEngineTip] = useState<{ x: number; y: number } | null>(null);
 
   const filteredItems = useMemo(() => {
     if (!searchFilter) return items;
@@ -103,6 +108,30 @@ export default function CategorySection({
         />
 
         <span className="text-xs font-medium text-slate-100 flex-1">{label}</span>
+        {engineTooltip && (
+          <span
+            className="flex items-center px-0.5"
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={(e) => setEngineTip({ x: e.clientX, y: e.clientY })}
+            onMouseMove={(e) => setEngineTip({ x: e.clientX, y: e.clientY })}
+            onMouseLeave={() => setEngineTip(null)}
+          >
+            <Info className="w-3 h-3 text-slate-500 hover:text-cyan-300 cursor-help" />
+          </span>
+        )}
+        {engineTip && engineTooltip &&
+          createPortal(
+            <div
+              className="fixed z-[9999] w-72 rounded-lg border border-white/15 bg-slate-900 px-3 py-2.5 text-[10px] text-slate-200 leading-relaxed shadow-xl pointer-events-none whitespace-pre-wrap"
+              style={{
+                left: Math.min(engineTip.x + 14, window.innerWidth - 304),
+                top: Math.min(engineTip.y + 16, window.innerHeight - 240),
+              }}
+            >
+              {engineTooltip}
+            </div>,
+            document.body
+          )}
         <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${style.badge}`}>
           {level}
         </span>

@@ -9,6 +9,7 @@ from jsonschema import Draft202012Validator
 import yaml
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.feature_config import (
     EntropyConfig,
     FactoryConfig,
@@ -26,6 +27,22 @@ LEGACY_SOURCE_ALIASES = {
     "med_price": "med-price",
     "typ_price": "typ-price",
     "wcl_price": "wcl-price",
+}
+
+# Indicators that return more than one output column per parameter combination.
+# All others default to 1.
+_INDICATOR_OUTPUT_COUNTS: Dict[str, int] = {
+    "MACD":     3,  # Line / Signal / Hist
+    "MACDEXT":  3,
+    "MACDFIX":  3,
+    "BBANDS":   3,  # Upper / Middle / Lower
+    "HT_PHASOR": 2,  # InPhase / Quadrature
+    "HT_SINE":  2,  # Sine / LeadSine
+    "MAMA":     2,  # MAMA / FAMA
+    "STOCH":    2,  # slowk / slowd
+    "STOCHF":   2,  # fastk / fastd
+    "STOCHRSI": 2,  # fastk / fastd
+    "AROON":    2,  # aroondown / aroonup
 }
 
 SPECIAL_CATEGORY_FEATURE_DEFAULTS = {
@@ -269,7 +286,7 @@ class ConfigManager:
         cross_cfg = config_dict.get("cross_sectional", {})
         labels_cfg = config_dict.get("labels", {})
 
-        derived_count = self._estimate_derived_count(atomic_total, operators_cfg)
+        derived_count = self._estimate_derived_count(atomic_total, atomic_counts, operators_cfg)
         rolling_count = self._estimate_rolling_count(atomic_total, rolling_cfg)
         lag_count = self._estimate_lag_count(atomic_total, lag_cfg, config_dict)
         cross_count = self._estimate_cross_count(cross_cfg)
@@ -308,7 +325,7 @@ class ConfigManager:
             + lag_count
             + cross_count
             + meta_count
-            + label_count
+            # labels are target variables, NOT input features; excluded from preprocessing
         )
         if config.preprocessing.enabled:
             preprocess_multiplier = self._estimate_preprocessing_multiplier(config.preprocessing)
@@ -324,7 +341,7 @@ class ConfigManager:
             + lag_count
             + cross_count
             + meta_count
-            + label_count
+            # label_count intentionally excluded: labels are Y targets, not X features
             + preprocessing_added
         )
 
@@ -599,45 +616,82 @@ class ConfigManager:
         return breakdown
 
     def _estimate_indicator_params(self, indicator: Dict[str, Any]) -> int:
-        count = 1
-        periods = indicator.get("periods")
-        if isinstance(periods, str):
-            count *= {
-                "fibonacci": 9,
-                "fibonacci_short": 6,
-                "fibonacci_full": 9,
-                "log_scale": 7,
-                "linear": 6,
-            }.get(periods, 6)
-        elif isinstance(periods, list):
-            count *= max(1, len(periods))
+        """Return the exact number of feature columns for one indicator config entry.
 
-        period_range = indicator.get("period_range")
-        if isinstance(period_range, list) and period_range:
-            count *= 9
+        Handles all parameter axes:
+        - combos (MACD-family, STOCH-family, ULTOSC, ADOSC, APO, PPO, …)
+        - ema_periods + atr_multiplier (Keltner / Force_Index)
+        - acceleration × maximum (SAR / SAREXT)
+        - periods: str — resolved via ParameterGenerator including industry_standard
+        - periods: list — merged with industry_standard
+        - stddev (BBANDS), nbdev (STDDEV/VAR), vfactor (T3), matype (MA)
 
+        Result is multiplied by the indicator's output_count for multi-column
+        outputs such as MACD (3) and BBANDS (3).
+        """
+        name = indicator.get("name", "")
+        output_count = _INDICATOR_OUTPUT_COUNTS.get(name, 1)
+
+        # ── combos: each entry is one full parameter set ──────────────────────
         combos = indicator.get("combos")
         if isinstance(combos, list) and combos:
-            count *= len(combos)
+            return len(combos) * output_count
 
-        stddev = indicator.get("stddev")
-        if isinstance(stddev, list) and stddev:
-            count *= len(stddev)
+        # ── ema_periods (Keltner, Force_Index) ────────────────────────────────
+        ema_periods = indicator.get("ema_periods")
+        if isinstance(ema_periods, list) and ema_periods:
+            param_count = len(ema_periods)
+            atr_multiplier = indicator.get("atr_multiplier")
+            if isinstance(atr_multiplier, list) and atr_multiplier:
+                param_count *= len(atr_multiplier)
+            return param_count * output_count
 
-        atr_multiplier = indicator.get("atr_multiplier")
-        if isinstance(atr_multiplier, list) and atr_multiplier:
-            count *= len(atr_multiplier)
-
+        # ── SAR / SAREXT: acceleration × maximum ──────────────────────────────
         acceleration = indicator.get("acceleration")
         maximum = indicator.get("maximum")
         if isinstance(acceleration, list) and isinstance(maximum, list):
-            count *= max(1, len(acceleration)) * max(1, len(maximum))
+            return max(1, len(acceleration)) * max(1, len(maximum)) * output_count
 
-        ema_periods = indicator.get("ema_periods")
-        if isinstance(ema_periods, list) and ema_periods:
-            count *= len(ema_periods)
+        # ── Period-based calculation ──────────────────────────────────────────
+        periods = indicator.get("periods")
+        period_range = indicator.get("period_range")
+        industry_standard = indicator.get("industry_standard")
 
-        return count
+        if isinstance(periods, str):
+            range_min = 5
+            range_max = 233
+            if isinstance(period_range, list) and len(period_range) >= 2:
+                range_min = int(period_range[0])
+                range_max = int(period_range[1])
+            ind_std = industry_standard if isinstance(industry_standard, list) else None
+            period_list = ParameterGenerator.generate(periods, range_min, range_max, ind_std)
+            param_count = max(1, len(period_list))
+        elif isinstance(periods, list):
+            merged = {int(p) for p in periods}
+            if isinstance(industry_standard, list):
+                merged.update(int(p) for p in industry_standard)
+            param_count = max(1, len(merged))
+        else:
+            # No explicit periods: fixed-param indicator
+            # (e.g. OBV, TRANGE, BOP, HT_*, pattern CDLs, VWAP)
+            param_count = 1
+
+        # Additional expansion axes (applied in combination with periods)
+        stddev  = indicator.get("stddev")   # BBANDS nbdevup/dn
+        nbdev   = indicator.get("nbdev")    # STDDEV / VAR
+        vfactor = indicator.get("vfactor")  # T3
+        matype  = indicator.get("matype")   # MA (multiple MA types)
+
+        if isinstance(stddev, list) and stddev:
+            param_count *= len(stddev)
+        if isinstance(nbdev, list) and nbdev:
+            param_count *= len(nbdev)
+        if isinstance(vfactor, list) and vfactor:
+            param_count *= len(vfactor)
+        if isinstance(matype, list) and matype:
+            param_count *= len(matype)
+
+        return max(1, param_count) * output_count
 
     def _estimate_label_count(self, labels_cfg: Dict[str, Any]) -> int:
         binary = labels_cfg.get("binary", {}) if isinstance(labels_cfg, dict) else {}
@@ -671,26 +725,89 @@ class ConfigManager:
         ratio = enabled_count / max(1, total_feature_types)
         return max(0, int(full_count * ratio))
 
-    def _estimate_derived_count(self, atomic_total: int, operators_cfg: Dict[str, Any]) -> int:
-        """Estimate Layer 2 derived feature count based on enabled operators."""
+    def _estimate_derived_count(
+        self,
+        atomic_total: int,
+        atomic_counts: Dict[str, int],
+        operators_cfg: Dict[str, Any],
+    ) -> int:
+        """Estimate Layer 2 derived feature count based on enabled operators.
+
+        Operator semantics (from derived_operators.py):
+          distance  — 1 output per filtered feature (apply_to selects category subset)
+          cross     — multiplier-based pairing [3x,5x,10x,20x,40x], only single-param
+                      features qualify (~70% of atomic); each param gets at most 5 partners
+                      but higher params find fewer valid partners; empirical ratio ≈ 1.8
+          momentum  — len(lags) outputs per feature
+          ratio     — same multiplier pairing as cross; ratio ≈ 1.8
+          binary_signal — 1 output per enabled rule (exact)
+          worldquant    — conservative estimate (intentionally small)
+        """
+        # Respect the top-level enabled=False flag (set when user disables Layer 2).
+        if operators_cfg.get("enabled") is False:
+            return 0
         if not self._any_enabled(operators_cfg):
             return 0
         count = 0
-        for key in ["distance", "cross", "momentum", "ratio"]:
-            op = operators_cfg.get(key, {})
-            if isinstance(op, dict) and op.get("enabled", True):
-                count += int(atomic_total * 0.15)
+
+        # distance: 1:1 ratio, restricted to the category specified by apply_to
+        dist = operators_cfg.get("distance", {})
+        if isinstance(dist, dict) and dist.get("enabled", True):
+            apply_to = dist.get("apply_to", "all")
+            if apply_to == "all_trend":
+                base = atomic_counts.get("trend", atomic_total)
+            elif apply_to == "all_momentum":
+                base = atomic_counts.get("momentum", atomic_total)
+            elif apply_to == "all_volatility":
+                base = atomic_counts.get("volatility", atomic_total)
+            else:  # "all" or unrecognised
+                base = atomic_total
+            count += base
+
+        # cross: multiplier-based pairing [3x,5x,10x,20x,40x]; each param produces on average
+        # ~1-3 valid pairs (larger params find fewer partners at the high-multiplier targets).
+        # Empirically ~1.8 pairs per single-param feature; ~70% of atomic have 1 param.
+        cross = operators_cfg.get("cross", {})
+        if isinstance(cross, dict) and cross.get("enabled", True):
+            count += int(atomic_total * 1.8)
+
+        # momentum: len(lags) new features per input feature (full atomic, apply_to defaulting to all)
+        mom = operators_cfg.get("momentum", {})
+        if isinstance(mom, dict) and mom.get("enabled", True):
+            apply_to = mom.get("apply_to", "all")
+            if apply_to == "all_trend":
+                base = atomic_counts.get("trend", atomic_total)
+            elif apply_to == "all_momentum":
+                base = atomic_counts.get("momentum", atomic_total)
+            else:
+                base = atomic_total
+            lags = mom.get("lags", [3, 5, 8])
+            n_lags = len(lags) if isinstance(lags, list) else 3
+            count += base * n_lags
+
+        # ratio: same multiplier pairing structure as cross (~1.8)
+        ratio_op = operators_cfg.get("ratio", {})
+        if isinstance(ratio_op, dict) and ratio_op.get("enabled", True):
+            count += int(atomic_total * 1.8)
+
+        # binary_signal: exact count of enabled rules
         bs = operators_cfg.get("binary_signal", {})
         if isinstance(bs, dict) and bs.get("enabled", True):
             rules = bs.get("rules", [])
             if isinstance(rules, list):
                 count += sum(1 for r in rules if isinstance(r, dict) and r.get("enabled", True))
+
+        # worldquant: keep conservative estimate (complex formula, intentionally small)
         wq = operators_cfg.get("worldquant", {})
         if isinstance(wq, dict) and wq.get("enabled", True):
             wq_ops = wq.get("operators") or {}
             if isinstance(wq_ops, dict):
-                wq_enabled = sum(1 for v in wq_ops.values() if isinstance(v, dict) and v.get("enabled", True))
+                wq_enabled = sum(
+                    1 for v in wq_ops.values()
+                    if isinstance(v, dict) and v.get("enabled", True)
+                )
                 count += int(atomic_total * 0.05 * max(1, wq_enabled))
+
         return count
 
     def _estimate_rolling_count(self, atomic_total: int, rolling_cfg: Dict[str, Any]) -> int:
@@ -707,28 +824,28 @@ class ConfigManager:
             n_enabled_agg = len(agg_dict)
         else:
             n_enabled_agg = 0
-        n_windows = len(rolling_cfg.get("windows", [5, 13, 21]))
+        n_windows = len(rolling_cfg.get("windows", [3, 5, 8, 13, 21, 34, 55, 89, 144, 233]))
         return atomic_total * n_enabled_agg * n_windows
 
     def _estimate_lag_count(
         self, atomic_total: int, lag_cfg: Dict[str, Any], config_dict: Dict[str, Any]
     ) -> int:
-        """Estimate Layer 4 lag feature count based on lag strategy."""
+        """Estimate Layer 4 lag feature count using ParameterGenerator for exact lag sequence."""
         if not lag_cfg.get("enabled", True):
             return 0
-        strategy = config_dict.get("global", {}).get("lag_strategy", "adaptive")
-        custom_lags = config_dict.get("global", {}).get("custom_lags")
-        if strategy == "adaptive":
-            lags_per_feature = 3
-        elif strategy == "dense":
-            lags_per_feature = 5
-        elif strategy == "sparse_log":
-            lags_per_feature = 4
-        elif strategy == "custom" and isinstance(custom_lags, list):
-            lags_per_feature = len(custom_lags)
-        else:
-            lags_per_feature = 3
-        return atomic_total * lags_per_feature
+        global_cfg = config_dict.get("global") or {}
+        sequence_length = int(global_cfg.get("sequence_length", 100))
+        max_lag_ratio = float(global_cfg.get("max_lag_ratio", 0.5))
+        strategy = global_cfg.get("lag_strategy", "adaptive")
+        custom_lags = global_cfg.get("custom_lags")
+        lags = ParameterGenerator.generate_lag_sequence(
+            sequence_length=sequence_length,
+            max_lag_ratio=max_lag_ratio,
+            strategy=strategy if isinstance(strategy, str) else "adaptive",
+            custom_lags=custom_lags if isinstance(custom_lags, list) else None,
+        )
+        return atomic_total * len(lags)
+
 
     @staticmethod
     def _estimate_cross_count(cross_cfg: Dict[str, Any]) -> int:
