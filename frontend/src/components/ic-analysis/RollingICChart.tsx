@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RollingICSeries } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Area, AreaChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   Select,
   SelectContent,
@@ -16,6 +16,8 @@ interface RollingICChartProps {
   series?: RollingICSeries | null;
   featureName?: string | null;
 }
+
+const BAND_WINDOW = 20;
 
 export default function RollingICChart({ series, featureName }: RollingICChartProps) {
   const windowKeys = useMemo(() => Object.keys(series || {}), [series]);
@@ -34,7 +36,31 @@ export default function RollingICChart({ series, featureName }: RollingICChartPr
       return [];
     }
     const values = series[selectedWindow] || [];
-    return values.map((value, index) => ({ index, value }));
+    return values.map((value, index) => {
+      const start = Math.max(0, index - BAND_WINDOW + 1);
+      const slice = values.slice(start, index + 1).filter((item) => Number.isFinite(item));
+      if (slice.length < 3) {
+        return {
+          index,
+          value,
+          rollMean: null,
+          rollLower: null,
+          rollBandHeight: null,
+        };
+      }
+
+      const mean = slice.reduce((acc, current) => acc + current, 0) / slice.length;
+      const variance = slice.reduce((acc, current) => acc + (current - mean) ** 2, 0) / slice.length;
+      const std = Math.sqrt(variance);
+
+      return {
+        index,
+        value,
+        rollMean: mean,
+        rollLower: mean - std,
+        rollBandHeight: std * 2,
+      };
+    });
   }, [series, selectedWindow]);
 
   return (
@@ -68,7 +94,7 @@ export default function RollingICChart({ series, featureName }: RollingICChartPr
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+            <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-white/10" />
               <XAxis dataKey="index" className="text-xs" />
               <YAxis className="text-xs" />
@@ -79,8 +105,11 @@ export default function RollingICChart({ series, featureName }: RollingICChartPr
                   borderRadius: '8px',
                 }}
               />
+              <Area type="monotone" dataKey="rollLower" stroke="none" fillOpacity={0} />
+              <Area type="monotone" dataKey="rollBandHeight" stroke="none" fill="#22d3ee33" name="Rolling Band" />
+              <Line type="monotone" dataKey="rollMean" stroke="#22d3ee" strokeDasharray="4 3" strokeWidth={1.4} dot={false} name="Rolling Mean" />
               <Line type="monotone" dataKey="value" stroke="#fbbf24" strokeWidth={2} dot={false} />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </CardContent>

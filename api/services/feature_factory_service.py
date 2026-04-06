@@ -28,11 +28,9 @@ except Exception:
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from momentum.DataExtraction.parallel_search_engine import FailureType, classify_error
-from momentum.factories import create_feature_factory
-from momentum.FeatureEngineering.feature_factory import FeatureGenerationResult
-from momentum.FeatureEngineering.mcp.feature_factory_mcp import FeatureFactoryMCP
-from api.services.feature_export_service import FeatureExportService
+from api.utils.feature_name_parser import infer_category, infer_layer, infer_level
+from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
+from momentum.factories import create_feature_factory, create_feature_factory_mcp
 
 
 logger = get_logger("api.feature_factory_service")
@@ -45,11 +43,20 @@ _FEATURE_KLINE_CACHE_DIR = str(settings.data_cache_path / "feature_klines")
 class FeatureFactoryService:
     """Feature Factory service for task management and config operations."""
 
+    _report_builder_cls = None  # Lazy-loaded via service_providers (Rule 4 compliant)
+
+    @classmethod
+    def _get_report_builder(cls):
+        """Return a stateless FeatureExportService instance (Rule 4 compliant)."""
+        if cls._report_builder_cls is None:
+            from api.utils.service_providers import get_report_builder_class
+            cls._report_builder_cls = get_report_builder_class()
+        return cls._report_builder_cls()
+
     def __init__(self):
         self._factory = create_feature_factory(cache_dir=_FEATURE_KLINE_CACHE_DIR)
         self._config_manager = self._factory.config_manager
-        self._mcp = FeatureFactoryMCP(self._factory, self._config_manager)
-        self._export_service = FeatureExportService()
+        self._mcp = create_feature_factory_mcp(factory=self._factory)
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._research_tasks: Dict[str, Dict[str, Any]] = {}
         self._callbacks: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
@@ -301,8 +308,7 @@ class FeatureFactoryService:
         end_date: Optional[str] = None,
     ) -> FeatureGenerationResult:
         shadow_factory = create_feature_factory()
-        # Shadow path must not overwrite persisted output.
-        shadow_factory._storage.save_factory_output = lambda *_args, **_kwargs: ""
+        # Shadow path must not overwrite persisted output — use persist=False.
         return self._run_with_env_overrides(
             shadow_factory,
             symbol=symbol,
@@ -313,6 +319,7 @@ class FeatureFactoryService:
             env_overrides=self._old_path_env_overrides(),
             start_date=start_date,
             end_date=end_date,
+            persist=False,
         )
 
     def _run_with_env_overrides(
@@ -326,6 +333,7 @@ class FeatureFactoryService:
         env_overrides: Dict[str, str],
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        persist: bool = True,
     ) -> FeatureGenerationResult:
         with self._temporary_environ(env_overrides):
             return factory.generate_features(
@@ -336,6 +344,7 @@ class FeatureFactoryService:
                 progress_callback=progress_callback,
                 start_date=start_date,
                 end_date=end_date,
+                persist=persist,
             )
 
     @staticmethod
@@ -518,7 +527,7 @@ class FeatureFactoryService:
         include_datasource: bool = False,
     ) -> Dict[str, Any]:
         """Build CSV export stream payload for API route."""
-        from momentum.DataExtraction.kline_storage import KlineStorageManager
+        from momentum.factories import create_kline_storage_manager
 
         context = self._load_task_context(task_id)
         schema = self._load_hdf5_schema(context)
@@ -545,7 +554,7 @@ class FeatureFactoryService:
         raw_columns: List[str] = []
         if include_datasource:
             try:
-                storage = KlineStorageManager(cache_dir=_FEATURE_KLINE_CACHE_DIR)
+                storage = create_kline_storage_manager(cache_dir=_FEATURE_KLINE_CACHE_DIR)
                 kline_df = storage.read_klines(symbol, timeframe, validate_continuity=False)
                 if kline_df is not None and not kline_df.empty and "timestamp" in kline_df.columns:
                     ts_val = kline_df["timestamp"].iloc[0]
@@ -606,7 +615,8 @@ class FeatureFactoryService:
     ) -> Dict[str, Any]:
         """Build structured JSON export payload."""
         df, export_meta = self._load_task_features(task_id)
-        return self._export_service.build_json_report(
+        report_builder = self._get_report_builder()
+        return report_builder.build_json_report(
             task_id=task_id,
             features_df=df,
             export_meta=export_meta,
@@ -625,7 +635,8 @@ class FeatureFactoryService:
     ) -> str:
         """Build markdown report for LLM/human consumption."""
         df, export_meta = self._load_task_features(task_id)
-        return self._export_service.build_markdown_report(
+        report_builder = self._get_report_builder()
+        return report_builder.build_markdown_report(
             task_id=task_id,
             features_df=df,
             export_meta=export_meta,
@@ -999,9 +1010,9 @@ class FeatureFactoryService:
         by_level: Dict[str, int] = {}
         by_layer_raw: Dict[str, int] = {}
         for col in features_df.columns:
-            cat = self._export_service._infer_category(col)
-            layer = self._export_service._infer_layer(col)
-            level_raw = self._export_service._infer_level(cat)
+            cat = infer_category(col)
+            layer = infer_layer(col)
+            level_raw = infer_level(cat)
             simple_level = self._to_simple_level(level_raw)
             by_category[cat] = by_category.get(cat, 0) + 1
             by_layer_raw[layer] = by_layer_raw.get(layer, 0) + 1
@@ -1766,9 +1777,9 @@ class FeatureFactoryService:
         for name in feature_names:
             if name in cache:
                 continue
-            inferred_category = self._export_service._infer_category(name)
-            inferred_layer = self._export_service._infer_layer(name)
-            inferred_level = self._to_simple_level(self._export_service._infer_level(inferred_category))
+            inferred_category = infer_category(name)
+            inferred_layer = infer_layer(name)
+            inferred_level = self._to_simple_level(infer_level(inferred_category))
             cache[name] = {
                 "category": inferred_category,
                 "layer": inferred_layer,

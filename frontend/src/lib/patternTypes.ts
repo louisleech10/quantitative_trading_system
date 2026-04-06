@@ -271,6 +271,7 @@ export interface BatchAnalysisRequest {
   symbols: string[];
   timeframe: string;
   indicators: IndicatorConfig[];
+  selected_features?: string[];
   lookback_bars: number;
   sequence_length?: number | null;
   sequence_feature_mode?: 'aggregate' | 'flatten';

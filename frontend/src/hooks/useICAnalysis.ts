@@ -124,15 +124,47 @@ export function useICAnalysis() {
     async (config: ICAnalysisConfig) => {
       const featuresPath = config.features_path.trim();
       const hasLibrarySelection = Boolean(config.symbol && config.timeframe);
-      if (!featuresPath && !hasLibrarySelection) {
+      const hasCrossSectionSelection = Boolean(
+        config.mode === 'cross_sectional' &&
+        config.timeframe &&
+        (config.cross_sectional_symbols?.length || 0) >= 2
+      );
+
+      if (!featuresPath && !hasLibrarySelection && !hasCrossSectionSelection) {
         throw new Error('請提供特徵檔案路徑，或選擇 Symbol/Timeframe');
       }
 
       const effectiveConfig = useICAnalysisStore.getState().getEffectiveConfig();
+      const featureFilter = useICAnalysisStore.getState().featureFilter;
+      const isCrossSectionalMode = config.mode === 'cross_sectional';
+
+      const normalizedFeatureFilter = {
+        include_pattern: featureFilter.include_pattern?.trim() || undefined,
+        include_categories:
+          featureFilter.include_categories && featureFilter.include_categories.length > 0
+            ? featureFilter.include_categories
+            : undefined,
+        include_data_sources:
+          featureFilter.include_data_sources && featureFilter.include_data_sources.length > 0
+            ? featureFilter.include_data_sources
+            : undefined,
+        include_families:
+          featureFilter.include_families && featureFilter.include_families.length > 0
+            ? featureFilter.include_families
+            : undefined,
+        max_features:
+          typeof featureFilter.max_features === 'number' && featureFilter.max_features > 0
+            ? featureFilter.max_features
+            : undefined,
+      };
+
+      const hasFeatureFilter = Object.values(normalizedFeatureFilter).some((value) => value !== undefined);
 
       const payload = {
+        mode: isCrossSectionalMode ? 'cross_sectional' : 'longitudinal',
         features_path: featuresPath || undefined,
-        symbol: config.symbol || undefined,
+        symbol: isCrossSectionalMode ? undefined : config.symbol || undefined,
+        symbols: isCrossSectionalMode ? config.cross_sectional_symbols || [] : undefined,
         timeframe: config.timeframe || undefined,
         labels_path: config.labels_path?.trim() || undefined,
         meta_path: config.meta_path?.trim() || undefined,
@@ -141,6 +173,7 @@ export function useICAnalysis() {
           ...(effectiveConfig.feature_tiers ? { feature_tiers: effectiveConfig.feature_tiers } : {}),
         },
         feature_tiers: effectiveConfig.feature_tiers,
+        feature_filter: hasFeatureFilter ? normalizedFeatureFilter : undefined,
         event_query: config.mode === 'event' ? config.event_query?.trim() || undefined : undefined,
       };
 

@@ -74,3 +74,39 @@ def test_monitor_near_zero_exposures_warning():
     exposures = pd.Series({f"f{i}": 1.0 for i in range(30)})
     result = analyzer.monitor_exposure_concentration(exposures, max_single_exposure=0.9)
     assert "near_zero_exposures" in result["warnings"]
+
+
+def test_beta_neutralization_reduces_market_correlation():
+    np.random.seed(42)
+    index = pd.RangeIndex(200)
+    market_proxy = pd.Series(np.linspace(-1.0, 1.0, 200), index=index)
+    factors = pd.DataFrame(
+        {
+            "f1": market_proxy.values * 1.8 + np.random.normal(0, 0.05, 200),
+            "f2": market_proxy.values * -1.1 + np.random.normal(0, 0.05, 200),
+        },
+        index=index,
+    )
+
+    analyzer = FactorExposureAnalyzer(config={"neutralization_mode": "beta_neutral"})
+    neutralized = analyzer.neutralize_factor_matrix(factors, market_proxy)
+
+    before_corr = abs(np.corrcoef(factors["f1"], market_proxy)[0, 1])
+    after_corr = abs(np.corrcoef(neutralized["f1"], market_proxy)[0, 1])
+    assert after_corr < before_corr
+
+
+def test_vol_neutralization_reduces_volatility_gap():
+    np.random.seed(7)
+    index = pd.RangeIndex(400)
+    low_vol = np.random.normal(0, 1.0, 200)
+    high_vol = np.random.normal(0, 4.0, 200)
+    values = np.concatenate([low_vol, high_vol])
+    factors = pd.DataFrame({"f1": values}, index=index)
+
+    analyzer = FactorExposureAnalyzer(config={"neutralization_mode": "vol_neutral", "neutralization_lookback": 30})
+    neutralized = analyzer.neutralize_factor_matrix(factors, pd.Series(np.zeros(len(index)), index=index))
+
+    raw_ratio = float(np.std(values[200:]) / np.std(values[:200]))
+    neutral_ratio = float(np.std(neutralized["f1"].values[200:]) / np.std(neutralized["f1"].values[:200]))
+    assert neutral_ratio < raw_ratio

@@ -478,17 +478,6 @@ class ModelEnhancementService:
                 merged.update(enhancement_inputs)
         return merged
 
-    def _default_task_payload_provider(self, model_task_id: str) -> Optional[Dict[str, Any]]:
-        try:
-            from api.routes.pattern_analysis import model_task_service
-
-            payload = model_task_service.get_task_status(model_task_id)
-            if isinstance(payload, dict):
-                return payload
-        except Exception:
-            return None
-        return None
-
     @staticmethod
     def _to_dataframe(value: Any) -> pd.DataFrame:
         if isinstance(value, pd.DataFrame):
@@ -536,7 +525,12 @@ _model_enhancement_service: Optional[ModelEnhancementService] = None
 
 
 def get_model_enhancement_service() -> ModelEnhancementService:
+    """Return the ModelEnhancementService singleton, wired with cross-service provider."""
     global _model_enhancement_service
     if _model_enhancement_service is None:
-        _model_enhancement_service = ModelEnhancementService()
+        from api.utils.service_providers import create_model_task_provider
+
+        _model_enhancement_service = ModelEnhancementService(
+            task_payload_provider=create_model_task_provider(),
+        )
     return _model_enhancement_service

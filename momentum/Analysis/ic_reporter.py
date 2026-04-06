@@ -49,6 +49,8 @@ class ICReporter:
             "rolling_ic_series": rolling_series,
             "turnover_analysis": analysis_results.get("turnover_analysis", {}),
             "coverage_analysis": analysis_results.get("coverage_analysis", {}),
+            "cross_sectional_symbol_ic": analysis_results.get("cross_sectional_symbol_ic", {}),
+            "cross_symbol_validation": analysis_results.get("cross_symbol_validation", {}),
         }
 
         deep_report = analysis_results.get("deep_analysis_report")

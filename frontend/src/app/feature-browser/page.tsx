@@ -9,11 +9,13 @@ import FeatureSummaryTable from '@/components/feature-browser/FeatureSummaryTabl
 import ICDashboard from '@/components/feature-browser/ICDashboard';
 import ModelAttribution from '@/components/feature-browser/ModelAttribution';
 import QualityScorecard from '@/components/feature-browser/QualityScorecard';
+import SymbolCoverageMatrix from '@/components/feature-browser/SymbolCoverageMatrix';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FeatureBrowserTab } from '@/lib/types';
 import { useFeatureBrowserStore } from '@/store/featureBrowserStore';
+import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
 
 const VALID_TABS: FeatureBrowserTab[] = [
@@ -23,6 +25,7 @@ const VALID_TABS: FeatureBrowserTab[] = [
   'correlation',
   'drift',
   'attribution',
+  'coverage',
 ];
 
 
@@ -41,6 +44,15 @@ function FeatureBrowserPageContent() {
     setSelectedFeature,
     loadOverview,
   } = useFeatureBrowserStore();
+  const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
+  const fetchRegistry = useFeatureFactoryStore((state) => state.fetchRegistry);
+
+  const distinctSymbolCount = new Set(registryEntries.map((entry) => entry.symbol)).size;
+  const coverageAvailable = distinctSymbolCount >= 2;
+
+  useEffect(() => {
+    fetchRegistry().catch(() => undefined);
+  }, [fetchRegistry]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -95,6 +107,7 @@ function FeatureBrowserPageContent() {
             <TabsTrigger value="correlation">相關性</TabsTrigger>
             <TabsTrigger value="drift">Drift</TabsTrigger>
             <TabsTrigger value="attribution">Attribution</TabsTrigger>
+            <TabsTrigger value="coverage">Coverage Matrix</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -132,6 +145,19 @@ function FeatureBrowserPageContent() {
 
           <TabsContent value="attribution" className="space-y-4">
             <ModelAttribution featuresPath={featuresPath} />
+          </TabsContent>
+
+          <TabsContent value="coverage" className="space-y-4">
+            {coverageAvailable ? (
+              <SymbolCoverageMatrix
+                entries={registryEntries}
+                featureNames={overview?.items.map((item) => item.feature_name) || []}
+              />
+            ) : (
+              <div className="rounded-xl border border-white/10 bg-[#141b2d] p-4 text-sm text-slate-300">
+                Coverage Matrix 需至少 2 個 Symbol 的特徵資料，請先到 Feature Factory 生成資料。
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

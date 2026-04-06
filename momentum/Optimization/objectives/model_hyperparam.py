@@ -8,7 +8,6 @@ import numpy as np
 import optuna
 import pandas as pd
 
-from momentum.Analysis.model_config import ModelConfigManager
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IModelTrainer, IOptimizationObjective
 
@@ -39,7 +38,8 @@ class ModelHyperparamObjective(IOptimizationObjective):
         self.max_train_val_gap = float(max_train_val_gap)
         self.search_space_override = search_space_override
         self.train_kwargs = train_kwargs or {}
-        self.config_manager = ModelConfigManager()
+        from momentum.factories import create_model_config_manager  # noqa: PLC0415
+        self.config_manager = create_model_config_manager()
         self._current_trial = None
 
         if self.engine not in {"lightgbm", "xgboost"}:

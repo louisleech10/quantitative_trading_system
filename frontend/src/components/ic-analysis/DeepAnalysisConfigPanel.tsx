@@ -8,7 +8,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 interface DeepAnalysisConfigPanelProps {
   selectedFeatureCount: number;
   modules: DeepAnalysisModules;
+  neutralizationMode: 'none' | 'beta_neutral' | 'vol_neutral';
   onModulesChange: (modules: DeepAnalysisModules) => void;
+  onNeutralizationModeChange: (mode: 'none' | 'beta_neutral' | 'vol_neutral') => void;
   onStart: () => void;
   isRunning?: boolean;
 }
@@ -29,7 +31,9 @@ const moduleMeta: Array<{ key: keyof DeepAnalysisModules; label: string; tip: st
 export default function DeepAnalysisConfigPanel({
   selectedFeatureCount,
   modules,
+  neutralizationMode,
   onModulesChange,
+  onNeutralizationModeChange,
   onStart,
   isRunning = false,
 }: DeepAnalysisConfigPanelProps) {
@@ -71,6 +75,19 @@ export default function DeepAnalysisConfigPanel({
           ))}
         </div>
       </TooltipProvider>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-slate-400">Factor Neutralization（搭配 Factor Exposure）</label>
+        <select
+          value={neutralizationMode}
+          onChange={(event) => onNeutralizationModeChange(event.target.value as 'none' | 'beta_neutral' | 'vol_neutral')}
+          className="h-9 rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
+        >
+          <option value="none">None</option>
+          <option value="beta_neutral">Beta Neutral</option>
+          <option value="vol_neutral">Vol Neutral</option>
+        </select>
+      </div>
 
       <button
         type="button"

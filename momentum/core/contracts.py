@@ -1,4 +1,9 @@
-"""Momentum internal DTO contracts."""
+"""Momentum internal DTO contracts.
+
+This module re-exports pure data types (enums, dataclasses, Pydantic models)
+from domain-internal modules so that ``api/`` can depend on
+``momentum.core.contracts`` instead of reaching into domain internals (Rule 3).
+"""
 
 from __future__ import annotations
 
@@ -9,6 +14,35 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+# ── Lazy re-exports from domain modules ─────────────────────────────────────
+# Pure data types that api/ needs without coupling to domain internals.
+# Uses lazy imports to avoid circular dependency via __init__.py files.
+
+def _lazy_reexport(name: str):
+    """Lazy re-export helper to avoid circular imports via __init__.py."""
+    _MAP = {
+        "FailureType": ("momentum.DataExtraction.parallel_search_engine", "FailureType"),
+        "classify_error": ("momentum.DataExtraction.parallel_search_engine", "classify_error"),
+        "FeatureGenerationResult": ("momentum.FeatureEngineering.feature_factory", "FeatureGenerationResult"),
+        "DifficultyLevel": ("momentum.Analysis.feature_toggle_registry", "DifficultyLevel"),
+        "IndicatorConfig": ("momentum.FeatureEngineering.feature_config", "IndicatorConfig"),
+    }
+    if name in _MAP:
+        import importlib
+        mod_path, attr = _MAP[name]
+        mod = importlib.import_module(mod_path)
+        return getattr(mod, attr)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+# Populated on first access via __getattr__ in the module
+_LAZY_NAMES = {"FailureType", "classify_error", "FeatureGenerationResult", "DifficultyLevel", "IndicatorConfig"}
+
+def __getattr__(name: str):
+    if name in _LAZY_NAMES:
+        val = _lazy_reexport(name)
+        globals()[name] = val  # Cache to avoid repeated import
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 @dataclass(frozen=True)
 class TrainingWindowConfig:

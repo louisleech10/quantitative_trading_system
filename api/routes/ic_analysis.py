@@ -22,7 +22,7 @@ from api.models.ic_models import (
     ICRefilterRequest,
 )
 from api.services.ic_analysis_service import ic_analysis_service
-from momentum.Analysis.ic_config_schema import load_ic_config
+from momentum.factories import load_ic_config
 
 
 router = APIRouter(prefix="/api/v1/ic")

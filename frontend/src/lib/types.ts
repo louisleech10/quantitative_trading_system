@@ -1605,7 +1605,8 @@ export interface ICAnalysisConfig {
   timeframe?: string;
   labels_path?: string;
   meta_path?: string;
-  mode: 'global' | 'event';
+  mode: 'global' | 'event' | 'cross_sectional';
+  cross_sectional_symbols?: string[];
   event_query?: string;
   event_timestamps?: number[];
   horizons: number[];
@@ -1643,9 +1644,11 @@ export interface ICFeatureInfo {
   rank: number;
   feature_name: string;
   ic_mean: number;
+  ic_std?: number;
   icir: number;
   p_value: number;
   ic_hit_rate?: number;
+  t_stat?: number;
   monotonicity_score?: number;
   coverage?: number;
   turnover_rate?: number;
@@ -1658,6 +1661,20 @@ export interface ICDecayData {
   peak_horizon?: number;
   decay_rate?: number;
   decay_type?: string;
+  fit_r2?: number;
+}
+
+export interface TurnoverTimeSeriesData {
+  quantile_turnovers: number[];
+  rank_change_rates: number[];
+  timestamps: Array<number | string>;
+}
+
+export interface TurnoverFeatureData {
+  quantile_turnover?: number;
+  rank_change_rate?: number;
+  autocorrelation?: number;
+  time_series?: TurnoverTimeSeriesData;
 }
 
 export interface QuantileReturnData {
@@ -1666,9 +1683,44 @@ export interface QuantileReturnData {
   cumulative_returns?: Record<string, number[]>;
 }
 
+export interface EquityCurvePoint {
+  bar_index: number;
+  Q1: number;
+  Q5: number;
+  ls_spread: number;
+  drawdown?: number;
+}
+
 export interface CorrelationMatrix {
   features: string[];
   matrix: number[][];
+}
+
+export interface CrossSectionalICMatrix {
+  symbols: string[];
+  features: string[];
+  matrix: Record<string, Record<string, number | null>>;
+}
+
+export interface CrossSymbolValidationSummary {
+  status?: 'completed' | 'skipped' | 'not_run';
+  reason?: string | null;
+  consistency_score?: number | null;
+  best_symbol?: string | null;
+  worst_symbol?: string | null;
+  symbol_scores?: Record<string, number>;
+  feature_summary?: {
+    total_features?: number;
+    universal_features?: number;
+    symbol_specific_features?: number;
+    sign_conflict_features?: number;
+  };
+  samples?: {
+    universal_features?: string[];
+    symbol_specific_features?: string[];
+    sign_conflict_features?: string[];
+  };
+  suggestions?: string[];
 }
 
 export interface FilterLogStage {
@@ -1695,8 +1747,10 @@ export interface ICReport {
   correlation_matrix?: CorrelationMatrix;
   grouped_ic?: GroupedICData;
   rolling_ic_series?: Record<string, RollingICSeries>;
-  turnover_analysis?: Record<string, Record<string, number>>;
+  turnover_analysis?: Record<string, TurnoverFeatureData>;
   diversification_metrics?: Record<string, number>;
+  cross_sectional_symbol_ic?: CrossSectionalICMatrix;
+  cross_symbol_validation?: CrossSymbolValidationSummary;
   ai_summary?: string;
   deep_analysis_enabled?: boolean;
   deep_analysis_version?: string;
@@ -1781,6 +1835,26 @@ export interface DeepAnalysisResponse {
   module_status?: ModuleStatus[] | null;
   results?: Record<string, unknown> | null;
   error?: string | null;
+}
+
+export type WatchlistStatus = 'candidate' | 'verified' | 'rejected' | 'watching';
+
+export interface WatchlistEntry {
+  feature_name: string;
+  task_id: string;
+  status: WatchlistStatus;
+  note: string;
+  ic_snapshot: number | null;
+  icir_snapshot: number | null;
+  turnover_snapshot?: number | null;
+  added_at: string;
+  updated_at: string;
+}
+
+export interface WatchlistExportPayload {
+  version: '1.0';
+  exported_at: string;
+  entries: WatchlistEntry[];
 }
 
 export interface SkippedResult {
@@ -1944,6 +2018,10 @@ export interface FactorOrthogonalizationData {
 
 export interface FactorExposureData {
   portfolio_exposure?: Record<string, number>;
+  neutralized_portfolio_exposure?: Record<string, number>;
+  neutralization_mode?: 'none' | 'beta_neutral' | 'vol_neutral' | string;
+  neutralization_lookback?: number;
+  neutralization_delta_hhi?: number | null;
   factor_attribution?: {
     factor_betas?: Record<string, number>;
     alpha?: number;
@@ -1952,6 +2030,13 @@ export interface FactorExposureData {
     unexplained?: number;
   };
   concentration?: {
+    max_exposure_factor?: string | null;
+    max_exposure_value?: number;
+    hhi?: number;
+    concentrated?: boolean;
+    warnings?: string[];
+  };
+  neutralized_concentration?: {
     max_exposure_factor?: string | null;
     max_exposure_value?: number;
     hhi?: number;
@@ -2234,10 +2319,32 @@ export interface ImportanceComparison {
   }>;
 }
 
+export interface CoverageMatrixRequestPayload {
+  symbols: string[];
+  timeframe: string;
+  feature_names: string[];
+  feature_base_path?: string;
+  timeout_seconds?: number;
+}
+
+export interface CoverageMatrixResponsePayload {
+  matrix: Record<string, Record<string, number | null>>;
+  valid_counts: Record<string, Record<string, number>>;
+  row_counts: Record<string, number>;
+  symbols: string[];
+  features: string[];
+  summary: {
+    avg_coverage: number;
+    worst_symbol: string | null;
+    worst_feature: string | null;
+  };
+}
+
 export type FeatureBrowserTab =
   | 'overview'
   | 'ic_dashboard'
   | 'quality'
   | 'correlation'
   | 'drift'
-  | 'attribution';
+  | 'attribution'
+  | 'coverage';

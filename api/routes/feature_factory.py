@@ -393,7 +393,7 @@ async def browse_feature_data(
     task_id: str,
     features: str = Query(..., description="逗號分隔的特徵名（最多 20）"),
     offset: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=5000),
 ):
     """取得指定特徵的原始數據（時間序列）。"""
     try:

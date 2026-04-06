@@ -203,6 +203,10 @@ class XGBoostBatchAnalysisRequest(BaseModel):
     symbols: List[str] = Field(..., description="交易對列表，如 ['ETHUSDT', 'BTCUSDT']")
     timeframe: str = Field(default="12h", description="時間週期：1h, 4h, 12h, 1d")
     indicators: List[IndicatorParamsConfig] = Field(..., description="指標配置列表")
+    selected_features: Optional[List[str]] = Field(
+        default=None,
+        description="指定要訓練的因子名稱列表（若使用 FeatureLibrary 可直接過濾）"
+    )
     lookback_bars: int = Field(default=200, description="每個案例回看 K 線數量")
     sequence_length: Optional[int] = Field(
         default=None,

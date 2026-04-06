@@ -20,7 +20,9 @@ from api.models.optimization_models import (
 )
 from api.services.optimization_output_service import get_optimization_output_service
 from api.services.optimization_task_service import optimization_task_service
-from momentum.core.config import MomentumConfig
+from momentum.factories import get_momentum_config_class
+
+MomentumConfig = get_momentum_config_class()
 
 
 router = APIRouter(prefix="/api/v1/optimization", tags=["Hyperparameter Optimization"])

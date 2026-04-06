@@ -60,6 +60,68 @@ class TurnoverAnalyzer:
             return float("nan")
         return float(series.autocorr(lag=1))
 
+    def compute_turnover_time_series(
+        self,
+        feature: pd.Series,
+        num_quantiles: int = 5,
+    ) -> dict[str, list]:
+        """回傳逐 bar turnover / rank change 時序。"""
+
+        series = feature.dropna()
+        if series.empty or series.size < 2:
+            return {
+                "quantile_turnovers": [],
+                "rank_change_rates": [],
+                "timestamps": [],
+            }
+
+        num_quantiles = max(int(num_quantiles or self._num_quantiles), 2)
+        try:
+            quantiles = pd.qcut(series, q=num_quantiles, labels=False, duplicates="drop")
+        except ValueError as exc:
+            logger.warning("qcut failed for turnover time series: %s", exc)
+            return {
+                "quantile_turnovers": [],
+                "rank_change_rates": [],
+                "timestamps": [],
+            }
+
+        top_mask = (quantiles == quantiles.max()).astype(float)
+        quantile_turnovers = top_mask.diff().abs().dropna().astype(float)
+
+        ranks = series.rank(method="average")
+        rank_change_rates = ranks.diff().abs().dropna().astype(float)
+
+        if quantile_turnovers.empty or rank_change_rates.empty:
+            return {
+                "quantile_turnovers": [],
+                "rank_change_rates": [],
+                "timestamps": [],
+            }
+
+        common_index = quantile_turnovers.index.intersection(rank_change_rates.index)
+        if common_index.empty:
+            return {
+                "quantile_turnovers": [],
+                "rank_change_rates": [],
+                "timestamps": [],
+            }
+
+        return {
+            "quantile_turnovers": [
+                float(value)
+                for value in quantile_turnovers.loc[common_index].tolist()
+            ],
+            "rank_change_rates": [
+                float(value)
+                for value in rank_change_rates.loc[common_index].tolist()
+            ],
+            "timestamps": [
+                ts.isoformat() if hasattr(ts, "isoformat") else int(ts) if isinstance(ts, (int, np.integer)) else str(ts)
+                for ts in common_index.tolist()
+            ],
+        }
+
     def compute_net_ic_proxy(
         self,
         gross_ic: float,
@@ -84,9 +146,11 @@ class TurnoverAnalyzer:
             turnover = self.compute_quantile_turnover(series, num_quantiles=num_quantiles)
             rank_change = self.compute_rank_change_rate(series)
             autocorr = self.compute_factor_autocorrelation(series)
+            turnover_series = self.compute_turnover_time_series(series, num_quantiles=num_quantiles)
             results[feature_name] = {
                 "quantile_turnover": turnover,
                 "rank_change_rate": rank_change,
                 "autocorrelation": autocorr,
+                "time_series": turnover_series,
             }
         return results

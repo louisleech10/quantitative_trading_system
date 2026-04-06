@@ -22,7 +22,7 @@ from typing import Dict, Union, Optional, Tuple
 import logging
 from pathlib import Path
 
-from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.core.protocols import IKlineReader
 from .types import DataSourceEnum
 
 logger = logging.getLogger(__name__)
@@ -48,14 +48,17 @@ class DataSourceManager:
         >>> close_data = manager.get_data_source_from_df(df, DataSourceEnum.CLOSE)
     """
 
-    def __init__(self, storage_manager: Optional[KlineStorageManager] = None):
+    def __init__(self, storage_manager: Optional[IKlineReader] = None):
         """
         初始化數據源管理器
 
         Args:
-            storage_manager: KlineStorageManager 實例（可選，默認創建新實例）
+            storage_manager: IKlineReader 實例（可選，默認透過工廠建立）
         """
-        self.storage = storage_manager or KlineStorageManager()
+        if storage_manager is None:
+            from momentum.factories import create_kline_storage_manager
+            storage_manager = create_kline_storage_manager()
+        self.storage = storage_manager
         self._cache: Dict[str, pd.DataFrame] = {}  # 簡單緩存
 
     def get_dataframe(

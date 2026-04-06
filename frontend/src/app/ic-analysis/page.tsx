@@ -25,6 +25,10 @@ import LongShortComparisonChart from '@/components/ic-analysis/LongShortComparis
 import FactorExposureRadar from '@/components/ic-analysis/FactorExposureRadar';
 import FeatureQualityDashboard from '@/components/ic-analysis/FeatureQualityDashboard';
 import NetICChart from '@/components/ic-analysis/NetICChart';
+import TurnoverTimeSeriesChart from '@/components/ic-analysis/TurnoverTimeSeriesChart';
+import FactorEquityCurveChart from '@/components/ic-analysis/FactorEquityCurveChart';
+import CrossSectionalICHeatmap from '@/components/ic-analysis/CrossSectionalICHeatmap';
+import CrossSymbolValidationPanel from '@/components/ic-analysis/CrossSymbolValidationPanel';
 import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
 import { Progress } from '@/components/ui/progress';
@@ -91,14 +95,118 @@ function ICAnalysisPageContent() {
   const [isRunning, setIsRunning] = useState(false);
   const [isRefiltering, setIsRefiltering] = useState(false);
   const [isDeepRunning, setIsDeepRunning] = useState(false);
+  const [neutralizationMode, setNeutralizationMode] = useState<'none' | 'beta_neutral' | 'vol_neutral'>('none');
 
   const summaryTable = useMemo(() => report?.summary_table ?? [], [report?.summary_table]);
+
+  const crossSectionalFeatureCount = useMemo(() => {
+    const keyword = (featureFilter.include_pattern || '').trim();
+    const normalizedKeyword = keyword.toLowerCase();
+    let regex: RegExp | null = null;
+    if (keyword) {
+      try {
+        regex = new RegExp(keyword, 'i');
+      } catch {
+        regex = null;
+      }
+    }
+
+    const matched = availableFeatures.filter((item) => {
+      const categoryPass =
+        !featureFilter.include_categories ||
+        featureFilter.include_categories.length === 0 ||
+        (item.category && featureFilter.include_categories.includes(item.category));
+
+      const sourcePass =
+        !featureFilter.include_data_sources ||
+        featureFilter.include_data_sources.length === 0 ||
+        (item.data_source && featureFilter.include_data_sources.includes(item.data_source));
+
+      const familyPass =
+        !featureFilter.include_families ||
+        featureFilter.include_families.length === 0 ||
+        (item.family && featureFilter.include_families.includes(item.family));
+
+      const textPass =
+        !keyword ||
+        (regex
+          ? regex.test(item.feature_name)
+          : item.feature_name.toLowerCase().includes(normalizedKeyword));
+
+      return Boolean(categoryPass && sourcePass && familyPass && textPass);
+    });
+
+    const maxFeatures =
+      typeof featureFilter.max_features === 'number' && featureFilter.max_features > 0
+        ? featureFilter.max_features
+        : matched.length;
+
+    return Math.min(maxFeatures, matched.length);
+  }, [availableFeatures, featureFilter]);
+
+  const crossSectionalSampleSize = useMemo(() => {
+    const raw = report?.metadata?.n_timestamps;
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+      return raw;
+    }
+    return 0;
+  }, [report?.metadata]);
+
+  const crossSectionalSymbolCount = useMemo(() => {
+    const raw = report?.metadata?.n_symbols;
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+      return raw;
+    }
+    return 0;
+  }, [report?.metadata]);
+
+  const resultMode = useMemo(() => {
+    const raw = report?.metadata?.mode;
+    if (raw === 'cross_sectional') {
+      return 'cross_sectional';
+    }
+    if (config.mode === 'cross_sectional') {
+      return 'cross_sectional';
+    }
+    return config.mode;
+  }, [config.mode, report?.metadata]);
 
   const activeFeature = selectedFeature || summaryTable[0]?.feature_name || null;
 
   const deepTabVisible = Boolean(report?.deep_analysis_enabled || deepAnalysisReport?.deep_analysis_enabled);
 
   const deepSummary = deepAnalysisReport?.deep_analysis_summary;
+
+  const crossSymbolValidationData = useMemo(() => {
+    const deepData = deepAnalysisReport?.cross_symbol_validation;
+    if (deepData && typeof deepData === 'object') {
+      return deepData;
+    }
+
+    const crossModuleStatus = (deepAnalysisReport?.module_statuses || []).find((item) =>
+      item.module_name === 'cross_symbol_validation' || item.module_name === 'cross_symbol_validator'
+    );
+    if (crossModuleStatus && crossModuleStatus.status !== 'completed') {
+      const skipDetail = (deepAnalysisReport?.deep_analysis_errors || []).find((item) =>
+        item.module_name === crossModuleStatus.module_name
+      );
+      return {
+        status: 'skipped' as const,
+        reason: skipDetail?.reason || crossModuleStatus.reason || `status=${crossModuleStatus.status}`,
+      };
+    }
+
+    const reportData = report?.cross_symbol_validation;
+    if (reportData && typeof reportData === 'object') {
+      return reportData;
+    }
+    return null;
+  }, [
+    deepAnalysisReport?.cross_symbol_validation,
+    deepAnalysisReport?.deep_analysis_errors,
+    deepAnalysisReport?.module_statuses,
+    report?.cross_symbol_validation,
+  ]);
 
   useEffect(() => {
     if (!selectedFeature && summaryTable.length > 0) {
@@ -210,6 +318,15 @@ function ICAnalysisPageContent() {
     setIsRunning(true);
 
     try {
+      if (config.mode === 'cross_sectional') {
+        if ((config.cross_sectional_symbols?.length || 0) < 2) {
+          throw new Error('請至少選擇 2 個 Symbol');
+        }
+        if (crossSectionalFeatureCount > 50) {
+          throw new Error('截面 IC 最多支援 50 個因子，請先在 Feature Browser 篩選');
+        }
+      }
+
       await startAnalysis(config);
     } catch (err) {
       const message = err instanceof Error ? err.message : '啟動分析失敗';
@@ -239,6 +356,12 @@ function ICAnalysisPageContent() {
         selected_features: candidates,
         top_n: candidates.length,
         modules: deepAnalysisModules,
+        config_override: {
+          factor_exposure: {
+            neutralization_mode: neutralizationMode,
+            neutralization_lookback: 63,
+          },
+        },
       });
 
       let done = false;
@@ -327,7 +450,8 @@ function ICAnalysisPageContent() {
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <ICConfigPanel
             config={config}
-              registryEntries={registryEntries}
+            registryEntries={registryEntries}
+            crossSectionalFeatureCount={crossSectionalFeatureCount}
             featureTier={featureTier}
             featureToggles={featureToggles}
             onChangeFeatureTier={setFeatureTier}
@@ -370,12 +494,18 @@ function ICAnalysisPageContent() {
                 selectable
                 selectedFeatures={selectedFeatures}
                 onSelectFeatures={setSelectedFeatures}
+                analysisMode={resultMode}
+                crossSectionalSampleSize={crossSectionalSampleSize}
+                crossSectionalSymbolCount={crossSectionalSymbolCount}
+                taskId={taskId}
               />
 
               <DeepAnalysisConfigPanel
                 selectedFeatureCount={selectedFeatures.length}
                 modules={deepAnalysisModules}
+                neutralizationMode={neutralizationMode}
                 onModulesChange={setDeepAnalysisModules}
+                onNeutralizationModeChange={setNeutralizationMode}
                 onStart={handleStartDeepAnalysis}
                 isRunning={isDeepRunning}
               />
@@ -395,8 +525,18 @@ function ICAnalysisPageContent() {
                 <TabsContent value="basic" className="space-y-6">
                   <FilterFunnelChart filterLog={report?.filter_log} />
 
+                  {resultMode === 'cross_sectional' && (
+                    <ChartErrorBoundary title="Cross-Sectional IC Heatmap">
+                      <CrossSectionalICHeatmap data={report?.cross_sectional_symbol_ic || null} />
+                    </ChartErrorBoundary>
+                  )}
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <ICDecayChart data={report?.ic_decay?.[activeFeature || ''] || null} featureName={activeFeature} />
+                    <ICDecayChart
+                      data={report?.ic_decay?.[activeFeature || ''] || null}
+                      featureName={activeFeature}
+                      timeframe={config.timeframe}
+                    />
                     <QuantileReturnChart
                       data={report?.quantile_returns?.[activeFeature || ''] || null}
                       featureName={activeFeature}
@@ -428,6 +568,29 @@ function ICAnalysisPageContent() {
                       failed={deepSummary?.failed || 0}
                       errors={deepAnalysisReport?.deep_analysis_errors || []}
                     />
+
+                    {crossSymbolValidationData && (
+                      <ChartErrorBoundary title="Cross Symbol Validation">
+                        <CrossSymbolValidationPanel data={crossSymbolValidationData} />
+                      </ChartErrorBoundary>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {featureToggles.turnover_analysis && (
+                        <ChartErrorBoundary title="Turnover Time Series">
+                          <TurnoverTimeSeriesChart
+                            data={report?.turnover_analysis?.[activeFeature || ''] || null}
+                            featureName={activeFeature}
+                          />
+                        </ChartErrorBoundary>
+                      )}
+                      <ChartErrorBoundary title="Factor Equity Curve">
+                        <FactorEquityCurveChart
+                          data={report?.quantile_returns?.[activeFeature || ''] || null}
+                          featureName={activeFeature}
+                        />
+                      </ChartErrorBoundary>
+                    </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <ChartErrorBoundary title="C13 Factor Return">

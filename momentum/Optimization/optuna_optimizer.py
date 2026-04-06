@@ -95,11 +95,6 @@ from momentum.core.contracts import (
     StrategyConfig,
     ParameterRange,
 )
-from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
-from momentum.Analysis.kline_cache import KlineCache
-from momentum.Analysis.indicator_cache import IndicatorCache
-from momentum.DataExtraction.kline_storage import KlineStorageManager
-from momentum.Indicators.indicator_engine import IndicatorEngine
 from momentum.core.config import MomentumConfig
 from momentum.core.protocols import IOptimizationObjective
 
@@ -478,11 +473,16 @@ class OptunaOptimizer:
 
             # 同步分析器（用於真正的多核並行，繞過 async event loop 瓶頸）
             self._momentum_config = MomentumConfig.from_project_root()
-            self._kline_storage = KlineStorageManager(
+            from momentum.factories import (
+                create_kline_storage_manager,
+                create_indicator_engine,
+                create_signal_density_analyzer,
+            )
+            self._kline_storage = create_kline_storage_manager(
                 cache_dir=str(self._momentum_config.data_cache_path)
             )
-            self._indicator_engine = IndicatorEngine()
-            self._sync_analyzer = SignalDensityAnalyzer(
+            self._indicator_engine = create_indicator_engine()
+            self._sync_analyzer = create_signal_density_analyzer(
                 kline_storage=self._kline_storage,
                 indicator_engine=self._indicator_engine
             )
@@ -493,10 +493,10 @@ class OptunaOptimizer:
             self._sync_analyzer = None
 
         # K 線預載入快取（用於加速優化，在 optimize() 時初始化）
-        self._kline_cache: Optional[KlineCache] = None
+        self._kline_cache: Optional[Any] = None
 
         # 指標預計算快取（用於加速 EMA 計算，在 optimize() 時初始化）
-        self._indicator_cache: Optional[IndicatorCache] = None
+        self._indicator_cache: Optional[Any] = None
 
         # 日誌
         self.logger = logging.getLogger(__name__)
@@ -1809,7 +1809,8 @@ class OptunaOptimizer:
             return
 
         # 建立並預載入快取
-        self._kline_cache = KlineCache(
+        from momentum.factories import create_kline_cache
+        self._kline_cache = create_kline_cache(
             kline_storage=self._kline_storage,
             n_workers=min(8, self.n_jobs * 2)  # 使用更多線程加速預載入
         )
@@ -1997,7 +1998,8 @@ class OptunaOptimizer:
         )
 
         # 建立指標快取 (使用自動記憶體偵測)
-        self._indicator_cache = IndicatorCache(
+        from momentum.factories import create_indicator_cache
+        self._indicator_cache = create_indicator_cache(
             kline_cache=self._kline_cache,
             n_workers=min(8, self.n_jobs * 2),
             memory_limit_mb=None  # 自動偵測

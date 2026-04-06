@@ -25,7 +25,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 200, sortBy: 'std', sortOrder: 'desc' })
+    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'std', sortOrder: 'desc', detailLevel: 'table' })
       .then((resp) => {
         if (!active) return;
         setAvailable(resp.features.map((item) => item.name));

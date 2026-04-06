@@ -25,12 +25,23 @@ def test_report_generation_and_persistence(tmp_path: Path):
         "rolling_ic_series": {},
         "turnover_analysis": {},
         "coverage_analysis": {},
+        "cross_sectional_symbol_ic": {
+            "symbols": ["BTCUSDT", "ETHUSDT"],
+            "features": ["f1"],
+            "matrix": {"f1": {"BTCUSDT": 0.1, "ETHUSDT": 0.08}},
+        },
+        "cross_symbol_validation": {
+            "status": "completed",
+            "consistency_score": 0.76,
+        },
     }
     metadata = {"total_features_input": 10, "total_features_output": 5}
 
     report = reporter.generate_json_report(analysis_results, metadata)
     assert report["metadata"]["total_features_output"] == 5
     assert "summary_table" in report
+    assert "cross_sectional_symbol_ic" in report
+    assert "cross_symbol_validation" in report
 
     output_dir = tmp_path / "reports"
     saved = reporter.save_report(report, str(output_dir), "case_1")

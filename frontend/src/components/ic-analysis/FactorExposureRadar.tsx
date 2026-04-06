@@ -10,18 +10,28 @@ interface FactorExposureRadarProps {
 }
 
 export default function FactorExposureRadar({ data }: FactorExposureRadarProps) {
+  const activeExposure = data?.neutralized_portfolio_exposure || data?.portfolio_exposure || data?.factor_attribution?.factor_betas;
+
   const chartData = useMemo(() => {
-    return Object.entries(data?.portfolio_exposure || {}).map(([factor, value]) => ({
+    return Object.entries(activeExposure || {}).map(([factor, value]) => ({
       factor,
       exposure: Math.abs(value),
     }));
-  }, [data?.portfolio_exposure]);
+  }, [activeExposure]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">C20 Factor Exposure Radar</CardTitle>
-        <CardDescription>因子曝險雷達圖</CardDescription>
+        <CardDescription>
+          因子曝險雷達圖
+          {data?.neutralization_mode && data.neutralization_mode !== 'none'
+            ? `（${data.neutralization_mode}）`
+            : ''}
+          {typeof data?.neutralization_delta_hhi === 'number'
+            ? `，ΔHHI=${data.neutralization_delta_hhi.toFixed(4)}`
+            : ''}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {chartData.length === 0 ? (

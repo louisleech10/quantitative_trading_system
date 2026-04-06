@@ -12,7 +12,7 @@ from api.models.feature_toggle_models import (
 	FeatureToggleResponse,
 	FeatureToggleSummary,
 )
-from momentum.Analysis.feature_toggle_registry import DifficultyLevel, FeatureToggleRegistry
+from momentum.core.contracts import DifficultyLevel
 from momentum.factories import create_feature_toggle_registry
 
 

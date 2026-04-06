@@ -6,13 +6,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
-from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+from momentum.factories import create_feature_registry
 
 router = APIRouter(prefix="/feature-registry", tags=["feature-registry"])
 
 
-def _load_registry() -> FeatureRegistry:
-    return FeatureRegistry()
+def _load_registry():
+    return create_feature_registry()
 
 
 @router.get("/entries")

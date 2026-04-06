@@ -12,29 +12,21 @@ import numpy as np
 import pandas as pd
 
 from api.core.logging import get_logger
+from api.utils.feature_name_parser import (
+    LEVEL_CATEGORY_MAP,
+    infer_category,
+    infer_layer,
+    infer_level,
+)
 
 
 logger = get_logger("api.feature_export_service")
-
-# Compiled once at module level — matches any Layer 2 derived-operator suffix.
-# Derived from derived_operators.py output naming conventions.
-_LAYER2_RE = re.compile(
-    r"_(Cross|Ratio|Distance|SignedStrength|Sign|Log1p|Abs|Clip)$"
-    r"|_Momentum_L\d+$"
-    r"|_(TsArgmax|TsArgmin|TsRank|DecayLinear)_W\d+$"
-    r"|_TsCorr_.+_W\d+$"
-    r"|_BinarySignal"  # optional suffix after _BinarySignal
-)
 
 
 class FeatureExportService:
     """Build AI-friendly export payloads from feature DataFrame."""
 
-    LEVEL_CATEGORY_MAP = {
-        "L1_basic": ["trend", "momentum", "volatility", "volume"],
-        "L2_intermediate": ["statistics", "cycle", "pattern", "tail_risk"],
-        "L3_advanced": ["microstructure", "entropy"],
-    }
+    LEVEL_CATEGORY_MAP = LEVEL_CATEGORY_MAP
 
     def build_json_report(
         self,
@@ -446,64 +438,14 @@ class FeatureExportService:
         return "\n".join(lines)
 
     def _infer_category(self, feature_name: str) -> str:
-        if feature_name.startswith("ms_"):
-            return "microstructure"
-        if feature_name.startswith("ent_"):
-            return "entropy"
-        if feature_name.startswith("tr_"):
-            return "tail_risk"
-        if feature_name.startswith("close_trend_") or feature_name.startswith("volume_trend_") or "_trend_" in feature_name:
-            return "trend"
-        if "_momentum_" in feature_name:
-            return "momentum"
-        if "_volatility_" in feature_name:
-            return "volatility"
-        if "_volume_" in feature_name:
-            return "volume"
-        if "_cycle_" in feature_name:
-            return "cycle"
-        if "_pattern_" in feature_name:
-            return "pattern"
-        if "_statistics_" in feature_name or "_stats_" in feature_name or "_stat_" in feature_name:
-            return "statistics"
-        if feature_name.startswith("meta_"):
-            return "meta"
-        return "other"
+        return infer_category(feature_name)
 
     def _infer_level(self, category: str) -> str:
-        for level, categories in self.LEVEL_CATEGORY_MAP.items():
-            if category in categories:
-                return level
-        return "L1_basic"
+        return infer_level(category)
 
     @staticmethod
     def _infer_layer(feature_name: str) -> str:
-        # Detection order reflects pipeline depth: outermost transform wins.
-        # Layer 4 (Lag) is applied to Layers 1-3; Layer 5 (cs_) is NOT lagged.
-        # Layer 6.5 preprocessing wraps everything — always check first.
-
-        # Layer 6.5: preprocessing — _rank/_gaussian/_zscore_{n} (lowercase, no _W)
-        if (feature_name.endswith("_rank")
-                or feature_name.endswith("_gaussian")
-                or bool(re.search(r"_zscore_\d+$", feature_name))):
-            return "layer6_5"
-        # Layer 6: meta features
-        if feature_name.startswith("meta_"):
-            return "layer6"
-        # Layer 5: cross-sectional features (cs_ prefix; not fed into Lag layer)
-        if feature_name.startswith("cs_"):
-            return "layer5"
-        # Layer 4: lag — suffix _Lag_{n} (capital L, applied to Layers 1-3)
-        if "_Lag_" in feature_name:
-            return "layer4"
-        # Layer 3: rolling aggregation — suffix _{Agg}_W{n}
-        if re.search(r"_(Mean|Std|Min|Max|Range|Slope|Rank|ZScore|Skew|Kurt)_W\d+$", feature_name):
-            return "layer3"
-        # Layer 2: derived operators (all known suffixes from derived_operators.py)
-        if _LAYER2_RE.search(feature_name):
-            return "layer2"
-        # Layer 1: atomic indicators (fallback)
-        return "layer1"
+        return infer_layer(feature_name)
 
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:

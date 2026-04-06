@@ -19,8 +19,7 @@ import pandas as pd
 
 from api.core.logging import get_logger
 from api.models.ic_models import DeepAnalysisRequest, ICAnalyzeRequest, ICFullAnalysisRequest
-from momentum.factories import create_feature_library, create_ic_analyzer
-from momentum.Analysis.ic_reporter import ICReporter
+from momentum.factories import create_feature_library, create_ic_analyzer, create_ic_reporter
 
 
 logger = get_logger("api.ic_analysis_service")
@@ -247,7 +246,7 @@ class ICAnalysisService:
                 "media_type": "application/x-hdf5",
             }
 
-        reporter = ICReporter(config={})
+        reporter = create_ic_reporter(config={})
         payload_for_export = dict(report)
         if isinstance(deep_report, dict):
             payload_for_export.setdefault("deep_analysis_report", deep_report)
@@ -404,6 +403,7 @@ class ICAnalysisService:
                 None,
             )
             serialized = self._serialize_deep_report(deep_report)
+            serialized = self._attach_cross_symbol_context(serialized, analyzer)
 
             with self._lock:
                 task_info = self._tasks.get(task_id)
@@ -548,6 +548,7 @@ class ICAnalysisService:
                     None,
                 )
                 deep_result = self._serialize_deep_report(deep_report)
+                deep_result = self._attach_cross_symbol_context(deep_result, analyzer)
                 if isinstance(report, dict):
                     report["deep_analysis_enabled"] = True
                     report["deep_analysis_report"] = deep_result
@@ -751,6 +752,26 @@ class ICAnalysisService:
         if isinstance(normalized, dict):
             return normalized
         return {"raw": normalized}
+
+    def _attach_cross_symbol_context(self, deep_payload: Dict[str, Any], analyzer: Any) -> Dict[str, Any]:
+        if not isinstance(deep_payload, dict):
+            return deep_payload
+
+        report = None
+        if hasattr(analyzer, "get_report"):
+            try:
+                report = analyzer.get_report()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Unable to read analyzer report for deep payload merge: %s", exc)
+
+        if not isinstance(report, dict):
+            return deep_payload
+
+        for key in ("cross_symbol_validation", "cross_sectional_symbol_ic"):
+            if key in report and key not in deep_payload:
+                deep_payload[key] = self._to_json_compatible(report.get(key))
+
+        return deep_payload
 
     def _to_json_compatible(self, value: Any) -> Any:
         """Recursively normalize nested values for FastAPI/Pydantic serialization."""

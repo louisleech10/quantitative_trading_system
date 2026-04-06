@@ -19,8 +19,10 @@ import json
 from pathlib import Path
 
 from api.core.logging import get_logger
-from momentum.FeatureEngineering.ml_pipeline_config import MLPipelineConfig
-from momentum.FeatureEngineering.feature_config import IndicatorConfig
+from momentum.factories import get_ml_pipeline_config_class
+from momentum.core.contracts import IndicatorConfig
+
+MLPipelineConfig = get_ml_pipeline_config_class()
 
 router = APIRouter(prefix="/api/v1/ml-pipeline")
 logger = get_logger("api.routes.ml_pipeline")

@@ -66,7 +66,7 @@ from api.services.shap_analysis_service import SHAPAnalysisService
 from api.services.xgboost_task_cache import XGBoostTaskCache
 from api.core.logging import get_logger
 from api.utils.json_serializer import sanitize_for_json
-from momentum.Analysis.prediction_analyzer import PredictionAnalyzer
+from momentum.factories import create_prediction_analyzer
 
 logger = get_logger(__name__)
 
@@ -76,7 +76,7 @@ router = APIRouter(prefix="/pattern-analysis", tags=["Pattern Analysis"])
 xgboost_service = XGBoostTaskService()
 shap_service = SHAPAnalysisService()
 task_cache = XGBoostTaskCache()
-prediction_analyzer = PredictionAnalyzer()
+prediction_analyzer = create_prediction_analyzer()
 model_task_service = ModelTaskService()
 
 
@@ -348,15 +348,13 @@ async def _perform_oot_validation(
     import pandas as pd
     from datetime import datetime
     
-    from momentum.Analysis.time_splitter import (
-        TimeSplitter,
-        TimestampColumnNotFound,
-        InsufficientOOTSamples,
-        InsufficientTrainSamples,
-        TimeRangeOverlap
+    from momentum.factories import (
+        create_time_splitter,
+        get_time_splitter_exceptions,
+        create_xgboost_analyzer,
+        create_drift_analyzer,
     )
-    from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
-    from momentum.Analysis.drift_analyzer import DriftAnalyzer
+    TimestampColumnNotFound, InsufficientOOTSamples, InsufficientTrainSamples, TimeRangeOverlap = get_time_splitter_exceptions()
     
     # 獲取原始任務資訊
     symbols = task_result.get('symbols', [])
@@ -404,7 +402,7 @@ async def _perform_oot_validation(
     logger.info(f"案例資料載入完成 - 總案例數: {len(cases_df)}")
     
     # 初始化時間切分器
-    time_splitter = TimeSplitter(
+    time_splitter = create_time_splitter(
         min_oot_samples=50,
         min_train_samples=100,
         random_seed=42
@@ -501,7 +499,7 @@ async def _perform_oot_validation(
         logger.warning("未找到指標配置，使用基本特徵")
     
     # 為每個標的計算特徵
-    from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, StrategyParams
+    from momentum.factories import create_feature_extractor, create_strategy_params
     
     all_symbol_features = {}
     for sym, kline_df in all_kline_data.items():
@@ -509,7 +507,7 @@ async def _perform_oot_validation(
         sym_feature_names = []
         
         for indicator_config in indicators:
-            strategy_params = StrategyParams(
+            strategy_params = create_strategy_params(
                 strategy_type=indicator_config['indicator'],
                 params=indicator_config['params'],
                 data_source=indicator_config.get('data_source', 'close')
@@ -603,7 +601,7 @@ async def _perform_oot_validation(
     try:
         X_train, _ = _extract_feature_vectors(split_result.train_df, "Train")
         if len(X_train) >= 50:
-            drift_analyzer = DriftAnalyzer()
+            drift_analyzer = create_drift_analyzer()
             psi_results = drift_analyzer.calculate_all_features_psi(
                 X_train=X_train,
                 X_test=X_oot,
@@ -643,7 +641,7 @@ async def _perform_oot_validation(
     model = model_data['model']
     
     # 建立 XGBoostAnalyzer 並設定模型
-    analyzer = XGBoostAnalyzer()
+    analyzer = create_xgboost_analyzer()
     analyzer.model = model
     analyzer.feature_names = feature_names
     
@@ -828,6 +826,7 @@ async def start_batch_xgboost_analysis(request: XGBoostBatchAnalysisRequest):
             symbols=request.symbols,
             timeframe=request.timeframe,
             indicators=indicators,
+            selected_features=request.selected_features,
             lookback_bars=request.lookback_bars,
             sequence_length=request.sequence_length,
             sequence_feature_mode=request.sequence_feature_mode,
@@ -871,6 +870,7 @@ async def start_batch_analysis(request: BatchAnalysisRequest):
             symbols=request.symbols,
             timeframe=request.timeframe,
             indicators=indicators,
+            selected_features=request.selected_features,
             lookback_bars=request.lookback_bars,
             sequence_length=request.sequence_length,
             sequence_feature_mode=request.sequence_feature_mode,

@@ -10,8 +10,20 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { Star } from 'lucide-react';
 
-import type { FeatureBrowserDistributionResponse, FeatureOverview } from '@/lib/types';
+import type { FeatureBrowserDistributionResponse, FeatureOverview, WatchlistStatus } from '@/lib/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useWatchlistStore } from '@/store/watchlistStore';
 
 interface FeatureSummaryTableProps {
   overview: FeatureOverview | null;
@@ -31,8 +43,20 @@ export default function FeatureSummaryTable({
   const [distribution, setDistribution] = useState<FeatureBrowserDistributionResponse | null>(null);
   const [isLoadingDistribution, setIsLoadingDistribution] = useState(false);
   const [distributionError, setDistributionError] = useState<string | null>(null);
+  const [watchlistFeature, setWatchlistFeature] = useState<string | null>(null);
+  const [watchlistStatus, setWatchlistStatus] = useState<WatchlistStatus>('candidate');
+  const [watchlistNote, setWatchlistNote] = useState('');
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
+
+  const watchlistEntries = useWatchlistStore((state) => state.entries);
+  const addWatchlistEntry = useWatchlistStore((state) => state.addEntry);
 
   const selected = selectedFeature || overview?.items[0]?.feature_name || null;
+
+  const watchlistSet = useMemo(
+    () => new Set(watchlistEntries.map((entry) => entry.feature_name)),
+    [watchlistEntries]
+  );
 
   const nanHeatmapData = useMemo(() => {
     if (!overview) {
@@ -76,6 +100,37 @@ export default function FeatureSummaryTable({
     }
   };
 
+  const openWatchlistDialog = (featureName: string) => {
+    const existing = watchlistEntries.find((entry) => entry.feature_name === featureName);
+    setWatchlistFeature(featureName);
+    setWatchlistStatus(existing?.status || 'candidate');
+    setWatchlistNote(existing?.note || '');
+    setWatchlistError(null);
+  };
+
+  const submitWatchlist = () => {
+    if (!watchlistFeature) {
+      return;
+    }
+
+    try {
+      addWatchlistEntry({
+        feature_name: watchlistFeature,
+        task_id: featuresPath || 'feature-browser',
+        status: watchlistStatus,
+        note: watchlistNote,
+        ic_snapshot: null,
+        icir_snapshot: null,
+        added_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      setWatchlistFeature(null);
+      setWatchlistError(null);
+    } catch (error) {
+      setWatchlistError(error instanceof Error ? error.message : '加入 Watchlist 失敗');
+    }
+  };
+
   if (!overview || overview.items.length === 0) {
     return <div className="rounded-xl border border-white/10 bg-[#141b2d] p-4 text-sm text-slate-300">沒有可顯示的特徵摘要。</div>;
   }
@@ -88,6 +143,10 @@ export default function FeatureSummaryTable({
           特徵數 {overview.total_features} / 數值欄位 {overview.numeric_features} / 平均 NaN% {overview.mean_nan_pct.toFixed(2)}
         </p>
 
+        {watchlistError && (
+          <div className="mt-2 text-xs text-rose-300">{watchlistError}</div>
+        )}
+
         <div className="mt-4 max-h-72 overflow-auto">
           <table className="min-w-full text-xs">
             <thead className="text-slate-300">
@@ -99,6 +158,7 @@ export default function FeatureSummaryTable({
                 <th className="px-2 py-1 text-right">Max</th>
                 <th className="px-2 py-1 text-right">NaN%</th>
                 <th className="px-2 py-1 text-right">Action</th>
+                <th className="px-2 py-1 text-right">Watchlist</th>
               </tr>
             </thead>
             <tbody>
@@ -116,6 +176,14 @@ export default function FeatureSummaryTable({
                       className="rounded border border-white/20 px-2 py-1 text-slate-200 hover:bg-white/10"
                     >
                       C31
+                    </button>
+                  </td>
+                  <td className="px-2 py-1 text-right">
+                    <button
+                      onClick={() => openWatchlistDialog(item.feature_name)}
+                      className="inline-flex items-center rounded border border-amber-400/40 px-2 py-1 text-amber-200 hover:bg-amber-400/10"
+                    >
+                      <Star className={`h-3.5 w-3.5 ${watchlistSet.has(item.feature_name) ? 'fill-amber-300' : ''}`} />
                     </button>
                   </td>
                 </tr>
@@ -169,6 +237,41 @@ export default function FeatureSummaryTable({
           })}
         </div>
       </div>
+
+      <Dialog open={Boolean(watchlistFeature)} onOpenChange={(open) => !open && setWatchlistFeature(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>加入 Watchlist</DialogTitle>
+            <DialogDescription>{watchlistFeature || '--'}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <select
+              value={watchlistStatus}
+              onChange={(event) => setWatchlistStatus(event.target.value as WatchlistStatus)}
+              className="h-9 w-full rounded-md border border-white/10 bg-slate-950 px-3 text-sm text-slate-100"
+            >
+              <option value="candidate">候選</option>
+              <option value="verified">已驗證</option>
+              <option value="rejected">淘汰</option>
+              <option value="watching">觀察中</option>
+            </select>
+
+            <Input
+              value={watchlistNote}
+              onChange={(event) => setWatchlistNote(event.target.value)}
+              placeholder="備註"
+            />
+
+            {watchlistError && <div className="text-xs text-rose-300">{watchlistError}</div>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWatchlistFeature(null)}>取消</Button>
+            <Button onClick={submitWatchlist}>儲存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

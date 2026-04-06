@@ -21,6 +21,7 @@ import {
 interface ICConfigPanelProps {
   config: ICAnalysisConfig;
   registryEntries?: FeatureRegistryEntry[];
+  crossSectionalFeatureCount?: number;
   featureTier: FeatureTierLevel;
   featureToggles: Record<string, boolean>;
   onChangeFeatureTier: (tier: FeatureTierLevel) => void;
@@ -42,6 +43,7 @@ const horizonOptions = [1, 2, 3, 5, 8, 13, 21].map((value) => ({
 export default function ICConfigPanel({
   config,
   registryEntries = [],
+  crossSectionalFeatureCount = 0,
   featureTier,
   featureToggles,
   onChangeFeatureTier,
@@ -56,6 +58,31 @@ export default function ICConfigPanel({
     [registryEntries]
   );
   const timeframeOptions = useMemo(() => {
+    if (config.mode === 'cross_sectional') {
+      const selectedSymbols = config.cross_sectional_symbols || [];
+      if (selectedSymbols.length === 0) {
+        return Array.from(new Set(registryEntries.map((entry) => entry.timeframe))).sort();
+      }
+
+      const timeframeSets = selectedSymbols.map(
+        (symbol) =>
+          new Set(
+            registryEntries
+              .filter((entry) => entry.symbol === symbol)
+              .map((entry) => entry.timeframe)
+          )
+      );
+
+      const [firstSet, ...restSets] = timeframeSets;
+      if (!firstSet) {
+        return [];
+      }
+
+      return Array.from(firstSet)
+        .filter((timeframe) => restSets.every((set) => set.has(timeframe)))
+        .sort();
+    }
+
     if (!config.symbol) {
       return Array.from(new Set(registryEntries.map((entry) => entry.timeframe))).sort();
     }
@@ -66,7 +93,32 @@ export default function ICConfigPanel({
           .map((entry) => entry.timeframe)
       )
     ).sort();
-  }, [config.symbol, registryEntries]);
+  }, [config.mode, config.symbol, config.cross_sectional_symbols, registryEntries]);
+
+  const crossSymbolOptions = useMemo(
+    () => symbolOptions.map((symbol) => ({ value: symbol, label: symbol })),
+    [symbolOptions]
+  );
+
+  const isCrossSectionalMode = config.mode === 'cross_sectional';
+  const selectedCrossSymbols = config.cross_sectional_symbols || [];
+  const crossSymbolInsufficient = isCrossSectionalMode && selectedCrossSymbols.length < 2;
+  const crossFeatureOverflow = isCrossSectionalMode && crossSectionalFeatureCount > 50;
+  const noAvailableSymbols = isCrossSectionalMode && symbolOptions.length === 0;
+  const crossTimeframeInvalid =
+    isCrossSectionalMode &&
+    Boolean(config.timeframe) &&
+    !timeframeOptions.includes(config.timeframe as string);
+
+  const runDisabled =
+    isRunning ||
+    (isCrossSectionalMode && (
+      crossSymbolInsufficient ||
+      !config.timeframe ||
+      crossTimeframeInvalid ||
+      crossFeatureOverflow ||
+      noAvailableSymbols
+    ));
 
   const updateConfig = (patch: ICConfigPatch) => {
     onConfigChange({
@@ -113,36 +165,69 @@ export default function ICConfigPanel({
 
         <div className="rounded-lg border border-white/10 p-3 space-y-3">
           <p className="text-xs text-slate-400">或從 Feature Library 選擇</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Select
-              value={config.symbol}
-              onValueChange={(value) => updateConfig({ symbol: value, timeframe: undefined })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="選擇 Symbol" />
-              </SelectTrigger>
-              <SelectContent>
-                {symbolOptions.map((symbol) => (
-                  <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {!isCrossSectionalMode ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Select
+                value={config.symbol}
+                onValueChange={(value) => updateConfig({ symbol: value, timeframe: undefined })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇 Symbol" />
+                </SelectTrigger>
+                <SelectContent>
+                  {symbolOptions.map((symbol) => (
+                    <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select
-              value={config.timeframe}
-              onValueChange={(value) => updateConfig({ timeframe: value })}
-              disabled={!config.symbol}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="選擇 Timeframe" />
-              </SelectTrigger>
-              <SelectContent>
-                {timeframeOptions.map((timeframe) => (
-                  <SelectItem key={timeframe} value={timeframe}>{timeframe}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <Select
+                value={config.timeframe}
+                onValueChange={(value) => updateConfig({ timeframe: value })}
+                disabled={!config.symbol}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇 Timeframe" />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeframeOptions.map((timeframe) => (
+                    <SelectItem key={timeframe} value={timeframe}>{timeframe}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <MultiSelect
+                label="截面 Symbol 多選"
+                options={crossSymbolOptions}
+                value={selectedCrossSymbols}
+                onChange={(values) =>
+                  updateConfig({
+                    cross_sectional_symbols: values,
+                    timeframe: undefined,
+                  })
+                }
+                placeholder={noAvailableSymbols ? '無可用標的' : '請選擇至少 2 個 Symbol'}
+                description="資料來源：Feature Library registry"
+                disabled={noAvailableSymbols}
+              />
+              <Select
+                value={config.timeframe}
+                onValueChange={(value) => updateConfig({ timeframe: value })}
+                disabled={timeframeOptions.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={timeframeOptions.length === 0 ? '無可用 Timeframe' : '選擇共同 Timeframe'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {timeframeOptions.map((timeframe) => (
+                    <SelectItem key={timeframe} value={timeframe}>{timeframe}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -150,7 +235,7 @@ export default function ICConfigPanel({
         <label className="text-sm font-medium text-slate-200">分析模式</label>
         <Select
           value={config.mode}
-          onValueChange={(value) => updateConfig({ mode: value as 'global' | 'event' })}
+          onValueChange={(value) => updateConfig({ mode: value as ICAnalysisConfig['mode'] })}
         >
           <SelectTrigger>
             <SelectValue placeholder="選擇模式" />
@@ -158,6 +243,7 @@ export default function ICConfigPanel({
           <SelectContent>
             <SelectItem value="global">Global 模式</SelectItem>
             <SelectItem value="event">Event-Driven 模式</SelectItem>
+            <SelectItem value="cross_sectional">截面 IC</SelectItem>
           </SelectContent>
         </Select>
 
@@ -168,6 +254,24 @@ export default function ICConfigPanel({
             onChange={(event) => updateConfig({ event_query: event.target.value })}
             rows={4}
           />
+        )}
+
+        {isCrossSectionalMode && (
+          <div className="space-y-2 text-xs">
+            {crossSymbolInsufficient && (
+              <p className="text-amber-300">請至少選擇 2 個 Symbol</p>
+            )}
+            {crossFeatureOverflow && (
+              <p className="text-amber-300">截面 IC 最多支援 50 個因子，請先在 Feature Browser 篩選</p>
+            )}
+            {crossTimeframeInvalid && (
+              <p className="text-amber-300">目前 Timeframe 與已選 Symbol 不相容，請重新選擇共同 Timeframe</p>
+            )}
+            {noAvailableSymbols && (
+              <p className="text-amber-300">無可用標的</p>
+            )}
+            <p className="text-slate-400">目前預估分析因子數：{crossSectionalFeatureCount}</p>
+          </div>
         )}
       </div>
 
@@ -238,7 +342,7 @@ export default function ICConfigPanel({
 
       <Button
         onClick={onRunAnalysis}
-        disabled={isRunning}
+        disabled={runDisabled}
         className="w-full bg-cyan-500/20 text-cyan-100 border border-cyan-300/30 hover:bg-cyan-500/30"
       >
         {isRunning ? '分析執行中...' : '啟動 IC 分析'}

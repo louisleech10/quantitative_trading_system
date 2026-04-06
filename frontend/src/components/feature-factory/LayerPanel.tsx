@@ -6,7 +6,6 @@ import { Layers, Search, X, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { FeaturePreview, FeatureSchema, SchemaIndicator } from '@/lib/types';
 import CategorySection from './CategorySection';
-import IndicatorCheckbox from './IndicatorCheckbox';
 
 // ─── Instant Tooltip（Portal 版，脫離父層 stacking context） ────
 function ItemTooltip({ text, children }: { text: string; children: React.ReactNode }) {

@@ -220,7 +220,8 @@ class ICFilterOrchestrator:
         if not time_levels:
             raise InvalidInputError("cannot infer timestamp level for cross-sectional analysis")
 
-        grouped = numeric_df.groupby(level=time_levels, sort=True)
+        grouped_level: Any = time_levels[0] if len(time_levels) == 1 else time_levels
+        grouped = numeric_df.groupby(level=grouped_level, sort=True)
         ic_series: dict[str, list[float]] = {column: [] for column in feature_cols}
         n_slices = 0
 
@@ -249,11 +250,16 @@ class ICFilterOrchestrator:
                 ic_std = np.nan
                 icir = np.nan
                 ic_hit_rate = np.nan
+                t_stat = np.nan
             else:
                 ic_mean = float(np.nanmean(values))
                 ic_std = float(np.nanstd(values))
                 icir = float(ic_mean / ic_std) if ic_std > 0 else np.nan
                 ic_hit_rate = float(np.mean(values > 0))
+                if values.size > 1 and ic_std > 0:
+                    t_stat = float(ic_mean / (ic_std / np.sqrt(values.size)))
+                else:
+                    t_stat = np.nan
 
             summary_table.append(
                 {
@@ -261,6 +267,7 @@ class ICFilterOrchestrator:
                     "ic_mean": ic_mean,
                     "ic_std": ic_std,
                     "icir": icir,
+                    "t_stat": t_stat,
                     "p_value": None,
                     "ic_hit_rate": ic_hit_rate,
                     "monotonicity_score": None,
@@ -282,9 +289,24 @@ class ICFilterOrchestrator:
             reverse=True,
         )
 
+        ranked_features = [
+            item.get("feature_name")
+            for item in summary_table
+            if isinstance(item.get("feature_name"), str)
+        ]
+
+        symbol_ic_matrix = self._build_cross_sectional_symbol_matrix(
+            numeric_df=numeric_df,
+            feature_cols=ranked_features,
+            label_col=label_col,
+            symbol_level_idx=symbol_level_idx,
+        )
+        cross_symbol_validation = self._build_cross_symbol_validation(symbol_ic_matrix)
+
         metadata = {
             "mode": "cross_sectional",
             "n_symbols": int(features.index.get_level_values(symbol_level_idx).nunique()),
+            "symbols": symbol_ic_matrix.get("symbols", []),
             "n_timestamps": int(n_slices),
             "total_features_input": len(feature_cols),
             "total_features_output": len(feature_cols),
@@ -307,12 +329,154 @@ class ICFilterOrchestrator:
             },
             "turnover_analysis": {},
             "coverage_analysis": {},
+            "cross_sectional_symbol_ic": symbol_ic_matrix,
+            "cross_symbol_validation": cross_symbol_validation,
         }
 
         report = self._reporter.generate_json_report(analysis_results, metadata)
         self._report = report
         self._report_progress(2, "cross_sectional", 1.0, "completed")
         return report
+
+    @staticmethod
+    def _safe_rank_corr(x: pd.Series, y: pd.Series) -> Optional[float]:
+        pair = pd.concat([x, y], axis=1).dropna()
+        if len(pair) < 2:
+            return None
+        ranked_x = pair.iloc[:, 0].rank(method="average")
+        ranked_y = pair.iloc[:, 1].rank(method="average")
+        corr = ranked_x.corr(ranked_y, method="pearson")
+        if pd.isna(corr):
+            return None
+        return float(corr)
+
+    def _build_cross_sectional_symbol_matrix(
+        self,
+        numeric_df: pd.DataFrame,
+        feature_cols: list[str],
+        label_col: str,
+        symbol_level_idx: int,
+    ) -> dict[str, Any]:
+        symbols: list[str] = []
+        matrix: dict[str, dict[str, Optional[float]]] = {
+            feature_name: {} for feature_name in feature_cols
+        }
+
+        for symbol, group in numeric_df.groupby(level=symbol_level_idx, sort=True):
+            symbol_name = str(symbol)
+            symbols.append(symbol_name)
+            y = group[label_col]
+
+            for feature_name in feature_cols:
+                matrix[feature_name][symbol_name] = self._safe_rank_corr(group[feature_name], y)
+
+        return {
+            "symbols": symbols,
+            "features": feature_cols,
+            "matrix": matrix,
+        }
+
+    def _build_cross_symbol_validation(self, symbol_ic_matrix: dict[str, Any]) -> dict[str, Any]:
+        symbols = [str(item) for item in symbol_ic_matrix.get("symbols", [])]
+        features = [str(item) for item in symbol_ic_matrix.get("features", [])]
+        matrix = symbol_ic_matrix.get("matrix", {})
+
+        if len(symbols) < 2 or len(features) == 0:
+            return {
+                "status": "skipped",
+                "reason": "insufficient_symbols_or_features",
+                "consistency_score": None,
+                "best_symbol": None,
+                "worst_symbol": None,
+                "symbol_scores": {},
+                "suggestions": ["Symbol 或特徵數不足，無法進行跨 Symbol 一致性驗證"],
+            }
+
+        symbol_scores: dict[str, float] = {}
+        for symbol in symbols:
+            abs_values: list[float] = []
+            for feature in features:
+                value = (matrix.get(feature) or {}).get(symbol)
+                if isinstance(value, (int, float)) and np.isfinite(value):
+                    abs_values.append(abs(float(value)))
+            if abs_values:
+                symbol_scores[symbol] = float(np.mean(abs_values))
+
+        feature_scores: list[float] = []
+        sign_conflict_features: list[str] = []
+        symbol_specific_features: list[str] = []
+        universal_features: list[str] = []
+
+        for feature in features:
+            per_symbol = (matrix.get(feature) or {})
+            values = [
+                float(value)
+                for value in (per_symbol.get(symbol) for symbol in symbols)
+                if isinstance(value, (int, float)) and np.isfinite(value)
+            ]
+            if len(values) < 2:
+                continue
+
+            sign_array = np.sign(np.array(values, dtype=float))
+            positive_count = int(np.sum(sign_array > 0))
+            negative_count = int(np.sum(sign_array < 0))
+            if positive_count > 0 and negative_count > 0:
+                sign_conflict_features.append(feature)
+
+            sign_agreement = abs(float(np.sum(sign_array))) / len(sign_array)
+            dispersion = float(np.std(values))
+            dispersion_score = max(0.0, 1.0 - min(dispersion / 0.1, 1.0))
+            feature_scores.append(0.7 * sign_agreement + 0.3 * dispersion_score)
+
+            abs_values = [abs(item) for item in values]
+            sorted_abs_values = sorted(abs_values, reverse=True)
+            if len(sorted_abs_values) >= 2 and sorted_abs_values[0] >= 0.02 and (sorted_abs_values[0] - sorted_abs_values[1]) >= 0.02:
+                symbol_specific_features.append(feature)
+
+            same_direction = positive_count == len(sign_array) or negative_count == len(sign_array)
+            strong_ratio = float(np.mean(np.array(abs_values) >= 0.015))
+            if same_direction and strong_ratio >= 0.7:
+                universal_features.append(feature)
+
+        consistency_score = float(np.mean(feature_scores)) if feature_scores else 0.0
+
+        best_symbol = None
+        worst_symbol = None
+        if symbol_scores:
+            best_symbol = max(symbol_scores, key=symbol_scores.get)
+            worst_symbol = min(symbol_scores, key=symbol_scores.get)
+
+        suggestions: list[str] = []
+        if consistency_score >= 0.7:
+            suggestions.append("跨 Symbol 一致性高，可優先納入聯合訓練候選")
+        elif consistency_score >= 0.4:
+            suggestions.append("跨 Symbol 一致性中等，建議搭配 regime 條件做分組驗證")
+        else:
+            suggestions.append("跨 Symbol 一致性偏弱，建議僅在特定 Symbol 場景使用")
+
+        if sign_conflict_features:
+            suggestions.append("部分因子在不同 Symbol 呈現方向衝突，需檢查市場結構差異")
+
+        return {
+            "status": "completed",
+            "reason": None,
+            "consistency_score": consistency_score,
+            "best_symbol": best_symbol,
+            "worst_symbol": worst_symbol,
+            "symbol_scores": symbol_scores,
+            "feature_summary": {
+                "total_features": len(features),
+                "universal_features": len(universal_features),
+                "symbol_specific_features": len(symbol_specific_features),
+                "sign_conflict_features": len(sign_conflict_features),
+            },
+            "samples": {
+                "universal_features": universal_features[:10],
+                "symbol_specific_features": symbol_specific_features[:10],
+                "sign_conflict_features": sign_conflict_features[:10],
+            },
+            "suggestions": suggestions,
+        }
 
     def refilter(self, thresholds: dict) -> dict:
         """使用新門檻重新篩選（不重算 IC）。"""
@@ -675,19 +839,54 @@ class ICFilterOrchestrator:
 
         analyzer = FactorExposureAnalyzer(config.factor_exposure.model_dump())
         factor_values = self._ic_cache["features_df"][selected_features]
+        market_proxy = pd.to_numeric(self._ic_cache.get("label_series"), errors="coerce")
         positions = pd.Series(1.0 / max(1, len(factor_values)), index=factor_values.index)
+
+        neutralization_mode = str(config.factor_exposure.neutralization_mode)
+        neutralized_values = analyzer.neutralize_factor_matrix(
+            factor_values=factor_values,
+            market_proxy=market_proxy,
+            mode=neutralization_mode,
+            lookback=config.factor_exposure.neutralization_lookback,
+        )
+
         exposure = analyzer.calculate_portfolio_exposure(positions, factor_values)
+        neutralized_exposure = analyzer.calculate_portfolio_exposure(positions, neutralized_values)
         concentration = analyzer.monitor_exposure_concentration(
             exposure,
             max_single_exposure=config.factor_exposure.max_single_exposure,
         )
+        neutralized_concentration = analyzer.monitor_exposure_concentration(
+            neutralized_exposure,
+            max_single_exposure=config.factor_exposure.max_single_exposure,
+        )
+
+        original_hhi = concentration.get("hhi")
+        neutralized_hhi = neutralized_concentration.get("hhi")
+        delta_hhi = None
+        if isinstance(original_hhi, (int, float)) and isinstance(neutralized_hhi, (int, float)):
+            delta_hhi = float(original_hhi) - float(neutralized_hhi)
+
         return {
+            "portfolio_exposure": exposure.to_dict(),
             "factor_betas": exposure.to_dict(),
+            "factor_attribution": {
+                "factor_betas": exposure.to_dict(),
+                "alpha": np.nan,
+                "r_squared": np.nan,
+                "attribution": {},
+                "unexplained": np.nan,
+            },
             "alpha": np.nan,
             "r_squared": np.nan,
             "attribution": {},
             "unexplained": np.nan,
             "concentration": concentration,
+            "neutralization_mode": neutralization_mode,
+            "neutralization_lookback": int(config.factor_exposure.neutralization_lookback),
+            "neutralized_portfolio_exposure": neutralized_exposure.to_dict(),
+            "neutralized_concentration": neutralized_concentration,
+            "neutralization_delta_hhi": delta_hhi,
         }
 
     def _run_long_short(self, selected_features: list[str], config: ICConfig) -> dict:

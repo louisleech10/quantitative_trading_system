@@ -155,6 +155,7 @@ const defaultConfig: ICAnalysisConfig = {
   labels_path: '',
   meta_path: '',
   mode: 'global',
+  cross_sectional_symbols: [],
   event_query: '',
   horizons: [1, 2, 3, 5, 8, 13, 21],
   thresholds: {

@@ -25,6 +25,17 @@ def _write_sample_feature_h5(path: Path, rows: int = 300, cols: int = 16) -> Non
         group.create_dataset("timestamps", data=timestamps)
 
 
+def _write_symbol_feature_h5(path: Path, data: np.ndarray, feature_names: list[str]) -> None:
+    with h5py.File(path, "w") as h5_file:
+        group = h5_file.create_group("data")
+        group.create_dataset("features", data=data)
+        group.create_dataset(
+            "feature_names",
+            data=np.array(feature_names, dtype=object),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )
+
+
 @pytest.fixture(scope="module")
 def sample_h5(tmp_path_factory: pytest.TempPathFactory) -> str:
     file_path = tmp_path_factory.mktemp("feature_browser_service") / "sample_features.h5"
@@ -91,3 +102,32 @@ def test_get_importance_comparison(service: FeatureBrowserService, sample_h5: st
 def test_missing_file_raises(service: FeatureBrowserService) -> None:
     with pytest.raises(FileNotFoundError):
         service.get_overview("/tmp/does_not_exist.h5")
+
+
+def test_get_coverage_matrix(service: FeatureBrowserService, tmp_path: Path) -> None:
+    feature_base = tmp_path / "features"
+    feature_base.mkdir()
+
+    _write_symbol_feature_h5(
+        feature_base / "BTCUSDT_12h_factory.h5",
+        np.array([[1.0, np.nan], [2.0, 3.0]], dtype=float),
+        ["feature_a", "feature_b"],
+    )
+    _write_symbol_feature_h5(
+        feature_base / "ETHUSDT_12h_factory.h5",
+        np.array([[1.0, 2.0], [2.0, 3.0]], dtype=float),
+        ["feature_a", "feature_b"],
+    )
+
+    payload = service.get_coverage_matrix(
+        symbols=["BTCUSDT", "ETHUSDT"],
+        timeframe="12h",
+        feature_names=["feature_a", "feature_b"],
+        feature_base_path=str(feature_base),
+    )
+
+    assert payload["symbols"] == ["BTCUSDT", "ETHUSDT"]
+    assert payload["features"] == ["feature_a", "feature_b"]
+    assert np.isclose(payload["matrix"]["feature_a"]["BTCUSDT"], 0.0)
+    assert np.isclose(payload["matrix"]["feature_b"]["BTCUSDT"], 0.5)
+    assert payload["summary"]["worst_symbol"] == "BTCUSDT"

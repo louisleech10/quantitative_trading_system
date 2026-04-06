@@ -197,6 +197,12 @@ def create_regime_analyzer() -> RegimeAnalyzer:
     return RegimeAnalyzer()
 
 
+def create_coverage_analyzer() -> "CoverageAnalyzer":
+    from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
+
+    return CoverageAnalyzer()
+
+
 def create_pattern_extractor() -> PatternExtractor:
     from momentum.Analysis.pattern_extractor import PatternExtractor
 
@@ -231,6 +237,13 @@ def create_parameter_ranges(**kwargs: Any) -> ParameterRanges:
     from momentum.Optimization.optuna_optimizer import ParameterRanges
 
     return ParameterRanges(**kwargs)
+
+
+def get_parameter_ranges_class():
+    """Return ParameterRanges class for Pydantic field type usage."""
+    from momentum.Optimization.optuna_optimizer import ParameterRanges
+
+    return ParameterRanges
 
 
 def create_optuna_optimizer(
@@ -448,3 +461,166 @@ def create_analysis_exporter() -> "AnalysisExporter":
     from momentum.Analysis.analysis_exporter import AnalysisExporter
 
     return AnalysisExporter()
+
+
+# ── Phase 2 Rule 3 factories ────────────────────────────────────────────────
+
+def create_feature_factory_mcp(
+    factory: Optional[Any] = None,
+    cache_dir: Optional[str] = None,
+) -> "FeatureFactoryMCP":
+    """Factory — Feature Factory MCP server wrapper."""
+    from momentum.FeatureEngineering.mcp.feature_factory_mcp import FeatureFactoryMCP
+
+    if factory is None:
+        factory = create_feature_factory(cache_dir=cache_dir)
+    return FeatureFactoryMCP(factory, factory.config_manager)
+
+
+def create_ic_reporter(config: Optional[dict] = None) -> "ICReporter":
+    """Factory — IC analysis report generator."""
+    from momentum.Analysis.ic_reporter import ICReporter
+
+    return ICReporter(config=config or {})
+
+
+def create_model_hyperparam_objective(**kwargs: Any) -> "ModelHyperparamObjective":
+    """Factory — Optuna objective for model hyper-parameter tuning."""
+    from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective
+
+    return ModelHyperparamObjective(**kwargs)
+
+
+def create_strategy_backtest_objective(**kwargs: Any) -> "StrategyBacktestObjective":
+    """Factory — Optuna objective for strategy backtesting."""
+    from momentum.Optimization.objectives.strategy_backtest import StrategyBacktestObjective
+
+    return StrategyBacktestObjective(**kwargs)
+
+
+def create_lstm_engine(config: Optional[Any] = None) -> "LSTMEngine":
+    """Factory — LSTM/Transformer sequence model engine."""
+    from momentum.Analysis.lstm_engine import LSTMEngine, SequenceModelConfig
+
+    if config is None:
+        config = SequenceModelConfig()
+    return LSTMEngine(config)
+
+
+def get_sequence_model_config_class():
+    """Return SequenceModelConfig class for type construction."""
+    from momentum.Analysis.lstm_engine import SequenceModelConfig
+
+    return SequenceModelConfig
+
+
+def create_feature_registry() -> "FeatureRegistry":
+    """Factory — Feature registry for feature name management."""
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    return FeatureRegistry()
+
+
+def create_prediction_analyzer() -> "PredictionAnalyzer":
+    """Factory — Prediction analyzer for pattern analysis."""
+    from momentum.Analysis.prediction_analyzer import PredictionAnalyzer
+
+    return PredictionAnalyzer()
+
+
+def get_strategy_registry() -> "StrategyRegistry":
+    """Accessor — module-level strategy registry singleton."""
+    from momentum.Analysis.strategy_registry import strategy_registry
+
+    return strategy_registry
+
+
+def compare_trials(study: Any, **kwargs: Any) -> Any:
+    """Re-export — Optuna trial comparison function."""
+    from momentum.Optimization.trial_comparison import compare_trials as _compare_trials
+
+    return _compare_trials(study, **kwargs)
+
+
+def get_trial_comparison_result_class():
+    """Return TrialComparisonResult class for type annotation/construction."""
+    from momentum.Optimization.trial_comparison import TrialComparisonResult
+
+    return TrialComparisonResult
+
+
+def load_ic_config(**kwargs: Any) -> Any:
+    """Re-export — IC config loader with YAML merge."""
+    from momentum.Analysis.ic_config_schema import load_ic_config as _load_ic_config
+
+    return _load_ic_config(**kwargs)
+
+
+def get_ml_pipeline_config_class():
+    """Return MLPipelineConfig class for type construction."""
+    from momentum.FeatureEngineering.ml_pipeline_config import MLPipelineConfig
+
+    return MLPipelineConfig
+
+
+# ─── Route-level factories (Rule 3 Phase 2) ───────────────────────────
+
+def create_result_analyzer() -> "ResultAnalyzer":
+    """Create ResultAnalyzer for optimization analysis routes."""
+    from momentum.Optimization.result_analyzer import ResultAnalyzer
+
+    return ResultAnalyzer()
+
+
+def get_momentum_config_class():
+    """Return MomentumConfig class for static method access."""
+    from momentum.core.config import MomentumConfig
+
+    return MomentumConfig
+
+
+def get_data_source_enum():
+    """Return DataSourceEnum for strategy validation."""
+    from momentum.Indicators.types import DataSourceEnum
+
+    return DataSourceEnum
+
+
+def create_time_splitter(**kwargs: Any):
+    """Create TimeSplitter instance."""
+    from momentum.Analysis.time_splitter import TimeSplitter
+
+    return TimeSplitter(**kwargs)
+
+
+def get_time_splitter_exceptions():
+    """Return TimeSplitter exception classes tuple."""
+    from momentum.Analysis.time_splitter import (
+        TimestampColumnNotFound,
+        InsufficientOOTSamples,
+        InsufficientTrainSamples,
+        TimeRangeOverlap,
+    )
+
+    return TimestampColumnNotFound, InsufficientOOTSamples, InsufficientTrainSamples, TimeRangeOverlap
+
+
+def create_drift_analyzer() -> "DriftAnalyzer":
+    """Create DriftAnalyzer instance."""
+    from momentum.Analysis.drift_analyzer import DriftAnalyzer
+
+    return DriftAnalyzer()
+
+
+def create_kline_cache(**kwargs: Any) -> "KlineCache":
+    """Create KlineCache for optimization preloading."""
+    from momentum.Analysis.kline_cache import KlineCache
+
+    return KlineCache(**kwargs)
+
+
+def create_indicator_cache(**kwargs: Any) -> "IndicatorCache":
+    """Create IndicatorCache for optimization precomputing."""
+    from momentum.Analysis.indicator_cache import IndicatorCache
+
+    return IndicatorCache(**kwargs)

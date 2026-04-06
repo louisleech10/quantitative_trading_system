@@ -219,6 +219,7 @@ class XGBoostBatchService:
         symbols: List[str],
         timeframe: str,
         indicators: List[Dict],
+        selected_features: Optional[List[str]] = None,
         lookback_bars: int = 200,
         sequence_length: Optional[int] = None,
         sequence_feature_mode: str = "aggregate",
@@ -243,6 +244,7 @@ class XGBoostBatchService:
             symbols: 交易對列表（如 ['ETHUSDT', 'BTCUSDT']），合併所有案例訓練單一模型
             timeframe: K線時間週期（用於計算指標，與案例搜尋週期無關）
             indicators: 指標配置列表
+            selected_features: 指定訓練因子（可選）
             lookback_bars: 每個案例回看 K 線數量
             sequence_length: 序列特徵長度（TO 前 N 根）
             sequence_feature_mode: 序列特徵模式（aggregate 或 flatten）
@@ -278,7 +280,8 @@ class XGBoostBatchService:
         self.logger.info(
             f"啟動批量 XGBoost 分析 - task_id: {task_id}, "
             f"symbols: {', '.join(symbols)}, timeframe: {timeframe}, "
-            f"案例數: {len(all_cases)}, 指標數: {len(indicators)}"
+            f"案例數: {len(all_cases)}, 指標數: {len(indicators)}, "
+            f"指定因子數: {len(selected_features or [])}"
         )
         
         # 建立任務
@@ -292,6 +295,7 @@ class XGBoostBatchService:
                 timeframe=timeframe,
                 cases=all_cases,
                 indicators=indicators,
+                selected_features=selected_features,
                 lookback_bars=lookback_bars,
                 sequence_length=sequence_length,
                 sequence_feature_mode=sequence_feature_mode,
@@ -326,6 +330,7 @@ class XGBoostBatchService:
         timeframe: str,
         cases: List,
         indicators: List[Dict],
+        selected_features: Optional[List[str]],
         lookback_bars: int,
         sequence_length: Optional[int],
         sequence_feature_mode: str,
@@ -345,6 +350,12 @@ class XGBoostBatchService:
     ):
         """執行批量分析（背景任務，支援多標的跨商品訓練）"""
         try:
+            normalized_selected_features = [
+                name.strip()
+                for name in (selected_features or [])
+                if isinstance(name, str) and name.strip()
+            ]
+
             # ===== Step 1: 計算時間範圍 =====
             self.task_manager.update_progress(task_id, 5, '計算時間範圍', '分析案例時間範圍...')
             
@@ -442,14 +453,45 @@ class XGBoostBatchService:
                             library_df["timestamp"] = (library_df.index.astype("int64") // 10**6).astype(int)
                         else:
                             library_df["timestamp"] = pd.to_numeric(library_df.index, errors="coerce")
+                    numeric_columns = library_df.select_dtypes(include=[np.number]).columns.tolist()
+                    candidate_columns = [
+                        column_name
+                        for column_name in numeric_columns
+                        if column_name not in {"label", "open_time", "timestamp"}
+                    ]
+
+                    if normalized_selected_features:
+                        selected_in_library = [
+                            column_name
+                            for column_name in normalized_selected_features
+                            if column_name in candidate_columns
+                        ]
+                        if not selected_in_library:
+                            self.logger.warning(
+                                "%s/%s 找不到指定因子，跳過此標的（requested=%s）",
+                                sym,
+                                timeframe,
+                                len(normalized_selected_features),
+                            )
+                            continue
+
+                        keep_columns = [
+                            column_name
+                            for column_name in ["timestamp", "open_time", "label"]
+                            if column_name in library_df.columns
+                        ] + selected_in_library
+                        library_df = library_df[keep_columns].copy()
+                        candidate_columns = selected_in_library
+
                     all_symbol_features[sym] = library_df.copy()
 
-                    numeric_columns = library_df.select_dtypes(include=[np.number]).columns.tolist()
                     if shared_feature_names is None:
+                        shared_feature_names = candidate_columns
+                    else:
                         shared_feature_names = [
                             column_name
-                            for column_name in numeric_columns
-                            if column_name not in {"label", "open_time", "timestamp"}
+                            for column_name in shared_feature_names
+                            if column_name in candidate_columns
                         ]
 
                     self.logger.info("從 FeatureLibrary 載入 %s/%s 預計算特徵", sym, timeframe)
@@ -512,6 +554,9 @@ class XGBoostBatchService:
             
             if not all_symbol_features:
                 raise ValueError("未能為任何標的提取特徵")
+
+            if not shared_feature_names:
+                raise ValueError("找不到可用特徵，請檢查 selected_features 或指標設定")
             
             self.logger.info(f"所有標的特徵計算完成 - 共 {len(all_symbol_features)} 個標的，{len(shared_feature_names)} 個特徵")
             

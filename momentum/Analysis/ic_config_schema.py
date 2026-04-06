@@ -210,6 +210,8 @@ class FactorOrthogonalizationConfig(BaseModel):
 class FactorExposureConfig(BaseModel):
     enabled: bool = False
     max_single_exposure: float = Field(default=0.4, ge=0.0, le=1.0)
+    neutralization_mode: Literal["none", "beta_neutral", "vol_neutral"] = "none"
+    neutralization_lookback: int = Field(default=63, ge=5, le=5000)
 
 
 class LongShortAnalysisConfig(BaseModel):

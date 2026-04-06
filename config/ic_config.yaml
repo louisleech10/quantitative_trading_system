@@ -154,6 +154,8 @@ factor_orthogonalization:
 factor_exposure:
   enabled: false
   max_single_exposure: 0.4
+  neutralization_mode: "none"
+  neutralization_lookback: 63
 
 long_short_analysis:
   enabled: true

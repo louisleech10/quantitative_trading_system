@@ -7,7 +7,7 @@ from typing import Iterable, Tuple
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.FeatureEngineering.feature_config import AlignmentMode, SUPPORTED_TIMEFRAMES
 
 
@@ -126,8 +126,8 @@ class TimeframeAligner:
     def _timeframe_to_seconds(timeframe: str) -> int | None:
         if not timeframe:
             return None
-        if timeframe in KlineStorageManager.TIMEFRAME_SECONDS:
-            return KlineStorageManager.TIMEFRAME_SECONDS[timeframe]
+        if timeframe in TIMEFRAME_SECONDS:
+            return TIMEFRAME_SECONDS[timeframe]
         try:
             value = int(timeframe[:-1])
             unit = timeframe[-1]
@@ -145,6 +145,6 @@ class TimeframeAligner:
 
     @staticmethod
     def _timeframe_seconds_keys() -> list[str]:
-        keys = set(KlineStorageManager.TIMEFRAME_SECONDS.keys())
+        keys = set(TIMEFRAME_SECONDS.keys())
         keys.update(SUPPORTED_TIMEFRAMES)
         return list(keys)

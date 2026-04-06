@@ -254,7 +254,8 @@ async def validate_strategy_config(
 
     try:
         # 1. 驗證數據源
-        from momentum.Indicators.types import DataSourceEnum
+        from momentum.factories import get_data_source_enum
+        DataSourceEnum = get_data_source_enum()
         valid_sources = [source.value for source in DataSourceEnum]
         if request.strategy_config.data_source not in valid_sources:
             errors.append(

@@ -431,8 +431,8 @@ def get_result_analyzer():
     """延遲初始化 ResultAnalyzer"""
     global _result_analyzer
     if _result_analyzer is None:
-        from momentum.Optimization.result_analyzer import ResultAnalyzer
-        _result_analyzer = ResultAnalyzer()
+        from momentum.factories import create_result_analyzer
+        _result_analyzer = create_result_analyzer()
     return _result_analyzer
 
 

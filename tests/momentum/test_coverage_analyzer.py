@@ -1,7 +1,19 @@
 import numpy as np
 import pandas as pd
+import h5py
 
 from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
+
+
+def _write_feature_h5(path, data: np.ndarray, feature_names: list[str]) -> None:
+    with h5py.File(path, "w") as h5_file:
+        group = h5_file.create_group("data")
+        group.create_dataset("features", data=data)
+        group.create_dataset(
+            "feature_names",
+            data=np.array(feature_names, dtype=object),
+            dtype=h5py.string_dtype(encoding="utf-8"),
+        )
 
 
 def test_time_coverage_and_effective_start():
@@ -62,3 +74,78 @@ def test_flag_low_coverage_skips_nan():
     low = analyzer.flag_low_coverage(coverage_results, threshold=0.5)
 
     assert low == ["feature_b"]
+
+
+def test_compute_symbol_coverage_matrix(tmp_path):
+    """features x symbols NaN 率矩陣計算正確。"""
+    analyzer = CoverageAnalyzer()
+    base = tmp_path / "features"
+    base.mkdir()
+
+    _write_feature_h5(
+        base / "BTCUSDT_12h_factory.h5",
+        np.array(
+            [
+                [1.0, np.nan],
+                [np.nan, np.nan],
+                [3.0, 1.0],
+            ],
+            dtype=float,
+        ),
+        ["feature_a", "feature_b"],
+    )
+    _write_feature_h5(
+        base / "ETHUSDT_12h_factory.h5",
+        np.array(
+            [
+                [1.0, 4.0],
+                [2.0, 5.0],
+                [3.0, 6.0],
+            ],
+            dtype=float,
+        ),
+        ["feature_a", "feature_b"],
+    )
+
+    result = analyzer.compute_symbol_coverage_matrix(
+        symbols=["btcusdt", "ethusdt"],
+        timeframe="12h",
+        feature_names=["feature_a", "feature_b"],
+        feature_base_path=str(base),
+    )
+
+    assert result["symbols"] == ["BTCUSDT", "ETHUSDT"]
+    assert result["features"] == ["feature_a", "feature_b"]
+    assert np.isclose(result["matrix"]["feature_a"]["BTCUSDT"], 1.0 / 3.0)
+    assert np.isclose(result["matrix"]["feature_a"]["ETHUSDT"], 0.0)
+    assert np.isclose(result["matrix"]["feature_b"]["BTCUSDT"], 2.0 / 3.0)
+    assert np.isclose(result["matrix"]["feature_b"]["ETHUSDT"], 0.0)
+    assert result["valid_counts"]["feature_b"]["BTCUSDT"] == 1
+    assert result["row_counts"]["BTCUSDT"] == 3
+    assert result["summary"]["worst_symbol"] == "BTCUSDT"
+    assert result["summary"]["worst_feature"] == "feature_b"
+
+
+def test_compute_symbol_coverage_matrix_missing_symbol_file(tmp_path):
+    """缺失 Symbol 檔案時，應回傳 100% NaN。"""
+    analyzer = CoverageAnalyzer()
+    base = tmp_path / "features"
+    base.mkdir()
+
+    _write_feature_h5(
+        base / "BTCUSDT_12h_factory.h5",
+        np.array([[1.0], [2.0], [3.0]], dtype=float),
+        ["feature_a"],
+    )
+
+    result = analyzer.compute_symbol_coverage_matrix(
+        symbols=["BTCUSDT", "SOLUSDT"],
+        timeframe="12h",
+        feature_names=["feature_a"],
+        feature_base_path=str(base),
+    )
+
+    assert np.isclose(result["matrix"]["feature_a"]["BTCUSDT"], 0.0)
+    assert np.isclose(result["matrix"]["feature_a"]["SOLUSDT"], 1.0)
+    assert result["valid_counts"]["feature_a"]["SOLUSDT"] == 0
+    assert result["row_counts"]["SOLUSDT"] == 0

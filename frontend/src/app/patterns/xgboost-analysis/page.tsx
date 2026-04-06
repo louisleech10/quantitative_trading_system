@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import FeaturesTab from '@/components/pattern/details/tabs/FeaturesTab';
 import MonitoringTab from '@/components/pattern/details/tabs/MonitoringTab';
 import DiagnosisTab from '@/components/pattern/details/tabs/DiagnosisTab';
 import { createPattern, getBatchTaskStatus, getCaseSummary, startBatchAnalysis, startModelHyperparamOptimization } from '@/lib/api/patternApi';
+import { fetchWatchlist } from '@/lib/api/watchlistApi';
 import type { AnalysisResult, CreatePatternRequest, IndicatorConfig, ValidationConfig } from '@/lib/patternTypes';
 import { usePatternStore } from '@/store/patternStore';
 import { AlertCircle, BarChart2, Brain, CheckCircle, CheckSquare, Database, Info, List, Loader2, Play, Save, Square, TrendingUp } from 'lucide-react';
@@ -211,6 +212,7 @@ function SimpleMetric({ label, value, percent = false }: { label: string; value:
 
 export default function XGBoostAnalysisPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     currentAnalysis,
     setCurrentAnalysis,
@@ -241,6 +243,7 @@ export default function XGBoostAnalysisPage() {
   const [activeTab, setActiveTab] = useState<'result' | 'comparison' | 'deep'>('result');
   const [deepEngine, setDeepEngine] = useState<'xgboost' | 'lightgbm'>('xgboost');
   const [engineTaskMap, setEngineTaskMap] = useState<{ xgboost?: string; lightgbm?: string }>({});
+  const [selectedWatchlistFeatures, setSelectedWatchlistFeatures] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -278,6 +281,27 @@ export default function XGBoostAnalysisPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const mode = searchParams.get('use_watchlist');
+    if (mode !== 'verified') {
+      setSelectedWatchlistFeatures([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const response = await fetchWatchlist('verified');
+        const features = response.entries.map((entry) => entry.feature_name).filter(Boolean);
+        setSelectedWatchlistFeatures(features);
+        if (features.length === 0) {
+          setError('Watchlist 沒有已驗證因子，請先在 IC 分析或 Feature Browser 標記。');
+        }
+      } catch {
+        setError('讀取 Watchlist 已驗證因子失敗');
+      }
+    })();
+  }, [searchParams]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
@@ -332,7 +356,11 @@ export default function XGBoostAnalysisPage() {
 
   const startAnalysis = async () => {
     if (selectedSymbols.length === 0) return setError('請至少選擇一個交易對');
-    if (indicators.length === 0) return setError('請至少配置一個指標');
+
+    const hasWatchlistFeatures = selectedWatchlistFeatures.length > 0;
+    if (indicators.length === 0 && !hasWatchlistFeatures) {
+      return setError('請至少配置一個指標，或使用 Watchlist 已驗證因子');
+    }
 
     setError(null);
     setIsLoading(true);
@@ -361,6 +389,7 @@ export default function XGBoostAnalysisPage() {
         symbols: selectedSymbols,
         timeframe: klineTimeframe,
         indicators,
+        selected_features: selectedWatchlistFeatures.length > 0 ? selectedWatchlistFeatures : undefined,
         lookback_bars: lookbackBars,
         cv_folds: validationConfig.cv_folds,
         engine: selectedEngine === 'both' ? 'lightgbm' : selectedEngine,
@@ -452,7 +481,16 @@ export default function XGBoostAnalysisPage() {
 
             <Card className="glass-panel border-slate-800/80">
               <CardHeader className="pb-3"><CardTitle className="text-lg text-slate-100">Step 2: 指標配置</CardTitle></CardHeader>
-              <CardContent><MultiIndicatorConfig value={indicators} onChange={setIndicators} /></CardContent>
+              <CardContent className="space-y-3">
+                {selectedWatchlistFeatures.length > 0 && (
+                  <Alert className="bg-emerald-500/10 border-emerald-400/30">
+                    <AlertDescription className="text-emerald-200">
+                      已從 Watchlist 帶入 {selectedWatchlistFeatures.length} 個已驗證因子，將優先使用這批因子訓練。
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <MultiIndicatorConfig value={indicators} onChange={setIndicators} />
+              </CardContent>
             </Card>
 
             <EngineConfigPanel

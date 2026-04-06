@@ -168,3 +168,26 @@ class FeatureDataTableResponse(BaseModel):
     page_size: int
     columns: List[str]
     rows: List[Dict[str, Any]]
+
+
+class CoverageMatrixRequest(BaseModel):
+    symbols: List[str] = Field(..., min_length=1)
+    timeframe: str
+    feature_names: List[str] = Field(default_factory=list)
+    feature_base_path: str = "data_cache/features"
+    timeout_seconds: int = Field(default=30, ge=5, le=120)
+
+
+class CoverageMatrixSummary(BaseModel):
+    avg_coverage: float
+    worst_symbol: Optional[str] = None
+    worst_feature: Optional[str] = None
+
+
+class CoverageMatrixResponse(BaseModel):
+    matrix: Dict[str, Dict[str, Optional[float]]]
+    valid_counts: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    row_counts: Dict[str, int] = Field(default_factory=dict)
+    symbols: List[str]
+    features: List[str]
+    summary: CoverageMatrixSummary

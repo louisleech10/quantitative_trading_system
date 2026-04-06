@@ -54,6 +54,7 @@ def test_compute_all_outputs_metrics():
     assert "quantile_turnover" in results["feature_a"]
     assert "rank_change_rate" in results["feature_a"]
     assert "autocorrelation" in results["feature_a"]
+    assert "time_series" in results["feature_a"]
 
 
 def test_net_ic_proxy():
@@ -124,3 +125,33 @@ def test_rank_change_rate_empty_diffs(monkeypatch):
 
     monkeypatch.setattr(pd.Series, "rank", _rank)
     assert analyzer.compute_rank_change_rate(series) == 0.0
+
+
+def test_compute_turnover_time_series_structure():
+    """Turnover 時序輸出結構應完整且長度一致。"""
+    analyzer = TurnoverAnalyzer({"num_quantiles": 3})
+    series = pd.Series([1, 3, 2, 5, 4], index=[100, 101, 102, 103, 104])
+
+    result = analyzer.compute_turnover_time_series(series, num_quantiles=3)
+
+    assert set(result.keys()) == {"quantile_turnovers", "rank_change_rates", "timestamps"}
+    assert len(result["quantile_turnovers"]) == len(result["rank_change_rates"]) == len(result["timestamps"])
+    assert len(result["quantile_turnovers"]) == len(series) - 1
+    assert all(isinstance(ts, int) for ts in result["timestamps"])
+
+
+def test_compute_turnover_time_series_qcut_failure(monkeypatch):
+    """qcut 失敗時應回傳空時序，不拋例外。"""
+    analyzer = TurnoverAnalyzer({})
+    series = pd.Series([1.0, 2.0, 3.0, 4.0])
+
+    def _raise(*_args, **_kwargs):
+        raise ValueError("qcut fail")
+
+    monkeypatch.setattr(pd, "qcut", _raise)
+    result = analyzer.compute_turnover_time_series(series, num_quantiles=4)
+    assert result == {
+        "quantile_turnovers": [],
+        "rank_change_rates": [],
+        "timestamps": [],
+    }

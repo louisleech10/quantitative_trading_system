@@ -201,7 +201,9 @@ class LSTMTaskService:
 
         try:
             # Lazy import：避免 torch 影響系統啟動時間
-            from momentum.Analysis.lstm_engine import LSTMEngine, SequenceModelConfig  # noqa: PLC0415
+            from momentum.factories import create_lstm_engine, get_sequence_model_config_class  # noqa: PLC0415
+
+            SequenceModelConfig = get_sequence_model_config_class()
 
             # 建立設定
             cfg_kwargs = config_dict or {}
@@ -213,7 +215,7 @@ class LSTMTaskService:
             status.total_epochs = config.epochs
             status.message = f"開始訓練（{config.epochs} epochs）..."
 
-            engine = LSTMEngine(config=config)
+            engine = create_lstm_engine(config=config)
 
             # 在 thread pool 執行 CPU/GPU 密集訓練，帶進度回調
             result = await asyncio.to_thread(

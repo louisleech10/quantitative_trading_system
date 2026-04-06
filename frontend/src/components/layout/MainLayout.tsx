@@ -1,7 +1,7 @@
 // frontend/src/components/layout/MainLayout.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -15,8 +15,11 @@ import {
   LineChart,
   Target,
   TrendingUp,
-  Brain
+  Brain,
+  Star
 } from 'lucide-react';
+import WatchlistPanel from '@/components/common/WatchlistPanel';
+import { useWatchlistStore } from '@/store/watchlistStore';
 
 interface NavItem {
   name: string;
@@ -108,7 +111,14 @@ const navigationItems: NavItem[] = [
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
   const pathname = usePathname();
+  const watchlistCount = useWatchlistStore((state) => state.entries.length);
+  const hydrateFromServer = useWatchlistStore((state) => state.hydrateFromServer);
+
+  useEffect(() => {
+    void hydrateFromServer();
+  }, [hydrateFromServer]);
 
   const isActive = (href: string) => {
     if (href === '/') {
@@ -284,6 +294,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
           </div>
         </main>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setWatchlistOpen(true)}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-sm text-amber-100 shadow-lg shadow-black/40 hover:bg-amber-500/30"
+      >
+        <Star className="h-4 w-4" />
+        Watchlist
+        <span className="inline-flex min-w-6 justify-center rounded-full bg-amber-300/20 px-2 py-0.5 text-xs font-semibold">
+          {watchlistCount}
+        </span>
+      </button>
+
+      <WatchlistPanel open={watchlistOpen} onOpenChange={setWatchlistOpen} />
     </div>
   );
 }

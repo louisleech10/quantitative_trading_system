@@ -40,7 +40,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 200, sortBy: 'name', sortOrder: 'asc' })
+    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
       .then((resp) => {
         if (!active) return;
         const options = resp.features.map((item) => item.name);

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.DataExtraction.kline_storage import KlineStorageManager
+from momentum.core.protocols import IKlineReader
 from momentum.FeatureEngineering.adapters.base_adapter import DataSourceAdapter, FieldMeta
 
 logger = get_logger(__name__)
@@ -29,7 +29,7 @@ class CryptoSpotAdapter(DataSourceAdapter):
 
     _SYNTHETIC_FIELDS = ["avg-price", "med-price", "typ-price", "wcl-price", "log-volume", "log-quote-volume"]
 
-    def __init__(self, storage_manager: KlineStorageManager) -> None:
+    def __init__(self, storage_manager: IKlineReader) -> None:
         self._storage = storage_manager
         self._field_meta = self._build_field_meta()
 

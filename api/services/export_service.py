@@ -122,38 +122,16 @@ class ExportService:
                 return True
         return False
 
-    def _default_task_payload_provider(self, model_task_id: str) -> Optional[Dict[str, Any]]:
-        try:
-            from api.routes.pattern_analysis import model_task_service
-
-            task = model_task_service.get_task_status(model_task_id)
-            if isinstance(task, dict):
-                return task
-        except Exception as error:
-            self.logger.warning(f"讀取 pattern analysis task 失敗: {error}")
-
-        try:
-            from api.services.model_enhancement_service import get_model_enhancement_service
-
-            enhancement_task = get_model_enhancement_service().get_task_status(model_task_id)
-            if enhancement_task is not None:
-                payload = enhancement_task.model_dump()
-                return {
-                    "engine": "unknown",
-                    "enhancement": {enhancement_task.module: enhancement_task.result},
-                    "result": payload,
-                }
-        except Exception as error:
-            self.logger.warning(f"讀取 model enhancement task 失敗: {error}")
-
-        return None
-
-
 _export_service: Optional[ExportService] = None
 
 
 def get_export_service() -> ExportService:
+    """Return the ExportService singleton, wired with cross-service provider."""
     global _export_service
     if _export_service is None:
-        _export_service = ExportService()
+        from api.utils.service_providers import create_task_payload_provider
+
+        _export_service = ExportService(
+            task_payload_provider=create_task_payload_provider(),
+        )
     return _export_service

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from api.core.logging import get_logger
 from api.models.feature_browser_models import (
+    CoverageMatrixRequest,
+    CoverageMatrixResponse,
     CorrelationMatrixResponse,
     FeatureDataTableResponse,
     FeatureDistributionResponse,
@@ -145,6 +148,25 @@ async def get_importance_comparison(
 ):
     try:
         return feature_browser_service.get_importance_comparison(features_path, top_k=top_k)
+    except Exception as exc:
+        raise _http_error(exc)
+
+
+@router.post("/feature-browser/coverage-matrix", response_model=CoverageMatrixResponse)
+async def post_coverage_matrix(request: CoverageMatrixRequest):
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                feature_browser_service.get_coverage_matrix,
+                symbols=request.symbols,
+                timeframe=request.timeframe,
+                feature_names=request.feature_names,
+                feature_base_path=request.feature_base_path,
+            ),
+            timeout=request.timeout_seconds,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="Coverage Matrix 計算逾時，請縮小 Symbol 或 Feature 範圍") from exc
     except Exception as exc:
         raise _http_error(exc)
 

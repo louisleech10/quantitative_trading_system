@@ -160,6 +160,74 @@ def test_event_filter_fallback(tmp_path: Path):
     assert event_info.get("tier") == "insufficient"
 
 
+def test_analyze_cross_sectional_includes_symbol_matrix_and_validation():
+    """cross-sectional 模式應輸出逐 Symbol IC 矩陣與一致性摘要。"""
+    orchestrator = ICFilterOrchestrator(load_ic_config())
+
+    timestamps = np.arange(16)
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    index = pd.MultiIndex.from_product(
+        [timestamps, symbols],
+        names=["timestamp", "_symbol"],
+    )
+
+    rng = np.random.default_rng(42)
+    base_label = np.repeat(np.sin(np.linspace(0, 3.14, len(timestamps))), len(symbols))
+    symbol_array = np.array(list(index.get_level_values("_symbol")))
+
+    feature_all = base_label + rng.normal(0, 0.02, size=len(index))
+    feature_specific = rng.normal(0, 0.1, size=len(index))
+    feature_specific[symbol_array == "BTCUSDT"] = base_label[symbol_array == "BTCUSDT"] + rng.normal(
+        0,
+        0.015,
+        size=(symbol_array == "BTCUSDT").sum(),
+    )
+
+    feature_conflict = base_label.copy()
+    feature_conflict[symbol_array == "SOLUSDT"] *= -1
+    feature_conflict += rng.normal(0, 0.02, size=len(index))
+
+    features = pd.DataFrame(
+        {
+            "feature_all": feature_all,
+            "feature_specific": feature_specific,
+            "feature_conflict": feature_conflict,
+            "label": base_label,
+        },
+        index=index,
+    )
+
+    report = orchestrator.analyze_cross_sectional(features)
+
+    matrix = report.get("cross_sectional_symbol_ic")
+    assert isinstance(matrix, dict)
+    assert set(matrix.get("symbols", [])) == set(symbols)
+    assert "feature_all" in matrix.get("features", [])
+    assert isinstance(matrix.get("matrix", {}).get("feature_all", {}).get("BTCUSDT"), float)
+
+    validation = report.get("cross_symbol_validation")
+    assert isinstance(validation, dict)
+    assert validation.get("status") == "completed"
+    assert isinstance(validation.get("consistency_score"), float)
+    assert validation.get("best_symbol") in symbols
+
+
+def test_build_cross_symbol_validation_skips_when_symbol_insufficient():
+    """當 Symbol 數不足時，應回傳 skipped 狀態。"""
+    orchestrator = ICFilterOrchestrator(load_ic_config())
+
+    validation = orchestrator._build_cross_symbol_validation(
+        {
+            "symbols": ["BTCUSDT"],
+            "features": ["feature_a"],
+            "matrix": {"feature_a": {"BTCUSDT": 0.1}},
+        }
+    )
+
+    assert validation["status"] == "skipped"
+    assert validation["reason"] == "insufficient_symbols_or_features"
+
+
 def test_refilter_without_cache_raises():
     """未先 analyze 時 refilter 應拋錯。"""
     orchestrator = ICFilterOrchestrator(load_ic_config())

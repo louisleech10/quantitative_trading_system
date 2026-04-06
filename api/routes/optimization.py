@@ -22,10 +22,11 @@ from api.services.optimization_task_service import (
     OptimizationTaskStatus
 )
 from api.models.training_window_config import TrainingWindowConfig
-from momentum.Optimization.optuna_optimizer import ParameterRanges
-from momentum.Analysis.strategy_registry import strategy_registry
-from momentum.Optimization.trial_comparison import compare_trials, TrialComparisonResult
-
+from momentum.factories import (
+    get_strategy_registry,
+    compare_trials,
+    create_parameter_ranges,
+)
 
 router = APIRouter(prefix="/api/v1/optimization")
 logger = get_logger("api.routes.optimization")
@@ -49,7 +50,7 @@ class CreateOptimizationTaskRequest(BaseModel):
     n_jobs: int = Field(1, description="並行核心數（目前架構不支援真正多核）", ge=1, le=16)
     use_multi_objective: bool = Field(False, description="是否使用多目標優化（separation + stability）")
     enable_pruning: bool = Field(True, description="是否啟用 Pruner（MedianPruner）")
-    parameter_ranges: Optional[ParameterRanges] = Field(None, description="參數搜索範圍（None使用預設）")
+    parameter_ranges: Optional[dict] = Field(None, description="參數搜索範圍（None使用預設）")
 
     model_config = ConfigDict(
         json_json_schema_extra={
@@ -112,6 +113,11 @@ async def create_optimization_task(request: CreateOptimizationTaskRequest):
             if not request.positive_cases or not request.negative_cases:
                 raise HTTPException(status_code=422, detail="signal_density 任務必須提供 positive_cases 與 negative_cases")
 
+        # Convert parameter_ranges dict to ParameterRanges if provided
+        param_ranges = None
+        if request.parameter_ranges is not None:
+            param_ranges = create_parameter_ranges(**request.parameter_ranges)
+
         # 創建任務
         task_id = optimization_task_service.create_task(
             study_name=request.study_name,
@@ -124,7 +130,7 @@ async def create_optimization_task(request: CreateOptimizationTaskRequest):
             n_trials=request.n_trials,
             n_startup_trials=request.n_startup_trials,
             n_jobs=request.n_jobs,
-            parameter_ranges=request.parameter_ranges,
+            parameter_ranges=param_ranges,
             use_multi_objective=request.use_multi_objective,
             enable_pruning=request.enable_pruning
         )
@@ -305,7 +311,7 @@ async def list_strategies():
         - parameter_count: 參數數量
     """
     try:
-        strategy_list = strategy_registry.list_strategies()
+        strategy_list = get_strategy_registry().list_strategies()
         strategies = []
 
         for metadata in strategy_list:
@@ -353,7 +359,7 @@ async def get_strategy_detail(strategy_id: str):
         - 計算函數位置
     """
     try:
-        metadata = strategy_registry.get_strategy(strategy_id)
+        metadata = get_strategy_registry().get_strategy(strategy_id)
 
         # 構建參數定義
         parameters = []
@@ -472,7 +478,7 @@ async def compare_optimization_trials(
         logger.info(f"Comparing {len(trial_nums)} trials from study '{study_name}': {trial_nums}")
         
         # 調用 trial_comparison.py 的 compare_trials 函式
-        comparison_result: TrialComparisonResult = compare_trials(
+        comparison_result = compare_trials(
             study_name=study_name,
             trial_numbers=trial_nums
         )

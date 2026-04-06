@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional, Tuple, Union
 import optuna
 import pandas as pd
 
-from momentum.Strategy.performance_metrics import PerformanceMetrics
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IBacktestEngine, IOptimizationObjective
 
@@ -110,6 +109,7 @@ class StrategyBacktestObjective(IOptimizationObjective):
             strategy_params=params,
         )
 
+        from momentum.Strategy.performance_metrics import PerformanceMetrics  # noqa: PLC0415
         metrics = PerformanceMetrics(result.equity_curve, result.trades).calculate_all()
         self._record_trial_metrics(metrics)
         self._apply_constraints(metrics)

@@ -11,7 +11,11 @@ import pandas as pd
 from scipy import stats
 
 from api.core.logging import get_logger
-from momentum.factories import create_feature_library, create_feature_quality_diagnostics
+from momentum.factories import (
+    create_coverage_analyzer,
+    create_feature_library,
+    create_feature_quality_diagnostics,
+)
 
 
 logger = get_logger("api.feature_browser_service")
@@ -23,6 +27,26 @@ class FeatureBrowserService:
     def __init__(self) -> None:
         self._quality_diagnostics = create_feature_quality_diagnostics(config={})
         self._feature_library = create_feature_library()
+        self._coverage_analyzer = create_coverage_analyzer()
+
+    def get_coverage_matrix(
+        self,
+        symbols: List[str],
+        timeframe: str,
+        feature_names: Optional[List[str]] = None,
+        feature_base_path: str = "data_cache/features",
+    ) -> Dict[str, Any]:
+        normalized_symbols = [item.strip().upper() for item in (symbols or []) if item and item.strip()]
+        if len(normalized_symbols) < 2:
+            raise ValueError("Coverage Matrix 需至少 2 個 Symbol")
+
+        normalized_features = [item.strip() for item in (feature_names or []) if item and item.strip()]
+        return self._coverage_analyzer.compute_symbol_coverage_matrix(
+            symbols=normalized_symbols,
+            timeframe=timeframe,
+            feature_names=normalized_features,
+            feature_base_path=feature_base_path,
+        )
 
     def get_overview(self, features_path: str) -> Dict[str, Any]:
         df = self._load_features_df(features_path)

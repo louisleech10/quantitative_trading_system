@@ -25,10 +25,13 @@ import pandas as pd
 
 from api.core.config import settings
 from api.core.logging import get_logger
-from api.services.optimization_output_service import get_optimization_output_service
-from momentum.factories import create_backtest_engine, create_model_trainer, create_optuna_optimizer
-from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective
-from momentum.Optimization.objectives.strategy_backtest import StrategyBacktestObjective
+from momentum.factories import (
+    create_backtest_engine,
+    create_model_trainer,
+    create_optuna_optimizer,
+    create_model_hyperparam_objective,
+    create_strategy_backtest_objective,
+)
 from api.models.training_window_config import TrainingWindowConfig
 from api.utils.case_storage import get_case_storage_manager
 
@@ -284,7 +287,7 @@ class OptimizationTaskService:
 
         return task_id
 
-    def _build_model_hyperparam_objective(self, objective_config: Dict[str, Any]) -> ModelHyperparamObjective:
+    def _build_model_hyperparam_objective(self, objective_config: Dict[str, Any]) -> Any:
         engine = str(objective_config.get("engine", "lightgbm"))
         features = objective_config.get("features")
         labels = objective_config.get("labels")
@@ -314,7 +317,7 @@ class OptimizationTaskService:
             raise ValueError("features 與 labels 長度不一致")
 
         trainer = create_model_trainer(engine, config=objective_config.get("base_model_params"))
-        return ModelHyperparamObjective(
+        return create_model_hyperparam_objective(
             trainer=trainer,
             features=X,
             labels=y,
@@ -330,7 +333,7 @@ class OptimizationTaskService:
         self,
         objective_config: Dict[str, Any],
         use_multi_objective: bool,
-    ) -> StrategyBacktestObjective:
+    ) -> Any:
         csv_path = objective_config.get("model_predictions_path")
         prices = objective_config.get("prices")
         predicted_proba = objective_config.get("predicted_proba")
@@ -394,7 +397,7 @@ class OptimizationTaskService:
             slippage=float(objective_config.get("slippage", 0.0005)),
         )
 
-        return StrategyBacktestObjective(
+        return create_strategy_backtest_objective(
             backtest_engine=backtest_engine,
             prices=prices,
             predicted_proba=pd.Series(predicted_proba),
@@ -604,6 +607,7 @@ class OptimizationTaskService:
 
             # Phase 4.5: 任務完成後自動生成輸出檔案
             try:
+                from api.utils.service_providers import get_optimization_output_service
                 output_service = get_optimization_output_service()
                 output_service.generate_outputs(
                     task_type=str(config.get("task_type", "unknown")),

@@ -97,6 +97,7 @@ class FeatureFactory:
         progress_callback: Optional[Callable] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        persist: bool = True,
     ) -> FeatureGenerationResult:
         """Run the seven-layer pipeline.
 
@@ -180,6 +181,7 @@ class FeatureFactory:
             time.time() - start_time,
             config_hash,
             compute_warnings=compute_warnings,
+            persist=persist,
         )
         return result
 
@@ -678,6 +680,7 @@ class FeatureFactory:
         elapsed: float,
         config_hash: str,
         compute_warnings: Optional[List[str]] = None,
+        persist: bool = True,
     ) -> FeatureGenerationResult:
         features_df = self._combine_layers(layers, context="layer7_final")
         features_df = features_df.reindex(raw_data.index)
@@ -734,7 +737,10 @@ class FeatureFactory:
         result.metadata = metadata
         result.feature_count = int(result.features_df.shape[1])
 
-        result.hdf5_path = self._storage.save_factory_output(symbol, timeframe, result)
+        if persist:
+            result.hdf5_path = self._storage.save_factory_output(symbol, timeframe, result)
+        else:
+            result.hdf5_path = ""
 
         try:
             self._registry.add(
