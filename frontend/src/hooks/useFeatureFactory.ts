@@ -10,6 +10,7 @@ import {
   BrowseFeaturesResponse,
   FeatureSummary,
   BrowseCorrelationMatrix,
+  BrowseVifResponse,
   DistributionData,
   NanPatternData,
   BrowseFeatureDataResponse,
@@ -275,7 +276,13 @@ export function useFeatureFactory() {
     },
     []
   );
-
+  const browseVif = useCallback(
+    async (taskId: string, features: string[]) => {
+      const query = new URLSearchParams({ features: features.join(',') });
+      return requestJson<BrowseVifResponse>(`/browse/${taskId}/vif?${query.toString()}`);
+    },
+    []
+  );
   const browseDistribution = useCallback(
     async (taskId: string, feature: string, nBins = 50) => {
       const query = new URLSearchParams({ feature, n_bins: String(nBins) });
@@ -417,6 +424,7 @@ export function useFeatureFactory() {
     browseFeatures,
     browseSummary,
     browseCorrelation,
+    browseVif,
     browseDistribution,
     browseNanPattern,
     browseData,

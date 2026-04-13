@@ -503,10 +503,24 @@ export interface PhaseMetrics {
   note?: string | null;
 }
 
+export interface RegimeClusterStat {
+  regime: string;
+  count: number;
+  pct: number;
+  volatility_mean?: number;
+  volatility_std?: number;
+  trend_strength_mean?: number;
+  trend_strength_std?: number;
+  volume_ratio_mean?: number;
+  volume_ratio_std?: number;
+}
+
 export interface RegimeReport {
   overall_auc?: number | null;
   phase_metrics: PhaseMetrics[];
   trading_rules: Record<string, { threshold: number | null; position_size: string | null }>;
+  regime_method?: string | null;  // "rule" | "kmeans"
+  cluster_stats?: RegimeClusterStat[] | null;  // K-Means 聚類統計
 }
 
 export interface SHAPSummaryPoint {

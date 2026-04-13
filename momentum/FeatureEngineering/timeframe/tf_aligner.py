@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Tuple
+import os
+from typing import Iterable, List, Tuple
 
+import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
 from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.FeatureEngineering.feature_config import AlignmentMode, SUPPORTED_TIMEFRAMES
+from momentum.FeatureEngineering.memmap_utils import (
+    create_temp_memmap,
+    MEMMAP_THRESHOLD_BYTES,
+)
 
 
 logger = get_logger(__name__)
@@ -83,6 +89,33 @@ class TimeframeAligner:
         source_index: pd.DatetimeIndex,
         primary_index: pd.DatetimeIndex,
     ) -> pd.DataFrame:
+        chunk_size = TimeframeAligner._resolve_merge_chunk_size()
+        n_cols = source_values.shape[1]
+
+        if chunk_size > 0 and n_cols > chunk_size:
+            return TimeframeAligner._merge_asof_align_chunked(
+                source_values, source_index, primary_index, chunk_size,
+            )
+        return TimeframeAligner._merge_asof_align_single(
+            source_values, source_index, primary_index,
+        )
+
+    @staticmethod
+    def _resolve_merge_chunk_size() -> int:
+        """Resolve merge chunk size from env (0 = disabled, default 5000)."""
+        raw = os.getenv("FFACT_MERGE_CHUNK_SIZE", "5000").strip()
+        try:
+            return max(int(raw), 0)
+        except ValueError:
+            return 5000
+
+    @staticmethod
+    def _merge_asof_align_single(
+        source_values: pd.DataFrame,
+        source_index: pd.DatetimeIndex,
+        primary_index: pd.DatetimeIndex,
+    ) -> pd.DataFrame:
+        """Original merge_asof path for narrow DataFrames."""
         source_work = source_values.copy()
         source_work["_source_ts"] = source_index.to_numpy()
         source_work = source_work.sort_values("_source_ts")
@@ -103,6 +136,93 @@ class TimeframeAligner:
         aligned = merged.drop(columns=["_primary_ts", "_order"]).set_index(primary_index)
         source_ts = aligned.pop("_source_ts")
         aligned.attrs["source_timestamps"] = pd.DatetimeIndex(source_ts)
+        return aligned
+
+    @staticmethod
+    def _merge_asof_align_chunked(
+        source_values: pd.DataFrame,
+        source_index: pd.DatetimeIndex,
+        primary_index: pd.DatetimeIndex,
+        chunk_size: int,
+    ) -> pd.DataFrame:
+        """Column-batch merge_asof for wide DataFrames to reduce peak memory.
+
+        Instead of accumulating chunk DataFrames in a list and calling
+        ``pd.concat`` (which doubles peak RAM), writes each chunk's result
+        directly into a disk-backed ``np.memmap`` (C-order).  The OS loads
+        only the pages being written/read, keeping resident memory small.
+        """
+        all_columns = list(source_values.columns)
+        total_cols = len(all_columns)
+        n_rows = len(primary_index)
+        n_chunks = (total_cols + chunk_size - 1) // chunk_size
+        logger.info(
+            "[MultiTF] Column-batch merge: %d cols → %d chunks of ≤%d",
+            total_cols,
+            n_chunks,
+            chunk_size,
+        )
+
+        # Pre-compute the sorted source timestamps once
+        source_ts_arr = source_index.to_numpy()
+        sort_order = source_ts_arr.argsort()
+
+        primary_df = pd.DataFrame({"_primary_ts": primary_index})
+        primary_df["_order"] = range(len(primary_df))
+        primary_sorted = primary_df.sort_values("_primary_ts")
+
+        # Decide: memmap for large outputs, plain array for small
+        est_bytes = n_rows * total_cols * 4
+        use_memmap = est_bytes >= MEMMAP_THRESHOLD_BYTES
+        if use_memmap:
+            out_arr = create_temp_memmap((n_rows, total_cols), prefix="tf_merge_")
+        else:
+            out_arr = np.empty((n_rows, total_cols), dtype=np.float32)
+
+        source_timestamps = None
+        col_offset = 0
+
+        for i in range(0, total_cols, chunk_size):
+            chunk_cols = all_columns[i : i + chunk_size]
+            chunk_idx = i // chunk_size + 1
+            n_chunk_cols = len(chunk_cols)
+
+            # Build a small DF: just this chunk's cols + _source_ts
+            chunk_work = source_values[chunk_cols].iloc[sort_order].copy()
+            chunk_work["_source_ts"] = source_ts_arr[sort_order]
+
+            merged = pd.merge_asof(
+                primary_sorted.copy(),
+                chunk_work,
+                left_on="_primary_ts",
+                right_on="_source_ts",
+                direction="backward",
+            )
+            merged = merged.sort_values("_order")
+            del chunk_work
+
+            # Extract source_timestamps from first chunk only
+            if source_timestamps is None:
+                source_timestamps = pd.DatetimeIndex(merged["_source_ts"].values)
+
+            # Write chunk result directly into pre-allocated array (memmap or RAM)
+            out_arr[:, col_offset : col_offset + n_chunk_cols] = (
+                merged[chunk_cols].values.astype(np.float32, copy=False)
+            )
+            col_offset += n_chunk_cols
+            del merged
+
+            if chunk_idx % 5 == 0 or chunk_idx == n_chunks:
+                logger.info("[MultiTF] Merged chunk %d/%d", chunk_idx, n_chunks)
+
+        # Wrap pre-allocated array as DataFrame (zero-copy for memmap)
+        aligned = pd.DataFrame(
+            data=out_arr, index=primary_index, columns=all_columns, copy=False,
+        )
+
+        if source_timestamps is not None:
+            aligned.attrs["source_timestamps"] = source_timestamps
+
         return aligned
 
     @staticmethod

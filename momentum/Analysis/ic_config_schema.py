@@ -81,11 +81,17 @@ class ICCalculationConfig(BaseModel):
         by_category: bool = True
         by_data_source: bool = True
         by_layer: bool = True
+        regime_method: Literal["rule", "kmeans"] = "rule"
         regime_definitions: dict = {
             "bull": "close > close_EMA_55",
             "bear": "close < close_EMA_55",
             "high_vol_percentile": 80,
             "low_vol_percentile": 20,
+        }
+        regime_kmeans: dict = {
+            "n_clusters": 4,
+            "lookback": 55,
+            "min_samples_for_fit": 100,
         }
 
     grouped_analysis: GroupedConfig = GroupedConfig()

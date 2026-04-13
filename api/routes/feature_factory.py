@@ -350,7 +350,7 @@ async def register_hdf5_for_browse(
 async def browse_features(
     task_id: str,
     offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=5000),
+    limit: int = Query(50, ge=1, le=100000),
     cursor: Optional[str] = Query(None, description="游標分頁：前一頁最後一筆 name"),
     sort_by: Optional[str] = Query(None, description="排序欄位：nan_ratio, std, skewness, kurtosis, mean, name"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
@@ -445,6 +445,33 @@ async def browse_correlation(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to browse correlation: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/vif")
+async def browse_vif(
+    task_id: str,
+    features: str = Query(..., description="逗號分隔的特徵名（最多 50）"),
+):
+    """取得指定特徵集合的 VIF（方差膨脹因子）——共線性診斷。"""
+    try:
+        selected_features = [feature.strip() for feature in features.split(",") if feature.strip()]
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(
+                feature_factory_service.browse_vif,
+                task_id=task_id,
+                features=selected_features,
+            ),
+        )
+        return result
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse VIF: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

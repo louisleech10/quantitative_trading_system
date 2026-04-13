@@ -197,6 +197,20 @@ def create_regime_analyzer() -> RegimeAnalyzer:
     return RegimeAnalyzer()
 
 
+def create_regime_detector(
+    n_clusters: int = 4,
+    lookback: int = 55,
+    min_samples_for_fit: int = 100,
+) -> "RegimeDetector":
+    from momentum.Analysis.regime_detector import RegimeDetector
+
+    return RegimeDetector(
+        n_clusters=n_clusters,
+        lookback=lookback,
+        min_samples_for_fit=min_samples_for_fit,
+    )
+
+
 def create_coverage_analyzer() -> "CoverageAnalyzer":
     from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
 

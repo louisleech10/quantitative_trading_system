@@ -462,7 +462,7 @@ class XGBoostTaskService:
         return self.model_storage.model_file_exists(case_id)
 
     def _resolve_market_phases(self, df: pd.DataFrame) -> Optional[list]:
-        """解析 Market_Phase 欄位，若缺失則以時間戳推導"""
+        """解析 Market_Phase 欄位，若缺失則以 K-Means 自動推導"""
         phase_columns = ["Market_Phase", "market_phase", "marketPhase"]
         for col in phase_columns:
             if col in df.columns:
@@ -470,8 +470,23 @@ class XGBoostTaskService:
                 if any(phases):
                     return phases
 
-        if "timestamp" not in df.columns:
-            return None
+        # Fallback: 使用 K-Means RegimeDetector 自動推導
+        if "close" in df.columns:
+            try:
+                from momentum.factories import create_regime_detector
+                detector = create_regime_detector(n_clusters=4, lookback=55)
+                close = df["close"].astype(float)
+                volume = df["volume"].astype(float) if "volume" in df.columns else None
+                phases = detector.detect_phases_for_index(close, volume)
+                self.logger.info(
+                    "Market_Phase 欄位缺失，使用 K-Means RegimeDetector 推導 %d 筆 phases",
+                    len(phases),
+                )
+                return phases
+            except Exception as e:
+                self.logger.warning(f"K-Means regime 推導失敗: {str(e)}")
+
+        return None
 
     def _resolve_price_changes(self, df: pd.DataFrame) -> Optional[np.ndarray]:
         """解析 Price_Change 欄位"""
@@ -484,21 +499,3 @@ class XGBoostTaskService:
 
         self.logger.info("找不到 Price_Change 欄位，跳過期望值估算")
         return None
-
-        try:
-            from datetime import datetime
-
-            timestamps = df["timestamp"].values
-            phases = []
-            for ts in timestamps:
-                ts_int = int(ts)
-                if ts_int > 10 ** 12:
-                    ts_int = ts_int // 1000
-                phase = create_market_config().get_market_phase(
-                    datetime.utcfromtimestamp(ts_int)
-                )
-                phases.append(phase)
-            return phases
-        except Exception as e:
-            self.logger.warning(f"市場體制推導失敗: {str(e)}")
-            return None

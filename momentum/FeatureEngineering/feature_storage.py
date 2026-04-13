@@ -264,7 +264,11 @@ class FeatureStorage:
             with h5py.File(file_path, "w") as f:
                 group = f.create_group(f"{symbol}/{timeframe}")
 
-                features_arr = features_df.to_numpy(dtype=np.float32)
+                # Use .values to get underlying array directly (memmap if
+                # disk-backed) instead of .to_numpy() which may force a copy.
+                features_arr = features_df.values
+                if features_arr.dtype != np.float32:
+                    features_arr = np.asarray(features_arr, dtype=np.float32)
                 feature_chunks = self._build_2d_chunks(features_arr.shape)
                 group.create_dataset(
                     "features",

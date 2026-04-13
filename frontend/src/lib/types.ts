@@ -551,6 +551,16 @@ export interface BrowseCorrelationMatrix {
   matrix: number[][];
 }
 
+export interface VifRow {
+  feature_name: string;
+  vif: number;
+  status: 'stable' | 'warning' | 'severe';
+}
+
+export interface BrowseVifResponse {
+  items: VifRow[];
+}
+
 export interface FeatureStats {
   count: number;
   nan_ratio: number;

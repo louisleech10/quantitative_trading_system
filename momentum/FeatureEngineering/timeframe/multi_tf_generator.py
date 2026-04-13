@@ -209,7 +209,10 @@ class MultiTFGenerator:
         valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
         if not valid_layers:
             return pd.DataFrame()
-        return pd.concat(valid_layers, axis=1)
+
+        from momentum.FeatureEngineering.memmap_utils import concat_with_memmap
+
+        return concat_with_memmap(valid_layers)
 
     @staticmethod
     def _apply_timeframe_tag(features_df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
@@ -219,8 +222,10 @@ class MultiTFGenerator:
         tf_keys = TimeframeAligner._timeframe_seconds_keys()
 
         def _rename(col: str) -> str:
-            if col.startswith("meta_") or col.startswith("label_"):
-                return col
+            if col.startswith("label_"):
+                return col  # Labels come from primary TF only, no TF tag needed
+            # meta_ columns MUST be tagged with TF prefix (meta_1h_*, meta_12h_*)
+            # to avoid duplicate column names when merging multi-TF outputs.
             parts = col.split("_")
             if len(parts) < 2:
                 return col

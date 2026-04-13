@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -47,11 +48,33 @@ class FeaturePreprocessor:
         self.mode = self._config.get("mode", "replace")
 
         self._fracdiff_processed_columns: set[str] = set()
+        self._column_chunk_size = self._resolve_column_chunk_size()
+        self._d_star_cache: Optional[Dict[str, float]] = None
+
+    @staticmethod
+    def _resolve_column_chunk_size() -> int:
+        """Resolve L6.5 column chunk size from env var (0 = disabled)."""
+        raw = os.getenv("FFACT_L65_CHUNK_SIZE", "2000").strip()
+        try:
+            size = int(raw)
+        except ValueError:
+            size = 2000
+        return max(size, 0)
 
     def transform(self, features_df: pd.DataFrame) -> pd.DataFrame:
         if features_df is None or features_df.empty:
             return pd.DataFrame(index=features_df.index if features_df is not None else None)
 
+        num_cols = len(features_df.columns)
+        chunk_size = self._column_chunk_size
+
+        if chunk_size > 0 and num_cols > chunk_size:
+            return self._transform_chunked(features_df, chunk_size)
+
+        return self._transform_single(features_df)
+
+    def _transform_single(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """Original transform logic applied to a full DataFrame."""
         transformed = features_df.copy()
         self._fracdiff_processed_columns = set()
 
@@ -73,6 +96,77 @@ class FeaturePreprocessor:
             transformed = self._apply_adaptive_zscore(transformed)
 
         return transformed
+
+    def _transform_chunked(self, features_df: pd.DataFrame, chunk_size: int) -> pd.DataFrame:
+        """Process columns in chunks to limit peak memory on wide DataFrames.
+
+        All L6.5 operations (winsorization, rank_transform, adaptive_zscore, etc.)
+        are column-independent, so chunking does not affect correctness.
+        """
+        all_columns = list(features_df.columns)
+        n_chunks = (len(all_columns) + chunk_size - 1) // chunk_size
+        logger.info(
+            "[L6.5] Column chunking activated: %d cols → %d chunks of ≤%d",
+            len(all_columns),
+            n_chunks,
+            chunk_size,
+        )
+
+        result_chunks: List[pd.DataFrame] = []
+        use_memmap = (len(features_df.index) * len(all_columns) * 4) >= 500_000_000
+
+        use_shared_dstar_cache = bool(
+            self.fracdiff_config.get("enabled", False)
+            and self.fracdiff_config.get("cache_d_star", True)
+        )
+        if use_shared_dstar_cache:
+            # Load once for the whole run (instead of once per chunk).
+            self._d_star_cache = self._load_d_star_cache("default", "default")
+
+        if use_memmap:
+            from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+            import numpy as _np
+
+            out_arr = create_temp_memmap(
+                (len(features_df.index), len(all_columns)), prefix="l65_"
+            )
+            col_offset = 0
+
+        for i in range(0, len(all_columns), chunk_size):
+            chunk_cols = all_columns[i : i + chunk_size]
+            chunk_idx = i // chunk_size + 1
+            logger.info("[L6.5] Processing chunk %d/%d (%d cols)", chunk_idx, n_chunks, len(chunk_cols))
+
+            chunk_df = features_df[chunk_cols]
+            processed_chunk = self._transform_single(chunk_df)
+
+            if use_memmap:
+                n = processed_chunk.shape[1]
+                out_arr[:, col_offset : col_offset + n] = _np.asarray(
+                    processed_chunk.values, dtype=_np.float32
+                )
+                col_offset += n
+                del processed_chunk
+            else:
+                result_chunks.append(processed_chunk)
+
+            # Release references to reduce peak memory
+            del chunk_df
+
+        if use_shared_dstar_cache and self._d_star_cache is not None:
+            # Save once after all chunks complete.
+            self._save_d_star_cache("default", "default", self._d_star_cache)
+            self._d_star_cache = None
+
+        if use_memmap:
+            return pd.DataFrame(
+                data=out_arr, index=features_df.index, columns=all_columns, copy=False,
+            )
+
+        if not result_chunks:
+            return pd.DataFrame(index=features_df.index)
+
+        return pd.concat(result_chunks, axis=1, copy=False)
 
     def _apply_winsorization(self, df: pd.DataFrame) -> pd.DataFrame:
         apply_to = self.winsor_config.get("apply_to", "all")
@@ -97,8 +191,8 @@ class FeaturePreprocessor:
             lowers = means.loc[valid_columns] - sigma_k * stds.loc[valid_columns]
             uppers = means.loc[valid_columns] + sigma_k * stds.loc[valid_columns]
             clipped = selected.loc[:, valid_columns].clip(lower=lowers, upper=uppers, axis=1)
-            for column in valid_columns:
-                result[column] = clipped[column]
+            clipped = clipped.astype(np.float32, copy=False)
+            result.loc[:, valid_columns] = clipped
         elif method == "quantile":
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             lower_q = float(quantile_range[0])
@@ -106,8 +200,8 @@ class FeaturePreprocessor:
             lowers = selected.quantile(lower_q)
             uppers = selected.quantile(upper_q)
             clipped = selected.clip(lower=lowers, upper=uppers, axis=1)
-            for column in columns:
-                result[column] = clipped[column]
+            clipped = clipped.astype(np.float32, copy=False)
+            result.loc[:, columns] = clipped.loc[:, columns]
         else:
             raise ValueError(f"Unsupported winsorization method: {method}")
 
@@ -133,15 +227,24 @@ class FeaturePreprocessor:
         if max_lag <= 0:
             max_lag = min(max(2, len(df) // 10), 252)
 
-        cache = {}
-        if self.fracdiff_config.get("cache_d_star", True):
+        cache_enabled = bool(self.fracdiff_config.get("cache_d_star", True))
+        if self._d_star_cache is not None:
+            cache = self._d_star_cache
+            shared_cache = True
+        elif cache_enabled:
             cache = self._load_d_star_cache("default", "default")
+            shared_cache = False
+        else:
+            cache = {}
+            shared_cache = False
 
-        for column in columns:
+        # Precompute NaN rates once per chunk to avoid per-column scans.
+        nan_rates = result.loc[:, columns].isna().mean()
+        eligible_columns = [column for column in columns if float(nan_rates.get(column, 1.0)) <= 0.5]
+        skipped_high_nan: List[str] = [column for column in columns if column not in eligible_columns]
+
+        for column in eligible_columns:
             series = result[column].astype(float)
-            if series.isna().mean() > 0.5:
-                logger.warning("FracDiff skipped for %s due to too many NaN", column)
-                continue
 
             try:
                 if column in cache:
@@ -168,7 +271,14 @@ class FeaturePreprocessor:
 
             self._fracdiff_processed_columns.add(column)
 
-        if self.fracdiff_config.get("cache_d_star", True):
+        if skipped_high_nan:
+            logger.warning(
+                "FracDiff skipped for %d columns due to too many NaN. Sample: %s",
+                len(skipped_high_nan),
+                skipped_high_nan[:10],
+            )
+
+        if cache_enabled and not shared_cache:
             self._save_d_star_cache("default", "default", cache)
 
         return result
@@ -187,15 +297,22 @@ class FeaturePreprocessor:
         threshold = float(self.adf_config.get("adf_threshold", 0.05))
         max_diff = int(self.adf_config.get("max_diff", 2))
         sample_size = int(self.adf_config.get("sample_size", 500))
+        candidate_columns = [
+            column for column in columns if column not in self._fracdiff_processed_columns
+        ]
+        if not candidate_columns:
+            return result
 
-        for column in columns:
-            if column in self._fracdiff_processed_columns:
-                continue
+        nan_rates = result.loc[:, candidate_columns].isna().mean()
+        eligible_columns = [
+            column for column in candidate_columns if float(nan_rates.get(column, 1.0)) <= 0.5
+        ]
+        skipped_high_nan: List[str] = [
+            column for column in candidate_columns if column not in eligible_columns
+        ]
 
+        for column in eligible_columns:
             series = result[column].astype(float)
-            if series.isna().mean() > 0.5:
-                logger.warning("ADF differencing skipped for %s due to too many NaN", column)
-                continue
 
             working = series.copy()
             chosen_diff = 0
@@ -224,6 +341,13 @@ class FeaturePreprocessor:
             else:
                 result[f"{column}_diff{chosen_diff}"] = working
 
+        if skipped_high_nan:
+            logger.warning(
+                "ADF differencing skipped for %d columns due to too many NaN. Sample: %s",
+                len(skipped_high_nan),
+                skipped_high_nan[:10],
+            )
+
         return result
 
     def _apply_rank_transform(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -250,6 +374,7 @@ class FeaturePreprocessor:
         constant_mask = rolling_max == rolling_min
         ranked_df = ranked_df.mask(constant_mask, 0.5)
         ranked_df = ranked_df.where(~selected.isna(), np.nan)
+        ranked_df = ranked_df.astype(np.float32, copy=False)
 
         if self.mode == "replace":
             result.loc[:, columns] = ranked_df
@@ -306,7 +431,7 @@ class FeaturePreprocessor:
             gaussian = np.sqrt(2.0) * erfinv(2.0 * clipped - 1.0)
             gaussian_series = pd.Series(gaussian, index=series.index)
             if self.mode == "replace":
-                result[column] = gaussian_series
+                result[column] = gaussian_series.astype(np.float32, copy=False)
             else:
                 new_columns[f"{column}_gaussian"] = gaussian_series
 
@@ -334,6 +459,7 @@ class FeaturePreprocessor:
             zscore = (selected - mean) / (std + epsilon)
             zscore = zscore.where(std > 0.0, 0.0)
             zscore = zscore.where(~selected.isna(), np.nan)
+            zscore = zscore.astype(np.float32, copy=False)
             result.loc[:, columns] = zscore
         else:
             append_frames: List[pd.DataFrame] = []
@@ -344,6 +470,7 @@ class FeaturePreprocessor:
                 zscore = (selected - mean) / (std + epsilon)
                 zscore = zscore.where(std > 0.0, 0.0)
                 zscore = zscore.where(~selected.isna(), np.nan)
+                zscore = zscore.astype(np.float32, copy=False)
                 zscore = zscore.rename(columns={column: f"{column}_zscore_{window_int}" for column in columns})
                 append_frames.append(zscore)
 

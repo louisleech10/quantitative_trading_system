@@ -375,13 +375,16 @@ class FeatureFactoryService:
 
     @staticmethod
     def _old_path_env_overrides() -> Dict[str, str]:
-        # Keep old behavior: no Layer1 parallel, no Layer3 chunking.
+        # Keep old behavior: no Layer1 parallel, no Layer3 column-chunking.
         # Layer4 chunk/batch use large values to approximate non-chunked flow.
+        # FFACT_L3_STREAMING=1 activates Phase-2 streaming + variance filter to
+        # prevent OOM on wide feature matrices (96K+ cols) on M1 8GB.
         return {
             "FFACT_LAYER1_PARALLEL": "0",
             "FFACT_LAYER3_CHUNK_SIZE": "0",
             "FFACT_LAYER4_CHUNK_SIZE": "1000000000",
             "FFACT_LAYER4_LAG_BATCH_SIZE": "1000000000",
+            "FFACT_L3_STREAMING": "1",
         }
 
     @staticmethod
@@ -937,6 +940,46 @@ class FeatureFactoryService:
             "method": method,
             "matrix": corr_df.to_numpy().tolist(),
         }
+
+    def browse_vif(self, task_id: str, features: List[str]) -> Dict[str, Any]:
+        """Return VIF (Variance Inflation Factor) for selected features.
+
+        VIF_i = diagonal element of inverse(correlation_matrix).
+        VIF < 5: stable, 5-10: warning, >10: severe multicollinearity.
+        """
+        if len(features) < 2:
+            raise ValueError("VIF requires at least 2 features")
+        if len(features) > 50:
+            raise ValueError("features count exceeds limit 50")
+
+        df, _ = self._load_task_features(task_id)
+        missing = [name for name in features if name not in df.columns]
+        if missing:
+            raise ValueError(f"Invalid features: {missing}")
+
+        selected_df = df[features].select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        if selected_df.shape[1] < 2:
+            return {"items": []}
+
+        corr_matrix = selected_df.corr(method="pearson").fillna(0.0).to_numpy(dtype=float)
+        # 加微小正則化避免奇異矩陣
+        corr_matrix = corr_matrix + np.eye(corr_matrix.shape[0]) * 1e-6
+        inv_corr = np.linalg.pinv(corr_matrix)
+        vif_values = np.diag(inv_corr)
+
+        items = []
+        for feature_name, vif_val in zip(list(selected_df.columns), vif_values):
+            value = float(max(vif_val, 0.0))
+            if value < 5.0:
+                status = "stable"
+            elif value < 10.0:
+                status = "warning"
+            else:
+                status = "severe"
+            items.append({"feature_name": feature_name, "vif": round(value, 3), "status": status})
+
+        items.sort(key=lambda item: item["vif"], reverse=True)
+        return {"items": items}
 
     def browse_distribution(self, task_id: str, feature: str, n_bins: int) -> Dict[str, Any]:
         """Return histogram payload for one feature."""

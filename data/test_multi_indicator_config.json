@@ -1,6 +1,6 @@
 {
   "pipeline_name": "test_multi_indicator_pipeline",
-  "created_at": "2026-04-04T22:29:59.977706",
+  "created_at": "2026-04-12T00:52:05.236767",
   "strategy_config": {
     "strategy_type": "multi_indicator",
     "data_source": "close",

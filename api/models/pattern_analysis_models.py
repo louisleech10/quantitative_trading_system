@@ -163,6 +163,8 @@ class RegimeReport(BaseModel):
     overall_auc: Optional[float] = None
     phase_metrics: List[PhaseMetrics]
     trading_rules: Dict[str, Dict[str, Optional[Union[float, str]]]]
+    regime_method: Optional[str] = None  # "rule" | "kmeans"
+    cluster_stats: Optional[List[Dict[str, Any]]] = None  # K-Means 聚類統計
 
 
 class RegimeAnalysisResponse(BaseModel):

@@ -62,7 +62,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
+    browseFeatures(taskId, { offset: 0, limit: 100000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
       .then((resp) => {
         if (!active) return;
         setOptions(resp.features.map((item) => item.name));
@@ -217,11 +217,27 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
 
   return (
     <div className="glass-panel rounded-2xl p-4 space-y-3">
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="text-sm text-slate-300">Feature Time Series（最多 5 條）</div>
+      {/* 標題列：標題 + 清除按鈕 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm text-slate-300">
+          Feature Time Series
+          <span className="ml-2 text-xs text-slate-500">(最多 5 條，筆數：{options.length.toLocaleString()})</span>
+        </div>
+        {explorerSelectedFeatures.length > 0 && (
+          <button
+            onClick={() => setExplorerSelectedFeatures([])}
+            className="text-xs px-2.5 py-1 rounded border border-rose-400/50 bg-rose-400/10 text-rose-300 hover:bg-rose-400/20 font-medium"
+            title="取消所有已選特徵"
+          >
+            ✕ 清除選取（{explorerSelectedFeatures.length}）
+          </button>
+        )}
+      </div>
 
+      {/* 控制列 */}
+      <div className="flex items-center gap-2 flex-wrap">
         {/* Rolling ±1σ 控制組 */}
-        <label className="ml-auto text-xs text-slate-300 inline-flex items-center gap-1">
+        <label className="text-xs text-slate-300 inline-flex items-center gap-1">
           <input
             type="checkbox"
             checked={showRollingBand}
@@ -264,7 +280,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
         </label>
         <button
           onClick={() => exportChartToPNG('feature-timeseries-chart', 'feature_timeseries', taskId)}
-          className="text-xs px-2 py-1 rounded border border-white/10 text-slate-200"
+          className="ml-auto text-xs px-2 py-1 rounded border border-white/10 text-slate-200"
         >
           匯出 PNG
         </button>
@@ -273,6 +289,20 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
       <FeatureNameSegmentFilter features={options} onFilteredFeaturesChange={setFilteredOptions} />
 
       <div className="flex flex-wrap gap-2 max-h-28 overflow-auto">
+        {/* 已選但不在前 500 可見清單裡的特徵：固定置頂，確保可點選取消 */}
+        {explorerSelectedFeatures
+          .filter((name) => !filteredOptions.slice(0, 500).includes(name))
+          .map((name) => (
+            <button
+              key={`pinned-${name}`}
+              onClick={() => toggleFeature(name)}
+              title={`${name}（點擊取消選取）`}
+              className="text-xs px-2 py-1 rounded-full border bg-cyan-400/20 border-cyan-300/40 text-cyan-200 ring-1 ring-cyan-300/30"
+            >
+              {name} ✕
+            </button>
+          ))}
+        {/* 篩選後的選項（前 500）*/}
         {filteredOptions.slice(0, 500).map((name) => {
           const active = selected.includes(name);
           return (

@@ -1,0 +1,201 @@
+2026-04-12 00:56:54 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2026-04-12 00:56:54 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-04-12 00:56:54 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2026-04-12 00:56:54 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2026-04-12 00:56:54 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2026-04-12 00:56:54 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-04-12 00:56:54 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2026-04-12 00:56:54 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2026-04-12 00:56:54 - api.startup - [32mINFO[0m - 運行環境: Production
+2026-04-12 00:56:54 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [58f2fae4] Started GET /api/v1/feature-data/kline/list from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [e8354534] Started OPTIONS /api/v1/features/config from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [cce73fe2] Started OPTIONS /api/v1/features/presets from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [cd9f7532] Started OPTIONS /api/v1/features/indicators from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [2349fc39] Started OPTIONS /api/v1/features/data-sources from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [a5afe2fe] Started OPTIONS /api/v1/features/schema from 127.0.0.1
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_download_service.KlineDownloadService - [32mINFO[0m - KlineDownloadService initialized
+2026-04-12 00:57:02 - momentum.DataExtraction.providers.binance_provider.RateLimiter - [32mINFO[0m - Rate limiter initialized: 1000 req/min
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_provider_base.Binance - [32mINFO[0m - BinanceProvider initialized
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_download_service.ProviderRegistry - [32mINFO[0m - Registered provider: binance (rate_limit=1000/min)
+2026-04-12 00:57:02 - api.feature_kline_service - [32mINFO[0m - FeatureKlineService: BinanceProvider 已註冊
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 1082 klines from ETHUSDT/12h in 0.013s
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Integrity check for ETHUSDT/12h: PASS
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 12888 klines from ETHUSDT/1h in 0.008s
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Integrity check for ETHUSDT/1h: PASS
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 898 klines from BTCUSDT/12h in 0.003s
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Integrity check for BTCUSDT/12h: PASS
+2026-04-12 00:57:02 - api.request - [32mINFO[0m - GET /api/v1/feature-data/kline/list - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [58f2fae4] Completed GET /api/v1/feature-data/kline/list - 200 - 0.268s
+2026-04-12 00:57:02 - api.request - [32mINFO[0m - OPTIONS /api/v1/features/config - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [e8354534] Completed OPTIONS /api/v1/features/config - 200 - 0.268s
+2026-04-12 00:57:02 - api.request - [32mINFO[0m - OPTIONS /api/v1/features/presets - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [cce73fe2] Completed OPTIONS /api/v1/features/presets - 200 - 0.268s
+2026-04-12 00:57:02 - api.request - [32mINFO[0m - OPTIONS /api/v1/features/indicators - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [cd9f7532] Completed OPTIONS /api/v1/features/indicators - 200 - 0.268s
+2026-04-12 00:57:02 - api.request - [32mINFO[0m - OPTIONS /api/v1/features/data-sources - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [2349fc39] Completed OPTIONS /api/v1/features/data-sources - 200 - 0.268s
+2026-04-12 00:57:02 - api.request - [32mINFO[0m - OPTIONS /api/v1/features/schema - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [a5afe2fe] Completed OPTIONS /api/v1/features/schema - 200 - 0.268s
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [ce90bfed] Started OPTIONS /api/v1/watchlist from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [d2bada44] Started GET /api/v1/feature-data/kline/list from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [0fe4641c] Started GET /api/v1/features/config from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [0a945827] Started GET /api/v1/features/presets from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [e5c39486] Started GET /api/v1/features/indicators from 127.0.0.1
+2026-04-12 00:57:02 - api.middleware.request - [32mINFO[0m - [c7de1826] Started GET /api/v1/features/data-sources from 127.0.0.1
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 1082 klines from ETHUSDT/12h in 0.003s
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Integrity check for ETHUSDT/12h: PASS
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 12888 klines from ETHUSDT/1h in 0.005s
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Integrity check for ETHUSDT/1h: PASS
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 898 klines from BTCUSDT/12h in 0.003s
+2026-04-12 00:57:02 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Integrity check for BTCUSDT/12h: PASS
+2026-04-12 00:57:03 - momentum.FeatureEngineering.atomic.talib_wrapper - [32mINFO[0m - Loaded 132 TA-Lib indicators
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - OPTIONS /api/v1/watchlist - 200 - 1.078s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [ce90bfed] Completed OPTIONS /api/v1/watchlist - 200 - 1.078s
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/feature-data/kline/list - 200 - 1.078s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [d2bada44] Completed GET /api/v1/feature-data/kline/list - 200 - 1.078s
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/features/config - 200 - 1.078s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [0fe4641c] Completed GET /api/v1/features/config - 200 - 1.078s
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/features/presets - 200 - 1.077s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [0a945827] Completed GET /api/v1/features/presets - 200 - 1.077s
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/features/indicators - 200 - 1.077s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [e5c39486] Completed GET /api/v1/features/indicators - 200 - 1.077s
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/features/data-sources - 200 - 1.078s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [c7de1826] Completed GET /api/v1/features/data-sources - 200 - 1.078s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [b854bb11] Started GET /api/v1/features/schema from 127.0.0.1
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [4dadd535] Started GET /api/v1/watchlist from 127.0.0.1
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/features/schema - 200 - 0.073s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [b854bb11] Completed GET /api/v1/features/schema - 200 - 0.073s
+2026-04-12 00:57:03 - api.request - [32mINFO[0m - GET /api/v1/watchlist - 200 - 0.073s
+2026-04-12 00:57:03 - api.middleware.request - [32mINFO[0m - [4dadd535] Completed GET /api/v1/watchlist - 200 - 0.073s
+2026-04-12 00:57:04 - api.middleware.request - [32mINFO[0m - [4a69e142] Started OPTIONS /api/v1/features/preview from 127.0.0.1
+2026-04-12 00:57:04 - api.request - [32mINFO[0m - OPTIONS /api/v1/features/preview - 200 - 0.002s
+2026-04-12 00:57:04 - api.middleware.request - [32mINFO[0m - [4a69e142] Completed OPTIONS /api/v1/features/preview - 200 - 0.002s
+2026-04-12 00:57:04 - api.middleware.request - [32mINFO[0m - [52b5e5e2] Started POST /api/v1/features/preview from 127.0.0.1
+2026-04-12 00:57:04 - api.request - [32mINFO[0m - POST /api/v1/features/preview - 200 - 0.098s
+2026-04-12 00:57:04 - api.middleware.request - [32mINFO[0m - [52b5e5e2] Completed POST /api/v1/features/preview - 200 - 0.098s
+2026-04-12 00:57:04 - api.middleware.request - [32mINFO[0m - [0ca7d7e1] Started PUT /api/v1/watchlist from 127.0.0.1
+2026-04-12 00:57:04 - api.services.watchlist_service - [32mINFO[0m - Watchlist synced: entries=0
+2026-04-12 00:57:04 - api.request - [32mINFO[0m - PUT /api/v1/watchlist - 200 - 0.003s
+---
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L8 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L13 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L21 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L34 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L55 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L89 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L144 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Momentum_L233 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L3 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L5 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L8 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L13 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L21 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L34 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L55 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L89 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L144 due to too many NaN
+2026-04-12 08:38:21 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Momentum_L233 due to too many NaN
+2026-04-12 08:38:53 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 13/227 (2000 cols)
+2026-04-12 08:39:54 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 14/227 (2000 cols)
+2026-04-12 08:41:08 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 15/227 (2000 cols)
+2026-04-12 08:42:10 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 16/227 (2000 cols)
+2026-04-12 08:42:54 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 17/227 (2000 cols)
+2026-04-12 08:43:35 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 18/227 (2000 cols)
+2026-04-12 08:44:20 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 19/227 (2000 cols)
+2026-04-12 08:45:06 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 20/227 (2000 cols)
+2026-04-12 08:46:10 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 21/227 (2000 cols)
+2026-04-12 08:47:19 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 22/227 (2000 cols)
+2026-04-12 08:48:02 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 23/227 (2000 cols)
+2026-04-12 08:48:48 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 24/227 (2000 cols)
+2026-04-12 08:49:37 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 25/227 (2000 cols)
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsArgmax_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsArgmin_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsRank_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_DecayLinear_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsArgmax_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsArgmin_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsRank_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_DecayLinear_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsArgmax_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsArgmin_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_TsRank_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_DecayLinear_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_Sign due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_Log1p due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_Abs due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_13_Clip due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsArgmax_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsArgmin_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsRank_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_DecayLinear_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsArgmax_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsArgmin_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsRank_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_DecayLinear_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsArgmax_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsArgmin_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_TsRank_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_DecayLinear_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Sign due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Log1p due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Abs due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_21_Clip due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsArgmax_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsArgmin_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsRank_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_DecayLinear_W5 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsArgmax_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsArgmin_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsRank_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_DecayLinear_W13 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsArgmax_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsArgmin_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_TsRank_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_DecayLinear_W21 due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Sign due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Log1p due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Abs due to too many NaN
+2026-04-12 08:50:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for ms_1h_large_trade_ratio_55_Clip due to too many NaN
+2026-04-12 08:50:33 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 26/227 (2000 cols)
+2026-04-12 08:51:36 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 27/227 (2000 cols)
+2026-04-12 08:52:50 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 28/227 (2000 cols)
+2026-04-12 08:53:47 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 29/227 (2000 cols)
+2026-04-12 08:54:10 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for close_1h_trend_MIDPOINT_233_ZScore_W3 due to too many NaN
+2026-04-12 08:54:28 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 30/227 (2000 cols)
+2026-04-12 08:55:04 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 31/227 (2000 cols)
+2026-04-12 08:56:18 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 32/227 (2000 cols)
+2026-04-12 08:57:18 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 33/227 (2000 cols)
+2026-04-12 08:57:54 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 34/227 (2000 cols)
+2026-04-12 08:58:32 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 35/227 (2000 cols)
+2026-04-12 08:59:42 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 36/227 (2000 cols)
+2026-04-12 09:00:28 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 37/227 (2000 cols)
+2026-04-12 09:00:51 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for hl_1h_trend_MIDPRICE_233_ZScore_W5 due to too many NaN
+2026-04-12 09:01:11 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 38/227 (2000 cols)
+2026-04-12 09:01:50 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 39/227 (2000 cols)
+2026-04-12 09:02:54 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 40/227 (2000 cols)
+2026-04-12 09:04:11 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 41/227 (2000 cols)
+2026-04-12 09:05:11 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 42/227 (2000 cols)
+2026-04-12 09:05:54 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 43/227 (2000 cols)
+2026-04-12 09:07:52 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 44/227 (2000 cols)
+2026-04-12 09:08:43 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 45/227 (2000 cols)
+2026-04-12 09:09:08 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for close_1h_trend_MIDPOINT_233_ZScore_W8 due to too many NaN
+2026-04-12 09:09:08 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for hl_1h_trend_MIDPRICE_233_ZScore_W8 due to too many NaN
+2026-04-12 09:09:26 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 46/227 (2000 cols)
+2026-04-12 09:10:05 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 47/227 (2000 cols)
+2026-04-12 09:10:58 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 48/227 (2000 cols)
+2026-04-12 09:12:10 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 49/227 (2000 cols)
+2026-04-12 09:12:58 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 50/227 (2000 cols)
+2026-04-12 09:13:42 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 51/227 (2000 cols)
+2026-04-12 09:14:46 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 52/227 (2000 cols)
+2026-04-12 09:16:00 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 53/227 (2000 cols)
+2026-04-12 09:17:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for close_1h_trend_MIDPOINT_233_ZScore_W13 due to too many NaN
+2026-04-12 09:17:09 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [33mWARNING[0m - FracDiff skipped for hl_1h_trend_MIDPRICE_233_ZScore_W13 due to too many NaN
+2026-04-12 09:17:31 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 54/227 (2000 cols)
+2026-04-12 09:18:29 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 55/227 (2000 cols)
+2026-04-12 09:19:23 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 56/227 (2000 cols)
+2026-04-12 09:20:55 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 57/227 (2000 cols)
+2026-04-12 09:21:51 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 58/227 (2000 cols)
+2026-04-12 09:22:37 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 59/227 (2000 cols)
+2026-04-12 09:23:28 - momentum.FeatureEngineering.preprocessing.feature_preprocessor - [32mINFO[0m - [L6.5] Processing chunk 60/227 (2000 cols)

@@ -18,6 +18,7 @@ from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
 from momentum.Analysis.statistical_validator import StatisticalValidator
 from momentum.Analysis.feature_toggle_registry import FeatureToggleRegistry, FeatureToggle, DifficultyLevel
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
+from momentum.Analysis.regime_detector import RegimeDetector, RegimeDetectionResult
 
 __all__ = [
 	"CoverageAnalyzer",
@@ -42,4 +43,6 @@ __all__ = [
 	"FeatureToggle",
 	"DifficultyLevel",
 	"TurnoverAnalyzer",
+	"RegimeDetector",
+	"RegimeDetectionResult",
 ]

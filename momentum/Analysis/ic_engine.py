@@ -389,6 +389,26 @@ class ICEngine:
         if close is None:
             return {}
         close = close.reindex(features_df.index)
+
+        regime_method = config.get("regime_method", "rule")
+
+        if regime_method == "kmeans":
+            return self._compute_regime_groups_kmeans(
+                features_df, label, close, raw_data, config
+            )
+
+        return self._compute_regime_groups_rule(
+            features_df, label, close, config
+        )
+
+    def _compute_regime_groups_rule(
+        self,
+        features_df: pd.DataFrame,
+        label: pd.Series,
+        close: pd.Series,
+        config: dict,
+    ) -> dict[str, dict]:
+        """原始規則式 regime 分組（bull/bear/high_vol/low_vol）。"""
         ema_55 = close.ewm(span=55, adjust=False).mean()
         vol = close.pct_change(fill_method=None).rolling(55).std()
 
@@ -416,6 +436,48 @@ class ICEngine:
                 results[name] = {}
                 continue
             results[name] = self.compute_ic(
+                features_df.loc[idx], label.loc[idx], method
+            )
+        return results
+
+    def _compute_regime_groups_kmeans(
+        self,
+        features_df: pd.DataFrame,
+        label: pd.Series,
+        close: pd.Series,
+        raw_data: pd.DataFrame,
+        config: dict,
+    ) -> dict[str, dict]:
+        """K-Means 無監督 regime 分組。"""
+        from momentum.Analysis.regime_detector import RegimeDetector
+
+        kmeans_cfg = config.get("regime_kmeans", {})
+        n_clusters = kmeans_cfg.get("n_clusters", 4)
+        lookback = kmeans_cfg.get("lookback", 55)
+        min_samples = kmeans_cfg.get("min_samples_for_fit", 100)
+
+        volume = raw_data.get("volume")
+        if volume is not None:
+            volume = volume.reindex(features_df.index)
+
+        detector = RegimeDetector(
+            n_clusters=n_clusters,
+            lookback=lookback,
+            min_samples_for_fit=min_samples,
+        )
+        detection = detector.detect(close, volume, expanding=True)
+
+        results: dict[str, dict] = {}
+        method = config.get("method", self._methods[0])
+        for regime_name in set(detection.labels):
+            if not regime_name or regime_name == "unknown":
+                continue
+            mask = detection.labels == regime_name
+            idx = features_df.index[mask[:len(features_df)]]
+            if len(idx) == 0:
+                results[regime_name] = {}
+                continue
+            results[regime_name] = self.compute_ic(
                 features_df.loc[idx], label.loc[idx], method
             )
         return results

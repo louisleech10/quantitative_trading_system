@@ -493,7 +493,18 @@ class FeatureFactory:
         data: pd.DataFrame,
         config: "FactoryConfig",
     ) -> pd.DataFrame:
-        base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")
+        # LagProcessor.apply_to is typically "layer1_and_raw", which only
+        # selects L1 and raw-data columns.  Passing the full
+        # [data, layer1, layer2, layer3] creates a massive intermediate
+        # DataFrame (213K cols) just for column selection to discard most of it.
+        # Instead, pass only [data, layer1] — the layers that LagProcessor
+        # actually uses — avoiding the 2-minute memmap copy entirely.
+        apply_to = getattr(config.lag_features, "apply_to", "all")
+        if apply_to == "layer1_and_raw":
+            # Fast path: only the columns that will be selected
+            base = self._combine_layers([data, layer1], context="layer4_input")
+        else:
+            base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")
         if base.empty:
             return pd.DataFrame(index=base.index)
         processor = LagProcessor(config)
@@ -516,11 +527,17 @@ class FeatureFactory:
 
         try:
             cache_key = (reference_symbol, timeframe)
-            ref_data = self._reference_data_cache.get(cache_key)
-            if ref_data is None:
+            if cache_key in self._reference_data_cache:
+                ref_data = self._reference_data_cache[cache_key]
+                # Cached negative lookup: reference data unavailable in this run.
+                if ref_data is None:
+                    return pd.DataFrame(index=layer1.index)
+            else:
                 ref_data = self._layer0_data_ingestion(reference_symbol, timeframe, config)
                 self._reference_data_cache[cache_key] = ref_data
         except Exception as exc:
+            # Cache negative result to avoid repeated failing fetch attempts.
+            self._reference_data_cache[cache_key] = None
             logger.error("Cross-sectional reference fetch failed: %s", exc, exc_info=True)
             return pd.DataFrame(index=layer1.index)
 
@@ -685,7 +702,8 @@ class FeatureFactory:
         features_df = self._combine_layers(layers, context="layer7_final")
         features_df = features_df.reindex(raw_data.index)
         if not features_df.empty:
-            features_df = features_df.astype("float32")
+            # copy=False: if already float32 (memmap), avoids duplicating 11+ GB
+            features_df = features_df.astype("float32", copy=False)
         # Add timeframe tag to all feature columns so single-TF and multi-TF outputs
         # share the same naming convention (e.g. ema_20 → ema_12h_20).
         if not features_df.empty:
@@ -824,8 +842,9 @@ class FeatureFactory:
     def _apply_timeframe_tag(features_df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
         """Add timeframe tag to feature column names (e.g. ``ema_20`` → ``ema_12h_20``).
 
-        Columns that already carry a timeframe tag or start with reserved prefixes
-        (``meta_``, ``label_``) are left unchanged.  The convention matches
+        Columns that already carry a timeframe tag or start with ``label_`` prefix
+        are left unchanged.  ``meta_`` columns also get tagged to avoid duplicate
+        names when merging multi-TF outputs.  The convention matches
         ``MultiTFGenerator._apply_timeframe_tag`` so single-TF and multi-TF outputs
         share the same naming scheme.
         """
@@ -833,8 +852,10 @@ class FeatureFactory:
         tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
 
         def _rename(col: str) -> str:
-            if col.startswith("meta_") or col.startswith("label_"):
-                return col
+            if col.startswith("label_"):
+                return col  # Labels come from primary TF only, no TF tag needed
+            # meta_ columns MUST be tagged with TF prefix (meta_1h_*, meta_12h_*)
+            # to stay consistent with MultiTFGenerator._apply_timeframe_tag.
             parts = col.split("_")
             if len(parts) < 2:
                 return col
@@ -850,7 +871,11 @@ class FeatureFactory:
         valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
         if not valid_layers:
             return pd.DataFrame()
-        combined = pd.concat(valid_layers, axis=1, copy=False)
+
+        from momentum.FeatureEngineering.memmap_utils import concat_with_memmap
+
+        combined = concat_with_memmap(valid_layers)
+
         if combined.columns.has_duplicates:
             duplicate_count = int(combined.columns.duplicated(keep="first").sum())
             duplicate_series = combined.columns.to_series()
@@ -862,7 +887,41 @@ class FeatureFactory:
                 len(duplicate_counts),
                 duplicate_counts.head(30).to_dict(),
             )
-            combined = combined.loc[:, ~combined.columns.duplicated(keep="first")]
+            # Memmap-safe dedup: .loc[:, ~mask] on a memmap-backed DF forces a
+            # full in-memory copy (11+ GB → OOM).  Use contiguous-range copy
+            # into a new memmap instead.
+            keep_mask = ~combined.columns.duplicated(keep="first")
+            est_bytes = combined.shape[0] * int(keep_mask.sum()) * 4
+            if est_bytes >= 500_000_000:
+                import numpy as _np
+                from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+
+                keep_idx = _np.where(keep_mask)[0]
+                n_keep = len(keep_idx)
+                n_rows = combined.shape[0]
+                out = create_temp_memmap((n_rows, n_keep), prefix="dedup_")
+                src = combined.values  # underlying memmap or array
+
+                # Copy in contiguous ranges (typically ~12 ranges for 11 dups)
+                dst = 0
+                i = 0
+                while i < n_keep:
+                    s = int(keep_idx[i])
+                    rlen = 1
+                    while i + rlen < n_keep and int(keep_idx[i + rlen]) == s + rlen:
+                        rlen += 1
+                    out[:, dst : dst + rlen] = src[:, s : s + rlen]
+                    dst += rlen
+                    i += rlen
+
+                combined = pd.DataFrame(
+                    data=out,
+                    index=combined.index,
+                    columns=combined.columns[keep_idx].tolist(),
+                    copy=False,
+                )
+            else:
+                combined = combined.loc[:, keep_mask]
         return combined
 
     @staticmethod

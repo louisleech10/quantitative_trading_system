@@ -52,11 +52,16 @@ ic_calculation:
     by_category: true  # 依指標類別
     by_data_source: true  # 依資料來源
     by_layer: true  # 依 pipeline layer
+    regime_method: "rule"  # rule=規則式(bull/bear/vol), kmeans=K-Means無監督聚類
     regime_definitions:
       bull: "close > close_EMA_55"
       bear: "close < close_EMA_55"
       high_vol_percentile: 80
       low_vol_percentile: 20
+    regime_kmeans:
+      n_clusters: 4  # 聚類數量（4=高波趨勢/中波趨勢/中波盤整/低波盤整）
+      lookback: 55  # 特徵計算回看窗口
+      min_samples_for_fit: 100  # 最少樣本數才進行聚類
 
 # 篩選門檻
 thresholds:

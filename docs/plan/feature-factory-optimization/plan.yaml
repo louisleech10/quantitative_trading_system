@@ -1,0 +1,2035 @@
+plan_id: feature-factory-optimization
+objective: |
+  實作 Feature Factory 效能優化方案 M（Hybrid — CGSA + Polars + Numba + searchsorted），
+  將 ETHUSDT 2TF pipeline 從 170+ min 降至 ~7 min，同時滿足：
+  數值完全等價(C1)、不減特徵(C2)、不改欄位名(C3)、RAM ≤ 6GB(C4)、無 future leakage(C5)、NaN 語義一致(C6)。
+  全程由 AI Agent 自動執行，包含 98 項測試（38 單元 + 35 邊界 + 12 整合 + 5 golden 等價 + 8 效能）。
+created_at: "2026-04-12T18:00:00"
+created_by: gem-planner
+status: approved
+research_confidence: high
+
+plan_metrics:
+  wave_1_task_count: 6
+  total_dependencies: 48
+  risk_score: medium
+
+tldr: |
+  6 Phase 漸進式效能優化，每 Phase 有獨立 gate 決策點：
+  - Phase 0: 可觀測性建設（log + golden output）— 零風險
+  - Phase 1: searchsorted + skip self-align — 省 7.5 min
+  - Phase 2: CGSA 架構（ColumnGroup 串流）— 消除 global concat，170 min → 20 min
+  - Phase 3: Numba 融合 rolling — L3 385s → 60s
+  - Phase 4: Polars L2/L6.5（條件性）— 僅在 re-profile 確認瓶頸時推進
+  - Phase 5: 生產化（multi-symbol parallel + DuckDB）
+  每 Phase 附帶完整測試 + 邊界測試 + 自我審查 checkbox。
+
+open_questions:
+  - "現行 pipeline 能否跑完全量 config 產生 golden output？若 OOM 需用 reduced config"
+  - "TA-Lib 是否 thread-safe？影響 Task 1.5 ThreadPoolExecutor 決策"
+  - "Phase 4 是否需要推進？取決於 Phase 3 後的 re-profile 結果"
+
+pre_mortem:
+  overall_risk_level: medium
+  critical_failure_modes:
+    - scenario: "searchsorted ms→ns 精度導致 off-by-one，C1 數值不等價"
+      likelihood: medium
+      impact: high
+      mitigation: "T1.2 offset 測試 + T1.B14 精確邊界測試；fallback env FFACT_USE_SEARCHSORTED=0"
+    - scenario: "CGSA per-group persist 產生 ~4500 小 Parquet 檔案，IO 效能下降"
+      likelihood: medium
+      impact: medium
+      mitigation: "可合併相同 indicator 的 groups 到一個 Parquet；monitor IO throughput"
+    - scenario: "Numba fused rolling skew/kurt 數值不穩定，atol=1e-4 fail"
+      likelihood: medium
+      impact: high
+      mitigation: "Pebay + 每 W 步校正 + float64 累加器；fallback FFACT_USE_NUMBA_ROLLING=0"
+    - scenario: "現行 pipeline OOM → 無法建立完整 golden output"
+      likelihood: high
+      impact: critical
+      mitigation: "用 reduced config golden；分層 golden（L1/L3/final）"
+    - scenario: "L2 Cross/Ratio 跨 group 依賴在 CGSA 中產生資料競爭"
+      likelihood: low
+      impact: high
+      mitigation: "L2 Stage A 保留 L1 全量 RAM（87 MB），Stage B 才釋放；雙軌 A/B 驗證"
+    - scenario: "CGSA 雙軌 A/B 同時執行 → RAM 翻倍 → OOM"
+      likelihood: medium
+      impact: high
+      mitigation: "A/B 不同時在記憶體中；legacy 先跑完存 parquet，再跑 CGSA 比對"
+    - scenario: "TA-Lib 非 thread-safe，Task 1.5 ThreadPoolExecutor 導致 segfault (R11)"
+      likelihood: high
+      impact: high
+      mitigation: "Task 1.5 標記 OPTIONAL；若實作改用 ProcessPoolExecutor"
+    - scenario: "多 TF 平行化時 TA-Lib GIL 競爭，效能無改善 (R6)"
+      likelihood: medium
+      impact: medium
+      mitigation: "改用 ProcessPoolExecutor 而非 ThreadPoolExecutor"
+    - scenario: ".npy 中介檔案硬碟暴漲，work_dir 爆滿 (R8)"
+      likelihood: low
+      impact: medium
+      mitigation: "persist 後即刪 + cleanup finally block"
+    - scenario: "Numba JIT 首次編譯耗時 ~30s cold start (R12)"
+      likelihood: low
+      impact: low
+      mitigation: "使用 @numba.njit(cache=True) 磁碟快取"
+    - scenario: "build_asof_index_map int64 ms→ns 轉換溢出 year>2262 (R13)"
+      likelihood: low
+      impact: medium
+      mitigation: "T1.B15 overflow 測試 + assert year < 2100"
+    - scenario: "self-align skip 後 index 對齊不一致，後續 concat 列數不匹配 (R2)"
+      likelihood: low
+      impact: medium
+      mitigation: "T1.B11 index mismatch 測試 + assert len(combined) == len(primary_timestamps)"
+    - scenario: "Polars null ≠ NaN 語義差異導致 C6 fail (R5)"
+      likelihood: medium
+      impact: medium
+      mitigation: "T4.B1 null/NaN 驗證 + pl.Series.fill_null(float('nan'))；Phase 4 為條件性，不影響 Phase 2/3"
+    - scenario: "materialize_wide_df() 重組 45 萬欄位 Parquet → metadata 極大導致讀取慢 (R10)"
+      likelihood: high
+      impact: high
+      mitigation: "per-group Parquet 已在 CGSA 設計中；materialize_wide_df() 僅供向後相容，新 code 應直接讀 per-group"
+  assumptions:
+    - "MacBook M1 8GB RAM 環境（留 2GB 給 OS）"
+    - "ETHUSDT K-line 資料已在 data_cache/ 中"
+    - "scan_config.yaml 為預設設定（全開 L1~L6）"
+    - "momentum.core.logging 已可用"
+    - "numpy, pandas, numba, h5py 已安裝"
+    - "所有 Phase 在獨立 git branch 上開發"
+
+implementation_specification:
+  code_structure: |
+    新增程式碼位於 momentum/FeatureEngineering/ 下，遵循解耦 7 規則。
+    Phase 2 新增 core/ 子目錄（ColumnGroup, Registry）。
+    Phase 3 新增 numba/ 子目錄（fused rolling kernels）。
+    測試位於 tests/ 頂層，效能測試在 tests/performance/。
+    Golden output 位於 data_cache/golden_output/。
+    腳本位於 scripts/。
+  affected_areas:
+    - "momentum/FeatureEngineering/feature_factory.py — L2 計時、L7 per-group validate"
+    - "momentum/FeatureEngineering/memmap_utils.py — heartbeat log"
+    - "momentum/FeatureEngineering/timeframe/tf_aligner.py — searchsorted align"
+    - "momentum/FeatureEngineering/timeframe/multi_tf_generator.py — self-align skip"
+    - "momentum/FeatureEngineering/core/ — 新增 ColumnGroup + Registry (Phase 2)"
+    - "momentum/FeatureEngineering/operators/rolling_aggregator.py — Numba fused (Phase 3)"
+    - "momentum/FeatureEngineering/operators/derived_operators.py — L2 CGSA (Phase 2)"
+    - "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py — L6.5 per-group (Phase 2)"
+    - "momentum/FeatureEngineering/feature_storage.py — per-group Parquet (Phase 2)"
+    - "scripts/generate_golden_output.py — golden baseline"
+    - "tests/ — 98 項測試"
+  component_details:
+    - component: "TimeframeAligner.build_asof_index_map()"
+      responsibility: "O(N log M) searchsorted 對齊，替代 merge_asof"
+      interfaces:
+        - "build_asof_index_map(primary_ts, source_ts, offset_ns) -> np.ndarray"
+        - "_searchsorted_align(source_values, source_index, primary_index, offset_ns) -> pd.DataFrame"
+    - component: "ColumnGroup + ColumnGroupRegistry"
+      responsibility: "CGSA 核心資料結構：immutable group metadata + disk-backed registry"
+      interfaces:
+        - "ColumnGroup(group_id, layer, timeframe, ...)"
+        - "Registry.register(group), .get(group_id), .save_data(), .load_data()"
+        - "Registry.materialize_wide_df() -> pd.DataFrame (向後相容)"
+    - component: "Numba Fused Rolling"
+      responsibility: "單次掃描計算 mean/std/min/max/range/zscore/skew/kurt/rank/slope"
+      interfaces:
+        - "fused_rolling_stats(data, windows, aggs) -> dict[str, np.ndarray]"
+    - component: "Golden Output Generator"
+      responsibility: "建立數值基準，用於所有 Phase 的 C1~C6 驗證"
+      interfaces:
+        - "scripts/generate_golden_output.py → data_cache/golden_output/"
+  dependencies:
+    - component: "Phase 1 (searchsorted)"
+      relationship: "depends on Phase 0 golden output for validation"
+    - component: "Phase 2 (CGSA)"
+      relationship: "depends on Phase 1 for searchsorted align in non-primary TF"
+    - component: "Phase 3 (Numba)"
+      relationship: "depends on Phase 2 for per-group data structure"
+    - component: "Phase 4 (Polars)"
+      relationship: "conditional on Phase 3 re-profile; depends on Phase 2 CGSA"
+    - component: "Phase 5 (Production)"
+      relationship: "depends on Phase 3 gate decision（Phase 4 conditional）；延用 Phase 2 的 per-group Parquet 產出"
+  integration_points:
+    - "feature_factory.py _layer7_validate_and_persist — Phase 2 改為 per-group"
+    - "tf_aligner.py align_to_primary — Phase 1 切換 searchsorted"
+    - "multi_tf_generator.py generate_multi_tf — Phase 1 skip self-align"
+    - "rolling_aggregator.py — Phase 3 Numba fused replacement"
+    - "momentum/factories.py — Phase 2 新增 create_column_group_registry()"
+
+task_guidelines:
+  description: |
+    以下規則適用於所有 gem-implementer 任務，由 agent 在執行時自動遵循。
+    Gate reviewer 負責驗證每個 task 是否滿足這些全域規則。
+
+  ultra_think_enforcement: |
+    每個 implementer task 必須遵循 Ultra Think 3-step（§0.3）：
+    Step 1: 生成可運作的程式碼
+    Step 2: 自我 review → 列出 To-do
+    Step 3: 套用 To-do，產出 production-ready 版本
+    完成後在 task comment 中記錄 "Ultra Think ✓"
+
+  pre_commit_checklist: |
+    每個 task 完成後必須檢查（§0.13）：
+    □ grep -r "from api\." momentum/ → 0 結果（R1）
+    □ 無 hardcoded data
+    □ 所有函式有 type hints
+    □ Error handling 使用 FailureType 分類（適用 I/O tasks）
+    □ Logging 使用 momentum.core.logging
+    □ 命名符合 §0.6（lowercase_with_underscores for functions/vars）
+    □ .npy / .parquet 不在 git track 中
+    □ Vectorized ops preferred — pandas/numpy 優先於 Python loop（§0.8）
+    □ Architecture/API 變更時更新 docs/（§0.13: ARCHITECTURE.md, DEVELOPMENT_GUIDE.md）
+    □ Fallback env var 可切回舊行為（§0.12）
+
+  test_conventions: |
+    所有測試任務（focus_area 含 'testing'）必須：
+    - 測試函式名：test_{功能}_{場景}
+    - 每個 test 有中文 docstring
+    - 合成資料用 make_kline_df / make_feature_df fixture（INFRA-T1 提供）
+    - 測試可獨立執行（Rule 6: 無需 run_api.py）
+
+  error_handling: |
+    涉及 I/O 的 tasks（P0-T3, P2-T2, P2-T8, P5-T1）必須使用 FailureType 分類（§0.4）：
+    RATE_LIMIT / NETWORK_ERROR → retryable
+    INVALID_SYMBOL / IO_ERROR → not retryable
+    明確的 try/except + logger.error(exc_info=True)
+
+  git_branching: |
+    每 Phase 在獨立 git branch 上開發（§0.10, §1.2）：
+    Phase 0 → perf/phase-0-observability
+    Phase 1 → perf/phase-1-searchsorted
+    Phase 2 → perf/phase-2-cgsa
+    Phase 3 → perf/phase-3-numba-rolling
+    Phase 4 → perf/phase-4-polars（條件性）
+    Phase 5 → perf/phase-5-production
+    Gate 通過後合併到 main。
+    連續失敗 3 次以上 → 重新評估該 Phase 技術方案（§1.2.1）。
+
+contracts:
+  - from_task: "P0-T3"
+    to_task: "P1-T5"
+    interface: "Golden output parquet + columns.json + nan_mask.npz"
+    format: "data_cache/golden_output/ETHUSDT_1h_2tf_golden.parquet"
+  - from_task: "P1-T1"
+    to_task: "P1-T2"
+    interface: "build_asof_index_map() returns np.ndarray index"
+    format: "np.ndarray[int64], -1 for invalid"
+  - from_task: "P2-T1"
+    to_task: "P2-T2"
+    interface: "ColumnGroup dataclass definition"
+    format: "frozen dataclass with group_id, layer, columns, shape, disk_path"
+  - from_task: "P2-T2"
+    to_task: "P2-T3"
+    interface: "ColumnGroupRegistry API (register, save_data, load_data)"
+    format: "Registry instance with work_dir"
+  - from_task: "P2-T8"
+    to_task: "P2-T9"
+    interface: "Per-group Parquet files on disk"
+    format: "data_cache/features/{symbol}/{config_hash}/*.parquet"
+  - from_task: "P3-T1"
+    to_task: "P3-T5"
+    interface: "Numba fused rolling kernels (mean/std/min/max/range/zscore)"
+    format: "dict[str, np.ndarray] per window"
+  - from_task: "P3-T2"
+    to_task: "P3-T5"
+    interface: "Online skew/kurt Pebay kernels"
+    format: "np.ndarray per aggregation"
+
+# =============================================================================
+# TASKS
+# =============================================================================
+
+tasks:
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure — 共享測試基礎設施
+  # ---------------------------------------------------------------------------
+
+  - id: "INFRA-T1"
+    title: "建立共享測試 fixture (make_kline_df / make_feature_df)"
+    description: |
+      建立 tests/conftest.py（或 tests/test_fixtures.py），包含 §9.3 定義的合成資料生成器：
+      - make_kline_df(n_rows, timeframe_seconds, seed) → pd.DataFrame（ETHUSDT-like OHLCV）
+      - make_feature_df(n_rows, n_cols, seed) → pd.DataFrame（NaN pattern: 前 20% rows）
+      Phase 1~5 所有測試任務依賴此 fixture。
+    wave: 1
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies: []
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§9.3 合成資料生成器"
+      - "tests/": "test directory"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 60
+    focus_area: "test infrastructure"
+    verification:
+      - "from tests.conftest import make_kline_df, make_feature_df 可成功匯入"
+      - "make_kline_df(100, 3600) 回傳含 timestamp/open/high/low/close/volume 的 DataFrame"
+      - "make_feature_df(100, 50) 回傳含 NaN pattern 的 float32 DataFrame"
+    acceptance_criteria:
+      - "兩個 fixture 函式存在且有完整 type hints"
+      - "有中文 docstring"
+      - "seed 參數確保 deterministic output"
+    failure_modes: []
+    tech_stack:
+      - "numpy"
+      - "pandas"
+      - "pytest"
+    test_coverage: null
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Phase 0 — 可觀測性基礎建設
+  # ---------------------------------------------------------------------------
+
+  - id: "P0-T1"
+    title: "Phase 0.1: 加 L2 前後計時 log"
+    description: |
+      在 feature_factory.py 的 _layer2_derived_features() 開頭和結尾加計時 log，
+      格式: [L2] Starting derived features: XX L1 cols / [L2] Completed: XX cols in XX.XXs
+      不改變任何現有行為，純增加可觀測性。
+    wave: 1
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies: []
+    context_files:
+      - "momentum/FeatureEngineering/feature_factory.py": "L2 derived features method"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 10
+    focus_area: "observability"
+    verification:
+      - "grep '[L2]' in feature_factory.py confirms log lines added"
+      - "T0.1 test passes"
+    acceptance_criteria:
+      - "L2 計時 log 包含 'Starting' 和 'Completed'"
+      - "L1 為空 DF 時不 crash"
+      - "遵守 logging 規範 (momentum.core.logging)"
+    failure_modes:
+      - scenario: "logger import 路徑錯誤 (from api.core.logging)"
+        likelihood: low
+        impact: medium
+        mitigation: "grep 驗證 import path"
+    tech_stack:
+      - "Python"
+      - "time.perf_counter"
+    test_coverage: "T0.1"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P0-T2"
+    title: "Phase 0.2: 加 F 段 heartbeat log"
+    description: |
+      在 memmap_utils.py 的 concat_with_memmap() block copy loop 中，
+      每 30 秒輸出進度: [concat_memmap] Progress: X/Y rows copied, RSS=XX MB。
+      不改變任何現有行為。
+    wave: 1
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies: []
+    context_files:
+      - "momentum/FeatureEngineering/memmap_utils.py": "concat_with_memmap function"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 15
+    focus_area: "observability"
+    verification:
+      - "grep 'concat_memmap' in memmap_utils.py confirms heartbeat log"
+      - "T0.2 test passes"
+    acceptance_criteria:
+      - "合成 >30s concat 可看到 heartbeat log"
+      - "小 DF (<30s) 不輸出 heartbeat"
+      - "heartbeat log 內含 RSS=XX MB 且 XX > 0"
+    failure_modes:
+      - scenario: "psutil 未安裝"
+        likelihood: low
+        impact: low
+        mitigation: "fallback to os.getpid() memory read"
+    tech_stack:
+      - "Python"
+      - "psutil"
+    test_coverage: "T0.2"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P0-T3"
+    title: "Phase 0.3: 建立 Golden Output baseline"
+    description: |
+      建立 scripts/generate_golden_output.py，執行 Feature Factory pipeline，
+      輸出到 data_cache/golden_output/。若全量 OOM 則用 reduced config (GOLDEN_CONFIG_OVERRIDE)。
+      同時儲存 columns.json 和 nan_mask.npz。支援多層 golden (L1/L3/final)。
+    wave: 1
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies: []
+    context_files:
+      - "momentum/FeatureEngineering/feature_factory.py": "pipeline entry point"
+      - "config/scan_config.yaml": "default config"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 200
+    focus_area: "test infrastructure"
+    verification:
+      - "data_cache/golden_output/ directory exists with .parquet + .json + .npz after execution"
+      - "T0.3 and T0.4 tests pass"
+    acceptance_criteria:
+      - "golden.parquet 存在、欄位 >0、無 inf"
+      - "columns.json 與 parquet 欄位一致"
+      - "若全量 OOM → 記錄 warning 並自動降級到 reduced config，流程仍以 exit code 0 結束"
+      - "支援 reduced config 的 GOLDEN_CONFIG_OVERRIDE"
+    failure_modes:
+      - scenario: "即使 reduced config 也 OOM"
+        likelihood: medium
+        impact: critical
+        mitigation: "僅產生 L1 golden（單層比對）"
+    tech_stack:
+      - "Python"
+      - "pandas"
+      - "numpy"
+      - "pyarrow"
+    test_coverage: "T0.3, T0.4"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P0-T4"
+    title: "Phase 0: 測試套件 (T0.1~T0.4)"
+    description: |
+      建立 tests/test_golden_output_generation.py，包含：
+      - T0.1: test_l2_timing_log_emitted — L2 log 包含 Starting/Completed；L1 空 DF 不 crash
+      - T0.2: test_heartbeat_emitted_during_concat — 合成 >30s concat 有 heartbeat；小 DF 無
+      - T0.3: test_golden_output_generated — golden.parquet 存在、欄位>0、無 inf
+      - T0.4: test_golden_columns_json_matches — columns.json 與 parquet 欄位一致
+    wave: 2
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P0-T1"
+      - "P0-T2"
+      - "P0-T3"
+      - "INFRA-T1"
+    context_files:
+      - "tests/": "test directory"
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "test specifications §2.2"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 120
+    focus_area: "testing"
+    verification:
+      - "pytest tests/test_golden_output_generation.py -v passes all 4 tests"
+    acceptance_criteria:
+      - "T0.1~T0.4 全部 PASS"
+      - "測試有中文 docstring"
+      - "測試可獨立執行 (Rule 6)"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "numpy"
+      - "pandas"
+    test_coverage: "T0.1, T0.2, T0.3, T0.4"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P0-GATE"
+    title: "Phase Gate 0→1: 驗證可觀測性 + golden 就緒"
+    description: |
+      Gate 檢查清單：
+      □ Golden output 已建立（data_cache/golden_output/ 存在且可讀）
+      □ L2 計時 log 可見（確認 A3 段時間分布）
+      □ T0.1~T0.4 全部 PASS
+      □ grep -r "from api\." momentum/ → 0 結果 (R1 check)
+    wave: 3
+    agent: gem-reviewer
+    priority: high
+    status: pending
+    dependencies:
+      - "P0-T4"
+    context_files:
+      - "data_cache/golden_output/": "golden baseline"
+    estimated_effort: small
+    estimated_files: 0
+    estimated_lines: 0
+    focus_area: "gate review"
+    verification:
+      - "All Phase 0 tests pass"
+      - "Golden output files exist"
+    acceptance_criteria:
+      - "Gate checklist 全部 ✓"
+    failure_modes:
+      - scenario: "Golden output 未建立 (OOM or data missing)"
+        likelihood: medium
+        impact: critical
+        mitigation: "使用 reduced config 或 L1-only golden"
+    tech_stack: []
+    test_coverage: null
+    requires_review: true
+    review_depth: standard
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Phase 1 — searchsorted + Multi-TF 快修
+  # ---------------------------------------------------------------------------
+
+  - id: "P1-T1"
+    title: "Phase 1.1: 實作 build_asof_index_map()"
+    description: |
+      在 tf_aligner.py 新增靜態方法 build_asof_index_map(primary_ts, source_ts, offset_ns)。
+      使用 np.searchsorted(side='right')-1 實作 backward asof lookup。
+      必須：input validation (unsorted → ValueError)、ms→ns 轉換、-1 for out-of-range。
+      完整 type hints + docstring。
+    wave: 4
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P0-GATE"
+    context_files:
+      - "momentum/FeatureEngineering/timeframe/tf_aligner.py": "alignment module"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 50
+    focus_area: "searchsorted alignment"
+    verification:
+      - "T1.1 test passes (basic alignment)"
+      - "T1.B7 test passes (unsorted raises ValueError)"
+    acceptance_criteria:
+      - "build_asof_index_map 方法存在且有完整 type hints"
+      - "unsorted source → ValueError"
+      - "out-of-range → -1"
+      - "數值等價於 merge_asof(direction='backward')"
+    failure_modes:
+      - scenario: "int64 ms→ns 溢出 (year>2262)"
+        likelihood: low
+        impact: medium
+        mitigation: "T1.B15 overflow 測試 + assert year < 2100"
+    tech_stack:
+      - "numpy"
+    test_coverage: "T1.1, T1.2, T1.B1~T1.B7, T1.B14, T1.B15"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-T2"
+    title: "Phase 1.2: 實作 _searchsorted_align() 方法"
+    description: |
+      在 tf_aligner.py 新增 _searchsorted_align()，使用 build_asof_index_map 做 alignment。
+      支援 memmap 大矩陣（est_bytes >= MEMMAP_THRESHOLD_BYTES）。
+      在 aligned.attrs["source_timestamps"] 儲存 source 時間戳（供 future leak 驗證）。
+    wave: 5
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P1-T1"
+    context_files:
+      - "momentum/FeatureEngineering/timeframe/tf_aligner.py": "alignment module"
+      - "momentum/FeatureEngineering/memmap_utils.py": "memmap utilities"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 60
+    focus_area: "searchsorted alignment"
+    verification:
+      - "T1.3 test passes (numeric equivalence vs merge_asof)"
+      - "T1.4 test passes (column names preserved)"
+      - "T1.9 test passes (source_timestamps attr)"
+    acceptance_criteria:
+      - "_searchsorted_align 方法存在且有完整 type hints"
+      - "aligned.attrs['source_timestamps'] 類型為 pd.DatetimeIndex"
+      - "大矩陣使用 memmap"
+      - "結果與 merge_asof np.allclose(atol=1e-6, equal_nan=True)"
+    failure_modes:
+      - scenario: "memmap threshold 判斷錯誤導致 OOM"
+        likelihood: low
+        impact: high
+        mitigation: "使用與現行相同的 MEMMAP_THRESHOLD_BYTES 常數"
+    tech_stack:
+      - "numpy"
+      - "pandas"
+    test_coverage: "T1.3, T1.4, T1.5, T1.8, T1.9, T1.B8~T1.B10"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-T3"
+    title: "Phase 1.3: 修改 align_to_primary() 切換 searchsorted"
+    description: |
+      在 align_to_primary() 中切換到 _searchsorted_align。
+      保留 _merge_asof_align 和 _merge_asof_align_chunked 作為 fallback。
+      透過環境變數 FFACT_USE_SEARCHSORTED=0 可切回舊路徑。
+    wave: 6
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P1-T2"
+    context_files:
+      - "momentum/FeatureEngineering/timeframe/tf_aligner.py": "alignment module"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 30
+    focus_area: "searchsorted integration"
+    verification:
+      - "T1.10 test passes (fallback via env var)"
+      - "T1.7 golden output equivalence pass"
+    acceptance_criteria:
+      - "預設使用 searchsorted"
+      - "FFACT_USE_SEARCHSORTED=0 走舊路徑"
+      - "舊方法程式碼保留"
+    failure_modes:
+      - scenario: "offset_ns 判斷邏輯與 merge_asof direction 語義不匹配"
+        likelihood: medium
+        impact: high
+        mitigation: "T1.2 offset test + T1.B14 boundary test"
+    tech_stack:
+      - "Python"
+      - "os.environ"
+    test_coverage: "T1.10"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-T4"
+    title: "Phase 1.4: 跳過 Primary TF Self-Alignment"
+    description: |
+      在 multi_tf_generator.py 的 generate_multi_tf() 中，當 timeframe == primary_tf 時，
+      跳過 align_to_primary() 呼叫。使用 copy(deep=False) + 重設 index 為 primary_timestamps。
+      加 logger.info 記錄 skip。
+    wave: 4
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P0-GATE"
+    context_files:
+      - "momentum/FeatureEngineering/timeframe/multi_tf_generator.py": "multi-TF generator"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 20
+    focus_area: "self-alignment skip"
+    verification:
+      - "T1.6 test passes (same output with/without skip)"
+      - "T1.B11~T1.B13 boundary tests pass"
+    acceptance_criteria:
+      - "primary TF 不再呼叫 align_to_primary()"
+      - "欄位順序不變 (T1.B13)"
+      - "NaN 保留不變 (T1.B12)"
+      - "index 正確重設為 DatetimeIndex (T1.B11)"
+    failure_modes:
+      - scenario: "combined.index 類型與 primary_timestamps 不相容"
+        likelihood: low
+        impact: medium
+        mitigation: "assert len(combined) == len(primary_timestamps)"
+    tech_stack:
+      - "pandas"
+    test_coverage: "T1.6, T1.B11, T1.B12, T1.B13"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-T5"
+    title: "Phase 1: 核心正確性測試 (T1.1~T1.10)"
+    description: |
+      建立 3 個測試檔：
+      - tests/test_searchsorted_align.py
+      - tests/test_primary_self_align_skip.py
+      - tests/test_multi_tf_golden_equivalence.py
+      共同覆蓋 10 項核心正確性測試：
+      - T1.1: build_asof_index_map 基本對齊
+      - T1.2: OPEN_MINUS offset=-1ns
+      - T1.3: searchsorted vs merge_asof 數值等價（真實 ETHUSDT）
+      - T1.4: 欄位名保留
+      - T1.5: NaN pattern 一致
+      - T1.6: self-align skip 等價
+      - T1.7: multi-TF golden output 等價
+      - T1.8: no future leak
+      - T1.9: source_timestamps attr 存在
+      - T1.10: env var fallback 到 merge_asof
+    wave: 7
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P1-T3"
+      - "P1-T4"
+      - "INFRA-T1"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§3.6.1 test specs"
+    estimated_effort: medium
+    estimated_files: 3
+    estimated_lines: 400
+    focus_area: "testing"
+    verification:
+      - "pytest tests/test_searchsorted_align.py tests/test_primary_self_align_skip.py tests/test_multi_tf_golden_equivalence.py -v → 10 PASSED"
+      - "pytest tests/test_primary_self_align_skip.py -v → PASSED"
+      - "pytest tests/test_multi_tf_golden_equivalence.py -v → PASSED"
+    acceptance_criteria:
+      - "10/10 核心測試 PASS"
+      - "所有測試有中文 docstring"
+      - "合成資料用 make_kline_df fixture"
+    failure_modes:
+      - scenario: "T1.3 需要真實 ETHUSDT 資料但不存在"
+        likelihood: medium
+        impact: medium
+        mitigation: "pytest.skip if data_cache missing"
+    tech_stack:
+      - "pytest"
+      - "numpy"
+      - "pandas"
+    test_coverage: "T1.1~T1.10"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-T6"
+    title: "Phase 1: 邊界條件測試 (T1.B1~T1.B15)"
+    description: |
+      在 tests/test_searchsorted_align.py 和 tests/test_primary_self_align_skip.py 中新增
+      15 項邊界測試：
+      - T1.B1~B7: build_asof_index_map 邊界（空 source/primary/單行/全早/全晚/重複/未排序）
+      - T1.B8~B10: _searchsorted_align 邊界（全 NaN/mixed dtype/227k cols）
+      - T1.B11~B13: self-align skip 邊界（index mismatch/NaN/column order）
+      - T1.B14: offset=-1ns 精確邊界
+      - T1.B15: int overflow 大 timestamp
+    wave: 7
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P1-T3"
+      - "P1-T4"
+      - "INFRA-T1"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§3.6.2 boundary test specs"
+    estimated_effort: medium
+    estimated_files: 2
+    estimated_lines: 350
+    focus_area: "boundary testing"
+    verification:
+      - "pytest tests/test_searchsorted_align.py tests/test_primary_self_align_skip.py -k 'boundary' -v → 15 PASSED"
+    acceptance_criteria:
+      - "15/15 邊界測試 PASS"
+      - "每個測試明確標註邊界條件和預期行為"
+      - "所有測試有中文 docstring"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "numpy"
+    test_coverage: "T1.B1~T1.B15"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-T7"
+    title: "Phase 1: 效能驗收測試 (T1.P1~T1.P3)"
+    description: |
+      建立 tests/performance/test_searchsorted_perf.py，包含：
+      - T1.P1: 227k cols × 12888 rows align < 30s (vs 舊 298s)
+      - T1.P2: RSS 增量 < 500 MB
+      - T1.P3: self-align skip 後無新 memmap 檔案建立
+    wave: 7
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P1-T3"
+      - "P1-T4"
+      - "INFRA-T1"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§3.6.3 perf test specs"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 100
+    focus_area: "performance testing"
+    verification:
+      - "pytest tests/performance/test_searchsorted_perf.py -v → 3 PASSED"
+    acceptance_criteria:
+      - "在同資料集上，相較 merge_asof 基準有 >= 5x speedup"
+      - "若本機效能穩定，align 目標 < 30s"
+      - "RSS 增量 < 500 MB"
+      - "skip self-align 無新 memmap 檔案"
+    failure_modes:
+      - scenario: "CI 環境效能差異大"
+        likelihood: medium
+        impact: low
+        mitigation: "使用 relative improvement (>5x speedup) 而非絕對時間"
+    tech_stack:
+      - "pytest"
+      - "psutil"
+      - "time"
+    test_coverage: "T1.P1~T1.P3"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P1-GATE"
+    title: "Phase Gate 1→2: 驗證 searchsorted + skip 正確性與效能"
+    description: |
+      Gate 檢查清單：
+      □ T1.3 PASS — searchsorted vs merge_asof 數值一致
+      □ T1.6 PASS — self-align skip 數值一致
+      □ T1.7 PASS — 整個 multi-TF golden 等價
+      □ 效能改善實測 — 與 merge_asof 基準相比 B2+D 合計 >= 5x speedup
+      □ re-profile 完成 — 新的時間分布記錄
+      □ grep -r "from api\." momentum/ → 0 結果 (R1)
+      □ 所有 fallback env var 測試通過 (T1.10)
+      □ Pre-commit checklist 全部 ✓
+    wave: 8
+    agent: gem-reviewer
+    priority: high
+    status: pending
+    dependencies:
+      - "P1-T5"
+      - "P1-T6"
+      - "P1-T7"
+    context_files: []
+    estimated_effort: small
+    estimated_files: 0
+    estimated_lines: 0
+    focus_area: "gate review"
+    verification:
+      - "All Phase 1 tests pass"
+      - "Performance improvement confirmed"
+    acceptance_criteria:
+      - "Gate checklist 全部 ✓"
+      - "re-profile 記錄已產出"
+    failure_modes:
+      - scenario: "數值不等價 → gate fail"
+        likelihood: low
+        impact: critical
+        mitigation: "回退 branch，定位 off-by-one 問題"
+    tech_stack: []
+    test_coverage: null
+    requires_review: true
+    review_depth: full
+    review_security_sensitive: false
+
+  - id: "P1-T8"
+    title: "Phase 1.5 (OPTIONAL): Multi-TF 平行化"
+    description: |
+      將 multi_tf_generator.py 中的 for 迴圈改為 ThreadPoolExecutor / ProcessPoolExecutor。
+      此任務為 OPTIONAL，僅在 re-profile 顯示 C 段佔比顯著時才執行。
+      風險：TA-Lib 可能非 thread-safe → 需用 ProcessPoolExecutor。
+    wave: 9
+    agent: gem-implementer
+    priority: low
+    status: pending
+    dependencies:
+      - "P1-GATE"
+    context_files:
+      - "momentum/FeatureEngineering/timeframe/multi_tf_generator.py": "multi-TF generator"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 80
+    focus_area: "parallelization"
+    verification:
+      - "golden output equivalence still passes"
+      - "no segfault on multi-thread"
+    acceptance_criteria:
+      - "平行化後 golden output 與串行一致"
+      - "無 segfault 或 race condition"
+    failure_modes:
+      - scenario: "TA-Lib segfault under multi-thread"
+        likelihood: high
+        impact: high
+        mitigation: "改用 ProcessPoolExecutor；或 skip 此 task"
+    tech_stack:
+      - "concurrent.futures"
+    test_coverage: null
+    requires_review: true
+    review_depth: standard
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Phase 2 — CGSA 架構規格與實作
+  # ---------------------------------------------------------------------------
+
+  - id: "P2-T1"
+    title: "Phase 2.1: 建立 ColumnGroup dataclass"
+    description: |
+      新建 momentum/FeatureEngineering/core/__init__.py 和 column_group.py。
+      定義 frozen ColumnGroup dataclass (group_id, layer, timeframe, data_source,
+      indicator, columns, shape, dtype, disk_path) + LayerSource enum。
+    wave: 9
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P1-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.1 ColumnGroup spec"
+    estimated_effort: small
+    estimated_files: 2
+    estimated_lines: 80
+    focus_area: "CGSA data structure"
+    verification:
+      - "T2.1 (immutable) and T2.2 (est_bytes) tests pass"
+    acceptance_criteria:
+      - "ColumnGroup 是 frozen dataclass"
+      - "est_bytes 正確計算"
+      - "LayerSource enum 包含 L1~L6.5"
+    failure_modes: []
+    tech_stack:
+      - "Python dataclasses"
+    test_coverage: "T2.1, T2.2"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T2"
+    title: "Phase 2.2: 建立 ColumnGroupRegistry"
+    description: |
+      新建 column_group_registry.py。實作 register/get/list_by_layer/list_by_timeframe/
+      save_data/load_data/total_columns/all_column_names/cleanup API。
+      在 momentum/factories.py 加入 create_column_group_registry()。
+    wave: 10
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T1"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.1.3 Registry API"
+      - "momentum/factories.py": "factory functions"
+    estimated_effort: small
+    estimated_files: 2
+    estimated_lines: 120
+    focus_area: "CGSA registry"
+    verification:
+      - "T2.3~T2.10 unit tests pass"
+    acceptance_criteria:
+      - "所有 Registry API 方法存在且有 type hints"
+      - "duplicate group_id → ValueError"
+      - "save → load roundtrip data 完全一致"
+      - "cleanup 刪除所有 .npy"
+      - "factory 函式在 momentum/factories.py"
+    failure_modes:
+      - scenario: "np.save/.npy 大量小檔案效能問題"
+        likelihood: low
+        impact: low
+        mitigation: "Phase 2.8 最終改為 Parquet"
+    tech_stack:
+      - "numpy"
+      - "pathlib"
+    test_coverage: "T2.3~T2.10"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T3"
+    title: "Phase 2.3: L1 per-indicator column-group 輸出"
+    description: |
+      修改 feature_factory.py 的 _layer1_atomic_indicators()，
+      改為每個 indicator 輸出一個 ColumnGroup + .npy 而非合併到大 DataFrame。
+    wave: 11
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T2"
+    context_files:
+      - "momentum/FeatureEngineering/feature_factory.py": "L1 method"
+      - "momentum/FeatureEngineering/atomic/": "atomic engines"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 150
+    focus_area: "CGSA L1"
+    verification:
+      - "L1 output 改為 ColumnGroups"
+      - "Golden equivalence (數值) 測試通過"
+    acceptance_criteria:
+      - "L1 不再產生全域 DataFrame"
+      - "每個 indicator 對應一個 ColumnGroup"
+      - "Group ID 符合 ^(L[1-6](?:\\.5)?)_[A-Z0-9_]+_[A-Za-z0-9_]+$"
+    failure_modes:
+      - scenario: "L1 indicator 動態數量與 group ID 衝突"
+        likelihood: low
+        impact: medium
+        mitigation: "group ID 包含 indicator + data_source 確保唯一"
+    tech_stack:
+      - "numpy"
+      - "pandas"
+    test_coverage: "T2.11 (partial)"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T4"
+    title: "Phase 2.4: L2 兩階段計算 (Stage A/B)"
+    description: |
+      修改 derived_operators.py。Stage A: L1 全量保留 RAM(~87MB) 執行跨 indicator 操作
+      (Cross/Ratio/Distance)。Stage B: per-group .npy emit，然後釋放 L1。
+    wave: 12
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T3"
+    context_files:
+      - "momentum/FeatureEngineering/operators/derived_operators.py": "L2 operators"
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.2 L2 cross-group"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 200
+    focus_area: "CGSA L2"
+    verification:
+      - "T2.16 (L2 cross group) test passes"
+      - "L1 RAM 釋放後 RSS 下降"
+    acceptance_criteria:
+      - "Cross/Ratio 結果與 legacy np.allclose(atol=1e-6, equal_nan=True)"
+      - "L1 全量在 Stage A 保留，Stage B 釋放"
+      - "RAM 峰值 < 200 MB (L1 87MB + L2 largest group)"
+    failure_modes:
+      - scenario: "新 operator 類型打破 per-group 假設"
+        likelihood: low
+        impact: medium
+        mitigation: "明確記錄跨 group operators 必須在 Stage A"
+    tech_stack:
+      - "numpy"
+      - "pandas"
+    test_coverage: "T2.16"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T5"
+    title: "Phase 2.5: L3/L4/L5/L6 per-group streaming + _combine_layers 消除"
+    description: |
+      核心架構變更：將整個 per-TF 處理流程從 combined DataFrame 改為 per-ColumnGroup 串流。
+      
+      1. 消除 _combine_layers() — 不再做 pd.concat，各 layer ColumnGroups 直接註冊到 Registry
+      2. L3 (rolling_aggregator.py) — 改為接受 ColumnGroup 輸入，逐 group 計算 rolling stats，
+         每個 group 輸出新的 ColumnGroup（L3 layer）
+      3. L4 (lag features) — 改為 per-group lag 計算
+      4. L5 (cross-sectional) — 改為 per-group（L5 是 row-wise 操作，per-group 可行）
+      5. L6 (meta features) — 改為 per-group meta features
+      
+      參見 §4.5.1 CGSA Pipeline 新流程圖。
+      每個 layer 的 output 都是新的 ColumnGroups + .npy 註冊到 Registry。
+      Fallback: FFACT_USE_CGSA=0 可切回 legacy pd.concat 路徑。
+      
+      注意：此 task 是 Phase 2 架構變更的核心，涉及多個 layer 的輸入/輸出改造。
+      Phase 3 (Numba) 將進一步優化 L3 的演算法，但 L3 的 per-group 介面在這裡建立。
+    wave: 13
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T3"
+      - "P2-T4"
+    context_files:
+      - "momentum/FeatureEngineering/feature_factory.py": "_combine_layers + per-TF pipeline"
+      - "momentum/FeatureEngineering/operators/rolling_aggregator.py": "L3 rolling"
+      - "momentum/FeatureEngineering/operators/derived_operators.py": "L2 derived (already done in P2-T4)"
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.5.1 CGSA Pipeline 流程圖"
+    estimated_effort: large
+    estimated_files: 5
+    estimated_lines: 500
+    focus_area: "CGSA core pipeline"
+    verification:
+      - "T2.12 (no global concat) test passes"
+      - "L3/L4/L5/L6 各自輸出 ColumnGroups"
+      - "Golden equivalence 數值驗證通過"
+    acceptance_criteria:
+      - "在 feature_factory per-TF pipeline 不再呼叫 _combine_layers()"
+      - "在 FeatureEngineering pipeline 路徑不再呼叫 concat_with_memmap()"
+      - "L3/L4/L5/L6 均改為 per-ColumnGroup 輸入/輸出"
+      - "FFACT_USE_CGSA=0 可完整切回 legacy 路徑"
+      - "所有修改函式有完整 type hints"
+    failure_modes:
+      - scenario: "L5 cross-sectional 需要多 group 的同 row 資料"
+        likelihood: medium
+        impact: high
+        mitigation: "檢查 L5 是否為 row-wise 操作；若需跨 group 則在 Stage A 處理"
+      - scenario: "L3 per-group output 與後續 L4/L5/L6 的 group_id 衝突"
+        likelihood: low
+        impact: medium
+        mitigation: "group_id 加 layer_suffix 確保唯一 (如 _Mean_W5 for L3)"
+      - scenario: "改動範圍太大，regression"
+        likelihood: medium
+        impact: high
+        mitigation: "啟用雙軌 A/B 驗證 (P2-T12) 全量比對"
+    tech_stack:
+      - "numpy"
+      - "pandas"
+      - "Python"
+    test_coverage: "T2.12"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T6"
+    title: "Phase 2.6: Multi-TF column tagging via group_id"
+    description: |
+      修改 multi_tf_generator.py，TF prefix 改為在 group_id 命名中包含（天然包含），
+      消除 _apply_timeframe_tag() 的 .rename() 呼叫。
+    wave: 12
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P2-T3"
+    context_files:
+      - "momentum/FeatureEngineering/timeframe/multi_tf_generator.py": "TF tagging"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 40
+    focus_area: "CGSA naming"
+    verification:
+      - "Column names match golden output"
+    acceptance_criteria:
+      - "group_id 包含 TF prefix"
+      - "不再呼叫 .rename()"
+      - "欄位名與 golden 一致 (C3)"
+    failure_modes:
+      - scenario: "命名規則變更導致 downstream 依賴破壞（涉及 C3 硬約束）"
+        likelihood: medium
+        impact: high
+        mitigation: "雙軌 A/B 驗證 column names；T2.11 全量比對 set(new_cols) == set(golden_cols)"
+    tech_stack:
+      - "Python"
+    test_coverage: "T2.11 (partial)"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T7"
+    title: "Phase 2.7: L6.5 per-group preprocessing"
+    description: |
+      修改 feature_preprocessor.py，L6.5 改為逐 ColumnGroup 處理。
+      rank scope 不變（同列所有 rows），per-group 可行。
+    wave: 14
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T5"
+    context_files:
+      - "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py": "L6.5"
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.3 L6.5 rank semantics"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 150
+    focus_area: "CGSA L6.5"
+    verification:
+      - "T2.17 (per-group rank matches legacy) test passes"
+    acceptance_criteria:
+      - "rank/gaussian/zscore/diff/fracdiff 全部 per-group 正確"
+      - "rank 仍沿時間軸對單一欄位計算（不跨欄位混算）"
+      - "數值等價於 legacy (C1, C6)"
+    failure_modes:
+      - scenario: "fracdiff 非 element-wise 導致 per-group 語義不同"
+        likelihood: low
+        impact: medium
+        mitigation: "T2.B8 驗證 fracdiff per-group 可行"
+    tech_stack:
+      - "numpy"
+      - "scipy"
+    test_coverage: "T2.17, T2.B8"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T8"
+    title: "Phase 2.8: Persist per-group Parquet"
+    description: |
+      修改 feature_storage.py，改為逐 ColumnGroup 寫入 Parquet。
+      路徑: data_cache/features/{symbol}/{config_hash}/{group_id}.parquet
+    wave: 15
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T7"
+    context_files:
+      - "momentum/FeatureEngineering/feature_storage.py": "storage module"
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.4 persist format"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 120
+    focus_area: "CGSA persist"
+    verification:
+      - "T2.15 (DuckDB readable) test passes"
+      - "Parquet files created per group"
+    acceptance_criteria:
+      - "每個 group 一個 Parquet 檔"
+      - "DuckDB 可讀取並 count columns == total"
+      - ".npy 中介檔刪除"
+    failure_modes:
+      - scenario: "~4500 小 Parquet 檔案 IO 效能問題"
+        likelihood: medium
+        impact: medium
+        mitigation: "可合併相同 indicator 的 groups"
+    tech_stack:
+      - "pyarrow"
+      - "pandas"
+    test_coverage: "T2.14, T2.15"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T9"
+    title: "Phase 2.9: manifest.json 生成"
+    description: |
+      在 persist 階段產生 manifest.json，包含：symbol, primary_tf, training_tfs,
+      config_hash, total_features, total_groups, groups list, created_at。
+    wave: 16
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P2-T8"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.4 manifest spec"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 60
+    focus_area: "CGSA manifest"
+    verification:
+      - "T2.14 (manifest valid) test passes"
+    acceptance_criteria:
+      - "manifest.json 格式正確"
+      - "groups 數量 > 0"
+      - "total_features == sum of group columns"
+    failure_modes:
+      - scenario: "453k columns manifest JSON 過大 (>50MB)"
+        likelihood: low
+        impact: low
+        mitigation: "manifest 只含 group metadata，不含 column names → < 5 MB"
+    tech_stack:
+      - "json"
+    test_coverage: "T2.14"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T10"
+    title: "Phase 2.10: L7 per-group validate"
+    description: |
+      修改 feature_factory.py 的 _layer7_validate_and_persist()，
+      改為遍歷 Registry 逐個 ColumnGroup load + validate (inf check, NaN ratio check)。
+    wave: 16
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P2-T8"
+    context_files:
+      - "momentum/FeatureEngineering/feature_factory.py": "L7 validate"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 80
+    focus_area: "CGSA validation"
+    verification:
+      - "L7 validation passes per-group"
+    acceptance_criteria:
+      - "逐 group validate，不載入全量 DF"
+      - "inf check + NaN ratio check"
+    failure_modes: []
+    tech_stack:
+      - "numpy"
+    test_coverage: "T2.11 (partial)"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T11"
+    title: "Phase 2.11: materialize_wide_df() 向後相容"
+    description: |
+      在 ColumnGroupRegistry 新增 materialize_wide_df() 方法，
+      從 Parquet files 重組完整 wide DataFrame（僅在下游明確需要時呼叫）。
+    wave: 16
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P2-T8"
+    context_files:
+      - "momentum/FeatureEngineering/core/column_group_registry.py": "registry"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 50
+    focus_area: "backward compatibility"
+    verification:
+      - "materialize_wide_df() output matches golden"
+    acceptance_criteria:
+      - "返回 pd.DataFrame 與 golden output 數值等價"
+      - "column 順序按 registration order"
+    failure_modes:
+      - scenario: "453k columns 的 wide DF 占用大量 RAM"
+        likelihood: medium
+        impact: medium
+        mitigation: "明確文檔化此方法僅供向後相容，新 code 應使用 per-group"
+    tech_stack:
+      - "pandas"
+      - "pyarrow"
+    test_coverage: "T2.11"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T12"
+    title: "Phase 2.12: 雙軌 A/B 驗證框架"
+    description: |
+      建立 scripts/validate_cgsa_ab.py。同一資料分別跑 legacy 和 CGSA pipeline，
+      全量比對 C1~C6。不同時在記憶體中（legacy 先存 parquet，再跑 CGSA 比對）。
+    wave: 17
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T11"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.5 migration strategy"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 200
+    focus_area: "A/B validation"
+    verification:
+      - "A/B validation script runs without errors"
+      - "C1~C6 all pass"
+    acceptance_criteria:
+      - "Legacy 和 CGSA 在 C1/C6 以 np.allclose(atol=1e-6, equal_nan=True) 驗證通過"
+      - "C2/C3 以特徵數與欄位名集合完全一致驗證通過"
+      - "C5 以 source_timestamps 逐列檢查無 future leakage"
+      - "不同時在記憶體中"
+      - "output 報告 pass/fail 每項 constraint"
+    failure_modes:
+      - scenario: "雙軌同時執行 OOM"
+        likelihood: medium
+        impact: high
+        mitigation: "序列化執行：legacy → save → clear → CGSA → compare"
+    tech_stack:
+      - "Python"
+      - "numpy"
+      - "pandas"
+    test_coverage: "T2.11~T2.17"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T13"
+    title: "Phase 2: 單元測試 (T2.1~T2.10)"
+    description: |
+      建立 tests/test_column_group.py，包含 10 項 ColumnGroup/Registry 單元測試：
+      T2.1 immutable, T2.2 est_bytes, T2.3 register/get, T2.4 duplicate raises,
+      T2.5 save/load roundtrip, T2.6 list_by_layer, T2.7 list_by_timeframe,
+      T2.8 all_column_names order, T2.9 cleanup, T2.10 total_columns
+    wave: 11
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T2"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.7.1 unit test specs"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 200
+    focus_area: "unit testing"
+    verification:
+      - "pytest tests/test_column_group.py -v → 10 PASSED"
+    acceptance_criteria:
+      - "10/10 單元測試 PASS"
+      - "中文 docstring"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "numpy"
+    test_coverage: "T2.1~T2.10"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-T14"
+    title: "Phase 2: 整合 + 邊界測試 (T2.11~T2.17, T2.B1~T2.B9)"
+    description: |
+      建立 2 個測試檔：
+      - tests/test_cgsa_pipeline.py
+      - tests/performance/test_cgsa_memory.py
+      內容包含：
+      整合測試: T2.11 CGSA vs legacy 數值等價, T2.12 無 global concat,
+      T2.13 RAM < 2GB, T2.14 manifest valid, T2.15 DuckDB readable,
+      T2.16 L2 cross-group 精確, T2.17 L6.5 rank 精確。
+      邊界測試: T2.B1~T2.B9 (單 indicator/無跨 group/全 NaN/0 cols/disk full/
+      同 ID 不同 TF/manifest 大小/fracdiff/cleanup 中斷)。
+    wave: 18
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T12"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§4.7.2~4.7.3 test specs"
+    estimated_effort: large
+    estimated_files: 2
+    estimated_lines: 500
+    focus_area: "integration + boundary testing"
+    verification:
+      - "pytest tests/test_cgsa_pipeline.py -v → all PASSED"
+      - "pytest tests/performance/test_cgsa_memory.py -v → PASSED"
+    acceptance_criteria:
+      - "T2.11~T2.17 全部 PASS"
+      - "T2.B1~T2.B9 全部 PASS"
+      - "所有測試有中文 docstring"
+      - "T2.13 (RAM peak) 位於 tests/performance/test_cgsa_memory.py"
+    failure_modes:
+      - scenario: "T2.11 需要真實資料但不存在"
+        likelihood: medium
+        impact: medium
+        mitigation: "pytest.skip if data missing"
+    tech_stack:
+      - "pytest"
+      - "numpy"
+      - "duckdb"
+    test_coverage: "T2.11~T2.17, T2.B1~T2.B9"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P2-GATE"
+    title: "Phase Gate 2→3: 驗證 CGSA 正確性 + RAM + 無 global concat"
+    description: |
+      Gate 檢查清單：
+      □ T2.11 PASS — CGSA vs legacy 數值一致
+      □ T2.12 PASS — 無 global concat
+      □ T2.13 PASS — RSS < 2 GB
+      □ re-profile 完成 — 確認 L3 是剩餘 top-1 瓶頸
+      □ grep -r "from api\." momentum/ → 0 結果 (R1)
+      □ momentum/factories.py 包含 create_column_group_registry()
+      □ 所有 fallback env var 可切回 (FFACT_USE_CGSA=0)
+      □ Pre-commit checklist 全部 ✓
+    wave: 19
+    agent: gem-reviewer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-T13"
+      - "P2-T14"
+    context_files: []
+    estimated_effort: small
+    estimated_files: 0
+    estimated_lines: 0
+    focus_area: "gate review"
+    verification:
+      - "All Phase 2 tests pass"
+      - "RAM < 2 GB confirmed"
+    acceptance_criteria:
+      - "Gate checklist 全部 ✓"
+    failure_modes:
+      - scenario: "CGSA 數值不等價"
+        likelihood: low
+        impact: critical
+        mitigation: "回退 branch，A/B diff analysis"
+    tech_stack: []
+    test_coverage: null
+    requires_review: true
+    review_depth: full
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Phase 3 — Numba L3 融合 Rolling
+  # ---------------------------------------------------------------------------
+
+  - id: "P3-T1"
+    title: "Phase 3.1: fused_rolling_stats (mean/std/min/max/range/zscore)"
+    description: |
+      實作 Numba @njit(cache=True) 融合 rolling 核心：
+      Welford online mean/var + monotonic deque min/max。
+      float64 累加器，float32 輸出。NaN 處理與 pandas 一致。
+    wave: 20
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§5.2.1~5.2.2 algorithm specs"
+      - "momentum/FeatureEngineering/operators/rolling_aggregator.py": "current rolling"
+    estimated_effort: large
+    estimated_files: 2
+    estimated_lines: 400
+    focus_area: "Numba fused rolling"
+    verification:
+      - "T3.1~T3.6 all pass (per-aggregation vs pandas)"
+    acceptance_criteria:
+      - "mean/std/min/max/range/zscore 與 pandas allclose(atol=1e-6, equal_nan=True)"
+      - "float64 累加器 + float32 輸出"
+      - "@njit(cache=True) 確保 warm start"
+    failure_modes:
+      - scenario: "Welford remove 數值不穩定"
+        likelihood: medium
+        impact: high
+        mitigation: "定期校正 (每 W 步)"
+    tech_stack:
+      - "numba"
+      - "numpy"
+    test_coverage: "T3.1~T3.6"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T2"
+    title: "Phase 3.2: online skew/kurt (Pebay algorithm)"
+    description: |
+      實作 Pebay online 高階矩 (skew, kurtosis)。
+      float64 累加器 + 每 W 步從 ring buffer 校正。atol=1e-4。
+    wave: 20
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§5.2.4 Pebay specs"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 200
+    focus_area: "Numba high-order moments"
+    verification:
+      - "T3.7 (skew) and T3.8 (kurt) pass"
+    acceptance_criteria:
+      - "skew 與 pandas allclose(atol=1e-4)"
+      - "kurt 與 pandas allclose(atol=1e-4)"
+    failure_modes:
+      - scenario: "catastrophic cancellation in high-order moments"
+        likelihood: medium
+        impact: high
+        mitigation: "每 W 步重算校正"
+    tech_stack:
+      - "numba"
+      - "numpy"
+    test_coverage: "T3.7, T3.8"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T3"
+    title: "Phase 3.3: rolling rank (sorted buffer + bisect)"
+    description: |
+      實作 Numba rolling rank：sorted buffer insert/remove + bisect。
+      O(N·W) 複雜度。average method for ties。
+    wave: 20
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P2-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§5.2.3 rolling rank"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 150
+    focus_area: "Numba rolling rank"
+    verification:
+      - "T3.9 (rank vs pandas) passes"
+    acceptance_criteria:
+      - "rank 與 pandas rolling.rank(pct=True) allclose(atol=1e-6)"
+      - "ties 使用 average method"
+    failure_modes:
+      - scenario: "sorted buffer shift 在大 window 時效能不佳"
+        likelihood: low
+        impact: low
+        mitigation: "window max=233，shift cost acceptable"
+    tech_stack:
+      - "numba"
+      - "numpy"
+    test_coverage: "T3.9, T3.B9"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T4"
+    title: "Phase 3.4: rolling slope (running sums)"
+    description: |
+      實作 Numba rolling slope：使用 running sum(x), sum(y), sum(xy), sum(x²) 的 O(1) 更新。
+    wave: 20
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P2-GATE"
+    context_files:
+      - "momentum/FeatureEngineering/operators/rolling_aggregator.py": "existing slope"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 80
+    focus_area: "Numba rolling slope"
+    verification:
+      - "T3.10 (slope vs existing) passes"
+    acceptance_criteria:
+      - "slope 與現有 vectorized 實作 allclose(atol=1e-6)"
+    failure_modes: []
+    tech_stack:
+      - "numba"
+      - "numpy"
+    test_coverage: "T3.10"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T5"
+    title: "Phase 3.5: 整合到 RollingAggregator"
+    description: |
+      將 T3.1~T3.4 的 Numba kernels 整合到 rolling_aggregator.py。
+      支援 multi-window 融合（一次掃描計算所有 windows）。
+      Fallback: FFACT_USE_NUMBA_ROLLING=0 切回 pandas。
+    wave: 21
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P3-T1"
+      - "P3-T2"
+      - "P3-T3"
+      - "P3-T4"
+    context_files:
+      - "momentum/FeatureEngineering/operators/rolling_aggregator.py": "integration target"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 200
+    focus_area: "Numba integration"
+    verification:
+      - "T3.11 (multi-window equivalent) passes"
+      - "T3.12 (golden output match) passes"
+    acceptance_criteria:
+      - "融合 10 windows 結果 == 單獨 10 次 rolling"
+      - "golden output 在 C1/C6 以 np.allclose(atol=1e-6, equal_nan=True) 驗證通過"
+      - "FFACT_USE_NUMBA_ROLLING=0 fallback 正常"
+    failure_modes:
+      - scenario: "multi-window kernel compilation 過慢 (>30s cold start)"
+        likelihood: low
+        impact: low
+        mitigation: "cache=True 磁碟快取"
+    tech_stack:
+      - "numba"
+      - "numpy"
+    test_coverage: "T3.11, T3.12"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T6"
+    title: "Phase 3: 數值正確性測試 (T3.1~T3.12)"
+    description: |
+      建立 tests/test_numba_rolling.py，包含：
+      T3.1~T3.10: 每個聚合函式 vs pandas 驗證。
+      T3.11: multi-window 融合等價。T3.12: golden output 全量比對。
+    wave: 22
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P3-T5"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§5.3.1~5.3.2 test specs"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 350
+    focus_area: "correctness testing"
+    verification:
+      - "pytest tests/test_numba_rolling.py -v → 12 PASSED"
+    acceptance_criteria:
+      - "12/12 正確性測試 PASS"
+      - "所有測試有中文 docstring"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "numba"
+      - "pandas"
+    test_coverage: "T3.1~T3.12"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T7"
+    title: "Phase 3: 邊界條件測試 (T3.B1~T3.B13)"
+    description: |
+      在 tests/test_numba_rolling.py 新增 13 項邊界測試：
+      T3.B1~B13: 全 NaN/常數/W=1/N<W/極大極小值/W=233/inf/N=1/
+      重複值 rank/float64 vs 32/間歇 NaN/min_periods/9 windows 融合
+    wave: 22
+    agent: gem-implementer
+    priority: high
+    status: pending
+    dependencies:
+      - "P3-T5"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§5.3.3 boundary tests"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 300
+    focus_area: "boundary testing"
+    verification:
+      - "pytest tests/test_numba_rolling.py -k 'boundary' -v → 13 PASSED"
+    acceptance_criteria:
+      - "13/13 邊界測試 PASS"
+      - "所有測試有中文 docstring"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "numba"
+    test_coverage: "T3.B1~T3.B13"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-T8"
+    title: "Phase 3: 效能驗收 (T3.P1~T3.P2)"
+    description: |
+      建立 tests/performance/test_numba_rolling_perf.py：
+      T3.P1: 1683 cols × 10w × 10 agg × 12888 rows < 120s (vs 385s)
+      T3.P2: RAM 增量 < 500 MB
+    wave: 22
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P3-T5"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§5.3.4 perf specs"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 80
+    focus_area: "performance testing"
+    verification:
+      - "pytest tests/performance/test_numba_rolling_perf.py -v → 2 PASSED"
+    acceptance_criteria:
+      - "同資料集相較 pandas rolling 基準 >= 3x speedup"
+      - "若本機效能穩定，目標 < 120s"
+      - "RAM < 500 MB"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "psutil"
+    test_coverage: "T3.P1, T3.P2"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P3-GATE"
+    title: "Phase Gate 3→4: re-profile 決定是否進 Phase 4"
+    description: |
+      Gate 檢查清單：
+      □ T3.12 PASS — 融合結果 vs golden 一致
+      □ T3.P1 PASS — 效能改善 > 3x
+      □ re-profile 完成
+      □ 決策：L2 或 L6.5 是否為 top-2 瓶頸？
+        → 是 → 推進 Phase 4
+        → 否 → 跳到 Phase 5
+      □ grep -r "from api\." momentum/ → 0 結果 (R1)
+      □ Pre-commit checklist 全部 ✓
+    wave: 23
+    agent: gem-reviewer
+    priority: high
+    status: pending
+    dependencies:
+      - "P3-T6"
+      - "P3-T7"
+      - "P3-T8"
+    context_files: []
+    estimated_effort: small
+    estimated_files: 0
+    estimated_lines: 0
+    focus_area: "gate review + conditional decision"
+    verification:
+      - "Phase 3 all tests pass"
+      - "re-profile report produced"
+    acceptance_criteria:
+      - "Gate checklist 全部 ✓"
+      - "Phase 4 go/no-go 決策已記錄"
+    failure_modes: []
+    tech_stack: []
+    test_coverage: null
+    requires_review: true
+    review_depth: full
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Phase 4 — Polars L2 / L6.5（條件性）
+  # ---------------------------------------------------------------------------
+
+  - id: "P4-T1"
+    title: "Phase 4.1~4.4: Polars L2/L6.5 改寫（條件性）"
+    description: |
+      僅在 Phase Gate 3→4 決策為 GO 時執行。
+      T4.1: L1→Polars DataFrame (pl.from_numpy zero-copy)
+      T4.2: L2 DerivedOperatorEngine → Polars with_columns() batch
+      T4.3: L6.5 FeaturePreprocessor → Polars expressions
+      T4.4: NaN 語義對齊驗證 (Polars null vs NaN)
+      Fallback: FFACT_USE_POLARS=0
+    wave: 24
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P3-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§6 Phase 4 specs"
+    estimated_effort: large
+    estimated_files: 3
+    estimated_lines: 400
+    focus_area: "Polars migration"
+    verification:
+      - "T4.1~T4.4 all pass"
+      - "T4.B1~T4.B3 boundary tests pass"
+    acceptance_criteria:
+      - "L2/L6.5 Polars 實作對 pandas 結果 np.allclose(atol=1e-6, equal_nan=True)"
+      - "輸出前統一將 null 轉為 NaN，且 NaN mask 與 pandas 一致"
+      - "fallback env var 正常"
+    failure_modes:
+      - scenario: "Polars null/NaN 語義差異導致 C6 fail"
+        likelihood: medium
+        impact: high
+        mitigation: "T4.B1 + pl.Series.fill_null(float('nan'))"
+    tech_stack:
+      - "polars"
+      - "numpy"
+    test_coverage: "T4.1~T4.4, T4.B1~T4.B3"
+    requires_review: true
+    review_depth: standard
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Phase 5 — 生產化
+  # ---------------------------------------------------------------------------
+
+  - id: "P5-T1"
+    title: "Phase 5.1: ProcessPoolExecutor multi-symbol"
+    description: |
+      實作 multi-symbol 平行處理：每個 symbol 一個 worker process，
+      各自擁有獨立 ColumnGroupRegistry。max_workers=8。
+      若 Phase 3 Gate 判定需執行 Phase 4，則此 task 必須在 P4-T1 完成後才可開始。
+    wave: 25
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P3-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§7.1 production tasks"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 150
+    focus_area: "production parallelization"
+    verification:
+      - "T5.1 (2 sym × 2 TF parallel) passes"
+      - "T5.2 (no crosstalk) passes"
+    acceptance_criteria:
+      - "多 symbol 平行，各自 golden 一致"
+      - "無共享 Registry 污染"
+    failure_modes:
+      - scenario: "Worker OOM killed"
+        likelihood: medium
+        impact: medium
+        mitigation: "主進程捕獲 exc，記錄失敗 symbol (T5.B2)"
+    tech_stack:
+      - "concurrent.futures"
+      - "multiprocessing"
+    test_coverage: "T5.1, T5.2, T5.B1, T5.B2"
+    requires_review: true
+    review_depth: standard
+    review_security_sensitive: false
+
+  - id: "P5-T2"
+    title: "Phase 5.2~5.3: Arrow IPC + DuckDB 下游介面"
+    description: |
+      T5.2: Arrow IPC 作為 column-group intermediate format。
+      T5.3: DuckDB 讀取 per-group Parquet 工具函式。
+      若 Phase 3 Gate 判定需執行 Phase 4，則此 task 必須在 P4-T1 完成後才可開始。
+    wave: 25
+    agent: gem-implementer
+    priority: low
+    status: pending
+    dependencies:
+      - "P3-GATE"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§7 Phase 5"
+    estimated_effort: medium
+    estimated_files: 2
+    estimated_lines: 150
+    focus_area: "production integration"
+    verification:
+      - "T5.3 (DuckDB read parquet) passes"
+    acceptance_criteria:
+      - "DuckDB 可讀取全部 parquet 並 count columns == manifest total"
+    failure_modes:
+      - scenario: "DuckDB 未安裝 or version incompatible"
+        likelihood: low
+        impact: low
+        mitigation: "pytest.importorskip('duckdb')"
+    tech_stack:
+      - "pyarrow"
+      - "duckdb"
+    test_coverage: "T5.3, T5.B3"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P5-T3"
+    title: "Phase 5: 測試套件 (T5.1~T5.3, T5.B1~T5.B3)"
+    description: |
+      建立 tests/test_multi_symbol_parallel.py，包含：
+      T5.1: multi-symbol 平行正確性
+      T5.2: 無 Registry 污染
+      T5.3: DuckDB 讀取
+      T5.B1: 單 symbol 失敗不影響其他
+      T5.B2: Worker OOM → 主進程捕獲
+      T5.B3: 磁碟空間不足 → 提前失敗清理
+    wave: 26
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P5-T1"
+      - "P5-T2"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "§7.2 test specs"
+    estimated_effort: medium
+    estimated_files: 1
+    estimated_lines: 250
+    focus_area: "production testing"
+    verification:
+      - "pytest tests/test_multi_symbol_parallel.py -v → all PASSED"
+    acceptance_criteria:
+      - "6/6 測試 PASS"
+      - "所有測試有中文 docstring"
+    failure_modes: []
+    tech_stack:
+      - "pytest"
+      - "duckdb"
+    test_coverage: "T5.1~T5.3, T5.B1~T5.B3"
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P5-T4"
+    title: "Phase 5.4: 效能預估驗證 (100 sym × 4 TF × 8 workers < 90 min)"
+    description: |
+      建立 scripts/benchmark_multi_symbol.py，驗證生產環境效能預估（§7.1 Task 5.4）：
+      - 使用 2~4 symbol 實測，外推 100 symbol 預估
+      - 計算每 symbol 平均耗時
+      - 驗證 100 sym × 4 TF × 8 workers < 90 min 的預估是否合理
+      - 輸出效能報告（before/after per-Phase 數據表）
+    wave: 26
+    agent: gem-implementer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P5-T1"
+    context_files:
+      - "docs/FEATURE_FACTORY_OPTIMIZATION_PLAN.md": "附錄 A 效能預估對照表"
+    estimated_effort: small
+    estimated_files: 1
+    estimated_lines: 100
+    focus_area: "performance benchmarking"
+    verification:
+      - "scripts/benchmark_multi_symbol.py 可執行並輸出效能報告"
+      - "報告包含 per-symbol 耗時和 100-symbol 外推預估"
+    acceptance_criteria:
+      - "效能預估報告產出"
+      - "含 per-Phase before/after 數據"
+    failure_modes:
+      - scenario: "可用 symbols 不足（data_cache 內 < 2 symbols）"
+        likelihood: medium
+        impact: low
+        mitigation: "使用 ETHUSDT 單 symbol 乘以係數外推"
+    tech_stack:
+      - "Python"
+      - "time"
+      - "psutil"
+    test_coverage: null
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+
+  - id: "P5-GATE"
+    title: "Final Gate: 全量 golden 驗證 + 效能達標"
+    description: |
+      最終驗收檢查清單：
+      □ 全量 golden output 比對 PASS (C1~C6)
+      □ 1 sym × 2 TF < 20 min (Phase 2 後) 或 < 7 min (Phase 3 後)
+      □ RSS 峰值 < 2 GB (Phase 2+)
+      □ 所有 98 項測試 PASS
+      □ grep -r "from api\." momentum/ → 0 結果 (R1)
+      □ 所有 fallback env var 測試通過
+      □ Pre-commit checklist 全部 ✓
+      □ 無 .npy / .parquet 在 git track 中
+    wave: 27
+    agent: gem-reviewer
+    priority: high
+    status: pending
+    dependencies:
+      - "P5-T3"
+      - "P5-T4"
+    context_files: []
+    estimated_effort: small
+    estimated_files: 0
+    estimated_lines: 0
+    focus_area: "final acceptance"
+    verification:
+      - "All 98 tests pass"
+      - "Performance targets met"
+    acceptance_criteria:
+      - "Final gate checklist 全部 ✓"
+    failure_modes:
+      - scenario: "部分 Phase 未達標"
+        likelihood: low
+        impact: medium
+        mitigation: "分析未達標 Phase，評估是否可接受"
+    tech_stack: []
+    test_coverage: null
+    requires_review: true
+    review_depth: full
+    review_security_sensitive: false
+
+  # ---------------------------------------------------------------------------
+  # Documentation
+  # ---------------------------------------------------------------------------
+
+  - id: "DOC-T1"
+    title: "撰寫優化完成報告 + 架構變更記錄"
+    description: |
+      撰寫最終文件：
+      - 效能優化完成報告（before/after 數據、每 Phase 關鍵決策）
+      - ARCHITECTURE.md 更新（CGSA 架構、per-group Parquet 格式）
+      - DEVELOPMENT_GUIDE.md 更新（新 env var、fallback 機制）
+    wave: 28
+    agent: gem-documentation-writer
+    priority: medium
+    status: pending
+    dependencies:
+      - "P5-GATE"
+    context_files:
+      - "docs/ARCHITECTURE.md": "architecture doc"
+      - "docs/DEVELOPMENT_GUIDE.md": "dev guide"
+    estimated_effort: medium
+    estimated_files: 3
+    estimated_lines: 300
+    focus_area: "documentation"
+    verification:
+      - "Updated docs reflect CGSA architecture"
+    acceptance_criteria:
+      - "before/after 效能數據完整"
+      - "新架構圖更新"
+      - "env var 文件化"
+    failure_modes: []
+    tech_stack: []
+    test_coverage: null
+    requires_review: false
+    review_depth: null
+    review_security_sensitive: false
+    task_type: update
+    audience: developers
+    coverage_matrix:
+      - "ARCHITECTURE.md CGSA section"
+      - "DEVELOPMENT_GUIDE.md env vars"
+      - "optimization completion report"
