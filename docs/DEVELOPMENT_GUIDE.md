@@ -23,7 +23,6 @@
 13. [Git工作流程](#git工作流程)
 14. [代碼審查Checklist](#代碼審查checklist)
 15. [安全性規範](#安全性規範)
-16. [Protocol 與 Factory 開發模式 (Phase 3.7)](#protocol-與-factory-開發模式-phase-37)
 
 ---
 
@@ -1377,120 +1376,6 @@ typescriptasync function waitForTaskCompletion(taskId: string) {
 
 ---
 
-### 📄 新建文檔：docs/LONG_SEARCH_OPTIMIZATION.md
-
-**位置**: 在`docs/`目錄下創建新文件
-
-**完整內容**請參考我之前提供的LONG_SEARCH_OPTIMIZATION.md文檔。
-
----
-
-### 📄 .claude/TASK_LONG_SEARCH_FIX.md
-
-**位置**: 在`.claude/`目錄下創建新文件
-
-**重要修正**：之前的任務文檔需要補充以下章節：
-```markdown
-## ⚠️ 重要提醒
-
-### 修改前必做
-1. ✅ Git commit當前代碼: `git commit -am "Backup before long search fix"`
-2. ✅ 創建備份分支: `git checkout -b backup-before-fix`
-3. ✅ 切回主分支: `git checkout main`
-
-### 修改原則
-- 每次只改一個文件
-- 改完立即測試
-- 測試通過才commit
-- 出問題立即回退: `git checkout -- <file>`
-
-### 測試順序（必須遵守）
-1. 先測試4個symbol（快速驗證基本功能）
-2. 再測試20個symbol（驗證進度更新）
-3. 最後測試ALL_USDT（完整壓力測試）
-
-### 回退方案
-如果出問題：
-```bash
-# 方案1：回退單個文件
-git checkout HEAD -- api/services/standalone_search_service.py
-
-# 方案2：回退所有修改
-git reset --hard HEAD
-
-# 方案3：切換到備份分支
-git checkout backup-before-fix
-
----
-
-## 4. 整體程式碼優化和混亂問題
-
-您提到的擔憂非常合理。我重新分析了現有程式碼，發現**確實存在混亂和重複**。
-
-### 🔍 我發現的程式碼架構問題
-
-#### 問題1：任務管理器重複
-api/services/task_manager.py              ← EnhancedTaskManager (4000行)
-api/services/standalone_task_manager.py   ← StandaloneTaskManager (200行)
-
-**分析**：
-- `EnhancedTaskManager`: 功能完整但複雜
-- `StandaloneTaskManager`: 簡化版本
-- **衝突**：兩個都在使用，功能重疊
-
-**建議**：
-- ✅ **保留**：`standalone_task_manager.py`（簡單夠用）
-- ⚠️ **暫時保留但不使用**：`task_manager.py`（可能未來需要）
-- 📝 **不修改**：避免破壞現有功能
-
-#### 問題2：搜索服務多版本並存
-api/services/standalone_search_service.py  ← 當前使用
-api/services/fixed_search_service.py       ← 過時？
-api/services/search_service.py             ← 可能是最早版本
-
-**分析**：
-- 從import看，`standalone_search_service`是當前主要使用的
-- 其他兩個可能是歷史遺留
-
-**建議**：
-- ✅ **保留使用**：`standalone_search_service.py`
-- ⚠️ **改名存檔**：`fixed_search_service.py` → `_deprecated_fixed_search_service.py`
-- ⚠️ **改名存檔**：`search_service.py` → `_deprecated_search_service.py`
-- 📝 **原則**：改名不刪除，加`_deprecated_`前綴
-
-#### 問題3：搜索引擎的調用鏈過長
-page.tsx
-→ api.ts
-→ two_stage_search.py
-→ search_task_service.py
-→ standalone_search_service.py
-→ case_search_engine.py
-
-**分析**：6層調用，過於複雜
-
-**建議**：
-- ✅ **當前不動**：調用鏈雖長但能工作
-- 📋 **未來優化**：考慮合併`search_task_service`和`standalone_search_service`
-- ⚠️ **風險高**：現在改動可能引入bug
-
-### 📋 最小必要改動清單（安全版）
-
-根據"能少動就少動"原則，我重新整理：
-
-#### 階段0：準備工作（必做）
-```bash
-# 1. 完整備份
-git commit -am "Backup before optimization $(date +%Y%m%d)"
-git checkout -b backup-$(date +%Y%m%d)
-git checkout main
-
-# 2. 標記過時文件（不刪除）
-git mv api/services/fixed_search_service.py api/services/_deprecated_fixed_search_service.py
-git mv api/services/search_service.py api/services/_deprecated_search_service.py
-git commit -m "Mark deprecated files"
-
----
-
 ## Python開發規範
 
 ### PEP 8風格指南
@@ -2475,7 +2360,7 @@ pythonworkers = get_optimal_workers()  # 動態偵測
 
 性能測試基準
 
-基準硬體：M1 8核/16GB
+基準硬體：M1 8核/8GB
 其他硬體：按核心數線性推算
 內存不足時：自動降級到串行處理
 
@@ -2518,6 +2403,6 @@ pythonworkers = get_optimal_workers()  # 動態偵測
 
 ---
 
-*文檔版本：1.1*  
-*最後更新：2026-02-14*  
+*文檔版本：1.2*  
+*最後更新：2026-04-14*  
 *維護者：開發團隊*

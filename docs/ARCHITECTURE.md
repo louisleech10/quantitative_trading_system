@@ -497,7 +497,7 @@ python scripts/check_architecture_rules.py
         │           │           │           │
 ┌───────▼───────────▼───────────▼───────────▼──────────┐
 │              api/routes/ (Thin Handlers)              │
-│  21+ 個路由模組, 120+ 端點                            │
+│  25 個路由模組, 130+ 端點                            │
 │  case_search │ case │ chart │ chart_signals           │
 │  config │ signal_analysis │ optimization              │
 │  optimization_analysis │ feature_engineering          │
@@ -593,29 +593,33 @@ api/
 │   ├── ★ ic_models.py                  # ★ ICAnalysisRequest/Response（IC 配置 + 結果）
 │   ├── ★ model_enhancement.py          # ★ Model Enhancement Request/Response（Phase 3.5）
 │   └── ★ optimization_models.py        # ★ Hyperparameter/Execution Optimization 模型（Phase 4）
-├── routes/                              # Thin Route Handlers (21 個)
+├── routes/                              # Thin Route Handlers (25 個)
 │   ├── case_search.py                  # /search/* — 案例搜索 (8 endpoints)
 │   ├── case.py                         # /api/v1/case/* + /api/v1/kline/* (6 endpoints)
 │   ├── chart.py                        # /api/v1/chart/data (1 endpoint)
 │   ├── chart_signals.py                # /api/v1/chart/signals + validate (2 endpoints)
 │   ├── config.py                       # /config/* — 範本 + 系統設定 (9 endpoints)
+│   ├── cross_symbol.py                 # /api/v1/cross-symbol/* — 跨標的訓練
 │   ├── signal_analysis.py              # /api/v1/signal-analysis/* (2 endpoints)
 │   ├── optimization.py                 # /api/v1/optimization/* — 優化核心 (8 endpoints)
 │   ├── optimization_analysis.py        # /api/v1/optimization/* — 分析 (9 endpoints)
 │   ├── feature_engineering.py          # /features/* (4 endpoints)
 │   ├── ★ feature_factory.py             # ★ /api/v1/feature-factory/* （Phase 1）
 │   ├── ★ feature_browser.py             # ★ /api/v1/feature-browser/* （Phase 2.12）
+│   ├── feature_data.py                 # /api/v1/feature-data/* — 特徵數據
+│   ├── feature_registry.py             # /api/v1/feature-registry/* — 特徵註冊
 │   ├── ★ feature_toggles.py             # ★ /api/v1/feature-toggles/*
 │   ├── ★ export.py                      # ★ /api/v1/export/*
 │   ├── pattern_analysis.py             # /pattern-analysis/* — XGBoost (21 endpoints)
 │   ├── pattern_management.py           # /patterns/* — Pattern CRUD (8 endpoints)
 │   ├── ml_pipeline.py                  # /api/v1/ml-pipeline/* (4 endpoints)
 │   ├── two_stage_search.py             # /two-stage/* (3 endpoints)
+│   ├── watchlist.py                    # /api/v1/watchlist/* — 自選清單
 │   ├── ★ ic_analysis.py                # ★ /api/v1/ic-analysis/* — IC Gatekeeper (13 endpoints)
 │   ├── ★ model_enhancement.py          # ★ /api/v1/model-enhancement/* — 模型增強（Phase 3.5, 8 endpoints）
 │   ├── ★ hyperparameter_optimization.py # ★ 超參數優化（Phase 4）
 │   └── ★ execution_optimization.py      # ★ 執行優化（Phase 4）
-├── services/                            # Business Logic (28 個服務)
+├── services/                            # Business Logic (33 個服務)
 │   ├── kline_data_service.py           # ★ 統一 K 線資料存取層 (快取+下載)
 │   ├── kline_storage_service.py        # HDF5 讀寫操作
 │   ├── chart_data_service.py           # 圖表數據 + 指標計算
@@ -643,7 +647,12 @@ api/
 │   ├── ★ ic_analysis_service.py        # ★ IC 分析任務服務（使用 Factory 建構）
 │   ├── ★ model_enhancement_service.py  # ★ 模型增強服務（Phase 3.5, 6 模組平行執行）
 │   ├── ★ model_task_service.py         # ★ 模型任務服務
-│   └── ★ optimization_output_service.py # ★ 優化輸出服務（Phase 4, JSON/CSV/HTML/AI 報告）
+│   ├── ★ optimization_output_service.py # ★ 優化輸出服務（Phase 4, JSON/CSV/HTML/AI 報告）
+│   ├── cross_symbol_training_service.py # 跨標的 ML 訓練
+│   ├── feature_factory_batch_service.py # Feature Factory 批次處理
+│   ├── feature_kline_service.py        # 特徵 K 線數據服務
+│   ├── lstm_task_service.py            # LSTM 模型訓練任務
+│   └── watchlist_service.py            # 自選清單管理
 ├── websocket/
 │   ├── optimization_ws.py              # WebSocket 即時優化進度推送
 │   ├── ★ ic_analysis_ws.py             # ★ IC 分析實時進度推送（八階段狀態）
@@ -1885,13 +1894,13 @@ class XGBoostTaskService:
 |------|------|
 | `docs/API_SPECIFICATION.md` | API 端點規格（100+ 端點） |
 | `docs/DEVELOPMENT_GUIDE.md` | 開發規範（Ultra Think 3 步驟） |
-| `docs/REFACTOR_ARCHITECTURE_V4.md` | 架構重構記錄（10 個 Phase） |
-| `docs/FRONTEND_INTEGRATION_GUIDE.md` | 前端整合指南 |
-| `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` | 動態指標系統指南 |
+| `docs/REFACTOR_ARCHITECTURE_V4.md` | 架構重構記錄（10 個 Phase）— 歷史參考 |
+| `docs/FRONTEND_INTEGRATION_GUIDE.md` | 前端整合指南（Phase 3-6 UI） |
+| `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` | 動態指標系統指南（Legacy，已被 Feature Factory 取代） |
 | `.github/copilot-instructions.md` | AI Agent 指令 |
 
 ---
 
-*文檔版本：6.0*  
-*最後更新：2026-03-15*  
+*文檔版本：6.1*  
+*最後更新：2026-04-14*  
 *狀態：Phase 1-4 + Feature Factory MultiTF/Batch 全部完成，前端 UI 整合進行中*

@@ -5,8 +5,28 @@
 > **約束**: 不減特徵、不降品質、數值完全等價  
 > **執行者**: AI Agent（全自動，含測試）  
 > **建立日期**: 2026-04-12  
+> **V2 修訂日期**: 2026-04-15  
+> **版本**: V2（整合 Review1 + Review2 + Codebase 交叉驗證）  
 > **硬體**: MacBook M1 8GB RAM  
-> **狀態**: 🔒 FROZEN（2026-04-12）— 不可修改，實作變更需開 ADR
+> **狀態**: 🔒 FROZEN（2026-04-16 — 完整交叉驗證通過，無新增架構盲點/矛盾/風險）
+>
+> ### V2 變更摘要
+>
+> 本版整合以下來源的審查結論：
+> - `FEATURE_FACTORY_REVIEW1.md`（架構盲點 / 數據矛盾 / 潛在風險，共 10 節 + A1~C5 修正項）
+> - `FEATURE_FACTORY_REVIEW2.md`（交叉驗證 / 信心分級，共 P0×5 + P1×5 + P2×3 優先項）
+> - **Codebase 交叉驗證**（對照實際程式碼發現的額外盲點）
+>
+> **主要變更**：
+> 1. §1.1 C1 改為 per-layer atol map（取代單一 atol=1e-6）
+> 2. §1.3 Golden 策略強化（三層 baseline + 大記憶體環境完整基準）
+> 3. §3.5 Task 1.5 從 OPTIONAL 升級為 **DEFERRED to Phase 5**
+> 4. §4 新增 L2 RAM 斷路器、L4/L5/L6 依賴域定義、欄位排序規格、Group 粒度調整、Registry 持久化、config_hash 規範化、A/B 驗證改為逐層比對、downstream contract 定義
+> 5. §5 新增 float64 累加器要求、rolling rank 數學語義凍結、現有 L3 streaming 模式說明
+> 6. §6 Phase 4 明確 skip 條件與 no-Phase-4 效能預估
+> 7. §7 新增 Numba JIT 預熱、ProcessPoolExecutor spawn context
+> 8. §10 新增 R15~R25 風險項
+> 9. 新增附錄 D: Review 整合追溯表
 
 ---
 
@@ -14,15 +34,36 @@
 
 0. [AI Agent 生成規範](#0-ai-agent-生成規範)
 1. [全局約束與驗收標準](#1-全局約束與驗收標準)
+   - [1.3.1 三層 Baseline 策略](#131-三層-baseline-策略v2-新增)
+   - [1.3.2 Golden Output 循環依賴的打破策略](#132-golden-output-循環依賴的打破策略v2-新增)
 2. [Phase 0 — 可觀測性基礎建設](#2-phase-0--可觀測性基礎建設)
 3. [Phase 1 — searchsorted + Multi-TF 快修](#3-phase-1--searchsorted--multi-tf-快修)
+   - [3.5 Task 1.5 — DEFERRED to Phase 5](#35-task-15-multi-tf-平行化--deferred-to-phase-5v2-修訂)
 4. [Phase 2 — CGSA 架構規格與實作](#4-phase-2--cgsa-架構規格與實作)
+   - [4.2.1 L2 RAM 預算修正與斷路器](#421-l2-ram-預算修正與斷路器v2-新增)
+   - [4.2.2 L4 LagProcessor 依賴域定義](#422-l4-lagprocessor-依賴域定義v2-新增--codebase-交叉驗證發現)
+   - [4.2.3 L5 Cross-Sectional 依賴域定義](#423-l5-cross-sectional-依賴域定義v2-新增)
+   - [4.2.4 L6 Meta Features 跨 Group 依賴解決方案](#424-l6-meta-features-跨-group-依賴解決方案v2-新增)
+   - [4.8 Column Ordering 規格](#48-column-ordering-規格v2-新增)
+   - [4.9 ColumnGroup 粒度調整](#49-columngroup-粒度調整v2-新增)
+   - [4.10 Registry 持久化與斷點續跑](#410-registry-持久化與斷點續跑v2-新增)
+   - [4.11 config_hash 正規化](#411-config_hash-正規化v2-新增)
+   - [4.12 A/B 驗證修訂](#412-ab-驗證修訂v2-修訂)
+   - [4.13 Downstream Contract](#413-downstream-contract-與-materialize_wide_df-處置v2-新增)
+   - [4.14 現有優化措施確認](#414-現有優化措施確認v2-新增--codebase-交叉驗證)
 5. [Phase 3 — Numba L3 融合 Rolling](#5-phase-3--numba-l3-融合-rolling)
+   - [5.0 現有 L3 Streaming 模式說明](#50-現有-l3-streaming-模式說明v2-新增)
 6. [Phase 4 — Polars L2 / L6.5（條件性）](#6-phase-4--polars-l2--l65條件性)
+   - [6.0 Phase 4 Skip 條件](#60-phase-4-skip-條件v2-新增)
 7. [Phase 5 — 生產化](#7-phase-5--生產化)
+   - [7.0 Phase 5 前置要求](#70-phase-5-前置要求v2-新增)
 8. [Phase Gate 決策矩陣](#8-phase-gate-決策矩陣)
 9. [全局測試策略](#9-全局測試策略)
-10. [風險登記簿](#10-風險登記簿)
+10. [風險登記簿](#10-風險登記簿)（R1~R25）
+- [附錄 A: 效能預估對照表](#附錄-a-效能預估對照表)
+- [附錄 B: 參考文件](#附錄-b-參考文件)
+- [附錄 C: AI Agent 執行清單](#附錄-c-ai-agent-執行清單)
+- [附錄 D: Review 整合追溯表](#附錄-d-review-整合追溯表v2-新增)（V2 新增）
 
 ---
 
@@ -288,12 +329,33 @@ symbols = config.get_symbols()
 
 | # | 約束 | 驗證方式 |
 |---|---|---|
-| C1 | **數值等價**：優化後的 feature 矩陣與 golden output 欄位名稱完全相同、數值 `np.allclose(atol=1e-6, equal_nan=True)` | Golden output test suite |
+| C1 | **數值等價**：優化後的 feature 矩陣與 golden output 欄位名稱完全相同、數值等價（per-layer atol，見下表） | Golden output test suite |
 | C2 | **不減特徵**：feature_count 不變（453,953 cols for ETHUSDT 2TF） | `assert new_count == golden_count` |
-| C3 | **不改 column name**：包含 TF prefix、indicator name、window size 等 | `assert set(new_cols) == set(golden_cols)` |
+| C3 | **不改 column name**：包含 TF prefix、indicator name、window size 等；**欄位順序須由顯式排序規格決定**（見 §4.8），不依賴 runtime 註冊順序 | `assert sorted(new_cols) == sorted(golden_cols)` + order test |
 | C4 | **RAM 峰值 ≤ 6 GB**（8GB 機器留 2GB 給 OS） | `psutil.Process().memory_info().rss` 監控 |
 | C5 | **無 future leakage**：align 後 12h 特徵不超前 primary 1h | `TimeframeAligner.validate_no_future_leak()` |
 | C6 | **NaN 語義一致**：rolling window 開頭的 NaN pattern 完全相同 | per-column NaN mask comparison |
+
+#### C1 Per-Layer Tolerance Map（V2 新增）
+
+> **動機**（Review1 §6.2, Review2 B7）：不同層的數值穩定性不同，L3 skew/kurt 使用 Pebay online 演算法與 pandas Cython batch 演算法存在 ~1e-4 差異，若統一用 atol=1e-6 會導致全量 golden 比對在 skew/kurt 欄位系統性 FAIL。
+
+| Layer / Operation | atol | rtol | 說明 |
+|---|---|---|---|
+| L1（TA-Lib） | 1e-7 | 0 | C 函式庫精確計算，不應有差異 |
+| L2（四則運算） | 1e-6 | 0 | 浮點四則運算 |
+| L3 mean / std / min / max / range | 1e-6 | 0 | Welford / monotonic deque 精度 |
+| L3 zscore | 1e-6 | 0 | 由 mean + std 推導 |
+| L3 skew / kurt | **1e-4** | 0 | Pebay online 演算法 + float64 累加器 |
+| L3 slope | 1e-5 | 0 | cumsum 公式精度 |
+| L3 rank | 1e-6 | 0 | sorted buffer pct 精度 |
+| L6.5 winsorization | 1e-6 | 0 | clip 操作 |
+| L6.5 rank_transform | 1e-6 | 0 | rolling rank pct |
+| L6.5 adaptive_zscore | 1e-6 | 0 | (x - mean) / std |
+| L6.5 gaussian | 1e-5 | 0 | erfinv 精度 |
+| **全量 golden 比對**（C1 預設） | **1e-4** | 0 | 取最寬鬆 layer 的上限，確保不誤報 |
+
+**驗證方式**：golden 比對時，先按 column name 解析 layer + operation，再套用對應 atol。若無法解析，使用預設 atol=1e-4。
 
 ### 1.2 每 Phase 通用驗收流程
 
@@ -324,6 +386,34 @@ symbols = config.get_symbols()
 - **OOM 降級策略**: 若全量 config 也 OOM → 使用 reduced config（Phase 0 定義的 GOLDEN_CONFIG_OVERRIDE）。若 reduced config 也 OOM → 僅產生 L1 golden（單層比對，仍可驗證 L1 正確性）
 - **多層 Golden**: 儲存 `golden_l1.parquet`, `golden_l3_pre_concat.parquet`, `golden_final.parquet`，視可用性而定
 - **儲存格式**: `data_cache/golden_output/ETHUSDT_1h_2tf_golden.parquet` + `_columns.json` + `_nan_mask.npz`
+
+#### 1.3.1 三層 Baseline 策略（V2 新增）
+
+> **動機**（Review2 A1）：Review1/Review2 一致認為 Golden 驗證策略不足以支撐「全量等價」承諾。Reduced config golden 只覆蓋局部正確性，無法保證 453,953 欄位在重構後不偏移。
+
+**三層 baseline 定義**：
+
+| Tier | 名稱 | 內容 | 建立環境 | 用途 |
+|---|---|---|---|---|
+| **Tier 1** | Full-Config Structural Baseline | 欄位數、欄位名列表、欄位排序、各層輸出 shape 摘要、NaN 比率摘要 | **大記憶體環境（≥32 GB RAM）** 或雲端機器完整跑出一次 | Phase 2+ 的結構等價驗證 |
+| **Tier 2** | Reduced-Config Numeric Baseline | 全數值比對（per-layer atol）、NaN mask 完全比對、邊界條件比對 | 開發機（8 GB）使用 reduced config | Phase 1~3 逐層正確性驗證 |
+| **Tier 3** | Per-Layer Golden | L1 / L2 / L3 / L6.5 個別層輸出，逐層比對 | 開發機 + 大記憶體環境互補 | 精確定位哪一層引入偏差 |
+
+**強制要求**：
+- **Tier 1 必須在 Phase 0 完成前取得**。若開發機 OOM，必須在大記憶體環境（雲端 VM、同事機器、或 CI 大型 runner）執行一次 full pipeline，取得並存檔 `golden_structural.json`（欄位名列表 + 各層 shape + NaN 率）。此檔案為 **immutable baseline**，不可被後續 Phase 覆蓋。
+- Tier 1 不要求全量數值比對（因為 full config 的 parquet 可能超過 20 GB），但**必須取得欄位名稱的完整列表**。
+- Phase 2 完成後，CGSA 可在開發機上完整跑出 full config → 此輸出即成為 **new full baseline**，用於驗證 Phase 3/4 的改動。
+
+#### 1.3.2 Golden Output 循環依賴的打破策略（V2 新增）
+
+> **動機**（Review1 §6.1）：要建立 golden 需要現行 pipeline 跑完，但現行 pipeline 的 F 段卡住。
+
+**打破循環的步驟**：
+1. **L1 golden 可直接建立**：L1 計算很快（~1s），不涉及 concat/memmap → 用現行 pipeline 在開發機建立
+2. **L2/L3 golden 用 reduced config**：減少 data_sources 到 `["close"]`，限制 indicator 數量，使 concat 規模可控（< 6 GB）
+3. **Full structural baseline 在大記憶體環境取得**（Tier 1）
+4. **Phase 2 完成後**：用 CGSA 跑 full config 產出新的完整 golden → 此後所有 Phase 3/4/5 的驗證都以此為基準
+5. **Phase 2 本身的正確性**只能用 per-layer golden + reduced-config numeric golden 驗證（有盲區，但這是可接受的 trade-off）
 
 ---
 
@@ -578,25 +668,38 @@ aligned = self._apply_timeframe_tag(aligned, timeframe)
 - 使用 `copy(deep=False)` 避免修改 `combined` 的 index（影響後續 debug）
 - 行數驗證：`assert len(combined) == len(primary_timestamps)` — 因 primary_raw 是 L0 的輸入，長度必然一致
 
-### 3.5 Task 1.5: Multi-TF 平行化
+### 3.5 Task 1.5: Multi-TF 平行化 — ⚠️ DEFERRED to Phase 5（V2 修訂）
 
-**檔案**: `momentum/FeatureEngineering/timeframe/multi_tf_generator.py`
+> **V2 變更**（Review2 A3, Review1 §4.7）：從 OPTIONAL ThreadPoolExecutor 改為 **DEFERRED to Phase 5**，且僅允許 `ProcessPoolExecutor + spawn`。
 
-**變更**: 將 `for` 迴圈改為 `concurrent.futures.ThreadPoolExecutor`（不用 ProcessPool，因為 TA-Lib 有 GIL 但 L3 pandas rolling 也有 GIL，ThreadPool 對 IO-bound memmap 操作仍有收益）
+**原始設計問題**：
+1. TA-Lib 為 C 語言擴充套件，**非 thread-safe**（R11）。使用 ThreadPoolExecutor 可能導致 segfault
+2. 效益僅 C=37s（佔 ABCDE 的 2.0%），**成本效益完全不合理**
+3. macOS 預設 `fork()` 與 TA-Lib C 全域狀態衝突（fork-safety 問題）
+4. 併發註冊可能導致欄位順序非決定性
 
-**注意**: 此 Task 的風險較高，建議在 Phase 1 的最後才做，且可暫時不做（效益僅 C=37s）
+**⚠️ 注意：codebase 中 L1 已有平行模式**（`FFACT_LAYER1_PARALLEL=1` + `FFACT_LAYER1_MAX_WORKERS=4`），使用 ThreadPoolExecutor 平行執行 7+ 個 TA-Lib category engine。此模式同樣有 thread-safety 風險，預設為關閉（`FFACT_LAYER1_PARALLEL=0`）。若啟用，與 Task 1.5 的風險完全相同。
+
+**Phase 5 實作指引**（若屆時需要平行化）：
 
 ```python
-# 結構變更概念
-def _process_single_tf(self, symbol, timeframe, primary_raw, primary_timestamps):
-    """處理單一 TF 的 L0~L6 + combine + align + tag，回傳 aligned DF"""
-    # ... 包含 L0~L6 計算 + combine + align + tag 邏輯 ...
-    return aligned, tf_layer_counts
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
-# 在 generate_multi_tf 中：
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# 必須使用 spawn context（避免 fork + TA-Lib 衝突）
+mp_ctx = multiprocessing.get_context('spawn')
 
-with ThreadPoolExecutor(max_workers=min(len(self._training_tfs), 4)) as pool:
+with ProcessPoolExecutor(
+    max_workers=min(len(training_tfs), 4),
+    mp_context=mp_ctx,
+) as pool:
+    futures = {
+        pool.submit(_process_single_tf, symbol, tf, config_dict): tf
+        for tf in training_tfs
+    }
+```
+
+**Phase 1 中不可實作任何 Multi-TF 平行化**。
     futures = {
         pool.submit(self._process_single_tf, symbol, tf, primary_raw, primary_timestamps): tf
         for tf in self._training_tfs
@@ -824,6 +927,118 @@ Stage B: L1 data 釋放
 
 **RAM 預算**: L1 = 87 MB + L2 最大單 group ~5 MB = **< 100 MB**。完全在預算內。
 
+#### 4.2.1 L2 RAM 預算修正與斷路器（V2 新增）
+
+> **動機**（Review1 §3.3 + §3.3.1, Review2 B1）：上述 RAM 預算只計入 L1 **輸入**，未計入 L2 **輸出**。L2 產出 48,591 columns（Research §4.4），48,591 cols × 12,888 rows × 4 bytes = **2.5 GB**。若 Stage A 一次性計算所有 cross/ratio，輸出會在 RAM 中直到 `save_data()` 完成。
+
+**修正後的 RAM 預算**：
+
+| 組件 | 大小 | 說明 |
+|---|---|---|
+| L1 全量（Stage A 輸入） | 87 MB | 保留在 RAM 供跨 indicator 計算 |
+| L2 單 category 輸出（最大） | ~500 MB | Distance 類別最多（~12,000 cols） |
+| L2 中間結果 + save buffer | ~100 MB | per-group save 後即釋放 |
+| **峰值** | **~700 MB** | 使用 per-category 分批模式 |
+
+**關鍵變更：L2 Stage A 改為 per-category 分批計算**：
+
+```python
+# ❌ V1 原始設計：一次性計算全部 L2
+l2_result = engine.compute_all(l1_df, raw_data, specs)  # → 2.5 GB 峰值
+
+# ✅ V2 修正：per-category 分批 + 逐批 save
+for category in ['Distance', 'Cross', 'Ratio', 'Momentum', 'BinarySignal', 'SignedStrength', 'WorldQuant']:
+    cat_result = engine.compute_category(l1_df, raw_data, specs, category)
+    for group in split_into_groups(cat_result):
+        registry.save_data(group, group_data)
+    del cat_result  # 立即釋放
+```
+
+**斷路器（Circuit Breaker）**：
+
+> **動機**（Review1 §3.3.1）：若 config 設定全排列 Cross/Ratio 組合（1,683 個 L1 指標兩兩配對 → ~7M columns），會遠超 RAM 容量。需要預估保護。
+
+```python
+MAX_L2_ESTIMATED_COLS = 100_000  # 斷路器閾值
+
+def _estimate_l2_output_cols(self, l1_col_count: int, config: Dict) -> int:
+    """預估 L2 輸出欄位數，用於斷路器判斷。"""
+    # ... 根據 config 中的 operator 設定計算預估值 ...
+
+estimated = self._estimate_l2_output_cols(l1_df.shape[1], config)
+if estimated > MAX_L2_ESTIMATED_COLS:
+    logger.warning("[L2] Estimated output %d cols > threshold %d, forcing per-category chunked mode",
+                   estimated, MAX_L2_ESTIMATED_COLS)
+    # 強制使用 per-category 分批 + per-group save，避免 OOM
+```
+
+#### 4.2.2 L4 LagProcessor 依賴域定義（V2 新增 — Codebase 交叉驗證發現）
+
+> **動機**：Review1/Review2 均未討論 L4 在 CGSA 下的依賴範圍。Codebase 分析發現 `_layer4_lag_features` 有兩條路徑：
+
+```python
+# 現行程式碼（feature_factory.py）
+if apply_to == "layer1_and_raw":
+    base = self._combine_layers([data, layer1], context="layer4_input")  # 快速路徑
+else:
+    base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")  # 完整路徑
+```
+
+**CGSA 下的處理方式**：
+- **快速路徑（`layer1_and_raw`）**：L4 需要 raw_data + L1 全量 → L1 全量已在 Stage A 保留（87 MB），raw_data 來自 L0（~1 MB）→ 合計 ~88 MB，可接受
+- **完整路徑（`all`）**：L4 需要 raw_data + L1 + L2 + L3 全量 → 在 CGSA 下需要從 Registry 讀回所有 L1/L2/L3 group → **等同於 wide-table materialization**
+- **建議**：CGSA 下強制 L4 使用 `apply_to="layer1_and_raw"` 快速路徑，避免觸發 wide materialization
+
+**在 Task 2.5 中需加入**：若 config 的 `lag_features.apply_to` 不是 `"layer1_and_raw"`，在 CGSA 模式下發出警告並自動降級為快速路徑。
+
+#### 4.2.3 L5 Cross-Sectional 依賴域定義（V2 新增）
+
+> **動機**（Review2 A2, Review1 §2.1）：L5 需要**跨 symbol** 資料（BTCUSDT reference），與 per-symbol CGSA 架構存在衝突。兩份 Review 一致認為這是系統分層與 orchestration 邊界問題，必須在 Phase 2 前定義。
+
+**Codebase 現狀**（`feature_factory.py` L5 實作）：
+- `_layer5_cross_sectional()` 呼叫 `self._layer0_data_ingestion(reference_symbol, timeframe, config)` 取得 BTCUSDT 資料
+- 只產出 3 個特徵：`cs_relative_price`, `cs_beta`, `cs_idiosyncratic_momentum`
+- 使用 `_reference_data_cache` 快取 reference 資料（instance-level）
+
+**L5 依賴分類（凍結）**：
+
+| 類型 | 定義 | L5 屬於 |
+|---|---|---|
+| intra-symbol / cross-feature | 同 symbol 不同 feature 計算 | ❌ |
+| **inter-symbol / same timestamp** | **同時間戳跨 symbol 計算** | **✅** |
+| market-relative / universe-wide | 全市場排名/正規化 | ❌（目前） |
+
+**CGSA 處理方式**：
+- L5 的 registry scope 維持 **per-symbol**（L5 輸出歸屬於目標 symbol）
+- Reference symbol 資料透過獨立 adapter 讀取，**不需要 reference symbol 的完整 pipeline 結果**（只需 raw close price）
+- Phase 5 multi-symbol 時，BTCUSDT raw data 可用 **shared read-only cache**（Arrow IPC 或 Parquet），避免 8 個 worker 各自讀取一次
+- L5 在 CGSA per-group streaming 中作為 **獨立 stage**（不在 per-group 迴圈內），在 L1/L2 完成後、L7 persist 前執行
+- L5 的 3 個輸出 column 組成一個獨立 ColumnGroup（`{tf}_cross_sectional_relative_strength_close`）
+
+#### 4.2.4 L6 Meta Features 跨 Group 依賴解決方案（V2 新增）
+
+> **動機**（Review1 §2.2, Review2 B2）：L6 的 consensus/interaction 引擎使用 `_find_column()` 模糊匹配 L1 欄位名（如 EMA_8, RSI_14, ATR_14），需要同時存取來自不同 indicator engine 的 columns。
+
+**Codebase 現狀**（`consensus_features.py`, `interaction_features.py`）：
+- `ConsensusFeatureEngine.compute_trend_consensus()` 需要：EMA_8 (trend), EMA_21 (trend), MACD_Hist (trend), ADX_14 (trend) — 全部來自 trend 類別
+- `InteractionFeatureEngine.compute_all()` 需要：EMA_8 (trend) × RSI_14 (momentum) × ATR_14 (volatility) — **跨類別**
+- `_find_column()` 做 fuzzy matching：先精確匹配，後子字串匹配 → **需要全 L1 DataFrame 的欄位列表**
+
+**CGSA 處理方式（仿 L2 Stage A/B）**：
+
+```
+L6 Stage A: 從 Registry 讀取 L6 需要的 L1 columns（~10 個已知 columns，非全量）
+  → 使用 manifest 中的 column name 做精確匹配
+  → 只讀取包含目標 column 的 group（通常 3~5 個 group）
+  → 合計 RAM: ~5 MB
+  → 計算 consensus / interaction / time features → 產出 L6 group
+
+L6 Stage B: L6 group save_data() 到 disk
+  → 釋放 Stage A 讀取的 L1 subset
+```
+
+**⚠️ `_find_column` 的 fuzzy matching 風險**：在 CGSA 下，若 column 命名格式改變（如加入 group_id prefix），fuzzy matching 可能失敗。建議 L6 改為**顯式 column 引用**（從 Registry 按 indicator name + category 查詢），而非全 DataFrame 模糊搜尋。
+
 ### 4.3 L6.5 per-group rank 語義定義
 
 **問題**: `rank(pct=True)` 需要看同一列所有 rows 的分佈。但 per-group 處理時，rank 的 scope 不變。
@@ -839,6 +1054,22 @@ for col_idx in range(group.shape[1]):
 ```
 
 **結論**: rank 的 scope 是「同一列的所有 rows」，不是「同一 row 的所有 columns」→ per-group 無影響。
+
+**⚠️ L6.5 操作完整列表與 per-group 相容性確認（V2 補充）**：
+
+> **動機**（Review1 §4.6）：Plan V1 未窮盡列舉 L6.5 所有操作的 per-group 相容性。
+
+| 操作 | Scope | Per-Group 相容 | 說明 |
+|---|---|---|---|
+| winsorization（sigma/quantile） | per-column（需整列 mean/std/percentile） | ✅ | per-group 每列仍有完整 12,888 rows |
+| rank_transform | per-column（rolling rank on same column） | ✅ | 同上 |
+| adaptive_zscore | per-column（(x - mean) / std） | ✅ | 同上 |
+| gaussian_normalize | per-column（erfinv 轉換） | ✅ | 同上 |
+| adf_differencing | per-column（ADF 檢定 + diff） | ✅ | 同上 |
+| fractional_differencing | per-column（FFD 權重） | ✅ | 同上 |
+| **cross-feature rank**（假設性） | per-row（同 row 所有 features 排名） | **❌** | 目前 L6.5 **未實作** cross-feature rank。若未來新增，需跳出 per-group 模式 |
+
+**結論**：現行 L6.5 的 6 種操作均為 per-column，per-group 完全相容。在新增 L6.5 操作前，須先檢查是否為 per-column scope。
 
 ### 4.4 Persist 格式規格
 
@@ -1005,6 +1236,203 @@ post-loop:          Registry 已收集所有 ColumnGroups
 | T2.B8 | L6.5 的 fracdiff transform（非 element-wise） | 需要同一列的所有 rows → per-group 可行 |
 | T2.B9 | cleanup 被中斷（process killed） | .npy 殘留 → 下次執行需自動清理 work_dir |
 
+### 4.8 Column Ordering 規格（V2 新增）
+
+> **動機**（Review2 B3, Review1 §2.4）：V1 SPEC 用 `set(new_cols) == set(golden_cols)` 做欄位名比對，但未定義欄位**順序**。若順序不一致，後續 IC Analysis / ML Training 的特徵 index 可能不穩定，導致 XGBoost 的 feature_importances_ 映射錯誤。
+
+**定義：Canonical Column Order**
+
+```
+排序鍵（優先序，由高到低）：
+  1. timeframe（primary first, then training TFs by period ascending: 1h → 4h → 12h → 1d）
+  2. layer（L1 → L2 → L3 → L4 → L5 → L6 → L6.5）
+  3. category（alphabetical: entropy → microstructure → momentum → tail_risk → trend → volatility → volume）
+  4. indicator（alphabetical within category: ADX → ATR → BBANDS → ...）
+  5. source（alphabetical: close → high → low → open → volume）
+  6. window（ascending: 5 → 8 → 13 → 21 → ...）
+  7. aggregator（alphabetical: kurt → max → mean → min → range → rank → skew → slope → std → zscore）
+```
+
+**實作方式**：
+- Registry 的 `all_column_names()` 方法須按上述排序鍵排序
+- persist 階段的 manifest.json `groups` 陣列按 group_id 排序（group_id 本身由排序鍵組成）
+- `materialize_wide_df()` 的 column 順序 = canonical order
+- Label columns（以 `label_` prefix 開頭）固定排在最後
+
+**Golden 比對時**：
+```python
+# V1: assert set(new_cols) == set(golden_cols)  # 順序不敏感
+# V2: 雙重比對
+assert set(new_cols) == set(golden_cols)  # 先確認名稱集合相同
+assert list(new_cols) == list(golden_cols)  # 再確認順序完全一致
+```
+
+### 4.9 ColumnGroup 粒度調整（V2 新增）
+
+> **動機**（Review1 §7.1, Review2 B5）：V1 設計中 group_id 為 `{tf}_{category}_{indicator}_{source}_{agg}_{window}`，預估 ~33,600 groups（L3 以上）。過細粒度導致：
+> 1. .npy 中介檔案數量爆炸（~36,000+ 檔案，含 I/O overhead）
+> 2. DuckDB 讀取時 Parquet footer scan 累計開銷（R19）
+> 3. Manifest JSON 體積過大
+
+**調整：提升粒度為 indicator level**
+
+| Layer | Group 粒度 | Group 命名 | 預估 Group 數 |
+|---|---|---|---|
+| L1 | per-indicator (all sources) | `{tf}_L1_{category}_{indicator}` | ~200 |
+| L2 | per-category | `{tf}_L2_{operator}` | ~14 |
+| L3 | per-L1-indicator (all windows × all aggs) | `{tf}_L3_{category}_{indicator}_{source}` | ~800 |
+| L4 | per-L1-indicator (all lags) | `{tf}_L4_{category}_{indicator}_{source}` | ~200 |
+| L5 | single group | `{tf}_L5_cross_sectional` | 2（1h + 12h）|
+| L6 | per-engine | `{tf}_L6_{engine}` | ~6 |
+| **合計** | | | **~1,200** |
+
+**效果**：
+- .npy 檔案數：~33,600 → ~1,200（降低 28×）
+- 單 group columns 數：10 cols → ~30~100 cols（仍在 per-group 記憶體預算內）
+- Parquet 檔案數：~1,200（DuckDB 可高效處理）
+- Manifest JSON：從 ~50 MB 降到 ~5 MB
+
+**替代中介格式**：若 .npy 的 I/O 開銷仍顯著，考慮 Arrow IPC（`.arrow`）作為中介格式：
+- Arrow IPC 支援 columnar + metadata + 零複製讀取
+- 可直接被 DuckDB 和 Polars 讀取
+- 權衡：多一個依賴（pyarrow），但通常已安裝
+
+### 4.10 Registry 持久化與斷點續跑（V2 新增）
+
+> **動機**（Review1 §7.2）：若 pipeline 在 L3 第 500 個 group 崩潰，需要從頭重跑所有 L1/L2/L3。Registry 應支援 incremental checkpoint。
+
+**方案**：
+
+```python
+class ColumnGroupRegistry:
+    def save_data(self, group: ColumnGroup, data: np.ndarray):
+        """Save group data to disk and update manifest incrementally."""
+        # 1. Write .npy / .arrow
+        path = self._work_dir / f"{group.group_id}.npy"
+        np.save(path, data)
+        
+        # 2. Update in-memory registry
+        self._groups[group.group_id] = group
+        
+        # 3. Incremental manifest write（每次 save 都更新）
+        self._write_manifest()  # atomic write via temp + rename
+    
+    def _write_manifest(self):
+        """Atomic manifest write using temp file + os.rename."""
+        tmp = self._work_dir / "manifest.json.tmp"
+        with open(tmp, 'w') as f:
+            json.dump(self._to_manifest_dict(), f, indent=2)
+        os.replace(tmp, self._work_dir / "manifest.json")  # atomic on POSIX
+    
+    @classmethod
+    def resume_from_manifest(cls, work_dir: Path) -> 'ColumnGroupRegistry':
+        """Resume from existing manifest.json — load all registered groups."""
+        manifest = json.load(open(work_dir / "manifest.json"))
+        registry = cls(work_dir=work_dir)
+        for g in manifest['groups']:
+            # 驗證 .npy 檔案存在
+            if (work_dir / g['npy_path']).exists():
+                registry._register_from_manifest(g)
+            else:
+                logger.warning("[Registry] Missing file for group %s, will recompute", g['group_id'])
+        return registry
+```
+
+**斷點續跑邏輯**：
+- pipeline 開始前，檢查 `manifest.json` 是否存在
+- 若存在 → `resume_from_manifest()` → 跳過已完成的 groups
+- 若不存在 → 全新開始
+- 每個 layer 開始前，比對 manifest 已有的 groups vs 需要計算的 groups → 差集即為需計算的
+
+### 4.11 config_hash 正規化（V2 新增）
+
+> **動機**（Review1 §2.3）：config_hash 用於儲存路徑和 manifest 識別，但 Python dict 的 key 順序可能不一致（Python 3.7+ 保證插入順序，但不保證跨版本或不同建構方式的順序一致性）。
+
+**規範**：
+
+```python
+import hashlib
+import json
+
+def compute_config_hash(config: dict) -> str:
+    """Canonical config hash: sorted keys + deterministic JSON + SHA256."""
+    canonical_json = json.dumps(config, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
+    return hashlib.sha256(canonical_json.encode('utf-8')).hexdigest()[:12]
+```
+
+**額外要求**：
+- manifest.json 中**同時存放 config_hash 和完整 config snapshot**（便於事後驗證）
+- config 變更 → config_hash 變更 → 產出到新目錄（不覆蓋舊結果）
+- config 中排除非影響結果的欄位（如 `log_level`, `n_jobs`）→ 在計算 hash 前 strip 這些 keys
+
+### 4.12 A/B 驗證修訂（V2 修訂）
+
+> **動機**（Review1 §3.5, Review2 A1）：V1 的 A/B 驗證要求「新舊 pipeline 都跑一次 ETHUSDT full config」，但現行 pipeline 的 F 段 OOM 無法完成。驗證陷入死鎖。
+
+**修訂方案：逐層 Golden 比對（取代全量 A/B）**
+
+| 比對層級 | 方法 | 基準來源 |
+|---|---|---|
+| L1 output | `np.allclose(cgsa_l1, legacy_l1, atol=1e-7, equal_nan=True)` | 現行 pipeline L1 golden（可在 8 GB 機器建立） |
+| L2 output | `np.allclose(..., atol=1e-6)` per-category | Reduced-config 下現行 pipeline L2 output |
+| L3 output | per-aggregator atol（見 C1 tolerance map） | Reduced-config golden |
+| Full structure | column names list + count + NaN 率 | **Tier 1 Structural Baseline**（大記憶體環境） |
+| Final numeric | 全量 atol（C1 預設 1e-4） | Phase 2 完成後用 CGSA 跑出的 full-config baseline |
+
+**Phase 2 A/B 驗證不再要求現行 pipeline 完成 full-config run。**
+
+### 4.13 Downstream Contract 與 materialize_wide_df 處置（V2 新增）
+
+> **動機**（Review2 A5）：CGSA 的核心價值是消除 wide-table，但現行所有下游消費者（IC Analysis, ML Training, SHAP, Export）都假設接收 wide DataFrame。必須定義過渡策略。
+
+**新 Downstream Interface**：
+
+```python
+class IFeatureProvider(Protocol):
+    """V2.0 feature access protocol — per-group or streaming."""
+    
+    def get_group(self, group_id: str) -> pd.DataFrame:
+        """讀取單一 ColumnGroup。"""
+        ...
+    
+    def iter_groups(self, layer: Optional[str] = None) -> Iterator[Tuple[str, pd.DataFrame]]:
+        """迭代所有 ColumnGroups（可按 layer 過濾）。"""
+        ...
+    
+    def get_column_names(self) -> List[str]:
+        """取得 canonical ordered column names。"""
+        ...
+    
+    def materialize_wide_df(self) -> pd.DataFrame:
+        """
+        ⚠️ DEPRECATED — 僅用於向後相容和 debug。
+        會在 RAM 中建構完整 wide DataFrame。
+        Production 使用者應遷移到 get_group() / iter_groups()。
+        """
+        ...
+```
+
+**遷移計畫**：
+1. Phase 2 期間：所有下游模組**繼續使用** `materialize_wide_df()`（確保功能不中斷）
+2. Phase 2 完成後：逐步重構下游為 per-group 消費（IC Analysis, ML Training 優先）
+3. `materialize_wide_df()` 加上 `@deprecated` decorator + RAM 估算 warning log
+4. 最終 Phase 5 時刪除 wide materialization（或僅在 debug 模式保留）
+
+### 4.14 現有優化措施確認（V2 新增 — Codebase 交叉驗證）
+
+> **動機**：Codebase 中已存在多項 streaming / chunking 優化，SPEC 不應忽略這些既有能力。CGSA 應與這些機制整合而非重複建構。
+
+| 既有機制 | 所在程式碼 | 與 CGSA 的關係 |
+|---|---|---|
+| **L1 平行**（`FFACT_LAYER1_PARALLEL`） | `feature_factory.py` | ThreadPoolExecutor — 有 TA-Lib 安全性風險（R21），CGSA 下保持預設關閉 |
+| **L3 Streaming**（`FFACT_L3_STREAMING`） | `rolling_aggregator.py` | Per-column streaming + variance_filter + memmap 輸出 — CGSA 的 per-group 模式可直接復用此路徑 |
+| **L4 快速路徑**（`apply_to == "layer1_and_raw"`） | `feature_factory.py` | 避免 2 分鐘 memmap copy — CGSA 下強制使用此路徑（§4.2.2） |
+| **L6.5 Chunking**（`FFACT_L65_CHUNK_SIZE`） | `feature_preprocessor.py` | Per-chunk + memmap — CGSA per-group 模式取代 chunking（per-group 即為天然 chunk） |
+| **concat_with_memmap** | `memmap_utils.py` | 大量 concat 時改用 memmap — CGSA 消除 global concat 後，此函式僅在 `materialize_wide_df()` 中使用 |
+| **MultiTFGenerator._combine_layers** | `multi_tf_generator.py` | 靜態方法，呼叫 `concat_with_memmap` — **需要同步修改為 CGSA Registry-based 整合** |
+
+**⚠️ 重要**：`MultiTFGenerator._combine_layers()` 是 `FeatureFactory._combine_layers()` 之外的**獨立程式碼路徑**。CGSA Task 2.5 修改 `_combine_layers` 時，必須同時處理 `multi_tf_generator.py` 中的 `_combine_layers` 靜態方法。
+
 ---
 
 ## 5. Phase 3 — Numba L3 融合 Rolling
@@ -1012,6 +1440,27 @@ post-loop:          Registry 已收集所有 ColumnGroups
 **目標**: L3 掃描次數 100N → 1N  
 **預計效果**: A4 385s → ~60s  
 **風險**: 中等（數值穩定性）
+
+### 5.0 現有 L3 Streaming 模式說明（V2 新增）
+
+> **動機**（Codebase 交叉驗證）：`RollingAggregator` 已實作 streaming 模式（`FFACT_L3_STREAMING=1`），包含 variance_filter、base_cache per window、vectorized slope、memmap 輸出。Phase 3 Numba 方案是在此基礎上的**進一步優化**，不是從零開始。
+
+**現有 streaming 模式特性**：
+- Per-column 迴圈（避免全量 expand）
+- `variance_filter`：移除低 variance 特徵（減少無效計算）
+- 每個 window 的 base stats（mean/std）有 cache
+- Slope 使用 vectorized cumsum 公式
+- 大量結果使用 memmap 輸出
+
+**Phase 3 在此基礎上的增量改進**：
+1. 將 per-column pandas rolling 替換為 Numba single-pass fused rolling（10 aggs 一次掃描）
+2. 用 float64 累加器 + Welford/Pebay 演算法取代 pandas 內部的 Cython 計算
+3. 維持 streaming 模式的 variance_filter + memmap 輸出
+
+**⚠️ variance_filter 與 Golden 的互動**（V2 新增）：
+- variance_filter 移除的特徵可能因 float32/float64 差異或 CGSA 計算順序不同而有微小變化
+- **決定性保證**：variance 閾值必須為固定值（不使用百分位或動態閾值），確保同一輸入資料的過濾結果相同
+- Golden 比對時，先比較 variance_filter 保留的 column set → 若不同，須 log 差異並使用交集做數值比對
 
 ### 5.1 Task 清單
 
@@ -1029,6 +1478,10 @@ post-loop:          Registry 已收集所有 ColumnGroups
 ### 5.2 演算法規格
 
 #### 5.2.1 Welford Online Mean/Var（float64 累加器）
+
+> **V2 強調**（Review1 §4.3.1）：float64 累加器是 **硬性要求**，不可使用 float32。Numba `@njit` 函式的所有 internal state（count, mean, M2, S3, S4）必須宣告為 `float64`。最終輸出時再 `astype(np.float32)` 寫入 ColumnGroup。
+>
+> 若使用 float32 累加器，Welford 在 W=233 時的 catastrophic cancellation 可能使 std 誤差達 ~1e-2 級別（Research §15.1）。
 
 **NaN 處理語義**（必須與 pandas 一致）：
 - `min_periods` = window size（即 pandas 預設）。前 W-1 行輸出 NaN。
@@ -1071,19 +1524,78 @@ def _welford_remove(count, mean, M2, old_value):
 
 #### 5.2.3 Rolling Rank（Sorted Buffer + Bisect）
 
+> **V2 數學語義凍結**（Review2 A4）：rolling rank 的精確定義必須在 Phase 3 開始前凍結，因為 `bisect_left` 和 `pandas rank(pct=True, method='average')` 對 ties 的處理不同。
+
+**凍結的數學定義**：
+```
+rolling_rank(x, window=W) at position i:
+  buf = sorted([x[j] for j in range(i-W+1, i+1) if not isnan(x[j])])
+  count = len(buf)
+  if count < min_periods:
+    return NaN
+  
+  # Tie handling: average method（等同 pandas default）
+  # 若 x[i] 出現 k 次，rank = (first_pos + last_pos) / 2 + 1
+  lo = bisect_left(buf, x[i])   # first position of x[i]
+  hi = bisect_right(buf, x[i])  # position after last x[i]
+  rank = (lo + hi - 1) / 2 + 1  # 1-based average rank
+  
+  pct = rank / count  # percentile rank
+  return pct
+```
+
+**邊界情況（凍結）**：
+| 情況 | 結果 | 說明 |
+|---|---|---|
+| Window 全 NaN | NaN | count=0 < min_periods |
+| Window 全同值 | 0.5 | average of [1, 1, ..., 1] / count |
+| Window=1, 唯一非 NaN | 1.0 | rank 1 / count 1 |
+| 極大值出現在 sorted 最後 | ~1.0 | (count-1+count)/2/count |
+
+**atol 驗證**: `np.allclose(numba_rank, pd.rolling(W).apply(lambda x: x.rank(pct=True).iloc[-1]), atol=1e-6)`
+
 ```python
 # 維護一個 sorted array of size W
 # 新值加入：bisect_insort → O(W) shift
 # 舊值移除：bisect_left → O(W) shift
-# Rank = bisect_left(sorted, current) / count
+# Rank = (bisect_left + bisect_right - 1) / 2 / count  # average tie method
 # 總複雜度：O(N·W) — 比 pandas rolling.rank O(N·W·log(W)) 快
 ```
 
 #### 5.2.4 Pebay Online Skew/Kurt（float64 累加器 + 定期校正）
 
+> **V2 強化**（Review1 §4.3.1）：Pebay online 的 S3/S4 累加器在長序列（N >> W）中因 catastrophic cancellation 可能累積誤差。定期校正是**必要的**，不是 nice-to-have。
+
 ```
-每 W 步從 ring buffer 重新計算一次，避免 catastrophic cancellation。
-校正成本：O(W) per W steps = amortized O(1) per step。
+定期校正策略：
+  recalc_interval = min(W, 50)  # 每 min(W, 50) 步從 ring buffer 重新計算
+  
+  for i in range(N):
+    # Online update
+    _pebay_update(...)
+    
+    if (i + 1) % recalc_interval == 0:
+      # 從 ring buffer 的原始值重新計算 S2, S3, S4
+      buf = ring_buffer[valid_start:valid_end]
+      count, mean, M2, M3, M4 = _batch_compute(buf)  # Exact batch computation
+      # 覆蓋 online state
+```
+
+**校正成本**：O(W) per `recalc_interval` steps = amortized O(W / recalc_interval) = O(1~5) per step。
+**精度保證**：校正後 skew/kurt 與 batch 計算的差異必須 < 1e-6（若不滿足，說明 ring buffer 有 bug）。
+
+**⚠️ Numba ARM64/macOS 相容性**（R16）：
+- Numba 在 Apple Silicon（M1/M2）的 ARM64 backend 可能有 JIT 編譯差異
+- 必須在開發機上跑完全量測試（T3.1~T3.B13）後才視為 Phase 3 完成
+- 版本釘選：`numba>=0.57,<0.60`（已知穩定版本範圍）
+
+**⚠️ Numba skew/kurt zero-variance guard**（R17）：
+```python
+@numba.njit
+def _compute_skew(M2, M3, count):
+    if count < 3 or M2 < 1e-30:  # epsilon guard for zero-variance
+        return np.nan
+    return (count * np.sqrt(count - 1) / (count - 2)) * (M3 / M2 ** 1.5)
 ```
 
 ### 5.3 Phase 3 測試項目
@@ -1141,6 +1653,27 @@ def _welford_remove(count, mean, M2, old_value):
 
 **決策門檻**: Phase 3 完成後重新 profile。僅當 L2 或 L6.5 是剩餘的 top-2 瓶頸時才推進。
 
+#### 6.0 Phase 4 Skip 條件（V2 新增）
+
+> **動機**（Review1 §3.2）：Research §16.2 將 Phase 4 設為「條件性」，但未定義明確的 skip 條件。若 Phase 3 完成後整體已達目標（< 7 min/sym），Phase 4 的 Polars 遷移**成本效益不合理**（引入 Polars 依賴、NaN/null 語義差異、版本鎖定風險）。
+
+**明確 Skip 條件**：
+```
+IF (Phase 3 完成後 profile 結果)
+   L2_time + L6.5_time < 0.30 × total_pipeline_time
+THEN
+   SKIP Phase 4 → 直接進入 Phase 5
+```
+
+**No-Phase-4 效能預估**：
+- Phase 1 (searchsorted): B2+D 454s → ~50s（省 ~400s）
+- Phase 2 (CGSA): F 8,365s → ~0s（消除 memmap page thrashing）
+- Phase 3 (Numba): A4 385s → ~60s（省 ~325s）
+- **Total without Phase 4**: ~7 min/sym（可接受的 research platform 效能）
+- 若仍需更快 → 推進 Phase 4 或 Phase 5 multi-symbol parallelism
+
+**Polars 版本鎖定風險**（R25）：Polars API 在 major 版本間有重大 breaking changes（如 `pl.Expr` API 變更）。若推進 Phase 4，須釘選版本：`polars>=0.20,<0.21`。
+
 ### 6.1 Task 清單
 
 | Task | 描述 | 依賴 |
@@ -1172,6 +1705,66 @@ def _welford_remove(count, mean, M2, old_value):
 ## 7. Phase 5 — 生產化
 
 **目標**: multi-symbol 平行化 + 下游 DuckDB 整合
+
+### 7.0 Phase 5 前置要求（V2 新增）
+
+> **動機**（Review1 §4.3, §4.7）：Phase 5 引入多進程平行，有多項 Numba + TA-Lib 相關風險需事先處理。
+
+#### 7.0.1 Numba JIT 預熱
+
+**問題**：Numba `@njit` 函式的首次呼叫會觸發 JIT 編譯（~3-10s per function）。若 8 個 worker 同時啟動，各自編譯相同函式，會導致：
+1. CPU spike（8 × compilation）
+2. 可能的快取競爭（Numba cache dir 寫入衝突）
+
+**解法**：
+```python
+def warmup_numba_cache():
+    """在啟動 worker pool 前，main process 先呼叫一次所有 @njit 函式。"""
+    dummy = np.random.randn(100).astype(np.float32)
+    fused_rolling_stats(dummy, window=5)  # 觸發 JIT 編譯 → 寫入 __pycache__
+    # ... 其他 @njit 函式 ...
+
+# main process 中：
+warmup_numba_cache()  # 先預熱
+
+mp_ctx = multiprocessing.get_context('spawn')
+with ProcessPoolExecutor(max_workers=8, mp_context=mp_ctx) as pool:
+    # Workers 從 __pycache__ 載入已編譯的函式（不重複編譯）
+    futures = [pool.submit(process_symbol, sym) for sym in symbols]
+```
+
+#### 7.0.2 ProcessPoolExecutor 強制 spawn context
+
+**問題**：macOS 預設 `fork()` + TA-Lib C 全域狀態 → segfault。
+**要求**：**所有 Phase 5 多進程必須使用 `multiprocessing.get_context('spawn')`**。
+
+```python
+# ❌ 禁止
+with ProcessPoolExecutor(max_workers=8) as pool:  # macOS 預設 fork
+
+# ✅ 必須
+mp_ctx = multiprocessing.get_context('spawn')
+with ProcessPoolExecutor(max_workers=8, mp_context=mp_ctx) as pool:
+```
+
+#### 7.0.3 Reference Data 共享快取（V2 新增 — Codebase 交叉驗證）
+
+> **動機**：L5 的 `_reference_data_cache` 是 instance-level（per-FeatureFactory）。Phase 5 多進程中，8 個 worker 各自建立 FeatureFactory 實例，各自讀取 BTCUSDT reference data → 8 次重複 I/O。
+
+**解法**：
+- 在 main process 中預先讀取 BTCUSDT reference data
+- 序列化為 Arrow IPC 或 Parquet 到 shared temp path
+- Workers 透過 read-only mmap 或 Arrow IPC 讀取（零複製）
+
+```python
+# Main process
+btcusdt_ref = load_reference_data("BTCUSDT", timeframe, config)
+ref_path = work_dir / "shared_ref_BTCUSDT.arrow"
+btcusdt_ref.to_feather(ref_path)  # Arrow IPC format
+
+# Worker process（process_symbol 內）
+ref_data = pd.read_feather(ref_path)  # OS page cache → 實質零複製
+```
 
 ### 7.1 Task 清單
 
@@ -1233,8 +1826,9 @@ def _welford_remove(count, mean, M2, old_value):
 | 條件 | 要求 |
 |---|---|
 | T3.12 PASS | 融合結果 vs golden 一致 |
-| re-profile 完成 | **僅當 L2 或 L6.5 是 top-2 瓶頸時才推進 Phase 4** |
-| 否則 → 跳到 Phase 5 | |
+| re-profile 完成 | **僅當 L2_time + L6.5_time > 0.30 × total_pipeline_time 時才推進 Phase 4** |
+| No-Phase-4 效能是否可接受 | 若 total < 7 min/sym → SKIP Phase 4 → 直接到 Phase 5 |
+| 否則 → 跳到 Phase 5 | Phase 4 為條件性，不跳過需要明確 profiling 數據支撐 |
 
 ### 8.5 Phase 4/5 → Done Gate
 
@@ -1346,6 +1940,17 @@ def make_feature_df(n_rows: int, n_cols: int, seed: int = 42) -> pd.DataFrame:
 | R12 | Numba JIT 首次編譯耗時（cold start ~30s） | 首次執行慢 | 低 | 使用 `@numba.njit(cache=True)` 磁碟快取 |
 | R13 | `build_asof_index_map` 的 int64 ms→ns 轉換溢出（year > 2262） | idx 全錯 | 極低 | T1.B15 overflow 測試；加 assert year < 2100 |
 | R14 | CGSA 雙軌 A/B 同時執行 → RAM 翻倍 → OOM | Phase 2 測試無法完成 | 中 | A/B 不同時在記憶體中；legacy 先跑完存 parquet，再跑 CGSA 比對 |
+| **R15** | **.npy 中介檔案爆炸**：33,600+ groups → 33,600+ .npy 檔（V1 粒度） | I/O overhead、inode 耗盡 | 中 | §4.9 粒度調整 → ~1,200 groups；persist 後立即刪除 .npy |
+| **R16** | **Numba ARM64/macOS JIT 相容性**：Apple Silicon 的 LLVM backend 可能有 JIT 差異 | Phase 3 數值不穩定或 compile error | 低 | 版本釘選 `numba>=0.57,<0.60`；CI/CD 加入 ARM64 runner；Phase 3 完成前必須在開發機全量測試通過 |
+| **R17** | **Numba skew/kurt zero-variance divide-by-zero**：全常數序列的 M2≈0 → skew/kurt 除零 | NaN 或 inf 汙染 | 中 | float64 累加器 + epsilon guard（M2 < 1e-30 → NaN）；T3.B2 全常數邊界測試 |
+| **R18** | **L2 O(N²) 組合爆炸**：若 config 開啟全排列 Cross/Ratio → 1,683² ≈ 2.8M columns | RAM 爆炸、pipeline 卡死 | 低 | §4.2.1 斷路器 MAX_L2_ESTIMATED_COLS=100,000；超過閾值自動降級為 per-category 分批 |
+| **R19** | **DuckDB Parquet footer scan overhead**：V1 粒度 33,600 Parquet files 的 footer scan | 下游讀取慢 | 中 | §4.9 粒度調整 → ~1,200 files；或合併為 category-level Parquet |
+| **R20** | **Phase 5 磁碟 I/O 未建模**：100 symbol × per-group I/O，磁碟可能成為新瓶頸 | 實際效能遠差於預估 | 中 | Phase 5 啟動前做 2-symbol pilot benchmark，量測磁碟吞吐；若 I/O bound → 考慮 SSD RAID 或 Arrow IPC |
+| **R21** | **現有 L1 ThreadPool + TA-Lib 安全風險**：`FFACT_LAYER1_PARALLEL=1` 使用 ThreadPoolExecutor | segfault 或結果錯誤（與 R11 同類） | 中 | 預設關閉（`FFACT_LAYER1_PARALLEL=0`）；Phase 5 才啟用，且改用 ProcessPoolExecutor + spawn |
+| **R22** | **L6 `_find_column` fuzzy matching 在 CGSA 下失敗**：欄位重命名或 group_id prefix 改變 column name pattern | L6 meta features 產出 0 個特徵 | 中 | §4.2.4 建議改為顯式 column 引用（從 manifest 查詢）；增加 L6 output column count 的 sanity check |
+| **R23** | **L3 variance_filter 非決定性**：float32/64 精度差異可能導致不同特徵被過濾 | Golden 比對 column count 不一致（C2 fail） | 低 | 固定 variance 閾值（不用百分位）；Golden 比對先比 column set，再用交集做數值比對 |
+| **R24** | **MultiTFGenerator._combine_layers 獨立程式碼路徑未被 CGSA 覆蓋** | Phase 2 遺漏此路徑 → 仍觸發 wide concat | 中 | §4.14 明確標記；Task 2.5 必須同時修改兩處 _combine_layers |
+| **R25** | **Polars 版本鎖定風險（Phase 4）**：Polars API 跨 major 版本有 breaking changes | Phase 4 程式碼在 Polars 升級後失效 | 低 | 版本釘選 `polars>=0.20,<0.21`；Phase 4 為條件性，可能 skip |
 
 ---
 
@@ -1394,39 +1999,99 @@ Phase 1:
   □      跑 T1.B1~T1.B15 全部邊界條件測試
   □      跑 T1.P1~T1.P3 效能驗收
   □      Phase Gate 1→2 檢查
-  □ 1.5  (OPTIONAL) Multi-TF 平行化 → multi_tf_generator.py
+  □ 1.5  ~~(OPTIONAL) Multi-TF 平行化~~ → **DEFERRED to Phase 5**（V2 修訂）
 
 Phase 2:
   □ 2.1  建立 ColumnGroup dataclass
-  □ 2.2  建立 ColumnGroupRegistry
+  □ 2.2  建立 ColumnGroupRegistry（含 incremental manifest + resume）
   □ 2.3  L1 per-indicator output
-  □ 2.4  L2 兩階段計算
-  □ 2.5  _combine_layers registry-based
+  □ 2.4  L2 兩階段計算（per-category 分批 + 斷路器）
+  □ 2.5  _combine_layers registry-based（**含 MultiTFGenerator._combine_layers**）
   □ 2.6  Multi-TF column tagging via group_id
   □ 2.7  L6.5 per-group
   □ 2.8  Persist per-group Parquet
-  □ 2.9  manifest.json
+  □ 2.9  manifest.json（含 config_hash 正規化 + 完整 config snapshot）
   □ 2.10 L7 per-group validate
-  □ 2.11 materialize_wide_df() 向後相容
-  □ 2.12 雙軌 A/B 驗證
+  □ 2.11 materialize_wide_df() 向後相容（@deprecated + RAM warning）
+  □ 2.12 逐層 Golden 比對（V2 修訂：取代全量 A/B）
+  □      L4 快速路徑強制（§4.2.2）
+  □      L5 依賴域定義驗證（§4.2.3）
+  □      L6 Stage A/B 驗證（§4.2.4）
+  □      Column Ordering 驗證（§4.8）
   □      跑 T2.1~T2.17 + T2.B1~T2.B9
   □      Phase Gate 2→3 檢查
 
 Phase 3:
-  □ 3.1  fused_rolling_stats (mean/std/min/max/range/zscore)
-  □ 3.2  online skew/kurt (Pebay)
-  □ 3.3  rolling rank (sorted buffer)
+  □ 3.1  fused_rolling_stats (mean/std/min/max/range/zscore) — **float64 累加器**
+  □ 3.2  online skew/kurt (Pebay) — **定期校正 + epsilon guard**
+  □ 3.3  rolling rank (sorted buffer) — **average tie method 凍結**
   □ 3.4  slope (running sums)
-  □ 3.5  整合到 RollingAggregator
+  □ 3.5  整合到 RollingAggregator（維持現有 streaming 模式架構）
   □ 3.6  跑 T3.1~T3.12 + T3.B1~T3.B13 + T3.P1~T3.P2
-  □      Phase Gate 3→4 檢查（re-profile 決定是否進 Phase 4）
+  □      Phase Gate 3→4 檢查（re-profile：L2+L6.5 > 30% total → Phase 4，否則 skip）
 
-Phase 4 (條件性):
-  □ 4.1~4.4  Polars L2/L6.5 改寫
+Phase 4 (條件性 — 可 skip):
+  □ 4.1~4.4  Polars L2/L6.5 改寫（版本釘選 polars>=0.20,<0.21）
   □          跑 T4.1~T4.4 + T4.B1~T4.B3
 
 Phase 5:
+  □ 5.0  Numba JIT 預熱 + ProcessPoolExecutor spawn context
+  □ 5.0  Reference data 共享快取（BTCUSDT → Arrow IPC）
   □ 5.1~5.3  生產化（multi-symbol, Arrow IPC, DuckDB）
   □          跑 T5.1~T5.3 + T5.B1~T5.B3
   □          最終全量 golden 驗證
 ```
+
+---
+
+## 附錄 D: Review 整合追溯表（V2 新增）
+
+> 本表追溯 Review1 + Review2 的每一個發現項在 SPEC V2 中的處理方式。
+
+### D.1 Review2 P0 項（實作前必須解決）
+
+| Review2 項 | 原始描述 | SPEC V2 處置 | 對應 SPEC 章節 |
+|---|---|---|---|
+| **A1** | Golden 驗證策略不足 | 三層 Baseline 策略 + 大記憶體環境 Tier 1 + 循環依賴打破 | §1.3.1, §1.3.2 |
+| **A2** | L5 cross-sectional 與 per-symbol CGSA 衝突 | L5 依賴域凍結定義 + 獨立 stage + Phase 5 共享快取 | §4.2.3 |
+| **A3** | Task 1.5 ThreadPool + TA-Lib 不安全 | DEFERRED to Phase 5 + ProcessPoolExecutor + spawn | §3.5 |
+| **A4** | Rolling rank 數學語義未凍結 | Frozen 定義（average tie method + bisect_left/right + 邊界表） | §5.2.3 |
+| **A5** | Downstream contract 未重寫（materialize_wide_df 仍存在） | IFeatureProvider Protocol + 遷移計畫 + @deprecated | §4.13 |
+
+### D.2 Review2 P1 項（Phase 2 前必須解決）
+
+| Review2 項 | 原始描述 | SPEC V2 處置 | 對應 SPEC 章節 |
+|---|---|---|---|
+| **B1** | L2 output RAM 低估（未計 2.5GB 輸出） | Per-category 分批 + 斷路器 | §4.2.1 |
+| **B2** | L6 meta cross-group 依賴未定義 | L6 Stage A/B + _find_column 風險說明 | §4.2.4 |
+| **B3** | Column ordering 不穩定 | Canonical Column Order 定義（7-key 排序） | §4.8 |
+| **B4** | searchsorted 為過渡方案（Phase 2 CGSA 後可能不需要） | 維持 Phase 1 實作；Phase 2 後 searchsorted 用於 non-primary TF → 仍有價值 | §3 無修改（已標記 transitional） |
+| **B5** | 小檔案治理（Group 粒度過細） | Group 粒度從 ~33,600 提升到 ~1,200 | §4.9 |
+| **B7** | Per-layer atol 需要分層定義 | C1 Tolerance Map（12 個操作各有 atol） | §1.1 C1 |
+
+### D.3 Review1 獨有發現（Review2 未覆蓋）
+
+| Review1 項 | 原始描述 | SPEC V2 處置 | 對應 SPEC 章節 |
+|---|---|---|---|
+| **§2.3** | config_hash 正規化不足 | Canonical JSON + SHA256 + 完整 config snapshot | §4.11 |
+| **§4.6** | L6.5 操作的 per-group 相容性未窮盡列舉 | 6 種操作完整列表 + cross-feature rank 不相容注記 | §4.3 |
+| **§7.1** | Group 粒度過細（~33,600 groups） | 同 Review2 B5 | §4.9 |
+| **§7.2** | Registry 不支援斷點續跑 | Incremental manifest + resume_from_manifest() | §4.10 |
+| **§4.3** | Numba JIT cold start 在 Phase 5 多 worker 場景 | JIT 預熱方案 + spawn context | §7.0.1, §7.0.2 |
+| **§4.3.1** | float64 累加器硬性要求 | 加強語氣 + epsilon guard + 定期校正策略 | §5.2.1, §5.2.4 |
+| **§3.2** | Phase 4 skip 條件未定義 | 30% 閾值 + No-Phase-4 效能預估 | §6.0 |
+| **§3.5** | A/B 驗證死鎖（現行 pipeline OOM 無法完成） | 逐層 Golden 比對 + Tier 1 structural baseline | §4.12 |
+
+### D.4 Codebase 交叉驗證獨有發現（兩份 Review 均未覆蓋）
+
+| 發現 | 描述 | SPEC V2 處置 | 對應 SPEC 章節 |
+|---|---|---|---|
+| **CB-1** | L4 有兩條路徑（快速 / 完整），完整路徑在 CGSA 下等同 wide materialization | CGSA 下強制 L4 快速路徑 | §4.2.2 |
+| **CB-2** | L3 已有 streaming 模式（`FFACT_L3_STREAMING`） | Phase 3 定位為增量改進（非從零開始） | §5.0 |
+| **CB-3** | L1 已有 ThreadPool 平行（`FFACT_LAYER1_PARALLEL`），與 Task 1.5 同類風險 | 加入 R21 風險；預設關閉直到 Phase 5 | §3.5 注意, R21 |
+| **CB-4** | L4 已有快速路徑優化（`apply_to == "layer1_and_raw"` 避免 2min memmap copy） | 確認既有優化，CGSA 整合 | §4.14 |
+| **CB-5** | `MultiTFGenerator._combine_layers()` 是獨立程式碼路徑（static method） | Task 2.5 必須同時修改；加入 R24 風險 | §4.14, R24 |
+| **CB-6** | L5 使用 instance-level `_reference_data_cache`，Phase 5 多 worker 重複讀取 | 共享 read-only reference data cache | §7.0.3 |
+| **CB-7** | L6.5 已有 chunking 模式（`FFACT_L65_CHUNK_SIZE=2000`） | CGSA per-group 取代 chunking | §4.14 |
+| **CB-8** | variance_filter 可能導致 Golden column count 不一致 | 固定閾值 + column set 先比 → 交集數值比對 | §5.0, R23 |
+| **CB-9** | `_find_column()` fuzzy matching 在 CGSA 重命名後可能失效 | 建議改為顯式 column 引用 | §4.2.4, R22 |

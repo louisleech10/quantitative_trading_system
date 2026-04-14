@@ -1,7 +1,7 @@
 # AI Agent Instructions for Quantitative Trading System
 
 > Quick reference guide for AI coding agents (GitHub Copilot, Claude, Cursor, etc.)  
-> **Last Updated**: 2026-02-18 | **Version**: 3.0
+> **Last Updated**: 2026-04-14 | **Version**: 3.1
 
 ## 🎯 System Overview
 
@@ -36,7 +36,7 @@ V3.0 (2027+):                 Fully autonomous AI Agent → Proposes strategies 
 
 ### Backend (`api/`)
 - **`api/main.py`** - FastAPI app entry, lifespan management, router registration
-- **`api/routes/`** - Thin route handlers (case_search.py, case.py, chart.py, chart_signals.py, config.py, export.py, feature_browser.py, feature_engineering.py, feature_factory.py, feature_toggles.py, ic_analysis.py, ml_pipeline.py, model_enhancement.py, optimization.py, optimization_analysis.py, hyperparameter_optimization.py, execution_optimization.py, pattern_analysis.py, pattern_management.py, signal_analysis.py, two_stage_search.py)
+- **`api/routes/`** - Thin route handlers (case_search.py, case.py, chart.py, chart_signals.py, config.py, cross_symbol.py, export.py, feature_browser.py, feature_data.py, feature_engineering.py, feature_factory.py, feature_registry.py, feature_toggles.py, ic_analysis.py, ml_pipeline.py, model_enhancement.py, optimization.py, optimization_analysis.py, hyperparameter_optimization.py, execution_optimization.py, pattern_analysis.py, pattern_management.py, signal_analysis.py, two_stage_search.py, watchlist.py)
 - **`api/services/`** - Heavy business logic:
   - `search_task_service.py` - Async case search orchestration
   - `optimization_task_service.py` - Optuna hyperparameter optimization
@@ -54,6 +54,17 @@ V3.0 (2027+):                 Fully autonomous AI Agent → Proposes strategies 
   - `shap_analysis_service.py` - SHAP feature importance
   - `export_service.py` - General export service
   - `kline_data_service.py`, `kline_storage_service.py` - Kline data management
+  - `case_import_service.py` - CSV/Excel case import
+  - `case_storage.py` - Case in-memory storage
+  - `data_service.py` - Template & settings management
+  - `standalone_search_service.py` - Standalone search service
+  - `cross_symbol_training_service.py` - Cross-symbol ML training
+  - `feature_factory_batch_service.py` - Feature Factory batch processing
+  - `feature_kline_service.py` - Feature kline data service
+  - `lstm_task_service.py` - LSTM model training tasks
+  - `model_task_service.py` - Model task management
+  - `watchlist_service.py` - Watchlist management
+  - `xgboost_task_cache.py` - XGBoost result caching
   - `task_manager.py` - Global async task tracking
 - **`api/core/`** - Config (Settings from pydantic-settings), logging (ColoredFormatter), middleware
 - **`api/models/`** - Pydantic request/response models
@@ -84,7 +95,7 @@ V3.0 (2027+):                 Fully autonomous AI Agent → Proposes strategies 
   - `risk_manager.py` - Risk management calculations
 
 ### Frontend (`frontend/src/`)
-- **`app/`** - Next.js 15 App Router pages (search/, chart/, ic-analysis/, feature-factory/, feature-browser/, optimization-execution/, optimization-hyperparameter/, optimization-result/, patterns/, strategy-test/, strategy-demo/, data-preparation/, result/)
+- **`app/`** - Next.js 15 App Router pages (search/, chart/, charts/, ic-analysis/, feature-factory/, feature-browser/, optimization-execution/, optimization-hyperparameter/, optimization-result/, patterns/, strategy-test/, strategy-demo/, data-preparation/, result/, lstm-model/)
 - **`components/`** - React components:
   - `charts/` - Chart components (PriceChart, TakerRatioChart, TradingChartWithSignals, DensityDistributionChart, StrategySignalChart)
   - `optimization/` - Optuna optimization UI (TrialComparisonPanel, CalibrationPlot, WalkForwardTimeline, CPCVPathChart; sub: common/, execution/, hyperparameter/)
@@ -107,6 +118,7 @@ V3.0 (2027+):                 Fully autonomous AI Agent → Proposes strategies 
   - `featureToggleStore.ts` - Feature toggle flags
   - `patternStore.ts` - Pattern management state
   - `strategyTestStore.ts` - Strategy testing state
+  - `watchlistStore.ts` - Watchlist management state
 - **`lib/types.ts`** - TypeScript interfaces matching backend models
 - **`hooks/`** - Custom React hooks (useICAnalysis, useOptimization, useFeatureFactory, useChart, useChartSync, useAutoResearch, useAvailableSymbols, useStrategyConfig)
 
@@ -387,7 +399,7 @@ python test_*.py          # Legacy standalone tests
 
 ## ⚡ Performance Guidelines
 
-**Target platform**: MacBook M1 (8-core, 16GB RAM)  
+**Target platform**: MacBook M1 (8-core, 8GB RAM)  
 
 **Optimization hierarchy** (from best to worst):
 1. **Vectorized pandas/numpy** - Always prefer `df['column'].apply()` over Python loops
@@ -533,13 +545,14 @@ class FeatureEngineer:
 **Start here**:
 - `README.md` - System overview, tech stack, roadmap (in Chinese)
 - `docs/PRODUCT_VISION.md` - V1/V2/V3 evolution plan, version goals, decoupling rationale
-- `docs/ARCHITECTURE.md` - Detailed system architecture (~4000 lines)
+- `docs/ARCHITECTURE.md` - Detailed system architecture (~1900 lines)
 - `docs/DEVELOPMENT_GUIDE.md` - Ultra Think 3-step process, coding standards (~2500 lines)
 
 **Reference**:
 - `docs/API_SPECIFICATION.md` - API endpoints and models
-- `docs/FRONTEND_INTEGRATION_GUIDE.md` - Frontend integration guide
-- `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` - Dynamic indicator system guide
+- `docs/FRONTEND_INTEGRATION_GUIDE.md` - Frontend integration guide (Phase 3-6 UI)
+- `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` - Dynamic indicator system guide (Legacy, superseded by Feature Factory)
+- `docs/REFACTOR_ARCHITECTURE_V4.md` - Architecture refactoring record (10 Phases, Rule 1-7 violation fixes)
 
 ---
 
