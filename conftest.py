@@ -88,6 +88,33 @@ _patch_numpy_dtypes_compatibility()
 import pytest
 
 
+# 歷史腳本型測試：保留可回歸，但預設不納入日常 smoke。
+LEGACY_TEST_FILES = {
+    "tests/test_data_source_quick.py",
+    "tests/test_data_source_variation.py",
+    "tests/test_density_comparison.py",
+    "tests/test_dynamic_indicator_system.py",
+    "tests/test_feature_naming_integration.py",
+    "tests/test_frontend_integration.py",
+    "tests/test_kline_data_service.py",
+    "tests/test_kline_downloader.py",
+    "tests/test_kline_storage.py",
+    "tests/test_storage_path_fix.py",
+}
+
+
+def pytest_collection_modifyitems(config, items):
+    """自動為舊式測試檔加上 legacy marker。"""
+    for item in items:
+        try:
+            rel_path = Path(str(item.fspath)).resolve().relative_to(project_root).as_posix()
+        except Exception:
+            continue
+
+        if rel_path in LEGACY_TEST_FILES:
+            item.add_marker(pytest.mark.legacy)
+
+
 @pytest.fixture
 def training_window():
     """提供通用訓練窗口配置給整合測試使用"""

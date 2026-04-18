@@ -7,9 +7,21 @@
 import requests
 import json
 import time
+import pytest
 
 API_BASE_URL = "http://localhost:8000"
 
+
+def _is_api_reachable() -> bool:
+    """Check whether local optimization API endpoint is reachable."""
+    try:
+        requests.get(API_BASE_URL, timeout=2)
+        return True
+    except requests.RequestException:
+        return False
+
+
+@pytest.mark.slow
 def test_parameter_range_fix():
     """
     測試參數範圍修復
@@ -17,6 +29,9 @@ def test_parameter_range_fix():
     用戶配置: Short 3-12, Mid 14-18, Long 20-33
     預期結果: 所有 trials 的參數都在這些範圍內
     """
+
+    if not _is_api_reachable():
+        pytest.skip(f"Optimization API not reachable at {API_BASE_URL}")
 
     print("=" * 60)
     print("參數範圍修復驗證測試")

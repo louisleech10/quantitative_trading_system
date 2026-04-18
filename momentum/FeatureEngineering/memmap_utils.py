@@ -19,12 +19,19 @@ a fast row-by-row memcpy instead of a slow element-level transpose.
 
 from __future__ import annotations
 
+import gc
 import os
 import tempfile
+import time
 from typing import List, Optional
 
 import numpy as np
 import pandas as pd
+
+try:
+    import psutil
+except Exception:  # pragma: no cover - optional dependency
+    psutil = None
 
 from momentum.core.logging import get_logger
 
@@ -33,6 +40,7 @@ logger = get_logger(__name__)
 # DataFrames smaller than this threshold use normal pd.concat (faster for
 # small/medium workloads).  500 MB is well within 8 GB RAM budget.
 MEMMAP_THRESHOLD_BYTES: int = 500_000_000
+HEARTBEAT_INTERVAL_SECONDS: float = 30.0
 
 
 def _resolve_copy_block_rows() -> int:
@@ -43,6 +51,16 @@ def _resolve_copy_block_rows() -> int:
     except ValueError:
         rows = 1024
     return max(rows, 0)
+
+
+def _get_process_rss_mb() -> Optional[float]:
+    """Return current process RSS in MB, or None when unavailable."""
+    if psutil is None:
+        return None
+    try:
+        return psutil.Process().memory_info().rss / (1024 * 1024)
+    except Exception:
+        return None
 
 
 def create_temp_memmap(
@@ -154,40 +172,66 @@ def concat_with_memmap(
     col_names: List[str] = []
     col_offset = 0
     block_rows = _resolve_copy_block_rows()
+    if block_rows <= 0:
+        block_rows = 1024  # always use block copy to cap peak memory
 
-    for idx, df in enumerate(valid_dfs, start=1):
+    result_index = index if index is not None else valid_dfs[0].index
+
+    for idx in range(len(valid_dfs)):
+        df = valid_dfs[idx]
         n = df.shape[1]
-        # .values returns underlying array (may be memmap). Use C-order so writes to
-        # C-order destination memmap are contiguous row copies.
-        src = np.asarray(df.values, dtype=np.float32, order="C")
 
         logger.info(
             "[memmap concat] copying DF %d/%d (%d cols)",
-            idx,
+            idx + 1,
             len(valid_dfs),
             n,
         )
 
-        if block_rows <= 0 or n_rows <= block_rows:
-            out_arr[:, col_offset : col_offset + n] = src
-        else:
-            total_steps = (n_rows + block_rows - 1) // block_rows
-            heartbeat = max(1, total_steps // 4)
-            for step, row_start in enumerate(range(0, n_rows, block_rows), start=1):
-                row_end = min(row_start + block_rows, n_rows)
-                out_arr[row_start:row_end, col_offset : col_offset + n] = src[row_start:row_end, :]
-                if step % heartbeat == 0 or step == total_steps:
+        # Collect column names BEFORE releasing df reference
+        col_names.extend(df.columns.tolist())
+
+        # Materialise the underlying numpy array ONCE (zero-copy if already
+        # float32 C-order, one-pass copy otherwise).  Then slice rows from
+        # the numpy array — avoids the extreme overhead of df.iloc[slice]
+        # on wide DataFrames (156K cols → iloc rebuilds DF per block).
+        src_arr = df.to_numpy(dtype=np.float32, copy=False)
+        if not src_arr.flags["C_CONTIGUOUS"]:
+            src_arr = np.ascontiguousarray(src_arr, dtype=np.float32)
+
+        # Release the pandas DF immediately — we only need src_arr now.
+        valid_dfs[idx] = None
+        del df
+        gc.collect()
+
+        last_heartbeat = time.perf_counter()
+        for row_start in range(0, n_rows, block_rows):
+            row_end = min(row_start + block_rows, n_rows)
+            out_arr[row_start:row_end, col_offset : col_offset + n] = src_arr[row_start:row_end]
+            now = time.perf_counter()
+            if now - last_heartbeat >= HEARTBEAT_INTERVAL_SECONDS:
+                rss_mb = _get_process_rss_mb()
+                if rss_mb is not None:
                     logger.info(
-                        "[memmap concat] DF %d/%d progress: rows %d/%d (%d%%)",
-                        idx,
+                        "[concat_memmap] DF %d/%d: %d/%d rows copied, RSS=%.0f MB",
+                        idx + 1,
                         len(valid_dfs),
                         row_end,
                         n_rows,
-                        int(row_end * 100 / n_rows),
+                        rss_mb,
                     )
+                else:
+                    logger.info(
+                        "[concat_memmap] DF %d/%d: %d/%d rows copied",
+                        idx + 1,
+                        len(valid_dfs),
+                        row_end,
+                        n_rows,
+                    )
+                last_heartbeat = now
 
-        col_names.extend(df.columns.tolist())
         col_offset += n
+        del src_arr
+        gc.collect()
 
-    result_index = index if index is not None else valid_dfs[0].index
     return pd.DataFrame(data=out_arr, index=result_index, columns=col_names, copy=False)

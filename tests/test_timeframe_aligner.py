@@ -1,7 +1,38 @@
+import numpy as np
 import pandas as pd
+import pytest
 
 from momentum.FeatureEngineering.feature_config import AlignmentMode
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+
+def test_build_asof_index_map_basic():
+    """測試 build_asof_index_map 基本對齊行為。"""
+    primary = np.array([5, 15, 25], dtype=np.int64)
+    source = np.array([0, 10, 20], dtype=np.int64)
+
+    result = TimeframeAligner.build_asof_index_map(primary, source)
+
+    np.testing.assert_array_equal(result, np.array([0, 1, 2], dtype=np.int64))
+
+
+def test_build_asof_index_map_with_offset():
+    """測試 OPEN_MINUS offset=-1ns 時，邊界點會取上一根。"""
+    primary = np.array([10, 20], dtype=np.int64)
+    source = np.array([10, 20], dtype=np.int64)
+
+    result = TimeframeAligner.build_asof_index_map(primary, source, offset_ns=-1)
+
+    np.testing.assert_array_equal(result, np.array([-1, 0], dtype=np.int64))
+
+
+def test_build_asof_index_map_unsorted_source_raises_value_error():
+    """測試 source timestamp 未排序時會拋出 ValueError。"""
+    primary = np.array([5, 15, 25], dtype=np.int64)
+    source = np.array([0, 20, 10], dtype=np.int64)
+
+    with pytest.raises(ValueError, match="source_ts must be sorted"):
+        TimeframeAligner.build_asof_index_map(primary, source)
 
 
 def test_align_high_frequency_to_primary():

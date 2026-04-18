@@ -48,8 +48,8 @@ def test_1_basic_ema_extraction():
         'close_ema5_value',
         'close_ema20_value',
         'close_ema60_value',
-        'close_ema5_20_distance',
-        'close_ema20_60_distance',
+        'close_ema5-20_distance',
+        'close_ema20-60_distance',
         'close_ema_trend_aligned',
         'close_ema_entry_signal_score'
     ]
@@ -109,8 +109,8 @@ def test_2_different_parameters():
     # 驗證
     assert 'close_ema5_value' in names1, "參數組1應包含 close_ema5_value"
     assert 'close_ema10_value' in names2, "參數組2應包含 close_ema10_value"
-    assert 'close_ema5_20_distance' in names1
-    assert 'close_ema10_30_distance' in names2
+    assert 'close_ema5-20_distance' in names1
+    assert 'close_ema10-30_distance' in names2
     
     print(f"✅ 參數組1特徵數: {len(names1)}")
     print(f"✅ 參數組2特徵數: {len(names2)}")

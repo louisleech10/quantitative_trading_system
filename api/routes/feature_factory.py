@@ -9,7 +9,6 @@ from typing import Dict, Optional
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response, StreamingResponse
 
-from api.main import get_batch_service
 from api.core.logging import get_logger
 from api.models.feature_factory_models import (
     BatchGenerateRequest,
@@ -27,12 +26,22 @@ from api.models.feature_factory_models import (
 )
 from api.services.feature_factory_batch_service import (
     FeatureFactoryBatchService,
+    get_feature_factory_batch_service,
 )
 from api.services.feature_factory_service import feature_factory_service
 
 
 router = APIRouter(prefix="/api/v1/features", tags=["Feature Factory"])
 logger = get_logger("api.routes.feature_factory")
+
+
+def get_batch_service() -> FeatureFactoryBatchService:
+    """DI provider for FeatureFactoryBatchService singleton.
+
+    Defined in route module to avoid importing api.main at module import time,
+    which can cause circular imports during test collection.
+    """
+    return get_feature_factory_batch_service()
 
 
 @router.get("/presets")
@@ -231,16 +240,22 @@ async def export_features_csv(
     """串流匯出特徵數據為 CSV。"""
     try:
         selected_columns = [column.strip() for column in columns.split(",") if column.strip()] if columns else None
+        export_kwargs = {
+            "task_id": task_id,
+            "columns": selected_columns,
+            "max_rows": max_rows,
+            "include_metadata_header": include_metadata_header,
+        }
+        # Backward-compat: only pass include_datasource when explicitly requested.
+        # Older tests/mocks may not accept this keyword argument.
+        if include_datasource:
+            export_kwargs["include_datasource"] = True
         loop = asyncio.get_running_loop()
         payload = await loop.run_in_executor(
             None,
             partial(
                 feature_factory_service.export_csv_stream,
-                task_id=task_id,
-                columns=selected_columns,
-                max_rows=max_rows,
-                include_metadata_header=include_metadata_header,
-                include_datasource=include_datasource,
+                **export_kwargs,
             ),
         )
         headers = {

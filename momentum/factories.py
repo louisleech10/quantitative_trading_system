@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, Optional, List
 
 from momentum.DataExtraction.kline_storage import KlineStorageManager
@@ -147,7 +149,10 @@ def create_feature_validator() -> FeatureValidator:
     return FeatureValidator()
 
 
-def create_feature_factory(cache_dir: Optional[str] = None) -> "FeatureFactory":
+def create_feature_factory(
+    cache_dir: Optional[str] = None,
+    validate_continuity: bool = True,
+) -> "FeatureFactory":
     """Create a FeatureFactory instance with ConfigManager and AdapterRegistry."""
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from momentum.FeatureEngineering.config_manager import ConfigManager
@@ -157,9 +162,19 @@ def create_feature_factory(cache_dir: Optional[str] = None) -> "FeatureFactory":
     storage = create_kline_storage_manager(cache_dir)
     config_manager = ConfigManager()
     registry = AdapterRegistry()
-    registry.register(CryptoSpotAdapter(storage))
+    registry.register(CryptoSpotAdapter(storage, validate_continuity=validate_continuity))
 
     return FeatureFactory(config_manager, registry)
+
+
+def create_column_group_registry(
+    work_dir: Optional[Path] = None,
+) -> "ColumnGroupRegistry":
+    """Factory for ColumnGroupRegistry used by CGSA pipeline."""
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+
+    resolved_work_dir = work_dir or Path(tempfile.mkdtemp(prefix="ffact_cgsa_"))
+    return ColumnGroupRegistry(work_dir=resolved_work_dir)
 
 
 def create_feature_library() -> "FeatureLibrary":

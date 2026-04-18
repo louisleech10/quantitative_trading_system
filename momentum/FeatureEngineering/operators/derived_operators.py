@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -33,6 +33,16 @@ class DerivedOperatorEngine:
       sign, log1p, abs, clip
     """
 
+    OPERATOR_CATEGORIES: tuple[str, ...] = (
+        "Distance",
+        "Cross",
+        "Ratio",
+        "Momentum",
+        "BinarySignal",
+        "SignedStrength",
+        "WorldQuant",
+    )
+
     def __init__(self, config: Dict | None) -> None:
         self._config = self._normalize_config(config)
         self._duplicate_series_warnings: set[str] = set()
@@ -48,42 +58,96 @@ class DerivedOperatorEngine:
 
         feature_info = self._build_feature_info(layer1_df.columns, indicator_specs)
         frames: List[pd.DataFrame] = []
-
-        distance_cfg = self._get_section("distance")
-        if distance_cfg.get("enabled", False):
-            frames.append(self._apply_distance(layer1_df, raw_data, feature_info, distance_cfg))
-
-        cross_cfg = self._get_section("cross")
-        if cross_cfg.get("enabled", False):
-            frames.append(self._apply_pair_operator(layer1_df, feature_info, "Cross"))
-
-        ratio_cfg = self._get_section("ratio")
-        if ratio_cfg.get("enabled", False):
-            frames.append(self._apply_pair_operator(layer1_df, feature_info, "Ratio"))
-
-        momentum_cfg = self._get_section("momentum")
-        if not momentum_cfg:
-            momentum_cfg = self._get_section("momentum_change")
-        if momentum_cfg.get("enabled", False):
-            frames.append(self._apply_momentum(layer1_df, feature_info, momentum_cfg))
-
-        binary_cfg = self._get_section("binary_signal")
-        if binary_cfg.get("enabled", False):
-            frames.append(self._apply_binary_signal(layer1_df, feature_info, binary_cfg))
-
-        signed_cfg = self._get_section("signed_strength")
-        if signed_cfg.get("enabled", False):
-            frames.append(self._apply_signed_strength(layer1_df, feature_info, signed_cfg))
-
-        worldquant_cfg = self._get_section("worldquant")
-        if worldquant_cfg.get("enabled", False):
-            frames.append(self._apply_worldquant(layer1_df, raw_data, feature_info, worldquant_cfg))
+        for category in self.OPERATOR_CATEGORIES:
+            category_frame = self._compute_category_from_feature_info(
+                layer1_df=layer1_df,
+                raw_data=raw_data,
+                feature_info=feature_info,
+                category=category,
+            )
+            if category_frame is not None and not category_frame.empty:
+                frames.append(category_frame)
 
         frames = [frame for frame in frames if not frame.empty]
         if not frames:
             return pd.DataFrame(index=layer1_df.index)
 
         return pd.concat(frames, axis=1)
+
+    def compute_category(
+        self,
+        layer1_df: pd.DataFrame,
+        raw_data: pd.DataFrame,
+        indicator_specs: Optional[Dict[str, Dict]],
+        category: str,
+    ) -> pd.DataFrame:
+        """Compute a single derived-operator category while preserving legacy formulas."""
+        if layer1_df.empty:
+            return pd.DataFrame(index=layer1_df.index)
+
+        feature_info = self._build_feature_info(layer1_df.columns, indicator_specs)
+        return self._compute_category_from_feature_info(
+            layer1_df=layer1_df,
+            raw_data=raw_data,
+            feature_info=feature_info,
+            category=category,
+        )
+
+    def _compute_category_from_feature_info(
+        self,
+        layer1_df: pd.DataFrame,
+        raw_data: pd.DataFrame,
+        feature_info: Dict[str, FeatureInfo],
+        category: str,
+    ) -> pd.DataFrame:
+        normalized = category.strip().lower()
+
+        if normalized == "distance":
+            distance_cfg = self._get_section("distance")
+            if distance_cfg.get("enabled", False):
+                return self._apply_distance(layer1_df, raw_data, feature_info, distance_cfg)
+            return pd.DataFrame(index=layer1_df.index)
+
+        if normalized == "cross":
+            cross_cfg = self._get_section("cross")
+            if cross_cfg.get("enabled", False):
+                return self._apply_pair_operator(layer1_df, feature_info, "Cross")
+            return pd.DataFrame(index=layer1_df.index)
+
+        if normalized == "ratio":
+            ratio_cfg = self._get_section("ratio")
+            if ratio_cfg.get("enabled", False):
+                return self._apply_pair_operator(layer1_df, feature_info, "Ratio")
+            return pd.DataFrame(index=layer1_df.index)
+
+        if normalized == "momentum":
+            momentum_cfg = self._get_section("momentum")
+            if not momentum_cfg:
+                momentum_cfg = self._get_section("momentum_change")
+            if momentum_cfg.get("enabled", False):
+                return self._apply_momentum(layer1_df, feature_info, momentum_cfg)
+            return pd.DataFrame(index=layer1_df.index)
+
+        if normalized in {"binarysignal", "binary_signal"}:
+            binary_cfg = self._get_section("binary_signal")
+            if binary_cfg.get("enabled", False):
+                return self._apply_binary_signal(layer1_df, feature_info, binary_cfg)
+            return pd.DataFrame(index=layer1_df.index)
+
+        if normalized in {"signedstrength", "signed_strength"}:
+            signed_cfg = self._get_section("signed_strength")
+            if signed_cfg.get("enabled", False):
+                return self._apply_signed_strength(layer1_df, feature_info, signed_cfg)
+            return pd.DataFrame(index=layer1_df.index)
+
+        if normalized == "worldquant":
+            worldquant_cfg = self._get_section("worldquant")
+            if worldquant_cfg.get("enabled", False):
+                return self._apply_worldquant(layer1_df, raw_data, feature_info, worldquant_cfg)
+            return pd.DataFrame(index=layer1_df.index)
+
+        logger.warning("Unknown derived operator category '%s', skipped", category)
+        return pd.DataFrame(index=layer1_df.index)
 
     def compute_distance(self, price: pd.Series, indicator: pd.Series, name_prefix: str) -> pd.Series:
         """(Price - Indicator) / Indicator"""
@@ -388,7 +452,8 @@ class DerivedOperatorEngine:
                 frames.append(decay_df)
 
             if has_corr and corr_with is not None:
-                corr_ref = raw_data[corr_with].reindex(selected.index)
+                corr_ref_source = self._deduplicate_index(raw_data[corr_with], f"raw:{corr_with}")
+                corr_ref = corr_ref_source.reindex(selected.index)
                 corr_df = rolling.corr(corr_ref)
                 corr_df.columns = [f"{col}_TsCorr_{corr_with}_W{window}" for col in selected_cols]
                 frames.append(corr_df)

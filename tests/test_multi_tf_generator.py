@@ -102,6 +102,34 @@ def test_multi_tf_generator_aligns_and_tags():
     assert "close_trend_EMA_21" not in df.columns
 
 
+def test_multi_tf_generator_skips_primary_self_alignment(monkeypatch):
+    """測試 primary timeframe 會跳過 self-alignment 呼叫。"""
+    primary_ts = [0, 12 * 3600 * 1000, 24 * 3600 * 1000]
+    primary_data = pd.DataFrame({"timestamp": primary_ts, "value": [10, 11, 12]})
+
+    hourly_ts = [i * 3600 * 1000 for i in range(25)]
+    hourly_data = pd.DataFrame({"timestamp": hourly_ts, "value": list(range(25))})
+
+    factory = StubFactory({"12h": primary_data, "1h": hourly_data})
+    generator = MultiTFGenerator(factory, DummyConfig())
+
+    original_align = TimeframeAligner.align_to_primary
+    called_source_tfs = []
+
+    def _spy_align(source_df, source_tf, primary_timestamps, primary_tf, alignment_mode=AlignmentMode.OPEN_MINUS):
+        called_source_tfs.append(source_tf)
+        if source_tf == primary_tf:
+            raise AssertionError("Primary TF should skip self-alignment")
+        return original_align(source_df, source_tf, primary_timestamps, primary_tf, alignment_mode)
+
+    monkeypatch.setattr(TimeframeAligner, "align_to_primary", staticmethod(_spy_align))
+
+    result = generator.generate_multi_tf("BTCUSDT")
+
+    assert result.features_df.shape[0] == 3
+    assert called_source_tfs == ["1h"]
+
+
 def test_apply_timeframe_tag_format_and_skip_prefixes():
     df = pd.DataFrame(
         {
@@ -115,7 +143,7 @@ def test_apply_timeframe_tag_format_and_skip_prefixes():
 
     assert "close_1h_RSI_14" in tagged.columns
     assert "close_1h_RSI_14_Lag_3" in tagged.columns
-    assert "meta_quality" in tagged.columns
+    assert "meta_1h_quality" in tagged.columns
     assert "label_return_5" in tagged.columns
 
 

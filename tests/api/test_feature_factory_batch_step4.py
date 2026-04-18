@@ -10,22 +10,41 @@ from typing import Dict, Optional
 import pytest
 from fastapi.testclient import TestClient
 
-from api.main import app, get_batch_service
+from api.main import app
+from api.routes.feature_factory import get_batch_service
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
 
 
-def _compute_success(symbol: str, timeframe: str, _config_override, _force_regenerate: bool) -> str:
+def _compute_success(
+    symbol: str,
+    timeframe: str,
+    _config_override,
+    _force_regenerate: bool,
+    _cache_dir: Optional[str] = None,
+) -> str:
     return f"/tmp/{symbol}_{timeframe}.h5"
 
 
-def _compute_partial(symbol: str, timeframe: str, _config_override, _force_regenerate: bool) -> str:
+def _compute_partial(
+    symbol: str,
+    timeframe: str,
+    _config_override,
+    _force_regenerate: bool,
+    _cache_dir: Optional[str] = None,
+) -> str:
     if symbol == "BAD":
         raise RuntimeError("simulated failure")
     return f"/tmp/{symbol}_{timeframe}.h5"
 
 
-def _compute_fail(symbol: str, timeframe: str, _config_override, _force_regenerate: bool) -> str:
+def _compute_fail(
+    symbol: str,
+    timeframe: str,
+    _config_override,
+    _force_regenerate: bool,
+    _cache_dir: Optional[str] = None,
+) -> str:
     raise RuntimeError(f"{symbol}-{timeframe}-failed")
 
 

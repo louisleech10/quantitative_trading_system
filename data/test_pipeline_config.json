@@ -1,6 +1,6 @@
 {
   "pipeline_name": "test_single_ema_pipeline",
-  "created_at": "2026-04-12T00:52:05.225859",
+  "created_at": "2026-04-18T01:39:15.408252",
   "strategy_config": {
     "strategy_type": "ema_three_line",
     "data_source": "close",

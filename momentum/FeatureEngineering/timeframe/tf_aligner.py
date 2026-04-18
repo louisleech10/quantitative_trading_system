@@ -52,14 +52,26 @@ class TimeframeAligner:
             elif source_seconds > primary_seconds:
                 logger.info("Aligning lower-frequency %s to %s", source_tf, primary_tf)
 
+        use_searchsorted = os.environ.get("FFACT_USE_SEARCHSORTED", "1").strip() == "1"
         if alignment_mode == AlignmentMode.OPEN_MINUS and source_tf != primary_tf:
             # OPEN_MINUS only shifts anchor for non-primary TFs to avoid same-open bar leakage.
+            offset_ns = -1
             anchor_index = primary_index - pd.Timedelta(nanoseconds=1)
         else:
+            offset_ns = 0
             anchor_index = primary_index
 
-        aligned = TimeframeAligner._merge_asof_align(source_values, source_index, anchor_index)
-        aligned.index = primary_index
+        if use_searchsorted:
+            aligned = TimeframeAligner._searchsorted_align(
+                source_values,
+                source_index,
+                primary_index,
+                offset_ns=offset_ns,
+            )
+        else:
+            aligned = TimeframeAligner._merge_asof_align(source_values, source_index, anchor_index)
+            aligned.index = primary_index
+
         return aligned
 
     @staticmethod
@@ -82,6 +94,141 @@ class TimeframeAligner:
             return False
 
         return (source_index <= primary_index).all()
+
+    @staticmethod
+    def build_asof_index_map(
+        primary_ts: np.ndarray,
+        source_ts: np.ndarray,
+        offset_ns: int = 0,
+    ) -> np.ndarray:
+        """Build index map equivalent to merge_asof(direction='backward').
+
+        Parameters
+        ----------
+        primary_ts : np.ndarray
+            Primary timeframe timestamps in milliseconds. Must be sorted ascending.
+        source_ts : np.ndarray
+            Source timeframe timestamps in milliseconds. Must be sorted ascending.
+        offset_ns : int, default 0
+            Offset in nanoseconds for OPEN_MINUS alignment.
+
+        Returns
+        -------
+        np.ndarray
+            Mapping index array where -1 indicates no valid source row.
+
+        Raises
+        ------
+        ValueError
+            If ``source_ts`` is not sorted in ascending order.
+        """
+        primary_ms = np.asarray(primary_ts, dtype=np.int64)
+        source_ms = np.asarray(source_ts, dtype=np.int64)
+
+        if source_ms.size > 1 and np.any(source_ms[1:] < source_ms[:-1]):
+            raise ValueError("source_ts must be sorted in ascending order")
+
+        if primary_ms.size == 0:
+            return np.empty(0, dtype=np.int64)
+
+        if source_ms.size == 0:
+            return np.full(primary_ms.shape[0], -1, dtype=np.int64)
+
+        primary_ns = primary_ms * 1_000_000 + np.int64(offset_ns)
+        source_ns = source_ms * 1_000_000
+
+        idx = np.searchsorted(source_ns, primary_ns, side="right") - 1
+        idx = idx.astype(np.int64, copy=False)
+        idx[idx < 0] = -1
+
+        valid_positions = np.flatnonzero(idx >= 0)
+        if valid_positions.size > 0:
+            mismatch_mask = source_ns[idx[valid_positions]] > primary_ns[valid_positions]
+            if np.any(mismatch_mask):
+                idx[valid_positions[mismatch_mask]] = -1
+
+        return idx
+
+    @staticmethod
+    def _searchsorted_align(
+        source_values: pd.DataFrame,
+        source_index: pd.DatetimeIndex,
+        primary_index: pd.DatetimeIndex,
+        offset_ns: int = 0,
+    ) -> pd.DataFrame:
+        """Align via searchsorted index map with memmap fallback for wide outputs."""
+        n_rows = len(primary_index)
+        n_cols = source_values.shape[1]
+
+        if n_rows == 0 or n_cols == 0:
+            aligned = pd.DataFrame(index=primary_index, columns=source_values.columns, dtype=np.float32)
+            aligned.attrs["source_timestamps"] = pd.DatetimeIndex(
+                np.full(n_rows, np.datetime64("NaT"), dtype="datetime64[ns]")
+            )
+            return aligned
+
+        source_ms = (source_index.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000).astype(np.int64)
+        primary_ms = (primary_index.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000).astype(np.int64)
+
+        idx_map = TimeframeAligner.build_asof_index_map(
+            primary_ms,
+            source_ms,
+            offset_ns=offset_ns,
+        )
+
+        est_bytes = n_rows * n_cols * np.dtype(np.float32).itemsize
+        if est_bytes >= MEMMAP_THRESHOLD_BYTES:
+            out = create_temp_memmap((n_rows, n_cols), prefix="ss_align_")
+        else:
+            out = np.empty((n_rows, n_cols), dtype=np.float32)
+
+        # Pre-convert source DataFrame to float32 numpy array ONCE.
+        # Using iloc in a loop on a wide DF (217K cols) is extremely slow
+        # because each iloc call rebuilds a DF object.
+        # For 12h TF: 1677 × 217K × 4B = ~1.38 GB — fits in 8GB M1.
+        src_np = source_values.to_numpy(dtype=np.float32, na_value=np.nan, copy=False)
+        if not src_np.flags["C_CONTIGUOUS"]:
+            src_np = np.ascontiguousarray(src_np, dtype=np.float32)
+
+        # Row-block copy: C-order memmap writes are fast when writing full
+        # rows (sequential I/O).  Column-block or out.fill(np.nan) causes
+        # ~35 GB random I/O on a 17 GB output and triggers page thrashing
+        # on 8 GB M1.  Row blocks keep peak temp at ~block_rows × n_cols × 4.
+        valid_mask = idx_map >= 0
+        row_block = 1024
+        for row_start in range(0, n_rows, row_block):
+            row_end = min(row_start + row_block, n_rows)
+            local_idx = idx_map[row_start:row_end]
+            local_valid = local_idx >= 0
+
+            if not np.any(local_valid):
+                # Entire block is NaN — write a contiguous NaN slab.
+                out[row_start:row_end, :] = np.nan
+                continue
+
+            if np.all(local_valid):
+                # All rows valid — most common case for 12h→1h.
+                # Get unique source rows to minimise reads from src_np.
+                unique_src, inverse = np.unique(local_idx, return_inverse=True)
+                out[row_start:row_end, :] = src_np[unique_src][inverse]
+            else:
+                # Mixed block: some valid, some NaN.
+                block = np.full((row_end - row_start, n_cols), np.nan, dtype=np.float32)
+                valid_in_block = np.where(local_valid)[0]
+                src_indices = local_idx[valid_in_block]
+                unique_src, inverse = np.unique(src_indices, return_inverse=True)
+                block[valid_in_block] = src_np[unique_src][inverse]
+                out[row_start:row_end, :] = block
+                del block
+
+        del src_np
+
+        aligned = pd.DataFrame(out, index=primary_index, columns=source_values.columns, copy=False)
+        source_ts_mapped = np.full(n_rows, np.datetime64("NaT"), dtype="datetime64[ns]")
+        if np.any(valid_mask):
+            source_ts_mapped[valid_mask] = source_index.to_numpy()[idx_map[valid_mask]]
+        aligned.attrs["source_timestamps"] = pd.DatetimeIndex(source_ts_mapped)
+        return aligned
 
     @staticmethod
     def _merge_asof_align(

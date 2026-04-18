@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import re
 import os
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, TYPE_CHECKING, Tuple, Any
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
 
+import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
@@ -37,10 +41,14 @@ from momentum.FeatureEngineering.atomic.custom_indicators import CustomIndicator
 from momentum.FeatureEngineering.atomic.microstructure_indicators import MicrostructureIndicatorEngine
 from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicatorEngine
 from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
+from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
+from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
 
 logger = get_logger(__name__)
+
+MAX_L2_ESTIMATED_COLS = 100_000
 
 if TYPE_CHECKING:
     from momentum.FeatureEngineering.feature_config import FactoryConfig
@@ -87,6 +95,7 @@ class FeatureFactory:
         self._current_timeframe: Optional[str] = None
         self._current_raw_data: Optional[pd.DataFrame] = None
         self._reference_data_cache: Dict[Tuple[str, str], pd.DataFrame] = {}
+        self._cgsa_registry: Optional[ColumnGroupRegistry] = None
 
     def generate_features(
         self,
@@ -108,6 +117,7 @@ class FeatureFactory:
         self._progress_callback = progress_callback
         self._current_symbol = symbol
         self._current_timeframe = timeframe
+        self._cgsa_registry = None
         start_time = time.time()
 
         config_hash = self._compute_config_hash(
@@ -121,6 +131,8 @@ class FeatureFactory:
             cached = self._try_load_cache(symbol, timeframe, config_hash)
             if cached:
                 return cached
+
+        self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe)
 
         training_tfs = list(dict.fromkeys(config.timeframes.training))
         if len(training_tfs) > 1:
@@ -160,6 +172,15 @@ class FeatureFactory:
         compute_warnings = self._collect_layer1_warnings(raw_data, config)
         layer1 = self._safe_execute("Layer 1", self._layer1_atomic_indicators, raw_data, config)
         layer2 = self._safe_execute("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+
+        # Spill layer2 to disk-backed memmap BEFORE L3.
+        # L3 only uses layer1, but layer2 stays alive (needed for L4/L5/L6).
+        # On 8 GB M1: float64 layer2 (46K cols × 20K rows = 7.5 GB) + L3
+        # memmap (12.9 GB on disk) causes OOM.  Converting layer2 to a
+        # float32 memmap releases the 7.5 GB and uses ~0 RSS (only paged in
+        # when accessed later by L4/L5/L6).
+        layer2 = self._spill_to_memmap(layer2, "layer2")
+
         layer3 = self._safe_execute("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
         layer4 = self._safe_execute("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
         layer5 = self._safe_execute("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
@@ -182,6 +203,54 @@ class FeatureFactory:
             config_hash,
             compute_warnings=compute_warnings,
             persist=persist,
+        )
+        return result
+
+    @staticmethod
+    def _spill_to_memmap(df: pd.DataFrame, label: str) -> pd.DataFrame:
+        """Convert a large DataFrame to a float32 memmap-backed DataFrame.
+
+        Releases the original float64 data and replaces it with a
+        memory-mapped array on disk.  Pages are only loaded when accessed,
+        so RSS drops to ~0 for inactive layers.
+        """
+        if df is None or df.empty:
+            return df
+
+        est_bytes = df.shape[0] * df.shape[1] * 8  # float64 estimate
+        # Only spill if the DataFrame is large enough to warrant it (>500 MB).
+        if est_bytes < 500_000_000:
+            return df
+
+        import gc
+        from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+
+        t0 = time.perf_counter()
+        n_rows, n_cols = df.shape
+        out = create_temp_memmap((n_rows, n_cols), prefix=f"spill_{label}_")
+
+        # Row-block copy to avoid materialising full float32 array in memory.
+        block_rows = 2048
+        for row_start in range(0, n_rows, block_rows):
+            row_end = min(row_start + block_rows, n_rows)
+            out[row_start:row_end, :] = df.iloc[row_start:row_end].to_numpy(
+                dtype=np.float32, na_value=np.nan
+            )
+
+        index = df.index
+        columns = df.columns.tolist()
+        del df
+        gc.collect()
+
+        result = pd.DataFrame(data=out, index=index, columns=columns, copy=False)
+        elapsed = time.perf_counter() - t0
+        logger.info(
+            "[spill] %s: %d×%d → float32 memmap in %.1fs (freed ~%.1f GB float64)",
+            label,
+            n_rows,
+            n_cols,
+            elapsed,
+            est_bytes / 1e9,
         )
         return result
 
@@ -340,11 +409,16 @@ class FeatureFactory:
                     ordered_results[idx] = frame
 
             for idx in range(len(tasks)):
-                frames.append(ordered_results.get(idx, pd.DataFrame(index=data.index)))
+                task_name, _, _ = tasks[idx]
+                frame = ordered_results.get(idx, pd.DataFrame(index=data.index))
+                frames.append(frame)
+                self._persist_layer1_indicator_groups(frame, category_hint=task_name)
         else:
             for task_name, required, builder in tasks:
                 try:
-                    frames.append(builder())
+                    frame = builder()
+                    frames.append(frame)
+                    self._persist_layer1_indicator_groups(frame, category_hint=task_name)
                 except Exception as exc:
                     if required:
                         raise
@@ -371,6 +445,169 @@ class FeatureFactory:
         except ValueError:
             workers = 4
         return max(1, workers)
+
+    @staticmethod
+    def _cgsa_enabled() -> bool:
+        raw = os.getenv("FFACT_USE_CGSA", "1").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
+
+    def _prepare_cgsa_registry(
+        self,
+        symbol: str,
+        timeframe: str,
+    ) -> Optional[ColumnGroupRegistry]:
+        if not self._cgsa_enabled():
+            return None
+
+        configured_work_dir = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
+        if configured_work_dir:
+            work_dir = Path(configured_work_dir)
+        else:
+            safe_symbol = re.sub(r"[^A-Za-z0-9_.-]+", "_", symbol)
+            safe_timeframe = re.sub(r"[^A-Za-z0-9_.-]+", "_", timeframe)
+            work_dir = Path(tempfile.mkdtemp(prefix=f"ffact_cgsa_{safe_symbol}_{safe_timeframe}_"))
+
+        logger.info("[CGSA] Initialized ColumnGroupRegistry at %s", work_dir)
+        return ColumnGroupRegistry(work_dir=work_dir)
+
+    @staticmethod
+    def _is_numeric_token(token: str) -> bool:
+        return re.fullmatch(r"-?\d+(?:\.\d+)?", token) is not None
+
+    @classmethod
+    def _parse_l1_column_identity(
+        cls,
+        column_name: str,
+        category_hint: str,
+    ) -> tuple[str, str, str]:
+        parts = column_name.split("_")
+        if len(parts) < 3:
+            return "unknown", category_hint, column_name
+
+        source = parts[0]
+        category = parts[1] if parts[1] else category_hint
+        indicator_tokens: List[str] = []
+        for token in parts[2:]:
+            if cls._is_numeric_token(token):
+                break
+            indicator_tokens.append(token)
+
+        indicator = "_".join(indicator_tokens) if indicator_tokens else parts[2]
+        return source, category, indicator
+
+    def _next_available_group_id(self, base_group_id: str) -> str:
+        if self._cgsa_registry is None:
+            return base_group_id
+
+        candidate = base_group_id
+        suffix = 2
+        while True:
+            try:
+                self._cgsa_registry.get(candidate)
+            except KeyError:
+                return candidate
+            candidate = f"{base_group_id}_{suffix}"
+            suffix += 1
+
+    def _persist_layer1_indicator_groups(self, frame: pd.DataFrame, category_hint: str) -> None:
+        if self._cgsa_registry is None or frame is None or frame.empty:
+            return
+        if not self._current_timeframe:
+            return
+
+        grouped_columns: Dict[tuple[str, str], List[str]] = {}
+        grouped_sources: Dict[tuple[str, str], set[str]] = {}
+        for column_name in frame.columns:
+            source, category, indicator = self._parse_l1_column_identity(column_name, category_hint)
+            key = (category, indicator)
+            grouped_columns.setdefault(key, []).append(column_name)
+            grouped_sources.setdefault(key, set()).add(source)
+
+        for (category, indicator), columns in grouped_columns.items():
+            if not columns:
+                continue
+
+            base_group_id = f"{self._current_timeframe}_L1_{category}_{indicator}"
+            group_id = self._next_available_group_id(base_group_id)
+            sources = grouped_sources.get((category, indicator), set())
+            data_source = next(iter(sources)) if len(sources) == 1 else "mixed"
+            data = frame.loc[:, columns].to_numpy(dtype=np.float32, copy=False)
+            group = ColumnGroup(
+                group_id=group_id,
+                layer=LayerSource.L1,
+                timeframe=self._current_timeframe,
+                data_source=data_source,
+                indicator=indicator,
+                columns=tuple(columns),
+                shape=(frame.shape[0], len(columns)),
+                dtype="float32",
+            )
+            self._cgsa_registry.save_data(group, data)
+
+    def _persist_layer2_category_group(self, category: str, frame: pd.DataFrame) -> None:
+        if self._cgsa_registry is None or frame is None or frame.empty:
+            return
+        if not self._current_timeframe:
+            return
+
+        base_group_id = f"{self._current_timeframe}_L2_{category}"
+        group_id = self._next_available_group_id(base_group_id)
+        data = frame.to_numpy(dtype=np.float32, copy=False)
+        group = ColumnGroup(
+            group_id=group_id,
+            layer=LayerSource.L2,
+            timeframe=self._current_timeframe,
+            data_source="derived",
+            indicator=category,
+            columns=tuple(frame.columns),
+            shape=(frame.shape[0], frame.shape[1]),
+            dtype="float32",
+        )
+        self._cgsa_registry.save_data(group, data)
+
+    @staticmethod
+    def _estimate_l2_output_cols(l1_col_count: int, operators_config: Dict[str, Any]) -> int:
+        if l1_col_count <= 0:
+            return 0
+
+        estimated = 0
+        pair_count = max(0, (l1_col_count * (l1_col_count - 1)) // 2)
+
+        distance_cfg = operators_config.get("distance", {})
+        if distance_cfg.get("enabled", False):
+            estimated += l1_col_count
+
+        cross_cfg = operators_config.get("cross", {})
+        if cross_cfg.get("enabled", False):
+            estimated += pair_count
+
+        ratio_cfg = operators_config.get("ratio", {})
+        if ratio_cfg.get("enabled", False):
+            estimated += pair_count
+
+        momentum_cfg = operators_config.get("momentum", {}) or operators_config.get("momentum_change", {})
+        if momentum_cfg.get("enabled", False):
+            lags = momentum_cfg.get("lags", [3, 5, 8])
+            estimated += l1_col_count * max(1, len(lags))
+
+        binary_cfg = operators_config.get("binary_signal", {})
+        if binary_cfg.get("enabled", False):
+            rules = binary_cfg.get("rules", [])
+            estimated += l1_col_count * max(1, len(rules))
+
+        signed_cfg = operators_config.get("signed_strength", {})
+        if signed_cfg.get("enabled", False):
+            estimated += l1_col_count
+
+        worldquant_cfg = operators_config.get("worldquant", {})
+        if worldquant_cfg.get("enabled", False):
+            windows = worldquant_cfg.get("windows", [5, 13, 21])
+            operators = worldquant_cfg.get("operators", ["ts_argmax", "ts_argmin", "ts_rank", "decay_linear"])
+            transforms = worldquant_cfg.get("transforms", ["sign", "log1p", "abs", "clip"])
+            total_ops = max(1, len(windows) * len(operators) + len(transforms))
+            estimated += l1_col_count * total_ops
+
+        return int(estimated)
 
     # ── Strategy A: Centralized filter helpers ─────────────────────────
 
@@ -461,15 +698,45 @@ class FeatureFactory:
     def _layer2_derived_features(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
     ) -> pd.DataFrame:
-        if layer1.empty:
-            return pd.DataFrame(index=layer1.index)
-        if not getattr(config.operators, 'enabled', True):
-            return pd.DataFrame(index=layer1.index)
+        t0 = time.perf_counter()
+        logger.info("[L2] Starting derived features: %d L1 cols", layer1.shape[1])
 
-        filtered_ops = self._filter_operators_config(config.operators)
-        engine = DerivedOperatorEngine(filtered_ops)
-        indicator_specs = self._build_indicator_specs(layer1, config)
-        return engine.compute_all(layer1, data, indicator_specs)
+        if layer1.empty:
+            result = pd.DataFrame(index=layer1.index)
+        elif not getattr(config.operators, 'enabled', True):
+            result = pd.DataFrame(index=layer1.index)
+        else:
+            filtered_ops = self._filter_operators_config(config.operators)
+            engine = DerivedOperatorEngine(filtered_ops)
+            indicator_specs = self._build_indicator_specs(layer1, config)
+
+            if self._cgsa_registry is None:
+                result = engine.compute_all(layer1, data, indicator_specs)
+            else:
+                estimated_cols = self._estimate_l2_output_cols(layer1.shape[1], filtered_ops)
+                if estimated_cols > MAX_L2_ESTIMATED_COLS:
+                    logger.warning(
+                        "[L2] Estimated output %d cols exceeds threshold %d, forcing per-category mode",
+                        estimated_cols,
+                        MAX_L2_ESTIMATED_COLS,
+                    )
+
+                category_frames: List[pd.DataFrame] = []
+                for category in DerivedOperatorEngine.OPERATOR_CATEGORIES:
+                    category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+                    if category_frame is None or category_frame.empty:
+                        continue
+                    self._persist_layer2_category_group(category, category_frame)
+                    category_frames.append(category_frame)
+
+                if category_frames:
+                    result = pd.concat(category_frames, axis=1)
+                else:
+                    result = pd.DataFrame(index=layer1.index)
+
+        elapsed = time.perf_counter() - t0
+        logger.info("[L2] Completed: %d cols in %.2fs", result.shape[1], elapsed)
+        return result
 
     def _layer3_rolling_aggregation(
         self, layer1: pd.DataFrame, layer2: pd.DataFrame, config: "FactoryConfig"
@@ -500,6 +767,13 @@ class FeatureFactory:
         # Instead, pass only [data, layer1] — the layers that LagProcessor
         # actually uses — avoiding the 2-minute memmap copy entirely.
         apply_to = getattr(config.lag_features, "apply_to", "all")
+        if self._cgsa_enabled() and apply_to != "layer1_and_raw":
+            logger.warning(
+                "[L4] CGSA mode requires lag_features.apply_to='layer1_and_raw'; forcing fast path from '%s'",
+                apply_to,
+            )
+            apply_to = "layer1_and_raw"
+
         if apply_to == "layer1_and_raw":
             # Fast path: only the columns that will be selected
             base = self._combine_layers([data, layer1], context="layer4_input")
@@ -685,7 +959,204 @@ class FeatureFactory:
     def _layer6_5_preprocessing(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
         """Layer 6.5: Feature preprocessing and normalization."""
         preprocessor = FeaturePreprocessor(config.preprocessing.model_dump())
+
+        if self._cgsa_enabled() and self._cgsa_registry is not None:
+            preprocessor.transform_registry_groups(self._cgsa_registry)
+            return pd.DataFrame(index=all_features.index if all_features is not None else None)
+
         return preprocessor.transform(all_features)
+
+    @staticmethod
+    def _collect_cgsa_layer_counts(registry: ColumnGroupRegistry) -> Dict[str, int]:
+        """Aggregate per-layer column counts directly from registry groups."""
+        layer_mapping = {
+            LayerSource.L1: "layer1",
+            LayerSource.L2: "layer2",
+            LayerSource.L3: "layer3",
+            LayerSource.L4: "layer4",
+            LayerSource.L5: "layer5",
+            LayerSource.L6: "layer6",
+            LayerSource.L65: "layer6_5",
+        }
+
+        counts: Dict[str, int] = {
+            "layer1": 0,
+            "layer2": 0,
+            "layer3": 0,
+            "layer4": 0,
+            "layer5": 0,
+            "layer6": 0,
+            "layer6_5": 0,
+        }
+
+        for _, group in registry.iter_all():
+            target_key = layer_mapping.get(group.layer)
+            if target_key is None:
+                continue
+            counts[target_key] += int(group.n_cols)
+
+        return counts
+
+    def _scan_cgsa_registry_validation(self, registry: ColumnGroupRegistry) -> Dict[str, Any]:
+        """Validate registry groups via per-group scan without materializing wide DataFrame."""
+        has_nan = False
+        has_inf = False
+        warnings: List[str] = []
+        total_values = 0
+        non_nan_values = 0
+
+        for group_id, group in registry.iter_all():
+            group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
+            if group_data.ndim != 2:
+                warnings.append(f"Group {group_id} has invalid ndim={group_data.ndim}; expected 2D")
+                logger.warning("[L7][CGSA] Invalid group shape for %s: ndim=%d", group_id, group_data.ndim)
+                continue
+
+            if group_data.shape[1] != group.n_cols:
+                warnings.append(
+                    f"Group {group_id} columns mismatch: expected {group.n_cols}, got {group_data.shape[1]}"
+                )
+                logger.warning(
+                    "[L7][CGSA] Column mismatch for %s: expected=%d got=%d",
+                    group_id,
+                    group.n_cols,
+                    group_data.shape[1],
+                )
+
+            value_count = int(group_data.size)
+            if value_count == 0:
+                continue
+
+            inf_count = int(np.isinf(group_data).sum())
+            nan_count = int(np.isnan(group_data).sum())
+            nan_ratio = nan_count / value_count
+
+            if inf_count > 0:
+                has_inf = True
+                message = f"Group {group_id} contains {inf_count} inf values"
+                warnings.append(message)
+                logger.warning("[L7][CGSA] %s", message)
+
+            if nan_count > 0:
+                has_nan = True
+
+            if nan_ratio > 0.90:
+                message = f"Group {group_id} NaN ratio={nan_ratio:.4f} exceeds 0.90"
+                warnings.append(message)
+                logger.warning("[L7][CGSA] %s", message)
+
+            total_values += value_count
+            non_nan_values += value_count - nan_count
+
+        coverage = float(non_nan_values / total_values) if total_values > 0 else 0.0
+        return {
+            "has_nan": has_nan,
+            "has_inf": has_inf,
+            "coverage": coverage,
+            "warnings": warnings,
+        }
+
+    def _layer7_validate_and_persist_cgsa(
+        self,
+        symbol: str,
+        timeframe: str,
+        raw_data: pd.DataFrame,
+        config: "FactoryConfig",
+        elapsed: float,
+        config_hash: str,
+        compute_warnings: Optional[List[str]] = None,
+        persist: bool = True,
+    ) -> FeatureGenerationResult:
+        """CGSA Layer 7 path: per-group scan validation + per-group parquet persistence."""
+        if self._cgsa_registry is None:
+            raise ValueError("CGSA Layer 7 requested without initialized registry")
+
+        labels_df = pd.DataFrame(index=raw_data.index)
+        if "close" in raw_data.columns:
+            label_generator = LabelGenerator(config.labels.model_dump())
+            labels_df = label_generator.generate_all(raw_data["close"])
+
+        validation_summary = self._scan_cgsa_registry_validation(self._cgsa_registry)
+        layer_counts = self._collect_cgsa_layer_counts(self._cgsa_registry)
+        feature_names = self._cgsa_registry.all_column_names()
+        feature_count = int(self._cgsa_registry.total_columns())
+
+        config_payload = config.model_dump(by_alias=True)
+        training_tfs = config_payload.get("timeframes", {}).get("training", [])
+        if not isinstance(training_tfs, list):
+            training_tfs = [timeframe]
+
+        persisted_group_paths: List[str] = []
+        if persist:
+            persisted_group_paths = self._storage.persist_registry_to_parquet(
+                symbol=symbol,
+                config_hash=config_hash,
+                registry=self._cgsa_registry,
+                cleanup_intermediate=False,
+            )
+
+        self._cgsa_registry.save_state(
+            symbol=symbol,
+            primary_tf=timeframe,
+            training_tfs=training_tfs,
+            config_hash=config_hash,
+            config_snapshot=config_payload,
+        )
+
+        manifest_path = str(self._cgsa_registry.manifest_path)
+        merged_warnings = (compute_warnings or []) + list(validation_summary["warnings"])
+
+        metadata = {
+            "feature_names": feature_names,
+            "feature_count": feature_count,
+            "layer_counts": layer_counts,
+            "config_hash": config_hash,
+            "generation_time": float(elapsed),
+            "compute_warnings": merged_warnings,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "data_range": self._data_range(raw_data),
+            "config_used": config_payload,
+            "manifest_path": manifest_path,
+            "persisted_group_paths": persisted_group_paths,
+            "validation": {
+                "has_nan": bool(validation_summary["has_nan"]),
+                "has_inf": bool(validation_summary["has_inf"]),
+                "max_correlation": 0.0,
+                "high_correlation_pairs": [],
+                "warnings": list(validation_summary["warnings"]),
+                "coverage": float(validation_summary["coverage"]),
+                "constant_features_removed": [],
+            },
+        }
+
+        result = FeatureGenerationResult(
+            features_df=pd.DataFrame(index=raw_data.index),
+            labels_df=labels_df,
+            metadata=metadata,
+            feature_count=feature_count,
+            generation_time=float(elapsed),
+            layer_counts=layer_counts,
+            config_used=config_payload,
+            compute_warnings=merged_warnings,
+            hdf5_path=manifest_path if persist else "",
+        )
+
+        try:
+            self._registry.add(
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "feature_count": result.feature_count,
+                    "row_count": len(raw_data.index),
+                    "hdf5_relative_path": result.hdf5_path,
+                }
+            )
+        except Exception as exc:
+            logger.warning("Failed to update feature registry: %s", exc)
+
+        return result
 
     def _layer7_validate_and_persist(
         self,
@@ -699,6 +1170,18 @@ class FeatureFactory:
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
     ) -> FeatureGenerationResult:
+        if self._cgsa_enabled() and self._cgsa_registry is not None:
+            return self._layer7_validate_and_persist_cgsa(
+                symbol=symbol,
+                timeframe=timeframe,
+                raw_data=raw_data,
+                config=config,
+                elapsed=elapsed,
+                config_hash=config_hash,
+                compute_warnings=compute_warnings,
+                persist=persist,
+            )
+
         features_df = self._combine_layers(layers, context="layer7_final")
         features_df = features_df.reindex(raw_data.index)
         if not features_df.empty:
@@ -868,6 +1351,15 @@ class FeatureFactory:
 
     @staticmethod
     def _combine_layers(layers: List[pd.DataFrame], context: str = "unknown") -> pd.DataFrame:
+        # In CGSA mode, skip the heavyweight multi-layer merge used for L7 and
+        # multi-TF final merge.  Internal single-layer concats (layer3_input,
+        # layer4_input, layer5_input) still need to materialize a DF because
+        # the computation engines expect a pandas DataFrame as input.
+        _cgsa_skip_contexts = {"layer6_5_input", "layer7_final", "multi_tf_merged"}
+        if FeatureFactory._cgsa_enabled() and context in _cgsa_skip_contexts:
+            logger.info("[CGSA] Skip _combine_layers in context=%s (registry-based path)", context)
+            return pd.DataFrame()
+
         valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
         if not valid_layers:
             return pd.DataFrame()

@@ -15,11 +15,18 @@ client = TestClient(app)
 def test_export_csv_stream_success(monkeypatch):
     """CSV 串流端點：成功回傳 + headers。"""
 
-    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header):
+    def fake_export_csv_stream(
+        task_id,
+        columns,
+        max_rows,
+        include_metadata_header,
+        include_datasource=False,
+    ):
         assert task_id == "task-123"
         assert columns == ["a", "b"]
         assert max_rows == 10
         assert include_metadata_header is True
+        assert include_datasource is False
 
         def generator():
             yield "# task_id: task-123\n"

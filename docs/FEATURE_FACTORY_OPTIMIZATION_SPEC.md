@@ -319,6 +319,8 @@ symbols = config.get_symbols()
 □ .npy / .parquet 不在 git track 中
 □ 效能程式碼已向量化（§0.8）
 □ Fallback env var 可切回舊行為（§0.12）
+□ ruff check momentum/ → 0 error
+□ smoke test：pytest tests/ -m "not slow" -x -q → 0 error
 ```
 
 ---

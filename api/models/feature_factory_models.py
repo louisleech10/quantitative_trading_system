@@ -94,6 +94,31 @@ class BatchGenerateRequest(BaseModel):
     force_regenerate: bool = False
     max_workers: int = Field(default=4, ge=1, le=8)
 
+    @field_validator("symbols")
+    @classmethod
+    def deduplicate_symbols(cls, value: List[str]) -> List[str]:
+        """自動去重且保留順序。"""
+        return list(dict.fromkeys(value))
+
+    @field_validator("symbols")
+    @classmethod
+    def validate_symbol_format(cls, value: List[str]) -> List[str]:
+        """驗證標的名稱格式（英數與底線）。"""
+        for symbol in value:
+            if not re.match(r"^[A-Za-z0-9_]+$", symbol):
+                raise ValueError(f"無效標的名稱: {symbol}")
+        return value
+
+    @field_validator("timeframe")
+    @classmethod
+    def validate_timeframe(cls, value: str) -> str:
+        """驗證主時間週期。"""
+        if value not in SUPPORTED_TIMEFRAMES:
+            raise ValueError(
+                f"Unsupported timeframe: {value}, available: {SUPPORTED_TIMEFRAMES}"
+            )
+        return value
+
 
 class FeatureGenerationRequest(BaseModel):
     """Feature generation request with optional date range."""

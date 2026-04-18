@@ -177,8 +177,8 @@ class TestPreviewUpdate:
         assert "preview" in self.preview_bar and "FeaturePreview" in self.preview_bar
 
     def test_page_integrates_preview_bar(self):
-        """page.tsx 整合 FeaturePreviewBar 元件"""
-        assert "FeaturePreviewBar" in self.page
+        """page.tsx 整合預覽元件（舊版 FeaturePreviewBar / 新版 PreviewPanel）。"""
+        assert ("PreviewPanel" in self.page) or ("FeaturePreviewBar" in self.page)
 
 
 # ===========================================================
@@ -340,12 +340,12 @@ class TestPageIntegration:
         assert "LayerPanel" in self.page
 
     def test_feature_preview_bar_imported(self):
-        """FeaturePreviewBar 被匯入"""
-        assert "FeaturePreviewBar" in self.page
+        """預覽元件被匯入（舊版 FeaturePreviewBar / 新版 PreviewPanel）。"""
+        assert ("PreviewPanel" in self.page) or ("FeaturePreviewBar" in self.page)
 
     def test_config_io_buttons_imported(self):
-        """ConfigIOButtons 被匯入"""
-        assert "ConfigIOButtons" in self.page
+        """Config IO 功能被整合（可直接在 page，或透過 ConfigPanel 組合）。"""
+        assert ("ConfigIOButtons" in self.page) or ("ConfigPanel" in self.page)
 
     def test_schema_loaded(self):
         """page 有載入 schema 邏輯"""

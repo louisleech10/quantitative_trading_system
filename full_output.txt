@@ -1,0 +1,94 @@
+[2026-04-18 19:30:07,778] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-04-18 19:30:09,019 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+2026-04-18 19:30:09,084 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+[2026-04-18 19:30:09,085] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-04-18 19:30:09,085 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+[2026-04-18 19:30:09,086] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 915 entries
+2026-04-18 19:30:09,086 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 915 entries
+[2026-04-18 19:30:09,086] INFO momentum.FeatureEngineering.adapters.crypto_spot_adapter: Fetching spot data: ETHUSDT/12h
+2026-04-18 19:30:09,086 - momentum.FeatureEngineering.adapters.crypto_spot_adapter - INFO - Fetching spot data: ETHUSDT/12h
+2026-04-18 19:30:09,090 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1677 bars are continuous
+2026-04-18 19:30:09,091 - momentum.DataExtraction.kline_storage - INFO - Read 1677 klines from ETHUSDT/12h in 0.004s
+[2026-04-18 19:30:09,094] INFO momentum.FeatureEngineering.adapters.adapter_registry: Aligned data for ETHUSDT/12h: 1677 rows, 10 columns
+2026-04-18 19:30:09,094 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Aligned data for ETHUSDT/12h: 1677 rows, 10 columns
+[2026-04-18 19:30:09,097] INFO momentum.FeatureEngineering.atomic.talib_wrapper: Loaded 132 TA-Lib indicators
+2026-04-18 19:30:09,097 - momentum.FeatureEngineering.atomic.talib_wrapper - INFO - Loaded 132 TA-Lib indicators
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,299 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-04-18 19:30:09,302 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-04-18 19:30:09,304 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+[2026-04-18 19:30:09,432] INFO momentum.FeatureEngineering.memmap_utils: [memmap] created: shape=(1677, 6400), dtype=<class 'numpy.float32'>, est=0.04 GB  (file auto-unlinked)
+2026-04-18 19:30:09,432 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap] created: shape=(1677, 6400), dtype=<class 'numpy.float32'>, est=0.04 GB  (file auto-unlinked)
+[2026-04-18 19:30:09,538] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 10/100 (W3_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:09,538 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 10/100 (W3_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:09,632] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 20/100 (W5_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:09,632 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 20/100 (W5_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:09,728] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 30/100 (W8_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:09,728 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 30/100 (W8_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:09,829] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 40/100 (W13_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:09,829 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 40/100 (W13_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:09,930] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 50/100 (W21_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:09,930 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 50/100 (W21_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,031] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 60/100 (W34_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,031 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 60/100 (W34_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,131] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 70/100 (W55_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,131 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 70/100 (W55_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,232] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 80/100 (W89_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,232 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 80/100 (W89_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,336] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 90/100 (W144_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,336 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 90/100 (W144_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,437] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] step 100/100 (W233_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,437 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] step 100/100 (W233_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,437] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming] complete: 6400 total generated, 64 dead dropped, 6336 survivors
+2026-04-18 19:30:10,437 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming] complete: 6400 total generated, 64 dead dropped, 6336 survivors
+[2026-04-18 19:30:10,443] INFO momentum.FeatureEngineering.memmap_utils: [memmap] created: shape=(1677, 6400), dtype=<class 'numpy.float32'>, est=0.04 GB  (file auto-unlinked)
+2026-04-18 19:30:10,443 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap] created: shape=(1677, 6400), dtype=<class 'numpy.float32'>, est=0.04 GB  (file auto-unlinked)
+[2026-04-18 19:30:10,666] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 10/100 (W3_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,666 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 10/100 (W3_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,737] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 20/100 (W5_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,737 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 20/100 (W5_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,809] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 30/100 (W8_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,809 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 30/100 (W8_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,882] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 40/100 (W13_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,882 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 40/100 (W13_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:10,956] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 50/100 (W21_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:10,956 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 50/100 (W21_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:11,032] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 60/100 (W34_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:11,032 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 60/100 (W34_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:11,109] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 70/100 (W55_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:11,109 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 70/100 (W55_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:11,192] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 80/100 (W89_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:11,192 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 80/100 (W89_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:11,280] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 90/100 (W144_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:11,280 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 90/100 (W144_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:11,375] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] step 100/100 (W233_range): 64→64 cols (-0 dead)
+2026-04-18 19:30:11,375 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] step 100/100 (W233_range): 64→64 cols (-0 dead)
+[2026-04-18 19:30:11,375] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba] complete: 6400 total generated, 64 dead dropped, 6336 survivors
+2026-04-18 19:30:11,375 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba] complete: 6400 total generated, 64 dead dropped, 6336 survivors
+
+REPORT_START
+{"symbol": "ETHUSDT", "timeframe": "12h", "rows": 1677, "input_cols": 64, "output_cols": 6336, "same_columns": true, "max_abs_diff": 0.0625, "by_tolerance": {"1e-6": {"cols": 4480, "max_diff": 0.0625, "pass": true}, "1e-5": {"cols": 640, "max_diff": 0.0, "pass": true}, "1e-4": {"cols": 1216, "max_diff": 0.0, "pass": true}}, "all_pass": true}
+REPORT_END

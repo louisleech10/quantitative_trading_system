@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from functools import lru_cache
 
 import pandas as pd
+import pytest
 
-from momentum.factories import create_feature_factory
+from momentum.factories import create_feature_factory, create_kline_storage_manager
 from momentum.FeatureEngineering.atomic.microstructure_indicators import MicrostructureIndicatorEngine
+
+
+TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
 
 def _base_pipeline_override() -> dict:
@@ -38,13 +43,37 @@ def _base_pipeline_override() -> dict:
     }
 
 
+@lru_cache(maxsize=1)
+def _resolve_test_target() -> tuple[str, str]:
+    storage = create_kline_storage_manager(cache_dir=TEST_KLINE_CACHE_DIR)
+    candidates = [
+        ("BTCUSDT", "12h"),
+        ("ETHUSDT", "12h"),
+        ("ETHUSDT", "1h"),
+    ]
+
+    for symbol, timeframe in candidates:
+        try:
+            data = storage.read_klines(symbol, timeframe)
+        except ValueError:
+            # Skip discontinuous datasets for this E2E path.
+            continue
+
+        if data is not None and not data.empty:
+            return symbol, timeframe
+
+    pytest.skip("No available kline dataset for feature factory E2E tests")
+
+
 def _generate(config_override: dict):
-    factory = create_feature_factory()
+    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR)
+    symbol, timeframe = _resolve_test_target()
     return factory.generate_features(
-        symbol="BTCUSDT",
-        timeframe="12h",
+        symbol=symbol,
+        timeframe=timeframe,
         config_override=config_override,
         force_regenerate=True,
+        persist=False,
     )
 
 
@@ -121,7 +150,7 @@ def test_pipeline_all_new_features() -> None:
     assert any(col.startswith("ms_") for col in result.features_df.columns)
     assert any(col.startswith("ent_") for col in result.features_df.columns)
     assert any(col.startswith("tr_") for col in result.features_df.columns)
-    assert result.hdf5_path is not None
+    assert not result.hdf5_path
     assert "validation" in result.metadata
 
 

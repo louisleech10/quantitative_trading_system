@@ -8,11 +8,26 @@ import requests
 import json
 import time
 from typing import Dict, List
+import pytest
 
 API_BASE_URL = "http://localhost:8000"
 
+
+def _is_api_reachable() -> bool:
+    """Check whether local optimization API endpoint is reachable."""
+    try:
+        requests.get(API_BASE_URL, timeout=2)
+        return True
+    except requests.RequestException:
+        return False
+
+
+@pytest.mark.slow
 def test_optimization_flow():
     """測試完整優化流程"""
+
+    if not _is_api_reachable():
+        pytest.skip(f"Optimization API not reachable at {API_BASE_URL}")
 
     print("=" * 60)
     print("Optuna 優化流程測試")

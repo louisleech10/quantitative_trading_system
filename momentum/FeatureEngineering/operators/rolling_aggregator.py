@@ -7,6 +7,7 @@ import re
 
 import numpy as np
 import pandas as pd
+from scipy.stats import rankdata
 
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
@@ -31,6 +32,15 @@ class RollingAggregator:
         "range": "_compute_range",
     }
 
+    _NUMBA_FUSED_INDEX = {
+        "mean": 0,
+        "std": 1,
+        "min": 2,
+        "max": 3,
+        "range": 4,
+        "zscore": 5,
+    }
+
     def __init__(self, config: Dict | None) -> None:
         config_dict = self._normalize_config(config)
         self._enabled = config_dict.get("enabled", True)
@@ -47,7 +57,7 @@ class RollingAggregator:
         if not columns:
             return pd.DataFrame(index=features_df.index)
 
-        streaming = os.getenv("FFACT_L3_STREAMING", "0").strip() == "1"
+        streaming = os.getenv("FFACT_L3_STREAMING", "1").strip() == "1"
 
         if streaming:
             return self._compute_all_streaming(features_df, columns)
@@ -86,6 +96,17 @@ class RollingAggregator:
         valid_aggs = [agg for agg in self._enabled_aggregators if agg in self.AGGREGATORS]
         if not valid_aggs:
             return pd.DataFrame(index=features_df.index)
+
+        use_numba = os.getenv("FFACT_USE_NUMBA_ROLLING", "1").strip() == "1"
+        if use_numba:
+            try:
+                return self._compute_all_streaming_numba(features_df, columns, valid_aggs)
+            except Exception as exc:
+                logger.error(
+                    "[L3 streaming] Numba rolling path failed, fallback to pandas path: %s",
+                    exc,
+                    exc_info=True,
+                )
 
         chunk_size = self._column_chunk_size or 256
         n_rows = features_df.shape[0]
@@ -219,6 +240,160 @@ class RollingAggregator:
             columns=out_col_names,
             copy=False,
         )
+
+    def _compute_all_streaming_numba(
+        self,
+        features_df: pd.DataFrame,
+        columns: List[str],
+        valid_aggs: List[str],
+    ) -> pd.DataFrame:
+        from momentum.FeatureEngineering.operators.numba_rolling import (
+            fused_rolling_stats,
+            rolling_rank,
+        )
+
+        chunk_size = self._column_chunk_size or 256
+        n_rows = features_df.shape[0]
+        total_generated = 0
+        total_dropped = 0
+
+        max_out_cols = len(columns) * len(valid_aggs) * len(self._windows)
+        out_arr = create_temp_memmap((n_rows, max_out_cols), prefix="l3_stream_numba_")
+        out_col_names: List[str] = []
+        col_offset = 0
+
+        n_steps = len(self._windows) * len(valid_aggs)
+        step = 0
+
+        fused_aggs = [agg for agg in valid_aggs if agg in self._NUMBA_FUSED_INDEX]
+
+        for window in self._windows:
+            chunk_starts = list(range(0, len(columns), chunk_size))
+            cached_results: Dict[int, Dict[str, pd.DataFrame]] = {}
+
+            if fused_aggs:
+                for start in chunk_starts:
+                    chunk_cols = columns[start : start + chunk_size]
+                    chunk_df = features_df[chunk_cols]
+
+                    agg_arrays: Dict[str, np.ndarray] = {}
+                    for agg_name in fused_aggs:
+                        agg_arrays[agg_name] = np.empty((n_rows, len(chunk_cols)), dtype=np.float32)
+
+                    for col_idx, col_name in enumerate(chunk_cols):
+                        values = chunk_df[col_name].to_numpy(dtype=np.float64, copy=False)
+
+                        if fused_aggs:
+                            fused = fused_rolling_stats(values, int(window))
+                            for agg_name in fused_aggs:
+                                fused_idx = self._NUMBA_FUSED_INDEX[agg_name]
+                                agg_arrays[agg_name][:, col_idx] = fused[:, fused_idx]
+
+                    cache_entry: Dict[str, pd.DataFrame] = {}
+                    for agg_name, matrix in agg_arrays.items():
+                        cache_entry[agg_name] = pd.DataFrame(
+                            matrix,
+                            index=chunk_df.index,
+                            columns=chunk_cols,
+                            copy=False,
+                        )
+                    cached_results[start] = cache_entry
+
+            for agg_name in valid_aggs:
+                step += 1
+                agg_label = self._format_agg_label(agg_name)
+
+                step_frames: List[pd.DataFrame] = []
+                for start in chunk_starts:
+                    chunk_cols = columns[start : start + chunk_size]
+                    chunk_df = features_df[chunk_cols]
+
+                    if start in cached_results and agg_name in cached_results[start]:
+                        result = cached_results[start][agg_name]
+                    elif agg_name == "rank":
+                        result = self._compute_numba_rank(chunk_df, int(window), rolling_rank)
+                    elif agg_name == "slope":
+                        result = self._compute_slope_vectorized(chunk_df, int(window))
+                    elif agg_name == "skew":
+                        result = chunk_df.rolling(window).skew()
+                    elif agg_name == "kurt":
+                        result = chunk_df.rolling(window).kurt()
+                    else:
+                        continue
+
+                    chunk_result = result.add_suffix(f"_{agg_label}_W{window}")
+                    if not chunk_result.empty:
+                        step_frames.append(chunk_result)
+
+                if not step_frames:
+                    continue
+
+                step_result = pd.concat(step_frames, axis=1, copy=False) if len(step_frames) > 1 else step_frames[0]
+                del step_frames
+
+                n_before = step_result.shape[1]
+                step_result = self._variance_filter(step_result)
+                n_after = step_result.shape[1]
+                n_dropped = n_before - n_after
+                total_generated += n_before
+                total_dropped += n_dropped
+
+                if n_after > 0:
+                    out_arr[:, col_offset : col_offset + n_after] = step_result.to_numpy(dtype=np.float32)
+                    out_col_names.extend(step_result.columns.tolist())
+                    col_offset += n_after
+
+                del step_result
+
+                if step % 10 == 0 or step == n_steps:
+                    logger.info(
+                        "[L3 streaming][numba] step %d/%d (W%d_%s): %d→%d cols (-%d dead)",
+                        step,
+                        n_steps,
+                        window,
+                        agg_name,
+                        n_before,
+                        n_after,
+                        n_dropped,
+                    )
+
+            del cached_results
+
+        logger.info(
+            "[L3 streaming][numba] complete: %d total generated, %d dead dropped, %d survivors",
+            total_generated,
+            total_dropped,
+            col_offset,
+        )
+
+        if col_offset == 0:
+            del out_arr
+            return pd.DataFrame(index=features_df.index)
+
+        return pd.DataFrame(
+            data=out_arr[:, :col_offset],
+            index=features_df.index,
+            columns=out_col_names,
+            copy=False,
+        )
+
+    @staticmethod
+    def _compute_numba_rank(data: pd.DataFrame, window: int, rank_fn: callable) -> pd.DataFrame:
+        n_rows, n_cols = data.shape
+        out = np.empty((n_rows, n_cols), dtype=np.float32)
+        for col_idx, col_name in enumerate(data.columns):
+            values = data[col_name].to_numpy(dtype=np.float64, copy=False)
+            out[:, col_idx] = rank_fn(values, window)
+        return pd.DataFrame(out, index=data.index, columns=data.columns, copy=False)
+
+    @staticmethod
+    def _compute_numba_slope(data: pd.DataFrame, window: int, slope_fn: callable) -> pd.DataFrame:
+        n_rows, n_cols = data.shape
+        out = np.empty((n_rows, n_cols), dtype=np.float32)
+        for col_idx, col_name in enumerate(data.columns):
+            values = data[col_name].to_numpy(dtype=np.float64, copy=False)
+            out[:, col_idx] = slope_fn(values, window)
+        return pd.DataFrame(out, index=data.index, columns=data.columns, copy=False)
 
     def _compute_single_agg_window(
         self,

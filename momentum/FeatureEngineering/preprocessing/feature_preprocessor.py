@@ -4,12 +4,16 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+
+
+if TYPE_CHECKING:
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
 
 logger = get_logger(__name__)
@@ -72,6 +76,29 @@ class FeaturePreprocessor:
             return self._transform_chunked(features_df, chunk_size)
 
         return self._transform_single(features_df)
+
+    def transform_registry_groups(self, registry: "ColumnGroupRegistry") -> int:
+        """Apply L6.5 transforms per group from registry and overwrite each group in place."""
+        if registry is None:
+            return 0
+
+        processed_count = 0
+        for group_id, group in registry.iter_all():
+            if group.n_cols == 0:
+                continue
+
+            group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+            group_df = pd.DataFrame(group_array, columns=list(group.columns), copy=False)
+
+            # CGSA per-group path intentionally bypasses global chunking.
+            processed_df = self._transform_single(group_df)
+            processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
+
+            registry.overwrite_data(group_id, processed_array)
+            processed_count += 1
+
+        logger.info("[L6.5][CGSA] Per-group preprocessing completed: %d groups", processed_count)
+        return processed_count
 
     def _transform_single(self, features_df: pd.DataFrame) -> pd.DataFrame:
         """Original transform logic applied to a full DataFrame."""

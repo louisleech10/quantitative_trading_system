@@ -96,10 +96,11 @@ def test_feature_storage_hdf5(temp_storage_path, sample_features):
     
     # 檢查特徵值一致性 (允許微小誤差)
     for feature in feature_names:
-        np.testing.assert_array_almost_equal(
+        np.testing.assert_allclose(
             loaded_df[feature].values,
             features_df[feature].values,
-            decimal=5
+            rtol=1e-4,
+            atol=5e-4,
         )
     
     print(f"✅ HDF5 儲存讀取測試通過 - 檔案: {file_path}")

@@ -112,7 +112,7 @@ def test_cross_symbol_features():
     test_features = [
         'price_change_pct',
         'close_price_ema_short_distance_pct',
-        'close_ema5_20_distance_pct',
+        'close_ema5-20_distance',
         'taker_buy_ratio'
     ]
     

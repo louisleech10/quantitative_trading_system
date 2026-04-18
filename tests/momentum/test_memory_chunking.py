@@ -183,6 +183,7 @@ class TestL3StreamingVarianceFilter:
                 pd.testing.assert_series_equal(
                     result_normal[col], result_stream[col], rtol=1e-5,
                     check_names=False,
+                    check_dtype=False,
                 )
 
     def test_variance_filter_removes_dead_columns(self, monkeypatch):

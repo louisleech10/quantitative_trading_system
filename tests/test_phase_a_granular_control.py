@@ -402,7 +402,7 @@ class TestA7MigrateConfig:
         assert result["rolling_aggregation"]["aggregators"]["std"]["enabled"] is False
 
     def test_migrate_microstructure_enabled_features_all(self):
-        """enabled_features='all' 且無 features dict → 不遷移，保持 'all'"""
+        """enabled_features='all' 且無 features dict → 生成完整 features map。"""
         raw = {
             "atomic_indicators": {
                 "microstructure": {
@@ -413,10 +413,14 @@ class TestA7MigrateConfig:
         }
         result = ConfigManager.migrate_config(raw)
         ms = result["atomic_indicators"]["microstructure"]
-        assert "features" not in ms
+        assert ms.get("enabled_features") == "all"
+        assert "features" in ms
+        assert isinstance(ms["features"], dict)
+        assert len(ms["features"]) > 0
+        assert all(cfg.get("enabled") is True for cfg in ms["features"].values())
 
     def test_migrate_microstructure_features_already_present(self):
-        """features dict 已存在 → 不覆蓋"""
+        """microstructure enabled_features(list) 仍為權威來源，會覆蓋既有 features。"""
         raw = {
             "atomic_indicators": {
                 "microstructure": {
@@ -428,8 +432,8 @@ class TestA7MigrateConfig:
         }
         result = ConfigManager.migrate_config(raw)
         ms = result["atomic_indicators"]["microstructure"]
-        # features 已存在，不會被 enabled_features 覆蓋
-        assert ms["features"] == {"vpin": {"enabled": True}}
+        # list 型 enabled_features 是 legacy allow-list，優先於既有 features。
+        assert ms["features"] == {"amihud": {"enabled": True}}
 
 
 # ═══════════════════════════════════════════════════════════════════

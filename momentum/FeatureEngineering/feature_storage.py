@@ -12,12 +12,14 @@ import h5py
 import pandas as pd
 import numpy as np
 import json
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
-import logging
 
 from momentum.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
 logger = get_logger(__name__)
 
@@ -243,7 +245,7 @@ class FeatureStorage:
     def save_factory_output(self, symbol: str, timeframe: str, result) -> str:
         """儲存工廠輸出：features.h5 + meta.json"""
         file_path = self.base_path / f"{symbol}_{timeframe}_factory.h5"
-        meta_path = self.save_metadata_json(symbol, timeframe, result.metadata or {})
+        self.save_metadata_json(symbol, timeframe, result.metadata or {})
 
         self.logger.info(f"開始儲存工廠輸出 - {symbol}/{timeframe}")
 
@@ -324,6 +326,83 @@ class FeatureStorage:
         except Exception as e:
             self.logger.error(f"工廠輸出儲存失敗: {str(e)}", exc_info=True)
             raise
+
+    def persist_registry_to_parquet(
+        self,
+        symbol: str,
+        config_hash: str,
+        registry: "ColumnGroupRegistry",
+        cleanup_intermediate: bool = False,
+    ) -> List[str]:
+        """Persist CGSA registry groups to per-group parquet files."""
+        output_dir = self.base_path / symbol / config_hash
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        staging_dir = output_dir / f".staging_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+        staging_dir.mkdir(parents=True, exist_ok=False)
+
+        staged_pairs: List[Tuple[str, Path, Path]] = []
+        persisted_paths: List[str] = []
+        parquet_path_map: Dict[str, str] = {}
+
+        try:
+            for group_id, group in registry.iter_all():
+                group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
+                if group_data.ndim != 2:
+                    raise ValueError(f"Group {group_id} data must be 2D, got shape={group_data.shape}")
+                if group_data.shape[1] != len(group.columns):
+                    raise ValueError(
+                        f"Group {group_id} columns mismatch: expected {len(group.columns)}, got {group_data.shape[1]}"
+                    )
+
+                staged_path = staging_dir / f"{group_id}.parquet"
+                final_path = output_dir / f"{group_id}.parquet"
+                group_frame = pd.DataFrame(group_data, columns=list(group.columns), copy=False)
+                group_frame.to_parquet(staged_path, index=False, compression="gzip")
+                staged_pairs.append((group_id, staged_path, final_path))
+
+            for group_id, staged_path, final_path in staged_pairs:
+                os.replace(staged_path, final_path)
+                resolved_path = str(final_path.resolve())
+                persisted_paths.append(resolved_path)
+                parquet_path_map[group_id] = resolved_path
+
+            if parquet_path_map:
+                registry.set_group_parquet_paths(parquet_path_map)
+
+            if cleanup_intermediate:
+                removed_count = 0
+                for _, group in registry.iter_all():
+                    if group.disk_path and group.disk_path.exists():
+                        group.disk_path.unlink()
+                        removed_count += 1
+                self.logger.info(
+                    "CGSA intermediate .npy cleanup completed: %d files removed",
+                    removed_count,
+                )
+
+            self.logger.info(
+                "CGSA per-group parquet persist completed: symbol=%s config_hash=%s groups=%d",
+                symbol,
+                config_hash,
+                len(persisted_paths),
+            )
+            return persisted_paths
+        except Exception as e:
+            self.logger.error(
+                "CGSA per-group parquet persist failed: symbol=%s config_hash=%s error=%s",
+                symbol,
+                config_hash,
+                str(e),
+                exc_info=True,
+            )
+            raise
+        finally:
+            if staging_dir.exists():
+                for child in staging_dir.iterdir():
+                    if child.is_file():
+                        child.unlink()
+                staging_dir.rmdir()
 
     def _build_2d_chunks(self, shape: Tuple[int, int]) -> Optional[Tuple[int, int]]:
         if len(shape) != 2:

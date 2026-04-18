@@ -64,7 +64,7 @@ def test_feature_extraction_ema_strategy(sample_kline_data, ema_strategy_params)
         'close_ema5_value',  # 新命名格式
         'close_ema20_value',
         'close_ema60_value',
-        'close_ema5_20_distance',
+        'close_ema5-20_distance',
         'close_ema_trend_aligned',
         'close_ema_entry_signal_score'
     ]
@@ -150,8 +150,8 @@ def test_dynamic_feature_generation():
     # 特徵名稱應該不同 (因為 EMA 參數不同)
     assert 'close_ema5_value' in feature_names1
     assert 'close_ema10_value' in feature_names2
-    assert 'close_ema5_20_distance' in feature_names1
-    assert 'close_ema10_30_distance' in feature_names2
+    assert 'close_ema5-20_distance' in feature_names1
+    assert 'close_ema10-30_distance' in feature_names2
     
     # 不同數據源應該生成不同特徵名稱
     assert 'volume_ema5_value' in feature_names3

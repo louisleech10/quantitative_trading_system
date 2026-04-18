@@ -1,3 +1,7 @@
+from functools import lru_cache
+
+import pytest
+
 from momentum.factories import create_kline_storage_manager
 from momentum.FeatureEngineering.atomic.trend_indicators import TrendIndicatorEngine
 from momentum.FeatureEngineering.atomic.momentum_indicators import MomentumIndicatorEngine
@@ -6,10 +10,32 @@ from momentum.FeatureEngineering.atomic.volume_indicators import VolumeIndicator
 from momentum.FeatureEngineering.atomic.pattern_indicators import PatternIndicatorEngine
 
 
+TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
+
+
+@lru_cache(maxsize=1)
+def _resolve_test_target() -> tuple[str, str]:
+    storage = create_kline_storage_manager(cache_dir=TEST_KLINE_CACHE_DIR)
+    candidates = [
+        ("BTCUSDT", "12h"),
+        ("ETHUSDT", "1h"),
+        ("ETHUSDT", "12h"),
+    ]
+    for symbol, timeframe in candidates:
+        try:
+            df = storage.read_klines(symbol, timeframe, validate_continuity=False)
+        except Exception:
+            continue
+        if df is not None and len(df) >= 100:
+            return symbol, timeframe
+    pytest.skip("missing market data for atomic indicator tests")
+
+
 def _load_data():
-    storage = create_kline_storage_manager()
-    df = storage.read_klines("BTCUSDT", "12h")
-    assert df is not None
+    symbol, timeframe = _resolve_test_target()
+    storage = create_kline_storage_manager(cache_dir=TEST_KLINE_CACHE_DIR)
+    df = storage.read_klines(symbol, timeframe, validate_continuity=False)
+    assert df is not None and not df.empty
     return df
 
 

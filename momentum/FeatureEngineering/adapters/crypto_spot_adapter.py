@@ -29,8 +29,9 @@ class CryptoSpotAdapter(DataSourceAdapter):
 
     _SYNTHETIC_FIELDS = ["avg-price", "med-price", "typ-price", "wcl-price", "log-volume", "log-quote-volume"]
 
-    def __init__(self, storage_manager: IKlineReader) -> None:
+    def __init__(self, storage_manager: IKlineReader, validate_continuity: bool = True) -> None:
         self._storage = storage_manager
+        self._validate_continuity = validate_continuity
         self._field_meta = self._build_field_meta()
 
     @property
@@ -58,7 +59,7 @@ class CryptoSpotAdapter(DataSourceAdapter):
             timeframe=timeframe,
             start_time=start_time,
             end_time=end_time,
-            validate_continuity=True,
+            validate_continuity=self._validate_continuity,
         )
         if df is None or df.empty:
             raise ValueError(f"No data returned for {symbol}/{timeframe}")

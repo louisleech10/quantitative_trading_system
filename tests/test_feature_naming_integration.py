@@ -50,10 +50,10 @@ def test_close_data_source():
         'close_ema5_value',
         'close_ema20_value',
         'close_ema60_value',
-        'close_ema5_20_distance',
-        'close_ema20_60_distance',
+        'close_ema5-20_distance',
+        'close_ema20-60_distance',
         'close_ema_trend_aligned',
-        'close_ema5_20_cross_signal'
+        'close_ema5-20_cross_signal'
     ]
     
     for expected in expected_features:
@@ -89,8 +89,8 @@ def test_volume_data_source():
         'volume_ema6_value',
         'volume_ema15_value',
         'volume_ema28_value',
-        'volume_ema6_15_distance',
-        'volume_ema15_28_distance',
+        'volume_ema6-15_distance',
+        'volume_ema15-28_distance',
         'volume_ema_trend_aligned'
     ]
     

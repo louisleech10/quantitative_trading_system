@@ -28,10 +28,9 @@ def test_preset_standard():
     cm = ConfigManager()
     config = cm.apply_preset("standard")
     preview = cm.preview_feature_count(config)
-    # B4 改善後 preview 準確度大幅提升
-    # rolling = atomic(866) * n_agg(10) * n_windows(3) = 25,980
-    # 加上 atomic + derived + lag + meta + labels ≈ 30,000+
-    assert 20000 <= preview.total_features <= 50000
+    # 2026-04 feature space expanded (microstructure/entropy/tail-risk + registry growth).
+    # Keep this guard broad enough to detect regressions while allowing expected expansion.
+    assert 60000 <= preview.total_features <= 100000
 
 
 def test_validate_rejects_invalid():
@@ -129,8 +128,8 @@ def test_config_hash_changes_when_alignment_mode_changes():
         {"timeframes": {"primary": "12h", "training": ["12h", "1h"], "alignment_mode": "close_time"}}
     )
 
-    hash_open = factory._compute_config_hash(config_open)
-    hash_close = factory._compute_config_hash(config_close)
+    hash_open = factory._compute_config_hash(config_open, symbol="ETHUSDT", timeframe="12h")
+    hash_close = factory._compute_config_hash(config_close, symbol="ETHUSDT", timeframe="12h")
     assert hash_open != hash_close
 
 
@@ -143,8 +142,8 @@ def test_config_hash_same_for_reordered_training_timeframes():
         {"timeframes": {"primary": "12h", "training": ["1h", "12h"], "alignment_mode": "open_minus"}}
     )
 
-    hash_a = factory._compute_config_hash(config_a)
-    hash_b = factory._compute_config_hash(config_b)
+    hash_a = factory._compute_config_hash(config_a, symbol="ETHUSDT", timeframe="12h")
+    hash_b = factory._compute_config_hash(config_b, symbol="ETHUSDT", timeframe="12h")
     assert hash_a == hash_b
 
 
@@ -157,8 +156,8 @@ def test_config_hash_changes_when_training_timeframes_change():
         {"timeframes": {"primary": "12h", "training": ["12h", "4h"], "alignment_mode": "open_minus"}}
     )
 
-    hash_a = factory._compute_config_hash(config_a)
-    hash_b = factory._compute_config_hash(config_b)
+    hash_a = factory._compute_config_hash(config_a, symbol="ETHUSDT", timeframe="12h")
+    hash_b = factory._compute_config_hash(config_b, symbol="ETHUSDT", timeframe="12h")
     assert hash_a != hash_b
 
 
@@ -193,7 +192,7 @@ def test_preview_with_new_engines():
     )
     preview = cm.preview_feature_count(config)
     assert preview.breakdown.get("microstructure", 0) == 25
-    assert preview.breakdown.get("entropy", 0) == 15
+    assert preview.breakdown.get("entropy", 0) == 21
     assert preview.breakdown.get("tail_risk", 0) == 26
 
 
@@ -214,7 +213,7 @@ def test_preview_with_preprocessing_added():
     assert preview.breakdown.get("preprocessing_added", 0) > 0
 
 
-def test_preview_new_engines_add_66_features():
+def test_preview_new_engines_add_72_features():
     cm = ConfigManager()
     base = cm.get_merged_config()
     base_preview = cm.preview_feature_count(base)
@@ -230,9 +229,9 @@ def test_preview_new_engines_add_66_features():
     )
     enhanced_preview = cm.preview_feature_count(enhanced)
 
-    assert enhanced_preview.total_features - base_preview.total_features == 66
+    assert enhanced_preview.total_features - base_preview.total_features == 72
     assert enhanced_preview.breakdown["microstructure"] == 25
-    assert enhanced_preview.breakdown["entropy"] == 15
+    assert enhanced_preview.breakdown["entropy"] == 21
     assert enhanced_preview.breakdown["tail_risk"] == 26
 
 

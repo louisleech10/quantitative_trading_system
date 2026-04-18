@@ -34,11 +34,12 @@ async def async_client(app: FastAPI):
 async def test_export_csv_stream_success(async_client, monkeypatch):
     """CSV 匯出：串流成功回傳。"""
 
-    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header):
+    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header, include_datasource=False):
         assert task_id == "task-123"
         assert columns is None
         assert max_rows is None
         assert include_metadata_header is True
+        assert include_datasource is False
 
         def generator():
             yield "# task_id: task-123\n"
@@ -71,8 +72,9 @@ async def test_export_csv_stream_success(async_client, monkeypatch):
 async def test_export_csv_columns_filter(async_client, monkeypatch):
     """CSV 匯出：欄位篩選轉換正確。"""
 
-    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header):
+    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header, include_datasource=False):
         assert columns == ["a", "b", "c"]
+        assert include_datasource is False
 
         def generator():
             yield "timestamp,a,b,c\n"
@@ -99,8 +101,9 @@ async def test_export_csv_columns_filter(async_client, monkeypatch):
 async def test_export_csv_max_rows(async_client, monkeypatch):
     """CSV 匯出：行數限制參數轉發正確。"""
 
-    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header):
+    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header, include_datasource=False):
         assert max_rows == 10
+        assert include_datasource is False
 
         def generator():
             yield "timestamp,a\n"
@@ -127,8 +130,9 @@ async def test_export_csv_max_rows(async_client, monkeypatch):
 async def test_export_csv_metadata_header_flag(async_client, monkeypatch):
     """CSV 匯出：metadata header 開關參數轉發正確。"""
 
-    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header):
+    def fake_export_csv_stream(task_id, columns, max_rows, include_metadata_header, include_datasource=False):
         assert include_metadata_header is False
+        assert include_datasource is False
 
         def generator():
             yield "timestamp,a\n"
