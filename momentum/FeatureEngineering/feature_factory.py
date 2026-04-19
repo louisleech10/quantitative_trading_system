@@ -565,6 +565,53 @@ class FeatureFactory:
         )
         self._cgsa_registry.save_data(group, data)
 
+    def _persist_layer_output_groups(
+        self,
+        frame: pd.DataFrame,
+        layer: "LayerSource",
+        label: str,
+        chunk_cols: int = 5000,
+    ) -> None:
+        """Persist a layer output DataFrame into CGSA registry as chunked groups.
+
+        Used for L3, L4, L5, L6 which don't have category-level grouping.
+        Large outputs (e.g. L3 with 156K cols) are split into chunks.
+        """
+        if self._cgsa_registry is None or frame is None or frame.empty:
+            return
+        if not self._current_timeframe:
+            return
+
+        columns = list(frame.columns)
+        n_cols = len(columns)
+        chunk_idx = 0
+
+        for start in range(0, n_cols, chunk_cols):
+            chunk_cols_list = columns[start : start + chunk_cols]
+            chunk_idx += 1
+            suffix = f"_{chunk_idx}" if n_cols > chunk_cols else ""
+            base_group_id = f"{self._current_timeframe}_{label}{suffix}"
+            group_id = self._next_available_group_id(base_group_id)
+            data = frame.iloc[:, start : start + chunk_cols].to_numpy(
+                dtype=np.float32, copy=False,
+            )
+            group = ColumnGroup(
+                group_id=group_id,
+                layer=layer,
+                timeframe=self._current_timeframe,
+                data_source="derived",
+                indicator=label,
+                columns=tuple(chunk_cols_list),
+                shape=(frame.shape[0], len(chunk_cols_list)),
+                dtype="float32",
+            )
+            self._cgsa_registry.save_data(group, data)
+
+        logger.info(
+            "[CGSA] Persisted %s: %d cols → %d groups (tf=%s)",
+            label, n_cols, chunk_idx, self._current_timeframe,
+        )
+
     @staticmethod
     def _estimate_l2_output_cols(l1_col_count: int, operators_config: Dict[str, Any]) -> int:
         if l1_col_count <= 0:

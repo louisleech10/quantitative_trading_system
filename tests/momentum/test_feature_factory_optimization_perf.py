@@ -252,9 +252,14 @@ def test_full_pipeline_overhead() -> None:
 
     assert base_result.feature_count > 0
     assert new_result.feature_count > base_result.feature_count
-    assert any(col.startswith("ms_") for col in new_result.features_df.columns)
-    assert any(col.startswith("ent_") for col in new_result.features_df.columns)
-    assert any(col.startswith("tr_") for col in new_result.features_df.columns)
+    new_columns = (
+        list(new_result.features_df.columns)
+        if not new_result.features_df.empty
+        else new_result.metadata.get("feature_names", [])
+    )
+    assert any(col.startswith("ms_") for col in new_columns)
+    assert any(col.startswith("ent_") for col in new_columns)
+    assert any(col.startswith("tr_") for col in new_columns)
 
     base_time_per_feature = base_elapsed / max(base_result.feature_count, 1)
     new_time_per_feature = new_elapsed / max(new_result.feature_count, 1)

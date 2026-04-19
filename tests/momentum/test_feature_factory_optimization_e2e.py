@@ -77,12 +77,19 @@ def _generate(config_override: dict):
     )
 
 
+def _result_columns(result) -> list[str]:
+    """Get feature column names — from features_df or CGSA metadata if df is empty."""
+    if not result.features_df.empty:
+        return list(result.features_df.columns)
+    return list(result.metadata.get("feature_names", []))
+
+
 def test_pipeline_with_microstructure() -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["microstructure"]["enabled"] = True
 
     result = _generate(config)
-    ms_columns = [col for col in result.features_df.columns if col.startswith("ms_")]
+    ms_columns = [col for col in _result_columns(result) if col.startswith("ms_")]
 
     assert len(ms_columns) > 0
 
@@ -92,7 +99,7 @@ def test_pipeline_with_entropy() -> None:
     config["atomic_indicators"]["entropy"]["enabled"] = True
 
     result = _generate(config)
-    ent_columns = [col for col in result.features_df.columns if col.startswith("ent_")]
+    ent_columns = [col for col in _result_columns(result) if col.startswith("ent_")]
 
     assert len(ent_columns) > 0
 
@@ -102,7 +109,7 @@ def test_pipeline_with_tail_risk() -> None:
     config["atomic_indicators"]["tail_risk"]["enabled"] = True
 
     result = _generate(config)
-    tr_columns = [col for col in result.features_df.columns if col.startswith("tr_")]
+    tr_columns = [col for col in _result_columns(result) if col.startswith("tr_")]
 
     assert len(tr_columns) > 0
 
@@ -122,7 +129,7 @@ def test_pipeline_with_preprocessing() -> None:
     }
 
     result = _generate(config)
-    columns = result.features_df.columns
+    columns = _result_columns(result)
 
     assert any(col.endswith("_rank") for col in columns)
     assert any("_zscore_" in col for col in columns)
@@ -145,11 +152,12 @@ def test_pipeline_all_new_features() -> None:
     }
 
     result = _generate(config)
+    columns = _result_columns(result)
 
     assert result.feature_count > 0
-    assert any(col.startswith("ms_") for col in result.features_df.columns)
-    assert any(col.startswith("ent_") for col in result.features_df.columns)
-    assert any(col.startswith("tr_") for col in result.features_df.columns)
+    assert any(col.startswith("ms_") for col in columns)
+    assert any(col.startswith("ent_") for col in columns)
+    assert any(col.startswith("tr_") for col in columns)
     assert not result.hdf5_path
     assert "validation" in result.metadata
 
@@ -177,6 +185,7 @@ def test_pipeline_partial_engine_failure(monkeypatch) -> None:
     monkeypatch.setattr(MicrostructureIndicatorEngine, "compute_all", _raise)
 
     result = _generate(config)
+    columns = _result_columns(result)
 
-    assert any(col.startswith("tr_") for col in result.features_df.columns)
-    assert not any(col.startswith("ms_") for col in result.features_df.columns)
+    assert any(col.startswith("tr_") for col in columns)
+    assert not any(col.startswith("ms_") for col in columns)

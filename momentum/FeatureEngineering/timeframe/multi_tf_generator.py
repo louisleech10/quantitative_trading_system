@@ -133,6 +133,9 @@ class MultiTFGenerator:
             # Record groups before this TF runs so we know which were added.
             groups_before = set(registry._groups.keys())
 
+            # Set current timeframe so CGSA group IDs use the correct TF prefix.
+            self._factory._current_timeframe = timeframe
+
             try:
                 layer1 = self._factory._layer1_atomic_indicators(raw_data, self._config)
                 layer2 = self._factory._layer2_derived_features(layer1, raw_data, self._config)
@@ -144,6 +147,17 @@ class MultiTFGenerator:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
                 continue
+
+            # Persist L3/L4/L5/L6 to CGSA registry (L1/L2 are persisted inside their layer methods).
+            from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+            if layer3 is not None and not layer3.empty:
+                self._factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
+            if layer4 is not None and not layer4.empty:
+                self._factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
+            if layer5 is not None and not layer5.empty:
+                self._factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
+            if layer6 is not None and not layer6.empty:
+                self._factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
 
             tf_layer_counts[timeframe] = self._collect_layer_counts(
                 [layer1, layer2, layer3, layer4, layer5, layer6]
@@ -186,6 +200,9 @@ class MultiTFGenerator:
 
         if self._primary_tf in skipped_tfs:
             raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
+
+        # Restore current timeframe to primary for downstream L6.5/L7.
+        self._factory._current_timeframe = self._primary_tf
 
         total_groups = len(list(registry.iter_all()))
         if total_groups == 0:

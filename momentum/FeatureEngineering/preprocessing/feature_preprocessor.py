@@ -82,22 +82,115 @@ class FeaturePreprocessor:
         if registry is None:
             return 0
 
+        # Determine which transforms are active (for the fast numpy path).
+        do_winsorize = self.winsor_config.get("enabled", True)
+        do_rank = self.rank_config.get("enabled", False)
+        do_zscore = self.zscore_config.get("enabled", False)
+        do_fracdiff = self.fracdiff_config.get("enabled", False)
+        do_adf = self.adf_config.get("enabled", False)
+        do_gaussian = self.gaussian_config.get("enabled", False)
+
+        # Use the fast numpy/numba path when only winsorize+rank+zscore are active
+        # (the common CGSA case), avoiding pandas overhead entirely.
+        use_fast = (
+            not do_fracdiff
+            and not do_adf
+            and not do_gaussian
+            and self.mode == "replace"
+        )
+
+        if use_fast:
+            from momentum.FeatureEngineering.preprocessing._numba_transforms import (
+                transform_array_fast,
+                warmup_numba,
+            )
+            # JIT warmup once (< 1s).
+            warmup_numba()
+
+            winsor_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            rank_window = int(self.rank_config.get("window", 252))
+            zscore_windows = self.zscore_config.get("windows", [100, 252])
+            zscore_primary = int(zscore_windows[0]) if zscore_windows else 100
+            zscore_eps = float(self.zscore_config.get("epsilon", 1e-8))
+
+        import time as _time
+        from momentum.FeatureEngineering.core.column_group import ColumnGroup as _CG, LayerSource as _LS
+
         processed_count = 0
-        for group_id, group in registry.iter_all():
+        all_groups = list(registry.iter_all())
+        total_groups = len(all_groups)
+        t0_all = _time.time()
+        is_append = self.mode == "append"
+
+        for idx, (group_id, group) in enumerate(all_groups, 1):
             if group.n_cols == 0:
                 continue
 
+            t0 = _time.time()
             group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-            group_df = pd.DataFrame(group_array, columns=list(group.columns), copy=False)
 
-            # CGSA per-group path intentionally bypasses global chunking.
-            processed_df = self._transform_single(group_df)
-            processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
+            if use_fast:
+                processed_array = transform_array_fast(
+                    group_array,
+                    winsorize=do_winsorize,
+                    winsor_lower_q=float(winsor_range[0]),
+                    winsor_upper_q=float(winsor_range[1]),
+                    rank=do_rank,
+                    rank_window=rank_window,
+                    zscore=do_zscore,
+                    zscore_window=zscore_primary,
+                    zscore_epsilon=zscore_eps,
+                )
+                registry.overwrite_data(group_id, processed_array)
+            else:
+                # Fallback: original pandas path for exotic transforms or append mode.
+                group_df = pd.DataFrame(group_array, columns=list(group.columns), copy=False)
+                processed_df = self._transform_single(group_df)
 
-            registry.overwrite_data(group_id, processed_array)
+                if is_append and len(processed_df.columns) > group.n_cols:
+                    # Split: overwrite originals, save appended cols as new group.
+                    orig_cols = list(group.columns)
+                    orig_array = processed_df[orig_cols].to_numpy(dtype=np.float32, copy=False)
+                    registry.overwrite_data(group_id, orig_array)
+
+                    new_cols = [c for c in processed_df.columns if c not in orig_cols]
+                    if new_cols:
+                        new_array = processed_df[new_cols].to_numpy(dtype=np.float32, copy=False)
+                        new_gid = f"{group_id}_L65"
+                        # Avoid collision
+                        suffix = 1
+                        while new_gid in registry._groups:
+                            new_gid = f"{group_id}_L65_{suffix}"
+                            suffix += 1
+                        new_group = _CG(
+                            group_id=new_gid,
+                            layer=_LS.L65,
+                            timeframe=group.timeframe,
+                            data_source="preprocessed",
+                            indicator=group.indicator,
+                            columns=tuple(new_cols),
+                            shape=(new_array.shape[0], new_array.shape[1]),
+                            dtype="float32",
+                        )
+                        registry.save_data(new_group, new_array)
+                else:
+                    processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
+                    registry.overwrite_data(group_id, processed_array)
+
             processed_count += 1
 
-        logger.info("[L6.5][CGSA] Per-group preprocessing completed: %d groups", processed_count)
+            elapsed = _time.time() - t0
+            if elapsed > 5.0 or idx % 50 == 0 or idx == total_groups:
+                logger.info(
+                    "[L6.5][CGSA] Group %d/%d (%s) %d cols — %.1fs",
+                    idx, total_groups, group_id, group.n_cols, elapsed,
+                )
+
+        total_elapsed = _time.time() - t0_all
+        logger.info(
+            "[L6.5][CGSA] Per-group preprocessing completed: %d groups in %.1fs (fast=%s)",
+            processed_count, total_elapsed, use_fast,
+        )
         return processed_count
 
     def _transform_single(self, features_df: pd.DataFrame) -> pd.DataFrame:

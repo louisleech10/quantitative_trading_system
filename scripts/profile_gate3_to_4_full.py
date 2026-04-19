@@ -30,6 +30,7 @@ logger = get_logger(__name__)
 SYMBOL = "ETHUSDT"
 PRIMARY_TF = "1h"
 TRAINING_TFS = ["1h", "12h"]
+KLINE_CACHE_DIR = str(PROJECT_ROOT / "data_cache" / "feature_klines")
 
 
 def main() -> None:
@@ -38,7 +39,7 @@ def main() -> None:
     gc.collect()
     rss_before = process.memory_info().rss
 
-    factory = create_feature_factory()
+    factory = create_feature_factory(cache_dir=KLINE_CACHE_DIR)
 
     # 使用 full config — 全層開啟（包含 preprocessing L6.5）
     config_override = {

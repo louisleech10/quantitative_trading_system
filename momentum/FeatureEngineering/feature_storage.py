@@ -334,19 +334,25 @@ class FeatureStorage:
         registry: "ColumnGroupRegistry",
         cleanup_intermediate: bool = False,
     ) -> List[str]:
-        """Persist CGSA registry groups to per-group parquet files."""
+        """Persist CGSA registry groups to per-group parquet files.
+
+        Uses stream-and-delete: each group is staged → moved → .npy deleted
+        before proceeding to the next, keeping peak disk usage bounded.
+        """
         output_dir = self.base_path / symbol / config_hash
         output_dir.mkdir(parents=True, exist_ok=True)
 
         staging_dir = output_dir / f".staging_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
         staging_dir.mkdir(parents=True, exist_ok=False)
 
-        staged_pairs: List[Tuple[str, Path, Path]] = []
         persisted_paths: List[str] = []
         parquet_path_map: Dict[str, str] = {}
+        npy_freed = 0
 
         try:
-            for group_id, group in registry.iter_all():
+            groups_list = list(registry.iter_all())
+            total_groups = len(groups_list)
+            for idx, (group_id, group) in enumerate(groups_list, 1):
                 group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
                 if group_data.ndim != 2:
                     raise ValueError(f"Group {group_id} data must be 2D, got shape={group_data.shape}")
@@ -358,34 +364,35 @@ class FeatureStorage:
                 staged_path = staging_dir / f"{group_id}.parquet"
                 final_path = output_dir / f"{group_id}.parquet"
                 group_frame = pd.DataFrame(group_data, columns=list(group.columns), copy=False)
-                group_frame.to_parquet(staged_path, index=False, compression="gzip")
-                staged_pairs.append((group_id, staged_path, final_path))
+                group_frame.to_parquet(staged_path, index=False, compression="zstd")
 
-            for group_id, staged_path, final_path in staged_pairs:
+                # Atomic move staging → final
                 os.replace(staged_path, final_path)
                 resolved_path = str(final_path.resolve())
                 persisted_paths.append(resolved_path)
                 parquet_path_map[group_id] = resolved_path
 
+                # Stream-and-delete: free .npy immediately after parquet written
+                del group_data, group_frame
+                if group.disk_path and group.disk_path.exists():
+                    group.disk_path.unlink()
+                    npy_freed += 1
+
+                if idx % 100 == 0 or idx == total_groups:
+                    self.logger.info(
+                        "[L7] Persisted %d/%d groups (%d .npy freed)",
+                        idx, total_groups, npy_freed,
+                    )
+
             if parquet_path_map:
                 registry.set_group_parquet_paths(parquet_path_map)
 
-            if cleanup_intermediate:
-                removed_count = 0
-                for _, group in registry.iter_all():
-                    if group.disk_path and group.disk_path.exists():
-                        group.disk_path.unlink()
-                        removed_count += 1
-                self.logger.info(
-                    "CGSA intermediate .npy cleanup completed: %d files removed",
-                    removed_count,
-                )
-
             self.logger.info(
-                "CGSA per-group parquet persist completed: symbol=%s config_hash=%s groups=%d",
+                "CGSA per-group parquet persist completed: symbol=%s config_hash=%s groups=%d npy_freed=%d",
                 symbol,
                 config_hash,
                 len(persisted_paths),
+                npy_freed,
             )
             return persisted_paths
         except Exception as e:

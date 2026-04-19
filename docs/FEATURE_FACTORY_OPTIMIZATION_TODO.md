@@ -64,7 +64,7 @@
 | 30 | Task 4.4 | NaN 語義對齊驗證 | §6.1 |
 | 31 | Task 5.1 | ProcessPoolExecutor multi-symbol | §7.1 |
 | 32 | Task 5.2 | Arrow IPC column-group intermediate | §7.1 |
-| 33 | Task 5.3 | DuckDB 讀取 Parquet 下游介面 | §7.1 |
+| 33 | Task 5.3 | FeatureReader 統一讀取介面（Parquet-only） | §7.1, V7 §11 |
 
 ### B. Test ID 清單（共 98 個）
 
@@ -82,7 +82,7 @@
 | 10 | T3.P1~T3.P2 | Phase 3 效能驗收 | §5.3.4 | 2 |
 | 11 | T4.1~T4.4 | Phase 4 數值等價 | §6.2 | 4 |
 | 12 | T4.B1~T4.B3 | Phase 4 邊界條件 | §6.2 | 3 |
-| 13 | T5.1~T5.3 | Phase 5 平行正確性 | §7.2 | 3 |
+| 13 | T5.1~T5.3d | Phase 5 平行正確性 + FeatureReader | §7.2, V7 §11 | 6 |
 | 14 | T5.B1~T5.B3 | Phase 5 邊界條件 | §7.2 | 3 |
 | | **合計** | | | **98** |
 
@@ -108,7 +108,7 @@
 | 16 | R16 | Numba ARM64/macOS JIT 相容性 | §10 |
 | 17 | R17 | Numba skew/kurt zero-variance | §10 |
 | 18 | R18 | L2 O(N²) 組合爆炸 | §10 |
-| 19 | R19 | DuckDB Parquet footer scan overhead | §10 |
+| 19 | R19 | ~~DuckDB Parquet footer scan overhead~~ → 已改為 FeatureReader（PyArrow） | §10, V7 §11 |
 | 20 | R20 | Phase 5 磁碟 I/O 未建模 | §10 |
 | 21 | R21 | L1 ThreadPool + TA-Lib 安全風險 | §10 |
 | 22 | R22 | L6 _find_column fuzzy matching 失敗 | §10 |
@@ -378,7 +378,7 @@ Phase 4 (Polars — 條件性，可 skip)
 Phase 5 (生產化)
   ├── Task 5.1 (multi-symbol)          ← Phase 2
   ├── Task 5.2 (Arrow IPC)             ← Phase 2
-  ├── Task 5.3 (DuckDB)               ← Phase 2
+  ├── Task 5.3 (FeatureReader)         ← Phase 2 + V7 P0
   └── Task 1.5 (Multi-TF 平行)         ← 從 Phase 1 延遲
   Gate 5→Done: C1~C6 全通過 + <20min + RSS<2GB
 ```
@@ -403,7 +403,7 @@ Phase 5 (生產化)
 | Batch 3c | Task 3.5 → 3.6 | Batch 3a+3b | 整合 + 驗證 | 2 Task / ~150 行 |
 | Batch 4 | Task 4.1-4.4 | Phase 3 Gate | 條件性，可整體 skip | 4 Task / ~200 行 |
 | Batch 5a | Task 5.1, 5.2 | Phase 2 Gate | multi-symbol 平行 + IPC 中介 | 2 Task / ~250 行 |
-| Batch 5b | Task 5.3, 1.5 | Batch 5a | DuckDB + 延遲的 Multi-TF | 2 Task / ~150 行 |
+| Batch 5b | Task 5.3, 1.5 | Batch 5a | FeatureReader + 延遲的 Multi-TF | 2 Task / ~200 行 |
 
 ---
 
@@ -459,7 +459,7 @@ Phase 3 完成後 re-profile。若 L2+L6.5 佔比 ≥30%，執行 Task 4.1-4.4�
 ### Batch 5: 生產化
 ```
 請執行 Task 5.1（ProcessPoolExecutor + spawn，8 workers）、Task 5.2（Arrow IPC 中介）、
-Task 5.3（DuckDB 讀取介面）、Task 1.5（Multi-TF 平行化）。
+Task 5.3（FeatureReader 統一讀取介面）、Task 1.5（Multi-TF 平行化）。
 使用 spawn context，Numba 主進程預熱，per-symbol 獨立 Registry。
 ```
 
@@ -1405,7 +1405,7 @@ for group_id, group in registry.iter_all():
 1. 遍歷 Registry groups → 每個 group 寫一個 Parquet file
 2. 儲存路徑：`data_cache/features/{symbol}/{config_hash}/{group_id}.parquet`
 3. 寫入後可刪除 .npy 中介檔案
-4. 粒度 ~1,200 groups → ~1,200 Parquet files（可被 DuckDB 高效處理）
+4. 粒度 ~1,200 groups → ~1,200 Parquet files（可被 FeatureReader column projection 高效處理）
 
 ### 禁止事項
 
@@ -1418,8 +1418,8 @@ for group_id, group in registry.iter_all():
 
 ### 驗證
 
-- **通過條件**: DuckDB 可讀取所有 Parquet 並 count columns == total
-- **測試**: T2.15 `test_cgsa_parquet_readable_by_duckdb`
+- **通過條件**: FeatureReader 可讀取所有 Parquet 並 count columns == manifest total
+- **測試**: T2.15 `test_cgsa_parquet_readable_by_feature_reader`
 
 ### 邊界情況
 
@@ -1635,7 +1635,7 @@ def materialize_wide_df(self) -> pd.DataFrame:
 | T2.12 | `test_cgsa_no_global_concat` | 無 concat_with_memmap 呼叫 |
 | T2.13 | `test_cgsa_ram_peak_under_2gb` | RSS < 2 GB |
 | T2.14 | `test_cgsa_manifest_valid` | manifest.json 格式正確 |
-| T2.15 | `test_cgsa_parquet_readable_by_duckdb` | DuckDB count == total |
+| T2.15 | `test_cgsa_parquet_readable_by_feature_reader` | FeatureReader count == manifest total |
 | T2.16 | `test_cgsa_l2_cross_group_operators` | Cross/Ratio 結果等於 legacy |
 | T2.17 | `test_cgsa_l65_rank_matches_legacy` | per-group rank == legacy |
 
@@ -2202,7 +2202,7 @@ def test_numba_rolling_mean_vs_pandas(sample_ohlcv, window):
 
 # Phase 5 — 生產化
 
-**目標**: multi-symbol 平行化 + DuckDB 下游整合  
+**目標**: multi-symbol 平行化 + FeatureReader 統一讀取介面  
 **風險**: 中等（多進程 + TA-Lib 安全）  
 **Branch**: `perf/phase-5-production`
 
@@ -2308,7 +2308,7 @@ def run_multi_symbol(symbols: list[str], config: dict, ref_ipc_path: str, max_wo
   ```
 - **修改檔案**: `feature_storage.py` → `persist_column_group()` 新增 IPC 寫入; 新建 `arrow_ipc_utils.py`（讀寫工具）
 - **不可做**:
-  - ❌ 不可移除 Parquet 最終持久化路徑（DuckDB 需要 Parquet）
+  - ❌ 不可移除 Parquet 最終持久化路徑（FeatureReader 需要 Parquet）
   - ❌ 不可使用 Arrow Stream format（需 random access for mmap）
 - **風險緩解**: ⊘（Arrow IPC 為 well-tested 格式）
 - **驗證**: T5.1 — multi-symbol golden 比對間接驗證 IPC 正確性
@@ -2316,36 +2316,133 @@ def run_multi_symbol(symbols: list[str], config: dict, ref_ipc_path: str, max_wo
   - worker 讀取期間 IPC 檔案被刪除 → FileNotFoundError catch + retry
   - 超大 group（>1GB）→ 改為 chunked IPC 寫入
 
-## Task 5.3: DuckDB 讀取 Parquet 下游介面
+## Task 5.3: FeatureReader 統一讀取介面（Parquet-only）
 
-- **SPEC 參考**: §7.1
-- **目標**: 下游模組（IC Analysis, ML Training）可透過 DuckDB 讀取 per-group Parquet，不需 materialize_wide_df()
+- **SPEC 參考**: §7.1, V7 §11
+- **目標**: 建立統一的 FeatureReader 介面，取代所有下游的 HDF5/DuckDB 讀取路徑，支援 4 種載入模式
 - **輸入**: per-group Parquet files（來自 Task 2.8）+ manifest.json（Task 2.9）
-- **輸出**: DuckDB query results（下游可直接做 IC / ML feature selection）
-- **實作要點**:
-  1. 新建 `duckdb_reader.py`，提供 `read_features(manifest_path, columns=None)` API
-  2. 內部使用 `duckdb.read_parquet(parquet_files)` 掃描所有 per-group Parquet
-  3. 支援 column projection（只讀取需要的欄位，避免全量載入）
-  ```python
-  import duckdb
-  
-  def read_features(manifest_path: str, columns: list[str] | None = None) -> duckdb.DuckDBPyRelation:
-      manifest = json.load(open(manifest_path))
-      parquet_files = [g['path'] for g in manifest['groups']]
-      rel = duckdb.read_parquet(parquet_files)
-      if columns:
-          rel = rel.select(*columns)
-      return rel
-  ```
-- **修改檔案**: 新建 `momentum/FeatureEngineering/duckdb_reader.py`; 修改 `feature_storage.py` → 確保 Parquet 路徑在 manifest 中正確
-- **不可做**:
-  - ❌ 不可要求下游必須使用 DuckDB（保持 `materialize_wide_df()` 可用）
-  - ❌ 不可修改 Parquet 檔案結構（與 Task 2.8 的輸出一致）
-- **風險緩解**: ⊘（DuckDB 為 read-only 查詢）
-- **驗證**: T5.3 — `duckdb.read_parquet(all_files).count('*')` == total columns from manifest
-- **Edge Cases**:
-  - manifest 引用的 Parquet 不存在 → raise FileNotFoundError with missing paths
-  - DuckDB 版本不支援 → 降級為 `pd.read_parquet` fallback
+- **輸出**: FeatureReader API — 所有下游（IC Analysis, ML Training, Feature Browser, SHAP）的唯一入口
+- **設計依據**: V7 FEATURE_STORAGE_ARCHITECTURE_V7.md §11 分層儲存架構
+
+### 修改檔案
+
+| 檔案 | 函式/方法 | 修改類型 |
+|------|----------|---------|
+| `momentum/FeatureEngineering/feature_reader.py` | `FeatureReader` class | **新增** |
+| `momentum/FeatureEngineering/feature_library.py` | `load()` / `load_multi()` | 改用 FeatureReader，移除 h5py |
+| `api/services/feature_browser_service.py` | `_load_features_df()` + 12 個分析函式 | 改用 FeatureReader 三種模式 |
+| `api/services/ic_analysis_service.py` | cross-sectional IC | 改用 FeatureReader per-feature streaming |
+| `momentum/Analysis/coverage_analyzer.py` | `_resolve_feature_file_path()` | 移除 HDF5 路徑，改用 FeatureReader |
+
+### 4 種載入模式
+
+```python
+class FeatureReader:
+    """V7 統一特徵讀取介面 — 只支援 Parquet，不支援 HDF5"""
+    
+    def __init__(self, feature_base_path: str = "data_cache/features"):
+        self._base = Path(feature_base_path)
+    
+    # Mode 1: Metadata-Only（零資料 I/O）
+    def load_manifest(self, symbol: str, config_hash: str) -> dict:
+        """載入 manifest.json"""
+        path = self._base / symbol / config_hash / "manifest.json"
+        return json.loads(path.read_text())
+    
+    def list_features(self, symbol: str, config_hash: str) -> list[str]:
+        """列出所有 feature names（不載入資料）"""
+        # 從 columns.json.gz 讀取（V7 §13 決議 #1）
+        path = self._base / symbol / config_hash / "columns.json.gz"
+        with gzip.open(path, 'rt') as f:
+            return json.load(f)
+    
+    # Mode 2: Column-Projected（只讀指定 columns）
+    def load_columns(self, symbol: str, config_hash: str, 
+                     columns: list[str]) -> pd.DataFrame:
+        """Column projection — 只讀指定 columns"""
+        manifest = self.load_manifest(symbol, config_hash)
+        frames = []
+        for group_name, group_info in manifest["groups"].items():
+            needed = [c for c in columns if c in group_info["columns"]]
+            if not needed:
+                continue
+            path = self._base / symbol / config_hash / group_info["file"]
+            table = pq.read_table(str(path), columns=needed)
+            frames.append(table.to_pandas())
+        return pd.concat(frames, axis=1) if frames else pd.DataFrame()
+    
+    # Mode 3: Per-Group Streaming（逐 group 串流，計算完釋放記憶體）
+    def stream_groups(self, symbol: str, config_hash: str
+                      ) -> Iterator[tuple[str, pd.DataFrame]]:
+        """逐 group 串流"""
+        manifest = self.load_manifest(symbol, config_hash)
+        for group_name, group_info in manifest["groups"].items():
+            path = self._base / symbol / config_hash / group_info["file"]
+            df = pq.read_table(str(path)).to_pandas()
+            yield group_name, df
+            del df
+    
+    # Mode 4: Cross-Symbol（跨 symbol 載入同一組 columns）
+    def load_cross_symbol(self, symbols: list[str], config_hash: str,
+                          columns: list[str]) -> pd.DataFrame:
+        """跨 symbol 載入 → MultiIndex"""
+        frames = []
+        for symbol in symbols:
+            df = self.load_columns(symbol, config_hash, columns)
+            df["_symbol"] = symbol
+            frames.append(df)
+        result = pd.concat(frames)
+        return result.set_index("_symbol", append=True)
+```
+
+### 下游函式 → 載入模式映射
+
+| 下游函式 | 載入模式 | 說明 |
+|----------|---------|------|
+| Feature Browser `get_overview()` | Metadata-Only | manifest.json 即可 |
+| Feature Browser `get_catalog()` | Metadata-Only | columns.json.gz |
+| Feature Browser `get_ic_dashboard()` | Per-Group Streaming | 逐 group IC |
+| Feature Browser `get_rolling_ic()` | Column-Projected | 單 feature |
+| Feature Browser `get_quality_scorecard()` | Per-Group Streaming | 逐 group stats |
+| Feature Browser `get_correlation_matrix()` | Column-Projected | top 200 |
+| Feature Browser `get_vif()` | Column-Projected | top 200 |
+| Feature Browser `get_drift_monitor()` | Per-Group Streaming | 逐 group |
+| Feature Browser `get_coverage_matrix()` | Cross-Symbol | 多 symbols |
+| IC Analysis (single) | Per-Group Streaming | 逐 group IC |
+| IC Analysis (cross-sectional) | Cross-Symbol | per-feature × N symbols |
+| LightGBM/XGBoost | Column-Projected | selected features |
+| SHAP (cross-symbol) | Cross-Symbol | per-symbol iteration |
+
+### 禁止事項
+
+- ❌ 不可保留任何 h5py / HDF5 讀取路徑（V7 決議：Parquet-only）
+- ❌ 不可新增 DuckDB 依賴（PyArrow column projection 已足夠）
+- ❌ 不可在 FeatureReader 中寫入資料（read-only，寫入由 feature_storage.py 負責）
+- ❌ 不可要求下游必須改用 FeatureReader 才能工作（`materialize_wide_df()` 保持可用作 fallback）
+
+### 風險緩解
+
+- R19：~~DuckDB footer scan overhead~~ → PyArrow column projection 無此問題
+- R10：Parquet 45 萬欄位 metadata → manifest.json + columns.json.gz 完全避開
+
+### 驗證
+
+- **通過條件**: 
+  1. FeatureReader 4 種模式都能正確讀取 V6.2+ 輸出
+  2. `load_columns()` 結果與 `materialize_wide_df()` 的 column subset 數值一致
+  3. `stream_groups()` 遍歷所有 groups 後 column count == manifest total
+- **測試**: 
+  - T5.3a `test_feature_reader_metadata_only` — manifest + list_features
+  - T5.3b `test_feature_reader_column_projection` — selected columns 數值等價
+  - T5.3c `test_feature_reader_stream_groups` — 全 groups 遍歷 count 一致
+  - T5.3d `test_feature_reader_cross_symbol` — 2 symbols × same columns
+
+### 邊界情況
+
+1. manifest 引用的 Parquet 不存在 → raise FileNotFoundError with missing paths
+2. columns.json.gz 缺失（舊版 output）→ fallback 到逐 group 讀 Parquet metadata
+3. 指定 column 不在任何 group 中 → return empty DataFrame + log warning
+4. 極大 group（>5000 cols，舊版未拆分）→ Per-Group Streaming 仍可處理（只是記憶體較高）
 
 ## Task 1.5（延遲到此）: Multi-TF 平行化
 
@@ -2360,7 +2457,10 @@ def run_multi_symbol(symbols: list[str], config: dict, ref_ipc_path: str, max_wo
 |----|---------|---------|
 | T5.1 | `test_multi_symbol_parallel_correctness` | 2 sym × 2 TF 各自 golden 一致 |
 | T5.2 | `test_multi_symbol_no_crosstalk` | 無共享 Registry 污染 |
-| T5.3 | `test_duckdb_read_parquet_all_columns` | DuckDB count == manifest total |
+| T5.3a | `test_feature_reader_metadata_only` | manifest + list_features 正確 |
+| T5.3b | `test_feature_reader_column_projection` | selected columns 數值等價 |
+| T5.3c | `test_feature_reader_stream_groups` | 全 groups count == manifest total |
+| T5.3d | `test_feature_reader_cross_symbol` | 2 symbols × same columns |
 | T5.B1 | 某 symbol 失敗 | 其他不受影響 |
 | T5.B2 | Worker OOM killed | 主進程捕獲 exc |
 | T5.B3 | 磁碟空間不足 mid-run | 提前失敗 + 清理 |
@@ -2397,7 +2497,7 @@ def run_multi_symbol(symbols: list[str], config: dict, ref_ipc_path: str, max_wo
 | R16 | 3 | numba>=0.57,<0.60 | T3.B10 |
 | R17 | 3 | epsilon guard M2<1e-30 | T3.B2 |
 | R18 | 2 | 斷路器 MAX_L2_ESTIMATED_COLS | T2.B2 |
-| R19 | 2 | 粒度 ~1,200 | T2.15 |
+| R19 | 2 | ~~DuckDB footer scan~~ → FeatureReader PyArrow | T2.15 |
 | R20 | 5 | 2-symbol pilot benchmark | T5.1 |
 | R21 | 5 | FFACT_LAYER1_PARALLEL=0 直到 Phase 5 | Phase 5 |
 | R22 | 2 | L6 顯式 column 引用 | T2.16 |
@@ -2496,9 +2596,9 @@ Phase 5:
   □ Numba JIT 預熱
   □ Task 5.1  multi-symbol ProcessPoolExecutor
   □ Task 5.2  Arrow IPC intermediate
-  □ Task 5.3  DuckDB Parquet
+  □ Task 5.3  FeatureReader 統一讀取介面
   □ Task 1.5  Multi-TF 平行（延遲）
-  □ T5.1~T5.3 + T5.B1~T5.B3
+  □ T5.1~T5.3d + T5.B1~T5.B3
   □ 最終 C1~C6 全量驗證
 ```
 
