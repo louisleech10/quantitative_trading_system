@@ -10,12 +10,13 @@ import time
 import tracemalloc
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 
 from momentum.factories import create_feature_factory
+from momentum.FeatureEngineering.feature_reader import FeatureReader
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -189,6 +190,8 @@ def main() -> None:
     parser.add_argument("--timeframe", default="12h")
     parser.add_argument("--preset", default="full")
     parser.add_argument("--force-regenerate", action="store_true")
+    parser.add_argument("--no-validate-continuity", action="store_true",
+                        help="Skip kline data continuity validation")
     parser.add_argument("--baseline-root", default="results/full_golden_baseline")
     parser.add_argument(
         "--config-override-file",
@@ -235,7 +238,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _signal_handler)
     reporter.start()
 
-    factory = create_feature_factory()
+    factory = create_feature_factory(validate_continuity=not args.no_validate_continuity)
 
     config_override: Dict[str, Any] = {"preset": args.preset}
     if args.config_override_file:
@@ -262,19 +265,38 @@ def main() -> None:
     metadata = dict(result.metadata)
     config_used = dict(result.config_used)
 
+    # CGSA mode: features_df is empty but features stored in per-group Parquet
+    cgsa_mode = features_df.empty and result.feature_count > 0
+    if cgsa_mode:
+        config_hash = str(metadata.get("config_hash", ""))
+        reader = FeatureReader("data_cache/features")
+        frames: List[pd.DataFrame] = []
+        for _group_name, group_df in reader.stream_groups(args.symbol, config_hash):
+            frames.append(group_df)
+        if frames:
+            features_df = pd.concat(frames, axis=1)
+        print(f"[CGSA] Loaded {features_df.shape[1]} features from per-group Parquet")
+
+    # Copy source artifacts
     hdf5_path = Path(result.hdf5_path or "")
-    if not hdf5_path.exists():
-        raise FileNotFoundError(f"HDF5 output not found: {hdf5_path}")
-
-    meta_path = _resolve_meta_path(hdf5_path, args.symbol, args.timeframe)
-
     copied_hdf5_path = artifacts_dir / "features_factory.h5"
-    shutil.copy2(hdf5_path, copied_hdf5_path)
-
     copied_meta_path = None
-    if meta_path.exists():
-        copied_meta_path = artifacts_dir / "features_factory_meta.json"
-        shutil.copy2(meta_path, copied_meta_path)
+
+    if cgsa_mode:
+        # In CGSA mode, hdf5_path points to CGSA manifest, not HDF5
+        # Save a placeholder and copy the CGSA manifest instead
+        copied_hdf5_path.write_bytes(b"")  # empty placeholder
+        cgsa_manifest_src = hdf5_path
+        if cgsa_manifest_src.exists():
+            shutil.copy2(cgsa_manifest_src, artifacts_dir / "cgsa_manifest.json")
+    else:
+        if not hdf5_path.exists():
+            raise FileNotFoundError(f"HDF5 output not found: {hdf5_path}")
+        meta_path = _resolve_meta_path(hdf5_path, args.symbol, args.timeframe)
+        shutil.copy2(hdf5_path, copied_hdf5_path)
+        if meta_path.exists():
+            copied_meta_path = artifacts_dir / "features_factory_meta.json"
+            shutil.copy2(meta_path, copied_meta_path)
 
     feature_names = [str(col) for col in features_df.columns]
     label_names = [str(col) for col in labels_df.columns]

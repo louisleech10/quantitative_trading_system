@@ -74,6 +74,222 @@ class DerivedOperatorEngine:
 
         return pd.concat(frames, axis=1)
 
+    def compute_all_polars(
+        self,
+        layer1_df: pd.DataFrame,
+        raw_data: pd.DataFrame,
+        indicator_specs: Optional[Dict[str, Dict]] = None,
+    ) -> pd.DataFrame:
+        """Compute all derived features using Polars batch with_columns() (Task 4.2).
+
+        Falls back to pandas compute_all() for categories that cannot be
+        expressed as pure Polars expressions (e.g., WorldQuant time-series ops).
+
+        Returns pandas DataFrame for downstream compatibility.
+        """
+        if layer1_df.empty:
+            return pd.DataFrame(index=layer1_df.index)
+
+        from momentum.FeatureEngineering.polars_adapter import (
+            ensure_nan_semantics,
+            pandas_to_polars,
+            polars_l2_derived_diff,
+            polars_l2_derived_distance,
+            polars_l2_derived_momentum,
+            polars_l2_derived_ratio,
+            polars_to_pandas,
+        )
+        import polars as pl
+
+        feature_info = self._build_feature_info(layer1_df.columns, indicator_specs)
+
+        # Convert L1 to Polars (Task 4.1: zero-copy via from_numpy)
+        pl_l1 = pandas_to_polars(layer1_df)
+        pl_raw = pandas_to_polars(raw_data.select_dtypes(include=[np.number]), use_float64=True)
+
+        # Build batch expression specs for Polars-compatible categories
+        ratio_pairs = self._collect_ratio_pairs(layer1_df, feature_info)
+        cross_pairs = self._collect_cross_pairs(layer1_df, feature_info)
+        momentum_specs = self._collect_momentum_specs(layer1_df, feature_info)
+        distance_pairs = self._collect_distance_pairs(layer1_df, raw_data, feature_info)
+
+        polars_frames: List[pl.DataFrame] = []
+
+        # Ratio → Polars batch
+        if ratio_pairs:
+            ratio_result = polars_l2_derived_ratio(pl_l1, ratio_pairs)
+            if not ratio_result.is_empty():
+                polars_frames.append(ratio_result)
+
+        # Cross (diff) → Polars batch
+        if cross_pairs:
+            cross_result = polars_l2_derived_diff(pl_l1, cross_pairs)
+            if not cross_result.is_empty():
+                polars_frames.append(cross_result)
+
+        # Momentum → Polars batch
+        if momentum_specs:
+            momentum_result = polars_l2_derived_momentum(pl_l1, momentum_specs)
+            if not momentum_result.is_empty():
+                polars_frames.append(momentum_result)
+
+        # Distance → Polars batch (price - indicator) / indicator
+        if distance_pairs:
+            # Merge L1 + raw numeric for distance computation
+            pl_combined = pl.concat([pl_l1, pl_raw.select(
+                [c for c in pl_raw.columns if c not in pl_l1.columns]
+            )], how="horizontal")
+            distance_result = polars_l2_derived_distance(pl_combined, distance_pairs)
+            if not distance_result.is_empty():
+                polars_frames.append(distance_result)
+
+        # Categories not suitable for Polars (BinarySignal, SignedStrength, WorldQuant)
+        # → fall back to pandas
+        pandas_fallback_categories = ("BinarySignal", "SignedStrength", "WorldQuant")
+        pandas_frames: List[pd.DataFrame] = []
+        for category in pandas_fallback_categories:
+            category_frame = self._compute_category_from_feature_info(
+                layer1_df=layer1_df,
+                raw_data=raw_data,
+                feature_info=feature_info,
+                category=category,
+            )
+            if category_frame is not None and not category_frame.empty:
+                pandas_frames.append(category_frame)
+
+        # Combine Polars results
+        result_frames: List[pd.DataFrame] = []
+        for pl_frame in polars_frames:
+            pl_frame = ensure_nan_semantics(pl_frame)
+            result_frames.append(polars_to_pandas(pl_frame, index=layer1_df.index))
+
+        result_frames.extend(pandas_frames)
+
+        if not result_frames:
+            return pd.DataFrame(index=layer1_df.index)
+
+        return pd.concat(result_frames, axis=1)
+
+    def _collect_ratio_pairs(
+        self,
+        layer1_df: pd.DataFrame,
+        feature_info: Dict[str, "FeatureInfo"],
+    ) -> List[tuple]:
+        """Collect (col_a, col_b, output_name) tuples for Ratio operator."""
+        ratio_cfg = self._get_section("ratio")
+        if not ratio_cfg.get("enabled", False):
+            return []
+        return self._collect_pair_specs(layer1_df, feature_info, "Ratio")
+
+    def _collect_cross_pairs(
+        self,
+        layer1_df: pd.DataFrame,
+        feature_info: Dict[str, "FeatureInfo"],
+    ) -> List[tuple]:
+        """Collect (col_a, col_b, output_name) tuples for Cross operator."""
+        cross_cfg = self._get_section("cross")
+        if not cross_cfg.get("enabled", False):
+            return []
+        return self._collect_pair_specs(layer1_df, feature_info, "Cross")
+
+    def _collect_momentum_specs(
+        self,
+        layer1_df: pd.DataFrame,
+        feature_info: Dict[str, "FeatureInfo"],
+    ) -> List[tuple]:
+        """Collect (col_name, lag, output_name) tuples for Momentum operator."""
+        momentum_cfg = self._get_section("momentum")
+        if not momentum_cfg:
+            momentum_cfg = self._get_section("momentum_change")
+        if not momentum_cfg.get("enabled", False):
+            return []
+
+        lags = momentum_cfg.get("lags", [1, 5, 10, 21])
+        apply_to = momentum_cfg.get("apply_to", "all")
+        specs: List[tuple] = []
+        for col, info in feature_info.items():
+            if not self._matches_apply_to(info, apply_to):
+                continue
+            if col not in layer1_df.columns:
+                continue
+            for lag in lags:
+                output_name = f"{col}_Momentum_L{lag}"
+                specs.append((col, int(lag), output_name))
+        return specs
+
+    def _collect_distance_pairs(
+        self,
+        layer1_df: pd.DataFrame,
+        raw_data: pd.DataFrame,
+        feature_info: Dict[str, "FeatureInfo"],
+    ) -> List[tuple]:
+        """Collect (price_col, indicator_col, output_name) for Distance operator."""
+        distance_cfg = self._get_section("distance")
+        if not distance_cfg.get("enabled", False):
+            return []
+
+        apply_to = distance_cfg.get("apply_to", "all")
+        pairs: List[tuple] = []
+        for col, info in feature_info.items():
+            if not self._matches_apply_to(info, apply_to):
+                continue
+            if info.source not in raw_data.columns:
+                continue
+            if col not in layer1_df.columns:
+                continue
+            # Distance = (price - indicator) / indicator
+            # Rewritten as: price/indicator - 1, but we use ratio form here
+            # Actually (price - indicator) / indicator = price/indicator - 1
+            # We store as (source_col, indicator_col, output_name) for the ratio adapter
+            pairs.append((info.source, col, f"{col}_Distance"))
+        return pairs
+
+    def _collect_pair_specs(
+        self,
+        layer1_df: pd.DataFrame,
+        feature_info: Dict[str, "FeatureInfo"],
+        operator_name: str,
+    ) -> List[tuple]:
+        """Collect (col_a, col_b, output_name) for pair-based operators."""
+        grouped: Dict[tuple, List["FeatureInfo"]] = {}
+        for info in feature_info.values():
+            if not info.params or len(info.params) != 1:
+                continue
+            key = (info.source, info.category, info.indicator)
+            grouped.setdefault(key, []).append(info)
+
+        specs: List[tuple] = []
+        for key, infos in grouped.items():
+            infos_sorted = sorted(infos, key=lambda item: item.params[0])
+            all_params: List[float] = [i.params[0] for i in infos_sorted]
+            param_to_info: Dict[float, "FeatureInfo"] = {i.params[0]: i for i in infos_sorted}
+
+            seen_pairs: set = set()
+            for fast in infos_sorted:
+                x = fast.params[0]
+                for m in self._PAIR_MULTIPLIERS:
+                    threshold = m * x
+                    candidates = [p for p in all_params if p >= threshold]
+                    if not candidates:
+                        continue
+                    slow_param = min(candidates)
+                    pair_key = (x, slow_param)
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
+
+                    slow = param_to_info[slow_param]
+                    if fast.name not in layer1_df.columns or slow.name not in layer1_df.columns:
+                        continue
+                    param_str = self._format_params([x, slow_param])
+                    col_name = (
+                        f"{fast.source}_{fast.category}_{fast.indicator}"
+                        f"_{param_str}_{operator_name}"
+                    )
+                    specs.append((fast.name, slow.name, col_name))
+
+        return specs
+
     def compute_category(
         self,
         layer1_df: pd.DataFrame,

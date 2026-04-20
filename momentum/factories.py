@@ -177,15 +177,37 @@ def create_column_group_registry(
     return ColumnGroupRegistry(work_dir=resolved_work_dir)
 
 
+def create_multi_symbol_runner(
+    cache_dir: Optional[str] = None,
+    max_workers: int = 8,
+) -> "FeatureFactory":
+    """Factory for multi-symbol parallel FeatureFactory runner.
+
+    Returns a FeatureFactory instance ready for run_multi_symbol().
+    """
+    return create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
+
+
+def create_feature_reader(
+    feature_base_path: Optional[str] = None,
+) -> "FeatureReader":
+    """Factory for V7 FeatureReader (Parquet-only read interface)."""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    return FeatureReader(feature_base_path or "data_cache/features")
+
+
 def create_feature_library() -> "FeatureLibrary":
-    """Create a FeatureLibrary instance."""
+    """Create a FeatureLibrary instance with V7 FeatureReader."""
     from momentum.FeatureEngineering.feature_library import FeatureLibrary
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
     from momentum.FeatureEngineering.feature_registry import FeatureRegistry
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
     registry = FeatureRegistry()
     storage = FeatureStorage()
-    return FeatureLibrary(registry, storage)
+    reader = FeatureReader(str(storage.base_path))
+    return FeatureLibrary(registry, storage, feature_reader=reader)
 
 
 def create_expectancy_calculator() -> ExpectancyCalculator:

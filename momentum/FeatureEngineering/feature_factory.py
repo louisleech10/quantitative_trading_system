@@ -753,36 +753,80 @@ class FeatureFactory:
         elif not getattr(config.operators, 'enabled', True):
             result = pd.DataFrame(index=layer1.index)
         else:
-            filtered_ops = self._filter_operators_config(config.operators)
-            engine = DerivedOperatorEngine(filtered_ops)
-            indicator_specs = self._build_indicator_specs(layer1, config)
+            from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
-            if self._cgsa_registry is None:
-                result = engine.compute_all(layer1, data, indicator_specs)
+            use_polars = polars_enabled()
+            if use_polars:
+                result = self._layer2_derived_polars(layer1, data, config)
             else:
-                estimated_cols = self._estimate_l2_output_cols(layer1.shape[1], filtered_ops)
-                if estimated_cols > MAX_L2_ESTIMATED_COLS:
-                    logger.warning(
-                        "[L2] Estimated output %d cols exceeds threshold %d, forcing per-category mode",
-                        estimated_cols,
-                        MAX_L2_ESTIMATED_COLS,
-                    )
-
-                category_frames: List[pd.DataFrame] = []
-                for category in DerivedOperatorEngine.OPERATOR_CATEGORIES:
-                    category_frame = engine.compute_category(layer1, data, indicator_specs, category)
-                    if category_frame is None or category_frame.empty:
-                        continue
-                    self._persist_layer2_category_group(category, category_frame)
-                    category_frames.append(category_frame)
-
-                if category_frames:
-                    result = pd.concat(category_frames, axis=1)
-                else:
-                    result = pd.DataFrame(index=layer1.index)
+                result = self._layer2_derived_pandas(layer1, data, config)
 
         elapsed = time.perf_counter() - t0
         logger.info("[L2] Completed: %d cols in %.2fs", result.shape[1], elapsed)
+        return result
+
+    def _layer2_derived_pandas(
+        self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
+    ) -> pd.DataFrame:
+        """Legacy pandas path for L2 derived features."""
+        filtered_ops = self._filter_operators_config(config.operators)
+        engine = DerivedOperatorEngine(filtered_ops)
+        indicator_specs = self._build_indicator_specs(layer1, config)
+
+        if self._cgsa_registry is None:
+            return engine.compute_all(layer1, data, indicator_specs)
+
+        estimated_cols = self._estimate_l2_output_cols(layer1.shape[1], filtered_ops)
+        if estimated_cols > MAX_L2_ESTIMATED_COLS:
+            logger.warning(
+                "[L2] Estimated output %d cols exceeds threshold %d, forcing per-category mode",
+                estimated_cols,
+                MAX_L2_ESTIMATED_COLS,
+            )
+
+        category_frames: List[pd.DataFrame] = []
+        for category in DerivedOperatorEngine.OPERATOR_CATEGORIES:
+            category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+            if category_frame is None or category_frame.empty:
+                continue
+            self._persist_layer2_category_group(category, category_frame)
+            category_frames.append(category_frame)
+
+        if category_frames:
+            return pd.concat(category_frames, axis=1)
+        return pd.DataFrame(index=layer1.index)
+
+    def _layer2_derived_polars(
+        self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
+    ) -> pd.DataFrame:
+        """Polars-based path for L2 derived features (Task 4.1 + 4.2).
+
+        Converts L1 to Polars for batch with_columns() operations,
+        then converts back to pandas for downstream compatibility.
+        """
+        from momentum.FeatureEngineering.polars_adapter import (
+            ensure_nan_semantics,
+            pandas_to_polars,
+            polars_to_pandas,
+        )
+
+        filtered_ops = self._filter_operators_config(config.operators)
+        engine = DerivedOperatorEngine(filtered_ops)
+        indicator_specs = self._build_indicator_specs(layer1, config)
+
+        # Use Polars batch computation via engine's polars path
+        result = engine.compute_all_polars(layer1, data, indicator_specs)
+
+        if result is None or result.empty:
+            return pd.DataFrame(index=layer1.index)
+
+        # Persist to CGSA registry if enabled
+        if self._cgsa_registry is not None:
+            for category in DerivedOperatorEngine.OPERATOR_CATEGORIES:
+                category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+                if category_frame is not None and not category_frame.empty:
+                    self._persist_layer2_category_group(category, category_frame)
+
         return result
 
     def _layer3_rolling_aggregation(
@@ -1597,3 +1641,157 @@ class FeatureFactory:
         preferred = [source for source in ["close", "volume", "taker_ratio"] if source in enabled]
         ordered = preferred + [source for source in enabled if source not in preferred]
         return ordered
+
+    # ------------------------------------------------------------------
+    # Phase 5: Multi-symbol parallel execution
+    # ------------------------------------------------------------------
+
+    def run_multi_symbol(
+        self,
+        symbols: List[str],
+        config_override: Optional[dict] = None,
+        max_workers: int = 8,
+        ref_symbol: str = "BTCUSDT",
+        timeout_per_symbol: int = 600,
+        cache_dir: Optional[str] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, str]]:
+        """Run the feature pipeline for multiple symbols in parallel.
+
+        Uses ProcessPoolExecutor with spawn context to avoid fork-related
+        issues with TA-Lib C globals and Numba JIT.
+
+        Returns:
+            (results, errors) where results maps symbol → metadata dict,
+            and errors maps symbol → error message string.
+        """
+        import multiprocessing as mp
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        # Step 1: Numba warm-up in main process (cache compiled functions)
+        _warmup_numba_functions()
+
+        # Step 2: Resolve config
+        config = self._resolve_config(config_override)
+        config_payload = config.model_dump(by_alias=True)
+
+        # Step 3: Prepare reference data as Arrow IPC for zero-copy sharing
+        ref_ipc_path: Optional[str] = None
+        try:
+            from momentum.FeatureEngineering.arrow_ipc_utils import write_reference_data_ipc
+            ref_data = self._load_reference_if_available(ref_symbol, config)
+            if ref_data is not None:
+                import tempfile
+                work_dir = Path(tempfile.mkdtemp(prefix="ffact_multi_"))
+                ipc_path = write_reference_data_ipc(ref_data, work_dir, ref_symbol)
+                ref_ipc_path = str(ipc_path)
+        except Exception as exc:
+            logger.warning("Reference data IPC preparation failed: %s", exc)
+
+        # Step 4: spawn context (mandatory on macOS for TA-Lib safety)
+        ctx = mp.get_context("spawn")
+        effective_workers = min(max_workers, len(symbols))
+
+        results: Dict[str, Any] = {}
+        errors: Dict[str, str] = {}
+
+        with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
+            futures = {
+                pool.submit(
+                    _worker_entry,
+                    sym,
+                    config_payload,
+                    cache_dir,
+                    ref_ipc_path,
+                ): sym
+                for sym in symbols
+            }
+            for future in as_completed(futures):
+                sym = futures[future]
+                try:
+                    results[sym] = future.result(timeout=timeout_per_symbol)
+                except Exception as exc:
+                    errors[sym] = str(exc)
+                    logger.error("Symbol %s failed: %s", sym, exc)
+
+        logger.info(
+            "Multi-symbol run complete: %d succeeded, %d failed",
+            len(results),
+            len(errors),
+        )
+        return results, errors
+
+    def _load_reference_if_available(
+        self,
+        ref_symbol: str,
+        config: "FactoryConfig",
+    ) -> Optional[pd.DataFrame]:
+        """Try to load reference symbol data from cache."""
+        try:
+            training_tfs = list(dict.fromkeys(config.timeframes.training))
+            tf = training_tfs[0] if training_tfs else "1h"
+            cached = self._reference_data_cache.get((ref_symbol, tf))
+            if cached is not None:
+                return cached
+            # Attempt adapter fetch
+            raw = self._layer0_data_ingestion(ref_symbol, tf, config)
+            return raw
+        except Exception:
+            return None
+
+
+def _worker_entry(
+    symbol: str,
+    config_payload: dict,
+    cache_dir: Optional[str],
+    ref_ipc_path: Optional[str],
+) -> dict:
+    """Module-level worker function for ProcessPoolExecutor (must be picklable).
+
+    Each worker creates its own FeatureFactory instance with an independent
+    ColumnGroupRegistry — no shared mutable state across workers.
+    """
+    from momentum.factories import create_feature_factory
+
+    factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
+
+    # Inject reference data from Arrow IPC if available
+    if ref_ipc_path:
+        try:
+            from momentum.FeatureEngineering.arrow_ipc_utils import read_reference_data_ipc
+            ref_df = read_reference_data_ipc(Path(ref_ipc_path))
+            config_tfs = config_payload.get("timeframes", {}).get("training", ["1h"])
+            tf = config_tfs[0] if config_tfs else "1h"
+            factory._reference_data_cache[("BTCUSDT", tf)] = ref_df
+        except Exception:
+            pass  # Proceed without reference data
+
+    result = factory.generate_features(
+        symbol=symbol,
+        timeframe=config_payload.get("timeframes", {}).get("training", ["1h"])[0] if config_payload.get("timeframes", {}).get("training") else "1h",
+        config_override=config_payload,
+        force_regenerate=True,
+    )
+    return result.metadata or {}
+
+
+def _warmup_numba_functions() -> None:
+    """Pre-compile all Numba @njit functions in the main process.
+
+    Workers started via spawn inherit the Numba cache from __pycache__,
+    avoiding redundant JIT compilation across 8 workers.
+    """
+    try:
+        from momentum.FeatureEngineering.operators.numba_rolling import (
+            fused_rolling_stats,
+            rolling_rank,
+            rolling_skew_kurt,
+            rolling_slope,
+        )
+        dummy = np.random.randn(100).astype(np.float64)
+        fused_rolling_stats(dummy, 5)
+        rolling_rank(dummy, 5)
+        rolling_slope(dummy, 5)
+        rolling_skew_kurt(dummy, 5, 50)
+        logger.info("[warmup] Numba JIT functions pre-compiled successfully")
+    except Exception as exc:
+        logger.warning("[warmup] Numba JIT warmup failed (non-fatal): %s", exc)

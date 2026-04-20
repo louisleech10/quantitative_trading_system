@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import gc
 import os
+import tempfile
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
 
 import numpy as np
@@ -94,6 +96,13 @@ class MultiTFGenerator:
     ) -> "FeatureGenerationResult":
         """CGSA multi-TF: compute layers per TF, align registry groups, then L6.5 + L7."""
         from momentum.FeatureEngineering.feature_config import AlignmentMode
+
+        # Task 1.5: parallel mode dispatches non-primary TFs to spawned workers
+        if self._multi_tf_parallel_enabled() and len(self._training_tfs) > 1:
+            return self._generate_multi_tf_cgsa_parallel(
+                symbol, primary_raw, primary_timestamps, start_time,
+                start_date=start_date, end_date=end_date,
+            )
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
@@ -187,7 +196,6 @@ class MultiTFGenerator:
                 n_primary = len(primary_timestamps)
                 aligned_count = 0
                 for gid in new_group_ids:
-                    group = registry.get(gid)
                     src_data = np.asarray(registry.load_data(gid), dtype=np.float32)
                     aligned_arr = self._align_group_array(src_data, idx_map, n_primary)
                     registry.overwrite_data(gid, aligned_arr)
@@ -256,6 +264,213 @@ class MultiTFGenerator:
         if np.any(valid):
             out[valid] = src_data[idx_map[valid]]
         return out
+
+    # ------------------------------------------------------------------
+    # CGSA parallel path (Task 1.5, SPEC §3.5)
+    # ------------------------------------------------------------------
+    def _generate_multi_tf_cgsa_parallel(
+        self,
+        symbol: str,
+        primary_raw: pd.DataFrame,
+        primary_timestamps: pd.DatetimeIndex,
+        start_time: float,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> "FeatureGenerationResult":
+        """CGSA multi-TF with ProcessPoolExecutor + spawn for non-primary TFs."""
+        import multiprocessing as mp
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        from momentum.FeatureEngineering.feature_factory import _warmup_numba_functions
+
+        registry = self._factory._cgsa_registry
+        skipped_tfs: List[str] = []
+        tf_layer_counts: Dict[str, Dict[str, int]] = {}
+
+        # Step 1: Process primary TF in main process (needs registry + factory state)
+        self._report_progress("multi_tf", 0.1, f"[CGSA-parallel] Processing primary TF {self._primary_tf}")
+        self._factory._current_timeframe = self._primary_tf
+
+        try:
+            layer1 = self._factory._layer1_atomic_indicators(primary_raw, self._config)
+            layer2 = self._factory._layer2_derived_features(layer1, primary_raw, self._config)
+            layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
+            layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, primary_raw, self._config)
+            layer5 = self._factory._layer5_cross_sectional(layer1, layer2, self._config)
+            layer6 = self._factory._layer6_meta_features(layer1, layer2, primary_raw, self._config)
+        except Exception as exc:
+            logger.error("Primary TF pipeline failed: %s", exc, exc_info=True)
+            raise
+
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+        for layer_df, layer_src, label in [
+            (layer3, _LS.L3, "L3_rolling"), (layer4, _LS.L4, "L4_lag"),
+            (layer5, _LS.L5, "L5_cross"), (layer6, _LS.L6, "L6_meta"),
+        ]:
+            if layer_df is not None and not layer_df.empty:
+                self._factory._persist_layer_output_groups(layer_df, layer_src, label)
+
+        tf_layer_counts[self._primary_tf] = self._collect_layer_counts(
+            [layer1, layer2, layer3, layer4, layer5, layer6]
+        )
+        del layer1, layer2, layer3, layer4, layer5, layer6
+        gc.collect()
+
+        logger.info("[CGSA-parallel] Primary TF %s done, %d groups", self._primary_tf, len(list(registry.iter_all())))
+
+        # Step 2: Process non-primary TFs in parallel via ProcessPoolExecutor + spawn
+        non_primary_tfs = [tf for tf in self._training_tfs if tf != self._primary_tf]
+        if non_primary_tfs:
+            _warmup_numba_functions()
+            config_payload = self._config.model_dump(by_alias=True)
+            ctx = mp.get_context("spawn")
+            max_workers = min(len(non_primary_tfs), 4)
+
+            self._report_progress("multi_tf", 0.3, f"[CGSA-parallel] Spawning {len(non_primary_tfs)} TF workers")
+
+            with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as pool:
+                futures = {
+                    pool.submit(
+                        _tf_worker_entry,
+                        symbol,
+                        tf,
+                        config_payload,
+                        start_date,
+                        end_date,
+                    ): tf
+                    for tf in non_primary_tfs
+                }
+                for future in as_completed(futures):
+                    tf = futures[future]
+                    try:
+                        result = future.result(timeout=600)
+                    except Exception as exc:
+                        logger.error("TF worker %s failed: %s", tf, exc, exc_info=True)
+                        skipped_tfs.append(tf)
+                        continue
+
+                    if "error" in result:
+                        logger.warning("TF worker %s returned error: %s", tf, result["error"])
+                        skipped_tfs.append(tf)
+                        continue
+
+                    # Register groups from worker into main registry
+                    tf_layer_counts[tf] = result.get("layer_counts", {})
+                    groups_data = result.get("groups", [])
+                    source_ts_ms = result.get("source_timestamps_ms")
+                    self._register_worker_groups(
+                        registry, groups_data, tf,
+                        primary_timestamps, self._config.timeframes.alignment_mode,
+                        source_timestamps_ms=source_ts_ms,
+                    )
+
+        self._report_progress("multi_tf", 0.7, "[CGSA-parallel] All TFs done")
+
+        # Restore current timeframe to primary for downstream L6.5/L7.
+        self._factory._current_timeframe = self._primary_tf
+
+        total_groups = len(list(registry.iter_all()))
+        if total_groups == 0:
+            raise ValueError(f"All training timeframes skipped for {symbol}")
+
+        logger.info("[CGSA-parallel] All TFs done: %d total groups in registry", total_groups)
+
+        # L6.5 preprocessing via registry (per-group)
+        if self._config.preprocessing.enabled:
+            self._report_progress("preprocessing", 0.75, "[CGSA-parallel] Running Layer 6.5")
+            self._factory._layer6_5_preprocessing(pd.DataFrame(), self._config)
+
+        # L7 validate + persist
+        self._report_progress("persist", 0.9, "[CGSA-parallel] Running Layer 7")
+        config_hash = self._factory._compute_config_hash(
+            self._config, symbol, self._primary_tf,
+            start_date=start_date, end_date=end_date,
+        )
+        elapsed = time.time() - start_time
+        result = self._factory._layer7_validate_and_persist(
+            symbol=symbol,
+            timeframe=self._primary_tf,
+            raw_data=primary_raw,
+            layers=[pd.DataFrame()],
+            config=self._config,
+            elapsed=elapsed,
+            config_hash=config_hash,
+        )
+
+        total_layer_counts = self._build_total_layer_counts(tf_layer_counts)
+        result.layer_counts = total_layer_counts
+        result.metadata["layer_counts"] = total_layer_counts
+        result.metadata["skipped_timeframes"] = skipped_tfs
+        result.metadata["actual_timeframes"] = [
+            tf for tf in self._training_tfs if tf not in skipped_tfs
+        ]
+
+        self._report_progress("complete", 1.0, f"[CGSA-parallel] MultiTF completed ({elapsed:.2f}s)")
+        return result
+
+    def _register_worker_groups(
+        self,
+        registry: object,
+        groups_data: List[Dict],
+        source_tf: str,
+        primary_timestamps: pd.DatetimeIndex,
+        alignment_mode: object,
+        source_timestamps_ms: Optional[np.ndarray] = None,
+    ) -> None:
+        """Register and align groups from a parallel TF worker into the main registry."""
+        from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
+        from momentum.FeatureEngineering.feature_config import AlignmentMode
+
+        n_primary = len(primary_timestamps)
+        primary_ms = (
+            primary_timestamps.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000
+        ).astype(np.int64)
+
+        # Build alignment index map from source → primary timestamps
+        idx_map: Optional[np.ndarray] = None
+        if source_timestamps_ms is not None:
+            offset_ns = -1 if alignment_mode == AlignmentMode.OPEN_MINUS else 0
+            idx_map = TimeframeAligner.build_asof_index_map(
+                primary_ms, source_timestamps_ms, offset_ns=offset_ns,
+            )
+
+        aligned_count = 0
+        for gd in groups_data:
+            src_data = gd["data"]
+            columns = tuple(gd["columns"])
+
+            # Align non-primary TF data to primary resolution
+            if idx_map is not None:
+                src_data = self._align_group_array(src_data, idx_map, n_primary)
+            elif src_data.shape[0] != n_primary:
+                # No source timestamps available — fill with NaN
+                logger.warning(
+                    "No source timestamps for group %s; filling NaN", gd["group_id"],
+                )
+                src_data = np.full((n_primary, len(columns)), np.nan, dtype=np.float32)
+
+            work_dir = Path(tempfile.mkdtemp(prefix="ffact_tf_"))
+            npy_path = work_dir / f"{gd['group_id']}.npy"
+            np.save(npy_path, src_data)
+
+            group = ColumnGroup(
+                group_id=gd["group_id"],
+                layer=LayerSource(gd["layer"]),
+                timeframe=gd["timeframe"],
+                data_source=gd["data_source"],
+                indicator=gd["indicator"],
+                columns=columns,
+                shape=src_data.shape,
+                dtype=gd["dtype"],
+                disk_path=npy_path,
+            )
+            registry.register(group)
+            aligned_count += 1
+
+        logger.info(
+            "[CGSA-parallel] Registered %d groups from worker TF %s",
+            aligned_count, source_tf,
+        )
 
     # ------------------------------------------------------------------
     # Legacy path: wide DataFrame concat + alignment (non-CGSA)
@@ -471,6 +686,12 @@ class MultiTFGenerator:
         raw = os.getenv("FFACT_USE_CGSA", "1").strip().lower()
         return raw not in {"0", "false", "no", "off"}
 
+    @staticmethod
+    def _multi_tf_parallel_enabled() -> bool:
+        """Check if Multi-TF parallel processing is enabled (Task 1.5, SPEC §3.5)."""
+        raw = os.getenv("FFACT_MULTI_TF_PARALLEL", "0").strip().lower()
+        return raw in {"1", "true", "yes", "on"}
+
     def _ensure_primary(self, training_tfs: List[str]) -> List[str]:
         deduped = list(dict.fromkeys(training_tfs))
         if self._primary_tf in deduped:
@@ -481,3 +702,85 @@ if TYPE_CHECKING:
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from momentum.FeatureEngineering.feature_config import FactoryConfig
     from momentum.FeatureEngineering.feature_factory import FeatureGenerationResult
+
+
+# ------------------------------------------------------------------
+# Module-level worker for Multi-TF parallel (Task 1.5, SPEC §3.5)
+# Must be at module level for ProcessPoolExecutor pickling.
+# ------------------------------------------------------------------
+
+def _tf_worker_entry(
+    symbol: str,
+    timeframe: str,
+    config_payload: dict,
+    start_date: Optional[str],
+    end_date: Optional[str],
+) -> Dict:
+    """Process a single timeframe in a spawned worker process.
+
+    Each worker creates its own FeatureFactory with an independent
+    ColumnGroupRegistry. Returns serialized group data + source timestamps
+    for the main process to register and align.
+
+    Returns dict with keys: timeframe, groups, source_timestamps_ms,
+    layer_counts, or error.
+    """
+    from momentum.factories import create_feature_factory
+
+    try:
+        factory = create_feature_factory(validate_continuity=False)
+        config = factory._resolve_config(config_payload)
+
+        raw_data = factory._layer0_data_ingestion(
+            symbol, timeframe, config,
+            start_date=start_date, end_date=end_date,
+        )
+        if raw_data is None or raw_data.empty:
+            return {"timeframe": timeframe, "error": f"Empty data for {symbol}/{timeframe}"}
+
+        # Extract source timestamps for alignment by main process
+        source_index, _ = TimeframeAligner._split_timestamp_index(raw_data)
+        source_dt = TimeframeAligner._to_datetime_index(source_index)
+        source_timestamps_ms = (
+            source_dt.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000
+        ).astype(np.int64)
+
+        factory._current_timeframe = timeframe
+        layer1 = factory._layer1_atomic_indicators(raw_data, config)
+        layer2 = factory._layer2_derived_features(layer1, raw_data, config)
+        layer3 = factory._layer3_rolling_aggregation(layer1, layer2, config)
+        layer4 = factory._layer4_lag_features(layer1, layer2, layer3, raw_data, config)
+        layer5 = factory._layer5_cross_sectional(layer1, layer2, config)
+        layer6 = factory._layer6_meta_features(layer1, layer2, raw_data, config)
+
+        # Collect group data from the worker's independent CGSA registry
+        groups_data: List[Dict] = []
+        registry = getattr(factory, "_cgsa_registry", None)
+        if registry is not None:
+            for group_id in sorted(registry._groups.keys()):
+                group = registry.get(group_id)
+                data = np.asarray(registry.load_data(group_id), dtype=np.float32)
+                groups_data.append({
+                    "group_id": group.group_id,
+                    "layer": group.layer.value,
+                    "timeframe": group.timeframe,
+                    "data_source": group.data_source,
+                    "indicator": group.indicator,
+                    "columns": list(group.columns),
+                    "shape": list(group.shape),
+                    "dtype": group.dtype,
+                    "data": data,
+                })
+
+        layer_counts = MultiTFGenerator._collect_layer_counts(
+            [layer1, layer2, layer3, layer4, layer5, layer6]
+        )
+
+        return {
+            "timeframe": timeframe,
+            "groups": groups_data,
+            "source_timestamps_ms": source_timestamps_ms,
+            "layer_counts": layer_counts,
+        }
+    except Exception as exc:
+        return {"timeframe": timeframe, "error": str(exc)}

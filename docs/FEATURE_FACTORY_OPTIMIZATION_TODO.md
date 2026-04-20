@@ -2202,9 +2202,221 @@ def test_numba_rolling_mean_vs_pandas(sample_ohlcv, window):
 
 # Phase 5 — 生產化
 
-**目標**: multi-symbol 平行化 + FeatureReader 統一讀取介面  
+**目標**: V7 P0 儲存基礎 → multi-symbol 平行化 → FeatureReader 統一讀取介面  
 **風險**: 中等（多進程 + TA-Lib 安全）  
 **Branch**: `perf/phase-5-production`
+
+---
+
+## Task 5.0: V7 P0 — 儲存基礎建設（Phase 5 前置）
+
+- **SPEC 參考**: `docs/FEATURE_STORAGE_ARCHITECTURE_V7.md` §11, §12 P0
+- **目標**: 建立 float16 + manifest + max_group_split + FeatureReader 基礎，所有 Phase 5 後續 Task 依賴此基礎
+- **輸入**: V6.2 pipeline 輸出的 per-group Parquet files（float32, 708 files, 36.63 GB）
+- **輸出**: 
+  - `manifest.json` — 每個 symbol/config_hash 目錄下產生（groups → file/column_count 映射）
+  - `columns.json.gz` — 壓縮全量 feature names（< 1 MB）
+  - float16 Parquet files — 取代 float32（~18 GB）
+  - `momentum/FeatureEngineering/feature_reader.py` — 新增 FeatureReader class
+- **前置**: Phase 3 完成（Numba rolling）、V6.2 pipeline 可執行
+- **實作要點**:
+  1. **manifest.json 寫入** — 在 `persist_registry_to_parquet()` 結束後：
+     ```python
+     manifest = {
+         "version": "7.0",
+         "symbol": symbol,
+         "config_hash": config_hash,
+         "created_at": datetime.now().isoformat(),
+         "total_features": total_col_count,
+         "total_rows": n_rows,
+         "dtype": "float16",
+         "groups": {}  # 填入 group_name → {"file": filename, "column_count": N}
+     }
+     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
+     ```
+  2. **columns.json.gz 寫入** — 收集所有 group 的 column names，gzip 壓縮寫入：
+     ```python
+     all_columns = []
+     for group_name, group_info in manifest["groups"].items():
+         all_columns.extend(group_info["columns"])
+     with gzip.open(output_dir / "columns.json.gz", 'wt') as f:
+         json.dump(all_columns, f)
+     # 驗證: compressed size < 1 MB（V7 §13 決議 #1）
+     ```
+  3. **float16 cast** — 在 `persist_column_group()` 中 `.astype(np.float16)` 後再寫入 Parquet：
+     ```python
+     # 在寫入 Parquet 前
+     df = df.astype(np.float16)
+     # 注意：NaN/Inf 在 float16 中保留（np.float16 支援 NaN/Inf）
+     table = pa.Table.from_pandas(df)
+     pq.write_table(table, path, compression='zstd')
+     ```
+  4. **max_group_columns=5000 自動拆分** — 當某 group 的 column count > 5000：
+     ```python
+     MAX_GROUP_COLUMNS = 5000
+     if len(columns) > MAX_GROUP_COLUMNS:
+         for i, chunk_start in enumerate(range(0, len(columns), MAX_GROUP_COLUMNS)):
+             chunk_cols = columns[chunk_start:chunk_start + MAX_GROUP_COLUMNS]
+             part_name = f"{group_name}_part{i+1}"
+             # 分別寫入 Parquet + 更新 manifest groups
+     ```
+  5. **FeatureReader 統一介面** — 新增 `feature_reader.py`，實作 4 種模式（見下方 API）
+  6. **FeatureLibrary 改造** — `load()` / `load_multi()` 內部改為委託 FeatureReader，移除 `import h5py`
+- **修改檔案**:
+  | 檔案 | 函式/方法 | 修改類型 |
+  |------|----------|---------|
+  | `momentum/FeatureEngineering/feature_storage.py` | `persist_registry_to_parquet()` | 修改：加入 manifest 寫入 + float16 cast |
+  | `momentum/FeatureEngineering/feature_storage.py` | `persist_column_group()` | 修改：float16 cast + max_group_split |
+  | `momentum/FeatureEngineering/feature_storage.py` | `_write_manifest()` | 新增：manifest.json + columns.json.gz 寫入 |
+  | `momentum/FeatureEngineering/feature_storage.py` | `_split_large_group()` | 新增：>5000 columns 自動拆分邏輯 |
+  | `momentum/FeatureEngineering/feature_reader.py` | `FeatureReader` class（全部） | **新增檔案** |
+  | `momentum/FeatureEngineering/feature_library.py` | `load()`, `load_multi()` | 修改：改用 FeatureReader，移除 h5py |
+- **不可做**:
+  - ❌ 不可保留 HDF5 讀取路徑（V7 決議：Parquet-only）
+  - ❌ 不可在 FeatureReader 中實作寫入功能（read-only，寫入職責在 feature_storage.py）
+  - ❌ 不可修改 pipeline 計算邏輯（只改 persist 層）
+  - ❌ 不可跳過 float16 精度驗證直接部署（必須有 T5.0b 通過）
+  - ❌ manifest.json 不可存 435K+ 完整 column names（用 columns.json.gz 壓縮另存）
+- **風險緩解**:
+  - R10（Parquet 45 萬欄位 metadata 開銷）→ manifest.json 避免讀 Parquet metadata
+  - R19（讀取效能）→ PyArrow column projection 直接讀指定欄，不需全檔掃描
+- **驗證**: T5.0a, T5.0b, T5.0c, T5.0d, T5.0e, T5.0f, T5.0g
+  - **通過條件**: 
+    1. persist 後 `manifest.json` + `columns.json.gz` 自動存在且內容正確
+    2. 所有 Parquet 檔 dtype == float16
+    3. float16 vs float32 數值差異 < `np.finfo(np.float16).eps * 10`（relative），NaN 位置完全一致
+    4. >5000 columns group 自動拆分為 part1/part2，manifest 正確記錄
+    5. FeatureReader 4 模式全部可用，結果與 `materialize_wide_df()` 一致
+    6. FeatureLibrary.load() 走 FeatureReader，`import h5py` 不再出現
+
+### FeatureReader API（V7 §11）
+
+```python
+class FeatureReader:
+    """V7 統一特徵讀取介面 — 只支援 Parquet，不支援 HDF5"""
+    
+    def __init__(self, feature_base_path: str = "data_cache/features"):
+        self._base = Path(feature_base_path)
+    
+    # Mode 1: Metadata-Only（零資料 I/O）
+    def load_manifest(self, symbol: str, config_hash: str) -> dict:
+        """載入 manifest.json"""
+        path = self._base / symbol / config_hash / "manifest.json"
+        if not path.exists():
+            raise FileNotFoundError(f"manifest.json not found: {path}")
+        return json.loads(path.read_text())
+    
+    def list_features(self, symbol: str, config_hash: str) -> list[str]:
+        """列出所有 feature names（不載入資料）"""
+        path = self._base / symbol / config_hash / "columns.json.gz"
+        if not path.exists():
+            # Fallback: 逐 group 讀 Parquet schema
+            return self._list_features_from_parquet(symbol, config_hash)
+        with gzip.open(path, 'rt') as f:
+            return json.load(f)
+    
+    # Mode 2: Column-Projected（只讀指定 columns）
+    def load_columns(self, symbol: str, config_hash: str, 
+                     columns: list[str]) -> pd.DataFrame:
+        """Column projection — 只讀指定 columns"""
+        manifest = self.load_manifest(symbol, config_hash)
+        frames = []
+        for group_name, group_info in manifest["groups"].items():
+            group_cols = group_info.get("columns", [])
+            needed = [c for c in columns if c in group_cols]
+            if not needed:
+                continue
+            path = self._base / symbol / config_hash / group_info["file"]
+            table = pq.read_table(str(path), columns=needed)
+            frames.append(table.to_pandas())
+        if not frames:
+            logger.warning(f"No columns matched in any group: {columns[:5]}...")
+            return pd.DataFrame()
+        return pd.concat(frames, axis=1)
+    
+    # Mode 3: Per-Group Streaming（逐 group 串流，計算完釋放記憶體）
+    def stream_groups(self, symbol: str, config_hash: str
+                      ) -> Iterator[tuple[str, pd.DataFrame]]:
+        """逐 group 串流"""
+        manifest = self.load_manifest(symbol, config_hash)
+        for group_name, group_info in manifest["groups"].items():
+            path = self._base / symbol / config_hash / group_info["file"]
+            df = pq.read_table(str(path)).to_pandas()
+            yield group_name, df
+            del df
+    
+    # Mode 4: Cross-Symbol（跨 symbol 載入同一組 columns）
+    def load_cross_symbol(self, symbols: list[str], config_hash: str,
+                          columns: list[str]) -> pd.DataFrame:
+        """跨 symbol 載入 → MultiIndex"""
+        frames = []
+        for sym in symbols:
+            df = self.load_columns(sym, config_hash, columns)
+            df["_symbol"] = sym
+            frames.append(df)
+        result = pd.concat(frames)
+        return result.set_index("_symbol", append=True)
+```
+
+### manifest.json 格式範例（V7 §13 決議 #1）
+
+```json
+{
+  "version": "7.0",
+  "symbol": "ETHUSDT",
+  "config_hash": "18228376bf79e867590ecee84f1f3a16",
+  "created_at": "2026-04-19T12:00:00",
+  "total_features": 435389,
+  "total_rows": 17928,
+  "dtype": "float16",
+  "groups": {
+    "12h_L2_momentum": {
+      "file": "12h_L2_momentum.parquet",
+      "column_count": 312,
+      "columns": ["12h_L2_momentum_ema_5", "12h_L2_momentum_ema_10", "..."]
+    },
+    "1h_L65_WorldQuant101_part1": {
+      "file": "1h_L65_WorldQuant101_part1.parquet",
+      "column_count": 5000,
+      "columns": ["..."]
+    },
+    "1h_L65_WorldQuant101_part2": {
+      "file": "1h_L65_WorldQuant101_part2.parquet",
+      "column_count": 3421,
+      "columns": ["..."]
+    }
+  }
+}
+```
+
+### 禁止事項
+
+- ❌ 不可保留 HDF5 讀取路徑（V7 決議：Parquet-only）
+- ❌ 不可在 FeatureReader 中實作寫入功能（read-only）
+- ❌ 不可修改 pipeline 計算邏輯（只改 persist 層）
+- ❌ 不可跳過 float16 精度驗證直接部署
+- ❌ manifest.json 不可存完整 column names（用 columns.json.gz 壓縮另存）
+
+### 風險緩解
+
+- R10（Parquet metadata 開銷）→ manifest.json 完全避開 Parquet 原生 metadata
+- R19（讀取效能）→ PyArrow column projection 取代全檔掃描
+
+### 邊界情況
+
+1. **空 group（0 columns）** → 不寫入 Parquet，不計入 manifest groups
+2. **全 NaN column** → float16 保留 NaN，manifest 仍記錄該 column
+3. **columns.json.gz 缺失（舊版 output 相容）** → `list_features()` fallback 逐 group 讀 Parquet schema
+4. **manifest.json 損壞/缺失** → raise FileNotFoundError，不嘗試修復
+5. **Group 恰好 5000 columns** → 不拆分（只有 > 5000 才觸發拆分）
+6. **float16 溢出（|value| > 65504）** → cast 後為 Inf，T5.0b 需記錄溢出位置
+7. **磁碟空間不足** → persist 中途失敗時清理不完整的 manifest + Parquet
+
+### ⚠️ 注意事項
+
+- 完成後須**刪除舊 float32 資料**重新跑 pipeline（V7 §13 決議 #3）
+- `columns.json.gz` 須 < 1 MB（V7 §13 決議 #1）
+- FeatureReader 不支援 HDF5，只支援 Parquet（V7 設計決策）
 
 ---
 
@@ -2453,17 +2665,24 @@ class FeatureReader:
 
 ## Phase 5 測試清單
 
-| ID | 測試名稱 | 驗證內容 |
-|----|---------|---------|
-| T5.1 | `test_multi_symbol_parallel_correctness` | 2 sym × 2 TF 各自 golden 一致 |
-| T5.2 | `test_multi_symbol_no_crosstalk` | 無共享 Registry 污染 |
-| T5.3a | `test_feature_reader_metadata_only` | manifest + list_features 正確 |
-| T5.3b | `test_feature_reader_column_projection` | selected columns 數值等價 |
-| T5.3c | `test_feature_reader_stream_groups` | 全 groups count == manifest total |
-| T5.3d | `test_feature_reader_cross_symbol` | 2 symbols × same columns |
-| T5.B1 | 某 symbol 失敗 | 其他不受影響 |
-| T5.B2 | Worker OOM killed | 主進程捕獲 exc |
-| T5.B3 | 磁碟空間不足 mid-run | 提前失敗 + 清理 |
+| ID | 測試名稱 | 驗證內容 | 通過條件 | SPEC ref |
+|----|---------|---------|---------|---------|
+| T5.0a | `test_manifest_written_after_persist` | persist 後 manifest.json + columns.json.gz 存在且正確 | manifest["total_features"] == 實際 column 數; columns.json.gz < 1 MB | V7 §12 P0#1 |
+| T5.0b | `test_float16_storage_precision` | float16 與 float32 差異 + NaN 保留 | relative diff < `np.finfo(np.float16).eps * 10`; NaN 位置完全一致; 溢出記錄 | V7 §12 P0#2 |
+| T5.0c | `test_max_group_split` | >5000 columns 自動拆分 | part1 有 5000 cols, part2 有餘數; manifest groups 正確記錄 | V7 §12 P0#2 |
+| T5.0d | `test_feature_reader_metadata_only` | `list_features()` 回傳正確 names | len == manifest["total_features"]; 與實際 Parquet columns 一致 | V7 §11 |
+| T5.0e | `test_feature_reader_column_projection` | `load_columns()` 只讀指定 columns | 結果與 `materialize_wide_df()[columns]` 數值 `np.allclose` | V7 §11 |
+| T5.0f | `test_feature_reader_stream_groups` | `stream_groups()` 逐 group 產出 | sum(group.shape[1]) == manifest["total_features"]; RSS < 2 GB | V7 §11 |
+| T5.0g | `test_feature_library_uses_reader` | FeatureLibrary.load() 走 FeatureReader | `grep -r "import h5py" momentum/FeatureEngineering/feature_library.py` == 0 | V7 §12 P0#4 |
+| T5.1 | `test_multi_symbol_parallel_correctness` | 2 sym × 2 TF 各自 golden 一致 | `np.allclose(atol=C1_MAP)` 全 PASS | §7.1 |
+| T5.2 | `test_multi_symbol_no_crosstalk` | 無共享 Registry 污染 | symbol A 結果不含 symbol B 任何 column | §7.1 |
+| T5.3a | `test_feature_reader_metadata_only` | manifest + list_features 正確 | 同 T5.0d | V7 §11 |
+| T5.3b | `test_feature_reader_column_projection` | selected columns 數值等價 | 同 T5.0e | V7 §11 |
+| T5.3c | `test_feature_reader_stream_groups` | 全 groups count == manifest total | 同 T5.0f | V7 §11 |
+| T5.3d | `test_feature_reader_cross_symbol` | 2 symbols × same columns | MultiIndex 正確; per-symbol 數值與單獨 load 一致 | V7 §11 |
+| T5.B1 | `test_multi_symbol_single_failure` | 某 symbol 失敗 | 其他 symbols 正常完成 + error log 記錄 | §7.1 |
+| T5.B2 | `test_worker_oom_handling` | Worker OOM killed | 主進程捕獲 BrokenProcessPool exc + 記錄 | §7.1 |
+| T5.B3 | `test_disk_full_mid_persist` | 磁碟空間不足 mid-run | 提前失敗 + 清理不完整檔案 | V7 §12 |
 
 ## Phase 5 → Done Gate
 
@@ -2593,12 +2812,13 @@ Phase 4 (條件性):
   ☑ SKIP（條件未觸發：L2+L6.5=29.89% < 30%，且 No-Phase-4 pipeline_total=303.848s < 7 min/sym）
 
 Phase 5:
-  □ Numba JIT 預熱
-  □ Task 5.1  multi-symbol ProcessPoolExecutor
-  □ Task 5.2  Arrow IPC intermediate
-  □ Task 5.3  FeatureReader 統一讀取介面
-  □ Task 1.5  Multi-TF 平行（延遲）
-  □ T5.1~T5.3d + T5.B1~T5.B3
+  ☑ Numba JIT 預熱
+  ☑ Task 5.0  V7 P0 儲存基礎建設（manifest.json + columns.json.gz + float16 + max_group_split + FeatureReader）
+  ☑ Task 5.1  multi-symbol ProcessPoolExecutor
+  ☑ Task 5.2  Arrow IPC intermediate
+  ☑ Task 5.3  FeatureReader 統一讀取介面
+  ☑ Task 1.5  Multi-TF 平行（延遲）
+  ☑ T5.0a~T5.0g + T5.1~T5.3d + T5.B1~T5.B3（26 passed）
   □ 最終 C1~C6 全量驗證
 ```
 

@@ -69,8 +69,16 @@ class FeaturePreprocessor:
         if features_df is None or features_df.empty:
             return pd.DataFrame(index=features_df.index if features_df is not None else None)
 
+        from momentum.FeatureEngineering.polars_adapter import polars_enabled
+
+        use_polars = polars_enabled()
+
         num_cols = len(features_df.columns)
         chunk_size = self._column_chunk_size
+
+        if use_polars and not self.fracdiff_config.get("enabled", False):
+            # Polars path: fracdiff not supported in Polars (requires scipy/statsmodels)
+            return self._transform_single_polars(features_df)
 
         if chunk_size > 0 and num_cols > chunk_size:
             return self._transform_chunked(features_df, chunk_size)
@@ -216,6 +224,76 @@ class FeaturePreprocessor:
             transformed = self._apply_adaptive_zscore(transformed)
 
         return transformed
+
+    def _transform_single_polars(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """Polars-based L6.5 transform (Task 4.3).
+
+        Handles winsorization, rank, zscore using Polars expressions.
+        fracdiff and ADF are not supported (require scipy/statsmodels)
+        and must use the pandas path.
+        """
+        from momentum.FeatureEngineering.polars_adapter import (
+            pandas_to_polars,
+            polars_l65_adaptive_zscore,
+            polars_l65_winsorization,
+            polars_to_pandas,
+        )
+
+        pl_df = pandas_to_polars(features_df)
+
+        # Winsorization
+        winsor_apply_to = self.winsor_config.get("apply_to", "all")
+        winsor_columns = self._select_columns(features_df, winsor_apply_to)
+        if winsor_columns:
+            method = self.winsor_config.get("method", "sigma")
+            sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
+            quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            pl_df = polars_l65_winsorization(
+                pl_df,
+                columns=winsor_columns,
+                method=method,
+                sigma_k=sigma_k,
+                quantile_range=(float(quantile_range[0]), float(quantile_range[1])),
+            )
+
+        # ADF differencing (pandas fallback — not supported in Polars)
+        if self.adf_config.get("enabled", False):
+            # Convert back to pandas, apply ADF, then convert back
+            pd_temp = polars_to_pandas(pl_df, index=features_df.index)
+            pd_temp = self._apply_adf_differencing(pd_temp)
+            pl_df = pandas_to_polars(pd_temp)
+
+        # Rank transform (fall back to pandas — rolling_rank not available in Polars 0.20)
+        if self.rank_config.get("enabled", False):
+            pd_temp = polars_to_pandas(pl_df, index=features_df.index)
+            pd_temp = self._apply_rank_transform(pd_temp)
+            pl_df = pandas_to_polars(pd_temp)
+
+        # Gaussian normalize (pandas fallback — requires scipy erfinv)
+        if self.gaussian_config.get("enabled", False):
+            pd_temp = polars_to_pandas(pl_df, index=features_df.index)
+            pd_temp = self._apply_gaussian_normalize(pd_temp)
+            pl_df = pandas_to_polars(pd_temp)
+
+        # Adaptive z-score
+        if self.zscore_config.get("enabled", False):
+            zscore_apply_to = self.zscore_config.get("apply_to", "all")
+            zscore_columns = self._select_columns(features_df, zscore_apply_to)
+            windows = self.zscore_config.get("windows", [100, 252])
+            epsilon = float(self.zscore_config.get("epsilon", 1e-8))
+            primary_window = int(windows[0]) if windows else 100
+            if zscore_columns and self.mode == "replace":
+                pl_df = polars_l65_adaptive_zscore(
+                    pl_df, columns=zscore_columns, window=primary_window, epsilon=epsilon
+                )
+            elif zscore_columns:
+                # append mode: fall back to pandas
+                pd_temp = polars_to_pandas(pl_df, index=features_df.index)
+                pd_temp = self._apply_adaptive_zscore(pd_temp)
+                pl_df = pandas_to_polars(pd_temp)
+
+        result = polars_to_pandas(pl_df, index=features_df.index)
+        return result
 
     def _transform_chunked(self, features_df: pd.DataFrame, chunk_size: int) -> pd.DataFrame:
         """Process columns in chunks to limit peak memory on wide DataFrames.

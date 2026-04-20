@@ -14,6 +14,7 @@ from api.core.logging import get_logger
 from momentum.factories import (
     create_coverage_analyzer,
     create_feature_library,
+    create_feature_reader,
     create_feature_quality_diagnostics,
 )
 
@@ -28,6 +29,7 @@ class FeatureBrowserService:
         self._quality_diagnostics = create_feature_quality_diagnostics(config={})
         self._feature_library = create_feature_library()
         self._coverage_analyzer = create_coverage_analyzer()
+        self._feature_reader = create_feature_reader()
 
     def get_coverage_matrix(
         self,
@@ -679,6 +681,15 @@ class FeatureBrowserService:
                 return self._normalize_df_index(self._feature_library.load(symbol, timeframe))
             raise ValueError("Invalid FeatureLibrary source format, expected library:{symbol}:{timeframe}")
 
+        # V7 Parquet path: try FeatureReader when features_path refers to a
+        # per-group Parquet directory (symbol/config_hash with manifest.json).
+        if features_path.startswith("parquet:"):
+            parts = features_path.split(":")
+            if len(parts) == 3:
+                _, symbol, config_hash = parts
+                return self._load_via_reader(symbol, config_hash)
+            raise ValueError("Invalid Parquet source format, expected parquet:{symbol}:{config_hash}")
+
         path = Path(features_path)
         if not path.exists():
             raise FileNotFoundError(f"features_path not found: {features_path}")
@@ -696,6 +707,18 @@ class FeatureBrowserService:
                 raise ValueError(f"Invalid HDF5 structure: {features_path}")
 
         raise ValueError(f"Unsupported features file format: {suffix}")
+
+    def _load_via_reader(self, symbol: str, config_hash: str) -> pd.DataFrame:
+        """Load features via V7 FeatureReader (Parquet per-group streaming)."""
+        columns = self._feature_reader.list_features(symbol, config_hash)
+        if not columns:
+            raise FileNotFoundError(f"No features found for {symbol}/{config_hash}")
+        df = self._feature_reader.load_columns(symbol, config_hash, columns)
+        logger.info(
+            "Loaded features via FeatureReader for %s/%s: %d rows x %d cols",
+            symbol, config_hash, len(df), len(df.columns),
+        )
+        return self._normalize_df_index(df)
 
     def _load_hdf5_features(self, path: Path) -> pd.DataFrame:
         with h5py.File(path, "r") as h5_file:

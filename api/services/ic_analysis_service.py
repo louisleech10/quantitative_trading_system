@@ -19,7 +19,7 @@ import pandas as pd
 
 from api.core.logging import get_logger
 from api.models.ic_models import DeepAnalysisRequest, ICAnalyzeRequest, ICFullAnalysisRequest
-from momentum.factories import create_feature_library, create_ic_analyzer, create_ic_reporter
+from momentum.factories import create_feature_library, create_feature_reader, create_ic_analyzer, create_ic_reporter
 
 
 logger = get_logger("api.ic_analysis_service")
@@ -299,12 +299,27 @@ class ICAnalysisService:
         }
 
     def list_features(self, features_path: str, meta_path: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Read available feature list from HDF5 (+ optional metadata JSON)."""
+        """Read available feature list from V7 Parquet or legacy HDF5.
+
+        V7 path: features_path = 'parquet:{symbol}:{config_hash}' → FeatureReader.
+        Legacy: features_path = '/path/to/file.h5' → h5py.
+        """
+        metadata = self._load_meta(meta_path)
+
+        # V7 Parquet path via FeatureReader
+        if features_path.startswith("parquet:"):
+            parts = features_path.split(":")
+            if len(parts) != 3:
+                raise ValueError("Invalid Parquet source format, expected parquet:{symbol}:{config_hash}")
+            _, symbol, config_hash = parts
+            reader = create_feature_reader()
+            names = reader.list_features(symbol, config_hash)
+            return self._build_feature_items(names, metadata)
+
+        # Legacy HDF5 path
         path = Path(features_path)
         if not path.exists():
             raise FileNotFoundError(f"features_path not found: {features_path}")
-
-        metadata = self._load_meta(meta_path)
 
         with h5py.File(path, "r") as h5_file:
             if "data" not in h5_file:
@@ -322,6 +337,14 @@ class ICAnalysisService:
             else:
                 raise ValueError("Invalid features HDF5: missing feature_names/features")
 
+        return self._build_feature_items(names, metadata)
+
+    @staticmethod
+    def _build_feature_items(
+        names: List[str],
+        metadata: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Build feature item list from names + optional metadata."""
         feature_items: List[Dict[str, Any]] = []
         for name in names:
             meta_item = metadata.get(name, {}) if isinstance(metadata.get(name, {}), dict) else {}
@@ -332,7 +355,6 @@ class ICAnalysisService:
                 "family": meta_item.get("family"),
                 "layer": meta_item.get("layer"),
             })
-
         return feature_items
 
     async def start_deep_analysis(self, task_id: str, request: DeepAnalysisRequest) -> Dict[str, str]:

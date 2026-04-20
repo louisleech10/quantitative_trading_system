@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.feature_reader import FeatureReader
 
 
 logger = get_logger(__name__)
@@ -67,6 +68,49 @@ class CoverageAnalyzer:
     def _resolve_feature_file_path(symbol: str, timeframe: str, feature_base_path: str) -> Path:
         base_path = Path(feature_base_path).expanduser().resolve()
         return base_path / f"{symbol}_{timeframe}_factory.h5"
+
+    def _load_symbol_features(
+        self,
+        symbol: str,
+        timeframe: str,
+        feature_base_path: str,
+    ) -> pd.DataFrame | None:
+        """Load features for a symbol, trying V7 FeatureReader first, then legacy HDF5."""
+        # V7 path: scan for manifest.json in feature_base_path/{symbol}/*/
+        base = Path(feature_base_path).expanduser().resolve()
+        sym_dir = base / symbol
+        if sym_dir.is_dir():
+            for config_dir in sorted(sym_dir.iterdir(), reverse=True):
+                manifest_path = config_dir / "manifest.json"
+                if manifest_path.exists():
+                    try:
+                        reader = FeatureReader(str(base))
+                        config_hash = config_dir.name
+                        columns = reader.list_features(symbol, config_hash)
+                        if columns:
+                            df = reader.load_columns(symbol, config_hash, columns)
+                            if not df.empty:
+                                logger.info(
+                                    "Coverage: loaded %s via FeatureReader (%d cols)",
+                                    symbol, len(df.columns),
+                                )
+                                return df
+                    except Exception as exc:
+                        logger.warning(
+                            "Coverage: FeatureReader failed for %s: %s, falling back to HDF5",
+                            symbol, exc,
+                        )
+
+        # Legacy HDF5 fallback
+        file_path = self._resolve_feature_file_path(symbol, timeframe, feature_base_path)
+        if not file_path.exists():
+            logger.warning("Coverage matrix feature file not found: %s", file_path)
+            return None
+        try:
+            return self._load_feature_dataframe(file_path)
+        except Exception as exc:
+            logger.warning("Coverage matrix failed to read %s: %s", file_path, exc)
+            return None
 
     @staticmethod
     def _decode_feature_names(raw_names: np.ndarray, feature_count: int) -> list[str]:
@@ -144,23 +188,16 @@ class CoverageAnalyzer:
         discovered_features: set[str] = set()
 
         for symbol in dedup_symbols:
-            file_path = self._resolve_feature_file_path(symbol, timeframe.strip(), feature_base_path)
-            if not file_path.exists():
-                logger.warning("Coverage matrix feature file not found: %s", file_path)
+            frame = self._load_symbol_features(symbol, timeframe.strip(), feature_base_path)
+            if frame is None:
                 symbol_frames[symbol] = None
                 row_counts[symbol] = 0
                 continue
 
-            try:
-                frame = self._load_feature_dataframe(file_path)
-                symbol_frames[symbol] = frame
-                row_counts[symbol] = int(frame.shape[0])
-                if len(dedup_features) == 0:
-                    discovered_features.update(str(column) for column in frame.columns)
-            except Exception as exc:
-                logger.warning("Coverage matrix failed to read %s: %s", file_path, exc)
-                symbol_frames[symbol] = None
-                row_counts[symbol] = 0
+            symbol_frames[symbol] = frame
+            row_counts[symbol] = int(frame.shape[0])
+            if len(dedup_features) == 0:
+                discovered_features.update(str(column) for column in frame.columns)
 
         if len(dedup_features) == 0:
             dedup_features = sorted(discovered_features)

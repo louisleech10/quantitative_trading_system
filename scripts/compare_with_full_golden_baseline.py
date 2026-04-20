@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.factories import create_feature_factory
+from momentum.FeatureEngineering.feature_reader import FeatureReader
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -367,6 +368,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Compare current run with full golden baseline")
     parser.add_argument("--manifest", required=True, help="Path to baseline manifest.json")
     parser.add_argument("--force-regenerate", action="store_true")
+    parser.add_argument("--no-validate-continuity", action="store_true",
+                        help="Skip kline data continuity validation")
     parser.add_argument("--output", default="results/full_golden_baseline/latest_compare_report.json")
     parser.add_argument(
         "--config-override-file",
@@ -493,7 +496,7 @@ def main() -> None:
         cache_drop_info = _run_cache_drop_command(args.cache_drop_command)
 
         gc.collect()
-        factory = create_feature_factory()
+        factory = create_feature_factory(validate_continuity=not args.no_validate_continuity)
         run_started_at_utc = datetime.utcnow().isoformat() + "Z"
         record = _run_generation_once(
             factory=factory,
@@ -521,6 +524,17 @@ def main() -> None:
 
     df = result.features_df.copy()
     labels_df = result.labels_df.copy()
+
+    # CGSA mode: features_df is empty but features stored in per-group Parquet
+    if df.empty and result.feature_count > 0:
+        config_hash = str(result.metadata.get("config_hash", ""))
+        reader = FeatureReader("data_cache/features")
+        frames: List[pd.DataFrame] = []
+        for _gn, gdf in reader.stream_groups(symbol, config_hash):
+            frames.append(gdf)
+        if frames:
+            df = pd.concat(frames, axis=1)
+        print(f"[CGSA] Loaded {df.shape[1]} features from per-group Parquet")
     current_feature_names = [str(col) for col in df.columns]
     current_label_names = [str(col) for col in labels_df.columns]
     current_overall_checksum = _overall_dataframe_checksum(df)

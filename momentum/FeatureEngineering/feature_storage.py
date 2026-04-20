@@ -327,6 +327,9 @@ class FeatureStorage:
             self.logger.error(f"工廠輸出儲存失敗: {str(e)}", exc_info=True)
             raise
 
+    # V7 §12 P0: max columns before auto-splitting a group
+    MAX_GROUP_COLUMNS = 5000
+
     def persist_registry_to_parquet(
         self,
         symbol: str,
@@ -336,9 +339,18 @@ class FeatureStorage:
     ) -> List[str]:
         """Persist CGSA registry groups to per-group parquet files.
 
+        V7 enhancements:
+        - float16 cast before writing (halves storage, IC delta < 1e-5)
+        - Auto-split groups with > MAX_GROUP_COLUMNS columns
+        - Write manifest.json + columns.json.gz after all groups persisted
+
         Uses stream-and-delete: each group is staged → moved → .npy deleted
         before proceeding to the next, keeping peak disk usage bounded.
         """
+        import gzip as _gzip
+        import pyarrow as pa
+        import pyarrow.parquet as pq_writer
+
         output_dir = self.base_path / symbol / config_hash
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -347,6 +359,10 @@ class FeatureStorage:
 
         persisted_paths: List[str] = []
         parquet_path_map: Dict[str, str] = {}
+        # V7 manifest groups metadata
+        manifest_groups: Dict[str, Dict] = {}
+        all_columns: List[str] = []
+        total_rows: int = 0
         npy_freed = 0
 
         try:
@@ -361,19 +377,45 @@ class FeatureStorage:
                         f"Group {group_id} columns mismatch: expected {len(group.columns)}, got {group_data.shape[1]}"
                     )
 
-                staged_path = staging_dir / f"{group_id}.parquet"
-                final_path = output_dir / f"{group_id}.parquet"
-                group_frame = pd.DataFrame(group_data, columns=list(group.columns), copy=False)
-                group_frame.to_parquet(staged_path, index=False, compression="zstd")
+                if total_rows == 0 and group_data.shape[0] > 0:
+                    total_rows = group_data.shape[0]
 
-                # Atomic move staging → final
-                os.replace(staged_path, final_path)
-                resolved_path = str(final_path.resolve())
-                persisted_paths.append(resolved_path)
-                parquet_path_map[group_id] = resolved_path
+                columns_list = list(group.columns)
 
-                # Stream-and-delete: free .npy immediately after parquet written
-                del group_data, group_frame
+                # Auto-split groups exceeding MAX_GROUP_COLUMNS (V7 §12 P0)
+                parts = self._split_large_group(group_id, columns_list, group_data)
+
+                for part_id, part_cols, part_data in parts:
+                    # Cast to float16 for storage (V7 §12 P0)
+                    data_f16 = part_data.astype(np.float16)
+
+                    staged_path = staging_dir / f"{part_id}.parquet"
+                    final_path = output_dir / f"{part_id}.parquet"
+
+                    table = pa.table(
+                        {col: data_f16[:, ci] for ci, col in enumerate(part_cols)}
+                    )
+                    pq_writer.write_table(table, staged_path, compression="zstd")
+
+                    os.replace(staged_path, final_path)
+                    resolved_path = str(final_path.resolve())
+                    persisted_paths.append(resolved_path)
+
+                    manifest_groups[part_id] = {
+                        "file": f"{part_id}.parquet",
+                        "column_count": len(part_cols),
+                        "columns": list(part_cols),
+                    }
+                    all_columns.extend(part_cols)
+                    del data_f16, table
+
+                # Map original group_id to the first part path for registry compat
+                if parts:
+                    parquet_path_map[group_id] = str(
+                        (output_dir / f"{parts[0][0]}.parquet").resolve()
+                    )
+
+                del group_data
                 if group.disk_path and group.disk_path.exists():
                     group.disk_path.unlink()
                     npy_freed += 1
@@ -387,12 +429,25 @@ class FeatureStorage:
             if parquet_path_map:
                 registry.set_group_parquet_paths(parquet_path_map)
 
+            # Write V7 manifest.json + columns.json.gz
+            self._write_v7_manifest(
+                output_dir=output_dir,
+                symbol=symbol,
+                config_hash=config_hash,
+                total_features=len(all_columns),
+                total_rows=total_rows,
+                groups=manifest_groups,
+            )
+            self._write_columns_json_gz(output_dir, all_columns)
+
             self.logger.info(
-                "CGSA per-group parquet persist completed: symbol=%s config_hash=%s groups=%d npy_freed=%d",
+                "CGSA per-group parquet persist completed: symbol=%s config_hash=%s "
+                "groups=%d npy_freed=%d total_features=%d dtype=float16",
                 symbol,
                 config_hash,
                 len(persisted_paths),
                 npy_freed,
+                len(all_columns),
             )
             return persisted_paths
         except Exception as e:
@@ -410,6 +465,68 @@ class FeatureStorage:
                     if child.is_file():
                         child.unlink()
                 staging_dir.rmdir()
+
+    @classmethod
+    def _split_large_group(
+        cls,
+        group_id: str,
+        columns: List[str],
+        data: np.ndarray,
+    ) -> List[Tuple[str, List[str], np.ndarray]]:
+        """Split a group into sub-parts when column count exceeds MAX_GROUP_COLUMNS.
+
+        Returns list of (part_id, part_columns, part_data_slice).
+        Groups with <= MAX_GROUP_COLUMNS columns are returned as-is.
+        """
+        max_cols = cls.MAX_GROUP_COLUMNS
+        if len(columns) <= max_cols:
+            return [(group_id, columns, data)]
+
+        parts: List[Tuple[str, List[str], np.ndarray]] = []
+        for i, chunk_start in enumerate(range(0, len(columns), max_cols)):
+            chunk_end = min(chunk_start + max_cols, len(columns))
+            part_cols = columns[chunk_start:chunk_end]
+            part_data = data[:, chunk_start:chunk_end]
+            part_id = f"{group_id}_part{i + 1}"
+            parts.append((part_id, part_cols, part_data))
+        return parts
+
+    @staticmethod
+    def _write_v7_manifest(
+        output_dir: Path,
+        symbol: str,
+        config_hash: str,
+        total_features: int,
+        total_rows: int,
+        groups: Dict[str, Dict],
+    ) -> None:
+        """Write V7-format manifest.json (without full column names inline)."""
+        manifest = {
+            "version": "7.0",
+            "symbol": symbol,
+            "config_hash": config_hash,
+            "created_at": datetime.utcnow().isoformat(),
+            "total_features": total_features,
+            "total_rows": total_rows,
+            "dtype": "float16",
+            "groups": groups,
+        }
+        manifest_path = output_dir / "manifest.json"
+        temp_path = output_dir / "manifest.json.tmp"
+        with temp_path.open("w", encoding="utf-8") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+        os.replace(temp_path, manifest_path)
+
+    @staticmethod
+    def _write_columns_json_gz(output_dir: Path, all_columns: List[str]) -> None:
+        """Write compressed columns.json.gz containing all feature names."""
+        import gzip as _gzip
+
+        gz_path = output_dir / "columns.json.gz"
+        temp_path = output_dir / "columns.json.gz.tmp"
+        with _gzip.open(temp_path, "wt", encoding="utf-8") as f:
+            json.dump(all_columns, f)
+        os.replace(temp_path, gz_path)
 
     def _build_2d_chunks(self, shape: Tuple[int, int]) -> Optional[Tuple[int, int]]:
         if len(shape) != 2:
