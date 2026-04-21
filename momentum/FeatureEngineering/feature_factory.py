@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import os
-import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
@@ -42,7 +41,7 @@ from momentum.FeatureEngineering.atomic.microstructure_indicators import Microst
 from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicatorEngine
 from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
 from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
-from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry, ColumnGroupRegistryError
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
 
@@ -96,6 +95,7 @@ class FeatureFactory:
         self._current_raw_data: Optional[pd.DataFrame] = None
         self._reference_data_cache: Dict[Tuple[str, str], pd.DataFrame] = {}
         self._cgsa_registry: Optional[ColumnGroupRegistry] = None
+        self._cgsa_force_fresh: bool = False
 
     def generate_features(
         self,
@@ -132,7 +132,8 @@ class FeatureFactory:
             if cached:
                 return cached
 
-        self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe)
+        self._cgsa_force_fresh = force_regenerate
+        self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe, config_hash or "")
 
         training_tfs = list(dict.fromkeys(config.timeframes.training))
         if len(training_tfs) > 1:
@@ -455,17 +456,44 @@ class FeatureFactory:
         self,
         symbol: str,
         timeframe: str,
+        config_hash: str = "",
     ) -> Optional[ColumnGroupRegistry]:
         if not self._cgsa_enabled():
             return None
 
         configured_work_dir = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
         if configured_work_dir:
-            work_dir = Path(configured_work_dir)
+            work_dir = Path(configured_work_dir).expanduser().resolve()
         else:
             safe_symbol = re.sub(r"[^A-Za-z0-9_.-]+", "_", symbol)
             safe_timeframe = re.sub(r"[^A-Za-z0-9_.-]+", "_", timeframe)
-            work_dir = Path(tempfile.mkdtemp(prefix=f"ffact_cgsa_{safe_symbol}_{safe_timeframe}_"))
+            normalized_config_hash = config_hash or ""
+            hash_prefix = normalized_config_hash[:8] if normalized_config_hash else "nohash"
+            work_dir = (
+                Path.cwd()
+                / "data_cache"
+                / "cgsa_work"
+                / f"{safe_symbol}_{safe_timeframe}_{hash_prefix}"
+            ).resolve()
+
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest_path = work_dir / "manifest.json"
+        force_fresh = bool(getattr(self, "_cgsa_force_fresh", False))
+        if manifest_path.exists() and not force_fresh:
+            try:
+                with manifest_path.open("r", encoding="utf-8") as handle:
+                    manifest_payload = json.load(handle)
+                if "groups" not in manifest_payload:
+                    raise KeyError("groups")
+                logger.info("[CGSA] Resuming from manifest at %s", work_dir)
+                return ColumnGroupRegistry.resume_from_manifest(work_dir)
+            except (json.JSONDecodeError, KeyError, OSError, ColumnGroupRegistryError) as exc:
+                logger.warning(
+                    "[CGSA] Corrupt manifest at %s: %s, starting fresh",
+                    work_dir,
+                    exc,
+                )
 
         logger.info("[CGSA] Initialized ColumnGroupRegistry at %s", work_dir)
         return ColumnGroupRegistry(work_dir=work_dir)
@@ -804,12 +832,6 @@ class FeatureFactory:
         Converts L1 to Polars for batch with_columns() operations,
         then converts back to pandas for downstream compatibility.
         """
-        from momentum.FeatureEngineering.polars_adapter import (
-            ensure_nan_semantics,
-            pandas_to_polars,
-            polars_to_pandas,
-        )
-
         filtered_ops = self._filter_operators_config(config.operators)
         engine = DerivedOperatorEngine(filtered_ops)
         indicator_specs = self._build_indicator_specs(layer1, config)
