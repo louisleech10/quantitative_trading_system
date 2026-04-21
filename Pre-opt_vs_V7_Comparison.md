@@ -11,7 +11,7 @@
 
 | 模式 | 定義 | Flags |
 |------|------|-------|
-| **Pre-optimization** | 所有計算優化全部關閉 | SEARCHSORTED=0, CGSA=0, NUMBA_ROLLING=0, POLARS=0, L3_STREAMING=0 |
+| **Pre-optimization** | 所有計算優化全部關閉  | SEARCHSORTED=0, CGSA=0, NUMBA_ROLLING=0, POLARS=0, L3_STREAMING=0 |
 | **V7 Baseline** | 所有計算優化全部開啟 + V7 Storage (float16, manifest, split) | SEARCHSORTED=1, CGSA=1, NUMBA_ROLLING=1, POLARS=1, L3_STREAMING=1 |
 
 **注意**: V7 Storage 變更（float16 Parquet、manifest.json、columns.json.gz、max_group_split）為硬編碼，兩個模式皆使用 V7 Storage path。
