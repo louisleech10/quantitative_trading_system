@@ -1,0 +1,114 @@
+你是嚴格執行 docs/FEATURE_OPTIMIZATION_TODO.md的實作者。
+任務：完成（ Batch 1 : Phase 0 (Task 0.1, 0.2) + Phase 1 (Task 1.1, 1.2, 1.3))，了解TODO整體架構和內容，只允許在 TODO 範圍內修補；不得擴展功能或架構。先讀取相關檔案後直接進入 Step 1。
+
+參考SPEC:docs/FFEATURE_OPTIMIZATION_SPEC.md
+
+規則：
+1. 閱讀要修改的檔案，理解現有程式碼
+2. Ultra Think 3 步驟：生成 → 自審 → 優化
+3. 完成後執行「驗證指令」，確認全部通過
+4.每個TASK完成前都要執行SPEC.md的0. AI Agent 生成規範相關項目的逐一檢查
+5.檢查解耦 7 規則（Zero Tolerance）
+6.每個TASK完成前要執行ruff check和
+7.完成後執行驗證：
+  ./venv/bin/pytest tests/test_hardware_utils.py tests/test_cgsa_resume.py -v
+  grep -r "from api\." momentum/ | wc -l  # 必須為 0
+8.若有測試/檢查失敗，修復後重新驗證
+
+
+Ultra Think 三步驟：
+Step 1 - 初版：先產出可執行的實作，含必要錯誤處理與日誌。
+Step 2 - 自我審查：列出待辦清單（品質、邊界、命名、一致性、效能、測試），先不修改。
+Step 3 - 優化：依待辦清單逐項修補；必要時加入少量註解。
+
+Ultra Think 三步驟完成後，直接進行驗證測試。
+確保所有驗證都通過，驗證有問題需確實解決，不能以繞過，縮減或bypass取代通過。Checklist皆已完成，才算完成Task。
+驗證通過，Checklist重複審查為完成
+
+約束：
+- 嚴格遵守 First Principles。
+- TODO中的§0 全域規則與約束
+- 不新增未被 TODO 暗示的功能或流程。
+- 不改動與本 Task 無關的區塊。
+- 維持最高品質。
+- PLAN中的相對應Checkbox都要檢查是否完成
+
+輸出要求CHECKBOX，確保有以下項目才能打勾：
+[ ] 所有的§0 全域規則與約束的驗收和檢查清單，則同步更新測試和每個Checkbox
+[ ] 更新實作；若 TODO 含測試和Checkbox，則將TODO.md中這次任務已完成項目的checkbox做相對應更新
+[ ] 列出實際修改的檔案。
+[ ] 提供對應驗證命令。
+[ ] 若有無法驗證之處，標明原因與替代檢查方式。
+[ ] 這些Task完成了哪些項目和進展，將細項條列式逐一列出。
+[ ] 驗證了哪些項目，通過條件是什麼，結果如何，將每個驗證程式內的項目條列式逐一列出，不是只寫出有哪些測試項目名稱。
+[ ] 驗證結果任何非PASSED的所有項目都要解釋，包括Error，Failed，Skipped，deselect，Warnings...等各種非PASSED都要解釋
+
+Batch 1: [Phase 0 + Phase 1] ──── 無前置依賴
+  Task 0.1, 0.2 (hardware_utils.py — 新增)
+  Task 1.1, 1.2, 1.3 (CGSA resume — 修改 feature_factory.py)
+  （Phase 0 和 Phase 1 修改不同檔案，無互依賴）
+    │
+    ▼ Gate: T0.x + T1.x 全通過，hardware_utils 無 api import
+Batch 2: [Phase 2] ──── 依賴 Batch 1（hardware_utils + CGSA registry）
+  Task 2.1, 2.2, 2.3, 2.4
+    │
+    ▼ Gate: T2.x 全通過，C1~C6，≥2× speedup
+Batch 3: [Phase 3] ──── 依賴 Batch 2 Gate（L6.5 必須正確後才改 L3）
+  Task 3.1, 3.2, 3.3
+    │
+    ▼ Gate: T3.x 全通過，C1~C6，≥1.3× speedup
+Batch 4: [Phase 4] ──── 依賴 Batch 3 Gate
+  Task 4.1, 4.2, 4.3
+    │
+    ▼ Gate: T4.x 全通過，C1~C6，≥2× speedup，且小檔數受控
+Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils）
+  Task 5.1, 5.2, 5.3
+    │
+    ▼ Gate: T5.x 全通過，API + 前端可用
+批次明細
+Batch	包含項目	依賴前置	合併理由	預估規模
+1	Phase 0 (Task 0.1, 0.2) + Phase 1 (Task 1.1, 1.2, 1.3)	—	修改不同檔案（新增 hardware_utils vs 修改 feature_factory），無互依賴	中（5 Task，但邏輯簡單）
+2	Phase 2 (Task 2.1, 2.2, 2.3, 2.4, 2.5)	Batch 1	依賴 hardware_utils (Task 0.1) + CGSA registry 修改 (Task 1.x)；同批處理 greedy scheduling、warmup 與 deferred 判定，可減少重複改動與遺漏	中（5 Task，4 個實作 + 1 個 deferred 決策）
+3	Phase 3 (Task 3.1, 3.2, 3.3, 3.4)	Batch 2	依賴 Phase 2 Gate 通過（確認 L6.5 正確後才改 L3）；同批保留大資料集 chunking 的 deferred 判定，避免後續批次遺漏	中（4 Task，3 個實作 + 1 個 deferred 決策）
+4	Phase 4 (Task 4.1, 4.2, 4.3)	Batch 3	_persist_parts_parallel()、呼叫端整合與 Async compactor 共用同一資料流，分開做容易造成介面漂移	中（3 Task，I/O 路徑與背景佇列需一起驗證）
+5	Phase 5 (Task 5.1, 5.2, 5.3)	Batch 4	依賴 hardware_utils + 所有核心 Phase 完成	中（3 Task，跨前後端）
+批次間 Gate 檢查
+轉換	必須通過的驗證	驗證命令
+Batch 1 → 2	T0.1~T0.4, T0.B1~T0.B3, T1.1~T1.4, T1.B1~T1.B5 + grep -r "from api\." momentum/ = 0	./venv/bin/pytest tests/test_hardware_utils.py tests/test_cgsa_resume.py -v && ! grep -r 'from api\.' momentum/
+Batch 2 → 3	T2.1~T2.6, T2.B1~T2.B7, T2.P1~T2.P2 + C1~C6 全量比對 + FFACT_L65_WORKERS=1 fallback + Task 2.5 deferred 觸發條件仍未達成	./venv/bin/pytest tests/test_l65_parallel.py tests/performance/test_l65_parallel_perf.py -v
+Batch 3 → 4	T3.1~T3.4, T3.B1~T3.B8, T3.P1~T3.P2 + C1~C6 + FFACT_L3_MULTI_WINDOW=0 fallback + Task 3.4 deferred 觸發條件仍未達成	./venv/bin/pytest tests/test_multi_window_rolling.py tests/performance/test_multi_window_perf.py -v
+Batch 4 → 5	T4.1~T4.5, T4.B1~T4.B7, T4.P1~T4.P2 + C1~C6 + FFACT_L7_COMPACTOR_ENABLED=0 fallback	./venv/bin/pytest tests/test_l7_parallel_persist.py tests/performance/test_l7_persist_perf.py -v
+Batch 5 → Done	T5.1~T5.3, T5.B1~T5.B2 + API 回傳正確 JSON	./venv/bin/pytest tests/test_hardware_api.py -v
+快速執行參考（複製貼上用）
+Batch 1:
+請執行以下 Task：Phase 0 全域前置 + Task 0.1 + Task 0.2 + Task 1.1 + Task 1.2 + Task 1.3
+完成後執行驗證：
+  ./venv/bin/pytest tests/test_hardware_utils.py tests/test_cgsa_resume.py -v
+  grep -r "from api\." momentum/ | wc -l  # 必須為 0
+Batch 2:
+前置已完成：Batch 1（Phase 0 + Phase 1 全部 Task + Gate 通過）
+請執行：Task 2.1 + Task 2.2 + Task 2.3 + Task 2.4，並完成 Task 2.5 的 deferred 條件確認（不實作程式碼）
+完成後執行驗證：
+  ./venv/bin/pytest tests/test_l65_parallel.py tests/performance/test_l65_parallel_perf.py -v
+  FFACT_L65_WORKERS=1 ./venv/bin/pytest tests/test_l65_parallel.py -v  # fallback 驗證
+  手動確認 Task 2.5 觸發條件未達成：開發機非 32GB，且 P0-A ThreadPool 路徑已作為主要方案
+Batch 3:
+前置已完成：Batch 1-2（Phase 0-2 全部 Task + Gate 通過）
+請執行：Task 3.1 + Task 3.2 + Task 3.3，並完成 Task 3.4 的 deferred 條件確認（不實作程式碼）
+完成後執行驗證：
+  ./venv/bin/pytest tests/test_multi_window_rolling.py tests/performance/test_multi_window_perf.py -v
+  FFACT_L3_MULTI_WINDOW=0 ./venv/bin/pytest tests/test_multi_window_rolling.py -v  # fallback
+  手動確認 Task 3.4 觸發條件未達成：目前資料集非 1min 大時間序列，故維持 deferred
+Batch 4:
+前置已完成：Batch 1-3（Phase 0-3 全部 Task + Gate 通過）
+請執行：Task 4.1 + Task 4.2 + Task 4.3
+完成後執行驗證：
+  ./venv/bin/pytest tests/test_l7_parallel_persist.py tests/performance/test_l7_persist_perf.py -v
+  FFACT_L7_WORKERS=1 ./venv/bin/pytest tests/test_l7_parallel_persist.py -v  # fallback
+  FFACT_L7_COMPACTOR_ENABLED=0 ./venv/bin/pytest tests/test_l7_parallel_persist.py -v  # compactor fallback
+Batch 5:
+前置已完成：Batch 1-4（Phase 0-4 全部 Task + Gate 通過）
+請執行：Task 5.1 + Task 5.2 + Task 5.3
+完成後執行驗證：
+  ./venv/bin/pytest tests/test_hardware_api.py -v
+  curl http://localhost:8000/api/v1/config/hardware | python -m json.tool  # 手動檢查

@@ -35,7 +35,7 @@
 3. [Phase 1 — Resume 啟用 + CGSA 修正](#3-phase-1--resume-啟用--cgsa-修正)
 4. [Phase 2 — L6.5 Preprocessing 平行化（P0）](#4-phase-2--l65-preprocessing-平行化p0)
 5. [Phase 3 — L3 Rolling Aggregation 優化（P2）](#5-phase-3--l3-rolling-aggregation-優化p2)
-6. [Phase 4 — L7 Parallel Parquet Writes（P3）](#6-phase-4--l7-parallel-parquet-writesp3)
+6. [Phase 4 — L7 Parallel Parquet Writes + Async Compactor（P3）](#6-phase-4--l7-parallel-parquet-writes--async-compactorp3)
 7. [Phase 5 — 硬體資訊 API + 前端顯示](#7-phase-5--硬體資訊-api--前端顯示)
 8. [Phase Gate 決策矩陣](#8-phase-gate-決策矩陣)
 9. [全局測試策略](#9-全局測試策略)
@@ -187,7 +187,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 |-------|--------------|---------------------|
 | Phase 2 | L6.5 串行路徑 | `FFACT_L65_WORKERS=1` |
 | Phase 3 | 現有 per-window kernel | `FFACT_L3_MULTI_WINDOW=0`（回到逐 window 呼叫） |
-| Phase 4 | L7 串行 writes | `FFACT_L7_WORKERS=1` |
+| Phase 4 | L7 串行 writes + 停用背景合併 | `FFACT_L7_WORKERS=1`, `FFACT_L7_COMPACTOR_ENABLED=0` |
 | Phase 0/1 | 無需 fallback（純增、純修正） | — |
 | Phase 5 | 無需 fallback（獨立新功能，不影響核心 pipeline） | — |
 
@@ -547,6 +547,18 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
       from concurrent.futures import ThreadPoolExecutor, as_completed
       
       groups = registry.list_all_groups()
+
+      # 【新增 — 盲點二】貪婪排程（Greedy Scheduling）：按欄位數降序排列
+      # 風險來源：L65_AVG_S_PER_GROUP=3.42s 是平均值，但 L2_Momentum（~16,110 欄）
+      # 可能耗時百倍於小型 Group（<50 欄）。若使用原始順序提交，可能出現「3 個 Worker
+      # 已完成所有小任務，第 4 個 Worker 才剛開始大任務」的長尾效應。
+      # 解法：最大 Group 優先進 Pool，使大任務與小任務盡量並行。
+      groups = sorted(
+          groups,
+          key=lambda g: getattr(g, 'n_columns', 0),
+          reverse=True,
+      )
+
       logger.info("[L6.5] Starting parallel transform: %d groups, %d workers",
                   len(groups), n_workers)
       
@@ -583,6 +595,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
     1. `n_workers=0` → 等同 `n_workers=1`，串行執行
     2. groups 為空列表 → 直接回傳 0
     3. 某個 group transform 失敗 → log error，繼續其他 groups
+    4. **【新增 — 盲點二】** 所有 groups `n_columns=0`（屬性不存在）→ `sorted` 排序無效但不影響正確性（退化為原始順序）
 - **輸出**: `int`（成功 transform 的 group 數）
 - **禁止事項**: 不可使用 ProcessPoolExecutor（L6.5 內無 TA-Lib，ThreadPool 足夠且開銷小）
 
@@ -631,6 +644,14 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
   - 邊界條件：
     1. Numba 未安裝 → ImportError → skip warmup
     2. 多次呼叫 → 只 warmup 一次（`_numba_warmed_up` flag）
+    3. **【新增 — 盲點三】** 快取目錄不可寫入（唯讀環境）→ `cache=True` 失效，Numba 每次重新編譯並記錄 warning
+    4. **【新增 — 盲點三】** 第一次執行（無磁碟快取）＋ ProcessPoolExecutor → 務必在 `fork()` 前完成主進程 warmup，否則每個子進程各自觸發編譯
+
+  - **【新增 — 盲點三】ThreadPool vs ProcessPool 安全性差異**：
+    - **目前實作（ThreadPool）**：所有 Worker 執行緒共用同一進程記憶體，主執行緒 warmup 後 JIT 結果即可直接使用 ✅
+    - **若未來引入 ProcessPoolExecutor**（如跨 Symbol 平行化）：fork 出的子進程**不繼承** JIT 編譯結果。8 個子進程同時觸發 Numba 編譯 → CPU 突波 × 8、RAM 突波 → OOM 風險（已列入 R13）
+    - **根本防禦**：所有 `@numba.njit` 函式必須設定 `cache=True`（§0.7 已規範）。主進程 warmup 後，Numba 將機器碼快取至磁碟（`~/.cache/numba/` 或 `__pycache__/`）。Fork 出的子進程直接讀取磁碟快取 → 跳過重新編譯
+    - **驗證方式**：主進程 warmup 後確認 `.nbi`/`.nbc` 快取檔案存在；子進程啟動時 log 中無 `"numba: compiling"` 訊息
 
 #### Task 2.4: CGSA In-Memory Buffer — P0-B（24/32GB）
 
@@ -705,6 +726,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 | T2.3 | `test_tier_auto_selects_workers` | 8GB tier → 4 workers | `n_workers == 4` | Task 2.2 |
 | T2.4 | `test_cgsa_buffer_batch_write` | buffer=4 時每 4 groups 才 flush | mock `_write_npy` 呼叫次數 | Task 2.4 |
 | T2.5 | `test_cgsa_buffer_finalize_flushes_remaining` | finalize 清空剩餘 buffer | buffer 為空 | Task 2.4 |
+| T2.6 | `test_parallel_greedy_scheduling_largest_groups_first` | 平行提交順序按 `n_columns` 降序 | 最大 group 最先進入 pool | Task 2.1 |
 
 #### 邊界條件測試
 
@@ -716,6 +738,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 | T2.B4 | `test_parallel_workers_1_is_serial` | n_workers=1 | 走串行路徑 |
 | T2.B5 | `test_cgsa_buffer_zero_is_immediate_flush` | buffer=0 | 每次 save 立即 write |
 | T2.B6 | `test_cgsa_buffer_crash_loses_unflushed` | buffer=4, 存 2 個後模擬 crash | 只有 0 個寫入 disk |
+| T2.B7 | `test_numba_warmup_runs_before_process_pool_fanout` | 模擬未來 ProcessPool 路徑 | 主進程 warmup 先於 worker 啟動 |
 
 #### 效能驗收測試
 
@@ -726,8 +749,8 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 
 ### 4.3 Phase 2 → Phase 3 Gate
 
-- [ ] T2.1~T2.5 全部通過
-- [ ] T2.B1~T2.B6 全部通過
+- [ ] T2.1~T2.6 全部通過
+- [ ] T2.B1~T2.B7 全部通過
 - [ ] T2.P1 效能驗收通過（≥ 2× speedup）
 - [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）
 - [ ] `FFACT_L65_WORKERS=1` fallback 正常
@@ -919,11 +942,11 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 
 ---
 
-## 6. Phase 4 — L7 Parallel Parquet Writes（P3）
+## 6. Phase 4 — L7 Parallel Parquet Writes + Async Compactor（P3）
 
-> **目標**: ThreadPool 平行寫入 Parquet parts（max_group_split 已生效，可直接做）
-> **預計效果**: L7 從 467s → ~150s (8GB/4w) / ~100s (24GB/8w)
-> **風險**: 低（Parquet 寫入天然可平行，無共享狀態）
+> **目標**: ThreadPool 平行寫入 Parquet parts（max_group_split 已生效，可直接做），並以背景合併程序避免小檔案碎片化反噬 IOPS
+> **預計效果**: L7 從 467s → ~150s (8GB/4w) / ~100s (24GB/8w)，且輸出檔案數維持在可接受範圍，避免後續 ML 讀取退化
+> **風險**: 低到中（Parquet 寫入天然可平行；新增 compactor 需注意 manifest 與 crash recovery）
 
 ### 6.1 任務清單
 
@@ -939,6 +962,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
       self,
       parts_queue: List[Tuple[str, Any, Path, Path]],
       n_workers: int,
+      compactor: Optional['AsyncParquetCompactor'] = None,
   ) -> List[str]:
       """Write prepared (part_id, table, final_path, staging_path) tuples in parallel.
       
@@ -947,14 +971,20 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
       Args:
           parts_queue: List of (part_id, arrow_table, final_path, staging_path).
           n_workers: Number of parallel write threads.
+          compactor: Optional background compactor. When present, worker threads
+              write to staging and enqueue files for asynchronous merge/promotion.
       
       Returns:
-          List of successfully written file paths.
+          List of accepted part targets. When compactor is enabled, actual merged
+          file paths are returned later by `compactor.finalize()`.
       """
       def _write_one(item: Tuple[str, Any, Path, Path]) -> str:
           part_id, table, final_path, staging_path = item
           pq.write_table(table, str(staging_path), compression="zstd")
-          os.replace(str(staging_path), str(final_path))
+          if compactor is not None:
+              compactor.enqueue((part_id, staging_path))
+          else:
+              os.replace(str(staging_path), str(final_path))
           return str(final_path)
       
       with ThreadPoolExecutor(max_workers=n_workers) as pool:
@@ -964,13 +994,13 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
   ```
   - Thread-safety 保證：
     - 每個 part 寫入獨立檔案，無共享狀態 ✅
-    - 使用 `os.replace` 原子替換 ✅
+        - 未啟用 compactor 時使用 `os.replace` 原子替換；啟用時由 compactor 負責最終 promotion ✅
     - staging_path 包含 part_id → 不會衝突 ✅
   - 邊界條件：
     1. `parts_queue` 為空 → 回傳空 list
     2. 某個 part 寫入失敗（磁碟滿）→ raise OSError，其他 parts 可能部分完成
     3. `n_workers=1` → 串行寫入（fallback）
-- **輸出**: `List[str]`（成功寫入的檔案路徑）
+- **輸出**: `List[str]`（已接受的 part 路徑/邏輯目標；若啟用 compactor，最終 merged 檔案由 `finalize()` 回傳）
 - **禁止事項**: 不可修改 zstd compression level（維持 level=1 速度優先）
 
 #### Task 4.2: 呼叫端整合 — 硬體自適應 workers
@@ -993,6 +1023,72 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
   - 邊界條件：
     1. 只有 1 個 part → 不啟動 ThreadPool（開銷不值得）
     2. `FFACT_L7_WORKERS=1` → 強制串行
+        3. **【新增】** 啟用 compactor 時，worker 僅保證 staging 寫入成功；最終檔案 promotion 由背景合併程序負責
+
+#### Task 4.3: 實作 `AsyncParquetCompactor` — 【新增】盲點一 IOPS Bottleneck 緩解
+
+- **目標**: 將 L7 Worker 先輸出到 staging 目錄，由背景執行緒批次合併小型 Parquet parts，抑制碎片化檔案數暴增
+- **修改檔案**: `momentum/FeatureEngineering/feature_storage.py`（新增 `AsyncParquetCompactor` 與整合點）
+- **實作規格**:
+    ```python
+    class AsyncParquetCompactor:
+            """Background compactor for small parquet parts.
+
+            Workers write small parts to a staging directory first. The compactor merges
+            them into larger target files to reduce SSD IOPS pressure and downstream
+            training read amplification.
+            """
+
+            def __init__(
+                    self,
+                    staging_dir: Path,
+                    final_dir: Path,
+                    target_rows: int = 100_000,
+                    min_files_to_compact: int = 8,
+            ) -> None:
+                    ...
+
+            def enqueue(self, item: Tuple[str, Path]) -> None:
+                    ...
+
+            def start(self) -> None:
+                    ...
+
+            def finalize(self) -> List[Path]:
+                    """Drain queue, compact remaining files, and return merged outputs."""
+                    ...
+    ```
+    - 背景流程：
+        1. L7 worker 將 part 寫到 `staging_dir/part_*.parquet`
+        2. worker 完成後呼叫 `compactor.enqueue((part_id, staging_path))`
+        3. compactor 執行緒累積到 `min_files_to_compact` 或 `target_rows` 門檻後觸發 merge
+        4. merge 後產出 `final_dir/merged_{index}.parquet`，並刪除已吸收的小檔
+        5. pipeline 結束時呼叫 `compactor.finalize()`，清空佇列與剩餘 staging 檔
+    - 整合方式：
+        ```python
+        compactor_enabled = os.getenv("FFACT_L7_COMPACTOR_ENABLED", "1") != "0"
+        target_rows = int(os.getenv("FFACT_L7_COMPACTOR_TARGET_ROWS", "100000"))
+
+        if compactor_enabled and chunk_bars is not None and max_group_columns <= 5_000:
+                compactor = AsyncParquetCompactor(staging_dir, final_dir, target_rows=target_rows)
+                compactor.start()
+                written = self._persist_parts_parallel(parts_queue, n_workers, compactor=compactor)
+                merged_files = compactor.finalize()
+        else:
+                written = self._persist_parts_parallel(parts_queue, n_workers)
+        ```
+    - **【新增】盲點一設計說明**：
+        - 8GB tier 為了避免 OOM，`CHUNK_BARS=50_000` 且 `MAX_GROUP_COLUMNS=5_000` 會讓 part 數量顯著上升
+        - 若直接將 1,000 個小檔寫到最終輸出目錄，CPU 完成後會卡在 SSD IOPS，且後續 ML 訓練讀取這些碎片檔案的延遲很高
+        - Async compactor 的角色是把「寫入延遲」與「合併延遲」與主運算路徑解耦，讓 worker 專注於計算與初步落盤
+    - 邊界條件：
+        1. `FFACT_L7_COMPACTOR_ENABLED=0` → 完全回退到現行直接輸出模式
+        2. `parts_queue` 很小（< `min_files_to_compact`）→ 直到 `finalize()` 才做最後合併
+        3. merge 過程 crash → staging 目錄保留，下一次啟動可檢查/重跑，不覆寫既有 final 檔
+        4. 單一 part 已超過 `target_rows` → 直接 promote 到 final_dir，不再二次合併
+        5. 後續 ML 仍需 part-aware 讀取時 → 保留 `manifest.json` 記錄 merged 檔與原始來源對應
+- **輸出**: 較少的大型 Parquet 檔案 + manifest
+- **禁止事項**: 不可在主 worker thread 同步執行 merge（會把 IOPS 瓶頸重新拉回熱路徑）
 
 ### 6.2 測試項目
 
@@ -1003,6 +1099,8 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 | T4.1 | `test_parallel_persist_matches_serial` | 平行寫入的 Parquet == 串行寫入 | 檔案 binary 比對（排除 metadata timestamp） | Task 4.1 |
 | T4.2 | `test_parallel_persist_atomic_write` | 寫入過程中 staging 檔存在，完成後只有 final 檔 | `final_path.exists() and not staging_path.exists()` | Task 4.1 |
 | T4.3 | `test_tier_auto_selects_l7_workers` | 8GB tier → 4 workers | `n_workers == 4` | Task 4.2 |
+| T4.4 | `test_async_compactor_merges_small_files_into_large_parts` | 多個 staging 小檔被合併 | final 檔案數 < staging 檔案數 | Task 4.3 |
+| T4.5 | `test_async_compactor_manifest_tracks_sources` | merge 後 manifest 記錄來源檔案 | manifest 含 merged→source 對應 | Task 4.3 |
 
 #### 邊界條件測試
 
@@ -1012,19 +1110,24 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 | T4.B2 | `test_parallel_persist_single_part` | 只有 1 個 part | 串行寫入 |
 | T4.B3 | `test_parallel_persist_disk_full` | mock disk full → OSError | raise OSError，不 silent fail |
 | T4.B4 | `test_l7_workers_env_override` | `FFACT_L7_WORKERS=2` | 使用 2 workers |
+| T4.B5 | `test_async_compactor_disabled_bypasses_merge` | `FFACT_L7_COMPACTOR_ENABLED=0` | 不建立 compactor，直接輸出小檔 |
+| T4.B6 | `test_async_compactor_finalize_flushes_remaining_files` | 未達 batch 門檻即結束 | `finalize()` 後 staging 為空 |
+| T4.B7 | `test_async_compactor_crash_preserves_staging_files` | merge 中途 raise OSError | staging 檔仍存在，final 不部分覆蓋 |
 
 #### 效能驗收測試
 
 | ID | 測試名稱 | 驗收標準 |
 |----|---------|---------|
 | T4.P1 | `test_l7_parallel_speedup` | 4 workers 比 1 worker 快 ≥ 2× |
+| T4.P2 | `test_async_compactor_controls_file_explosion` | 8GB tier 小檔數被壓到原始 staging 檔數的 ≤ 25% |
 
 ### 6.3 Phase 4 → Phase 5 Gate
 
-- [ ] T4.1~T4.3 全部通過
-- [ ] T4.B1~T4.B4 全部通過
-- [ ] T4.P1 效能驗收通過（≥ 2× speedup）
+- [ ] T4.1~T4.5 全部通過
+- [ ] T4.B1~T4.B7 全部通過
+- [ ] T4.P1~T4.P2 效能驗收通過
 - [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）
+- [ ] `FFACT_L7_COMPACTOR_ENABLED=0` fallback 正常
 
 ---
 
@@ -1084,6 +1187,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
               "FFACT_L65_WORKERS":       tier_config["l65_workers"],
               "FFACT_CGSA_MEMORY_BUFFER": tier_config["cgsa_memory_buffer"],
               "FFACT_L7_WORKERS":        tier_config["l7_workers"],
+              "FFACT_L7_COMPACTOR_ENABLED": 1,
           },
       }
   ```
@@ -1160,7 +1264,7 @@ with ThreadPoolExecutor(max_workers=n_workers) as pool:
 | Phase 1 → 2 | T1.x 全通過 + Resume 場景驗證 | Phase 2 | 修正 Phase 1 |
 | Phase 2 → 3 | T2.x 全通過 + C1~C6 + ≥2× speedup | Phase 3 | 修正 Phase 2 |
 | Phase 3 → 4 | T3.x 全通過 + C1~C6 + ≥1.3× speedup | Phase 4 | 修正 Phase 3 |
-| Phase 4 → 5 | T4.x 全通過 + C1~C6 | Phase 5 | 修正 Phase 4 |
+| Phase 4 → 5 | T4.x 全通過 + C1~C6 + 小檔數受控 | Phase 5 | 修正 Phase 4 |
 | Phase 5 → Done | T5.x 全通過 + API 可用 | ✅ 完成 | 修正 Phase 5 |
 
 ---
@@ -1184,12 +1288,12 @@ tests/
 ├── test_cgsa_resume.py                   # Phase 1 — T1.1~T1.4, T1.B1~T1.B5
 ├── test_l65_parallel.py                  # Phase 2 — T2.1~T2.5, T2.B1~T2.B6
 ├── test_multi_window_rolling.py          # Phase 3 — T3.1~T3.4, T3.B1~T3.B8
-├── test_l7_parallel_persist.py           # Phase 4 — T4.1~T4.3, T4.B1~T4.B4
+├── test_l7_parallel_persist.py           # Phase 4 — T4.1~T4.5, T4.B1~T4.B7
 ├── test_hardware_api.py                  # Phase 5 — T5.1~T5.3, T5.B1~T5.B2
 ├── performance/
 │   ├── test_l65_parallel_perf.py         # T2.P1~T2.P2
 │   ├── test_multi_window_perf.py         # T3.P1~T3.P2
-│   └── test_l7_persist_perf.py           # T4.P1
+│   └── test_l7_persist_perf.py           # T4.P1~T4.P2
 ```
 
 ### 9.3 測試 ID 統計
@@ -1198,11 +1302,11 @@ tests/
 |-------|------|------|------|------|
 | Phase 0 | 4 | 3 | 0 | **7** |
 | Phase 1 | 4 | 5 | 0 | **9** |
-| Phase 2 | 5 | 6 | 2 | **13** |
+| Phase 2 | 6 | 7 | 2 | **15** |
 | Phase 3 | 4 | 8 | 2 | **14** |
-| Phase 4 | 3 | 4 | 1 | **8** |
+| Phase 4 | 5 | 7 | 2 | **14** |
 | Phase 5 | 3 | 2 | 0 | **5** |
-| **總計** | **23** | **28** | **5** | **56** |
+| **總計** | **26** | **32** | **6** | **64** |
 
 ### 9.4 合成資料生成器（共用 Fixture）
 
@@ -1247,6 +1351,9 @@ def mock_column_group_registry(tmp_path):
 | R8 | Polars API 跨版本 breaking changes（若實作 Task 2.5） | Polars 升級後程式碼失效 | 中 | Task 2.5 已 DEFERRED；版本釘選 | Task 2.5 |
 | R9 | 前端 API 不可用導致 HardwareStatusPanel 白屏 | 使用者體驗差 | 低 | Error boundary + fallback 錯誤訊息 | Task 5.2 |
 | R10 | psutil 不可用（極少見的環境） | `get_memory_tier()` 無法偵測 | 極低 | fallback 為 "8gb" 最保守 tier | Task 0.1 |
+| R11 | **【新增】** 8GB tier 因小 chunk + 小 group 導致 Parquet 檔案碎片化，SSD IOPS 反成新瓶頸 | L7 寫入與後續 ML 讀取雙重退化 | 中 | Task 4.3 背景 compactor + `FFACT_L7_COMPACTOR_ENABLED=0` fallback + T4.P2 檔案數上限驗證 | Task 4.3 |
+| R12 | **【新增】** L6.5 group 成本差異極大，若按原始順序提交會出現長尾效應 | Phase 2 speedup 不達標，CPU 閒置 | 中 | Task 2.1 依 `n_columns` 降序貪婪排程 + T2.6 驗證最大 group 優先 | Task 2.1 |
+| R13 | **【新增】** Numba JIT 在多進程冷啟動時同時編譯，造成 CPU/RAM 突波並可能 OOM | Phase 2/未來跨 Symbol 平行化啟動時崩潰 | 中 | Task 2.3 主進程 warmup + `cache=True` 磁碟快取 + T2.B7 驗證 warmup 順序 | Task 2.3 |
 
 ---
 
@@ -1259,6 +1366,7 @@ def mock_column_group_registry(tmp_path):
 | P0-B CGSA buffer | 2,055s (L2†) | 不變 | ~1,300s | ~1,000s |
 | P2-A multi-window kernel | 2,051s (L3) | ~1,400s | ~800s | ~400s |
 | P3 L7 parallel | 467s | ~150s | ~100s | ~80s |
+| P3-B Async compactor | 724 files | ~150-250 files | ~80-160 files | ~40-120 files |
 | **合計（8GB ×4）** | **7,756s** | **~5,300s** | **—** | **—** |
 | **合計（24GB ×8）** | **7,756s** | **—** | **~3,500s** | **—** |
 | **合計（32GB）** | **7,756s** | **—** | **—** | **~2,000s** |
@@ -1312,11 +1420,13 @@ Phase 1: (Resume 啟用)
 
 Phase 2: (L6.5 平行化 — 最高 ROI)
   □ 2.1  實作 _transform_registry_parallel (ThreadPool)
+    □      【新增】依 n_columns 降序做貪婪排程，避免長尾效應
   □ 2.2  呼叫端整合 (tier auto-select workers)
   □ 2.3  Numba warmup 確保 JIT 完成
+    □      【新增】驗證主進程 warmup + cache=True 可覆蓋未來 ProcessPool 路徑
   □ 2.4  CGSA In-Memory Buffer (24/32GB)
   □ 2.5  ⚠️ DEFERRED: Polars Wide Matrix (32GB)
-  □      跑 T2.1~T2.5, T2.B1~T2.B6, T2.P1~T2.P2
+    □      跑 T2.1~T2.6, T2.B1~T2.B7, T2.P1~T2.P2
   □      Gate: ≥2× speedup + C1~C6
 
 Phase 3: (L3 Multi-Window Kernel)
@@ -1327,11 +1437,12 @@ Phase 3: (L3 Multi-Window Kernel)
   □      跑 T3.1~T3.4, T3.B1~T3.B8, T3.P1~T3.P2
   □      Gate: ≥1.3× speedup + C1~C6
 
-Phase 4: (L7 Parallel Persist)
+Phase 4: (L7 Parallel Persist + Async Compactor)
   □ 4.1  實作 _persist_parts_parallel
   □ 4.2  呼叫端整合 (tier auto-select workers)
-  □      跑 T4.1~T4.3, T4.B1~T4.B4, T4.P1
-  □      Gate: ≥2× speedup + C1~C6
+    □ 4.3  【新增】實作 AsyncParquetCompactor，背景合併碎片化小檔
+    □      跑 T4.1~T4.5, T4.B1~T4.B7, T4.P1~T4.P2
+    □      Gate: ≥2× speedup + 小檔數受控 + C1~C6
 
 Phase 5: (硬體資訊 API + 前端)
   □ 5.1  GET /config/hardware endpoint
@@ -1353,6 +1464,8 @@ Phase 5: (硬體資訊 API + 前端)
 | `FFACT_CGSA_MEMORY_BUFFER` | tier-dependent (0/0/32/64) | CGSA In-Memory Buffer groups 數 | Phase 2 |
 | `FFACT_L3_MULTI_WINDOW` | `1` | 啟用 multi-window fused kernel | Phase 3 |
 | `FFACT_L7_WORKERS` | tier-dependent (4/6/8/8) | L7 平行 persist workers 數 | Phase 4 |
+| `FFACT_L7_COMPACTOR_ENABLED` | `1` | 啟用背景 Parquet 合併程序 | Phase 4 |
+| `FFACT_L7_COMPACTOR_TARGET_ROWS` | `100000` | 每個 merged parquet 目標列數 | Phase 4 |
 | `FFACT_L65_POLARS` | `auto` | 啟用 Polars wide matrix (32GB only) | DEFERRED |
 
 ---
