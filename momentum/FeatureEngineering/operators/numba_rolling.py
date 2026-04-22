@@ -439,4 +439,15 @@ __all__ = [
     "rolling_rank",
     "rolling_slope",
     "rolling_skew_kurt",
+    "warmup_numba",
 ]
+
+
+def warmup_numba() -> None:
+    """Warm up cached rolling kernels in the main process."""
+
+    dummy = np.random.randn(64).astype(np.float64)
+    fused_rolling_stats(dummy, 5)
+    rolling_rank(dummy, 5)
+    rolling_slope(dummy, 5)
+    rolling_skew_kurt(dummy, 5, 10)

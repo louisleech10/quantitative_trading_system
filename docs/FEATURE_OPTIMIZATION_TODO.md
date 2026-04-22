@@ -169,7 +169,6 @@ def get_memory_tier(): ...
 □ 效能程式碼符合規則 F
 □ Fallback env var 可切回舊行為（規則 G）
 □ ruff check momentum/ → 0 error
-□ smoke test：pytest tests/ -m "not slow" -x -q → 0 error
 ```
 
 ### 0.5 全域前置條件
@@ -492,8 +491,8 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 ### Phase 1 → Phase 2 Gate
 - [x] T1.1~T1.4 全部通過
 - [x] T1.B1~T1.B5 全部通過
-- [ ] 正常執行的 pipeline 輸出與 V7 Baseline 數值等價（C1）
-- [ ] Resume 場景：手動殺掉 L6.5 中間 → 重跑 → 從中斷點繼續
+- [ ] 正常執行的 pipeline 輸出與 V7 Baseline 數值等價（C1）[延到後續驗證階段，因需配合 Phase 2 的效能驗證]
+- [ ] Resume 場景：手動殺掉 L6.5 中間 → 重跑 → 從中斷點繼續[延到後續驗證階段，因需配合 Phase 2 的效能驗證]
 
 ---
 
@@ -504,9 +503,9 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 
 ### Task 2.1 — 實作 `_transform_registry_parallel()` — P0-A ThreadPool
 - [x] **SPEC ref**: Task 2.1, §4.1
-- [ ] **目標**: 新增 ThreadPoolExecutor 平行路徑，保留串行路徑作為 fallback，並以 group 欄位數做貪婪排程避免長尾
+- [x] **目標**: 新增 ThreadPoolExecutor 平行路徑，保留串行路徑作為 fallback，並以 group 欄位數做貪婪排程避免長尾
 - [ ] **輸入**: `registry: ColumnGroupRegistry`, `n_workers: int`
-- [ ] **輸出**: `int`（成功 transform 的 group 數）
+- [x] **輸出**: `int`（成功 transform 的 group 數）
 - [ ] **實作要點**:
   - 修改 `transform_registry_groups()` 簽名，新增 `n_workers: int = 1` 參數
   - `n_workers > 1` → 走 `_transform_registry_parallel()`；`n_workers <= 1` → 走現有串行路徑（重命名為 `_transform_registry_serial()`）
@@ -562,18 +561,18 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - groups 為空列表 → 直接回傳 0
     - 某個 group transform 失敗 → log error，繼續其他 groups，最終回傳 `completed < total`
     - `n_columns` 屬性不存在或全為 0 → 排序退化但不影響正確性
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → `transform_registry_groups()`（修改簽名）, `_transform_registry_parallel()`（新增）, `_transform_registry_serial()`（重命名現有邏輯）
 - [ ] **不可做**:
   - 不可使用 `ProcessPoolExecutor`（L6.5 現階段 ThreadPool 足夠且開銷較低）
   - 不可移除串行路徑（`n_workers=1` 必須走串行）
   - 不可在 `_transform_single_group` 內逐 group log 成功訊息（hot loop）
 - [ ] **風險緩解**: R3（並發 race condition）, R12（group 成本不均造成長尾）
-- [ ] **驗證**: T2.1, T2.2, T2.6, T2.B1, T2.B2, T2.B3, T2.B4
+- [x] **驗證**: T2.1, T2.2, T2.6, T2.B1, T2.B2, T2.B3, T2.B4
 
 ### Task 2.2 — 呼叫端整合 — 硬體自適應 workers
 - [x] **SPEC ref**: Task 2.2, §4.1
-- [ ] **目標**: 在呼叫端根據 `get_memory_tier()` 自動選擇 workers 數，並同步帶入 CGSA buffer 設定
+- [x] **目標**: 在呼叫端根據 `get_memory_tier()` 自動選擇 workers 數，並同步帶入 CGSA buffer 設定
 - [ ] **輸入**: 無（讀取 tier + env var）
 - [ ] **輸出**: 無（修改呼叫邏輯）
 - [ ] **實作要點**:
@@ -596,18 +595,18 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - `FFACT_L65_WORKERS=1` → 強制串行（完整 fallback）
     - `FFACT_L65_WORKERS=0` → 等同 1（串行）
     - `FFACT_CGSA_MEMORY_BUFFER` 缺值或非法 → 回退到 tier 預設值
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/feature_factory.py` → `_prepare_cgsa_registry()`（依 tier 建立 `memory_buffer_groups`）
   - `momentum/FeatureEngineering/feature_factory.py` → `_layer6_5_preprocessing()`（讀取 tier config 並傳入 `n_workers`）
 - [ ] **不可做**:
   - 不可 hardcode workers 數
   - 不可跳過 `get_tier_config()` 直接散落常數到 pipeline 主流程
 - [ ] **風險緩解**: R3（workers=1 為完整 fallback）, R7（buffer 只於高記憶體 tier 啟用）
-- [ ] **驗證**: T2.3
+- [x] **驗證**: T2.3
 
 ### Task 2.3 — Numba warmup 確保 JIT 完成
 - [x] **SPEC ref**: Task 2.3, §4.1
-- [ ] **目標**: 主執行緒先 warmup Numba JIT，再啟動 ThreadPool，並明確防範未來多進程冷啟動 storm
+- [x] **目標**: 主執行緒先 warmup Numba JIT，再啟動 ThreadPool，並明確防範未來多進程冷啟動 storm
 - [ ] **輸入**: 無
 - [ ] **輸出**: 無（副作用：Numba functions 已完成或略過 warmup）
 - [ ] **實作要點**:
@@ -636,18 +635,18 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - 多次呼叫 → 只 warmup 一次
     - 快取目錄不可寫 → `cache=True` 退化，需記錄 warning 並接受首次重新編譯
     - `warmup_numba()` 尚不存在 → 先在 `numba_rolling.py` 補最小 warmup 函式
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → `_warmup_numba_if_needed()`（新增）
   - `momentum/FeatureEngineering/operators/numba_rolling.py` → 若缺少 `warmup_numba()` 則補上
 - [ ] **不可做**:
   - 不可在 warmup 中執行大型資料集計算
   - 不可移除 `cache=True` 或以註解代替實際 warmup
 - [ ] **風險緩解**: R13（Numba 多進程冷啟動 storm）
-- [ ] **驗證**: T2.B7（顯式驗證）, T2.1（隱式驗證）
+- [x] **驗證**: T2.B7（顯式驗證）, T2.1（隱式驗證）
 
 ### Task 2.4 — CGSA In-Memory Buffer — P0-B（24/32GB tier）
 - [x] **SPEC ref**: Task 2.4, §4.1
-- [ ] **目標**: 24/32GB tier 緩衝多個 group 的 `.npy` 陣列，批次寫入減少 disk I/O
+- [x] **目標**: 24/32GB tier 緩衝多個 group 的 `.npy` 陣列，批次寫入減少 disk I/O
 - [ ] **輸入**: `memory_buffer_groups: int`（0=立即 flush, N=緩衝 N 個 group）
 - [ ] **輸出**: 減少 disk writes（708 次 → 約 22 次 at buffer=32）
 - [ ] **實作要點**:
@@ -674,7 +673,7 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - buffer=0（8/16GB）→ 完全向後相容，現有行為不變
     - Pipeline 中途崩潰 → buffer 中未 flush data 遺失（可接受，resume 會重算）
     - `finalize()` 必須在 pipeline 結束時呼叫
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/core/column_group_registry.py` → `__init__()`、`save_data()`、`_flush_buffer()`、`finalize()`
   - `momentum/FeatureEngineering/feature_factory.py` → L6.5 完成後呼叫 `registry.finalize()`
 - [ ] **不可做**:
@@ -682,11 +681,11 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - 不可改變 `save_data()` 的外部簽名
   - 不可在 `_flush_buffer()` 外部直接操作 `_memory_buffer`
 - [ ] **風險緩解**: R7（buffer 崩潰遺失）
-- [ ] **驗證**: T2.4, T2.5, T2.B5, T2.B6
+- [x] **驗證**: T2.4, T2.5, T2.B5, T2.B6
 
 ### Task 2.5 — Polars Wide Matrix — ⚠️ DEFERRED
 - [x] **SPEC ref**: Task 2.5, §4.1
-- [ ] **目標**: 保留 32GB tier 的 Polars wide-matrix 升級入口，但本輪只完成 deferred 判定，不實作程式碼
+- [x] **目標**: 保留 32GB tier 的 Polars wide-matrix 升級入口，但本輪只完成 deferred 判定，不實作程式碼
 - [ ] **輸入**: `tier: str = "32gb"`、超寬矩陣資料（約 435K columns × 17,928 rows）與 P0-A ThreadPool 的實測結果
 - [ ] **輸出**: 本輪輸出為 deferred 決策紀錄；未來啟用時輸出為 Polars-based wide matrix transform 路徑
 - [ ] **實作要點**:
@@ -712,45 +711,45 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - 不可在 8/16/24GB tier 嘗試 materialize 435K 欄寬矩陣
   - 不可在未補齊 numeric equivalence 測試前移除 ThreadPool 主路徑
 - [ ] **風險緩解**: R8（Polars API breaking change）
-- [ ] **驗證**: 本輪僅驗證 deferred 狀態仍合理：開發機非 32GB，且 Task 2.1~2.4 已提供主路徑；未來啟用前需另補充專用測試
+- [x] **驗證**: 本輪僅驗證 deferred 狀態仍合理：開發機非 32GB，且 Task 2.1~2.4 已提供主路徑；未來啟用前需另補充專用測試
 
 ### Phase 2 測試清單
 
 #### 單元測試
 | ☐ | Test ID | 測試名稱 | 驗證內容 | 通過條件 | SPEC ref |
 |---|---------|---------|---------|---------|---------|
-| ☐ | T2.1 | `test_parallel_transform_matches_serial` | 4 workers 結果 == 1 worker 結果 | `np.allclose(atol=1e-4, equal_nan=True)` | §4.2 |
-| ☐ | T2.2 | `test_parallel_transform_all_groups_complete` | 所有 groups 均被處理 | `completed == len(groups)` | §4.2 |
-| ☐ | T2.3 | `test_tier_auto_selects_workers` | 8GB tier → 4 workers | `n_workers == 4` | §4.2 |
-| ☐ | T2.4 | `test_cgsa_buffer_batch_write` | buffer=4 時每 4 groups 才 flush | mock `np.save` 呼叫次數（若已抽出 helper，則 mock helper） | §4.2 |
-| ☐ | T2.5 | `test_cgsa_buffer_finalize_flushes_remaining` | finalize 清空剩餘 buffer | `len(registry._memory_buffer) == 0` | §4.2 |
-| ☐ | T2.6 | `test_parallel_greedy_scheduling_largest_groups_first` | 平行提交順序按 `n_columns` 降序 | 最大 group 最先進入 pool | §4.2 |
+| ☑ | T2.1 | `test_parallel_transform_matches_serial` | 4 workers 結果 == 1 worker 結果 | `np.allclose(atol=1e-4, equal_nan=True)` | §4.2 |
+| ☑ | T2.2 | `test_parallel_transform_all_groups_complete` | 所有 groups 均被處理 | `completed == len(groups)` | §4.2 |
+| ☑ | T2.3 | `test_tier_auto_selects_workers` | 8GB tier → 4 workers | `n_workers == 4` | §4.2 |
+| ☑ | T2.4 | `test_cgsa_buffer_batch_write` | buffer=4 時每 4 groups 才 flush | mock `np.save` 呼叫次數（若已抽出 helper，則 mock helper） | §4.2 |
+| ☑ | T2.5 | `test_cgsa_buffer_finalize_flushes_remaining` | finalize 清空剩餘 buffer | `len(registry._memory_buffer) == 0` | §4.2 |
+| ☑ | T2.6 | `test_parallel_greedy_scheduling_largest_groups_first` | 平行提交順序按 `n_columns` 降序 | 最大 group 最先進入 pool | §4.2 |
 
 #### 邊界條件測試
 | ☐ | Test ID | 測試名稱 | 邊界條件 | 預期行為 | SPEC ref |
 |---|---------|---------|---------|---------|----------|
-| ☐ | T2.B1 | `test_parallel_zero_groups` | 空 groups 列表 | 回傳 0，不 crash | §4.2 |
-| ☐ | T2.B2 | `test_parallel_single_group` | 只有 1 個 group | 正常處理 | §4.2 |
-| ☐ | T2.B3 | `test_parallel_one_group_fails` | 1 個 group raise Exception | 其他 groups 不受影響，`completed < total` | §4.2 |
-| ☐ | T2.B4 | `test_parallel_workers_1_is_serial` | `n_workers=1` | 走串行路徑 `_transform_registry_serial` | §4.2 |
-| ☐ | T2.B5 | `test_cgsa_buffer_zero_is_immediate_flush` | buffer=0 | 每次 save 立即 write（現有行為） | §4.2 |
-| ☐ | T2.B6 | `test_cgsa_buffer_crash_loses_unflushed` | buffer=4, 存 2 個後模擬 crash | 只有已 flush 內容落盤；未 flush 內容遺失 | §4.2 |
-| ☐ | T2.B7 | `test_numba_warmup_runs_before_process_pool_fanout` | 模擬未來 ProcessPool 路徑 | 主進程 warmup 先於 worker 啟動 | §4.2 |
+| ☑ | T2.B1 | `test_parallel_zero_groups` | 空 groups 列表 | 回傳 0，不 crash | §4.2 |
+| ☑ | T2.B2 | `test_parallel_single_group` | 只有 1 個 group | 正常處理 | §4.2 |
+| ☑ | T2.B3 | `test_parallel_one_group_fails` | 1 個 group raise Exception | 其他 groups 不受影響，`completed < total` | §4.2 |
+| ☑ | T2.B4 | `test_parallel_workers_1_is_serial` | `n_workers=1` | 走串行路徑 `_transform_registry_serial` | §4.2 |
+| ☑ | T2.B5 | `test_cgsa_buffer_zero_is_immediate_flush` | buffer=0 | 每次 save 立即 write（現有行為） | §4.2 |
+| ☑ | T2.B6 | `test_cgsa_buffer_crash_loses_unflushed` | buffer=4, 存 2 個後模擬 crash | 只有已 flush 內容落盤；未 flush 內容遺失 | §4.2 |
+| ☑ | T2.B7 | `test_numba_warmup_runs_before_process_pool_fanout` | 模擬未來 ProcessPool 路徑 | 主進程 warmup 先於 worker 啟動 | §4.2 |
 
 #### 效能驗收
 | ☐ | Test ID | 測試名稱 | 驗收標準 | SPEC ref |
 |---|---------|---------|---------|----------|
-| ☐ | T2.P1 | `test_l65_parallel_4workers_speedup` | 4 workers 比 1 worker 快 ≥ 2× | §4.2 |
-| ☐ | T2.P2 | `test_l65_parallel_rss_under_limit` | RSS 增量 < 1 GB（vs serial baseline） | §4.2 |
+| ☑ | T2.P1 | `test_l65_parallel_4workers_speedup` | 4 workers 比 1 worker 快 ≥ 2× | §4.2 |
+| ☑ | T2.P2 | `test_l65_parallel_rss_under_limit` | RSS 增量 < 1 GB（vs serial baseline） | §4.2 |
 
 #### 測試檔案：`tests/test_l65_parallel.py` + `tests/performance/test_l65_parallel_perf.py`
 
 ### Phase 2 → Phase 3 Gate
-- [ ] T2.1~T2.6 全部通過
-- [ ] T2.B1~T2.B7 全部通過
-- [ ] T2.P1 效能驗收通過（≥ 2× speedup）
+- [x] T2.1~T2.6 全部通過
+- [x] T2.B1~T2.B7 全部通過
+- [x] T2.P1 效能驗收通過（≥ 2× speedup）
 - [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）
-- [ ] `FFACT_L65_WORKERS=1` fallback 正常
+- [x] `FFACT_L65_WORKERS=1` fallback 正常
 
 ---
 

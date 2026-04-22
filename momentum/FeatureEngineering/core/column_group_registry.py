@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import re
+import tempfile
+import threading
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -80,12 +82,16 @@ class ColumnGroupRegistry:
     _TIMEFRAME_REGEX = re.compile(r"^(\d+)([mhdw])$")
     _NUMBER_REGEX = re.compile(r"(?<!\d)(\d+)(?!\d)")
 
-    def __init__(self, work_dir: Path):
+    def __init__(self, work_dir: Path, memory_buffer_groups: int = 0):
         self._groups: dict[str, ColumnGroup] = {}
         self._work_dir = Path(work_dir)
         self._work_dir.mkdir(parents=True, exist_ok=True)
         self._manifest_context: dict[str, Any] = {}
         self._group_parquet_paths: dict[str, str] = {}
+        self._memory_buffer: dict[str, np.ndarray] = {}
+        self._memory_buffer_limit = max(0, int(memory_buffer_groups))
+        self._buffer_lock = threading.Lock()
+        self._manifest_lock = threading.Lock()
 
     @property
     def work_dir(self) -> Path:
@@ -164,6 +170,11 @@ class ColumnGroupRegistry:
 
     def load_data(self, group_id: str) -> np.ndarray:
         """Load column group data from disk with memory-mapped read-only mode."""
+        with self._buffer_lock:
+            buffered = self._memory_buffer.get(group_id)
+        if buffered is not None:
+            return np.asarray(buffered, dtype=np.float32)
+
         group = self.get(group_id)
         if group.disk_path is None:
             raise ColumnGroupRegistryError(
@@ -199,19 +210,6 @@ class ColumnGroupRegistry:
         data_fp32 = np.asarray(data, dtype=np.float32)
         path = self._work_dir / f"{group.group_id}.npy"
 
-        try:
-            np.save(path, data_fp32, allow_pickle=False)
-        except MemoryError as exc:
-            raise ColumnGroupRegistryError(
-                f"OOM while persisting group {group.group_id} to {path}",
-                failure_type=FailureType.OOM,
-            ) from exc
-        except OSError as exc:
-            raise ColumnGroupRegistryError(
-                f"Failed to save group {group.group_id} to {path}: {exc}",
-                failure_type=FailureType.IO_ERROR,
-            ) from exc
-
         updated_group = ColumnGroup(
             group_id=group.group_id,
             layer=group.layer,
@@ -226,8 +224,20 @@ class ColumnGroupRegistry:
 
         self._groups[updated_group.group_id] = updated_group
 
+        if self._memory_buffer_limit > 0:
+            with self._buffer_lock:
+                self._memory_buffer[group.group_id] = data_fp32
+                should_flush = len(self._memory_buffer) >= self._memory_buffer_limit
+
+            if should_flush:
+                self._flush_buffer()
+
+            return updated_group
+
+        self._persist_group_array(updated_group.group_id, path, data_fp32, action="persist")
+
         try:
-            self._write_manifest()
+            self._write_manifest_thread_safe()
         except OSError as exc:
             self._groups.pop(updated_group.group_id, None)
             if path.exists():
@@ -258,7 +268,11 @@ class ColumnGroupRegistry:
         temp_path = target_path.with_suffix(".npy.tmp")
         data_fp32 = np.asarray(data, dtype=np.float32)
 
+        with self._buffer_lock:
+            self._memory_buffer.pop(group_id, None)
+
         try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
             with temp_path.open("wb") as handle:
                 np.save(handle, data_fp32, allow_pickle=False)
             os.replace(temp_path, target_path)
@@ -291,7 +305,7 @@ class ColumnGroupRegistry:
         self._groups[group_id] = updated_group
 
         try:
-            self._write_manifest()
+            self._write_manifest_thread_safe()
         except OSError as exc:
             raise ColumnGroupRegistryError(
                 f"Failed to write manifest after overwriting {group_id}: {exc}",
@@ -316,6 +330,9 @@ class ColumnGroupRegistry:
 
     def cleanup(self) -> None:
         """Delete persisted .npy files and clear the in-memory registry."""
+        with self._buffer_lock:
+            self._memory_buffer.clear()
+
         for group in self._groups.values():
             if group.disk_path and group.disk_path.exists():
                 try:
@@ -463,8 +480,8 @@ class ColumnGroupRegistry:
 
     def _write_manifest(self) -> None:
         """Write manifest.json using atomic temp-file replacement."""
+        self._work_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = self.manifest_path
-        temp_path = self._work_dir / "manifest.json.tmp"
 
         default_created_at = self._manifest_context.get("created_at")
         if not default_created_at:
@@ -474,26 +491,47 @@ class ColumnGroupRegistry:
         if not isinstance(training_tfs, list):
             training_tfs = []
 
+        groups_payload = self._manifest_groups_payload()
+        total_features = sum(len(group_meta["columns"]) for group_meta in groups_payload)
+
         payload = {
             "symbol": self._manifest_context.get("symbol"),
             "primary_tf": self._manifest_context.get("primary_tf"),
             "training_tfs": training_tfs,
             "config_hash": self._manifest_context.get("config_hash"),
             "config_snapshot": self._manifest_context.get("config_snapshot") or {},
-            "total_features": self.total_columns(),
-            "total_groups": len(self._groups),
+            "total_features": total_features,
+            "total_groups": len(groups_payload),
             "created_at": default_created_at,
-            "groups": self._manifest_groups_payload(),
+            "groups": groups_payload,
         }
 
-        with temp_path.open("w", encoding="utf-8") as handle:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=self._work_dir,
+            prefix="manifest.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
             json.dump(payload, handle, ensure_ascii=False, indent=2)
+            temp_path = Path(handle.name)
 
-        os.replace(temp_path, manifest_path)
+        try:
+            os.replace(temp_path, manifest_path)
+        except Exception:
+            if temp_path.exists():
+                temp_path.unlink()
+            raise
 
     def _manifest_groups_payload(self) -> list[dict[str, Any]]:
+        with self._buffer_lock:
+            buffered_group_ids = set(self._memory_buffer.keys())
+
         payload: list[dict[str, Any]] = []
         for group in sorted(self._groups.values(), key=lambda item: item.group_id):
+            if group.group_id in buffered_group_ids:
+                continue
             payload.append(
                 {
                     "group_id": group.group_id,
@@ -509,6 +547,56 @@ class ColumnGroupRegistry:
                 }
             )
         return payload
+
+    def _persist_group_array(
+        self,
+        group_id: str,
+        path: Path,
+        data_fp32: np.ndarray,
+        action: str,
+    ) -> None:
+        """Persist one group array to disk with explicit failure classification."""
+
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, data_fp32, allow_pickle=False)
+        except MemoryError as exc:
+            raise ColumnGroupRegistryError(
+                f"OOM while {action} group {group_id} to {path}",
+                failure_type=FailureType.OOM,
+            ) from exc
+        except OSError as exc:
+            raise ColumnGroupRegistryError(
+                f"Failed to {action} group {group_id} to {path}: {exc}",
+                failure_type=FailureType.IO_ERROR,
+            ) from exc
+
+    def _write_manifest_thread_safe(self) -> None:
+        """Serialize manifest writes to avoid parallel temp-file races."""
+
+        with self._manifest_lock:
+            self._write_manifest()
+
+    def _flush_buffer(self) -> None:
+        """Flush buffered group arrays to disk and refresh manifest once."""
+
+        with self._buffer_lock:
+            if not self._memory_buffer:
+                return
+            buffered_items = list(self._memory_buffer.items())
+            self._memory_buffer.clear()
+
+        for group_id, data_fp32 in buffered_items:
+            group = self.get(group_id)
+            target_path = group.disk_path or (self._work_dir / f"{group_id}.npy")
+            self._persist_group_array(group_id, target_path, np.asarray(data_fp32, dtype=np.float32), action="flush")
+
+        self._write_manifest_thread_safe()
+
+    def finalize(self) -> None:
+        """Flush any remaining buffered arrays to disk."""
+
+        self._flush_buffer()
 
     @deprecated("Use iter_all()/load_data() instead; materialize_wide_df may consume large RAM.")
     def materialize_wide_df(self) -> pd.DataFrame:

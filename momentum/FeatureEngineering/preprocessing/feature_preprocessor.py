@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
@@ -54,6 +56,7 @@ class FeaturePreprocessor:
         self._fracdiff_processed_columns: set[str] = set()
         self._column_chunk_size = self._resolve_column_chunk_size()
         self._d_star_cache: Optional[Dict[str, float]] = None
+        self._numba_warmed_up = False
 
     @staticmethod
     def _resolve_column_chunk_size() -> int:
@@ -85,12 +88,35 @@ class FeaturePreprocessor:
 
         return self._transform_single(features_df)
 
-    def transform_registry_groups(self, registry: "ColumnGroupRegistry") -> int:
+    def transform_registry_groups(
+        self,
+        registry: "ColumnGroupRegistry",
+        n_workers: int = 1,
+    ) -> int:
         """Apply L6.5 transforms per group from registry and overwrite each group in place."""
         if registry is None:
             return 0
 
-        # Determine which transforms are active (for the fast numpy path).
+        groups = [group for _, group in registry.iter_all() if group.n_cols > 0]
+        if not groups:
+            return 0
+
+        worker_count = max(1, int(n_workers))
+        transform_context = self._build_registry_transform_context()
+
+        if worker_count <= 1:
+            return self._transform_registry_serial(registry, groups, transform_context)
+
+        return self._transform_registry_parallel(
+            registry,
+            groups,
+            transform_context,
+            worker_count,
+        )
+
+    def _build_registry_transform_context(self) -> Dict[str, object]:
+        """Resolve immutable per-run settings for registry-based L6.5 transforms."""
+
         do_winsorize = self.winsor_config.get("enabled", True)
         do_rank = self.rank_config.get("enabled", False)
         do_zscore = self.zscore_config.get("enabled", False)
@@ -98,8 +124,6 @@ class FeaturePreprocessor:
         do_adf = self.adf_config.get("enabled", False)
         do_gaussian = self.gaussian_config.get("enabled", False)
 
-        # Use the fast numpy/numba path when only winsorize+rank+zscore are active
-        # (the common CGSA case), avoiding pandas overhead entirely.
         use_fast = (
             not do_fracdiff
             and not do_adf
@@ -107,99 +131,219 @@ class FeaturePreprocessor:
             and self.mode == "replace"
         )
 
+        transform_context: Dict[str, object] = {
+            "use_fast": use_fast,
+        }
+
         if use_fast:
-            from momentum.FeatureEngineering.preprocessing._numba_transforms import (
-                transform_array_fast,
-                warmup_numba,
-            )
-            # JIT warmup once (< 1s).
-            warmup_numba()
+            self._warmup_numba_if_needed()
+
+            from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
 
             winsor_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
-            rank_window = int(self.rank_config.get("window", 252))
             zscore_windows = self.zscore_config.get("windows", [100, 252])
-            zscore_primary = int(zscore_windows[0]) if zscore_windows else 100
-            zscore_eps = float(self.zscore_config.get("epsilon", 1e-8))
 
-        import time as _time
+            transform_context.update(
+                {
+                    "transform_array_fast": transform_array_fast,
+                    "do_winsorize": do_winsorize,
+                    "winsor_lower_q": float(winsor_range[0]),
+                    "winsor_upper_q": float(winsor_range[1]),
+                    "do_rank": do_rank,
+                    "rank_window": int(self.rank_config.get("window", 252)),
+                    "do_zscore": do_zscore,
+                    "zscore_window": int(zscore_windows[0]) if zscore_windows else 100,
+                    "zscore_epsilon": float(self.zscore_config.get("epsilon", 1e-8)),
+                }
+            )
+
+        return transform_context
+
+    def _warmup_numba_if_needed(self) -> None:
+        """Compile relevant Numba kernels once before any fan-out begins."""
+
+        if self._numba_warmed_up:
+            return
+
+        try:
+            from momentum.FeatureEngineering.operators.numba_rolling import warmup_numba as warmup_rolling_numba
+
+            warmup_rolling_numba()
+        except ImportError:
+            pass
+
+        try:
+            from momentum.FeatureEngineering.preprocessing._numba_transforms import warmup_numba as warmup_l65_numba
+
+            warmup_l65_numba()
+        except ImportError:
+            pass
+
+        self._numba_warmed_up = True
+
+    @staticmethod
+    def _group_n_columns(group: object) -> int:
+        """Best-effort group width lookup for greedy scheduling."""
+
+        n_columns = getattr(group, "n_columns", None)
+        if isinstance(n_columns, int):
+            return n_columns
+
+        n_cols = getattr(group, "n_cols", None)
+        if isinstance(n_cols, int):
+            return n_cols
+
+        return 0
+
+    def _transform_registry_serial(
+        self,
+        registry: "ColumnGroupRegistry",
+        groups: List[object],
+        transform_context: Dict[str, object],
+    ) -> int:
+        """Serial fallback path for deterministic L6.5 registry transforms."""
+
+        completed = 0
+        failed = 0
+        started_at = time.perf_counter()
+
+        for group in groups:
+            try:
+                self._transform_single_group(registry, group, transform_context)
+                completed += 1
+            except Exception as error:
+                failed += 1
+                logger.error(
+                    "[L6.5] Failed group %s: %s",
+                    getattr(group, "group_id", "<unknown>"),
+                    error,
+                    exc_info=True,
+                )
+
+        elapsed = time.perf_counter() - started_at
+        logger.info(
+            "[L6.5] Serial complete: %d/%d in %.2fs (%d failed)",
+            completed,
+            len(groups),
+            elapsed,
+            failed,
+        )
+        return completed
+
+    def _transform_registry_parallel(
+        self,
+        registry: "ColumnGroupRegistry",
+        groups: List[object],
+        transform_context: Dict[str, object],
+        n_workers: int,
+    ) -> int:
+        """ThreadPool-based L6.5 registry transform with greedy scheduling."""
+
+        if not groups:
+            return 0
+
+        ordered_groups = sorted(
+            groups,
+            key=self._group_n_columns,
+            reverse=True,
+        )
+
+        completed = 0
+        failed = 0
+        started_at = time.perf_counter()
+
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futures = {
+                pool.submit(self._transform_single_group, registry, group, transform_context): group
+                for group in ordered_groups
+            }
+            for future in as_completed(futures):
+                group = futures[future]
+                try:
+                    future.result()
+                    completed += 1
+                except Exception as error:
+                    failed += 1
+                    logger.error(
+                        "[L6.5] Failed group %s: %s",
+                        getattr(group, "group_id", "<unknown>"),
+                        error,
+                        exc_info=True,
+                    )
+
+        elapsed = time.perf_counter() - started_at
+        logger.info(
+            "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers (%d failed)",
+            completed,
+            len(groups),
+            elapsed,
+            n_workers,
+            failed,
+        )
+        return completed
+
+    def _transform_single_group(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        transform_context: Dict[str, object],
+    ) -> None:
+        """Transform a single registry group in-place."""
+
         from momentum.FeatureEngineering.core.column_group import ColumnGroup as _CG, LayerSource as _LS
 
-        processed_count = 0
-        all_groups = list(registry.iter_all())
-        total_groups = len(all_groups)
-        t0_all = _time.time()
+        group_id = getattr(group, "group_id")
+        group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+        use_fast = bool(transform_context.get("use_fast", False))
+
+        if use_fast:
+            transform_array_fast = transform_context["transform_array_fast"]
+            processed_array = transform_array_fast(
+                group_array,
+                winsorize=bool(transform_context.get("do_winsorize", True)),
+                winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
+                winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+                rank=bool(transform_context.get("do_rank", False)),
+                rank_window=int(transform_context.get("rank_window", 252)),
+                zscore=bool(transform_context.get("do_zscore", False)),
+                zscore_window=int(transform_context.get("zscore_window", 100)),
+                zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+            )
+            registry.overwrite_data(group_id, processed_array)
+            return
+
         is_append = self.mode == "append"
+        group_df = pd.DataFrame(group_array, columns=list(getattr(group, "columns")), copy=False)
+        processed_df = self._transform_single(group_df)
 
-        for idx, (group_id, group) in enumerate(all_groups, 1):
-            if group.n_cols == 0:
-                continue
+        if is_append and len(processed_df.columns) > getattr(group, "n_cols"):
+            orig_cols = list(getattr(group, "columns"))
+            orig_array = processed_df[orig_cols].to_numpy(dtype=np.float32, copy=False)
+            registry.overwrite_data(group_id, orig_array)
 
-            t0 = _time.time()
-            group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-
-            if use_fast:
-                processed_array = transform_array_fast(
-                    group_array,
-                    winsorize=do_winsorize,
-                    winsor_lower_q=float(winsor_range[0]),
-                    winsor_upper_q=float(winsor_range[1]),
-                    rank=do_rank,
-                    rank_window=rank_window,
-                    zscore=do_zscore,
-                    zscore_window=zscore_primary,
-                    zscore_epsilon=zscore_eps,
+            new_cols = [column for column in processed_df.columns if column not in orig_cols]
+            if new_cols:
+                new_array = processed_df[new_cols].to_numpy(dtype=np.float32, copy=False)
+                new_gid = f"{group_id}_L65"
+                suffix = 1
+                while new_gid in registry._groups:
+                    new_gid = f"{group_id}_L65_{suffix}"
+                    suffix += 1
+                new_group = _CG(
+                    group_id=new_gid,
+                    layer=_LS.L65,
+                    timeframe=getattr(group, "timeframe"),
+                    data_source="preprocessed",
+                    indicator=getattr(group, "indicator"),
+                    columns=tuple(new_cols),
+                    shape=(new_array.shape[0], new_array.shape[1]),
+                    dtype="float32",
                 )
-                registry.overwrite_data(group_id, processed_array)
-            else:
-                # Fallback: original pandas path for exotic transforms or append mode.
-                group_df = pd.DataFrame(group_array, columns=list(group.columns), copy=False)
-                processed_df = self._transform_single(group_df)
+                registry.save_data(new_group, new_array)
+            return
 
-                if is_append and len(processed_df.columns) > group.n_cols:
-                    # Split: overwrite originals, save appended cols as new group.
-                    orig_cols = list(group.columns)
-                    orig_array = processed_df[orig_cols].to_numpy(dtype=np.float32, copy=False)
-                    registry.overwrite_data(group_id, orig_array)
-
-                    new_cols = [c for c in processed_df.columns if c not in orig_cols]
-                    if new_cols:
-                        new_array = processed_df[new_cols].to_numpy(dtype=np.float32, copy=False)
-                        new_gid = f"{group_id}_L65"
-                        # Avoid collision
-                        suffix = 1
-                        while new_gid in registry._groups:
-                            new_gid = f"{group_id}_L65_{suffix}"
-                            suffix += 1
-                        new_group = _CG(
-                            group_id=new_gid,
-                            layer=_LS.L65,
-                            timeframe=group.timeframe,
-                            data_source="preprocessed",
-                            indicator=group.indicator,
-                            columns=tuple(new_cols),
-                            shape=(new_array.shape[0], new_array.shape[1]),
-                            dtype="float32",
-                        )
-                        registry.save_data(new_group, new_array)
-                else:
-                    processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
-                    registry.overwrite_data(group_id, processed_array)
-
-            processed_count += 1
-
-            elapsed = _time.time() - t0
-            if elapsed > 5.0 or idx % 50 == 0 or idx == total_groups:
-                logger.info(
-                    "[L6.5][CGSA] Group %d/%d (%s) %d cols — %.1fs",
-                    idx, total_groups, group_id, group.n_cols, elapsed,
-                )
-
-        total_elapsed = _time.time() - t0_all
-        logger.info(
-            "[L6.5][CGSA] Per-group preprocessing completed: %d groups in %.1fs (fast=%s)",
-            processed_count, total_elapsed, use_fast,
-        )
-        return processed_count
+        processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
+        registry.overwrite_data(group_id, processed_array)
 
     def _transform_single(self, features_df: pd.DataFrame) -> pd.DataFrame:
         """Original transform logic applied to a full DataFrame."""

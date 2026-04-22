@@ -347,10 +347,6 @@ class FeatureStorage:
         Uses stream-and-delete: each group is staged → moved → .npy deleted
         before proceeding to the next, keeping peak disk usage bounded.
         """
-        import gzip as _gzip
-        import pyarrow as pa
-        import pyarrow.parquet as pq_writer
-
         output_dir = self.base_path / symbol / config_hash
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -392,10 +388,10 @@ class FeatureStorage:
                     staged_path = staging_dir / f"{part_id}.parquet"
                     final_path = output_dir / f"{part_id}.parquet"
 
-                    table = pa.table(
+                    staged_frame = pd.DataFrame(
                         {col: data_f16[:, ci] for ci, col in enumerate(part_cols)}
                     )
-                    pq_writer.write_table(table, staged_path, compression="zstd")
+                    staged_frame.to_parquet(staged_path, compression="zstd", index=False)
 
                     os.replace(staged_path, final_path)
                     resolved_path = str(final_path.resolve())
@@ -407,7 +403,7 @@ class FeatureStorage:
                         "columns": list(part_cols),
                     }
                     all_columns.extend(part_cols)
-                    del data_f16, table
+                    del data_f16, staged_frame
 
                 # Map original group_id to the first part path for registry compat
                 if parts:

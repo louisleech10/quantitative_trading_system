@@ -43,7 +43,7 @@ def _check_polars_available() -> bool:
 
 def polars_enabled() -> bool:
     """Check if Polars path is enabled via env var AND polars is installed."""
-    raw = os.getenv("FFACT_USE_POLARS", "1").strip().lower()
+    raw = os.getenv("FFACT_USE_POLARS", "0").strip().lower()
     enabled = raw in {"1", "true", "yes", "on"}
     if enabled and not _check_polars_available():
         return False

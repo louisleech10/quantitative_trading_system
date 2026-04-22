@@ -527,7 +527,12 @@ class MultiTFGenerator:
                 # Spill layer2 to memmap before L3 to avoid OOM on 8 GB M1.
                 # In single-TF path this is done in feature_factory.py; multi-TF
                 # calls layer methods directly so we must spill here too.
-                layer2 = self._factory._spill_to_memmap(layer2, "layer2")
+                spill_to_memmap = getattr(self._factory, "_spill_to_memmap", None)
+                if not callable(spill_to_memmap):
+                    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+                    spill_to_memmap = FeatureFactory._spill_to_memmap
+                layer2 = spill_to_memmap(layer2, "layer2")
 
                 layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
                 layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, raw_data, self._config)
@@ -542,7 +547,10 @@ class MultiTFGenerator:
                 [layer1, layer2, layer3, layer4, layer5, layer6]
             )
 
-            combined = self._combine_layers([layer1, layer2, layer3, layer4, layer5, layer6])
+            combined = self._factory._combine_layers(
+                [layer1, layer2, layer3, layer4, layer5, layer6],
+                context="multi_tf_layers",
+            )
             del layer1, layer2, layer3, layer4, layer5, layer6
             gc.collect()
             if timeframe == self._primary_tf:
@@ -575,7 +583,10 @@ class MultiTFGenerator:
         if not aligned_outputs:
             raise ValueError(f"All training timeframes skipped for {symbol}")
 
-        merged_df = self._factory._combine_layers(aligned_outputs, context="multi_tf_merged")
+        merged_df = self._factory._combine_layers(
+            aligned_outputs,
+            context="multi_tf_legacy_merged",
+        )
         if merged_df.empty:
             raise ValueError(f"Merged MultiTF features empty for {symbol}")
 

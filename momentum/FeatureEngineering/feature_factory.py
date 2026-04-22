@@ -495,8 +495,36 @@ class FeatureFactory:
                     exc,
                 )
 
-        logger.info("[CGSA] Initialized ColumnGroupRegistry at %s", work_dir)
-        return ColumnGroupRegistry(work_dir=work_dir)
+        from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
+
+        tier = get_memory_tier()
+        tier_cfg = get_tier_config(tier)
+        buffer_groups = self._parse_positive_int_env(
+            "FFACT_CGSA_MEMORY_BUFFER",
+            int(tier_cfg["cgsa_memory_buffer"]),
+        )
+
+        logger.info(
+            "[CGSA] Initialized ColumnGroupRegistry at %s (tier=%s, buffer_groups=%d)",
+            work_dir,
+            tier,
+            buffer_groups,
+        )
+        return ColumnGroupRegistry(
+            work_dir=work_dir,
+            memory_buffer_groups=buffer_groups,
+        )
+
+    @staticmethod
+    def _parse_positive_int_env(env_name: str, default: int) -> int:
+        """Parse a non-negative integer env var with fallback to default."""
+
+        raw_value = os.getenv(env_name, str(default)).strip()
+        try:
+            parsed_value = int(raw_value)
+        except ValueError:
+            parsed_value = default
+        return max(0, parsed_value)
 
     @staticmethod
     def _is_numeric_token(token: str) -> bool:
@@ -1074,7 +1102,23 @@ class FeatureFactory:
         preprocessor = FeaturePreprocessor(config.preprocessing.model_dump())
 
         if self._cgsa_enabled() and self._cgsa_registry is not None:
-            preprocessor.transform_registry_groups(self._cgsa_registry)
+            from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
+
+            tier = get_memory_tier()
+            tier_cfg = get_tier_config(tier)
+            n_workers = self._parse_positive_int_env(
+                "FFACT_L65_WORKERS",
+                int(tier_cfg["l65_workers"]),
+            )
+            n_workers = max(1, n_workers)
+
+            try:
+                preprocessor.transform_registry_groups(
+                    self._cgsa_registry,
+                    n_workers=n_workers,
+                )
+            finally:
+                self._cgsa_registry.finalize()
             return pd.DataFrame(index=all_features.index if all_features is not None else None)
 
         return preprocessor.transform(all_features)
