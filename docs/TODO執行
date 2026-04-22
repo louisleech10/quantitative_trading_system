@@ -1,5 +1,5 @@
 你是嚴格執行 docs/FEATURE_OPTIMIZATION_TODO.md的實作者。
-任務：完成（ Batch 1 : Phase 0 (Task 0.1, 0.2) + Phase 1 (Task 1.1, 1.2, 1.3))，了解TODO整體架構和內容，只允許在 TODO 範圍內修補；不得擴展功能或架構。先讀取相關檔案後直接進入 Step 1。
+任務：完成（)，了解TODO整體架構和內容，只允許在 TODO 範圍內修補；不得擴展功能或架構。先讀取相關檔案後直接進入 Step 1。
 
 參考SPEC:docs/FFEATURE_OPTIMIZATION_SPEC.md
 
