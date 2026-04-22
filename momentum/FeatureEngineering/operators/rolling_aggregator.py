@@ -41,6 +41,19 @@ class RollingAggregator:
         "zscore": 5,
     }
 
+    _NUMBA_MULTI_WINDOW_INDEX = {
+        "mean": 0,
+        "std": 1,
+        "min": 2,
+        "max": 3,
+        "range": 4,
+        "zscore": 5,
+        "skew": 6,
+        "kurt": 7,
+        "rank": 8,
+        "slope": 9,
+    }
+
     def __init__(self, config: Dict | None) -> None:
         config_dict = self._normalize_config(config)
         self._enabled = config_dict.get("enabled", True)
@@ -247,6 +260,17 @@ class RollingAggregator:
         columns: List[str],
         valid_aggs: List[str],
     ) -> pd.DataFrame:
+        use_multi_window = os.getenv("FFACT_L3_MULTI_WINDOW", "1").strip() != "0"
+        if use_multi_window:
+            return self._compute_all_streaming_numba_multi_window(features_df, columns, valid_aggs)
+        return self._compute_all_streaming_numba_single_window(features_df, columns, valid_aggs)
+
+    def _compute_all_streaming_numba_single_window(
+        self,
+        features_df: pd.DataFrame,
+        columns: List[str],
+        valid_aggs: List[str],
+    ) -> pd.DataFrame:
         from momentum.FeatureEngineering.operators.numba_rolling import (
             fused_rolling_stats,
             rolling_rank,
@@ -376,6 +400,113 @@ class RollingAggregator:
             columns=out_col_names,
             copy=False,
         )
+
+    def _compute_all_streaming_numba_multi_window(
+        self,
+        features_df: pd.DataFrame,
+        columns: List[str],
+        valid_aggs: List[str],
+    ) -> pd.DataFrame:
+        from momentum.FeatureEngineering.operators.numba_rolling import fused_rolling_stats_multi_window
+
+        n_rows = features_df.shape[0]
+        if n_rows == 0:
+            return pd.DataFrame(index=features_df.index)
+
+        windows_array = np.asarray(self._windows, dtype=np.int32)
+        chunk_size = min(self._column_chunk_size or 256, 64)
+        step_keys = [(window, agg_name) for window in self._windows for agg_name in valid_aggs]
+        step_frames = {step_key: [] for step_key in step_keys}
+        step_generated = {step_key: 0 for step_key in step_keys}
+        step_dropped = {step_key: 0 for step_key in step_keys}
+
+        for start in range(0, len(columns), chunk_size):
+            chunk_cols = columns[start : start + chunk_size]
+            chunk_df = features_df[chunk_cols]
+            chunk_results = {step_key: [] for step_key in step_keys}
+            chunk_names = {step_key: [] for step_key in step_keys}
+
+            for col_name in chunk_cols:
+                values = chunk_df[col_name].to_numpy(dtype=np.float64, copy=False)
+                fused_all = fused_rolling_stats_multi_window(values, windows_array)
+
+                for window_idx, window in enumerate(self._windows):
+                    window_results: Dict[str, np.ndarray] = {}
+                    for agg_name in valid_aggs:
+                        step_key = (window, agg_name)
+                        step_generated[step_key] += 1
+                        window_results[agg_name] = self._extract_multi_window_stat(fused_all[:, window_idx, :], agg_name)
+
+                    filtered_results = self._batch_variance_filter(window_results)
+
+                    for agg_name in valid_aggs:
+                        step_key = (window, agg_name)
+                        if agg_name not in filtered_results:
+                            step_dropped[step_key] += 1
+                            continue
+
+                        chunk_results[step_key].append(filtered_results[agg_name])
+                        chunk_names[step_key].append(f"{col_name}_{self._format_agg_label(agg_name)}_W{window}")
+
+            for step_key in step_keys:
+                if not chunk_results[step_key]:
+                    continue
+
+                chunk_matrix = np.column_stack(chunk_results[step_key]).astype(np.float32, copy=False)
+                step_frames[step_key].append(
+                    pd.DataFrame(
+                        data=chunk_matrix,
+                        index=features_df.index,
+                        columns=chunk_names[step_key],
+                        copy=False,
+                    )
+                )
+
+        ordered_frames: List[pd.DataFrame] = []
+        total_generated = 0
+        total_dropped = 0
+        n_steps = len(step_keys)
+
+        for step_index, step_key in enumerate(step_keys, start=1):
+            window, agg_name = step_key
+            generated = step_generated[step_key]
+            dropped = step_dropped[step_key]
+            step_parts = step_frames[step_key]
+            kept = generated - dropped
+            total_generated += generated
+            total_dropped += dropped
+
+            if step_index % 10 == 0 or step_index == n_steps:
+                logger.info(
+                    "[L3 streaming][numba][multi] step %d/%d (W%d_%s): %d→%d cols (-%d dead)",
+                    step_index,
+                    n_steps,
+                    window,
+                    agg_name,
+                    generated,
+                    kept,
+                    dropped,
+                )
+
+            if kept == 0:
+                continue
+
+            if len(step_parts) == 1:
+                ordered_frames.append(step_parts[0])
+            else:
+                ordered_frames.append(pd.concat(step_parts, axis=1, copy=False))
+
+        logger.info(
+            "[L3 streaming][numba][multi] complete: %d total generated, %d dead dropped, %d survivors",
+            total_generated,
+            total_dropped,
+            total_generated - total_dropped,
+        )
+
+        if not ordered_frames:
+            return pd.DataFrame(index=features_df.index)
+
+        return pd.concat(ordered_frames, axis=1, copy=False)
 
     @staticmethod
     def _compute_numba_rank(data: pd.DataFrame, window: int, rank_fn: callable) -> pd.DataFrame:
@@ -538,6 +669,50 @@ class RollingAggregator:
             return df
 
         return df.loc[:, ~dead_mask]
+
+    @staticmethod
+    def _should_keep_output(data: np.ndarray, nan_threshold: float = 0.9) -> bool:
+        if data.size == 0:
+            return False
+
+        values = np.asarray(data, dtype=np.float64)
+        if np.isinf(values).any():
+            return False
+
+        nan_rate = float(np.isnan(values).mean())
+        if nan_rate > nan_threshold:
+            return False
+
+        valid_values = values[~np.isnan(values)]
+        if valid_values.size <= 1:
+            return False
+
+        std_value = float(np.std(valid_values, ddof=1))
+        if np.isnan(std_value) or std_value == 0.0:
+            return False
+
+        return True
+
+    def _batch_variance_filter(
+        self,
+        window_results: Dict[str, np.ndarray],
+        nan_threshold: float = 0.9,
+    ) -> Dict[str, np.ndarray]:
+        if not window_results:
+            return {}
+
+        window_frame = pd.DataFrame(window_results, copy=False)
+        filtered_frame = self._variance_filter(window_frame, nan_threshold=nan_threshold)
+        filtered: Dict[str, np.ndarray] = {}
+        for agg_name in filtered_frame.columns:
+            filtered[agg_name] = filtered_frame[agg_name].to_numpy(dtype=np.float32, copy=False)
+        return filtered
+
+    def _extract_multi_window_stat(self, fused_window: np.ndarray, agg_name: str) -> np.ndarray:
+        stat_index = self._NUMBA_MULTI_WINDOW_INDEX.get(agg_name)
+        if stat_index is None:
+            raise KeyError(f"Unsupported multi-window aggregator: {agg_name}")
+        return fused_window[:, stat_index].astype(np.float32, copy=False)
 
     def _apply_vectorized_aggregators_chunked(
         self,

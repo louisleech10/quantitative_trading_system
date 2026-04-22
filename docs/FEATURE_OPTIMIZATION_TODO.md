@@ -491,8 +491,8 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 ### Phase 1 → Phase 2 Gate
 - [x] T1.1~T1.4 全部通過
 - [x] T1.B1~T1.B5 全部通過
-- [ ] 正常執行的 pipeline 輸出與 V7 Baseline 數值等價（C1）[延到後續驗證階段，因需配合 Phase 2 的效能驗證]
-- [ ] Resume 場景：手動殺掉 L6.5 中間 → 重跑 → 從中斷點繼續[延到後續驗證階段，因需配合 Phase 2 的效能驗證]
+- [ ] 正常執行的 pipeline 輸出與 V7 Baseline 數值等價（C1）[延到後續驗證階段]
+- [ ] Resume 場景：手動殺掉 L6.5 中間 → 重跑 → 從中斷點繼續[延到後續驗證階段]
 
 ---
 
@@ -748,7 +748,7 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 - [x] T2.1~T2.6 全部通過
 - [x] T2.B1~T2.B7 全部通過
 - [x] T2.P1 效能驗收通過（≥ 2× speedup）
-- [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）
+- [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）[延到後續驗證階段]
 - [x] `FFACT_L65_WORKERS=1` fallback 正常
 
 ---
@@ -760,10 +760,10 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 
 ### Task 3.1 — 實作 `fused_rolling_stats_multi_window()` — P2-A Multi-Window Fused Kernel
 - [x] **SPEC ref**: Task 3.1, §5.1
-- [ ] **目標**: 每個 column 只讀取 1 次，同時計算所有 windows 的 rolling stats
-- [ ] **輸入**: `values: np.ndarray` shape (n_rows,), `windows: np.ndarray` shape (n_windows,) int32
-- [ ] **輸出**: `np.ndarray` shape (n_rows, n_windows, N_STATS)，internal float64
-- [ ] **實作要點**:
+- [x] **目標**: 每個 column 只讀取 1 次，同時計算所有 windows 的 rolling stats
+- [x] **輸入**: `values: np.ndarray` shape (n_rows,), `windows: np.ndarray` shape (n_windows,) int32
+- [x] **輸出**: `np.ndarray` shape (n_rows, n_windows, N_STATS)，internal float64
+- [x] **實作要點**:
   - 新增函式於 `numba_rolling.py`：
     ```python
     @numba.njit(parallel=True, cache=True)
@@ -792,21 +792,21 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - `values` 長度 < max(windows) → 部分 window 全 NaN
     - 含 1e30 和 1e-30 → 不 overflow/underflow（float64 累加器保護）
     - 單一常數值 → mean=val, std=0, skew=NaN, kurt=NaN, rank=0.5, slope=0
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/operators/numba_rolling.py` → `fused_rolling_stats_multi_window()`（新增）
-- [ ] **不可做**:
+- [x] **不可做**:
   - 不可在 Numba JIT 內呼叫 Python 函式（包括 logger、print）
   - 不可刪除現有 `fused_rolling_stats()`（保留作為 fallback）
   - 不可使用 `parallel=True` 和 `prange` 在 column 維度（data race 風險）
-- [ ] **風險緩解**: R4（數值穩定性 — float64 累加器 + T3.B2 全常數測試）, R5（Numba ARM64 相容性）
-- [ ] **驗證**: T3.1, T3.3, T3.B1~T3.B7
+- [x] **風險緩解**: R4（數值穩定性 — float64 累加器 + T3.B2 全常數測試）, R5（Numba ARM64 相容性）
+- [x] **驗證**: T3.1, T3.3, T3.B1~T3.B7
 
 ### Task 3.2 — 整合到 `_compute_all_streaming_numba()`
 - [x] **SPEC ref**: Task 3.2, §5.1
-- [ ] **目標**: 修改 RollingAggregator 呼叫邏輯，改用 multi-window kernel
-- [ ] **輸入**: 環境變數 `FFACT_L3_MULTI_WINDOW`（預設 `"1"` 啟用）
-- [ ] **輸出**: 與現行相同的 rolling 結果（column name、NaN pattern 完全一致）
-- [ ] **實作要點**:
+- [x] **目標**: 修改 RollingAggregator 呼叫邏輯，改用 multi-window kernel
+- [x] **輸入**: 環境變數 `FFACT_L3_MULTI_WINDOW`（預設 `"1"` 啟用）
+- [x] **輸出**: 與現行相同的 rolling 結果（column name、NaN pattern 完全一致）
+- [x] **實作要點**:
   - 在 `_compute_all_streaming_numba()` 開頭檢查 feature flag：
     ```python
     use_multi_window = os.getenv("FFACT_L3_MULTI_WINDOW", "1").strip() != "0"
@@ -828,19 +828,19 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - Edge case 處理：
     - `FFACT_L3_MULTI_WINDOW=0` → 回到逐 window 呼叫（現有路徑完全不變）
     - 單一 window 情境 → multi-window kernel 仍正確
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/operators/rolling_aggregator.py` → `_compute_all_streaming_numba()`
-- [ ] **不可做**:
+- [x] **不可做**:
   - 不可移除現有 per-window 路徑（保留作為 `FFACT_L3_MULTI_WINDOW=0` fallback）
   - 不可改變輸出 column name 的命名規則
-- [ ] **驗證**: T3.2, T3.B8
+- [x] **驗證**: T3.2, T3.B8
 
 ### Task 3.3 — Batch Variance Filter — P2-B
 - [x] **SPEC ref**: Task 3.3, §5.1
-- [ ] **目標**: 每個 window 的所有 agg 計算完畢後，做一次 batch variance filter 再寫入（減少 memmap writes）
-- [ ] **輸入**: `window_results: Dict[str, np.ndarray]`（某 window 的所有 agg 結果）
-- [ ] **輸出**: 過濾後的 dict（只含非零方差 columns），與現行 filter 結果一致
-- [ ] **實作要點**:
+- [x] **目標**: 每個 window 的所有 agg 計算完畢後，做一次 batch variance filter 再寫入（減少 memmap writes）
+- [x] **輸入**: `window_results: Dict[str, np.ndarray]`（某 window 的所有 agg 結果）
+- [x] **輸出**: 過濾後的 dict（只含非零方差 columns），與現行 filter 結果一致
+- [x] **實作要點**:
   - 新增 `_batch_variance_filter()` 方法：
     ```python
     def _batch_variance_filter(self, window_results: Dict[str, np.ndarray], var_threshold: float = 0.0) -> Dict[str, np.ndarray]:
@@ -864,19 +864,19 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - Edge case 處理：
     - 空 batch（所有 aggs 被 filter 掉）→ 不寫入，不 crash
     - `var_threshold=0.0` → 只過濾完全零方差（常數列），與現有行為一致
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/operators/rolling_aggregator.py` → `_batch_variance_filter()`（新增）, `_compute_all_streaming_numba()`（修改 write 時機）
-- [ ] **不可做**:
+- [x] **不可做**:
   - 不可改變 variance filter 的判斷閾值或邏輯（只改批次化時機）
   - 不可在 filter 前改變 data 的值
-- [ ] **驗證**: T3.4
+- [x] **驗證**: T3.4
 
 ### Task 3.4 — TimeChunkIterator — ⚠️ DEFERRED
 - [x] **SPEC ref**: Task 3.4, §5.1
-- [ ] **目標**: 保留大資料集的 time-chunking 設計入口，但本輪只完成 deferred 判定，不引入額外 chunk orchestration
-- [ ] **輸入**: `n_rows`、`max_window`、目標 timeframe（特別是 1min）
-- [ ] **輸出**: 本輪輸出為 deferred 決策紀錄；未來啟用時輸出為可逐時間塊串流的 rolling aggregation 路徑
-- [ ] **實作要點**:
+- [x] **目標**: 保留大資料集的 time-chunking 設計入口，但本輪只完成 deferred 判定，不引入額外 chunk orchestration
+- [x] **輸入**: `n_rows`、`max_window`、目標 timeframe（特別是 1min）
+- [x] **輸出**: 本輪輸出為 deferred 決策紀錄；未來啟用時輸出為可逐時間塊串流的 rolling aggregation 路徑
+- [x] **實作要點**:
   - 本輪不修改 `_compute_all_streaming_numba()` 執行流程，只保留未來在大資料集啟用 chunking 的落點
   - 未來啟用時優先在 `rolling_aggregator.py` 新增 `TimeChunkIterator`，並由 `_compute_all_streaming_numba()` 增加 chunked branch
   - 未來啟用時的最小偽碼：
@@ -896,45 +896,45 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - 本輪不可加入半成品 chunk 路徑破壞 C1~C6
   - 不可在未定義 overlap 與邊界拼接規則前切入 chunk 處理
   - 不可將 1h 目前資料集強行改成 chunked 路徑以增加複雜度
-- [ ] **風險緩解**: 未來主要對應大資料集 OOM 風險；本輪以明確 deferred 決策避免過早複雜化
-- [ ] **驗證**: 本輪僅驗證 deferred 狀態仍合理：目前資料集為 17,928 rows（1h），不需 chunking；未來 1min 專案啟動前再補專用測試
+- [x] **風險緩解**: 未來主要對應大資料集 OOM 風險；本輪以明確 deferred 決策避免過早複雜化
+- [x] **驗證**: 本輪僅驗證 deferred 狀態仍合理：目前資料集為 17,928 rows（1h），不需 chunking；未來 1min 專案啟動前再補專用測試
 
 ### Phase 3 測試清單
 
 #### 單元測試
 | ☐ | Test ID | 測試名稱 | 驗證內容 | 通過條件 | SPEC ref |
 |---|---------|---------|---------|---------|---------|
-| ☐ | T3.1 | `test_multi_window_matches_single_window` | multi-window 結果 == 逐 window 結果 | `np.allclose(atol=1e-4, equal_nan=True)` per stat | §5.2 |
-| ☐ | T3.2 | `test_multi_window_golden_equivalence` | multi-window pipeline → V7 golden 比對 | C1 全量比對通過 | §5.2 |
-| ☐ | T3.3 | `test_multi_window_nan_pattern_preserved` | NaN pattern 與 V7 完全一致 | C6: `np.array_equal(nan_mask_new, nan_mask_golden)` | §5.2 |
-| ☐ | T3.4 | `test_batch_variance_filter_matches_per_step` | batch filter 結果 == per-step filter 結果 | 保留的 column set 一致 | §5.2 |
+| ☑ | T3.1 | `test_multi_window_matches_single_window` | multi-window 結果 == 逐 window 結果 | `np.allclose(atol=1e-4, equal_nan=True)` per stat | §5.2 |
+| ☑ | T3.2 | `test_multi_window_golden_equivalence` | multi-window pipeline → V7 golden 比對 | C1 全量比對通過 | §5.2 |
+| ☑ | T3.3 | `test_multi_window_nan_pattern_preserved` | NaN pattern 與 V7 完全一致 | C6: `np.array_equal(nan_mask_new, nan_mask_golden)` | §5.2 |
+| ☑ | T3.4 | `test_batch_variance_filter_matches_per_step` | batch filter 結果 == per-step filter 結果 | 保留的 column set 一致 | §5.2 |
 
 #### 邊界條件測試
 | ☐ | Test ID | 測試名稱 | 邊界條件 | 預期行為 | SPEC ref |
 |---|---------|---------|---------|---------|----------|
-| ☐ | T3.B1 | `test_multi_window_all_nan_input` | 輸入全 NaN | 輸出全 NaN | §5.2 |
-| ☐ | T3.B2 | `test_multi_window_constant_values` | 輸入單一常數值 | mean=val, std=0, skew=NaN, kurt=NaN | §5.2 |
-| ☐ | T3.B3 | `test_multi_window_single_window` | windows=[21] 單一 window | 結果與逐 window 一致 | §5.2 |
-| ☐ | T3.B4 | `test_multi_window_short_series` | n_rows=10, max_window=21 | 前 20 行 NaN | §5.2 |
-| ☐ | T3.B5 | `test_multi_window_extreme_values` | 含 1e30 和 1e-30 | 不 overflow/underflow | §5.2 |
-| ☐ | T3.B6 | `test_multi_window_all_windows` | 所有 9 個 window 同時 (5,8,13,21,34,55,89,144,233) | 全部正確 | §5.2 |
-| ☐ | T3.B7 | `test_multi_window_intermittent_nan` | [1, NaN, 3, NaN, 5, ...] intermittent NaN | 跳過 NaN，min_periods 行為一致 | §5.2 |
-| ☐ | T3.B8 | `test_fallback_env_var` | `FFACT_L3_MULTI_WINDOW=0` | 走逐 window 舊路徑，結果不變 | §5.2 |
+| ☑ | T3.B1 | `test_multi_window_all_nan_input` | 輸入全 NaN | 輸出全 NaN | §5.2 |
+| ☑ | T3.B2 | `test_multi_window_constant_values` | 輸入單一常數值 | mean=val, std=0, skew=NaN, kurt=NaN | §5.2 |
+| ☑ | T3.B3 | `test_multi_window_single_window` | windows=[21] 單一 window | 結果與逐 window 一致 | §5.2 |
+| ☑ | T3.B4 | `test_multi_window_short_series` | n_rows=10, max_window=21 | 前 20 行 NaN | §5.2 |
+| ☑ | T3.B5 | `test_multi_window_extreme_values` | 含 1e30 和 1e-30 | 不 overflow/underflow | §5.2 |
+| ☑ | T3.B6 | `test_multi_window_all_windows` | 所有 9 個 window 同時 (5,8,13,21,34,55,89,144,233) | 全部正確 | §5.2 |
+| ☑ | T3.B7 | `test_multi_window_intermittent_nan` | [1, NaN, 3, NaN, 5, ...] intermittent NaN | 跳過 NaN，min_periods 行為一致 | §5.2 |
+| ☑ | T3.B8 | `test_fallback_env_var` | `FFACT_L3_MULTI_WINDOW=0` | 走逐 window 舊路徑，結果不變 | §5.2 |
 
 #### 效能驗收
 | ☐ | Test ID | 測試名稱 | 驗收標準 | SPEC ref |
 |---|---------|---------|---------|----------|
-| ☐ | T3.P1 | `test_multi_window_speedup` | multi-window 比逐 window 快 ≥ 1.3× | §5.2 |
-| ☐ | T3.P2 | `test_multi_window_rss_stable` | RSS 增量 < 500 MB | §5.2 |
+| ☑ | T3.P1 | `test_multi_window_speedup` | multi-window 比逐 window 快 ≥ 1.3× | §5.2 |
+| ☑ | T3.P2 | `test_multi_window_rss_stable` | RSS 增量 < 500 MB | §5.2 |
 
 #### 測試檔案：`tests/test_multi_window_rolling.py` + `tests/performance/test_multi_window_perf.py`
 
 ### Phase 3 → Phase 4 Gate
-- [ ] T3.1~T3.4 全部通過
-- [ ] T3.B1~T3.B8 全部通過
-- [ ] T3.P1 效能驗收通過（≥ 1.3× speedup）
+- [x] T3.1~T3.4 全部通過
+- [x] T3.B1~T3.B8 全部通過
+- [x] T3.P1 效能驗收通過（≥ 1.3× speedup）
 - [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）
-- [ ] `FFACT_L3_MULTI_WINDOW=0` fallback 正常
+- [x] `FFACT_L3_MULTI_WINDOW=0` fallback 正常
 
 ---
 

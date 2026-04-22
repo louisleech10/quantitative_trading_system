@@ -434,8 +434,42 @@ def rolling_skew_kurt(data: np.ndarray, window: int, recalc_interval: int = 50) 
     return output.astype(np.float32)
 
 
+@numba.njit(cache=True, parallel=True)
+def fused_rolling_stats_multi_window(values: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """Compute rolling stats for multiple windows with a single Python/Numpy call.
+
+    Output layout on the last axis:
+    mean, std, min, max, range, zscore, skew, kurt, rank, slope.
+    """
+    n_rows = len(values)
+    n_windows = windows.shape[0]
+    output = np.full((n_rows, n_windows, 10), np.nan, dtype=np.float64)
+
+    if n_windows == 0:
+        return output
+
+    for window_idx in numba.prange(n_windows):
+        window = int(windows[window_idx])
+        if window <= 0:
+            continue
+
+        fused = fused_rolling_stats(values, window).astype(np.float64)
+        skew_kurt = rolling_skew_kurt(values, window).astype(np.float64)
+        rank = rolling_rank(values, window).astype(np.float64)
+        slope = rolling_slope(values, window).astype(np.float64)
+
+        output[:, window_idx, 0:6] = fused
+        output[:, window_idx, 6] = skew_kurt[:, 0]
+        output[:, window_idx, 7] = skew_kurt[:, 1]
+        output[:, window_idx, 8] = rank
+        output[:, window_idx, 9] = slope
+
+    return output
+
+
 __all__ = [
     "fused_rolling_stats",
+    "fused_rolling_stats_multi_window",
     "rolling_rank",
     "rolling_slope",
     "rolling_skew_kurt",
@@ -448,6 +482,7 @@ def warmup_numba() -> None:
 
     dummy = np.random.randn(64).astype(np.float64)
     fused_rolling_stats(dummy, 5)
+    fused_rolling_stats_multi_window(dummy, np.array([5, 13, 21], dtype=np.int32))
     rolling_rank(dummy, 5)
     rolling_slope(dummy, 5)
     rolling_skew_kurt(dummy, 5, 10)

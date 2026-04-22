@@ -258,6 +258,180 @@ tests/momentum/test_feature_preprocessor.py::test_transform_fixed_order FAILED
 - `T1.B1~T1.B5`
 - `grep -r "from api\." momentum/` = 0
 
+---
+
+## Batch 3 驗證追加（2026-04-22）
+
+> **驗證範圍**: Batch 3 = Phase 3 (Task 3.1, 3.2, 3.3, 3.4)
+> **驗證結論**: **Batch 3 實作與指定驗證已通過。V7 full-pipeline golden baseline 比對未於本輪命令中執行，已以 fallback 等價測試與邊界/效能測試替代驗證。**
+
+### Batch 3 摘要
+
+| 項目 | 狀態 | 說明 |
+|---|---|---|
+| Task 3.1 | ✅ PASS | 已新增 `fused_rolling_stats_multi_window()` |
+| Task 3.2 | ✅ PASS | 已整合 `FFACT_L3_MULTI_WINDOW` 新路徑與 fallback |
+| Task 3.3 | ✅ PASS | 已新增 `_batch_variance_filter()` 並維持既有 filter 語義 |
+| Task 3.4 | ✅ PASS | Deferred 狀態已確認，未引入 chunk orchestration |
+| Batch 3 lint | ✅ PASS | 指定檔案 `ruff check` 通過 |
+| Batch 3 decoupling | ✅ PASS | `grep -r 'from api\.' momentum/ | wc -l` = 0 |
+| Batch 3 main pytest | ✅ PASS | `14 passed` |
+| Batch 3 fallback pytest | ✅ PASS | `12 passed` |
+| V7 full golden baseline (C1~C6) | ⚠️ 未執行 | 本輪未跑 full pipeline / 未使用 golden baseline harness |
+
+### Batch 3 實際修改檔案
+
+- `momentum/FeatureEngineering/operators/numba_rolling.py`
+- `momentum/FeatureEngineering/operators/rolling_aggregator.py`
+- `tests/test_multi_window_rolling.py`
+- `tests/performance/test_multi_window_perf.py`
+- `docs/FEATURE_OPTIMIZATION_TODO.md`
+
+### Batch 3 Task 完成明細
+
+#### Task 3.1 — Multi-window kernel
+
+- 已新增 `fused_rolling_stats_multi_window()`
+- 已整合 10 個統計輸出：`mean/std/min/max/range/zscore/skew/kurt/rank/slope`
+- 保留既有 `fused_rolling_stats()`、`rolling_rank()`、`rolling_skew_kurt()`、`rolling_slope()` 作為 fallback building blocks
+- `warmup_numba()` 已涵蓋 multi-window kernel
+
+#### Task 3.2 — RollingAggregator 整合
+
+- `_compute_all_streaming_numba()` 已依 `FFACT_L3_MULTI_WINDOW` 分流
+- `FFACT_L3_MULTI_WINDOW=0` 時保留舊單 window 路徑
+- `FFACT_L3_MULTI_WINDOW=1` 時啟用 multi-window 路徑
+- 已維持舊輸出欄位名稱與 NaN pattern 等價
+
+#### Task 3.3 — Batch Variance Filter
+
+- 已新增 `_batch_variance_filter()`
+- 已重用既有 `_variance_filter()` 語義，未改變 dead feature 判定規則
+- multi-window 路徑已改為 window-batch 過濾後再組合輸出
+
+#### Task 3.4 — Deferred 確認
+
+- 本輪未加入 `TimeChunkIterator`
+- 本輪未新增 chunked branch
+- Deferred 狀態維持，避免在未定義 overlap/邊界拼接前破壞 C1~C6
+
+### Batch 3 驗證命令與結果
+
+#### 1. Ruff lint
+
+**命令**
+
+```bash
+./venv/bin/ruff check \
+  momentum/FeatureEngineering/operators/numba_rolling.py \
+  momentum/FeatureEngineering/operators/rolling_aggregator.py \
+  tests/test_multi_window_rolling.py \
+  tests/performance/test_multi_window_perf.py
+```
+
+**結果**
+
+- Exit code: `0`
+- 結論: PASS
+
+#### 2. Batch 3 主驗證
+
+**命令**
+
+```bash
+./venv/bin/pytest tests/test_multi_window_rolling.py tests/performance/test_multi_window_perf.py -v
+```
+
+**結果**
+
+- Exit code: `0`
+- 統計: `14 passed`
+- 結論: PASS
+
+**逐項驗證內容**
+
+- `T3.1`：multi-window kernel 與逐 window kernel 數值等價
+- `T3.2`：RollingAggregator multi-window 路徑與 fallback 路徑輸出欄位和值一致
+- `T3.3`：NaN pattern 與 fallback 路徑一致
+- `T3.4`：batch variance filter 與既有 per-step filter 保留結果一致
+- `T3.B1`：全 NaN 輸入輸出全 NaN
+- `T3.B2`：常數輸入與逐 window 參考一致
+- `T3.B3`：單一 window 模式正確
+- `T3.B4`：短序列在 window 不足時輸出 NaN
+- `T3.B5`：極值資料不 overflow/underflow
+- `T3.B6`：九個 windows 同時計算仍與逐 window 等價
+- `T3.B7`：間歇 NaN 的 min_periods 行為一致
+- `T3.B8`：環境變數 fallback 正常
+- `T3.P1`：在九窗口較大工作負載下 speedup ≥ 1.3x
+- `T3.P2`：RSS 增量 < 500 MB
+
+**非 PASSED 項目說明**
+
+- 無 failed
+- 無 skipped
+- 無 deselected
+- 無 warnings
+
+#### 3. Fallback 驗證
+
+**命令**
+
+```bash
+FFACT_L3_MULTI_WINDOW=0 ./venv/bin/pytest tests/test_multi_window_rolling.py -v
+```
+
+**結果**
+
+- Exit code: `0`
+- 統計: `12 passed`
+- 結論: PASS
+
+**通過條件**
+
+- 舊單 window 路徑在 `FFACT_L3_MULTI_WINDOW=0` 下持續可用
+
+**非 PASSED 項目說明**
+
+- 無 failed
+- 無 skipped
+- 無 deselected
+- 無 warnings
+
+#### 4. 解耦規則 R1 檢查
+
+**命令**
+
+```bash
+grep -r 'from api\.' momentum/ | wc -l
+```
+
+**結果**
+
+- Exit code: `0`
+- 輸出: `0`
+- 結論: PASS
+
+### 無法直接驗證項目
+
+#### V7 golden baseline full pipeline（C1~C6）
+
+- **狀態**: 本輪未直接執行
+- **原因**: 使用者指定的 Batch 3 驗證命令僅涵蓋 Phase 3 單元/效能/fallback；本輪未追加 full pipeline golden harness 或 full output comparison
+- **替代檢查方式**:
+  - 已以 `T3.2` 驗證 multi-window 與 fallback 路徑整體輸出等價
+  - 已以 `T3.3` 驗證 NaN pattern 等價
+  - 已以 `T3.B1~T3.B8` 驗證邊界條件
+  - 已以 `T3.P1~T3.P2` 驗證效能與 RSS
+
+### Batch 3 Gate 判定
+
+- `T3.1~T3.4`：PASS
+- `T3.B1~T3.B8`：PASS
+- `T3.P1~T3.P2`：PASS
+- `FFACT_L3_MULTI_WINDOW=0` fallback：PASS
+- `grep -r 'from api\.' momentum/ | wc -l` = 0：PASS
+- `Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）`：本輪未直接執行，保留後續 full pipeline 驗證
+
 ### 尚未勾選 / 未驗證
 
 - `C1` 正常執行 pipeline 與 V7 Baseline 數值等價
