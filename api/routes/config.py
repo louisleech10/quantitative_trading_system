@@ -1,7 +1,12 @@
-from typing import List
+import os
+import shutil
+from pathlib import Path
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+from api.core.config import settings
 from api.core.logging import get_logger, log_function_call
 from api.models.requests import (
     SearchConfigRequest,
@@ -15,10 +20,121 @@ from api.models.responses import (
     StatsResponse
 )
 from api.services.data_service import data_service
+from momentum.FeatureEngineering.utils.hardware_utils import (
+    get_memory_tier,
+    get_tier_config,
+)
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+
+def _build_cpu_info() -> Dict[str, Any]:
+    """Build CPU info with safe fallbacks when psutil is unavailable."""
+    logical_cores = os.cpu_count() or 1
+    physical_cores = logical_cores
+    usage_pct = 0.0
+
+    if psutil is None:
+        return {
+            "logical_cores": logical_cores,
+            "physical_cores": physical_cores,
+            "usage_pct": usage_pct,
+        }
+
+    try:
+        physical_cores = psutil.cpu_count(logical=False) or logical_cores
+        usage_pct = round(float(psutil.cpu_percent(interval=0.1)), 1)
+    except OSError:
+        physical_cores = logical_cores
+        usage_pct = 0.0
+
+    return {
+        "logical_cores": logical_cores,
+        "physical_cores": physical_cores,
+        "usage_pct": usage_pct,
+    }
+
+
+def _build_memory_info() -> Dict[str, float]:
+    """Build memory info with safe fallbacks when psutil is unavailable."""
+    if psutil is None:
+        return {
+            "total_gb": 0.0,
+            "available_gb": 0.0,
+            "used_pct": 0.0,
+        }
+
+    try:
+        virtual_memory = psutil.virtual_memory()
+        return {
+            "total_gb": round(virtual_memory.total / 1024 ** 3, 1),
+            "available_gb": round(virtual_memory.available / 1024 ** 3, 1),
+            "used_pct": round(float(virtual_memory.percent), 1),
+        }
+    except OSError:
+        return {
+            "total_gb": 0.0,
+            "available_gb": 0.0,
+            "used_pct": 0.0,
+        }
+
+
+def _build_disk_info(data_cache_path: Path) -> Dict[str, Any]:
+    """Build data_cache disk info without exposing paths outside the project cache."""
+    resolved_path = data_cache_path.resolve()
+    empty_disk_info = {
+        "path": str(resolved_path),
+        "free_gb": 0.0,
+        "total_gb": 0.0,
+        "used_pct": 0.0,
+    }
+
+    if not resolved_path.exists():
+        return empty_disk_info
+
+    try:
+        disk_usage = shutil.disk_usage(resolved_path)
+    except OSError:
+        return empty_disk_info
+
+    return {
+        "path": str(resolved_path),
+        "free_gb": round(disk_usage.free / 1024 ** 3, 1),
+        "total_gb": round(disk_usage.total / 1024 ** 3, 1),
+        "used_pct": round(disk_usage.used / disk_usage.total * 100, 1),
+    }
 
 # Create router
 router = APIRouter(prefix="/config", tags=["Configuration"])
 logger = get_logger("api.routes.config")
+
+
+@router.get("/hardware")
+async def get_hardware_info() -> Dict[str, Any]:
+    """Return hardware information and recommended Feature Factory settings."""
+    try:
+        memory_tier = get_memory_tier()
+        tier_config = get_tier_config(memory_tier)
+        data_cache_path = settings.data_cache_path
+
+        return {
+            "memory_tier": memory_tier,
+            "cpu": _build_cpu_info(),
+            "memory": _build_memory_info(),
+            "disk": _build_disk_info(data_cache_path),
+            "recommended_settings": {
+                "FFACT_L65_WORKERS": tier_config["l65_workers"],
+                "FFACT_CGSA_MEMORY_BUFFER": tier_config["cgsa_memory_buffer"],
+                "FFACT_L7_WORKERS": tier_config["l7_workers"],
+                "FFACT_L7_COMPACTOR_ENABLED": 1,
+            },
+        }
+    except Exception as error:
+        logger.error("Error getting hardware info: %s", str(error), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/templates", response_model=TemplateListResponse)
 async def get_search_templates(

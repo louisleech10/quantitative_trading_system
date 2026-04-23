@@ -960,3 +960,209 @@ FFACT_L65_WORKERS=1 ./venv/bin/pytest tests/test_l65_parallel.py -v
 Batch 2 的 Task 2.1~2.5 已完成，且指定驗證命令、fallback 驗證、lint、Batch 2 套件測試與 multi-tf 相容性回歸測試均通過。  
 本輪另外修復了 L7 parquet disk-full 相容性與 legacy multi-tf 的 `multi_tf_merged` context 回歸。  
 依本次要求，Batch 2 已以指定驗證完成，不再以全域 smoke test 作為結案條件。
+
+---
+
+## Batch 5 驗證追加（2026-04-23）
+
+> **驗證範圍**: Batch 5 = Phase 5 (Task 5.1, 5.2, 5.3)
+> **驗證結論**: **Batch 5 已完成；Phase 5 指定實作與驗證皆已通過。Repo 全域 `ruff check momentum/` 仍存在既有、且與本批次 TODO 無關的 lint 負債，未越界修補。**
+
+### Batch 5 摘要
+
+| 項目 | 狀態 | 說明 |
+|---|---|---|
+| Task 5.1 | ✅ PASS | 已新增 `GET /api/v1/config/hardware` endpoint |
+| Task 5.2 | ✅ PASS | 已新增 `HardwareStatusPanel`，可顯示 tier / CPU / RAM / 磁碟 / 建議設定 |
+| Task 5.3 | ✅ PASS | 面板已嵌入 Feature Factory 頁面頂部 |
+| T5.1 / T5.2 / T5.B1 | ✅ PASS | `tests/test_hardware_api.py` 共 3 項測試通過 |
+| T5.3 | ✅ PASS | 實際瀏覽器頁面驗證，正常渲染且頁面未受破壞 |
+| T5.B2 | ✅ PASS | 實際瀏覽器失敗態驗證，顯示「無法取得系統資訊」且未白屏 |
+| Batch 5 lint（指定檔案） | ✅ PASS | 相關檔案 `ruff check` 通過 |
+| Batch 5 decoupling | ✅ PASS | `grep -r 'from api\.' momentum/ | wc -l` = 0 |
+| Batch 5 curl 驗證 | ✅ PASS | 實際 `curl` 可取得硬體 JSON |
+| Repo 全域 `ruff check momentum/` | ⚠️ PARTIAL | 既有大量錯誤，非本批次 TODO 範圍 |
+
+### Batch 5 實際修改檔案
+
+- `api/routes/config.py`
+- `frontend/src/components/feature-factory/HardwareStatusPanel.tsx`
+- `frontend/src/app/feature-factory/page.tsx`
+- `tests/test_hardware_api.py`
+- `docs/FEATURE_OPTIMIZATION_TODO.md`
+
+### Batch 5 Task 完成明細
+
+#### Task 5.1 — 後端 `GET /config/hardware` endpoint
+
+- 已在 `api/routes/config.py` 新增 `GET /api/v1/config/hardware`
+- 以 `api/core/config.py` 的 `settings.data_cache_path` 作為磁碟檢查來源，未硬編碼路徑
+- 重用 `momentum/FeatureEngineering/utils/hardware_utils.py` 的 `get_memory_tier()` 與 `get_tier_config()`
+- CPU / RAM / 磁碟資訊皆有 fallback，`data_cache/` 不存在時不 crash
+- `psutil` 不可用時維持保守 fallback，不暴露敏感系統資訊
+
+#### Task 5.2 — 前端 `HardwareStatusPanel.tsx`
+
+- 已新增 `frontend/src/components/feature-factory/HardwareStatusPanel.tsx`
+- 首次載入呼叫 `GET /api/v1/config/hardware`
+- 顯示 memory tier、CPU、RAM、磁碟與建議設定
+- 支援手動重新整理
+- API 失敗時顯示「無法取得系統資訊」
+- 未引入 Zustand 或跨頁面共享狀態
+
+#### Task 5.3 — 嵌入 Feature Factory 頁面
+
+- 已於 `frontend/src/app/feature-factory/page.tsx` 引入 `HardwareStatusPanel`
+- 面板位於 Feature Factory hero 區塊下方、原有頁面主功能上方
+- 未替換既有功能元件
+- API 失敗時頁面仍維持可操作，未出現白屏
+
+### Batch 5 驗證命令與結果
+
+#### 1. Ruff lint（指定檔案）
+
+**命令**
+
+```bash
+./venv/bin/ruff check \
+  api/routes/config.py \
+  frontend/src/components/feature-factory/HardwareStatusPanel.tsx \
+  frontend/src/app/feature-factory/page.tsx \
+  tests/test_hardware_api.py
+```
+
+**結果**
+
+- Exit code: `0`
+- 結論: PASS
+
+#### 2. Batch 5 後端測試
+
+**命令**
+
+```bash
+./venv/bin/pytest tests/test_hardware_api.py -v
+```
+
+**結果**
+
+- Exit code: `0`
+- 統計: `3 passed`
+- 結論: PASS
+
+**逐項驗證內容**
+
+- `T5.1`: `test_hardware_endpoint_returns_valid_json`
+- `T5.2`: `test_hardware_endpoint_tier_matches_util`
+- `T5.B1`: `test_hardware_endpoint_missing_data_cache`
+
+**非 PASSED 項目說明**
+
+- 無 failed
+- 無 skipped
+- 無 deselected
+
+#### 3. IDE 診斷檢查
+
+**工具**
+
+- VS Code `get_errors`
+
+**結果**
+
+- 相關修改檔案無新增 syntax / type / lint 診斷
+- 結論: PASS
+
+#### 4. 解耦規則 R1 檢查
+
+**命令**
+
+```bash
+grep -r 'from api\.' momentum/ | wc -l
+```
+
+**結果**
+
+- Exit code: `0`
+- 輸出: `0`
+- 結論: PASS
+
+#### 5. 實際 API curl 驗證
+
+**命令**
+
+```bash
+curl http://127.0.0.1:8000/api/v1/config/hardware
+```
+
+**結果摘要**
+
+- 成功回傳 JSON
+- 實機回傳包含：`memory_tier=8gb`、`cpu.logical_cores=8`、`memory.total_gb=8.0`
+- `recommended_settings` 實際回傳 `l65_workers=4`、`cgsa_buffer=0`、`l7_workers=4`、`compactor_enabled=true`
+- 結論: PASS
+
+#### 6. 前端正常渲染驗證（T5.3）
+
+**方式**
+
+- 啟動前端 dev server
+- 開啟 `http://localhost:3000/feature-factory`
+- 以實際 DOM snapshot 檢查頁面
+
+**驗證到的畫面事實**
+
+- 頁面正常載入 `Feature Factory 控制中樞`
+- 面板顯示 `系統資源` 與 `Tier: 8GB`
+- 面板內顯示 CPU / RAM / 磁碟資訊與 `L65_WORKERS=4` 等建議設定
+- 原本 Feature Factory 頁面其他元件仍存在，未被替換或遮擋
+
+**結果**
+
+- 結論: PASS
+
+#### 7. 前端 API 失敗態驗證（T5.B2）
+
+**方式**
+
+- 暫停後端 API
+- 重新整理 `http://localhost:3000/feature-factory`
+- 以實際 DOM snapshot 檢查頁面
+
+**驗證到的畫面事實**
+
+- `HardwareStatusPanel` 顯示 `無法取得系統資訊`
+- 頁面主架構仍存在，未白屏
+- 因後端整體關閉，其他依賴 API 的既有區塊亦出現 `Failed to fetch`；這是整站失聯下的預期副作用，不屬本批次新增面板缺陷
+
+**結果**
+
+- 結論: PASS
+
+#### 8. Repo 全域 ruff 檢查
+
+**命令**
+
+```bash
+./venv/bin/ruff check momentum/
+```
+
+**結果**
+
+- 結論: PARTIAL
+- 說明: 存在既有、且與本輪 Phase 5 TODO 無關的 lint 錯誤；未在本批次中越界修補
+
+### Batch 5 Gate 判定
+
+### 已通過
+
+- `T5.1~T5.3`
+- `T5.B1~T5.B2`
+- `GET /api/v1/config/hardware` 可實際存取
+- 前端正常 / 失敗態皆已手動驗證
+- `grep -r 'from api\.' momentum/ | wc -l` = 0
+
+### 未納入完成阻塞
+
+- Repo 全域 `ruff check momentum/` 既有錯誤
+- 原因：使用者要求僅允許在 TODO 範圍內修補；本輪未擴展到與 Phase 5 無關的 repo 歷史 lint 負債

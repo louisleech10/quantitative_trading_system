@@ -1113,9 +1113,9 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 
 ### Task 5.1 — 後端 `GET /config/hardware` endpoint
 - [x] **SPEC ref**: Task 5.1, §7.1
-- [ ] **目標**: 新增 API endpoint 回傳硬體資訊、memory tier、建議設定
-- [ ] **輸入**: 無（讀取系統資訊）
-- [ ] **輸出**: JSON response，結構：
+- [x] **目標**: 新增 API endpoint 回傳硬體資訊、memory tier、建議設定
+- [x] **輸入**: 無（讀取系統資訊）
+- [x] **輸出**: JSON response，結構：
   ```json
   {
     "memory_tier": "8gb",
@@ -1125,7 +1125,7 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     "recommended_settings": {"FFACT_L65_WORKERS": 4, "FFACT_CGSA_MEMORY_BUFFER": 0, "FFACT_L7_WORKERS": 4, "FFACT_L7_COMPACTOR_ENABLED": 1}
   }
   ```
-- [ ] **實作要點**:
+- [x] **實作要點**:
   - 在 `api/routes/config.py` 新增：
     ```python
     @router.get("/hardware")
@@ -1171,20 +1171,20 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - Edge case 處理：
     - `data_cache/` 不存在 → disk info 全為 0
     - psutil 不可用 → 回傳 fallback 值
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `api/routes/config.py` → `get_hardware_info()`（新增 endpoint）
-- [ ] **不可做**:
+- [x] **不可做**:
   - 不可暴露敏感資訊（API keys, 完整檔案系統路徑 outside data_cache）
   - 不可使用 `cpu_percent(interval=1)` 以上（會阻塞 async event loop）
-- [ ] **風險緩解**: R9（API 不可用 — 前端 error boundary）
-- [ ] **驗證**: T5.1, T5.2, T5.B1
+- [x] **風險緩解**: R9（API 不可用 — 前端 error boundary）
+- [x] **驗證**: T5.1, T5.2, T5.B1
 
 ### Task 5.2 — 前端 `HardwareStatusPanel.tsx`
 - [x] **SPEC ref**: Task 5.2, §7.1
-- [ ] **目標**: 建立系統資源顯示面板
-- [ ] **輸入**: `GET /api/v1/config/hardware` 回傳的 JSON
-- [ ] **輸出**: React 元件
-- [ ] **實作要點**:
+- [x] **目標**: 建立系統資源顯示面板
+- [x] **輸入**: `GET /api/v1/config/hardware` 回傳的 JSON
+- [x] **輸出**: React 元件
+- [x] **實作要點**:
   - 新建 `frontend/src/components/feature-factory/HardwareStatusPanel.tsx`
   - UI Layout：
     ```
@@ -1223,20 +1223,20 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
       };
     }
     ```
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `frontend/src/components/feature-factory/HardwareStatusPanel.tsx`（**新增**）
-- [ ] **不可做**:
+- [x] **不可做**:
   - 不可自動輪詢（使用者手動觸發）
   - 不可在此元件引入 Zustand store（不需要跨頁面共享此狀態）
-- [ ] **風險緩解**: R9（error boundary + fallback 錯誤訊息）
-- [ ] **驗證**: T5.3, T5.B2
+- [x] **風險緩解**: R9（error boundary + fallback 錯誤訊息）
+- [x] **驗證**: T5.3, T5.B2
 
 ### Task 5.3 — 嵌入 Feature Factory 頁面
 - [x] **SPEC ref**: Task 5.3, §7.1
-- [ ] **目標**: 將 HardwareStatusPanel 嵌入 Feature Factory 頁面
-- [ ] **輸入**: `HardwareStatusPanel` 元件
-- [ ] **輸出**: Feature Factory 頁面頂部可見系統資源面板
-- [ ] **實作要點**:
+- [x] **目標**: 將 HardwareStatusPanel 嵌入 Feature Factory 頁面
+- [x] **輸入**: `HardwareStatusPanel` 元件
+- [x] **輸出**: Feature Factory 頁面頂部可見系統資源面板
+- [x] **實作要點**:
   - 在 `frontend/src/app/feature-factory/page.tsx` 引入：
     ```tsx
     import { HardwareStatusPanel } from '@/components/feature-factory/HardwareStatusPanel';
@@ -1247,34 +1247,34 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
   - 可折疊（預設展開），使用 `<details>` 或 custom collapsible
   - Edge case 處理：
     - API 不可用 → 面板顯示最小化的錯誤狀態，不影響其他功能
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `frontend/src/app/feature-factory/page.tsx` → `FeatureFactoryPage()`（引入並嵌入 `HardwareStatusPanel`）
-- [ ] **不可做**:
+- [x] **不可做**:
   - 不可遮擋或替換現有的主要功能元件
   - 不可在未登入/API 不可用時 crash 整個頁面
-- [ ] **驗證**: T5.3（隱含）
+- [x] **驗證**: T5.3（隱含）
 
 ### Phase 5 測試清單
 
 #### 單元測試
 | ☐ | Test ID | 測試名稱 | 驗證內容 | 通過條件 | SPEC ref |
 |---|---------|---------|---------|---------|---------|
-| ☐ | T5.1 | `test_hardware_endpoint_returns_valid_json` | endpoint 回傳正確 JSON 結構 | 包含 memory_tier, cpu, memory, disk, recommended_settings | §7.2 |
-| ☐ | T5.2 | `test_hardware_endpoint_tier_matches_util` | endpoint tier == `get_memory_tier()` | 一致 | §7.2 |
-| ☐ | T5.3 | `test_hardware_panel_renders_without_crash` | React 元件正常渲染 | 無 console error | §7.2 |
+| ☑ | T5.1 | `test_hardware_endpoint_returns_valid_json` | endpoint 回傳正確 JSON 結構 | 包含 memory_tier, cpu, memory, disk, recommended_settings | §7.2 |
+| ☑ | T5.2 | `test_hardware_endpoint_tier_matches_util` | endpoint tier == `get_memory_tier()` | 一致 | §7.2 |
+| ☑ | T5.3 | `test_hardware_panel_renders_without_crash` | React 元件正常渲染 | 無 console error | §7.2 |
 
 #### 邊界條件測試
 | ☐ | Test ID | 測試名稱 | 邊界條件 | 預期行為 | SPEC ref |
 |---|---------|---------|---------|---------|----------|
-| ☐ | T5.B1 | `test_hardware_endpoint_missing_data_cache` | `data_cache/` 不存在 | disk info 全為 0，endpoint 不 crash | §7.2 |
-| ☐ | T5.B2 | `test_hardware_panel_api_error` | API 回傳 500 | 前端顯示錯誤狀態，不白屏 | §7.2 |
+| ☑ | T5.B1 | `test_hardware_endpoint_missing_data_cache` | `data_cache/` 不存在 | disk info 全為 0，endpoint 不 crash | §7.2 |
+| ☑ | T5.B2 | `test_hardware_panel_api_error` | API 回傳 500 | 前端顯示錯誤狀態，不白屏 | §7.2 |
 
 #### 測試檔案：`tests/test_hardware_api.py`
 
 ### Phase 5 → Done Gate
-- [ ] T5.1~T5.3 全部通過
-- [ ] T5.B1~T5.B2 全部通過
-- [ ] API 可正常存取 `GET /api/v1/config/hardware`
+- [x] T5.1~T5.3 全部通過
+- [x] T5.B1~T5.B2 全部通過
+- [x] API 可正常存取 `GET /api/v1/config/hardware`
 
 ---
 

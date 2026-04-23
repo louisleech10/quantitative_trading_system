@@ -14,6 +14,7 @@ import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel'
 import LayerPanel from '@/components/feature-factory/LayerPanel';
 import FeatureExplorer from '@/components/feature-factory/FeatureExplorer';
 import BatchQualityOverview from '@/components/feature-factory/BatchQualityOverview';
+import HardwareStatusPanel from '@/components/feature-factory/HardwareStatusPanel';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
@@ -225,6 +226,8 @@ export default function FeatureFactoryPage() {
             <GenerationProgress task={currentTask} batchTask={batchTask} symbols={normalizedSymbols} naked />
           )}
         </div>
+
+        <HardwareStatusPanel />
 
         {error && (
           <div className="glass-panel rounded-xl p-4 border border-rose-400/30 text-rose-200 flex items-center gap-2">
