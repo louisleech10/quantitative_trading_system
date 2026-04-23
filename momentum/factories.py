@@ -251,7 +251,7 @@ def create_regime_detector(
 def create_coverage_analyzer() -> "CoverageAnalyzer":
     from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
 
-    return CoverageAnalyzer()
+    return CoverageAnalyzer(feature_reader_factory=create_feature_reader)
 
 
 def create_pattern_extractor() -> PatternExtractor:

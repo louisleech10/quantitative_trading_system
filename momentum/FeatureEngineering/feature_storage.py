@@ -8,20 +8,213 @@ Date: 2026-01-10
 """
 
 import os
+import queue
+import threading
+import time
 import h5py
 import pandas as pd
 import numpy as np
 import json
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 
+try:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+except ImportError:
+    pa = None
+    pq = None
+
+from momentum.FeatureEngineering.core.column_group_registry import FailureType
 from momentum.core.logging import get_logger
 
 if TYPE_CHECKING:
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
 logger = get_logger(__name__)
+
+
+def _require_pyarrow() -> Tuple[Any, Any]:
+    """Return pyarrow modules or raise a clear dependency error."""
+    if pa is None or pq is None:
+        raise ImportError("pyarrow is required for parquet persistence")
+    return pa, pq
+
+
+class AsyncParquetCompactor:
+    """Background compactor that merges small parquet column partitions."""
+
+    def __init__(
+        self,
+        staging_dir: Path,
+        final_dir: Path,
+        target_rows: int = 100_000,
+        min_files_to_compact: int = 8,
+    ) -> None:
+        self._staging_dir = Path(staging_dir)
+        self._final_dir = Path(final_dir)
+        self._target_rows = max(1, int(target_rows))
+        self._min_files_to_compact = max(2, int(min_files_to_compact))
+        self._queue: "queue.Queue[Optional[Tuple[str, Path]]]" = queue.Queue()
+        self._pending: List[Tuple[str, Path, int]] = []
+        self._lock = threading.Lock()
+        self._thread: Optional[threading.Thread] = None
+        self._error: Optional[BaseException] = None
+        self._merged_outputs: List[Path] = []
+        self._merged_sources: Dict[str, List[str]] = {}
+        self._part_to_final_path: Dict[str, str] = {}
+        self._merge_index = 0
+
+    @property
+    def merged_sources(self) -> Dict[str, List[str]]:
+        """Return merged parquet filename -> source part ids mapping."""
+        with self._lock:
+            return {key: list(value) for key, value in self._merged_sources.items()}
+
+    @property
+    def part_to_final_path(self) -> Dict[str, str]:
+        """Return source part id -> final parquet path mapping."""
+        with self._lock:
+            return dict(self._part_to_final_path)
+
+    def start(self) -> None:
+        """Start the background compactor worker."""
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._run, name="l7-parquet-compactor", daemon=True)
+        self._thread.start()
+
+    def enqueue(self, item: Tuple[str, Path]) -> None:
+        """Queue one staging parquet file for background compaction."""
+        if self._error is not None:
+            raise RuntimeError("AsyncParquetCompactor already failed") from self._error
+        part_id, staging_path = item
+        self._queue.put((part_id, Path(staging_path)))
+
+    def finalize(self) -> List[Path]:
+        """Flush remaining files, stop the worker, and return final parquet paths."""
+        if self._thread is None:
+            return []
+        self._queue.put(None)
+        self._thread.join()
+        if self._error is not None:
+            raise RuntimeError("AsyncParquetCompactor failed during finalize") from self._error
+        with self._lock:
+            return list(self._merged_outputs)
+
+    def _run(self) -> None:
+        try:
+            while True:
+                item = self._queue.get()
+                if item is None:
+                    self._flush_pending(force=True)
+                    return
+
+                part_id, staging_path = item
+                row_count = self._read_row_count(staging_path)
+
+                if row_count >= self._target_rows:
+                    self._compact_batch([(part_id, staging_path, row_count)])
+                    continue
+
+                self._pending.append((part_id, staging_path, row_count))
+                if len(self._pending) >= self._min_files_to_compact:
+                    self._flush_pending(force=False)
+        except BaseException as exc:
+            self._error = exc
+
+    def _flush_pending(self, force: bool) -> None:
+        if not self._pending:
+            return
+        if not force and len(self._pending) < self._min_files_to_compact:
+            return
+        batch = list(self._pending)
+        self._pending.clear()
+        self._compact_batch(batch)
+
+    def _compact_batch(self, batch: List[Tuple[str, Path, int]]) -> None:
+        start_time = time.perf_counter()
+        final_path, source_ids = self._merge_batch(batch)
+        elapsed = time.perf_counter() - start_time
+        with self._lock:
+            self._merged_outputs.append(final_path)
+            self._merged_sources[final_path.name] = list(source_ids)
+            resolved_path = str(final_path.resolve())
+            for part_id in source_ids:
+                self._part_to_final_path[part_id] = resolved_path
+        logger.info(
+            "[L7] Compactor merged %d parts into %s in %.2fs",
+            len(source_ids),
+            final_path.name,
+            elapsed,
+        )
+
+    def _merge_batch(self, batch: List[Tuple[str, Path, int]]) -> Tuple[Path, List[str]]:
+        _, pq_module = _require_pyarrow()
+        final_path = self._next_output_path()
+        temp_path = self._next_temp_path(final_path)
+        source_ids = [part_id for part_id, _path, _rows in batch]
+
+        if len(batch) == 1:
+            part_id, staging_path, _row_count = batch[0]
+            os.replace(staging_path, final_path)
+            return final_path, [part_id]
+
+        try:
+            merged_table = self._merge_tables(batch)
+            pq_module.write_table(
+                merged_table,
+                str(temp_path),
+                compression="zstd",
+                compression_level=1,
+            )
+            os.replace(temp_path, final_path)
+            for _part_id, staging_path, _row_count in batch:
+                if staging_path.exists():
+                    staging_path.unlink()
+            return final_path, source_ids
+        except Exception:
+            if temp_path.exists():
+                temp_path.unlink()
+            raise
+
+    def _merge_tables(self, batch: List[Tuple[str, Path, int]]):
+        pa_module, pq_module = _require_pyarrow()
+        expected_rows: Optional[int] = None
+        arrays: List[Any] = []
+        names: List[str] = []
+
+        for _part_id, staging_path, row_count in batch:
+            table = pq_module.read_table(staging_path)
+            if expected_rows is None:
+                expected_rows = row_count
+            elif row_count != expected_rows:
+                raise ValueError(
+                    f"Compactor row mismatch: expected {expected_rows}, got {row_count} for {staging_path.name}"
+                )
+
+            for column_name in table.column_names:
+                if column_name in names:
+                    raise ValueError(f"Compactor duplicate column detected: {column_name}")
+                names.append(column_name)
+                arrays.append(table[column_name])
+
+        return pa_module.Table.from_arrays(arrays, names=names)
+
+    def _read_row_count(self, staging_path: Path) -> int:
+        _, pq_module = _require_pyarrow()
+        parquet_file = pq_module.ParquetFile(str(staging_path))
+        return int(parquet_file.metadata.num_rows)
+
+    def _next_output_path(self) -> Path:
+        self._merge_index += 1
+        return self._final_dir / f"merged_{self._merge_index:04d}.parquet"
+
+    @staticmethod
+    def _next_temp_path(final_path: Path) -> Path:
+        return final_path.parent / f".{final_path.stem}.tmp{final_path.suffix}"
 
 
 class FeatureStorage:
@@ -330,6 +523,69 @@ class FeatureStorage:
     # V7 §12 P0: max columns before auto-splitting a group
     MAX_GROUP_COLUMNS = 5000
 
+    @staticmethod
+    def _classify_persist_failure(error: BaseException) -> FailureType:
+        """Classify parquet persistence failures for logging and diagnostics."""
+        if isinstance(error, MemoryError):
+            return FailureType.OOM
+        if isinstance(error, (OSError, IOError)):
+            return FailureType.IO_ERROR
+        if isinstance(error, (ValueError, TypeError)):
+            return FailureType.VALIDATION
+        return FailureType.CONFIG
+
+    def _persist_parts_parallel(
+        self,
+        parts_queue: List[Tuple[str, Any, Path, Path]],
+        n_workers: int,
+        compactor: Optional[AsyncParquetCompactor] = None,
+    ) -> List[str]:
+        """Persist parquet parts with optional parallel writes and async compaction."""
+        _, pq_module = _require_pyarrow()
+        if not parts_queue:
+            return []
+
+        start_time = time.perf_counter()
+
+        def _write_one(item: Tuple[str, Any, Path, Path]) -> str:
+            part_id, table, final_path, staging_path = item
+            pq_module.write_table(
+                table,
+                str(staging_path),
+                compression="zstd",
+                compression_level=1,
+            )
+            if compactor is not None:
+                compactor.enqueue((part_id, staging_path))
+            else:
+                os.replace(staging_path, final_path)
+            return str(final_path.resolve())
+
+        try:
+            if n_workers <= 1 or len(parts_queue) == 1:
+                results = [_write_one(item) for item in parts_queue]
+            else:
+                with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                    results = list(pool.map(_write_one, parts_queue))
+        except Exception as exc:
+            failure_type = self._classify_persist_failure(exc)
+            self.logger.error(
+                "[L7] Parallel persist failed: failure_type=%s error=%s",
+                failure_type.value,
+                str(exc),
+                exc_info=True,
+            )
+            raise
+
+        elapsed = time.perf_counter() - start_time
+        self.logger.info(
+            "[L7] Parallel persist: %d parts in %.2fs, %d workers",
+            len(results),
+            elapsed,
+            max(1, int(n_workers)),
+        )
+        return results
+
     def persist_registry_to_parquet(
         self,
         symbol: str,
@@ -344,9 +600,13 @@ class FeatureStorage:
         - Auto-split groups with > MAX_GROUP_COLUMNS columns
         - Write manifest.json + columns.json.gz after all groups persisted
 
-        Uses stream-and-delete: each group is staged → moved → .npy deleted
-        before proceeding to the next, keeping peak disk usage bounded.
+        Uses bounded batched staging: groups are converted to parquet-ready parts,
+        flushed through the L7 writer, and their backing .npy files are deleted
+        once the batch is durably accepted.
         """
+        pa_module, _ = _require_pyarrow()
+        from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
+
         output_dir = self.base_path / symbol / config_hash
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -360,10 +620,62 @@ class FeatureStorage:
         all_columns: List[str] = []
         total_rows: int = 0
         npy_freed = 0
+        preserve_staging = False
+        part_to_group_id: Dict[str, str] = {}
+        first_part_by_group: Dict[str, str] = {}
 
         try:
             groups_list = list(registry.iter_all())
             total_groups = len(groups_list)
+            max_group_columns = max((len(group.columns) for _group_id, group in groups_list), default=0)
+            tier = get_memory_tier()
+            tier_cfg = get_tier_config(tier)
+            n_workers = self._resolve_positive_env(
+                "FFACT_L7_WORKERS",
+                int(tier_cfg["l7_workers"]),
+            )
+            compactor_enabled = os.getenv("FFACT_L7_COMPACTOR_ENABLED", "1").strip() != "0"
+            target_rows = self._resolve_positive_env("FFACT_L7_COMPACTOR_TARGET_ROWS", 100_000)
+            chunk_bars = tier_cfg.get("chunk_bars")
+            use_compactor = (
+                compactor_enabled
+                and n_workers > 1
+                and chunk_bars is not None
+                and max_group_columns <= self.MAX_GROUP_COLUMNS
+                and total_groups > 1
+            )
+            compactor: Optional[AsyncParquetCompactor] = None
+            if use_compactor:
+                compactor = AsyncParquetCompactor(
+                    staging_dir=staging_dir,
+                    final_dir=output_dir,
+                    target_rows=target_rows,
+                )
+                compactor.start()
+
+            pending_parts: List[Tuple[str, Any, Path, Path]] = []
+            pending_disk_paths: Dict[str, Path] = {}
+            batch_limit = max(1, n_workers * 2)
+
+            def _flush_pending_parts() -> None:
+                nonlocal pending_parts, pending_disk_paths, npy_freed, persisted_paths
+                if not pending_parts:
+                    return
+                batch_results = self._persist_parts_parallel(
+                    pending_parts,
+                    n_workers=n_workers,
+                    compactor=compactor,
+                )
+                if compactor is None:
+                    persisted_paths.extend(batch_results)
+
+                for group_id, disk_path in pending_disk_paths.items():
+                    if disk_path.exists():
+                        disk_path.unlink()
+                        npy_freed += 1
+                pending_parts = []
+                pending_disk_paths = {}
+
             for idx, (group_id, group) in enumerate(groups_list, 1):
                 group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
                 if group_data.ndim != 2:
@@ -388,14 +700,11 @@ class FeatureStorage:
                     staged_path = staging_dir / f"{part_id}.parquet"
                     final_path = output_dir / f"{part_id}.parquet"
 
-                    staged_frame = pd.DataFrame(
-                        {col: data_f16[:, ci] for ci, col in enumerate(part_cols)}
-                    )
-                    staged_frame.to_parquet(staged_path, compression="zstd", index=False)
-
-                    os.replace(staged_path, final_path)
-                    resolved_path = str(final_path.resolve())
-                    persisted_paths.append(resolved_path)
+                    arrays = [pa_module.array(data_f16[:, ci]) for ci in range(len(part_cols))]
+                    table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
+                    pending_parts.append((part_id, table, final_path, staged_path))
+                    part_to_group_id[part_id] = group_id
+                    first_part_by_group.setdefault(group_id, part_id)
 
                     manifest_groups[part_id] = {
                         "file": f"{part_id}.parquet",
@@ -403,24 +712,46 @@ class FeatureStorage:
                         "columns": list(part_cols),
                     }
                     all_columns.extend(part_cols)
-                    del data_f16, staged_frame
+                    del data_f16
 
-                # Map original group_id to the first part path for registry compat
-                if parts:
-                    parquet_path_map[group_id] = str(
-                        (output_dir / f"{parts[0][0]}.parquet").resolve()
-                    )
+                if group.disk_path and group.disk_path.exists():
+                    pending_disk_paths[group_id] = group.disk_path
 
                 del group_data
-                if group.disk_path and group.disk_path.exists():
-                    group.disk_path.unlink()
-                    npy_freed += 1
+
+                if len(pending_parts) >= batch_limit:
+                    _flush_pending_parts()
 
                 if idx % 100 == 0 or idx == total_groups:
                     self.logger.info(
                         "[L7] Persisted %d/%d groups (%d .npy freed)",
                         idx, total_groups, npy_freed,
                     )
+
+            _flush_pending_parts()
+
+            compaction_manifest: Dict[str, List[str]] = {}
+            part_to_final_path: Dict[str, str]
+            if compactor is not None:
+                merged_paths = compactor.finalize()
+                persisted_paths = [str(path.resolve()) for path in merged_paths]
+                part_to_final_path = compactor.part_to_final_path
+                compaction_manifest = compactor.merged_sources
+            else:
+                part_to_final_path = {
+                    part_id: str((output_dir / f"{part_id}.parquet").resolve())
+                    for part_id in manifest_groups
+                }
+
+            for part_id, group_metadata in manifest_groups.items():
+                resolved_path = part_to_final_path.get(part_id)
+                if resolved_path:
+                    group_metadata["file"] = Path(resolved_path).name
+
+            for group_id, first_part_id in first_part_by_group.items():
+                resolved_path = part_to_final_path.get(first_part_id)
+                if resolved_path:
+                    parquet_path_map[group_id] = resolved_path
 
             if parquet_path_map:
                 registry.set_group_parquet_paths(parquet_path_map)
@@ -433,6 +764,7 @@ class FeatureStorage:
                 total_features=len(all_columns),
                 total_rows=total_rows,
                 groups=manifest_groups,
+                compaction_sources=compaction_manifest,
             )
             self._write_columns_json_gz(output_dir, all_columns)
 
@@ -447,16 +779,19 @@ class FeatureStorage:
             )
             return persisted_paths
         except Exception as e:
+            preserve_staging = True
+            failure_type = self._classify_persist_failure(e)
             self.logger.error(
-                "CGSA per-group parquet persist failed: symbol=%s config_hash=%s error=%s",
+                "CGSA per-group parquet persist failed: symbol=%s config_hash=%s failure_type=%s error=%s",
                 symbol,
                 config_hash,
+                failure_type.value,
                 str(e),
                 exc_info=True,
             )
             raise
         finally:
-            if staging_dir.exists():
+            if staging_dir.exists() and not preserve_staging:
                 for child in staging_dir.iterdir():
                     if child.is_file():
                         child.unlink()
@@ -495,6 +830,7 @@ class FeatureStorage:
         total_features: int,
         total_rows: int,
         groups: Dict[str, Dict],
+        compaction_sources: Optional[Dict[str, List[str]]] = None,
     ) -> None:
         """Write V7-format manifest.json (without full column names inline)."""
         manifest = {
@@ -507,6 +843,10 @@ class FeatureStorage:
             "dtype": "float16",
             "groups": groups,
         }
+        if compaction_sources:
+            manifest["compaction"] = {
+                "merged_files": compaction_sources,
+            }
         manifest_path = output_dir / "manifest.json"
         temp_path = output_dir / "manifest.json.tmp"
         with temp_path.open("w", encoding="utf-8") as f:

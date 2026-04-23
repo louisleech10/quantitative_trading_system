@@ -212,3 +212,19 @@ class ICVValidator(Protocol):
 
     def get_oot_result(self) -> dict:
         ...
+
+
+@runtime_checkable
+class IFeatureReader(Protocol):
+    """Read persisted feature metadata and projected columns."""
+
+    def list_features(self, symbol: str, config_hash: str) -> List[str]:
+        ...
+
+    def load_columns(
+        self,
+        symbol: str,
+        config_hash: str,
+        columns: List[str],
+    ) -> Any:
+        ...

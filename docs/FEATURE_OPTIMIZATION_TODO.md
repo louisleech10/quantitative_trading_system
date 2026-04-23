@@ -945,10 +945,10 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
 
 ### Task 4.1 — 實作 `_persist_parts_parallel()`
 - [x] **SPEC ref**: Task 4.1, §6.1
-- [ ] **目標**: ThreadPool 平行寫入已分割的 Parquet parts，並支援選配的 compactor 佇列
-- [ ] **輸入**: `parts_queue: List[Tuple[str, Any, Path, Path]]`（part_id, arrow_table, final_path, staging_path）, `n_workers: int`, `compactor: Optional[AsyncParquetCompactor] = None`
-- [ ] **輸出**: `List[str]`（已接受的 part 目標路徑；若啟用 compactor，實際 merged 檔案由 `finalize()` 回傳）
-- [ ] **實作要點**:
+- [x] **目標**: ThreadPool 平行寫入已分割的 Parquet parts，並支援選配的 compactor 佇列
+- [x] **輸入**: `parts_queue: List[Tuple[str, Any, Path, Path]]`（part_id, arrow_table, final_path, staging_path）, `n_workers: int`, `compactor: Optional[AsyncParquetCompactor] = None`
+- [x] **輸出**: `List[str]`（已接受的 part 目標路徑；若啟用 compactor，實際 merged 檔案由 `finalize()` 回傳）
+- [x] **實作要點**:
   - 新增方法於 `feature_storage.py`：
     ```python
     def _persist_parts_parallel(self, parts_queue, n_workers, compactor=None):
@@ -980,20 +980,20 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - 某個 part 寫入失敗（磁碟滿）→ raise `OSError`，不 silent fail
     - `n_workers=1` → 串行寫入（fallback）
     - 啟用 compactor 時，回傳值表示 part 已被接收，不代表最終 merged 檔已生成
-- [ ] **修改檔案**:
-  - `momentum/FeatureEngineering/feature_storage.py` → `_persist_parts_parallel()`（新增或擴充）, `persist_registry_to_parquet()`（修改呼叫邏輯）
+- [x] **修改檔案**:
+  - `momentum/FeatureEngineering/feature_storage.py` → `_persist_parts_parallel()`（新增）, `persist_registry_to_parquet()`（修改呼叫邏輯）
 - [ ] **不可做**:
   - 不可修改 zstd compression level（維持 level=1 速度優先）
   - 不可用 `ProcessPoolExecutor`（I/O bound，ThreadPool 足夠）
 - [ ] **風險緩解**: R6（磁碟空間不足）, R11（小檔案爆炸）
-- [ ] **驗證**: T4.1, T4.2, T4.B1, T4.B2, T4.B3
+- [x] **驗證**: T4.1, T4.2, T4.B1, T4.B2, T4.B3
 
 ### Task 4.2 — 呼叫端整合 — 硬體自適應 workers + compactor 開關
 - [x] **SPEC ref**: Task 4.2, §6.1
-- [ ] **目標**: 在 persist 呼叫端根據 tier 選擇 workers，並依條件啟用 Async compactor
-- [ ] **輸入**: 無（讀取 tier + env var）
-- [ ] **輸出**: 無（修改呼叫邏輯）
-- [ ] **實作要點**:
+- [x] **目標**: 在 persist 呼叫端根據 tier 選擇 workers，並依條件啟用 Async compactor
+- [x] **輸入**: 無（讀取 tier + env var）
+- [x] **輸出**: 無（修改呼叫邏輯）
+- [x] **實作要點**:
   - 在 persist 呼叫點整合：
     ```python
     tier = get_memory_tier()
@@ -1017,21 +1017,21 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - `FFACT_L7_WORKERS=1` → 強制串行
     - `FFACT_L7_COMPACTOR_ENABLED=0` → 完整回退到直接輸出模式
     - 啟用 compactor 時，worker 只保證 staging 寫入成功；最終檔案 promotion 由背景合併程序負責
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/feature_storage.py` → `persist_registry_to_parquet()`（注入 tier-based workers / compactor 選擇）
-  - `momentum/FeatureEngineering/feature_factory.py` → `generate_features()`（persist branch 傳遞最終寫出策略）
+  - `momentum/FeatureEngineering/feature_factory.py` → 既有 persist 呼叫點已可直接沿用，無需額外修改
 - [ ] **不可做**:
   - 不可 hardcode workers 或 `target_rows`
   - 不可讓 compactor 在主 worker thread 同步執行 merge
 - [ ] **風險緩解**: R11（IOPS bottleneck）
-- [ ] **驗證**: T4.3, T4.B4, T4.B5
+- [x] **驗證**: T4.3, T4.B4, T4.B5
 
 ### Task 4.3 — 實作 `AsyncParquetCompactor`
 - [x] **SPEC ref**: Task 4.3, §6.1
-- [ ] **目標**: 將 L7 worker 先輸出到 staging 目錄，由背景執行緒批次合併小型 Parquet parts，抑制碎片化檔案數暴增
-- [ ] **輸入**: `staging_dir: Path`, `final_dir: Path`, `target_rows: int = 100_000`, `min_files_to_compact: int = 8`
-- [ ] **輸出**: 較少的大型 Parquet 檔案 + manifest 對應資訊
-- [ ] **實作要點**:
+- [x] **目標**: 將 L7 worker 先輸出到 staging 目錄，由背景執行緒批次合併小型 Parquet parts，抑制碎片化檔案數暴增
+- [x] **輸入**: `staging_dir: Path`, `final_dir: Path`, `target_rows: int = 100_000`, `min_files_to_compact: int = 8`
+- [x] **輸出**: 較少的大型 Parquet 檔案 + manifest 對應資訊
+- [x] **實作要點**:
   - 在 `feature_storage.py` 新增：
     ```python
     class AsyncParquetCompactor:
@@ -1059,50 +1059,50 @@ Batch 5: [Phase 5] ──── 依賴 Batch 4 Gate + Phase 0（hardware_utils�
     - merge 過程 crash → staging 目錄保留，final 目錄不可部分覆寫
     - 單一 part 已超過 `target_rows` → 直接 promote，不做二次合併
     - 若後續 ML 仍需 part-aware 讀取 → 保留 manifest 記錄 merged 檔與來源檔對應
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/feature_storage.py` → `AsyncParquetCompactor`（新增）與 manifest 整合點
 - [ ] **不可做**:
   - 不可在主執行緒同步合併
   - 不可在 merge 失敗時刪除尚未成功吸收的 staging 檔
 - [ ] **風險緩解**: R11（小檔案/IOPS）, R6（crash 時保留 staging 供復原）
-- [ ] **驗證**: T4.4, T4.5, T4.B6, T4.B7, T4.P2
+- [x] **驗證**: T4.4, T4.5, T4.B6, T4.B7, T4.P2
 
 ### Phase 4 測試清單
 
 #### 單元測試
 | ☐ | Test ID | 測試名稱 | 驗證內容 | 通過條件 | SPEC ref |
 |---|---------|---------|---------|---------|---------|
-| ☐ | T4.1 | `test_parallel_persist_matches_serial` | 平行寫入的 Parquet == 串行寫入 | 檔案 binary 比對（排除 metadata timestamp） | §6.2 |
-| ☐ | T4.2 | `test_parallel_persist_atomic_write` | 寫入過程中 staging 檔存在，完成後只有 final 檔 | `final_path.exists() and not staging_path.exists()` | §6.2 |
-| ☐ | T4.3 | `test_tier_auto_selects_l7_workers` | 8GB tier → 4 workers | `n_workers == 4` | §6.2 |
-| ☐ | T4.4 | `test_async_compactor_merges_small_files_into_large_parts` | 多個 staging 小檔被合併 | final 檔案數 < staging 檔案數 | §6.2 |
-| ☐ | T4.5 | `test_async_compactor_manifest_tracks_sources` | merge 後 manifest 記錄來源檔案 | manifest 含 merged→source 對應 | §6.2 |
+| ☑ | T4.1 | `test_parallel_persist_matches_serial` | 平行寫入的 Parquet == 串行寫入 | 檔案 binary 比對（排除 metadata timestamp） | §6.2 |
+| ☑ | T4.2 | `test_parallel_persist_atomic_write` | 寫入過程中 staging 檔存在，完成後只有 final 檔 | `final_path.exists() and not staging_path.exists()` | §6.2 |
+| ☑ | T4.3 | `test_tier_auto_selects_l7_workers` | 8GB tier → 4 workers | `n_workers == 4` | §6.2 |
+| ☑ | T4.4 | `test_async_compactor_merges_small_files_into_large_parts` | 多個 staging 小檔被合併 | final 檔案數 < staging 檔案數 | §6.2 |
+| ☑ | T4.5 | `test_async_compactor_manifest_tracks_sources` | merge 後 manifest 記錄來源檔案 | manifest 含 merged→source 對應 | §6.2 |
 
 #### 邊界條件測試
 | ☐ | Test ID | 測試名稱 | 邊界條件 | 預期行為 | SPEC ref |
 |---|---------|---------|---------|---------|----------|
-| ☐ | T4.B1 | `test_parallel_persist_empty_queue` | 空 parts_queue | 回傳空 list | §6.2 |
-| ☐ | T4.B2 | `test_parallel_persist_single_part` | 只有 1 個 part | 串行寫入（不啟動 ThreadPool） | §6.2 |
-| ☐ | T4.B3 | `test_parallel_persist_disk_full` | mock disk full → OSError | raise OSError，不 silent fail | §6.2 |
-| ☐ | T4.B4 | `test_l7_workers_env_override` | `FFACT_L7_WORKERS=2` | 使用 2 workers | §6.2 |
-| ☐ | T4.B5 | `test_async_compactor_disabled_bypasses_merge` | `FFACT_L7_COMPACTOR_ENABLED=0` | 不建立 compactor，直接輸出小檔 | §6.2 |
-| ☐ | T4.B6 | `test_async_compactor_finalize_flushes_remaining_files` | 未達 batch 門檻即結束 | `finalize()` 後 staging 為空 | §6.2 |
-| ☐ | T4.B7 | `test_async_compactor_crash_preserves_staging_files` | merge 中途 raise OSError | staging 檔仍存在，final 不部分覆蓋 | §6.2 |
+| ☑ | T4.B1 | `test_parallel_persist_empty_queue` | 空 parts_queue | 回傳空 list | §6.2 |
+| ☑ | T4.B2 | `test_parallel_persist_single_part` | 只有 1 個 part | 串行寫入（不啟動 ThreadPool） | §6.2 |
+| ☑ | T4.B3 | `test_parallel_persist_disk_full` | mock disk full → OSError | raise OSError，不 silent fail | §6.2 |
+| ☑ | T4.B4 | `test_l7_workers_env_override` | `FFACT_L7_WORKERS=2` | 使用 2 workers | §6.2 |
+| ☑ | T4.B5 | `test_async_compactor_disabled_bypasses_merge` | `FFACT_L7_COMPACTOR_ENABLED=0` | 不建立 compactor，直接輸出小檔 | §6.2 |
+| ☑ | T4.B6 | `test_async_compactor_finalize_flushes_remaining_files` | 未達 batch 門檻即結束 | `finalize()` 後 staging 為空 | §6.2 |
+| ☑ | T4.B7 | `test_async_compactor_crash_preserves_staging_files` | merge 中途 raise OSError | staging 檔仍存在，final 不部分覆蓋 | §6.2 |
 
 #### 效能驗收
 | ☐ | Test ID | 測試名稱 | 驗收標準 | SPEC ref |
 |---|---------|---------|---------|----------|
-| ☐ | T4.P1 | `test_l7_parallel_speedup` | 4 workers 比 1 worker 快 ≥ 2× | §6.2 |
-| ☐ | T4.P2 | `test_async_compactor_controls_file_explosion` | 8GB tier 小檔數壓到原始 staging 檔數的 ≤ 25% | §6.2 |
+| ☑ | T4.P1 | `test_l7_parallel_speedup` | 4 workers 比 1 worker 快 ≥ 2× | §6.2 |
+| ☑ | T4.P2 | `test_async_compactor_controls_file_explosion` | 8GB tier 小檔數壓到原始 staging 檔數的 ≤ 25% | §6.2 |
 
 #### 測試檔案：`tests/test_l7_parallel_persist.py` + `tests/performance/test_l7_persist_perf.py`
 
 ### Phase 4 → Phase 5 Gate
-- [ ] T4.1~T4.5 全部通過
-- [ ] T4.B1~T4.B7 全部通過
-- [ ] T4.P1~T4.P2 效能驗收通過
+- [x] T4.1~T4.5 全部通過
+- [x] T4.B1~T4.B7 全部通過
+- [x] T4.P1~T4.P2 效能驗收通過
 - [ ] Pipeline 完整輸出與 V7 Baseline 數值等價（C1~C6）
-- [ ] `FFACT_L7_COMPACTOR_ENABLED=0` fallback 正常
+- [x] `FFACT_L7_COMPACTOR_ENABLED=0` fallback 正常
 
 ---
 

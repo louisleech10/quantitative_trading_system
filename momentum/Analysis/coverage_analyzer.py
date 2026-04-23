@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable, Optional
 
 import h5py
 import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.FeatureEngineering.feature_reader import FeatureReader
+from momentum.core.protocols import IFeatureReader
 
 
 logger = get_logger(__name__)
@@ -17,6 +18,12 @@ logger = get_logger(__name__)
 
 class CoverageAnalyzer:
     """因子覆蓋率分析 — 確保因子在大部分時間點有值。"""
+
+    def __init__(
+        self,
+        feature_reader_factory: Optional[Callable[[str], IFeatureReader]] = None,
+    ) -> None:
+        self._feature_reader_factory = feature_reader_factory
 
     def compute_time_coverage(self, feature: pd.Series) -> float:
         """時間覆蓋率: count(非NaN) / total_bars。"""
@@ -84,7 +91,7 @@ class CoverageAnalyzer:
                 manifest_path = config_dir / "manifest.json"
                 if manifest_path.exists():
                     try:
-                        reader = FeatureReader(str(base))
+                        reader = self._get_feature_reader(str(base))
                         config_hash = config_dir.name
                         columns = reader.list_features(symbol, config_hash)
                         if columns:
@@ -111,6 +118,13 @@ class CoverageAnalyzer:
         except Exception as exc:
             logger.warning("Coverage matrix failed to read %s: %s", file_path, exc)
             return None
+
+    def _get_feature_reader(self, feature_base_path: str) -> IFeatureReader:
+        if self._feature_reader_factory is None:
+            from momentum.factories import create_feature_reader
+
+            self._feature_reader_factory = create_feature_reader
+        return self._feature_reader_factory(feature_base_path)
 
     @staticmethod
     def _decode_feature_names(raw_names: np.ndarray, feature_count: int) -> list[str]:
