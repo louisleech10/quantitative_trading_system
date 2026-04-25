@@ -218,6 +218,10 @@ class FeatureFactory:
         if df is None or df.empty:
             return df
 
+        # P2.1 idempotent: skip if already spilled (caller may chain spills).
+        if getattr(df, "attrs", {}).get("_is_memmap"):
+            return df
+
         est_bytes = df.shape[0] * df.shape[1] * 8  # float64 estimate
         # Only spill if the DataFrame is large enough to warrant it (>500 MB).
         if est_bytes < 500_000_000:
@@ -244,6 +248,11 @@ class FeatureFactory:
         gc.collect()
 
         result = pd.DataFrame(data=out, index=index, columns=columns, copy=False)
+        # Mark so chained _spill_to_memmap calls become no-ops (P2.1).
+        try:
+            result.attrs["_is_memmap"] = True
+        except Exception:
+            pass
         elapsed = time.perf_counter() - t0
         logger.info(
             "[spill] %s: %d×%d → float32 memmap in %.1fs (freed ~%.1f GB float64)",
@@ -862,6 +871,8 @@ class FeatureFactory:
                 if category_frame is None or category_frame.empty:
                     continue
                 self._persist_layer2_category_group(category, category_frame)
+                # P2.1: downcast to float32 immediately to halve RAM before concat.
+                category_frame = self._downcast_inplace_float32(category_frame)
                 category_frames.append(category_frame)
         else:
             from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -896,6 +907,8 @@ class FeatureFactory:
                 if category_frame is None:
                     continue
                 self._persist_layer2_category_group(category, category_frame)
+                # P2.1: downcast to float32 immediately to halve RAM before concat.
+                category_frame = self._downcast_inplace_float32(category_frame)
                 category_frames.append(category_frame)
 
             logger.info(
@@ -907,7 +920,13 @@ class FeatureFactory:
             )
 
         if category_frames:
-            return pd.concat(category_frames, axis=1)
+            # P2.1: concat already-float32 frames, then optionally pre-spill
+            # the L2 result so the caller's _spill_to_memmap becomes a no-op.
+            # This avoids holding both the concat result AND the spilled
+            # memmap in RAM simultaneously during the spill copy.
+            merged = pd.concat(category_frames, axis=1, copy=False)
+            del category_frames
+            return self._spill_to_memmap(merged, "layer2")
         return pd.DataFrame(index=layer1.index)
 
     def _layer2_derived_polars(
@@ -935,7 +954,10 @@ class FeatureFactory:
                 if category_frame is not None and not category_frame.empty:
                     self._persist_layer2_category_group(category, category_frame)
 
-        return result
+        # P2.1: pre-spill so the caller's _spill_to_memmap is a no-op,
+        # avoiding double-buffer during the spill copy.
+        result = self._downcast_inplace_float32(result)
+        return self._spill_to_memmap(result, "layer2")
 
     def _layer3_rolling_aggregation(
         self, layer1: pd.DataFrame, layer2: pd.DataFrame, config: "FactoryConfig"
@@ -1676,6 +1698,32 @@ class FeatureFactory:
         # Batched conversion avoids costly per-column block fragmentation on very wide DataFrames.
         dtype_map = {column_name: "float32" for column_name in numeric_columns}
         return df.astype(dtype_map, copy=False)
+
+    @staticmethod
+    def _downcast_inplace_float32(df: pd.DataFrame) -> pd.DataFrame:
+        """P2.1 helper: cast all numeric float64 columns to float32 in-place.
+
+        Returns the same DataFrame object when possible (copy=False) so that
+        the caller's reference is updated by reassignment. Used by the L2
+        per-category loop to halve transient RAM before concat.
+        """
+        if df is None or df.empty:
+            return df
+        # Skip if all numeric cols are already <= float32 (no-op).
+        needs_cast = False
+        for col in df.columns:
+            kind_dtype = df[col].dtype
+            if pd.api.types.is_float_dtype(kind_dtype) and kind_dtype.itemsize > 4:
+                needs_cast = True
+                break
+        if not needs_cast:
+            return df
+        cast_map = {
+            col: "float32"
+            for col in df.columns
+            if pd.api.types.is_float_dtype(df[col].dtype) and df[col].dtype.itemsize > 4
+        }
+        return df.astype(cast_map, copy=False)
 
     @staticmethod
     def _data_range(raw_data: pd.DataFrame) -> List[str]:
