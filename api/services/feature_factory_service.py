@@ -1934,17 +1934,60 @@ class FeatureFactoryService:
             raise ValueError(f"Missing symbol/timeframe metadata for task: {task_id}")
 
         # Detect CGSA V7 manifest (manifest.json) vs legacy HDF5 (.h5).
-        # CGSA pipeline persists features as per-group Parquet files described
-        # by manifest.json; legacy single-TF path still writes one HDF5 file.
         is_cgsa = file_path.suffix.lower() == ".json"
         manifest: Optional[Dict[str, Any]] = None
+        manifest_dir: Optional[Path] = None
+
         if is_cgsa:
             try:
-                manifest = json.loads(file_path.read_text(encoding="utf-8"))
+                raw_manifest = json.loads(file_path.read_text(encoding="utf-8"))
             except (OSError, ValueError) as exc:
                 raise FileNotFoundError(
                     f"Failed to read CGSA manifest {file_path}: {exc}"
                 ) from exc
+
+            # V7 format: version=="7.0" and groups is a dict.
+            # CGSA registry format: version==None and groups is a list.
+            # When the latter, look for the companion V7 manifest under
+            # data_cache/features/{symbol}/{config_hash}/manifest.json.
+            if raw_manifest.get("version") != "7.0" and isinstance(
+                raw_manifest.get("groups"), list
+            ):
+                config_hash = raw_manifest.get("config_hash")
+                v7_path: Optional[Path] = None
+                if config_hash:
+                    candidate = (
+                        settings.data_cache_path
+                        / "features"
+                        / symbol
+                        / config_hash
+                        / "manifest.json"
+                    )
+                    if candidate.exists():
+                        v7_path = candidate
+                if v7_path is not None:
+                    try:
+                        manifest = json.loads(v7_path.read_text(encoding="utf-8"))
+                        file_path = v7_path
+                        logger.debug(
+                            "Redirected CGSA registry manifest to V7 manifest: %s",
+                            v7_path,
+                        )
+                    except (OSError, ValueError) as exc:
+                        logger.warning(
+                            "Failed to read V7 manifest %s; falling back to registry manifest: %s",
+                            v7_path, exc,
+                        )
+                        manifest = raw_manifest
+                else:
+                    # V7 manifest not yet written or lives elsewhere — keep the
+                    # CGSA registry manifest; _load_cgsa_features_df handles
+                    # the list format via each group's 'parquet_path' field.
+                    manifest = raw_manifest
+            else:
+                manifest = raw_manifest
+
+            manifest_dir = file_path.parent
 
         return {
             "task_id": task_id,
@@ -1957,7 +2000,7 @@ class FeatureFactoryService:
             "generated_at": datetime.now().isoformat(),
             "is_cgsa": is_cgsa,
             "manifest": manifest,
-            "manifest_dir": file_path.parent if is_cgsa else None,
+            "manifest_dir": manifest_dir,
         }
 
     def _load_hdf5_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
@@ -1990,35 +2033,60 @@ class FeatureFactoryService:
         return df
 
     def _load_cgsa_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
-        """Materialize a features DataFrame from a CGSA V7 Parquet manifest.
+        """Materialize a features DataFrame from a CGSA manifest.
 
-        Each parquet file in the manifest holds a column-wise slice of the
-        same row index; we read them group-by-group and concat horizontally.
-        Timestamps are not stored alongside the parquet groups, so we use a
-        positional RangeIndex (sufficient for stats/preview consumers).
+        Supports two manifest formats:
+        * V7 (version=="7.0", groups is dict): each entry has ``file`` (relative
+          parquet filename) and ``columns``. Created by feature_storage.py.
+        * CGSA registry (version==None, groups is list): each entry has
+          ``parquet_path`` (absolute) and ``columns``. Created by
+          cgsa_registry.save_state(). Used as fallback when V7 manifest is not
+          yet available (e.g. persistence disabled or in-progress).
         """
         import pyarrow.parquet as pq  # local import keeps cold-start light
 
         manifest = context.get("manifest") or {}
         manifest_dir: Optional[Path] = context.get("manifest_dir")
-        groups = manifest.get("groups") or {}
-        if not groups or manifest_dir is None:
+        groups_raw = manifest.get("groups")
+        if not groups_raw:
             return pd.DataFrame()
 
-        # Preserve manifest insertion order for deterministic column layout.
         frames: List[pd.DataFrame] = []
-        for _group_id, group_meta in groups.items():
-            relative = group_meta.get("file")
-            if not relative:
-                continue
-            parquet_path = manifest_dir / relative
-            if not parquet_path.exists():
-                logger.warning(
-                    "CGSA parquet missing for task %s: %s", context["task_id"], parquet_path,
-                )
-                continue
-            table = pq.read_table(str(parquet_path))
-            frames.append(table.to_pandas(self_destruct=True))
+
+        if isinstance(groups_raw, dict):
+            # V7 format: {group_id: {"file": "...", "columns": [...]}}
+            for _group_id, group_meta in groups_raw.items():
+                relative = group_meta.get("file")
+                if not relative or manifest_dir is None:
+                    continue
+                parquet_path = manifest_dir / relative
+                if not parquet_path.exists():
+                    logger.warning(
+                        "CGSA V7 parquet missing for task %s: %s",
+                        context["task_id"], parquet_path,
+                    )
+                    continue
+                table = pq.read_table(str(parquet_path))
+                frames.append(table.to_pandas(self_destruct=True))
+        else:
+            # CGSA registry list format: [{"parquet_path": "...", "columns": [...]}]
+            for group_meta in groups_raw:
+                if not isinstance(group_meta, dict):
+                    continue
+                parquet_path_str = group_meta.get("parquet_path")
+                if not parquet_path_str:
+                    continue
+                parquet_path = Path(parquet_path_str)
+                if not parquet_path.exists():
+                    logger.warning(
+                        "CGSA registry parquet missing for task %s: %s",
+                        context["task_id"], parquet_path,
+                    )
+                    continue
+                cols = group_meta.get("columns")
+                read_cols = list(cols) if cols else None
+                table = pq.read_table(str(parquet_path), columns=read_cols)
+                frames.append(table.to_pandas(self_destruct=True))
 
         if not frames:
             return pd.DataFrame()
@@ -2028,14 +2096,37 @@ class FeatureFactoryService:
     def _load_hdf5_schema(self, context: Dict[str, Any]) -> Dict[str, Any]:
         if context.get("is_cgsa"):
             manifest = context.get("manifest") or {}
-            groups = manifest.get("groups") or {}
+            groups_raw = manifest.get("groups")
             feature_names: List[str] = []
-            for group_meta in groups.values():
-                feature_names.extend(group_meta.get("columns") or [])
-            return {
-                "feature_names": feature_names,
-                "row_count": int(manifest.get("total_rows") or 0),
-            }
+            if isinstance(groups_raw, dict):
+                # V7 format
+                for group_meta in groups_raw.values():
+                    feature_names.extend(group_meta.get("columns") or [])
+                return {
+                    "feature_names": feature_names,
+                    "row_count": int(manifest.get("total_rows") or 0),
+                }
+            elif isinstance(groups_raw, list):
+                # CGSA registry list format — read row count from first parquet
+                import pyarrow.parquet as pq
+                total_rows = 0
+                for group_meta in groups_raw:
+                    if not isinstance(group_meta, dict):
+                        continue
+                    feature_names.extend(group_meta.get("columns") or [])
+                    if total_rows == 0:
+                        pp = group_meta.get("parquet_path")
+                        if pp and Path(pp).exists():
+                            try:
+                                pf = pq.ParquetFile(pp)
+                                total_rows = pf.metadata.num_rows
+                            except Exception:
+                                pass
+                return {
+                    "feature_names": feature_names,
+                    "row_count": total_rows,
+                }
+            return {"feature_names": [], "row_count": 0}
         file_path = context["file_path"]
         group_path = context["group_path"]
         with h5py.File(file_path, "r") as h5_file:
@@ -2160,27 +2251,49 @@ class FeatureFactoryService:
         else:
             manifest = context.get("manifest") or {}
             manifest_dir: Optional[Path] = context.get("manifest_dir")
-            groups = manifest.get("groups") or {}
-            if not groups or manifest_dir is None:
+            groups_raw = manifest.get("groups")
+            if not groups_raw:
                 raise FileNotFoundError(f"Empty CGSA manifest for task {task_id}")
 
-            # Map column → group file (first match wins; columns are unique across groups).
             selected_set = set(selected_features)
-            column_to_file: Dict[str, Path] = {}
-            for group_meta in groups.values():
-                relative = group_meta.get("file")
-                if not relative:
-                    continue
-                parquet_path = manifest_dir / relative
-                for col in group_meta.get("columns") or []:
-                    if col in selected_set and col not in column_to_file:
-                        column_to_file[col] = parquet_path
+
+            if isinstance(groups_raw, dict):
+                # V7 dict format: find file per column
+                column_to_file: Dict[str, Path] = {}
+                for group_meta in groups_raw.values():
+                    relative = group_meta.get("file")
+                    if not relative or manifest_dir is None:
+                        continue
+                    parquet_path = manifest_dir / relative
+                    for col in group_meta.get("columns") or []:
+                        if col in selected_set and col not in column_to_file:
+                            column_to_file[col] = parquet_path
+                total_rows = int(manifest.get("total_rows") or 0)
+            else:
+                # CGSA registry list format: find parquet_path per column
+                column_to_file = {}
+                total_rows = 0
+                for group_meta in groups_raw:
+                    if not isinstance(group_meta, dict):
+                        continue
+                    pp = group_meta.get("parquet_path")
+                    if not pp:
+                        continue
+                    parquet_path = Path(pp)
+                    for col in group_meta.get("columns") or []:
+                        if col in selected_set and col not in column_to_file:
+                            column_to_file[col] = parquet_path
+                    if total_rows == 0 and parquet_path.exists():
+                        try:
+                            pf = pq.ParquetFile(str(parquet_path))
+                            total_rows = pf.metadata.num_rows
+                        except Exception:
+                            pass
 
             missing = [name for name in selected_features if name not in column_to_file]
             if missing:
                 raise ValueError(f"Invalid features: {missing}")
 
-            total_rows = int(manifest.get("total_rows") or 0)
             start = min(offset, total_rows)
             end = min(offset + limit, total_rows)
 
