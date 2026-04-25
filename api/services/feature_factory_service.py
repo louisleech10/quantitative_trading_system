@@ -81,6 +81,11 @@ class FeatureFactoryService:
         self._adf_warming_tasks: set[str] = set()
         # Per-task inferred metadata cache: task_id -> feature_name -> {category, layer, level}
         self._feature_metadata_cache: Dict[str, Dict[str, Dict[str, str]]] = {}
+        # Per-task CGSA catalog rows derived from parquet/manifest metadata.
+        # This powers Feature Explorer table/options without materializing the
+        # full 50k-200k column DataFrame.
+        self._cgsa_catalog_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self._cgsa_column_path_cache: Dict[str, Dict[str, Path]] = {}
 
     async def start_generation(self, request: Any) -> Dict[str, str]:
         """Start feature generation task."""
@@ -172,9 +177,12 @@ class FeatureFactoryService:
                     task_info["progress"] = 1.0
                     task_info["result"] = summary
 
-            # Precompute Feature Table stats as soon as generation completes.
-            # This keeps first table open responsive without changing any metrics.
-            self._start_stats_cache_warmup(task_id, reason="generation_completed")
+            # Precompute Feature Table stats as soon as generation completes for
+            # legacy HDF5 tasks. CGSA outputs can have 50k-200k columns; full
+            # stats warmup materializes the whole matrix and blocks the UI for
+            # minutes. CGSA Feature Explorer uses manifest/parquet metadata.
+            if not str(summary.get("hdf5_path", "")).lower().endswith(".json"):
+                self._start_stats_cache_warmup(task_id, reason="generation_completed")
 
             self._notify_callbacks(task_id, {
                 "stage": "completed",
@@ -745,6 +753,26 @@ class FeatureFactoryService:
         normalized_search = (search or "").strip()
         normalized_cursor = (cursor or "").strip() or None
 
+        context: Optional[Dict[str, Any]] = None
+        try:
+            context = self._load_task_context(task_id)
+        except Exception:
+            context = None
+
+        if context and context.get("is_cgsa") and detail_level == "table":
+            return self._browse_cgsa_catalog_features(
+                task_id=task_id,
+                context=context,
+                offset=offset,
+                limit=limit,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                category=normalized_category,
+                level=normalized_level,
+                search=normalized_search,
+                cursor=normalized_cursor,
+            )
+
         # Fast path for the most common first-load pattern:
         # no filters + name ascending pagination.  This avoids repeated O(N log N)
         # sorting on each chunk request and keeps full accuracy/data unchanged.
@@ -892,6 +920,114 @@ class FeatureFactoryService:
             projected.append({k: row.get(k) for k in keys})
         return projected
 
+    def _browse_cgsa_catalog_features(
+        self,
+        task_id: str,
+        context: Dict[str, Any],
+        offset: int,
+        limit: int,
+        sort_by: Optional[str],
+        sort_order: str,
+        category: str,
+        level: str,
+        search: str,
+        cursor: Optional[str],
+    ) -> Dict[str, Any]:
+        """Browse CGSA features from manifest/parquet metadata only.
+
+        This is intentionally lighter than ``_build_stats_rows``: wide CGSA
+        outputs can contain 100k+ columns, so computing mean/std/skew/kurt for
+        every feature blocks the UI for minutes. The table/detail selectors only
+        need names and parsed metadata; nan_ratio is available from parquet
+        column statistics.
+        """
+        rows = list(self._build_cgsa_catalog_rows(task_id, context))
+
+        if category:
+            category_lower = category.lower()
+            rows = [row for row in rows if str(row["category"]).lower() == category_lower]
+
+        if level:
+            level_upper = level.upper()
+            rows = [row for row in rows if str(row["level"]).upper() == level_upper]
+
+        if search:
+            needle = search.lower()
+            rows = [row for row in rows if needle in str(row["name"]).lower()]
+
+        reverse = sort_order == "desc"
+        order_key = sort_by or "name"
+        if order_key not in {"nan_ratio", "std", "skewness", "kurtosis", "name", "mean"}:
+            raise ValueError(f"Invalid sort_by: {order_key}")
+        rows.sort(key=lambda item: self._sortable_value(item.get(order_key)), reverse=reverse)
+
+        start_index = offset
+        if cursor is not None:
+            if order_key != "name" or reverse or category or level or search:
+                raise ValueError("cursor is only supported for name-asc browse without filters")
+            name_keys = [str(item.get("name", "")) for item in rows]
+            start_index = bisect_right(name_keys, cursor) + offset
+
+        total = len(rows)
+        page_rows = rows[start_index: start_index + limit]
+        has_more = (start_index + len(page_rows)) < total
+        next_cursor = str(page_rows[-1].get("name", "")) if (page_rows and has_more and order_key == "name" and not reverse) else None
+
+        return {
+            "total": total,
+            "offset": start_index,
+            "limit": limit,
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "has_more": has_more,
+            "filters_applied": {
+                "category": category or None,
+                "level": level or None,
+                "search": search or None,
+            },
+            "features": self._project_browse_rows(page_rows, "table"),
+        }
+
+    def _build_cgsa_catalog_rows(self, task_id: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        cached = self._cgsa_catalog_cache.get(task_id)
+        if cached is not None:
+            return cached
+
+        fast = self._load_cgsa_summary_fast(context)
+        if fast is None:
+            raise FileNotFoundError(f"CGSA metadata unavailable for task {task_id}")
+
+        columns: List[str] = fast["columns"]
+        nan_ratios: pd.Series = fast["nan_ratios"]
+        metadata_map = self._get_feature_metadata_map(task_id, columns)
+
+        rows: List[Dict[str, Any]] = []
+        for name in columns:
+            meta = metadata_map[name]
+            rows.append({
+                "name": name,
+                "category": meta["category"],
+                "level": meta["level"],
+                "layer": meta["layer"],
+                "nan_ratio": self._safe_float(nan_ratios.get(name, 0.0)) or 0.0,
+                "mean": None,
+                "std": None,
+                "min": None,
+                "q25": None,
+                "median": None,
+                "q75": None,
+                "max": None,
+                "skewness": None,
+                "kurtosis": None,
+                "is_stationary": None,
+                "adf_pvalue": None,
+            })
+
+        self._cgsa_catalog_cache[task_id] = rows
+        self._cgsa_column_path_cache[task_id] = fast["column_to_path"]
+        logger.info("CGSA catalog cached for task %s (%d features)", task_id, len(rows))
+        return rows
+
     def browse_feature_data(
         self,
         task_id: str,
@@ -928,12 +1064,16 @@ class FeatureFactoryService:
         if method not in {"pearson", "spearman", "kendall"}:
             raise ValueError(f"Invalid correlation method: {method}")
 
-        df, _ = self._load_task_features(task_id)
+        context = self._load_task_context(task_id)
+        if context.get("is_cgsa"):
+            df, _total_rows = self._load_cgsa_selected_df(context, features)
+        else:
+            df, _ = self._load_task_features(task_id)
         missing = [name for name in features if name not in df.columns]
         if missing:
             raise ValueError(f"Invalid features: {missing}")
 
-        selected = df[features]
+        selected = df[features].replace([np.inf, -np.inf], np.nan)
         corr_df = selected.corr(method=method).fillna(0.0)
 
         return {
@@ -953,12 +1093,21 @@ class FeatureFactoryService:
         if len(features) > 50:
             raise ValueError("features count exceeds limit 50")
 
-        df, _ = self._load_task_features(task_id)
+        context = self._load_task_context(task_id)
+        if context.get("is_cgsa"):
+            df, _total_rows = self._load_cgsa_selected_df(context, features)
+        else:
+            df, _ = self._load_task_features(task_id)
         missing = [name for name in features if name not in df.columns]
         if missing:
             raise ValueError(f"Invalid features: {missing}")
 
-        selected_df = df[features].select_dtypes(include=[np.number]).dropna(axis=1, how="all")
+        selected_df = (
+            df[features]
+            .replace([np.inf, -np.inf], np.nan)
+            .select_dtypes(include=[np.number])
+            .dropna(axis=1, how="all")
+        )
         if selected_df.shape[1] < 2:
             return {"items": []}
 
@@ -984,11 +1133,15 @@ class FeatureFactoryService:
 
     def browse_distribution(self, task_id: str, feature: str, n_bins: int) -> Dict[str, Any]:
         """Return histogram payload for one feature."""
-        df, _ = self._load_task_features(task_id)
+        context = self._load_task_context(task_id)
+        if context.get("is_cgsa"):
+            df, _total_rows = self._load_cgsa_selected_df(context, [feature])
+        else:
+            df, _ = self._load_task_features(task_id)
         if feature not in df.columns:
             raise ValueError(f"Invalid feature: {feature}")
 
-        series = df[feature].dropna()
+        series = pd.to_numeric(df[feature], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
         if series.empty:
             bins = np.array([])
             edges = np.array([])
@@ -1165,6 +1318,14 @@ class FeatureFactoryService:
 
     def _start_stats_cache_warmup(self, task_id: str, reason: str) -> None:
         """Warm per-feature stats cache in background if not already available."""
+        try:
+            context = self._load_task_context(task_id)
+            if context.get("is_cgsa"):
+                logger.info("Skipping CGSA stats warmup for task %s (reason=%s)", task_id, reason)
+                return
+        except Exception:
+            pass
+
         with self._lock:
             if task_id in self._stats_cache or task_id in self._stats_warming_tasks:
                 return
@@ -1824,6 +1985,8 @@ class FeatureFactoryService:
         self._stats_name_keys_cache.pop(task_id, None)
         self._adf_cache.pop(task_id, None)
         self._feature_metadata_cache.pop(task_id, None)
+        self._cgsa_catalog_cache.pop(task_id, None)
+        self._cgsa_column_path_cache.pop(task_id, None)
         with self._lock:
             self._stats_warming_tasks.discard(task_id)
             self._adf_warming_tasks.discard(task_id)
@@ -1847,6 +2010,14 @@ class FeatureFactoryService:
         """Warm per-feature ADF cache in batches to improve browse responsiveness."""
         if not HAS_STATSMODELS:
             return
+
+        try:
+            context = self._load_task_context(task_id)
+            if context.get("is_cgsa"):
+                logger.info("Skipping CGSA ADF warmup for task %s (reason=%s)", task_id, reason)
+                return
+        except Exception:
+            pass
 
         with self._lock:
             if task_id in self._adf_warming_tasks:
@@ -2568,7 +2739,6 @@ class FeatureFactoryService:
         """CGSA Parquet variant: read only the parquet groups that contain
         the requested columns, then slice rows. Falls back to the cached
         full DataFrame when it is already materialized."""
-        import pyarrow.parquet as pq  # local import keeps cold-start light
         task_id = context["task_id"]
 
         # Reuse cache if present (typical after stats warmup) — avoids re-reading parquet.
@@ -2585,67 +2755,15 @@ class FeatureFactoryService:
             chunk_values = slice_df.to_numpy()
             timestamps = self._format_cgsa_timestamps(df_full.index, start, end)
         else:
-            manifest = context.get("manifest") or {}
-            manifest_dir: Optional[Path] = context.get("manifest_dir")
-            groups_raw = manifest.get("groups")
-            if not groups_raw:
-                raise FileNotFoundError(f"Empty CGSA manifest for task {task_id}")
-
-            selected_set = set(selected_features)
-
-            if isinstance(groups_raw, dict):
-                # V7 dict format: find file per column
-                column_to_file: Dict[str, Path] = {}
-                for group_meta in groups_raw.values():
-                    relative = group_meta.get("file")
-                    if not relative or manifest_dir is None:
-                        continue
-                    parquet_path = manifest_dir / relative
-                    for col in group_meta.get("columns") or []:
-                        if col in selected_set and col not in column_to_file:
-                            column_to_file[col] = parquet_path
-                total_rows = int(manifest.get("total_rows") or 0)
-            else:
-                # CGSA registry list format: find parquet_path per column
-                column_to_file = {}
-                total_rows = 0
-                for group_meta in groups_raw:
-                    if not isinstance(group_meta, dict):
-                        continue
-                    pp = group_meta.get("parquet_path")
-                    if not pp:
-                        continue
-                    parquet_path = Path(pp)
-                    for col in group_meta.get("columns") or []:
-                        if col in selected_set and col not in column_to_file:
-                            column_to_file[col] = parquet_path
-                    if total_rows == 0 and parquet_path.exists():
-                        try:
-                            pf = pq.ParquetFile(str(parquet_path))
-                            total_rows = pf.metadata.num_rows
-                        except Exception:
-                            pass
-
-            missing = [name for name in selected_features if name not in column_to_file]
-            if missing:
-                raise ValueError(f"Invalid features: {missing}")
-
+            selected_df, total_rows = self._load_cgsa_selected_df(
+                context=context,
+                selected_features=selected_features,
+            )
             start = min(offset, total_rows)
             end = min(offset + limit, total_rows)
-
-            # Group required columns by parquet file to minimize reads.
-            file_to_cols: Dict[Path, List[str]] = {}
-            for col in selected_features:
-                file_to_cols.setdefault(column_to_file[col], []).append(col)
-
-            partial_frames: List[pd.DataFrame] = []
-            for parquet_path, cols in file_to_cols.items():
-                table = pq.read_table(str(parquet_path), columns=cols)
-                partial_frames.append(table.to_pandas(self_destruct=True))
-            combined = pd.concat(partial_frames, axis=1, copy=False)
-            slice_df = combined.iloc[start:end][selected_features]
+            slice_df = selected_df.iloc[start:end][selected_features]
             chunk_values = slice_df.to_numpy()
-            timestamps = [str(idx) for idx in range(start, end)]
+            timestamps = self._load_cgsa_kline_timestamps(context, start, end, total_rows)
 
         data_rows: List[Dict[str, Any]] = []
         for row_idx in range(chunk_values.shape[0]):
@@ -2661,6 +2779,117 @@ class FeatureFactoryService:
             "features": selected_features,
             "rows": data_rows,
         }
+
+    def _load_cgsa_selected_df(
+        self,
+        context: Dict[str, Any],
+        selected_features: List[str],
+    ) -> tuple[pd.DataFrame, int]:
+        """Load only selected CGSA feature columns from parquet."""
+        import pyarrow.parquet as pq
+
+        task_id = context["task_id"]
+        manifest = context.get("manifest") or {}
+        manifest_dir: Optional[Path] = context.get("manifest_dir")
+        groups_raw = manifest.get("groups")
+        if not groups_raw:
+            raise FileNotFoundError(f"Empty CGSA manifest for task {task_id}")
+
+        selected_set = set(selected_features)
+        column_to_file: Dict[str, Path] = {}
+        total_rows = int(manifest.get("total_rows") or 0)
+
+        if isinstance(groups_raw, dict):
+            for group_meta in groups_raw.values():
+                if not isinstance(group_meta, dict):
+                    continue
+                relative = group_meta.get("file")
+                if not relative or manifest_dir is None:
+                    continue
+                parquet_path = manifest_dir / relative
+                for col in group_meta.get("columns") or []:
+                    if col in selected_set and col not in column_to_file:
+                        column_to_file[col] = parquet_path
+        else:
+            for group_meta in groups_raw:
+                if not isinstance(group_meta, dict):
+                    continue
+                pp = group_meta.get("parquet_path")
+                if not pp:
+                    continue
+                parquet_path = Path(pp)
+                for col in group_meta.get("columns") or []:
+                    if col in selected_set and col not in column_to_file:
+                        column_to_file[col] = parquet_path
+                if total_rows == 0 and parquet_path.exists():
+                    try:
+                        total_rows = int(pq.ParquetFile(str(parquet_path)).metadata.num_rows)
+                    except Exception:
+                        pass
+
+        missing = [name for name in selected_features if name not in column_to_file]
+        if missing:
+            raise ValueError(f"Invalid features: {missing}")
+
+        file_to_cols: Dict[Path, List[str]] = {}
+        for col in selected_features:
+            file_to_cols.setdefault(column_to_file[col], []).append(col)
+
+        partial_frames: List[pd.DataFrame] = []
+        for parquet_path, cols in file_to_cols.items():
+            table = pq.read_table(str(parquet_path), columns=cols)
+            partial_frames.append(table.to_pandas(self_destruct=True))
+
+        if not partial_frames:
+            return pd.DataFrame(columns=selected_features), total_rows
+
+        combined = pd.concat(partial_frames, axis=1, copy=False)
+        if combined.columns.duplicated().any():
+            combined = combined.loc[:, ~combined.columns.duplicated(keep="first")]
+        if total_rows == 0:
+            total_rows = int(combined.shape[0])
+        return combined[selected_features], total_rows
+
+    def _load_cgsa_kline_timestamps(
+        self,
+        context: Dict[str, Any],
+        start: int,
+        end: int,
+        expected_rows: int,
+    ) -> List[str]:
+        """Load exact timestamps for CGSA rows from the Feature K-line cache.
+
+        CGSA parquet feature shards do not store a timestamp column. Returning
+        row numbers here corrupts the time axis, so fail loudly if the canonical
+        kline timestamp source is unavailable or length-mismatched.
+        """
+        symbol = context.get("symbol")
+        timeframe = context.get("timeframe")
+        if not symbol or not timeframe:
+            raise ValueError("Missing symbol/timeframe for CGSA timestamp lookup")
+
+        h5_path = settings.data_cache_path / "feature_klines" / "kline_cache.h5"
+        dataset_path = f"{symbol}/{timeframe}/data"
+        if not h5_path.exists():
+            raise FileNotFoundError(f"Feature kline cache not found: {h5_path}")
+
+        with h5py.File(h5_path, "r") as h5_file:
+            if dataset_path not in h5_file:
+                raise FileNotFoundError(f"Kline dataset not found: {dataset_path}")
+            dataset = h5_file[dataset_path]
+            if int(dataset.shape[0]) != int(expected_rows):
+                raise ValueError(
+                    f"Kline timestamp length mismatch for {dataset_path}: "
+                    f"{dataset.shape[0]} != {expected_rows}"
+                )
+            if "timestamp" not in dataset.dtype.names:
+                raise ValueError(f"Kline dataset has no timestamp field: {dataset_path}")
+            ts_values = dataset["timestamp"][start:end]
+
+        ts = pd.to_datetime(ts_values, unit="s", errors="coerce")
+        if ts.isna().any():
+            raise ValueError(f"Invalid timestamps in kline cache: {dataset_path}")
+        return [value.isoformat() for value in ts]
 
     @staticmethod
     def _format_cgsa_timestamps(index: pd.Index, start: int, end: int) -> List[str]:

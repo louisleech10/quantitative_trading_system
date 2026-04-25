@@ -114,7 +114,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 100000, sortBy: 'std', sortOrder: 'desc', detailLevel: 'table' })
+    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
       .then((resp) => {
         if (!active) return;
         setAvailable(resp.features.map((item) => item.name));
@@ -234,7 +234,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
           }}
           className="text-xs px-2 py-1 rounded border border-white/10 text-slate-200 hover:bg-white/5"
         >
-          Top 20 by Std
+          前 20
         </button>
         <select
           value={method}

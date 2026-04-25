@@ -62,7 +62,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 100000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
+    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
       .then((resp) => {
         if (!active) return;
         setOptions(resp.features.map((item) => item.name));
