@@ -37,6 +37,9 @@ interface FeatureFactoryState {
   explorerSelectedFeature: string | null;
   explorerSelectedFeatures: string[];
   explorerSummary: FeatureSummary | null;
+  // Per-task summary cache so switching back to a recently visited task is
+  // instantaneous (avoids re-hitting /browse/{taskId}/summary).
+  explorerSummaryByTask: Record<string, FeatureSummary>;
   // Phase C: schema and search
   schema: FeatureSchema | null;
   indicatorSearch: string;
@@ -66,6 +69,8 @@ interface FeatureFactoryState {
   setExplorerActiveTab: (tab: ExplorerTab, selectedFeature?: string | null) => void;
   setExplorerSelectedFeatures: (features: string[]) => void;
   setExplorerSummary: (summary: FeatureSummary | null) => void;
+  setExplorerSummaryForTask: (taskId: string, summary: FeatureSummary) => void;
+  clearExplorerSummaryForTask: (taskId: string) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
   fetchRegistry: () => Promise<void>;
   startBatchGeneration: (
@@ -134,6 +139,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   explorerSelectedFeature: null,
   explorerSelectedFeatures: [],
   explorerSummary: null,
+  explorerSummaryByTask: {},
   schema: null,
   indicatorSearch: '',
   batchTask: null,
@@ -183,6 +189,18 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
     })),
   setExplorerSelectedFeatures: (features) => set({ explorerSelectedFeatures: features }),
   setExplorerSummary: (summary) => set({ explorerSummary: summary }),
+  setExplorerSummaryForTask: (taskId, summary) =>
+    set((state) => ({
+      explorerSummaryByTask: { ...state.explorerSummaryByTask, [taskId]: summary },
+      explorerSummary: summary,
+    })),
+  clearExplorerSummaryForTask: (taskId) =>
+    set((state) => {
+      if (!(taskId in state.explorerSummaryByTask)) return state;
+      const next = { ...state.explorerSummaryByTask };
+      delete next[taskId];
+      return { explorerSummaryByTask: next };
+    }),
   setBatchTask: (batchTask) => set({ batchTask }),
   fetchRegistry: async () => {
     set({ registryLoading: true });

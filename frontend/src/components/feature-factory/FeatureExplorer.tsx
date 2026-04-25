@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FeatureSummary, ExplorerTab } from '@/lib/types';
+import { ExplorerTab } from '@/lib/types';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import OverviewDashboard from '@/components/feature-factory/OverviewDashboard';
@@ -27,16 +27,18 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
 ];
 
 export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: FeatureExplorerProps) {
-  const { browseSummary } = useFeatureFactory();
+  const { browseSummary, browseFeatures } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
   // which triggers React 18 concurrent-mode's "getSnapshot should be cached" infinite loop.
   const explorerTaskId = useFeatureFactoryStore((state) => state.explorerTaskId);
   const explorerActiveTab = useFeatureFactoryStore((state) => state.explorerActiveTab);
   const explorerSummary = useFeatureFactoryStore((state) => state.explorerSummary);
+  const explorerSummaryByTask = useFeatureFactoryStore((state) => state.explorerSummaryByTask);
   const setExplorerTaskId = useFeatureFactoryStore((state) => state.setExplorerTaskId);
   const setExplorerActiveTab = useFeatureFactoryStore((state) => state.setExplorerActiveTab);
   const setExplorerSelectedFeatures = useFeatureFactoryStore((state) => state.setExplorerSelectedFeatures);
+  const setExplorerSummaryForTask = useFeatureFactoryStore((state) => state.setExplorerSummaryForTask);
 
   // 允許使用者在沒有進行中任務時手動輸入 task ID 瀏覽歷史結果
   const [manualTaskId, setManualTaskId] = useState('');
@@ -45,8 +47,11 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-  const [summaryCache, setSummaryCache] = useState<Record<string, FeatureSummary>>({});
-  const hasCachedSummary = Boolean(taskId && summaryCache[taskId]);
+  const cachedSummary = taskId ? explorerSummaryByTask[taskId] : undefined;
+  const hasCachedSummary = Boolean(cachedSummary);
+  // Track which tasks we've already prefetched FeatureTable rows for to avoid
+  // duplicate background requests on remount/tab switches.
+  const prefetchedRef = useRef<Set<string>>(new Set());
   // 只有在任務已完成（或未傳 taskStatus）時才允許載入
   const isTaskReady = !taskStatus || taskStatus === 'completed';
 
@@ -71,7 +76,16 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
     browseSummary(taskId)
       .then((payload) => {
         if (!active) return;
-        setSummaryCache((prev) => ({ ...prev, [taskId]: payload }));
+        setExplorerSummaryForTask(taskId, payload);
+        // Fire-and-forget prefetch of FeatureTable's first page so switching
+        // to the Table tab feels instant. Failure is non-fatal — the tab
+        // will refetch on demand.
+        if (!prefetchedRef.current.has(taskId)) {
+          prefetchedRef.current.add(taskId);
+          browseFeatures(taskId, { offset: 0, limit: 50, sortBy: 'name', sortOrder: 'asc' }).catch(() => {
+            /* swallow: prefetch is best-effort */
+          });
+        }
       })
       .catch((err) => {
         if (!active) return;
@@ -85,9 +99,9 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
     return () => {
       active = false;
     };
-  }, [browseSummary, taskId, hasCachedSummary, isTaskReady]);
+  }, [browseSummary, browseFeatures, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask]);
 
-  const summary = useMemo(() => (taskId ? summaryCache[taskId] : null) || explorerSummary, [summaryCache, taskId, explorerSummary]);
+  const summary = useMemo(() => cachedSummary || explorerSummary, [cachedSummary, explorerSummary]);
 
   return (
     <div className="glass-panel rounded-2xl p-6 space-y-4">
