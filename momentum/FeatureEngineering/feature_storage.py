@@ -169,6 +169,7 @@ class AsyncParquetCompactor:
                 str(temp_path),
                 compression="zstd",
                 compression_level=1,
+                use_dictionary=False,  # P4.1: -37% size on float16 (dict-encoding hurts halffloat)
             )
             os.replace(temp_path, final_path)
             for _part_id, staging_path, _row_count in batch:
@@ -554,6 +555,7 @@ class FeatureStorage:
                 str(staging_path),
                 compression="zstd",
                 compression_level=1,
+                use_dictionary=False,  # P4.1: -37% size on float16 (dict-encoding hurts halffloat)
             )
             if compactor is not None:
                 compactor.enqueue((part_id, staging_path))
