@@ -655,7 +655,15 @@ class FeatureStorage:
 
             pending_parts: List[Tuple[str, Any, Path, Path]] = []
             pending_disk_paths: Dict[str, Path] = {}
-            batch_limit = max(1, n_workers * 2)
+            # P3.1 (2026-04-25): Tier-aware batch_limit. The previous
+            # ``n_workers * 2`` over-pipelined the producer on small-RAM tiers
+            # (8gb): up to 8 Arrow Tables (each ~group_size float16) lingered
+            # in RAM before flush, contributing to the persist-phase plateau.
+            # Cap at ``n_workers`` for tiers where the K-line buffer is tight;
+            # 16gb+ keeps the 2x pipeline depth for max throughput.
+            tier_label = str(tier).lower()
+            batch_multiplier = 1 if "8" in tier_label and "gb" in tier_label else 2
+            batch_limit = max(1, n_workers * batch_multiplier)
 
             def _flush_pending_parts() -> None:
                 nonlocal pending_parts, pending_disk_paths, npy_freed, persisted_paths
@@ -677,24 +685,35 @@ class FeatureStorage:
                 pending_disk_paths = {}
 
             for idx, (group_id, group) in enumerate(groups_list, 1):
-                group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
-                if group_data.ndim != 2:
-                    raise ValueError(f"Group {group_id} data must be 2D, got shape={group_data.shape}")
-                if group_data.shape[1] != len(group.columns):
+                # P3.1 (2026-04-25): Skip the wasteful float32 materialization.
+                # ``registry.load_data`` returns a memory-mapped read-only
+                # array; the previous ``np.asarray(..., dtype=np.float32)``
+                # forced a full RAM copy as float32 (4 bytes/cell) only for
+                # the very next line to ``astype(np.float16)`` (2 bytes/cell)
+                # and discard the float32. We retain the validation contract
+                # by checking the mmap shape directly and let the f16 cast
+                # do the one-and-only allocation in the part loop below.
+                mmap_arr = registry.load_data(group_id)
+                if mmap_arr.ndim != 2:
+                    raise ValueError(f"Group {group_id} data must be 2D, got shape={mmap_arr.shape}")
+                if mmap_arr.shape[1] != len(group.columns):
                     raise ValueError(
-                        f"Group {group_id} columns mismatch: expected {len(group.columns)}, got {group_data.shape[1]}"
+                        f"Group {group_id} columns mismatch: expected {len(group.columns)}, got {mmap_arr.shape[1]}"
                     )
 
-                if total_rows == 0 and group_data.shape[0] > 0:
-                    total_rows = group_data.shape[0]
+                if total_rows == 0 and mmap_arr.shape[0] > 0:
+                    total_rows = mmap_arr.shape[0]
 
                 columns_list = list(group.columns)
 
-                # Auto-split groups exceeding MAX_GROUP_COLUMNS (V7 §12 P0)
-                parts = self._split_large_group(group_id, columns_list, group_data)
+                # Auto-split groups exceeding MAX_GROUP_COLUMNS (V7 §12 P0).
+                # ``_split_large_group`` only slices columns (no copy); slices
+                # of an mmap stay mmap-backed.
+                parts = self._split_large_group(group_id, columns_list, mmap_arr)
 
                 for part_id, part_cols, part_data in parts:
-                    # Cast to float16 for storage (V7 §12 P0)
+                    # Cast to float16 for storage (V7 §12 P0). This is the
+                    # ONLY full materialization of the part data for L7.
                     data_f16 = part_data.astype(np.float16)
 
                     staged_path = staging_dir / f"{part_id}.parquet"
@@ -717,7 +736,7 @@ class FeatureStorage:
                 if group.disk_path and group.disk_path.exists():
                     pending_disk_paths[group_id] = group.disk_path
 
-                del group_data
+                del mmap_arr
 
                 if len(pending_parts) >= batch_limit:
                     _flush_pending_parts()
