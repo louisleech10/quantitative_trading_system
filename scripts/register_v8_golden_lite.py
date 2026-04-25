@@ -12,6 +12,7 @@ golden baseline，避免重跑 1800s benchmark。
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from datetime import datetime
@@ -34,6 +35,17 @@ V8FIX6_METRICS = {
 }
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Register baseline from existing parquet outputs")
+    parser.add_argument("--label-suffix", default="v8fix6", help="baseline_id suffix, e.g. v8fix7c")
+    parser.add_argument("--elapsed-seconds", type=float, default=V8FIX6_METRICS["elapsed_seconds"])
+    parser.add_argument("--peak-rss-mb", type=float, default=V8FIX6_METRICS["peak_rss_mb"])
+    parser.add_argument("--label", default="V8 Golden (v8fix6 - Plan A streaming persist + hardware auto-tier)")
+    parser.add_argument("--v7-speedup", type=float, default=4.12)
+    parser.add_argument("--peak-rss-reduction", type=float, default=0.51)
+    return parser.parse_args()
+
+
 def column_sha256(series: pd.Series) -> str:
     arr = series.to_numpy()
     if arr.dtype != np.float16:
@@ -42,6 +54,7 @@ def column_sha256(series: pd.Series) -> str:
 
 
 def main() -> int:
+    args = _parse_args()
     if not FEATURES_DIR.is_dir():
         print(f"[FAIL] features dir not found: {FEATURES_DIR}")
         return 1
@@ -85,7 +98,7 @@ def main() -> int:
 
     # 建立 baseline 目錄
     ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    baseline_id = f"{ts}_ETHUSDT_1h_full_multitf_v8fix6"
+    baseline_id = f"{ts}_ETHUSDT_1h_full_multitf_{args.label_suffix}"
     baseline_dir = BASELINE_REGISTRY_DIR / baseline_id
     artifacts_dir = baseline_dir / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -113,6 +126,13 @@ def main() -> int:
         },
     )
 
+    perf_metrics = {
+        "elapsed_seconds": args.elapsed_seconds,
+        "peak_rss_mb": args.peak_rss_mb,
+        "feature_count": len(feature_names_unique),
+        "groups": len(parquet_files),
+        "dtype": "float16",
+    }
     manifest = {
         "baseline_id": baseline_id,
         "created_at_utc": datetime.utcnow().isoformat() + "Z",
@@ -123,16 +143,16 @@ def main() -> int:
         "force_regenerate": True,
         "shape": {"rows": rows, "columns": len(feature_names_unique)},
         "layer_counts": {},
-        "performance": V8FIX6_METRICS,
+        "performance": perf_metrics,
         "checksums": {
             "overall_dataframe_sha256": overall_sha,
             "overall_sha256_method": "order_invariant_concat_of_sorted_col_sha256",
             "feature_name_count": len(feature_names_unique),
             "config_hash": "9e5c8a65c9cbd773a778e8c99ca634ec",
         },
-        "label": "V8 Golden (v8fix6 - Plan A streaming persist + hardware auto-tier)",
-        "v7_speedup": 4.12,
-        "peak_rss_reduction_vs_v7": 0.51,
+        "label": args.label,
+        "v7_speedup": args.v7_speedup,
+        "peak_rss_reduction_vs_v7": args.peak_rss_reduction,
         "status": "official",
         "lite_baseline": True,
     }
@@ -155,11 +175,11 @@ def main() -> int:
             "baseline_id": baseline_id,
             "label": manifest["label"],
             "created_at": manifest["created_at_utc"],
-            "v7_baseline_speedup": 4.12,
-            "peak_rss_reduction": 0.51,
+            "v7_baseline_speedup": args.v7_speedup,
+            "peak_rss_reduction": args.peak_rss_reduction,
             "feature_count": len(feature_names_unique),
-            "elapsed_seconds": V8FIX6_METRICS["elapsed_seconds"],
-            "peak_rss_mb": V8FIX6_METRICS["peak_rss_mb"],
+            "elapsed_seconds": args.elapsed_seconds,
+            "peak_rss_mb": args.peak_rss_mb,
             "status": "official",
             "lite_baseline": True,
         }
