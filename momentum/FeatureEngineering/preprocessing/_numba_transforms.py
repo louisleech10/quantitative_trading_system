@@ -184,9 +184,19 @@ def winsorize_array(arr: np.ndarray, lower_q: float = 0.01, upper_q: float = 0.9
            dtype when the bounds match.
         Peak drops from ~4× input to ~2× input (only the two quantile
         bound vectors are extra).
+
+    Single-sort optimization (P4.3 — 2026-04-25):
+        ``np.nanquantile`` sorts each column to compute the quantile.
+        Calling it twice (lower then upper) doubles the sort cost. By
+        passing both quantiles as an array, numpy sorts each column once
+        and interpolates both quantiles from the same sorted view —
+        bit-exact equivalent to two separate calls.
     """
-    lowers = np.nanquantile(arr, lower_q, axis=0).astype(np.float32, copy=False)
-    uppers = np.nanquantile(arr, upper_q, axis=0).astype(np.float32, copy=False)
+    bounds = np.nanquantile(arr, [lower_q, upper_q], axis=0).astype(
+        np.float32, copy=False
+    )
+    lowers = bounds[0]
+    uppers = bounds[1]
     nan_mask = np.isnan(arr)
     np.clip(arr, lowers, uppers, out=arr)
     arr[nan_mask] = np.nan
