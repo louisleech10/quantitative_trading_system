@@ -237,10 +237,29 @@ class FeaturePreprocessor:
         transform_context: Dict[str, object],
         n_workers: int,
     ) -> int:
-        """ThreadPool-based L6.5 registry transform with greedy scheduling."""
+        """ThreadPool-based L6.5 registry transform with greedy scheduling.
+
+        P1.2 — Large-group splitting:
+            When a group's column count exceeds ``FFACT_L65_SPLIT_THRESHOLD``
+            (tier-aware), it is partitioned into balanced column slices that
+            run as independent sub-tasks in the same ThreadPool. This reduces
+            tail latency caused by giant groups (e.g. ``L2_Momentum`` with
+            ~16k cols) blocking otherwise idle workers. Splitting only applies
+            on the fast (Numba) path because column-wise transforms (winsor /
+            rank / zscore) are independent and safely concatenable; the slow
+            pandas path is left intact for correctness.
+        """
 
         if not groups:
             return 0
+
+        from collections import defaultdict
+
+        from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
+
+        split_threshold = get_l65_split_threshold()
+        use_fast = bool(transform_context.get("use_fast", False))
+        can_split = use_fast and split_threshold > 0
 
         ordered_groups = sorted(
             groups,
@@ -248,39 +267,138 @@ class FeaturePreprocessor:
             reverse=True,
         )
 
+        # Partition groups into "full" (single task) vs "split" (multi-slice tasks).
+        full_groups: List[object] = []
+        split_meta: Dict[str, Dict[str, object]] = {}
+
+        for group in ordered_groups:
+            n_cols = self._group_n_columns(group)
+            if can_split and n_cols > split_threshold:
+                # Balance slice widths: ceil(n_cols / n_splits) ensures a final
+                # slice no larger than the others (avoids straggler).
+                n_splits = (n_cols + split_threshold - 1) // split_threshold
+                slice_width = (n_cols + n_splits - 1) // n_splits
+                slices = [
+                    (i * slice_width, min((i + 1) * slice_width, n_cols))
+                    for i in range(n_splits)
+                ]
+                # Load array once; sub-tasks share read-only views.
+                group_array = np.asarray(registry.load_data(group.group_id), dtype=np.float32)
+                split_meta[group.group_id] = {
+                    "group": group,
+                    "array": group_array,
+                    "slices": slices,
+                    "results": {},
+                    "completed_slices": 0,
+                }
+            else:
+                full_groups.append(group)
+
         completed = 0
         failed = 0
         started_at = time.perf_counter()
 
+        # Submit task type tagging: ("full", group, None) or ("slice", group, (s, e)).
         with ThreadPoolExecutor(max_workers=n_workers) as pool:
-            futures = {
-                pool.submit(self._transform_single_group, registry, group, transform_context): group
-                for group in ordered_groups
-            }
-            for future in as_completed(futures):
-                group = futures[future]
+            futures: Dict[object, Tuple[str, object, Optional[Tuple[int, int]]]] = {}
+
+            for group in full_groups:
+                fut = pool.submit(self._transform_single_group, registry, group, transform_context)
+                futures[fut] = ("full", group, None)
+
+            for gid, info in split_meta.items():
+                group_array = info["array"]
+                for (start, end) in info["slices"]:
+                    slice_view = group_array[:, start:end]
+                    fut = pool.submit(self._transform_array_slice, slice_view, transform_context)
+                    futures[fut] = ("slice", info["group"], (start, end))
+
+            split_completed_groups: set[str] = set()
+
+            for fut in as_completed(futures):
+                kind, group, slice_range = futures[fut]
+                gid = getattr(group, "group_id", "<unknown>")
                 try:
-                    future.result()
-                    completed += 1
+                    result = fut.result()
+                    if kind == "full":
+                        completed += 1
+                    else:
+                        meta = split_meta[gid]
+                        meta["results"][slice_range] = result
+                        meta["completed_slices"] += 1
+                        if meta["completed_slices"] == len(meta["slices"]):
+                            # Concatenate slices in column order and persist.
+                            ordered = sorted(meta["results"].items(), key=lambda kv: kv[0][0])
+                            merged = np.concatenate([r for _, r in ordered], axis=1)
+                            registry.overwrite_data(gid, merged)
+                            # Free intermediate buffers asap.
+                            del meta["results"]
+                            del meta["array"]
+                            split_completed_groups.add(gid)
+                            completed += 1
                 except Exception as error:
                     failed += 1
                     logger.error(
-                        "[L6.5] Failed group %s: %s",
-                        getattr(group, "group_id", "<unknown>"),
+                        "[L6.5] Failed group %s (%s): %s",
+                        gid,
+                        kind,
                         error,
                         exc_info=True,
                     )
 
         elapsed = time.perf_counter() - started_at
-        logger.info(
-            "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers (%d failed)",
-            completed,
-            len(groups),
-            elapsed,
-            n_workers,
-            failed,
-        )
+        split_count = len(split_meta)
+        if split_count:
+            total_slices = sum(len(info["slices"]) for info in split_meta.values())
+            logger.info(
+                "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
+                "(%d failed, %d big-group splits → %d sub-tasks)",
+                completed,
+                len(groups),
+                elapsed,
+                n_workers,
+                failed,
+                split_count,
+                total_slices,
+            )
+        else:
+            logger.info(
+                "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers (%d failed)",
+                completed,
+                len(groups),
+                elapsed,
+                n_workers,
+                failed,
+            )
         return completed
+
+    def _transform_array_slice(
+        self,
+        array_slice: np.ndarray,
+        transform_context: Dict[str, object],
+    ) -> np.ndarray:
+        """Run the fast Numba transform pipeline on a column slice.
+
+        Used by ``_transform_registry_parallel`` for big-group sub-tasks (P1.2).
+        Inputs/outputs are decoupled from the registry; the caller concatenates
+        slice results and writes back. Operations are column-wise so slicing is
+        safe (winsor / rolling rank / rolling zscore each operate per column).
+        """
+        transform_array_fast = transform_context["transform_array_fast"]
+        # Ensure contiguous float32 to satisfy numba layout assumptions.
+        if not array_slice.flags["C_CONTIGUOUS"] or array_slice.dtype != np.float32:
+            array_slice = np.ascontiguousarray(array_slice, dtype=np.float32)
+        return transform_array_fast(
+            array_slice,
+            winsorize=bool(transform_context.get("do_winsorize", True)),
+            winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
+            winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+            rank=bool(transform_context.get("do_rank", False)),
+            rank_window=int(transform_context.get("rank_window", 252)),
+            zscore=bool(transform_context.get("do_zscore", False)),
+            zscore_window=int(transform_context.get("zscore_window", 100)),
+            zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+        )
 
     def _transform_single_group(
         self,
@@ -379,6 +497,7 @@ class FeaturePreprocessor:
         from momentum.FeatureEngineering.polars_adapter import (
             pandas_to_polars,
             polars_l65_adaptive_zscore,
+            polars_l65_rank_transform,
             polars_l65_winsorization,
             polars_to_pandas,
         )
@@ -407,11 +526,20 @@ class FeaturePreprocessor:
             pd_temp = self._apply_adf_differencing(pd_temp)
             pl_df = pandas_to_polars(pd_temp)
 
-        # Rank transform (fall back to pandas — rolling_rank not available in Polars 0.20)
+        # Rank transform (polars 1.x: map_batches + scipy, numerically equiv. to pandas)
         if self.rank_config.get("enabled", False):
-            pd_temp = polars_to_pandas(pl_df, index=features_df.index)
-            pd_temp = self._apply_rank_transform(pd_temp)
-            pl_df = pandas_to_polars(pd_temp)
+            rank_apply_to = self.rank_config.get("apply_to", "all")
+            rank_columns = self._select_columns(features_df, rank_apply_to)
+            rank_window = int(self.rank_config.get("window", 252))
+            if rank_columns and self.mode == "replace":
+                pl_df = polars_l65_rank_transform(
+                    pl_df, columns=rank_columns, window=rank_window
+                )
+            else:
+                # append mode or empty column list: fall back to pandas
+                pd_temp = polars_to_pandas(pl_df, index=features_df.index)
+                pd_temp = self._apply_rank_transform(pd_temp)
+                pl_df = pandas_to_polars(pd_temp)
 
         # Gaussian normalize (pandas fallback — requires scipy erfinv)
         if self.gaussian_config.get("enabled", False):

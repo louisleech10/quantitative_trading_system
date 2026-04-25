@@ -824,7 +824,16 @@ class FeatureFactory:
     def _layer2_derived_pandas(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
     ) -> pd.DataFrame:
-        """Legacy pandas path for L2 derived features."""
+        """Legacy pandas path for L2 derived features.
+
+        P1.3 — When per-category mode is in effect (registry persistence),
+        the seven operator categories (Distance / Cross / Ratio / Momentum /
+        BinarySignal / SignedStrength / WorldQuant) are dispatched to a
+        ThreadPool. Many of the inner pandas / numpy ops release the GIL,
+        delivering measurable parallelism on 4-8 core machines without the
+        spawn overhead of a ProcessPool. Persistence to the registry remains
+        serialised in the main thread to avoid concurrent-write races.
+        """
         filtered_ops = self._filter_operators_config(config.operators)
         engine = DerivedOperatorEngine(filtered_ops)
         indicator_specs = self._build_indicator_specs(layer1, config)
@@ -840,13 +849,62 @@ class FeatureFactory:
                 MAX_L2_ESTIMATED_COLS,
             )
 
-        category_frames: List[pd.DataFrame] = []
-        for category in DerivedOperatorEngine.OPERATOR_CATEGORIES:
-            category_frame = engine.compute_category(layer1, data, indicator_specs, category)
-            if category_frame is None or category_frame.empty:
-                continue
-            self._persist_layer2_category_group(category, category_frame)
-            category_frames.append(category_frame)
+        from momentum.FeatureEngineering.utils.hardware_utils import get_l2_category_workers
+
+        category_workers = get_l2_category_workers()
+        categories = list(DerivedOperatorEngine.OPERATOR_CATEGORIES)
+
+        if category_workers <= 1 or len(categories) <= 1:
+            # Serial fallback (or trivial single-category case).
+            category_frames: List[pd.DataFrame] = []
+            for category in categories:
+                category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+                if category_frame is None or category_frame.empty:
+                    continue
+                self._persist_layer2_category_group(category, category_frame)
+                category_frames.append(category_frame)
+        else:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            t0 = time.perf_counter()
+            computed_frames: Dict[str, pd.DataFrame] = {}
+            with ThreadPoolExecutor(max_workers=category_workers) as pool:
+                futures = {
+                    pool.submit(
+                        engine.compute_category, layer1, data, indicator_specs, category
+                    ): category
+                    for category in categories
+                }
+                for fut in as_completed(futures):
+                    category = futures[fut]
+                    try:
+                        category_frame = fut.result()
+                    except Exception as error:
+                        logger.error(
+                            "[L2] Category %s failed: %s", category, error, exc_info=True
+                        )
+                        continue
+                    if category_frame is None or category_frame.empty:
+                        continue
+                    computed_frames[category] = category_frame
+
+            # Serial persistence in the original category order keeps registry
+            # writes single-threaded and downstream concat order deterministic.
+            category_frames = []
+            for category in categories:
+                category_frame = computed_frames.get(category)
+                if category_frame is None:
+                    continue
+                self._persist_layer2_category_group(category, category_frame)
+                category_frames.append(category_frame)
+
+            logger.info(
+                "[L2] Parallel categories: %d/%d categories (%d workers) in %.2fs",
+                len(category_frames),
+                len(categories),
+                category_workers,
+                time.perf_counter() - t0,
+            )
 
         if category_frames:
             return pd.concat(category_frames, axis=1)
@@ -891,6 +949,36 @@ class FeatureFactory:
             return pd.DataFrame(index=base.index)
         filtered_config = self._filter_rolling_config(config.rolling_aggregation)
         aggregator = RollingAggregator(filtered_config)
+
+        # Plan A: streaming persist when CGSA is enabled and tier prefers it.
+        # The persister buffers small chunks per step and flushes to
+        # ColumnGroupRegistry as soon as buffer reaches the tier-specific limit,
+        # so the wide L3 DataFrame (~10 GB at 1h timeframe) is never materialised.
+        from momentum.FeatureEngineering.utils.hardware_utils import (
+            get_l3_persist_mode,
+            get_l3_streaming_buffer_cols,
+        )
+        persist_mode = get_l3_persist_mode()
+        if self._cgsa_enabled() and self._cgsa_registry is not None and persist_mode in {"streaming", "hybrid"}:
+            persister = _StreamingL3Persister(
+                factory=self,
+                layer=LayerSource.L3,
+                label_prefix="L3_rolling",
+                buffer_cols=get_l3_streaming_buffer_cols(),
+            )
+            try:
+                _ = aggregator.compute_all(base, persist_callback=persister)
+            finally:
+                persister.flush_all()
+            logger.info(
+                "[L3] streaming persist (mode=%s) complete: %d cols persisted in %d groups",
+                persist_mode, persister.total_cols, persister.total_groups,
+            )
+            # Return an empty DataFrame keyed by the input index so downstream
+            # layers (L4 fast path uses only L1+raw) compose correctly.
+            return pd.DataFrame(index=base.index)
+
+        # Classic in-memory path (tier_xlarge or CGSA disabled).
         return aggregator.compute_all(base)
 
     def _layer4_lag_features(
@@ -1803,6 +1891,110 @@ class FeatureFactory:
             return raw
         except Exception:
             return None
+
+
+class _StreamingL3Persister:
+    """Plan A: stream L3 chunks to ColumnGroupRegistry as they are produced.
+
+    The RollingAggregator produces L3 features in (window, agg) × column-chunk
+    order. Without streaming, every step's output across all column chunks must
+    live in memory until the final pd.concat — at 1h timeframe this peaks at
+    ~10 GB and triggers OOM in 8 GB workers.
+
+    This persister is registered as a ``persist_callback`` on the aggregator.
+    It buffers per-step columns up to ``buffer_cols`` (tier-aware) and flushes
+    each buffer as a ColumnGroup .npy file via ``save_data``. After flush, the
+    in-memory buffer is freed via ``del`` + ``gc.collect()``.
+
+    Contract: caller (FeatureFactory) owns ``flush_all()`` invocation after
+    the aggregator returns.
+    """
+
+    __slots__ = (
+        "factory", "layer", "label_prefix", "buffer_cols",
+        "_buffers", "_buffer_col_count", "_flushed_chunks",
+        "total_cols", "total_groups",
+    )
+
+    def __init__(
+        self,
+        factory: "FeatureFactory",
+        layer: LayerSource,
+        label_prefix: str,
+        buffer_cols: int = 5000,
+    ) -> None:
+        self.factory = factory
+        self.layer = layer
+        self.label_prefix = label_prefix
+        self.buffer_cols = max(100, int(buffer_cols))
+        self._buffers: Dict[str, List[pd.DataFrame]] = {}
+        self._buffer_col_count: Dict[str, int] = {}
+        self._flushed_chunks: Dict[str, int] = {}
+        self.total_cols = 0
+        self.total_groups = 0
+
+    def __call__(self, step_label: str, chunk_frame: pd.DataFrame) -> None:
+        if chunk_frame is None or chunk_frame.empty:
+            return
+        bufs = self._buffers.setdefault(step_label, [])
+        bufs.append(chunk_frame)
+        new_count = self._buffer_col_count.get(step_label, 0) + chunk_frame.shape[1]
+        self._buffer_col_count[step_label] = new_count
+        if new_count >= self.buffer_cols:
+            self._flush(step_label)
+
+    def _flush(self, step_label: str) -> None:
+        bufs = self._buffers.pop(step_label, None)
+        if not bufs:
+            self._buffer_col_count.pop(step_label, None)
+            return
+        self._buffer_col_count.pop(step_label, None)
+
+        chunk_idx = self._flushed_chunks.get(step_label, 0) + 1
+        self._flushed_chunks[step_label] = chunk_idx
+
+        if len(bufs) == 1:
+            merged = bufs[0]
+        else:
+            merged = pd.concat(bufs, axis=1, copy=False)
+        # Drop intermediate list reference before allocating numpy buffer.
+        del bufs
+
+        n_rows, n_cols = merged.shape
+        if n_cols == 0:
+            del merged
+            return
+
+        registry = self.factory._cgsa_registry
+        timeframe = self.factory._current_timeframe or "unknown"
+        base_id = f"{timeframe}_{self.label_prefix}_{step_label}_{chunk_idx}"
+        group_id = self.factory._next_available_group_id(base_id)
+        columns_tuple = tuple(merged.columns)
+        data = merged.to_numpy(dtype=np.float32, copy=False)
+        # ColumnGroup.save_data atomically writes .npy then registers metadata.
+        group = ColumnGroup(
+            group_id=group_id,
+            layer=self.layer,
+            timeframe=timeframe,
+            data_source="derived",
+            indicator=self.label_prefix,
+            columns=columns_tuple,
+            shape=(n_rows, n_cols),
+            dtype="float32",
+        )
+        registry.save_data(group, data)
+
+        self.total_cols += n_cols
+        self.total_groups += 1
+        del merged, data
+        import gc as _gc
+        _gc.collect()
+
+    def flush_all(self) -> None:
+        for sl in list(self._buffers.keys()):
+            self._flush(sl)
+        import gc as _gc
+        _gc.collect()
 
 
 def _worker_entry(

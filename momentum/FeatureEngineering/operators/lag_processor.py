@@ -28,6 +28,14 @@ class LagProcessor:
         self._enabled = config.lag_features.enabled
         self._column_chunk_size = self._resolve_positive_env("FFACT_LAYER4_CHUNK_SIZE", 200)
         self._lag_batch_size = self._resolve_positive_env("FFACT_LAYER4_LAG_BATCH_SIZE", 8)
+        # P1.4: V7→V8 regression fix. The legacy chunked path triggers
+        # ~ (cols/chunk) × (lags/batch) intermediate ``pd.concat`` calls — at
+        # 12K cols × 8 lags this costs >20s of overhead alone. When the
+        # estimated output stays under this cap we fall back to a flat
+        # one-shift-per-lag plan that performs only ``len(lags)`` concats.
+        self._fast_path_max_cols = self._resolve_positive_env(
+            "FFACT_LAYER4_FAST_PATH_MAX_COLS", 200_000
+        )
 
     def compute_all(self, features_df: pd.DataFrame) -> pd.DataFrame:
         if not self._enabled or features_df.empty:
@@ -45,7 +53,19 @@ class LagProcessor:
         if not columns or not lag_steps:
             return pd.DataFrame(index=features_df.index)
 
-        frames: List[pd.DataFrame] = []
+        selected_df = features_df[columns]
+        estimated_output_cols = len(columns) * len(lag_steps)
+
+        if estimated_output_cols <= self._fast_path_max_cols:
+            # Fast path (P1.4): one shift per lag, single outer concat.
+            # ``copy=False`` keeps memory flat; output columns are immutable.
+            frames: List[pd.DataFrame] = [
+                selected_df.shift(lag).add_suffix(f"_Lag_{lag}") for lag in lag_steps
+            ]
+            return pd.concat(frames, axis=1, copy=False)
+
+        # Legacy chunked path retained for very wide inputs (>fast_path_max_cols).
+        frames = []
         chunk_size = self._column_chunk_size
         for start in range(0, len(columns), chunk_size):
             chunk = columns[start : start + chunk_size]

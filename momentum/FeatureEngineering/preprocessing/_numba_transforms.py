@@ -27,18 +27,28 @@ except ImportError:
 
 if _HAS_NUMBA:
 
-    @njit(cache=True, parallel=True)
+    @njit(cache=True)
     def _rolling_rank_numba(arr: np.ndarray, window: int) -> np.ndarray:
-        """Rolling percentile rank along axis-0, parallel across columns.
+        """Rolling percentile rank along axis-0.
 
         Returns float32 array same shape as *arr*.
         Constant windows → 0.5. NaN → NaN.
+
+        Note (P1.1 reverted 2026-04-25):
+            We previously experimented with ``@njit(parallel=True) + prange``
+            here. It is **incompatible** with the L6.5 outer ThreadPool
+            (``feature_preprocessor._transform_registry_parallel``) under the
+            default Numba ``workqueue`` threading layer, which is *not*
+            threadsafe. Concurrent calls from multiple Python threads aborted
+            the worker process. Switching layers (``omp``/``tbb``) requires
+            extra binary deps that aren't pinned. Sequential ``range`` is the
+            safe choice as long as parallelism is provided by the outer pool.
         """
         n_rows, n_cols = arr.shape
         out = np.empty((n_rows, n_cols), dtype=np.float32)
         out[:] = np.nan
 
-        for c in prange(n_cols):
+        for c in range(n_cols):
             for r in range(n_rows):
                 val = arr[r, c]
                 if np.isnan(val):
