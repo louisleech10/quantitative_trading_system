@@ -130,6 +130,8 @@ async def get_hardware_info() -> Dict[str, Any]:
                 "FFACT_CGSA_MEMORY_BUFFER": tier_config["cgsa_memory_buffer"],
                 "FFACT_L7_WORKERS": tier_config["l7_workers"],
                 "FFACT_L7_COMPACTOR_ENABLED": 1,
+                "FFACT_MULTI_TF_MAX_WORKERS": tier_config["multi_tf_max_workers"],
+                "FFACT_LAYER3_CHUNK_SIZE": tier_config["layer3_chunk_size"],
             },
         }
     except Exception as error:

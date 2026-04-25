@@ -144,7 +144,7 @@
 | 1 | `FFACT_USE_SEARCHSORTED` | 0=fallback merge_asof | §0.12, §3.3 |
 | 2 | `FFACT_USE_CGSA` | 0=fallback legacy concat | §0.12, §4.5 |
 | 3 | `FFACT_USE_NUMBA_ROLLING` | 0=fallback pandas rolling | §0.12, §5.1 |
-| 4 | `FFACT_USE_POLARS` | 0=fallback pandas | §0.12 |
+| 4 | `FFACT_USE_POLARS` | **預設 1**（Polars ON）；0=fallback pandas | §0.12 |
 | 5 | `FFACT_LAYER1_PARALLEL` | L1 ThreadPool（預設 0） | §3.5 |
 | 6 | `FFACT_L3_STREAMING` | L3 streaming mode | §5.0 |
 | 7 | `FFACT_L65_CHUNK_SIZE` | L6.5 chunk 大小 | §4.14 |
@@ -450,10 +450,11 @@ persist 為 per-group Parquet，最後執行 A/B 逐層驗證。每步遵循 env
 完成後執行 Task 3.2（Pebay skew/kurt）→ Task 3.5（整合）→ Task 3.6（數值等價 suite）。
 ```
 
-### Batch 4: Polars（條件性）
+### Batch 4: Polars（✅ 已完成）
 ```
-Phase 3 完成後 re-profile。若 L2+L6.5 佔比 ≥30%，執行 Task 4.1-4.4（L1/L2/L6.5 → Polars）。
-否則 skip Phase 4。注意 NaN 語義對齊（R5）和 polars 版本釘選 ≥0.20,<0.21。
+Phase 3 完成後 re-profile 結果：L2+L6.5 佔比 ~60%，超過 30% 門檻，決定推進。
+Task 4.1-4.4 全部完成。FFACT_USE_POLARS 預設改為 1，納入 V7 Baseline。
+R5（null vs NaN）已透過三層保護消除；R25 版本釘選已寫入 requirements.txt。
 ```
 
 ### Batch 5: 生產化

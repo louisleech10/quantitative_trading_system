@@ -462,12 +462,14 @@ class TestEmptyDataFrame:
 class TestPolarsAdapter:
     """Polars adapter 基礎功能測試"""
 
-    def test_polars_enabled_default_off(self):
-        """測試 FFACT_USE_POLARS 預設為關閉"""
+    def test_polars_enabled_default_on(self):
+        """測試 FFACT_USE_POLARS 預設為開啟（V7 baseline 行為）"""
         from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
         os.environ.pop("FFACT_USE_POLARS", None)
-        assert not polars_enabled()
+        # Phase 4 COMPLETED & ACTIVE: default changed to ON in V7 baseline.
+        # Use FFACT_USE_POLARS=0 to opt out.
+        assert polars_enabled()
 
     def test_polars_enabled_on(self):
         """測試 FFACT_USE_POLARS=1 啟用"""

@@ -1,11 +1,20 @@
 """Polars adapter for Feature Factory Phase 4 optimization.
 
-Provides Polars-based implementations of L1/L2/L6.5 operations with
-automatic fallback to pandas when FFACT_USE_POLARS=0 (default).
+Provides Polars-based implementations of L2/L6.5 operations.
+Default is ON (FFACT_USE_POLARS=1); disable with FFACT_USE_POLARS=0
+to fall back to pandas path.
 
-Risk mitigations:
-- R5: Polars null vs NaN — handled by ensure_nan_semantics()
-- R25: Version pinned to polars>=0.20,<0.21
+Phase 4 status: COMPLETED & ACTIVE (default-on as of V7 baseline)
+
+Risk mitigations (both risks resolved):
+- R5: Polars null vs NaN — fully handled via ensure_nan_semantics(),
+  fill_null(float('nan')) at all pandas←→polars conversion points.
+  In polars 1.x (null/NaN are distinct types), map_batches output uses
+  fill_nan(None) so downstream rolling ops skip missing values.
+- R25: Version upgraded to polars>=1.0,<2.0 (was >=0.20,<0.21).
+  Only breaking changes were rolling_rank() (removed in 1.x) and
+  rolling_count() (renamed to rolling_len()). Both replaced with
+  map_batches() + scipy.stats.rankdata in polars_l65_rank_transform().
 """
 
 from __future__ import annotations
@@ -42,8 +51,12 @@ def _check_polars_available() -> bool:
 
 
 def polars_enabled() -> bool:
-    """Check if Polars path is enabled via env var AND polars is installed."""
-    raw = os.getenv("FFACT_USE_POLARS", "0").strip().lower()
+    """Check if Polars path is enabled via env var AND polars is installed.
+
+    Default is ON ("1"). Phase 4 is completed and active as of V7 baseline.
+    Use FFACT_USE_POLARS=0 to force fallback to pandas path.
+    """
+    raw = os.getenv("FFACT_USE_POLARS", "1").strip().lower()
     enabled = raw in {"1", "true", "yes", "on"}
     if enabled and not _check_polars_available():
         return False
@@ -370,12 +383,63 @@ def polars_l65_winsorization(
         raise ValueError(f"Unsupported winsorization method: {method}")
 
 
+def _make_rolling_pct_rank_fn(window: int):
+    """Create a rolling pct-rank closure for polars 1.x map_batches.
+
+    Replaces polars 0.20.x rolling_rank() which was removed in polars 1.x.
+    Semantics:
+    - Null input → null output (NaN in pandas).
+    - Constant window (max==min) → 0.5 exactly.
+    - Otherwise: 1-indexed average rank / count of non-null values in window.
+    Numerically equivalent to pandas rolling.rank(pct=True, method='average',
+    min_periods=1) within float32 precision (atol < 1e-5).
+    """
+    from scipy.stats import rankdata as _rankdata
+
+    _w = window
+
+    def _fn(s: "pl.Series") -> "pl.Series":
+        import polars as pl
+
+        # to_numpy(): null → np.nan for float series (both polars 0.20 and 1.x)
+        arr = s.to_numpy()
+        n = len(arr)
+        out = np.full(n, np.nan, dtype=np.float32)
+
+        for i in range(n):
+            curr = arr[i]
+            if np.isnan(curr):
+                continue  # null input → null output
+
+            start = max(0, i - _w + 1)
+            w_data = arr[start : i + 1]
+            valid = w_data[~np.isnan(w_data)]
+            n_valid = len(valid)
+            if n_valid == 0:
+                continue
+
+            # Constant window → 0.5 (matches pandas constant_mask behaviour)
+            if np.all(valid == valid[0]):
+                out[i] = 0.5
+                continue
+
+            # valid[-1] == curr because curr is not NaN and is the last element
+            # of w_data, so it is preserved at the tail of valid.
+            ranks = _rankdata(valid, method="average")
+            out[i] = np.float32(ranks[-1] / n_valid)
+
+        # fill_nan(None): NaN → polars null so downstream rolling ops skip them
+        return pl.Series(out).fill_nan(None)
+
+    return _fn
+
+
 def polars_l65_rank_transform(
     pl_df: "pl.DataFrame",
     columns: List[str],
     window: int = 252,
 ) -> "pl.DataFrame":
-    """Apply rolling rank transform using Polars expressions.
+    """Apply rolling rank transform using map_batches (polars 1.x compatible).
 
     Parameters
     ----------
@@ -390,6 +454,13 @@ def polars_l65_rank_transform(
     -------
     pl.DataFrame
         DataFrame with rank-transformed columns (same column names).
+
+    Notes
+    -----
+    polars 0.20.x rolling_rank() was removed in polars 1.x.
+    Replaced with map_batches() + scipy.stats.rankdata.
+    Results are numerically equivalent to the pandas path within float32
+    precision (atol < 1e-5) as verified by T4.2 test suite.
     """
     import polars as pl
 
@@ -400,23 +471,11 @@ def polars_l65_rank_transform(
     if not valid_columns:
         return pl_df
 
-    # Polars rolling rank: use rolling_map with rank logic
-    # For large datasets, we use a workaround: rank / count over rolling window
-    exprs = []
-    for col_name in valid_columns:
-        col = pl.col(col_name)
-        # Polars rolling rank (pct) — use rolling with min_periods=1
-        ranked = col.rolling_rank(window_size=window, min_periods=1, method="average")
-        count = col.rolling_count(window_size=window)
-        # Percentage rank
-        pct_rank = ranked / count
-        # Handle constant windows: when all values same -> 0.5
-        rolling_max = col.rolling_max(window_size=window, min_periods=1)
-        rolling_min = col.rolling_min(window_size=window, min_periods=1)
-        is_constant = rolling_max == rolling_min
-        result_expr = pl.when(col.is_null()).then(None).when(is_constant).then(0.5).otherwise(pct_rank)
-        exprs.append(result_expr.alias(col_name))
-
+    rank_fn = _make_rolling_pct_rank_fn(window)
+    exprs = [
+        pl.col(col_name).map_batches(rank_fn, return_dtype=pl.Float32).alias(col_name)
+        for col_name in valid_columns
+    ]
     return pl_df.with_columns(exprs)
 
 
@@ -456,14 +515,15 @@ def polars_l65_adaptive_zscore(
     exprs = []
     for col_name in valid_columns:
         col = pl.col(col_name)
-        mean_val = col.rolling_mean(window_size=window, min_periods=1)
-        std_val = col.rolling_std(window_size=window, min_periods=1)
+        mean_val = col.rolling_mean(window_size=window, min_samples=1)
+        std_val = col.rolling_std(window_size=window, min_samples=1)
         zscore = (col - mean_val) / (std_val + epsilon)
-        # When std <= 0, output 0 (matching pandas behavior)
+        # When std is null (single-point window, ddof=1 undefined) or std <= 0,
+        # output 0 to match pandas rolling_std(min_periods=1) + where(std>0, 0.0) logic.
         result_expr = (
             pl.when(col.is_null())
             .then(None)
-            .when(std_val <= 0.0)
+            .when(std_val.is_null() | (std_val <= 0.0))
             .then(0.0)
             .otherwise(zscore)
         )

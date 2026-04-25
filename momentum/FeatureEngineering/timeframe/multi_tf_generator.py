@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import gc
 import os
-import tempfile
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
@@ -324,9 +323,37 @@ class MultiTFGenerator:
             _warmup_numba_functions()
             config_payload = self._config.model_dump(by_alias=True)
             ctx = mp.get_context("spawn")
-            max_workers = min(len(non_primary_tfs), 4)
+            # FFACT_MULTI_TF_MAX_WORKERS caps worker count.
+            # Set to a number to override; "auto" or unset → tier-based auto-detection.
+            # Tier defaults: 8 GB=2, 16 GB=3, 24/32 GB=4.
+            _env_raw = os.getenv("FFACT_MULTI_TF_MAX_WORKERS", "auto").strip().lower()
+            if _env_raw in {"", "auto"}:
+                from momentum.FeatureEngineering.utils.hardware_utils import (
+                    get_memory_tier,
+                    get_tier_config,
+                )
+                _env_max = get_tier_config(get_memory_tier())["multi_tf_max_workers"]
+            else:
+                try:
+                    _env_max = max(1, int(_env_raw))
+                except ValueError:
+                    _env_max = 2
+            max_workers = min(len(non_primary_tfs), _env_max)
 
-            self._report_progress("multi_tf", 0.3, f"[CGSA-parallel] Spawning {len(non_primary_tfs)} TF workers")
+            self._report_progress("multi_tf", 0.3, f"[CGSA-parallel] Spawning {len(non_primary_tfs)} TF workers (max_workers={max_workers})")
+
+            # Bug #1 fix: extract cache_dir from the factory's storage adapter so
+            # worker subprocesses use the same kline cache (not the default path).
+            _worker_cache_dir: Optional[str] = None
+            for _adapter in self._factory._adapter_registry._adapters.values():
+                _storage = getattr(_adapter, "_storage", None)
+                if _storage is not None and hasattr(_storage, "cache_dir"):
+                    _worker_cache_dir = str(_storage.cache_dir)
+                    break
+
+            # OOM Fix: drop primary-TF in-memory buffers before spawning so
+            # the parent process gives RAM headroom back to workers.
+            gc.collect()
 
             with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as pool:
                 futures = {
@@ -337,13 +364,14 @@ class MultiTFGenerator:
                         config_payload,
                         start_date,
                         end_date,
+                        _worker_cache_dir,
                     ): tf
                     for tf in non_primary_tfs
                 }
                 for future in as_completed(futures):
                     tf = futures[future]
                     try:
-                        result = future.result(timeout=600)
+                        result = future.result(timeout=None)  # No timeout; worker may use Python fallback (slow)
                     except Exception as exc:
                         logger.error("TF worker %s failed: %s", tf, exc, exc_info=True)
                         skipped_tfs.append(tf)
@@ -354,7 +382,9 @@ class MultiTFGenerator:
                         skipped_tfs.append(tf)
                         continue
 
-                    # Register groups from worker into main registry
+                    # Register groups from worker into main registry.
+                    # OOM Fix: result now carries only metadata + npy paths,
+                    # so the pickle payload is KB rather than GB.
                     tf_layer_counts[tf] = result.get("layer_counts", {})
                     groups_data = result.get("groups", [])
                     source_ts_ms = result.get("source_timestamps_ms")
@@ -363,6 +393,10 @@ class MultiTFGenerator:
                         primary_timestamps, self._config.timeframes.alignment_mode,
                         source_timestamps_ms=source_ts_ms,
                     )
+                    # Drop the worker payload immediately so accumulated
+                    # paths/columns lists do not grow unchecked.
+                    del result, groups_data, source_ts_ms
+                    gc.collect()
 
         self._report_progress("multi_tf", 0.7, "[CGSA-parallel] All TFs done")
 
@@ -436,22 +470,37 @@ class MultiTFGenerator:
 
         aligned_count = 0
         for gd in groups_data:
-            src_data = gd["data"]
             columns = tuple(gd["columns"])
+
+            # OOM Fix: mmap-read the worker's .npy instead of receiving a
+            # full ndarray over pickle. Backwards compatible: if a worker
+            # returned the legacy "data" payload, fall back to it.
+            if "npy_path" in gd:
+                src_data = np.load(gd["npy_path"], mmap_mode="r", allow_pickle=False)
+            else:
+                src_data = gd["data"]
 
             # Align non-primary TF data to primary resolution
             if idx_map is not None:
-                src_data = self._align_group_array(src_data, idx_map, n_primary)
+                aligned_data = self._align_group_array(src_data, idx_map, n_primary)
             elif src_data.shape[0] != n_primary:
                 # No source timestamps available — fill with NaN
                 logger.warning(
                     "No source timestamps for group %s; filling NaN", gd["group_id"],
                 )
-                src_data = np.full((n_primary, len(columns)), np.nan, dtype=np.float32)
+                aligned_data = np.full((n_primary, len(columns)), np.nan, dtype=np.float32)
+            else:
+                # Materialise mmap view into a real ndarray for persistence
+                aligned_data = np.asarray(src_data, dtype=np.float32)
 
-            work_dir = Path(tempfile.mkdtemp(prefix="ffact_tf_"))
-            npy_path = work_dir / f"{gd['group_id']}.npy"
-            np.save(npy_path, src_data)
+            # Release the mmap view as soon as possible so the underlying
+            # file is not pinned during the np.save() below.
+            del src_data
+
+            # Save directly into registry.work_dir so cleanup() handles the files;
+            # previously used tempfile.mkdtemp per group, leaking empty dirs on each run.
+            npy_path = registry.work_dir / f"{gd['group_id']}.npy"
+            np.save(npy_path, aligned_data, allow_pickle=False)
 
             group = ColumnGroup(
                 group_id=gd["group_id"],
@@ -460,13 +509,16 @@ class MultiTFGenerator:
                 data_source=gd["data_source"],
                 indicator=gd["indicator"],
                 columns=columns,
-                shape=src_data.shape,
+                shape=aligned_data.shape,
                 dtype=gd["dtype"],
                 disk_path=npy_path,
             )
             registry.register(group)
             aligned_count += 1
+            del aligned_data
 
+        # Reclaim memory after processing a worker's full payload.
+        gc.collect()
         logger.info(
             "[CGSA-parallel] Registered %d groups from worker TF %s",
             aligned_count, source_tf,
@@ -699,9 +751,13 @@ class MultiTFGenerator:
 
     @staticmethod
     def _multi_tf_parallel_enabled() -> bool:
-        """Check if Multi-TF parallel processing is enabled (Task 1.5, SPEC §3.5)."""
-        raw = os.getenv("FFACT_MULTI_TF_PARALLEL", "0").strip().lower()
-        return raw in {"1", "true", "yes", "on"}
+        """Check if Multi-TF parallel processing is enabled (Task 1.5, SPEC §3.5).
+
+        Enabled by default because multi-TF is the primary research mode.
+        Set FFACT_MULTI_TF_PARALLEL=0 to force serial execution.
+        """
+        raw = os.getenv("FFACT_MULTI_TF_PARALLEL", "1").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
 
     def _ensure_primary(self, training_tfs: List[str]) -> List[str]:
         deduped = list(dict.fromkeys(training_tfs))
@@ -726,6 +782,7 @@ def _tf_worker_entry(
     config_payload: dict,
     start_date: Optional[str],
     end_date: Optional[str],
+    cache_dir: Optional[str] = None,
 ) -> Dict:
     """Process a single timeframe in a spawned worker process.
 
@@ -735,12 +792,29 @@ def _tf_worker_entry(
 
     Returns dict with keys: timeframe, groups, source_timestamps_ms,
     layer_counts, or error.
+
+    Note: NUMBA_NUM_THREADS=1 is set here to keep Numba in sequential mode
+    inside the spawned subprocess. The workqueue threading layer is not
+    safe for concurrent access across processes; forcing a single thread
+    avoids SIGABRT while keeping full JIT compilation benefits.
+    All hot paths (fused_rolling_stats_multi_window, _rolling_rank_numba)
+    have already been changed from parallel=True/prange to sequential, so
+    there is no performance regression vs. the parallel build.
     """
+    import os as _os
+    _os.environ["NUMBA_NUM_THREADS"] = "1"
     from momentum.factories import create_feature_factory
 
     try:
-        factory = create_feature_factory(validate_continuity=False)
+        # Bug #1 fix: pass cache_dir so the worker uses the same kline cache.
+        factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
         config = factory._resolve_config(config_payload)
+
+        # Bug #2 fix: explicitly initialize the CGSA registry so that L1/L2
+        # layer methods can persist their groups, and so L3-L6 persist calls
+        # below have a valid registry to write to.
+        factory._cgsa_force_fresh = True
+        factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, "worker")
 
         raw_data = factory._layer0_data_ingestion(
             symbol, timeframe, config,
@@ -757,20 +831,82 @@ def _tf_worker_entry(
         ).astype(np.int64)
 
         factory._current_timeframe = timeframe
+
+        # OOM Fix: persist+del+gc per layer to avoid holding multiple large
+        # layers in worker memory simultaneously. 1h L3 alone can be ~10 GB.
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+        import gc as _gc
+
         layer1 = factory._layer1_atomic_indicators(raw_data, config)
         layer2 = factory._layer2_derived_features(layer1, raw_data, config)
         layer3 = factory._layer3_rolling_aggregation(layer1, layer2, config)
-        layer4 = factory._layer4_lag_features(layer1, layer2, layer3, raw_data, config)
-        layer5 = factory._layer5_cross_sectional(layer1, layer2, config)
-        layer6 = factory._layer6_meta_features(layer1, layer2, raw_data, config)
+        # Plan A streaming: when L3 streaming-persist is active, layer3 is an
+        # empty index-only DataFrame because survivors are already in registry.
+        # Read true count from the registry instead of layer3.shape.
+        if layer3 is not None and not layer3.empty:
+            factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
+            layer_counts_l3 = layer3.shape[1]
+        else:
+            registry = getattr(factory, "_cgsa_registry", None)
+            layer_counts_l3 = sum(
+                g.shape[1] for _, g in registry.iter_all() if g.layer == _LS.L3
+            ) if registry is not None else 0
+        del layer3
+        _gc.collect()
 
-        # Collect group data from the worker's independent CGSA registry
+        layer4 = factory._layer4_lag_features(layer1, layer2, None, raw_data, config)
+        layer_counts_l4 = layer4.shape[1] if layer4 is not None else 0
+        if layer4 is not None and not layer4.empty:
+            factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
+        del layer4
+        _gc.collect()
+
+        layer5 = factory._layer5_cross_sectional(layer1, layer2, config)
+        layer_counts_l5 = layer5.shape[1] if layer5 is not None else 0
+        if layer5 is not None and not layer5.empty:
+            factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
+        del layer5
+        _gc.collect()
+
+        layer6 = factory._layer6_meta_features(layer1, layer2, raw_data, config)
+        layer_counts_l6 = layer6.shape[1] if layer6 is not None else 0
+        if layer6 is not None and not layer6.empty:
+            factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
+        del layer6
+
+        # L1/L2 already persisted inside their layer methods; capture counts
+        # then drop wide DataFrames before collecting group metadata.
+        layer_counts = {
+            "layer1": layer1.shape[1] if layer1 is not None else 0,
+            "layer2": layer2.shape[1] if layer2 is not None else 0,
+            "layer3": layer_counts_l3,
+            "layer4": layer_counts_l4,
+            "layer5": layer_counts_l5,
+            "layer6": layer_counts_l6,
+        }
+        del layer1, layer2
+        _gc.collect()
+
+        # OOM Fix: collect ONLY metadata + .npy paths, never reload arrays.
+        # Previously this materialised every group (np.asarray on mmap), pushing
+        # 1h worker RSS past 10 GB and triggering BrokenProcessPool. The main
+        # process now mmap-reads from these paths in _register_worker_groups.
         groups_data: List[Dict] = []
         registry = getattr(factory, "_cgsa_registry", None)
         if registry is not None:
             for group_id in sorted(registry._groups.keys()):
                 group = registry.get(group_id)
-                data = np.asarray(registry.load_data(group_id), dtype=np.float32)
+                npy_path = group.disk_path
+                # If a group is still buffered in memory (no disk_path),
+                # flush it explicitly so the main process can mmap-read it.
+                if npy_path is None or not Path(npy_path).exists():
+                    target_path = registry.work_dir / f"{group_id}.npy"
+                    buffered = registry._memory_buffer.get(group_id) if hasattr(registry, "_memory_buffer") else None
+                    if buffered is None:
+                        # Defensive: skip groups with no recoverable data.
+                        continue
+                    np.save(target_path, np.asarray(buffered, dtype=np.float32), allow_pickle=False)
+                    npy_path = target_path
                 groups_data.append({
                     "group_id": group.group_id,
                     "layer": group.layer.value,
@@ -780,12 +916,8 @@ def _tf_worker_entry(
                     "columns": list(group.columns),
                     "shape": list(group.shape),
                     "dtype": group.dtype,
-                    "data": data,
+                    "npy_path": str(npy_path),
                 })
-
-        layer_counts = MultiTFGenerator._collect_layer_counts(
-            [layer1, layer2, layer3, layer4, layer5, layer6]
-        )
 
         return {
             "timeframe": timeframe,

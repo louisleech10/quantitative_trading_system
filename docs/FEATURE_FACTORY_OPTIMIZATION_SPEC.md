@@ -297,7 +297,7 @@ symbols = config.get_symbols()
 | Phase 1 | searchsorted → merge_asof | `FFACT_USE_SEARCHSORTED=0` |
 | Phase 2 | CGSA → legacy concat | `FFACT_USE_CGSA=0` |
 | Phase 3 | Numba fused → pandas rolling | `FFACT_USE_NUMBA_ROLLING=0` |
-| Phase 4 | Polars → pandas | `FFACT_USE_POLARS=0` |
+| Phase 4 | Polars → pandas（預設 ON） | `FFACT_USE_POLARS=0` |
 
 **規則**：
 - 舊路徑程式碼保留至少到下一 Phase Gate 通過
@@ -1651,30 +1651,25 @@ def _compute_skew(M2, M3, count):
 
 ---
 
-## 6. Phase 4 — Polars L2 / L6.5（條件性）
+## 6. Phase 4 — Polars L2 / L6.5（✅ 已完成，預設 ON）
 
-**決策門檻**: Phase 3 完成後重新 profile。僅當 L2 或 L6.5 是剩餘的 top-2 瓶頸時才推進。
+**狀態**: COMPLETED。Phase 3 完成後實測 L2+L6.5 仍占整體 pipeline 約 60%，加速效果明確，因此 Phase 4 已全面實作並納入 V7 Baseline（`FFACT_USE_POLARS=1` 為預設值）。
 
-#### 6.0 Phase 4 Skip 條件（V2 新增）
+#### 6.0 Phase 4 決策記錄（已完成）
 
-> **動機**（Review1 §3.2）：Research §16.2 將 Phase 4 設為「條件性」，但未定義明確的 skip 條件。若 Phase 3 完成後整體已達目標（< 7 min/sym），Phase 4 的 Polars 遷移**成本效益不合理**（引入 Polars 依賴、NaN/null 語義差異、版本鎖定風險）。
+> **原始動機**（Review1 §3.2）：Phase 3 完成後 re-profile，L2（2,055s）+ L6.5（2,424s）仍占 pipeline 約 60%，遠超 30% 門檻，因此決定推進 Phase 4。
 
-**明確 Skip 條件**：
-```
-IF (Phase 3 完成後 profile 結果)
-   L2_time + L6.5_time < 0.30 × total_pipeline_time
-THEN
-   SKIP Phase 4 → 直接進入 Phase 5
-```
+**已完成 Tasks**：
+- Task 4.1: L1 → Polars DataFrame（`pl.from_numpy` zero-copy）
+- Task 4.2: L2 DerivedOperatorEngine → Polars `with_columns()` batch
+- Task 4.3: L6.5 FeaturePreprocessor → Polars expressions
+- Task 4.4: NaN 語義對齊（R5 已消除）
 
-**No-Phase-4 效能預估**：
-- Phase 1 (searchsorted): B2+D 454s → ~50s（省 ~400s）
-- Phase 2 (CGSA): F 8,365s → ~0s（消除 memmap page thrashing）
-- Phase 3 (Numba): A4 385s → ~60s（省 ~325s）
-- **Total without Phase 4**: ~7 min/sym（可接受的 research platform 效能）
-- 若仍需更快 → 推進 Phase 4 或 Phase 5 multi-symbol parallelism
+**兩個原始風險均已解決**：
+- R5（null vs NaN）：`pandas_to_polars()` 入口 `fill_nan(None)`、`ensure_nan_semantics()` 清理 inf/null、`polars_to_pandas()` 出口 `fill_null(float('nan'))`，三層保護完整。
+- R25（版本鎖定）：`requirements.txt` 已釘選 `polars>=0.20,<0.21`，可按需升版。
 
-**Polars 版本鎖定風險**（R25）：Polars API 在 major 版本間有重大 breaking changes（如 `pl.Expr` API 變更）。若推進 Phase 4，須釘選版本：`polars>=0.20,<0.21`。
+**Polars 版本鎖定**（R25 已緩解）：`polars>=0.20,<0.21` 已釘選於 `requirements.txt`。
 
 ### 6.1 Task 清單
 
@@ -1952,7 +1947,7 @@ def make_feature_df(n_rows: int, n_cols: int, seed: int = 42) -> pd.DataFrame:
 | **R22** | **L6 `_find_column` fuzzy matching 在 CGSA 下失敗**：欄位重命名或 group_id prefix 改變 column name pattern | L6 meta features 產出 0 個特徵 | 中 | §4.2.4 建議改為顯式 column 引用（從 manifest 查詢）；增加 L6 output column count 的 sanity check |
 | **R23** | **L3 variance_filter 非決定性**：float32/64 精度差異可能導致不同特徵被過濾 | Golden 比對 column count 不一致（C2 fail） | 低 | 固定 variance 閾值（不用百分位）；Golden 比對先比 column set，再用交集做數值比對 |
 | **R24** | **MultiTFGenerator._combine_layers 獨立程式碼路徑未被 CGSA 覆蓋** | Phase 2 遺漏此路徑 → 仍觸發 wide concat | 中 | §4.14 明確標記；Task 2.5 必須同時修改兩處 _combine_layers |
-| **R25** | **Polars 版本鎖定風險（Phase 4）**：Polars API 跨 major 版本有 breaking changes | Phase 4 程式碼在 Polars 升級後失效 | 低 | 版本釘選 `polars>=0.20,<0.21`；Phase 4 為條件性，可能 skip |
+| **R25** | **Polars 版本鎖定風險（Phase 4）**：Polars API 跨 major 版本有 breaking changes | Phase 4 程式碼在 Polars 升級後失效 | **✅ 已緩解** | 版本釘選 `polars>=0.20,<0.21` 已寫入 `requirements.txt`；Phase 4 已完成並為預設 ON |
 
 ---
 

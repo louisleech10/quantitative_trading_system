@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import re
 
@@ -14,6 +14,12 @@ from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
 
 
 logger = get_logger(__name__)
+
+
+# Plan A streaming persist callback: receives (step_label, chunk_df) and is
+# expected to consume + free the data immediately. Implementations typically
+# buffer up to N cols and flush to ColumnGroupRegistry as a .npy file.
+PersistCallback = Callable[[str, pd.DataFrame], None]
 
 
 class RollingAggregator:
@@ -62,7 +68,23 @@ class RollingAggregator:
         self._apply_to = config_dict.get("apply_to", "all")
         self._column_chunk_size = self._resolve_chunk_size()
 
-    def compute_all(self, features_df: pd.DataFrame) -> pd.DataFrame:
+    def compute_all(
+        self,
+        features_df: pd.DataFrame,
+        persist_callback: Optional["PersistCallback"] = None,
+    ) -> pd.DataFrame:
+        """Compute rolling aggregations.
+
+        Plan A streaming persist:
+        When ``persist_callback`` is provided, each (window, agg, col-chunk)
+        slice is handed to the callback IMMEDIATELY after the variance filter,
+        and the local buffer is freed. The returned DataFrame contains only
+        the row index — the caller is expected to consume features via the
+        callback (e.g. write into ColumnGroupRegistry on disk).
+
+        This is the cornerstone of the 8/16 GB OOM fix: layer3 (~10 GB at
+        1h timeframe with 156k cols) is never materialised as a wide DataFrame.
+        """
         if not self._enabled or features_df.empty:
             return pd.DataFrame(index=features_df.index)
 
@@ -73,7 +95,13 @@ class RollingAggregator:
         streaming = os.getenv("FFACT_L3_STREAMING", "1").strip() == "1"
 
         if streaming:
-            return self._compute_all_streaming(features_df, columns)
+            return self._compute_all_streaming(features_df, columns, persist_callback)
+
+        if persist_callback is not None:
+            # Non-streaming paths don't yet support callback; fall back to in-memory.
+            logger.warning(
+                "[L3] persist_callback ignored: requires FFACT_L3_STREAMING=1 path",
+            )
 
         if self._column_chunk_size and len(columns) > self._column_chunk_size:
             return self._apply_vectorized_aggregators_chunked(features_df, columns)
@@ -85,6 +113,7 @@ class RollingAggregator:
         self,
         features_df: pd.DataFrame,
         columns: List[str],
+        persist_callback: Optional["PersistCallback"] = None,
     ) -> pd.DataFrame:
         """Streaming L3: process one (window, agg) at a time, applying variance filter
         after each step to discard dead features and reduce peak memory.
@@ -113,7 +142,7 @@ class RollingAggregator:
         use_numba = os.getenv("FFACT_USE_NUMBA_ROLLING", "1").strip() == "1"
         if use_numba:
             try:
-                return self._compute_all_streaming_numba(features_df, columns, valid_aggs)
+                return self._compute_all_streaming_numba(features_df, columns, valid_aggs, persist_callback)
             except Exception as exc:
                 logger.error(
                     "[L3 streaming] Numba rolling path failed, fallback to pandas path: %s",
@@ -259,10 +288,15 @@ class RollingAggregator:
         features_df: pd.DataFrame,
         columns: List[str],
         valid_aggs: List[str],
+        persist_callback: Optional["PersistCallback"] = None,
     ) -> pd.DataFrame:
         use_multi_window = os.getenv("FFACT_L3_MULTI_WINDOW", "1").strip() != "0"
         if use_multi_window:
-            return self._compute_all_streaming_numba_multi_window(features_df, columns, valid_aggs)
+            return self._compute_all_streaming_numba_multi_window(features_df, columns, valid_aggs, persist_callback)
+        if persist_callback is not None:
+            logger.warning(
+                "[L3] single-window numba path does not support persist_callback; using in-memory result",
+            )
         return self._compute_all_streaming_numba_single_window(features_df, columns, valid_aggs)
 
     def _compute_all_streaming_numba_single_window(
@@ -406,8 +440,10 @@ class RollingAggregator:
         features_df: pd.DataFrame,
         columns: List[str],
         valid_aggs: List[str],
+        persist_callback: Optional["PersistCallback"] = None,
     ) -> pd.DataFrame:
         from momentum.FeatureEngineering.operators.numba_rolling import fused_rolling_stats_multi_window
+        import gc as _gc
 
         n_rows = features_df.shape[0]
         if n_rows == 0:
@@ -416,9 +452,15 @@ class RollingAggregator:
         windows_array = np.asarray(self._windows, dtype=np.int32)
         chunk_size = min(self._column_chunk_size or 256, 64)
         step_keys = [(window, agg_name) for window in self._windows for agg_name in valid_aggs]
-        step_frames = {step_key: [] for step_key in step_keys}
+        # In streaming-persist mode we DO NOT accumulate full per-step frames;
+        # the callback consumes each chunk and we only retain counters.
+        streaming_persist = persist_callback is not None
+        step_frames: Dict = {} if streaming_persist else {sk: [] for sk in step_keys}
         step_generated = {step_key: 0 for step_key in step_keys}
         step_dropped = {step_key: 0 for step_key in step_keys}
+        # Track persisted survivor count per step for accurate logging in
+        # streaming mode (kept = generated - dropped is still correct because
+        # the variance filter happens before the callback).
 
         for start in range(0, len(columns), chunk_size):
             chunk_cols = columns[start : start + chunk_size]
@@ -453,20 +495,52 @@ class RollingAggregator:
                     continue
 
                 chunk_matrix = np.column_stack(chunk_results[step_key]).astype(np.float32, copy=False)
-                step_frames[step_key].append(
-                    pd.DataFrame(
-                        data=chunk_matrix,
-                        index=features_df.index,
-                        columns=chunk_names[step_key],
-                        copy=False,
-                    )
+                chunk_frame = pd.DataFrame(
+                    data=chunk_matrix,
+                    index=features_df.index,
+                    columns=chunk_names[step_key],
+                    copy=False,
                 )
 
-        ordered_frames: List[pd.DataFrame] = []
+                if streaming_persist:
+                    # Plan A: hand off to caller and free immediately.
+                    window, agg_name = step_key
+                    step_label = f"W{window}_{self._format_agg_label(agg_name)}"
+                    persist_callback(step_label, chunk_frame)
+                    del chunk_frame, chunk_matrix
+                else:
+                    step_frames[step_key].append(chunk_frame)
+
+            # Drop per-chunk transient buffers before next chunk_cols iteration.
+            del chunk_results, chunk_names, chunk_df
+            if streaming_persist:
+                _gc.collect()
+
         total_generated = 0
         total_dropped = 0
         n_steps = len(step_keys)
 
+        if streaming_persist:
+            # Streaming mode: nothing left to concat, just emit the summary log.
+            for step_index, step_key in enumerate(step_keys, start=1):
+                window, agg_name = step_key
+                generated = step_generated[step_key]
+                dropped = step_dropped[step_key]
+                kept = generated - dropped
+                total_generated += generated
+                total_dropped += dropped
+                if step_index % 10 == 0 or step_index == n_steps:
+                    logger.info(
+                        "[L3 streaming][numba][multi][persist] step %d/%d (W%d_%s): %d→%d cols (-%d dead)",
+                        step_index, n_steps, window, agg_name, generated, kept, dropped,
+                    )
+            logger.info(
+                "[L3 streaming][numba][multi][persist] complete: %d generated, %d dropped, %d survivors persisted via callback",
+                total_generated, total_dropped, total_generated - total_dropped,
+            )
+            return pd.DataFrame(index=features_df.index)
+
+        ordered_frames: List[pd.DataFrame] = []
         for step_index, step_key in enumerate(step_keys, start=1):
             window, agg_name = step_key
             generated = step_generated[step_key]
@@ -957,7 +1031,13 @@ class RollingAggregator:
 
     @staticmethod
     def _resolve_chunk_size() -> Optional[int]:
-        raw = os.getenv("FFACT_LAYER3_CHUNK_SIZE", "256").strip()
+        raw = os.getenv("FFACT_LAYER3_CHUNK_SIZE", "auto").strip().lower()
+        if raw in {"", "auto"}:
+            from momentum.FeatureEngineering.utils.hardware_utils import (
+                get_memory_tier,
+                get_tier_config,
+            )
+            return get_tier_config(get_memory_tier())["layer3_chunk_size"]
         try:
             size = int(raw)
         except ValueError:

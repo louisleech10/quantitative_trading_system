@@ -434,7 +434,7 @@ def rolling_skew_kurt(data: np.ndarray, window: int, recalc_interval: int = 50) 
     return output.astype(np.float32)
 
 
-@numba.njit(cache=True, parallel=True)
+@numba.njit(cache=True)
 def fused_rolling_stats_multi_window(values: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """Compute rolling stats for multiple windows with a single Python/Numpy call.
 
@@ -448,7 +448,7 @@ def fused_rolling_stats_multi_window(values: np.ndarray, windows: np.ndarray) ->
     if n_windows == 0:
         return output
 
-    for window_idx in numba.prange(n_windows):
+    for window_idx in range(n_windows):
         window = int(windows[window_idx])
         if window <= 0:
             continue

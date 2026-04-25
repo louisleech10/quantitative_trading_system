@@ -1,4 +1,4 @@
-[2026-04-22 20:43:49,435] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+[2026-04-22 21:01:24,920] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
 ============================= test session starts ==============================
 platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
 rootdir: /Users/louis/Desktop/quantitative_trading_system
@@ -7,285 +7,285 @@ plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
 
 ----------------------------- live log collection ------------------------------
-20:43:49 [INFO] ✅ 成功註冊 EMAExtractor
-20:43:51 [INFO] 所有中間件已設置完成
-20:43:51 [INFO] 異常處理器設置完成
-20:43:52 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
-20:43:52 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
-20:43:52 [INFO] Created global CaseStorageManager instance
-20:43:52 [INFO] CaseImportService initialized
-20:43:52 [INFO] Created global CaseImportService instance with shared storage
-20:43:52 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
-20:43:52 [INFO] KlineDownloadService initialized
-20:43:52 [INFO] Rate limiter initialized: 1000 req/min
-20:43:52 [INFO] BinanceProvider initialized
-20:43:52 [INFO] Registered provider: binance (rate_limit=1000/min)
-20:43:52 [INFO] Registered BinanceProvider to KlineDownloadService
-20:43:52 [INFO] BatchDownloadService initialized
-20:43:52 [INFO] Created global BatchDownloadService instance with shared storage
-20:43:52 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
-20:43:52 [INFO] KlineDownloadService initialized
-20:43:52 [INFO] Rate limiter initialized: 1000 req/min
-20:43:52 [INFO] BinanceProvider initialized
-20:43:52 [INFO] Registered provider: binance (rate_limit=1000/min)
-20:43:52 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
-20:43:52 [INFO] IndicatorEngine initialized
-20:43:52 [INFO] ChartDataService initialized with IndicatorEngine
-20:43:52 [INFO] OptimizationTaskService initialized
-20:43:52 [INFO] Loaded feature registry with 181 entries
-20:43:52 [INFO] Loaded feature registry with 181 entries
-20:43:52 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
-20:43:52 [INFO] Registered adapter: crypto_spot
-20:43:52 [INFO] Loaded feature registry with 181 entries
-20:43:52 [INFO] Loaded feature registry with 181 entries
-20:43:52 [INFO] Loaded feature registry with 181 entries
-20:43:52 [INFO] Loaded feature registry with 181 entries
-20:43:52 [INFO] WebSocketConnectionManager initialized
-20:43:52 [INFO] All API routes registered successfully
-20:43:53 [INFO] 使用數據源 'close' 計算 EMA 特徵
-20:43:53 [INFO] 使用數據源 'volume' 計算 EMA 特徵
-20:43:53 [INFO] 使用數據源 'taker_ratio' 計算 EMA 特徵
-20:43:53 [WARNING] Indicator 'ema' already registered, skipping overwrite
-20:43:53 [INFO] Registered functional indicator: 'ema' -> EMAIndicator (calculate_fn=calculate_ema, validate_fn=validate_ema_params)
-20:43:53 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
-20:43:53 [INFO] IndicatorEngine initialized
-20:43:53 [WARNING] Data length (3) < period (20), returning all NaN
-20:43:53 [INFO] Loading strategies from /Users/louis/Desktop/quantitative_trading_system/config/strategies.yaml
-20:43:53 [INFO] Loaded strategy: three_line (三線排列)
-20:43:53 [INFO] Loaded strategy: short_long_cross (短長交叉)
-20:43:53 [INFO] Loaded strategy: mid_long_cross (中長交叉)
-20:43:53 [INFO] Strategy registry initialized with 3 strategies
-20:43:53 [INFO] 開始訓練 XGBoost 模型 - 樣本數: 100, 特徵數: 5
-20:43:53 [INFO] 標籤分佈: {0: 50, 1: 50}
-20:43:53 [INFO] 訓練集: 80 樣本, 驗證集: 20 樣本
-20:43:53 [INFO] 開始交叉驗證 - 5-fold CV
-20:43:53 [INFO] Fold 1/5 - AUC: 0.6400, Precision: 0.5385, Recall: 0.7000, F1: 0.6087
-20:43:53 [INFO] Fold 2/5 - AUC: 0.6500, Precision: 0.6667, Recall: 0.6000, F1: 0.6316
-20:43:53 [INFO] Fold 3/5 - AUC: 0.2700, Precision: 0.4000, Recall: 0.6000, F1: 0.4800
-20:43:53 [INFO] Fold 4/5 - AUC: 0.4600, Precision: 0.6000, Recall: 0.6000, F1: 0.6000
-20:43:53 [INFO] Fold 5/5 - AUC: 0.5000, Precision: 0.6000, Recall: 0.3000, F1: 0.4000
-20:43:53 [INFO] 校準指標 - Brier: 0.2480, ECE: 0.0908, 品質: fair
-20:43:53 [INFO] 交叉驗證完成 - Train AUC: 0.6140, CV AUC: 0.5040 ± 0.1389, Overfitting: 0.1100
-20:43:53 [INFO] 訓練完成 - Train AUC: 0.6125, CV AUC: 0.5040 ± 0.1389
-20:43:53 [INFO] 開始訓練 XGBoost 模型 - 樣本數: 100, 特徵數: 5
-20:43:53 [INFO] 標籤分佈: {0: 50, 1: 50}
-20:43:53 [INFO] 訓練集: 80 樣本, 驗證集: 20 樣本
-20:43:53 [INFO] 開始交叉驗證 - 5-fold CV
-20:43:53 [INFO] Fold 1/5 - AUC: 0.6400, Precision: 0.5385, Recall: 0.7000, F1: 0.6087
-20:43:54 [INFO] Fold 2/5 - AUC: 0.6500, Precision: 0.6667, Recall: 0.6000, F1: 0.6316
-20:43:54 [INFO] Fold 3/5 - AUC: 0.2700, Precision: 0.4000, Recall: 0.6000, F1: 0.4800
-20:43:54 [INFO] Fold 4/5 - AUC: 0.4600, Precision: 0.6000, Recall: 0.6000, F1: 0.6000
-20:43:54 [INFO] Fold 5/5 - AUC: 0.5000, Precision: 0.6000, Recall: 0.3000, F1: 0.4000
-20:43:54 [INFO] 校準指標 - Brier: 0.2480, ECE: 0.0908, 品質: fair
-20:43:54 [INFO] 交叉驗證完成 - Train AUC: 0.6140, CV AUC: 0.5040 ± 0.1389, Overfitting: 0.1100
-20:43:54 [INFO] 訓練完成 - Train AUC: 0.6125, CV AUC: 0.5040 ± 0.1389
+21:01:24 [INFO] ✅ 成功註冊 EMAExtractor
+21:01:34 [INFO] 所有中間件已設置完成
+21:01:34 [INFO] 異常處理器設置完成
+21:01:34 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+21:01:34 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=0)
+21:01:34 [INFO] Created global CaseStorageManager instance
+21:01:34 [INFO] CaseImportService initialized
+21:01:34 [INFO] Created global CaseImportService instance with shared storage
+21:01:34 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+21:01:34 [INFO] KlineDownloadService initialized
+21:01:34 [INFO] Rate limiter initialized: 1000 req/min
+21:01:34 [INFO] BinanceProvider initialized
+21:01:34 [INFO] Registered provider: binance (rate_limit=1000/min)
+21:01:34 [INFO] Registered BinanceProvider to KlineDownloadService
+21:01:34 [INFO] BatchDownloadService initialized
+21:01:34 [INFO] Created global BatchDownloadService instance with shared storage
+21:01:34 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:01:34 [INFO] KlineDownloadService initialized
+21:01:34 [INFO] Rate limiter initialized: 1000 req/min
+21:01:34 [INFO] BinanceProvider initialized
+21:01:34 [INFO] Registered provider: binance (rate_limit=1000/min)
+21:01:34 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:01:34 [INFO] IndicatorEngine initialized
+21:01:34 [INFO] ChartDataService initialized with IndicatorEngine
+21:01:34 [INFO] OptimizationTaskService initialized
+21:01:35 [INFO] Loaded feature registry with 208 entries
+21:01:35 [INFO] Loaded feature registry with 208 entries
+21:01:35 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+21:01:35 [INFO] Registered adapter: crypto_spot
+21:01:35 [INFO] Loaded feature registry with 208 entries
+21:01:36 [INFO] Loaded feature registry with 208 entries
+21:01:37 [INFO] Loaded feature registry with 208 entries
+21:01:37 [INFO] Loaded feature registry with 208 entries
+21:01:37 [INFO] WebSocketConnectionManager initialized
+21:01:38 [INFO] All API routes registered successfully
+21:01:40 [INFO] 使用數據源 'close' 計算 EMA 特徵
+21:01:40 [INFO] 使用數據源 'volume' 計算 EMA 特徵
+21:01:40 [INFO] 使用數據源 'taker_ratio' 計算 EMA 特徵
+21:01:41 [WARNING] Indicator 'ema' already registered, skipping overwrite
+21:01:41 [INFO] Registered functional indicator: 'ema' -> EMAIndicator (calculate_fn=calculate_ema, validate_fn=validate_ema_params)
+21:01:41 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:01:41 [INFO] IndicatorEngine initialized
+21:01:41 [WARNING] Data length (3) < period (20), returning all NaN
+21:01:41 [INFO] Loading strategies from /Users/louis/Desktop/quantitative_trading_system/config/strategies.yaml
+21:01:41 [INFO] Loaded strategy: three_line (三線排列)
+21:01:41 [INFO] Loaded strategy: short_long_cross (短長交叉)
+21:01:41 [INFO] Loaded strategy: mid_long_cross (中長交叉)
+21:01:41 [INFO] Strategy registry initialized with 3 strategies
+21:01:41 [INFO] 開始訓練 XGBoost 模型 - 樣本數: 100, 特徵數: 5
+21:01:41 [INFO] 標籤分佈: {0: 50, 1: 50}
+21:01:41 [INFO] 訓練集: 80 樣本, 驗證集: 20 樣本
+21:01:41 [INFO] 開始交叉驗證 - 5-fold CV
+21:01:42 [INFO] Fold 1/5 - AUC: 0.6400, Precision: 0.5385, Recall: 0.7000, F1: 0.6087
+21:01:42 [INFO] Fold 2/5 - AUC: 0.6500, Precision: 0.6667, Recall: 0.6000, F1: 0.6316
+21:01:42 [INFO] Fold 3/5 - AUC: 0.2700, Precision: 0.4000, Recall: 0.6000, F1: 0.4800
+21:01:43 [INFO] Fold 4/5 - AUC: 0.4600, Precision: 0.6000, Recall: 0.6000, F1: 0.6000
+21:01:43 [INFO] Fold 5/5 - AUC: 0.5000, Precision: 0.6000, Recall: 0.3000, F1: 0.4000
+21:01:43 [INFO] 校準指標 - Brier: 0.2480, ECE: 0.0908, 品質: fair
+21:01:43 [INFO] 交叉驗證完成 - Train AUC: 0.6140, CV AUC: 0.5040 ± 0.1389, Overfitting: 0.1100
+21:01:43 [INFO] 訓練完成 - Train AUC: 0.6125, CV AUC: 0.5040 ± 0.1389
+21:01:43 [INFO] 開始訓練 XGBoost 模型 - 樣本數: 100, 特徵數: 5
+21:01:43 [INFO] 標籤分佈: {0: 50, 1: 50}
+21:01:43 [INFO] 訓練集: 80 樣本, 驗證集: 20 樣本
+21:01:43 [INFO] 開始交叉驗證 - 5-fold CV
+21:01:43 [INFO] Fold 1/5 - AUC: 0.6400, Precision: 0.5385, Recall: 0.7000, F1: 0.6087
+21:01:43 [INFO] Fold 2/5 - AUC: 0.6500, Precision: 0.6667, Recall: 0.6000, F1: 0.6316
+21:01:43 [INFO] Fold 3/5 - AUC: 0.2700, Precision: 0.4000, Recall: 0.6000, F1: 0.4800
+21:01:44 [INFO] Fold 4/5 - AUC: 0.4600, Precision: 0.6000, Recall: 0.6000, F1: 0.6000
+21:01:44 [INFO] Fold 5/5 - AUC: 0.5000, Precision: 0.6000, Recall: 0.3000, F1: 0.4000
+21:01:44 [INFO] 校準指標 - Brier: 0.2480, ECE: 0.0908, 品質: fair
+21:01:44 [INFO] 交叉驗證完成 - Train AUC: 0.6140, CV AUC: 0.5040 ± 0.1389, Overfitting: 0.1100
+21:01:44 [INFO] 訓練完成 - Train AUC: 0.6125, CV AUC: 0.5040 ± 0.1389
 collected 2028 items / 19 deselected / 2009 selected
 
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_endpoint_exists 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [06b13dbc] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
-20:43:54 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
-20:43:54 [INFO] IndicatorEngine initialized
-20:43:54 [INFO] SignalAnalysisService initialized
-20:43:54 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.003s
-20:43:54 [INFO] [06b13dbc] Completed POST /api/v1/signal-analysis/density - 422 - 0.003s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [416fda3a] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+21:01:45 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:01:45 [INFO] IndicatorEngine initialized
+21:01:45 [INFO] SignalAnalysisService initialized
+21:01:45 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.006s
+21:01:45 [INFO] [416fda3a] Completed POST /api/v1/signal-analysis/density - 422 - 0.006s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_request_validation_missing_fields 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [32214905] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] [32214905] Completed POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [34daac24] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] [34daac24] Completed POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_request_validation_invalid_types 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [24a35b5a] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'value_error', 'loc': ('body', 'strategy_config', 'params'), 'msg': 'Value error, short_period 必須為數值', 'input': {'short_period': 'not_a_number'}, 'ctx': {'error': ValueError('short_period 必須為數值')}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] [24a35b5a] Completed POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [902cc77b] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [WARNING] Validation error: [{'type': 'value_error', 'loc': ('body', 'strategy_config', 'params'), 'msg': 'Value error, short_period 必須為數值', 'input': {'short_period': 'not_a_number'}, 'ctx': {'error': ValueError('short_period 必須為數值')}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] [902cc77b] Completed POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_request_validation_invalid_enum 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [dcbe5947] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'literal_error', 'loc': ('body', 'training_window', 'reference_point'), 'msg': "Input should be 'TO', 'TC' or 'custom'", 'input': 'INVALID', 'ctx': {'expected': "'TO', 'TC' or 'custom'"}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.002s
-20:43:54 [INFO] [dcbe5947] Completed POST /api/v1/signal-analysis/density - 422 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [7ee82fc4] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [WARNING] Validation error: [{'type': 'literal_error', 'loc': ('body', 'training_window', 'reference_point'), 'msg': "Input should be 'TO', 'TC' or 'custom'", 'input': 'INVALID', 'ctx': {'expected': "'TO', 'TC' or 'custom'"}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] [7ee82fc4] Completed POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_request_validation_negative_lookback 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [b2dea273] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'greater_than_equal', 'loc': ('body', 'training_window', 'lookback_bars'), 'msg': 'Input should be greater than or equal to 1', 'input': -100, 'ctx': {'ge': 1}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] [b2dea273] Completed POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [15100098] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [WARNING] Validation error: [{'type': 'greater_than_equal', 'loc': ('body', 'training_window', 'lookback_bars'), 'msg': 'Input should be greater than or equal to 1', 'input': -100, 'ctx': {'ge': 1}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] [15100098] Completed POST /api/v1/signal-analysis/density - 422 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_business_logic_validation_unregistered_indicator 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [b7404b08] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=1, negative=1
-20:43:54 [ERROR] 參數驗證失敗: 未註冊的指標: nonexistent_indicator. 可用指標: ema
-20:43:54 [WARNING] HTTP 400: 未註冊的指標: nonexistent_indicator. 可用指標: ema
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 400 - 0.002s
-20:43:54 [INFO] [b7404b08] Completed POST /api/v1/signal-analysis/density - 400 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 400 Bad Request"
+21:01:45 [INFO] [548c03aa] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=1, negative=1
+21:01:45 [ERROR] 參數驗證失敗: 未註冊的指標: nonexistent_indicator. 可用指標: ema
+21:01:45 [WARNING] HTTP 400: 未註冊的指標: nonexistent_indicator. 可用指標: ema
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 400 - 0.004s
+21:01:45 [INFO] [548c03aa] Completed POST /api/v1/signal-analysis/density - 400 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 400 Bad Request"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_business_logic_validation_nonexistent_cases 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [ac2e25d2] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=1, negative=1
-20:43:54 [INFO] [DEBUG] 信號密度分析輸入參數:
+21:01:45 [INFO] [edf0a576] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=1, negative=1
+21:01:45 [INFO] [DEBUG] 信號密度分析輸入參數:
   - positive_cases: ['ABSOLUTELY_NONEXISTENT']... (共1個)
   - negative_cases: ['ALSO_NONEXISTENT']... (共1個)
   - training_window: near=240, far=None, ref=TO, mode=relative
   - strategy_config: data_source=close, indicator=ema, logic=three_line, params={'short_period': 20, 'mid_period': 60, 'long_period': 120}
-20:43:54 [WARNING] 正例案例不存在: ABSOLUTELY_NONEXISTENT
-20:43:54 [WARNING] 反例案例不存在: ALSO_NONEXISTENT
-20:43:54 [ERROR] 數據不存在: 正例案例載入不足: 需要至少1個,實際載入0個。請求1個,缺失2個
-20:43:54 [WARNING] HTTP 404: 正例案例載入不足: 需要至少1個,實際載入0個。請求1個,缺失2個
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 404 - 0.002s
-20:43:54 [INFO] [ac2e25d2] Completed POST /api/v1/signal-analysis/density - 404 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 404 Not Found"
+21:01:45 [WARNING] 正例案例不存在: ABSOLUTELY_NONEXISTENT
+21:01:45 [WARNING] 反例案例不存在: ALSO_NONEXISTENT
+21:01:45 [ERROR] 數據不存在: 正例案例載入不足: 需要至少1個,實際載入0個。請求1個,缺失2個
+21:01:45 [WARNING] HTTP 404: 正例案例載入不足: 需要至少1個,實際載入0個。請求1個,缺失2個
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 404 - 0.004s
+21:01:45 [INFO] [edf0a576] Completed POST /api/v1/signal-analysis/density - 404 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCalculateSignalDensityEndpoint::test_response_schema_validation 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [07d5097d] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=2, negative=2
-20:43:54 [INFO] [DEBUG] 信號密度分析輸入參數:
+21:01:45 [INFO] [fbbc3f5e] Started POST /api/v1/signal-analysis/density from testclient
+21:01:45 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=2, negative=2
+21:01:45 [INFO] [DEBUG] 信號密度分析輸入參數:
   - positive_cases: ['test1', 'test2']... (共2個)
   - negative_cases: ['test3', 'test4']... (共2個)
   - training_window: near=240, far=None, ref=TO, mode=relative
   - strategy_config: data_source=close, indicator=ema, logic=three_line, params={'short_period': 20, 'mid_period': 60, 'long_period': 120}
-20:43:54 [WARNING] 正例案例不存在: test1
-20:43:54 [WARNING] 正例案例不存在: test2
-20:43:54 [WARNING] 反例案例不存在: test3
-20:43:54 [WARNING] 反例案例不存在: test4
-20:43:54 [ERROR] 數據不存在: 正例案例載入不足: 需要至少1個,實際載入0個。請求2個,缺失4個
-20:43:54 [WARNING] HTTP 404: 正例案例載入不足: 需要至少1個,實際載入0個。請求2個,缺失4個
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 404 - 0.002s
-20:43:54 [INFO] [07d5097d] Completed POST /api/v1/signal-analysis/density - 404 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 404 Not Found"
+21:01:45 [WARNING] 正例案例不存在: test1
+21:01:45 [WARNING] 正例案例不存在: test2
+21:01:45 [WARNING] 反例案例不存在: test3
+21:01:45 [WARNING] 反例案例不存在: test4
+21:01:45 [ERROR] 數據不存在: 正例案例載入不足: 需要至少1個,實際載入0個。請求2個,缺失4個
+21:01:45 [WARNING] HTTP 404: 正例案例載入不足: 需要至少1個,實際載入0個。請求2個,缺失4個
+21:01:45 [WARNING] POST /api/v1/signal-analysis/density - 404 - 0.002s
+21:01:45 [INFO] [fbbc3f5e] Completed POST /api/v1/signal-analysis/density - 404 - 0.002s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestPreviewTrainingWindowEndpoint::test_endpoint_exists 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [b3f5ab07] Started POST /api/v1/signal-analysis/preview-window from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'case_id'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'window_config'), 'msg': 'Field required', 'input': {}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/preview-window - 422 - 0.002s
-20:43:54 [INFO] [b3f5ab07] Completed POST /api/v1/signal-analysis/preview-window - 422 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [7d849000] Started POST /api/v1/signal-analysis/preview-window from testclient
+21:01:45 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'case_id'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'window_config'), 'msg': 'Field required', 'input': {}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/preview-window - 422 - 0.005s
+21:01:45 [INFO] [7d849000] Completed POST /api/v1/signal-analysis/preview-window - 422 - 0.005s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestPreviewTrainingWindowEndpoint::test_preview_missing_case_id 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [0c8f3a1d] Started POST /api/v1/signal-analysis/preview-window from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'case_id'), 'msg': 'Field required', 'input': {'window_config': {'reference_point': 'TO', 'lookback_bars': 240, 'lookforward_bars': 0, 'mode': 'relative'}}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/preview-window - 422 - 0.001s
-20:43:54 [INFO] [0c8f3a1d] Completed POST /api/v1/signal-analysis/preview-window - 422 - 0.001s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 422 Unprocessable Entity"
+21:01:45 [INFO] [0c3b1b65] Started POST /api/v1/signal-analysis/preview-window from testclient
+21:01:45 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'case_id'), 'msg': 'Field required', 'input': {'window_config': {'reference_point': 'TO', 'lookback_bars': 240, 'lookforward_bars': 0, 'mode': 'relative'}}}]
+21:01:45 [WARNING] POST /api/v1/signal-analysis/preview-window - 422 - 0.003s
+21:01:45 [INFO] [0c3b1b65] Completed POST /api/v1/signal-analysis/preview-window - 422 - 0.003s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestPreviewTrainingWindowEndpoint::test_preview_nonexistent_case 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [0a2856f5] Started POST /api/v1/signal-analysis/preview-window from testclient
-20:43:54 [INFO] POST /api/v1/signal-analysis/preview-window: case_id=NONEXISTENT_CASE, lookback=240
-20:43:54 [WARNING] HTTP 404: 未找到案例: NONEXISTENT_CASE
-20:43:54 [WARNING] POST /api/v1/signal-analysis/preview-window - 404 - 0.002s
-20:43:54 [INFO] [0a2856f5] Completed POST /api/v1/signal-analysis/preview-window - 404 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 404 Not Found"
+21:01:45 [INFO] [78df132d] Started POST /api/v1/signal-analysis/preview-window from testclient
+21:01:45 [INFO] POST /api/v1/signal-analysis/preview-window: case_id=NONEXISTENT_CASE, lookback=240
+21:01:45 [WARNING] HTTP 404: 未找到案例: NONEXISTENT_CASE
+21:01:45 [WARNING] POST /api/v1/signal-analysis/preview-window - 404 - 0.004s
+21:01:45 [INFO] [78df132d] Completed POST /api/v1/signal-analysis/preview-window - 404 - 0.004s
+21:01:45 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestAPIDocumentation::test_openapi_schema_available 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [95d313b9] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.188s
-20:43:54 [INFO] [95d313b9] Completed GET /openapi.json - 200 - 0.188s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:45 [INFO] [d9136f0d] Started GET /openapi.json from testclient
+21:01:46 [INFO] GET /openapi.json - 200 - 1.256s
+21:01:46 [INFO] [d9136f0d] Completed GET /openapi.json - 200 - 1.256s
+21:01:46 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestAPIDocumentation::test_signal_analysis_endpoints_documented 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [ea4abf6a] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.012s
-20:43:54 [INFO] [ea4abf6a] Completed GET /openapi.json - 200 - 0.012s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:46 [INFO] [0419f320] Started GET /openapi.json from testclient
+21:01:46 [INFO] GET /openapi.json - 200 - 0.023s
+21:01:46 [INFO] [0419f320] Completed GET /openapi.json - 200 - 0.023s
+21:01:46 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestAPIDocumentation::test_density_endpoint_has_post_method 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [76fb1ad1] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.011s
-20:43:54 [INFO] [76fb1ad1] Completed GET /openapi.json - 200 - 0.011s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:47 [INFO] [b5162e73] Started GET /openapi.json from testclient
+21:01:47 [INFO] GET /openapi.json - 200 - 0.016s
+21:01:47 [INFO] [b5162e73] Completed GET /openapi.json - 200 - 0.016s
+21:01:47 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestAPIDocumentation::test_request_schema_documented 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [8357ed5c] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.011s
-20:43:54 [INFO] [8357ed5c] Completed GET /openapi.json - 200 - 0.011s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:47 [INFO] [dbeb8093] Started GET /openapi.json from testclient
+21:01:47 [INFO] GET /openapi.json - 200 - 0.019s
+21:01:47 [INFO] [dbeb8093] Completed GET /openapi.json - 200 - 0.019s
+21:01:47 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestAPIDocumentation::test_response_schema_documented 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [129fded5] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.012s
-20:43:54 [INFO] [129fded5] Completed GET /openapi.json - 200 - 0.012s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:47 [INFO] [274a09a1] Started GET /openapi.json from testclient
+21:01:47 [INFO] GET /openapi.json - 200 - 0.022s
+21:01:47 [INFO] [274a09a1] Completed GET /openapi.json - 200 - 0.022s
+21:01:47 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestAPIDocumentation::test_endpoint_descriptions_exist 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [48cf2f4e] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.011s
-20:43:54 [INFO] [48cf2f4e] Completed GET /openapi.json - 200 - 0.011s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:47 [INFO] [59ad80fb] Started GET /openapi.json from testclient
+21:01:47 [INFO] GET /openapi.json - 200 - 0.016s
+21:01:47 [INFO] [59ad80fb] Completed GET /openapi.json - 200 - 0.016s
+21:01:47 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestErrorResponses::test_400_error_format 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [0681103a] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=1, negative=1
-20:43:54 [ERROR] 參數驗證失敗: 未註冊的指標: nonexistent. 可用指標: ema
-20:43:54 [WARNING] HTTP 400: 未註冊的指標: nonexistent. 可用指標: ema
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 400 - 0.002s
-20:43:54 [INFO] [0681103a] Completed POST /api/v1/signal-analysis/density - 400 - 0.002s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 400 Bad Request"
+21:01:47 [INFO] [ad96ea60] Started POST /api/v1/signal-analysis/density from testclient
+21:01:47 [INFO] POST /api/v1/signal-analysis/density: strategy=three_line, positive=1, negative=1
+21:01:47 [ERROR] 參數驗證失敗: 未註冊的指標: nonexistent. 可用指標: ema
+21:01:47 [WARNING] HTTP 400: 未註冊的指標: nonexistent. 可用指標: ema
+21:01:47 [WARNING] POST /api/v1/signal-analysis/density - 400 - 0.004s
+21:01:47 [INFO] [ad96ea60] Completed POST /api/v1/signal-analysis/density - 400 - 0.004s
+21:01:47 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 400 Bad Request"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestErrorResponses::test_404_error_format 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [c512eccc] Started POST /api/v1/signal-analysis/preview-window from testclient
-20:43:54 [INFO] POST /api/v1/signal-analysis/preview-window: case_id=NONEXISTENT, lookback=240
-20:43:54 [WARNING] HTTP 404: 未找到案例: NONEXISTENT
-20:43:54 [WARNING] POST /api/v1/signal-analysis/preview-window - 404 - 0.001s
-20:43:54 [INFO] [c512eccc] Completed POST /api/v1/signal-analysis/preview-window - 404 - 0.001s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 404 Not Found"
+21:01:47 [INFO] [b23ce2bd] Started POST /api/v1/signal-analysis/preview-window from testclient
+21:01:47 [INFO] POST /api/v1/signal-analysis/preview-window: case_id=NONEXISTENT, lookback=240
+21:01:47 [WARNING] HTTP 404: 未找到案例: NONEXISTENT
+21:01:47 [WARNING] POST /api/v1/signal-analysis/preview-window - 404 - 0.003s
+21:01:47 [INFO] [b23ce2bd] Completed POST /api/v1/signal-analysis/preview-window - 404 - 0.003s
+21:01:47 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/preview-window "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestErrorResponses::test_422_error_format 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [abf6b176] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.003s
-20:43:54 [INFO] [abf6b176] Completed POST /api/v1/signal-analysis/density - 422 - 0.003s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:47 [INFO] [e7414c2b] Started POST /api/v1/signal-analysis/density from testclient
+21:01:47 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {'invalid_field': 'value'}}]
+21:01:47 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.003s
+21:01:47 [INFO] [e7414c2b] Completed POST /api/v1/signal-analysis/density - 422 - 0.003s
+21:01:47 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  0%]
 tests/analysis/test_api_endpoints.py::TestCORSAndHeaders::test_content_type_json 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [0f1b57c2] Started POST /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {}}]
-20:43:54 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] [0f1b57c2] Completed POST /api/v1/signal-analysis/density - 422 - 0.001s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
+21:01:47 [INFO] [85eb869e] Started POST /api/v1/signal-analysis/density from testclient
+21:01:47 [WARNING] Validation error: [{'type': 'missing', 'loc': ('body', 'strategy_config'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'training_window'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'positive_cases'), 'msg': 'Field required', 'input': {}}, {'type': 'missing', 'loc': ('body', 'negative_cases'), 'msg': 'Field required', 'input': {}}]
+21:01:47 [WARNING] POST /api/v1/signal-analysis/density - 422 - 0.003s
+21:01:47 [INFO] [85eb869e] Completed POST /api/v1/signal-analysis/density - 422 - 0.003s
+21:01:47 [INFO] HTTP Request: POST http://testserver/api/v1/signal-analysis/density "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  1%]
 tests/analysis/test_api_endpoints.py::TestCORSAndHeaders::test_cors_headers_if_enabled 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [b534eced] Started OPTIONS /api/v1/signal-analysis/density from testclient
-20:43:54 [WARNING] OPTIONS /api/v1/signal-analysis/density - 405 - 0.001s
-20:43:54 [INFO] [b534eced] Completed OPTIONS /api/v1/signal-analysis/density - 405 - 0.001s
-20:43:54 [INFO] HTTP Request: OPTIONS http://testserver/api/v1/signal-analysis/density "HTTP/1.1 405 Method Not Allowed"
+21:01:47 [INFO] [fe515597] Started OPTIONS /api/v1/signal-analysis/density from testclient
+21:01:47 [WARNING] OPTIONS /api/v1/signal-analysis/density - 405 - 0.002s
+21:01:47 [INFO] [fe515597] Completed OPTIONS /api/v1/signal-analysis/density - 405 - 0.002s
+21:01:47 [INFO] HTTP Request: OPTIONS http://testserver/api/v1/signal-analysis/density "HTTP/1.1 405 Method Not Allowed"
 PASSED                                                                   [  1%]
 tests/analysis/test_api_endpoints.py::TestEndpointTags::test_endpoints_have_signal_analysis_tag 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [36961c1d] Started GET /openapi.json from testclient
-20:43:54 [INFO] GET /openapi.json - 200 - 0.012s
-20:43:54 [INFO] [36961c1d] Completed GET /openapi.json - 200 - 0.012s
-20:43:54 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
+21:01:47 [INFO] [dfc44716] Started GET /openapi.json from testclient
+21:01:47 [INFO] GET /openapi.json - 200 - 0.027s
+21:01:47 [INFO] [dfc44716] Completed GET /openapi.json - 200 - 0.027s
+21:01:47 [INFO] HTTP Request: GET http://testserver/openapi.json "HTTP/1.1 200 OK"
 PASSED                                                                   [  1%]
 tests/analysis/test_drift_regime.py::test_calculate_psi_stable PASSED    [  1%]
 tests/analysis/test_drift_regime.py::test_calculate_psi_shifted PASSED   [  1%]
@@ -294,36 +294,36 @@ tests/analysis/test_signal_analysis_service.py::TestServiceInitialization::test_
 tests/analysis/test_signal_analysis_service.py::TestServiceInitialization::test_dependencies_initialized PASSED [  1%]
 tests/analysis/test_signal_analysis_service.py::TestAnalyzeSignalDensity::test_analyze_minimal_cases 
 -------------------------------- live log setup --------------------------------
-20:43:54 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:01:47 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
 SKIPPED (Cannot load ETHUSDT/1h data: 'KlineStorageManager' object h...) [  1%]
 tests/analysis/test_signal_analysis_service.py::TestAnalyzeSignalDensity::test_analyze_with_validation 
 -------------------------------- live log call ---------------------------------
-20:43:54 [ERROR] 參數驗證失敗: 未註冊的指標: invalid_indicator. 可用指標: ema
+21:01:47 [ERROR] 參數驗證失敗: 未註冊的指標: invalid_indicator. 可用指標: ema
 PASSED                                                                   [  1%]
 tests/analysis/test_signal_analysis_service.py::TestAnalyzeSignalDensity::test_analyze_missing_params 
 -------------------------------- live log call ---------------------------------
-20:43:54 [ERROR] 參數驗證失敗: 參數不足: EMA 三線需要 short/mid/long 週期
+21:01:47 [ERROR] 參數驗證失敗: 參數不足: EMA 三線需要 short/mid/long 週期
 PASSED                                                                   [  1%]
 tests/analysis/test_signal_analysis_service.py::TestAnalyzeSignalDensity::test_analyze_invalid_data_source 
 -------------------------------- live log call ---------------------------------
-20:43:54 [ERROR] 參數驗證失敗: 無效的data_source: invalid_source. 必須是以下之一: close, open, high, low, volume, taker_buy_volume, taker_ratio, quote_volume
+21:01:47 [ERROR] 參數驗證失敗: 無效的data_source: invalid_source. 必須是以下之一: close, open, high, low, volume, taker_buy_volume, taker_ratio, quote_volume
 PASSED                                                                   [  1%]
 tests/analysis/test_signal_analysis_service.py::TestPreviewTrainingWindow::test_preview_basic SKIPPED [  1%]
 tests/analysis/test_signal_analysis_service.py::TestPreviewTrainingWindow::test_preview_nonexistent_case PASSED [  1%]
 tests/analysis/test_signal_analysis_service.py::TestErrorHandling::test_handle_value_error 
 -------------------------------- live log call ---------------------------------
-20:43:54 [ERROR] 參數驗證失敗: 參數不足: EMA 三線需要 short/mid/long 週期
+21:01:47 [ERROR] 參數驗證失敗: 參數不足: EMA 三線需要 short/mid/long 週期
 PASSED                                                                   [  1%]
 tests/analysis/test_signal_analysis_service.py::TestErrorHandling::test_handle_file_not_found 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] [DEBUG] 信號密度分析輸入參數:
+21:01:47 [INFO] [DEBUG] 信號密度分析輸入參數:
   - positive_cases: ['NONEXISTENT']... (共1個)
   - negative_cases: ['ALSO_NONEXISTENT']... (共1個)
   - training_window: near=240, far=None, ref=TO, mode=relative
   - strategy_config: data_source=close, indicator=ema, logic=three_line, params={'short_period': 20, 'mid_period': 60, 'long_period': 120}
-20:43:54 [WARNING] 正例案例不存在: NONEXISTENT
-20:43:54 [WARNING] 反例案例不存在: ALSO_NONEXISTENT
-20:43:54 [ERROR] 數據不存在: 正例案例載入不足: 需要至少1個,實際載入0個。請求1個,缺失2個
+21:01:47 [WARNING] 正例案例不存在: NONEXISTENT
+21:01:47 [WARNING] 反例案例不存在: ALSO_NONEXISTENT
+21:01:47 [ERROR] 數據不存在: 正例案例載入不足: 需要至少1個,實際載入0個。請求1個,缺失2個
 PASSED                                                                   [  1%]
 tests/analysis/test_signal_analysis_service.py::TestPerformanceMonitoring::test_execution_time_logged SKIPPED [  1%]
 tests/analysis/test_signal_analysis_service.py::TestIntegrationWithRealComponents::test_service_uses_real_kline_storage PASSED [  1%]
@@ -336,8 +336,8 @@ tests/analysis/test_signal_analysis_service.py::TestCaseCounts::test_insufficien
 tests/analysis/test_signal_analysis_service.py::TestCaseCounts::test_insufficient_negative_cases PASSED [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestExtractTrainingWindow::test_extract_basic_window 
 -------------------------------- live log setup --------------------------------
-20:43:54 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
-20:43:54 [INFO] IndicatorEngine initialized
+21:01:47 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:01:47 [INFO] IndicatorEngine initialized
 SKIPPED (Cannot load ETHUSDT/1h data: 'KlineStorageManager' object h...) [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestExtractTrainingWindow::test_extract_with_lookforward SKIPPED [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestExtractTrainingWindow::test_extract_minimal_window SKIPPED [  2%]
@@ -350,11 +350,11 @@ tests/analysis/test_signal_density_analyzer.py::TestCalculateCaseDensity::test_c
 tests/analysis/test_signal_density_analyzer.py::TestCalculateCaseDensity::test_calculate_density_with_nan PASSED [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestCalculateCaseDensity::test_calculate_density_all_nan 
 -------------------------------- live log call ---------------------------------
-20:43:54 [WARNING] 所有信號均為NaN,返回密度0.0
+21:01:47 [WARNING] 所有信號均為NaN,返回密度0.0
 PASSED                                                                   [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestCalculateCaseDensity::test_calculate_density_empty_array 
 -------------------------------- live log call ---------------------------------
-20:43:54 [WARNING] 信號數組為空,返回密度0.0
+21:01:47 [WARNING] 信號數組為空,返回密度0.0
 PASSED                                                                   [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestCalculateCaseDensity::test_calculate_density_all_zero PASSED [  2%]
 tests/analysis/test_signal_density_analyzer.py::TestCalculateCaseDensity::test_calculate_density_all_one PASSED [  2%]
@@ -379,494 +379,494 @@ tests/api/test_batch_download_multi_timeframe.py::test_batch_download_request_ac
 tests/api/test_batch_download_multi_timeframe.py::test_batch_download_request_rejects_invalid_timeframe PASSED [  3%]
 tests/api/test_batch_download_multi_timeframe.py::test_execute_batch_download_processes_each_timeframe_sequentially 
 -------------------------------- live log call ---------------------------------
-20:43:54 [INFO] BatchDownloadService initialized
-20:43:54 [INFO] Created download task batch_download_20260422_124354_f8af9c35 for 1 cases across 2 timeframe(s) ['1h', '4h'] (lookback=10, forward=5)
-20:43:54 [INFO] Starting batch download task: batch_download_20260422_124354_f8af9c35
-20:43:54 [INFO] Global time range for 1h: 2024-12-31 06:00 → 2024-12-31 22:00 (lookback=10 warmup=0 forward=5 bars, 1 cases)
-20:43:54 [INFO] Global time range for 4h: 2024-12-30 00:00 → 2025-01-01 16:00 (lookback=10 warmup=0 forward=5 bars, 1 cases)
-20:43:54 [INFO] Starting sequential download for timeframe 1h (1/2)
-20:43:54 [INFO] Processing 1 cases for BTCUSDT/1h (download timeframe=1h, cases may have different timeframes)
-20:43:54 [INFO] Using global time window for BTCUSDT/1h: 2024-12-31 06:00 → 2024-12-31 22:00
-20:43:54 [INFO] 📥 DOWNLOADING from Binance API: BTCUSDT/1h
+21:01:47 [INFO] BatchDownloadService initialized
+21:01:47 [INFO] Created download task batch_download_20260422_130147_c01749c6 for 1 cases across 2 timeframe(s) ['1h', '4h'] (lookback=10, forward=5)
+21:01:47 [INFO] Starting batch download task: batch_download_20260422_130147_c01749c6
+21:01:47 [INFO] Global time range for 1h: 2024-12-31 06:00 → 2024-12-31 22:00 (lookback=10 warmup=0 forward=5 bars, 1 cases)
+21:01:47 [INFO] Global time range for 4h: 2024-12-30 00:00 → 2025-01-01 16:00 (lookback=10 warmup=0 forward=5 bars, 1 cases)
+21:01:47 [INFO] Starting sequential download for timeframe 1h (1/2)
+21:01:47 [INFO] Processing 1 cases for BTCUSDT/1h (download timeframe=1h, cases may have different timeframes)
+21:01:47 [INFO] Using global time window for BTCUSDT/1h: 2024-12-31 06:00 → 2024-12-31 22:00
+21:01:47 [INFO] 📥 DOWNLOADING from Binance API: BTCUSDT/1h
    Time range: 2024-12-31 06:00:00 to 2024-12-31 22:00:00
    For 1 cases
    Force redownload: True
-20:43:54 [INFO] ✅ DOWNLOAD SUCCESS: BTCUSDT/1h
+21:01:47 [INFO] ✅ DOWNLOAD SUCCESS: BTCUSDT/1h
    Downloaded: 3 K-lines in 0.00s
    Requested: 2024-12-31 06:00:00 to 2024-12-31 22:00:00
    Actual data: 2024-12-31 06:00:00 to 2024-12-31 22:00:00
    Saved to HDF5: data_cache/BTCUSDT_1h.h5
-20:43:54 [INFO] ✓ 案例 BTCUSDT_1735689600_1 驗證通過: 3 K線，範圍連續
-20:43:54 [INFO] Starting sequential download for timeframe 4h (2/2)
-20:43:54 [INFO] Processing 1 cases for BTCUSDT/4h (download timeframe=4h, cases may have different timeframes)
-20:43:54 [INFO] Using global time window for BTCUSDT/4h: 2024-12-30 00:00 → 2025-01-01 16:00
-20:43:54 [INFO] 📥 DOWNLOADING from Binance API: BTCUSDT/4h
+21:01:47 [INFO] ✓ 案例 BTCUSDT_1735689600_1 驗證通過: 3 K線，範圍連續
+21:01:47 [INFO] Starting sequential download for timeframe 4h (2/2)
+21:01:47 [INFO] Processing 1 cases for BTCUSDT/4h (download timeframe=4h, cases may have different timeframes)
+21:01:47 [INFO] Using global time window for BTCUSDT/4h: 2024-12-30 00:00 → 2025-01-01 16:00
+21:01:47 [INFO] 📥 DOWNLOADING from Binance API: BTCUSDT/4h
    Time range: 2024-12-30 00:00:00 to 2025-01-01 16:00:00
    For 1 cases
    Force redownload: True
-20:43:54 [INFO] ✅ DOWNLOAD SUCCESS: BTCUSDT/4h
+21:01:47 [INFO] ✅ DOWNLOAD SUCCESS: BTCUSDT/4h
    Downloaded: 3 K-lines in 0.00s
    Requested: 2024-12-30 00:00:00 to 2025-01-01 16:00:00
    Actual data: 2024-12-30 00:00:00 to 2025-01-01 16:00:00
    Saved to HDF5: data_cache/BTCUSDT_4h.h5
-20:43:54 [INFO] ✓ 案例 BTCUSDT_1735689600_1 驗證通過: 3 K線，範圍連續
-20:43:54 [INFO] Batch download task batch_download_20260422_124354_f8af9c35 completed: 2 success, 0 failed, 0 skipped, 0.00s
+21:01:47 [INFO] ✓ 案例 BTCUSDT_1735689600_1 驗證通過: 3 K線，範圍連續
+21:01:47 [INFO] Batch download task batch_download_20260422_130147_c01749c6 completed: 2 success, 0 failed, 0 skipped, 0.01s
 PASSED                                                                   [  3%]
 tests/api/test_export_api.py::test_export_csv_summary_200 
 -------------------------------- live log setup --------------------------------
-20:43:54 [INFO] [d6355e90] Started POST /api/v1/ic/analyze from testclient
-20:43:54 [INFO] IC config loaded
-20:43:54 [INFO] IC analysis task started: 9f1e67e7-0613-40e6-b4f1-deb04bcdaf08
-20:43:54 [INFO] Data preprocessing complete: columns=8
-20:43:54 [INFO] IC autocorr persistent: count=8
-20:43:54 [INFO] Redundancy filter completed: method=greedy input=5 output=5
-20:43:54 [INFO] Filtered features saved: data_cache/features/TESTUSDT_12h_filtered.h5
-20:43:54 [INFO] IC report saved: data_cache/reports/ic_report_ic_export_test.json
-20:43:54 [INFO] IC analysis task completed: 9f1e67e7-0613-40e6-b4f1-deb04bcdaf08
-20:43:54 [INFO] POST /api/v1/ic/analyze - 200 - 0.168s
-20:43:54 [INFO] [d6355e90] Completed POST /api/v1/ic/analyze - 200 - 0.168s
-20:43:54 [INFO] HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
-20:43:54 [INFO] [ce67c328] Started GET /api/v1/ic/task/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 from testclient
-20:43:54 [INFO] GET /api/v1/ic/task/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 - 200 - 0.004s
-20:43:54 [INFO] [ce67c328] Completed GET /api/v1/ic/task/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 - 200 - 0.004s
-20:43:54 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 "HTTP/1.1 200 OK"
-20:43:54 [INFO] [0ad172fb] Started GET /api/v1/ic/result/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 from testclient
-20:43:54 [INFO] GET /api/v1/ic/result/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 - 200 - 0.026s
-20:43:54 [INFO] [0ad172fb] Completed GET /api/v1/ic/result/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 - 200 - 0.026s
-20:43:54 [INFO] HTTP Request: GET http://testserver/api/v1/ic/result/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08 "HTTP/1.1 200 OK"
+21:01:47 [INFO] [58cc1d0f] Started POST /api/v1/ic/analyze from testclient
+21:01:47 [INFO] IC config loaded
+21:01:47 [INFO] IC analysis task started: 864d2cf6-a4f9-46c2-94de-85c51bc52557
+21:01:47 [INFO] Data preprocessing complete: columns=8
+21:01:47 [INFO] IC autocorr persistent: count=8
+21:01:48 [INFO] Redundancy filter completed: method=greedy input=5 output=5
+21:01:48 [INFO] Filtered features saved: data_cache/features/TESTUSDT_12h_filtered.h5
+21:01:48 [INFO] IC report saved: data_cache/reports/ic_report_ic_export_test.json
+21:01:48 [INFO] IC analysis task completed: 864d2cf6-a4f9-46c2-94de-85c51bc52557
+21:01:48 [INFO] POST /api/v1/ic/analyze - 200 - 0.806s
+21:01:48 [INFO] [58cc1d0f] Completed POST /api/v1/ic/analyze - 200 - 0.806s
+21:01:48 [INFO] HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+21:01:48 [INFO] [9b9a505d] Started GET /api/v1/ic/task/864d2cf6-a4f9-46c2-94de-85c51bc52557 from testclient
+21:01:48 [INFO] GET /api/v1/ic/task/864d2cf6-a4f9-46c2-94de-85c51bc52557 - 200 - 0.001s
+21:01:48 [INFO] [9b9a505d] Completed GET /api/v1/ic/task/864d2cf6-a4f9-46c2-94de-85c51bc52557 - 200 - 0.001s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/task/864d2cf6-a4f9-46c2-94de-85c51bc52557 "HTTP/1.1 200 OK"
+21:01:48 [INFO] [f0b38fa1] Started GET /api/v1/ic/result/864d2cf6-a4f9-46c2-94de-85c51bc52557 from testclient
+21:01:48 [INFO] GET /api/v1/ic/result/864d2cf6-a4f9-46c2-94de-85c51bc52557 - 200 - 0.037s
+21:01:48 [INFO] [f0b38fa1] Completed GET /api/v1/ic/result/864d2cf6-a4f9-46c2-94de-85c51bc52557 - 200 - 0.037s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/result/864d2cf6-a4f9-46c2-94de-85c51bc52557 "HTTP/1.1 200 OK"
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [498b042c] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_summary from testclient
-20:43:55 [INFO] Export success: task_id=9f1e67e7-0613-40e6-b4f1-deb04bcdaf08, format=csv_summary, module=None
-20:43:55 [INFO] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_summary - 200 - 0.006s
-20:43:55 [INFO] [498b042c] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_summary - 200 - 0.006s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_summary "HTTP/1.1 200 OK"
+21:01:48 [INFO] [ec92d2c9] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_summary from testclient
+21:01:48 [INFO] Export success: task_id=864d2cf6-a4f9-46c2-94de-85c51bc52557, format=csv_summary, module=None
+21:01:48 [INFO] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_summary - 200 - 0.004s
+21:01:48 [INFO] [ec92d2c9] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_summary - 200 - 0.004s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_summary "HTTP/1.1 200 OK"
 PASSED                                                                   [  3%]
 tests/api/test_export_api.py::test_export_csv_detailed_factor_return 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [f8c549eb] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed from testclient
-20:43:55 [INFO] Export success: task_id=9f1e67e7-0613-40e6-b4f1-deb04bcdaf08, format=csv_detailed, module=factor_returns
-20:43:55 [INFO] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed - 200 - 0.005s
-20:43:55 [INFO] [f8c549eb] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed - 200 - 0.005s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed?module=factor_returns "HTTP/1.1 200 OK"
+21:01:48 [INFO] [9592fd36] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed from testclient
+21:01:48 [INFO] Export success: task_id=864d2cf6-a4f9-46c2-94de-85c51bc52557, format=csv_detailed, module=factor_returns
+21:01:48 [INFO] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed - 200 - 0.004s
+21:01:48 [INFO] [9592fd36] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed - 200 - 0.004s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed?module=factor_returns "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_export_api.py::test_export_ai_json_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [ed5fc888] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/ai_json from testclient
-20:43:55 [INFO] Export success: task_id=9f1e67e7-0613-40e6-b4f1-deb04bcdaf08, format=ai_json, module=None
-20:43:55 [INFO] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/ai_json - 200 - 0.004s
-20:43:55 [INFO] [ed5fc888] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/ai_json - 200 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/ai_json "HTTP/1.1 200 OK"
+21:01:48 [INFO] [84b0cba3] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/ai_json from testclient
+21:01:48 [INFO] Export success: task_id=864d2cf6-a4f9-46c2-94de-85c51bc52557, format=ai_json, module=None
+21:01:48 [INFO] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/ai_json - 200 - 0.005s
+21:01:48 [INFO] [84b0cba3] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/ai_json - 200 - 0.005s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/ai_json "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_export_api.py::test_export_markdown_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [fce59063] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/markdown from testclient
-20:43:55 [INFO] Export success: task_id=9f1e67e7-0613-40e6-b4f1-deb04bcdaf08, format=markdown, module=None
-20:43:55 [INFO] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/markdown - 200 - 0.005s
-20:43:55 [INFO] [fce59063] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/markdown - 200 - 0.005s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/markdown "HTTP/1.1 200 OK"
+21:01:48 [INFO] [5617e0f9] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/markdown from testclient
+21:01:48 [INFO] Export success: task_id=864d2cf6-a4f9-46c2-94de-85c51bc52557, format=markdown, module=None
+21:01:48 [INFO] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/markdown - 200 - 0.004s
+21:01:48 [INFO] [5617e0f9] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/markdown - 200 - 0.004s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/markdown "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_export_api.py::test_export_hdf5_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [8c37259c] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/hdf5 from testclient
-20:43:55 [INFO] Export success: task_id=9f1e67e7-0613-40e6-b4f1-deb04bcdaf08, format=hdf5, module=None
-20:43:55 [INFO] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/hdf5 - 200 - 0.005s
-20:43:55 [INFO] [8c37259c] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/hdf5 - 200 - 0.005s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/hdf5 "HTTP/1.1 200 OK"
+21:01:48 [INFO] [67130531] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/hdf5 from testclient
+21:01:48 [INFO] Export success: task_id=864d2cf6-a4f9-46c2-94de-85c51bc52557, format=hdf5, module=None
+21:01:48 [INFO] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/hdf5 - 200 - 0.004s
+21:01:48 [INFO] [67130531] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/hdf5 - 200 - 0.004s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/hdf5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_export_api.py::test_export_unknown_task_404 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [c61dfdef] Started GET /api/v1/ic/export/unknown-task-id/csv_summary from testclient
-20:43:55 [WARNING] HTTP 404: Task not found: unknown-task-id
-20:43:55 [WARNING] GET /api/v1/ic/export/unknown-task-id/csv_summary - 404 - 0.009s
-20:43:55 [INFO] [c61dfdef] Completed GET /api/v1/ic/export/unknown-task-id/csv_summary - 404 - 0.009s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/unknown-task-id/csv_summary "HTTP/1.1 404 Not Found"
+21:01:48 [INFO] [eb2fd5cd] Started GET /api/v1/ic/export/unknown-task-id/csv_summary from testclient
+21:01:48 [WARNING] HTTP 404: Task not found: unknown-task-id
+21:01:48 [WARNING] GET /api/v1/ic/export/unknown-task-id/csv_summary - 404 - 0.003s
+21:01:48 [INFO] [eb2fd5cd] Completed GET /api/v1/ic/export/unknown-task-id/csv_summary - 404 - 0.003s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/unknown-task-id/csv_summary "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  4%]
 tests/api/test_export_api.py::test_export_invalid_format_422 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [3daa479b] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/xlsx from testclient
-20:43:55 [WARNING] HTTP 422: Unsupported format: xlsx
-20:43:55 [WARNING] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/xlsx - 422 - 0.004s
-20:43:55 [INFO] [3daa479b] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/xlsx - 422 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/xlsx "HTTP/1.1 422 Unprocessable Entity"
+21:01:48 [INFO] [cfac88f1] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/xlsx from testclient
+21:01:48 [WARNING] HTTP 422: Unsupported format: xlsx
+21:01:48 [WARNING] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/xlsx - 422 - 0.002s
+21:01:48 [INFO] [cfac88f1] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/xlsx - 422 - 0.002s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/xlsx "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  4%]
 tests/api/test_export_api.py::test_export_csv_detailed_without_module_422 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [5ed9be01] Started GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed from testclient
-20:43:55 [WARNING] HTTP 422: module query parameter is required for csv_detailed
-20:43:55 [WARNING] GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed - 422 - 0.005s
-20:43:55 [INFO] [5ed9be01] Completed GET /api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed - 422 - 0.005s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/9f1e67e7-0613-40e6-b4f1-deb04bcdaf08/csv_detailed "HTTP/1.1 422 Unprocessable Entity"
+21:01:48 [INFO] [6e36c2c7] Started GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed from testclient
+21:01:48 [WARNING] HTTP 422: module query parameter is required for csv_detailed
+21:01:48 [WARNING] GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed - 422 - 0.003s
+21:01:48 [INFO] [6e36c2c7] Completed GET /api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed - 422 - 0.003s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/ic/export/864d2cf6-a4f9-46c2-94de-85c51bc52557/csv_detailed "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  4%]
 tests/api/test_export_routes.py::test_export_download_success 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [bb4dc9b7] Started GET /api/v1/export/task-1 from testclient
-20:43:55 [INFO] GET /api/v1/export/task-1 - 200 - 0.010s
-20:43:55 [INFO] [bb4dc9b7] Completed GET /api/v1/export/task-1 - 200 - 0.010s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1?format=csv&scope=full "HTTP/1.1 200 OK"
+21:01:48 [INFO] [4ed6b925] Started GET /api/v1/export/task-1 from testclient
+21:01:48 [INFO] GET /api/v1/export/task-1 - 200 - 0.006s
+21:01:48 [INFO] [4ed6b925] Completed GET /api/v1/export/task-1 - 200 - 0.006s
+21:01:48 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1?format=csv&scope=full "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_export_routes.py::test_export_preview_success 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [c37869de] Started GET /api/v1/export/task-1/preview from testclient
-20:43:55 [INFO] GET /api/v1/export/task-1/preview - 200 - 0.005s
-20:43:55 [INFO] [c37869de] Completed GET /api/v1/export/task-1/preview - 200 - 0.005s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1/preview?format=json&scope=performance "HTTP/1.1 200 OK"
+21:01:49 [INFO] [07847ae7] Started GET /api/v1/export/task-1/preview from testclient
+21:01:49 [INFO] GET /api/v1/export/task-1/preview - 200 - 0.002s
+21:01:49 [INFO] [07847ae7] Completed GET /api/v1/export/task-1/preview - 200 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1/preview?format=json&scope=performance "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_export_routes.py::test_export_missing_task_returns_404 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [ff131413] Started GET /api/v1/export/missing from testclient
-20:43:55 [WARNING] HTTP 404: 任務不存在或無可匯出資料
-20:43:55 [WARNING] GET /api/v1/export/missing - 404 - 0.005s
-20:43:55 [INFO] [ff131413] Completed GET /api/v1/export/missing - 404 - 0.005s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/export/missing?format=json&scope=full "HTTP/1.1 404 Not Found"
+21:01:49 [INFO] [b9a632d2] Started GET /api/v1/export/missing from testclient
+21:01:49 [WARNING] HTTP 404: 任務不存在或無可匯出資料
+21:01:49 [WARNING] GET /api/v1/export/missing - 404 - 0.002s
+21:01:49 [INFO] [b9a632d2] Completed GET /api/v1/export/missing - 404 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/export/missing?format=json&scope=full "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  4%]
 tests/api/test_export_routes.py::test_export_invalid_format_returns_422 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [31c7caf2] Started GET /api/v1/export/task-1 from testclient
-20:43:55 [WARNING] Validation error: [{'type': 'enum', 'loc': ('query', 'format'), 'msg': "Input should be 'csv', 'json' or 'markdown'", 'input': 'xml', 'ctx': {'expected': "'csv', 'json' or 'markdown'"}}]
-20:43:55 [WARNING] GET /api/v1/export/task-1 - 422 - 0.004s
-20:43:55 [INFO] [31c7caf2] Completed GET /api/v1/export/task-1 - 422 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1?format=xml&scope=full "HTTP/1.1 422 Unprocessable Entity"
+21:01:49 [INFO] [cc26673f] Started GET /api/v1/export/task-1 from testclient
+21:01:49 [WARNING] Validation error: [{'type': 'enum', 'loc': ('query', 'format'), 'msg': "Input should be 'csv', 'json' or 'markdown'", 'input': 'xml', 'ctx': {'expected': "'csv', 'json' or 'markdown'"}}]
+21:01:49 [WARNING] GET /api/v1/export/task-1 - 422 - 0.002s
+21:01:49 [INFO] [cc26673f] Completed GET /api/v1/export/task-1 - 422 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1?format=xml&scope=full "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  4%]
 tests/api/test_export_routes.py::test_export_invalid_scope_returns_422 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [722cecbd] Started GET /api/v1/export/task-1 from testclient
-20:43:55 [WARNING] Validation error: [{'type': 'enum', 'loc': ('query', 'scope'), 'msg': "Input should be 'performance', 'features', 'calibration', 'walk_forward', 'adversarial', 'cpcv', 'learning_curve', 'optimization', 'comparison' or 'full'", 'input': 'unknown', 'ctx': {'expected': "'performance', 'features', 'calibration', 'walk_forward', 'adversarial', 'cpcv', 'learning_curve', 'optimization', 'comparison' or 'full'"}}]
-20:43:55 [WARNING] GET /api/v1/export/task-1 - 422 - 0.004s
-20:43:55 [INFO] [722cecbd] Completed GET /api/v1/export/task-1 - 422 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1?format=json&scope=unknown "HTTP/1.1 422 Unprocessable Entity"
+21:01:49 [INFO] [321adec7] Started GET /api/v1/export/task-1 from testclient
+21:01:49 [WARNING] Validation error: [{'type': 'enum', 'loc': ('query', 'scope'), 'msg': "Input should be 'performance', 'features', 'calibration', 'walk_forward', 'adversarial', 'cpcv', 'learning_curve', 'optimization', 'comparison' or 'full'", 'input': 'unknown', 'ctx': {'expected': "'performance', 'features', 'calibration', 'walk_forward', 'adversarial', 'cpcv', 'learning_curve', 'optimization', 'comparison' or 'full'"}}]
+21:01:49 [WARNING] GET /api/v1/export/task-1 - 422 - 0.001s
+21:01:49 [INFO] [321adec7] Completed GET /api/v1/export/task-1 - 422 - 0.001s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/export/task-1?format=json&scope=unknown "HTTP/1.1 422 Unprocessable Entity"
 PASSED                                                                   [  4%]
 tests/api/test_feature_api.py::test_feature_extraction_api 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [00d47fcd] Started POST /api/v1/features/extract from testclient
-20:43:55 [INFO] 收到特徵提取請求 - case_id: ETHUSDT_1735905600_1, symbol: ETHUSDT, timeframe: 1h
-20:43:55 [INFO] 啟動特徵提取任務 - task_id: feat_c013f5ea, case_id: ETHUSDT_1735905600_1
-20:43:55 [INFO] 開始執行特徵提取 - task_id: feat_c013f5ea
-20:43:55 [INFO] K線數據載入完成 - 行數: 322
-20:43:55 [INFO] 開始提取特徵 - 策略: ema_three_line, 數據行數: 322
-20:43:55 [INFO] 提取價格特徵: 8 個
-20:43:55 [INFO] 提取成交量特徵: 6 個
-20:43:55 [INFO] 使用數據源 'close' 計算 EMA 特徵
-20:43:55 [INFO] 提取 ema_three_line 策略特徵: 14 個 (數據源: close)
-20:43:55 [INFO] 提取信號特徵: 3 個
-20:43:55 [INFO] 特徵提取完成 - 總共 31 個特徵
-20:43:55 [INFO] 特徵提取完成 - 特徵數: 31
-20:43:55 [INFO] 開始驗證特徵 - 特徵數量: 31, 樣本數量: 322
-20:43:55 [WARNING] 發現 NaN 值: 9 個特徵
-20:43:55 [WARNING]   price_volatility_5: 4 (1.24%)
-20:43:55 [WARNING]   price_momentum_3_pct: 3 (0.93%)
-20:43:55 [WARNING]   volume_change_pct: 1 (0.31%)
-20:43:55 [WARNING]   volume_ma_ratio_5: 4 (1.24%)
-20:43:55 [WARNING]   volume_price_correlation_5: 4 (1.24%)
-20:43:55 [WARNING]   close_ema_short_slope_pct: 3 (0.93%)
-20:43:55 [WARNING]   close_ema_mid_slope_pct: 5 (1.55%)
-20:43:55 [WARNING]   close_ema_trend_consistency_5: 4 (1.24%)
-20:43:55 [WARNING]   close_ema_signal_strength: 4 (1.24%)
-20:43:55 [WARNING] 發現 7 對高相關性特徵:
-20:43:55 [WARNING]   taker_buy_ratio <-> taker_buy_value_ratio: 0.9997
-20:43:55 [WARNING]   taker_buy_ratio <-> taker_ratio_distance_60: 1.0000
-20:43:55 [WARNING]   taker_buy_value_ratio <-> taker_ratio_distance_60: 0.9997
-20:43:55 [WARNING]   close_ema5_value <-> close_ema20_value: 0.9661
-20:43:55 [WARNING]   close_ema20_value <-> close_ema60_value: 0.9573
-20:43:55 [INFO] 驗證完成 - 通過: False, 警告數: 2
-20:43:55 [WARNING] 發現 NaN 值，執行前向填補
-20:43:55 [INFO] NaN 值填補完成 - 方法: forward
-20:43:55 [INFO] 開始儲存特徵 - 案例: ETHUSDT_1735905600_1, 檔案: data_cache/features/ETHUSDT_1735905600_1.h5
-20:43:55 [INFO] 特徵儲存完成 - 樣本數: 322, 特徵數: 31, 檔案大小: 45.88 KB
-20:43:55 [INFO] 特徵提取任務完成 - task_id: feat_c013f5ea
-20:43:55 [INFO] POST /api/v1/features/extract - 202 - 0.088s
-20:43:55 [INFO] [00d47fcd] Completed POST /api/v1/features/extract - 202 - 0.088s
-20:43:55 [INFO] HTTP Request: POST http://testserver/api/v1/features/extract "HTTP/1.1 202 Accepted"
-20:43:55 [INFO] [93d09cdb] Started GET /api/v1/features/task/feat_c013f5ea from testclient
-20:43:55 [INFO] GET /api/v1/features/task/feat_c013f5ea - 200 - 0.001s
-20:43:55 [INFO] [93d09cdb] Completed GET /api/v1/features/task/feat_c013f5ea - 200 - 0.001s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/task/feat_c013f5ea "HTTP/1.1 200 OK"
+21:01:49 [INFO] [c61c0c3c] Started POST /api/v1/features/extract from testclient
+21:01:49 [INFO] 收到特徵提取請求 - case_id: ETHUSDT_1735905600_1, symbol: ETHUSDT, timeframe: 1h
+21:01:49 [INFO] 啟動特徵提取任務 - task_id: feat_17841708, case_id: ETHUSDT_1735905600_1
+21:01:49 [INFO] 開始執行特徵提取 - task_id: feat_17841708
+21:01:49 [INFO] K線數據載入完成 - 行數: 322
+21:01:49 [INFO] 開始提取特徵 - 策略: ema_three_line, 數據行數: 322
+21:01:49 [INFO] 提取價格特徵: 8 個
+21:01:49 [INFO] 提取成交量特徵: 6 個
+21:01:49 [INFO] 使用數據源 'close' 計算 EMA 特徵
+21:01:49 [INFO] 提取 ema_three_line 策略特徵: 14 個 (數據源: close)
+21:01:49 [INFO] 提取信號特徵: 3 個
+21:01:49 [INFO] 特徵提取完成 - 總共 31 個特徵
+21:01:49 [INFO] 特徵提取完成 - 特徵數: 31
+21:01:49 [INFO] 開始驗證特徵 - 特徵數量: 31, 樣本數量: 322
+21:01:49 [WARNING] 發現 NaN 值: 9 個特徵
+21:01:49 [WARNING]   price_volatility_5: 4 (1.24%)
+21:01:49 [WARNING]   price_momentum_3_pct: 3 (0.93%)
+21:01:49 [WARNING]   volume_change_pct: 1 (0.31%)
+21:01:49 [WARNING]   volume_ma_ratio_5: 4 (1.24%)
+21:01:49 [WARNING]   volume_price_correlation_5: 4 (1.24%)
+21:01:49 [WARNING]   close_ema_short_slope_pct: 3 (0.93%)
+21:01:49 [WARNING]   close_ema_mid_slope_pct: 5 (1.55%)
+21:01:49 [WARNING]   close_ema_trend_consistency_5: 4 (1.24%)
+21:01:49 [WARNING]   close_ema_signal_strength: 4 (1.24%)
+21:01:49 [WARNING] 發現 7 對高相關性特徵:
+21:01:49 [WARNING]   taker_buy_ratio <-> taker_buy_value_ratio: 0.9997
+21:01:49 [WARNING]   taker_buy_ratio <-> taker_ratio_distance_60: 1.0000
+21:01:49 [WARNING]   taker_buy_value_ratio <-> taker_ratio_distance_60: 0.9997
+21:01:49 [WARNING]   close_ema5_value <-> close_ema20_value: 0.9661
+21:01:49 [WARNING]   close_ema20_value <-> close_ema60_value: 0.9573
+21:01:49 [INFO] 驗證完成 - 通過: False, 警告數: 2
+21:01:49 [WARNING] 發現 NaN 值，執行前向填補
+21:01:49 [INFO] NaN 值填補完成 - 方法: forward
+21:01:49 [INFO] 開始儲存特徵 - 案例: ETHUSDT_1735905600_1, 檔案: data_cache/features/ETHUSDT_1735905600_1.h5
+21:01:49 [INFO] 特徵儲存完成 - 樣本數: 322, 特徵數: 31, 檔案大小: 45.88 KB
+21:01:49 [INFO] 特徵提取任務完成 - task_id: feat_17841708
+21:01:49 [INFO] POST /api/v1/features/extract - 202 - 0.113s
+21:01:49 [INFO] [c61c0c3c] Completed POST /api/v1/features/extract - 202 - 0.113s
+21:01:49 [INFO] HTTP Request: POST http://testserver/api/v1/features/extract "HTTP/1.1 202 Accepted"
+21:01:49 [INFO] [87c16a19] Started GET /api/v1/features/task/feat_17841708 from testclient
+21:01:49 [INFO] GET /api/v1/features/task/feat_17841708 - 200 - 0.003s
+21:01:49 [INFO] [87c16a19] Completed GET /api/v1/features/task/feat_17841708 - 200 - 0.003s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/task/feat_17841708 "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_feature_api.py::test_feature_task_status_api 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [905f0020] Started POST /api/v1/features/extract from testclient
-20:43:55 [INFO] 收到特徵提取請求 - case_id: ETHUSDT_1736942400_1, symbol: ETHUSDT, timeframe: 1h
-20:43:55 [INFO] 啟動特徵提取任務 - task_id: feat_a4b9b0d4, case_id: ETHUSDT_1736942400_1
-20:43:55 [INFO] 開始執行特徵提取 - task_id: feat_a4b9b0d4
-20:43:55 [INFO] K線數據載入完成 - 行數: 322
-20:43:55 [INFO] 開始提取特徵 - 策略: ema_three_line, 數據行數: 322
-20:43:55 [INFO] 提取價格特徵: 8 個
-20:43:55 [INFO] 提取成交量特徵: 6 個
-20:43:55 [INFO] 使用數據源 'close' 計算 EMA 特徵
-20:43:55 [INFO] 提取 ema_three_line 策略特徵: 14 個 (數據源: close)
-20:43:55 [INFO] 提取信號特徵: 3 個
-20:43:55 [INFO] 特徵提取完成 - 總共 31 個特徵
-20:43:55 [INFO] 特徵提取完成 - 特徵數: 31
-20:43:55 [INFO] 開始驗證特徵 - 特徵數量: 31, 樣本數量: 322
-20:43:55 [WARNING] 發現 NaN 值: 9 個特徵
-20:43:55 [WARNING]   price_volatility_5: 4 (1.24%)
-20:43:55 [WARNING]   price_momentum_3_pct: 3 (0.93%)
-20:43:55 [WARNING]   volume_change_pct: 1 (0.31%)
-20:43:55 [WARNING]   volume_ma_ratio_5: 4 (1.24%)
-20:43:55 [WARNING]   volume_price_correlation_5: 4 (1.24%)
-20:43:55 [WARNING]   close_ema_short_slope_pct: 3 (0.93%)
-20:43:55 [WARNING]   close_ema_mid_slope_pct: 5 (1.55%)
-20:43:55 [WARNING]   close_ema_trend_consistency_5: 4 (1.24%)
-20:43:55 [WARNING]   close_ema_signal_strength: 4 (1.24%)
-20:43:55 [WARNING] 發現 7 對高相關性特徵:
-20:43:55 [WARNING]   taker_buy_ratio <-> taker_buy_value_ratio: 0.9997
-20:43:55 [WARNING]   taker_buy_ratio <-> taker_ratio_distance_60: 1.0000
-20:43:55 [WARNING]   taker_buy_value_ratio <-> taker_ratio_distance_60: 0.9997
-20:43:55 [WARNING]   close_ema5_value <-> close_ema20_value: 0.9661
-20:43:55 [WARNING]   close_ema20_value <-> close_ema60_value: 0.9573
-20:43:55 [INFO] 驗證完成 - 通過: False, 警告數: 2
-20:43:55 [WARNING] 發現 NaN 值，執行前向填補
-20:43:55 [INFO] NaN 值填補完成 - 方法: forward
-20:43:55 [INFO] 開始儲存特徵 - 案例: ETHUSDT_1736942400_1, 檔案: data_cache/features/ETHUSDT_1736942400_1.h5
-20:43:55 [INFO] 特徵儲存完成 - 樣本數: 322, 特徵數: 31, 檔案大小: 45.88 KB
-20:43:55 [INFO] 特徵提取任務完成 - task_id: feat_a4b9b0d4
-20:43:55 [INFO] POST /api/v1/features/extract - 202 - 0.069s
-20:43:55 [INFO] [905f0020] Completed POST /api/v1/features/extract - 202 - 0.069s
-20:43:55 [INFO] HTTP Request: POST http://testserver/api/v1/features/extract "HTTP/1.1 202 Accepted"
-20:43:55 [INFO] [0552f44c] Started GET /api/v1/features/task/feat_a4b9b0d4 from testclient
-20:43:55 [INFO] GET /api/v1/features/task/feat_a4b9b0d4 - 200 - 0.003s
-20:43:55 [INFO] [0552f44c] Completed GET /api/v1/features/task/feat_a4b9b0d4 - 200 - 0.003s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/task/feat_a4b9b0d4 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [a2a8bdcf] Started POST /api/v1/features/extract from testclient
+21:01:49 [INFO] 收到特徵提取請求 - case_id: ETHUSDT_1736942400_1, symbol: ETHUSDT, timeframe: 1h
+21:01:49 [INFO] 啟動特徵提取任務 - task_id: feat_b10e7b76, case_id: ETHUSDT_1736942400_1
+21:01:49 [INFO] 開始執行特徵提取 - task_id: feat_b10e7b76
+21:01:49 [INFO] K線數據載入完成 - 行數: 322
+21:01:49 [INFO] 開始提取特徵 - 策略: ema_three_line, 數據行數: 322
+21:01:49 [INFO] 提取價格特徵: 8 個
+21:01:49 [INFO] 提取成交量特徵: 6 個
+21:01:49 [INFO] 使用數據源 'close' 計算 EMA 特徵
+21:01:49 [INFO] 提取 ema_three_line 策略特徵: 14 個 (數據源: close)
+21:01:49 [INFO] 提取信號特徵: 3 個
+21:01:49 [INFO] 特徵提取完成 - 總共 31 個特徵
+21:01:49 [INFO] 特徵提取完成 - 特徵數: 31
+21:01:49 [INFO] 開始驗證特徵 - 特徵數量: 31, 樣本數量: 322
+21:01:49 [WARNING] 發現 NaN 值: 9 個特徵
+21:01:49 [WARNING]   price_volatility_5: 4 (1.24%)
+21:01:49 [WARNING]   price_momentum_3_pct: 3 (0.93%)
+21:01:49 [WARNING]   volume_change_pct: 1 (0.31%)
+21:01:49 [WARNING]   volume_ma_ratio_5: 4 (1.24%)
+21:01:49 [WARNING]   volume_price_correlation_5: 4 (1.24%)
+21:01:49 [WARNING]   close_ema_short_slope_pct: 3 (0.93%)
+21:01:49 [WARNING]   close_ema_mid_slope_pct: 5 (1.55%)
+21:01:49 [WARNING]   close_ema_trend_consistency_5: 4 (1.24%)
+21:01:49 [WARNING]   close_ema_signal_strength: 4 (1.24%)
+21:01:49 [WARNING] 發現 7 對高相關性特徵:
+21:01:49 [WARNING]   taker_buy_ratio <-> taker_buy_value_ratio: 0.9997
+21:01:49 [WARNING]   taker_buy_ratio <-> taker_ratio_distance_60: 1.0000
+21:01:49 [WARNING]   taker_buy_value_ratio <-> taker_ratio_distance_60: 0.9997
+21:01:49 [WARNING]   close_ema5_value <-> close_ema20_value: 0.9661
+21:01:49 [WARNING]   close_ema20_value <-> close_ema60_value: 0.9573
+21:01:49 [INFO] 驗證完成 - 通過: False, 警告數: 2
+21:01:49 [WARNING] 發現 NaN 值，執行前向填補
+21:01:49 [INFO] NaN 值填補完成 - 方法: forward
+21:01:49 [INFO] 開始儲存特徵 - 案例: ETHUSDT_1736942400_1, 檔案: data_cache/features/ETHUSDT_1736942400_1.h5
+21:01:49 [INFO] 特徵儲存完成 - 樣本數: 322, 特徵數: 31, 檔案大小: 45.88 KB
+21:01:49 [INFO] 特徵提取任務完成 - task_id: feat_b10e7b76
+21:01:49 [INFO] POST /api/v1/features/extract - 202 - 0.088s
+21:01:49 [INFO] [a2a8bdcf] Completed POST /api/v1/features/extract - 202 - 0.088s
+21:01:49 [INFO] HTTP Request: POST http://testserver/api/v1/features/extract "HTTP/1.1 202 Accepted"
+21:01:49 [INFO] [ef7f4e40] Started GET /api/v1/features/task/feat_b10e7b76 from testclient
+21:01:49 [INFO] GET /api/v1/features/task/feat_b10e7b76 - 200 - 0.002s
+21:01:49 [INFO] [ef7f4e40] Completed GET /api/v1/features/task/feat_b10e7b76 - 200 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/task/feat_b10e7b76 "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_feature_api.py::test_feature_task_not_found 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [9560c63f] Started GET /api/v1/features/task/nonexistent_task from testclient
-20:43:55 [WARNING] HTTP 404: 找不到任務: nonexistent_task
-20:43:55 [WARNING] GET /api/v1/features/task/nonexistent_task - 404 - 0.004s
-20:43:55 [INFO] [9560c63f] Completed GET /api/v1/features/task/nonexistent_task - 404 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/task/nonexistent_task "HTTP/1.1 404 Not Found"
+21:01:49 [INFO] [3760d952] Started GET /api/v1/features/task/nonexistent_task from testclient
+21:01:49 [WARNING] HTTP 404: 找不到任務: nonexistent_task
+21:01:49 [WARNING] GET /api/v1/features/task/nonexistent_task - 404 - 0.002s
+21:01:49 [INFO] [3760d952] Completed GET /api/v1/features/task/nonexistent_task - 404 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/task/nonexistent_task "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  4%]
 tests/api/test_feature_api.py::test_feature_extraction_invalid_params 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [45b980b0] Started POST /api/v1/features/extract from testclient
-20:43:55 [INFO] 收到特徵提取請求 - case_id: INVALID_CASE, symbol: ETHUSDT, timeframe: 1h
-20:43:55 [ERROR] 參數錯誤: 不支持的策略類型: 'invalid_strategy'
+21:01:49 [INFO] [9f79410d] Started POST /api/v1/features/extract from testclient
+21:01:49 [INFO] 收到特徵提取請求 - case_id: INVALID_CASE, symbol: ETHUSDT, timeframe: 1h
+21:01:49 [ERROR] 參數錯誤: 不支持的策略類型: 'invalid_strategy'
 可用的策略: ema_three_line
 提示：使用 StrategyRegistry().register_strategy() 註冊新策略
-20:43:55 [WARNING] HTTP 400: 不支持的策略類型: 'invalid_strategy'
+21:01:49 [WARNING] HTTP 400: 不支持的策略類型: 'invalid_strategy'
 可用的策略: ema_three_line
 提示：使用 StrategyRegistry().register_strategy() 註冊新策略
-20:43:55 [WARNING] POST /api/v1/features/extract - 400 - 0.009s
-20:43:55 [INFO] [45b980b0] Completed POST /api/v1/features/extract - 400 - 0.009s
-20:43:55 [INFO] HTTP Request: POST http://testserver/api/v1/features/extract "HTTP/1.1 400 Bad Request"
+21:01:49 [WARNING] POST /api/v1/features/extract - 400 - 0.002s
+21:01:49 [INFO] [9f79410d] Completed POST /api/v1/features/extract - 400 - 0.002s
+21:01:49 [INFO] HTTP Request: POST http://testserver/api/v1/features/extract "HTTP/1.1 400 Bad Request"
 PASSED                                                                   [  4%]
 tests/api/test_feature_api.py::test_health_check 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [dbf68b8c] Started GET /api/v1/features/health from testclient
-20:43:55 [INFO] GET /api/v1/features/health - 200 - 0.004s
-20:43:55 [INFO] [dbf68b8c] Completed GET /api/v1/features/health - 200 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/health "HTTP/1.1 200 OK"
+21:01:49 [INFO] [1c819daf] Started GET /api/v1/features/health from testclient
+21:01:49 [INFO] GET /api/v1/features/health - 200 - 0.002s
+21:01:49 [INFO] [1c819daf] Completed GET /api/v1/features/health - 200 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/health "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_feature_browser.py::test_catalog_returns_all_features 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [e1386abd] Started GET /api/v1/features/catalog from testclient
-20:43:55 [INFO] GET /api/v1/features/catalog - 200 - 0.007s
-20:43:55 [INFO] [e1386abd] Completed GET /api/v1/features/catalog - 200 - 0.007s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/catalog?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [80e17755] Started GET /api/v1/features/catalog from testclient
+21:01:49 [INFO] GET /api/v1/features/catalog - 200 - 0.010s
+21:01:49 [INFO] [80e17755] Completed GET /api/v1/features/catalog - 200 - 0.010s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/catalog?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_feature_browser.py::test_catalog_includes_statistics 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [3ccd723c] Started GET /api/v1/features/catalog from testclient
-20:43:55 [INFO] GET /api/v1/features/catalog - 200 - 0.004s
-20:43:55 [INFO] [3ccd723c] Completed GET /api/v1/features/catalog - 200 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/catalog?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [fd4b2c2b] Started GET /api/v1/features/catalog from testclient
+21:01:49 [INFO] GET /api/v1/features/catalog - 200 - 0.005s
+21:01:49 [INFO] [fd4b2c2b] Completed GET /api/v1/features/catalog - 200 - 0.005s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/catalog?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  4%]
 tests/api/test_feature_browser.py::test_catalog_unknown_path_404 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [8f6712a7] Started GET /api/v1/features/catalog from testclient
-20:43:55 [WARNING] HTTP 404: features_path not found: /not/exist/sample.h5
-20:43:55 [WARNING] GET /api/v1/features/catalog - 404 - 0.004s
-20:43:55 [INFO] [8f6712a7] Completed GET /api/v1/features/catalog - 404 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/catalog?features_path=%2Fnot%2Fexist%2Fsample.h5 "HTTP/1.1 404 Not Found"
+21:01:49 [INFO] [91ab682b] Started GET /api/v1/features/catalog from testclient
+21:01:49 [WARNING] HTTP 404: features_path not found: /not/exist/sample.h5
+21:01:49 [WARNING] GET /api/v1/features/catalog - 404 - 0.002s
+21:01:49 [INFO] [91ab682b] Completed GET /api/v1/features/catalog - 404 - 0.002s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/catalog?features_path=%2Fnot%2Fexist%2Fsample.h5 "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  4%]
 tests/api/test_feature_browser.py::test_distribution_50_bins 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [968d80a9] Started GET /api/v1/features/feature_0/distribution from testclient
-20:43:55 [INFO] GET /api/v1/features/feature_0/distribution - 200 - 0.009s
-20:43:55 [INFO] [968d80a9] Completed GET /api/v1/features/feature_0/distribution - 200 - 0.009s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/feature_0/distribution?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&bins=50 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [2bc0d9fd] Started GET /api/v1/features/feature_0/distribution from testclient
+21:01:49 [INFO] GET /api/v1/features/feature_0/distribution - 200 - 0.006s
+21:01:49 [INFO] [2bc0d9fd] Completed GET /api/v1/features/feature_0/distribution - 200 - 0.006s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/feature_0/distribution?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&bins=50 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_distribution_statistics_correct 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [eb8f1cc3] Started GET /api/v1/features/feature_0/distribution from testclient
-20:43:55 [INFO] GET /api/v1/features/feature_0/distribution - 200 - 0.008s
-20:43:55 [INFO] [eb8f1cc3] Completed GET /api/v1/features/feature_0/distribution - 200 - 0.008s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/feature_0/distribution?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&bins=20 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [074d8647] Started GET /api/v1/features/feature_0/distribution from testclient
+21:01:49 [INFO] GET /api/v1/features/feature_0/distribution - 200 - 0.008s
+21:01:49 [INFO] [074d8647] Completed GET /api/v1/features/feature_0/distribution - 200 - 0.008s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/feature_0/distribution?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&bins=20 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_distribution_unknown_feature_404 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [85a81970] Started GET /api/v1/features/unknown/distribution from testclient
-20:43:55 [WARNING] HTTP 404: Feature not found: unknown
-20:43:55 [WARNING] GET /api/v1/features/unknown/distribution - 404 - 0.007s
-20:43:55 [INFO] [85a81970] Completed GET /api/v1/features/unknown/distribution - 404 - 0.007s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/unknown/distribution?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&bins=20 "HTTP/1.1 404 Not Found"
+21:01:49 [INFO] [86084145] Started GET /api/v1/features/unknown/distribution from testclient
+21:01:49 [WARNING] HTTP 404: Feature not found: unknown
+21:01:49 [WARNING] GET /api/v1/features/unknown/distribution - 404 - 0.003s
+21:01:49 [INFO] [86084145] Completed GET /api/v1/features/unknown/distribution - 404 - 0.003s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/unknown/distribution?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&bins=20 "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_timeseries_single_feature 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [9354c34b] Started GET /api/v1/features/time-series from testclient
-20:43:55 [INFO] GET /api/v1/features/time-series - 200 - 0.016s
-20:43:55 [INFO] [9354c34b] Completed GET /api/v1/features/time-series - 200 - 0.016s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/time-series?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&features=feature_0 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [34267a1b] Started GET /api/v1/features/time-series from testclient
+21:01:49 [INFO] GET /api/v1/features/time-series - 200 - 0.014s
+21:01:49 [INFO] [34267a1b] Completed GET /api/v1/features/time-series - 200 - 0.014s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/time-series?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&features=feature_0 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_timeseries_multiple_features 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [db3b8b9c] Started GET /api/v1/features/time-series from testclient
-20:43:55 [INFO] GET /api/v1/features/time-series - 200 - 0.020s
-20:43:55 [INFO] [db3b8b9c] Completed GET /api/v1/features/time-series - 200 - 0.020s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/time-series?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&features=feature_0%2Cfeature_2%2Cfeature_3 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [160a0d1c] Started GET /api/v1/features/time-series from testclient
+21:01:49 [INFO] GET /api/v1/features/time-series - 200 - 0.019s
+21:01:49 [INFO] [160a0d1c] Completed GET /api/v1/features/time-series - 200 - 0.019s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/time-series?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&features=feature_0%2Cfeature_2%2Cfeature_3 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_timeseries_sample_rate 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [d5035620] Started GET /api/v1/features/time-series from testclient
-20:43:55 [INFO] GET /api/v1/features/time-series - 200 - 0.008s
-20:43:55 [INFO] [d5035620] Completed GET /api/v1/features/time-series - 200 - 0.008s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/time-series?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&features=feature_0&sample_rate=4 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [d74dd00f] Started GET /api/v1/features/time-series from testclient
+21:01:49 [INFO] GET /api/v1/features/time-series - 200 - 0.007s
+21:01:49 [INFO] [d74dd00f] Completed GET /api/v1/features/time-series - 200 - 0.007s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/time-series?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&features=feature_0&sample_rate=4 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_correlation_spearman_default 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [f4548b1b] Started GET /api/v1/features/correlation from testclient
-20:43:55 [INFO] GET /api/v1/features/correlation - 200 - 0.008s
-20:43:55 [INFO] [f4548b1b] Completed GET /api/v1/features/correlation - 200 - 0.008s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/correlation?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&features=feature_0%2Cfeature_1 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [c8b4a118] Started GET /api/v1/features/correlation from testclient
+21:01:49 [INFO] GET /api/v1/features/correlation - 200 - 0.005s
+21:01:49 [INFO] [c8b4a118] Completed GET /api/v1/features/correlation - 200 - 0.005s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/correlation?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&features=feature_0%2Cfeature_1 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_correlation_max_features_limit 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [0bd33afb] Started GET /api/v1/features/correlation from testclient
-20:43:55 [INFO] GET /api/v1/features/correlation - 200 - 0.006s
-20:43:55 [INFO] [0bd33afb] Completed GET /api/v1/features/correlation - 200 - 0.006s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/correlation?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&max_features=2 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [b96c7b98] Started GET /api/v1/features/correlation from testclient
+21:01:49 [INFO] GET /api/v1/features/correlation - 200 - 0.004s
+21:01:49 [INFO] [b96c7b98] Completed GET /api/v1/features/correlation - 200 - 0.004s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/correlation?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&max_features=2 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_quality_check_runs_adf 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [afade0d4] Started POST /api/v1/features/quality-check from testclient
-20:43:55 [INFO] POST /api/v1/features/quality-check - 200 - 0.041s
-20:43:55 [INFO] [afade0d4] Completed POST /api/v1/features/quality-check - 200 - 0.041s
-20:43:55 [INFO] HTTP Request: POST http://testserver/api/v1/features/quality-check "HTTP/1.1 200 OK"
+21:01:49 [INFO] [0dcf07b7] Started POST /api/v1/features/quality-check from testclient
+21:01:49 [INFO] POST /api/v1/features/quality-check - 200 - 0.055s
+21:01:49 [INFO] [0dcf07b7] Completed POST /api/v1/features/quality-check - 200 - 0.055s
+21:01:49 [INFO] HTTP Request: POST http://testserver/api/v1/features/quality-check "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_quality_check_selected_features 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [10bae583] Started POST /api/v1/features/quality-check from testclient
-20:43:55 [INFO] POST /api/v1/features/quality-check - 200 - 0.012s
-20:43:55 [INFO] [10bae583] Completed POST /api/v1/features/quality-check - 200 - 0.012s
-20:43:55 [INFO] HTTP Request: POST http://testserver/api/v1/features/quality-check "HTTP/1.1 200 OK"
+21:01:49 [INFO] [0e15f7ce] Started POST /api/v1/features/quality-check from testclient
+21:01:49 [INFO] POST /api/v1/features/quality-check - 200 - 0.023s
+21:01:49 [INFO] [0e15f7ce] Completed POST /api/v1/features/quality-check - 200 - 0.023s
+21:01:49 [INFO] HTTP Request: POST http://testserver/api/v1/features/quality-check "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_data_table_pagination 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [992eac9e] Started GET /api/v1/features/data-table from testclient
-20:43:55 [INFO] GET /api/v1/features/data-table - 200 - 0.010s
-20:43:55 [INFO] [992eac9e] Completed GET /api/v1/features/data-table - 200 - 0.010s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/data-table?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&page=2&page_size=100 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [57da6661] Started GET /api/v1/features/data-table from testclient
+21:01:49 [INFO] GET /api/v1/features/data-table - 200 - 0.010s
+21:01:49 [INFO] [57da6661] Completed GET /api/v1/features/data-table - 200 - 0.010s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/data-table?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&page=2&page_size=100 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser.py::test_data_table_column_selection 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [8b5b5713] Started GET /api/v1/features/data-table from testclient
-20:43:55 [INFO] GET /api/v1/features/data-table - 200 - 0.006s
-20:43:55 [INFO] [8b5b5713] Completed GET /api/v1/features/data-table - 200 - 0.006s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/features/data-table?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser0%2Fsample_features.h5&columns=feature_0%2Cfeature_1&page_size=10 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [f670df00] Started GET /api/v1/features/data-table from testclient
+21:01:49 [INFO] GET /api/v1/features/data-table - 200 - 0.003s
+21:01:49 [INFO] [f670df00] Completed GET /api/v1/features/data-table - 200 - 0.003s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/features/data-table?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser0%2Fsample_features.h5&columns=feature_0%2Cfeature_1&page_size=10 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_overview_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [68324249] Started GET /api/v1/feature-browser/overview from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/overview - 200 - 0.004s
-20:43:55 [INFO] [68324249] Completed GET /api/v1/feature-browser/overview - 200 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/overview?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [8d6d0de8] Started GET /api/v1/feature-browser/overview from testclient
+21:01:49 [INFO] GET /api/v1/feature-browser/overview - 200 - 0.010s
+21:01:49 [INFO] [8d6d0de8] Completed GET /api/v1/feature-browser/overview - 200 - 0.010s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/overview?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_distribution_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [ef6e5c95] Started GET /api/v1/feature-browser/distribution/feature_0 from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/distribution/feature_0 - 200 - 0.008s
-20:43:55 [INFO] [ef6e5c95] Completed GET /api/v1/feature-browser/distribution/feature_0 - 200 - 0.008s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/distribution/feature_0?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5&bins=40 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [19ae6201] Started GET /api/v1/feature-browser/distribution/feature_0 from testclient
+21:01:49 [INFO] GET /api/v1/feature-browser/distribution/feature_0 - 200 - 0.005s
+21:01:49 [INFO] [19ae6201] Completed GET /api/v1/feature-browser/distribution/feature_0 - 200 - 0.005s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/distribution/feature_0?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5&bins=40 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_ic_dashboard_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [82df7767] Started GET /api/v1/feature-browser/ic-dashboard from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/ic-dashboard - 200 - 0.024s
-20:43:55 [INFO] [82df7767] Completed GET /api/v1/feature-browser/ic-dashboard - 200 - 0.024s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/ic-dashboard?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [5c2eb4e5] Started GET /api/v1/feature-browser/ic-dashboard from testclient
+21:01:49 [INFO] GET /api/v1/feature-browser/ic-dashboard - 200 - 0.137s
+21:01:49 [INFO] [5c2eb4e5] Completed GET /api/v1/feature-browser/ic-dashboard - 200 - 0.137s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/ic-dashboard?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_rolling_ic_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [84444246] Started GET /api/v1/feature-browser/rolling-ic/feature_1 from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/rolling-ic/feature_1 - 200 - 0.012s
-20:43:55 [INFO] [84444246] Completed GET /api/v1/feature-browser/rolling-ic/feature_1 - 200 - 0.012s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/rolling-ic/feature_1?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5&window=40 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [f114f6af] Started GET /api/v1/feature-browser/rolling-ic/feature_1 from testclient
+21:01:49 [INFO] GET /api/v1/feature-browser/rolling-ic/feature_1 - 200 - 0.023s
+21:01:49 [INFO] [f114f6af] Completed GET /api/v1/feature-browser/rolling-ic/feature_1 - 200 - 0.023s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/rolling-ic/feature_1?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5&window=40 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_quality_scorecard_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [a0b74b72] Started GET /api/v1/feature-browser/quality-scorecard from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/quality-scorecard - 200 - 0.061s
-20:43:55 [INFO] [a0b74b72] Completed GET /api/v1/feature-browser/quality-scorecard - 200 - 0.061s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/quality-scorecard?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [087180b2] Started GET /api/v1/feature-browser/quality-scorecard from testclient
+21:01:49 [INFO] GET /api/v1/feature-browser/quality-scorecard - 200 - 0.140s
+21:01:49 [INFO] [087180b2] Completed GET /api/v1/feature-browser/quality-scorecard - 200 - 0.140s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/quality-scorecard?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_correlation_matrix_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [79dec1b1] Started GET /api/v1/feature-browser/correlation-matrix from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/correlation-matrix - 200 - 0.007s
-20:43:55 [INFO] [79dec1b1] Completed GET /api/v1/feature-browser/correlation-matrix - 200 - 0.007s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/correlation-matrix?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5&max_features=20 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [6b99473b] Started GET /api/v1/feature-browser/correlation-matrix from testclient
+21:01:49 [INFO] GET /api/v1/feature-browser/correlation-matrix - 200 - 0.008s
+21:01:49 [INFO] [6b99473b] Completed GET /api/v1/feature-browser/correlation-matrix - 200 - 0.008s
+21:01:49 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/correlation-matrix?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5&max_features=20 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_vif_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [ef5a3e9b] Started GET /api/v1/feature-browser/vif from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/vif - 200 - 0.003s
-20:43:55 [INFO] [ef5a3e9b] Completed GET /api/v1/feature-browser/vif - 200 - 0.003s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/vif?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:49 [INFO] [4c046337] Started GET /api/v1/feature-browser/vif from testclient
+21:01:50 [INFO] GET /api/v1/feature-browser/vif - 200 - 0.006s
+21:01:50 [INFO] [4c046337] Completed GET /api/v1/feature-browser/vif - 200 - 0.006s
+21:01:50 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/vif?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_drift_monitor_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [a44225d8] Started GET /api/v1/feature-browser/drift-monitor from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/drift-monitor - 200 - 0.011s
-20:43:55 [INFO] [a44225d8] Completed GET /api/v1/feature-browser/drift-monitor - 200 - 0.011s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/drift-monitor?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:50 [INFO] [dd1e509a] Started GET /api/v1/feature-browser/drift-monitor from testclient
+21:01:50 [INFO] GET /api/v1/feature-browser/drift-monitor - 200 - 0.015s
+21:01:50 [INFO] [dd1e509a] Completed GET /api/v1/feature-browser/drift-monitor - 200 - 0.015s
+21:01:50 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/drift-monitor?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  5%]
 tests/api/test_feature_browser_routes.py::test_shap_summary_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [d3a84146] Started GET /api/v1/feature-browser/shap-summary from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/shap-summary - 200 - 0.006s
-20:43:55 [INFO] [d3a84146] Completed GET /api/v1/feature-browser/shap-summary - 200 - 0.006s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/shap-summary?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:50 [INFO] [4a1215d2] Started GET /api/v1/feature-browser/shap-summary from testclient
+21:01:50 [INFO] GET /api/v1/feature-browser/shap-summary - 200 - 0.011s
+21:01:50 [INFO] [4a1215d2] Completed GET /api/v1/feature-browser/shap-summary - 200 - 0.011s
+21:01:50 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/shap-summary?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_routes.py::test_importance_comparison_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [5d8ea838] Started GET /api/v1/feature-browser/importance-comparison from testclient
-20:43:55 [INFO] GET /api/v1/feature-browser/importance-comparison - 200 - 0.008s
-20:43:55 [INFO] [5d8ea838] Completed GET /api/v1/feature-browser/importance-comparison - 200 - 0.008s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/importance-comparison?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
+21:01:50 [INFO] [1e240205] Started GET /api/v1/feature-browser/importance-comparison from testclient
+21:01:50 [INFO] GET /api/v1/feature-browser/importance-comparison - 200 - 0.008s
+21:01:50 [INFO] [1e240205] Completed GET /api/v1/feature-browser/importance-comparison - 200 - 0.008s
+21:01:50 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/importance-comparison?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 200 OK"
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_routes.py::test_overview_missing_path_404 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [45ae2f0d] Started GET /api/v1/feature-browser/overview from testclient
-20:43:55 [WARNING] HTTP 404: features_path not found: /tmp/does_not_exist.h5
-20:43:55 [WARNING] GET /api/v1/feature-browser/overview - 404 - 0.004s
-20:43:55 [INFO] [45ae2f0d] Completed GET /api/v1/feature-browser/overview - 404 - 0.004s
-20:43:55 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/overview?features_path=%2Ftmp%2Fdoes_not_exist.h5 "HTTP/1.1 404 Not Found"
+21:01:50 [INFO] [6ee43a1f] Started GET /api/v1/feature-browser/overview from testclient
+21:01:50 [WARNING] HTTP 404: features_path not found: /tmp/does_not_exist.h5
+21:01:50 [WARNING] GET /api/v1/feature-browser/overview - 404 - 0.001s
+21:01:50 [INFO] [6ee43a1f] Completed GET /api/v1/feature-browser/overview - 404 - 0.001s
+21:01:50 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/overview?features_path=%2Ftmp%2Fdoes_not_exist.h5 "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_routes.py::test_distribution_unknown_feature_404 
 -------------------------------- live log call ---------------------------------
-20:43:55 [INFO] [434813d1] Started GET /api/v1/feature-browser/distribution/not_exists from testclient
-20:43:56 [WARNING] HTTP 404: Feature not found: not_exists
-20:43:56 [WARNING] GET /api/v1/feature-browser/distribution/not_exists - 404 - 0.009s
-20:43:56 [INFO] [434813d1] Completed GET /api/v1/feature-browser/distribution/not_exists - 404 - 0.009s
-20:43:56 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/distribution/not_exists?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-207%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 404 Not Found"
+21:01:50 [INFO] [5b78ee89] Started GET /api/v1/feature-browser/distribution/not_exists from testclient
+21:01:50 [WARNING] HTTP 404: Feature not found: not_exists
+21:01:50 [WARNING] GET /api/v1/feature-browser/distribution/not_exists - 404 - 0.005s
+21:01:50 [INFO] [5b78ee89] Completed GET /api/v1/feature-browser/distribution/not_exists - 404 - 0.005s
+21:01:50 [INFO] HTTP Request: GET http://testserver/api/v1/feature-browser/distribution/not_exists?features_path=%2Fprivate%2Fvar%2Ffolders%2F_c%2F3xdf41hd3tvgxpx63mrml2c00000gn%2FT%2Fpytest-of-louis%2Fpytest-218%2Ffeature_browser_v20%2Fsample_features.h5 "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_routes.py::test_coverage_matrix_endpoint_200 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] [896ffaa6] Started POST /api/v1/feature-browser/coverage-matrix from testclient
-20:43:56 [INFO] POST /api/v1/feature-browser/coverage-matrix - 200 - 0.006s
-20:43:56 [INFO] [896ffaa6] Completed POST /api/v1/feature-browser/coverage-matrix - 200 - 0.006s
-20:43:56 [INFO] HTTP Request: POST http://testserver/api/v1/feature-browser/coverage-matrix "HTTP/1.1 200 OK"
+21:01:50 [INFO] [f001026a] Started POST /api/v1/feature-browser/coverage-matrix from testclient
+21:01:50 [INFO] POST /api/v1/feature-browser/coverage-matrix - 200 - 0.014s
+21:01:50 [INFO] [f001026a] Completed POST /api/v1/feature-browser/coverage-matrix - 200 - 0.014s
+21:01:50 [INFO] HTTP Request: POST http://testserver/api/v1/feature-browser/coverage-matrix "HTTP/1.1 200 OK"
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_routes.py::test_coverage_matrix_requires_at_least_two_symbols 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] [39df4d24] Started POST /api/v1/feature-browser/coverage-matrix from testclient
-20:43:56 [WARNING] HTTP 400: Coverage Matrix 需至少 2 個 Symbol
-20:43:56 [WARNING] POST /api/v1/feature-browser/coverage-matrix - 400 - 0.008s
-20:43:56 [INFO] [39df4d24] Completed POST /api/v1/feature-browser/coverage-matrix - 400 - 0.008s
-20:43:56 [INFO] HTTP Request: POST http://testserver/api/v1/feature-browser/coverage-matrix "HTTP/1.1 400 Bad Request"
+21:01:50 [INFO] [36ed4ae0] Started POST /api/v1/feature-browser/coverage-matrix from testclient
+21:01:50 [WARNING] HTTP 400: Coverage Matrix 需至少 2 個 Symbol
+21:01:50 [WARNING] POST /api/v1/feature-browser/coverage-matrix - 400 - 0.003s
+21:01:50 [INFO] [36ed4ae0] Completed POST /api/v1/feature-browser/coverage-matrix - 400 - 0.003s
+21:01:50 [INFO] HTTP Request: POST http://testserver/api/v1/feature-browser/coverage-matrix "HTTP/1.1 400 Bad Request"
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_service.py::test_get_overview 
 -------------------------------- live log setup --------------------------------
-20:43:56 [INFO] Loaded feature registry with 181 entries
+21:01:50 [INFO] Loaded feature registry with 208 entries
 PASSED                                                                   [  6%]
 tests/api/test_feature_browser_service.py::test_get_ic_dashboard PASSED  [  6%]
 tests/api/test_feature_browser_service.py::test_get_rolling_ic PASSED    [  6%]
@@ -880,105 +880,105 @@ tests/api/test_feature_browser_service.py::test_missing_file_raises PASSED [  6%
 tests/api/test_feature_browser_service.py::test_get_coverage_matrix PASSED [  6%]
 tests/api/test_feature_export.py::test_export_csv_stream_success 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-123/csv "HTTP/1.1 200 OK"
+21:01:50 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-123/csv "HTTP/1.1 200 OK"
 PASSED                                                                   [  6%]
 tests/api/test_feature_export.py::test_export_csv_columns_filter 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/csv?columns=a%2Cb%2Cc "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/csv?columns=a%2Cb%2Cc "HTTP/1.1 200 OK"
 PASSED                                                                   [  6%]
 tests/api/test_feature_export.py::test_export_csv_max_rows 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/csv?max_rows=10 "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/csv?max_rows=10 "HTTP/1.1 200 OK"
 PASSED                                                                   [  6%]
 tests/api/test_feature_export.py::test_export_csv_metadata_header_flag 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/csv?include_metadata_header=false "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/csv?include_metadata_header=false "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_csv_not_found 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/missing/csv "HTTP/1.1 404 Not Found"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/missing/csv "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_json_schema_structure 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_json_level_catalog 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_json_per_feature_statistics 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_json_quality_alerts 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_json_correlation_hotspots 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
+21:01:51 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/json "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_markdown_token_budget 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/markdown?max_token_budget=2048 "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/markdown?max_token_budget=2048 "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_markdown_sections_filter 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/markdown?sections=header%2Cquality "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/markdown?sections=header%2Cquality "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_markdown_language_switch 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/markdown?language=en "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/export/task-1/markdown?language=en "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_export_markdown_xss_protection PASSED [  7%]
 tests/api/test_feature_export.py::test_browse_features_pagination 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/features?offset=0&limit=2 "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/features?offset=0&limit=2 "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_features_sorting 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/features?sort_by=std&sort_order=desc "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/features?sort_by=std&sort_order=desc "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_features_filtering 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/features?category=microstructure&level=L3&search=ms_ "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/features?category=microstructure&level=L3&search=ms_ "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_correlation_success 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/correlation?features=ms_a&method=pearson "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/correlation?features=ms_a&method=pearson "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_distribution_success 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/distribution?feature=ent_a&n_bins=20 "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/distribution?feature=ent_a&n_bins=20 "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_nan_pattern_success 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/nan-pattern?sample_features=10 "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/nan-pattern?sample_features=10 "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_summary_success 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/summary "HTTP/1.1 200 OK"
+21:01:52 [INFO] HTTP Request: GET http://test/api/v1/features/browse/task-1/summary "HTTP/1.1 200 OK"
 PASSED                                                                   [  7%]
 tests/api/test_feature_export.py::test_browse_invalid_task_returns_404 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] HTTP Request: GET http://test/api/v1/features/browse/missing/features "HTTP/1.1 404 Not Found"
+21:01:53 [INFO] HTTP Request: GET http://test/api/v1/features/browse/missing/features "HTTP/1.1 404 Not Found"
 PASSED                                                                   [  7%]
 tests/api/test_feature_factory_batch_step4.py::test_batch_service_completed 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] Feature Factory batch task created: task_id=bec2bf02-928f-44a7-9667-59d4dd022993 symbols=3 timeframe=12h workers=4
+21:01:53 [INFO] Feature Factory batch task created: task_id=77bc35f3-f767-4033-8dfb-46f291210160 symbols=3 timeframe=12h workers=4
 PASSED                                                                   [  7%]
 tests/api/test_feature_factory_batch_step4.py::test_batch_service_partial 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] Feature Factory batch task created: task_id=42c6006b-d69e-4aea-abc3-1216a446f939 symbols=3 timeframe=12h workers=4
-20:43:56 [ERROR] Batch task 42c6006b-d69e-4aea-abc3-1216a446f939 failed for BAD: simulated failure
+21:01:53 [INFO] Feature Factory batch task created: task_id=9b31899f-9b80-4008-92c5-4cbddae83fa4 symbols=3 timeframe=12h workers=4
+21:01:53 [ERROR] Batch task 9b31899f-9b80-4008-92c5-4cbddae83fa4 failed for BAD: simulated failure
 NoneType: None
 PASSED                                                                   [  8%]
 tests/api/test_feature_factory_batch_step4.py::test_batch_service_all_failed 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] Feature Factory batch task created: task_id=88e96e99-fc2d-4b09-8a32-2054ef126027 symbols=2 timeframe=12h workers=4
-20:43:56 [ERROR] Batch task 88e96e99-fc2d-4b09-8a32-2054ef126027 failed for BTCUSDT: BTCUSDT-12h-failed
+21:01:53 [INFO] Feature Factory batch task created: task_id=c4633789-07f7-4eac-9689-84c1667fd2b8 symbols=2 timeframe=12h workers=4
+21:01:53 [ERROR] Batch task c4633789-07f7-4eac-9689-84c1667fd2b8 failed for BTCUSDT: BTCUSDT-12h-failed
 NoneType: None
-20:43:56 [ERROR] Batch task 88e96e99-fc2d-4b09-8a32-2054ef126027 failed for ETHUSDT: ETHUSDT-12h-failed
+21:01:53 [ERROR] Batch task c4633789-07f7-4eac-9689-84c1667fd2b8 failed for ETHUSDT: ETHUSDT-12h-failed
 NoneType: None
 PASSED                                                                   [  8%]
 tests/api/test_feature_factory_batch_step4.py::test_batch_service_concurrent_limit PASSED [  8%]
@@ -989,7 +989,7 @@ tests/api/test_feature_factory_batch_step4.py::test_batch_generate_request_rejec
 tests/api/test_feature_factory_batch_step4.py::test_batch_generate_request_rejects_invalid_timeframe PASSED [  8%]
 tests/api/test_feature_factory_batch_step4.py::test_batch_routes_start_and_status 
 -------------------------------- live log call ---------------------------------
-20:43:56 [INFO] 正在啟動 Case Search API...
+21:01:53 [INFO] 正在啟動 Case Search API...
 PASSED                                                                   [  8%]
 tests/api/test_feature_factory_batch_step4.py::test_batch_route_rejects_invalid_timeframe_payload PASSED [  8%]
 tests/api/test_feature_factory_service_browse_summary.py::test_build_stats_rows_with_no_columns_returns_empty_rows PASSED [  8%]
@@ -2229,4 +2229,140 @@ tests/test_feature_factory_adapters.py::test_crypto_spot_fetch PASSED    [ 69%]
 tests/test_feature_factory_adapters.py::test_synthetic_sources PASSED    [ 69%]
 tests/test_feature_factory_adapters.py::test_adapter_registry PASSED     [ 69%]
 tests/test_feature_factory_api.py::test_feature_factory_preview PASSED   [ 70%]
-tests/test_feature_factory_api.py::test_feature_factory_generate 
+tests/test_feature_factory_api.py::test_feature_factory_generate PASSED  [ 70%]
+tests/test_feature_factory_api.py::test_feature_factory_task_not_found PASSED [ 70%]
+tests/test_feature_factory_api.py::test_feature_factory_browse_invalid_detail_level PASSED [ 70%]
+tests/test_feature_factory_api.py::test_feature_factory_browse_cursor_param_accepted PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task23_l1_per_indicator_groups_saved PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task24_l2_per_category_emit_and_registry_save PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task24_l2_estimate_cols_respects_breaker_threshold PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task25_feature_factory_combine_layers_cgsa_noop PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task25_layer4_forces_layer1_and_raw_in_cgsa PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task25_multitf_combine_layers_cgsa_noop PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task26_multitf_tagging_skips_when_registry_present PASSED [ 70%]
+tests/test_feature_factory_batch2b.py::test_task26_multitf_tagging_fallback_when_registry_absent PASSED [ 70%]
+tests/test_feature_factory_batch2c.py::test_t217_l65_per_group_matches_legacy PASSED [ 70%]
+tests/test_feature_factory_batch2c.py::test_t215_per_group_parquet_duckdb_readable PASSED [ 70%]
+tests/test_feature_factory_batch2d.py::test_t214_manifest_contains_required_fields PASSED [ 70%]
+tests/test_feature_factory_batch2d.py::test_task211_materialize_wide_df_prefers_parquet PASSED [ 70%]
+tests/test_feature_factory_batch2d.py::test_task210_layer7_cgsa_per_group_validate_without_materialize PASSED [ 70%]
+tests/test_feature_factory_batch2e.py::test_cgsa_l2_cross_group_operators PASSED [ 70%]
+tests/test_feature_factory_batch2e.py::test_t2b1_l1_single_indicator_runs_normally PASSED [ 70%]
+tests/test_feature_factory_batch2e.py::test_t2b2_l2_without_cross_group_ops_direct_emit PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b3_all_nan_group_register_and_persist PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b4_zero_columns_group_not_registered PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b5_disk_full_raises_ioerror_and_cleans_staging PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b6_same_indicator_different_tf_no_conflict PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b7_manifest_projected_size_under_50mb PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b8_l65_fracdiff_per_group_feasible PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_t2b9_cleanup_interrupted_then_next_cleanup_succeeds PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_phase2_l5_dependency_domain_excludes_layer2_runtime PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_phase2_l6_dependency_domain_excludes_layer2_runtime PASSED [ 71%]
+tests/test_feature_factory_batch2e.py::test_phase2_column_ordering_confirmation PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_features_success PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_features_invalid_sort_by PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_data_feature_limit PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_correlation_success PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_correlation_feature_limit PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_distribution_success PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_nan_pattern_success PASSED [ 71%]
+tests/test_feature_factory_browse_api.py::test_browse_summary_success PASSED [ 71%]
+tests/test_feature_factory_config.py::test_three_layer_merge PASSED      [ 71%]
+tests/test_feature_factory_config.py::test_preset_standard PASSED        [ 72%]
+tests/test_feature_factory_config.py::test_validate_rejects_invalid PASSED [ 72%]
+tests/test_feature_factory_config.py::test_microstructure_config_defaults PASSED [ 72%]
+tests/test_feature_factory_config.py::test_entropy_config_perm_m_validation PASSED [ 72%]
+tests/test_feature_factory_config.py::test_tail_risk_config_alpha_validation PASSED [ 72%]
+tests/test_feature_factory_config.py::test_preprocessing_config_has_all_subconfigs PASSED [ 72%]
+tests/test_feature_factory_config.py::test_atomic_indicator_config_has_new_sections PASSED [ 72%]
+tests/test_feature_factory_config.py::test_factory_config_backward_compat_defaults PASSED [ 72%]
+tests/test_feature_factory_config.py::test_timeframe_config_supported_timeframes PASSED [ 72%]
+tests/test_feature_factory_config.py::test_timeframe_config_rejects_unsupported_values PASSED [ 72%]
+tests/test_feature_factory_config.py::test_migrate_config_adds_alignment_mode_default PASSED [ 72%]
+tests/test_feature_factory_config.py::test_migrate_config_fallback_on_unknown_alignment_mode PASSED [ 72%]
+tests/test_feature_factory_config.py::test_config_hash_changes_when_alignment_mode_changes PASSED [ 72%]
+tests/test_feature_factory_config.py::test_config_hash_same_for_reordered_training_timeframes PASSED [ 72%]
+tests/test_feature_factory_config.py::test_config_hash_changes_when_training_timeframes_change PASSED [ 72%]
+tests/test_feature_factory_config.py::test_yaml_with_new_sections_defaults PASSED [ 72%]
+tests/test_feature_factory_config.py::test_yaml_enable_microstructure PASSED [ 72%]
+tests/test_feature_factory_config.py::test_preview_with_new_engines PASSED [ 72%]
+tests/test_feature_factory_config.py::test_preview_with_preprocessing_added PASSED [ 72%]
+tests/test_feature_factory_config.py::test_preview_new_engines_add_72_features PASSED [ 72%]
+tests/test_feature_factory_config.py::test_scan_config_contains_new_sections PASSED [ 73%]
+tests/test_feature_factory_e2e.py::test_standard_preset_btcusdt SKIPPED  [ 73%]
+tests/test_feature_factory_e2e.py::test_minimal_preset SKIPPED (miss...) [ 73%]
+tests/test_feature_factory_e2e.py::test_multi_data_source SKIPPED (m...) [ 73%]
+tests/test_feature_factory_e2e.py::test_multi_timeframe_alignment SKIPPED [ 73%]
+tests/test_feature_factory_e2e.py::test_user_override_rsi_period SKIPPED [ 73%]
+tests/test_feature_factory_e2e.py::test_no_future_leak_alignment_check SKIPPED [ 73%]
+tests/test_feature_factory_e2e.py::test_naming_convention_basic SKIPPED  [ 73%]
+tests/test_feature_factory_e2e.py::test_metadata_completeness SKIPPED    [ 73%]
+tests/test_feature_factory_export_api.py::test_export_csv_stream_success PASSED [ 73%]
+tests/test_feature_factory_export_api.py::test_export_csv_not_found PASSED [ 73%]
+tests/test_feature_factory_export_api.py::test_export_csv_invalid_columns PASSED [ 73%]
+tests/test_feature_factory_export_api.py::test_export_json_success PASSED [ 73%]
+tests/test_feature_factory_export_api.py::test_export_markdown_success PASSED [ 73%]
+tests/test_feature_factory_mcp.py::test_mcp_list_indicators PASSED       [ 73%]
+tests/test_feature_factory_mcp.py::test_mcp_list_data_sources PASSED     [ 73%]
+tests/test_feature_factory_mcp.py::test_mcp_preview_update_validate PASSED [ 73%]
+tests/test_feature_factory_mcp.py::test_mcp_get_presets PASSED           [ 73%]
+tests/test_feature_factory_mcp.py::test_mcp_get_feature_metadata PASSED  [ 73%]
+tests/test_feature_factory_mcp.py::test_mcp_generate_features_returns_dict PASSED [ 73%]
+tests/test_feature_factory_mcp.py::test_nl2config_converter_no_match PASSED [ 74%]
+tests/test_feature_factory_mcp.py::test_mcp_nl2config PASSED             [ 74%]
+tests/test_feature_factory_operators.py::test_derived_operators_distance_cross_ratio_momentum_binary PASSED [ 74%]
+tests/test_feature_factory_operators.py::test_rolling_aggregator_slope_rank_zscore PASSED [ 74%]
+tests/test_feature_factory_operators.py::test_rolling_aggregator_handles_duplicate_columns XFAIL [ 74%]
+tests/test_feature_factory_operators.py::test_talib_wrapper_midpoint_registered_and_computable PASSED [ 74%]
+tests/test_feature_factory_operators.py::test_talib_wrapper_midprice_and_plus_dm_computable PASSED [ 74%]
+tests/test_feature_factory_operators.py::test_lag_processor_layer1_and_raw PASSED [ 74%]
+tests/test_feature_factory_operators.py::test_derived_distance_handles_duplicate_raw_index PASSED [ 74%]
+tests/test_feature_factory_operators.py::test_derived_worldquant_tscorr_handles_duplicate_corr_index PASSED [ 74%]
+tests/test_feature_naming_integration.py::test_close_data_source PASSED  [ 74%]
+tests/test_feature_naming_integration.py::test_volume_data_source PASSED [ 74%]
+tests/test_feature_naming_integration.py::test_no_collision PASSED       [ 74%]
+tests/test_feature_naming_integration.py::test_different_params_same_indicator PASSED [ 74%]
+tests/test_feature_storage_validator_factory.py::test_feature_storage_factory_roundtrip PASSED [ 74%]
+tests/test_feature_storage_validator_factory.py::test_feature_validator_factory PASSED [ 74%]
+tests/test_frontend_integration.py::test_trial_comparison PASSED         [ 74%]
+tests/test_frontend_integration.py::test_create_single_indicator_pipeline PASSED [ 74%]
+tests/test_frontend_integration.py::test_create_multi_indicator_pipeline PASSED [ 74%]
+tests/test_frontend_integration.py::test_get_pipeline_detail PASSED      [ 74%]
+tests/test_frontend_integration.py::test_list_pipelines PASSED           [ 75%]
+tests/test_golden_output_generation.py::test_l2_timing_log_emitted PASSED [ 75%]
+tests/test_golden_output_generation.py::test_heartbeat_emitted_during_concat PASSED [ 75%]
+tests/test_golden_output_generation.py::test_golden_output_generated PASSED [ 75%]
+tests/test_golden_output_generation.py::test_golden_columns_json_matches PASSED [ 75%]
+tests/test_golden_output_generation.py::test_golden_default_skips_tier1_full PASSED [ 75%]
+tests/test_hardware_utils.py::test_get_memory_tier_auto_detection PASSED [ 75%]
+tests/test_hardware_utils.py::test_get_memory_tier_env_override PASSED   [ 75%]
+tests/test_hardware_utils.py::test_get_tier_config_returns_valid_dict PASSED [ 75%]
+tests/test_hardware_utils.py::test_get_tier_config_unknown_tier_fallback PASSED [ 75%]
+tests/test_hardware_utils.py::test_get_memory_tier_env_auto PASSED       [ 75%]
+tests/test_hardware_utils.py::test_get_memory_tier_env_empty PASSED      [ 75%]
+tests/test_hardware_utils.py::test_get_memory_tier_psutil_unavailable PASSED [ 75%]
+tests/test_indicator_engine_dataframe.py::test_calculate_indicators_from_dataframe_success PASSED [ 75%]
+tests/test_indicator_engine_dataframe.py::test_calculate_indicators_from_dataframe_missing_column PASSED [ 75%]
+tests/test_kline_data_service.py::test_1_first_request_cache_miss PASSED [ 75%]
+tests/test_kline_data_service.py::test_2_second_request_cache_hit PASSED [ 75%]
+tests/test_kline_data_service.py::test_3_partial_cache_incremental_download PASSED [ 75%]
+tests/test_kline_data_service.py::test_4_data_integrity_validation PASSED [ 75%]
+tests/test_kline_data_service.py::test_5_performance_benchmark PASSED    [ 75%]
+tests/test_kline_downloader.py::test_1_single_download_ethusdt PASSED    [ 76%]
+tests/test_kline_downloader.py::test_2_different_timeframe_btcusdt PASSED [ 76%]
+tests/test_kline_downloader.py::test_3_batch_download PASSED             [ 76%]
+tests/test_kline_downloader.py::test_4_storage_integration PASSED        [ 76%]
+tests/test_kline_downloader.py::test_5_provider_registry PASSED          [ 76%]
+tests/test_kline_downloader.py::test_6_error_handling PASSED             [ 76%]
+tests/test_kline_storage.py::test_basic_write_read PASSED                [ 76%]
+tests/test_kline_storage.py::test_metadata PASSED                        [ 76%]
+tests/test_kline_storage.py::test_append PASSED                          [ 76%]
+tests/test_kline_storage.py::test_data_validation PASSED                 [ 76%]
+tests/test_kline_storage.py::test_cache_index PASSED                     [ 76%]
+tests/test_kline_storage.py::test_data_integrity PASSED                  [ 76%]
+tests/test_l65_parallel.py::test_parallel_transform_matches_serial Fatal Python error: Aborted
+
+Thread 0x0000000179dc7000 (most recent call first):
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/preprocessing/_numba_transforms.py", line 206 in transform_array_fast
+Fatal Python error: Segmentation fault
+

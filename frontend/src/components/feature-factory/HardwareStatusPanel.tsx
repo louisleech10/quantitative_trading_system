@@ -26,6 +26,8 @@ interface HardwareInfo {
     FFACT_CGSA_MEMORY_BUFFER: number;
     FFACT_L7_WORKERS: number;
     FFACT_L7_COMPACTOR_ENABLED: number;
+    FFACT_MULTI_TF_MAX_WORKERS: number;
+    FFACT_LAYER3_CHUNK_SIZE: number;
   };
 }
 
@@ -139,46 +141,112 @@ export function HardwareStatusPanel() {
             </div>
           ) : hardwareInfo ? (
             <>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                    <Cpu className="h-3.5 w-3.5" />
-                    CPU
+              {/* 硬體概況：三格縮小版 */}
+              <div className="grid gap-2 md:grid-cols-3">
+                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3">
+                  <Cpu className="h-4 w-4 shrink-0 text-slate-400" />
+                  <div>
+                    <div className="text-xs text-slate-200">
+                      {hardwareInfo.cpu.logical_cores} 核（{hardwareInfo.cpu.physical_cores} 實體）
+                    </div>
+                    <div className="text-xs text-slate-500">使用率 {hardwareInfo.cpu.usage_pct}%</div>
                   </div>
-                  <div className="mt-3 text-sm text-slate-200">
-                    {hardwareInfo.cpu.logical_cores} 核（{hardwareInfo.cpu.physical_cores} 實體）
-                  </div>
-                  <div className="mt-1 text-xs text-slate-400">使用率 {hardwareInfo.cpu.usage_pct}%</div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-500">RAM</div>
-                  <div className="mt-3 text-sm text-slate-200">{hardwareInfo.memory.total_gb.toFixed(1)} GB</div>
-                  <div className={`mt-1 text-xs ${getMemoryTextColor(hardwareInfo.memory.available_gb)}`}>
-                    可用 {hardwareInfo.memory.available_gb.toFixed(1)} GB
+                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3">
+                  <div className="h-4 w-4 shrink-0 text-slate-400 text-xs font-bold leading-4">RAM</div>
+                  <div>
+                    <div className="text-xs text-slate-200">{hardwareInfo.memory.total_gb.toFixed(1)} GB</div>
+                    <div className={`text-xs ${getMemoryTextColor(hardwareInfo.memory.available_gb)}`}>
+                      可用 {hardwareInfo.memory.available_gb.toFixed(1)} GB · 已用 {hardwareInfo.memory.used_pct}%
+                    </div>
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">已用 {hardwareInfo.memory.used_pct}%</div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-slate-500">磁碟</div>
-                  <div className="mt-3 text-sm text-slate-200">{hardwareInfo.disk.total_gb.toFixed(1)} GB</div>
-                  <div className={`mt-1 text-xs ${getDiskTextColor(hardwareInfo.disk.free_gb)}`}>
-                    可用 {hardwareInfo.disk.free_gb.toFixed(1)} GB
+                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3">
+                  <div className="h-4 w-4 shrink-0 text-slate-400 text-xs font-bold leading-4">SSD</div>
+                  <div>
+                    <div className="text-xs text-slate-200">{hardwareInfo.disk.total_gb.toFixed(1)} GB</div>
+                    <div className={`text-xs ${getDiskTextColor(hardwareInfo.disk.free_gb)}`}>
+                      可用 {hardwareInfo.disk.free_gb.toFixed(1)} GB · 已用 {hardwareInfo.disk.used_pct}%
+                    </div>
                   </div>
-                  <div className="mt-1 text-xs text-slate-400">已用 {hardwareInfo.disk.used_pct}%</div>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-4">
+              {/* 建議設定（目前 tier 高亮） */}
+              <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3">
                 <div className="text-xs uppercase tracking-[0.18em] text-cyan-100/70">建議設定</div>
-                <div className="mt-3 grid gap-2 text-sm text-cyan-50 md:grid-cols-2">
-                  <div>L65_WORKERS={hardwareInfo.recommended_settings.FFACT_L65_WORKERS}</div>
-                  <div>CGSA_BUFFER={hardwareInfo.recommended_settings.FFACT_CGSA_MEMORY_BUFFER}</div>
-                  <div>L7_WORKERS={hardwareInfo.recommended_settings.FFACT_L7_WORKERS}</div>
-                  <div>
-                    Compactor={hardwareInfo.recommended_settings.FFACT_L7_COMPACTOR_ENABLED === 1 ? 'ON' : 'OFF'}
-                  </div>
+                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-cyan-50">
+                  <span>L65_WORKERS={hardwareInfo.recommended_settings.FFACT_L65_WORKERS}</span>
+                  <span>L7_WORKERS={hardwareInfo.recommended_settings.FFACT_L7_WORKERS}</span>
+                  <span>CGSA_BUFFER={hardwareInfo.recommended_settings.FFACT_CGSA_MEMORY_BUFFER}</span>
+                  <span>Compactor={hardwareInfo.recommended_settings.FFACT_L7_COMPACTOR_ENABLED === 1 ? 'ON' : 'OFF'}</span>
+                  <span className="text-cyan-200">MultiTF_Workers={hardwareInfo.recommended_settings.FFACT_MULTI_TF_MAX_WORKERS}</span>
+                  <span className="text-cyan-200">L3_Chunk={hardwareInfo.recommended_settings.FFACT_LAYER3_CHUNK_SIZE}</span>
+                </div>
+              </div>
+
+              {/* Tier 對照表 */}
+              <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                <div className="px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-500 border-b border-white/10">
+                  各 Tier 參數對照
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="px-3 py-2 text-left font-medium text-slate-400">參數</th>
+                        {(['8gb', '16gb', '24gb', '32gb'] as const).map((tier) => (
+                          <th
+                            key={tier}
+                            className={`px-3 py-2 text-center font-medium ${
+                              hardwareInfo.memory_tier === tier
+                                ? 'text-cyan-300 bg-cyan-400/10'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            {tier.toUpperCase()}
+                            {hardwareInfo.memory_tier === tier && (
+                              <span className="ml-1 text-cyan-400">◀</span>
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {[
+                        { label: 'L65_WORKERS', values: [4, 6, 8, 8] },
+                        { label: 'L7_WORKERS', values: [4, 6, 8, 8] },
+                        { label: 'CGSA_BUFFER', values: [0, 0, 32, 64] },
+                        { label: 'MultiTF_Workers', values: [2, 3, 4, 4], highlight: true },
+                        { label: 'L3_Chunk', values: [256, 512, 512, 1024], highlight: true },
+                        { label: 'Chunk_Bars', values: ['50K', '100K', '250K', '∞'] },
+                      ].map(({ label, values, highlight }) => (
+                        <tr key={label} className="hover:bg-white/5">
+                          <td className={`px-3 py-1.5 font-mono ${highlight ? 'text-cyan-200' : 'text-slate-300'}`}>
+                            {label}
+                          </td>
+                          {values.map((val, i) => {
+                            const tier = ['8gb', '16gb', '24gb', '32gb'][i];
+                            const isCurrent = hardwareInfo.memory_tier === tier;
+                            return (
+                              <td
+                                key={tier}
+                                className={`px-3 py-1.5 text-center font-mono ${
+                                  isCurrent
+                                    ? 'text-cyan-300 font-semibold bg-cyan-400/10'
+                                    : 'text-slate-400'
+                                }`}
+                              >
+                                {String(val)}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </>
