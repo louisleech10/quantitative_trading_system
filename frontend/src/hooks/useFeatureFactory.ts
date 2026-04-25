@@ -155,6 +155,7 @@ export function useFeatureFactory() {
       configOverride: FeatureFactoryConfig,
       startDate?: string,
       endDate?: string,
+      forceRegenerate: boolean = true,
     ) => {
       setIsGenerating(true);
       try {
@@ -162,6 +163,7 @@ export function useFeatureFactory() {
           symbol,
           timeframe,
           config_override: configOverride,
+          force_regenerate: forceRegenerate,
         };
         if (startDate) body.start_date = startDate;
         if (endDate) body.end_date = endDate;
@@ -239,7 +241,7 @@ export function useFeatureFactory() {
         category?: string;
         level?: 'L1' | 'L2' | 'L3';
         search?: string;
-        detailLevel?: 'full' | 'table';
+        detailLevel?: 'full' | 'table' | 'names';
       }
     ) => {
       const query = new URLSearchParams();

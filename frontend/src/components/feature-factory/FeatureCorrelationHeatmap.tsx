@@ -12,6 +12,7 @@ interface FeatureCorrelationHeatmapProps {
 }
 
 const methods: Array<'pearson' | 'spearman' | 'kendall'> = ['pearson', 'spearman', 'kendall'];
+const FEATURE_NAME_LIMIT = 300000;
 
 /**
  * 業界標準 RdBu_r 色彩映射（與 matplotlib/seaborn 一致）:
@@ -97,6 +98,7 @@ const METHOD_INFO: Record<
 
 export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelationHeatmapProps) {
   const { explorerSelectedFeatures, setExplorerSelectedFeatures } = useFeatureFactoryStore();
+  const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
   const { browseCorrelation, browseFeatures, browseVif } = useFeatureFactory();
   const [method, setMethod] = useState<'pearson' | 'spearman' | 'kendall'>('spearman');
   const [available, setAvailable] = useState<string[]>([]);
@@ -114,7 +116,12 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
+    if (sharedFeatureNames) {
+      setAvailable(sharedFeatureNames);
+      return;
+    }
+
+    browseFeatures(taskId, { offset: 0, limit: FEATURE_NAME_LIMIT, sortBy: 'name', sortOrder: 'asc', detailLevel: 'names' })
       .then((resp) => {
         if (!active) return;
         setAvailable(resp.features.map((item) => item.name));
@@ -127,7 +134,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId]);
+  }, [browseFeatures, taskId, sharedFeatureNames]);
 
   const selected = useMemo(() => Array.from(new Set(explorerSelectedFeatures)).slice(0, 50), [explorerSelectedFeatures]);
 

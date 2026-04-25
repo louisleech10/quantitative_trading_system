@@ -27,7 +27,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
 ];
 
 export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: FeatureExplorerProps) {
-  const { browseSummary } = useFeatureFactory();
+  const { browseSummary, browseFeatures } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
   // which triggers React 18 concurrent-mode's "getSnapshot should be cached" infinite loop.
@@ -35,23 +35,27 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
   const explorerActiveTab = useFeatureFactoryStore((state) => state.explorerActiveTab);
   const explorerSummary = useFeatureFactoryStore((state) => state.explorerSummary);
   const explorerSummaryByTask = useFeatureFactoryStore((state) => state.explorerSummaryByTask);
+  const explorerFeatureNamesByTask = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask);
   const explorerRecentTasks = useFeatureFactoryStore((state) => state.explorerRecentTasks);
   const setExplorerTaskId = useFeatureFactoryStore((state) => state.setExplorerTaskId);
   const setExplorerActiveTab = useFeatureFactoryStore((state) => state.setExplorerActiveTab);
   const setExplorerSelectedFeatures = useFeatureFactoryStore((state) => state.setExplorerSelectedFeatures);
   const setExplorerSummaryForTask = useFeatureFactoryStore((state) => state.setExplorerSummaryForTask);
+  const setExplorerFeatureNamesForTask = useFeatureFactoryStore((state) => state.setExplorerFeatureNamesForTask);
   const pushExplorerRecentTask = useFeatureFactoryStore((state) => state.pushExplorerRecentTask);
   const removeExplorerRecentTask = useFeatureFactoryStore((state) => state.removeExplorerRecentTask);
 
   // 允許使用者在沒有進行中任務時手動輸入 task ID 瀏覽歷史結果
   const [manualTaskId, setManualTaskId] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const taskId: string = propTaskId || manualTaskId;
+  const taskId: string = manualTaskId || propTaskId || '';
 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const cachedSummary = taskId ? explorerSummaryByTask[taskId] : undefined;
   const hasCachedSummary = Boolean(cachedSummary);
+  const cachedFeatureNames = taskId ? explorerFeatureNamesByTask[taskId] : undefined;
+  const hasCachedFeatureNames = Array.isArray(cachedFeatureNames);
   // Only auto-load when task is fully ready.
   const isTaskReady = !taskStatus || taskStatus === 'completed';
 
@@ -66,7 +70,15 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
 
   useEffect(() => {
     let active = true;
-    if (!taskId || hasCachedSummary || !isTaskReady) {
+    if (!taskId || !isTaskReady) {
+      setSummaryLoading(false);
+      if (!taskId) setSummaryError(null);
+      return;
+    }
+
+    if (hasCachedSummary) {
+      setSummaryLoading(false);
+      setSummaryError(null);
       return;
     }
 
@@ -93,6 +105,36 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
     };
   }, [browseSummary, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask, pushExplorerRecentTask]);
 
+  useEffect(() => {
+    let active = true;
+    if (!taskId || !isTaskReady || hasCachedFeatureNames) {
+      return;
+    }
+
+    browseFeatures(taskId, {
+      offset: 0,
+      limit: 300000,
+      sortBy: 'name',
+      sortOrder: 'asc',
+      detailLevel: 'names',
+    })
+      .then((payload) => {
+        if (!active) return;
+        const names = payload.features
+          .map((item) => item.name)
+          .filter((name): name is string => typeof name === 'string' && name.length > 0);
+        setExplorerFeatureNamesForTask(taskId, names);
+      })
+      .catch(() => {
+        // Summary carries the user-facing failure state. A missing names catalog
+        // should not block Overview/Table rendering.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [browseFeatures, taskId, isTaskReady, hasCachedFeatureNames, setExplorerFeatureNamesForTask]);
+
   // When summary loads from cache (no fetch needed), still mark as recent.
   useEffect(() => {
     if (taskId && hasCachedSummary) {
@@ -100,7 +142,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
     }
   }, [taskId, hasCachedSummary, pushExplorerRecentTask]);
 
-  const summary = useMemo(() => cachedSummary || explorerSummary, [cachedSummary, explorerSummary]);
+  const summary = useMemo(() => cachedSummary || (explorerTaskId === taskId ? explorerSummary : null), [cachedSummary, explorerSummary, explorerTaskId, taskId]);
 
   return (
     <div className="glass-panel rounded-2xl p-6 space-y-4">
@@ -112,52 +154,50 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
             : <div className="text-xs text-slate-500">尚無進行中的任務，可貼入 Task ID 瀏覽歷史結果</div>
           }
         </div>
-        {/* 手動輸入 Task ID + Recent Tasks 下拉（無進行中任務時顯示） */}
-        {!propTaskId && (
-          <div className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={manualTaskId}
-              onChange={(e) => setManualTaskId(e.target.value.trim())}
-              placeholder="貼入 Task ID…"
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
-            />
-            {manualTaskId && (
-              <button
-                type="button"
-                onClick={() => { setManualTaskId(''); setSummaryError(null); }}
-                className="text-slate-500 hover:text-slate-300 text-xs"
-              >✕</button>
-            )}
-            {explorerRecentTasks.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v) setManualTaskId(v);
-                }}
-                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
-                title="切換最近瀏覽的 Task"
-              >
-                <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
-                {explorerRecentTasks.map((tid) => (
-                  <option key={tid} value={tid}>
-                    {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
-                  </option>
-                ))}
-              </select>
-            )}
-            {manualTaskId && explorerRecentTasks.includes(manualTaskId) && (
-              <button
-                type="button"
-                onClick={() => { removeExplorerRecentTask(manualTaskId); setManualTaskId(''); }}
-                className="text-rose-400/70 hover:text-rose-300 text-xs"
-                title="從最近清單移除"
-              >移除</button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={manualTaskId}
+            onChange={(e) => setManualTaskId(e.target.value.trim())}
+            placeholder="貼入 Task ID…"
+            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
+          />
+          {manualTaskId && (
+            <button
+              type="button"
+              onClick={() => { setManualTaskId(''); setSummaryError(null); }}
+              className="text-slate-500 hover:text-slate-300 text-xs"
+              title={propTaskId ? '回到目前任務' : '清除手動 Task'}
+            >✕</button>
+          )}
+          {explorerRecentTasks.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v) setManualTaskId(v);
+              }}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
+              title="切換最近瀏覽的 Task"
+            >
+              <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
+              {explorerRecentTasks.map((tid) => (
+                <option key={tid} value={tid}>
+                  {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
+                </option>
+              ))}
+            </select>
+          )}
+          {manualTaskId && explorerRecentTasks.includes(manualTaskId) && (
+            <button
+              type="button"
+              onClick={() => { removeExplorerRecentTask(manualTaskId); setManualTaskId(''); }}
+              className="text-rose-400/70 hover:text-rose-300 text-xs"
+              title="從最近清單移除"
+            >移除</button>
+          )}
+        </div>
       </div>
 
       {/* ——— 生成中：顯示等待狀態 ——— */}

@@ -23,8 +23,11 @@ interface FeatureDistributionChartProps {
   taskId: string;
 }
 
+const FEATURE_NAME_LIMIT = 300000;
+
 export default function FeatureDistributionChart({ taskId }: FeatureDistributionChartProps) {
   const { explorerSelectedFeature, setExplorerActiveTab } = useFeatureFactoryStore();
+  const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
   const { browseDistribution, browseFeatures } = useFeatureFactory();
   const [feature, setFeature] = useState<string>('');
   const [featureOptions, setFeatureOptions] = useState<string[]>([]);
@@ -40,7 +43,13 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
+    if (sharedFeatureNames) {
+      setFeatureOptions(sharedFeatureNames);
+      setFeature((current) => current || explorerSelectedFeature || sharedFeatureNames[0] || '');
+      return;
+    }
+
+    browseFeatures(taskId, { offset: 0, limit: FEATURE_NAME_LIMIT, sortBy: 'name', sortOrder: 'asc', detailLevel: 'names' })
       .then((resp) => {
         if (!active) return;
         const options = resp.features.map((item) => item.name);
@@ -55,7 +64,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId, explorerSelectedFeature]);
+  }, [browseFeatures, taskId, explorerSelectedFeature, sharedFeatureNames]);
 
   useEffect(() => {
     if (!feature && filteredFeatureOptions.length > 0) {

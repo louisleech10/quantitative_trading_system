@@ -173,7 +173,7 @@ export default function FeatureFactoryPage() {
           symbols: normalizedSymbols,
           timeframe,
           config_override: config as unknown as Record<string, unknown>,
-          force_regenerate: false,
+          force_regenerate: true,
           max_workers: 4,
         });
       }

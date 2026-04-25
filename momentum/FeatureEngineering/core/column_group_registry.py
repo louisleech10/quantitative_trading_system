@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import tempfile
 import threading
 from datetime import datetime
@@ -570,6 +571,16 @@ class ColumnGroupRegistry:
     ) -> None:
         """Persist one group array to disk with explicit failure classification."""
 
+        expected_bytes = int(data_fp32.nbytes)
+        free_before = self._disk_free_bytes(path.parent)
+        if free_before is not None and free_before < expected_bytes:
+            raise ColumnGroupRegistryError(
+                f"Insufficient disk space while {action} group {group_id} to {path}: "
+                f"need {self._format_bytes(expected_bytes)}, available {self._format_bytes(free_before)}, "
+                f"shape={tuple(data_fp32.shape)}",
+                failure_type=FailureType.IO_ERROR,
+            )
+
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             np.save(path, data_fp32, allow_pickle=False)
@@ -579,10 +590,27 @@ class ColumnGroupRegistry:
                 failure_type=FailureType.OOM,
             ) from exc
         except OSError as exc:
+            free_after = self._disk_free_bytes(path.parent)
             raise ColumnGroupRegistryError(
-                f"Failed to {action} group {group_id} to {path}: {exc}",
+                f"Failed to {action} group {group_id} to {path}: {exc}; "
+                f"shape={tuple(data_fp32.shape)}, bytes={self._format_bytes(expected_bytes)}, "
+                f"free_before={self._format_bytes(free_before)}, free_after={self._format_bytes(free_after)}",
                 failure_type=FailureType.IO_ERROR,
             ) from exc
+
+    @staticmethod
+    def _disk_free_bytes(path: Path) -> Optional[int]:
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            return int(shutil.disk_usage(path).free)
+        except OSError:
+            return None
+
+    @staticmethod
+    def _format_bytes(num_bytes: Optional[int]) -> str:
+        if num_bytes is None:
+            return "unknown"
+        return f"{num_bytes / (1024 ** 3):.2f} GiB"
 
     def _write_manifest_thread_safe(self) -> None:
         """Serialize manifest writes to avoid parallel temp-file races."""

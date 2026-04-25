@@ -26,6 +26,7 @@ const COLORS = ['#34d399', '#60a5fa', '#f59e0b', '#f472b6', '#a78bfa'];
 const ROLLING_WINDOW_MIN = 5;
 const ROLLING_WINDOW_MAX = 200;
 const ROLLING_WINDOW_DEFAULT = 20;
+const FEATURE_NAME_LIMIT = 300000;
 
 /** ISO/Unix timestamp → "YYYY/MM/DD" */
 function formatTimestamp(val: string | number): string {
@@ -46,6 +47,7 @@ function calcXInterval(dataLen: number): number {
 
 export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChartProps) {
   const { explorerSelectedFeatures, explorerSelectedFeature, setExplorerSelectedFeatures } = useFeatureFactoryStore();
+  const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
   const { browseData, browseFeatures } = useFeatureFactory();
   const [options, setOptions] = useState<string[]>([]);
   const [filteredOptions, setFilteredOptions] = useState<string[]>([]);
@@ -62,7 +64,12 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
 
   useEffect(() => {
     let active = true;
-    browseFeatures(taskId, { offset: 0, limit: 5000, sortBy: 'name', sortOrder: 'asc', detailLevel: 'table' })
+    if (sharedFeatureNames) {
+      setOptions(sharedFeatureNames);
+      return;
+    }
+
+    browseFeatures(taskId, { offset: 0, limit: FEATURE_NAME_LIMIT, sortBy: 'name', sortOrder: 'asc', detailLevel: 'names' })
       .then((resp) => {
         if (!active) return;
         setOptions(resp.features.map((item) => item.name));
@@ -75,7 +82,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId]);
+  }, [browseFeatures, taskId, sharedFeatureNames]);
 
   const selected = useMemo(() => {
     const uniq = Array.from(new Set(explorerSelectedFeatures)).slice(0, 5);
@@ -204,6 +211,20 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     setBrushKey((k) => k + 1);
   };
 
+  const missingSummaries = useMemo(() => {
+    if (rows.length === 0) return [];
+    return selected.map((feature) => {
+      const validCount = rows.reduce((count, row) => (typeof row[feature] === 'number' ? count + 1 : count), 0);
+      const missingCount = rows.length - validCount;
+      return {
+        feature,
+        validCount,
+        missingCount,
+        missingRatio: rows.length > 0 ? missingCount / rows.length : 0,
+      };
+    }).filter((item) => item.missingCount > 0);
+  }, [rows, selected]);
+
   const toggleFeature = (feature: string) => {    const current = new Set(explorerSelectedFeatures);
     if (current.has(feature)) {
       current.delete(feature);
@@ -287,6 +308,16 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
       </div>
 
       <FeatureNameSegmentFilter features={options} onFilteredFeaturesChange={setFilteredOptions} />
+
+      {missingSummaries.length > 0 && (
+        <div className="rounded-lg border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+          圖線中斷代表原始特徵值為 NaN/缺值，系統不會插值以免扭曲時間序列。{missingSummaries.slice(0, 3).map((item) => (
+            <span key={item.feature} className="ml-2 font-mono">
+              {item.feature}: {(item.missingRatio * 100).toFixed(1)}% 缺值
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 max-h-28 overflow-auto">
         {/* 已選但不在前 500 可見清單裡的特徵：固定置頂，確保可點選取消 */}
@@ -422,6 +453,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
                   stroke={COLORS[idx % COLORS.length]}
                   strokeWidth={1.5}
                   dot={false}
+                  connectNulls={false}
                   isAnimationActive={false}
                 />
               ))}

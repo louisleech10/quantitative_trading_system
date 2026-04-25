@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
+from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 from momentum.FeatureEngineering.feature_config import AlignmentMode
@@ -210,6 +212,110 @@ def test_primary_missing_raises_error():
         assert False, "Expected ValueError for missing primary timeframe"
     except ValueError as exc:
         assert "Primary timeframe data missing" in str(exc)
+
+
+def test_register_worker_groups_chunked_persist_and_cleanup(tmp_path):
+    """Worker TF group registration writes aligned npy and releases worker temp files."""
+    registry = ColumnGroupRegistry(tmp_path / "main_work", memory_buffer_groups=0)
+    worker_dir = tmp_path / "BTCUSDT_12h_worker"
+    worker_dir.mkdir()
+    worker_npy = worker_dir / "L1_test.npy"
+    source = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]], dtype=np.float32)
+    np.save(worker_npy, source, allow_pickle=False)
+
+    primary_timestamps = pd.date_range("2026-01-01", periods=3, freq="h")
+    groups_data = [
+        {
+            "group_id": "L1_test",
+            "layer": "L1",
+            "timeframe": "12h",
+            "data_source": "close",
+            "indicator": "TEST",
+            "columns": ["a", "b"],
+            "shape": [3, 2],
+            "dtype": "float32",
+            "npy_path": str(worker_npy),
+        }
+    ]
+
+    generator = MultiTFGenerator.__new__(MultiTFGenerator)
+    generator._register_worker_groups(
+        registry,
+        groups_data,
+        "12h",
+        primary_timestamps,
+        AlignmentMode.CLOSE_TIME,
+        source_timestamps_ms=None,
+    )
+
+    persisted = registry.load_data("L1_test")
+    np.testing.assert_allclose(np.asarray(persisted), source)
+    assert not worker_npy.exists()
+    assert not worker_dir.exists()
+
+
+def test_register_worker_groups_keeps_worker_npy_when_flag_enabled(monkeypatch, tmp_path):
+    """FFACT_MULTI_TF_KEEP_WORKER_NPY=1 must preserve worker .npy + workdir."""
+    monkeypatch.setenv("FFACT_MULTI_TF_KEEP_WORKER_NPY", "1")
+
+    registry = ColumnGroupRegistry(tmp_path / "main_work", memory_buffer_groups=0)
+    worker_dir = tmp_path / "ETHUSDT_1h_worker"
+    worker_dir.mkdir()
+    worker_npy = worker_dir / "L1_keep.npy"
+    source = np.array([[7.0, 70.0], [8.0, 80.0]], dtype=np.float32)
+    np.save(worker_npy, source, allow_pickle=False)
+
+    primary_timestamps = pd.date_range("2026-01-01", periods=2, freq="h")
+    groups_data = [
+        {
+            "group_id": "L1_keep",
+            "layer": "L1",
+            "timeframe": "1h",
+            "data_source": "close",
+            "indicator": "TEST",
+            "columns": ["x", "y"],
+            "shape": [2, 2],
+            "dtype": "float32",
+            "npy_path": str(worker_npy),
+        }
+    ]
+
+    generator = MultiTFGenerator.__new__(MultiTFGenerator)
+    generator._register_worker_groups(
+        registry,
+        groups_data,
+        "1h",
+        primary_timestamps,
+        AlignmentMode.CLOSE_TIME,
+        source_timestamps_ms=None,
+    )
+
+    persisted = registry.load_data("L1_keep")
+    np.testing.assert_allclose(np.asarray(persisted), source)
+    # Debug flag preserves both the worker .npy and the enclosing workdir.
+    assert worker_npy.exists()
+    assert worker_dir.exists()
+
+
+def test_persist_aligned_group_to_npy_reports_insufficient_disk(monkeypatch, tmp_path):
+    """Disk guard fails before writing when aligned group cannot fit."""
+    monkeypatch.setattr(MultiTFGenerator, "_disk_free_bytes", staticmethod(lambda _path: 1))
+    target_path = tmp_path / "aligned.npy"
+
+    try:
+        MultiTFGenerator._persist_aligned_group_to_npy(
+            np.ones((2, 2), dtype=np.float32),
+            target_path,
+            n_primary=2,
+            n_cols=2,
+            idx_map=None,
+            group_id="too_big",
+        )
+        assert False, "Expected disk space guard to fail"
+    except OSError as exc:
+        assert "Insufficient disk space" in str(exc)
+        assert "too_big" in str(exc)
+        assert not target_path.exists()
 
 
 def test_open_minus_no_future_leak_for_lower_tf():

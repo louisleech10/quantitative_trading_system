@@ -523,6 +523,8 @@ class FeatureStorage:
 
     # V7 §12 P0: max columns before auto-splitting a group
     MAX_GROUP_COLUMNS = 5000
+    FLOAT16_MAX_REL_ERROR = 1e-3
+    FLOAT16_MAX_ABS_ERROR = 1e-12
 
     @staticmethod
     def _classify_persist_failure(error: BaseException) -> FailureType:
@@ -598,7 +600,8 @@ class FeatureStorage:
         """Persist CGSA registry groups to per-group parquet files.
 
         V7 enhancements:
-        - float16 cast before writing (halves storage, IC delta < 1e-5)
+        - float16 cast before writing when roundtrip-safe (halves storage)
+        - float32 fallback for parts that would overflow, underflow, or lose too much precision
         - Auto-split groups with > MAX_GROUP_COLUMNS columns
         - Write manifest.json + columns.json.gz after all groups persisted
 
@@ -620,6 +623,13 @@ class FeatureStorage:
         # V7 manifest groups metadata
         manifest_groups: Dict[str, Dict] = {}
         all_columns: List[str] = []
+        storage_dtypes: set[str] = set()
+        # Per-dtype counters + per-part fallback list (Task 1: dtype_summary).
+        # Future cross-symbol parity audits compare these counts to detect when
+        # a previously-float16 group fell back to float32 on a different symbol
+        # (which would silently change parquet bytes / overall_sha).
+        storage_dtype_counts: Dict[str, int] = {}
+        float32_fallback_parts: List[str] = []
         total_rows: int = 0
         npy_freed = 0
         preserve_staging = False
@@ -629,6 +639,12 @@ class FeatureStorage:
         try:
             groups_list = list(registry.iter_all())
             total_groups = len(groups_list)
+            # Task 2: aggregate disk pre-check at L7 entry. We pessimistically
+            # size every cell as float32 (worst-case fallback path) and apply a
+            # tunable safety factor; this catches situations where multiple L7
+            # workers (or higher tier with L6.5 dual-worker) would otherwise
+            # race past the per-group guard and explode mid-batch.
+            self._precheck_l7_disk_space(output_dir, groups_list)
             max_group_columns = max((len(group.columns) for _group_id, group in groups_list), default=0)
             tier = get_memory_tier()
             tier_cfg = get_tier_config(tier)
@@ -714,14 +730,18 @@ class FeatureStorage:
                 parts = self._split_large_group(group_id, columns_list, mmap_arr)
 
                 for part_id, part_cols, part_data in parts:
-                    # Cast to float16 for storage (V7 §12 P0). This is the
-                    # ONLY full materialization of the part data for L7.
-                    data_f16 = part_data.astype(np.float16)
+                    data_for_parquet, storage_dtype = self._select_parquet_storage_array(part_data)
+                    storage_dtypes.add(storage_dtype)
+                    storage_dtype_counts[storage_dtype] = (
+                        storage_dtype_counts.get(storage_dtype, 0) + 1
+                    )
+                    if storage_dtype != "float16":
+                        float32_fallback_parts.append(part_id)
 
                     staged_path = staging_dir / f"{part_id}.parquet"
                     final_path = output_dir / f"{part_id}.parquet"
 
-                    arrays = [pa_module.array(data_f16[:, ci]) for ci in range(len(part_cols))]
+                    arrays = [pa_module.array(data_for_parquet[:, ci]) for ci in range(len(part_cols))]
                     table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
                     pending_parts.append((part_id, table, final_path, staged_path))
                     part_to_group_id[part_id] = group_id
@@ -731,9 +751,10 @@ class FeatureStorage:
                         "file": f"{part_id}.parquet",
                         "column_count": len(part_cols),
                         "columns": list(part_cols),
+                        "dtype": storage_dtype,
                     }
                     all_columns.extend(part_cols)
-                    del data_f16
+                    del data_for_parquet
 
                 if group.disk_path and group.disk_path.exists():
                     pending_disk_paths[group_id] = group.disk_path
@@ -786,17 +807,22 @@ class FeatureStorage:
                 total_rows=total_rows,
                 groups=manifest_groups,
                 compaction_sources=compaction_manifest,
+                dtype=self._summarize_storage_dtype(storage_dtypes),
+                dtype_summary=self._build_dtype_summary(
+                    storage_dtype_counts, float32_fallback_parts
+                ),
             )
             self._write_columns_json_gz(output_dir, all_columns)
 
             self.logger.info(
                 "CGSA per-group parquet persist completed: symbol=%s config_hash=%s "
-                "groups=%d npy_freed=%d total_features=%d dtype=float16",
+                "groups=%d npy_freed=%d total_features=%d dtype=%s",
                 symbol,
                 config_hash,
                 len(persisted_paths),
                 npy_freed,
                 len(all_columns),
+                self._summarize_storage_dtype(storage_dtypes),
             )
             return persisted_paths
         except Exception as e:
@@ -843,6 +869,145 @@ class FeatureStorage:
             parts.append((part_id, part_cols, part_data))
         return parts
 
+    @classmethod
+    def _select_parquet_storage_array(cls, data: np.ndarray) -> Tuple[np.ndarray, str]:
+        """Return a parquet-ready array only using float16 when its roundtrip is safe.
+
+        Feature scales vary widely across symbols and data sources: BTC price-scale
+        indicators can overflow float16, while tiny quote prices can underflow to
+        zero. A roundtrip gate catches both cases plus excessive quantization error.
+        """
+        if data.size == 0:
+            return data.astype(np.float16), "float16"
+
+        source = np.asarray(data, dtype=np.float32)
+        with np.errstate(all="ignore"):
+            data_float16 = source.astype(np.float16)
+
+        finite_mask = np.isfinite(source)
+        if not finite_mask.any():
+            return data_float16, "float16"
+
+        roundtrip = data_float16.astype(np.float32)
+        finite_roundtrip = np.isfinite(roundtrip)
+        if not bool(np.all(finite_roundtrip[finite_mask])):
+            return source, "float32"
+
+        source_finite = source[finite_mask]
+        roundtrip_finite = roundtrip[finite_mask]
+        abs_error = np.abs(roundtrip_finite - source_finite)
+        tolerance = np.maximum(
+            cls.FLOAT16_MAX_ABS_ERROR,
+            np.abs(source_finite) * cls.FLOAT16_MAX_REL_ERROR,
+        )
+
+        if bool(np.any(abs_error > tolerance)):
+            return source, "float32"
+
+        return data_float16, "float16"
+
+    @staticmethod
+    def _summarize_storage_dtype(storage_dtypes: set[str]) -> str:
+        if not storage_dtypes:
+            return "float16"
+        if len(storage_dtypes) == 1:
+            return next(iter(storage_dtypes))
+        return "mixed"
+
+    @staticmethod
+    def _build_dtype_summary(
+        counts: Dict[str, int],
+        float32_fallback_parts: List[str],
+    ) -> Dict[str, Any]:
+        """Return a structured dtype summary embedded in the V7 manifest.
+
+        ``counts`` keeps per-dtype part counts (float16 / float32). The list of
+        parts that fell back to float32 is bounded so that the manifest stays
+        small even when many groups overflow on alternative symbols (e.g.
+        BTC); the truncation is recorded explicitly for downstream auditors.
+        """
+        max_listed = 256
+        sorted_parts = sorted(float32_fallback_parts)
+        summary: Dict[str, Any] = {
+            "counts": dict(sorted(counts.items())),
+            "float32_fallback_count": len(sorted_parts),
+            "float32_fallback_parts": sorted_parts[:max_listed],
+        }
+        if len(sorted_parts) > max_listed:
+            summary["float32_fallback_truncated"] = True
+            summary["float32_fallback_listed"] = max_listed
+        return summary
+
+    def _precheck_l7_disk_space(
+        self,
+        output_dir: Path,
+        groups_list: List[Tuple[str, Any]],
+    ) -> None:
+        """Aggregate worst-case L7 footprint and fail fast on tight disks.
+
+        Per-group :func:`_persist_group_array` already checks individual writes,
+        but with parallel persist (and future L6.5 dual-worker tiers) several
+        groups can simultaneously pass their guard while collectively exceeding
+        free space. Estimating with ``float32`` (4 bytes/cell) covers both the
+        normal float16 path and the float32-fallback path under one budget.
+        """
+        if not groups_list:
+            return
+
+        bytes_per_cell = np.dtype(np.float32).itemsize
+        estimated_bytes = 0
+        for _gid, group in groups_list:
+            n_rows, n_cols = group.shape
+            estimated_bytes += int(n_rows) * int(n_cols) * bytes_per_cell
+
+        safety_factor = self._resolve_l7_disk_safety_factor()
+        required_bytes = int(estimated_bytes * safety_factor)
+
+        free_bytes = self._safe_disk_free_bytes(output_dir)
+        if free_bytes is None:
+            return  # disk_usage unavailable; fall back to per-group guard
+
+        if free_bytes < required_bytes:
+            raise OSError(
+                "Insufficient disk space for L7 persist: "
+                f"need ~{required_bytes / (1024 ** 3):.2f} GiB "
+                f"(safety_factor={safety_factor:.2f}, raw_estimate="
+                f"{estimated_bytes / (1024 ** 3):.2f} GiB), "
+                f"available {free_bytes / (1024 ** 3):.2f} GiB at {output_dir}; "
+                f"groups={len(groups_list)}; clear data_cache/cgsa_work/* or lower "
+                "FFACT_L7_DISK_SAFETY_FACTOR if you accept the risk."
+            )
+
+        self.logger.info(
+            "[L7] Disk pre-check OK: estimate=%.2f GiB (safety x%.2f), free=%.2f GiB, groups=%d",
+            estimated_bytes / (1024 ** 3),
+            safety_factor,
+            free_bytes / (1024 ** 3),
+            len(groups_list),
+        )
+
+    @staticmethod
+    def _resolve_l7_disk_safety_factor() -> float:
+        raw = os.getenv("FFACT_L7_DISK_SAFETY_FACTOR", "1.5").strip()
+        try:
+            value = float(raw)
+        except ValueError:
+            return 1.5
+        # Refuse non-positive values; treat as default rather than letting the
+        # check trivially pass.
+        if value <= 0:
+            return 1.5
+        return value
+
+    @staticmethod
+    def _safe_disk_free_bytes(path: Path) -> Optional[int]:
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            import shutil as _shutil
+            return int(_shutil.disk_usage(path).free)
+        except OSError:
+            return None
+
     @staticmethod
     def _write_v7_manifest(
         output_dir: Path,
@@ -852,6 +1017,8 @@ class FeatureStorage:
         total_rows: int,
         groups: Dict[str, Dict],
         compaction_sources: Optional[Dict[str, List[str]]] = None,
+        dtype: str = "float16",
+        dtype_summary: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Write V7-format manifest.json (without full column names inline)."""
         manifest = {
@@ -861,9 +1028,11 @@ class FeatureStorage:
             "created_at": datetime.utcnow().isoformat(),
             "total_features": total_features,
             "total_rows": total_rows,
-            "dtype": "float16",
+            "dtype": dtype,
             "groups": groups,
         }
+        if dtype_summary is not None:
+            manifest["dtype_summary"] = dtype_summary
         if compaction_sources:
             manifest["compaction"] = {
                 "merged_files": compaction_sources,

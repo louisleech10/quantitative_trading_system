@@ -43,6 +43,9 @@ interface FeatureFactoryState {
   // LRU list of recently visited explorer task IDs (most-recent first, max 10).
   // Persisted to localStorage so the dropdown survives page reloads.
   explorerRecentTasks: string[];
+  // Complete feature-name catalog per task. Shared by all explorer tabs so
+  // segment filters show the same complete options everywhere.
+  explorerFeatureNamesByTask: Record<string, string[]>;
   // Phase C: schema and search
   schema: FeatureSchema | null;
   indicatorSearch: string;
@@ -76,6 +79,7 @@ interface FeatureFactoryState {
   clearExplorerSummaryForTask: (taskId: string) => void;
   pushExplorerRecentTask: (taskId: string) => void;
   removeExplorerRecentTask: (taskId: string) => void;
+  setExplorerFeatureNamesForTask: (taskId: string, featureNames: string[]) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
   fetchRegistry: () => Promise<void>;
   startBatchGeneration: (
@@ -145,6 +149,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   explorerSelectedFeatures: [],
   explorerSummary: null,
   explorerSummaryByTask: {},
+  explorerFeatureNamesByTask: {},
   explorerRecentTasks:
     typeof window !== 'undefined'
       ? (() => {
@@ -243,8 +248,14 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       }
       const summaries = { ...state.explorerSummaryByTask };
       delete summaries[taskId];
-      return { explorerRecentTasks: next, explorerSummaryByTask: summaries };
+      const featureNames = { ...state.explorerFeatureNamesByTask };
+      delete featureNames[taskId];
+      return { explorerRecentTasks: next, explorerSummaryByTask: summaries, explorerFeatureNamesByTask: featureNames };
     }),
+  setExplorerFeatureNamesForTask: (taskId, featureNames) =>
+    set((state) => ({
+      explorerFeatureNamesByTask: { ...state.explorerFeatureNamesByTask, [taskId]: featureNames },
+    })),
   setBatchTask: (batchTask) => set({ batchTask }),
   fetchRegistry: async () => {
     set({ registryLoading: true });
@@ -286,7 +297,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
           symbols: normalizedSymbols,
           timeframe,
           config_override: config,
-          force_regenerate: options?.forceRegenerate ?? false,
+          force_regenerate: options?.forceRegenerate ?? true,
           max_workers: options?.maxWorkers ?? 4,
         }),
       });

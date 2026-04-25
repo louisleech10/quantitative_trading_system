@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import os
+import shutil
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
@@ -469,38 +470,49 @@ class MultiTFGenerator:
             )
 
         aligned_count = 0
+        worker_dirs_to_cleanup: set[Path] = set()
+        freed_worker_bytes = 0
+        # Debug knob: keep worker .npy + workdir intact for post-mortem inspection
+        # or to resume from worker results. Default OFF so production runs reclaim
+        # the multi-GiB scratch space promptly.
+        keep_worker_npy = self._keep_worker_npy_enabled()
         for gd in groups_data:
             columns = tuple(gd["columns"])
+            n_cols = len(columns)
+            source_npy_path: Optional[Path] = None
 
             # OOM Fix: mmap-read the worker's .npy instead of receiving a
             # full ndarray over pickle. Backwards compatible: if a worker
             # returned the legacy "data" payload, fall back to it.
             if "npy_path" in gd:
-                src_data = np.load(gd["npy_path"], mmap_mode="r", allow_pickle=False)
+                source_npy_path = Path(gd["npy_path"])
+                src_data = np.load(source_npy_path, mmap_mode="r", allow_pickle=False)
             else:
                 src_data = gd["data"]
 
-            # Align non-primary TF data to primary resolution
-            if idx_map is not None:
-                aligned_data = self._align_group_array(src_data, idx_map, n_primary)
-            elif src_data.shape[0] != n_primary:
-                # No source timestamps available — fill with NaN
+            npy_path = registry.work_dir / f"{gd['group_id']}.npy"
+
+            if idx_map is None and src_data.shape[0] != n_primary:
                 logger.warning(
                     "No source timestamps for group %s; filling NaN", gd["group_id"],
                 )
-                aligned_data = np.full((n_primary, len(columns)), np.nan, dtype=np.float32)
+                source_for_save = None
             else:
-                # Materialise mmap view into a real ndarray for persistence
-                aligned_data = np.asarray(src_data, dtype=np.float32)
+                source_for_save = src_data
 
-            # Release the mmap view as soon as possible so the underlying
-            # file is not pinned during the np.save() below.
-            del src_data
-
-            # Save directly into registry.work_dir so cleanup() handles the files;
-            # previously used tempfile.mkdtemp per group, leaking empty dirs on each run.
-            npy_path = registry.work_dir / f"{gd['group_id']}.npy"
-            np.save(npy_path, aligned_data, allow_pickle=False)
+            try:
+                self._persist_aligned_group_to_npy(
+                    source_for_save,
+                    npy_path,
+                    n_primary=n_primary,
+                    n_cols=n_cols,
+                    idx_map=idx_map,
+                    group_id=gd["group_id"],
+                )
+            finally:
+                # Release mmap view before unlinking worker-side files.
+                del src_data
+                source_for_save = None
 
             group = ColumnGroup(
                 group_id=gd["group_id"],
@@ -509,20 +521,159 @@ class MultiTFGenerator:
                 data_source=gd["data_source"],
                 indicator=gd["indicator"],
                 columns=columns,
-                shape=aligned_data.shape,
-                dtype=gd["dtype"],
+                shape=(n_primary, n_cols),
+                dtype="float32",
                 disk_path=npy_path,
             )
-            registry.register(group)
+            try:
+                registry.register(group)
+            except Exception:
+                if npy_path.exists():
+                    npy_path.unlink()
+                raise
+
+            if source_npy_path is not None and not keep_worker_npy:
+                # Skip cleanup when KEEP_WORKER_NPY is enabled so the worker
+                # .npy + workdir remain intact for debugging / resume scenarios.
+                try:
+                    source_resolved = source_npy_path.resolve()
+                    target_resolved = npy_path.resolve()
+                    if source_resolved != target_resolved and source_npy_path.exists():
+                        file_size = source_npy_path.stat().st_size
+                        source_npy_path.unlink()
+                        freed_worker_bytes += file_size
+                        worker_dirs_to_cleanup.add(source_npy_path.parent)
+                except OSError as exc:
+                    logger.warning(
+                        "Failed to delete worker npy after registering %s: %s",
+                        gd["group_id"],
+                        exc,
+                    )
             aligned_count += 1
-            del aligned_data
+
+        if not keep_worker_npy:
+            self._cleanup_worker_dirs(worker_dirs_to_cleanup, registry.work_dir)
+        elif worker_dirs_to_cleanup:
+            logger.info(
+                "[CGSA-parallel] FFACT_MULTI_TF_KEEP_WORKER_NPY=1 "
+                "keeping %d worker workdirs for debug",
+                len(worker_dirs_to_cleanup),
+            )
 
         # Reclaim memory after processing a worker's full payload.
         gc.collect()
         logger.info(
-            "[CGSA-parallel] Registered %d groups from worker TF %s",
-            aligned_count, source_tf,
+            "[CGSA-parallel] Registered %d groups from worker TF %s (freed worker npy %.2f GiB)",
+            aligned_count, source_tf, freed_worker_bytes / (1024 ** 3),
         )
+
+    @classmethod
+    def _persist_aligned_group_to_npy(
+        cls,
+        src_data: Optional[np.ndarray],
+        target_path: Path,
+        n_primary: int,
+        n_cols: int,
+        idx_map: Optional[np.ndarray],
+        group_id: str,
+    ) -> None:
+        """Persist an aligned worker group with bounded RAM and clearer disk errors."""
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = target_path.with_name(f".{target_path.name}.{os.getpid()}.tmp")
+        if temp_path.exists():
+            temp_path.unlink()
+
+        expected_bytes = int(n_primary) * int(n_cols) * np.dtype(np.float32).itemsize
+        free_before = cls._disk_free_bytes(target_path.parent)
+        if free_before is not None and free_before < expected_bytes:
+            raise OSError(
+                f"Insufficient disk space while aligning worker group {group_id}: "
+                f"need {cls._format_bytes(expected_bytes)}, available {cls._format_bytes(free_before)}, "
+                f"target={target_path}"
+            )
+
+        block_rows = cls._align_block_rows()
+        try:
+            out = np.lib.format.open_memmap(
+                temp_path,
+                mode="w+",
+                dtype=np.float32,
+                shape=(int(n_primary), int(n_cols)),
+            )
+            for row_start in range(0, n_primary, block_rows):
+                row_end = min(row_start + block_rows, n_primary)
+                out_block = out[row_start:row_end]
+
+                if src_data is None:
+                    out_block[:] = np.nan
+                    continue
+
+                if idx_map is None:
+                    out_block[:] = np.asarray(src_data[row_start:row_end], dtype=np.float32)
+                    continue
+
+                block_idx = idx_map[row_start:row_end]
+                valid = block_idx >= 0
+                out_block[:] = np.nan
+                if np.any(valid):
+                    out_block[valid] = np.asarray(src_data[block_idx[valid]], dtype=np.float32)
+
+            out.flush()
+            del out
+            os.replace(temp_path, target_path)
+        except Exception as exc:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
+            free_after = cls._disk_free_bytes(target_path.parent)
+            raise OSError(
+                f"Failed to persist aligned worker group {group_id}: {exc}; "
+                f"shape=({n_primary}, {n_cols}), bytes={cls._format_bytes(expected_bytes)}, "
+                f"free_before={cls._format_bytes(free_before)}, free_after={cls._format_bytes(free_after)}, "
+                f"target={target_path}"
+            ) from exc
+
+    @staticmethod
+    def _align_block_rows() -> int:
+        raw = os.getenv("FFACT_MULTI_TF_ALIGN_BLOCK_ROWS", "1024").strip()
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            return 1024
+
+    @staticmethod
+    def _disk_free_bytes(path: Path) -> Optional[int]:
+        try:
+            return int(shutil.disk_usage(path).free)
+        except OSError:
+            return None
+
+    @staticmethod
+    def _format_bytes(num_bytes: Optional[int]) -> str:
+        if num_bytes is None:
+            return "unknown"
+        return f"{num_bytes / (1024 ** 3):.2f} GiB"
+
+    @staticmethod
+    def _cleanup_worker_dirs(worker_dirs: Iterable[Path], main_work_dir: Path) -> None:
+        main_resolved = main_work_dir.resolve()
+        for worker_dir in worker_dirs:
+            try:
+                worker_resolved = worker_dir.resolve()
+                if worker_resolved == main_resolved:
+                    continue
+                if worker_resolved.name.endswith("_worker") and worker_resolved.exists():
+                    shutil.rmtree(worker_resolved, ignore_errors=True)
+            except OSError as exc:
+                logger.warning("Failed to cleanup worker directory %s: %s", worker_dir, exc)
+
+    @staticmethod
+    def _keep_worker_npy_enabled() -> bool:
+        """Honor FFACT_MULTI_TF_KEEP_WORKER_NPY for debug / resume scenarios."""
+        raw = os.getenv("FFACT_MULTI_TF_KEEP_WORKER_NPY", "0").strip().lower()
+        return raw in {"1", "true", "yes", "on"}
 
     # ------------------------------------------------------------------
     # Legacy path: wide DataFrame concat + alignment (non-CGSA)

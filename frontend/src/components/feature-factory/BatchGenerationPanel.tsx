@@ -88,7 +88,7 @@ export default function BatchGenerationPanel({
       timeframe,
       config_override: (config as unknown as Record<string, unknown>) ?? undefined,
       max_workers: maxWorkers,
-      force_regenerate: false,
+      force_regenerate: true,
     };
 
     const taskId = await startBatchGeneration(request);

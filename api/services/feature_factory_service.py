@@ -745,7 +745,7 @@ class FeatureFactoryService:
             raise ValueError(f"Invalid sort_by: {sort_by}")
         if sort_order not in {"asc", "desc"}:
             raise ValueError(f"Invalid sort_order: {sort_order}")
-        if detail_level not in {"full", "table"}:
+        if detail_level not in {"full", "table", "names"}:
             raise ValueError(f"Invalid detail_level: {detail_level}")
 
         normalized_category = (category or "").strip()
@@ -759,7 +759,7 @@ class FeatureFactoryService:
         except Exception:
             context = None
 
-        if context and context.get("is_cgsa") and detail_level == "table":
+        if context and context.get("is_cgsa") and detail_level in {"table", "names"}:
             return self._browse_cgsa_catalog_features(
                 task_id=task_id,
                 context=context,
@@ -771,6 +771,7 @@ class FeatureFactoryService:
                 level=normalized_level,
                 search=normalized_search,
                 cursor=normalized_cursor,
+                detail_level=detail_level,
             )
 
         # Fast path for the most common first-load pattern:
@@ -904,6 +905,9 @@ class FeatureFactoryService:
         if detail_level == "full":
             return rows
 
+        if detail_level == "names":
+            return [{"name": row.get("name")} for row in rows]
+
         # table: only return columns currently required by Feature Table.
         keys = {
             "name",
@@ -911,7 +915,13 @@ class FeatureFactoryService:
             "level",
             "layer",
             "nan_ratio",
+            "mean",
             "std",
+            "min",
+            "q25",
+            "median",
+            "q75",
+            "max",
             "skewness",
             "kurtosis",
         }
@@ -932,6 +942,7 @@ class FeatureFactoryService:
         level: str,
         search: str,
         cursor: Optional[str],
+        detail_level: str,
     ) -> Dict[str, Any]:
         """Browse CGSA features from manifest/parquet metadata only.
 
@@ -970,6 +981,8 @@ class FeatureFactoryService:
 
         total = len(rows)
         page_rows = rows[start_index: start_index + limit]
+        if detail_level == "table":
+            page_rows = self._enrich_cgsa_catalog_page_stats(context, page_rows)
         has_more = (start_index + len(page_rows)) < total
         next_cursor = str(page_rows[-1].get("name", "")) if (page_rows and has_more and order_key == "name" and not reverse) else None
 
@@ -985,8 +998,50 @@ class FeatureFactoryService:
                 "level": level or None,
                 "search": search or None,
             },
-            "features": self._project_browse_rows(page_rows, "table"),
+            "features": self._project_browse_rows(page_rows, detail_level),
         }
+
+    def _enrich_cgsa_catalog_page_stats(
+        self,
+        context: Dict[str, Any],
+        rows: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Compute statistics for only the current CGSA page of features."""
+        if not rows:
+            return rows
+
+        names = [str(row.get("name", "")) for row in rows if row.get("name")]
+        if not names:
+            return rows
+
+        try:
+            df, _total_rows = self._load_cgsa_selected_df(context, names)
+        except Exception as exc:
+            logger.warning("CGSA page stats failed for task %s: %s", context.get("task_id"), exc)
+            return rows
+
+        numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
+        stats = {
+            "nan_ratio": numeric.isna().mean(),
+            "mean": numeric.mean(skipna=True),
+            "std": numeric.std(skipna=True),
+            "min": numeric.min(skipna=True),
+            "q25": numeric.quantile(0.25),
+            "median": numeric.quantile(0.50),
+            "q75": numeric.quantile(0.75),
+            "max": numeric.max(skipna=True),
+            "skewness": numeric.skew(skipna=True),
+            "kurtosis": numeric.kurt(skipna=True),
+        }
+
+        enriched: List[Dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            name = str(item.get("name", ""))
+            for key, series in stats.items():
+                item[key] = self._safe_float(series.get(name))
+            enriched.append(item)
+        return enriched
 
     def _build_cgsa_catalog_rows(self, task_id: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
         cached = self._cgsa_catalog_cache.get(task_id)

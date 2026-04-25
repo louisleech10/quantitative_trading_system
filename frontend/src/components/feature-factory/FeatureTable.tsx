@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowseFeatureItem } from '@/lib/types';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
+import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
 
 interface FeatureTableProps {
@@ -27,6 +28,7 @@ const VIRTUAL_OVERSCAN = 12;
 
 export default function FeatureTable({ taskId, totalCount, onOpenDistribution, onOpenCorrelation }: FeatureTableProps) {
   const { browseFeatures } = useFeatureFactory();
+  const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
 
   // All features loaded once from the server (up to 5000)
   const [allRows, setAllRows] = useState<BrowseFeatureItem[]>([]);
@@ -151,7 +153,10 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     };
   }, [browseFeatures, taskId]);
 
-  const featureNames = useMemo(() => allRows.map((row) => row.name), [allRows]);
+  const featureNames = useMemo(
+    () => (sharedFeatureNames && sharedFeatureNames.length > 0 ? sharedFeatureNames : allRows.map((row) => row.name)),
+    [allRows, sharedFeatureNames]
+  );
 
   // Client-side filter + sort (instant, no network)
   const filteredRows = useMemo(() => {
@@ -318,7 +323,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       )}
 
       <div className="text-[11px] text-slate-400">
-        提示：ADF 指標會在背景預熱，首次載入後同任務的後續分頁與查詢會更快。
+        提示：表格會先載入前段資料並在背景補齊；統計值以目前已載入的特徵列為準。
       </div>
 
       {error && <div className="text-xs text-rose-300">{error}</div>}

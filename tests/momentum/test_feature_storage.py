@@ -11,6 +11,7 @@ import pytest
 import pandas as pd
 import numpy as np
 import h5py
+import json
 from pathlib import Path
 import shutil
 
@@ -19,6 +20,8 @@ from momentum.FeatureEngineering.feature_extractor import (
     StrategyParams
 )
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
+from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
 
 @pytest.fixture
@@ -192,6 +195,216 @@ def test_edge_case_file_not_found(temp_storage_path):
         )
     
     print("✅ 檔案不存在處理測試通過")
+
+
+def test_cgsa_registry_reports_insufficient_disk(monkeypatch, tmp_path):
+    """測試 CGSA 中間 .npy 寫入遇到磁碟不足時回報可診斷訊息。"""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    monkeypatch.setattr(registry, "_disk_free_bytes", lambda _path: 1)
+    data = np.ones((2, 2), dtype=np.float32)
+    group = ColumnGroup(
+        group_id="disk_guard",
+        layer=LayerSource.L1,
+        timeframe="1h",
+        data_source="close",
+        indicator="TEST",
+        columns=("a", "b"),
+        shape=data.shape,
+    )
+
+    with pytest.raises(Exception) as exc_info:
+        registry.save_data(group, data)
+
+    message = str(exc_info.value)
+    assert "Insufficient disk space" in message
+    assert "disk_guard" in message
+    assert "shape=(2, 2)" in message
+
+
+def test_cgsa_parquet_uses_float32_when_values_exceed_float16(tmp_path):
+    """測試 BTC 價格尺度特徵不會因 float16 overflow 變成 inf。"""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    data = np.array(
+        [
+            [60000.0, 1.0],
+            [70000.0, 2.0],
+            [80000.0, 3.0],
+        ],
+        dtype=np.float32,
+    )
+    registry.save_data(
+        ColumnGroup(
+            group_id="test_high_price",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("btc_price_feature", "small_feature"),
+            shape=data.shape,
+        ),
+        data,
+    )
+
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    storage.persist_registry_to_parquet("BTCUSDT", "hash", registry)
+
+    output_dir = tmp_path / "features" / "BTCUSDT" / "hash"
+    df = pd.read_parquet(output_dir / "test_high_price.parquet")
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+
+    assert str(df["btc_price_feature"].dtype) == "float32"
+    assert np.isinf(df["btc_price_feature"].to_numpy()).sum() == 0
+    assert df["btc_price_feature"].tolist() == [60000.0, 70000.0, 80000.0]
+    assert manifest["dtype"] == "float32"
+    assert manifest["groups"]["test_high_price"]["dtype"] == "float32"
+
+
+def test_cgsa_parquet_uses_float32_when_float16_underflows_tiny_values(tmp_path):
+    """測試極小價格尺度特徵不會因 float16 underflow 變成 0。"""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    data = np.array(
+        [
+            [1.0e-8, -1.0e-8],
+            [2.0e-8, -2.0e-8],
+            [5.0e-8, -5.0e-8],
+        ],
+        dtype=np.float32,
+    )
+    registry.save_data(
+        ColumnGroup(
+            group_id="test_tiny_price",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("tiny_positive", "tiny_negative"),
+            shape=data.shape,
+        ),
+        data,
+    )
+
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    storage.persist_registry_to_parquet("TINYUSDT", "hash", registry)
+
+    output_dir = tmp_path / "features" / "TINYUSDT" / "hash"
+    df = pd.read_parquet(output_dir / "test_tiny_price.parquet")
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+
+    assert str(df["tiny_positive"].dtype) == "float32"
+    np.testing.assert_allclose(df["tiny_positive"].to_numpy(), data[:, 0], rtol=1e-7, atol=0)
+    np.testing.assert_allclose(df["tiny_negative"].to_numpy(), data[:, 1], rtol=1e-7, atol=0)
+    assert manifest["dtype"] == "float32"
+    assert manifest["groups"]["test_tiny_price"]["dtype"] == "float32"
+
+
+def test_cgsa_parquet_keeps_float16_when_safe(tmp_path):
+    """測試一般尺度特徵仍保留 float16 壓縮。"""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    data = np.array([[100.0, 1.0], [200.0, 2.0]], dtype=np.float32)
+    registry.save_data(
+        ColumnGroup(
+            group_id="test_small",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("small_price", "small_feature"),
+            shape=data.shape,
+        ),
+        data,
+    )
+
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    storage.persist_registry_to_parquet("ETHUSDT", "hash", registry)
+
+    output_dir = tmp_path / "features" / "ETHUSDT" / "hash"
+    df = pd.read_parquet(output_dir / "test_small.parquet")
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+
+    assert str(df["small_price"].dtype) == "float16"
+    assert manifest["dtype"] == "float16"
+    assert manifest["groups"]["test_small"]["dtype"] == "float16"
+    # Task 1: dtype_summary structured payload always present.
+    summary = manifest["dtype_summary"]
+    assert summary["counts"] == {"float16": 1}
+    assert summary["float32_fallback_count"] == 0
+    assert summary["float32_fallback_parts"] == []
+
+
+def test_cgsa_manifest_dtype_summary_records_mixed_dtype(tmp_path):
+    """Mixed-dtype runs must surface per-dtype counts + the fallback group list."""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    safe = np.array([[100.0, 1.0], [200.0, 2.0], [300.0, 3.0]], dtype=np.float32)
+    overflow = np.array(
+        [[60000.0, 1.0], [70000.0, 2.0], [80000.0, 3.0]],
+        dtype=np.float32,
+    )
+    registry.save_data(
+        ColumnGroup(
+            group_id="grp_safe",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("safe_a", "safe_b"),
+            shape=safe.shape,
+        ),
+        safe,
+    )
+    registry.save_data(
+        ColumnGroup(
+            group_id="grp_overflow",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("big_a", "big_b"),
+            shape=overflow.shape,
+        ),
+        overflow,
+    )
+
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    storage.persist_registry_to_parquet("MIXEDUSDT", "hash", registry)
+
+    manifest = json.loads(
+        (tmp_path / "features" / "MIXEDUSDT" / "hash" / "manifest.json").read_text()
+    )
+
+    assert manifest["dtype"] == "mixed"
+    summary = manifest["dtype_summary"]
+    assert summary["counts"] == {"float16": 1, "float32": 1}
+    assert summary["float32_fallback_count"] == 1
+    assert summary["float32_fallback_parts"] == ["grp_overflow"]
+
+
+def test_l7_disk_precheck_raises_when_estimate_exceeds_free_space(monkeypatch, tmp_path):
+    """L7 entry guard fails fast when aggregate estimate exceeds free disk."""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    data = np.ones((4, 2), dtype=np.float32)
+    registry.save_data(
+        ColumnGroup(
+            group_id="grp_one",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("a", "b"),
+            shape=data.shape,
+        ),
+        data,
+    )
+
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: 1)
+
+    try:
+        storage.persist_registry_to_parquet("DISKFULL", "hash", registry)
+        assert False, "Expected aggregate L7 disk pre-check to fail"
+    except OSError as exc:
+        message = str(exc)
+        assert "Insufficient disk space for L7 persist" in message
+        assert "safety_factor" in message
 
 
 def test_edge_case_corrupted_metadata(temp_storage_path, sample_features):
