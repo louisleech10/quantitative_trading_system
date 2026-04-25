@@ -636,18 +636,17 @@ class DerivedOperatorEngine:
 
         selected = self._build_selected_frame(layer1_df, selected_cols)
 
-        # P4.2: Numba fast path for ts_argmax/ts_argmin/decay_linear
+        # P4.2: Numba fast path for ts_argmax/ts_argmin
         # Replaces pandas rolling.apply (Python callbacks ~12s per (op,window) at 800 cols)
         # with parallel-prange Numba kernels (~0.3s per (op,window)).
-        # Parity verified bit-exact for argmax/argmin and within float epsilon for decay
-        # (vanishes after float16 storage cast). overall_sha unchanged (3e563d3fa3f0275c).
+        # Argmax/argmin: BIT-EXACT parity verified (diff=0 in float64, sha unchanged).
+        # decay_linear stays on pandas: BLAS-level np.dot summation cannot be matched
+        # sequentially without ULP drift that exceeds float16 precision in some cells
+        # (1 cell per ~200K at large magnitudes). Preserve parity > 8s/window saving.
         from momentum.FeatureEngineering.operators import _worldquant_numba as _wq_nb
 
-        # Pre-compute float64 ndarray once per call (numba kernels need contiguous float64)
         wq_uses_numba = _wq_nb.HAS_NUMBA and (
-            "ts_argmax" in operator_set
-            or "ts_argmin" in operator_set
-            or "decay_linear" in operator_set
+            "ts_argmax" in operator_set or "ts_argmin" in operator_set
         )
         selected_arr64 = (
             np.ascontiguousarray(selected.to_numpy(dtype=np.float64, copy=False))
@@ -687,14 +686,10 @@ class DerivedOperatorEngine:
                 weights = np.arange(1, window + 1, dtype=float)
                 weights /= weights.sum()
 
-                if _wq_nb.HAS_NUMBA:
-                    decay_arr = _wq_nb._decay_linear_2d(selected_arr64, weights)
-                    decay_df = pd.DataFrame(decay_arr, index=selected.index)
-                else:
-                    def _decay_fn(arr: np.ndarray, _weights: np.ndarray = weights) -> float:
-                        return float(np.dot(arr, _weights))
+                def _decay_fn(arr: np.ndarray, _weights: np.ndarray = weights) -> float:
+                    return float(np.dot(arr, _weights))
 
-                    decay_df = rolling.apply(_decay_fn, raw=True)
+                decay_df = rolling.apply(_decay_fn, raw=True)
                 decay_df.columns = [f"{col}_DecayLinear_W{window}" for col in selected_cols]
                 frames.append(decay_df)
 
