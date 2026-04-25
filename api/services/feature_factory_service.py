@@ -1114,7 +1114,7 @@ class FeatureFactoryService:
             "quality": {
                 "nan_ratio_mean": nan_ratio_mean,
                 "nan_ratio_max": nan_ratio_max,
-                "nan_ratio_distribution": self._nan_ratio_distribution(features_df),
+                "nan_ratio_distribution": self._nan_ratio_distribution(features_df, nan_ratios),
                 "constant_features": constant_features_list,
                 "high_corr_pairs_count": high_corr_pairs_count,
                 "stationary_ratio": stationary_ratio,
@@ -2091,6 +2091,21 @@ class FeatureFactoryService:
         if not frames:
             return pd.DataFrame()
         df = pd.concat(frames, axis=1, copy=False)
+
+        # Defensive dedup: legacy cgsa_work manifests can contain duplicate
+        # group entries (e.g. "_2" suffix groups produced by an aborted resume
+        # before commit 37195bb). Concatenating those parquet files yields a
+        # DataFrame with duplicated column names; downstream code that does
+        # ``df[col]`` then receives a DataFrame instead of a Series and crashes
+        # with "The truth value of a Series is ambiguous". Drop duplicates
+        # (keep first) so subsequent endpoints see a clean column index.
+        if df.columns.duplicated().any():
+            duplicate_count = int(df.columns.duplicated().sum())
+            logger.warning(
+                "CGSA features for task %s contain %d duplicate column names; keeping first occurrence",
+                context["task_id"], duplicate_count,
+            )
+            df = df.loc[:, ~df.columns.duplicated(keep="first")]
         return df
 
     def _load_hdf5_schema(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -2371,6 +2386,14 @@ class FeatureFactoryService:
         if not HAS_STATSMODELS:
             return None
 
+        # Defensive: when caller selects a duplicated column name from a wide
+        # DataFrame, ``df[name]`` returns a DataFrame. Pick the first column so
+        # subsequent ``.replace()/.dropna()/.nunique()`` ops stay scalar-safe.
+        if isinstance(series, pd.DataFrame):
+            if series.shape[1] == 0:
+                return None
+            series = series.iloc[:, 0]
+
         clean = series.replace([np.inf, -np.inf], np.nan).dropna()
         if clean.shape[0] < 30:
             return None
@@ -2419,13 +2442,21 @@ class FeatureFactoryService:
         return constants
 
     @staticmethod
-    def _nan_ratio_distribution(features_df: pd.DataFrame) -> List[float]:
+    def _nan_ratio_distribution(
+        features_df: pd.DataFrame,
+        nan_ratios: Optional["pd.Series"] = None,
+    ) -> List[float]:
         if features_df.empty:
             return []
         bins = [0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 1.0]
-        nan_ratios = features_df.isna().mean().to_numpy()
-        counts, _ = np.histogram(nan_ratios, bins=bins)
-        total = nan_ratios.shape[0]
+        # Reuse caller-supplied nan_ratios when available to avoid an extra
+        # full ``isna().mean()`` pass over a 200k-column DataFrame.
+        if nan_ratios is None:
+            nan_array = features_df.isna().mean().to_numpy()
+        else:
+            nan_array = nan_ratios.to_numpy()
+        counts, _ = np.histogram(nan_array, bins=bins)
+        total = nan_array.shape[0]
         if total == 0:
             return [0.0 for _ in counts]
         return [float(value / total) for value in counts]
