@@ -8,6 +8,7 @@ import asyncio
 import contextlib
 import hashlib
 import io
+import json
 import os
 import threading
 import uuid
@@ -1755,37 +1756,16 @@ class FeatureFactoryService:
 
     def _load_task_features(self, task_id: str) -> tuple:
         """Load task features DataFrame, using an in-memory cache to avoid
-        redundant HDF5 reads across multiple browse/export calls."""
+        redundant HDF5/Parquet reads across multiple browse/export calls."""
         if task_id in self._df_cache:
             return self._df_cache[task_id]
 
         context = self._load_task_context(task_id)
-        file_path = context["file_path"]
-        group_path = context["group_path"]
-        with h5py.File(file_path, "r") as h5_file:
-            if group_path not in h5_file:
-                raise FileNotFoundError(f"Group not found in HDF5: {group_path}")
-            group = h5_file[group_path]
 
-            if "features" not in group:
-                raise FileNotFoundError(f"features dataset missing: {group_path}/features")
-
-            features = group["features"][:]
-            raw_feature_names = list(group["feature_names"][:]) if "feature_names" in group else []
-            feature_names = [
-                name.decode("utf-8") if isinstance(name, (bytes, bytearray, np.bytes_)) else str(name)
-                for name in raw_feature_names
-            ]
-            if len(feature_names) != features.shape[1]:
-                feature_names = [f"feature_{idx}" for idx in range(features.shape[1])]
-
-            df = pd.DataFrame(features, columns=feature_names)
-
-            timestamps = group["timestamps"][:] if "timestamps" in group else None
-            if timestamps is not None:
-                timestamp_index = pd.to_datetime(timestamps, unit="s", errors="coerce")
-                df.index = timestamp_index
-                df.index.name = "timestamp"
+        if context.get("is_cgsa"):
+            df = self._load_cgsa_features_df(context)
+        else:
+            df = self._load_hdf5_features_df(context)
 
         export_meta = {
             "task_id": task_id,
@@ -1945,13 +1925,26 @@ class FeatureFactoryService:
 
         file_path = Path(hdf5_path)
         if not file_path.exists():
-            raise FileNotFoundError(f"HDF5 file not found: {file_path}")
+            raise FileNotFoundError(f"Feature output not found: {file_path}")
 
         metadata = task_result.get("metadata") or {}
         symbol = metadata.get("symbol")
         timeframe = metadata.get("timeframe")
         if not symbol or not timeframe:
             raise ValueError(f"Missing symbol/timeframe metadata for task: {task_id}")
+
+        # Detect CGSA V7 manifest (manifest.json) vs legacy HDF5 (.h5).
+        # CGSA pipeline persists features as per-group Parquet files described
+        # by manifest.json; legacy single-TF path still writes one HDF5 file.
+        is_cgsa = file_path.suffix.lower() == ".json"
+        manifest: Optional[Dict[str, Any]] = None
+        if is_cgsa:
+            try:
+                manifest = json.loads(file_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise FileNotFoundError(
+                    f"Failed to read CGSA manifest {file_path}: {exc}"
+                ) from exc
 
         return {
             "task_id": task_id,
@@ -1962,9 +1955,87 @@ class FeatureFactoryService:
             "file_path": file_path,
             "group_path": f"{symbol}/{timeframe}",
             "generated_at": datetime.now().isoformat(),
+            "is_cgsa": is_cgsa,
+            "manifest": manifest,
+            "manifest_dir": file_path.parent if is_cgsa else None,
         }
 
+    def _load_hdf5_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
+        """Materialize a features DataFrame from a legacy single-TF HDF5 file."""
+        file_path = context["file_path"]
+        group_path = context["group_path"]
+        with h5py.File(file_path, "r") as h5_file:
+            if group_path not in h5_file:
+                raise FileNotFoundError(f"Group not found in HDF5: {group_path}")
+            group = h5_file[group_path]
+            if "features" not in group:
+                raise FileNotFoundError(f"features dataset missing: {group_path}/features")
+
+            features = group["features"][:]
+            raw_feature_names = list(group["feature_names"][:]) if "feature_names" in group else []
+            feature_names = [
+                name.decode("utf-8") if isinstance(name, (bytes, bytearray, np.bytes_)) else str(name)
+                for name in raw_feature_names
+            ]
+            if len(feature_names) != features.shape[1]:
+                feature_names = [f"feature_{idx}" for idx in range(features.shape[1])]
+
+            df = pd.DataFrame(features, columns=feature_names)
+
+            timestamps = group["timestamps"][:] if "timestamps" in group else None
+            if timestamps is not None:
+                timestamp_index = pd.to_datetime(timestamps, unit="s", errors="coerce")
+                df.index = timestamp_index
+                df.index.name = "timestamp"
+        return df
+
+    def _load_cgsa_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
+        """Materialize a features DataFrame from a CGSA V7 Parquet manifest.
+
+        Each parquet file in the manifest holds a column-wise slice of the
+        same row index; we read them group-by-group and concat horizontally.
+        Timestamps are not stored alongside the parquet groups, so we use a
+        positional RangeIndex (sufficient for stats/preview consumers).
+        """
+        import pyarrow.parquet as pq  # local import keeps cold-start light
+
+        manifest = context.get("manifest") or {}
+        manifest_dir: Optional[Path] = context.get("manifest_dir")
+        groups = manifest.get("groups") or {}
+        if not groups or manifest_dir is None:
+            return pd.DataFrame()
+
+        # Preserve manifest insertion order for deterministic column layout.
+        frames: List[pd.DataFrame] = []
+        for _group_id, group_meta in groups.items():
+            relative = group_meta.get("file")
+            if not relative:
+                continue
+            parquet_path = manifest_dir / relative
+            if not parquet_path.exists():
+                logger.warning(
+                    "CGSA parquet missing for task %s: %s", context["task_id"], parquet_path,
+                )
+                continue
+            table = pq.read_table(str(parquet_path))
+            frames.append(table.to_pandas(self_destruct=True))
+
+        if not frames:
+            return pd.DataFrame()
+        df = pd.concat(frames, axis=1, copy=False)
+        return df
+
     def _load_hdf5_schema(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        if context.get("is_cgsa"):
+            manifest = context.get("manifest") or {}
+            groups = manifest.get("groups") or {}
+            feature_names: List[str] = []
+            for group_meta in groups.values():
+                feature_names.extend(group_meta.get("columns") or [])
+            return {
+                "feature_names": feature_names,
+                "row_count": int(manifest.get("total_rows") or 0),
+            }
         file_path = context["file_path"]
         group_path = context["group_path"]
         with h5py.File(file_path, "r") as h5_file:
@@ -1995,6 +2066,9 @@ class FeatureFactoryService:
         offset: int,
         limit: int,
     ) -> Dict[str, Any]:
+        if context.get("is_cgsa"):
+            return self._load_cgsa_selected_rows(context, selected_features, offset, limit)
+
         file_path = context["file_path"]
         group_path = context["group_path"]
 
@@ -2056,6 +2130,98 @@ class FeatureFactoryService:
                 "features": selected_features,
                 "rows": data_rows,
             }
+
+    def _load_cgsa_selected_rows(
+        self,
+        context: Dict[str, Any],
+        selected_features: List[str],
+        offset: int,
+        limit: int,
+    ) -> Dict[str, Any]:
+        """CGSA Parquet variant: read only the parquet groups that contain
+        the requested columns, then slice rows. Falls back to the cached
+        full DataFrame when it is already materialized."""
+        import pyarrow.parquet as pq  # local import keeps cold-start light
+        task_id = context["task_id"]
+
+        # Reuse cache if present (typical after stats warmup) — avoids re-reading parquet.
+        cached = self._df_cache.get(task_id)
+        if cached is not None:
+            df_full = cached[0]
+            missing = [name for name in selected_features if name not in df_full.columns]
+            if missing:
+                raise ValueError(f"Invalid features: {missing}")
+            total_rows = int(df_full.shape[0])
+            start = min(offset, total_rows)
+            end = min(offset + limit, total_rows)
+            slice_df = df_full.iloc[start:end][selected_features]
+            chunk_values = slice_df.to_numpy()
+            timestamps = self._format_cgsa_timestamps(df_full.index, start, end)
+        else:
+            manifest = context.get("manifest") or {}
+            manifest_dir: Optional[Path] = context.get("manifest_dir")
+            groups = manifest.get("groups") or {}
+            if not groups or manifest_dir is None:
+                raise FileNotFoundError(f"Empty CGSA manifest for task {task_id}")
+
+            # Map column → group file (first match wins; columns are unique across groups).
+            selected_set = set(selected_features)
+            column_to_file: Dict[str, Path] = {}
+            for group_meta in groups.values():
+                relative = group_meta.get("file")
+                if not relative:
+                    continue
+                parquet_path = manifest_dir / relative
+                for col in group_meta.get("columns") or []:
+                    if col in selected_set and col not in column_to_file:
+                        column_to_file[col] = parquet_path
+
+            missing = [name for name in selected_features if name not in column_to_file]
+            if missing:
+                raise ValueError(f"Invalid features: {missing}")
+
+            total_rows = int(manifest.get("total_rows") or 0)
+            start = min(offset, total_rows)
+            end = min(offset + limit, total_rows)
+
+            # Group required columns by parquet file to minimize reads.
+            file_to_cols: Dict[Path, List[str]] = {}
+            for col in selected_features:
+                file_to_cols.setdefault(column_to_file[col], []).append(col)
+
+            partial_frames: List[pd.DataFrame] = []
+            for parquet_path, cols in file_to_cols.items():
+                table = pq.read_table(str(parquet_path), columns=cols)
+                partial_frames.append(table.to_pandas(self_destruct=True))
+            combined = pd.concat(partial_frames, axis=1, copy=False)
+            slice_df = combined.iloc[start:end][selected_features]
+            chunk_values = slice_df.to_numpy()
+            timestamps = [str(idx) for idx in range(start, end)]
+
+        data_rows: List[Dict[str, Any]] = []
+        for row_idx in range(chunk_values.shape[0]):
+            row_payload: Dict[str, Any] = {"timestamp": timestamps[row_idx]}
+            for col_idx, feature_name in enumerate(selected_features):
+                row_payload[feature_name] = self._safe_float(chunk_values[row_idx, col_idx])
+            data_rows.append(row_payload)
+
+        return {
+            "total_rows": total_rows,
+            "offset": offset,
+            "limit": limit,
+            "features": selected_features,
+            "rows": data_rows,
+        }
+
+    @staticmethod
+    def _format_cgsa_timestamps(index: pd.Index, start: int, end: int) -> List[str]:
+        """Best-effort timestamp formatter for CGSA preview rows."""
+        if isinstance(index, pd.DatetimeIndex):
+            return [
+                value.isoformat() if pd.notna(value) else None
+                for value in index[start:end]
+            ]
+        return [str(value) for value in index[start:end]]
 
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:
@@ -2151,8 +2317,8 @@ class FeatureFactoryService:
             return [0.0 for _ in counts]
         return [float(value / total) for value in counts]
 
-    @staticmethod
     def _csv_chunk_generator_from_hdf5(
+        self,
         context: Dict[str, Any],
         selected_columns: List[str],
         max_rows: int,
@@ -2177,9 +2343,33 @@ class FeatureFactoryService:
         header = "timestamp," + (",".join(_raw_columns) + "," if _raw_columns else "") + ",".join(selected_columns) + "\n"
         yield header
 
+        chunk_size = 10_000
+
+        if context.get("is_cgsa"):
+            # CGSA path: read parquet groups via the cached DataFrame loader
+            # (faster on repeat calls; columns are already projected).
+            df_full, _ = self._load_task_features(task_id)
+            invalid = [c for c in selected_columns if c not in df_full.columns]
+            if invalid:
+                raise ValueError(
+                    f"Invalid columns: {invalid}. Available columns count: {len(df_full.columns)}"
+                )
+            view = df_full[selected_columns].iloc[:max_rows]
+            for start in range(0, len(view), chunk_size):
+                chunk_df = view.iloc[start:start + chunk_size]
+                if raw_df is not None and _raw_columns:
+                    try:
+                        raw_chunk = raw_df.reindex(chunk_df.index)[_raw_columns]
+                    except Exception:
+                        raw_chunk = pd.DataFrame(index=chunk_df.index, columns=_raw_columns)
+                    chunk_df = pd.concat([raw_chunk, chunk_df], axis=1)
+                buffer = io.StringIO()
+                chunk_df.to_csv(buffer, header=False, index=True)
+                yield buffer.getvalue()
+            return
+
         file_path = context["file_path"]
         group_path = context["group_path"]
-        chunk_size = 10_000
 
         with h5py.File(file_path, "r") as h5_file:
             group = h5_file[group_path]
