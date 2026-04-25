@@ -1042,11 +1042,44 @@ class FeatureFactoryService:
     def browse_summary(self, task_id: str) -> Dict[str, Any]:
         """Return feature explorer summary dashboard payload.
 
-        Rewritten to avoid calling build_json_report() which is prohibitively slow
-        for large feature sets (36k+ features).  All computation here is O(N) or
-        uses vectorized pandas/numpy — no full correlation matrix.
+        Performance strategy:
+        * For CGSA tasks (parquet-backed) we first try ``_load_cgsa_summary_fast``
+          which derives shape / nan_ratios / constants from parquet *metadata*
+          without decoding any column data. This drops the cold-load path from
+          ~30-60s (loading 200k columns into memory) to a few seconds.
+        * Stationarity (ADF) only needs ~100 sample columns, so we read just
+          those columns from parquet on demand.
+        * The full DataFrame is still warmed asynchronously for FeatureTable /
+          Distribution tabs via ``_start_stats_cache_warmup``; that no longer
+          blocks the Overview response.
+        * HDF5 tasks (or CGSA fast-path failures) fall through to the original
+          full-load implementation.
         """
         import warnings
+
+        # Probe context for CGSA fast-path. Wrap in try/except because some
+        # unit tests monkeypatch only _load_task_features; in that case we
+        # silently skip the fast path and fall through to the legacy load.
+        context: Optional[Dict[str, Any]] = None
+        try:
+            context = self._load_task_context(task_id)
+        except Exception as exc:
+            logger.debug("browse_summary: _load_task_context failed (%s); using legacy path", exc)
+            context = None
+
+        if context and context.get("is_cgsa"):
+            try:
+                fast_summary = self._load_cgsa_summary_fast(context)
+            except Exception as exc:
+                logger.warning(
+                    "CGSA fast summary failed for task %s, falling back to full load: %s",
+                    task_id, exc, exc_info=True,
+                )
+                fast_summary = None
+            if fast_summary is not None:
+                return self._browse_summary_from_fast(task_id, context, fast_summary)
+
+        # ----- Original full-load path (HDF5 / fast-path fallback) -----
         features_df, export_meta = self._load_task_features(task_id)
 
         # --- Category / layer / level breakdown (name parsing fast-path) ---
@@ -2108,6 +2141,294 @@ class FeatureFactoryService:
             df = df.loc[:, ~df.columns.duplicated(keep="first")]
         return df
 
+    def _load_cgsa_summary_fast(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Compute browse_summary inputs from parquet metadata WITHOUT decoding data.
+
+        Returns ``None`` when statistics are unavailable, signaling the caller
+        to fall back to the full DataFrame load path. Conservative: any single
+        missing column-level statistic triggers fallback so we never report
+        wrong nan_ratios.
+        """
+        import pyarrow.parquet as pq  # local import keeps cold-start light
+
+        manifest = context.get("manifest") or {}
+        manifest_dir: Optional[Path] = context.get("manifest_dir")
+        groups_raw = manifest.get("groups")
+        if not groups_raw:
+            return None
+
+        parquet_paths: List[Path] = []
+        if isinstance(groups_raw, dict):
+            for _gid, meta in groups_raw.items():
+                if not isinstance(meta, dict):
+                    continue
+                relative = meta.get("file")
+                if not relative or manifest_dir is None:
+                    continue
+                path = manifest_dir / relative
+                if path.exists():
+                    parquet_paths.append(path)
+        else:
+            for meta in groups_raw:
+                if not isinstance(meta, dict):
+                    continue
+                ppath = meta.get("parquet_path")
+                if not ppath:
+                    continue
+                path = Path(ppath)
+                if path.exists():
+                    parquet_paths.append(path)
+
+        if not parquet_paths:
+            return None
+
+        columns_ordered: List[str] = []
+        seen_cols: set = set()
+        null_counts: Dict[str, int] = {}
+        distinct_counts: Dict[str, Optional[int]] = {}
+        min_max: Dict[str, tuple] = {}
+        column_to_path: Dict[str, Path] = {}
+        total_rows = 0
+
+        for path in parquet_paths:
+            try:
+                pf = pq.ParquetFile(str(path))
+            except Exception as exc:
+                logger.warning("Failed to read parquet metadata %s: %s", path, exc)
+                return None
+            meta = pf.metadata
+            if meta is None:
+                return None
+
+            file_rows = meta.num_rows
+            if total_rows == 0:
+                total_rows = file_rows
+            elif file_rows != total_rows:
+                logger.warning(
+                    "Parquet row count mismatch in CGSA task %s: %s has %d rows vs baseline %d",
+                    context.get("task_id"), path, file_rows, total_rows,
+                )
+                total_rows = max(total_rows, file_rows)
+
+            file_columns = pf.schema_arrow.names
+            n_rg = meta.num_row_groups
+
+            for col_idx, col in enumerate(file_columns):
+                if col in seen_cols:
+                    continue
+                seen_cols.add(col)
+                columns_ordered.append(col)
+                column_to_path[col] = path
+
+                null_total = 0
+                min_val = None
+                max_val = None
+                distinct_total: Optional[int] = 0
+                for rg_i in range(n_rg):
+                    rg_col = meta.row_group(rg_i).column(col_idx)
+                    stats = rg_col.statistics
+                    if stats is None or not getattr(stats, "has_null_count", False):
+                        return None
+                    null_total += stats.null_count
+                    if distinct_total is not None:
+                        if getattr(stats, "has_distinct_count", False):
+                            distinct_total += stats.distinct_count
+                        else:
+                            distinct_total = None
+                    if getattr(stats, "has_min_max", False):
+                        s_min = stats.min
+                        s_max = stats.max
+                        if min_val is None:
+                            min_val, max_val = s_min, s_max
+                        else:
+                            try:
+                                if s_min < min_val:
+                                    min_val = s_min
+                                if s_max > max_val:
+                                    max_val = s_max
+                            except TypeError:
+                                # Mixed/unorderable types — skip min/max tracking.
+                                pass
+                null_counts[col] = null_total
+                distinct_counts[col] = distinct_total
+                min_max[col] = (min_val, max_val)
+
+        if total_rows == 0 or not columns_ordered:
+            return None
+
+        nan_ratios = pd.Series(
+            {col: (null_counts[col] / total_rows) for col in columns_ordered},
+            dtype=float,
+        )
+
+        constant_columns: List[str] = []
+        for col in columns_ordered:
+            dc = distinct_counts.get(col)
+            if dc is not None and dc <= 1:
+                constant_columns.append(col)
+                continue
+            mn, mx = min_max.get(col, (None, None))
+            if mn is not None and mx is not None and mn == mx and null_counts[col] == 0:
+                constant_columns.append(col)
+
+        return {
+            "total_rows": int(total_rows),
+            "columns": columns_ordered,
+            "nan_ratios": nan_ratios,
+            "constant_columns": constant_columns,
+            "column_to_path": column_to_path,
+        }
+
+    def _load_cgsa_columns_subset(
+        self,
+        column_to_path: Dict[str, Path],
+        columns: List[str],
+    ) -> pd.DataFrame:
+        """Read just the requested columns from CGSA parquet files.
+
+        Used by the fast browse_summary path for sample-based stationarity
+        tests and capped correlation checks. Avoids materializing the full
+        feature matrix.
+        """
+        import pyarrow.parquet as pq
+
+        by_path: Dict[Path, List[str]] = {}
+        for col in columns:
+            path = column_to_path.get(col)
+            if path is None:
+                continue
+            by_path.setdefault(path, []).append(col)
+
+        frames: List[pd.DataFrame] = []
+        for path, cols in by_path.items():
+            try:
+                table = pq.read_table(str(path), columns=cols)
+                frames.append(table.to_pandas(self_destruct=True))
+            except Exception as exc:
+                logger.warning("Failed to load CGSA subset from %s: %s", path, exc)
+
+        if not frames:
+            return pd.DataFrame()
+        df = pd.concat(frames, axis=1, copy=False)
+        if df.columns.duplicated().any():
+            df = df.loc[:, ~df.columns.duplicated(keep="first")]
+        return df
+
+    def _estimate_stationary_ratio_from_subset(self, df: pd.DataFrame) -> float:
+        """Stationarity ratio over a precomputed sample DataFrame."""
+        if df.empty or not HAS_STATSMODELS:
+            return 0.0
+        stationaries = 0
+        evaluated = 0
+        for column in df.columns:
+            pvalue = self._compute_adf_pvalue(df[column])
+            if pvalue is None:
+                continue
+            evaluated += 1
+            if pvalue < 0.05:
+                stationaries += 1
+        if evaluated == 0:
+            return 0.0
+        return float(stationaries / evaluated)
+
+    def _browse_summary_from_fast(
+        self,
+        task_id: str,
+        context: Dict[str, Any],
+        fast: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build the browse_summary payload from CGSA parquet metadata."""
+        import warnings
+
+        columns: List[str] = fast["columns"]
+        total_rows: int = fast["total_rows"]
+        nan_ratios: pd.Series = fast["nan_ratios"]
+        constant_features_list: List[str] = fast["constant_columns"]
+        column_to_path: Dict[str, Path] = fast["column_to_path"]
+
+        by_category: Dict[str, int] = {}
+        by_level: Dict[str, int] = {}
+        by_layer_raw: Dict[str, int] = {}
+        for col in columns:
+            cat = infer_category(col)
+            layer = infer_layer(col)
+            simple_level = self._to_simple_level(infer_level(cat))
+            by_category[cat] = by_category.get(cat, 0) + 1
+            by_layer_raw[layer] = by_layer_raw.get(layer, 0) + 1
+            by_level[simple_level] = by_level.get(simple_level, 0) + 1
+        by_layer = {
+            "Layer 1 (Atomic)": by_layer_raw.get("layer1", 0),
+            "Layer 2 (Derived)": by_layer_raw.get("layer2", 0),
+            "Layer 3 (Rolling)": by_layer_raw.get("layer3", 0),
+            "Layer 4 (Lag)": by_layer_raw.get("layer4", 0),
+            "Layer 5 (Cross-Sect)": by_layer_raw.get("layer5", 0),
+            "Layer 6 (Meta)": by_layer_raw.get("layer6", 0),
+            "Layer 6.5 (Preproc)": by_layer_raw.get("layer6_5", 0),
+        }
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            nan_ratio_mean = self._safe_float(nan_ratios.mean()) or 0.0
+            nan_ratio_max = float(nan_ratios.max()) if len(nan_ratios) else 0.0
+
+        HIGH_CORR_SAMPLE_LIMIT = 500
+        high_corr_pairs_count: Optional[int] = None
+        if 0 < len(columns) <= HIGH_CORR_SAMPLE_LIMIT:
+            try:
+                subset_df = self._load_cgsa_columns_subset(column_to_path, columns)
+                numeric_df = subset_df.select_dtypes(include=["number"])
+                if numeric_df.shape[1]:
+                    corr_abs = numeric_df.corr().abs()
+                    upper = corr_abs.where(
+                        np.triu(np.ones(corr_abs.shape), k=1).astype(bool)
+                    )
+                    high_corr_pairs_count = int((upper > 0.95).sum().sum())
+            except Exception as exc:
+                logger.warning("High-corr computation failed for task %s: %s", task_id, exc)
+
+        sample_columns = columns[: min(100, len(columns))]
+        try:
+            adf_df = self._load_cgsa_columns_subset(column_to_path, sample_columns)
+            stationary_ratio = self._estimate_stationary_ratio_from_subset(adf_df)
+        except Exception as exc:
+            logger.warning("Stationarity sample failed for task %s: %s", task_id, exc)
+            stationary_ratio = 0.0
+
+        quality_alerts = self._fast_quality_alerts(pd.DataFrame(), nan_ratios)
+
+        # Background warmup so subsequent FeatureTable / Distribution tabs are
+        # snappy. These are non-blocking.
+        self._start_stats_cache_warmup(task_id, reason="browse_summary")
+        self._start_adf_cache_warmup(task_id, reason="browse_summary")
+
+        task_result = context.get("task_result") or {}
+        metadata = context.get("metadata") or {}
+
+        return {
+            "total_features": len(columns),
+            "total_rows": int(total_rows),
+            "by_category": by_category,
+            "by_level": by_level,
+            "by_layer": by_layer,
+            "quality": {
+                "nan_ratio_mean": nan_ratio_mean,
+                "nan_ratio_max": nan_ratio_max,
+                "nan_ratio_distribution": self._nan_ratio_distribution(nan_ratios=nan_ratios),
+                "constant_features": constant_features_list,
+                "high_corr_pairs_count": high_corr_pairs_count,
+                "stationary_ratio": stationary_ratio,
+                "quality_alerts": quality_alerts,
+            },
+            "generation_info": {
+                "task_id": task_id,
+                "symbol": context.get("symbol"),
+                "timeframe": context.get("timeframe"),
+                "generated_at": context.get("generated_at"),
+                "generation_time": task_result.get("generation_time"),
+                "config_hash": metadata.get("config_hash"),
+            },
+        }
+
     def _load_hdf5_schema(self, context: Dict[str, Any]) -> Dict[str, Any]:
         if context.get("is_cgsa"):
             manifest = context.get("manifest") or {}
@@ -2443,18 +2764,22 @@ class FeatureFactoryService:
 
     @staticmethod
     def _nan_ratio_distribution(
-        features_df: pd.DataFrame,
+        features_df: Optional[pd.DataFrame] = None,
         nan_ratios: Optional["pd.Series"] = None,
     ) -> List[float]:
-        if features_df.empty:
-            return []
+        """Histogram of NaN ratios across feature columns.
+
+        Accepts either a DataFrame (legacy callers) or a precomputed
+        ``nan_ratios`` Series (fast-path callers) so we don't traverse a
+        200k-column frame twice.
+        """
         bins = [0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 1.0]
-        # Reuse caller-supplied nan_ratios when available to avoid an extra
-        # full ``isna().mean()`` pass over a 200k-column DataFrame.
-        if nan_ratios is None:
+        if nan_ratios is not None:
+            nan_array = nan_ratios.to_numpy()
+        elif features_df is not None and not features_df.empty:
             nan_array = features_df.isna().mean().to_numpy()
         else:
-            nan_array = nan_ratios.to_numpy()
+            return []
         counts, _ = np.histogram(nan_array, bins=bins)
         total = nan_array.shape[0]
         if total == 0:
