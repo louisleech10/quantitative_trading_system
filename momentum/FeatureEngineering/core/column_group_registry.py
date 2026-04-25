@@ -403,11 +403,24 @@ class ColumnGroupRegistry:
                 if parquet_candidate.exists():
                     parquet_path = parquet_candidate
 
-            if npy_path is None and parquet_path is None:
-                logger.warning(
-                    "[registry] Missing npy/parquet file for group %s; skipped",
-                    group_meta.get("group_id"),
-                )
+            if npy_path is None:
+                # Cannot resume without the intermediate .npy data.  When only
+                # parquet is present the previous run completed successfully and
+                # its .npy intermediates were already cleaned up; registering
+                # the group with disk_path=None would crash load_data later.
+                # Skip it so the new run recomputes from scratch with the
+                # original group IDs (no "_2" suffix collisions).
+                if parquet_path is not None:
+                    logger.debug(
+                        "[registry] Group %s has parquet output but no npy intermediate;"
+                        " not restoring (previous run already completed for this group)",
+                        group_meta.get("group_id"),
+                    )
+                else:
+                    logger.warning(
+                        "[registry] Missing npy/parquet file for group %s; skipped",
+                        group_meta.get("group_id"),
+                    )
                 continue
 
             try:
