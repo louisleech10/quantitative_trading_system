@@ -3,8 +3,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, ChevronDown, ChevronUp, Cpu, RefreshCw, Server } from 'lucide-react';
 
+type TierKey = '8gb' | '16gb' | '24gb' | '32gb';
+
+interface TierConfig {
+  l65_workers: number;
+  cgsa_memory_buffer: number;
+  l7_workers: number;
+  chunk_bars: number | null;
+  multi_tf_max_workers: number;
+  layer3_chunk_size: number;
+  l3_persist_mode: string;
+  l3_streaming_buffer_cols: number;
+  l65_split_threshold: number;
+  l2_category_workers: number;
+}
+
+interface AppliedSetting {
+  value: number | string | null;
+  source: 'auto' | 'env';
+  env_var: string;
+  env_raw: string | null;
+}
+
 interface HardwareInfo {
-  memory_tier: string;
+  memory_tier: TierKey;
   cpu: {
     logical_cores: number;
     physical_cores: number;
@@ -21,6 +43,7 @@ interface HardwareInfo {
     total_gb: number;
     used_pct: number;
   };
+  // Backward-compat (still emitted by backend).
   recommended_settings: {
     FFACT_L65_WORKERS: number;
     FFACT_CGSA_MEMORY_BUFFER: number;
@@ -29,26 +52,53 @@ interface HardwareInfo {
     FFACT_MULTI_TF_MAX_WORKERS: number;
     FFACT_LAYER3_CHUNK_SIZE: number;
   };
+  // New fields from v8fix13 optimization (single source of truth).
+  applied_settings?: Record<string, AppliedSetting>;
+  tier_table?: Record<TierKey, TierConfig>;
 }
 
+// All optimization parameters surfaced in the UI.
+// `key` matches `tier_table[tier][key]` and `applied_settings[key]`.
+const PARAM_ROWS: Array<{
+  key: keyof TierConfig;
+  label: string;
+  highlight?: boolean;
+  format?: (val: unknown) => string;
+}> = [
+  { key: 'l65_workers', label: 'L65_WORKERS' },
+  { key: 'l7_workers', label: 'L7_WORKERS' },
+  { key: 'cgsa_memory_buffer', label: 'CGSA_BUFFER' },
+  { key: 'multi_tf_max_workers', label: 'MultiTF_Workers', highlight: true },
+  { key: 'layer3_chunk_size', label: 'L3_Chunk', highlight: true },
+  { key: 'l3_persist_mode', label: 'L3_Persist' },
+  { key: 'l3_streaming_buffer_cols', label: 'L3_Stream_Buf' },
+  { key: 'l65_split_threshold', label: 'L65_Split_Thr' },
+  { key: 'l2_category_workers', label: 'L2_Cat_Workers', highlight: true },
+  {
+    key: 'chunk_bars',
+    label: 'Chunk_Bars',
+    format: (val) => (val == null ? '∞' : val >= 1000 ? `${(val as number) / 1000}K` : String(val)),
+  },
+];
+
+const ALL_TIERS: TierKey[] = ['8gb', '16gb', '24gb', '32gb'];
+
 function getMemoryTextColor(availableGb: number): string {
-  if (availableGb < 1) {
-    return 'text-rose-300';
-  }
-  if (availableGb < 2) {
-    return 'text-amber-300';
-  }
+  if (availableGb < 1) return 'text-rose-300';
+  if (availableGb < 2) return 'text-amber-300';
   return 'text-emerald-300';
 }
 
 function getDiskTextColor(freeGb: number): string {
-  if (freeGb < 5) {
-    return 'text-rose-300';
-  }
-  if (freeGb < 10) {
-    return 'text-amber-300';
-  }
+  if (freeGb < 5) return 'text-rose-300';
+  if (freeGb < 10) return 'text-amber-300';
   return 'text-slate-200';
+}
+
+function formatCell(val: unknown, format?: (val: unknown) => string): string {
+  if (format) return format(val);
+  if (val == null) return '—';
+  return String(val);
 }
 
 function LoadingSkeleton() {
@@ -109,7 +159,9 @@ export function HardwareStatusPanel() {
           <div>
             <div className="text-sm font-medium text-slate-100">系統資源</div>
             <div className="text-xs text-slate-400">
-              {hardwareInfo ? `Tier: ${hardwareInfo.memory_tier.toUpperCase()}` : '讀取硬體資訊中'}
+              {hardwareInfo
+                ? `Tier: ${hardwareInfo.memory_tier.toUpperCase()} · 自動偵測 / 自動套用`
+                : '讀取硬體資訊中'}
             </div>
           </div>
           {isExpanded ? (
@@ -174,30 +226,59 @@ export function HardwareStatusPanel() {
                 </div>
               </div>
 
-              {/* 建議設定（目前 tier 高亮） */}
-              <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.18em] text-cyan-100/70">建議設定</div>
-                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-cyan-50">
-                  <span>L65_WORKERS={hardwareInfo.recommended_settings.FFACT_L65_WORKERS}</span>
-                  <span>L7_WORKERS={hardwareInfo.recommended_settings.FFACT_L7_WORKERS}</span>
-                  <span>CGSA_BUFFER={hardwareInfo.recommended_settings.FFACT_CGSA_MEMORY_BUFFER}</span>
-                  <span>Compactor={hardwareInfo.recommended_settings.FFACT_L7_COMPACTOR_ENABLED === 1 ? 'ON' : 'OFF'}</span>
-                  <span className="text-cyan-200">MultiTF_Workers={hardwareInfo.recommended_settings.FFACT_MULTI_TF_MAX_WORKERS}</span>
-                  <span className="text-cyan-200">L3_Chunk={hardwareInfo.recommended_settings.FFACT_LAYER3_CHUNK_SIZE}</span>
+              {/* 套用中的設定（單一資料源 = backend tier_table[memory_tier]） */}
+              <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs uppercase tracking-[0.18em] text-cyan-100/70">
+                    套用中的設定（自動）
+                  </div>
+                  <div className="text-[10px] text-cyan-200/60">
+                    來源：{hardwareInfo.applied_settings ? 'tier auto-detect / env override' : 'auto-tier'}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-cyan-50 sm:grid-cols-3 lg:grid-cols-4">
+                  {PARAM_ROWS.map(({ key, label, highlight, format }) => {
+                    const tierVal = hardwareInfo.tier_table?.[hardwareInfo.memory_tier]?.[key];
+                    const applied = hardwareInfo.applied_settings?.[key];
+                    const isOverride = applied?.source === 'env';
+                    const displayVal = formatCell(applied?.value ?? tierVal, format);
+                    return (
+                      <div
+                        key={String(key)}
+                        className={`flex items-baseline gap-1 ${
+                          highlight ? 'text-cyan-200' : ''
+                        }`}
+                      >
+                        <span className="font-mono text-[11px] text-cyan-100/60">{label}=</span>
+                        <span className="font-mono">{displayVal}</span>
+                        {isOverride && (
+                          <span
+                            className="text-[9px] uppercase tracking-wide rounded px-1 bg-amber-400/20 text-amber-200"
+                            title={`Overridden by env var ${applied?.env_var}=${applied?.env_raw}`}
+                          >
+                            env
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] text-cyan-100/50">
+                  Compactor=ON（永久啟用）· 設定可由 <code className="font-mono">FFACT_*</code> 環境變數覆寫
                 </div>
               </div>
 
-              {/* Tier 對照表 */}
+              {/* Tier 對照表（資料來自 backend tier_table，無前端硬編碼） */}
               <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
                 <div className="px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-500 border-b border-white/10">
-                  各 Tier 參數對照
+                  各 Tier 參數對照（來源：hardware_utils.py，自動同步）
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/10">
                         <th className="px-3 py-2 text-left font-medium text-slate-400">參數</th>
-                        {(['8gb', '16gb', '24gb', '32gb'] as const).map((tier) => (
+                        {ALL_TIERS.map((tier) => (
                           <th
                             key={tier}
                             className={`px-3 py-2 text-center font-medium ${
@@ -215,21 +296,14 @@ export function HardwareStatusPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {[
-                        { label: 'L65_WORKERS', values: [4, 6, 8, 8] },
-                        { label: 'L7_WORKERS', values: [4, 6, 8, 8] },
-                        { label: 'CGSA_BUFFER', values: [0, 0, 32, 64] },
-                        { label: 'MultiTF_Workers', values: [2, 3, 4, 4], highlight: true },
-                        { label: 'L3_Chunk', values: [256, 512, 512, 1024], highlight: true },
-                        { label: 'Chunk_Bars', values: ['50K', '100K', '250K', '∞'] },
-                      ].map(({ label, values, highlight }) => (
-                        <tr key={label} className="hover:bg-white/5">
+                      {PARAM_ROWS.map(({ key, label, highlight, format }) => (
+                        <tr key={String(key)} className="hover:bg-white/5">
                           <td className={`px-3 py-1.5 font-mono ${highlight ? 'text-cyan-200' : 'text-slate-300'}`}>
                             {label}
                           </td>
-                          {values.map((val, i) => {
-                            const tier = ['8gb', '16gb', '24gb', '32gb'][i];
+                          {ALL_TIERS.map((tier) => {
                             const isCurrent = hardwareInfo.memory_tier === tier;
+                            const val = hardwareInfo.tier_table?.[tier]?.[key];
                             return (
                               <td
                                 key={tier}
@@ -239,7 +313,7 @@ export function HardwareStatusPanel() {
                                     : 'text-slate-400'
                                 }`}
                               >
-                                {String(val)}
+                                {formatCell(val, format)}
                               </td>
                             );
                           })}

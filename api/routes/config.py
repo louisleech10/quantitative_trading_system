@@ -21,6 +21,7 @@ from api.models.responses import (
 )
 from api.services.data_service import data_service
 from momentum.FeatureEngineering.utils.hardware_utils import (
+    TIER_THRESHOLDS,
     get_memory_tier,
     get_tier_config,
 )
@@ -114,17 +115,53 @@ logger = get_logger("api.routes.config")
 
 @router.get("/hardware")
 async def get_hardware_info() -> Dict[str, Any]:
-    """Return hardware information and recommended Feature Factory settings."""
+    """Return hardware info, recommended Feature Factory settings, and full tier table.
+
+    Frontend consumes the `tier_table` to render the comparison view, so values
+    in this endpoint are the single source of truth (no hardcoded duplicates).
+    `applied_settings` reports the EFFECTIVE configuration — auto-tier values
+    by default, overridden if the user set the corresponding `FFACT_*` env var.
+    """
     try:
         memory_tier = get_memory_tier()
         tier_config = get_tier_config(memory_tier)
         data_cache_path = settings.data_cache_path
+
+        # Build full tier table (all tiers × all params) so the frontend never
+        # hardcodes values; if hardware_utils.py changes, the UI updates.
+        all_tiers = ["8gb", "16gb", "24gb", "32gb"]
+        tier_table = {tier: get_tier_config(tier) for tier in all_tiers}
+
+        # Effective ("applied") settings — env var takes precedence over auto.
+        # Each entry: { value, source: "auto"|"env", env_var }
+        env_keys = {
+            "l65_workers": "FFACT_L65_WORKERS",
+            "cgsa_memory_buffer": "FFACT_CGSA_MEMORY_BUFFER",
+            "l7_workers": "FFACT_L7_WORKERS",
+            "multi_tf_max_workers": "FFACT_MULTI_TF_MAX_WORKERS",
+            "layer3_chunk_size": "FFACT_LAYER3_CHUNK_SIZE",
+            "l3_persist_mode": "FFACT_L3_PERSIST_MODE",
+            "l3_streaming_buffer_cols": "FFACT_L3_STREAMING_BUFFER_COLS",
+            "l65_split_threshold": "FFACT_L65_SPLIT_THRESHOLD",
+            "l2_category_workers": "FFACT_L2_CATEGORY_WORKERS",
+        }
+        applied_settings: Dict[str, Dict[str, Any]] = {}
+        for key, env_var in env_keys.items():
+            env_raw = os.environ.get(env_var, "").strip()
+            is_overridden = bool(env_raw) and env_raw.lower() != "auto"
+            applied_settings[key] = {
+                "value": tier_config.get(key),
+                "source": "env" if is_overridden else "auto",
+                "env_var": env_var,
+                "env_raw": env_raw if is_overridden else None,
+            }
 
         return {
             "memory_tier": memory_tier,
             "cpu": _build_cpu_info(),
             "memory": _build_memory_info(),
             "disk": _build_disk_info(data_cache_path),
+            # Legacy keys preserved for backward compatibility.
             "recommended_settings": {
                 "FFACT_L65_WORKERS": tier_config["l65_workers"],
                 "FFACT_CGSA_MEMORY_BUFFER": tier_config["cgsa_memory_buffer"],
@@ -133,6 +170,13 @@ async def get_hardware_info() -> Dict[str, Any]:
                 "FFACT_MULTI_TF_MAX_WORKERS": tier_config["multi_tf_max_workers"],
                 "FFACT_LAYER3_CHUNK_SIZE": tier_config["layer3_chunk_size"],
             },
+            # New fields (V8 final / v8fix13 optimization):
+            "applied_settings": applied_settings,
+            "tier_table": tier_table,
+            "tier_thresholds_gb": [
+                {"tier": tier, "min_total_gb": threshold}
+                for threshold, tier in TIER_THRESHOLDS
+            ],
         }
     except Exception as error:
         logger.error("Error getting hardware info: %s", str(error), exc_info=True)
