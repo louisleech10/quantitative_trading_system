@@ -40,6 +40,9 @@ interface FeatureFactoryState {
   // Per-task summary cache so switching back to a recently visited task is
   // instantaneous (avoids re-hitting /browse/{taskId}/summary).
   explorerSummaryByTask: Record<string, FeatureSummary>;
+  // LRU list of recently visited explorer task IDs (most-recent first, max 10).
+  // Persisted to localStorage so the dropdown survives page reloads.
+  explorerRecentTasks: string[];
   // Phase C: schema and search
   schema: FeatureSchema | null;
   indicatorSearch: string;
@@ -71,6 +74,8 @@ interface FeatureFactoryState {
   setExplorerSummary: (summary: FeatureSummary | null) => void;
   setExplorerSummaryForTask: (taskId: string, summary: FeatureSummary) => void;
   clearExplorerSummaryForTask: (taskId: string) => void;
+  pushExplorerRecentTask: (taskId: string) => void;
+  removeExplorerRecentTask: (taskId: string) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
   fetchRegistry: () => Promise<void>;
   startBatchGeneration: (
@@ -140,6 +145,18 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   explorerSelectedFeatures: [],
   explorerSummary: null,
   explorerSummaryByTask: {},
+  explorerRecentTasks:
+    typeof window !== 'undefined'
+      ? (() => {
+          try {
+            const raw = window.localStorage.getItem('ff:explorerRecentTasks');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string').slice(0, 10) : [];
+          } catch {
+            return [];
+          }
+        })()
+      : [],
   schema: null,
   indicatorSearch: '',
   batchTask: null,
@@ -200,6 +217,33 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       const next = { ...state.explorerSummaryByTask };
       delete next[taskId];
       return { explorerSummaryByTask: next };
+    }),
+  pushExplorerRecentTask: (taskId) =>
+    set((state) => {
+      if (!taskId) return state;
+      const next = [taskId, ...state.explorerRecentTasks.filter((t) => t !== taskId)].slice(0, 10);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('ff:explorerRecentTasks', JSON.stringify(next));
+        } catch {
+          /* ignore quota errors */
+        }
+      }
+      return { explorerRecentTasks: next };
+    }),
+  removeExplorerRecentTask: (taskId) =>
+    set((state) => {
+      const next = state.explorerRecentTasks.filter((t) => t !== taskId);
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('ff:explorerRecentTasks', JSON.stringify(next));
+        } catch {
+          /* ignore */
+        }
+      }
+      const summaries = { ...state.explorerSummaryByTask };
+      delete summaries[taskId];
+      return { explorerRecentTasks: next, explorerSummaryByTask: summaries };
     }),
   setBatchTask: (batchTask) => set({ batchTask }),
   fetchRegistry: async () => {

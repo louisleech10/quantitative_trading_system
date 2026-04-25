@@ -15,7 +15,12 @@ interface FeatureTableProps {
 const levelTabs: Array<'All' | 'L1' | 'L2' | 'L3'> = ['All', 'L1', 'L2', 'L3'];
 const PAGE_SIZE = 100;
 const INITIAL_LOAD_LIMIT = 500;
-const BACKGROUND_PAGE_LIMIT = 2000;
+const BACKGROUND_PAGE_LIMIT = 5000;
+// Hard cap on how many feature rows we materialize on the client. For very
+// wide CGSA tasks (200k+ columns) loading everything would explode browser
+// memory AND blow past the API rate limit. Above this cap we show a notice
+// telling users to use the search/filter to narrow the view.
+const MAX_CLIENT_ROWS = 20000;
 const TABLE_VIEWPORT_HEIGHT = 520;
 const TABLE_ROW_HEIGHT = 34;
 const VIRTUAL_OVERSCAN = 12;
@@ -104,10 +109,11 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
         setIsBackgroundLoading(true);
 
         let cursor = firstResp.next_cursor ?? null;
-        while (active && cursor) {
+        while (active && cursor && merged.length < MAX_CLIENT_ROWS) {
+          const remaining = MAX_CLIENT_ROWS - merged.length;
           const resp = await browseFeatures(taskId, {
             cursor,
-            limit: BACKGROUND_PAGE_LIMIT,
+            limit: Math.min(BACKGROUND_PAGE_LIMIT, remaining),
             sortBy: 'name',
             sortOrder: 'asc',
             detailLevel: 'table',

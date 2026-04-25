@@ -27,7 +27,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
 ];
 
 export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: FeatureExplorerProps) {
-  const { browseSummary, browseFeatures } = useFeatureFactory();
+  const { browseSummary } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
   // which triggers React 18 concurrent-mode's "getSnapshot should be cached" infinite loop.
@@ -35,10 +35,13 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
   const explorerActiveTab = useFeatureFactoryStore((state) => state.explorerActiveTab);
   const explorerSummary = useFeatureFactoryStore((state) => state.explorerSummary);
   const explorerSummaryByTask = useFeatureFactoryStore((state) => state.explorerSummaryByTask);
+  const explorerRecentTasks = useFeatureFactoryStore((state) => state.explorerRecentTasks);
   const setExplorerTaskId = useFeatureFactoryStore((state) => state.setExplorerTaskId);
   const setExplorerActiveTab = useFeatureFactoryStore((state) => state.setExplorerActiveTab);
   const setExplorerSelectedFeatures = useFeatureFactoryStore((state) => state.setExplorerSelectedFeatures);
   const setExplorerSummaryForTask = useFeatureFactoryStore((state) => state.setExplorerSummaryForTask);
+  const pushExplorerRecentTask = useFeatureFactoryStore((state) => state.pushExplorerRecentTask);
+  const removeExplorerRecentTask = useFeatureFactoryStore((state) => state.removeExplorerRecentTask);
 
   // 允許使用者在沒有進行中任務時手動輸入 task ID 瀏覽歷史結果
   const [manualTaskId, setManualTaskId] = useState('');
@@ -49,10 +52,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const cachedSummary = taskId ? explorerSummaryByTask[taskId] : undefined;
   const hasCachedSummary = Boolean(cachedSummary);
-  // Track which tasks we've already prefetched FeatureTable rows for to avoid
-  // duplicate background requests on remount/tab switches.
-  const prefetchedRef = useRef<Set<string>>(new Set());
-  // 只有在任務已完成（或未傳 taskStatus）時才允許載入
+  // Only auto-load when task is fully ready.
   const isTaskReady = !taskStatus || taskStatus === 'completed';
 
   useEffect(() => {
@@ -77,15 +77,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
       .then((payload) => {
         if (!active) return;
         setExplorerSummaryForTask(taskId, payload);
-        // Fire-and-forget prefetch of FeatureTable's first page so switching
-        // to the Table tab feels instant. Failure is non-fatal — the tab
-        // will refetch on demand.
-        if (!prefetchedRef.current.has(taskId)) {
-          prefetchedRef.current.add(taskId);
-          browseFeatures(taskId, { offset: 0, limit: 50, sortBy: 'name', sortOrder: 'asc' }).catch(() => {
-            /* swallow: prefetch is best-effort */
-          });
-        }
+        pushExplorerRecentTask(taskId);
       })
       .catch((err) => {
         if (!active) return;
@@ -99,7 +91,14 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
     return () => {
       active = false;
     };
-  }, [browseSummary, browseFeatures, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask]);
+  }, [browseSummary, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask, pushExplorerRecentTask]);
+
+  // When summary loads from cache (no fetch needed), still mark as recent.
+  useEffect(() => {
+    if (taskId && hasCachedSummary) {
+      pushExplorerRecentTask(taskId);
+    }
+  }, [taskId, hasCachedSummary, pushExplorerRecentTask]);
 
   const summary = useMemo(() => cachedSummary || explorerSummary, [cachedSummary, explorerSummary]);
 
@@ -113,7 +112,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
             : <div className="text-xs text-slate-500">尚無進行中的任務，可貼入 Task ID 瀏覽歷史結果</div>
           }
         </div>
-        {/* 手動輸入 Task ID（無進行中任務時顯示） */}
+        {/* 手動輸入 Task ID + Recent Tasks 下拉（無進行中任務時顯示） */}
         {!propTaskId && (
           <div className="flex items-center gap-2">
             <input
@@ -130,6 +129,32 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
                 onClick={() => { setManualTaskId(''); setSummaryError(null); }}
                 className="text-slate-500 hover:text-slate-300 text-xs"
               >✕</button>
+            )}
+            {explorerRecentTasks.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v) setManualTaskId(v);
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
+                title="切換最近瀏覽的 Task"
+              >
+                <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
+                {explorerRecentTasks.map((tid) => (
+                  <option key={tid} value={tid}>
+                    {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
+                  </option>
+                ))}
+              </select>
+            )}
+            {manualTaskId && explorerRecentTasks.includes(manualTaskId) && (
+              <button
+                type="button"
+                onClick={() => { removeExplorerRecentTask(manualTaskId); setManualTaskId(''); }}
+                className="text-rose-400/70 hover:text-rose-300 text-xs"
+                title="從最近清單移除"
+              >移除</button>
             )}
           </div>
         )}

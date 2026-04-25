@@ -115,7 +115,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # 測試環境（FastAPI TestClient）跳過限流，避免整個 smoke 測試累積請求導致偶發 429。
         if client_ip == "testclient":
             return await call_next(request)
-        
+
+        # Feature browser 與 explorer 的 GET endpoints 在大型 CGSA task（200k+ 欄）
+        # 載入時會在背景發出大量分頁請求，遠超 1000 req/60s。對 read-only GET
+        # 的瀏覽端點放行，避免使用者看到空白頁。寫入端點（POST/DELETE）仍受限。
+        if (
+            request.method == "GET"
+            and request.url.path.startswith("/api/v1/features/browse/")
+        ):
+            return await call_next(request)
+
         # 檢查速率限制
         current_time = time.time()
         
