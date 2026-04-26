@@ -1,7 +1,7 @@
 # AI Agent Instructions for Quantitative Trading System
 
 > Quick reference guide for AI coding agents (GitHub Copilot, Claude, Cursor, etc.)  
-> **Last Updated**: 2026-04-14 | **Version**: 3.1
+> **Last Updated**: 2026-04-26 | **Version**: 3.2
 
 ## 🎯 System Overview
 
@@ -159,7 +159,20 @@ pytest --cov=momentum --cov-report=html  # Coverage report
 
 ## 🔑 Project-Specific Patterns
 
-### 0. First Principle Thinking
+### 0. Non-Negotiable Optimization Principle
+
+All Feature Factory, Layer 6.5, multi-symbol, cache, storage, performance, and data-processing work must optimize under this priority order:
+
+1. **Cross-tier repeatability**: stable repeated runs on 8GB / 16GB / 24GB / 32GB hardware tiers.
+2. **Multi-symbol stability**: multi-symbol runs must avoid OOM, support safe throttling, and preserve resume/retry paths for long jobs.
+3. **Highest data quality**: no fake data, no cross-symbol statistical contamination, no stale cache reuse across incompatible configs, and no weakened validation gates.
+4. **Shortest practical computation time**: optimize runtime only after protecting correctness, memory stability, and data quality.
+5. **Smallest practical output files**: minimize output size without lossy numerical behavior or weakened roundtrip validation.
+6. **Quant finance best practice**: prefer methods consistent with quantitative finance research practice; document deviations explicitly.
+
+**Never** optimize by deleting features, reducing configured feature breadth, reducing rolling windows, silently skipping quality checks, weakening float16/NaN/inf gates, using cross-symbol cache without isolation, or expanding output size unless the user explicitly approves that tradeoff.
+
+### 0.1 First Principle Thinking
 ```
 All code and architecture decisions start from First Principles
 Ask "why" until you reach fundamental truths

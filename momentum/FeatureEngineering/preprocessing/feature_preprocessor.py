@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import json
 import os
 import re
@@ -202,10 +203,14 @@ class FeaturePreprocessor:
         transform_context: Dict[str, object],
     ) -> int:
         """Serial fallback path for deterministic L6.5 registry transforms."""
+        from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
 
         completed = 0
         failed = 0
         started_at = time.perf_counter()
+
+        use_fast = bool(transform_context.get("use_fast", False))
+        split_threshold = get_l65_split_threshold()
 
         # ── Sub-step progress logging ────────────────────────────────────
         # Mirrors the parallel path heartbeat so SIGKILL leaves the last
@@ -221,10 +226,17 @@ class FeaturePreprocessor:
 
         for group in groups:
             gid = getattr(group, "group_id", "<unknown>")
+            n_cols = self._group_n_columns(group)
             try:
-                self._transform_single_group(registry, group, transform_context)
+                # Route oversized slow-path groups through chunked processing
+                # to cap peak memory (avoids 3-4× full_array copies for 1.8 GB groups).
+                if not use_fast and split_threshold > 0 and n_cols > split_threshold:
+                    self._transform_single_group_chunked(registry, group, chunk_size=split_threshold)
+                    last_group_label = f"{gid} (slow-chunked)"
+                else:
+                    self._transform_single_group(registry, group, transform_context)
+                    last_group_label = gid
                 completed += 1
-                last_group_label = gid
             except Exception as error:
                 failed += 1
                 logger.error(
@@ -234,6 +246,7 @@ class FeaturePreprocessor:
                     exc_info=True,
                 )
 
+            gc.collect()
             now = time.perf_counter()
             done = completed + failed
             if (
@@ -304,9 +317,13 @@ class FeaturePreprocessor:
             reverse=True,
         )
 
-        # Partition groups into "full" (single task) vs "split" (multi-slice tasks).
+        # Partition groups into three categories:
+        #   "full"         – normal ThreadPool task (fast or slow path, n_cols ≤ threshold)
+        #   "split"        – fast-path Numba column-slice sub-tasks (n_cols > threshold)
+        #   "slow_chunked" – slow-path (FracDiff/ADF) large-group sequential chunking
         full_groups: List[object] = []
         split_meta: Dict[str, Dict[str, object]] = {}
+        slow_chunked_groups: List[object] = []
 
         for group in ordered_groups:
             n_cols = self._group_n_columns(group)
@@ -328,6 +345,11 @@ class FeaturePreprocessor:
                     "results": {},
                     "completed_slices": 0,
                 }
+            elif not use_fast and split_threshold > 0 and n_cols > split_threshold:
+                # Slow path (FracDiff/ADF/Gaussian) with a large group: process in
+                # column chunks sequentially to cap peak memory at ~full_array + chunk_copies
+                # instead of full_array × 3–4 copies (which OOM-kills on 8 GB systems).
+                slow_chunked_groups.append(group)
             else:
                 full_groups.append(group)
 
@@ -341,7 +363,11 @@ class FeaturePreprocessor:
         # "Parallel complete" line at the very end (which never prints on
         # crash). Heartbeat every max(1, total//20) completions OR every
         # 30s, whichever comes first.
-        total_tasks = len(full_groups) + sum(len(info["slices"]) for info in split_meta.values())
+        total_tasks = (
+            len(full_groups)
+            + sum(len(info["slices"]) for info in split_meta.values())
+            + len(slow_chunked_groups)
+        )
         heartbeat_step = max(1, total_tasks // 20)
         heartbeat_interval_sec = 30.0
         last_heartbeat_at = started_at
@@ -351,12 +377,13 @@ class FeaturePreprocessor:
 
         logger.info(
             "[L6.5] Parallel start: %d full groups + %d big-group splits → %d sub-tasks "
-            "(workers=%d, split_threshold=%d)",
+            "(workers=%d, split_threshold=%d, slow_chunked=%d)",
             len(full_groups),
             len(split_meta),
             total_tasks,
             n_workers,
             split_threshold,
+            len(slow_chunked_groups),
         )
 
         # Submit task type tagging: ("full", group, None) or ("slice", group, (s, e)).
@@ -440,13 +467,59 @@ class FeaturePreprocessor:
                     last_heartbeat_at = now
                     last_heartbeat_done = tasks_done
 
+        # ── Slow-path chunked groups (sequential, after ThreadPool) ──────
+        # These are large groups (n_cols > split_threshold) on the slow path
+        # (FracDiff/ADF/Gaussian). Processing them sequentially with column
+        # chunking caps peak memory at ~full_array + chunk_copies instead of
+        # full_array × 3–4 copies (which OOM-kills on 8 GB systems).
+        for group in slow_chunked_groups:
+            gid = getattr(group, "group_id", "<unknown>")
+            try:
+                self._transform_single_group_chunked(registry, group, chunk_size=split_threshold)
+                completed += 1
+                last_group_label = f"{gid} (slow-chunked)"
+            except Exception as error:
+                failed += 1
+                logger.error(
+                    "[L6.5] Failed slow-chunked group %s: %s",
+                    gid,
+                    error,
+                    exc_info=True,
+                )
+            gc.collect()
+
+            tasks_done += 1
+            now = time.perf_counter()
+            if (
+                tasks_done - last_heartbeat_done >= heartbeat_step
+                or (now - last_heartbeat_at) >= heartbeat_interval_sec
+            ):
+                elapsed_so_far = now - started_at
+                rate = tasks_done / elapsed_so_far if elapsed_so_far > 0 else 0.0
+                eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
+                logger.info(
+                    "[L6.5] heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
+                    "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, last=%s",
+                    tasks_done,
+                    total_tasks,
+                    100.0 * tasks_done / max(total_tasks, 1),
+                    completed,
+                    len(groups),
+                    elapsed_so_far,
+                    rate,
+                    eta if eta != float("inf") else -1,
+                    last_group_label,
+                )
+                last_heartbeat_at = now
+                last_heartbeat_done = tasks_done
+
         elapsed = time.perf_counter() - started_at
         split_count = len(split_meta)
         if split_count:
             total_slices = sum(len(info["slices"]) for info in split_meta.values())
             logger.info(
                 "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
-                "(%d failed, %d big-group splits → %d sub-tasks)",
+                "(%d failed, %d big-group splits → %d sub-tasks, %d slow-chunked)",
                 completed,
                 len(groups),
                 elapsed,
@@ -454,17 +527,149 @@ class FeaturePreprocessor:
                 failed,
                 split_count,
                 total_slices,
+                len(slow_chunked_groups),
             )
         else:
             logger.info(
-                "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers (%d failed)",
+                "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
+                "(%d failed, %d slow-chunked)",
                 completed,
                 len(groups),
                 elapsed,
                 n_workers,
                 failed,
+                len(slow_chunked_groups),
             )
         return completed
+
+    def _transform_single_group_chunked(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        chunk_size: int,
+    ) -> None:
+        """Process a large CGSA group in column chunks on the slow (pandas/FracDiff) path.
+
+        This is the memory-safe alternative to _transform_single_group for groups whose
+        column count exceeds split_threshold when use_fast=False (i.e. FracDiff/ADF/Gaussian
+        is enabled).
+
+        Memory comparison for a 1.8 GB group (L2_WorldQuant):
+          - Without chunking: full_array(1.8) + copy_A(1.8) + copy_B(3.6 append) = 7.2 GB
+          - With chunk_size=2000: full_array(1.8) + chunk_copies(~0.14) = ~1.94 GB peak
+
+        Correctness: All L6.5 transforms (winsor / rank / zscore / fracdiff / ADF /
+        gaussian) are column-wise independent → chunking by columns is mathematically
+        equivalent to processing all columns at once.
+
+        Performance: d_star cache is loaded once per group (shared across chunks) to
+        avoid 50× file-I/O storm. The full source array is freed before assembling
+        the output to avoid compounding allocations.
+
+        Handles both "replace" mode (same column count) and "append" mode (adds _fracdiff etc).
+        """
+        from momentum.FeatureEngineering.core.column_group import (
+            ColumnGroup as _CG,
+            LayerSource as _LS,
+        )
+
+        group_id = getattr(group, "group_id")
+        col_names = list(getattr(group, "columns"))
+        n_cols = len(col_names)
+
+        # Load the full group array ONCE. Slice views below are zero-copy
+        # when the underlying array is F-order (typical for CGSA .npy files).
+        full_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+
+        is_append = self.mode == "append"
+
+        # ── Shared d_star cache (avoids per-chunk file I/O storm) ───────
+        # Without this, every chunk re-loads/saves the cache file, turning
+        # a 50-chunk group into 50 disk roundtrips during FracDiff search.
+        use_shared_dstar_cache = bool(
+            self.fracdiff_config.get("enabled", False)
+            and self.fracdiff_config.get("cache_d_star", True)
+        )
+        if use_shared_dstar_cache:
+            self._d_star_cache = self._load_d_star_cache("default", "default")
+
+        orig_chunks: List[np.ndarray] = []
+        new_chunks: List[np.ndarray] = []
+        new_col_names_all: List[str] = []
+
+        try:
+            for chunk_start in range(0, n_cols, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, n_cols)
+                chunk_cols = col_names[chunk_start:chunk_end]
+
+                # F-order column slice is contiguous → pandas accepts copy=False
+                # without an internal copy. C-order falls back to a chunk-sized
+                # copy inside pandas (still much smaller than the full array).
+                chunk_view = full_array[:, chunk_start:chunk_end]
+                chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
+
+                processed_df = self._transform_single(chunk_df)
+
+                orig_chunks.append(
+                    processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False)
+                )
+
+                if is_append:
+                    new_col_names = [c for c in processed_df.columns if c not in chunk_cols]
+                    if new_col_names:
+                        new_chunks.append(
+                            processed_df[new_col_names].to_numpy(dtype=np.float32, copy=False)
+                        )
+                        new_col_names_all.extend(new_col_names)
+
+                # Free chunk temporaries immediately to prevent RSS accumulation.
+                del chunk_df, processed_df
+
+        finally:
+            # Persist d_star cache once after all chunks complete.
+            if use_shared_dstar_cache and self._d_star_cache is not None:
+                self._save_d_star_cache("default", "default", self._d_star_cache)
+                self._d_star_cache = None
+
+            # Free the large source array before assembling results so the
+            # concatenation allocations don't compound with it.
+            del full_array
+            gc.collect()
+
+        # Reassemble original columns and write back to registry.
+        orig_merged = np.concatenate(orig_chunks, axis=1)
+        del orig_chunks
+        registry.overwrite_data(group_id, orig_merged)
+        del orig_merged
+        gc.collect()
+
+        # Create L65 group for appended columns (e.g. _fracdiff, _diff1).
+        if is_append and new_chunks:
+            new_merged = np.concatenate(new_chunks, axis=1)
+            del new_chunks
+
+            timeframe = getattr(group, "timeframe", "unknown")
+            indicator = getattr(group, "indicator", "preprocessed")
+
+            new_gid = f"{group_id}_L65"
+            suffix = 1
+            while new_gid in registry._groups:
+                new_gid = f"{group_id}_L65_{suffix}"
+                suffix += 1
+
+            new_group = _CG(
+                group_id=new_gid,
+                layer=_LS.L65,
+                timeframe=timeframe,
+                data_source="preprocessed",
+                indicator=indicator,
+                columns=tuple(new_col_names_all),
+                shape=(new_merged.shape[0], new_merged.shape[1]),
+                dtype="float32",
+            )
+            registry.save_data(new_group, new_merged)
+            del new_merged
+            gc.collect()
 
     def _transform_array_slice(
         self,
