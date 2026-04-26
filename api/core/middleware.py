@@ -116,12 +116,21 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if client_ip == "testclient":
             return await call_next(request)
 
+        # CORS preflight must not be rate limited. Browsers may issue OPTIONS
+        # before every cross-origin request; blocking it returns 429 before the
+        # real GET/POST can even reach the route handler.
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Feature browser 與 explorer 的 GET endpoints 在大型 CGSA task（200k+ 欄）
         # 載入時會在背景發出大量分頁請求，遠超 1000 req/60s。對 read-only GET
         # 的瀏覽端點放行，避免使用者看到空白頁。寫入端點（POST/DELETE）仍受限。
         if (
             request.method == "GET"
-            and request.url.path.startswith("/api/v1/features/browse/")
+            and (
+                request.url.path.startswith("/api/v1/features/browse/")
+                or request.url.path.startswith("/api/v1/features/result/")
+            )
         ):
             return await call_next(request)
 

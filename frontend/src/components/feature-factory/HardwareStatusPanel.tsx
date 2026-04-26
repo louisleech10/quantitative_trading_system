@@ -120,7 +120,12 @@ const PARAM_ROWS: Array<{
     key: 'chunk_bars',
     label: 'Chunk_Bars',
     desc: '單批處理 K 線數上限；∞ = 全量載入（24/32GB 才安全）。',
-    format: (val) => (val == null ? '∞' : val >= 1000 ? `${(val as number) / 1000}K` : String(val)),
+    format: (val) => {
+      if (val == null) return '∞';
+      const numericValue = typeof val === 'number' ? val : Number(val);
+      if (!Number.isFinite(numericValue)) return String(val);
+      return numericValue >= 1000 ? `${numericValue / 1000}K` : String(numericValue);
+    },
   },
 ];
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -210,7 +210,7 @@ function SimpleMetric({ label, value, percent = false }: { label: string; value:
   return <div className="rounded-lg bg-slate-900/50 border border-slate-800/80 p-3"><div className="text-slate-400 text-xs">{label}</div><div className="text-slate-100 font-semibold">{display}</div></div>;
 }
 
-export default function XGBoostAnalysisPage() {
+function XGBoostAnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const {
@@ -583,4 +583,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return error.message;
   }
   return fallback;
+}
+
+export default function XGBoostAnalysisPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950/40 p-6 text-slate-400">載入中...</div>}>
+      <XGBoostAnalysisContent />
+    </Suspense>
+  );
 }

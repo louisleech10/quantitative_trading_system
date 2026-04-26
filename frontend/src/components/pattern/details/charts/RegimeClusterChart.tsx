@@ -137,10 +137,12 @@ export default function RegimeClusterChart({ data, loading }: RegimeClusterChart
                   borderRadius: '8px',
                   fontSize: 12,
                 }}
-                formatter={(value: number, _name: string, entry: { payload: { count: number } }) => [
-                  `${value.toFixed(1)}% (${entry.payload.count} 筆)`,
-                  '占比',
-                ]}
+                formatter={(value, _name, entry) => {
+                  const numericValue = typeof value === 'number' ? value : Number(value);
+                  const count = Number((entry?.payload as { count?: number } | undefined)?.count ?? 0);
+                  const label = Number.isFinite(numericValue) ? numericValue.toFixed(1) : String(value);
+                  return [`${label}% (${count} 筆)`, '占比'];
+                }}
               />
               <Bar dataKey="pct" radius={[0, 4, 4, 0]}>
                 {distributionData.map((entry, i) => (
@@ -166,7 +168,10 @@ export default function RegimeClusterChart({ data, loading }: RegimeClusterChart
                   borderRadius: '8px',
                   fontSize: 12,
                 }}
-                formatter={(value: number) => value.toFixed(4)}
+                formatter={(value) => {
+                  const numericValue = typeof value === 'number' ? value : Number(value);
+                  return Number.isFinite(numericValue) ? numericValue.toFixed(4) : String(value);
+                }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="volatility" name="波動率" fill="#ef4444" radius={[2, 2, 0, 0]} />

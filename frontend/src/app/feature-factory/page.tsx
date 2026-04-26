@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
@@ -65,6 +65,7 @@ export default function FeatureFactoryPage() {
   const [selectedBatchSymbol, setSelectedBatchSymbol] = useState<string | null>(null);
   const [browseTaskIds, setBrowseTaskIds] = useState<Record<string, string>>({});
   const [registeringSymbol, setRegisteringSymbol] = useState<string | null>(null);
+  const loadedResultTaskRef = useRef<string | null>(null);
   // 已下載的 Feature K 線標的（來自 FeatureKlineDownloadPanel 下載的資料）
   const [featureKlineSymbols, setFeatureKlineSymbols] = useState<string[]>([]);
   const [featureKlineSymbolsLoading, setFeatureKlineSymbolsLoading] = useState(false);
@@ -146,10 +147,17 @@ export default function FeatureFactoryPage() {
   }, [config, previewConfig]);
 
   useEffect(() => {
-    if (currentTask?.status === 'completed') {
-      loadTaskResult(currentTask.task_id);
+    if (currentTask?.status !== 'completed') {
+      return;
     }
-  }, [currentTask, loadTaskResult]);
+
+    if (loadedResultTaskRef.current === currentTask.task_id) {
+      return;
+    }
+
+    loadedResultTaskRef.current = currentTask.task_id;
+    void loadTaskResult(currentTask.task_id);
+  }, [currentTask?.status, currentTask?.task_id, loadTaskResult]);
 
   const handleGenerate = async () => {
     if (!config) {
