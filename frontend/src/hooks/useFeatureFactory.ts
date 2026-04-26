@@ -218,8 +218,26 @@ export function useFeatureFactory() {
         const result = await requestJson<FeatureGenerationResult>(`/result/${taskId}`);
         setFeatureList(result.feature_names || []);
         const warnings = result.metadata?.compute_warnings;
+        const validationRaw = result.metadata?.validation as Record<string, unknown> | undefined;
+        const patch: Record<string, unknown> = {};
         if (warnings && warnings.length > 0) {
-          updateCurrentTaskPartial({ compute_warnings: warnings });
+          patch.compute_warnings = warnings;
+        }
+        if (validationRaw && typeof validationRaw === 'object') {
+          patch.validation_summary = {
+            has_nan: Boolean(validationRaw.has_nan),
+            has_inf: Boolean(validationRaw.has_inf),
+            coverage: Number(validationRaw.coverage ?? 0),
+            inf_count: Number(validationRaw.inf_count ?? 0),
+            inf_ratio: Number(validationRaw.inf_ratio ?? 0),
+            groups_with_inf: Number(validationRaw.groups_with_inf ?? 0),
+            warnings: Array.isArray(validationRaw.warnings)
+              ? (validationRaw.warnings as string[])
+              : undefined,
+          };
+        }
+        if (Object.keys(patch).length > 0) {
+          updateCurrentTaskPartial(patch);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : '結果載入失敗';

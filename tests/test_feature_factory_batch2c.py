@@ -80,9 +80,16 @@ def test_t217_l65_per_group_matches_legacy(tmp_path: Path):
     )
 
 
-def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path):
-    """T2.15: per-group parquet should be DuckDB-readable and preserve total columns."""
+def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """T2.15: per-group parquet should be DuckDB-readable and preserve total columns.
+
+    The L7 compactor (FFACT_L7_COMPACTOR_ENABLED=1 by default) may merge multiple
+    parts into a single parquet for streaming efficiency; this test exercises the
+    *unmerged* per-group writer to verify each group remains DuckDB-readable.
+    Total column count remains the integrity invariant either way.
+    """
     duckdb = pytest.importorskip("duckdb")
+    monkeypatch.setenv("FFACT_L7_COMPACTOR_ENABLED", "0")
 
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
     group_a_cols = ("f_a_1", "f_a_2")

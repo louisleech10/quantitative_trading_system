@@ -282,44 +282,91 @@ class MultiTFGenerator:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         from momentum.FeatureEngineering.feature_factory import _warmup_numba_functions
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
 
-        # Step 1: Process primary TF in main process (needs registry + factory state)
-        self._report_progress("multi_tf", 0.1, f"[CGSA-parallel] Processing primary TF {self._primary_tf}")
-        self._factory._current_timeframe = self._primary_tf
-
-        try:
-            layer1 = self._factory._layer1_atomic_indicators(primary_raw, self._config)
-            layer2 = self._factory._layer2_derived_features(layer1, primary_raw, self._config)
-            layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
-            layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, primary_raw, self._config)
-            layer5 = self._factory._layer5_cross_sectional(layer1, layer2, self._config)
-            layer6 = self._factory._layer6_meta_features(layer1, layer2, primary_raw, self._config)
-        except Exception as exc:
-            logger.error("Primary TF pipeline failed: %s", exc, exc_info=True)
-            raise
-
-        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
-        for layer_df, layer_src, label in [
-            (layer3, _LS.L3, "L3_rolling"), (layer4, _LS.L4, "L4_lag"),
-            (layer5, _LS.L5, "L5_cross"), (layer6, _LS.L6, "L6_meta"),
-        ]:
-            if layer_df is not None and not layer_df.empty:
-                self._factory._persist_layer_output_groups(layer_df, layer_src, label)
-
-        tf_layer_counts[self._primary_tf] = self._collect_layer_counts(
-            [layer1, layer2, layer3, layer4, layer5, layer6]
+        # ── Resume support ────────────────────────────────────────────────
+        # When `_prepare_cgsa_registry` resumed an existing manifest, the
+        # registry already contains some L1-L6 groups. Re-running the layer
+        # methods would call `save_data` and raise "Duplicate group_id"
+        # (or quietly create `_2`-suffixed siblings via `_next_available_group_id`).
+        # Skip any TF whose L1-L6 set is already present.
+        _RESUME_LAYERS = (_LS.L1, _LS.L2, _LS.L3, _LS.L4, _LS.L5, _LS.L6)
+        primary_already_done = registry.has_layers_for_timeframe(
+            self._primary_tf, _RESUME_LAYERS
         )
-        del layer1, layer2, layer3, layer4, layer5, layer6
-        gc.collect()
+
+        # Step 1: Process primary TF in main process (needs registry + factory state)
+        if primary_already_done:
+            logger.info(
+                "[CGSA-parallel:resume] Primary TF %s already has L1-L6 in manifest; skipping.",
+                self._primary_tf,
+            )
+            self._report_progress(
+                "multi_tf", 0.25,
+                f"[CGSA-parallel:resume] Skipping primary TF {self._primary_tf} (already done)",
+            )
+            self._factory._current_timeframe = self._primary_tf
+            tf_layer_counts[self._primary_tf] = self._collect_layer_counts_from_registry(
+                registry, self._primary_tf
+            )
+        else:
+            self._report_progress(
+                "multi_tf", 0.1,
+                f"[CGSA-parallel] Processing primary TF {self._primary_tf}",
+            )
+            self._factory._current_timeframe = self._primary_tf
+
+            try:
+                layer1 = self._factory._layer1_atomic_indicators(primary_raw, self._config)
+                layer2 = self._factory._layer2_derived_features(layer1, primary_raw, self._config)
+                layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
+                layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, primary_raw, self._config)
+                layer5 = self._factory._layer5_cross_sectional(layer1, layer2, self._config)
+                layer6 = self._factory._layer6_meta_features(layer1, layer2, primary_raw, self._config)
+            except Exception as exc:
+                logger.error("Primary TF pipeline failed: %s", exc, exc_info=True)
+                raise
+
+            for layer_df, layer_src, label in [
+                (layer3, _LS.L3, "L3_rolling"), (layer4, _LS.L4, "L4_lag"),
+                (layer5, _LS.L5, "L5_cross"), (layer6, _LS.L6, "L6_meta"),
+            ]:
+                if layer_df is not None and not layer_df.empty:
+                    self._factory._persist_layer_output_groups(layer_df, layer_src, label)
+
+            tf_layer_counts[self._primary_tf] = self._collect_layer_counts(
+                [layer1, layer2, layer3, layer4, layer5, layer6]
+            )
+            del layer1, layer2, layer3, layer4, layer5, layer6
+            gc.collect()
+
+            # Persist primary TF progress immediately so a crash before workers
+            # finish still leaves a resumable manifest.
+            try:
+                registry.write_manifest()
+            except Exception as exc:
+                logger.warning("[CGSA-parallel:resume] manifest flush after primary TF failed: %s", exc)
 
         logger.info("[CGSA-parallel] Primary TF %s done, %d groups", self._primary_tf, len(list(registry.iter_all())))
 
         # Step 2: Process non-primary TFs in parallel via ProcessPoolExecutor + spawn
-        non_primary_tfs = [tf for tf in self._training_tfs if tf != self._primary_tf]
+        # Resume support: filter out TFs whose L1-L6 groups are already in the manifest.
+        all_non_primary = [tf for tf in self._training_tfs if tf != self._primary_tf]
+        non_primary_tfs: List[str] = []
+        for _tf in all_non_primary:
+            if registry.has_layers_for_timeframe(_tf, _RESUME_LAYERS):
+                logger.info(
+                    "[CGSA-parallel:resume] TF %s already has L1-L6 in manifest; skipping worker spawn.",
+                    _tf,
+                )
+                tf_layer_counts[_tf] = self._collect_layer_counts_from_registry(registry, _tf)
+            else:
+                non_primary_tfs.append(_tf)
+
         if non_primary_tfs:
             _warmup_numba_functions()
             config_payload = self._config.model_dump(by_alias=True)
@@ -394,6 +441,17 @@ class MultiTFGenerator:
                         primary_timestamps, self._config.timeframes.alignment_mode,
                         source_timestamps_ms=source_ts_ms,
                     )
+                    # Resume support: persist worker progress to manifest now,
+                    # so a SIGKILL during the next worker / L6.5 leaves a
+                    # resumable state. `register()` only updates in-memory
+                    # registry; manifest must be flushed explicitly.
+                    try:
+                        registry.write_manifest()
+                    except Exception as exc:
+                        logger.warning(
+                            "[CGSA-parallel:resume] manifest flush after TF %s failed: %s",
+                            tf, exc,
+                        )
                     # Drop the worker payload immediately so accumulated
                     # paths/columns lists do not grow unchecked.
                     del result, groups_data, source_ts_ms
@@ -843,6 +901,33 @@ class MultiTFGenerator:
             "layer5": layer_list[4].shape[1] if len(layer_list) > 4 and layer_list[4] is not None else 0,
             "layer6": layer_list[5].shape[1] if len(layer_list) > 5 and layer_list[5] is not None else 0,
         }
+
+    @staticmethod
+    def _collect_layer_counts_from_registry(registry: object, tf: str) -> Dict[str, int]:
+        """Reconstruct per-layer column counts from registry contents.
+
+        Used by Multi-TF resume path: when a TF is skipped because its
+        L1-L6 groups are already persisted, we need to report the correct
+        layer counts (instead of zeros) without re-running the layers.
+        """
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+
+        layer_map = {
+            _LS.L1: "layer1",
+            _LS.L2: "layer2",
+            _LS.L3: "layer3",
+            _LS.L4: "layer4",
+            _LS.L5: "layer5",
+            _LS.L6: "layer6",
+        }
+        counts: Dict[str, int] = {name: 0 for name in layer_map.values()}
+        for _gid, group in registry.iter_all():
+            if group.timeframe != tf:
+                continue
+            key = layer_map.get(group.layer)
+            if key is not None:
+                counts[key] += group.shape[1]
+        return counts
 
     def _build_total_layer_counts(self, tf_layer_counts: Dict[str, Dict[str, int]]) -> Dict[str, int]:
         total_layer_counts: Dict[str, int] = {}

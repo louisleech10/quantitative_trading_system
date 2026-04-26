@@ -414,6 +414,16 @@ export interface FeaturePreview {
   breakdown: Record<string, number>;
 }
 
+export interface FeatureValidationSummary {
+  has_nan: boolean;
+  has_inf: boolean;
+  coverage: number;
+  inf_count: number;
+  inf_ratio: number;
+  groups_with_inf: number;
+  warnings?: string[];
+}
+
 export interface FeatureTask {
   task_id: string;
   status: string;
@@ -422,6 +432,7 @@ export interface FeatureTask {
   completed_stages: string[];
   error: string | null;
   compute_warnings?: string[];
+  validation_summary?: FeatureValidationSummary;
 }
 
 export interface FeatureFactoryPreset {

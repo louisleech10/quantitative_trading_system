@@ -420,7 +420,12 @@ class TestA7MigrateConfig:
         assert all(cfg.get("enabled") is True for cfg in ms["features"].values())
 
     def test_migrate_microstructure_features_already_present(self):
-        """microstructure enabled_features(list) 仍為權威來源，會覆蓋既有 features。"""
+        """既有 features dict 為 user 明確設定，優先於 legacy enabled_features(list)。
+
+        Phase D 設計演進（test_edge_case_6_microstructure_features_dict_takes_priority）：
+        當 features dict 已被 user 明確填入時，legacy enabled_features 不應覆蓋，
+        以尊重 user 明確意圖。
+        """
         raw = {
             "atomic_indicators": {
                 "microstructure": {
@@ -432,8 +437,8 @@ class TestA7MigrateConfig:
         }
         result = ConfigManager.migrate_config(raw)
         ms = result["atomic_indicators"]["microstructure"]
-        # list 型 enabled_features 是 legacy allow-list，優先於既有 features。
-        assert ms["features"] == {"amihud": {"enabled": True}}
+        # features dict 已存在 → 完全尊重 user 設定，不被 legacy list 覆蓋。
+        assert ms["features"] == {"vpin": {"enabled": True}}
 
 
 # ═══════════════════════════════════════════════════════════════════

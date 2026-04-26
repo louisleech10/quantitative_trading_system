@@ -236,6 +236,75 @@ export default function FeatureFactoryPage() {
           </div>
         )}
 
+        {currentTask?.status === 'completed' && currentTask.validation_summary && (
+          (() => {
+            const v = currentTask.validation_summary;
+            const coveragePct = (v.coverage * 100).toFixed(2);
+            const infRatioPct = (v.inf_ratio * 100).toFixed(4);
+            const hasIssue = v.has_inf || v.coverage < 0.95;
+            const borderCls = v.has_inf
+              ? 'border-rose-400/40'
+              : v.coverage < 0.95
+                ? 'border-amber-400/30'
+                : 'border-emerald-400/30';
+            const titleCls = v.has_inf
+              ? 'text-rose-300'
+              : v.coverage < 0.95
+                ? 'text-amber-300'
+                : 'text-emerald-300';
+            return (
+              <div className={`glass-panel rounded-xl p-4 border ${borderCls} space-y-3`}>
+                <div className={`flex items-center gap-2 font-medium ${titleCls}`}>
+                  <AlertCircle className="w-5 h-5" />
+                  <span>
+                    L7 資料品質摘要 {hasIssue ? '— 偵測到輸入病理性訊號' : '— 通過'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
+                    <div className="text-xs text-slate-400">Coverage</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-100">{coveragePct}%</div>
+                    <div className="text-xs text-slate-500 mt-0.5">非 NaN 比例</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
+                    <div className="text-xs text-slate-400">Inf Count</div>
+                    <div
+                      className={`mt-1 text-lg font-semibold ${v.inf_count > 0 ? 'text-rose-300' : 'text-emerald-300'}`}
+                    >
+                      {v.inf_count.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">Float32 溢位次數</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
+                    <div className="text-xs text-slate-400">Inf Ratio</div>
+                    <div
+                      className={`mt-1 text-lg font-semibold ${v.inf_ratio > 0 ? 'text-rose-300' : 'text-emerald-300'}`}
+                    >
+                      {infRatioPct}%
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">Inf / 總值</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
+                    <div className="text-xs text-slate-400">Groups w/ Inf</div>
+                    <div
+                      className={`mt-1 text-lg font-semibold ${v.groups_with_inf > 0 ? 'text-amber-300' : 'text-emerald-300'}`}
+                    >
+                      {v.groups_with_inf}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">受影響 group 數</div>
+                  </div>
+                </div>
+                {v.has_inf && (
+                  <div className="text-xs text-rose-200/80">
+                    💡 Inf 通常源自比值類指標分母趨近 0 或回歸視窗常數。已套用 epsilon mask
+                    + 1e30 cap，並由 L6.5 winsorization 進一步處理。詳細位置見後端 log 的 Top-5 offending groups。
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        )}
+
         {currentTask?.status === 'completed' &&
           currentTask.compute_warnings &&
           currentTask.compute_warnings.length > 0 && (

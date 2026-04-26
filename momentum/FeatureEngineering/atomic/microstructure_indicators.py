@@ -12,6 +12,41 @@ from momentum.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+# ── Float32-safe ratio cap ──────────────────────────────────────────
+# Float32 max is ~3.4e38; pandas nanops aggregates in float64 then casts.
+# We cap ratios at 1e30 so:
+#   - downstream float32 storage never overflows (no inf produced)
+#   - extreme but legitimate values (e.g. 1e6–e8) are preserved
+#   - L6.5 winsorization can still trim them to reasonable z-scores
+# 1e-12 epsilon mask catches pathological near-zero denominators
+# (volume/std/baseline) without flagging legitimate small values.
+_RATIO_EPSILON = 1e-12
+_RATIO_CAP = 1e30
+
+
+def _safe_ratio(
+    numerator: pd.Series,
+    denominator: pd.Series,
+    *,
+    eps: float = _RATIO_EPSILON,
+    cap: float = _RATIO_CAP,
+) -> pd.Series:
+    """Divide two series with overflow-safe semantics.
+
+    1. Mask |denom| < eps  → NaN  (avoids +/- 1e30 spikes from underflow)
+    2. Compute division
+    3. Replace inf/-inf with NaN  (defence-in-depth)
+    4. Clip to [-cap, cap]  (float32 cast safety)
+
+    Result: pandas Series with no inf, no overflow risk on float32 cast.
+    The first NaN-mask is the *real* fix; cap is belt-and-braces.
+    """
+    safe_denom = denominator.where(denominator.abs() > eps, np.nan)
+    result = numerator / safe_denom
+    result = result.replace([np.inf, -np.inf], np.nan)
+    return result.clip(lower=-cap, upper=cap)
+
+
 class MicrostructureIndicatorEngine:
     """Layer 1 微觀結構特徵引擎。"""
 
@@ -120,7 +155,7 @@ class MicrostructureIndicatorEngine:
         else:
             quote_volume = (close * data["volume"]).astype(float)
 
-        ratio = returns / quote_volume.replace(0.0, np.nan)
+        ratio = _safe_ratio(returns, quote_volume)
         return pd.DataFrame(
             {f"ms_amihud_illiq_{window}": ratio.rolling(window).mean() for window in self.windows},
             index=data.index,
@@ -137,8 +172,7 @@ class MicrostructureIndicatorEngine:
         for window in self.kyle_lambda_windows:
             cov = price_change.rolling(window).cov(signed_volume)
             var = signed_volume.rolling(window).var()
-            value = cov / var.replace(0.0, np.nan)
-            value = value.fillna(0.0)
+            value = _safe_ratio(cov, var).fillna(0.0)
             output[f"ms_kyle_lambda_{window}"] = value
 
         return pd.DataFrame(output, index=data.index)
@@ -189,7 +223,7 @@ class MicrostructureIndicatorEngine:
         for window in self.windows:
             mean = ofi_raw.rolling(window).mean()
             std = ofi_raw.rolling(window).std()
-            output[f"ms_ofi_zscore_{window}"] = (ofi_raw - mean) / std.replace(0.0, np.nan)
+            output[f"ms_ofi_zscore_{window}"] = _safe_ratio(ofi_raw - mean, std)
 
         return pd.DataFrame(output, index=data.index)
 
@@ -208,12 +242,14 @@ class MicrostructureIndicatorEngine:
 
         trades = data["trades"].astype(float)
         trades = trades.where(trades >= self.min_trades, np.nan)
-        avg_trade_size = quote_volume / trades
+        avg_trade_size = _safe_ratio(quote_volume, trades)
 
         output: Dict[str, pd.Series] = {}
         for window in self.kyle_lambda_windows:
             baseline = avg_trade_size.rolling(window).median()
-            output[f"ms_large_trade_ratio_{window}"] = avg_trade_size / baseline.replace(0.0, np.nan)
+            output[f"ms_large_trade_ratio_{window}"] = _safe_ratio(
+                avg_trade_size, baseline
+            )
 
         return pd.DataFrame(output, index=data.index)
 
@@ -224,7 +260,7 @@ class MicrostructureIndicatorEngine:
         delta_p = close.diff().fillna(0.0)
         sigma = delta_p.rolling(max(self.vpin_n_buckets)).std().fillna(0.0)
 
-        z = delta_p / sigma.replace(0.0, np.nan)
+        z = _safe_ratio(delta_p, sigma)
         buy_pct = pd.Series(norm.cdf(z.fillna(0.0)), index=data.index)
         buy_pct = buy_pct.where(sigma != 0.0, 0.5)
 
@@ -235,7 +271,7 @@ class MicrostructureIndicatorEngine:
         for window in self.vpin_n_buckets:
             imbalance = (buy_volume - sell_volume).abs().rolling(window).sum()
             vol_sum = volume.rolling(window).sum()
-            vpin = imbalance / vol_sum.replace(0.0, np.nan)
+            vpin = _safe_ratio(imbalance, vol_sum)
             if sigma.eq(0.0).all():
                 vpin = pd.Series(0.0, index=data.index)
             output[f"ms_vpin_{window}"] = vpin
@@ -245,6 +281,6 @@ class MicrostructureIndicatorEngine:
             base_vpin = output[f"ms_vpin_{base_window}"]
             mean = base_vpin.rolling(window).mean()
             std = base_vpin.rolling(window).std()
-            output[f"ms_vpin_zscore_{window}"] = (base_vpin - mean) / std.replace(0.0, np.nan)
+            output[f"ms_vpin_zscore_{window}"] = _safe_ratio(base_vpin - mean, std)
 
         return pd.DataFrame(output, index=data.index)

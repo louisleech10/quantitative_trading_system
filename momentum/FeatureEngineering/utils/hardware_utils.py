@@ -18,8 +18,14 @@ TIER_THRESHOLDS: List[Tuple[int, str]] = [
     (0, "8gb"),
 ]
 
+# L6.5 preprocessing ThreadPool workers.
+# OOM Fix (2026-04-25): 8 GB tier reduced from 4 → 2. With CGSA-parallel
+# multi-TF + L6.5 large groups (e.g. WorldQuant ~16k cols), 4 concurrent
+# workers on M1 8GB easily push RSS past 6 GB and trigger SIGKILL when a
+# frontend dev server / browser is also resident. 2 workers keeps the peak
+# inside ~3.5 GB while only adding ~30-40% to L6.5 wall time.
 _WORKERS_BY_TIER: Dict[str, int] = {
-    "8gb": 4,
+    "8gb": 2,
     "16gb": 6,
     "24gb": 8,
     "32gb": 8,
@@ -92,8 +98,11 @@ _LAYER3_CHUNK_SIZE_BY_TIER: Dict[str, int] = {
 # sub-tasks dispatched to the same ThreadPool. Reduces tail latency caused by
 # imbalanced groups (e.g. L2_Momentum carrying ~16k cols while peers carry ~500).
 # Set 0 / negative to disable splitting.
+# OOM Fix (2026-04-25): 8 GB lowered 4000 → 2000 so each sub-task buffers a
+# smaller column slice (~half the previous peak). Combined with L65_WORKERS=2
+# this caps L6.5 transient RSS at ~3.5 GB on M1 8GB.
 _L65_SPLIT_THRESHOLD_BY_TIER: Dict[str, int] = {
-    "8gb": 4000,
+    "8gb": 2000,
     "16gb": 8000,
     "24gb": 12000,
     "32gb": 16000,

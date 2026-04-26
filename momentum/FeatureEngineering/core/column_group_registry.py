@@ -164,6 +164,36 @@ class ColumnGroupRegistry:
             key=lambda item: item.group_id,
         )
 
+    def has_layers_for_timeframe(self, tf: str, layers: Iterable[LayerSource]) -> bool:
+        """Return True iff every layer in ``layers`` has at least one group for ``tf``.
+
+        Used by Multi-TF resume logic to decide whether a TF can be skipped
+        when re-running a pipeline against an existing manifest. Caller is
+        responsible for passing the canonical layer set (typically L1..L6).
+        """
+        required = {layer for layer in layers}
+        if not required:
+            return False
+        seen: set[LayerSource] = set()
+        for group in self._groups.values():
+            if group.timeframe != tf:
+                continue
+            seen.add(group.layer)
+            if required.issubset(seen):
+                return True
+        return required.issubset(seen)
+
+    def write_manifest(self) -> None:
+        """Public façade for persisting manifest atomically (thread-safe).
+
+        Resume support: callers that register groups via :meth:`register`
+        (rather than :meth:`save_data`) must invoke this to flush the
+        in-memory mapping to ``manifest.json`` so a subsequent process can
+        pick up where the previous one left off. ``save_data`` already
+        writes the manifest internally.
+        """
+        self._write_manifest_thread_safe()
+
     def iter_all(self) -> Iterable[tuple[str, ColumnGroup]]:
         """Iterate all groups in deterministic group_id order."""
         for group_id in sorted(self._groups.keys()):

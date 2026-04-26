@@ -137,11 +137,10 @@ class TestD1EdgeCases:
 
         config = config_manager.get_merged_config(override)
         preview = config_manager.preview_feature_count(config)
-        # labels 總是產生固定特徵（price change labels），不受 indicator 開關影響
-        labels_count = preview.breakdown.get("labels", 0)
-        non_label_total = preview.total_features - labels_count
-        assert non_label_total == 0, \
-            f"全部 disabled → 非 labels 特徵數應為 0，實際 {non_label_total}"
+        # NOTE: preview.total_features already EXCLUDES labels (labels are Y targets,
+        # not X features — see preview_feature_count). So the assertion is direct.
+        assert preview.total_features == 0, \
+            f"全部 disabled → 特徵數應為 0，實際 {preview.total_features}, breakdown={preview.breakdown}"
 
     def test_edge_case_6_microstructure_features_dict_takes_priority(self, config_manager):
         """邊界 #6: Microstructure enabled_features + features 同時存在 → features dict 優先"""
@@ -465,10 +464,17 @@ class TestD3EndToEnd:
         assert "preview" in result
 
         preview = result["preview"]
-        # lightweight_ml should produce fewer features than full config
+        # lightweight_ml should produce fewer features than full config.
+        # We compare against the full preset rather than a fixed magic number,
+        # because absolute counts shift as new operators/indicators are added —
+        # what matters is that lightweight_ml stays *materially smaller* than full.
         assert preview["total_features"] > 0
-        assert preview["total_features"] < 10000, \
-            "lightweight_ml 應產出 < 10000 特徵"
+        full_result = svc.apply_preset_config("full")
+        full_total = full_result["preview"]["total_features"]
+        assert preview["total_features"] < full_total * 0.5, (
+            f"lightweight_ml 應遠小於 full：lightweight={preview['total_features']}, "
+            f"full={full_total}"
+        )
 
         # Restore to standard
         svc.apply_preset_config("standard")

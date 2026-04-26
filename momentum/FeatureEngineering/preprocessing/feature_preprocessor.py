@@ -207,18 +207,55 @@ class FeaturePreprocessor:
         failed = 0
         started_at = time.perf_counter()
 
+        # ── Sub-step progress logging ────────────────────────────────────
+        # Mirrors the parallel path heartbeat so SIGKILL leaves the last
+        # attempted group visible in the log.
+        total = len(groups)
+        heartbeat_step = max(1, total // 20)
+        heartbeat_interval_sec = 30.0
+        last_heartbeat_at = started_at
+        last_heartbeat_done = 0
+        last_group_label = "<none>"
+
+        logger.info("[L6.5] Serial start: %d groups", total)
+
         for group in groups:
+            gid = getattr(group, "group_id", "<unknown>")
             try:
                 self._transform_single_group(registry, group, transform_context)
                 completed += 1
+                last_group_label = gid
             except Exception as error:
                 failed += 1
                 logger.error(
                     "[L6.5] Failed group %s: %s",
-                    getattr(group, "group_id", "<unknown>"),
+                    gid,
                     error,
                     exc_info=True,
                 )
+
+            now = time.perf_counter()
+            done = completed + failed
+            if (
+                done - last_heartbeat_done >= heartbeat_step
+                or (now - last_heartbeat_at) >= heartbeat_interval_sec
+            ):
+                elapsed_so_far = now - started_at
+                rate = done / elapsed_so_far if elapsed_so_far > 0 else 0.0
+                eta = (total - done) / rate if rate > 0 else float("inf")
+                logger.info(
+                    "[L6.5] heartbeat (serial): %d/%d (%.1f%%), elapsed=%.1fs, "
+                    "rate=%.2f/s, ETA=%.0fs, last=%s",
+                    done,
+                    total,
+                    100.0 * done / max(total, 1),
+                    elapsed_so_far,
+                    rate,
+                    eta if eta != float("inf") else -1,
+                    last_group_label,
+                )
+                last_heartbeat_at = now
+                last_heartbeat_done = done
 
         elapsed = time.perf_counter() - started_at
         logger.info(
@@ -298,6 +335,30 @@ class FeaturePreprocessor:
         failed = 0
         started_at = time.perf_counter()
 
+        # ── Sub-step progress logging ────────────────────────────────────
+        # Goal: when L6.5 OOM-kills mid-pipeline, the last log line tells
+        # us which group/slice was running. Without this, we only see the
+        # "Parallel complete" line at the very end (which never prints on
+        # crash). Heartbeat every max(1, total//20) completions OR every
+        # 30s, whichever comes first.
+        total_tasks = len(full_groups) + sum(len(info["slices"]) for info in split_meta.values())
+        heartbeat_step = max(1, total_tasks // 20)
+        heartbeat_interval_sec = 30.0
+        last_heartbeat_at = started_at
+        last_heartbeat_done = 0
+        tasks_done = 0  # full task or single slice (fan-out granularity)
+        last_group_label = "<none>"
+
+        logger.info(
+            "[L6.5] Parallel start: %d full groups + %d big-group splits → %d sub-tasks "
+            "(workers=%d, split_threshold=%d)",
+            len(full_groups),
+            len(split_meta),
+            total_tasks,
+            n_workers,
+            split_threshold,
+        )
+
         # Submit task type tagging: ("full", group, None) or ("slice", group, (s, e)).
         with ThreadPoolExecutor(max_workers=n_workers) as pool:
             futures: Dict[object, Tuple[str, object, Optional[Tuple[int, int]]]] = {}
@@ -322,10 +383,15 @@ class FeaturePreprocessor:
                     result = fut.result()
                     if kind == "full":
                         completed += 1
+                        last_group_label = f"{gid} (full)"
                     else:
                         meta = split_meta[gid]
                         meta["results"][slice_range] = result
                         meta["completed_slices"] += 1
+                        last_group_label = (
+                            f"{gid} slice[{slice_range[0]}:{slice_range[1]}] "
+                            f"({meta['completed_slices']}/{len(meta['slices'])})"
+                        )
                         if meta["completed_slices"] == len(meta["slices"]):
                             # Concatenate slices in column order and persist.
                             ordered = sorted(meta["results"].items(), key=lambda kv: kv[0][0])
@@ -336,6 +402,7 @@ class FeaturePreprocessor:
                             del meta["array"]
                             split_completed_groups.add(gid)
                             completed += 1
+                            last_group_label = f"{gid} (split→merged)"
                 except Exception as error:
                     failed += 1
                     logger.error(
@@ -345,6 +412,33 @@ class FeaturePreprocessor:
                         error,
                         exc_info=True,
                     )
+
+                # Heartbeat: emit periodic progress so a SIGKILL leaves
+                # the last-attempted group visible in the log.
+                tasks_done += 1
+                now = time.perf_counter()
+                if (
+                    tasks_done - last_heartbeat_done >= heartbeat_step
+                    or (now - last_heartbeat_at) >= heartbeat_interval_sec
+                ):
+                    elapsed = now - started_at
+                    rate = tasks_done / elapsed if elapsed > 0 else 0.0
+                    eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
+                    logger.info(
+                        "[L6.5] heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
+                        "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, last=%s",
+                        tasks_done,
+                        total_tasks,
+                        100.0 * tasks_done / max(total_tasks, 1),
+                        completed,
+                        len(groups),
+                        elapsed,
+                        rate,
+                        eta if eta != float("inf") else -1,
+                        last_group_label,
+                    )
+                    last_heartbeat_at = now
+                    last_heartbeat_done = tasks_done
 
         elapsed = time.perf_counter() - started_at
         split_count = len(split_meta)

@@ -59,24 +59,67 @@ interface HardwareInfo {
 
 // All optimization parameters surfaced in the UI.
 // `key` matches `tier_table[tier][key]` and `applied_settings[key]`.
+// `desc` 提供 hover tooltip，說明此參數對效能 / 記憶體的影響。
 const PARAM_ROWS: Array<{
   key: keyof TierConfig;
   label: string;
   highlight?: boolean;
   format?: (val: unknown) => string;
+  desc?: string;
 }> = [
-  { key: 'l65_workers', label: 'L65_WORKERS' },
-  { key: 'l7_workers', label: 'L7_WORKERS' },
-  { key: 'cgsa_memory_buffer', label: 'CGSA_BUFFER' },
-  { key: 'multi_tf_max_workers', label: 'MultiTF_Workers', highlight: true },
-  { key: 'layer3_chunk_size', label: 'L3_Chunk', highlight: true },
-  { key: 'l3_persist_mode', label: 'L3_Persist' },
-  { key: 'l3_streaming_buffer_cols', label: 'L3_Stream_Buf' },
-  { key: 'l65_split_threshold', label: 'L65_Split_Thr' },
-  { key: 'l2_category_workers', label: 'L2_Cat_Workers', highlight: true },
+  {
+    key: 'l65_workers',
+    label: 'L65_WORKERS',
+    desc:
+      'Layer 6.5 預處理 ThreadPool worker 數。8GB tier 預設 2（OOM 修正：4 會在 Multi-TF + 大 group 時讓 RSS 衝破 6GB）。可由 FFACT_L65_WORKERS 覆寫。',
+  },
+  { key: 'l7_workers', label: 'L7_WORKERS', desc: 'Layer 7 持久化 parquet 寫入並行度。' },
+  {
+    key: 'cgsa_memory_buffer',
+    label: 'CGSA_BUFFER',
+    desc: 'CGSA registry 在記憶體中緩衝的 group 數量；0 = 立即落盤（8/16GB 預設）。',
+  },
+  {
+    key: 'multi_tf_max_workers',
+    label: 'MultiTF_Workers',
+    highlight: true,
+    desc:
+      'Multi-TF 平行子進程上限。8GB 必為 1（主進程 + 1 worker 已飽和）；其他 tier 隨 RAM 增加。',
+  },
+  {
+    key: 'layer3_chunk_size',
+    label: 'L3_Chunk',
+    highlight: true,
+    desc: 'Layer 3 rolling 計算的欄位 chunk 大小，平衡 CPU cache 與 RAM。',
+  },
+  {
+    key: 'l3_persist_mode',
+    label: 'L3_Persist',
+    desc:
+      'Layer 3 持久化模式：streaming = 每個 chunk 算完即落盤（8/16GB 必須）；hybrid / in_memory 適用大 RAM。',
+  },
+  {
+    key: 'l3_streaming_buffer_cols',
+    label: 'L3_Stream_Buf',
+    desc: 'Streaming 模式下每次 flush 累積的欄位數；越小峰值越低、寫入越多。',
+  },
+  {
+    key: 'l65_split_threshold',
+    label: 'L65_Split_Thr',
+    desc:
+      '單一 group 欄位數超過此值時拆成多個 sub-task 平衡 worker。8GB 預設 2000（OOM 修正：原 4000 易在 WorldQuant 等大 group 觸發峰值）。可由 FFACT_L65_SPLIT_THRESHOLD 覆寫。',
+  },
+  {
+    key: 'l2_category_workers',
+    label: 'L2_Cat_Workers',
+    highlight: true,
+    desc:
+      'Layer 2 derived feature 各 category 並行 worker。8GB 必為 1（Multi-TF 同時跑時記憶體會疊加）。',
+  },
   {
     key: 'chunk_bars',
     label: 'Chunk_Bars',
+    desc: '單批處理 K 線數上限；∞ = 全量載入（24/32GB 才安全）。',
     format: (val) => (val == null ? '∞' : val >= 1000 ? `${(val as number) / 1000}K` : String(val)),
   },
 ];
@@ -237,7 +280,7 @@ export function HardwareStatusPanel() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-cyan-50 sm:grid-cols-3 lg:grid-cols-4">
-                  {PARAM_ROWS.map(({ key, label, highlight, format }) => {
+                  {PARAM_ROWS.map(({ key, label, highlight, format, desc }) => {
                     const tierVal = hardwareInfo.tier_table?.[hardwareInfo.memory_tier]?.[key];
                     const applied = hardwareInfo.applied_settings?.[key];
                     const isOverride = applied?.source === 'env';
@@ -248,8 +291,9 @@ export function HardwareStatusPanel() {
                         className={`flex items-baseline gap-1 ${
                           highlight ? 'text-cyan-200' : ''
                         }`}
+                        title={desc}
                       >
-                        <span className="font-mono text-[11px] text-cyan-100/60">{label}=</span>
+                        <span className="font-mono text-[11px] text-cyan-100/60 cursor-help">{label}=</span>
                         <span className="font-mono">{displayVal}</span>
                         {isOverride && (
                           <span
@@ -264,7 +308,11 @@ export function HardwareStatusPanel() {
                   })}
                 </div>
                 <div className="text-[10px] text-cyan-100/50">
-                  Compactor=ON（永久啟用）· 設定可由 <code className="font-mono">FFACT_*</code> 環境變數覆寫
+                  Compactor=ON（永久啟用）· 設定可由 <code className="font-mono">FFACT_*</code> 環境變數覆寫· 滑鼠移入參數名可查看說明
+                </div>
+                <div className="text-[10px] text-amber-200/80 leading-relaxed">
+                  ⚠️ 8GB OOM 修正 (2026-04-25)：<code className="font-mono">L65_WORKERS</code> 4→2、<code className="font-mono">L65_Split_Thr</code> 4000→2000。
+                  與前端 <code>npm run dev</code> 同時跑時，可避免 L6.5 階段被 macOS SIGKILL；L6.5 時間增加 ~30-40%，交換可穩定完成。
                 </div>
               </div>
 
@@ -296,9 +344,12 @@ export function HardwareStatusPanel() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {PARAM_ROWS.map(({ key, label, highlight, format }) => (
+                      {PARAM_ROWS.map(({ key, label, highlight, format, desc }) => (
                         <tr key={String(key)} className="hover:bg-white/5">
-                          <td className={`px-3 py-1.5 font-mono ${highlight ? 'text-cyan-200' : 'text-slate-300'}`}>
+                          <td
+                            className={`px-3 py-1.5 font-mono ${highlight ? 'text-cyan-200' : 'text-slate-300'} cursor-help`}
+                            title={desc}
+                          >
                             {label}
                           </td>
                           {ALL_TIERS.map((tier) => {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import os
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
@@ -14,6 +15,32 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
 
 import numpy as np
 import pandas as pd
+
+# ── Pathological-input warnings: surface once, then stay quiet ──────────
+# These two warnings come from real input pathologies (not bugs) and were
+# previously flooding the log in tens of thousands of lines, hiding the
+# real progress / error messages:
+#   1. pandas overflow-on-cast: ratio features (e.g. ms_large_trade_ratio)
+#      whose denominator approaches 0 produce 1e30+ values; float32 cast
+#      yields ±inf. Final values get clipped by L6.5 winsorization.
+#   2. statsmodels divide-by-zero in log: OLS on constant rolling windows
+#      (zero residuals → log(0)=-inf in log-likelihood). Same downstream
+#      handling.
+# Using "once" preserves first-occurrence visibility (so we still see the
+# location during debugging) while preventing log flooding. The L7
+# validation scan tracks aggregate inf_count so we never *lose* visibility.
+warnings.filterwarnings(
+    "once",
+    message="overflow encountered in cast",
+    category=RuntimeWarning,
+    module=r"pandas\.core\.nanops",
+)
+warnings.filterwarnings(
+    "once",
+    message="divide by zero encountered in log",
+    category=RuntimeWarning,
+    module=r"statsmodels\.regression\.linear_model",
+)
 
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
@@ -1250,6 +1277,14 @@ class FeatureFactory:
         total_values = 0
         non_nan_values = 0
 
+        # Aggregate inf tracking — surfaces pathological-input quality signal.
+        # Although L6.5 winsorization clips inf to finite, residual inf can
+        # still appear in groups that bypass L6.5 (e.g. labels) or in early
+        # validation runs without L6.5. We surface inf_ratio so the user can
+        # quantify how much of the registry was tainted by overflow / div-zero.
+        total_inf = 0
+        groups_with_inf: List[Tuple[str, int, float]] = []  # (gid, count, ratio)
+
         for group_id, group in registry.iter_all():
             group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
             if group_data.ndim != 2:
@@ -1278,6 +1313,8 @@ class FeatureFactory:
 
             if inf_count > 0:
                 has_inf = True
+                total_inf += inf_count
+                groups_with_inf.append((group_id, inf_count, inf_count / value_count))
                 message = f"Group {group_id} contains {inf_count} inf values"
                 warnings.append(message)
                 logger.warning("[L7][CGSA] %s", message)
@@ -1294,10 +1331,41 @@ class FeatureFactory:
             non_nan_values += value_count - nan_count
 
         coverage = float(non_nan_values / total_values) if total_values > 0 else 0.0
+        inf_ratio = float(total_inf / total_values) if total_values > 0 else 0.0
+
+        # Emit a one-shot quality summary so the inf metric is always visible
+        # (instead of buried under per-group warnings). Top-5 offending groups
+        # help users locate the upstream pathological feature family.
+        if total_inf > 0:
+            top_inf = sorted(groups_with_inf, key=lambda item: item[1], reverse=True)[:5]
+            top_inf_str = ", ".join(
+                f"{gid}({count} inf, {ratio:.2%})" for gid, count, ratio in top_inf
+            )
+            logger.warning(
+                "[L7][CGSA] Quality summary: inf_count=%d, inf_ratio=%.6f, "
+                "groups_with_inf=%d, coverage=%.4f, top_inf={%s}",
+                total_inf,
+                inf_ratio,
+                len(groups_with_inf),
+                coverage,
+                top_inf_str,
+            )
+        else:
+            logger.info(
+                "[L7][CGSA] Quality summary: inf_count=0, coverage=%.4f, "
+                "non_nan=%d/%d",
+                coverage,
+                non_nan_values,
+                total_values,
+            )
+
         return {
             "has_nan": has_nan,
             "has_inf": has_inf,
             "coverage": coverage,
+            "inf_count": total_inf,
+            "inf_ratio": inf_ratio,
+            "groups_with_inf": len(groups_with_inf),
             "warnings": warnings,
         }
 
@@ -1371,6 +1439,9 @@ class FeatureFactory:
                 "high_correlation_pairs": [],
                 "warnings": list(validation_summary["warnings"]),
                 "coverage": float(validation_summary["coverage"]),
+                "inf_count": int(validation_summary.get("inf_count", 0)),
+                "inf_ratio": float(validation_summary.get("inf_ratio", 0.0)),
+                "groups_with_inf": int(validation_summary.get("groups_with_inf", 0)),
                 "constant_features_removed": [],
             },
         }

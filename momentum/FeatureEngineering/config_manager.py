@@ -181,9 +181,17 @@ class ConfigManager:
                     features = {}
 
                 # Keep legacy microstructure allow-list semantics:
-                # when enabled_features is a list, features should contain only listed items.
+                # when enabled_features is a list AND features dict is not already
+                # populated, build features from enabled_features. If both exist,
+                # the explicit features dict takes priority (user intent wins over
+                # legacy field). See test_edge_case_6_microstructure_features_dict_takes_priority.
                 if special_key == "microstructure":
                     ef = special_cfg.get("enabled_features")
+                    user_features = special_cfg.get("features")
+                    if isinstance(user_features, dict) and user_features:
+                        # User explicitly populated features → respect verbatim,
+                        # do NOT fill defaults (only listed indicators run).
+                        continue
                     if isinstance(ef, list):
                         special_cfg["features"] = {name: {"enabled": True} for name in ef}
                         continue
