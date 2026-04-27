@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import gc
-import json
 import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
+from momentum.FeatureEngineering.preprocessing._d_star_cache import (
+    DStarCache,
+    PreprocessingContext,
+)
+from momentum.FeatureEngineering.preprocessing._non_stationary_cache import NonStationaryCache
+from momentum.core.config import MomentumConfig, get_fracdiff_layers, get_fracdiff_precision
 from momentum.core.logging import get_logger
 
 
@@ -20,6 +25,21 @@ if TYPE_CHECKING:
 
 
 logger = get_logger(__name__)
+_FRACDIFF_LAYER_RE = re.compile(r"^(L\d+)_")
+
+
+def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bool:
+    if "ALL" in allowed_layers:
+        return True
+
+    match = _FRACDIFF_LAYER_RE.match(str(column))
+    if not match:
+        logger.warning(
+            "[L6.5] Layer parse failed col=%s, treat as non-target",
+            column,
+        )
+        return False
+    return match.group(1) in allowed_layers
 
 try:
     from scipy.special import erfinv
@@ -43,8 +63,9 @@ except Exception:
 class FeaturePreprocessor:
     """Layer 6.5: 特徵前處理與正規化。"""
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, context: Optional[PreprocessingContext] = None) -> None:
         self._config = config or {}
+        self._preprocessing_context = context or PreprocessingContext()
         self.rank_config = self._config.get("rank_transform", {})
         self.gaussian_config = self._config.get("gaussian_normalize", {})
         self.adf_config = self._config.get("adf_differencing", {})
@@ -55,8 +76,11 @@ class FeaturePreprocessor:
         self.mode = self._config.get("mode", "replace")
 
         self._fracdiff_processed_columns: set[str] = set()
+        self._fracdiff_apply_to_layers = get_fracdiff_layers()
+        self._non_stationary_cache = NonStationaryCache()
         self._column_chunk_size = self._resolve_column_chunk_size()
-        self._d_star_cache: Optional[Dict[str, float]] = None
+        self._d_star_cache: Optional[DStarCache] = None
+        self._d_star_cache_shared = False
         self._numba_warmed_up = False
 
     @staticmethod
@@ -302,8 +326,6 @@ class FeaturePreprocessor:
 
         if not groups:
             return 0
-
-        from collections import defaultdict
 
         from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
 
@@ -590,8 +612,10 @@ class FeaturePreprocessor:
             self.fracdiff_config.get("enabled", False)
             and self.fracdiff_config.get("cache_d_star", True)
         )
+        previous_shared_cache = self._d_star_cache_shared
         if use_shared_dstar_cache:
-            self._d_star_cache = self._load_d_star_cache("default", "default")
+            self._d_star_cache_shared = True
+            self._d_star_cache = None
 
         orig_chunks: List[np.ndarray] = []
         new_chunks: List[np.ndarray] = []
@@ -628,8 +652,9 @@ class FeaturePreprocessor:
         finally:
             # Persist d_star cache once after all chunks complete.
             if use_shared_dstar_cache and self._d_star_cache is not None:
-                self._save_d_star_cache("default", "default", self._d_star_cache)
+                self._d_star_cache.flush_atomic()
                 self._d_star_cache = None
+            self._d_star_cache_shared = previous_shared_cache
 
             # Free the large source array before assembling results so the
             # concatenation allocations don't compound with it.
@@ -888,9 +913,11 @@ class FeaturePreprocessor:
             self.fracdiff_config.get("enabled", False)
             and self.fracdiff_config.get("cache_d_star", True)
         )
+        previous_shared_cache = self._d_star_cache_shared
         if use_shared_dstar_cache:
             # Load once for the whole run (instead of once per chunk).
-            self._d_star_cache = self._load_d_star_cache("default", "default")
+            self._d_star_cache_shared = True
+            self._d_star_cache = None
 
         if use_memmap:
             from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
@@ -901,31 +928,33 @@ class FeaturePreprocessor:
             )
             col_offset = 0
 
-        for i in range(0, len(all_columns), chunk_size):
-            chunk_cols = all_columns[i : i + chunk_size]
-            chunk_idx = i // chunk_size + 1
-            logger.info("[L6.5] Processing chunk %d/%d (%d cols)", chunk_idx, n_chunks, len(chunk_cols))
+        try:
+            for i in range(0, len(all_columns), chunk_size):
+                chunk_cols = all_columns[i : i + chunk_size]
+                chunk_idx = i // chunk_size + 1
+                logger.info("[L6.5] Processing chunk %d/%d (%d cols)", chunk_idx, n_chunks, len(chunk_cols))
 
-            chunk_df = features_df[chunk_cols]
-            processed_chunk = self._transform_single(chunk_df)
+                chunk_df = features_df[chunk_cols]
+                processed_chunk = self._transform_single(chunk_df)
 
-            if use_memmap:
-                n = processed_chunk.shape[1]
-                out_arr[:, col_offset : col_offset + n] = _np.asarray(
-                    processed_chunk.values, dtype=_np.float32
-                )
-                col_offset += n
-                del processed_chunk
-            else:
-                result_chunks.append(processed_chunk)
+                if use_memmap:
+                    n = processed_chunk.shape[1]
+                    out_arr[:, col_offset : col_offset + n] = _np.asarray(
+                        processed_chunk.values, dtype=_np.float32
+                    )
+                    col_offset += n
+                    del processed_chunk
+                else:
+                    result_chunks.append(processed_chunk)
 
-            # Release references to reduce peak memory
-            del chunk_df
-
-        if use_shared_dstar_cache and self._d_star_cache is not None:
-            # Save once after all chunks complete.
-            self._save_d_star_cache("default", "default", self._d_star_cache)
-            self._d_star_cache = None
+                # Release references to reduce peak memory
+                del chunk_df
+        finally:
+            if use_shared_dstar_cache and self._d_star_cache is not None:
+                # Save once after all chunks complete.
+                self._d_star_cache.flush_atomic()
+                self._d_star_cache = None
+            self._d_star_cache_shared = previous_shared_cache
 
         if use_memmap:
             return pd.DataFrame(
@@ -976,13 +1005,64 @@ class FeaturePreprocessor:
 
         return result
 
+    def _resolve_fracdiff_precision(self) -> float:
+        return get_fracdiff_precision(self.fracdiff_config.get("precision", 0.02))
+
+    def _filter_fracdiff_target_columns(self, columns: List[str]) -> List[str]:
+        return [
+            column
+            for column in columns
+            if _is_fracdiff_target_layer(column, self._fracdiff_apply_to_layers)
+        ]
+
+    @staticmethod
+    def _d_star_cache_dir() -> Path:
+        return MomentumConfig.from_project_root().data_cache_path / "feature_preprocessing"
+
+    def _create_d_star_cache(
+        self,
+        *,
+        adf_threshold: float,
+        precision: float,
+        max_lag: int,
+        weight_threshold: float,
+    ) -> DStarCache:
+        sample_size = int(
+            self.fracdiff_config.get(
+                "sample_size",
+                self.adf_config.get("sample_size", 500),
+            )
+        )
+        return DStarCache(
+            self._preprocessing_context,
+            self._d_star_cache_dir(),
+            adf_threshold=adf_threshold,
+            precision=precision,
+            max_lag=max_lag,
+            weight_threshold=weight_threshold,
+            sample_size=sample_size,
+            nan_policy="dropna",
+        )
+
     def _apply_fractional_differencing(self, df: pd.DataFrame) -> pd.DataFrame:
         if not HAS_STATSMODELS:
             logger.warning("Fractional differencing skipped: statsmodels unavailable")
             return df
 
         apply_to = self.fracdiff_config.get("apply_to", "non_stationary")
-        columns = self._select_columns(df, apply_to)
+        selection_df = df
+        if apply_to == "non_stationary":
+            numeric_columns = [
+                column for column in df.columns if pd.api.types.is_numeric_dtype(df[column])
+            ]
+            target_columns = self._filter_fracdiff_target_columns(numeric_columns)
+            if not target_columns:
+                return df
+            selection_df = df.loc[:, target_columns]
+
+        columns = self._select_columns(selection_df, apply_to)
+        if apply_to != "non_stationary" and columns:
+            columns = self._filter_fracdiff_target_columns(columns)
         if not columns:
             return df
 
@@ -990,22 +1070,32 @@ class FeaturePreprocessor:
         d_range = self.fracdiff_config.get("d_range", [0.0, 1.0])
         adf_threshold = float(self.fracdiff_config.get("adf_threshold", 0.05))
         weight_threshold = float(self.fracdiff_config.get("weight_threshold", 1e-5))
-        precision = float(self.fracdiff_config.get("precision", 0.01))
+        precision = self._resolve_fracdiff_precision()
         # 限制 weight 寬度：最多序列長度的 10%（上限 252），避免 d≈0.5 時產生大量 NaN
         max_lag = int(self.fracdiff_config.get("max_lag", 0))
         if max_lag <= 0:
             max_lag = min(max(2, len(df) // 10), 252)
 
         cache_enabled = bool(self.fracdiff_config.get("cache_d_star", True))
-        if self._d_star_cache is not None:
+        cache: Optional[DStarCache] = None
+        shared_cache = False
+        if cache_enabled and self._d_star_cache_shared:
+            if self._d_star_cache is None:
+                self._d_star_cache = self._create_d_star_cache(
+                    adf_threshold=adf_threshold,
+                    precision=precision,
+                    max_lag=max_lag,
+                    weight_threshold=weight_threshold,
+                )
             cache = self._d_star_cache
             shared_cache = True
         elif cache_enabled:
-            cache = self._load_d_star_cache("default", "default")
-            shared_cache = False
-        else:
-            cache = {}
-            shared_cache = False
+            cache = self._create_d_star_cache(
+                adf_threshold=adf_threshold,
+                precision=precision,
+                max_lag=max_lag,
+                weight_threshold=weight_threshold,
+            )
 
         # Precompute NaN rates once per chunk to avoid per-column scans.
         nan_rates = result.loc[:, columns].isna().mean()
@@ -1016,8 +1106,9 @@ class FeaturePreprocessor:
             series = result[column].astype(float)
 
             try:
-                if column in cache:
-                    d_star = float(cache[column])
+                cached_d_star = cache.get(column) if cache is not None else None
+                if cached_d_star is not None:
+                    d_star = cached_d_star
                 else:
                     d_star = self._find_min_d(
                         series,
@@ -1026,7 +1117,8 @@ class FeaturePreprocessor:
                         precision=precision,
                         max_lag=max_lag,
                     )
-                    cache[column] = d_star
+                    if cache is not None:
+                        cache.set(column, d_star)
             except Exception as exc:
                 logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
                 d_star = 1.0
@@ -1047,8 +1139,20 @@ class FeaturePreprocessor:
                 skipped_high_nan[:10],
             )
 
-        if cache_enabled and not shared_cache:
-            self._save_d_star_cache("default", "default", cache)
+        if cache_enabled and cache is not None:
+            if not shared_cache:
+                cache.flush_atomic()
+            cache_hits, cache_misses = cache.stats()
+            total_lookups = cache_hits + cache_misses
+            if total_lookups > 0:
+                logger.info(
+                    "[L6.5] symbol=%s tf=%s d_star_cache_hit=%d/%d path=%s",
+                    self._preprocessing_context.symbol,
+                    self._preprocessing_context.timeframe,
+                    cache_hits,
+                    total_lookups,
+                    cache.path,
+                )
 
         return result
 
@@ -1278,20 +1382,45 @@ class FeaturePreprocessor:
             return []
 
         threshold = float(self.adf_config.get("adf_threshold", self.fracdiff_config.get("adf_threshold", 0.05)))
+        sample_size = int(self.adf_config.get("sample_size", self.fracdiff_config.get("sample_size", 500)))
+        sample_size = max(sample_size, 1)
+        nan_policy = "dropna"
         non_stationary: List[str] = []
 
         for column in df.columns:
-            series = df[column].dropna()
+            raw_series = df[column]
+            cache_key = self._non_stationary_cache.make_key(
+                str(column),
+                threshold,
+                sample_size,
+                nan_policy,
+                raw_series,
+            )
+            cached = self._non_stationary_cache.get(cache_key)
+            if cached is not None:
+                if cached:
+                    non_stationary.append(column)
+                continue
+
+            if float(raw_series.isna().mean()) > 0.5:
+                self._non_stationary_cache.set(cache_key, False)
+                continue
+
+            series = raw_series.dropna()
             if len(series) < 20:
+                is_non_stationary = True
+                self._non_stationary_cache.set(cache_key, is_non_stationary)
                 non_stationary.append(column)
                 continue
 
             try:
-                pvalue = adfuller(series.tail(500), autolag="AIC")[1]
+                pvalue = adfuller(series.tail(sample_size), autolag="AIC")[1]
             except Exception:
                 pvalue = 1.0
 
-            if pvalue > threshold:
+            is_non_stationary = bool(pvalue > threshold)
+            self._non_stationary_cache.set(cache_key, is_non_stationary)
+            if is_non_stationary:
                 non_stationary.append(column)
 
         return non_stationary
@@ -1353,9 +1482,10 @@ class FeaturePreprocessor:
     def _find_min_d(
         self,
         series: pd.Series,
+        *,
         adf_threshold: float = 0.05,
         d_range: Tuple[float, float] = (0.0, 1.0),
-        precision: float = 0.01,
+        precision: Optional[float] = None,
         max_lag: int = 0,
     ) -> float:
         if not HAS_STATSMODELS:
@@ -1367,6 +1497,11 @@ class FeaturePreprocessor:
 
         left, right = float(d_range[0]), float(d_range[1])
         best = right
+        effective_precision = (
+            self._resolve_fracdiff_precision() if precision is None else float(precision)
+        )
+        if effective_precision <= 0.0:
+            effective_precision = self._resolve_fracdiff_precision()
 
         def _is_stationary(d_value: float) -> bool:
             frac = self._frac_diff_ffd(
@@ -1381,7 +1516,7 @@ class FeaturePreprocessor:
             pvalue = adfuller(frac_clean.tail(500), autolag="AIC")[1]
             return bool(pvalue <= adf_threshold)
 
-        while right - left > precision:
+        while right - left > effective_precision:
             mid = (left + right) / 2.0
             try:
                 stationary = _is_stationary(mid)
@@ -1395,29 +1530,3 @@ class FeaturePreprocessor:
                 left = mid
 
         return round(best, 4)
-
-    @staticmethod
-    def _cache_path(symbol: str, timeframe: str) -> Path:
-        cache_dir = Path("data_cache") / "feature_preprocessing"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir / f"d_star_{symbol}_{timeframe}.json"
-
-    def _load_d_star_cache(self, symbol: str, timeframe: str) -> Dict[str, float]:
-        path = self._cache_path(symbol, timeframe)
-        if not path.exists():
-            return {}
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                return {str(k): float(v) for k, v in data.items()}
-            return {}
-        except Exception as exc:
-            logger.warning("Failed to load d* cache: %s", exc)
-            return {}
-
-    def _save_d_star_cache(self, symbol: str, timeframe: str, cache: Dict[str, float]) -> None:
-        path = self._cache_path(symbol, timeframe)
-        try:
-            path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception as exc:
-            logger.warning("Failed to save d* cache: %s", exc)

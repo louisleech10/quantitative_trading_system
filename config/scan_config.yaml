@@ -482,7 +482,7 @@ preprocessing:
     # 0.10 同上，避免長週期 EMA 無法找到有效 d*
     adf_threshold: 0.10
     weight_threshold: 1.0e-5
-    precision: 0.01
+    precision: 0.02
     apply_to: non_stationary
     cache_d_star: true
 

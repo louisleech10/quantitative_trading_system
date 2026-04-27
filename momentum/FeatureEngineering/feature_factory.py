@@ -69,6 +69,12 @@ from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicat
 from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
 from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry, ColumnGroupRegistryError
+from momentum.FeatureEngineering.preprocessing._d_star_cache import (
+    PreprocessingContext,
+    WEAK_FINGERPRINT,
+    compute_data_fingerprint,
+    compute_feature_schema_hash,
+)
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
 
@@ -119,6 +125,7 @@ class FeatureFactory:
         self._validator = FeatureValidator()
         self._current_symbol: Optional[str] = None
         self._current_timeframe: Optional[str] = None
+        self._current_config_hash: Optional[str] = None
         self._current_raw_data: Optional[pd.DataFrame] = None
         self._reference_data_cache: Dict[Tuple[str, str], pd.DataFrame] = {}
         self._cgsa_registry: Optional[ColumnGroupRegistry] = None
@@ -144,6 +151,7 @@ class FeatureFactory:
         self._progress_callback = progress_callback
         self._current_symbol = symbol
         self._current_timeframe = timeframe
+        self._current_config_hash = None
         self._cgsa_registry = None
         start_time = time.time()
 
@@ -154,6 +162,7 @@ class FeatureFactory:
             start_date=start_date,
             end_date=end_date,
         )
+        self._current_config_hash = config_hash
         if not force_regenerate:
             cached = self._try_load_cache(symbol, timeframe, config_hash)
             if cached:
@@ -1214,7 +1223,8 @@ class FeatureFactory:
 
     def _layer6_5_preprocessing(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
         """Layer 6.5: Feature preprocessing and normalization."""
-        preprocessor = FeaturePreprocessor(config.preprocessing.model_dump())
+        context = self._build_preprocessing_context(all_features, config)
+        preprocessor = FeaturePreprocessor(config.preprocessing.model_dump(), context=context)
 
         if self._cgsa_enabled() and self._cgsa_registry is not None:
             from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
@@ -1237,6 +1247,80 @@ class FeatureFactory:
             return pd.DataFrame(index=all_features.index if all_features is not None else None)
 
         return preprocessor.transform(all_features)
+
+    def _build_preprocessing_context(
+        self,
+        all_features: pd.DataFrame,
+        config: "FactoryConfig",
+    ) -> PreprocessingContext:
+        symbol = self._current_symbol or "unknown"
+        timeframe = self._current_timeframe or "unknown"
+        config_hash = self._current_config_hash or ""
+        raw_data = self._current_raw_data
+        source_frame = raw_data if raw_data is not None and not raw_data.empty else all_features
+
+        feature_columns: List[str]
+        if self._cgsa_registry is not None:
+            feature_columns = list(self._cgsa_registry.all_column_names())
+        elif all_features is not None:
+            feature_columns = [str(column) for column in all_features.columns]
+        else:
+            feature_columns = []
+
+        feature_schema_hash = compute_feature_schema_hash(feature_columns)
+        hdf5_meta = self._preprocessing_source_metadata(source_frame, symbol, timeframe)
+        data_fingerprint, is_weak = compute_data_fingerprint(source_frame, hdf5_meta)
+        source_attrs = getattr(source_frame, "attrs", {}) if source_frame is not None else {}
+        source_data_version = str(source_attrs.get("source_data_version", ""))
+
+        return PreprocessingContext(
+            symbol=symbol,
+            timeframe=timeframe,
+            config_hash=config_hash,
+            data_fingerprint=data_fingerprint,
+            feature_schema_hash=feature_schema_hash,
+            time_range=self._preprocessing_time_range(source_frame),
+            row_count=0 if source_frame is None else int(len(source_frame.index)),
+            source_data_version=source_data_version,
+            data_fingerprint_status=WEAK_FINGERPRINT if is_weak else "strong",
+        )
+
+    @staticmethod
+    def _preprocessing_source_metadata(
+        frame: Optional[pd.DataFrame],
+        symbol: str,
+        timeframe: str,
+    ) -> Dict[str, Any]:
+        if frame is None or frame.empty:
+            return {}
+        schema_hash = compute_feature_schema_hash([str(column) for column in frame.columns])
+        time_range = FeatureFactory._preprocessing_time_range(frame)
+        attrs = getattr(frame, "attrs", {})
+        return {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "start_ts": None if time_range is None else time_range[0],
+            "end_ts": None if time_range is None else time_range[1],
+            "row_count": int(len(frame.index)),
+            "source_data_version": str(attrs.get("source_data_version", "")),
+            "schema_hash": schema_hash,
+            "last_updated": attrs.get("last_updated"),
+        }
+
+    @staticmethod
+    def _preprocessing_time_range(frame: Optional[pd.DataFrame]) -> Optional[Tuple[int, int]]:
+        if frame is None or frame.empty:
+            return None
+        index = frame.index
+        first = index[0]
+        last = index[-1]
+        try:
+            return int(first), int(last)
+        except (TypeError, ValueError):
+            timestamps = pd.to_datetime(pd.Index([first, last]), errors="coerce")
+            if timestamps.isna().any():
+                return None
+            return int(timestamps[0].value), int(timestamps[1].value)
 
     @staticmethod
     def _collect_cgsa_layer_counts(registry: ColumnGroupRegistry) -> Dict[str, int]:

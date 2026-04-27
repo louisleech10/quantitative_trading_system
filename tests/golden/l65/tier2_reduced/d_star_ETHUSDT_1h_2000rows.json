@@ -1,0 +1,15 @@
+{
+  "L1_binance_close": 0.0547,
+  "L1_binance_high": 0.0547,
+  "L1_binance_low": 0.0391,
+  "L1_binance_open": 0.0547,
+  "L2_derived_close_mean_13": 0.1562,
+  "L2_derived_close_mean_21": 0.1562,
+  "L2_derived_close_mean_3": 0.0859,
+  "L2_derived_close_mean_34": 0.2344,
+  "L2_derived_close_mean_5": 0.1094,
+  "L2_derived_close_mean_55": 1.0,
+  "L2_derived_close_mean_8": 0.0859,
+  "L2_derived_close_mean_89": 1.0,
+  "L2_derived_log_close": 0.0547
+}

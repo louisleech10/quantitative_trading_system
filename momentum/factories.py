@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import TYPE_CHECKING, Any, Dict, Optional, List
 
 from momentum.DataExtraction.kline_storage import KlineStorageManager
 from momentum.DataExtraction.kline_download_service import KlineDownloadService
@@ -21,6 +21,10 @@ from momentum.FeatureEngineering.feature_extractor import FeatureExtractor, Stra
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
 from momentum.Indicators.types import DataSourceEnum
+
+
+if TYPE_CHECKING:
+    from momentum.FeatureEngineering.preprocessing._d_star_cache import PreprocessingContext
 
 
 def create_kline_storage_manager(cache_dir: Optional[str] = None) -> KlineStorageManager:
@@ -147,6 +151,17 @@ def create_strategy_params(**kwargs: Any) -> StrategyParams:
 
 def create_feature_validator() -> FeatureValidator:
     return FeatureValidator()
+
+
+def create_feature_preprocessor(
+    config: Dict[str, Any],
+    *,
+    context: Optional["PreprocessingContext"] = None,
+) -> "FeaturePreprocessor":
+    """Create a FeaturePreprocessor with optional L6.5 preprocessing context."""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    return FeaturePreprocessor(config, context=context)
 
 
 def create_feature_factory(

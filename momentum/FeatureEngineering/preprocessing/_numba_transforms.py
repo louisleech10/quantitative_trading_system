@@ -4,7 +4,6 @@ These operate on raw numpy float32 arrays and avoid pandas overhead entirely.
 """
 from __future__ import annotations
 
-import os
 import numpy as np
 from momentum.core.logging import get_logger
 
@@ -13,7 +12,7 @@ logger = get_logger(__name__)
 _HAS_NUMBA = False
 try:
     import numba
-    from numba import njit, prange
+    from numba import njit
 
     _HAS_NUMBA = True
 except ImportError:

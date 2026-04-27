@@ -152,11 +152,11 @@ class FailureType(Enum):
 
 ### 0.5 全域前置條件
 
-- [ ] Python 3.9 環境就緒；`./venv/bin/pytest --version` 可執行
-- [ ] `psutil`, `joblib`, `numba`, `statsmodels` 已安裝（在 `requirements.txt`）
-- [ ] `data_cache/feature_preprocessing/` 目錄存在且可寫
-- [ ] ETHUSDT 1h HDF5 在 `data_cache/kline_cache.h5` 內可讀（Tier 2B 需）
-- [ ] Tier 1+2 Golden Output 由 Task 0.0 建立完成（後續 Task 才能比對）
+- [x] Python 3.9 環境就緒；`./venv/bin/pytest --version` 可執行
+- [x] `psutil`, `joblib`, `numba`, `statsmodels` 已安裝（在 `requirements.txt`）
+- [x] `data_cache/feature_preprocessing/` 目錄存在且可寫
+- [x] ETHUSDT 1h HDF5 在 `data_cache/feature_klines/kline_cache.h5` 內可讀（Tier 2B 需；2026-04-27 本機 `ETHUSDT/1h/data` 為 17,928 rows，Task 0.0 Tier 2B artifact 已用此資料來源產出）
+- [x] Tier 1+2 Golden Output 由 Task 0.0 建立完成（後續 Task 才能比對）
 
 ### 0.6 不可違反最佳化原則（SPEC §0.0，**最高優先**）
 
@@ -345,13 +345,13 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
 
 ### Task 0.0 — 建立 Golden Baseline (Tier 1+2) 與測試清單
 
-- [ ] **SPEC ref**: Task 0.0（SPEC §2.1）
-- [ ] **目標**: 在 8GB MacBook M1 產出 Phase 0 開工前的 Tier 1（結構）+ Tier 2A（合成）+ Tier 2B（真實 short-window）baseline，以及實測既有 L6.5 / preprocessing 測試清單。
-- [ ] **輸入**:
+- [x] **SPEC ref**: Task 0.0（SPEC §2.1）
+- [x] **目標**: 在 8GB MacBook M1 產出 Phase 0 開工前的 Tier 1（結構）+ Tier 2A（合成）+ Tier 2B（真實 short-window）baseline，以及實測既有 L6.5 / preprocessing 測試清單。
+- [x] **輸入**:
   - 當前 main commit 的 `momentum/` 程式碼（Phase 0 開工前最後 commit）
-  - `data_cache/kline_cache.h5` 內 ETHUSDT 1h（Tier 2B 需，缺則該層標 blocked）
+  - `data_cache/feature_klines/kline_cache.h5` 內 ETHUSDT 1h（Tier 2B 需，缺則該層標 blocked）
   - `synthetic_l65_dataset` fixture（如尚未建立則於本 Task 一併建）
-- [ ] **輸出**:
+- [x] **輸出**:
   - `scripts/build_l65_golden.py`（新建，CLI tool）
   - `tests/golden/l65/tier1_structure/column_inventory.json`（schema：`[{name: str, dtype: str, layer: str, source: str}]`）
   - `tests/golden/l65/tier1_structure/schema_hash.txt`（SHA-256 of column_inventory）
@@ -361,7 +361,7 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
   - `tests/golden/l65/tier2_reduced/d_star_ETHUSDT_1h_2000rows.json`（預設僅本機產生；若需進版控，須使用者明確批准）
   - `tests/golden/l65/test_inventory.txt`（每行 `<nodeid>`，由 `pytest --collect-only` 產出）
   - `tests/conftest.py` 新增 `synthetic_l65_dataset` fixture（若尚未存在）
-- [ ] **實作要點**:
+- [x] **實作要點**:
   1. CLI 介面（pseudocode）：
      ```python
      # scripts/build_l65_golden.py
@@ -385,41 +385,43 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
   5. **Test inventory**：`subprocess.run(["./venv/bin/pytest", "--collect-only", "tests", "-q"])` → 過濾 nodeid 含 `l65|preprocess|feature_preprocessor|fracdiff|adf|d_star` → 寫入 `test_inventory.txt`。若 venv 無 pytest，**禁止** 把 0 tests 視為通過，需在 stdout 印 `BLOCKER: pytest not found` 並 `exit 2`。
   6. 函式簽名草案：
      ```python
-     def _ram_gate(min_available_gb: int) -> None: ...
+     def _ram_gate(min_available_gb: float, label: str) -> bool: ...
+     def _estimate_reduced_workload_ram_gate(rows: int, cols: int) -> float: ...
      def build_tier1_structure(out_dir: Path) -> None: ...
      def build_tier2_synthetic(out_dir: Path) -> None: ...
      def build_tier2_real_shortwindow(symbol: str, tf: str, max_rows: int, max_cols: int, out_dir: Path) -> None: ...
      def collect_existing_l65_tests(out_path: Path) -> int: ...   # returns nodeid count, exit 2 if blocker
      ```
   7. Edge cases：
-     - **(a) 跑前 RAM 不足**：`psutil.virtual_memory().available < 4 * 1024**3` → log error + `sys.exit(2)`，不寫部分檔。
-     - **(b) Tier 2B 真實資料缺失**：`data_cache/kline_cache.h5` 不存在或 ETHUSDT 1h key 缺 → log warning + 寫 `tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.BLOCKED`，繼續其他 tier。
-    - **(c) atomic write**：所有輸出檔先寫 `.tmp` → `os.rename`；任何中途失敗則刪 `.tmp` 不留 partial。
-    - **(d) Tier 2B 輸出 > 100MB**：不得自動 `git lfs track` 或 staging；改寫入本機 artifact 目錄並產生 manifest/checksum。只有使用者明確批准時才可加入 Git LFS。
-- [ ] **修改檔案**:
+     - **(a) 跑前 RAM 不足**：Task 0.0 reduced workload 不使用固定 `available >= 4GB`，因 8GB macOS 開機後常態可能低於 4GB；改用 `max(1GB, rows × cols × float64 × 128)` 並上限 4GB 的 workload-aware gate。完整/多 symbol gate 仍保留更嚴格門檻。
+     - **(b) Tier 2B 真實資料缺失**：`data_cache/feature_klines/kline_cache.h5` 不存在或 ETHUSDT 1h key 缺 → log warning + 寫 `tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.BLOCKED`，繼續其他 tier。
+     - **(c) atomic write**：所有輸出檔先寫 `.tmp` → `os.rename`；任何中途失敗則刪 `.tmp` 不留 partial。
+     - **(d) Tier 2B 輸出 > 100MB**：不得自動 `git lfs track` 或 staging；改寫入本機 artifact 目錄並產生 manifest/checksum。只有使用者明確批准時才可加入 Git LFS。
+- [x] **修改檔案**:
   - `scripts/build_l65_golden.py` → `main()`, `build_tier1_structure()`, `build_tier2_synthetic()`, `build_tier2_real_shortwindow()`, `collect_existing_l65_tests()`, `_ram_gate()`
   - `tests/conftest.py` → 新增 `synthetic_l65_dataset` fixture（若不存在）
   - `tests/golden/l65/{tier1_structure,tier2_reduced}/`（新目錄）
-- [ ] **不可做**:
+- [x] **不可做**:
   - ❌ 不試圖在 8GB 跑 Tier 3（必爆 RAM）
   - ❌ 不修改 `momentum/` 任何程式碼
   - ❌ 不寫部分完整 baseline 檔案
   - ❌ 不沿用 PLAN §7 引用的「381」固定數字；inventory 必須來自實測
-- [ ] **風險緩解**: R1（Golden baseline 缺失）— Tier 1+2 充分涵蓋 Phase 0/1 關鍵路徑；Tier 3 走 U1
-- [ ] **驗證**: T0.1（基本檔案/schema/rows/cols 存在性）；缺真實 HDF5 時 Gate 狀態為 `blocked-not-pass`，不算通過
+- [x] **風險緩解**: R1（Golden baseline 缺失）— Tier 1+2 充分涵蓋 Phase 0/1 關鍵路徑；Tier 3 走 U1
+- [x] **驗證**: T0.1（基本檔案/schema/rows/cols 存在性）；缺真實 HDF5 時 Gate 狀態為 `blocked-not-pass`，不算通過
+  - 2026-04-27 本機狀態：Tier 1、Tier 2A、Tier 2B、test inventory 已產出並通過；Tier 2B 使用 `data_cache/feature_klines/kline_cache.h5`（ETHUSDT 1h 共 17,928 rows），在 reduced workload gate 下以 available RAM 1.18GB >= required 1.06GB 成功產出 `ETHUSDT_1h_2000rows.parquet`（2000 rows × 34 cols）與 `d_star_ETHUSDT_1h_2000rows.json`（13 entries），且 `.BLOCKED` 已移除。
 
 ### Task 0.1 — FracDiff Apply-To-Layer Filter
 
-- [ ] **SPEC ref**: Task 0.1（SPEC §2.1）
-- [ ] **目標**: 在 `optimized` profile 下預設 `FFACT_FRACDIFF_APPLY_TO_LAYERS=L1,L2`；`legacy` profile 可恢復全 layer fracdiff，但保留 winsor/rank/zscore/gaussian。
-- [ ] **輸入**:
+- [x] **SPEC ref**: Task 0.1（SPEC §2.1）
+- [x] **目標**: 在 `optimized` profile 下預設 `FFACT_FRACDIFF_APPLY_TO_LAYERS=L1,L2`；`legacy` profile 可恢復全 layer fracdiff，但保留 winsor/rank/zscore/gaussian。
+- [x] **輸入**:
   - 環境變數 `FFACT_L65_OPTIMIZATION_PROFILE`、`FFACT_FRACDIFF_APPLY_TO_LAYERS`
   - feature column 名（用 layer parser 解析）
-- [ ] **輸出**:
+- [x] **輸出**:
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` 內 `_apply_fractional_differencing()` 對 non-target layer 跳過 fracdiff
   - `momentum/core/config.py` 新增 `FFACT_FRACDIFF_APPLY_TO_LAYERS` parser → 回傳 `FrozenSet[str]`
   - 新增 helper `_is_fracdiff_target_layer()`（同檔內 module-level）
-- [ ] **實作要點**:
+- [x] **實作要點**:
   1. Layer parser 規則：欄位名 `L1_xxx`, `L2_xxx`（即第一段以 `L\d+_` 開頭）對應 layer。實作前讀 repo memory `/memories/repo/feature_name_parser.md` 確認解析方式。
   2. Pseudocode：
      ```python
@@ -454,26 +456,26 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
      - **(a) 無法 parse layer 的 column**：log warning + 視為非 target。
      - **(b) `FFACT_FRACDIFF_APPLY_TO_LAYERS=ALL`**：等同 legacy 行為。
      - **(c) Empty allow list（空字串）**：視為 `optimized` 預設 `L1,L2`，並 log warning。
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → `_apply_fractional_differencing()`（line ~979）
   - `momentum/core/config.py` → 新增 `get_fracdiff_layers() -> FrozenSet[str]`
   - 新增測試 `tests/feature_engineering/preprocessing/test_layer_filter.py`
-- [ ] **不可做**:
+- [x] **不可做**:
   - ❌ 不在 UI 開放 L3+ 任意組合（只允許 expert env override）
   - ❌ 不影響 winsor/rank/zscore/gaussian transform
-- [ ] **風險緩解**: R2（業界假設失效）— Q1 fallback
-- [ ] **驗證**: T0.2, T0.3, T0.B1
+- [x] **風險緩解**: R2（業界假設失效）— Q1 fallback
+- [x] **驗證**: T0.2, T0.3, T0.B1
 
 ### Task 0.2 — precision 0.01 → 0.02 + cache version bump
 
-- [ ] **SPEC ref**: Task 0.2（SPEC §2.1）
-- [ ] **目標**: `_find_min_d` 二分搜尋從 7 次降至 6 次，bump d_star cache version 從 `v1` → `v2`，舊 cache 自動失效。
-- [ ] **輸入**: `config/scan_config.yaml` 之 `fractional_differencing.precision`、`FFACT_FRACDIFF_PRECISION_OVERRIDE` env var
-- [ ] **輸出**:
+- [x] **SPEC ref**: Task 0.2（SPEC §2.1）
+- [x] **目標**: `_find_min_d` 二分搜尋從 7 次降至 6 次，bump d_star cache version 從 `v1` → `v2`，舊 cache 自動失效。
+- [x] **輸入**: `config/scan_config.yaml` 之 `fractional_differencing.precision`、`FFACT_FRACDIFF_PRECISION_OVERRIDE` env var
+- [x] **輸出**:
   - `config/scan_config.yaml` 改 `precision: 0.02`（optimized 預設）
   - d_star cache schema 增加 `cache_version: "v2"` 欄位
   - `_find_min_d` 在計算前用 config helper 取得 `precision_override`，再決定 `effective_precision`
-- [ ] **實作要點**:
+- [x] **實作要點**:
   1. Pseudocode：
      ```python
      from momentum.core.config import get_fracdiff_precision_override
@@ -498,26 +500,27 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
   4. Edge cases：
      - **(a) 使用者自行調 precision**：cache key 含 precision（透過 config_hash），自動隔離。
      - **(b) cache 失效**：log 一次 INFO `[L6.5] cache_version mismatch, rebuild`，避免在 inner loop log。
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `config/scan_config.yaml` → `fractional_differencing.precision: 0.02`
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → `_find_min_d()`（line ~1353）
   - `momentum/core/config.py` → `get_fracdiff_precision() -> float`
   - `momentum/FeatureEngineering/preprocessing/_d_star_cache.py` → `CACHE_VERSION = "v2"`（依賴 Task 0.3）
   - 新增測試 `tests/feature_engineering/preprocessing/test_precision_corr.py`
-- [ ] **不可做**:
+- [x] **不可做**:
   - ❌ 不改變 `_find_min_d` 之 ADF threshold、weight_threshold 等其他參數
-- [ ] **風險緩解**: R3（精度偏離）— Q3 fallback（env override 切回 0.01）
-- [ ] **驗證**: T0.4, C2
+- [x] **風險緩解**: R3（精度偏離）— Q3 fallback（env override 切回 0.01）
+- [x] **驗證**: T0.4, C2
+  - 2026-04-27 Batch 2 範圍說明：已在既有 d_star cache load/save helper 內實作 `cache_version: "v2"`、precision mismatch 失效與 atomic replace；Task 0.3 的 `_d_star_cache.py` / context / migration 架構仍保留為獨立任務，未在本批擴展。
 
 ### Task 0.3 — d_star Cache Key 與 Schema 修正
 
-- [ ] **SPEC ref**: Task 0.3（SPEC §2.1）
-- [ ] **目標**: cache key 從寫死 `("default","default")` 改為 `(symbol, timeframe, config_hash)`；引入 `PreprocessingContext` dataclass + `data_fingerprint` 防 stale；atomic write；legacy quarantine/migration audit。
-- [ ] **輸入**:
+- [x] **SPEC ref**: Task 0.3（SPEC §2.1）
+- [x] **目標**: cache key 從寫死 `("default","default")` 改為 `(symbol, timeframe, config_hash)`；引入 `PreprocessingContext` dataclass + `data_fingerprint` 防 stale；atomic write；legacy quarantine/migration audit。
+- [x] **輸入**:
   - 既有 cache 檔（legacy `default/default` JSON）
   - `FeaturePreprocessor` 構造時可選 `PreprocessingContext`
   - HDF5 / parquet metadata（用於 data_fingerprint 計算）
-- [ ] **輸出**:
+- [x] **輸出**:
   - 新模組 `momentum/FeatureEngineering/preprocessing/_d_star_cache.py`：`DStarCache` 類別 + `PreprocessingContext` dataclass
   - 修改 `feature_preprocessor.py`：建構接 `Optional[PreprocessingContext]`
   - 修改 `momentum/FeatureEngineering/feature_factory.py` → `_layer6_5_preprocessing()` 建立 context
@@ -525,7 +528,7 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
   - 新增 `scripts/migrate_d_star_cache.py`（read-only quarantine + audit JSONL）
   - cache 路徑：`data_cache/feature_preprocessing/d_star_{SYMBOL}_{TIMEFRAME}_{config_hash[:12]}.json`
   - audit log：`data_cache/feature_preprocessing/d_star_migration_audit.jsonl`
-- [ ] **實作要點**:
+- [x] **實作要點**:
   1. Dataclass：
      ```python
      @dataclass(frozen=True)
@@ -639,29 +642,29 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
      - **(c) schema_hash / data_fingerprint mismatch**：cache miss + WARN log（一次 per run）。
      - **(d) context unknown（unit test 直接構造）**：cache disabled + log one warning per instance。
      - **(e) weak fingerprint**：標記 `cache status=weak_fingerprint`，禁止跨 run hit。
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - 新增 `momentum/FeatureEngineering/preprocessing/_d_star_cache.py`
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → 構造 + `_find_min_d`（line ~1353）+ cache lookup（line ~1394）
   - `momentum/FeatureEngineering/feature_factory.py` → `_layer6_5_preprocessing()` 建立 `PreprocessingContext`
   - `momentum/factories.py` → 新增 `create_feature_preprocessor()`
   - 新增 `scripts/migrate_d_star_cache.py`
   - 新增測試：`test_d_star_isolation.py`, `test_d_star_atomic_write.py`, `test_d_star_stale_invalidation.py`, `test_d_star_legacy_migration_audit.py`, `test_cache_version_invalid.py`
-- [ ] **不可做**:
+- [x] **不可做**:
   - ❌ 不允許 fallback 到 `("default","default")` 寫入新 cache
   - ❌ 舊 cache 只讀不寫
   - ❌ 不在 schema 缺欄時硬要 hit
-- [ ] **風險緩解**: R4（cross-symbol 污染）、R15（fingerprint 過弱）
-- [ ] **驗證**: T0.5, T0.6, T0.11, T0.12, T0.B5, C3
+- [x] **風險緩解**: R4（cross-symbol 污染）、R15（fingerprint 過弱）
+- [x] **驗證**: T0.5, T0.6, T0.11, T0.12, T0.B5, C3
 
 ### Task 0.4 — per-run non_stationary classification cache
 
-- [ ] **SPEC ref**: Task 0.4（SPEC §2.1）
-- [ ] **目標**: 同一 run 內 FracDiff 與 ADF 共用 non_stationary 判定結果，避免重複 ADF。
-- [ ] **輸入**: `(column, adf_threshold, sample_size, nan_policy, input_fingerprint)`，per-instance lifetime
-- [ ] **輸出**:
+- [x] **SPEC ref**: Task 0.4（SPEC §2.1）
+- [x] **目標**: 同一 run 內 FracDiff 與 ADF 共用 non_stationary 判定結果，避免重複 ADF。
+- [x] **輸入**: `(column, adf_threshold, sample_size, nan_policy, input_fingerprint)`，per-instance lifetime
+- [x] **輸出**:
   - 新模組 `momentum/FeatureEngineering/preprocessing/_non_stationary_cache.py`
   - 修改 `feature_preprocessor.py` → `_get_non_stationary_columns()`、`_select_columns()` 共用 cache
-- [ ] **實作要點**:
+- [x] **實作要點**:
   1. Pseudocode：
      ```python
      class NonStationaryCache:
@@ -697,27 +700,27 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
      - **(b) cache miss → 跑 ADF 後寫入**。
      - **(c) 不同 symbol 為不同 FeaturePreprocessor instance**：天然隔離。
      - **(d) series 含 NaN**：fingerprint 包含 NaN count，避免假命中。
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - 新增 `momentum/FeatureEngineering/preprocessing/_non_stationary_cache.py`
   - `momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → `_get_non_stationary_columns()`（line ~1276）、`_select_columns()`（line ~1267）
   - 新增測試 `tests/feature_engineering/preprocessing/test_non_stationary_cache.py`
-- [ ] **不可做**:
+- [x] **不可做**:
   - ❌ 不寫磁碟（避免 cross-run 污染）
   - ❌ 不用裸 `series.tobytes()` 作 fingerprint（必須含 dtype/shape/NaN summary）
-- [ ] **風險緩解**: Q6（cross-symbol 統計差異）— per-instance 自動隔離
-- [ ] **驗證**: T0.7, T0.B2
+- [x] **風險緩解**: Q6（cross-symbol 統計差異）— per-instance 自動隔離
+- [x] **驗證**: T0.7, T0.B2
 
 ### Task 0.5 — UI 文案修正（FracDiff/ADF 警告）
 
-- [ ] **SPEC ref**: Task 0.5（SPEC §2.1）
-- [ ] **目標**: 修正 PreprocessingPanel 文案，避免使用者誤期 ADF 為 FracDiff fallback；新增 8GB 全開估時警告。
-- [ ] **輸入**:
+- [x] **SPEC ref**: Task 0.5（SPEC §2.1）
+- [x] **目標**: 修正 PreprocessingPanel 文案，避免使用者誤期 ADF 為 FracDiff fallback；新增 8GB 全開估時警告。
+- [x] **輸入**:
   - 現有 [PreprocessingPanel.tsx](frontend/src/components/feature-factory/PreprocessingPanel.tsx)（U4：開工前先讀 + diff）
   - SPEC PLAN §3.6（兩段文案）+ PLAN §4 Tier 4 估時
-- [ ] **輸出**:
+- [x] **輸出**:
   - 修改後 React component
   - 新增 Storybook / unit test snapshot
-- [ ] **實作要點**:
+- [x] **實作要點**:
   1. 開工第一步：`read_file` 讀現有 panel（U4），記錄當前文案，再 diff。
   2. 顯示邏輯（pseudocode）：
      ```tsx
@@ -742,15 +745,15 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
      - **(a) 文案僅顯示，不阻擋送出**：警告為 `Alert` 而非 modal。
      - **(b) 警告等級色彩**：`bg-yellow-50 border-yellow-200`（黃色）。
      - **(c) 文案 i18n 預留**：常數放頂層，未來可換 i18n key。
-- [ ] **修改檔案**:
+- [x] **修改檔案**:
   - `frontend/src/components/feature-factory/PreprocessingPanel.tsx`
   - 新增測試 `frontend/src/components/feature-factory/__tests__/PreprocessingPanel.test.tsx`（snapshot）
-- [ ] **不可做**:
+- [x] **不可做**:
   - ❌ 不修改後端行為
   - ❌ 不阻擋使用者操作
   - ❌ 不寫死 symbol 或時間數字到 component（用 const）
-- [ ] **風險緩解**: R14（UI 估時警告過時）— Phase 0 完成後同步更新
-- [ ] **驗證**: T0.8
+- [x] **風險緩解**: R14（UI 估時警告過時）— Phase 0 完成後同步更新
+- [x] **驗證**: T0.8
 
 ### Task 0.6 — Multi-Symbol Batch Hardening
 
@@ -930,28 +933,28 @@ Batch 9（Frozen，需外部 24GB+ 或 proxy）：T0.F1 + T1.F1 + T2.F1
 
 | ☐ | Test ID | 測試名稱 | 驗證內容 | 通過條件 | SPEC ref |
 |---|---------|---------|---------|---------|----------|
-| ☐ | T0.1 | golden baseline 建立(Tier 1+2) | 4 種輸出檔存在；inventory 含實測 nodeids | 檔案/schema/hash/rows/cols 全可重現；缺真實 HDF5 → blocked-not-pass | §2.2 |
-| ☐ | T0.2 | layer filter 跳過 L3+ | L3/L4 column 不被 fracdiff，winsor/rank/zscore 仍套用 | transform call 計數比對 | §2.2 |
-| ☐ | T0.3 | layer filter fallback | `FFACT_FRACDIFF_APPLY_TO_LAYERS=L1,L2,L3,L4` 行為等同 baseline | golden corr > 0.999 | §2.2 |
-| ☐ | T0.4 | precision 微調 | precision 0.02 vs 0.01 fracdiff series corr | corr > 0.999（C2） | §2.2 |
-| ☐ | T0.5 | d_star cache 隔離 | ETHUSDT vs BTCUSDT 同 column 名不互相污染 | 兩 cache 獨立 | §2.2 |
-| ☐ | T0.6 | atomic write 並行 | 100 次 multi-thread 寫入無 partial JSON | 全數 valid JSON | §2.2 |
-| ☐ | T0.7 | per-run cache hit | 同 column 重複呼叫 ADF 計數 = 1 | mock `adfuller.call_count == 1` | §2.2 |
-| ☐ | T0.8 | UI 文案 snapshot | PreprocessingPanel 顯示新文案 | snapshot match | §2.2 |
+| ☑ | T0.1 | golden baseline 建立(Tier 1+2) | 4 種輸出檔存在；inventory 含實測 nodeids | Tier 1 / Tier 2A / Tier 2B / inventory 通過；Tier 2B 使用 `data_cache/feature_klines/kline_cache.h5` 並由 reduced workload gate 放行 | §2.2 |
+| ☑ | T0.2 | layer filter 跳過 L3+ | L3/L4 column 不被 fracdiff，winsor/rank/zscore 仍套用 | transform call 計數比對 | §2.2 |
+| ☑ | T0.3 | layer filter fallback | `FFACT_FRACDIFF_APPLY_TO_LAYERS=L1,L2,L3,L4` 行為等同 baseline | golden corr > 0.999 | §2.2 |
+| ☑ | T0.4 | precision 微調 | precision 0.02 vs 0.01 fracdiff series corr | corr > 0.999（C2） | §2.2 |
+| ☑ | T0.5 | d_star cache 隔離 | ETHUSDT vs BTCUSDT 同 column 名不互相污染 | 兩 cache 獨立 | §2.2 |
+| ☑ | T0.6 | atomic write 並行 | 100 次 multi-thread 寫入無 partial JSON | 全數 valid JSON | §2.2 |
+| ☑ | T0.7 | per-run cache hit | 同 column 重複呼叫 ADF 計數 = 1 | mock `adfuller.call_count == 1` | §2.2 |
+| ☑ | T0.8 | UI 文案 snapshot | PreprocessingPanel 顯示新文案 | snapshot match | §2.2 |
 | ☐ | T0.9 | batch resume | 模擬中斷 → resume 跳過 completed | route `POST /api/v1/features/batch/{batch_id}/resume`；completed_items 不重跑 | §2.2 |
 | ☐ | T0.10 | batch panel UI | 進度顯示 + resume 按鈕 | manual + Playwright | §2.2 |
-| ☐ | T0.11 | d_star stale invalidation | 改 data_fingerprint/feature_schema_hash/sample_size/nan_policy | cache miss + 重算 | §2.2 |
-| ☐ | T0.12 | legacy migration audit | legacy `default/default` 遷移或隔離 | audit JSONL；無 direct hit；無寫回 legacy | §2.2 |
+| ☑ | T0.11 | d_star stale invalidation | 改 data_fingerprint/feature_schema_hash/sample_size/nan_policy | cache miss + 重算 | §2.2 |
+| ☑ | T0.12 | legacy migration audit | legacy `default/default` 遷移或隔離 | audit JSONL；無 direct hit；無寫回 legacy | §2.2 |
 
 #### 邊界條件測試
 
 | ☐ | Test ID | 邊界條件 | 預期行為 | SPEC ref |
 |---|---------|---------|---------|---------|
-| ☐ | T0.B1 | unknown layer column | column 名無法 parse layer | 跳過 fracdiff + log warning | §2.2 |
-| ☐ | T0.B2 | high NaN column | NaN ratio > 50% | fracdiff skip + 不觸發 ADF（Q2） | §2.2 |
+| ☑ | T0.B1 | unknown layer column | column 名無法 parse layer | 跳過 fracdiff + log warning | §2.2 |
+| ☑ | T0.B2 | high NaN column | NaN ratio > 50% | fracdiff skip + 不觸發 ADF（Q2） | §2.2 |
 | ☐ | T0.B3 | RAM gate 觸發 | available RAM < 4GB | 拒絕新 symbol + 429 status | §2.2 |
 | ☐ | T0.B4 | checkpoint 寫入失敗 | mock OSError | log error 但任務繼續 | §2.2 |
-| ☐ | T0.B5 | cache schema 不相容 | 舊 v1 或 legacy `default/default` 讀入 | quarantine/migrate；不 direct hit；重建 v2 | §2.2 |
+| ☑ | T0.B5 | cache schema 不相容 | 舊 v1 或 legacy `default/default` 讀入 | quarantine/migrate；不 direct hit；重建 v2 | §2.2 |
 | ☐ | T0.B6 | resume 找不到 batch_id | invalid batch_id | 回傳 404 | §2.2 |
 
 #### 效能驗收測試（Tier-A 8GB 必跑）

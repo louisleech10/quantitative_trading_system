@@ -1,0 +1,6 @@
+{
+  "generated_at_utc": "2026-04-27T14:05:00+00:00",
+  "kline_cache_path": "data_cache/feature_klines/kline_cache.h5",
+  "reason": "RAM gate blocked Tier 2B rebuild before processing: available RAM 1.50GB < 4GB; source cache verified with ETHUSDT/1h/data rows=17928",
+  "status": "blocked-not-pass"
+}

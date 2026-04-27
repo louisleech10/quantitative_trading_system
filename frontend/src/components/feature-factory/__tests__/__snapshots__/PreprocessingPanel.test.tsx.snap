@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PreprocessingPanel warnings > renders yellow FracDiff and ADF warnings without blocking controls 1`] = `
+<div
+  class="relative w-full rounded-xl px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg~*]:pl-7 glass-panel border [&>svg]:text-slate-200 border-yellow-200 bg-yellow-50 text-yellow-900"
+  data-testid="preprocessing-warnings"
+  role="alert"
+>
+  <div
+    class="[&_p]:leading-relaxed space-y-2 text-xs leading-relaxed"
+  >
+    <p>
+      FracDiff 與 ADF 可以同時開啟；系統會避免對已由 FracDiff 處理的欄位再做 ADF。ADF 不是 FracDiff 的高 NaN fallback，高 NaN 欄位會被略過。
+    </p>
+    <p>
+      FracDiff 是 L6.5 最慢的子模組；optimized profile 預設只套用 L1/L2，L3/L4 僅能透過 expert env override 恢復。
+    </p>
+    <p>
+      若透過 expert env 將 FracDiff 擴到全 layer 並同時全開 ADF，8GB 機器預估約 18-20 小時。
+    </p>
+  </div>
+</div>
+`;

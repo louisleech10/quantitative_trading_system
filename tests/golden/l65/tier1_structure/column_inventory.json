@@ -1,0 +1,602 @@
+[
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_000",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_001",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_002",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_003",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_004",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_005",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_006",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_007",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_008",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_009",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_010",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_011",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_012",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_013",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_014",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_015",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_016",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_017",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_018",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_019",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_020",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_021",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_022",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_023",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_024",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_025",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_026",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_027",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_028",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_029",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_030",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_031",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_032",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_033",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_034",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_035",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_036",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_037",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_038",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_039",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_040",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_041",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_042",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_043",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_044",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_045",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_046",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_047",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_048",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_049",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_050",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_051",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_052",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_053",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_054",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_stationary_055",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_stationary_056",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_stationary_057",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_stationary_058",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_stationary_059",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_060",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_061",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_062",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_063",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_064",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_065",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_066",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_067",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_068",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_069",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_070",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_071",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_072",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_073",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_074",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_075",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_076",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_077",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_078",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_079",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_080",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_081",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_082",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_083",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_084",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_085",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_086",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_087",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_088",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_089",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_090",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_091",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_092",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_093",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_094",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L1",
+    "name": "L1_synthetic_randomwalk_095",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L2",
+    "name": "L2_synthetic_randomwalk_096",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L3",
+    "name": "L3_synthetic_randomwalk_097",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L4",
+    "name": "L4_synthetic_randomwalk_098",
+    "source": "synthetic"
+  },
+  {
+    "dtype": "float32",
+    "layer": "L5",
+    "name": "L5_synthetic_randomwalk_099",
+    "source": "synthetic"
+  }
+]

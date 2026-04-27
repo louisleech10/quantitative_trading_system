@@ -1,7 +1,8 @@
 'use client';
 
-import { FeatureFactoryConfig } from '@/lib/types';
+import type { FeatureFactoryConfig } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Tooltip,
   TooltipContent,
@@ -38,7 +39,7 @@ const DEFAULT_PREPROCESSING: PreprocessingConfig = {
     d_range: [0.0, 1.0],
     adf_threshold: 0.10,
     weight_threshold: 1e-5,
-    precision: 0.01,
+    precision: 0.02,
     apply_to: 'non_stationary',
     cache_d_star: true,
   },
@@ -102,6 +103,15 @@ function mergePreprocessing(
   return current;
 }
 
+export const PREPROCESSING_WARNINGS = {
+  fracdiffAdfCoexist:
+    'FracDiff 與 ADF 可以同時開啟；系統會避免對已由 FracDiff 處理的欄位再做 ADF。ADF 不是 FracDiff 的高 NaN fallback，高 NaN 欄位會被略過。',
+  fracdiffSlowLayerFilter:
+    'FracDiff 是 L6.5 最慢的子模組；optimized profile 預設只套用 L1/L2，L3/L4 僅能透過 expert env override 恢復。',
+  eightGbFullRunEstimate:
+    '若透過 expert env 將 FracDiff 擴到全 layer 並同時全開 ADF，8GB 機器預估約 18-20 小時。',
+} as const;
+
 /** 每張卡片的說明文字（懸停顯示） */
 const TOOLTIPS = {
   winsorization: `【Winsorization — 剪掉極端值】
@@ -122,14 +132,14 @@ d* 是「讓列車速度波動夠隨機」所需的最小煞車力道。
 煞車後，模型看到的是「比昨天快了多少」而不是「現在跑多快」，
 更能學到有意義的交易訊號。
 
-⚠️ 與 ADF 擇一使用，不可同時開啟。`,
+可與 ADF 同時開啟；ADF 不是 FracDiff 的高 NaN fallback，高 NaN 欄位會被略過。`,
 
   adf_differencing: `【ADF Differencing — 整數差分（整數版煞車）】
 功能與 FracDiff 相同，但只能選整數（差分 1 次或 2 次），像是「要嘛不踩、要嘛踩死」。
 FracDiff 可以踩 0.73 次這種中間值，保留更多市場記憶，通常效果更好。
 建議使用 FracDiff，除非速度是優先考量。
 
-⚠️ 與 FracDiff 擇一使用，不可同時開啟。`,
+可與 FracDiff 同時開啟；已由 FracDiff 處理的欄位不會再套用 ADF。`,
 
   rank_transform: `【Rank Transform — 百分位排名】
 把數字轉成「在過去 window 天中的名次」（0 到 1 之間）。
@@ -186,7 +196,7 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
 
   const fracEnabled = Boolean(preprocessing.fractional_differencing?.enabled);
   const adfEnabled = Boolean(preprocessing.adf_differencing?.enabled);
-  const diffConflict = fracEnabled && adfEnabled;
+  const showCoexistWarning = fracEnabled && adfEnabled;
 
   return (
     <div className="glass-panel rounded-2xl p-6 space-y-4 border border-white/10">
@@ -252,11 +262,17 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
         )}
       </div>
 
-      {/* FracDiff + ADF 互斥警告 */}
-      {diffConflict && (
-        <div className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-          ⚠️ <strong>FracDiff 與 ADF 不可同時啟用</strong>——會對已差分的序列再做一次差分，結果沒有意義。請擇一使用。
-        </div>
+      {(showCoexistWarning || fracEnabled) && (
+        <Alert
+          data-testid="preprocessing-warnings"
+          className="border-yellow-200 bg-yellow-50 text-yellow-900"
+        >
+          <AlertDescription className="space-y-2 text-xs leading-relaxed">
+            {showCoexistWarning && <p>{PREPROCESSING_WARNINGS.fracdiffAdfCoexist}</p>}
+            {fracEnabled && <p>{PREPROCESSING_WARNINGS.fracdiffSlowLayerFilter}</p>}
+            {fracEnabled && <p>{PREPROCESSING_WARNINGS.eightGbFullRunEstimate}</p>}
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* 六張計算卡片 */}
@@ -293,7 +309,7 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
         </div>
 
         {/* Fractional Differencing */}
-        <div className={`rounded-xl border p-3 space-y-2 ${diffConflict ? 'border-red-400/50 bg-red-500/10' : 'border-rose-300/30 bg-rose-400/5'}`}>
+        <div className="rounded-xl border border-rose-300/30 bg-rose-400/5 p-3 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-rose-200 font-medium">Fractional Differencing</span>
@@ -313,14 +329,14 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
               type="number"
               min={0.001}
               step={0.001}
-              value={preprocessing.fractional_differencing?.precision ?? 0.01}
+              value={preprocessing.fractional_differencing?.precision ?? 0.02}
               onChange={(e) =>
                 update({ fractional_differencing: { ...preprocessing.fractional_differencing, precision: Number(e.target.value) } })
               }
               className="w-24 rounded-md border border-white/10 bg-slate-900/60 px-2 py-1 text-slate-200"
             />
           </div>
-          <div className="text-[11px] text-rose-200/70">與 ADF 擇一 · 速度較慢但資訊保留更多</div>
+          <div className="text-[11px] text-rose-200/70">速度較慢但資訊保留更多 · optimized 預設 L1/L2</div>
         </div>
 
         {/* Rank Transform */}
@@ -387,7 +403,7 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
         </div>
 
         {/* ADF Differencing */}
-        <div className={`rounded-xl border p-3 space-y-2 ${diffConflict ? 'border-red-400/50 bg-red-500/10' : 'border-rose-300/30 bg-rose-400/5'}`}>
+        <div className="rounded-xl border border-rose-300/30 bg-rose-400/5 p-3 space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-rose-200 font-medium">ADF Differencing</span>
@@ -401,7 +417,7 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
               }
             />
           </div>
-          <div className="text-[11px] text-rose-200/70">與 FracDiff 擇一 · 速度較快但差分較粗糙</div>
+          <div className="text-[11px] text-rose-200/70">速度較快但差分較粗糙 · 不作為 FracDiff fallback</div>
         </div>
 
       </div>
