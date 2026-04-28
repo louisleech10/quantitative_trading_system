@@ -13,6 +13,7 @@ from api.core.logging import get_logger
 from api.models.feature_factory_models import (
     BatchGenerateRequest,
     BatchQualityResponse,
+    BatchResumeResponse,
     BatchTaskStatusResponse,
     BatchToggleRequest,
     FeatureGenerateRequest,
@@ -25,6 +26,7 @@ from api.models.feature_factory_models import (
     RegisterPathResponse,
 )
 from api.services.feature_factory_batch_service import (
+    BatchBusyError,
     FeatureFactoryBatchService,
     get_feature_factory_batch_service,
 )
@@ -155,11 +157,47 @@ async def start_batch_generation(
             "status": "pending",
             "total": len(request.symbols),
         }
+    except BatchBusyError as exc:
+        logger.warning("Feature Factory batch rejected: %s", exc)
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        )
+    except HTTPException:
+        raise
     except ValueError as exc:
         logger.error("Invalid batch request: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to start batch generation: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/batch/{batch_id}/resume", response_model=BatchResumeResponse)
+async def resume_batch_generation(
+    batch_id: str,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """從 checkpoint resume 批次特徵生成。"""
+    try:
+        return await service.resume_batch(batch_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="batch not found")
+    except BatchBusyError as exc:
+        logger.warning("Feature Factory batch resume rejected: %s", exc)
+        raise HTTPException(
+            status_code=429,
+            detail=str(exc),
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.error("Invalid batch resume request: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to resume batch generation: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

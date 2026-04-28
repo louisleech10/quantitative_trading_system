@@ -200,8 +200,13 @@ async def feature_factory_batch_websocket(websocket: WebSocket, task_id: str):
                 "completed": payload.get("completed", 0),
                 "failed": payload.get("failed", 0),
                 "current_symbol": payload.get("current_symbol"),
+                "current_timeframe": payload.get("current_timeframe"),
                 "progress": payload.get("progress", 0.0),
                 "status": payload.get("status"),
+                "queued": payload.get("queued", 0),
+                "concurrent_symbols": payload.get("concurrent_symbols", 1),
+                "memory_sanity_failed": payload.get("memory_sanity_failed", False),
+                "last_item_metrics": payload.get("last_item_metrics"),
             },
             "timestamp": datetime.now().isoformat(),
         })

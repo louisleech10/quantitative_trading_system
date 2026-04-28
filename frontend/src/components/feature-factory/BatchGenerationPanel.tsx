@@ -7,6 +7,7 @@ import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { useSearchStore } from '@/store/searchStore';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useAvailableSymbols } from '@/hooks/useAvailableSymbols';
+import BatchProgressPanel from './BatchProgressPanel';
 
 interface BatchGenerationPanelProps {
   timeframe: string;
@@ -34,7 +35,7 @@ export default function BatchGenerationPanel({
   const { startBatchGeneration } = useFeatureFactory();
   const { currentResult } = useSearchStore();
   const { symbols: availableSymbols, isLoading: isLoadingSymbols } = useAvailableSymbols();
-  const { error, setError } = useFeatureFactoryStore();
+  const { batchTask, error, setError } = useFeatureFactoryStore();
 
   const [manualSymbols, setManualSymbols] = useState('');
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
@@ -207,6 +208,12 @@ export default function BatchGenerationPanel({
       </div>
 
       {error && <div className="text-xs text-rose-300">{error}</div>}
+
+      {batchTask && (
+        <div className="pt-2 border-t border-white/10">
+          <BatchProgressPanel batchTask={batchTask} symbols={mergedSelection} naked />
+        </div>
+      )}
     </div>
   );
 }

@@ -14,7 +14,12 @@ import {
   FeatureSummary,
   ExplorerTab,
   FeatureSchema,
+  BatchItemRss,
+  BatchOutputPath,
 } from '@/lib/types';
+
+type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
+type BatchPayload = Partial<BatchTaskStatus> & Record<string, unknown>;
 
 interface FeatureFactoryState {
   config: FeatureFactoryConfig | null;
@@ -50,6 +55,9 @@ interface FeatureFactoryState {
   schema: FeatureSchema | null;
   indicatorSearch: string;
   batchTask: BatchTaskStatus | null;
+  batchStartedAtMs: number | null;
+  batchConnectionStatus: BatchConnectionStatus;
+  batchConnectionMessage: string | null;
   registryEntries: FeatureRegistryEntry[];
   registryLoading: boolean;
   alignmentMode: 'open_minus' | 'close_time';
@@ -81,6 +89,9 @@ interface FeatureFactoryState {
   removeExplorerRecentTask: (taskId: string) => void;
   setExplorerFeatureNamesForTask: (taskId: string, featureNames: string[]) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
+  applyBatchEvent: (payload: BatchPayload) => void;
+  setBatchConnectionState: (status: BatchConnectionStatus, message?: string | null) => void;
+  resumeBatch: (batchId?: string) => Promise<boolean>;
   fetchRegistry: () => Promise<void>;
   startBatchGeneration: (
     symbols: string[],
@@ -127,6 +138,141 @@ const mergeDeep = (
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1/features';
 
+function toNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function isResumeAvailable(status: string, explicitValue: unknown): boolean {
+  if (typeof explicitValue === 'boolean') {
+    return explicitValue;
+  }
+  return ['failed', 'partial', 'paused', 'paused_ram_gate'].includes(status);
+}
+
+function normalizeOutputPaths(payload: BatchPayload, previous?: BatchTaskStatus | null): BatchOutputPath[] {
+  const existing = new Map<string, BatchOutputPath>();
+
+  for (const item of previous?.output_paths ?? []) {
+    existing.set(`${item.symbol}:${item.timeframe}:${item.path}`, item);
+  }
+
+  const rawOutputPaths = payload.output_paths;
+  if (Array.isArray(rawOutputPaths)) {
+    rawOutputPaths.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const record = item as Record<string, unknown>;
+      const symbol = String(record.symbol ?? '');
+      const timeframe = String(record.timeframe ?? payload.current_timeframe ?? '');
+      const path = String(record.path ?? record.hdf5_path ?? '');
+      if (!symbol || !path) return;
+      existing.set(`${symbol}:${timeframe}:${path}`, {
+        symbol,
+        timeframe,
+        path,
+        download_url: typeof record.download_url === 'string' ? record.download_url : undefined,
+      });
+    });
+  }
+
+  const results = (payload.results ?? previous?.results ?? {}) as Record<string, string>;
+  Object.entries(results).forEach(([symbol, path]) => {
+    if (!path) return;
+    const knownTimeframe = previous?.output_paths?.find((item) => item.symbol === symbol && item.path === path)?.timeframe;
+    const timeframe = String(knownTimeframe ?? payload.current_timeframe ?? previous?.current_timeframe ?? '');
+    existing.set(`${symbol}:${timeframe}:${path}`, { symbol, timeframe, path });
+  });
+
+  return Array.from(existing.values());
+}
+
+function normalizePerItemRss(payload: BatchPayload, previous?: BatchTaskStatus | null): BatchItemRss[] {
+  const existing = new Map<string, BatchItemRss>();
+
+  for (const item of previous?.per_item_rss ?? []) {
+    existing.set(`${item.symbol}:${item.timeframe}`, item);
+  }
+
+  const rawItems = payload.per_item_rss;
+  if (Array.isArray(rawItems)) {
+    rawItems.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      const record = item as Record<string, unknown>;
+      const symbol = String(record.symbol ?? '');
+      const timeframe = String(record.timeframe ?? '');
+      const rssPeakMB = toNumber(record.rssPeakMB ?? record.rss_peak_item_mb, NaN);
+      const rssAfterGcMB = toNumber(record.rssAfterGcMB ?? record.rss_after_gc_mb, NaN);
+      if (!symbol || !timeframe || !Number.isFinite(rssPeakMB) || !Number.isFinite(rssAfterGcMB)) return;
+      existing.set(`${symbol}:${timeframe}`, {
+        symbol,
+        timeframe,
+        rssBeforeItemMB: toNumber(record.rssBeforeItemMB ?? record.rss_before_item_mb, 0),
+        rssPeakMB,
+        rssAfterGcMB,
+      });
+    });
+  }
+
+  const metrics = payload.last_item_metrics;
+  if (metrics && typeof metrics === 'object') {
+    const record = metrics as Record<string, unknown>;
+    const symbol = String(record.current_symbol ?? payload.current_symbol ?? '');
+    const timeframe = String(record.current_timeframe ?? payload.current_timeframe ?? '');
+    const rssPeakMB = toNumber(record.rss_peak_item_mb, NaN);
+    const rssAfterGcMB = toNumber(record.rss_after_gc_mb, NaN);
+    if (symbol && timeframe && Number.isFinite(rssPeakMB) && Number.isFinite(rssAfterGcMB)) {
+      existing.set(`${symbol}:${timeframe}`, {
+        symbol,
+        timeframe,
+        rssBeforeItemMB: toNumber(record.rss_before_item_mb, 0),
+        rssPeakMB,
+        rssAfterGcMB,
+      });
+    }
+  }
+
+  return Array.from(existing.values());
+}
+
+function normalizeBatchTask(
+  payload: BatchPayload,
+  previous: BatchTaskStatus | null,
+  startedAtMs: number | null
+): BatchTaskStatus {
+  const status = String(payload.status ?? previous?.status ?? 'idle') as BatchTaskStatus['status'];
+  const total = toNumber(payload.total ?? payload.total_items, previous?.total ?? 0);
+  const completed = toNumber(payload.completed ?? payload.completed_items, previous?.completed ?? 0);
+  const failed = toNumber(payload.failed ?? payload.failed_items, previous?.failed ?? 0);
+  const progress = toNumber(payload.progress, total > 0 ? (completed + failed) / total : previous?.progress ?? 0);
+  const elapsedSeconds = startedAtMs ? Math.max(0, Math.round((Date.now() - startedAtMs) / 1000)) : 0;
+  const etaFromAverage = completed > 0 && total > completed + failed
+    ? Math.round((total - completed - failed) * (elapsedSeconds / completed))
+    : 0;
+
+  return {
+    ...previous,
+    ...payload,
+    task_id: String(payload.task_id ?? payload.batch_id ?? previous?.task_id ?? ''),
+    batch_id: String(payload.batch_id ?? payload.task_id ?? previous?.batch_id ?? previous?.task_id ?? ''),
+    status,
+    total,
+    completed,
+    failed,
+    progress,
+    current_symbol: (payload.current_symbol as string | null | undefined) ?? previous?.current_symbol ?? null,
+    current_timeframe: (payload.current_timeframe as string | null | undefined) ?? previous?.current_timeframe ?? null,
+    queued: toNumber(payload.queued, Math.max(total - completed - failed, 0)),
+    concurrent_symbols: toNumber(payload.concurrent_symbols, previous?.concurrent_symbols ?? 1),
+    memory_sanity_failed: Boolean(payload.memory_sanity_failed ?? previous?.memory_sanity_failed ?? false),
+    eta_seconds: toNumber(payload.eta_seconds, etaFromAverage),
+    resume_available: isResumeAvailable(status, payload.resume_available ?? previous?.resume_available),
+    output_paths: normalizeOutputPaths(payload, previous),
+    per_item_rss: normalizePerItemRss(payload, previous),
+    last_item_metrics: (payload.last_item_metrics as BatchTaskStatus['last_item_metrics']) ?? previous?.last_item_metrics ?? null,
+    results: (payload.results as Record<string, string> | undefined) ?? previous?.results ?? {},
+    errors: (payload.errors as Record<string, string> | undefined) ?? previous?.errors ?? {},
+  };
+}
+
 export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => ({
   config: null,
   presets: [],
@@ -165,6 +311,9 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   schema: null,
   indicatorSearch: '',
   batchTask: null,
+  batchStartedAtMs: null,
+  batchConnectionStatus: 'idle',
+  batchConnectionMessage: null,
   registryEntries: [],
   registryLoading: false,
   alignmentMode: 'open_minus',
@@ -256,7 +405,73 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
     set((state) => ({
       explorerFeatureNamesByTask: { ...state.explorerFeatureNamesByTask, [taskId]: featureNames },
     })),
-  setBatchTask: (batchTask) => set({ batchTask }),
+  setBatchTask: (batchTask) =>
+    set((state) => ({
+      batchTask: batchTask
+        ? normalizeBatchTask(batchTask, state.batchTask, state.batchStartedAtMs ?? Date.now())
+        : null,
+      batchStartedAtMs: batchTask ? state.batchStartedAtMs ?? Date.now() : null,
+      batchConnectionStatus: batchTask ? state.batchConnectionStatus : 'idle',
+      batchConnectionMessage: batchTask ? state.batchConnectionMessage : null,
+    })),
+  applyBatchEvent: (payload) =>
+    set((state) => {
+      const startedAtMs = state.batchStartedAtMs ?? Date.now();
+      return {
+        batchTask: normalizeBatchTask(payload, state.batchTask, startedAtMs),
+        batchStartedAtMs: startedAtMs,
+      };
+    }),
+  setBatchConnectionState: (status, message = null) =>
+    set({ batchConnectionStatus: status, batchConnectionMessage: message }),
+  resumeBatch: async (batchId) => {
+    const targetBatchId = batchId ?? get().batchTask?.batch_id ?? get().batchTask?.task_id;
+    if (!targetBatchId) {
+      set({ error: '找不到可 resume 的批次任務' });
+      return false;
+    }
+
+    try {
+      set({ error: null });
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/batch/${encodeURIComponent(targetBatchId)}/resume`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.detail || payload?.error || response.statusText);
+      }
+      const payload = await response.json() as {
+        batch_id: string;
+        status: string;
+        skipped_items: number;
+        queued_items: number;
+      };
+      set((state) => ({
+        batchTask: normalizeBatchTask(
+          {
+            batch_id: payload.batch_id,
+            task_id: payload.batch_id,
+            status: payload.status as BatchTaskStatus['status'],
+            completed: payload.skipped_items,
+            queued: payload.queued_items,
+            progress: state.batchTask?.total
+              ? payload.skipped_items / Math.max(state.batchTask.total, 1)
+              : state.batchTask?.progress ?? 0,
+          },
+          state.batchTask,
+          Date.now()
+        ),
+        batchStartedAtMs: Date.now(),
+        batchConnectionStatus: 'connecting',
+        batchConnectionMessage: null,
+      }));
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '批次 resume 失敗';
+      set({ error: message });
+      return false;
+    }
+  },
   fetchRegistry: async () => {
     set({ registryLoading: true });
     try {
@@ -316,14 +531,24 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       set({
         batchTask: {
           task_id: payload.task_id,
+          batch_id: payload.task_id,
           status: payload.status,
           total: payload.total,
           completed: 0,
           failed: 0,
           progress: 0,
+          current_timeframe: timeframe,
+          queued: payload.total,
+          eta_seconds: 0,
+          resume_available: false,
+          output_paths: [],
+          per_item_rss: [],
           results: {},
           errors: {},
         },
+        batchStartedAtMs: Date.now(),
+        batchConnectionStatus: 'connecting',
+        batchConnectionMessage: null,
       });
 
       await get().pollBatchStatus(payload.task_id);

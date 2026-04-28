@@ -8,7 +8,11 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from api.core.logging import get_logger
 from momentum.FeatureEngineering.feature_config import SUPPORTED_TIMEFRAMES
+
+
+logger = get_logger("api.models.feature_factory")
 
 
 class FeatureGenerateRequest(BaseModel):
@@ -98,6 +102,14 @@ class BatchGenerateRequest(BaseModel):
     @classmethod
     def deduplicate_symbols(cls, value: List[str]) -> List[str]:
         """自動去重且保留順序。"""
+        duplicated = []
+        seen = set()
+        for symbol in value:
+            if symbol in seen and symbol not in duplicated:
+                duplicated.append(symbol)
+            seen.add(symbol)
+        if duplicated:
+            logger.warning("Feature Factory batch duplicate symbols ignored: %s", duplicated)
         return list(dict.fromkeys(value))
 
     @field_validator("symbols")
@@ -165,8 +177,24 @@ class BatchTaskStatusResponse(BaseModel):
     completed: int
     failed: int
     progress: float
+    current_symbol: Optional[str] = None
+    current_timeframe: Optional[str] = None
+    queued: Optional[int] = None
+    concurrent_symbols: Optional[int] = None
+    memory_sanity_failed: Optional[bool] = None
+    last_item_metrics: Optional[Dict[str, Any]] = None
     results: Optional[Dict[str, str]] = None
     errors: Optional[Dict[str, str]] = None
+
+
+class BatchResumeResponse(BaseModel):
+    """批次 resume 回應。"""
+
+    batch_id: str
+    resumed_from: str
+    skipped_items: int
+    queued_items: int
+    status: str
 
 
 class SymbolQualitySummary(BaseModel):

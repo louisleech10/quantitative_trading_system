@@ -395,14 +395,57 @@ export interface BatchGenerateRequest {
   max_workers?: number;
 }
 
+export type BatchTaskStatusValue =
+  | 'idle'
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'partial'
+  | 'paused'
+  | 'paused_ram_gate';
+
+export interface BatchOutputPath {
+  symbol: string;
+  timeframe: string;
+  path: string;
+  download_url?: string;
+}
+
+export interface BatchItemRss {
+  symbol: string;
+  timeframe: string;
+  rssBeforeItemMB?: number;
+  rssPeakMB: number;
+  rssAfterGcMB: number;
+}
+
+export interface BatchItemMetrics {
+  current_symbol?: string | null;
+  current_timeframe?: string | null;
+  rss_before_item_mb?: number;
+  rss_peak_item_mb?: number;
+  rss_after_gc_mb?: number;
+}
+
 export interface BatchTaskStatus {
   task_id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'partial';
+  batch_id?: string;
+  status: BatchTaskStatusValue;
   total: number;
   completed: number;
   failed: number;
   progress: number;
   current_symbol?: string | null;
+  current_timeframe?: string | null;
+  queued?: number;
+  concurrent_symbols?: number;
+  memory_sanity_failed?: boolean;
+  eta_seconds?: number;
+  resume_available?: boolean;
+  output_paths?: BatchOutputPath[];
+  per_item_rss?: BatchItemRss[];
+  last_item_metrics?: BatchItemMetrics | null;
   results?: Record<string, string>;
   errors?: Record<string, string>;
 }

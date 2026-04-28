@@ -398,16 +398,23 @@ export function useFeatureFactory() {
 
         setBatchTask({
           task_id: payload.task_id,
+          batch_id: payload.task_id,
           status: (payload.status as BatchTaskStatus['status']) ?? 'pending',
           total: payload.total,
           completed: 0,
           failed: 0,
           progress: 0,
+          current_timeframe: request.timeframe,
+          queued: payload.total,
+          eta_seconds: 0,
+          resume_available: false,
+          output_paths: [],
+          per_item_rss: [],
           results: {},
           errors: {},
         });
 
-        await pollBatchStatus(payload.task_id);
+        void pollBatchStatus(payload.task_id);
         setError(null);
         return payload.task_id;
       } catch (err) {
