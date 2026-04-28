@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
+from momentum.core.config import get_concurrent_symbols_override
+
 try:
     import psutil as _psutil
 except ImportError:
@@ -120,6 +122,13 @@ _L2_CATEGORY_WORKERS_BY_TIER: Dict[str, int] = {
     "32gb": 7,
 }
 
+_CONCURRENT_SYMBOLS_BY_TIER_GB: Dict[int, int] = {
+    8: 1,
+    16: 1,
+    24: 2,
+    32: 3,
+}
+
 
 def get_memory_tier() -> str:
     """Return the current memory tier using env override or psutil auto-detection."""
@@ -143,6 +152,7 @@ def get_memory_tier() -> str:
 
 def get_tier_config(tier: str) -> Dict[str, Any]:
     """Return conservative tier settings with 8GB defaults for unknown tiers."""
+    tier_gb = _parse_tier_gb(tier)
     return {
         "l65_workers": _WORKERS_BY_TIER.get(tier, _WORKERS_BY_TIER["8gb"]),
         "cgsa_memory_buffer": _CGSA_BUFFER_BY_TIER.get(tier, _CGSA_BUFFER_BY_TIER["8gb"]),
@@ -154,7 +164,32 @@ def get_tier_config(tier: str) -> Dict[str, Any]:
         "l3_streaming_buffer_cols": _L3_STREAMING_BUFFER_COLS_BY_TIER.get(tier, _L3_STREAMING_BUFFER_COLS_BY_TIER["8gb"]),
         "l65_split_threshold": _L65_SPLIT_THRESHOLD_BY_TIER.get(tier, _L65_SPLIT_THRESHOLD_BY_TIER["8gb"]),
         "l2_category_workers": _L2_CATEGORY_WORKERS_BY_TIER.get(tier, _L2_CATEGORY_WORKERS_BY_TIER["8gb"]),
+        "concurrent_symbols": get_tier_concurrent_symbols(tier_gb),
     }
+
+
+def _parse_tier_gb(tier: str) -> int:
+    """Parse a tier label such as '8gb' into an integer GB value."""
+
+    try:
+        return int(str(tier).strip().lower().replace("gb", ""))
+    except ValueError:
+        return 8
+
+
+def get_current_tier_gb() -> int:
+    """Return the current auto-detected memory tier as an integer GB value."""
+
+    return _parse_tier_gb(get_memory_tier())
+
+
+def get_tier_concurrent_symbols(tier_gb: int) -> int:
+    """Return tier-aware safe concurrent-symbol count for heavy batch execution."""
+
+    override = get_concurrent_symbols_override()
+    if override is not None:
+        return override
+    return _CONCURRENT_SYMBOLS_BY_TIER_GB.get(int(tier_gb), 1)
 
 
 def get_l3_persist_mode() -> str:
