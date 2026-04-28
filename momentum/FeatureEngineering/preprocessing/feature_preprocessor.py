@@ -12,11 +12,31 @@ import numpy as np
 import pandas as pd
 
 from momentum.FeatureEngineering.preprocessing._d_star_cache import (
+    ADF_ENGINE_VERSION,
     DStarCache,
     PreprocessingContext,
 )
+from momentum.FeatureEngineering.preprocessing._fast_adf_numba import (
+    FAST_ADF_ENGINE_VERSION,
+    adf_pvalue_fast,
+)
+from momentum.FeatureEngineering.preprocessing._hurst_prior import (
+    find_min_d_full_bisection,
+    find_min_d_with_prior,
+)
 from momentum.FeatureEngineering.preprocessing._non_stationary_cache import NonStationaryCache
-from momentum.core.config import MomentumConfig, get_fracdiff_layers, get_fracdiff_precision
+from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
+    ParallelSlowPath,
+    process_fracdiff_column_values,
+)
+from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
+from momentum.core.config import (
+    MomentumConfig,
+    get_fast_adf_enabled,
+    get_fracdiff_layers,
+    get_fracdiff_precision,
+    get_slowpath_n_jobs,
+)
 from momentum.core.logging import get_logger
 
 
@@ -367,10 +387,12 @@ class FeaturePreprocessor:
                     "results": {},
                     "completed_slices": 0,
                 }
-            elif not use_fast and split_threshold > 0 and n_cols > split_threshold:
+            elif not use_fast:
                 # Slow path (FracDiff/ADF/Gaussian) with a large group: process in
                 # column chunks sequentially to cap peak memory at ~full_array + chunk_copies
                 # instead of full_array × 3–4 copies (which OOM-kills on 8 GB systems).
+                # Task 1.1 keeps statsmodels ADF out of ThreadPool; optional loky
+                # parallelism happens inside the FracDiff slow path only.
                 slow_chunked_groups.append(group)
             else:
                 full_groups.append(group)
@@ -497,7 +519,8 @@ class FeaturePreprocessor:
         for group in slow_chunked_groups:
             gid = getattr(group, "group_id", "<unknown>")
             try:
-                self._transform_single_group_chunked(registry, group, chunk_size=split_threshold)
+                safe_chunk_size = split_threshold if split_threshold > 0 else self._group_n_columns(group)
+                self._transform_single_group_chunked(registry, group, chunk_size=safe_chunk_size)
                 completed += 1
                 last_group_label = f"{gid} (slow-chunked)"
             except Exception as error:
@@ -1042,7 +1065,154 @@ class FeaturePreprocessor:
             weight_threshold=weight_threshold,
             sample_size=sample_size,
             nan_policy="dropna",
+            adf_engine_version=self._adf_engine_version(),
         )
+
+    @staticmethod
+    def _adf_engine_version() -> str:
+        if get_fast_adf_enabled():
+            return FAST_ADF_ENGINE_VERSION
+        return ADF_ENGINE_VERSION
+
+    @staticmethod
+    def _adf_pvalue_for_values(values: np.ndarray, sample_size: int = 500) -> float:
+        clean_values = np.asarray(values, dtype=np.float64)
+        clean_values = clean_values[np.isfinite(clean_values)]
+        if clean_values.size < 20:
+            return 1.0
+        if get_fast_adf_enabled():
+            return float(adf_pvalue_fast(clean_values, sample_size=sample_size)[0])
+        try:
+            return float(adfuller(pd.Series(clean_values).tail(sample_size), autolag="AIC")[1])
+        except Exception:
+            return 1.0
+
+    @staticmethod
+    def _assign_fracdiff_result(
+        result: pd.DataFrame,
+        column: str,
+        fracdiff_series: pd.Series,
+        mode: str,
+    ) -> None:
+        if mode == "replace":
+            result[column] = fracdiff_series
+        else:
+            result[f"{column}_fracdiff"] = fracdiff_series
+
+    def _resolve_slowpath_n_jobs(self) -> int:
+        try:
+            tier_gb = get_current_tier_gb()
+        except Exception:
+            tier_gb = 8
+        return get_slowpath_n_jobs(tier_gb)
+
+    def _apply_fractional_differencing_serial(
+        self,
+        result: pd.DataFrame,
+        eligible_columns: List[str],
+        *,
+        cache: Optional[DStarCache],
+        adf_threshold: float,
+        d_range: Tuple[float, float],
+        precision: float,
+        max_lag: int,
+        weight_threshold: float,
+    ) -> pd.DataFrame:
+        for column in eligible_columns:
+            series = result[column].astype(float)
+
+            try:
+                cached_d_star = cache.get(column) if cache is not None else None
+                if cached_d_star is not None:
+                    d_star = cached_d_star
+                else:
+                    d_star = self._find_min_d(
+                        series,
+                        adf_threshold=adf_threshold,
+                        d_range=d_range,
+                        precision=precision,
+                        max_lag=max_lag,
+                    )
+                    if cache is not None:
+                        cache.set(column, d_star)
+            except Exception as exc:
+                logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
+                d_star = 1.0
+
+            fracdiff_series = self._frac_diff_ffd(
+                series,
+                d_star,
+                threshold=weight_threshold,
+                max_width=max_lag,
+            )
+            self._assign_fracdiff_result(result, column, fracdiff_series, self.mode)
+            self._fracdiff_processed_columns.add(column)
+
+        return result
+
+    def _apply_fractional_differencing_parallel(
+        self,
+        result: pd.DataFrame,
+        eligible_columns: List[str],
+        *,
+        cache: Optional[DStarCache],
+        adf_threshold: float,
+        d_range: Tuple[float, float],
+        precision: float,
+        max_lag: int,
+        weight_threshold: float,
+        n_jobs: int,
+    ) -> pd.DataFrame:
+        sample_size = int(
+            self.fracdiff_config.get(
+                "sample_size",
+                self.adf_config.get("sample_size", 500),
+            )
+        )
+        items: List[Tuple[np.ndarray, Dict[str, object]]] = []
+        for column in eligible_columns:
+            series = result[column].astype(float)
+            cached_d_star = cache.get(column) if cache is not None else None
+            metadata: Dict[str, object] = {
+                "column": column,
+                "cached_d_star": cached_d_star,
+                "adf_threshold": adf_threshold,
+                "d_range": d_range,
+                "precision": precision,
+                "max_lag": max_lag,
+                "weight_threshold": weight_threshold,
+                "sample_size": sample_size,
+            }
+            items.append((series.to_numpy(dtype=np.float64, copy=False), metadata))
+
+        outputs = ParallelSlowPath(n_jobs).map(items, process_fracdiff_column_values)
+        failed_columns: List[str] = []
+        for output in outputs:
+            column = str(output["column"])
+            d_star = float(output["d_star"])
+            fracdiff_values = np.asarray(output["fracdiff_values"], dtype=np.float64)
+            fracdiff_series = pd.Series(fracdiff_values, index=result.index)
+            self._assign_fracdiff_result(result, column, fracdiff_series, self.mode)
+            self._fracdiff_processed_columns.add(column)
+
+            if cache is not None and not bool(output.get("cache_hit", False)):
+                cache.set(column, d_star)
+            if output.get("status") != "ok":
+                failed_columns.append(column)
+
+        if failed_columns:
+            logger.warning(
+                "[L6.5] FracDiff joblib fallback d=1.0 for %d columns. Sample: %s",
+                len(failed_columns),
+                failed_columns[:10],
+            )
+
+        logger.info(
+            "[L6.5] FracDiff joblib slow path complete: columns=%d n_jobs=%d",
+            len(eligible_columns),
+            n_jobs,
+        )
+        return result
 
     def _apply_fractional_differencing(self, df: pd.DataFrame) -> pd.DataFrame:
         if not HAS_STATSMODELS:
@@ -1102,35 +1272,54 @@ class FeaturePreprocessor:
         eligible_columns = [column for column in columns if float(nan_rates.get(column, 1.0)) <= 0.5]
         skipped_high_nan: List[str] = [column for column in columns if column not in eligible_columns]
 
-        for column in eligible_columns:
-            series = result[column].astype(float)
-
-            try:
-                cached_d_star = cache.get(column) if cache is not None else None
-                if cached_d_star is not None:
-                    d_star = cached_d_star
-                else:
-                    d_star = self._find_min_d(
-                        series,
+        if eligible_columns:
+            slowpath_n_jobs = self._resolve_slowpath_n_jobs()
+            if slowpath_n_jobs > 1 and len(eligible_columns) > 1:
+                try:
+                    result = self._apply_fractional_differencing_parallel(
+                        result,
+                        eligible_columns,
+                        cache=cache,
                         adf_threshold=adf_threshold,
                         d_range=(float(d_range[0]), float(d_range[1])),
                         precision=precision,
                         max_lag=max_lag,
+                        weight_threshold=weight_threshold,
+                        n_jobs=slowpath_n_jobs,
                     )
-                    if cache is not None:
-                        cache.set(column, d_star)
-            except Exception as exc:
-                logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
-                d_star = 1.0
-
-            frac = self._frac_diff_ffd(series, d_star, threshold=weight_threshold, max_width=max_lag)
-
-            if self.mode == "replace":
-                result[column] = frac
+                except MemoryError:
+                    logger.error(
+                        "[L6.5] joblib slow-path OOM, raise for batch downscale",
+                        exc_info=True,
+                    )
+                    raise
+                except Exception as exc:
+                    logger.error(
+                        "[L6.5] joblib slow path failed, fallback to serial chunked slow path: %s",
+                        exc,
+                        exc_info=True,
+                    )
+                    result = self._apply_fractional_differencing_serial(
+                        result,
+                        eligible_columns,
+                        cache=cache,
+                        adf_threshold=adf_threshold,
+                        d_range=(float(d_range[0]), float(d_range[1])),
+                        precision=precision,
+                        max_lag=max_lag,
+                        weight_threshold=weight_threshold,
+                    )
             else:
-                result[f"{column}_fracdiff"] = frac
-
-            self._fracdiff_processed_columns.add(column)
+                result = self._apply_fractional_differencing_serial(
+                    result,
+                    eligible_columns,
+                    cache=cache,
+                    adf_threshold=adf_threshold,
+                    d_range=(float(d_range[0]), float(d_range[1])),
+                    precision=precision,
+                    max_lag=max_lag,
+                    weight_threshold=weight_threshold,
+                )
 
         if skipped_high_nan:
             logger.warning(
@@ -1194,10 +1383,7 @@ class FeaturePreprocessor:
                 if len(clean) < 20:
                     break
                 sample = clean.tail(sample_size)
-                try:
-                    pvalue = adfuller(sample, autolag="AIC")[1]
-                except Exception:
-                    pvalue = 1.0
+                pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
 
                 if pvalue <= threshold:
                     chosen_diff = diff_order
@@ -1413,10 +1599,10 @@ class FeaturePreprocessor:
                 non_stationary.append(column)
                 continue
 
-            try:
-                pvalue = adfuller(series.tail(sample_size), autolag="AIC")[1]
-            except Exception:
-                pvalue = 1.0
+            pvalue = self._adf_pvalue_for_values(
+                series.tail(sample_size).to_numpy(dtype=np.float64),
+                sample_size=sample_size,
+            )
 
             is_non_stationary = bool(pvalue > threshold)
             self._non_stationary_cache.set(cache_key, is_non_stationary)
@@ -1496,37 +1682,50 @@ class FeaturePreprocessor:
             return 1.0
 
         left, right = float(d_range[0]), float(d_range[1])
-        best = right
         effective_precision = (
             self._resolve_fracdiff_precision() if precision is None else float(precision)
         )
         if effective_precision <= 0.0:
             effective_precision = self._resolve_fracdiff_precision()
+        weight_threshold = float(self.fracdiff_config.get("weight_threshold", 1e-5))
+        values = clean.to_numpy(dtype=np.float64, copy=False)
 
-        def _is_stationary(d_value: float) -> bool:
-            frac = self._frac_diff_ffd(
+        def _fracdiff_values(raw_values: np.ndarray, d_value: float) -> np.ndarray:
+            del raw_values
+            fracdiff_series = self._frac_diff_ffd(
                 clean,
                 d_value,
-                threshold=float(self.fracdiff_config.get("weight_threshold", 1e-5)),
+                threshold=weight_threshold,
                 max_width=max_lag,
             )
-            frac_clean = frac.dropna()
-            if len(frac_clean) < 20:
-                return False
-            pvalue = adfuller(frac_clean.tail(500), autolag="AIC")[1]
-            return bool(pvalue <= adf_threshold)
+            return fracdiff_series.to_numpy(dtype=np.float64, copy=False)
 
-        while right - left > effective_precision:
-            mid = (left + right) / 2.0
-            try:
-                stationary = _is_stationary(mid)
-            except Exception:
-                stationary = False
+        def _adf_pvalue(fracdiff_values: np.ndarray) -> float:
+            clean_values = np.asarray(fracdiff_values, dtype=np.float64)
+            clean_values = clean_values[np.isfinite(clean_values)]
+            if clean_values.size < 20:
+                return 1.0
+            return self._adf_pvalue_for_values(clean_values, sample_size=500)
 
-            if stationary:
-                best = mid
-                right = mid
-            else:
-                left = mid
+        def _full_search() -> float:
+            return find_min_d_full_bisection(
+                values,
+                precision=effective_precision,
+                adf_threshold=adf_threshold,
+                adf_fn=_adf_pvalue,
+                fracdiff_fn=_fracdiff_values,
+                d_range=(left, right),
+            )
 
-        return round(best, 4)
+        return round(
+            find_min_d_with_prior(
+                values,
+                precision=effective_precision,
+                adf_threshold=adf_threshold,
+                adf_fn=_adf_pvalue,
+                fracdiff_fn=_fracdiff_values,
+                full_search_fn=_full_search,
+                d_range=(left, right),
+            ),
+            4,
+        )

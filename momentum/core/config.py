@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import FrozenSet, Optional
+from typing import FrozenSet, Iterator, Optional
 
 import yaml
 
@@ -16,6 +18,7 @@ logger = get_logger(__name__)
 _OPTIMIZED_FRACDIFF_LAYERS = frozenset({"L1", "L2"})
 _LEGACY_FRACDIFF_LAYERS = frozenset({"L1", "L2", "L3", "L4"})
 _ALL_FRACDIFF_LAYERS = frozenset({"ALL"})
+_SLOWPATH_NJOBS_BY_TIER_GB = {8: 2, 16: 4, 24: 6, 32: 8}
 
 
 def get_l65_optimization_profile() -> str:
@@ -116,6 +119,106 @@ def get_fracdiff_precision(config_precision: float = 0.02) -> float:
 def is_dstar_legacy_migration_enabled() -> bool:
     raw = os.getenv("FFACT_DSTAR_CACHE_MIGRATE_LEGACY", "0").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def get_concurrent_symbols_override() -> Optional[int]:
+    """Return the optional Feature Factory batch concurrent-symbol override."""
+
+    raw = os.getenv("FFACT_CONCURRENT_SYMBOLS_OVERRIDE")
+    if raw is None or not raw.strip():
+        return None
+
+    try:
+        value = int(raw.strip())
+    except ValueError:
+        logger.warning(
+            "Invalid FFACT_CONCURRENT_SYMBOLS_OVERRIDE=%s, ignoring override",
+            raw,
+        )
+        return None
+
+    if value <= 0:
+        logger.warning(
+            "FFACT_CONCURRENT_SYMBOLS_OVERRIDE must be positive, got %s; ignoring override",
+            raw,
+        )
+        return None
+    return value
+
+
+def get_batch_nested_enabled() -> bool:
+    """Return whether the current process is already inside a heavy batch layer."""
+
+    raw = os.getenv("FFACT_BATCH_NESTED", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def get_slowpath_parallel_enabled() -> bool:
+    """Return whether L6.5 joblib slow-path parallelism is explicitly enabled."""
+
+    raw = os.getenv("FFACT_L65_SLOWPATH_PARALLEL", "0").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"", "0", "false", "no", "off"}:
+        return False
+    logger.warning(
+        "Invalid FFACT_L65_SLOWPATH_PARALLEL=%s, fallback to disabled",
+        raw,
+    )
+    return False
+
+
+def get_fast_adf_enabled() -> bool:
+    """Return whether Phase 2 Fast ADF is explicitly enabled."""
+
+    raw = os.getenv("FFACT_USE_FAST_ADF", "0").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"", "0", "false", "no", "off"}:
+        return False
+    logger.warning(
+        "Invalid FFACT_USE_FAST_ADF=%s, fallback to disabled",
+        raw,
+    )
+    return False
+
+
+def get_slowpath_n_jobs(tier_gb: int) -> int:
+    """Return safe L6.5 slow-path joblib worker count for the memory tier."""
+
+    if get_batch_nested_enabled():
+        logger.warning("[L6.5] slow-path joblib disabled by FFACT_BATCH_NESTED=1")
+        return 1
+    if not get_slowpath_parallel_enabled():
+        return 1
+    if sys.platform.startswith("win"):
+        logger.warning("[L6.5] slow-path joblib disabled on Windows platform")
+        return 1
+
+    try:
+        tier_value = int(tier_gb)
+    except (TypeError, ValueError):
+        tier_value = 8
+    return _SLOWPATH_NJOBS_BY_TIER_GB.get(tier_value, 2)
+
+
+@contextmanager
+def batch_nested_environment(enabled: bool = True) -> Iterator[None]:
+    """Temporarily mark child workers as nested batch execution context."""
+
+    previous = os.environ.get("FFACT_BATCH_NESTED")
+    if enabled:
+        os.environ["FFACT_BATCH_NESTED"] = "1"
+    else:
+        os.environ.pop("FFACT_BATCH_NESTED", None)
+
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("FFACT_BATCH_NESTED", None)
+        else:
+            os.environ["FFACT_BATCH_NESTED"] = previous
 
 
 def _default_project_root() -> Path:
