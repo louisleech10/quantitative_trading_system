@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Phase 0 Layer 6.5 benchmark harness.
+"""Layer 6.5 benchmark suite.
 
-This script is intentionally scoped to Task 0.8 development gates. Task 3.1
-will extend it into the full cross-phase benchmark suite.
+Task 0.8 introduced the Phase 0 development-gate harness. Task 3.1 extends
+the same entry point into a cross-tier, cross-phase benchmark suite while
+keeping the original gate modes stable for regression checks.
 """
 
 from __future__ import annotations
@@ -17,8 +18,9 @@ import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -85,6 +87,14 @@ PHASE0_RSS_LIMIT_MB = 6 * 1024
 MULTI_RSS_CUMULATIVE_LIMIT_MB = 1536
 RAM_GATE_MIN_AVAILABLE_GB = 4.0
 DSTAR_JSON_LIMIT_BYTES = 5 * 1024 * 1024
+REGRESSION_LOOKBACK_DAYS = 7
+REGRESSION_DEGRADATION_THRESHOLD = 0.20
+SUITE_SCHEMA_VERSION = "l65-benchmark-suite-v1"
+SMOKE_TIERS = ("8gb", "16gb", "24gb", "32gb")
+SMOKE_PHASES = ("0", "1", "2")
+SMOKE_DEFAULT_ROWS = 1000
+SMOKE_DEFAULT_COLS = 100
+FULL_WIDTH_PROXY_MIN_ROWS = 5000
 STATUS_PASS = "PASS"
 STATUS_FAIL = "FAIL"
 STATUS_BLOCKED = "BLOCKED"
@@ -167,13 +177,19 @@ class BenchmarkSummary:
     oom: bool = False
     sigkill: bool = False
     output_size_delta_pct: Optional[float] = None
+    l7_size_mb: Optional[float] = None
     blocking_reason: str = ""
     concurrent_symbols: int = 1
     checkpoint_path: Optional[str] = None
+    regression_flag: bool = False
+    regression_reasons: List[str] = field(default_factory=list)
+    history_sample_count: int = 0
+    tier_simulation: Dict[str, Any] = field(default_factory=dict)
     entries: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "schema_version": SUITE_SCHEMA_VERSION,
             "gate_id": self.gate_id,
             "status": self.status,
             "phase": self.phase,
@@ -189,9 +205,14 @@ class BenchmarkSummary:
             "oom": self.oom,
             "sigkill": self.sigkill,
             "output_size_delta_pct": self.output_size_delta_pct,
+            "l7_size_mb": self.l7_size_mb,
             "blocking_reason": self.blocking_reason,
             "concurrent_symbols": self.concurrent_symbols,
             "checkpoint_path": self.checkpoint_path,
+            "regression_flag": self.regression_flag,
+            "regression_reasons": self.regression_reasons,
+            "history_sample_count": self.history_sample_count,
+            "tier_simulation": self.tier_simulation,
             "entries": self.entries,
         }
 
@@ -255,8 +276,107 @@ def _parse_tier_gb(raw: str) -> int:
         return 8
 
 
+def _safe_int(raw: object, default: int) -> int:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
 def _parse_csv(raw: str) -> List[str]:
     return [item.strip() for item in str(raw).split(",") if item.strip()]
+
+
+def _parse_timestamp(raw: object) -> Optional[datetime]:
+    if not raw:
+        return None
+    text = str(raw)
+    formats = ("%Y%m%dT%H%M%SZ", "%Y%m%dT%H%M%S%fZ")
+    for date_format in formats:
+        try:
+            return datetime.strptime(text, date_format).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    try:
+        value = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+@contextmanager
+def _tier_memory_limit(tier_gb: int, enabled: bool = True) -> Iterator[Dict[str, Any]]:
+    simulation = {
+        "enabled": False,
+        "requested_tier_gb": int(tier_gb),
+        "status": "skipped",
+        "reason": "tier simulation disabled",
+    }
+    if not enabled:
+        yield simulation
+        return
+
+    try:
+        import resource
+    except ImportError:
+        simulation["reason"] = "resource module unavailable"
+        logger.warning("[L6.5] tier simulation skipped: resource module unavailable")
+        yield simulation
+        return
+
+    if not hasattr(resource, "RLIMIT_AS"):
+        simulation["reason"] = "RLIMIT_AS unavailable"
+        logger.warning("[L6.5] tier simulation skipped: RLIMIT_AS unavailable")
+        yield simulation
+        return
+
+    target_bytes = int(tier_gb) * 1024 ** 3
+    try:
+        current_vms = int(psutil.Process().memory_info().vms)
+    except psutil.Error:
+        current_vms = 0
+    if current_vms and current_vms >= int(target_bytes * 0.90):
+        simulation["reason"] = "current process VMS is too close to requested tier limit"
+        simulation["current_vms_bytes"] = current_vms
+        logger.warning("[L6.5] tier simulation skipped: %s", simulation["reason"])
+        yield simulation
+        return
+
+    try:
+        previous_soft, previous_hard = resource.getrlimit(resource.RLIMIT_AS)
+    except (OSError, ValueError) as exc:
+        simulation["reason"] = "getrlimit failed: %s" % exc
+        logger.warning("[L6.5] tier simulation skipped: %s", simulation["reason"])
+        yield simulation
+        return
+
+    if previous_hard != resource.RLIM_INFINITY and target_bytes > previous_hard:
+        simulation["reason"] = "requested limit exceeds hard limit"
+        logger.warning("[L6.5] tier simulation skipped: %s", simulation["reason"])
+        yield simulation
+        return
+
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (target_bytes, previous_hard))
+        simulation.update({
+            "enabled": True,
+            "status": "applied",
+            "reason": "",
+            "soft_limit_bytes": target_bytes,
+        })
+        yield simulation
+    except (OSError, ValueError) as exc:
+        simulation["reason"] = "setrlimit failed: %s" % exc
+        logger.warning("[L6.5] tier simulation failed: %s", simulation["reason"])
+        yield simulation
+    finally:
+        if simulation.get("enabled"):
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, (previous_soft, previous_hard))
+            except (OSError, ValueError) as exc:
+                logger.warning("[L6.5] tier simulation restore failed: %s", exc)
 
 
 def _available_symbols_for_timeframes(timeframes: Sequence[str]) -> List[str]:
@@ -318,7 +438,7 @@ def _config_hash(config: Dict[str, Any], layers: str, workload_label: str, phase
         "fracdiff_layers": layers,
         "workload_label": workload_label,
         "phase": int(phase),
-        "benchmark_schema": "phase0-task0.8-v1-phase1-minimal",
+        "benchmark_schema": SUITE_SCHEMA_VERSION,
     }
     import hashlib
 
@@ -433,7 +553,7 @@ def _run_l65_transform(
         symbol=symbol,
         timeframe=timeframe,
         config_hash=config_hash,
-        source_data_version="benchmark_l65_task0.8_v1",
+        source_data_version=SUITE_SCHEMA_VERSION,
     )
     preprocessor = FeaturePreprocessor(config, context=context)
     DSTAR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -590,6 +710,8 @@ def _write_checkpoint(checkpoint: Dict[str, Any], timestamp: str) -> Path:
 
 
 def _gate_id_from_args(args: argparse.Namespace) -> str:
+    if bool(getattr(args, "smoke", False)):
+        return "T3.1"
     phase = int(getattr(args, "phase", 0))
     if phase == 1:
         if bool(args.cache_hit):
@@ -628,6 +750,159 @@ def _entry_passes_limits(entry: SingleRunResult, gate_id: str) -> Tuple[bool, st
     return True, ""
 
 
+def _sum_output_size_mb(entries: Sequence[Dict[str, Any]]) -> Optional[float]:
+    total_size = 0
+    found = False
+    for entry in entries:
+        raw_path = entry.get("output_path")
+        if not raw_path:
+            continue
+        output_path = PROJECT_ROOT / str(raw_path)
+        if output_path.exists():
+            total_size += output_path.stat().st_size
+            found = True
+    if not found:
+        return None
+    return round(total_size / float(BYTES_PER_MB), 6)
+
+
+def _load_recent_history(current: Dict[str, Any], result_dir: Path) -> List[Dict[str, Any]]:
+    timestamp = _parse_timestamp(current.get("timestamp")) or datetime.now(timezone.utc)
+    lookback_start = timestamp - timedelta(days=REGRESSION_LOOKBACK_DAYS)
+    history: List[Dict[str, Any]] = []
+    for result_file in sorted(result_dir.glob("*.json")):
+        try:
+            with result_file.open("r", encoding="utf-8") as file_obj:
+                candidate = json.load(file_obj)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(candidate, dict):
+            continue
+        if candidate.get("timestamp") == current.get("timestamp"):
+            continue
+        if candidate.get("status") != STATUS_PASS:
+            continue
+        if candidate.get("gate_id") != current.get("gate_id"):
+            continue
+        if _safe_int(candidate.get("phase"), -1) != _safe_int(current.get("phase"), -2):
+            continue
+        if _safe_int(candidate.get("tier_gb"), -1) != _safe_int(current.get("tier_gb"), -2):
+            continue
+        if _safe_int(candidate.get("rows_per_item"), -1) != _safe_int(current.get("rows_per_item"), -2):
+            continue
+        if _safe_int(candidate.get("n_symbols"), -1) != _safe_int(current.get("n_symbols"), -2):
+            continue
+        if _safe_int(candidate.get("n_timeframes"), -1) != _safe_int(current.get("n_timeframes"), -2):
+            continue
+        candidate_time = _parse_timestamp(candidate.get("timestamp"))
+        if candidate_time is None or candidate_time < lookback_start or candidate_time > timestamp:
+            continue
+        history.append(candidate)
+    return history
+
+
+def _regression_reasons(current: Dict[str, Any], history: Sequence[Dict[str, Any]]) -> List[str]:
+    if not history or current.get("status") != STATUS_PASS:
+        return []
+
+    reasons: List[str] = []
+    current_wall = float(current.get("wall_time_seconds") or 0.0)
+    history_walls = [
+        float(item.get("wall_time_seconds") or 0.0)
+        for item in history
+        if float(item.get("wall_time_seconds") or 0.0) > 0.0
+    ]
+    if current_wall > 0.0 and history_walls:
+        wall_baseline = median(history_walls)
+        if current_wall > wall_baseline * (1.0 + REGRESSION_DEGRADATION_THRESHOLD):
+            reasons.append(
+                "wall_time_seconds %.3f regressed >20%% vs 7-day median %.3f"
+                % (current_wall, wall_baseline)
+            )
+
+    current_rss = float(current.get("peak_rss_mb") or 0.0)
+    history_rss = [
+        float(item.get("peak_rss_mb") or 0.0)
+        for item in history
+        if float(item.get("peak_rss_mb") or 0.0) > 0.0
+    ]
+    if current_rss > 0.0 and history_rss:
+        rss_baseline = median(history_rss)
+        if current_rss > rss_baseline * (1.0 + REGRESSION_DEGRADATION_THRESHOLD):
+            reasons.append(
+                "peak_rss_mb %.1f regressed >20%% vs 7-day median %.1f"
+                % (current_rss, rss_baseline)
+            )
+    return reasons
+
+
+def detect_regression(current: Dict[str, Any], history: List[Dict[str, Any]]) -> bool:
+    return bool(_regression_reasons(current, history))
+
+
+def _finalize_summary(summary: BenchmarkSummary) -> BenchmarkSummary:
+    payload = summary.to_dict()
+    entries = payload.get("entries", [])
+    if isinstance(entries, list):
+        summary.l7_size_mb = _sum_output_size_mb(entries)
+    payload = summary.to_dict()
+    history = _load_recent_history(payload, RESULT_DIR)
+    reasons = _regression_reasons(payload, history)
+    summary.history_sample_count = len(history)
+    summary.regression_reasons = reasons
+    summary.regression_flag = bool(reasons)
+    return summary
+
+
+def _unique_result_path(directory: Path, file_name: str) -> Path:
+    path = directory / file_name
+    if not path.exists():
+        return path
+    stem = path.stem
+    suffix = path.suffix
+    for index in range(2, 1000):
+        candidate = directory / f"{stem}_{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError("Could not allocate unique result path for %s" % file_name)
+
+
+def _write_benchmark_payload(payload: Dict[str, Any], args: argparse.Namespace) -> List[Path]:
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    tier_label = "%dgb" % int(payload.get("tier_gb", _parse_tier_gb(args.tier)))
+    phase = int(payload.get("phase", int(args.phase)))
+    timestamp = str(payload.get("timestamp", _utc_timestamp()))
+    suite_name = "%s_%d_%s.json" % (tier_label, phase, timestamp)
+    written_paths = []
+    suite_path = _unique_result_path(RESULT_DIR, suite_name)
+    _atomic_write_json(suite_path, payload)
+    written_paths.append(suite_path)
+
+    if not bool(getattr(args, "_smoke_child", False)):
+        gate_id = str(payload.get("gate_id", _gate_id_from_args(args))).replace(".", "_")
+        legacy_name = "phase%d_gate_%s_%s.json" % (phase, gate_id, timestamp)
+        legacy_path = _unique_result_path(RESULT_DIR, legacy_name)
+        _atomic_write_json(legacy_path, payload)
+        written_paths.append(legacy_path)
+    return written_paths
+
+
+def _prepare_full_mode_args(args: argparse.Namespace) -> None:
+    tier_gb = _parse_tier_gb(args.tier)
+    if bool(args.full) and bool(args.full_width_proxy):
+        raise BenchmarkBlocked("--full and --full-width-proxy are mutually exclusive")
+    if bool(args.full) and tier_gb == 8 and not bool(args.best_effort):
+        raise BenchmarkBlocked("8GB --full requires --best-effort")
+    if bool(args.full):
+        args.symbols = "ETHUSDT,BTCUSDT"
+        args.tfs = "1h,12h"
+        args.multi = True
+    if bool(args.full_width_proxy):
+        args.max_rows = max(int(args.max_rows), FULL_WIDTH_PROXY_MIN_ROWS)
+        args.symbols = str(args.symbols or "ETHUSDT")
+        args.tfs = str(args.tfs or "1h")
+
+
 def _summarize_single(entries: List[SingleRunResult], args: argparse.Namespace) -> BenchmarkSummary:
     gate_id = _gate_id_from_args(args)
     timestamp = str(args._timestamp)
@@ -649,7 +924,7 @@ def _summarize_single(entries: List[SingleRunResult], args: argparse.Namespace) 
 
     cache_rates = [entry.cache_hit_rate for entry in entries if entry.cache_hit_rate is not None]
     size_deltas = [entry.output_size_delta_pct for entry in entries if entry.output_size_delta_pct is not None]
-    return BenchmarkSummary(
+    return _finalize_summary(BenchmarkSummary(
         gate_id=gate_id,
         status=status,
         phase=int(args.phase),
@@ -668,7 +943,7 @@ def _summarize_single(entries: List[SingleRunResult], args: argparse.Namespace) 
         blocking_reason="; ".join(reasons),
         concurrent_symbols=1,
         entries=[entry.to_dict() for entry in entries],
-    )
+    ))
 
 
 def _run_multi(args: argparse.Namespace) -> BenchmarkSummary:
@@ -753,7 +1028,7 @@ def _run_multi(args: argparse.Namespace) -> BenchmarkSummary:
 
     cache_rates = [entry.cache_hit_rate for entry in entries if entry.cache_hit_rate is not None]
     size_deltas = [entry.output_size_delta_pct for entry in entries if entry.output_size_delta_pct is not None]
-    return BenchmarkSummary(
+    return _finalize_summary(BenchmarkSummary(
         gate_id=gate_id,
         status=status,
         phase=int(args.phase),
@@ -771,7 +1046,7 @@ def _run_multi(args: argparse.Namespace) -> BenchmarkSummary:
         concurrent_symbols=concurrent_symbols,
         checkpoint_path=_relative(checkpoint_path),
         entries=[entry.to_dict() for entry in entries],
-    )
+    ))
 
 
 def run_benchmark(args: argparse.Namespace) -> Dict[str, Any]:
@@ -779,85 +1054,160 @@ def run_benchmark(args: argparse.Namespace) -> Dict[str, Any]:
     setattr(args, "_timestamp", timestamp)
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
     gate_id = _gate_id_from_args(args)
+    tier_gb = _parse_tier_gb(args.tier)
+    tier_simulation: Dict[str, Any] = {}
 
-    try:
-        if bool(args.multi) or bool(args.memory_sanity):
-            summary = _run_multi(args)
-        else:
-            repeat = int(args.repeat)
-            if bool(args.cache_hit):
-                repeat = max(repeat, 2)
-            entries: List[SingleRunResult] = []
-            for repeat_index in range(1, repeat + 1):
-                if bool(args.synthetic):
-                    entry = _run_single_synthetic(
-                        gate_id=gate_id,
-                        repeat_index=repeat_index,
-                        layers=str(args.layers),
-                        max_rows=int(args.max_rows),
-                        max_cols=int(args.max_cols),
-                        timestamp=timestamp,
-                        phase=int(args.phase),
-                    )
-                else:
-                    symbols = _resolve_symbols(str(args.symbols), _parse_csv(args.tfs))
-                    timeframes = _parse_csv(args.tfs)
-                    entry = _run_single_real(
-                        symbol=symbols[0],
-                        timeframe=timeframes[0],
-                        gate_id=gate_id,
-                        repeat_index=repeat_index,
-                        layers=str(args.layers),
-                        max_rows=int(args.max_rows),
-                        max_cols=int(args.max_cols),
-                        timestamp=timestamp,
-                        phase=int(args.phase),
-                    )
-                entries.append(entry)
-            summary = _summarize_single(entries, args)
-    except BenchmarkBlocked as exc:
-        summary = BenchmarkSummary(
-            gate_id=gate_id,
-            status=STATUS_BLOCKED,
-            phase=int(args.phase),
-            tier_gb=_parse_tier_gb(args.tier),
-            timestamp=timestamp,
-            blocking_reason=str(exc),
-            concurrent_symbols=get_tier_concurrent_symbols(_parse_tier_gb(args.tier)),
-        )
-    except MemoryError as exc:
-        summary = BenchmarkSummary(
-            gate_id=gate_id,
-            status=STATUS_FAIL,
-            phase=int(args.phase),
-            tier_gb=_parse_tier_gb(args.tier),
-            timestamp=timestamp,
-            oom=True,
-            blocking_reason=str(exc),
-            concurrent_symbols=get_tier_concurrent_symbols(_parse_tier_gb(args.tier)),
-        )
-    except Exception as exc:
-        logger.error("[L6.5] benchmark failed: %s", exc, exc_info=True)
-        summary = BenchmarkSummary(
-            gate_id=gate_id,
-            status=STATUS_FAIL,
-            phase=int(args.phase),
-            tier_gb=_parse_tier_gb(args.tier),
-            timestamp=timestamp,
-            blocking_reason=str(exc),
-            concurrent_symbols=get_tier_concurrent_symbols(_parse_tier_gb(args.tier)),
-        )
+    with _tier_memory_limit(tier_gb) as tier_state:
+        tier_simulation = dict(tier_state)
+        try:
+            _prepare_full_mode_args(args)
+            if bool(args.multi) or bool(args.memory_sanity):
+                summary = _run_multi(args)
+            else:
+                repeat = int(args.repeat)
+                if bool(args.cache_hit):
+                    repeat = max(repeat, 2)
+                entries: List[SingleRunResult] = []
+                for repeat_index in range(1, repeat + 1):
+                    if bool(args.synthetic):
+                        entry = _run_single_synthetic(
+                            gate_id=gate_id,
+                            repeat_index=repeat_index,
+                            layers=str(args.layers),
+                            max_rows=int(args.max_rows),
+                            max_cols=int(args.max_cols),
+                            timestamp=timestamp,
+                            phase=int(args.phase),
+                        )
+                    else:
+                        symbols = _resolve_symbols(str(args.symbols), _parse_csv(args.tfs))
+                        timeframes = _parse_csv(args.tfs)
+                        entry = _run_single_real(
+                            symbol=symbols[0],
+                            timeframe=timeframes[0],
+                            gate_id=gate_id,
+                            repeat_index=repeat_index,
+                            layers=str(args.layers),
+                            max_rows=int(args.max_rows),
+                            max_cols=int(args.max_cols),
+                            timestamp=timestamp,
+                            phase=int(args.phase),
+                        )
+                    entries.append(entry)
+                summary = _summarize_single(entries, args)
+        except BenchmarkBlocked as exc:
+            summary = _finalize_summary(BenchmarkSummary(
+                gate_id=gate_id,
+                status=STATUS_BLOCKED,
+                phase=int(args.phase),
+                tier_gb=tier_gb,
+                timestamp=timestamp,
+                blocking_reason=str(exc),
+                concurrent_symbols=get_tier_concurrent_symbols(tier_gb),
+            ))
+        except MemoryError as exc:
+            summary = _finalize_summary(BenchmarkSummary(
+                gate_id=gate_id,
+                status=STATUS_FAIL,
+                phase=int(args.phase),
+                tier_gb=tier_gb,
+                timestamp=timestamp,
+                oom=True,
+                blocking_reason=str(exc),
+                concurrent_symbols=get_tier_concurrent_symbols(tier_gb),
+            ))
+        except Exception as exc:
+            logger.error("[L6.5] benchmark failed: %s", exc, exc_info=True)
+            summary = _finalize_summary(BenchmarkSummary(
+                gate_id=gate_id,
+                status=STATUS_FAIL,
+                phase=int(args.phase),
+                tier_gb=tier_gb,
+                timestamp=timestamp,
+                blocking_reason=str(exc),
+                concurrent_symbols=get_tier_concurrent_symbols(tier_gb),
+            ))
 
+    summary.tier_simulation = tier_simulation
+    summary = _finalize_summary(summary)
     payload = summary.to_dict()
-    output_name = "phase%d_gate_%s_%s.json" % (int(args.phase), gate_id.replace(".", "_"), timestamp)
-    output_path = RESULT_DIR / output_name
+    written_paths = _write_benchmark_payload(payload, args)
+    payload["result_paths"] = [_relative(path) for path in written_paths]
+    for path in written_paths:
+        _atomic_write_json(path, payload)
+    print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+    return payload
+
+
+def run_smoke_suite(args: argparse.Namespace) -> Dict[str, Any]:
+    timestamp = _utc_timestamp()
+    explicit_tier = bool(getattr(args, "_tier_explicit", False))
+    tiers = [str(args.tier)] if explicit_tier else list(SMOKE_TIERS)
+    rows = min(int(args.max_rows), SMOKE_DEFAULT_ROWS)
+    cols = min(int(args.max_cols), SMOKE_DEFAULT_COLS)
+    entries: List[Dict[str, Any]] = []
+
+    for tier in tiers:
+        for phase in SMOKE_PHASES:
+            child_args = argparse.Namespace(**vars(args))
+            child_args.smoke = False
+            child_args._smoke_child = True
+            child_args.tier = tier
+            child_args.phase = phase
+            child_args.symbols = "SYNTHETIC"
+            child_args.tfs = "fixture"
+            child_args.repeat = 1
+            child_args.max_rows = rows
+            child_args.max_cols = cols
+            child_args.layers = "L1,L2"
+            child_args.multi = False
+            child_args.cache_hit = False
+            child_args.synthetic = True
+            child_args.full_l65 = True
+            child_args.memory_sanity = False
+            child_args.best_effort = True
+            child_args.full = False
+            child_args.full_width_proxy = False
+            child_payload = run_benchmark(child_args)
+            entries.append(child_payload)
+
+    statuses = [str(entry.get("status")) for entry in entries]
+    if all(status == STATUS_PASS for status in statuses):
+        status = STATUS_PASS
+        reason = ""
+    elif any(status == STATUS_FAIL for status in statuses):
+        status = STATUS_FAIL
+        reason = "one or more smoke benchmark entries failed"
+    else:
+        status = STATUS_BLOCKED
+        reason = "one or more smoke benchmark entries were blocked"
+
+    payload = {
+        "schema_version": SUITE_SCHEMA_VERSION,
+        "gate_id": "T3.1",
+        "status": status,
+        "timestamp": timestamp,
+        "tier_gb": None,
+        "phase": None,
+        "smoke_tiers": tiers,
+        "smoke_phases": list(SMOKE_PHASES),
+        "wall_time_seconds": round(sum(float(entry.get("wall_time_seconds") or 0.0) for entry in entries), 6),
+        "peak_rss_mb": max((int(entry.get("peak_rss_mb") or 0) for entry in entries), default=0),
+        "entries": entries,
+        "blocking_reason": reason,
+        "regression_flag": any(bool(entry.get("regression_flag")) for entry in entries),
+    }
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = _unique_result_path(RESULT_DIR, "smoke_%s.json" % timestamp)
+    _atomic_write_json(output_path, payload)
+    payload["result_paths"] = [_relative(output_path)]
     _atomic_write_json(output_path, payload)
     print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
     return payload
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run Phase 0 Layer 6.5 benchmark gates")
+    parser = argparse.ArgumentParser(description="Run Layer 6.5 benchmark gates and smoke suite")
     parser.add_argument("--tier", choices=["8gb", "16gb", "24gb", "32gb"], default="8gb")
     parser.add_argument("--phase", choices=["0", "1", "2"], default="0")
     parser.add_argument("--symbols", default="ETHUSDT")
@@ -872,17 +1222,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--full-l65", action="store_true")
     parser.add_argument("--memory-sanity", action="store_true")
     parser.add_argument("--best-effort", action="store_true")
+    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--full", action="store_true")
+    parser.add_argument("--full-width-proxy", action="store_true")
     return parser
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = build_parser().parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(raw_argv)
+    setattr(args, "_tier_explicit", any(item == "--tier" or item.startswith("--tier=") for item in raw_argv))
     if int(args.repeat) <= 0:
         raise SystemExit("--repeat must be positive")
     if int(args.max_rows) <= 0 or int(args.max_cols) <= 0:
         raise SystemExit("--max-rows and --max-cols must be positive")
 
-    payload = run_benchmark(args)
+    payload = run_smoke_suite(args) if bool(args.smoke) else run_benchmark(args)
     status = payload.get("status")
     if status == STATUS_PASS:
         return 0

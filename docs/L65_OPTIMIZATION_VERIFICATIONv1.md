@@ -605,3 +605,67 @@
 - Required broad ruff 仍 BLOCKED：失敗集中於既有 `api/services/` lint 債務；本批修改檔案 focused ruff 為 0 errors。依「不改動與本 Task 無關區塊」未清理 unrelated service 檔。
 - T2.P3 / T2.F1 未執行：需外部 16/24/32GB 或 full-width proxy；目前只能宣稱 development gate PASS，不可宣稱 Phase 2 Frozen。
 - `tests/golden/l65/fast_adf_gate_report.json` 為 runtime 覆寫 report，最近一次狀態為 PASS。
+
+## [Task 3.1 + 3.2] 2026-04-28
+
+### 範圍
+
+- Batch 8: Task 3.1 — L6.5 Benchmark Suite 完整化。
+- Batch 8: Task 3.2 — 跨 tier CI 回歸 workflow。
+- 僅擴充 TODO 指定的 benchmark / performance test / GitHub Actions 基礎設施；未修改 L6.5 演算法、Feature Factory service、API route 或資料 pipeline。
+- Hosted GitHub Actions 尚未由本機觸發；本紀錄只能標示 workflow 靜態/手動檢查 PASS，不能宣稱 nightly 連續 7 天 Gate 已完成。
+
+### Ultra Think 三步驟
+
+- Step 1 初版：擴充 `scripts/benchmark_l65.py`，加入 `--smoke`、`--full`、`--full-width-proxy`、suite 結果檔 `{tier}_{phase}_{timestamp}.json`、legacy gate 結果檔保留、best-effort tier memory simulation、7-day regression flag；新增 `tests/performance/test_l65_perf.py` 與 `.github/workflows/l65_benchmark.yml`。
+- Step 2 自審：發現歷史結果可能含 `phase: null` 造成轉型錯誤，以及 macOS / Python process VMS 過高時直接套 `RLIMIT_AS` 可能導致 false failure。
+- Step 3 優化：新增 `_safe_int()`、workload-compatible history filtering、VMS-too-close 時安全跳過 tier simulation，並讓 CI 額外解析 smoke JSON 的 `status` / `regression_flag` 來觸發 issue。
+
+### 交付物
+
+- `scripts/benchmark_l65.py`
+- `tests/performance/test_l65_perf.py`
+- `.github/workflows/l65_benchmark.yml`
+- `docs/L65_OPTIMIZATION_TODO.md`
+- `docs/L65_OPTIMIZATION_VERIFICATIONv1.md`
+
+### Gate 結果
+
+| Gate / Check | Command | Result | Notes |
+|---|---|---|---|
+| 新增 performance pytest | `./venv/bin/pytest tests/performance/test_l65_perf.py -q` | PASS | 4 passed；重跑後 4 warnings，皆非失敗。覆蓋 smoke explicit tier、suite + legacy result names、regression detection、8GB full without best-effort blocker。 |
+| Focused ruff | `./venv/bin/ruff check scripts/benchmark_l65.py tests/performance/test_l65_perf.py` | PASS | Exit 0；All checks passed。 |
+| 解耦 grep | `grep -r 'from api\.' momentum/FeatureEngineering/preprocessing/` | PASS | Exit 1 且無輸出，代表 0 matches。 |
+| Required broad ruff | `./venv/bin/ruff check momentum/FeatureEngineering/preprocessing/ api/services/ momentum/core/` | BLOCKED | Exit 1；115 個既有 lint errors，主要在 `api/services/batch_download_service.py`、`api/services/xgboost_task_service.py` 等非本批修改檔；本次修改檔案 focused ruff 為 0 errors。 |
+| T3.1 smoke | `scripts/benchmark_l65.py --smoke` | PASS | Exit 0；最新 report `benchmark_results/l65/smoke_20260428T142851Z.json`，`status=PASS`、`len(entries)=12`、tiers=`8gb,16gb,24gb,32gb`、phases=`0,1,2`、所有子項 PASS、`regression_flag=false`。 |
+| Phase 0 benchmark | `scripts/benchmark_l65.py --tier=8gb --phase=0 --max-rows=2000 --max-cols=500` | PASS | `gate_id=T0.P1`、wall 0.811334s、peak RSS 236MB、cache hit rate 0.0、blocking_reason 空；result paths: `benchmark_results/l65/8gb_0_20260428T142931Z.json`, `benchmark_results/l65/phase0_gate_T0_P1_20260428T142931Z.json`。 |
+| Phase 1 benchmark | `scripts/benchmark_l65.py --tier=8gb --phase=1 --max-rows=2000 --max-cols=500` | PASS | `gate_id=T1.P1`、wall 2.515161s、peak RSS 234MB、cache hit rate 0.0、blocking_reason 空；result paths: `benchmark_results/l65/8gb_1_20260428T142936Z.json`, `benchmark_results/l65/phase1_gate_T1_P1_20260428T142936Z.json`。 |
+| Phase 2 benchmark | `scripts/benchmark_l65.py --tier=8gb --phase=2 --max-rows=2000 --max-cols=500` | PASS | `gate_id=T2.P1`、wall 2.893984s、peak RSS 254MB、cache hit rate 0.0、blocking_reason 空；result paths: `benchmark_results/l65/8gb_2_20260428T142943Z.json`, `benchmark_results/l65/phase2_gate_T2_P1_20260428T142943Z.json`。 |
+| T3.2 workflow manual review | `manual review .github/workflows/l65_benchmark.yml` | PASS / Hosted Pending | YAML contains nightly schedule, `workflow_dispatch`, 8GB/16GB matrix, Python 3.9 setup, dependency install, `python scripts/benchmark_l65.py --smoke --tier=${{ matrix.tier }}`, artifact upload, and `actions/github-script` issue fallback. Hosted GitHub Actions log is not available locally. |
+
+### Gate ID 對照
+
+- T3.1: PASS — `--smoke` 產出 4 tier × 3 phase = 12 子結果 JSON；全部 status PASS，無 FAIL/BLOCKED。
+- T3.1a: PASS (development regression mode) — `benchmark_l65.py` 同時寫入新 suite 檔名 `{tier}_{phase}_{timestamp}.json` 與 legacy `phase{n}_gate_*.json`，保留 Task 0.8 Phase 0 gate / size compare 回歸路徑。
+- T3.2: PASS (static / manual workflow review) — workflow 已建立；真正 Hosted GitHub Actions nightly 觸發與 7 天綠燈仍是 Phase 3 Gate pending。
+
+### §0 規則確認
+
+- R1.1: PASS — `momentum/FeatureEngineering/preprocessing/` 無 `from api.`。
+- R1.2: PASS — 本批為 benchmark / CI infrastructure；未新增跨 Domain service 依賴或 context 物件。
+- R1.3: N/A for Batch 8 — 未修改 `api/services/feature_factory_batch_service.py`，也未直接建立 `FeaturePreprocessor()` 於 API service。
+- R1.4: PASS — 本批未新增 `FFACT_` 環境變數；既有 Phase 1/2 env 行為保持在 `momentum/core/config.py`。
+- R1.5: PASS — 新增 `tests/performance/test_l65_perf.py` 可單獨以 `./venv/bin/pytest` 執行，不依賴 `run_api.py`。
+- Rule 2 Logging: PASS — 新增 tier simulation warning 使用 `[L6.5]` 前綴；未新增 per-column inner-loop info log。
+- Rule 3 Error Handling: PASS — HDF5 缺失仍標 `BLOCKED`；8GB `--full` 未加 `--best-effort` 會 BLOCKED；tier simulation 失敗或 VMS 過高時 log warning 並安全跳過。
+- Rule 4 Naming: PASS — 新函式如 `_tier_memory_limit()`、`detect_regression()`、`run_smoke_suite()`、`_safe_int()` 命名具體；未使用禁止 placeholder。
+- Rule 5 Type Hints: PASS — 新增函式使用 Python 3.9-compatible typing，未使用 `X | Y`。
+- Rule 6 Performance: PASS — smoke 使用 reduced synthetic fixture（1000 rows × 100 cols），不跑 full baseline；history scan 僅讀 JSON metadata。
+- Rule 7 Fallback: PASS — Phase 0/1/2 env fallback 行為未改；Task 0.8 gate modes 保留。
+- Rule 8 Git: PASS — 未建立 branch、commit 或 push。
+
+### 已知阻塞 / 警告
+
+- Required broad ruff 仍 BLOCKED：115 個既有 `api/services/` lint errors 不屬本批 TODO 修改範圍；依「不改動與本 Task 無關區塊」未做 unrelated service lint cleanup。
+- Hosted GitHub Actions 尚未在本機觸發；T3.2 僅完成 workflow 建立與靜態/手動檢查。Phase 3 Gate 的「CI nightly 連續 7 天無誤觸 alert」仍不可標 PASS。
+- Tier simulation 在本機 smoke 中因 process VMS 已非常接近/超過 requested tier limit 而安全跳過，狀態記錄於結果 JSON 的 `tier_simulation.reason`；此符合 best-effort sim 規則，未阻塞 smoke PASS。
