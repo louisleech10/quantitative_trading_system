@@ -1,9 +1,10 @@
 # L6.5 V1 (8GB 實作版) vs V8 最終版 Feature Factory 比較與問題分析報告
 
-> **日期**: 2026-04-29（v2 — 修正可比性說明）
+> **日期**: 2026-05-05（v5 — P0/P2 實作後補 P1-full 實測結果）
 > **環境**: MacBook Air M1 (8GB RAM)
 > **資料**: ETHUSDT, Primary 1h (20,352 rows), Secondary 12h (~1,696 rows)
 > **Config**: preset=full, **preprocessing.enabled=true** (L6.5 ON：winsor + rank + zscore；fracdiff/adf/gaussian disabled)
+> **L6.5 runtime params**: `workers=2`, `split_threshold=2000`（**2026-04-25 8GB OOM 修正後的值**：原 workers=4 / split_threshold=4000，因 OOM 收緊）
 > **Branch / commit**: `docs/L65_OPTIMIZATION_TODO.md` V1 Frozen 後第一輪 8GB 實機驗證
 > **執行方式**: **前端 frontend 手動觸發** `POST /api/v1/features/generate`（非 background headless）
 > **比較基準**: [V8 最終版 (v8fix13)](V8_initial_vs_V8_final_Comparison.md)
@@ -11,6 +12,49 @@
 > - [logs/case_search_api_20260428.log](../logs/case_search_api_20260428.log)
 > - [logs/case_search_api_20260429.log](../logs/case_search_api_20260429.log)
 > - [logs/errors_20260429.log](../logs/errors_20260429.log)
+
+## 最新狀態（P0/P2 後 P1-full 實測）
+
+本文件前半部保留 v4 對「L65 V1 初版失敗」的原始分析；以下是本次依 TODO 順序完成後的最新結果。
+
+### 已完成項目
+
+| 階段 | 結果 | 證據 |
+|------|------|------|
+| **P0 hard bugs** | ✅ 已修 | L6.5 router 不再全量 slow_chunked；layer parse warning 改聚合；L7 disk pre-check 改 streaming budget |
+| **P1-smoke** | ✅ PASS | `scripts/benchmark_l65.py --tier=8gb --phase=1 --synthetic --full-l65 --best-effort --max-rows=1000 --max-cols=100 --layers=L1,L2 --repeat=1`：3.19s、Peak RSS 235 MB、`benchmark_results/l65/8gb_1_20260505T132817Z.json` |
+| **P2** | ✅ 已修 | mixed fast/slow routing；L6.5 manifest batching；registry I/O summary；focused tests `30 passed` |
+| **P1-full** | ✅ Engine/L7 完整完成 | ETHUSDT 1h+12h full，434,982 features、20,352 rows、858 parquet groups、0 `.npy` residue |
+
+### P1-full 實測摘要（背景 script + 完整 L6.5 config）
+
+執行指令：
+
+```bash
+PYTHONPATH="$PWD" FFACT_MEMORY_TIER=8gb FFACT_USE_CGSA=1 FFACT_L65_SLOWPATH_PARALLEL=0 ./venv/bin/python scripts/benchmark_ethusdt_multitf.py
+```
+
+> 注意：第一次跑此 script 時發現 runner 未覆寫 `timeframes.primary`，沿用 [config/scan_config.yaml](../config/scan_config.yaml) 的 `12h` 預設，導致實際只跑 12h primary。已修正 [scripts/benchmark_ethusdt_multitf.py](../scripts/benchmark_ethusdt_multitf.py)，明確設定 `primary=1h`、`training=[1h,12h]`。
+
+| 指標 | P1-full 結果 |
+|------|-------------|
+| 完成狀態 | ✅ FeatureFactory engine 完整完成；L7 parquet persist 完成 |
+| Pipeline wall time | **5,643.1s（1.57 hr）** |
+| Engine reported time | **5,136.77s** |
+| Peak RSS | **4,269 MB**（低於 6GB guard） |
+| L6.5 | **4,003.22s**；842/842 groups；2 workers；14 big-group splits → 68 sub-tasks；**0 slow-chunked** |
+| L6.5 registry I/O | overwrites=842；overwrite=33,770.58 MB；overwrite_sec=232.02s；manifest_writes=1；manifest_deferred=842 |
+| L7 disk pre-check | ✅ OK：required=11.73 GiB、estimated_final=16.49 GiB、reclaimable_npy=32.98 GiB、free=12.78 GiB |
+| L7 output | 858 parquet groups；total_features=434,982；dtype=mixed |
+| Output artifact | `data_cache/features/ETHUSDT/61e08a8ea2e4ef747c05b9d29e4cd991/manifest.json` |
+| Output size | `data_cache/features` 約 28G；CGSA workdir 約 21M；剩餘 `.npy` = 0 |
+
+### 最新解讀
+
+- 初版最嚴重的 hard bug 已解除：`0 full / all slow` 變成 `828 full fast + 14 big splits / 0 slow-chunked`，L6.5 絕對時間從初版 11,567s 降到 4,003s（約 2.9×，但初版是 frontend/API、P1-full 是 background script，仍不可視為完全同路徑百分比比較）。
+- L7 disk pre-check 已從「錯誤要求 51.6 GiB 並 abort」修成 streaming-aware：本輪在 free=12.78 GiB 下仍正確通過，並成功落地 parquet。
+- 8GB 上不能再做 full parquet concat readback：script 在 engine 完成後嘗試讀回 434k 欄做 baseline checksum，遭 macOS kill。已加 `--skip-full-readback` 與 `FFACT_MEMORY_TIER=8gb` 自動跳過保護。後續 schema/checksum 比對要改成 streaming-by-group，不能全量 concat。
+- Feature count 與既有 baseline 不完全相同：本輪 434,982 vs baseline 434,720（+262）。這不影響「P1-full pipeline 能完成」的結論，但需要 P3 streaming schema diff 查明是否來自 config/registry 版本差異或命名規則變更。
 
 ---
 
@@ -47,6 +91,30 @@
 |------|------|----------|
 | **V8 最終版 (v8fix13)** | Plan A streaming + P4.1/P4.2 v2/P4.3，**L6.5 簡化配置** | 背景 script，無 API/WebSocket |
 | **L6.5 V1 初版 (本輪)** | V8 最終版 + SPEC V1 + 8GB TODO 實作（CGSA registry + L6.5 router + L7 pre-check + Layer parse warning），**L6.5 完整配置** | 前端 POST → FastAPI → service |
+
+### 1.1 ★ 2026-04-25 8GB OOM 修正背景（影響本輪解讀）
+
+本輪 L6.5 啟動時，log 顯示的關鍵 runtime 參數：
+
+```
+[L6.5] Parallel start: ... (workers=2, split_threshold=2000, slow_chunked=922)
+```
+
+這兩個值 **不是 SPEC V1 的原始 default**，而是 **2026-04-25 8GB tier 為避免 OOM 收緊後的值**：
+
+| 參數 | SPEC V1 原始 default | 2026-04-25 OOM 修正後 (8GB tier) | 收緊原因 |
+|------|---------------------|-----|----------|
+| `L65_WORKERS` | 4 | **2** | 4 worker 同時複製大 group 觸發 OOM |
+| `L65_SPLIT_THRESHOLD` | 4000 cols | **2000 cols** | 大 group 內部峰值記憶體超過 8GB tier 安全水位 |
+
+**這個背景對本輪三大問題有以下影響**：
+
+1. **強化問題 A 的嚴重性**：split_threshold 從 4000 收緊到 2000 後，「會被判為 large group」的閾值更低，**理論上更多 group 應走 chunked**。但 log 顯示「**0 big-group splits**」，代表本輪所有 922 個 group 的 cols 都 **< 2000**——**全部都應該走 fast path**，卻 0 個走，這比原本以為的「部分 fallback」更嚴重，是 **100% 全量誤路由**。
+2. **解釋為何 worker=2 仍跑這麼慢**：worker 雖收緊到 2，但 fast path 內部仍走 ThreadPool（GIL-free numpy ops）；slow_chunked 路徑卻是**逐 group 序列**（worker 數對它幾乎無加速效果），所以即使 worker=2 在 fast path 也夠，slow path 卻退化成單執行緒。
+3. **約束未來的修法選擇**：問題 A 的修法不能簡單地「把 worker 改回 4 或 split_threshold 改回 4000」——那會直接重現 2026-04-25 修正的 OOM。**正確修法仍是讓 small group 走 fast path（保留 worker=2 / split_threshold=2000）**，而非鬆綁參數。
+4. **影響 Phase 4 規劃**：原 §7 Phase 4 提到「slow_chunked 改用 joblib loky workers 平行化」，必須在 8GB tier 上**重新評估記憶體峰值**——可能 slow_chunked 本身的 chunk_size 已是「2000 cols × full rows」，再開 2 worker 同時跑會直接複製到 OOM 區。Phase 4 的併行化只能在 ≥16GB tier 啟用。
+
+> 後續所有「workers=2 / split_threshold=2000」字樣都應理解為 **OOM-safe 下限值**，不是隨意可調的調優旋鈕。
 
 L6.5 V1 在實作層面引入的三條新路徑：
 1. **CGSA `ColumnGroupRegistry`**：把 L1/L2/L3/L4/L6 的輸出依 group 落盤為 `.npy` workdir，L6.5 / L7 改成「逐 group load → transform → free」。
@@ -117,7 +185,13 @@ L6.5 V1 在實作層面引入的三條新路徑：
 **0 個走 fast、0 個走 split、922 個全部走 slow_chunked。**
 這與 [`L65_OPTIMIZATION_SPEC.md`](L65_OPTIMIZATION_SPEC.md) V1 設計**直接相違**：SPEC 規定「small group 應走 ThreadPool full、large group (>split_threshold) 才走 chunked」，本輪 0 個走 full 是**邏輯 bug 而非配置差異**。
 
-每 group 平均 ~12.5s（11,567s ÷ 922），即使不與 V8 比較，這個絕對時間在 8 核 M1 上也明顯**單執行緒序列化**（worker=2 但 slow_chunked 路徑實際是 sequential per group）。
+**結合 §1.1 的 OOM 修正背景，本問題的嚴重程度比看上去更高**：
+- split_threshold 已從 4000 收緊到 **2000**
+- log 顯示「0 big-group splits」 ⇒ 922 個 group **沒有任何一個的 cols ≥ 2000**
+- ⇒ 在正確路由下，**全部 922 個 group 都應該走 fast path**
+- ⇒ 本輪是 **100% 全量誤路由**（不是「部分 fallback」），單 group ~12.5s 是**理論上應該 <1s 的工作被序列化跑**
+
+每 group 平均 ~12.5s（11,567s ÷ 922），即使不與 V8 比較，這個絕對時間在 8 核 M1 上也明顯**單執行緒序列化**（worker=2 但 slow_chunked 路徑實際是 sequential per group，worker 數對它幾乎無加速效果）。
 
 #### 根因
 
@@ -149,15 +223,15 @@ elif not use_fast:
 2. `do_fracdiff` / `do_adf` / `do_gaussian` 被某條 env 預設值打開。
 3. CGSA registry 路徑下 `_build_registry_transform_context` 的 `self.fracdiff_config` 來自不同來源，與 `scan_config.yaml` 的 `enabled: false` 解耦。
 
-#### 解法
+#### 重新研究後的解法
 
-| Priority | Action | 檔案 |
-|----------|--------|------|
-| **P0** | `_transform_registry_parallel` 的 `elif not use_fast` 加 `n_cols > split_threshold` 條件，small group 仍走 ThreadPool full 路徑 | [`feature_preprocessor.py:390`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) |
-| **P0** | 在 `_build_registry_transform_context` log `use_fast` 推導出的真值與來源（do_fracdiff/do_adf/do_gaussian/mode 各自為何）為 INFO | 同上 |
-| **P1** | 修好後**用同一份前端流程**重跑一次，驗證 L6.5 absolute time 進入合理區間（單 group < 1s） | — |
-| **P1** | 提供「混合模式」：winsor/rank/zscore 走 fast、fracdiff/adf/gaussian 走 slow，per-column 而非 per-group | 重構 `_transform_single_group` 內部 |
-| **P2** | slow_chunked path 啟用 joblib loky workers (`get_slowpath_n_jobs()`) 做 group 級平行 | [`feature_preprocessor.py:519`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) |
+| Priority | Action | 檔案 | 驗收 |
+|----------|--------|------|------|
+| **P0-A1** | 修正路由條件：`elif not use_fast` 必須改為 `elif (not use_fast) and n_cols > split_threshold`；否則 small group 在 slow mode 下仍會被全部丟進 sequential slow_chunked | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | 單元測試建立 3 個 group（500/1500/2500 cols）且 `use_fast=False, split_threshold=2000`，預期 2 full + 1 slow_chunked |
+| **P0-A2** | 新增 routing summary log：`use_fast`, `mode`, `do_fracdiff`, `do_adf`, `do_gaussian`, `full_groups`, `split_groups`, `slow_chunked_groups`, `max_group_cols`；避免下次只看到結果、看不到原因 | 同上 | log 必須一行 summary，不可 per-column；本輪案例應清楚顯示為何 `use_fast=False` |
+| **P0-A3** | 加「config truth」保護：若 UI/Service 宣稱 fracdiff/adf/gaussian disabled，但 runtime `use_fast=False`，要在 task metadata 與 log 中輸出 resolved preprocessing config | [`feature_factory_service.py`](../api/services/feature_factory_service.py), [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | 前端手動 run 後可以從 log 看到實際 `mode` 與三個 slow trigger 的值 |
+| **P1-A4** | 將 fast path 條件從單一 `use_fast` 拆成 `can_use_numba_fast` 與 `requires_slow_transform`；winsor/rank/zscore 可 fast，FracDiff/ADF/Gaussian 才 slow，避免 append/config 小變動讓全組降級 | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | 只開 winsor/rank/zscore + replace 時 922 groups 走 fast；開 fracdiff 時只有目標欄 slow，不拖累非目標欄 |
+| **P2-A5** | slow-path joblib 保持預設 OFF；僅在 ≥16GB tier 或 explicit env 下啟用。8GB 不用「加 worker」解問題，因 2026-04-25 已證明這會破 OOM 修正 | [`momentum/core/config.py`](../momentum/core/config.py), [`_slow_path_parallel.py`](../momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py) | 8GB 預設 `FFACT_L65_SLOWPATH_PARALLEL=0` 時不啟 joblib；16GB+ 可另跑 gate |
 
 ---
 
@@ -198,14 +272,15 @@ required_bytes = int(estimated_bytes * 1.5)
 - 目前唯一逃生口是 `FFACT_L7_DISK_SAFETY_FACTOR=0.5`（user memory 已記錄），但這違反「不弱化驗證閘」的開發原則
 - **CGSA workdir `.npy` 同時佔據 ~10–18 GiB**，是 free space 真正的小偷（precheck 卻沒把它算入；它在 L7 結束後才會被釋放）
 
-#### 解法
+#### 重新研究後的解法
 
-| Priority | Action | 檔案 |
-|----------|--------|------|
-| **P0** | `_precheck_l7_disk_space` 改用「實際 dtype × 經驗壓縮係數」：`bytes_per_cell = 2`（float16 預設），`safety_factor = 0.5`（zstd level 1 經驗壓縮率 ~3–5×，乘 1.5 仍遠小於原本 6×）→ 估算降至 ~3.4 GiB，與真實落盤 1.25 GiB 在合理範圍 | [`feature_storage.py:951`](../momentum/FeatureEngineering/feature_storage.py) |
-| **P0** | precheck 把 `data_cache/cgsa_work/` 的 `.npy` 暫存大小算入「**可回收空間**」（L7 寫完該 group 後就 free），而非從 free_bytes 扣除 | 同上 |
-| **P1** | precheck 改成 **per-batch streaming**：每寫完一批就重算 free，而非開頭一次性檢查全部 | `persist_registry_to_parquet` |
-| **P2** | 對 float16 roundtrip fallback 的 part 仍以 4 bytes/cell 估算，其餘走 2 bytes/cell（已記錄哪些 part 觸發 fallback） | 同上 |
+| Priority | Action | 檔案 | 驗收 |
+|----------|--------|------|------|
+| **P0-B1** | 不要只把 `safety_factor` 調低；改成「streaming budget」：`free_bytes + reclaimable_npy_bytes >= estimated_final_output + max_inflight_staging + safety_margin` | [`feature_storage.py`](../momentum/FeatureEngineering/feature_storage.py) | 用 mocked registry 重現 34.40 GiB raw estimate 時，新 pre-check 不再要求 51.60 GiB；但巨大輸出仍會 fail |
+| **P0-B2** | 估算粒度從「全部 group × float32」改為「per batch / per part」：8GB 的 `batch_limit=n_workers`，只需保證當前 batch 的 staging/final 空間 + 最終輸出空間，而不是一次性保證全部 raw float32 | 同上 | 測試 `batch_limit=4` 時 required bytes 只隨 batch peak 變動，不隨全部 groups raw bytes 線性暴增 |
+| **P0-B3** | 把 registry `.npy` 檔案大小納入可回收空間，但只在 `cleanup_intermediate=True` 或目前流程確定每 batch 成功後會 unlink 時啟用 | 同上 | log 顯示 `free`, `reclaimable_npy`, `estimated_output`, `max_inflight`, `required` 五個數字 |
+| **P1-B4** | dtype 估算用「float16 default + float32 fallback allowance」而不是全 float32：可先用 group metadata / column category 做保守 fallback ratio，真正寫入仍保留 `_select_parquet_storage_array` roundtrip gate | 同上 | BTC/高價 symbol fallback parts 不被誤估為全 float16；ETH 常規情境不再 30× 高估 |
+| **P1-B5** | 將 pre-check 失敗訊息改成 actionable：列出最大 group、最大 `.npy` 暫存、可回收空間、建議清理目錄；移除「lower safety factor if accept risk」作為首要建議 | 同上 | `errors_*.log` 可直接判斷是空間真的不足還是估算過度悲觀 |
 
 ---
 
@@ -258,13 +333,14 @@ def _is_fracdiff_target_layer(column, allowed_layers):
 - **observability 嚴重退化**：真正的錯誤被淹沒；errors_20260429.log 看似只有 1 個錯（L7 disk）但 case_search log 早已被 noise 灌爆
 - **違反 SPEC §0.2 Rule**：「禁止：在 per-column inner loop 內 logger.info（per-column WARNING 同樣禁止）」
 
-#### 解法
+#### 重新研究後的解法
 
-| Priority | Action | 檔案 |
-|----------|--------|------|
-| **P0** | `_is_fracdiff_target_layer` 在 fracdiff disabled 時 short-circuit，根本不要呼叫；且 fracdiff enabled 時把 WARNING 改成 DEBUG（這本來就是預期路徑） | [`feature_preprocessor.py:50-62`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) |
-| **P0** | 把 WARNING 聚合為 per-group summary：`f"[L6.5] {gid}: {n_skipped}/{n_cols} cols not L\\d+_ prefixed (fracdiff non-target)"` | 同上 |
-| **P1** | 7-segment 命名約定下，正規式應改成「找 `_L\d+_` 任意位置」或維護一份明確的 layer→column 索引表（已在 `ColumnGroupRegistry` 中存在 `group.layer`，直接用 group metadata 而非解析 column name） | 同上 |
+| Priority | Action | 檔案 | 驗收 |
+|----------|--------|------|------|
+| **P0-C1** | 先確認「為何 fracdiff helper 被呼叫」：本輪宣稱 fracdiff disabled，但只有 `_apply_fractional_differencing()` 會呼叫 `_filter_fracdiff_target_columns()`；因此需要 task log 輸出 resolved `fractional_differencing.enabled/apply_to/apply_to_layers` | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | 下次 run 能判斷是 frontend config 實際開了 fracdiff，還是 service/config 合併有 bug |
+| **P0-C2** | `_is_fracdiff_target_layer()` 不可 per-column WARNING。改為「無法解析 layer → return False + caller 聚合計數」；summary 在 group/run 結束時輸出一次 | 同上 | 280k warning 歸零；最多每 run 1-3 行 `[L6.5] fracdiff layer filter summary` |
+| **P0-C3** | 不再依賴 column name regex 判斷 layer；CGSA registry 已有 `group.layer` metadata，registry path 應優先用 group metadata 過濾 `FFACT_FRACDIFF_APPLY_TO_LAYERS` | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py), [`column_group_registry.py`](../momentum/FeatureEngineering/core/column_group_registry.py) | 7-segment 欄位名不再被誤判；L1/L2 filter 由 group.layer 決定 |
+| **P1-C4** | 非 registry / DataFrame fallback path 才保留 regex；regex 要支援舊 `L1_` 前綴與 7-segment fallback，parse fail 只記 DEBUG | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | legacy tests pass；無 per-column WARNING |
 
 ---
 
@@ -362,39 +438,55 @@ L7 (disk pre-check fail)   < 0.1%  (~3s 即拋錯)
 
 ---
 
-## 7. 修復路線圖（依優先序）
+## 7. 實作 TODO（重新 review 後）
 
-### Phase 1 — 解除 L7 pre-check 阻塞（讓 pipeline 至少能跑完）
+> 執行順序原則：**P0 hard bugs → P1-smoke → P2 效能深化 → P1-full 完整 baseline → P3 回歸防線**。先用短版 P1 smoke 確認任務能完成、log 可觀測、L7 不 false fail，再進 P2；P2 完成後才跑完整 P1 benchmark。**不可用放寬 8GB OOM 修正參數**（workers 2→4、split_threshold 2000→4000）當作修法。
 
-| Task | 預期效果 |
-|------|---------|
-| 1.1 修正 `_precheck_l7_disk_space`：`bytes_per_cell=2` (float16)、`safety_factor` 預設 0.5 | 估算降至 ~3.4 GiB，10.7 GiB free 可通過 |
-| 1.2 把 `cgsa_work/*.npy` 算入「可回收空間」 | 額外緩衝 |
-| 1.3 暫時環境變數 workaround：`FFACT_L7_DISK_SAFETY_FACTOR=0.2` 跑一次驗證 V8 P4.1 仍有效 | 即時可跑 |
+### P0 — 必修，讓任務可完成且可觀測
 
-### Phase 2 — 修正 L6.5 路由 + log noise（恢復 absolute 合理時間）
+| ID | TODO | 檔案 | 驗收方式 |
+|----|------|------|----------|
+| **T0.1** | 修 L6.5 router：`slow_chunked_groups` 只接 `not use_fast and n_cols > split_threshold`；small slow group 放回 full_groups | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | 新增 routing unit test：`use_fast=False, threshold=2000, groups=[500,1500,2500]` → full=2, slow=1；`use_fast=True` 大 group 仍 split |
+| **T0.2** | 新增 L6.5 resolved config summary log，包含 `mode`, enabled flags, `apply_to`, `FFACT_FRACDIFF_APPLY_TO_LAYERS`, `use_fast`, group routing counts | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | 前端 run log 可判斷 `use_fast=False` 的直接原因 |
+| **T0.3** | 修 layer parse warning：per-column WARNING 改成 aggregated summary；registry path 用 `group.layer` 判斷 fracdiff target layer | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | `case_search_api_*.log` 不再出現 280k 行 `Layer parse failed` |
+| **T0.4** | 修 L7 disk pre-check：改 streaming budget + reclaimable `.npy` + max inflight staging；不再全量 float32 × 1.5 | [`feature_storage.py`](../momentum/FeatureEngineering/feature_storage.py) | mocked ETHUSDT case 不再要求 51.6 GiB；仍能擋住真正不足的磁碟 |
+| **T0.5** | L7 pre-check log 改為可診斷格式：`free`, `reclaimable_npy`, `estimated_output`, `max_inflight`, `required`, `largest_group` | [`feature_storage.py`](../momentum/FeatureEngineering/feature_storage.py) | OSError 不再只建議降低 safety factor，而是指出真正瓶頸 |
 
-| Task | 預期效果 |
-|------|---------|
-| 2.1 `elif not use_fast` 加 `n_cols > split_threshold` 條件 | small group 不再 fallback |
-| 2.2 在 `_build_registry_transform_context` log `use_fast` 推導過程 | 可觀測性 |
-| 2.3 修 `_is_fracdiff_target_layer`：disabled 時 short-circuit、改用 group metadata 而非 regex parse | log 從 56MB → 50KB |
+### P1-smoke — P0 後的短版驗證（進 P2 前必跑）
 
-### Phase 3 — 釐清「前端 vs 背景」真實差異
+| ID | TODO | 檔案 / 指令 | 驗收方式 |
+|----|------|-------------|----------|
+| **T1S.1** | P0 後跑 reduced/smoke benchmark（例如 ETHUSDT 1h, max_rows/max_cols 或 single-symbol reduced config），只驗證 hard bug 是否解除 | [`scripts/benchmark_l65.py`](../scripts/benchmark_l65.py) 或 API reduced run | L6.5 routing 不再 `0 full / all slow`；`Layer parse failed` warning 不爆量；L7 pre-check 不 false fail |
+| **T1S.2** | 用同一份前端流程跑一次短版任務，確認 API/WS/task metadata 可看到 resolved config 與 routing summary | frontend/API 手動 run | log 可判斷 `use_fast` 原因；前端任務狀態不被大量 warning 淹沒 |
+| **T1S.3** | smoke parquet 落地檢查 | L7 output dir | 至少有 parquet + manifest；無 OOM、無 disk pre-check false fail；不做完整時間結論 |
 
-| Task | 預期效果 |
-|------|---------|
-| 3.1 同 commit 用背景 script 跑「完整 L6.5 配置」一次，建立**真正可比的本輪 baseline** | 區分「程式碼成本」vs「執行環境成本」 |
-| 3.2 關掉 `npm run dev` + browser，前端流程跑一次 | 隔離「dev server 競爭」 |
-| 3.3 暫時關掉 WebSocket broadcast，前端流程跑一次 | 隔離「WS 序列化成本」 |
+### P2 — 效能深化，只在 P0 + P1-smoke 通過後做
 
-### Phase 4 — slow path 平行化 + CGSA persist 優化（為後續 fracdiff 啟用做準備）
+| ID | TODO | 檔案 | 8GB 策略 |
+|----|------|------|----------|
+| **T2.1** | 拆分 fast/slow transform：winsor/rank/zscore 對非 slow target 欄位永遠走 Numba fast path；FracDiff/ADF/Gaussian 只處理目標欄 | [`feature_preprocessor.py`](../momentum/FeatureEngineering/preprocessing/feature_preprocessor.py) | ✅ 可做，但需 schema/parity gate |
+| **T2.2** | CGSA persist overhead profiling：量測 `save_data`, `overwrite_data`, manifest write 的時間與 bytes，判斷 L1/L4 慢因 | [`column_group_registry.py`](../momentum/FeatureEngineering/core/column_group_registry.py) | ✅ 只加 summary log，不加 per-group noise |
+| **T2.3** | 評估 manifest write batching：L6.5 overwrite 多 group 時可延後 manifest flush，避免 922 次 manifest rewrite | [`column_group_registry.py`](../momentum/FeatureEngineering/core/column_group_registry.py) | ✅ 需保 resume safety；crash 後最多重算當前 phase |
+| **T2.4** | slow-path joblib / mixed mode gate | [`_slow_path_parallel.py`](../momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py), [`momentum/core/config.py`](../momentum/core/config.py) | ❌ 8GB 預設 OFF；≥16GB 才考慮 ON |
 
-| Task | 預期效果 |
-|------|---------|
-| 4.1 slow_chunked 路徑改用 joblib loky workers | slow path 4× 加速 |
-| 4.2 「混合模式」：winsor/rank/zscore 走 fast、fracdiff/adf 只對 target column 走 slow | fracdiff 開啟僅退化 10–20% |
-| 4.3 CGSA workdir `.npy` 寫入是否需要 fsync？關閉可大幅提速 | -50–100s |
+### P1-full — P2 完成後的完整 baseline（正式判定用）
+
+| ID | TODO | 檔案 / 指令 | 驗收方式 |
+|----|------|-------------|----------|
+| **T1F.1** | 建立「同 commit、同完整 L6.5 config、背景 script」benchmark，隔離 frontend vs engine 成本 | [`scripts/benchmark_l65.py`](../scripts/benchmark_l65.py) 或新增參數 | 產出 wall time、per-layer time、peak RSS、L6.5 routing counts |
+| **T1F.2** | 建立「前端流程但關閉 browser/npm dev 競爭」runbook | 本文件 / docs | 可重跑，並和 T1F.1 對照 |
+| **T1F.3** | 重跑 ETHUSDT 1h+12h 8GB 完整任務：確認 L6.5 routing 不再 `0 full / 922 slow`，L7 能完成 parquet persist | API/frontend 手動 run | 產生 parquet + manifest，無 OOM、無 disk pre-check false fail |
+| **T1F.4** | 比對 output schema / feature count / dtype summary / parquet size | 既有 comparison scripts 或新增小工具 | 不得刪特徵；float16 roundtrip gate 保留；L7 size 不爆增 |
+| **T1F.5** | 產出正式 comparison 更新：只用同 config + 同 execution path 的數字做百分比比較 | 本文件 | 不再拿 V8 background 簡化 L6.5 與 frontend 完整 L6.5 硬比 |
+
+### P3 — 回歸防線
+
+| ID | TODO | 驗收方式 |
+|----|------|----------|
+| **T3.1** | 加 `grep` / pytest gate：L6.5 log 不得出現大量 `Layer parse failed` WARNING | 測試 log capture，warning count <= 1 summary |
+| **T3.2** | 加 routing regression test：8GB `workers=2/split_threshold=2000` 不可被改回 4/4000 | unit test + hardware_utils assertion |
+| **T3.3** | 加 L7 pre-check regression test：同樣 raw shape 下估算不得超過合理上限（例如 V8 final output × 5 + inflight） | mocked disk_usage + mocked registry |
+| **T3.4** | 文件更新：若再次比較 V8 / L6.5 V1，必須標明 config scope 與 execution path | 本文件保留 §0 可比性聲明 |
 
 ---
 
@@ -424,13 +516,15 @@ V8 留下兩條教訓（[V8_initial_vs_V8_final_Comparison.md §5](V8_initial_vs
 ## 10. 結論（修正版）
 
 1. **L6.5 11,567s 不能解讀為「對 V8 23× 回歸」**——V8 的 494s 是簡化配置，且本輪是前端流程（多了 middleware/WS/dev server 競爭）。但 11,567s 在**絕對標準下仍不可接受**，主因是問題 A（slow_chunked 全量回退）。
-2. **L7 pre-check 失敗是 hard bug**，與配置/執行方式無關，**必修**。
-3. **280k WARNING log 是 hard bug**，違反 SPEC §0.2，**必修**，且很可能是「前端執行特別慢」的部分嫌疑之一。
-4. **「前端 vs 背景」的真實差異**目前**無法單從這份 log 證實**，必須跑 Phase 3 對照實驗才能下結論。
-5. 修完 Phase 1+2 後，**請務必再跑一次背景 script + 完整 L6.5 配置**作為「真正可比的 V1 baseline」，**不要直接拿前端執行去和 V8 背景執行做百分比換算**。
+2. **問題 A 的嚴重程度因 2026-04-25 OOM 修正而被放大**：split_threshold 已從 4000 收緊到 2000，log 顯示 0 big-group splits ⇒ 922 個 group 全部 < 2000 cols，**全都應該走 fast path**，本輪是 **100% 全量誤路由**而非局部退化。
+3. **L7 pre-check 失敗是 hard bug**，與配置/執行方式無關，**必修**。
+4. **280k WARNING log 是 hard bug**，違反 SPEC §0.2，**必修**，且很可能是「前端執行特別慢」的部分嫌疑之一。
+5. **「前端 vs 背景」的真實差異**目前**無法單從這份 log 證實**，必須跑 P1-full 對照實驗才能下結論。
+6. **修問題 A 不可走「鬆綁 OOM 修正參數」的捷徑**——worker=2 / split_threshold=2000 是 8GB tier 的 OOM-safe 下限，必須維持；正確修法是讓 fast path 真的被走到。
+7. 修完 P0 後先跑 P1-smoke；P2 完成後，**請務必再跑 P1-full（背景 script + 完整 L6.5 配置 + 前端流程對照）**作為「真正可比的 V1 baseline」，**不要直接拿前端執行去和 V8 背景執行做百分比換算**。
 
 ---
 
-> **報告版本**: V2（修正可比性說明）
-> **產生時間**: 2026-04-29
+> **報告版本**: V5（P0/P2 實作 + P1-full 實測結果）
+> **產生時間**: 2026-05-05
 > **Reference**: [V8_initial_vs_V8_final_Comparison.md](V8_initial_vs_V8_final_Comparison.md)

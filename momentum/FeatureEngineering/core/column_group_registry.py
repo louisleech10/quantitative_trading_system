@@ -7,10 +7,12 @@ import re
 import shutil
 import tempfile
 import threading
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -93,6 +95,19 @@ class ColumnGroupRegistry:
         self._memory_buffer_limit = max(0, int(memory_buffer_groups))
         self._buffer_lock = threading.Lock()
         self._manifest_lock = threading.Lock()
+        self._manifest_defer_depth = 0
+        self._manifest_dirty = False
+        self._io_stats: Dict[str, float] = {
+            "persist_count": 0.0,
+            "persist_bytes": 0.0,
+            "persist_seconds": 0.0,
+            "overwrite_count": 0.0,
+            "overwrite_bytes": 0.0,
+            "overwrite_seconds": 0.0,
+            "manifest_write_count": 0.0,
+            "manifest_write_seconds": 0.0,
+            "manifest_deferred_count": 0.0,
+        }
 
     @property
     def work_dir(self) -> Path:
@@ -193,6 +208,44 @@ class ColumnGroupRegistry:
         writes the manifest internally.
         """
         self._write_manifest_thread_safe()
+
+    @contextmanager
+    def defer_manifest_writes(self, reason: str = "") -> Iterator[None]:
+        """Batch manifest writes until the protected mutation block exits."""
+        with self._manifest_lock:
+            self._manifest_defer_depth += 1
+
+        started_at = time.perf_counter()
+        try:
+            yield
+        finally:
+            should_flush = False
+            deferred_count = 0.0
+            with self._manifest_lock:
+                self._manifest_defer_depth = max(0, self._manifest_defer_depth - 1)
+                if self._manifest_defer_depth == 0 and self._manifest_dirty:
+                    self._manifest_dirty = False
+                    should_flush = True
+                    deferred_count = self._io_stats.get("manifest_deferred_count", 0.0)
+
+            if should_flush:
+                self._write_manifest_thread_safe()
+                elapsed = time.perf_counter() - started_at
+                logger.info(
+                    "[registry] Deferred manifest writes flushed: reason=%s deferred=%.0f elapsed=%.2fs",
+                    reason or "unspecified",
+                    deferred_count,
+                    elapsed,
+                )
+
+    def io_stats(self) -> Dict[str, float]:
+        """Return cumulative registry I/O counters for coarse performance diagnostics."""
+        return dict(self._io_stats)
+
+    def reset_io_stats(self) -> None:
+        """Reset cumulative registry I/O counters."""
+        for key in self._io_stats:
+            self._io_stats[key] = 0.0
 
     def iter_all(self) -> Iterable[tuple[str, ColumnGroup]]:
         """Iterate all groups in deterministic group_id order."""
@@ -304,9 +357,14 @@ class ColumnGroupRegistry:
 
         try:
             target_path.parent.mkdir(parents=True, exist_ok=True)
+            started_at = time.perf_counter()
             with temp_path.open("wb") as handle:
                 np.save(handle, data_fp32, allow_pickle=False)
             os.replace(temp_path, target_path)
+            elapsed = time.perf_counter() - started_at
+            self._io_stats["overwrite_count"] += 1.0
+            self._io_stats["overwrite_bytes"] += float(data_fp32.nbytes)
+            self._io_stats["overwrite_seconds"] += elapsed
         except MemoryError as exc:
             if temp_path.exists():
                 temp_path.unlink()
@@ -613,7 +671,12 @@ class ColumnGroupRegistry:
 
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
+            started_at = time.perf_counter()
             np.save(path, data_fp32, allow_pickle=False)
+            elapsed = time.perf_counter() - started_at
+            self._io_stats["persist_count"] += 1.0
+            self._io_stats["persist_bytes"] += float(expected_bytes)
+            self._io_stats["persist_seconds"] += elapsed
         except MemoryError as exc:
             raise ColumnGroupRegistryError(
                 f"OOM while {action} group {group_id} to {path}",
@@ -646,7 +709,15 @@ class ColumnGroupRegistry:
         """Serialize manifest writes to avoid parallel temp-file races."""
 
         with self._manifest_lock:
+            if self._manifest_defer_depth > 0:
+                self._manifest_dirty = True
+                self._io_stats["manifest_deferred_count"] += 1.0
+                return
+            started_at = time.perf_counter()
             self._write_manifest()
+            elapsed = time.perf_counter() - started_at
+            self._io_stats["manifest_write_count"] += 1.0
+            self._io_stats["manifest_write_seconds"] += elapsed
 
     def _flush_buffer(self) -> None:
         """Flush buffered group arrays to disk and refresh manifest once."""

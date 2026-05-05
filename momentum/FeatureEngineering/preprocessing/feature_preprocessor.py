@@ -54,10 +54,6 @@ def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bo
 
     match = _FRACDIFF_LAYER_RE.match(str(column))
     if not match:
-        logger.warning(
-            "[L6.5] Layer parse failed col=%s, treat as non-target",
-            column,
-        )
         return False
     return match.group(1) in allowed_layers
 
@@ -148,16 +144,47 @@ class FeaturePreprocessor:
 
         worker_count = max(1, int(n_workers))
         transform_context = self._build_registry_transform_context()
-
-        if worker_count <= 1:
-            return self._transform_registry_serial(registry, groups, transform_context)
-
-        return self._transform_registry_parallel(
-            registry,
-            groups,
-            transform_context,
+        logger.info(
+            "[L6.5] Registry transform config: groups=%d workers=%d mode=%s "
+            "use_fast=%s can_use_numba_fast=%s winsor=%s rank=%s zscore=%s "
+            "fracdiff=%s fracdiff_apply_to=%s fracdiff_layers=%s adf=%s gaussian=%s",
+            len(groups),
             worker_count,
+            self.mode,
+            bool(transform_context.get("use_fast", False)),
+            bool(transform_context.get("can_use_numba_fast", False)),
+            bool(transform_context.get("do_winsorize", False)),
+            bool(transform_context.get("do_rank", False)),
+            bool(transform_context.get("do_zscore", False)),
+            bool(transform_context.get("do_fracdiff", False)),
+            self.fracdiff_config.get("apply_to", "non_stationary"),
+            sorted(self._fracdiff_apply_to_layers),
+            bool(transform_context.get("do_adf", False)),
+            bool(transform_context.get("do_gaussian", False)),
         )
+
+        io_stats_before = self._registry_io_stats(registry)
+
+        def _execute() -> int:
+            if worker_count <= 1:
+                return self._transform_registry_serial(registry, groups, transform_context)
+
+            return self._transform_registry_parallel(
+                registry,
+                groups,
+                transform_context,
+                worker_count,
+            )
+
+        defer_manifest = getattr(registry, "defer_manifest_writes", None)
+        if callable(defer_manifest):
+            with defer_manifest("l65_transform"):
+                completed = _execute()
+        else:
+            completed = _execute()
+
+        self._log_registry_io_summary(registry, io_stats_before)
+        return completed
 
     def _build_registry_transform_context(self) -> Dict[str, object]:
         """Resolve immutable per-run settings for registry-based L6.5 transforms."""
@@ -169,18 +196,21 @@ class FeaturePreprocessor:
         do_adf = self.adf_config.get("enabled", False)
         do_gaussian = self.gaussian_config.get("enabled", False)
 
-        use_fast = (
-            not do_fracdiff
-            and not do_adf
-            and not do_gaussian
-            and self.mode == "replace"
-        )
+        can_use_numba_fast = self.mode == "replace"
+        use_fast = can_use_numba_fast and not do_fracdiff and not do_adf and not do_gaussian
 
         transform_context: Dict[str, object] = {
             "use_fast": use_fast,
+            "can_use_numba_fast": can_use_numba_fast,
+            "do_winsorize": do_winsorize,
+            "do_rank": do_rank,
+            "do_zscore": do_zscore,
+            "do_fracdiff": do_fracdiff,
+            "do_adf": do_adf,
+            "do_gaussian": do_gaussian,
         }
 
-        if use_fast:
+        if can_use_numba_fast:
             self._warmup_numba_if_needed()
 
             from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
@@ -240,6 +270,72 @@ class FeaturePreprocessor:
 
         return 0
 
+    @staticmethod
+    def _registry_io_stats(registry: "ColumnGroupRegistry") -> Dict[str, float]:
+        stats = getattr(registry, "io_stats", None)
+        if callable(stats):
+            return stats()
+        return {}
+
+    @staticmethod
+    def _log_registry_io_summary(
+        registry: "ColumnGroupRegistry",
+        before: Dict[str, float],
+    ) -> None:
+        stats = getattr(registry, "io_stats", None)
+        if not callable(stats):
+            return
+        after = stats()
+
+        def delta(key: str) -> float:
+            return float(after.get(key, 0.0)) - float(before.get(key, 0.0))
+
+        overwrite_count = delta("overwrite_count")
+        persist_count = delta("persist_count")
+        manifest_writes = delta("manifest_write_count")
+        manifest_deferred = delta("manifest_deferred_count")
+        if overwrite_count <= 0 and persist_count <= 0 and manifest_writes <= 0:
+            return
+
+        logger.info(
+            "[L6.5] Registry I/O summary: overwrites=%.0f overwrite_mb=%.2f overwrite_sec=%.2f "
+            "persists=%.0f persist_mb=%.2f persist_sec=%.2f manifest_writes=%.0f "
+            "manifest_deferred=%.0f manifest_sec=%.2f",
+            overwrite_count,
+            delta("overwrite_bytes") / (1024 ** 2),
+            delta("overwrite_seconds"),
+            persist_count,
+            delta("persist_bytes") / (1024 ** 2),
+            delta("persist_seconds"),
+            manifest_writes,
+            manifest_deferred,
+            delta("manifest_write_seconds"),
+        )
+
+    def _group_requires_slow_transform(
+        self,
+        group: object,
+        transform_context: Dict[str, object],
+    ) -> bool:
+        if self.mode != "replace":
+            return True
+        if bool(transform_context.get("do_adf", False)):
+            return True
+        if bool(transform_context.get("do_gaussian", False)):
+            return True
+        if not bool(transform_context.get("do_fracdiff", False)):
+            return False
+
+        if "ALL" in self._fracdiff_apply_to_layers:
+            return True
+
+        source_layer = self._group_layer_name(group)
+        if source_layer:
+            return source_layer in self._fracdiff_apply_to_layers
+
+        columns = list(getattr(group, "columns", []))
+        return bool(self._filter_fracdiff_target_columns(columns))
+
     def _transform_registry_serial(
         self,
         registry: "ColumnGroupRegistry",
@@ -254,6 +350,7 @@ class FeaturePreprocessor:
         started_at = time.perf_counter()
 
         use_fast = bool(transform_context.get("use_fast", False))
+        can_use_numba_fast = bool(transform_context.get("can_use_numba_fast", use_fast))
         split_threshold = get_l65_split_threshold()
 
         # ── Sub-step progress logging ────────────────────────────────────
@@ -274,12 +371,14 @@ class FeaturePreprocessor:
             try:
                 # Route oversized slow-path groups through chunked processing
                 # to cap peak memory (avoids 3-4× full_array copies for 1.8 GB groups).
-                if not use_fast and split_threshold > 0 and n_cols > split_threshold:
+                requires_slow = self._group_requires_slow_transform(group, transform_context)
+                slow_route_candidate = requires_slow or not can_use_numba_fast
+                if slow_route_candidate and split_threshold > 0 and n_cols > split_threshold:
                     self._transform_single_group_chunked(registry, group, chunk_size=split_threshold)
                     last_group_label = f"{gid} (slow-chunked)"
                 else:
                     self._transform_single_group(registry, group, transform_context)
-                    last_group_label = gid
+                    last_group_label = f"{gid} ({'slow' if slow_route_candidate else 'fast'})"
                 completed += 1
             except Exception as error:
                 failed += 1
@@ -350,8 +449,13 @@ class FeaturePreprocessor:
         from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
 
         split_threshold = get_l65_split_threshold()
-        use_fast = bool(transform_context.get("use_fast", False))
-        can_split = use_fast and split_threshold > 0
+        can_use_numba_fast = bool(
+            transform_context.get(
+                "can_use_numba_fast",
+                bool(transform_context.get("use_fast", False)),
+            )
+        )
+        can_split = can_use_numba_fast and split_threshold > 0
 
         ordered_groups = sorted(
             groups,
@@ -366,10 +470,16 @@ class FeaturePreprocessor:
         full_groups: List[object] = []
         split_meta: Dict[str, Dict[str, object]] = {}
         slow_chunked_groups: List[object] = []
+        slow_full_count = 0
+        fast_full_count = 0
+        max_group_cols = 0
 
         for group in ordered_groups:
             n_cols = self._group_n_columns(group)
-            if can_split and n_cols > split_threshold:
+            max_group_cols = max(max_group_cols, n_cols)
+            requires_slow = self._group_requires_slow_transform(group, transform_context)
+            slow_route_candidate = requires_slow or not can_use_numba_fast
+            if (not requires_slow) and can_split and n_cols > split_threshold:
                 # Balance slice widths: ceil(n_cols / n_splits) ensures a final
                 # slice no larger than the others (avoids straggler).
                 n_splits = (n_cols + split_threshold - 1) // split_threshold
@@ -387,7 +497,7 @@ class FeaturePreprocessor:
                     "results": {},
                     "completed_slices": 0,
                 }
-            elif not use_fast:
+            elif slow_route_candidate and split_threshold > 0 and n_cols > split_threshold:
                 # Slow path (FracDiff/ADF/Gaussian) with a large group: process in
                 # column chunks sequentially to cap peak memory at ~full_array + chunk_copies
                 # instead of full_array × 3–4 copies (which OOM-kills on 8 GB systems).
@@ -396,6 +506,10 @@ class FeaturePreprocessor:
                 slow_chunked_groups.append(group)
             else:
                 full_groups.append(group)
+                if slow_route_candidate:
+                    slow_full_count += 1
+                else:
+                    fast_full_count += 1
 
         completed = 0
         failed = 0
@@ -420,14 +534,18 @@ class FeaturePreprocessor:
         last_group_label = "<none>"
 
         logger.info(
-            "[L6.5] Parallel start: %d full groups + %d big-group splits → %d sub-tasks "
-            "(workers=%d, split_threshold=%d, slow_chunked=%d)",
+            "[L6.5] Parallel start: %d full groups (fast=%d, slow=%d) + "
+            "%d big-group splits → %d sub-tasks "
+            "(workers=%d, split_threshold=%d, slow_chunked=%d, max_group_cols=%d)",
             len(full_groups),
+            fast_full_count,
+            slow_full_count,
             len(split_meta),
             total_tasks,
             n_workers,
             split_threshold,
             len(slow_chunked_groups),
+            max_group_cols,
         )
 
         # Submit task type tagging: ("full", group, None) or ("slice", group, (s, e)).
@@ -655,7 +773,10 @@ class FeaturePreprocessor:
                 chunk_view = full_array[:, chunk_start:chunk_end]
                 chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
 
-                processed_df = self._transform_single(chunk_df)
+                processed_df = self._transform_single(
+                    chunk_df,
+                    source_layer=self._group_layer_name(group),
+                )
 
                 orig_chunks.append(
                     processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False)
@@ -759,9 +880,10 @@ class FeaturePreprocessor:
 
         group_id = getattr(group, "group_id")
         group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
-        use_fast = bool(transform_context.get("use_fast", False))
+        use_fast = bool(transform_context.get("can_use_numba_fast", transform_context.get("use_fast", False)))
+        requires_slow = self._group_requires_slow_transform(group, transform_context)
 
-        if use_fast:
+        if use_fast and not requires_slow:
             transform_array_fast = transform_context["transform_array_fast"]
             processed_array = transform_array_fast(
                 group_array,
@@ -779,7 +901,10 @@ class FeaturePreprocessor:
 
         is_append = self.mode == "append"
         group_df = pd.DataFrame(group_array, columns=list(getattr(group, "columns")), copy=False)
-        processed_df = self._transform_single(group_df)
+        processed_df = self._transform_single(
+            group_df,
+            source_layer=self._group_layer_name(group),
+        )
 
         if is_append and len(processed_df.columns) > getattr(group, "n_cols"):
             orig_cols = list(getattr(group, "columns"))
@@ -810,7 +935,19 @@ class FeaturePreprocessor:
         processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
         registry.overwrite_data(group_id, processed_array)
 
-    def _transform_single(self, features_df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _group_layer_name(group: object) -> Optional[str]:
+        layer = getattr(group, "layer", None)
+        value = getattr(layer, "value", layer)
+        if value is None:
+            return None
+        return str(value)
+
+    def _transform_single(
+        self,
+        features_df: pd.DataFrame,
+        source_layer: Optional[str] = None,
+    ) -> pd.DataFrame:
         """Original transform logic applied to a full DataFrame."""
         transformed = features_df.copy()
         self._fracdiff_processed_columns = set()
@@ -818,7 +955,10 @@ class FeaturePreprocessor:
         transformed = self._apply_winsorization(transformed)
 
         if self.fracdiff_config.get("enabled", False):
-            transformed = self._apply_fractional_differencing(transformed)
+            transformed = self._apply_fractional_differencing(
+                transformed,
+                source_layer=source_layer,
+            )
 
         if self.adf_config.get("enabled", False):
             transformed = self._apply_adf_differencing(transformed)
@@ -1031,12 +1171,50 @@ class FeaturePreprocessor:
     def _resolve_fracdiff_precision(self) -> float:
         return get_fracdiff_precision(self.fracdiff_config.get("precision", 0.02))
 
-    def _filter_fracdiff_target_columns(self, columns: List[str]) -> List[str]:
-        return [
-            column
-            for column in columns
-            if _is_fracdiff_target_layer(column, self._fracdiff_apply_to_layers)
-        ]
+    def _filter_fracdiff_target_columns(
+        self,
+        columns: List[str],
+        source_layer: Optional[str] = None,
+    ) -> List[str]:
+        if "ALL" in self._fracdiff_apply_to_layers:
+            return list(columns)
+
+        if source_layer:
+            if source_layer in self._fracdiff_apply_to_layers:
+                return list(columns)
+            logger.info(
+                "[L6.5] FracDiff skipped by registry layer: layer=%s allowed=%s columns=%d",
+                source_layer,
+                sorted(self._fracdiff_apply_to_layers),
+                len(columns),
+            )
+            return []
+
+        target_columns: List[str] = []
+        parse_failed = 0
+        parse_failed_examples: List[str] = []
+        for column in columns:
+            column_text = str(column)
+            match = _FRACDIFF_LAYER_RE.match(column_text)
+            if match is None:
+                parse_failed += 1
+                if len(parse_failed_examples) < 5:
+                    parse_failed_examples.append(column_text)
+                continue
+            if match.group(1) in self._fracdiff_apply_to_layers:
+                target_columns.append(column)
+
+        if parse_failed:
+            logger.warning(
+                "[L6.5] Layer parse failed for FracDiff filter: unparsed_columns=%d/%d "
+                "allowed=%s examples=%s; treating unparsed columns as non-target",
+                parse_failed,
+                len(columns),
+                sorted(self._fracdiff_apply_to_layers),
+                parse_failed_examples,
+            )
+
+        return target_columns
 
     @staticmethod
     def _d_star_cache_dir() -> Path:
@@ -1214,7 +1392,11 @@ class FeaturePreprocessor:
         )
         return result
 
-    def _apply_fractional_differencing(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _apply_fractional_differencing(
+        self,
+        df: pd.DataFrame,
+        source_layer: Optional[str] = None,
+    ) -> pd.DataFrame:
         if not HAS_STATSMODELS:
             logger.warning("Fractional differencing skipped: statsmodels unavailable")
             return df
@@ -1225,14 +1407,20 @@ class FeaturePreprocessor:
             numeric_columns = [
                 column for column in df.columns if pd.api.types.is_numeric_dtype(df[column])
             ]
-            target_columns = self._filter_fracdiff_target_columns(numeric_columns)
+            target_columns = self._filter_fracdiff_target_columns(
+                numeric_columns,
+                source_layer=source_layer,
+            )
             if not target_columns:
                 return df
             selection_df = df.loc[:, target_columns]
 
         columns = self._select_columns(selection_df, apply_to)
         if apply_to != "non_stationary" and columns:
-            columns = self._filter_fracdiff_target_columns(columns)
+            columns = self._filter_fracdiff_target_columns(
+                columns,
+                source_layer=source_layer,
+            )
         if not columns:
             return df
 

@@ -13,11 +13,16 @@ from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fe
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
 
-def _build_group(group_id: str, n_rows: int, n_cols: int) -> ColumnGroup:
+def _build_group(
+    group_id: str,
+    n_rows: int,
+    n_cols: int,
+    layer: LayerSource = LayerSource.L2,
+) -> ColumnGroup:
     columns = tuple(f"{group_id}_col_{index}" for index in range(n_cols))
     return ColumnGroup(
         group_id=group_id,
-        layer=LayerSource.L2,
+        layer=layer,
         timeframe="1h",
         data_source="close",
         indicator="mock",
@@ -39,6 +44,14 @@ def _make_registry_with_registered_groups(work_dir: Path, widths: list[int]) -> 
     registry = ColumnGroupRegistry(work_dir=work_dir)
     for index, width in enumerate(widths, start=1):
         registry.register(_build_group(f"group_{index}", 16, width))
+    return registry
+
+
+def _make_registry_with_layers(work_dir: Path, specs: list[tuple[int, LayerSource]]) -> ColumnGroupRegistry:
+    registry = ColumnGroupRegistry(work_dir=work_dir)
+    for index, (width, layer) in enumerate(specs, start=1):
+        data = np.ones((8, width), dtype=np.float32)
+        registry.save_data(_build_group(f"group_{index}", 8, width, layer=layer), data)
     return registry
 
 
@@ -72,6 +85,7 @@ def feature_factory() -> FeatureFactory:
     factory._validator = Mock()
     factory._current_symbol = None
     factory._current_timeframe = None
+    factory._current_config_hash = None
     factory._current_raw_data = None
     factory._reference_data_cache = {}
     factory._cgsa_registry = None
@@ -121,13 +135,193 @@ def test_parallel_transform_all_groups_complete(tmp_path: Path, l65_config: dict
     assert completed == 4
 
 
+def test_parallel_slow_path_chunks_only_large_groups(
+    tmp_path: Path,
+    l65_config: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """測試 slow path routing：只有超過 threshold 的 group 才走 chunked。"""
+    registry = _make_registry_with_registered_groups(tmp_path / "slow_route", [2, 5])
+    preprocessor = FeaturePreprocessor(l65_config)
+    full_groups: list[str] = []
+    chunked_groups: list[str] = []
+
+    class _ImmediateFuture:
+        def __init__(self, group_id: str) -> None:
+            self._group_id = group_id
+
+        def result(self) -> None:
+            return None
+
+    class _Executor:
+        def __init__(self, max_workers: int) -> None:
+            self.max_workers = max_workers
+
+        def __enter__(self) -> "_Executor":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def submit(self, func, registry, group, context):
+            full_groups.append(group.group_id)
+            return _ImmediateFuture(group.group_id)
+
+    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
+    monkeypatch.setattr(
+        "momentum.FeatureEngineering.utils.hardware_utils.get_l65_split_threshold",
+        lambda: 3,
+    )
+    monkeypatch.setattr(feature_preprocessor_module, "ThreadPoolExecutor", _Executor)
+    monkeypatch.setattr(feature_preprocessor_module, "as_completed", lambda futures: list(futures))
+    monkeypatch.setattr(preprocessor, "_transform_single_group", lambda registry, group, context: None)
+
+    def fake_chunked(registry: ColumnGroupRegistry, group: ColumnGroup, chunk_size: int) -> None:
+        chunked_groups.append(group.group_id)
+
+    monkeypatch.setattr(preprocessor, "_transform_single_group_chunked", fake_chunked)
+
+    completed = preprocessor.transform_registry_groups(registry, n_workers=2)
+
+    assert completed == 2
+    assert full_groups == ["group_1"]
+    assert chunked_groups == ["group_2"]
+
+
+def test_fracdiff_layer_parse_warning_is_aggregated(
+    l65_config: dict,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """測試 FracDiff layer parse warning：不可 per-column 洗版。"""
+    config = dict(l65_config)
+    config["fractional_differencing"] = {"enabled": True}
+    preprocessor = FeaturePreprocessor(config)
+    preprocessor._fracdiff_apply_to_layers = frozenset({"L1"})
+
+    with caplog.at_level("WARNING"):
+        selected = preprocessor._filter_fracdiff_target_columns(
+            ["close_1h_trend_EMA_5", "volume_1h_volume_OBV", "L1_valid_feature"]
+        )
+
+    warning_messages = [record.getMessage() for record in caplog.records]
+    parse_warnings = [message for message in warning_messages if "Layer parse failed" in message]
+
+    assert selected == ["L1_valid_feature"]
+    assert len(parse_warnings) == 1
+    assert "unparsed_columns=2/3" in parse_warnings[0]
+
+
+def test_fracdiff_registry_layer_filter_uses_group_metadata(l65_config: dict) -> None:
+    """測試 registry layer metadata 可直接決定 FracDiff 目標層。"""
+    config = dict(l65_config)
+    config["fractional_differencing"] = {"enabled": True}
+    preprocessor = FeaturePreprocessor(config)
+    preprocessor._fracdiff_apply_to_layers = frozenset({"L1", "L2"})
+
+    assert preprocessor._filter_fracdiff_target_columns(
+        ["unparseable_a", "unparseable_b"],
+        source_layer="L2",
+    ) == ["unparseable_a", "unparseable_b"]
+    assert preprocessor._filter_fracdiff_target_columns(
+        ["unparseable_a", "unparseable_b"],
+        source_layer="L3",
+    ) == []
+
+
+def test_fracdiff_non_target_registry_group_stays_on_fast_path(
+    tmp_path: Path,
+    l65_config: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """測試 P2 mixed routing：FracDiff 非 target layer 仍可走 Numba fast path。"""
+    registry = _make_registry_with_layers(
+        tmp_path / "mixed_fast_slow",
+        [(2, LayerSource.L1), (2, LayerSource.L3)],
+    )
+    preprocessor = FeaturePreprocessor(l65_config)
+    preprocessor._fracdiff_apply_to_layers = frozenset({"L1"})
+    fast_calls: list[tuple[int, int]] = []
+    slow_layers: list[str] = []
+
+    def fake_fast(array: np.ndarray, **kwargs) -> np.ndarray:
+        del kwargs
+        fast_calls.append(tuple(array.shape))
+        return np.asarray(array, dtype=np.float32)
+
+    monkeypatch.setattr(
+        preprocessor,
+        "_build_registry_transform_context",
+        lambda: {
+            "use_fast": False,
+            "can_use_numba_fast": True,
+            "transform_array_fast": fake_fast,
+            "do_winsorize": False,
+            "do_rank": False,
+            "do_zscore": False,
+            "do_fracdiff": True,
+            "do_adf": False,
+            "do_gaussian": False,
+        },
+    )
+    monkeypatch.setattr(
+        "momentum.FeatureEngineering.utils.hardware_utils.get_l65_split_threshold",
+        lambda: 2000,
+    )
+
+    def fake_slow(frame: pd.DataFrame, source_layer=None) -> pd.DataFrame:
+        slow_layers.append(str(source_layer))
+        return frame
+
+    monkeypatch.setattr(preprocessor, "_transform_single", fake_slow)
+
+    completed = preprocessor.transform_registry_groups(registry, n_workers=2)
+
+    assert completed == 2
+    assert fast_calls == [(8, 2)]
+    assert slow_layers == ["L1"]
+
+
+def test_l65_transform_defers_manifest_rewrites(
+    tmp_path: Path,
+    l65_config: dict,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """測試 P2 manifest batching：L6.5 多 group overwrite 只 flush manifest 一次。"""
+    registry = _make_registry_with_registered_groups(tmp_path / "defer_manifest", [2, 3, 4])
+    preprocessor = FeaturePreprocessor(l65_config)
+    manifest_writes: list[str] = []
+
+    monkeypatch.setattr(preprocessor, "_build_registry_transform_context", lambda: {"use_fast": False})
+    monkeypatch.setattr(registry, "_write_manifest", lambda: manifest_writes.append("write"))
+
+    def fake_transform(registry: ColumnGroupRegistry, group: ColumnGroup, context: dict) -> None:
+        del context
+        registry.overwrite_data(
+            group.group_id,
+            np.ones((group.n_rows, group.n_cols), dtype=np.float32),
+        )
+
+    monkeypatch.setattr(preprocessor, "_transform_single_group", fake_transform)
+
+    completed = preprocessor.transform_registry_groups(registry, n_workers=1)
+
+    assert completed == 3
+    assert manifest_writes == ["write"]
+    stats = registry.io_stats()
+    assert stats["manifest_deferred_count"] == 3.0
+    assert stats["manifest_write_count"] == 1.0
+
+
 def test_tier_auto_selects_workers(
     feature_factory: FeatureFactory,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """測試 Layer 6.5 呼叫端：8GB tier 應自動選擇 4 workers。"""
     captured: dict[str, int] = {}
-    feature_factory._cgsa_registry = Mock(finalize=Mock())
+    feature_factory._cgsa_registry = Mock(
+        finalize=Mock(),
+        all_column_names=Mock(return_value=[]),
+    )
     config = SimpleNamespace(preprocessing=SimpleNamespace(model_dump=lambda: {}))
 
     monkeypatch.delenv("FFACT_L65_WORKERS", raising=False)

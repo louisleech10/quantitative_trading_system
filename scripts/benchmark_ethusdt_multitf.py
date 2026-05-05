@@ -255,9 +255,6 @@ def run_checks(
     baseline_dir: Optional[Path],
 ) -> Tuple[List[str], List[str], Dict[str, Any]]:
     """執行 C1~C6 驗證。回傳 (passed, failed, detail_dict)。"""
-    import pandas as pd  # noqa: F811
-    import numpy as np  # noqa: F811
-
     passed: List[str] = []
     failed: List[str] = []
     details: Dict[str, Any] = {}
@@ -273,7 +270,7 @@ def run_checks(
                 new_overall = _sha256_df(features_df)
                 baseline_overall = baseline_checksums.get("overall_dataframe_sha256", "")
                 if new_overall == baseline_overall:
-                    passed.append(f"✅ C1: overall_checksum 與 baseline 完全一致")
+                    passed.append("✅ C1: overall_checksum 與 baseline 完全一致")
                 else:
                     # 逐欄比對找出差異
                     baseline_cols = baseline_checksums.get("column_sha256", {})
@@ -293,7 +290,7 @@ def run_checks(
         details["c1_overall_checksum"] = new_overall
         passed.append(f"⚠️  C1: 無 baseline，本次為首次執行（checksum={new_overall[:12]}...）")
     else:
-        passed.append("⚠️  C1: CGSA 模式 features_df 為空，跳過 C1（使用 CGSA readback 驗證）")
+        passed.append("⚠️  C1: CGSA 模式 features_df 為空，跳過 C1（未 materialize full DataFrame）")
 
     # ── C2: Feature count 合理性
     if baseline_manifest:
@@ -312,7 +309,7 @@ def run_checks(
         if feat_count > 0:
             passed.append(f"✅ C2: feature_count = {feat_count:,} > 0")
         else:
-            failed.append(f"❌ C2: feature_count = 0")
+            failed.append("❌ C2: feature_count = 0")
     details["c2_feature_count"] = feat_count
 
     # ── C3: Column 名稱集合一致性
@@ -416,10 +413,10 @@ def build_markdown_report(
     lines: List[str] = []
 
     # ── 標題 ─────────────────────────────────────────────────────────────────
-    lines.append(f"# ETHUSDT Multi-TF Pipeline Benchmark 報告")
+    lines.append("# ETHUSDT Multi-TF Pipeline Benchmark 報告")
     lines.append("")
     lines.append(f"> **執行時間**: {now_str}  ")
-    lines.append(f"> **環境**: macOS M1 (8GB RAM)  ")
+    lines.append("> **環境**: macOS M1 (8GB RAM)  ")
     data_range = f"{start_date or 'full'} → {end_date or 'full'}"
     lines.append(
         f"> **資料**: {symbol}, Primary {primary_tf} | Training {' + '.join(training_tfs)} | Range: {data_range}  "
@@ -523,7 +520,7 @@ def build_markdown_report(
     # ── RSS 軌跡 ──────────────────────────────────────────────────────────────
     lines.append("## 5. 記憶體 (RSS) 軌跡摘要")
     lines.append("")
-    lines.append(f"| 時間點 | RSS (MB) |")
+    lines.append("| 時間點 | RSS (MB) |")
     lines.append("|--------|----------|")
     lines.append(f"| 程式啟動 | {rss_start:.0f} |")
     lines.append(f"| Pipeline 結束 | {_rss_mb():.0f} |")
@@ -644,6 +641,7 @@ def main(
     force_regenerate: bool = True,
     compare_baseline_path: Optional[str] = None,
     create_baseline: bool = False,
+    skip_full_readback: bool = False,
 ) -> bool:
     import pandas as pd  # noqa: F811
 
@@ -702,7 +700,10 @@ def main(
         config_override: Dict[str, Any] = {
             "preset": PRESET,
             "timeframes": {
+                "primary": PRIMARY_TF,
                 "training": TRAINING_TFS,
+                "alignment": "point_in_time",
+                "alignment_mode": "open_minus",
             },
             # Bug #3 fix: scan_config.yaml has preprocessing.enabled=false by default.
             # Explicitly enable L6.5 preprocessing so all layers (L1-L7) are active,
@@ -743,7 +744,14 @@ def main(
     # C1/C3 都是 ⚠️ 跳過，不需要完整 DataFrame。
     features_df = getattr(result, "features_df", pd.DataFrame())
     cgsa_mode = features_df.empty and feat_count > 0
-    need_full_readback = cgsa_mode and baseline_manifest is not None
+    memory_tier = os.getenv("FFACT_MEMORY_TIER", "auto").strip().lower()
+    auto_skip_full_readback = memory_tier == "8gb"
+    need_full_readback = (
+        cgsa_mode
+        and baseline_manifest is not None
+        and not skip_full_readback
+        and not auto_skip_full_readback
+    )
     if need_full_readback:
         try:
             metadata = dict(getattr(result, "metadata", {}) or {})
@@ -757,7 +765,11 @@ def main(
         except Exception as e:
             print(f"[WARNING] CGSA readback 失敗: {e}")
     elif cgsa_mode:
-        print(f"[CGSA] 無 baseline，跳過全量 readback（feat_count={feat_count:,}）")
+        if skip_full_readback or auto_skip_full_readback:
+            reason = "--skip-full-readback" if skip_full_readback else "FFACT_MEMORY_TIER=8gb"
+            print(f"[CGSA] {reason}，跳過全量 readback（feat_count={feat_count:,}）")
+        else:
+            print(f"[CGSA] 無 baseline，跳過全量 readback（feat_count={feat_count:,}）")
 
     # ── C1~C6 驗證 ────────────────────────────────────────────────────────────
     passed_checks, failed_checks, check_details = run_checks(
@@ -771,10 +783,13 @@ def main(
 
     # ── 儲存為 baseline（若指定或首次執行） ─────────────────────────────────
     if create_baseline or baseline_manifest is None:
-        saved_dir = save_as_baseline(
-            SYMBOL, PRIMARY_TF, PRESET, result, features_df, overall_elapsed, peak_rss
-        )
-        passed_checks.append(f"✅ 已儲存為新 baseline: {saved_dir.name}")
+        if features_df.empty and cgsa_mode:
+            passed_checks.append("⚠️  CGSA no-readback 模式未儲存 baseline；請改用 streaming checksum/schema gate")
+        else:
+            saved_dir = save_as_baseline(
+                SYMBOL, PRIMARY_TF, PRESET, result, features_df, overall_elapsed, peak_rss
+            )
+            passed_checks.append(f"✅ 已儲存為新 baseline: {saved_dir.name}")
 
     # ── 產出 Markdown 報告 ────────────────────────────────────────────────────
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -834,6 +849,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="不論是否有既有 baseline，都強制儲存本次為新 baseline",
     )
+    p.add_argument(
+        "--skip-full-readback",
+        action="store_true",
+        help="CGSA 模式跳過全量 parquet concat readback，適合 8GB full benchmark 避免 OOM",
+    )
     return p.parse_args()
 
 
@@ -845,5 +865,6 @@ if __name__ == "__main__":
         force_regenerate=not args.no_force_regenerate,
         compare_baseline_path=args.compare_baseline,
         create_baseline=args.create_baseline,
+        skip_full_readback=args.skip_full_readback,
     )
     sys.exit(0 if success else 1)

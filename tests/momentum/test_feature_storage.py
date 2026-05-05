@@ -14,6 +14,7 @@ import h5py
 import json
 from pathlib import Path
 import shutil
+from types import SimpleNamespace
 
 from momentum.FeatureEngineering.feature_extractor import (
     FeatureExtractor,
@@ -407,6 +408,37 @@ def test_l7_disk_precheck_raises_when_estimate_exceeds_free_space(monkeypatch, t
         assert "safety_factor" in message
 
 
+def test_l7_disk_precheck_accounts_for_reclaimable_npy(monkeypatch, tmp_path):
+    """L7 precheck 應用 streaming budget，不因可回收 .npy 總量誤判失敗。"""
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    one_gib = 1024 ** 3
+    group_count = 1000
+    group_bytes = 1000 * 1000 * np.dtype(np.float32).itemsize
+
+    class _FakeDiskPath:
+        def exists(self) -> bool:
+            return True
+
+        def stat(self) -> SimpleNamespace:
+            return SimpleNamespace(st_size=group_bytes)
+
+    groups = [
+        (
+            f"grp_{index}",
+            SimpleNamespace(shape=(1000, 1000), disk_path=_FakeDiskPath()),
+        )
+        for index in range(group_count)
+    ]
+
+    monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: one_gib)
+
+    storage._precheck_l7_disk_space(
+        tmp_path / "features" / "STREAM" / "hash",
+        groups,
+        batch_limit=2,
+    )
+
+
 def test_edge_case_corrupted_metadata(temp_storage_path, sample_features):
     """Edge Case: 損壞的元數據處理"""
     features_df, feature_names, params = sample_features
@@ -424,7 +456,7 @@ def test_edge_case_corrupted_metadata(temp_storage_path, sample_features):
     
     # 手動修改 HDF5 檔案 (移除某些屬性)
     with h5py.File(file_path, 'a') as f:
-        group = f[f"{symbol}/{timeframe}"]
+        assert f"{symbol}/{timeframe}" in f
         # 嘗試讀取缺少某些屬性的情況
         # (實際上 get 方法會返回 None，不會報錯)
     

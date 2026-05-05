@@ -639,12 +639,6 @@ class FeatureStorage:
         try:
             groups_list = list(registry.iter_all())
             total_groups = len(groups_list)
-            # Task 2: aggregate disk pre-check at L7 entry. We pessimistically
-            # size every cell as float32 (worst-case fallback path) and apply a
-            # tunable safety factor; this catches situations where multiple L7
-            # workers (or higher tier with L6.5 dual-worker) would otherwise
-            # race past the per-group guard and explode mid-batch.
-            self._precheck_l7_disk_space(output_dir, groups_list)
             max_group_columns = max((len(group.columns) for _group_id, group in groups_list), default=0)
             tier = get_memory_tier()
             tier_cfg = get_tier_config(tier)
@@ -682,6 +676,12 @@ class FeatureStorage:
             tier_label = str(tier).lower()
             batch_multiplier = 1 if "8" in tier_label and "gb" in tier_label else 2
             batch_limit = max(1, n_workers * batch_multiplier)
+
+            self._precheck_l7_disk_space(
+                output_dir,
+                groups_list,
+                batch_limit=batch_limit,
+            )
 
             def _flush_pending_parts() -> None:
                 nonlocal pending_parts, pending_disk_paths, npy_freed, persisted_paths
@@ -942,26 +942,40 @@ class FeatureStorage:
         self,
         output_dir: Path,
         groups_list: List[Tuple[str, Any]],
+        batch_limit: int = 1,
     ) -> None:
-        """Aggregate worst-case L7 footprint and fail fast on tight disks.
-
-        Per-group :func:`_persist_group_array` already checks individual writes,
-        but with parallel persist (and future L6.5 dual-worker tiers) several
-        groups can simultaneously pass their guard while collectively exceeding
-        free space. Estimating with ``float32`` (4 bytes/cell) covers both the
-        normal float16 path and the float32-fallback path under one budget.
-        """
+        """Fail fast using the extra disk budget needed by streaming L7 writes."""
         if not groups_list:
             return
 
-        bytes_per_cell = np.dtype(np.float32).itemsize
-        estimated_bytes = 0
-        for _gid, group in groups_list:
+        final_bytes_per_cell = np.dtype(np.float16).itemsize
+        fallback_bytes_per_cell = np.dtype(np.float32).itemsize
+        estimated_final_bytes = 0
+        reclaimable_npy_bytes = 0
+        largest_group_id = "<none>"
+        largest_group_bytes = 0
+
+        for group_id, group in groups_list:
             n_rows, n_cols = group.shape
-            estimated_bytes += int(n_rows) * int(n_cols) * bytes_per_cell
+            cell_count = int(n_rows) * int(n_cols)
+            nominal_final_bytes = cell_count * final_bytes_per_cell
+            fallback_group_bytes = cell_count * fallback_bytes_per_cell
+            estimated_final_bytes += nominal_final_bytes
+            if fallback_group_bytes > largest_group_bytes:
+                largest_group_bytes = fallback_group_bytes
+                largest_group_id = str(group_id)
+
+            disk_path = getattr(group, "disk_path", None)
+            try:
+                if disk_path is not None and disk_path.exists():
+                    reclaimable_npy_bytes += int(disk_path.stat().st_size)
+            except OSError:
+                pass
 
         safety_factor = self._resolve_l7_disk_safety_factor()
-        required_bytes = int(estimated_bytes * safety_factor)
+        max_inflight_staging_bytes = largest_group_bytes * max(1, int(batch_limit))
+        net_growth_bytes = max(0, estimated_final_bytes - reclaimable_npy_bytes)
+        required_bytes = int((net_growth_bytes + max_inflight_staging_bytes) * safety_factor)
 
         free_bytes = self._safe_disk_free_bytes(output_dir)
         if free_bytes is None:
@@ -971,17 +985,29 @@ class FeatureStorage:
             raise OSError(
                 "Insufficient disk space for L7 persist: "
                 f"need ~{required_bytes / (1024 ** 3):.2f} GiB "
-                f"(safety_factor={safety_factor:.2f}, raw_estimate="
-                f"{estimated_bytes / (1024 ** 3):.2f} GiB), "
+                f"(safety_factor={safety_factor:.2f}, estimated_final="
+                f"{estimated_final_bytes / (1024 ** 3):.2f} GiB, reclaimable_npy="
+                f"{reclaimable_npy_bytes / (1024 ** 3):.2f} GiB, net_growth="
+                f"{net_growth_bytes / (1024 ** 3):.2f} GiB, max_inflight_staging="
+                f"{max_inflight_staging_bytes / (1024 ** 3):.2f} GiB, "
+                f"largest_group={largest_group_id}:{largest_group_bytes / (1024 ** 3):.2f} GiB), "
                 f"available {free_bytes / (1024 ** 3):.2f} GiB at {output_dir}; "
                 f"groups={len(groups_list)}; clear data_cache/cgsa_work/* or lower "
                 "FFACT_L7_DISK_SAFETY_FACTOR if you accept the risk."
             )
 
         self.logger.info(
-            "[L7] Disk pre-check OK: estimate=%.2f GiB (safety x%.2f), free=%.2f GiB, groups=%d",
-            estimated_bytes / (1024 ** 3),
+            "[L7] Disk pre-check OK: required=%.2f GiB (safety x%.2f), "
+            "estimated_final=%.2f GiB, reclaimable_npy=%.2f GiB, net_growth=%.2f GiB, "
+            "max_inflight_staging=%.2f GiB, largest_group=%s:%.2f GiB, free=%.2f GiB, groups=%d",
+            required_bytes / (1024 ** 3),
             safety_factor,
+            estimated_final_bytes / (1024 ** 3),
+            reclaimable_npy_bytes / (1024 ** 3),
+            net_growth_bytes / (1024 ** 3),
+            max_inflight_staging_bytes / (1024 ** 3),
+            largest_group_id,
+            largest_group_bytes / (1024 ** 3),
             free_bytes / (1024 ** 3),
             len(groups_list),
         )
