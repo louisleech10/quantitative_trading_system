@@ -1,0 +1,21 @@
+{
+  "blocking_reason": "RAM gate blocked multi benchmark: available 1.52GB < 4.00GB",
+  "cache_hit_rate": null,
+  "checkpoint_path": null,
+  "concurrent_symbols": 1,
+  "entries": [],
+  "gate_id": "T0.P7",
+  "memory_sanity_failed": false,
+  "n_symbols": 0,
+  "n_timeframes": 0,
+  "oom": false,
+  "output_size_delta_pct": null,
+  "peak_rss_mb": 0,
+  "phase": 0,
+  "rows_per_item": 0,
+  "sigkill": false,
+  "status": "BLOCKED",
+  "tier_gb": 8,
+  "timestamp": "20260428T120247Z",
+  "wall_time_seconds": 0.0
+}

@@ -339,6 +339,47 @@ class ICAnalysisService:
 
         return self._build_feature_items(names, metadata)
 
+    def compute_ic_from_l7_raw(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+        label: pd.Series,
+        *,
+        feature_base_path: Optional[str] = None,
+        config_override: Optional[Dict[str, Any]] = None,
+        ic_threshold: Optional[float] = None,
+        allow_partial_ic: bool = False,
+        method: Optional[str] = None,
+        label_horizon: Optional[str] = None,
+        selection_window: Optional[Dict[str, Any]] = None,
+        split_id: Optional[str] = None,
+        ic_params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Run IC-First raw streaming selection through momentum factories."""
+
+        analyzer = create_ic_analyzer(config_override)
+        ic_engine = getattr(analyzer, "_ic_engine", None)
+        if ic_engine is None:
+            raise RuntimeError("IC analyzer does not expose an IC engine")
+
+        reader = create_feature_reader(feature_base_path)
+        result = ic_engine.compute_ic_from_l7_raw(
+            symbol=symbol,
+            tf=timeframe,
+            config_hash=config_hash,
+            label=label,
+            feature_reader=reader,
+            ic_threshold=ic_threshold,
+            allow_partial_ic=allow_partial_ic,
+            method=method,
+            label_horizon=label_horizon,
+            selection_window=selection_window,
+            split_id=split_id,
+            ic_params=ic_params,
+        )
+        return self._to_json_compatible(result.to_dict())
+
     @staticmethod
     def _build_feature_items(
         names: List[str],

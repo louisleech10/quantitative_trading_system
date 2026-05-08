@@ -20,10 +20,12 @@ from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-CACHE_VERSION = "v2"
+CACHE_VERSION = "v3"
 ADF_ENGINE_VERSION = "statsmodels-v1"
 STRONG_FINGERPRINT = "strong"
 WEAK_FINGERPRINT = "weak_fingerprint"
+MAX_CACHE_ENTRIES = 200_000
+_GC_TRIM_FRACTION = 0.10
 
 
 @dataclass(frozen=True)
@@ -185,8 +187,52 @@ def _int_equal(left: Any, right: Any) -> bool:
         return False
 
 
+def _compute_fracdiff_hash(
+    adf_threshold: Optional[float],
+    precision: Optional[float],
+    max_lag: Optional[int],
+    weight_threshold: Optional[float],
+    sample_size: Optional[int],
+    nan_policy: str,
+    adf_engine_version: str,
+) -> str:
+    """Deterministic MD5 of only the fracdiff algorithm parameters."""
+    payload = {
+        "adf_threshold": None if adf_threshold is None else round(float(adf_threshold), 15),
+        "precision": None if precision is None else round(float(precision), 15),
+        "max_lag": None if max_lag is None else int(max_lag),
+        "weight_threshold": None if weight_threshold is None else round(float(weight_threshold), 15),
+        "sample_size": None if sample_size is None else int(sample_size),
+        "nan_policy": nan_policy,
+        "adf_engine_version": adf_engine_version,
+    }
+    return hashlib.md5(
+        json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    ).hexdigest()
+
+
+def _col_value_fingerprint(values: np.ndarray) -> str:
+    """Fast per-column value fingerprint using strided 64-sample SHA-256 (µs-level)."""
+    arr = np.asarray(values, dtype=np.float64).ravel()
+    n = len(arr)
+    if n == 0:
+        return "empty"
+    step = max(1, n // 64)
+    sample = arr[::step][:64]
+    return hashlib.sha256(np.ascontiguousarray(sample).view(np.uint8)).hexdigest()[:16]
+
+
 class DStarCache:
-    """Disk-backed d_star cache isolated by symbol, timeframe, config and data."""
+    """Disk-backed d_star cache isolated by (symbol, timeframe, fracdiff_params).
+
+    v3 changes vs v2:
+    - Cache file key uses fracdiff-params hash (not config_hash), so adding new
+      indicators or changing non-fracdiff UI settings does not invalidate the file.
+    - Each per-column entry is validated by its own value fingerprint (value_fp)
+      rather than a whole-file data fingerprint, enabling partial hits after
+      kline updates that only affect some columns.
+    - GC trims oldest _GC_TRIM_FRACTION of entries when file exceeds MAX_CACHE_ENTRIES.
+    """
 
     def __init__(
         self,
@@ -203,7 +249,6 @@ class DStarCache:
     ) -> None:
         self._ctx = context
         self._dir = cache_dir
-        self._path = self._build_path(cache_dir, context)
         self._metadata = {
             "adf_threshold": adf_threshold,
             "precision": precision,
@@ -213,6 +258,11 @@ class DStarCache:
             "nan_policy": nan_policy,
             "adf_engine_version": adf_engine_version,
         }
+        self._fracdiff_hash = _compute_fracdiff_hash(
+            adf_threshold, precision, max_lag, weight_threshold,
+            sample_size, nan_policy, adf_engine_version,
+        )
+        self._path = self._build_path(cache_dir, context, self._fracdiff_hash)
         self._dirty = False
         self._hits = 0
         self._misses = 0
@@ -230,11 +280,11 @@ class DStarCache:
         self._entries = self._load_or_init()
 
     @staticmethod
-    def _build_path(cache_dir: Path, context: PreprocessingContext) -> Path:
+    def _build_path(cache_dir: Path, context: PreprocessingContext, fracdiff_hash: str) -> Path:
         symbol = _safe_cache_token(context.symbol)
         timeframe = _safe_cache_token(context.timeframe)
-        config_hash = _safe_cache_token(context.config_hash[:12] or "nohash")
-        return cache_dir / f"d_star_{symbol}_{timeframe}_{config_hash}.json"
+        fhash = _safe_cache_token(fracdiff_hash[:12] or "nohash")
+        return cache_dir / f"d_star_{symbol}_{timeframe}_{fhash}.json"
 
     @property
     def path(self) -> Path:
@@ -245,9 +295,6 @@ class DStarCache:
         return (
             self._ctx.symbol not in {"", "unknown"}
             and self._ctx.timeframe not in {"", "unknown"}
-            and bool(self._ctx.config_hash)
-            and bool(self._ctx.data_fingerprint)
-            and bool(self._ctx.feature_schema_hash)
         )
 
     def _load_or_init(self) -> Dict[str, Dict[str, Any]]:
@@ -282,17 +329,19 @@ class DStarCache:
             logger.info("[d_star_cache] cache_version mismatch, rebuild: %s", self._path)
             return False
 
+        expected = self._base_payload_fields()
+
+        if payload.get("fracdiff_hash") != expected["fracdiff_hash"]:
+            logger.info("[d_star_cache] fracdiff_hash mismatch, rebuild: %s", self._path)
+            return False
+
         exact_fields = (
             "symbol",
             "timeframe",
-            "config_hash",
-            "data_fingerprint",
-            "feature_schema_hash",
             "source_data_version",
             "nan_policy",
             "adf_engine_version",
         )
-        expected = self._base_payload_fields()
         for field_name in exact_fields:
             if payload.get(field_name) != expected.get(field_name):
                 logger.warning(
@@ -302,9 +351,6 @@ class DStarCache:
                 )
                 return False
 
-        if payload.get("data_fingerprint_status") == WEAK_FINGERPRINT:
-            logger.info("[d_star_cache] weak fingerprint cache ignored: %s", self._path)
-            return False
 
         if int(payload.get("row_count", -1)) != int(expected.get("row_count", 0)):
             logger.warning("[d_star_cache] stale cache field=row_count path=%s", self._path)
@@ -345,15 +391,12 @@ class DStarCache:
             "cache_version": CACHE_VERSION,
             "symbol": self._ctx.symbol,
             "timeframe": self._ctx.timeframe,
-            "config_hash": self._ctx.config_hash,
+            "fracdiff_hash": self._fracdiff_hash,
             "adf_threshold": self._metadata["adf_threshold"],
             "precision": self._metadata["precision"],
             "max_lag": self._metadata["max_lag"],
             "weight_threshold": self._metadata["weight_threshold"],
             "adf_engine_version": self._metadata["adf_engine_version"],
-            "data_fingerprint": self._ctx.data_fingerprint,
-            "data_fingerprint_status": self._ctx.data_fingerprint_status,
-            "feature_schema_hash": self._ctx.feature_schema_hash,
             "time_range": time_range,
             "row_count": int(self._ctx.row_count),
             "sample_size": self._metadata["sample_size"],
@@ -361,7 +404,7 @@ class DStarCache:
             "source_data_version": self._ctx.source_data_version,
         }
 
-    def get(self, column: str) -> Optional[float]:
+    def get(self, column: str, col_values: Optional[np.ndarray] = None) -> Optional[float]:
         if not self.is_enabled:
             return None
 
@@ -369,9 +412,17 @@ class DStarCache:
         if not entry:
             self._misses += 1
             return None
-        if entry.get("input_fingerprint") != self._ctx.data_fingerprint:
-            self._misses += 1
-            return None
+
+        if col_values is not None:
+            # Per-column value fingerprint (v3 path): tolerates config/schema changes
+            if entry.get("value_fp") != _col_value_fingerprint(col_values):
+                self._misses += 1
+                return None
+        else:
+            # Backward-compat path: whole-file data fingerprint check
+            if entry.get("input_fingerprint") != self._ctx.data_fingerprint:
+                self._misses += 1
+                return None
 
         raw_value = entry.get("d_star")
         if raw_value is None:
@@ -386,22 +437,45 @@ class DStarCache:
         self._hits += 1
         return value
 
-    def set(self, column: str, d_star: float) -> None:
+    def set(self, column: str, d_star: float, col_values: Optional[np.ndarray] = None) -> None:
         if not self.is_enabled:
             return
         value = float(d_star)
         if not np.isfinite(value):
             return
-        self._entries[str(column)] = {
+        entry: Dict[str, Any] = {
             "d_star": value,
-            "input_fingerprint": self._ctx.data_fingerprint,
             "computed_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         }
+        if col_values is not None:
+            entry["value_fp"] = _col_value_fingerprint(col_values)
+        else:
+            entry["input_fingerprint"] = self._ctx.data_fingerprint
+        self._entries[str(column)] = entry
         self._dirty = True
+
+    def _maybe_gc(self) -> None:
+        """Trim oldest entries when the cache exceeds MAX_CACHE_ENTRIES."""
+        if len(self._entries) <= MAX_CACHE_ENTRIES:
+            return
+        trim_count = max(1, int(len(self._entries) * _GC_TRIM_FRACTION))
+        sorted_keys = sorted(
+            self._entries,
+            key=lambda k: self._entries[k].get("computed_at", ""),
+        )
+        for key in sorted_keys[:trim_count]:
+            del self._entries[key]
+        logger.info(
+            "[d_star_cache] GC: removed %d oldest entries, remaining=%d path=%s",
+            trim_count,
+            len(self._entries),
+            self._path,
+        )
 
     def flush_atomic(self) -> None:
         if not self.is_enabled or not self._dirty:
             return
+        self._maybe_gc()
         payload = self._base_payload_fields()
         payload["entries"] = self._entries
 

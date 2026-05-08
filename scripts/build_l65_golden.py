@@ -28,6 +28,7 @@ DEFAULT_GOLDEN_DIR = PROJECT_ROOT / "tests" / "golden" / "l65"
 KLINE_CACHE_PATH = PROJECT_ROOT / "data_cache" / "feature_klines" / "kline_cache.h5"
 TIER1_DIR = DEFAULT_GOLDEN_DIR / "tier1_structure"
 TIER2_DIR = DEFAULT_GOLDEN_DIR / "tier2_reduced"
+TIER2_ICFIRST_DIR = DEFAULT_GOLDEN_DIR / "tier2_icfirst"
 TEST_INVENTORY_PATH = DEFAULT_GOLDEN_DIR / "test_inventory.txt"
 L65_TEST_KEYWORDS = re.compile(
     r"l65|preprocess|feature_preprocessor|fracdiff|adf|d_star",
@@ -400,6 +401,122 @@ def build_tier2_real_shortwindow(
     )
 
 
+def _ic_first_raw_config() -> Dict[str, Any]:
+    return {
+        "enabled": True,
+        "mode": "replace",
+        "winsorization": {
+            "enabled": True,
+            "method": "quantile",
+            "quantile_range": [0.01, 0.99],
+            "apply_to": "all",
+        },
+    }
+
+
+def _ic_first_processed_config() -> Dict[str, Any]:
+    return {
+        "enabled": True,
+        "mode": "replace",
+        "winsorization": {
+            "enabled": True,
+            "method": "quantile",
+            "quantile_range": [0.01, 0.99],
+            "apply_to": "all",
+        },
+        "rank_transform": {"enabled": True, "window": 50, "apply_to": "all"},
+        "gaussian_normalize": {
+            "enabled": True,
+            "clip_range": [0.001, 0.999],
+            "apply_to": "all",
+        },
+    }
+
+
+def build_ic_first_golden(
+    symbol: str,
+    tf: str,
+    max_rows: int,
+    max_cols: int,
+    out_dir: Path = TIER2_ICFIRST_DIR,
+    use_real_data: bool = False,
+) -> Dict[str, Any]:
+    """Write a small IC-First golden scaffold or a blocked marker for missing real data."""
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    blocked_path = out_dir / f"{symbol}_{tf}_{max_rows}rows.BLOCKED"
+    source = "synthetic_l65_fixture"
+    if use_real_data:
+        frame = _load_hdf5_kline_frame(symbol, tf, KLINE_CACHE_PATH)
+        if frame is None:
+            _write_blocked_marker(
+                blocked_path,
+                "blocked_missing_data: missing HDF5 dataset "
+                f"{symbol}/{tf}/data in {KLINE_CACHE_PATH.relative_to(PROJECT_ROOT)}",
+            )
+            return {"status": "blocked_missing_data", "path": str(blocked_path)}
+        recent = frame.tail(max_rows)
+        source_frame = _build_l1_l2_real_features(recent, max_cols=max_cols)
+        source = "real_hdf5_shortwindow"
+    else:
+        source_frame = make_synthetic_l65_dataset(
+            rows=min(max_rows, 1000),
+            cols=min(max_cols, 100),
+            stationary_ratio=0.6,
+        )
+
+    raw_frame = FeaturePreprocessor(_ic_first_raw_config()).transform(source_frame)
+    selected_features = list(raw_frame.columns[: min(20, len(raw_frame.columns))])
+    processed_frame = FeaturePreprocessor(_ic_first_processed_config()).transform(
+        raw_frame.loc[:, selected_features]
+    )
+
+    raw_path = out_dir / f"{symbol}_{tf}_raw.parquet"
+    processed_path = out_dir / f"{symbol}_{tf}_processed.parquet"
+    selected_path = out_dir / f"ic_selected_features_{symbol}_{tf}.json"
+    metadata_path = out_dir / f"{symbol}_{tf}_metadata.json"
+
+    selected_payload = {
+        "status": "PASS",
+        "mode": "ic_first_scaffold",
+        "symbol": symbol,
+        "timeframe": tf,
+        "source": source,
+        "selected": selected_features,
+        "selected_count": len(selected_features),
+        "generated_at_utc": _utc_now(),
+    }
+    metadata = {
+        "status": "PASS",
+        "mode": "ic_first_scaffold",
+        "symbol": symbol,
+        "timeframe": tf,
+        "source": source,
+        "raw_rows": int(raw_frame.shape[0]),
+        "raw_columns": int(raw_frame.shape[1]),
+        "processed_columns": int(processed_frame.shape[1]),
+        "raw_path": raw_path.name,
+        "processed_path": processed_path.name,
+        "selected_path": selected_path.name,
+        "generated_at_utc": _utc_now(),
+    }
+
+    _atomic_write_parquet(raw_path, raw_frame.astype(np.float32, copy=False))
+    _atomic_write_parquet(processed_path, processed_frame.astype(np.float32, copy=False))
+    _atomic_write_json(selected_path, selected_payload)
+    _atomic_write_json(metadata_path, metadata)
+    if blocked_path.exists():
+        blocked_path.unlink()
+    logger.info(
+        "[L6.5] Tier 2C IC-First scaffold written: %s/%s raw_cols=%d selected=%d",
+        symbol,
+        tf,
+        raw_frame.shape[1],
+        len(selected_features),
+    )
+    return metadata
+
+
 def _remove_stale_real_artifacts(parquet_path: Path, d_star_path: Path) -> None:
     for artifact_path in (parquet_path, d_star_path, parquet_path.with_suffix(".manifest.json")):
         if artifact_path.exists():
@@ -462,6 +579,7 @@ def collect_existing_l65_tests(out_path: Path = TEST_INVENTORY_PATH) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build Layer 6.5 golden baseline artifacts")
     parser.add_argument("--tier", choices=["1", "2a", "2b", "3"], required=True)
+    parser.add_argument("--mode", choices=["legacy", "ic_first"], default="legacy")
     parser.add_argument("--symbol", default="ETHUSDT")
     parser.add_argument("--tf", default="1h")
     parser.add_argument("--max-rows", type=int, default=2000)
@@ -472,7 +590,30 @@ def main() -> int:
 
     try:
         golden_dir = Path(args.out_dir)
-        if args.tier == "1":
+        if args.mode == "ic_first":
+            if args.tier == "1":
+                build_tier1_structure(golden_dir / "tier1_structure")
+            elif args.tier == "2a":
+                build_ic_first_golden(
+                    symbol="SYNTHETIC",
+                    tf="fixture",
+                    max_rows=args.max_rows,
+                    max_cols=args.max_cols,
+                    out_dir=golden_dir / "tier2_icfirst",
+                    use_real_data=False,
+                )
+            elif args.tier == "2b":
+                build_ic_first_golden(
+                    symbol=args.symbol,
+                    tf=args.tf,
+                    max_rows=args.max_rows,
+                    max_cols=args.max_cols,
+                    out_dir=golden_dir / "tier2_icfirst",
+                    use_real_data=True,
+                )
+            elif args.tier == "3":
+                raise SystemExit("Tier 3 不支援 8GB；需 24GB+ 環境")
+        elif args.tier == "1":
             if not _ram_gate(
                 MIN_REDUCED_WORKLOAD_GATE_GB,
                 label="Tier 1 structure reduced workload",

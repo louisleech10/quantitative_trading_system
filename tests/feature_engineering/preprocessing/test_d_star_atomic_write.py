@@ -47,10 +47,10 @@ def test_d_star_atomic_write_parallel_valid_json(tmp_path: Path) -> None:
 
     assert len(payloads) == 100
     for payload in payloads:
-        assert payload["cache_version"] == "v2"
+        assert payload["cache_version"] == "v3"
         assert payload["symbol"] == "ETHUSDT"
         assert isinstance(payload["entries"], dict)
 
     final_payload = json.loads(_cache(tmp_path).path.read_text(encoding="utf-8"))
-    assert final_payload["cache_version"] == "v2"
+    assert final_payload["cache_version"] == "v3"
     assert isinstance(final_payload["entries"], dict)

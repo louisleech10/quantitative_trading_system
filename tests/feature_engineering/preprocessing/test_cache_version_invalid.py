@@ -54,7 +54,7 @@ def test_cache_version_invalid_rebuilds_v2_payload(tmp_path: Path) -> None:
     rebuilt_cache.flush_atomic()
     payload = json.loads(cache.path.read_text(encoding="utf-8"))
 
-    assert payload["cache_version"] == "v2"
+    assert payload["cache_version"] == "v3"
     assert payload["entries"]["L1_close"]["d_star"] == 0.3
 
 

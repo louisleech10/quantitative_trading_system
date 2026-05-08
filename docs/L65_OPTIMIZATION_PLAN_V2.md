@@ -95,11 +95,10 @@ rank/zscore 輸出特性
 ranked_features = aligned[features_df.columns].rank(axis=0, method="average")
 ```
 
-IC engine 在計算 Spearman IC 時**內部自行做 cross-sectional rank**（axis=0）。
-L6.5 的 rank transform 是 **time-series rolling rank**（每欄在時間窗 [t-W+1, t] 內排名）。
-兩者數學上不同，但 rank 是**單調變換**，`cs_rank(ts_rank(F))` = `cs_rank(F)` 在 Spearman IC 上**完全相同**。
+IC engine 在計算 Spearman IC 時目前會先做 `rank(axis=0, method="average")`，但此處必須先確認 pandas `axis=0` 在實際 `aligned` shape 下的語義（通常是沿 index 排名，未必是跨欄位 cross-sectional rank）。
+L6.5 的 rank transform 是 **time-series rolling rank**（每欄在時間窗 [t-W+1, t] 內排名），它不是對整條 feature series 的全域單調轉換，因此不能宣稱 `cs_rank(ts_rank(F)) = cs_rank(F)` 在所有 IC 計算上完全相同。
 
-結論：L6.5 的 time-series rank 對 IC 篩選零效益，卻佔用 39% 時間 + 貢獻 29 GB 輸出。
+修正後結論：IC-First 是高 ROI 架構假設，但不是可無條件成立的數學等式。V2 允許先把 rank/zscore/gaussian 移到 IC 後，前提是必須通過 IC stability gates（IC score diff、selected set overlap、top-K stability、下游 proxy validation）。若任一 gate 失敗，必須回退 legacy 或採 dual-path IC（rank-before-IC 與 raw-before-IC 同時計算後比較）。
 
 ### 1.4 L6.5 各 Transform 時間拆分（4,003s 實測）
 
@@ -147,7 +146,7 @@ def _transform_single_group(self, group_df):
 # 目標：一次複製 + 在 numpy array 上原地操作
 def _transform_single_group_optimized(self, group_df):
     columns = self._select_columns(group_df, apply_to="all")
-    arr = group_df[columns].to_numpy(dtype=np.float32, copy=True)  # 唯一一次 copy
+    arr = group_df[columns].to_numpy(copy=True)  # 唯一一次 copy；不得提早降精度，除非數值等效 gate + accepted risk 通過
     if self.do_winsorize:
         arr = _winsorize_2d_inplace(arr, self.lower_q, self.upper_q)
     if self.do_rank:
@@ -297,9 +296,12 @@ for window in windows:
 
 ```python
 def encode_zscore_as_int16(zscore_arr: np.ndarray) -> np.ndarray:
-    '''zscore -> int16; NaN -> INT16_MIN'''
-    clipped = np.clip(zscore_arr * 1000.0, -32767.0, 32767.0)
-    out = np.where(np.isnan(zscore_arr), np.int16(-32768), clipped.round().astype(np.int16))
+    '''zscore -> int16; NaN -> INT16_MIN；超界欄位 fallback float32，不 clip'''
+    finite_abs_max = np.nanmax(np.abs(zscore_arr))
+    if finite_abs_max > 32.767:
+        raise EncodeFallbackRequired("zscore out of int16 range; fallback float32")
+    scaled = zscore_arr * 1000.0
+    out = np.where(np.isnan(zscore_arr), np.int16(-32768), scaled.round().astype(np.int16))
     return out
 
 def decode_zscore_from_int16(int_arr: np.ndarray) -> np.ndarray:
@@ -412,12 +414,13 @@ L1-L6 generate
 ### 4.2 儲存路徑
 
 ```
-data_cache/features/{SYMBOL}/{config_hash}/
+data_cache/features/{SYMBOL}/{TF}/{config_hash}/
     raw/
         {group_id}.parquet      ← L7_raw（winsorized，ALL features）
     processed/
         {group_id}.parquet      ← L7_processed（rank+zscore，selected ~2k only）
-    ic_selected_features.json   ← IC 篩選結果（feature list + IC scores）
+    ic_selected_features_{SYMBOL}_{TF}.json   ← IC 篩選結果（feature list + IC scores + fingerprints）
+    feature_manifest.json       ← 完整寫入標記、schema hash、row count、group manifest
 ```
 
 ### 4.3 量化業界依據
@@ -426,7 +429,7 @@ data_cache/features/{SYMBOL}/{config_hash}/
 |-----------|---------|------|
 | Winsorize | IC **前**（必須）| IC 前去極值才能得到可靠 Spearman IC |
 | FracDiff（L1/L2）| IC **前**（必須）| IC 需要平穩序列；López de Prado Ch.5 |
-| Rank（time-series）| IC **後**（ML 前）| IC engine 已內部 rank；pre-rank 無效益；ML 需要跨時間可比性 |
+| Rank（time-series）| IC **後**（ML 前，需通過 stability gates）| 高 ROI 假設：IC 前不存全量 rank；但 rolling rank 可能改變 IC selection，必須以 C-V2-7 驗證，不可僅依「單調變換」推論 |
 | ZScore（adaptive）| IC **後**（ML 前）| ML normalization；不影響 IC 計算 |
 | Gaussian | IC **後**（可選）| 僅 linear factor models 需要 |
 
@@ -445,8 +448,9 @@ data_cache/features/{SYMBOL}/{config_hash}/
 2. **`feature_storage.py`** 新增 `write_raw()` / `write_processed()` 兩條路徑；保留現有 `write()` 作為 legacy fallback。
 
 3. **IC Gatekeeper**（`ic_analysis_service.py` + `ic_engine.py`）：
-   - 讀取路徑自動偵測 `features/{hash}/raw/` 或 `features/{hash}/`
-   - 篩選結果寫入 `ic_selected_features.json`
+    - 讀取 canonical 路徑 `features/{SYMBOL}/{TF}/{config_hash}/raw/`，legacy fallback 僅能讀舊版 `features/{SYMBOL}/{config_hash}/` 或既有 writer 路徑
+    - 篩選結果以 atomic write 寫入 `ic_selected_features_{SYMBOL}_{TF}.json`
+    - `feature_manifest.json` 必須含 `complete=true`、`schema_hash`、`data_fingerprint`、每個 group 的 path/columns/dtype/row_count
 
 4. **Post-IC Transform Service**：
    - `FeaturePreprocessor.transform_selected(selected: List[str], groups, config)`
@@ -469,7 +473,7 @@ data_cache/features/{SYMBOL}/{config_hash}/
 
 - L7_raw 磁碟大小 ≤ 1.38 GiB（V8 final × 1.1）
 - L7_processed 磁碟大小 ≤ 0.25 GB
-- IC scores（IC-First mode vs legacy mode）差異 ≤ 0.01（rank 是單調變換，Spearman IC 完全相同）
+- IC stability gates（IC-First mode vs legacy mode）全部通過：`max_abs_ic_diff ≤ 0.01`、selected set Jaccard ≥ 0.90、top-K（預設 K=500）overlap ≥ 0.90、top-K IC rank Spearman ≥ 0.95、下游 ML/backtest proxy 不劣於 legacy 超過 1%
 - 多 symbol 測試：10 symbols × 2 tf，每個 symbol 獨立 L7_raw
 
 ---
@@ -513,18 +517,29 @@ pq.write_table(
 針對 rank/zscore/gaussian 建立統一的整數編碼 metadata：
 
 ```python
-# L7 parquet file metadata（PyArrow schema metadata）
+# L7 parquet file metadata（PyArrow schema metadata；per-column registry）
 {
-    "encoding_type": "rank_uint16",   # or "zscore_int16" or "gaussian_int16"
-    "scale_factor": "504",            # 2W for rank, 1000 for zscore/gaussian
-    "nan_sentinel": "0",              # uint16=0 for rank; int16=-32768 for zscore
-    "window": "252",                  # rank window
-    "original_dtype": "float32"
+    "l7_encoding_registry": json.dumps({
+        "feature_a_rank_252": {
+            "encoding_type": "rank_uint16",
+            "scale_factor": "504",
+            "nan_sentinel": "0",
+            "window": "252",
+            "original_dtype": "float32"
+        },
+        "feature_b_zscore": {
+            "encoding_type": "zscore_int16",
+            "scale_factor": "1000",
+            "nan_sentinel": "-32768",
+            "window": None,
+            "original_dtype": "float32"
+        }
+    })
 }
 ```
 
-- 讀取端根據 `encoding_type` metadata 自動 decode
-- 向後相容：無 `encoding_type` metadata 的舊 parquet 以現有 float 路徑讀取
+- 讀取端根據 `l7_encoding_registry` 的 per-column metadata 自動 decode
+- 向後相容：無 `l7_encoding_registry` metadata 的舊 parquet 以現有 float 路徑讀取
 - L7_processed（IC-First mode）預設使用整數編碼；L7_raw（winsorized only）維持 float 路徑
 
 ---
@@ -539,22 +554,30 @@ pq.write_table(
 
 - d_star cache：`(symbol, timeframe, config_hash)` 獨立 → V1 Phase 0 Task 0.3
 - per-run non-stationary cache：每個 `FeaturePreprocessor` instance 獨立 → V1 Phase 0 Task 0.4
-- L7 路徑：`data_cache/features/{SYMBOL}/{config_hash}/raw/` 和 `/processed/`
+- L7 路徑：`data_cache/features/{SYMBOL}/{TF}/{config_hash}/raw/` 和 `/processed/`
 - IC selected features：`ic_selected_features_{SYMBOL}_{TF}.json`（每 symbol 獨立）
 
 ### 6.2 Sequential Symbol Execution with IC-First
+
+> ⚠️ **OOM 關鍵邊界**：`persist_l7_raw` 完成後，`run_ic_gate` 之前**必須**顯式釋放 L6.5_pre 輸出並呼叫 `gc.collect()`。
+> 否則 L6.5_pre 的 winsorized DataFrame（~7 GB in-mem，435k feat × 2k rows × float64）與 IC engine 讀回的 L7_raw 資料同時存在 heap → 8GB tier OOM。
 
 ```
 for (symbol, tf) in batch:
     [V1] check RAM gate; skip if checkpoint completed
     run_l1_l6(symbol, tf)
-    run_l65_pre_ic(symbol, tf)         ← winsor + fracdiff(L1/L2)
-    persist_l7_raw(symbol, tf)         ← ~1.3 GB
-    run_ic_gate(symbol, tf)            ← IC 篩選，寫 ic_selected_features.json
-    run_l65_post_ic(symbol, tf)        ← rank + zscore on selected ~2k
-    persist_l7_processed(symbol, tf)   ← ~0.16 GB
+    pre_ic_groups = run_l65_pre_ic(symbol, tf)   ← winsor + fracdiff(L1/L2)
+    persist_l7_raw(symbol, tf, pre_ic_groups)     ← 寫入 ~1.3 GB（atomic write + manifest complete）
+    del pre_ic_groups; gc.collect()               ← ⚠️ 必要：釋放 large refs；以 available RAM / peak RSS gate 驗證，不以固定 RSS 下降量作唯一 gate
+    run_ic_gate(symbol, tf)                       ← per-group 迭代讀 L7_raw；IC 篩選；atomic write ic_selected_features_{SYMBOL}_{TF}.json
+    run_l65_post_ic(symbol, tf)                   ← rank + zscore on selected ~2k；peak < 50 MB
+    persist_l7_processed(symbol, tf)              ← ~0.16 GB
     [V1] gc.collect(); write_checkpoint(symbol, tf)
 ```
+
+> **額外要求**：`ic_engine` 讀取 L7_raw 時必須 **per-group 迭代**（逐 parquet group 讀取、計算 IC、釋放），不可一次全載。
+> 858 groups × per-group peak ~8 MB → 總 peak < 300 MB（IC 計算期間）。
+> 若 IC engine 改為一次全載，8GB tier 下 peak ≈ 6.96 GB × 2（loaded + ranked）= ~14 GB → OOM。
 
 ### 6.3 Cross-Symbol Rank（可選，獨立批次）
 
@@ -609,15 +632,17 @@ CSR 是可選的，不阻塞 per-symbol L6.5 計算路徑。
 
 | ID | 約束 | 驗收方式 |
 |----|------|--------|
-| **C-V2-1** | 消除多 transform copy 後，結果 bit-exact vs 現有 | `np.testing.assert_array_equal` on winsor/rank/zscore output |
+| **C-V2-1** | 消除多 transform copy 後，結果與 legacy 數值等效 | schema / NaN mask exact + numeric `assert_allclose(rtol=1e-5, atol=1e-8)`；若聲稱 bit-exact 才額外 `assert_array_equal` |
 | **C-V2-2** | rank constant_mask 消除後，constant window 回傳 0.5（legacy behavior 不變）| unit test: 全常數 array → ranked_df = 0.5 |
 | **C-V2-3** | Gaussian 批次化後，結果與 per-column loop bit-exact | `np.testing.assert_allclose(rtol=1e-5)` |
-| **C-V2-4** | uint16 rank 整數編碼 roundtrip 誤差 ≤ 1/(2W)=0.002（W=252）| roundtrip test with tolerance |
+| **C-V2-4** | uint16 rank 整數編碼 roundtrip 誤差 ≤ 1/(2W)（W 由 per-column metadata 決定）| roundtrip test with dynamic tolerance |
 | **C-V2-5** | int16 zscore/gaussian 整數編碼 roundtrip 誤差 ≤ 0.001；NaN 位置一致 | roundtrip test with tolerance |
 | **C-V2-6** | IC-First 模式：L7_raw ≤ 1.5 GB；L7_processed ≤ 0.25 GB | file size check post-benchmark |
-| **C-V2-7** | IC scores（IC-First vs legacy）差異 ≤ 0.01 | IC score correlation test |
+| **C-V2-7** | IC-First vs legacy 的 IC selection stability 通過 | `max_abs_ic_diff ≤ 0.01` + selected set Jaccard ≥ 0.90 + top-K overlap ≥ 0.90 + top-K IC rank Spearman ≥ 0.95 + downstream proxy degradation ≤ 1% |
 | **C-V2-8** | byte_stream_split roundtrip bit-exact | pyarrow.parquet read-write roundtrip |
-| **C-V2-9** | integer encoding metadata 正確寫入 parquet schema | read schema metadata + validate encoding_type |
+| **C-V2-9** | integer encoding metadata 正確寫入 parquet schema，且支援 mixed rank/zscore/gaussian columns | read schema metadata + validate per-column `l7_encoding_registry` |
+| **C-V2-10** | IC-First 模式，8GB tier 下全流程不 OOM（單 symbol）| memory profiler peak RSS < 7 GB during `run_ic_gate` |
+| **C-V2-11** | `persist_l7_raw` 後釋放 large refs，且 IC Gate 前 available RAM / peak RSS 滿足 tier budget | `psutil.Process().memory_info().rss` + `psutil.virtual_memory().available` + memory profiler；5GB RSS drop 只作 full-scale diagnostic，不作 universal hard fail |
 
 ---
 
@@ -632,8 +657,10 @@ CSR 是可選的，不阻塞 per-symbol L6.5 計算路徑。
 | ❌ IC-First 模式下讓 IC Gatekeeper 讀 L7_processed | L7_processed 只有選中特徵；IC 要讀全量 L7_raw |
 | ❌ 跨 symbol 共用統計 cache（d_star / non_stationary / IC selected）| 不同 symbol 動態不同 → 違反隔離原則 |
 | ❌ 在 IC-First 之前啟用 integer encoding for rank/zscore at L7_raw | L7_raw 只存 winsorized；rank/zscore 進 L7_processed |
-| ❌ 用 lossy codec（如 snappy）替換 zstd | zstd level 1/3 已是 best choice |
+| ❌ 用低壓縮率 codec（如 snappy）替換 zstd | zstd level 1/3 已是較合適的壓縮/速度折衷 |
 | ❌ 把 gaussian 批次化的 `DataFrame.rank(pct=True)` 換成 rolling rank | gaussian 用的是 cross-time rank（非 rolling），語義不同 |
+| ❌ IC-First 中 `persist_l7_raw` 後不 `del` + `gc.collect()` 直接 `run_ic_gate` | L6.5_pre 輸出（~7 GB in-mem）未釋放 + IC 讀回 → 8GB tier OOM |
+| ❌ IC engine 一次全載 L7_raw 所有 group 計算 IC | 解壓後 ~14 GB，8GB tier 必 OOM；必須 per-group 迭代 |
 
 ---
 
@@ -646,12 +673,12 @@ CSR 是可選的，不阻塞 per-symbol L6.5 計算路徑。
 - IC 篩選是特徵選擇（ML training set），不是特徵刪除（不再計算）
 - 業界標準：AQR/Two Sigma/Man AHL 均有 alpha filtering stage
 
-### D2: Time-Series Rank（L6.5）vs Cross-Sectional Rank（IC engine）→ **完全不同操作，但 IC 結果相同** ✅
+### D2: Time-Series Rank（L6.5）vs IC engine rank → **高 ROI 假設，必須由 gate 證明** ⚠️
 
 - L6.5 rank：每欄在時間窗 [t-W+1, t] 內排名（time-series）→ 去除量綱
-- IC engine rank：`rank(axis=0)` 跨所有特徵在同一 timestamp 排名（cross-sectional）
-- rank 是單調變換 → `cs_rank(ts_rank(F))` = `cs_rank(F)` 在 Spearman IC 計算上完全相同
-- 結論：L6.5 time-series rank 對 IC 篩選零效益；rank 應移至 IC 後對 selected features
+- IC engine rank：目前程式碼使用 `rank(axis=0)`，需先驗證實際 `aligned` shape 下它是沿時間或跨欄位排名；不可只用註解推定 cross-sectional 行為
+- rolling time-series rank 不是全域單調轉換，可能改變 IC score 與 selected feature set
+- 結論：rank 移至 IC 後是高 ROI 設計，但必須通過 C-V2-7 stability gates；若失敗，使用 `FFACT_IC_FIRST_PIPELINE=0` 或 dual-path IC fallback
 
 ### D3: 整數編碼是否違反「不弱化 float16 roundtrip gate」？→ **不違反** ✅
 

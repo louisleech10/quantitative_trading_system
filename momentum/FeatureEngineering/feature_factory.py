@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import re
 import os
+import copy
+import gc
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
 import time
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
@@ -16,33 +19,8 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
 import numpy as np
 import pandas as pd
 
-# ── Pathological-input warnings: surface once, then stay quiet ──────────
-# These two warnings come from real input pathologies (not bugs) and were
-# previously flooding the log in tens of thousands of lines, hiding the
-# real progress / error messages:
-#   1. pandas overflow-on-cast: ratio features (e.g. ms_large_trade_ratio)
-#      whose denominator approaches 0 produce 1e30+ values; float32 cast
-#      yields ±inf. Final values get clipped by L6.5 winsorization.
-#   2. statsmodels divide-by-zero in log: OLS on constant rolling windows
-#      (zero residuals → log(0)=-inf in log-likelihood). Same downstream
-#      handling.
-# Using "once" preserves first-occurrence visibility (so we still see the
-# location during debugging) while preventing log flooding. The L7
-# validation scan tracks aggregate inf_count so we never *lose* visibility.
-warnings.filterwarnings(
-    "once",
-    message="overflow encountered in cast",
-    category=RuntimeWarning,
-    module=r"pandas\.core\.nanops",
-)
-warnings.filterwarnings(
-    "once",
-    message="divide by zero encountered in log",
-    category=RuntimeWarning,
-    module=r"statsmodels\.regression\.linear_model",
-)
-
 from momentum.core.logging import get_logger
+from momentum.core.config import get_ic_first_pipeline_enabled
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -80,6 +58,32 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import Featu
 
 logger = get_logger(__name__)
 
+# ── Pathological-input warnings: surface once, then stay quiet ──────────
+# These two warnings come from real input pathologies (not bugs) and were
+# previously flooding the log in tens of thousands of lines, hiding the
+# real progress / error messages:
+#   1. pandas overflow-on-cast: ratio features (e.g. ms_large_trade_ratio)
+#      whose denominator approaches 0 produce 1e30+ values; float32 cast
+#      yields ±inf. Final values get clipped by L6.5 winsorization.
+#   2. statsmodels divide-by-zero in log: OLS on constant rolling windows
+#      (zero residuals → log(0)=-inf in log-likelihood). Same downstream
+#      handling.
+# Using "once" preserves first-occurrence visibility (so we still see the
+# location during debugging) while preventing log flooding. The L7
+# validation scan tracks aggregate inf_count so we never *lose* visibility.
+warnings.filterwarnings(
+    "once",
+    message="overflow encountered in cast",
+    category=RuntimeWarning,
+    module=r"pandas\.core\.nanops",
+)
+warnings.filterwarnings(
+    "once",
+    message="divide by zero encountered in log",
+    category=RuntimeWarning,
+    module=r"statsmodels\.regression\.linear_model",
+)
+
 MAX_L2_ESTIMATED_COLS = 100_000
 
 if TYPE_CHECKING:
@@ -101,6 +105,57 @@ class FeatureGenerationResult:
     def __post_init__(self):
         if self.compute_warnings is None:
             self.compute_warnings = []
+
+
+@dataclass
+class MemoryBudgetSnapshot:
+    rss_before_gb: float
+    rss_after_gb: float
+    released_gb: float
+    available_after_gb: float
+    required_available_gb: float
+
+
+class _PeakRssTracker:
+    def __init__(self, label: str, interval_seconds: float = 0.02) -> None:
+        self.label = label
+        self.interval_seconds = interval_seconds
+        self.peak_rss_gb = 0.0
+        self._stop_event = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def __enter__(self) -> "_PeakRssTracker":
+        self.peak_rss_gb = _current_rss_gb()
+        self._thread = threading.Thread(target=self._sample, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+        self.peak_rss_gb = max(self.peak_rss_gb, _current_rss_gb())
+
+    def _sample(self) -> None:
+        while not self._stop_event.wait(self.interval_seconds):
+            self.peak_rss_gb = max(self.peak_rss_gb, _current_rss_gb())
+
+
+class _MemoryProfiler:
+    def track(self, label: str) -> _PeakRssTracker:
+        return _PeakRssTracker(label)
+
+
+def _current_rss_gb() -> float:
+    import psutil
+
+    return psutil.Process().memory_info().rss / float(1024**3)
+
+
+def _available_ram_gb() -> float:
+    import psutil
+
+    return psutil.virtual_memory().available / float(1024**3)
 
 
 class FeatureFactory:
@@ -130,6 +185,8 @@ class FeatureFactory:
         self._reference_data_cache: Dict[Tuple[str, str], pd.DataFrame] = {}
         self._cgsa_registry: Optional[ColumnGroupRegistry] = None
         self._cgsa_force_fresh: bool = False
+        self._memory_profiler = _MemoryProfiler()
+        self._ic_engine: Optional[Any] = None
 
     def generate_features(
         self,
@@ -224,6 +281,19 @@ class FeatureFactory:
         layer6 = self._safe_execute("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
 
         layers = [layer1, layer2, layer3, layer4, layer5, layer6]
+        if config.preprocessing.enabled and get_ic_first_pipeline_enabled():
+            return self.run_ic_first_pipeline(
+                symbol,
+                timeframe,
+                config,
+                raw_data=raw_data,
+                layers=layers,
+                config_hash=config_hash,
+                compute_warnings=compute_warnings,
+                start_time=start_time,
+                persist=persist,
+            )
+
         if config.preprocessing.enabled:
             all_features = self._combine_layers(layers, context="layer6_5_input")
             preprocessed = self._safe_execute("Layer 6.5", self._layer6_5_preprocessing, all_features, config)
@@ -1221,10 +1291,387 @@ class FeatureFactory:
 
         return pd.concat(frames, axis=1)
 
-    def _layer6_5_preprocessing(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
+    def run_ic_first_pipeline(
+        self,
+        symbol: str,
+        tf: str,
+        config: "FactoryConfig",
+        *,
+        raw_data: Optional[pd.DataFrame] = None,
+        layers: Optional[List[pd.DataFrame]] = None,
+        config_hash: Optional[str] = None,
+        compute_warnings: Optional[List[str]] = None,
+        start_time: Optional[float] = None,
+        persist: bool = True,
+        label: Optional[pd.Series] = None,
+        ic_engine: Optional[Any] = None,
+        feature_reader: Optional[Any] = None,
+        storage: Optional[FeatureStorage] = None,
+        ic_threshold: Optional[float] = None,
+        allow_partial_ic: bool = False,
+        label_horizon: str = "1_bar_forward_return",
+        selection_window: Optional[Dict[str, Any]] = None,
+        split_id: Optional[str] = None,
+    ) -> FeatureGenerationResult:
+        """Run the IC-First pipeline with raw persist, GC gate, IC, and processed persist."""
+        start = start_time if start_time is not None else time.time()
+        resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
+            config,
+            symbol,
+            tf,
+        )
+        self._current_symbol = symbol
+        self._current_timeframe = tf
+        self._current_config_hash = resolved_config_hash
+        if not hasattr(self, "_progress_callback"):
+            self._progress_callback = None
+        if not hasattr(self, "_cgsa_registry"):
+            self._cgsa_registry = None
+        if not hasattr(self, "_reference_data_cache"):
+            self._reference_data_cache = {}
+
+        storage_manager = storage or getattr(self, "_storage", None) or FeatureStorage()
+        resolved_reader = feature_reader or self._build_feature_reader_for_storage(storage_manager)
+        resolved_ic_engine = ic_engine or getattr(self, "_ic_engine", None)
+        if resolved_ic_engine is None:
+            raise ValueError("run_ic_first_pipeline requires an injected ic_engine")
+
+        if raw_data is None or layers is None:
+            raw_data, layers = self._run_l1_l6_for_ic_first(symbol, tf, config)
+        self._current_raw_data = raw_data
+
+        if label is None:
+            label = self._build_default_ic_label(raw_data)
+
+        if selection_window is None and split_id is None:
+            selection_window = {"start_pos": 0, "end_pos": int(len(label))}
+            split_id = "ic_first_full_window"
+
+        all_features = self._combine_layers(layers, context="ic_first_l65_pre_input")
+        pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
+        pre_ic_groups = self._frame_to_l7_groups(pre_ic_frame, "pre_ic")
+        raw_feature_count = sum(len(frame.columns) for frame in pre_ic_groups.values())
+        raw_path = storage_manager.write_raw(symbol, tf, resolved_config_hash, pre_ic_groups)
+
+        rss_before_gc_gb = _current_rss_gb()
+        del pre_ic_groups
+        del pre_ic_frame
+        del all_features
+        del layers
+        gc.collect()
+        memory_snapshot = self._check_ic_memory_budget_after_raw_persist(
+            rss_before_gc_gb,
+            config,
+        )
+
+        peak_budget_gb = self._resolve_tier_peak_budget_gb(config)
+        memory_profiler = getattr(self, "_memory_profiler", _MemoryProfiler())
+        with memory_profiler.track("run_ic_gate") as ic_memory:
+            ic_result = resolved_ic_engine.compute_ic_from_l7_raw(
+                symbol,
+                tf,
+                resolved_config_hash,
+                label,
+                feature_reader=resolved_reader,
+                ic_threshold=ic_threshold,
+                allow_partial_ic=allow_partial_ic,
+                method=None,
+                label_horizon=label_horizon,
+                selection_window=selection_window,
+                split_id=split_id,
+            )
+        if float(ic_memory.peak_rss_gb) > peak_budget_gb:
+            raise MemoryError(
+                "IC-First: run_ic_gate peak RSS "
+                f"{ic_memory.peak_rss_gb:.2f} GB > tier budget {peak_budget_gb:.2f} GB"
+            )
+
+        selected_features = self._extract_ic_selected_features(ic_result)
+        if selected_features:
+            selected_raw = resolved_reader.load_columns_v2(
+                symbol,
+                tf,
+                resolved_config_hash,
+                selected_features,
+                artifact_kind="raw",
+            )
+            raw_selected_groups = self._frame_to_l7_groups(selected_raw, "selected")
+        else:
+            logger.warning("[IC-First] IC selection is empty; writing empty processed artifact")
+            raw_selected_groups = {}
+
+        preprocessor = FeaturePreprocessor(
+            self._preprocessing_config_dict(config),
+            context=self._build_preprocessing_context(raw_data, config),
+        )
+        processed_groups = preprocessor.transform_selected(
+            selected_features,
+            raw_selected_groups,
+            config.preprocessing,
+        )
+        del raw_selected_groups
+        gc.collect()
+
+        processed_path = storage_manager.write_processed(
+            symbol,
+            tf,
+            resolved_config_hash,
+            processed_groups,
+        )
+        processed_feature_count = sum(len(frame.columns) for frame in processed_groups.values())
+        del processed_groups
+        gc.collect()
+
+        labels_df = label.to_frame(name=label.name or "label")
+        metadata = {
+            "symbol": symbol,
+            "timeframe": tf,
+            "config_hash": resolved_config_hash,
+            "ic_first_pipeline": True,
+            "raw_path": str(raw_path),
+            "processed_path": str(processed_path),
+            "selected_features": selected_features,
+            "selected_count": len(selected_features),
+            "raw_feature_count": raw_feature_count,
+            "processed_feature_count": processed_feature_count,
+            "memory_budget": memory_snapshot.__dict__,
+            "run_ic_gate_peak_rss_gb": float(ic_memory.peak_rss_gb),
+            "tier_peak_budget_gb": peak_budget_gb,
+            "persist_requested": bool(persist),
+        }
+        logger.info(
+            "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d peak_rss_gb=%.2f",
+            symbol,
+            tf,
+            len(selected_features),
+            processed_feature_count,
+            float(ic_memory.peak_rss_gb),
+        )
+        return FeatureGenerationResult(
+            features_df=pd.DataFrame(index=raw_data.index if raw_data is not None else None),
+            labels_df=labels_df,
+            metadata=metadata,
+            feature_count=processed_feature_count,
+            generation_time=float(time.time() - start),
+            layer_counts={
+                "layer6_5_raw": int(raw_feature_count),
+                "layer7_processed": int(processed_feature_count),
+            },
+            config_used=self._config_payload(config),
+            hdf5_path=str(processed_path),
+            compute_warnings=compute_warnings or [],
+        )
+
+    def _run_l1_l6_for_ic_first(
+        self,
+        symbol: str,
+        tf: str,
+        config: "FactoryConfig",
+    ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
+        raw_data = self._layer0_data_ingestion(symbol, tf, config)
+        self._current_raw_data = raw_data
+        layer1 = self._safe_execute("Layer 1", self._layer1_atomic_indicators, raw_data, config)
+        layer2 = self._safe_execute("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+        layer2 = self._spill_to_memmap(layer2, "layer2")
+        layer3 = self._safe_execute("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
+        layer4 = self._safe_execute("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
+        layer5 = self._safe_execute("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
+        layer6 = self._safe_execute("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
+        return raw_data, [layer1, layer2, layer3, layer4, layer5, layer6]
+
+    @staticmethod
+    def _frame_to_l7_groups(frame: pd.DataFrame, group_id: str) -> Dict[str, pd.DataFrame]:
+        if frame is None or frame.empty:
+            return {}
+        return {group_id: frame}
+
+    @staticmethod
+    def _build_feature_reader_for_storage(storage: FeatureStorage) -> Any:
+        from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+        return FeatureReader(str(storage.base_path))
+
+    @staticmethod
+    def _build_default_ic_label(raw_data: pd.DataFrame) -> pd.Series:
+        if raw_data is None or raw_data.empty or "close" not in raw_data.columns:
+            raise ValueError("IC-First requires an explicit label or raw_data with close column")
+        return raw_data["close"].astype(float).pct_change().shift(-1).rename("forward_return")
+
+    @staticmethod
+    def _extract_ic_selected_features(ic_result: Any) -> List[str]:
+        if isinstance(ic_result, dict):
+            selected = ic_result.get("selected", [])
+        else:
+            selected = getattr(ic_result, "selected", [])
+        return [str(feature) for feature in selected]
+
+    def _check_ic_memory_budget_after_raw_persist(
+        self,
+        rss_before_gc_gb: float,
+        config: "FactoryConfig",
+    ) -> MemoryBudgetSnapshot:
+        rss_after_gc_gb = _current_rss_gb()
+        available_after_gc_gb = _available_ram_gb()
+        required_available_gb = self._resolve_required_available_gb(config)
+        released_gb = rss_before_gc_gb - rss_after_gc_gb
+        if available_after_gc_gb < required_available_gb:
+            logger.error(
+                "[IC-First] available RAM insufficient before run_ic_gate: %.2f GB < %.2f GB",
+                available_after_gc_gb,
+                required_available_gb,
+            )
+            raise MemoryError("IC-First: insufficient available RAM before run_ic_gate")
+        logger.info(
+            "[IC-First] gc diagnostic: released_gb=%.2f rss_after_gb=%.2f available_after_gb=%.2f required_available_gb=%.2f",
+            released_gb,
+            rss_after_gc_gb,
+            available_after_gc_gb,
+            required_available_gb,
+        )
+        return MemoryBudgetSnapshot(
+            rss_before_gb=float(rss_before_gc_gb),
+            rss_after_gb=float(rss_after_gc_gb),
+            released_gb=float(released_gb),
+            available_after_gb=float(available_after_gc_gb),
+            required_available_gb=float(required_available_gb),
+        )
+
+    def _resolve_required_available_gb(self, config: "FactoryConfig") -> float:
+        return self._resolve_config_float(config, "ic_gate_required_available_gb", 1.0)
+
+    def _resolve_tier_peak_budget_gb(self, config: "FactoryConfig") -> float:
+        try:
+            from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
+
+            default_budget = max(float(get_current_tier_gb()) - 1.0, 1.0)
+        except Exception:
+            default_budget = 7.0
+        return self._resolve_config_float(config, "tier_peak_budget_gb", default_budget)
+
+    @staticmethod
+    def _resolve_config_float(config: "FactoryConfig", field_name: str, default: float) -> float:
+        candidates: List[Any] = [config, getattr(config, "preprocessing", None)]
+        if isinstance(config, dict):
+            candidates.extend([config.get("preprocessing"), config.get("memory")])
+        model_extra = getattr(config, "model_extra", None)
+        if isinstance(model_extra, dict):
+            candidates.append(model_extra)
+
+        for candidate in candidates:
+            if candidate is None:
+                continue
+            value = None
+            if isinstance(candidate, dict):
+                value = candidate.get(field_name)
+            else:
+                value = getattr(candidate, field_name, None)
+                extra = getattr(candidate, "model_extra", None)
+                if value is None and isinstance(extra, dict):
+                    value = extra.get(field_name)
+            if value is None:
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                logger.warning("Invalid %s=%r; fallback to %.2f", field_name, value, default)
+                return float(default)
+        return float(default)
+
+    @staticmethod
+    def _config_payload(config: "FactoryConfig") -> Dict[str, Any]:
+        if isinstance(config, dict):
+            return copy.deepcopy(config)
+        model_dump = getattr(config, "model_dump", None)
+        if callable(model_dump):
+            try:
+                return model_dump(by_alias=True)
+            except TypeError:
+                return model_dump()
+        return {}
+
+    def _layer6_5_preprocessing(
+        self,
+        all_features: pd.DataFrame,
+        config: "FactoryConfig",
+        *,
+        selected_features: Optional[List[str]] = None,
+    ) -> pd.DataFrame:
         """Layer 6.5: Feature preprocessing and normalization."""
+        if get_ic_first_pipeline_enabled():
+            if selected_features is None:
+                return self._layer6_5_pre_ic(all_features, config)
+            return self._layer6_5_post_ic(all_features, config, selected_features)
+
+        return self._layer6_5_legacy(all_features, config)
+
+    def _layer6_5_legacy(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
+        """Legacy Layer 6.5 path: apply preprocessing config to all features."""
+        preprocessing_config = self._preprocessing_config_dict(config)
+        return self._run_layer6_5_preprocessor(all_features, config, preprocessing_config)
+
+    def _layer6_5_pre_ic(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
+        """Pre-IC path: winsorization and FracDiff only."""
+        preprocessing_config = self._preprocessing_config_dict(config)
+        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "adf_differencing", False)
+        logger.info("[IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff only")
+        return self._run_layer6_5_preprocessor(all_features, config, preprocessing_config)
+
+    def _layer6_5_post_ic(
+        self,
+        all_features: pd.DataFrame,
+        config: "FactoryConfig",
+        selected_features: List[str],
+    ) -> pd.DataFrame:
+        """Post-IC path: rank, zscore, and gaussian only for selected features."""
+        selected_columns = [str(feature) for feature in selected_features]
+        if not selected_columns:
+            logger.warning("[IC-First] post_ic received no selected features; returning empty output")
+            return pd.DataFrame(index=all_features.index if all_features is not None else None)
+
+        if all_features is None and self._cgsa_registry is None:
+            logger.warning("[IC-First] post_ic received no L6.5 input features")
+            return pd.DataFrame()
+
+        post_ic_features = all_features
+        if all_features is not None:
+            available_columns = [column for column in selected_columns if column in all_features.columns]
+            missing_columns = [column for column in selected_columns if column not in all_features.columns]
+            if missing_columns:
+                logger.warning(
+                    "[IC-First] post_ic skipped %d selected features missing from L6.5 input",
+                    len(missing_columns),
+                )
+            if not available_columns:
+                logger.warning("[IC-First] post_ic selected features are absent from L6.5 input")
+                return pd.DataFrame(index=all_features.index)
+            selected_columns = available_columns
+            post_ic_features = all_features.loc[:, selected_columns].copy()
+
+        preprocessing_config = self._preprocessing_config_dict(config)
+        preprocessing_config["mode"] = "replace"
+        self._set_preprocessing_step_enabled(preprocessing_config, "winsorization", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "fractional_differencing", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "adf_differencing", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", True, selected_columns)
+        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", True, selected_columns)
+        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", True, selected_columns)
+        logger.info(
+            "[IC-First] Layer 6.5 post_ic enabled: transforming %d selected features",
+            len(selected_columns),
+        )
+        return self._run_layer6_5_preprocessor(post_ic_features, config, preprocessing_config)
+
+    def _run_layer6_5_preprocessor(
+        self,
+        all_features: pd.DataFrame,
+        config: "FactoryConfig",
+        preprocessing_config: Dict[str, Any],
+    ) -> pd.DataFrame:
         context = self._build_preprocessing_context(all_features, config)
-        preprocessor = FeaturePreprocessor(config.preprocessing.model_dump(), context=context)
+        preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
 
         if self._cgsa_enabled() and self._cgsa_registry is not None:
             from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
@@ -1247,6 +1694,25 @@ class FeatureFactory:
             return pd.DataFrame(index=all_features.index if all_features is not None else None)
 
         return preprocessor.transform(all_features)
+
+    @staticmethod
+    def _preprocessing_config_dict(config: "FactoryConfig") -> Dict[str, Any]:
+        return copy.deepcopy(config.preprocessing.model_dump())
+
+    @staticmethod
+    def _set_preprocessing_step_enabled(
+        preprocessing_config: Dict[str, Any],
+        step_name: str,
+        enabled: bool,
+        apply_to: Optional[List[str]] = None,
+    ) -> None:
+        step_config = preprocessing_config.get(step_name)
+        if not isinstance(step_config, dict):
+            step_config = {}
+            preprocessing_config[step_name] = step_config
+        step_config["enabled"] = enabled
+        if apply_to is not None:
+            step_config["apply_to"] = list(apply_to)
 
     def _build_preprocessing_context(
         self,

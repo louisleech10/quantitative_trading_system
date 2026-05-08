@@ -35,6 +35,20 @@ def get_l65_optimization_profile() -> str:
     return "optimized"
 
 
+def get_ic_first_pipeline_enabled() -> bool:
+    raw = os.getenv("FFACT_IC_FIRST_PIPELINE", "0").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"", "0", "false", "no", "off"}:
+        return False
+
+    logger.warning(
+        "Invalid FFACT_IC_FIRST_PIPELINE=%s, fallback to disabled legacy pipeline",
+        raw,
+    )
+    return False
+
+
 def _parse_fracdiff_layers(raw: str) -> Optional[FrozenSet[str]]:
     tokens = [token.strip().upper() for token in raw.split(",") if token.strip()]
     if not tokens:
@@ -224,8 +238,9 @@ def batch_nested_environment(enabled: bool = True) -> Iterator[None]:
 def _default_project_root() -> Path:
     current = Path(__file__).resolve()
     # core/config.py -> core -> momentum -> project root
-    if len(current.parents) >= 4:
-        return current.parents[3]
+    # parents[0]=core, parents[1]=momentum, parents[2]=project_root
+    if len(current.parents) >= 3:
+        return current.parents[2]
     return Path.cwd()
 
 

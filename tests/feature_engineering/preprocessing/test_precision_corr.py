@@ -106,7 +106,7 @@ def test_precision_cache_version_v2_invalidates_legacy_and_mismatch(
     cache.flush_atomic()
     payload = json.loads(cache.path.read_text(encoding="utf-8"))
 
-    assert payload["cache_version"] == "v2"
+    assert payload["cache_version"] == "v3"
     assert cache.get("L1_alpha") == 0.5
     assert DStarCache(
         context,

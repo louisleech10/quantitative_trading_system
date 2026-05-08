@@ -2,16 +2,49 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+import gc
+import json
+import os
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 from scipy import optimize, stats
 
 from momentum.core.logging import get_logger
+from momentum.core.protocols import IFeatureReader
 
 
 logger = get_logger(__name__)
+
+
+class ICReadError(RuntimeError):
+    """Raised when L7 raw IC streaming cannot be completed safely."""
+
+
+@dataclass
+class ICSelectionResult:
+    """Result payload for IC-First raw streaming selection."""
+
+    symbol: str
+    tf: str
+    config_hash: str
+    selected: List[str]
+    ic_scores: Dict[str, float]
+    skipped_groups: List[str]
+    quality_status: str
+    selected_path: str
+    data_fingerprint: Dict[str, Any]
+    ic_params: Dict[str, Any]
+    group_count: int
+    total_features: int
+    frozen_gate_eligible: bool
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 class ICEngine:
@@ -62,6 +95,137 @@ class ICEngine:
             results[feature] = value
 
         return results
+
+    def compute_ic_from_l7_raw(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        label: pd.Series,
+        *,
+        feature_reader: IFeatureReader,
+        ic_threshold: Optional[float] = None,
+        allow_partial_ic: bool = False,
+        method: Optional[str] = None,
+        label_horizon: Optional[str] = None,
+        selection_window: Optional[Dict[str, Any]] = None,
+        split_id: Optional[str] = None,
+        ic_params: Optional[Dict[str, Any]] = None,
+    ) -> ICSelectionResult:
+        """Compute IC from canonical L7 raw parquet groups without full concat."""
+
+        self._validate_selection_metadata(label_horizon, selection_window, split_id)
+        resolved_method = method or (self._methods[0] if self._methods else "spearman")
+        resolved_threshold = float(
+            ic_threshold
+            if ic_threshold is not None
+            else self._config.get("ic_threshold", 0.02)
+        )
+        merged_ic_params = self._build_ic_params(
+            method=resolved_method,
+            ic_threshold=resolved_threshold,
+            allow_partial_ic=allow_partial_ic,
+            label_horizon=label_horizon,
+            selection_window=selection_window,
+            split_id=split_id,
+            overrides=ic_params,
+        )
+
+        manifest = feature_reader.load_manifest_v2(
+            symbol,
+            tf,
+            config_hash,
+            artifact_kind="raw",
+        )
+        raw_artifact = self._validate_l7_raw_manifest(
+            manifest,
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+        )
+        run_dir = Path(feature_reader.feature_run_dir(symbol, tf, config_hash))
+        base_dir = self._resolve_l7_raw_base_dir(run_dir, manifest, config_hash)
+        selected_path = run_dir / f"ic_selected_features_{symbol}_{tf}.json"
+
+        data_fingerprint = self._build_data_fingerprint(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            manifest=manifest,
+            raw_artifact=raw_artifact,
+            ic_params=merged_ic_params,
+        )
+
+        ic_scores: Dict[str, float] = {}
+        skipped_groups: List[str] = []
+        group_count = 0
+
+        for group_name, parquet_path in self._iter_l7_raw_group_paths(base_dir, raw_artifact):
+            try:
+                group_df = pd.read_parquet(parquet_path)
+            except Exception as exc:
+                if not allow_partial_ic:
+                    raise ICReadError(f"Failed to read L7 raw group {group_name}: {parquet_path}") from exc
+                skipped_groups.append(str(parquet_path))
+                logger.warning("[IC-First] skipped corrupted group: %s", parquet_path)
+                continue
+
+            try:
+                group_ic = self._compute_l7_raw_group_ic(
+                    group_df=group_df,
+                    label=label,
+                    method=resolved_method,
+                    selection_window=selection_window,
+                )
+                ic_scores.update(group_ic)
+                group_count += 1
+            finally:
+                del group_df
+                gc.collect()
+
+        selected = [
+            feature
+            for feature, ic_value in ic_scores.items()
+            if self._passes_ic_threshold(ic_value, resolved_threshold)
+        ]
+        quality_status = "partial" if skipped_groups else "complete"
+        payload = self._write_ic_selected_json_atomic(
+            output_path=selected_path,
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            selected=selected,
+            ic_scores=ic_scores,
+            data_fingerprint=data_fingerprint,
+            ic_params=merged_ic_params,
+            skipped_groups=skipped_groups,
+            quality_status=quality_status,
+        )
+
+        logger.info(
+            "[IC-First] ic_gate done: symbol=%s tf=%s selected=%d/%d status=%s skipped=%d",
+            symbol,
+            tf,
+            len(selected),
+            len(ic_scores),
+            quality_status,
+            len(skipped_groups),
+        )
+        return ICSelectionResult(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            selected=selected,
+            ic_scores=ic_scores,
+            skipped_groups=skipped_groups,
+            quality_status=quality_status,
+            selected_path=str(payload["selected_path"]),
+            data_fingerprint=data_fingerprint,
+            ic_params=merged_ic_params,
+            group_count=group_count,
+            total_features=int(raw_artifact.get("total_features", len(ic_scores))),
+            frozen_gate_eligible=quality_status == "complete",
+        )
 
     def compute_rolling_ic(
         self,
@@ -239,6 +403,303 @@ class ICEngine:
         if persistent_count > 0:
             logger.info("IC autocorr persistent: count=%s", persistent_count)
         return results
+
+    @staticmethod
+    def _validate_selection_metadata(
+        label_horizon: Optional[str],
+        selection_window: Optional[Dict[str, Any]],
+        split_id: Optional[str],
+    ) -> None:
+        if not label_horizon:
+            raise ValueError("label_horizon is required for IC selection metadata")
+        if not selection_window and not split_id:
+            raise ValueError("selection_window or split_id is required for IC selection metadata")
+
+    @staticmethod
+    def _build_ic_params(
+        method: str,
+        ic_threshold: float,
+        allow_partial_ic: bool,
+        label_horizon: Optional[str],
+        selection_window: Optional[Dict[str, Any]],
+        split_id: Optional[str],
+        overrides: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        params: Dict[str, Any] = {
+            "method": method,
+            "ic_threshold": ic_threshold,
+            "allow_partial_ic": allow_partial_ic,
+            "label_horizon": label_horizon,
+            "selection_window": selection_window,
+            "split_id": split_id,
+        }
+        if overrides:
+            params.update(overrides)
+            params["method"] = method
+            params["ic_threshold"] = ic_threshold
+            params["allow_partial_ic"] = allow_partial_ic
+            params["label_horizon"] = label_horizon
+            params["selection_window"] = selection_window
+            params["split_id"] = split_id
+        return params
+
+    @staticmethod
+    def _validate_l7_raw_manifest(
+        manifest: Dict[str, Any],
+        symbol: str,
+        tf: str,
+        config_hash: str,
+    ) -> Dict[str, Any]:
+        if not manifest.get("complete"):
+            raise ICReadError("L7 raw manifest is incomplete")
+        if str(manifest.get("symbol")) != str(symbol):
+            raise ICReadError("L7 raw manifest symbol mismatch")
+        if str(manifest.get("tf")) != str(tf):
+            raise ICReadError("L7 raw manifest timeframe mismatch")
+        if str(manifest.get("config_hash")) != str(config_hash):
+            raise ICReadError("L7 raw manifest config_hash mismatch")
+
+        artifacts = manifest.get("artifacts", {})
+        raw_artifact = artifacts.get("raw")
+        if not isinstance(raw_artifact, dict):
+            raise ICReadError("L7 raw artifact is missing")
+        if not raw_artifact.get("complete"):
+            raise ICReadError("L7 raw artifact is incomplete")
+
+        groups = raw_artifact.get("groups", {})
+        total_features = int(raw_artifact.get("total_features") or 0)
+        if not groups or total_features <= 0:
+            raise ICReadError("L7 raw artifact is empty; fail closed")
+        return raw_artifact
+
+    @staticmethod
+    def _resolve_l7_raw_base_dir(
+        run_dir: Path,
+        manifest: Dict[str, Any],
+        config_hash: str,
+    ) -> Path:
+        if manifest.get("legacy_format"):
+            return run_dir.parent.parent / config_hash
+        return run_dir
+
+    def _iter_l7_raw_group_paths(
+        self,
+        base_dir: Path,
+        raw_artifact: Dict[str, Any],
+    ) -> List[Tuple[str, Path]]:
+        group_paths: List[Tuple[str, Path]] = []
+        groups = raw_artifact.get("groups", {})
+        for group_name in sorted(groups):
+            group_info = groups[group_name]
+            raw_path = group_info.get("path") or group_info.get("file")
+            group_paths.append((group_name, self._resolve_manifest_path(base_dir, raw_path)))
+        return group_paths
+
+    @staticmethod
+    def _resolve_manifest_path(base_dir: Path, raw_path: Optional[str]) -> Path:
+        if not raw_path:
+            raise ICReadError("L7 raw group path is missing")
+        relative_path = Path(str(raw_path))
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise ICReadError(f"Unsafe L7 raw group path: {raw_path}")
+        return base_dir / relative_path
+
+    def _compute_l7_raw_group_ic(
+        self,
+        group_df: pd.DataFrame,
+        label: pd.Series,
+        method: str,
+        selection_window: Optional[Dict[str, Any]],
+    ) -> Dict[str, float]:
+        numeric_df = group_df.select_dtypes(include=[np.number]).copy()
+        if numeric_df.empty:
+            return {}
+
+        aligned_label = self._align_label_to_group(label, numeric_df)
+        numeric_df, aligned_label = self._apply_selection_window(
+            numeric_df,
+            aligned_label,
+            selection_window,
+        )
+        if numeric_df.empty or len(numeric_df) < 2:
+            return {str(column): np.nan for column in numeric_df.columns}
+        return self.compute_ic(numeric_df, aligned_label, method=method)
+
+    @staticmethod
+    def _align_label_to_group(label: pd.Series, group_df: pd.DataFrame) -> pd.Series:
+        label_series = label if isinstance(label, pd.Series) else pd.Series(label)
+        label_name = label_series.name or "label"
+        if len(label_series) == len(group_df) and not label_series.index.equals(group_df.index):
+            return pd.Series(label_series.to_numpy(), index=group_df.index, name=label_name)
+        if not label_series.index.equals(group_df.index):
+            return label_series.reindex(group_df.index).rename(label_name)
+        return label_series.rename(label_name)
+
+    @staticmethod
+    def _apply_selection_window(
+        features_df: pd.DataFrame,
+        label: pd.Series,
+        selection_window: Optional[Dict[str, Any]],
+    ) -> Tuple[pd.DataFrame, pd.Series]:
+        if not selection_window:
+            return features_df, label
+
+        start_pos = selection_window.get("start_pos", selection_window.get("start_index"))
+        end_pos = selection_window.get("end_pos", selection_window.get("end_index"))
+        if isinstance(start_pos, int) or isinstance(end_pos, int):
+            start = max(int(start_pos or 0), 0)
+            end = int(end_pos) if isinstance(end_pos, int) else len(features_df)
+            end = max(min(end, len(features_df)), start)
+            return features_df.iloc[start:end], label.iloc[start:end]
+
+        start_value = selection_window.get("start") or selection_window.get("start_time")
+        end_value = selection_window.get("end") or selection_window.get("end_time")
+        if start_value is None and end_value is None:
+            return features_df, label
+
+        index = features_df.index
+        mask = pd.Series(True, index=index)
+        if isinstance(index, pd.DatetimeIndex):
+            if start_value is not None:
+                mask &= index >= pd.Timestamp(start_value)
+            if end_value is not None:
+                mask &= index <= pd.Timestamp(end_value)
+        else:
+            if start_value is not None:
+                mask &= index >= start_value
+            if end_value is not None:
+                mask &= index <= end_value
+        return features_df.loc[mask.to_numpy()], label.loc[mask.to_numpy()]
+
+    @staticmethod
+    def _passes_ic_threshold(ic_value: float, ic_threshold: float) -> bool:
+        try:
+            numeric_value = float(ic_value)
+        except (TypeError, ValueError):
+            return False
+        return bool(np.isfinite(numeric_value) and abs(numeric_value) >= ic_threshold)
+
+    @staticmethod
+    def _build_data_fingerprint(
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        manifest: Dict[str, Any],
+        raw_artifact: Dict[str, Any],
+        ic_params: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        source_info = manifest.get("source")
+        source_checksum = manifest.get("source_checksum") or manifest.get("data_source_checksum")
+        if not source_checksum and isinstance(source_info, dict):
+            source_checksum = source_info.get("checksum")
+        hdf5_metadata = manifest.get("hdf5_metadata") or manifest.get("source_metadata")
+        fingerprint: Dict[str, Any] = {
+            "symbol": symbol,
+            "tf": tf,
+            "time_range": raw_artifact.get("time_range") or manifest.get("time_range"),
+            "row_count": raw_artifact.get("row_count") or manifest.get("row_count"),
+            "source_checksum": source_checksum,
+            "hdf5_metadata": hdf5_metadata,
+            "feature_schema_hash": raw_artifact.get("feature_schema_hash") or manifest.get("feature_schema_hash"),
+            "config_hash": config_hash,
+            "algorithm_versions": {
+                "ic_engine": "ic_first_raw_v1",
+                "schema_version": raw_artifact.get("schema_version"),
+                "l65_algorithm_versions": manifest.get("algorithm_versions"),
+            },
+            "ic_params": ic_params,
+            "label_horizon": ic_params.get("label_horizon"),
+            "selection_window": ic_params.get("selection_window"),
+            "split_id": ic_params.get("split_id"),
+        }
+        missing_required_fields = [
+            key
+            for key in (
+                "symbol",
+                "tf",
+                "time_range",
+                "row_count",
+                "feature_schema_hash",
+                "config_hash",
+                "algorithm_versions",
+                "ic_params",
+                "label_horizon",
+            )
+            if fingerprint.get(key) in (None, "", {}, [])
+        ]
+        if source_checksum in (None, "") and hdf5_metadata in (None, {}, ""):
+            missing_required_fields.append("source_checksum_or_hdf5_metadata")
+        if not fingerprint.get("selection_window") and not fingerprint.get("split_id"):
+            missing_required_fields.append("selection_window_or_split_id")
+        fingerprint["missing_required_fields"] = sorted(set(missing_required_fields))
+        fingerprint["cache_valid"] = not bool(missing_required_fields)
+        fingerprint["cache_status"] = "recomputed"
+        return fingerprint
+
+    def _write_ic_selected_json_atomic(
+        self,
+        output_path: Path,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        selected: List[str],
+        ic_scores: Dict[str, float],
+        data_fingerprint: Dict[str, Any],
+        ic_params: Dict[str, Any],
+        skipped_groups: List[str],
+        quality_status: str,
+    ) -> Dict[str, Any]:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        payload: Dict[str, Any] = {
+            "schema_version": "ic_selected_v1",
+            "complete": True,
+            "symbol": symbol,
+            "tf": tf,
+            "timeframe": tf,
+            "config_hash": config_hash,
+            "selected": selected,
+            "selected_count": len(selected),
+            "ic_scores": ic_scores,
+            "skipped_groups": skipped_groups,
+            "quality_status": quality_status,
+            "frozen_gate_eligible": quality_status == "complete",
+            "data_fingerprint": data_fingerprint,
+            "ic_params": ic_params,
+            "selected_path": str(output_path),
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+        safe_payload = self._json_safe(payload)
+        temp_path = output_path.with_name(f".{output_path.name}.tmp")
+        try:
+            with temp_path.open("w", encoding="utf-8") as selected_file:
+                json.dump(safe_payload, selected_file, ensure_ascii=False, indent=2, allow_nan=False)
+            os.replace(temp_path, output_path)
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
+        return safe_payload
+
+    def _json_safe(self, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, float):
+            return value if np.isfinite(value) else None
+        if isinstance(value, (str, int, bool)):
+            return value
+        if isinstance(value, np.generic):
+            return self._json_safe(value.item())
+        if isinstance(value, Path):
+            return str(value)
+        if isinstance(value, dict):
+            return {str(key): self._json_safe(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [self._json_safe(item) for item in value]
+        if hasattr(value, "isoformat"):
+            try:
+                return value.isoformat()
+            except Exception:
+                pass
+        return str(value)
 
     @staticmethod
     def _fit_exponential_decay(

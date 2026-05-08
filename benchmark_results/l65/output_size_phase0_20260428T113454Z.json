@@ -1,0 +1,152 @@
+{
+  "blocking_reason": "size_failures=1 dstar_failures=0",
+  "comparisons": [
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet",
+      "baseline_size_bytes": 390697,
+      "delta_pct": 0.01331,
+      "gate_id": "T0.P1",
+      "output_path": "benchmark_results/l65/outputs/t0.p1_ETHUSDT_1h_run1_20260428T112920Z.parquet",
+      "output_size_bytes": 390749,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P1_20260428T112920Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet",
+      "baseline_size_bytes": 390697,
+      "delta_pct": 0.01331,
+      "gate_id": "T0.P1",
+      "output_path": "benchmark_results/l65/outputs/t0.p1_ETHUSDT_1h_run2_20260428T112920Z.parquet",
+      "output_size_bytes": 390749,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P1_20260428T112920Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet",
+      "baseline_size_bytes": 390697,
+      "delta_pct": 0.01331,
+      "gate_id": "T0.P1",
+      "output_path": "benchmark_results/l65/outputs/t0.p1_ETHUSDT_1h_run3_20260428T112920Z.parquet",
+      "output_size_bytes": 390749,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P1_20260428T112920Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet",
+      "baseline_size_bytes": 390697,
+      "delta_pct": 0.01331,
+      "gate_id": "T0.P3",
+      "output_path": "benchmark_results/l65/outputs/t0.p3_ETHUSDT_1h_run1_20260428T112930Z.parquet",
+      "output_size_bytes": 390749,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P3_20260428T112930Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet",
+      "baseline_size_bytes": 390697,
+      "delta_pct": 0.01331,
+      "gate_id": "T0.P3",
+      "output_path": "benchmark_results/l65/outputs/t0.p3_ETHUSDT_1h_run2_20260428T112930Z.parquet",
+      "output_size_bytes": 390749,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P3_20260428T112930Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/synthetic_baseline.parquet",
+      "baseline_size_bytes": 584811,
+      "delta_pct": 1.920792,
+      "gate_id": "T0.P5",
+      "output_path": "benchmark_results/l65/outputs/t0.p5_SYNTHETIC_fixture_run1_20260428T112935Z.parquet",
+      "output_size_bytes": 596044,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P5_20260428T112935Z.json",
+      "status": "PASS",
+      "symbol": "SYNTHETIC",
+      "timeframe": "fixture"
+    },
+    {
+      "baseline_path": "tests/golden/l65/tier2_reduced/synthetic_baseline.parquet",
+      "baseline_size_bytes": 584811,
+      "delta_pct": -98.975737,
+      "gate_id": "T0.P5",
+      "output_path": "benchmark_results/l65/outputs/t0.p5_SYNTHETIC_fixture_run1_20260428T113425Z.parquet",
+      "output_size_bytes": 5990,
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P5_20260428T113425Z.json",
+      "status": "FAIL",
+      "symbol": "SYNTHETIC",
+      "timeframe": "fixture"
+    }
+  ],
+  "delta_limit_pct": 5.0,
+  "dstar_cache_findings": [
+    {
+      "dstar_cache_path": "/Users/louis/Desktop/data_cache/feature_preprocessing/d_star_ETHUSDT_1h_cd942555e534.json",
+      "dstar_json_size_bytes": 2836,
+      "gate_id": "T0.P1",
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P1_20260428T112920Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "dstar_cache_path": "/Users/louis/Desktop/data_cache/feature_preprocessing/d_star_ETHUSDT_1h_cd942555e534.json",
+      "dstar_json_size_bytes": 2836,
+      "gate_id": "T0.P1",
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P1_20260428T112920Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "dstar_cache_path": "/Users/louis/Desktop/data_cache/feature_preprocessing/d_star_ETHUSDT_1h_cd942555e534.json",
+      "dstar_json_size_bytes": 2836,
+      "gate_id": "T0.P1",
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P1_20260428T112920Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "dstar_cache_path": "/Users/louis/Desktop/data_cache/feature_preprocessing/d_star_ETHUSDT_1h_cd942555e534.json",
+      "dstar_json_size_bytes": 2836,
+      "gate_id": "T0.P3",
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P3_20260428T112930Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "dstar_cache_path": "/Users/louis/Desktop/data_cache/feature_preprocessing/d_star_ETHUSDT_1h_cd942555e534.json",
+      "dstar_json_size_bytes": 2836,
+      "gate_id": "T0.P3",
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P3_20260428T112930Z.json",
+      "status": "PASS",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "dstar_cache_path": "/Users/louis/Desktop/data_cache/feature_preprocessing/d_star_SYNTHETIC_fixture_1ab5f9d891c3.json",
+      "dstar_json_size_bytes": 3275,
+      "gate_id": "T0.P5",
+      "result_file": "benchmark_results/l65/phase0_gate_T0_P5_20260428T112935Z.json",
+      "status": "PASS",
+      "symbol": "SYNTHETIC",
+      "timeframe": "fixture"
+    }
+  ],
+  "dstar_json_limit_bytes": 5242880,
+  "phase": 0,
+  "result_files_scanned": 6,
+  "skipped_without_baseline": 0,
+  "status": "FAIL",
+  "timestamp": "20260428T113454Z"
+}

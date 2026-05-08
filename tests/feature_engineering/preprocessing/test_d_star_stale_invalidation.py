@@ -44,7 +44,7 @@ def test_d_star_stale_invalidation_for_context_fields(tmp_path: Path) -> None:
 
     assert _cache(tmp_path).get("L1_close") == 0.4
     assert _cache(tmp_path, replace(BASE_CONTEXT, data_fingerprint="fingerprint-v2")).get("L1_close") is None
-    assert _cache(tmp_path, replace(BASE_CONTEXT, feature_schema_hash="schema-v2")).get("L1_close") is None
+    assert _cache(tmp_path, replace(BASE_CONTEXT, feature_schema_hash="schema-v2")).get("L1_close") == 0.4
 
 
 def test_d_star_stale_invalidation_for_selection_fields(tmp_path: Path) -> None:

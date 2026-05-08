@@ -15,6 +15,9 @@ import h5py
 import pandas as pd
 import numpy as np
 import json
+import hashlib
+import shutil
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from pathlib import Path
@@ -233,6 +236,10 @@ class FeatureStorage:
             /timestamps        # (n_samples,) int64
             /metadata          # Attributes
     """
+
+    L7_RAW_SCHEMA_VERSION = "raw_v1"
+    L7_PROCESSED_SCHEMA_VERSION = "processed_v1"
+    L7_V2_MANIFEST_NAME = "feature_manifest.json"
     
     def __init__(self, base_path: str = "data_cache/features"):
         """
@@ -245,6 +252,376 @@ class FeatureStorage:
         self._chunk_rows = self._resolve_positive_env("FFACT_HDF5_CHUNK_ROWS", 256)
         self._chunk_cols = self._resolve_positive_env("FFACT_HDF5_CHUNK_COLS", 512)
         self._gzip_level = self._resolve_bounded_env("FFACT_HDF5_GZIP_LEVEL", 4, 0, 9)
+
+    def feature_run_dir(self, symbol: str, tf: str, config_hash: str) -> Path:
+        """Return the canonical V2 run directory for one symbol/timeframe/config."""
+        safe_symbol = self._safe_path_segment(symbol, "symbol")
+        safe_tf = self._safe_path_segment(tf, "tf")
+        safe_config_hash = self._safe_path_segment(config_hash, "config_hash")
+        return self.base_path / safe_symbol / safe_tf / safe_config_hash
+
+    def write_raw(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        groups: Dict[str, pd.DataFrame],
+    ) -> Path:
+        """Write IC-First raw L7 groups to the canonical V2 raw path."""
+        return self._write_l7_v2_artifact(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            groups=groups,
+            artifact_kind="raw",
+            schema_version=self.L7_RAW_SCHEMA_VERSION,
+            allow_empty=False,
+            quality_status="complete",
+        )
+
+    def write_processed(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        groups: Dict[str, pd.DataFrame],
+    ) -> Path:
+        """Write IC-First processed L7 groups to the canonical V2 processed path."""
+        quality_status = "empty_selection" if not groups else "complete"
+        return self._write_l7_v2_artifact(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            groups=groups,
+            artifact_kind="processed",
+            schema_version=self.L7_PROCESSED_SCHEMA_VERSION,
+            allow_empty=True,
+            quality_status=quality_status,
+        )
+
+    def _write_l7_v2_artifact(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        groups: Dict[str, pd.DataFrame],
+        artifact_kind: str,
+        schema_version: str,
+        allow_empty: bool,
+        quality_status: str,
+    ) -> Path:
+        pa_module, pq_module = _require_pyarrow()
+        run_dir = self.feature_run_dir(symbol, tf, config_hash)
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        group_items = self._normalize_l7_v2_groups(groups)
+        total_features = sum(len(frame.columns) for _group_id, frame in group_items)
+        if not allow_empty and total_features <= 0:
+            raise ValueError("write_raw requires non-empty feature groups")
+        if allow_empty and total_features <= 0:
+            quality_status = "empty_selection"
+
+        feature_schema_hash = self._build_l7_v2_schema_hash(
+            schema_version=schema_version,
+            group_items=group_items,
+        )
+        row_count = self._resolve_l7_v2_row_count(group_items)
+        time_range = self._resolve_l7_v2_time_range(group_items)
+
+        temp_root = run_dir / f".tmp-{artifact_kind}-{uuid.uuid4().hex}"
+        temp_artifact_dir = temp_root / artifact_kind
+        temp_artifact_dir.mkdir(parents=True, exist_ok=False)
+
+        final_artifact_dir = run_dir / artifact_kind
+        backup_dir: Optional[Path] = None
+        artifact_installed = False
+
+        try:
+            group_manifest: Dict[str, Dict[str, Any]] = {}
+            parquet_metadata = self._build_l7_v2_parquet_metadata(
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                schema_version=schema_version,
+                feature_schema_hash=feature_schema_hash,
+                artifact_kind=artifact_kind,
+            )
+
+            for group_id, frame in group_items:
+                group_manifest[group_id] = self._write_l7_v2_group_parquet(
+                    pa_module=pa_module,
+                    pq_module=pq_module,
+                    artifact_dir=temp_artifact_dir,
+                    group_id=group_id,
+                    frame=frame,
+                    schema_metadata=parquet_metadata,
+                )
+
+            manifest = self._build_feature_manifest_v2(
+                run_dir=run_dir,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                artifact_kind=artifact_kind,
+                schema_version=schema_version,
+                quality_status=quality_status,
+                feature_schema_hash=feature_schema_hash,
+                row_count=row_count,
+                time_range=time_range,
+                total_features=total_features,
+                group_manifest=group_manifest,
+            )
+
+            if final_artifact_dir.exists():
+                backup_dir = run_dir / f".previous-{artifact_kind}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+                os.replace(final_artifact_dir, backup_dir)
+
+            os.replace(temp_artifact_dir, final_artifact_dir)
+            artifact_installed = True
+            self._write_feature_manifest_v2(run_dir, manifest)
+
+            if backup_dir is not None and backup_dir.exists():
+                shutil.rmtree(backup_dir)
+
+            self.logger.info(
+                "[IC-First] %s persist done: symbol=%s tf=%s groups=%d features=%d schema=%s",
+                artifact_kind,
+                symbol,
+                tf,
+                len(group_manifest),
+                total_features,
+                schema_version,
+            )
+            return final_artifact_dir
+        except Exception:
+            if artifact_installed and final_artifact_dir.exists():
+                shutil.rmtree(final_artifact_dir)
+            if backup_dir is not None and backup_dir.exists():
+                os.replace(backup_dir, final_artifact_dir)
+            raise
+        finally:
+            if temp_root.exists():
+                shutil.rmtree(temp_root)
+
+    @staticmethod
+    def _safe_path_segment(value: str, field_name: str) -> str:
+        segment = str(value).strip()
+        if not segment or segment in {".", ".."} or "/" in segment or "\\" in segment:
+            raise ValueError(f"Invalid {field_name}: {value!r}")
+        return segment
+
+    @classmethod
+    def _normalize_l7_v2_groups(
+        cls,
+        groups: Dict[str, pd.DataFrame],
+    ) -> List[Tuple[str, pd.DataFrame]]:
+        if groups is None:
+            raise ValueError("groups must be a dictionary")
+
+        normalized: List[Tuple[str, pd.DataFrame]] = []
+        seen_group_ids: set[str] = set()
+        for raw_group_id, frame in groups.items():
+            group_id = cls._safe_path_segment(str(raw_group_id), "group_id")
+            if group_id in seen_group_ids:
+                raise ValueError(f"Duplicate group_id after normalization: {group_id}")
+            if not isinstance(frame, pd.DataFrame):
+                raise TypeError(f"Group {group_id} must be a pandas DataFrame")
+            normalized.append((group_id, frame))
+            seen_group_ids.add(group_id)
+        return normalized
+
+    @staticmethod
+    def _build_l7_v2_schema_hash(
+        schema_version: str,
+        group_items: List[Tuple[str, pd.DataFrame]],
+    ) -> str:
+        schema_payload = {
+            "schema_version": schema_version,
+            "groups": {
+                group_id: [str(column) for column in frame.columns]
+                for group_id, frame in sorted(group_items, key=lambda item: item[0])
+            },
+        }
+        encoded = json.dumps(schema_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _resolve_l7_v2_row_count(group_items: List[Tuple[str, pd.DataFrame]]) -> int:
+        row_counts = {len(frame.index) for _group_id, frame in group_items}
+        if not row_counts:
+            return 0
+        if len(row_counts) != 1:
+            raise ValueError(f"L7 V2 group row_count mismatch: {sorted(row_counts)}")
+        return int(next(iter(row_counts)))
+
+    @classmethod
+    def _resolve_l7_v2_time_range(
+        cls,
+        group_items: List[Tuple[str, pd.DataFrame]],
+    ) -> Dict[str, Optional[str]]:
+        if not group_items:
+            return {"start": None, "end": None}
+
+        non_empty_indexes = [frame.index for _group_id, frame in group_items if len(frame.index) > 0]
+        if not non_empty_indexes:
+            return {"start": None, "end": None}
+
+        starts = [index[0] for index in non_empty_indexes]
+        ends = [index[-1] for index in non_empty_indexes]
+        return {
+            "start": cls._format_manifest_value(min(starts)),
+            "end": cls._format_manifest_value(max(ends)),
+        }
+
+    @staticmethod
+    def _format_manifest_value(value: Any) -> str:
+        if hasattr(value, "isoformat"):
+            return str(value.isoformat())
+        if isinstance(value, np.generic):
+            return str(value.item())
+        return str(value)
+
+    @staticmethod
+    def _build_l7_v2_parquet_metadata(
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        schema_version: str,
+        feature_schema_hash: str,
+        artifact_kind: str,
+    ) -> Dict[bytes, bytes]:
+        return {
+            b"schema_version": schema_version.encode("utf-8"),
+            b"symbol": str(symbol).encode("utf-8"),
+            b"tf": str(tf).encode("utf-8"),
+            b"config_hash": str(config_hash).encode("utf-8"),
+            b"feature_schema_hash": feature_schema_hash.encode("utf-8"),
+            b"artifact_kind": artifact_kind.encode("utf-8"),
+        }
+
+    def _write_l7_v2_group_parquet(
+        self,
+        pa_module: Any,
+        pq_module: Any,
+        artifact_dir: Path,
+        group_id: str,
+        frame: pd.DataFrame,
+        schema_metadata: Dict[bytes, bytes],
+    ) -> Dict[str, Any]:
+        file_name = f"{group_id}.parquet"
+        output_path = artifact_dir / file_name
+        table = pa_module.Table.from_pandas(frame, preserve_index=False)
+        merged_metadata = dict(table.schema.metadata or {})
+        merged_metadata.update(schema_metadata)
+        table = table.replace_schema_metadata(merged_metadata)
+        pq_module.write_table(
+            table,
+            str(output_path),
+            compression="zstd",
+            compression_level=1,
+            use_dictionary=False,
+        )
+        return {
+            "path": str(Path(artifact_dir.name) / file_name),
+            "file": file_name,
+            "columns": [str(column) for column in frame.columns],
+            "column_count": int(len(frame.columns)),
+            "row_count": int(len(frame.index)),
+            "dtype": self._summarize_frame_dtype(frame),
+            "nan_ratio": self._calculate_nan_ratio(frame),
+            "file_size_bytes": int(output_path.stat().st_size),
+        }
+
+    @staticmethod
+    def _summarize_frame_dtype(frame: pd.DataFrame) -> str:
+        if frame.empty and len(frame.columns) == 0:
+            return "none"
+        dtypes = sorted({str(dtype) for dtype in frame.dtypes})
+        if not dtypes:
+            return "none"
+        if len(dtypes) == 1:
+            return dtypes[0]
+        return "mixed"
+
+    @staticmethod
+    def _calculate_nan_ratio(frame: pd.DataFrame) -> float:
+        if frame.size == 0:
+            return 0.0
+        missing = int(frame.isna().to_numpy().sum())
+        return float(missing / frame.size)
+
+    def _build_feature_manifest_v2(
+        self,
+        run_dir: Path,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str,
+        schema_version: str,
+        quality_status: str,
+        feature_schema_hash: str,
+        row_count: int,
+        time_range: Dict[str, Optional[str]],
+        total_features: int,
+        group_manifest: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        existing_manifest = self._load_feature_manifest_v2_if_exists(run_dir)
+        if existing_manifest:
+            for key, expected in (("symbol", symbol), ("tf", tf), ("config_hash", config_hash)):
+                actual = existing_manifest.get(key)
+                if actual is not None and actual != expected:
+                    raise ValueError(f"Manifest {key} mismatch: expected {expected}, got {actual}")
+
+        artifact_manifest = {
+            "complete": True,
+            "schema_version": schema_version,
+            "quality_status": quality_status,
+            "path": artifact_kind,
+            "feature_schema_hash": feature_schema_hash,
+            "row_count": row_count,
+            "time_range": time_range,
+            "total_features": total_features,
+            "group_count": len(group_manifest),
+            "groups": group_manifest,
+        }
+        manifest = existing_manifest or {
+            "version": "l7_v2",
+            "symbol": symbol,
+            "tf": tf,
+            "config_hash": config_hash,
+            "artifacts": {},
+        }
+        manifest["complete"] = True
+        manifest["created_at"] = manifest.get("created_at") or datetime.utcnow().isoformat()
+        manifest["updated_at"] = datetime.utcnow().isoformat()
+        manifest["schema_version"] = schema_version
+        manifest["quality_status"] = quality_status
+        manifest["feature_schema_hash"] = feature_schema_hash
+        manifest["row_count"] = row_count
+        manifest["time_range"] = time_range
+        manifest["total_features"] = total_features
+        manifest["groups"] = group_manifest
+        manifest.setdefault("artifacts", {})[artifact_kind] = artifact_manifest
+        return manifest
+
+    @classmethod
+    def _load_feature_manifest_v2_if_exists(cls, run_dir: Path) -> Dict[str, Any]:
+        manifest_path = run_dir / cls.L7_V2_MANIFEST_NAME
+        if not manifest_path.exists():
+            return {}
+        with manifest_path.open("r", encoding="utf-8") as manifest_file:
+            loaded = json.load(manifest_file)
+        if not isinstance(loaded, dict):
+            raise ValueError(f"Invalid feature manifest: {manifest_path}")
+        return loaded
+
+    @classmethod
+    def _write_feature_manifest_v2(cls, run_dir: Path, manifest: Dict[str, Any]) -> None:
+        manifest_path = run_dir / cls.L7_V2_MANIFEST_NAME
+        temp_path = run_dir / f"{cls.L7_V2_MANIFEST_NAME}.tmp"
+        with temp_path.open("w", encoding="utf-8") as manifest_file:
+            json.dump(manifest, manifest_file, ensure_ascii=False, indent=2, default=str)
+        os.replace(temp_path, manifest_path)
     
     def save_features_to_hdf5(
         self,

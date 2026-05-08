@@ -14,7 +14,7 @@ from __future__ import annotations
 import gzip
 import json
 from pathlib import Path
-from typing import Dict, Iterator, List, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -27,8 +27,101 @@ logger = get_logger(__name__)
 class FeatureReader:
     """V7 unified feature read interface — Parquet-only, no HDF5."""
 
+    V2_MANIFEST_NAME = "feature_manifest.json"
+
     def __init__(self, feature_base_path: str = "data_cache/features") -> None:
         self._base = Path(feature_base_path)
+
+    def feature_run_dir(self, symbol: str, tf: str, config_hash: str) -> Path:
+        """Return the canonical V2 run directory for one symbol/timeframe/config."""
+        safe_symbol = self._safe_path_segment(symbol, "symbol")
+        safe_tf = self._safe_path_segment(tf, "tf")
+        safe_config_hash = self._safe_path_segment(config_hash, "config_hash")
+        return self._base / safe_symbol / safe_tf / safe_config_hash
+
+    def load_manifest_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> dict:
+        """Load a complete V2 manifest, falling back to V7 legacy metadata."""
+        manifest, _base_dir, _is_legacy = self._resolve_manifest_v2(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            artifact_kind=artifact_kind,
+        )
+        return manifest
+
+    def stream_groups_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> Iterator[Tuple[str, pd.DataFrame]]:
+        """Yield V2 groups one at a time from raw or processed canonical paths."""
+        manifest, base_dir, is_legacy = self._resolve_manifest_v2(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            artifact_kind=artifact_kind,
+        )
+        if is_legacy:
+            yield from self.stream_groups(symbol, config_hash)
+            return
+
+        artifact = self._get_v2_artifact(manifest, artifact_kind)
+        for group_name, group_info in artifact.get("groups", {}).items():
+            path = self._resolve_manifest_relative_path(base_dir, group_info.get("path") or group_info.get("file"))
+            if not path.exists():
+                raise FileNotFoundError(f"Parquet file missing: {path}")
+            dataframe = pq.read_table(str(path)).to_pandas()
+            yield group_name, dataframe
+            del dataframe
+
+    def load_columns_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        columns: List[str],
+        artifact_kind: str = "raw",
+    ) -> pd.DataFrame:
+        """Column projection for V2 raw/processed artifacts with legacy fallback."""
+        manifest, base_dir, is_legacy = self._resolve_manifest_v2(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            artifact_kind=artifact_kind,
+        )
+        if is_legacy:
+            return self.load_columns(symbol, config_hash, columns)
+
+        artifact = self._get_v2_artifact(manifest, artifact_kind)
+        col_to_group: Dict[str, List[str]] = {}
+        for group_name, group_info in artifact.get("groups", {}).items():
+            group_cols = set(group_info.get("columns", []))
+            needed = [column for column in columns if column in group_cols]
+            if needed:
+                col_to_group[group_name] = needed
+
+        if not col_to_group:
+            logger.warning("No V2 columns matched in any group: %s...", columns[:5])
+            return pd.DataFrame()
+
+        frames: List[pd.DataFrame] = []
+        for group_name, needed_cols in col_to_group.items():
+            group_info = artifact["groups"][group_name]
+            path = self._resolve_manifest_relative_path(base_dir, group_info.get("path") or group_info.get("file"))
+            if not path.exists():
+                raise FileNotFoundError(f"Parquet file missing: {path}")
+            table = pq.read_table(str(path), columns=needed_cols)
+            frames.append(table.to_pandas())
+
+        return pd.concat(frames, axis=1) if frames else pd.DataFrame()
 
     # ------------------------------------------------------------------
     # Mode 1: Metadata-Only
@@ -152,3 +245,105 @@ class FeatureReader:
                 schema = pq.read_schema(str(path))
                 all_columns.extend(schema.names)
         return all_columns
+
+    def _resolve_manifest_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str,
+    ) -> Tuple[dict, Path, bool]:
+        run_dir = self.feature_run_dir(symbol, tf, config_hash)
+        manifest_path = run_dir / self.V2_MANIFEST_NAME
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self._validate_manifest_v2(manifest, artifact_kind, manifest_path)
+            return manifest, run_dir, False
+
+        legacy_manifest = self.load_manifest(symbol, config_hash)
+        legacy_dir = self._base / symbol / config_hash
+        return (
+            self._adapt_legacy_manifest_v2(
+                manifest=legacy_manifest,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                artifact_kind=artifact_kind,
+            ),
+            legacy_dir,
+            True,
+        )
+
+    @staticmethod
+    def _validate_manifest_v2(manifest: dict, artifact_kind: str, manifest_path: Path) -> None:
+        if not isinstance(manifest, dict):
+            raise ValueError(f"Invalid V2 manifest: {manifest_path}")
+        if not manifest.get("complete"):
+            raise ValueError(f"Incomplete V2 manifest is not readable: {manifest_path}")
+        artifact = FeatureReader._get_v2_artifact(manifest, artifact_kind)
+        if not artifact.get("complete"):
+            raise ValueError(f"Incomplete V2 artifact is not readable: {artifact_kind}")
+
+    @staticmethod
+    def _get_v2_artifact(manifest: dict, artifact_kind: str) -> Dict[str, Any]:
+        artifacts = manifest.get("artifacts", {})
+        artifact = artifacts.get(artifact_kind)
+        if not isinstance(artifact, dict):
+            raise FileNotFoundError(f"V2 artifact not found: {artifact_kind}")
+        return artifact
+
+    @staticmethod
+    def _adapt_legacy_manifest_v2(
+        manifest: dict,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str,
+    ) -> dict:
+        groups = manifest.get("groups", {}) if isinstance(manifest, dict) else {}
+        total_features = int(manifest.get("total_features", 0)) if isinstance(manifest, dict) else 0
+        total_rows = int(manifest.get("total_rows", 0)) if isinstance(manifest, dict) else 0
+        artifact = {
+            "complete": True,
+            "schema_version": "legacy_v7",
+            "quality_status": "legacy",
+            "path": ".",
+            "feature_schema_hash": manifest.get("overall_sha", "legacy") if isinstance(manifest, dict) else "legacy",
+            "row_count": total_rows,
+            "time_range": {"start": None, "end": None},
+            "total_features": total_features,
+            "group_count": len(groups),
+            "groups": groups,
+        }
+        return {
+            "version": "l7_v2_legacy_adapter",
+            "complete": True,
+            "legacy_format": True,
+            "symbol": symbol,
+            "tf": tf,
+            "config_hash": config_hash,
+            "schema_version": "legacy_v7",
+            "quality_status": "legacy",
+            "feature_schema_hash": artifact["feature_schema_hash"],
+            "row_count": total_rows,
+            "time_range": artifact["time_range"],
+            "total_features": total_features,
+            "groups": groups,
+            "artifacts": {artifact_kind: artifact},
+        }
+
+    @staticmethod
+    def _resolve_manifest_relative_path(base_dir: Path, raw_path: Optional[str]) -> Path:
+        if not raw_path:
+            raise ValueError("Manifest group path is missing")
+        relative_path = Path(str(raw_path))
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise ValueError(f"Unsafe manifest path: {raw_path}")
+        return base_dir / relative_path
+
+    @staticmethod
+    def _safe_path_segment(value: str, field_name: str) -> str:
+        segment = str(value).strip()
+        if not segment or segment in {".", ".."} or "/" in segment or "\\" in segment:
+            raise ValueError(f"Invalid {field_name}: {value!r}")
+        return segment

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import copy
 import gc
 import os
 import re
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, FrozenSet, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -35,6 +37,7 @@ from momentum.core.config import (
     get_fast_adf_enabled,
     get_fracdiff_layers,
     get_fracdiff_precision,
+    get_l65_optimization_profile,
     get_slowpath_n_jobs,
 )
 from momentum.core.logging import get_logger
@@ -58,12 +61,12 @@ def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bo
     return match.group(1) in allowed_layers
 
 try:
-    from scipy.special import erfinv
+    from scipy.special import ndtri
 
     HAS_SCIPY = True
 except Exception:
     HAS_SCIPY = False
-    erfinv = None
+    ndtri = None
     logger.warning("scipy not available, gaussian normalization disabled")
 
 try:
@@ -128,6 +131,107 @@ class FeaturePreprocessor:
             return self._transform_chunked(features_df, chunk_size)
 
         return self._transform_single(features_df)
+
+    def transform_selected(
+        self,
+        selected: List[str],
+        groups: Dict[str, pd.DataFrame],
+        config: Optional[Any] = None,
+    ) -> Dict[str, pd.DataFrame]:
+        """Post-IC transform for selected features only."""
+        selected_columns = [str(feature) for feature in selected]
+        if not selected_columns:
+            logger.warning("[IC-First] post_ic received empty IC selection")
+            return {}
+
+        if groups is None:
+            raise ValueError("groups must be a dictionary")
+
+        post_ic_config = self._build_post_ic_transform_config(
+            selected_columns=selected_columns,
+            config=config,
+        )
+        post_ic_preprocessor = FeaturePreprocessor(
+            post_ic_config,
+            context=self._preprocessing_context,
+        )
+
+        processed_groups: Dict[str, pd.DataFrame] = {}
+        missing_columns = set(selected_columns)
+        for group_id, group_df in groups.items():
+            if not isinstance(group_df, pd.DataFrame):
+                raise TypeError(f"Group {group_id} must be a pandas DataFrame")
+
+            available_columns = [column for column in selected_columns if column in group_df.columns]
+            if not available_columns:
+                continue
+
+            missing_columns.difference_update(available_columns)
+            selected_frame = group_df.loc[:, available_columns].copy()
+            transformed = post_ic_preprocessor.transform(selected_frame)
+            if not transformed.empty:
+                processed_groups[str(group_id)] = transformed
+
+        if missing_columns:
+            logger.warning(
+                "[IC-First] post_ic skipped %d selected features missing from L7_raw",
+                len(missing_columns),
+            )
+        if not processed_groups:
+            logger.warning("[IC-First] post_ic produced no processed groups")
+
+        return processed_groups
+
+    def _build_post_ic_transform_config(
+        self,
+        selected_columns: List[str],
+        config: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        preprocessing_config = self._coerce_preprocessing_config(config, self._config)
+        preprocessing_config["mode"] = "replace"
+        preprocessing_config["enabled"] = True
+        self._set_config_step_enabled(preprocessing_config, "winsorization", False)
+        self._set_config_step_enabled(preprocessing_config, "fractional_differencing", False)
+        self._set_config_step_enabled(preprocessing_config, "adf_differencing", False)
+        self._set_config_step_enabled(preprocessing_config, "rank_transform", True, selected_columns)
+        self._set_config_step_enabled(preprocessing_config, "adaptive_zscore", True, selected_columns)
+        self._set_config_step_enabled(preprocessing_config, "gaussian_normalize", True, selected_columns)
+        return preprocessing_config
+
+    @staticmethod
+    def _coerce_preprocessing_config(
+        config: Optional[Any],
+        default_config: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if config is None:
+            return copy.deepcopy(default_config)
+
+        raw_config = getattr(config, "preprocessing", config)
+        if isinstance(raw_config, dict):
+            if "preprocessing" in raw_config and "rank_transform" not in raw_config:
+                raw_config = raw_config["preprocessing"]
+            return copy.deepcopy(raw_config)
+
+        model_dump = getattr(raw_config, "model_dump", None)
+        if callable(model_dump):
+            return copy.deepcopy(model_dump())
+
+        raise TypeError("config must be a preprocessing config, FactoryConfig, dict, or None")
+
+    @staticmethod
+    def _set_config_step_enabled(
+        preprocessing_config: Dict[str, Any],
+        step_name: str,
+        enabled: bool,
+        apply_to: Optional[List[str]] = None,
+    ) -> None:
+        step_config = preprocessing_config.get(step_name)
+        if not isinstance(step_config, dict):
+            step_config = {}
+            preprocessing_config[step_name] = step_config
+        step_config["enabled"] = enabled
+        if apply_to is not None:
+            step_config["apply_to"] = list(apply_to)
 
     def transform_registry_groups(
         self,
@@ -197,7 +301,11 @@ class FeaturePreprocessor:
         do_gaussian = self.gaussian_config.get("enabled", False)
 
         can_use_numba_fast = self.mode == "replace"
-        use_fast = can_use_numba_fast and not do_fracdiff and not do_adf and not do_gaussian
+        # Gaussian with apply_to="all" can be applied as a post-step after numba fast path,
+        # so it no longer forces use_fast=False globally.
+        gaussian_apply_to = self.gaussian_config.get("apply_to", "all")
+        gaussian_needs_slow = do_gaussian and gaussian_apply_to != "all"
+        use_fast = can_use_numba_fast and not do_fracdiff and not do_adf and not gaussian_needs_slow
 
         transform_context: Dict[str, object] = {
             "use_fast": use_fast,
@@ -208,6 +316,7 @@ class FeaturePreprocessor:
             "do_fracdiff": do_fracdiff,
             "do_adf": do_adf,
             "do_gaussian": do_gaussian,
+            "gaussian_apply_to": gaussian_apply_to,
         }
 
         if can_use_numba_fast:
@@ -217,6 +326,7 @@ class FeaturePreprocessor:
 
             winsor_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             zscore_windows = self.zscore_config.get("windows", [100, 252])
+            gaussian_clip = self.gaussian_config.get("clip_range", [0.001, 0.999])
 
             transform_context.update(
                 {
@@ -229,6 +339,8 @@ class FeaturePreprocessor:
                     "do_zscore": do_zscore,
                     "zscore_window": int(zscore_windows[0]) if zscore_windows else 100,
                     "zscore_epsilon": float(self.zscore_config.get("epsilon", 1e-8)),
+                    "gaussian_clip_lower": float(gaussian_clip[0]),
+                    "gaussian_clip_upper": float(gaussian_clip[1]),
                 }
             )
 
@@ -321,8 +433,12 @@ class FeaturePreprocessor:
             return True
         if bool(transform_context.get("do_adf", False)):
             return True
+        # Gaussian with apply_to="all" is handled as a vectorised post-step after the
+        # numba fast path (see _transform_single_group), so it does NOT force slow path.
+        # Only non-"all" apply_to needs column names and therefore requires slow path.
         if bool(transform_context.get("do_gaussian", False)):
-            return True
+            if transform_context.get("gaussian_apply_to", "all") != "all":
+                return True
         if not bool(transform_context.get("do_fracdiff", False)):
             return False
 
@@ -896,7 +1012,20 @@ class FeaturePreprocessor:
                 zscore_window=int(transform_context.get("zscore_window", 100)),
                 zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
             )
+            # Gaussian post-step: apply_to="all" can be vectorised directly on the
+            # numpy array without needing column names, so we handle it here instead
+            # of forcing the entire group through pandas slow path.
+            if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
+                processed_array = self._gaussian_2d(
+                    processed_array.astype(np.float64, copy=False),
+                    lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
+                    upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
+                )
             registry.overwrite_data(group_id, processed_array)
+            return
+
+        if self._can_use_optimized_dataframe_path():
+            self._transform_single_group_optimized(registry, group, group_array)
             return
 
         is_append = self.mode == "append"
@@ -935,6 +1064,28 @@ class FeaturePreprocessor:
         processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
         registry.overwrite_data(group_id, processed_array)
 
+    def _transform_single_group_optimized(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        group_array: Optional[np.ndarray] = None,
+    ) -> None:
+        """Transform a registry group via the optimized single-copy DataFrame path."""
+
+        group_id = getattr(group, "group_id")
+        source_array = group_array
+        if source_array is None:
+            source_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+
+        group_df = pd.DataFrame(
+            source_array,
+            columns=list(getattr(group, "columns")),
+            copy=False,
+        )
+        processed_df = self._transform_single_optimized_df(group_df)
+        processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
+        registry.overwrite_data(group_id, processed_array)
+
     @staticmethod
     def _group_layer_name(group: object) -> Optional[str]:
         layer = getattr(group, "layer", None)
@@ -943,12 +1094,246 @@ class FeaturePreprocessor:
             return None
         return str(value)
 
+    def _can_use_optimized_dataframe_path(self) -> bool:
+        if get_l65_optimization_profile() != "optimized":
+            return False
+        if self.mode != "replace":
+            return False
+        if self.fracdiff_config.get("enabled", False):
+            return False
+        if self.adf_config.get("enabled", False):
+            return False
+        return True
+
+    def _optimized_replace_columns(self, features_df: pd.DataFrame) -> List[str]:
+        selected_columns: List[str] = []
+        seen_columns = set()
+
+        def add_columns(columns: List[str]) -> None:
+            for column in columns:
+                if column not in seen_columns:
+                    selected_columns.append(column)
+                    seen_columns.add(column)
+
+        add_columns(
+            self._select_columns(
+                features_df,
+                self.winsor_config.get("apply_to", "all"),
+            )
+        )
+
+        if self.rank_config.get("enabled", False):
+            add_columns(
+                self._select_columns(
+                    features_df,
+                    self.rank_config.get("apply_to", "all"),
+                )
+            )
+
+        if self.gaussian_config.get("enabled", False):
+            add_columns(
+                self._select_columns(
+                    features_df,
+                    self.gaussian_config.get("apply_to", "all"),
+                )
+            )
+
+        if self.zscore_config.get("enabled", False):
+            add_columns(
+                self._select_columns(
+                    features_df,
+                    self.zscore_config.get("apply_to", "all"),
+                )
+            )
+
+        return selected_columns
+
+    @staticmethod
+    def _column_positions(
+        all_columns: List[str],
+        selected_columns: List[str],
+    ) -> List[int]:
+        position_by_column = {
+            column: position for position, column in enumerate(all_columns)
+        }
+        return [
+            position_by_column[column]
+            for column in selected_columns
+            if column in position_by_column
+        ]
+
+    def _winsorize_2d_legacy_equivalent(self, arr: np.ndarray) -> np.ndarray:
+        result_array = np.asarray(arr, dtype=np.float64).copy()
+        selected = pd.DataFrame(result_array)
+        method = self.winsor_config.get("method", "sigma")
+
+        if method == "sigma":
+            sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
+            means = selected.mean(skipna=True)
+            stds = selected.std(skipna=True)
+            valid_std = (~stds.isna()) & (stds != 0.0)
+            if not valid_std.any():
+                return result_array
+
+            valid_positions = valid_std[valid_std].index.tolist()
+            lowers = means.loc[valid_positions] - sigma_k * stds.loc[valid_positions]
+            uppers = means.loc[valid_positions] + sigma_k * stds.loc[valid_positions]
+            clipped = selected.loc[:, valid_positions].clip(
+                lower=lowers,
+                upper=uppers,
+                axis=1,
+            )
+            result_array[:, valid_positions] = clipped.to_numpy(dtype=np.float32, copy=False)
+            return result_array
+
+        if method == "quantile":
+            quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            lower_q = float(quantile_range[0])
+            upper_q = float(quantile_range[1])
+            return self._winsorize_2d_inplace(
+                result_array,
+                lower_q,
+                upper_q,
+            ).astype(np.float32, copy=False)
+
+        raise ValueError(f"Unsupported winsorization method: {method}")
+
+    @staticmethod
+    def _rolling_zscore_2d(
+        arr: np.ndarray,
+        windows: List[int],
+        epsilon: float,
+        mode: str = "replace",
+    ) -> Union[np.ndarray, Dict[int, np.ndarray]]:
+        if mode not in {"replace", "append"}:
+            raise ValueError(f"Unsupported zscore mode: {mode}")
+
+        selected = pd.DataFrame(np.asarray(arr, dtype=np.float64))
+        normalized_windows = [int(window) for window in windows]
+
+        if not normalized_windows:
+            if mode == "append":
+                return {}
+            return selected.to_numpy(dtype=np.float32, copy=True)
+
+        zscore_by_window: Dict[int, np.ndarray] = {}
+        for window_int in normalized_windows:
+            if window_int <= 0:
+                raise ValueError("zscore window must be positive")
+
+            rolling = selected.rolling(window_int, min_periods=1)
+            mean = rolling.mean()
+            std = rolling.std()
+            zscore = (selected - mean) / (std + epsilon)
+            zscore = zscore.where(std > 0.0, 0.0)
+            zscore = zscore.where(~selected.isna(), np.nan)
+            zscore_by_window[window_int] = zscore.to_numpy(dtype=np.float32, copy=False)
+
+        if mode == "append":
+            return zscore_by_window
+
+        primary_window = normalized_windows[0]
+        return zscore_by_window[primary_window]
+
+    def _transform_single_optimized_df(self, features_df: pd.DataFrame) -> pd.DataFrame:
+        """Single-copy replace-mode transform path for non-FracDiff/ADF L6.5 work."""
+
+        working_columns = self._optimized_replace_columns(features_df)
+        if not working_columns:
+            return features_df.copy()
+
+        working_values = features_df.loc[:, working_columns].to_numpy(
+            dtype=np.float64,
+            copy=True,
+        )
+
+        winsor_positions = self._column_positions(
+            working_columns,
+            self._select_columns(
+                features_df,
+                self.winsor_config.get("apply_to", "all"),
+            ),
+        )
+        if winsor_positions:
+            working_values[:, winsor_positions] = self._winsorize_2d_legacy_equivalent(
+                working_values[:, winsor_positions]
+            )
+
+        if self.rank_config.get("enabled", False):
+            rank_positions = self._column_positions(
+                working_columns,
+                self._select_columns(
+                    features_df,
+                    self.rank_config.get("apply_to", "all"),
+                ),
+            )
+            if rank_positions:
+                rank_window = int(self.rank_config.get("window", 252))
+                working_values[:, rank_positions] = self._rolling_rank_2d_v2(
+                    working_values[:, rank_positions],
+                    rank_window,
+                )
+
+        if self.gaussian_config.get("enabled", False):
+            if HAS_SCIPY:
+                gaussian_positions = self._column_positions(
+                    working_columns,
+                    self._select_columns(
+                        features_df,
+                        self.gaussian_config.get("apply_to", "all"),
+                    ),
+                )
+                if gaussian_positions:
+                    clip_range = self.gaussian_config.get("clip_range", [0.001, 0.999])
+                    working_values[:, gaussian_positions] = self._gaussian_2d(
+                        working_values[:, gaussian_positions],
+                        lower=float(clip_range[0]),
+                        upper=float(clip_range[1]),
+                    )
+            else:
+                logger.warning("Gaussian normalization skipped: scipy unavailable")
+
+        if self.zscore_config.get("enabled", False):
+            zscore_positions = self._column_positions(
+                working_columns,
+                self._select_columns(
+                    features_df,
+                    self.zscore_config.get("apply_to", "all"),
+                ),
+            )
+            if zscore_positions:
+                windows = [int(window) for window in self.zscore_config.get("windows", [100, 252])]
+                epsilon = float(self.zscore_config.get("epsilon", 1e-8))
+                zscore_values = self._rolling_zscore_2d(
+                    working_values[:, zscore_positions],
+                    windows,
+                    epsilon,
+                    mode="replace",
+                )
+                working_values[:, zscore_positions] = zscore_values
+
+        result = features_df.copy()
+        result.loc[:, working_columns] = working_values
+        return result
+
     def _transform_single(
         self,
         features_df: pd.DataFrame,
         source_layer: Optional[str] = None,
     ) -> pd.DataFrame:
         """Original transform logic applied to a full DataFrame."""
+        self._fracdiff_processed_columns = set()
+        if self._can_use_optimized_dataframe_path():
+            return self._transform_single_optimized_df(features_df)
+
+        return self._transform_single_legacy(features_df, source_layer=source_layer)
+
+    def _transform_single_legacy(
+        self,
+        features_df: pd.DataFrame,
+        source_layer: Optional[str] = None,
+    ) -> pd.DataFrame:
+        """Legacy per-transform DataFrame-copy pipeline."""
         transformed = features_df.copy()
         self._fracdiff_processed_columns = set()
 
@@ -1158,15 +1543,68 @@ class FeaturePreprocessor:
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             lower_q = float(quantile_range[0])
             upper_q = float(quantile_range[1])
-            lowers = selected.quantile(lower_q)
-            uppers = selected.quantile(upper_q)
-            clipped = selected.clip(lower=lowers, upper=uppers, axis=1)
-            clipped = clipped.astype(np.float32, copy=False)
-            result.loc[:, columns] = clipped.loc[:, columns]
+            selected_array = selected.to_numpy(dtype=np.float64, copy=True)
+            clipped_array = self._winsorize_2d_inplace(
+                selected_array,
+                lower_q,
+                upper_q,
+            )
+            clipped = pd.DataFrame(
+                clipped_array.astype(np.float32, copy=False),
+                index=selected.index,
+                columns=columns,
+            )
+            result.loc[:, columns] = clipped
         else:
             raise ValueError(f"Unsupported winsorization method: {method}")
 
         return result
+
+    @staticmethod
+    def _nanquantile_linear(
+        arr: np.ndarray,
+        quantiles: List[float],
+    ) -> np.ndarray:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="All-NaN slice encountered",
+                category=RuntimeWarning,
+            )
+            try:
+                return np.nanquantile(
+                    arr,
+                    quantiles,
+                    axis=0,
+                    method="linear",
+                )
+            except TypeError:
+                return np.nanquantile(
+                    arr,
+                    quantiles,
+                    axis=0,
+                    interpolation="linear",
+                )
+
+    @classmethod
+    def _winsorize_2d_inplace(
+        cls,
+        arr: np.ndarray,
+        lower_q: float,
+        upper_q: float,
+        method: str = "linear",
+    ) -> np.ndarray:
+        if method != "linear":
+            raise ValueError(f"Unsupported winsorize quantile method: {method}")
+
+        if arr.ndim != 2:
+            raise ValueError("winsorize input must be a 2D array")
+        if arr.shape[0] == 0 or arr.shape[1] == 0:
+            return arr
+
+        bounds = cls._nanquantile_linear(arr, [lower_q, upper_q])
+        np.clip(arr, bounds[0], bounds[1], out=arr)
+        return arr
 
     def _resolve_fracdiff_precision(self) -> float:
         return get_fracdiff_precision(self.fracdiff_config.get("precision", 0.02))
@@ -1298,9 +1736,10 @@ class FeaturePreprocessor:
     ) -> pd.DataFrame:
         for column in eligible_columns:
             series = result[column].astype(float)
+            col_arr = series.to_numpy(dtype=np.float64, copy=False)
 
             try:
-                cached_d_star = cache.get(column) if cache is not None else None
+                cached_d_star = cache.get(column, col_arr) if cache is not None else None
                 if cached_d_star is not None:
                     d_star = cached_d_star
                 else:
@@ -1312,7 +1751,7 @@ class FeaturePreprocessor:
                         max_lag=max_lag,
                     )
                     if cache is not None:
-                        cache.set(column, d_star)
+                        cache.set(column, d_star, col_arr)
             except Exception as exc:
                 logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
                 d_star = 1.0
@@ -1347,10 +1786,13 @@ class FeaturePreprocessor:
                 self.adf_config.get("sample_size", 500),
             )
         )
+        col_input_arrays: Dict[str, np.ndarray] = {}
         items: List[Tuple[np.ndarray, Dict[str, object]]] = []
         for column in eligible_columns:
             series = result[column].astype(float)
-            cached_d_star = cache.get(column) if cache is not None else None
+            col_arr = series.to_numpy(dtype=np.float64, copy=False)
+            col_input_arrays[column] = col_arr
+            cached_d_star = cache.get(column, col_arr) if cache is not None else None
             metadata: Dict[str, object] = {
                 "column": column,
                 "cached_d_star": cached_d_star,
@@ -1361,7 +1803,7 @@ class FeaturePreprocessor:
                 "weight_threshold": weight_threshold,
                 "sample_size": sample_size,
             }
-            items.append((series.to_numpy(dtype=np.float64, copy=False), metadata))
+            items.append((col_arr, metadata))
 
         outputs = ParallelSlowPath(n_jobs).map(items, process_fracdiff_column_values)
         failed_columns: List[str] = []
@@ -1374,7 +1816,7 @@ class FeaturePreprocessor:
             self._fracdiff_processed_columns.add(column)
 
             if cache is not None and not bool(output.get("cache_hit", False)):
-                cache.set(column, d_star)
+                cache.set(column, d_star, col_input_arrays.get(column))
             if output.get("status") != "ok":
                 failed_columns.append(column)
 
@@ -1597,6 +2039,19 @@ class FeaturePreprocessor:
 
         return result
 
+    @staticmethod
+    def _rolling_rank_2d_v2(arr: np.ndarray, window: int) -> np.ndarray:
+        if window <= 0:
+            raise ValueError("rank window must be positive")
+
+        selected = pd.DataFrame(np.asarray(arr, dtype=np.float64))
+        rolling = selected.rolling(window, min_periods=1)
+        ranked_df = rolling.rank(method="average", pct=True)
+        constant_mask = rolling.std(ddof=0) == 0.0
+        ranked_df = ranked_df.mask(constant_mask, 0.5)
+        ranked_df = ranked_df.where(~selected.isna(), np.nan)
+        return ranked_df.to_numpy(dtype=np.float32, copy=False)
+
     def _apply_rank_transform(self, df: pd.DataFrame) -> pd.DataFrame:
         apply_to = self.rank_config.get("apply_to", "all")
         columns = self._select_columns(df, apply_to)
@@ -1608,20 +2063,14 @@ class FeaturePreprocessor:
         result = df.copy()
         selected = result.loc[:, columns].astype(float)
 
-        # Use pandas' vectorized rolling.rank fast path and patch constant windows
-        # to keep legacy behavior exactly (constant window -> 0.5).
-        rolling = selected.rolling(window, min_periods=1)
-        ranked_df = rolling.rank(
-            method="average",
-            pct=True,
+        ranked_df = pd.DataFrame(
+            self._rolling_rank_2d_v2(
+                selected.to_numpy(dtype=np.float64, copy=False),
+                window,
+            ),
+            index=selected.index,
+            columns=columns,
         )
-        rolling_max = rolling.max()
-        rolling_min = rolling.min()
-        # all-NaN windows naturally produce False here (NaN == NaN is False).
-        constant_mask = rolling_max == rolling_min
-        ranked_df = ranked_df.mask(constant_mask, 0.5)
-        ranked_df = ranked_df.where(~selected.isna(), np.nan)
-        ranked_df = ranked_df.astype(np.float32, copy=False)
 
         if self.mode == "replace":
             result.loc[:, columns] = ranked_df
@@ -1652,6 +2101,31 @@ class FeaturePreprocessor:
         average_rank = less_count + (equal_count + 1) / 2.0
         return average_rank / float(valid_count)
 
+    @staticmethod
+    def _gaussian_2d(
+        arr: np.ndarray,
+        lower: float = 0.001,
+        upper: float = 0.999,
+    ) -> np.ndarray:
+        if not HAS_SCIPY or ndtri is None:
+            raise RuntimeError("scipy is required for gaussian normalization")
+
+        selected = pd.DataFrame(np.asarray(arr, dtype=np.float64))
+        ranked_df = selected.rank(pct=True)
+        nunique = selected.nunique(dropna=True)
+        constant_columns = nunique[nunique <= 1].index.tolist()
+        if constant_columns:
+            constant_values = ranked_df.loc[:, constant_columns].where(
+                selected.loc[:, constant_columns].isna(),
+                0.5,
+            )
+            ranked_df.loc[:, constant_columns] = constant_values
+
+        clipped = ranked_df.clip(lower=lower, upper=upper)
+        gaussian_arr = ndtri(clipped.to_numpy(dtype=np.float64, copy=False))
+        gaussian_arr[selected.isna().to_numpy()] = np.nan
+        return gaussian_arr.astype(np.float32, copy=False)
+
     def _apply_gaussian_normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         if not HAS_SCIPY:
             logger.warning("Gaussian normalization skipped: scipy unavailable")
@@ -1667,23 +2141,22 @@ class FeaturePreprocessor:
             return df
 
         result = df.copy()
-        new_columns: Dict[str, pd.Series] = {}
-        for column in columns:
-            series = result[column].astype(float)
-            if series.nunique(dropna=True) <= 1:
-                ranked = pd.Series(0.5, index=series.index)
-            else:
-                ranked = series.rank(pct=True)
-            clipped = ranked.clip(lower=lower, upper=upper)
-            gaussian = np.sqrt(2.0) * erfinv(2.0 * clipped - 1.0)
-            gaussian_series = pd.Series(gaussian, index=series.index)
-            if self.mode == "replace":
-                result[column] = gaussian_series.astype(np.float32, copy=False)
-            else:
-                new_columns[f"{column}_gaussian"] = gaussian_series
+        selected = result.loc[:, columns].astype(float)
+        gaussian_df = pd.DataFrame(
+            self._gaussian_2d(
+                selected.to_numpy(dtype=np.float64, copy=False),
+                lower=lower,
+                upper=upper,
+            ),
+            index=selected.index,
+            columns=columns,
+        )
 
-        if self.mode != "replace" and new_columns:
-            result = pd.concat([result, pd.DataFrame(new_columns, index=result.index)], axis=1)
+        if self.mode == "replace":
+            result.loc[:, columns] = gaussian_df
+        else:
+            gaussian_df = gaussian_df.rename(columns={column: f"{column}_gaussian" for column in columns})
+            result = pd.concat([result, gaussian_df], axis=1)
 
         return result
 
@@ -1698,26 +2171,37 @@ class FeaturePreprocessor:
 
         result = df.copy()
         selected = result.loc[:, columns].astype(float)
-        primary_window = int(windows[0]) if windows else 100
 
         if self.mode == "replace":
-            mean = selected.rolling(primary_window, min_periods=1).mean()
-            std = selected.rolling(primary_window, min_periods=1).std()
-            zscore = (selected - mean) / (std + epsilon)
-            zscore = zscore.where(std > 0.0, 0.0)
-            zscore = zscore.where(~selected.isna(), np.nan)
-            zscore = zscore.astype(np.float32, copy=False)
+            zscore_values = self._rolling_zscore_2d(
+                selected.to_numpy(dtype=np.float64, copy=False),
+                [int(window) for window in windows],
+                epsilon,
+                mode="replace",
+            )
+            zscore = pd.DataFrame(
+                zscore_values,
+                index=selected.index,
+                columns=columns,
+            )
             result.loc[:, columns] = zscore
         else:
             append_frames: List[pd.DataFrame] = []
+            zscore_by_window = self._rolling_zscore_2d(
+                selected.to_numpy(dtype=np.float64, copy=False),
+                [int(window) for window in windows],
+                epsilon,
+                mode="append",
+            )
             for window in windows:
                 window_int = int(window)
-                mean = selected.rolling(window_int, min_periods=1).mean()
-                std = selected.rolling(window_int, min_periods=1).std()
-                zscore = (selected - mean) / (std + epsilon)
-                zscore = zscore.where(std > 0.0, 0.0)
-                zscore = zscore.where(~selected.isna(), np.nan)
-                zscore = zscore.astype(np.float32, copy=False)
+                if window_int not in zscore_by_window:
+                    continue
+                zscore = pd.DataFrame(
+                    zscore_by_window[window_int],
+                    index=selected.index,
+                    columns=columns,
+                )
                 zscore = zscore.rename(columns={column: f"{column}_zscore_{window_int}" for column in columns})
                 append_frames.append(zscore)
 

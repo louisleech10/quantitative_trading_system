@@ -1,10 +1,11 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 6.0
-- **最後更新**: 2026-03-15
+- **版本**: 6.1
+- **最後更新**: 2026-05-07
 - **狀態**: 生產中 + 持續開發
 - **更新內容**: 
+  - v6.1 (2026-05-07): 修正 Feature Storage artifact 描述（HDF5 legacy → V7 per-group parquet）；新增 L65 V2 IC-First canonical path（`{SYMBOL}/{TF}/{config_hash}/raw|processed`）；同步 Artifact Contract Table 與目錄樹
   - v6.0 (2026-03-15): 同步 Feature Factory MultiTF 整合 + 多標的批次計算 — MultiTF 路由策略、AlignmentMode paradigm、FeatureFactoryBatchService 架構（ProcessPoolExecutor + TTL 清理）
   - v5.0 (2026-02-18): 同步全部已完成 PLAN — Phase 1 Feature Factory（7 層 Pipeline）、Phase 1.5 Feature Factory 優化（微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理）、Phase 2.4-2.12 IC Deep Analysis（10 個深度分析模組 + 特徵難度分級 + 匯出系統 + 資料瀏覽器）、Phase 3.5 模型增強（6 個增強模組：校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線）、Phase 4 Optuna 重構 + Strategy Domain（VectorizedBacktest + PerformanceMetrics + PositionSizing + RiskManager + IBacktestEngine/IPositionSizer Protocol）
   - v4.0 (2026-02-14): 新增 Phase 3.7 雙引擎 ML 系統架構（LightGBM + XGBoost、IModelTrainer Protocol 擴展、IOptimizationObjective、模型對比系統、四維參數系統、可插拔 Optuna 目標）
@@ -112,7 +113,14 @@ API 交互:
 時序數據: HDF5 (K 線數據，gzip 壓縮)
 結構化數據: CSV/JSON (搜索結果、案例數據)
 模型存儲: Pickle (XGBoost/LightGBM 模型)
-特徵存儲: HDF5 (特徵矩陣)
+特徵存儲: |
+  V7 per-group Parquet (L7 特徵矩陣，AsyncParquetCompactor，IC-First 雙路徑)
+    L7_raw:       data_cache/features/{SYMBOL}/{TF}/{config_hash}/raw/{group_id}.parquet
+    L7_processed: data_cache/features/{SYMBOL}/{TF}/{config_hash}/processed/{group_id}.parquet
+    IC 選擇清單:  data_cache/features/{SYMBOL}/{TF}/{config_hash}/ic_selected_features_{SYMBOL}_{TF}.json
+    Manifest:     data_cache/features/{SYMBOL}/{TF}/{config_hash}/feature_manifest.json
+  HDF5 legacy (FeatureStorage.save_factory_output，向後相容)
+    legacy:       data_cache/features/{symbol}_{timeframe}_factory.h5
 優化記錄: SQLite (Optuna Study)
 緩存: 內存緩存 (搜索結果臨時存儲)
 ```
@@ -304,8 +312,12 @@ Data Layer (HDF5 / API / SQLite)
 |--------|------|------|------|------|
 | Data | Binance API | K 線資料 | HDF5 | `data_cache/{SYMBOL}_{timeframe}.h5` |
 | Data | SearchConfig | 搜尋結果 | JSON | `search_results/{task_id}.json` |
-| Feature | K 線 HDF5 | 特徵矩陣 | HDF5 | `data_cache/features/{case_id}.h5` |
-| Analysis | 特徵 HDF5 | 模型 | Pickle | `data_cache/models/{case_id}.pkl` |
+| Feature (legacy) | K 線 HDF5 | 特徵矩陣 | HDF5 | `data_cache/features/{symbol}_{timeframe}_factory.h5` |
+| Feature L7_raw (V7) | K 線 → L6.5_pre winsorize | 全量 winsorized 特徵 | Parquet per-group | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/raw/{group_id}.parquet` |
+| Feature L7_processed (V7) | L7_raw → IC Gate → L6.5_post | IC 篩選後 rank/zscore 特徵 | Parquet per-group | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/processed/{group_id}.parquet` |
+| Feature IC Selection (V7) | L7_raw IC 分析 | 選中特徵清單 + metadata | JSON | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/ic_selected_features_{SYMBOL}_{TF}.json` |
+| Feature Manifest (V7) | 全 group 完成 | schema_hash + complete flag | JSON | `data_cache/features/{SYMBOL}/{TF}/{config_hash}/feature_manifest.json` |
+| Analysis | 特徵 Parquet/HDF5 | 模型 | Pickle | `data_cache/models/{case_id}.pkl` |
 | Optimization | 模型+搜尋空間 | Study/Checkpoint | SQLite+Pickle | `data/optuna_{study}.db` |
 
 ### 持續解耦要求
@@ -755,7 +767,7 @@ momentum/
 │   └── ...
 ├── FeatureEngineering/                  # 特徵工程
 │   ├── feature_extractor.py             # FeatureExtractor
-│   ├── feature_storage.py               # FeatureStorage (HDF5)
+│   ├── feature_storage.py               # FeatureStorage (HDF5 legacy) + AsyncParquetCompactor (V7 per-group parquet)
 │   ├── feature_validator.py             # FeatureValidator
 │   ├── feature_config.py
 │   ├── data_source_registry.py
@@ -1121,12 +1133,13 @@ close, open, high, low, volume, taker_volume, taker_ratio
 ### ✅ 8. 特徵工程系統
 
 #### 功能概述
-完整特徵擷取 → HDF5 存儲 → 品質驗證流程。新增 FeatureFactory 7 層 Pipeline（Phase 1）與三大擴充引擎（Phase 1.5）。
+完整特徵擷取 → V7 per-group parquet 存儲（IC-First 雙路徑：L7_raw + L7_processed）→ 品質驗證流程。新增 FeatureFactory 7 層 Pipeline（Phase 1）與三大擴充引擎（Phase 1.5）。L65 V2 IC-First 管線實作中（詳見 `docs/L65_OPTIMIZATION_SPEC_V2.md`）。
 
 #### 核心模組
 - **7 層 Pipeline**: `momentum/FeatureEngineering/feature_factory.py`（FeatureFactory — Phase 1）
 - **擷取**: `momentum/FeatureEngineering/feature_extractor.py`（Legacy）
-- **存儲**: `momentum/FeatureEngineering/feature_storage.py`（HDF5）
+- **存儲 (V7)**: `momentum/FeatureEngineering/feature_storage.py`（`AsyncParquetCompactor` — per-group parquet；V2 canonical path：`data_cache/features/{SYMBOL}/{TF}/{config_hash}/raw|processed/`）
+- **存儲 (legacy)**: `momentum/FeatureEngineering/feature_storage.py`（`FeatureStorage.save_factory_output` — HDF5，向後相容）
 - **驗證**: `momentum/FeatureEngineering/feature_validator.py`
 - **配置**: `momentum/FeatureEngineering/config_manager.py` + `config/scan_config.yaml`
 - **服務**: `api/services/feature_task_service.py`

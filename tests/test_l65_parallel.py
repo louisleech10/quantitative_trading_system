@@ -267,6 +267,10 @@ def test_fracdiff_non_target_registry_group_stays_on_fast_path(
         "momentum.FeatureEngineering.utils.hardware_utils.get_l65_split_threshold",
         lambda: 2000,
     )
+    # _can_use_optimized_dataframe_path reads self.fracdiff_config.enabled (which
+    # is False in the fixture), so it would return True and bypass _transform_single.
+    # Patch it to False so the test exercises the intended slow-path → _transform_single routing.
+    monkeypatch.setattr(preprocessor, "_can_use_optimized_dataframe_path", lambda: False)
 
     def fake_slow(frame: pd.DataFrame, source_layer=None) -> pd.DataFrame:
         slow_layers.append(str(source_layer))

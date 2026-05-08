@@ -1,0 +1,1389 @@
+F401 [*] `logging` imported but unused
+  --> api/services/batch_download_service.py:13:8
+   |
+11 | from collections import defaultdict
+12 | import uuid
+13 | import logging
+   |        ^^^^^^^
+14 |
+15 | # Add project root to Python path
+   |
+help: Remove unused import: `logging`
+
+E402 Module level import not at top of file
+  --> api/services/batch_download_service.py:19:1
+   |
+17 | sys.path.insert(0, str(project_root))
+18 |
+19 | from api.core.logging import get_logger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 | from api.core.config import settings
+21 | from api.models.case_models import (
+   |
+
+E402 Module level import not at top of file
+  --> api/services/batch_download_service.py:20:1
+   |
+19 | from api.core.logging import get_logger
+20 | from api.core.config import settings
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+21 | from api.models.case_models import (
+22 |     CaseRecord,
+   |
+
+E402 Module level import not at top of file
+  --> api/services/batch_download_service.py:21:1
+   |
+19 |   from api.core.logging import get_logger
+20 |   from api.core.config import settings
+21 | / from api.models.case_models import (
+22 | |     CaseRecord,
+23 | |     BatchDownloadRequest,
+24 | |     DownloadProgress,
+25 | |     DownloadResult,
+26 | |     TaskStatus
+27 | | )
+   | |_^
+28 |   from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
+29 |   from momentum.factories import (
+   |
+
+E402 Module level import not at top of file
+  --> api/services/batch_download_service.py:28:1
+   |
+26 |     TaskStatus
+27 | )
+28 | from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+29 | from momentum.factories import (
+30 |     create_binance_provider,
+   |
+
+E402 Module level import not at top of file
+  --> api/services/batch_download_service.py:29:1
+   |
+27 |   )
+28 |   from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
+29 | / from momentum.factories import (
+30 | |     create_binance_provider,
+31 | |     create_kline_download_service,
+32 | |     create_kline_storage_manager,
+33 | | )
+   | |_^
+34 |
+35 |   logger = get_logger("api.batch_download_service")
+   |
+
+F841 Local variable `dataset` is assigned to but never used
+   --> api/services/batch_download_service.py:923:25
+    |
+922 |                         # 創建dataset with compression
+923 |                         dataset = case_group.create_dataset(
+    |                         ^^^^^^^
+924 |                             'data',
+925 |                             data=structured_array,
+    |
+help: Remove assignment to unused variable `dataset`
+
+F841 Local variable `last_error` is assigned to but never used
+   --> api/services/batch_download_service.py:952:25
+    |
+950 |                     # HDF5 文件鎖定錯誤
+951 |                     if "Unable to synchronously open file" in str(e) or "file is already open" in str(e):
+952 |                         last_error = e
+    |                         ^^^^^^^^^^
+953 |                         if attempt < max_retries - 1:
+954 |                             logger.warning(
+    |
+help: Remove assignment to unused variable `last_error`
+
+F401 [*] `typing.Dict` imported but unused
+  --> api/services/case_import_service.py:9:26
+   |
+ 7 | import sys
+ 8 | from pathlib import Path
+ 9 | from typing import List, Dict, Tuple, Optional
+   |                          ^^^^
+10 | import pandas as pd
+11 | import numpy as np
+   |
+help: Remove unused import: `typing.Dict`
+
+F401 [*] `logging` imported but unused
+  --> api/services/case_import_service.py:15:8
+   |
+13 | from dateutil import parser as date_parser
+14 | import io
+15 | import logging
+   |        ^^^^^^^
+16 |
+17 | # Add project root to Python path
+   |
+help: Remove unused import: `logging`
+
+E402 Module level import not at top of file
+  --> api/services/case_import_service.py:21:1
+   |
+19 | sys.path.insert(0, str(project_root))
+20 |
+21 | from api.core.logging import get_logger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 | from api.models.case_models import CaseRecord, CaseImportResponse
+23 | from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
+   |
+
+E402 Module level import not at top of file
+  --> api/services/case_import_service.py:22:1
+   |
+21 | from api.core.logging import get_logger
+22 | from api.models.case_models import CaseRecord, CaseImportResponse
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+23 | from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
+   |
+
+E402 Module level import not at top of file
+  --> api/services/case_import_service.py:23:1
+   |
+21 | from api.core.logging import get_logger
+22 | from api.models.case_models import CaseRecord, CaseImportResponse
+23 | from api.utils.case_storage import CaseStorageManager, get_case_storage_manager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 |
+25 | logger = get_logger("api.case_import_service")
+   |
+
+F401 [*] `logging` imported but unused
+  --> api/services/chart_data_service.py:23:8
+   |
+21 | from typing import Optional, Dict, List, Any
+22 | from datetime import datetime
+23 | import logging
+   |        ^^^^^^^
+24 | import numpy as np
+25 | import pandas as pd
+   |
+help: Remove unused import: `logging`
+
+E402 Module level import not at top of file
+  --> api/services/chart_data_service.py:31:1
+   |
+29 | sys.path.insert(0, str(project_root))
+30 |
+31 | from typing import Any
+   | ^^^^^^^^^^^^^^^^^^^^^^
+32 |
+33 | from momentum.factories import (
+   |
+
+F811 [*] Redefinition of unused `Any` from line 21
+  --> api/services/chart_data_service.py:31:20
+   |
+29 | sys.path.insert(0, str(project_root))
+30 |
+31 | from typing import Any
+   |                    ^^^ `Any` redefined here
+32 |
+33 | from momentum.factories import (
+   |
+  ::: api/services/chart_data_service.py:21:42
+   |
+19 | import sys
+20 | from pathlib import Path
+21 | from typing import Optional, Dict, List, Any
+   |                                          --- previous definition of `Any` here
+22 | from datetime import datetime
+23 | import logging
+   |
+help: Remove definition: `Any`
+
+E402 Module level import not at top of file
+  --> api/services/chart_data_service.py:33:1
+   |
+31 |   from typing import Any
+32 |
+33 | / from momentum.factories import (
+34 | |     create_binance_provider,
+35 | |     create_indicator_engine,
+36 | |     create_kline_download_service,
+37 | |     create_kline_storage_manager,
+38 | | )
+   | |_^
+39 |   from api.core.logging import get_logger
+   |
+
+E402 Module level import not at top of file
+  --> api/services/chart_data_service.py:39:1
+   |
+37 |     create_kline_storage_manager,
+38 | )
+39 | from api.core.logging import get_logger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+40 |
+41 | logger = get_logger("api.chart_data_service")
+   |
+
+F541 [*] f-string without any placeholders
+  --> api/services/chart_data_service.py:80:21
+   |
+78 |         self.kline_data_service = kline_data_service
+79 |         self.indicator_engine = create_indicator_engine()  # 新增：用於指標計算
+80 |         logger.info(f"ChartDataService initialized with IndicatorEngine")
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove extraneous `f` prefix
+
+F821 Undefined name `KlineStorageManager`
+   --> api/services/chart_signal_service.py:352:33
+    |
+351 |             # 評估實際覆蓋率，若少於預期則記錄警告方便排查
+352 |             timeframe_seconds = KlineStorageManager.TIMEFRAME_SECONDS.get(timeframe)
+    |                                 ^^^^^^^^^^^^^^^^^^^
+353 |             if timeframe_seconds:
+354 |                 expected_bars = int((end_ts_sec - start_ts_sec) / timeframe_seconds) + 1
+    |
+
+F401 [*] `os` imported but unused
+ --> api/services/data_service.py:6:8
+  |
+4 | from pathlib import Path
+5 | import sys
+6 | import os
+  |        ^^
+7 |
+8 | # Add project root to Python path
+  |
+help: Remove unused import: `os`
+
+E402 Module level import not at top of file
+  --> api/services/data_service.py:12:1
+   |
+10 | sys.path.insert(0, str(project_root))
+11 |
+12 | from api.core.config import settings
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 | from api.core.logging import get_logger
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+   |
+
+E402 Module level import not at top of file
+  --> api/services/data_service.py:13:1
+   |
+12 | from api.core.config import settings
+13 | from api.core.logging import get_logger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+15 | from api.models.requests import SearchConfigRequest
+   |
+
+E402 Module level import not at top of file
+  --> api/services/data_service.py:14:1
+   |
+12 | from api.core.config import settings
+13 | from api.core.logging import get_logger
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 | from api.models.requests import SearchConfigRequest
+16 | from api.models.responses import SearchTemplate, ConfigData
+   |
+
+F401 [*] `api.utils.exceptions.DataLoaderException` imported but unused
+  --> api/services/data_service.py:14:34
+   |
+12 | from api.core.config import settings
+13 | from api.core.logging import get_logger
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+   |                                  ^^^^^^^^^^^^^^^^^^^
+15 | from api.models.requests import SearchConfigRequest
+16 | from api.models.responses import SearchTemplate, ConfigData
+   |
+help: Remove unused import
+
+F401 [*] `api.utils.exceptions.raise_data_error` imported but unused
+  --> api/services/data_service.py:14:55
+   |
+12 | from api.core.config import settings
+13 | from api.core.logging import get_logger
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+   |                                                       ^^^^^^^^^^^^^^^^
+15 | from api.models.requests import SearchConfigRequest
+16 | from api.models.responses import SearchTemplate, ConfigData
+   |
+help: Remove unused import
+
+E402 Module level import not at top of file
+  --> api/services/data_service.py:15:1
+   |
+13 | from api.core.logging import get_logger
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+15 | from api.models.requests import SearchConfigRequest
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 | from api.models.responses import SearchTemplate, ConfigData
+17 | from momentum.factories import create_market_config
+   |
+
+E402 Module level import not at top of file
+  --> api/services/data_service.py:16:1
+   |
+14 | from api.utils.exceptions import DataLoaderException, raise_data_error
+15 | from api.models.requests import SearchConfigRequest
+16 | from api.models.responses import SearchTemplate, ConfigData
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 | from momentum.factories import create_market_config
+   |
+
+E402 Module level import not at top of file
+  --> api/services/data_service.py:17:1
+   |
+15 | from api.models.requests import SearchConfigRequest
+16 | from api.models.responses import SearchTemplate, ConfigData
+17 | from momentum.factories import create_market_config
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | class TemplateManager:
+   |
+
+F811 Redefinition of unused `get_catalog` from line 407
+   --> api/services/feature_browser_service.py:533:9
+    |
+532 |     # Legacy API compatibility (Phase 2.12)
+533 |     def get_catalog(self, features_path: str) -> Dict[str, Any]:
+    |         ^^^^^^^^^^^ `get_catalog` redefined here
+534 |         overview = self.get_overview(features_path)
+535 |         items = []
+    |
+   ::: api/services/feature_browser_service.py:407:9
+    |
+405 |         return {"items": items[:top_k]}
+406 |
+407 |     def get_catalog(self, features_path: str) -> Dict[str, Any]:
+    |         ----------- previous definition of `get_catalog` here
+408 |         df = self._load_features_df(features_path)
+409 |         if df.empty:
+    |
+help: Remove definition: `get_catalog`
+
+F401 [*] `re` imported but unused
+ --> api/services/feature_export_service.py:5:8
+  |
+3 | from __future__ import annotations
+4 |
+5 | import re
+  |        ^^
+6 | from html import escape
+7 | from itertools import combinations
+  |
+help: Remove unused import: `re`
+
+F401 [*] `momentum.core.contracts.FailureType` imported but unused
+  --> api/services/feature_factory_service.py:33:37
+   |
+31 | from api.core.logging import get_logger
+32 | from api.utils.feature_name_parser import infer_category, infer_layer, infer_level
+33 | from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
+   |                                     ^^^^^^^^^^^
+34 | from momentum.factories import create_feature_factory, create_feature_factory_mcp
+   |
+help: Remove unused import: `momentum.core.contracts.FailureType`
+
+F401 [*] `logging` imported but unused
+  --> api/services/feature_task_service.py:14:8
+   |
+12 | from typing import Dict, Optional
+13 | from datetime import datetime
+14 | import logging
+   |        ^^^^^^^
+15 | import traceback
+   |
+help: Remove unused import: `logging`
+
+F821 Undefined name `FeatureToggleRegistry`
+  --> api/services/feature_toggle_service.py:22:40
+   |
+20 |     """Service layer for feature toggle endpoints."""
+21 |
+22 |     def __init__(self, registry: Optional[FeatureToggleRegistry] = None):
+   |                                           ^^^^^^^^^^^^^^^^^^^^^
+23 |         self.logger = get_logger(__name__)
+24 |         self.registry = registry or create_feature_toggle_registry()
+   |
+
+F401 [*] `typing.Dict` imported but unused
+  --> api/services/kline_data_service.py:26:30
+   |
+24 | import sys
+25 | from pathlib import Path
+26 | from typing import Optional, Dict, List, Tuple
+   |                              ^^^^
+27 | from datetime import datetime, timedelta
+28 | import logging
+   |
+help: Remove unused import: `typing.Dict`
+
+F401 [*] `datetime.timedelta` imported but unused
+  --> api/services/kline_data_service.py:27:32
+   |
+25 | from pathlib import Path
+26 | from typing import Optional, Dict, List, Tuple
+27 | from datetime import datetime, timedelta
+   |                                ^^^^^^^^^
+28 | import logging
+29 | import pandas as pd
+   |
+help: Remove unused import: `datetime.timedelta`
+
+F401 [*] `numpy` imported but unused
+  --> api/services/kline_data_service.py:30:17
+   |
+28 | import logging
+29 | import pandas as pd
+30 | import numpy as np
+   |                 ^^
+31 | import time
+   |
+help: Remove unused import: `numpy`
+
+E402 Module level import not at top of file
+  --> api/services/kline_data_service.py:37:1
+   |
+35 | sys.path.insert(0, str(project_root))
+36 |
+37 | from api.core.config import settings
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+38 | from api.core.logging import get_logger
+39 | from momentum.factories import (
+   |
+
+E402 Module level import not at top of file
+  --> api/services/kline_data_service.py:38:1
+   |
+37 | from api.core.config import settings
+38 | from api.core.logging import get_logger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+39 | from momentum.factories import (
+40 |     create_binance_provider,
+   |
+
+E402 Module level import not at top of file
+  --> api/services/kline_data_service.py:39:1
+   |
+37 |   from api.core.config import settings
+38 |   from api.core.logging import get_logger
+39 | / from momentum.factories import (
+40 | |     create_binance_provider,
+41 | |     create_kline_download_service,
+42 | |     create_kline_storage_manager,
+43 | | )
+   | |_^
+44 |
+45 |   logger = get_logger("api.kline_data_service")
+   |
+
+F541 [*] f-string without any placeholders
+   --> api/services/kline_data_service.py:204:25
+    |
+202 |                 if df.empty:
+203 |                     logger.warning(
+204 |                         f"Cache metadata exists but read returned empty, "
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+205 |                         f"falling back to download"
+206 |                     )
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/kline_data_service.py:205:25
+    |
+203 |                     logger.warning(
+204 |                         f"Cache metadata exists but read returned empty, "
+205 |                         f"falling back to download"
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+206 |                     )
+207 |                     df = self._download_and_cache(
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/kline_data_service.py:364:17
+    |
+362 |             # P1-2 fix: 嘗試從HDF5讀取部分數據作為fallback
+363 |             logger.info(
+364 |                 f"Attempting to read partial data from cache as fallback..."
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+365 |             )
+366 |             try:
+    |
+help: Remove extraneous `f` prefix
+
+F401 [*] `os` imported but unused
+  --> api/services/kline_storage_service.py:19:8
+   |
+18 | import sys
+19 | import os
+   |        ^^
+20 | from pathlib import Path
+21 | from typing import Optional, Dict, List
+   |
+help: Remove unused import: `os`
+
+F401 [*] `datetime.datetime` imported but unused
+  --> api/services/kline_storage_service.py:22:22
+   |
+20 | from pathlib import Path
+21 | from typing import Optional, Dict, List
+22 | from datetime import datetime
+   |                      ^^^^^^^^
+23 | import logging
+   |
+help: Remove unused import: `datetime.datetime`
+
+F401 [*] `logging` imported but unused
+  --> api/services/kline_storage_service.py:23:8
+   |
+21 | from typing import Optional, Dict, List
+22 | from datetime import datetime
+23 | import logging
+   |        ^^^^^^^
+24 |
+25 | # Add project root to Python path
+   |
+help: Remove unused import: `logging`
+
+E402 Module level import not at top of file
+  --> api/services/kline_storage_service.py:29:1
+   |
+27 | sys.path.insert(0, str(project_root))
+28 |
+29 | from api.core.config import settings
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+30 | from api.core.logging import get_logger
+31 | from momentum.factories import create_kline_storage_manager
+   |
+
+E402 Module level import not at top of file
+  --> api/services/kline_storage_service.py:30:1
+   |
+29 | from api.core.config import settings
+30 | from api.core.logging import get_logger
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 | from momentum.factories import create_kline_storage_manager
+32 | import pandas as pd
+   |
+
+E402 Module level import not at top of file
+  --> api/services/kline_storage_service.py:31:1
+   |
+29 | from api.core.config import settings
+30 | from api.core.logging import get_logger
+31 | from momentum.factories import create_kline_storage_manager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 | import pandas as pd
+   |
+
+E402 Module level import not at top of file
+  --> api/services/kline_storage_service.py:32:1
+   |
+30 | from api.core.logging import get_logger
+31 | from momentum.factories import create_kline_storage_manager
+32 | import pandas as pd
+   | ^^^^^^^^^^^^^^^^^^^
+33 |
+34 | logger = get_logger("api.kline_storage_service")
+   |
+
+F401 [*] `pandas` imported but unused
+  --> api/services/lstm_task_service.py:22:18
+   |
+21 | import numpy as np
+22 | import pandas as pd
+   |                  ^^
+23 |
+24 | from api.core.logging import get_logger
+   |
+help: Remove unused import: `pandas`
+
+F401 [*] `logging` imported but unused
+  --> api/services/pattern_management_service.py:13:8
+   |
+11 | from datetime import datetime
+12 | import uuid
+13 | import logging
+   |        ^^^^^^^
+14 |
+15 | from momentum.factories import (
+   |
+help: Remove unused import: `logging`
+
+F401 [*] `typing.Any` imported but unused
+  --> api/services/search_task_service.py:9:42
+   |
+ 7 | import uuid
+ 8 | from datetime import datetime, timedelta
+ 9 | from typing import Dict, List, Optional, Any
+   |                                          ^^^
+10 | from pathlib import Path
+   |
+help: Remove unused import: `typing.Any`
+
+F401 [*] `pathlib.Path` imported but unused
+  --> api/services/search_task_service.py:10:21
+   |
+ 8 | from datetime import datetime, timedelta
+ 9 | from typing import Dict, List, Optional, Any
+10 | from pathlib import Path
+   |                     ^^^^
+11 |
+12 | from pydantic import BaseModel, Field, ConfigDict
+   |
+help: Remove unused import: `pathlib.Path`
+
+F401 [*] `..core.config.settings` imported but unused
+  --> api/services/search_task_service.py:13:27
+   |
+12 | from pydantic import BaseModel, Field, ConfigDict
+13 | from ..core.config import settings
+   |                           ^^^^^^^^
+14 | from ..core.logging import get_logger
+15 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+   |
+help: Remove unused import: `..core.config.settings`
+
+F541 [*] f-string without any placeholders
+   --> api/services/search_task_service.py:305:34
+    |
+303 |                     # Pydantic enum/string 皆轉為字串處理
+304 |                     search_mode = str(getattr(positive_config.search_mode, 'value', positive_config.search_mode))
+305 |                 self.logger.info(f"📋 從正例配置繼承參數:")
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+306 |                 self.logger.info(f"   - 時間範圍: {search_start_date} 到 {search_end_date}")
+307 |                 self.logger.info(f"   - price_change_method: {price_change_method}")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/search_task_service.py:310:37
+    |
+308 |                 self.logger.info(f"   - search_mode: {search_mode}")
+309 |             else:
+310 |                 self.logger.warning(f"⚠️ 無法從正例配置獲取參數，使用默認值:")
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+311 |                 self.logger.warning(f"   - 時間範圍: {search_start_date} 到 {search_end_date}")
+312 |                 self.logger.warning(f"   - price_change_method: {price_change_method}")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/search_task_service.py:585:35
+    |
+584 |                 # Step 4: 詳細日誌 - 按Symbol顯示統計（前10個Symbol）
+585 |                 self.logger.debug(f"時間分離統計（按Symbol獨立計算）:")
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+586 |                 sorted_symbols = sorted(symbol_stats.keys())[:10]  # 只顯示前10個
+587 |                 for symbol in sorted_symbols:
+    |
+help: Remove extraneous `f` prefix
+
+F841 Local variable `target_timestamp` is assigned to but never used
+   --> api/services/search_task_service.py:721:29
+    |
+719 |                         if kline_data is not None and not kline_data.empty:
+720 |                             # 找到最接近目標時間的K線
+721 |                             target_timestamp = candidate_time.strftime('%Y-%m-%d %H:%M:%S')
+    |                             ^^^^^^^^^^^^^^^^
+722 |                             closest_idx = None
+723 |                             min_diff = float('inf')
+    |
+help: Remove assignment to unused variable `target_timestamp`
+
+F541 [*] f-string without any placeholders
+   --> api/services/search_task_service.py:741:57
+    |
+739 | …                         # 向後相容：如果沒有設定，預設使用 CLOSE_TO_CLOSE
+740 | …                         price_change_method = 'CLOSE_TO_CLOSE'
+741 | …                         self.logger.warning(f"⚠️ price_change_method not found in config, using default: CLOSE_TO_CLOSE")
+    |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+742 | …                     
+743 | …                     if price_change_method == 'OPEN_TO_CLOSE':
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/search_task_service.py:826:26
+    |
+824 |         negative_cases = self.negative_results.get(negative_task_id, [])
+825 |
+826 |         self.logger.info(f"🔍 get_combined_results in SearchTaskService:")
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+827 |         self.logger.info(f"  - positive_cases: {len(positive_cases)} cases")
+828 |         self.logger.info(f"  - negative_cases: {len(negative_cases)} cases")
+    |
+help: Remove extraneous `f` prefix
+
+E402 Module level import not at top of file
+   --> api/services/search_task_service.py:963:1
+    |
+961 | # 新增 API 路由: api/routes/two_stage_search.py
+962 |
+963 | from fastapi import APIRouter, HTTPException, BackgroundTasks
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+964 | from typing import Optional
+    |
+
+E402 Module level import not at top of file
+   --> api/services/search_task_service.py:964:1
+    |
+963 | from fastapi import APIRouter, HTTPException, BackgroundTasks
+964 | from typing import Optional
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+965 |
+966 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+    |
+
+E402 Module level import not at top of file
+   --> api/services/search_task_service.py:966:1
+    |
+964 | from typing import Optional
+965 |
+966 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+967 | from ..models.responses import TaskStartResponse, SearchResponse
+968 | from ..core.logging import get_logger
+    |
+
+E402 Module level import not at top of file
+   --> api/services/search_task_service.py:967:1
+    |
+966 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+967 | from ..models.responses import TaskStartResponse, SearchResponse
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+968 | from ..core.logging import get_logger
+    |
+
+E402 Module level import not at top of file
+   --> api/services/search_task_service.py:968:1
+    |
+966 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+967 | from ..models.responses import TaskStartResponse, SearchResponse
+968 | from ..core.logging import get_logger
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+969 |
+970 | router = APIRouter(prefix="/two-stage", tags=["Two-Stage Search"])
+    |
+
+F811 [*] Redefinition of unused `get_logger` from line 14
+   --> api/services/search_task_service.py:968:28
+    |
+966 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+967 | from ..models.responses import TaskStartResponse, SearchResponse
+968 | from ..core.logging import get_logger
+    |                            ^^^^^^^^^^ `get_logger` redefined here
+969 |
+970 | router = APIRouter(prefix="/two-stage", tags=["Two-Stage Search"])
+    |
+   ::: api/services/search_task_service.py:14:28
+    |
+ 12 | from pydantic import BaseModel, Field, ConfigDict
+ 13 | from ..core.config import settings
+ 14 | from ..core.logging import get_logger
+    |                            ---------- previous definition of `get_logger` here
+ 15 | from ..models.requests import SearchConfigRequest, NegativeCaseRequest
+ 16 | from ..models.responses import SearchResultData, CaseData, CaseSummary, SamplingQuality, TaskStatusEnum
+    |
+help: Remove definition: `get_logger`
+
+F401 [*] `typing.List` imported but unused
+  --> api/services/signal_analysis_service.py:18:20
+   |
+16 | import logging
+17 | import time
+18 | from typing import List, Optional, Dict, Any
+   |                    ^^^^
+19 | from fastapi import HTTPException
+   |
+help: Remove unused import
+
+F401 [*] `typing.Optional` imported but unused
+  --> api/services/signal_analysis_service.py:18:26
+   |
+16 | import logging
+17 | import time
+18 | from typing import List, Optional, Dict, Any
+   |                          ^^^^^^^^
+19 | from fastapi import HTTPException
+   |
+help: Remove unused import
+
+F401 [*] `os` imported but unused
+ --> api/services/standalone_search_service.py:6:8
+  |
+4 | from datetime import datetime, timedelta
+5 | import sys
+6 | import os
+  |        ^^
+7 | from pathlib import Path
+  |
+help: Remove unused import: `os`
+
+E402 Module level import not at top of file
+  --> api/services/standalone_search_service.py:13:1
+   |
+11 | sys.path.insert(0, str(project_root))
+12 |
+13 | from api.core.config import settings
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 | from api.core.logging import get_logger, log_function_call
+15 | from api.utils.exceptions import (
+   |
+
+E402 Module level import not at top of file
+  --> api/services/standalone_search_service.py:14:1
+   |
+13 | from api.core.config import settings
+14 | from api.core.logging import get_logger, log_function_call
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 | from api.utils.exceptions import (
+16 |     SearchExecutionException,
+   |
+
+E402 Module level import not at top of file
+  --> api/services/standalone_search_service.py:15:1
+   |
+13 |   from api.core.config import settings
+14 |   from api.core.logging import get_logger, log_function_call
+15 | / from api.utils.exceptions import (
+16 | |     SearchExecutionException,
+17 | |     DataLoaderException,
+18 | |     SearchConfigException,
+19 | |     raise_execution_error
+20 | | )
+   | |_^
+21 |   from api.models.requests import SearchConfigRequest, FilterConditionRequest
+22 |   from api.models.responses import (
+   |
+
+F401 [*] `api.utils.exceptions.DataLoaderException` imported but unused
+  --> api/services/standalone_search_service.py:17:5
+   |
+15 | from api.utils.exceptions import (
+16 |     SearchExecutionException,
+17 |     DataLoaderException,
+   |     ^^^^^^^^^^^^^^^^^^^
+18 |     SearchConfigException,
+19 |     raise_execution_error
+   |
+help: Remove unused import
+
+F401 [*] `api.utils.exceptions.SearchConfigException` imported but unused
+  --> api/services/standalone_search_service.py:18:5
+   |
+16 |     SearchExecutionException,
+17 |     DataLoaderException,
+18 |     SearchConfigException,
+   |     ^^^^^^^^^^^^^^^^^^^^^
+19 |     raise_execution_error
+20 | )
+   |
+help: Remove unused import
+
+F401 [*] `api.utils.exceptions.raise_execution_error` imported but unused
+  --> api/services/standalone_search_service.py:19:5
+   |
+17 |     DataLoaderException,
+18 |     SearchConfigException,
+19 |     raise_execution_error
+   |     ^^^^^^^^^^^^^^^^^^^^^
+20 | )
+21 | from api.models.requests import SearchConfigRequest, FilterConditionRequest
+   |
+help: Remove unused import
+
+E402 Module level import not at top of file
+  --> api/services/standalone_search_service.py:21:1
+   |
+19 |     raise_execution_error
+20 | )
+21 | from api.models.requests import SearchConfigRequest, FilterConditionRequest
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 | from api.models.responses import (
+23 |     CaseData, CaseSummary, SamplingQuality, SearchResultData,
+   |
+
+F401 [*] `api.models.requests.FilterConditionRequest` imported but unused
+  --> api/services/standalone_search_service.py:21:54
+   |
+19 |     raise_execution_error
+20 | )
+21 | from api.models.requests import SearchConfigRequest, FilterConditionRequest
+   |                                                      ^^^^^^^^^^^^^^^^^^^^^^
+22 | from api.models.responses import (
+23 |     CaseData, CaseSummary, SamplingQuality, SearchResultData,
+   |
+help: Remove unused import: `api.models.requests.FilterConditionRequest`
+
+E402 Module level import not at top of file
+  --> api/services/standalone_search_service.py:22:1
+   |
+20 |   )
+21 |   from api.models.requests import SearchConfigRequest, FilterConditionRequest
+22 | / from api.models.responses import (
+23 | |     CaseData, CaseSummary, SamplingQuality, SearchResultData,
+24 | |     TaskInfo, TaskStatusEnum, TaskProgress
+25 | | )
+   | |_^
+26 |
+27 |   class StandaloneTaskManager:
+   |
+
+F401 [*] `momentum.factories.create_search_configuration` imported but unused
+   --> api/services/standalone_search_service.py:201:17
+    |
+199 |                 create_case_search_engine,
+200 |                 create_momentum_data_loader,
+201 |                 create_search_configuration,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+202 |                 create_filter_condition,
+203 |             )
+    |
+help: Remove unused import
+
+F401 [*] `momentum.factories.create_filter_condition` imported but unused
+   --> api/services/standalone_search_service.py:202:17
+    |
+200 |                 create_momentum_data_loader,
+201 |                 create_search_configuration,
+202 |                 create_filter_condition,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^
+203 |             )
+    |
+help: Remove unused import
+
+F541 [*] f-string without any placeholders
+   --> api/services/standalone_search_service.py:312:30
+    |
+310 |         try:
+311 |             # DEBUG: 記錄接收到的請求參數
+312 |             self.logger.info(f"=== 轉換請求到搜索配置 ===")
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+313 |             self.logger.info(f"請求的 price_change_method: {request.price_change_method}")
+314 |             self.logger.info(f"price_change_method.value: {request.price_change_method.value}")
+    |
+help: Remove extraneous `f` prefix
+
+E722 Do not use bare `except`
+   --> api/services/standalone_search_service.py:440:29
+    |
+438 |                                 )]
+439 |                                 result.extend(filtered)
+440 |                             except:
+    |                             ^^^^^^
+441 |                                 result.append("BTCUSDT")
+442 |                         else:
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:454:1
+    |
+452 | """
+453 |
+454 | import asyncio
+    | ^^^^^^^^^^^^^^
+455 | import sys
+456 | from pathlib import Path
+    |
+
+F811 [*] Redefinition of unused `asyncio` from line 3
+   --> api/services/task_manager.py:454:8
+    |
+452 | """
+453 |
+454 | import asyncio
+    |        ^^^^^^^ `asyncio` redefined here
+455 | import sys
+456 | from pathlib import Path
+    |
+   ::: api/services/task_manager.py:3:8
+    |
+  1 | # 增強文件: api/services/task_manager.py
+  2 |
+  3 | import asyncio
+    |        ------- previous definition of `asyncio` here
+  4 | import uuid
+  5 | from datetime import datetime, timedelta
+    |
+help: Remove definition: `asyncio`
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:455:1
+    |
+454 | import asyncio
+455 | import sys
+    | ^^^^^^^^^^
+456 | from pathlib import Path
+457 | from typing import Dict, List, Optional, Any
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:456:1
+    |
+454 | import asyncio
+455 | import sys
+456 | from pathlib import Path
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+457 | from typing import Dict, List, Optional, Any
+458 | from datetime import datetime
+    |
+
+F811 [*] Redefinition of unused `Path` from line 11
+   --> api/services/task_manager.py:456:21
+    |
+454 | import asyncio
+455 | import sys
+456 | from pathlib import Path
+    |                     ^^^^ `Path` redefined here
+457 | from typing import Dict, List, Optional, Any
+458 | from datetime import datetime
+    |
+   ::: api/services/task_manager.py:11:21
+    |
+  9 | import threading
+ 10 | import json
+ 11 | from pathlib import Path
+    |                     ---- previous definition of `Path` here
+ 12 |
+ 13 | from ..core.config import settings
+    |
+help: Remove definition: `Path`
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:457:1
+    |
+455 | import sys
+456 | from pathlib import Path
+457 | from typing import Dict, List, Optional, Any
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+458 | from datetime import datetime
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:458:1
+    |
+456 | from pathlib import Path
+457 | from typing import Dict, List, Optional, Any
+458 | from datetime import datetime
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+459 |
+460 | from ..core.config import settings
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:460:1
+    |
+458 | from datetime import datetime
+459 |
+460 | from ..core.config import settings
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+461 | from ..core.logging import get_logger
+462 | from ..models.requests import SearchConfigRequest
+    |
+
+F811 [*] Redefinition of unused `settings` from line 13
+   --> api/services/task_manager.py:460:27
+    |
+458 | from datetime import datetime
+459 |
+460 | from ..core.config import settings
+    |                           ^^^^^^^^ `settings` redefined here
+461 | from ..core.logging import get_logger
+462 | from ..models.requests import SearchConfigRequest
+    |
+   ::: api/services/task_manager.py:13:27
+    |
+ 11 | from pathlib import Path
+ 12 |
+ 13 | from ..core.config import settings
+    |                           -------- previous definition of `settings` here
+ 14 | from ..core.logging import get_logger
+ 15 | from ..models.responses import SearchResultData
+    |
+help: Remove definition: `settings`
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:461:1
+    |
+460 | from ..core.config import settings
+461 | from ..core.logging import get_logger
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+462 | from ..models.requests import SearchConfigRequest
+463 | from ..models.responses import SearchResultData, CaseData
+    |
+
+F811 [*] Redefinition of unused `get_logger` from line 14
+   --> api/services/task_manager.py:461:28
+    |
+460 | from ..core.config import settings
+461 | from ..core.logging import get_logger
+    |                            ^^^^^^^^^^ `get_logger` redefined here
+462 | from ..models.requests import SearchConfigRequest
+463 | from ..models.responses import SearchResultData, CaseData
+    |
+   ::: api/services/task_manager.py:14:28
+    |
+ 13 | from ..core.config import settings
+ 14 | from ..core.logging import get_logger
+    |                            ---------- previous definition of `get_logger` here
+ 15 | from ..models.responses import SearchResultData
+    |
+help: Remove definition: `get_logger`
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:462:1
+    |
+460 | from ..core.config import settings
+461 | from ..core.logging import get_logger
+462 | from ..models.requests import SearchConfigRequest
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+463 | from ..models.responses import SearchResultData, CaseData
+464 | from ..utils.exceptions import SearchExecutionException
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:463:1
+    |
+461 | from ..core.logging import get_logger
+462 | from ..models.requests import SearchConfigRequest
+463 | from ..models.responses import SearchResultData, CaseData
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+464 | from ..utils.exceptions import SearchExecutionException
+465 | from .task_manager import enhanced_task_manager, TaskStatusEnum, TaskTypeEnum
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:464:1
+    |
+462 | from ..models.requests import SearchConfigRequest
+463 | from ..models.responses import SearchResultData, CaseData
+464 | from ..utils.exceptions import SearchExecutionException
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+465 | from .task_manager import enhanced_task_manager, TaskStatusEnum, TaskTypeEnum
+    |
+
+E402 Module level import not at top of file
+   --> api/services/task_manager.py:465:1
+    |
+463 | from ..models.responses import SearchResultData, CaseData
+464 | from ..utils.exceptions import SearchExecutionException
+465 | from .task_manager import enhanced_task_manager, TaskStatusEnum, TaskTypeEnum
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+466 |
+467 | # 動態導入momentum模組
+    |
+
+F811 Redefinition of unused `enhanced_task_manager` from line 447
+   --> api/services/task_manager.py:465:27
+    |
+463 | from ..models.responses import SearchResultData, CaseData
+464 | from ..utils.exceptions import SearchExecutionException
+465 | from .task_manager import enhanced_task_manager, TaskStatusEnum, TaskTypeEnum
+    |                           ^^^^^^^^^^^^^^^^^^^^^ `enhanced_task_manager` redefined here
+466 |
+467 | # 動態導入momentum模組
+    |
+   ::: api/services/task_manager.py:447:1
+    |
+446 | # 全局任務管理器實例
+447 | enhanced_task_manager = EnhancedTaskManager()
+    | --------------------- previous definition of `enhanced_task_manager` here
+448 |
+449 | # 修改文件: api/services/case_search_integration_service.py
+    |
+help: Remove definition: `enhanced_task_manager`
+
+F401 [*] `momentum.factories.create_filter_condition` imported but unused
+   --> api/services/task_manager.py:498:17
+    |
+496 |             from momentum.factories import (
+497 |                 create_case_search_engine,
+498 |                 create_filter_condition,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^
+499 |                 create_momentum_data_loader,
+500 |                 create_search_configuration,
+    |
+help: Remove unused import
+
+F401 [*] `momentum.factories.create_search_configuration` imported but unused
+   --> api/services/task_manager.py:500:17
+    |
+498 |                 create_filter_condition,
+499 |                 create_momentum_data_loader,
+500 |                 create_search_configuration,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+501 |             )
+    |
+help: Remove unused import
+
+F401 [*] `typing.Any` imported but unused
+  --> api/services/xgboost_batch_service.py:24:20
+   |
+22 | import uuid
+23 | from dataclasses import dataclass
+24 | from typing import Any, Dict, List, Optional, Tuple
+   |                    ^^^
+25 | from datetime import datetime
+26 | import logging
+   |
+help: Remove unused import: `typing.Any`
+
+F401 [*] `logging` imported but unused
+  --> api/services/xgboost_batch_service.py:26:8
+   |
+24 | from typing import Any, Dict, List, Optional, Tuple
+25 | from datetime import datetime
+26 | import logging
+   |        ^^^^^^^
+27 | from pathlib import Path
+   |
+help: Remove unused import: `logging`
+
+F401 [*] `pathlib.Path` imported but unused
+  --> api/services/xgboost_batch_service.py:27:21
+   |
+25 | from datetime import datetime
+26 | import logging
+27 | from pathlib import Path
+   |                     ^^^^
+28 |
+29 | import pandas as pd
+   |
+help: Remove unused import: `pathlib.Path`
+
+F823 Local variable `datetime` referenced before assignment
+   --> api/services/xgboost_batch_service.py:367:46
+    |
+365 |                 if isinstance(c.timestamp, int):
+366 |                     timestamps.append(c.timestamp)
+367 |                 elif isinstance(c.timestamp, datetime):
+    |                                              ^^^^^^^^
+368 |                     timestamps.append(int(c.timestamp.timestamp()))
+369 |                 else:
+    |
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:592:30
+    |
+590 |                 all_symbol_features[sym] = features_df
+591 |             
+592 |             self.logger.info(f"所有標的的 timestamp 處理完成")
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+593 |             
+594 |             for i, case in enumerate(cases):
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:686:21
+    |
+684 |             if positive_count == 0:
+685 |                 raise ValueError(
+686 |                     f"所有案例都是負例（反例），無法訓練二分類模型。"
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+687 |                     f"請檢查案例搜尋條件或選擇其他標的。"
+688 |                 )
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:687:21
+    |
+685 |                 raise ValueError(
+686 |                     f"所有案例都是負例（反例），無法訓練二分類模型。"
+687 |                     f"請檢查案例搜尋條件或選擇其他標的。"
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+688 |                 )
+689 |             if negative_count == 0:
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:691:21
+    |
+689 |             if negative_count == 0:
+690 |                 raise ValueError(
+691 |                     f"所有案例都是正例（盈利），無法訓練二分類模型。"
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+692 |                     f"建議方案："
+693 |                     f"\n1. 增加更多標的以獲得更多樣的案例"
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:692:21
+    |
+690 |                 raise ValueError(
+691 |                     f"所有案例都是正例（盈利），無法訓練二分類模型。"
+692 |                     f"建議方案："
+    |                     ^^^^^^^^^^^^^
+693 |                     f"\n1. 增加更多標的以獲得更多樣的案例"
+694 |                     f"\n2. 調整案例搜尋的正例判定條件（未來漲幅閾值）"
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:693:21
+    |
+691 |                     f"所有案例都是正例（盈利），無法訓練二分類模型。"
+692 |                     f"建議方案："
+693 |                     f"\n1. 增加更多標的以獲得更多樣的案例"
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+694 |                     f"\n2. 調整案例搜尋的正例判定條件（未來漲幅閾值）"
+695 |                     f"\n3. 使用其他標的的案例"
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:694:21
+    |
+692 |                     f"建議方案："
+693 |                     f"\n1. 增加更多標的以獲得更多樣的案例"
+694 |                     f"\n2. 調整案例搜尋的正例判定條件（未來漲幅閾值）"
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+695 |                     f"\n3. 使用其他標的的案例"
+696 |                 )
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> api/services/xgboost_batch_service.py:695:21
+    |
+693 |                     f"\n1. 增加更多標的以獲得更多樣的案例"
+694 |                     f"\n2. 調整案例搜尋的正例判定條件（未來漲幅閾值）"
+695 |                     f"\n3. 使用其他標的的案例"
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+696 |                 )
+    |
+help: Remove extraneous `f` prefix
+
+F401 [*] `logging` imported but unused
+  --> api/services/xgboost_task_service.py:14:8
+   |
+12 | from typing import Dict, Optional
+13 | from datetime import datetime
+14 | import logging
+   |        ^^^^^^^
+15 |
+16 | import pandas as pd
+   |
+help: Remove unused import: `logging`
+
+F401 [*] `momentum.factories.create_market_config` imported but unused
+  --> api/services/xgboost_task_service.py:28:5
+   |
+26 |     create_regime_analyzer,
+27 |     create_xgboost_analyzer,
+28 |     create_market_config,
+   |     ^^^^^^^^^^^^^^^^^^^^
+29 | )
+30 | from dataclasses import dataclass
+   |
+help: Remove unused import: `momentum.factories.create_market_config`
+
+Found 115 errors.
+[*] 61 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).

@@ -75,9 +75,14 @@ def _is_legacy_candidate(path: Path, payload: Optional[Dict[str, Any]]) -> bool:
         return True
     if payload is None:
         return path.name.startswith("d_star_") and path.suffix == ".json"
-    if payload.get("cache_version") != CACHE_VERSION:
+    cache_version = payload.get("cache_version")
+    # v2 and v3 are structured cache files; skip them (cold-start on v3 is acceptable)
+    if cache_version in (CACHE_VERSION, "v2"):
+        return payload.get("symbol") == "default" or payload.get("timeframe") == "default"
+    if cache_version is not None:
+        # unknown older version — treat as legacy
         return True
-    return payload.get("symbol") == "default" or payload.get("timeframe") == "default"
+    return True
 
 
 def _new_cache_path(cache_dir: Path, payload: Dict[str, Any]) -> Optional[Path]:

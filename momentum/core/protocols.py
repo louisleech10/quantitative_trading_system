@@ -218,6 +218,37 @@ class ICVValidator(Protocol):
 class IFeatureReader(Protocol):
     """Read persisted feature metadata and projected columns."""
 
+    def feature_run_dir(self, symbol: str, tf: str, config_hash: str) -> Any:
+        ...
+
+    def load_manifest_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> dict:
+        ...
+
+    def stream_groups_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> Iterable[Tuple[str, Any]]:
+        ...
+
+    def load_columns_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        columns: List[str],
+        artifact_kind: str = "raw",
+    ) -> Any:
+        ...
+
     def list_features(self, symbol: str, config_hash: str) -> List[str]:
         ...
 
