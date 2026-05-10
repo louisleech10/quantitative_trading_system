@@ -144,6 +144,7 @@ async def get_hardware_info() -> Dict[str, Any]:
             "l3_streaming_buffer_cols": "FFACT_L3_STREAMING_BUFFER_COLS",
             "l65_split_threshold": "FFACT_L65_SPLIT_THRESHOLD",
             "l2_category_workers": "FFACT_L2_CATEGORY_WORKERS",
+            "cgsa_shard_bytes": "FFACT_CGSA_SHARD_BYTES",
         }
         applied_settings: Dict[str, Dict[str, Any]] = {}
         for key, env_var in env_keys.items():

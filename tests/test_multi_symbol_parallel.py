@@ -12,10 +12,7 @@ from __future__ import annotations
 import gzip
 import json
 import os
-import shutil
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -185,7 +182,9 @@ class TestT50aManifestWritten:
             pq_path = output_dir / info["file"]
             assert pq_path.exists(), f"Parquet file {info['file']} missing"
             table = pq.read_table(pq_path)
-            assert table.num_columns == info["column_count"]
+            group_columns = [str(column) for column in info.get("columns", [])]
+            assert len(group_columns) == info["column_count"]
+            assert set(group_columns).issubset(set(table.column_names))
 
 
 # ===========================================================================
@@ -196,10 +195,12 @@ class TestT50bFloat16Precision:
     """T5.0b — float16 與 float32 差異 + NaN 保留"""
 
     def test_relative_diff_within_tolerance(self, persisted_output):
+        from momentum.FeatureEngineering.feature_reader import FeatureReader
+
         output_dir, _, data_small, _, symbol, config_hash = persisted_output
-        pq_path = output_dir / "small.parquet"
-        table = pq.read_table(pq_path)
-        loaded = table.to_pandas().values.astype(np.float32)
+        reader = FeatureReader(str(output_dir.parent.parent))
+        selected = [f"feat_small_{index}" for index in range(data_small.shape[1])]
+        loaded = reader.load_columns(symbol, config_hash, selected).values.astype(np.float32)
 
         expected_f16 = data_small.astype(np.float16).astype(np.float32)
         np.testing.assert_allclose(

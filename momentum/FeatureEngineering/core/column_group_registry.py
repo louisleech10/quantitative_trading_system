@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -26,7 +27,7 @@ except ImportError:
 
         return _decorator
 
-from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
+from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource, ShardMeta
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -253,13 +254,38 @@ class ColumnGroupRegistry:
             yield group_id, self._groups[group_id]
 
     def load_data(self, group_id: str) -> np.ndarray:
-        """Load column group data from disk with memory-mapped read-only mode."""
+        """Load column group data; transparently concatenates shards if sharded."""
         with self._buffer_lock:
             buffered = self._memory_buffer.get(group_id)
         if buffered is not None:
             return np.asarray(buffered, dtype=np.float32)
 
         group = self.get(group_id)
+
+        # Sharded path: concat per-shard mmaps. We allocate one ndarray and
+        # memcpy each shard slice in to avoid mmap-lifetime issues with the
+        # caller (np.concatenate on mmap views can keep file handles alive
+        # arbitrarily long, blocking unlink on Windows / multi-process).
+        if group.shards:
+            for shard in group.shards:
+                if not shard.disk_path.exists():
+                    raise ColumnGroupRegistryError(
+                        f"Persisted shard data missing: {shard.disk_path} (group={group_id} shard={shard.shard_idx})",
+                        failure_type=FailureType.IO_ERROR,
+                    )
+            try:
+                out = np.empty((group.n_rows, group.n_cols), dtype=np.float32)
+                for shard in group.shards:
+                    arr = np.load(shard.disk_path, mmap_mode="r", allow_pickle=False)
+                    out[:, shard.col_start:shard.col_end] = arr
+                    del arr
+                return out
+            except OSError as exc:
+                raise ColumnGroupRegistryError(
+                    f"Failed to load sharded group data for {group_id}: {exc}",
+                    failure_type=FailureType.IO_ERROR,
+                ) from exc
+
         if group.disk_path is None:
             raise ColumnGroupRegistryError(
                 f"Group {group_id} has no disk_path; cannot load persisted data.",
@@ -280,8 +306,81 @@ class ColumnGroupRegistry:
                 failure_type=FailureType.IO_ERROR,
             ) from exc
 
+    def iter_shards(self, group_id: str) -> Iterator[tuple[ShardMeta, np.ndarray, tuple[str, ...]]]:
+        """Yield ``(shard_meta, mmap_array, shard_columns)`` for each shard.
+
+        For non-sharded legacy groups, yields a single synthesized shard view
+        backed by ``disk_path``. The ``mmap_array`` is read-only mmap; caller
+        must NOT mutate. Drop reference between iterations to release mmap.
+        """
+        group = self.get(group_id)
+
+        # Memory-buffer fast path: synthesize as one virtual shard.
+        with self._buffer_lock:
+            buffered = self._memory_buffer.get(group_id)
+        if buffered is not None:
+            arr = np.asarray(buffered, dtype=np.float32)
+            virtual = ShardMeta(
+                shard_idx=0,
+                col_start=0,
+                col_end=group.n_cols,
+                n_rows=group.n_rows,
+                disk_path=group.disk_path or (self._work_dir / f"{group_id}.npy"),
+                nbytes=int(arr.nbytes),
+            )
+            yield virtual, arr, tuple(group.columns)
+            return
+
+        if group.shards:
+            for shard in group.shards:
+                if not shard.disk_path.exists():
+                    raise ColumnGroupRegistryError(
+                        f"Persisted shard data missing: {shard.disk_path} (group={group_id} shard={shard.shard_idx})",
+                        failure_type=FailureType.IO_ERROR,
+                    )
+                try:
+                    arr = np.load(shard.disk_path, mmap_mode="r", allow_pickle=False)
+                except OSError as exc:
+                    raise ColumnGroupRegistryError(
+                        f"Failed to mmap shard {shard.shard_idx} for {group_id}: {exc}",
+                        failure_type=FailureType.IO_ERROR,
+                    ) from exc
+                shard_columns = tuple(group.columns[shard.col_start:shard.col_end])
+                yield shard, arr, shard_columns
+                del arr
+            return
+
+        # Legacy single-file fallback: synthesize one shard.
+        if group.disk_path is None or not group.disk_path.exists():
+            raise ColumnGroupRegistryError(
+                f"Group {group_id} has no readable disk_path or shards.",
+                failure_type=FailureType.VALIDATION,
+            )
+        try:
+            arr = np.load(group.disk_path, mmap_mode="r", allow_pickle=False)
+        except OSError as exc:
+            raise ColumnGroupRegistryError(
+                f"Failed to mmap legacy single-file group {group_id}: {exc}",
+                failure_type=FailureType.IO_ERROR,
+            ) from exc
+        virtual = ShardMeta(
+            shard_idx=0,
+            col_start=0,
+            col_end=group.n_cols,
+            n_rows=group.n_rows,
+            disk_path=group.disk_path,
+            nbytes=int(arr.nbytes),
+        )
+        yield virtual, arr, tuple(group.columns)
+        del arr
+
     def save_data(self, group: ColumnGroup, data: np.ndarray) -> ColumnGroup:
-        """Save group data to .npy, register it, and update manifest atomically."""
+        """Save group data sharded across one or more .npy files; updates manifest.
+
+        Sharding is automatic based on ``get_cgsa_shard_bytes()`` tier target.
+        Small groups whose total bytes fit in one shard fall through the fast
+        single-file path (legacy behavior, ``disk_path`` set, ``shards`` empty).
+        """
         if data.ndim != 2:
             raise ColumnGroupRegistryError(
                 f"Group {group.group_id} data must be 2D, got shape={data.shape}",
@@ -292,7 +391,99 @@ class ColumnGroupRegistry:
             raise ValueError(f"Duplicate group_id: {group.group_id}")
 
         data_fp32 = np.asarray(data, dtype=np.float32)
-        path = self._work_dir / f"{group.group_id}.npy"
+        n_rows, n_cols = int(data_fp32.shape[0]), int(data_fp32.shape[1])
+
+        # Memory-buffer fast path bypasses sharding (small in-flight cache).
+        if self._memory_buffer_limit > 0:
+            single_path = self._work_dir / f"{group.group_id}.npy"
+            updated_group = ColumnGroup(
+                group_id=group.group_id,
+                layer=group.layer,
+                timeframe=group.timeframe,
+                data_source=group.data_source,
+                indicator=group.indicator,
+                columns=group.columns,
+                shape=(n_rows, n_cols),
+                dtype="float32",
+                disk_path=single_path,
+            )
+            self._groups[updated_group.group_id] = updated_group
+            with self._buffer_lock:
+                self._memory_buffer[group.group_id] = data_fp32
+                should_flush = len(self._memory_buffer) >= self._memory_buffer_limit
+            if should_flush:
+                self._flush_buffer()
+            return updated_group
+
+        slices = self._compute_shard_slices(n_rows, n_cols, dtype_size=4)
+
+        if len(slices) <= 1:
+            # Single-shard fast path (legacy on-disk shape).
+            single_path = self._work_dir / f"{group.group_id}.npy"
+            updated_group = ColumnGroup(
+                group_id=group.group_id,
+                layer=group.layer,
+                timeframe=group.timeframe,
+                data_source=group.data_source,
+                indicator=group.indicator,
+                columns=group.columns,
+                shape=(n_rows, n_cols),
+                dtype="float32",
+                disk_path=single_path,
+            )
+            self._groups[updated_group.group_id] = updated_group
+            self._persist_group_array(updated_group.group_id, single_path, data_fp32, action="persist")
+            try:
+                self._write_manifest_thread_safe()
+            except OSError as exc:
+                self._groups.pop(updated_group.group_id, None)
+                if single_path.exists():
+                    single_path.unlink()
+                raise ColumnGroupRegistryError(
+                    f"Failed to write manifest after persisting {group.group_id}: {exc}",
+                    failure_type=FailureType.IO_ERROR,
+                ) from exc
+            return updated_group
+
+        # Multi-shard path.
+        shard_metas: list[ShardMeta] = []
+        written_paths: list[Path] = []
+        width = max(2, len(str(len(slices) - 1)))
+        try:
+            for idx, (col_start, col_end) in enumerate(slices):
+                shard_path = self._work_dir / f"{group.group_id}.shard{idx:0{width}d}.npy"
+                shard_arr = np.ascontiguousarray(data_fp32[:, col_start:col_end])
+                self._persist_group_array(
+                    f"{group.group_id}#shard{idx}",
+                    shard_path,
+                    shard_arr,
+                    action="persist-shard",
+                )
+                shard_metas.append(
+                    ShardMeta(
+                        shard_idx=idx,
+                        col_start=col_start,
+                        col_end=col_end,
+                        n_rows=n_rows,
+                        disk_path=shard_path,
+                        nbytes=int(shard_arr.nbytes),
+                    )
+                )
+                written_paths.append(shard_path)
+                del shard_arr
+        except Exception:
+            for path in written_paths:
+                try:
+                    if path.exists():
+                        path.unlink()
+                except OSError:
+                    pass
+            for tmp in self._work_dir.glob(f"{group.group_id}.shard*.npy.tmp"):
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+            raise
 
         updated_group = ColumnGroup(
             group_id=group.group_id,
@@ -301,107 +492,229 @@ class ColumnGroupRegistry:
             data_source=group.data_source,
             indicator=group.indicator,
             columns=group.columns,
-            shape=(int(data_fp32.shape[0]), int(data_fp32.shape[1])),
+            shape=(n_rows, n_cols),
             dtype="float32",
-            disk_path=path,
+            disk_path=None,
+            shards=tuple(shard_metas),
         )
-
         self._groups[updated_group.group_id] = updated_group
-
-        if self._memory_buffer_limit > 0:
-            with self._buffer_lock:
-                self._memory_buffer[group.group_id] = data_fp32
-                should_flush = len(self._memory_buffer) >= self._memory_buffer_limit
-
-            if should_flush:
-                self._flush_buffer()
-
-            return updated_group
-
-        self._persist_group_array(updated_group.group_id, path, data_fp32, action="persist")
 
         try:
             self._write_manifest_thread_safe()
         except OSError as exc:
             self._groups.pop(updated_group.group_id, None)
-            if path.exists():
-                path.unlink()
+            for path in written_paths:
+                try:
+                    if path.exists():
+                        path.unlink()
+                except OSError:
+                    pass
             raise ColumnGroupRegistryError(
-                f"Failed to write manifest after persisting {group.group_id}: {exc}",
+                f"Failed to write manifest after persisting sharded {group.group_id}: {exc}",
                 failure_type=FailureType.IO_ERROR,
             ) from exc
 
+        logger.debug(
+            "[registry] Persisted sharded group %s: shards=%d, total_bytes=%.2f MiB, max_shard=%.2f MiB",
+            group.group_id,
+            len(shard_metas),
+            updated_group.total_shard_bytes / (1024 ** 2),
+            updated_group.max_shard_bytes / (1024 ** 2),
+        )
         return updated_group
 
+    def _compute_shard_slices(
+        self,
+        n_rows: int,
+        n_cols: int,
+        dtype_size: int,
+    ) -> list[tuple[int, int]]:
+        """Return list of (col_start, col_end) shard slices.
+
+        Floor: at least 1 column per shard (warns if single-column row exceeds
+        target). Single-shard fast path returned when total bytes <= target.
+        """
+        if n_cols <= 0 or n_rows <= 0:
+            return [(0, n_cols)]
+
+        try:
+            from momentum.FeatureEngineering.utils.hardware_utils import get_cgsa_shard_bytes
+            target_bytes = int(get_cgsa_shard_bytes())
+        except Exception:
+            target_bytes = 256 * 1024 * 1024
+
+        bytes_per_col = n_rows * dtype_size
+        if bytes_per_col <= 0:
+            return [(0, n_cols)]
+
+        total_bytes = bytes_per_col * n_cols
+        if total_bytes <= target_bytes:
+            return [(0, n_cols)]
+
+        cols_per_shard = max(1, target_bytes // bytes_per_col)
+        if cols_per_shard < 1:
+            cols_per_shard = 1
+            logger.warning(
+                "[registry] Single column (n_rows=%d, %.2f MiB) exceeds shard target %.2f MiB; "
+                "falling back to 1 column per shard",
+                n_rows,
+                bytes_per_col / (1024 ** 2),
+                target_bytes / (1024 ** 2),
+            )
+
+        slices: list[tuple[int, int]] = []
+        start = 0
+        while start < n_cols:
+            end = min(start + int(cols_per_shard), n_cols)
+            slices.append((start, end))
+            start = end
+        return slices
+
+    def unlink_shard(self, group_id: str, shard_idx: int) -> None:
+        """Delete one persisted shard file. No-op if file already absent.
+
+        Used by raw-sink cleanup hook to release shard bytes immediately after
+        the corresponding parquet part is durably written.
+        """
+        if group_id not in self._groups:
+            return
+        group = self._groups[group_id]
+        for shard in group.shards:
+            if shard.shard_idx == shard_idx:
+                if shard.disk_path.exists():
+                    try:
+                        shard.disk_path.unlink()
+                    except OSError as exc:
+                        raise ColumnGroupRegistryError(
+                            f"Failed to unlink shard {shard.disk_path}: {exc}",
+                            failure_type=FailureType.IO_ERROR,
+                        ) from exc
+                return
+
+    def unregister_group(self, group_id: str) -> None:
+        """Remove group from registry and delete any remaining shard / single files.
+
+        Used by raw-sink to release manifest entries after a group's parts are
+        all durably written. Manifest is rewritten atomically.
+        """
+        with self._buffer_lock:
+            self._memory_buffer.pop(group_id, None)
+        group = self._groups.pop(group_id, None)
+        if group is None:
+            return
+        for shard in group.shards:
+            if shard.disk_path.exists():
+                try:
+                    shard.disk_path.unlink()
+                except OSError:
+                    pass
+        if group.disk_path and group.disk_path.exists():
+            try:
+                group.disk_path.unlink()
+            except OSError:
+                pass
+        self._group_parquet_paths.pop(group_id, None)
+        try:
+            self._write_manifest_thread_safe()
+        except OSError:
+            pass
+
+    def release_storage(self, group_id: str) -> int:
+        """Release on-disk storage for a group while keeping the registry entry.
+
+        Symmetric to a legacy single-file ``Path.unlink()`` cleanup but works
+        for sharded groups too. After this call the group still exists in the
+        registry (so parquet path binding via :meth:`set_group_parquet_paths`
+        still works), but ``shards`` is empty and ``disk_path`` is cleared so
+        downstream code does not try to read a deleted file. Returns the total
+        bytes attributed to this group's prior on-disk footprint (using the
+        recorded ``ShardMeta.nbytes`` so callers get the full original size
+        even when individual shards were already incrementally unlinked by
+        the raw-sink path).
+        """
+        if group_id not in self._groups:
+            return 0
+        group = self._groups[group_id]
+        freed = 0
+        for shard in group.shards:
+            # Use recorded nbytes so the count is accurate even if the file
+            # was already unlinked by a prior per-shard cleanup hook.
+            freed += int(getattr(shard, "nbytes", 0))
+            try:
+                if shard.disk_path.exists():
+                    shard.disk_path.unlink()
+            except OSError:
+                pass
+        if group.disk_path is not None:
+            try:
+                if group.disk_path.exists():
+                    freed += int(group.disk_path.stat().st_size)
+                    group.disk_path.unlink()
+            except OSError:
+                pass
+        # Replace with a stripped ColumnGroup so .shards / .disk_path reflect reality.
+        self._groups[group_id] = replace(
+            group,
+            shards=(),
+            disk_path=None,
+        )
+        with self._buffer_lock:
+            self._memory_buffer.pop(group_id, None)
+        try:
+            self._write_manifest_thread_safe()
+        except OSError:
+            pass
+        return freed
+
     def overwrite_data(self, group_id: str, data: np.ndarray) -> ColumnGroup:
-        """Overwrite existing persisted .npy for a group and refresh manifest."""
+        """Overwrite an existing group with new data (legacy single-file API).
+
+        Re-persists via the same shard-aware ``save_data`` policy. Existing
+        shard / single files are removed first to avoid stale slices when the
+        new shard layout differs from the previous one.
+        """
         if data.ndim != 2:
             raise ColumnGroupRegistryError(
                 f"Group {group_id} data must be 2D, got shape={data.shape}",
                 failure_type=FailureType.VALIDATION,
             )
 
-        group = self.get(group_id)
-        if data.shape[1] != group.n_cols:
+        existing = self.get(group_id)
+        if data.shape[1] != existing.n_cols:
             raise ColumnGroupRegistryError(
-                f"Group {group_id} column count mismatch: expected {group.n_cols}, got {data.shape[1]}",
+                f"Group {group_id} column count mismatch: expected {existing.n_cols}, got {data.shape[1]}",
                 failure_type=FailureType.VALIDATION,
             )
-
-        target_path = group.disk_path or (self._work_dir / f"{group.group_id}.npy")
-        temp_path = target_path.with_suffix(".npy.tmp")
-        data_fp32 = np.asarray(data, dtype=np.float32)
 
         with self._buffer_lock:
             self._memory_buffer.pop(group_id, None)
 
+        # Remove old persisted artifacts before re-persisting.
+        for shard in existing.shards:
+            if shard.disk_path.exists():
+                try:
+                    shard.disk_path.unlink()
+                except OSError:
+                    pass
+        if existing.disk_path and existing.disk_path.exists():
+            try:
+                existing.disk_path.unlink()
+            except OSError:
+                pass
+
+        # Pop and re-save through the shard-aware path.
+        self._groups.pop(group_id, None)
         try:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            started_at = time.perf_counter()
-            with temp_path.open("wb") as handle:
-                np.save(handle, data_fp32, allow_pickle=False)
-            os.replace(temp_path, target_path)
-            elapsed = time.perf_counter() - started_at
-            self._io_stats["overwrite_count"] += 1.0
-            self._io_stats["overwrite_bytes"] += float(data_fp32.nbytes)
-            self._io_stats["overwrite_seconds"] += elapsed
-        except MemoryError as exc:
-            if temp_path.exists():
-                temp_path.unlink()
-            raise ColumnGroupRegistryError(
-                f"OOM while overwriting group {group_id} to {target_path}",
-                failure_type=FailureType.OOM,
-            ) from exc
-        except OSError as exc:
-            if temp_path.exists():
-                temp_path.unlink()
-            raise ColumnGroupRegistryError(
-                f"Failed to overwrite group {group_id} to {target_path}: {exc}",
-                failure_type=FailureType.IO_ERROR,
-            ) from exc
+            updated = self.save_data(existing, data)
+        except Exception:
+            # Best-effort restore registry entry to avoid leaving group_id
+            # missing; caller should treat overwrite as failed regardless.
+            self._groups[group_id] = existing
+            raise
 
-        updated_group = ColumnGroup(
-            group_id=group.group_id,
-            layer=group.layer,
-            timeframe=group.timeframe,
-            data_source=group.data_source,
-            indicator=group.indicator,
-            columns=group.columns,
-            shape=(int(data_fp32.shape[0]), int(data_fp32.shape[1])),
-            dtype="float32",
-            disk_path=target_path,
-        )
-        self._groups[group_id] = updated_group
-
-        try:
-            self._write_manifest_thread_safe()
-        except OSError as exc:
-            raise ColumnGroupRegistryError(
-                f"Failed to write manifest after overwriting {group_id}: {exc}",
-                failure_type=FailureType.IO_ERROR,
-            ) from exc
-
-        return updated_group
+        self._io_stats["overwrite_count"] += 1.0
+        self._io_stats["overwrite_bytes"] += float(np.asarray(data, dtype=np.float32).nbytes)
+        return updated
 
     def total_columns(self) -> int:
         """Total number of columns tracked by this registry."""
@@ -418,11 +731,20 @@ class ColumnGroupRegistry:
         return [column for _, column in flattened]
 
     def cleanup(self) -> None:
-        """Delete persisted .npy files and clear the in-memory registry."""
+        """Delete persisted .npy / shard files and clear the in-memory registry."""
         with self._buffer_lock:
             self._memory_buffer.clear()
 
         for group in self._groups.values():
+            for shard in group.shards:
+                if shard.disk_path.exists():
+                    try:
+                        shard.disk_path.unlink()
+                    except OSError as exc:
+                        raise ColumnGroupRegistryError(
+                            f"Failed to delete persisted shard file {shard.disk_path}: {exc}",
+                            failure_type=FailureType.IO_ERROR,
+                        ) from exc
             if group.disk_path and group.disk_path.exists():
                 try:
                     group.disk_path.unlink()
@@ -441,6 +763,13 @@ class ColumnGroupRegistry:
                     f"Failed to delete manifest file {manifest_path}: {exc}",
                     failure_type=FailureType.IO_ERROR,
                 ) from exc
+
+        # Belt-and-suspenders: clean any stray .tmp from interrupted runs.
+        for tmp in self._work_dir.glob("*.tmp"):
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
         self._groups.clear()
 
@@ -474,15 +803,70 @@ class ColumnGroupRegistry:
             "created_at": manifest.get("created_at") or datetime.utcnow().isoformat(),
         }
 
+        manifest_schema = int(manifest.get("schema_version", 1))
+        if manifest_schema not in (1, 2):
+            logger.warning(
+                "[registry] Unknown manifest schema_version=%s under %s; attempting schema 2 read",
+                manifest_schema, work_dir,
+            )
+
+        # Belt-and-suspenders: clean any stray *.tmp left from interrupted runs
+        # so resumed pipelines don't trip on partial writes.
+        for tmp in work_dir.glob("*.tmp"):
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
         for group_meta in manifest.get("groups", []):
             npy_path: Optional[Path] = None
             parquet_path: Optional[Path] = None
+            shard_metas: list[ShardMeta] = []
 
+            # ---- Schema 2 path: read shards list if present and non-empty.
+            shards_raw = group_meta.get("shards") or []
+            if shards_raw:
+                missing_shard = False
+                tmp_metas: list[ShardMeta] = []
+                for shard_meta_raw in shards_raw:
+                    shard_file = shard_meta_raw.get("file")
+                    if not shard_file:
+                        missing_shard = True
+                        break
+                    shard_path = work_dir / str(shard_file)
+                    if not shard_path.exists():
+                        logger.warning(
+                            "[registry] Missing shard file %s for group %s; skipping group",
+                            shard_path, group_meta.get("group_id"),
+                        )
+                        missing_shard = True
+                        break
+                    tmp_metas.append(
+                        ShardMeta(
+                            shard_idx=int(shard_meta_raw.get("shard_idx", 0)),
+                            col_start=int(shard_meta_raw.get("col_start", 0)),
+                            col_end=int(shard_meta_raw.get("col_end", 0)),
+                            n_rows=int(shard_meta_raw.get("n_rows", 0)),
+                            disk_path=shard_path,
+                            nbytes=int(shard_meta_raw.get("nbytes", 0)),
+                        )
+                    )
+                if missing_shard:
+                    continue
+                shard_metas = sorted(tmp_metas, key=lambda s: s.shard_idx)
+
+            # ---- Schema 1 / single-file fallback (treated as 1-shard group).
             npy_path_value = group_meta.get("npy_path")
-            if npy_path_value:
+            if not shard_metas and npy_path_value:
                 npy_candidate = work_dir / str(npy_path_value)
                 if npy_candidate.exists():
                     npy_path = npy_candidate
+                    if manifest_schema == 1:
+                        logger.debug(
+                            "[registry] Restoring legacy single-file group %s as 1-shard view "
+                            "(migrating manifest schema 1 -> 2 lazily on next persist)",
+                            group_meta.get("group_id"),
+                        )
 
             parquet_path_value = group_meta.get("parquet_path")
             if parquet_path_value:
@@ -492,22 +876,18 @@ class ColumnGroupRegistry:
                 if parquet_candidate.exists():
                     parquet_path = parquet_candidate
 
-            if npy_path is None:
-                # Cannot resume without the intermediate .npy data.  When only
-                # parquet is present the previous run completed successfully and
-                # its .npy intermediates were already cleaned up; registering
-                # the group with disk_path=None would crash load_data later.
-                # Skip it so the new run recomputes from scratch with the
-                # original group IDs (no "_2" suffix collisions).
+            if not shard_metas and npy_path is None:
+                # Cannot resume without intermediate data. Parquet-only entries
+                # mean the previous run completed; skip silently.
                 if parquet_path is not None:
                     logger.debug(
-                        "[registry] Group %s has parquet output but no npy intermediate;"
+                        "[registry] Group %s has parquet output but no npy/shard intermediate;"
                         " not restoring (previous run already completed for this group)",
                         group_meta.get("group_id"),
                     )
                 else:
                     logger.warning(
-                        "[registry] Missing npy/parquet file for group %s; skipped",
+                        "[registry] Missing npy/shard/parquet file for group %s; skipped",
                         group_meta.get("group_id"),
                     )
                 continue
@@ -524,6 +904,7 @@ class ColumnGroupRegistry:
                     shape=shape,
                     dtype=str(group_meta.get("dtype", "float32")),
                     disk_path=npy_path,
+                    shards=tuple(shard_metas),
                 )
             except (KeyError, ValueError, TypeError) as exc:
                 raise ColumnGroupRegistryError(
@@ -597,6 +978,7 @@ class ColumnGroupRegistry:
         total_features = sum(len(group_meta["columns"]) for group_meta in groups_payload)
 
         payload = {
+            "schema_version": 2,
             "symbol": self._manifest_context.get("symbol"),
             "primary_tf": self._manifest_context.get("primary_tf"),
             "training_tfs": training_tfs,
@@ -634,6 +1016,17 @@ class ColumnGroupRegistry:
         for group in sorted(self._groups.values(), key=lambda item: item.group_id):
             if group.group_id in buffered_group_ids:
                 continue
+            shards_payload: list[dict[str, Any]] = [
+                {
+                    "shard_idx": shard.shard_idx,
+                    "col_start": shard.col_start,
+                    "col_end": shard.col_end,
+                    "n_rows": shard.n_rows,
+                    "nbytes": shard.nbytes,
+                    "file": shard.disk_path.name,
+                }
+                for shard in group.shards
+            ]
             payload.append(
                 {
                     "group_id": group.group_id,
@@ -645,6 +1038,7 @@ class ColumnGroupRegistry:
                     "shape": [group.n_rows, group.n_cols],
                     "dtype": group.dtype,
                     "npy_path": group.disk_path.name if group.disk_path else None,
+                    "shards": shards_payload,
                     "parquet_path": self._group_parquet_paths.get(group.group_id),
                 }
             )
@@ -657,7 +1051,7 @@ class ColumnGroupRegistry:
         data_fp32: np.ndarray,
         action: str,
     ) -> None:
-        """Persist one group array to disk with explicit failure classification."""
+        """Persist one group array atomically (.tmp + os.replace) with disk pre-check."""
 
         expected_bytes = int(data_fp32.nbytes)
         free_before = self._disk_free_bytes(path.parent)
@@ -669,20 +1063,35 @@ class ColumnGroupRegistry:
                 failure_type=FailureType.IO_ERROR,
             )
 
+        # Atomic write: ``.npy.tmp`` first, then os.replace. Avoids partial
+        # files visible to a peer process / SIGKILL leaving half-written shards.
+        temp_path = path.with_suffix(path.suffix + ".tmp")
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             started_at = time.perf_counter()
-            np.save(path, data_fp32, allow_pickle=False)
+            with temp_path.open("wb") as handle:
+                np.save(handle, data_fp32, allow_pickle=False)
+            os.replace(temp_path, path)
             elapsed = time.perf_counter() - started_at
             self._io_stats["persist_count"] += 1.0
             self._io_stats["persist_bytes"] += float(expected_bytes)
             self._io_stats["persist_seconds"] += elapsed
         except MemoryError as exc:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
             raise ColumnGroupRegistryError(
                 f"OOM while {action} group {group_id} to {path}",
                 failure_type=FailureType.OOM,
             ) from exc
         except OSError as exc:
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass
             free_after = self._disk_free_bytes(path.parent)
             raise ColumnGroupRegistryError(
                 f"Failed to {action} group {group_id} to {path}: {exc}; "

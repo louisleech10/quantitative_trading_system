@@ -53,6 +53,10 @@ class ICAnalysisService:
             "analyzer": analyzer,
             "applied_tier": (request.feature_tiers.active_preset if request.feature_tiers else "intermediate"),
             "created_at": datetime.now().isoformat(),
+            # store source info for apply_transforms
+            "req_features_path": request.features_path,
+            "req_symbol": request.symbol,
+            "req_timeframe": request.timeframe,
         }
 
         with self._lock:
@@ -669,6 +673,156 @@ class ICAnalysisService:
         """Get last task id."""
         with self._lock:
             return self._last_task_id
+
+    async def apply_transforms(
+        self,
+        task_id: str,
+        selected_features: List[str],
+        rank: bool,
+        zscore: bool,
+        gaussian: bool,
+        rank_window: int = 252,
+        zscore_windows: Optional[List[int]] = None,
+    ) -> Dict[str, Any]:
+        """Apply rank/zscore/gaussian to IC-selected features and persist the result.
+
+        Intended for the IC-First workflow:
+          Feature Factory (IC-First mode) → IC Gatekeeper → *here* → downstream ML
+
+        Transform order: rank → zscore → gaussian (Gaussian always last).
+        """
+        return await asyncio.to_thread(
+            self._apply_transforms_sync,
+            task_id,
+            selected_features,
+            rank,
+            zscore,
+            gaussian,
+            rank_window,
+            zscore_windows or [100, 252],
+        )
+
+    def _apply_transforms_sync(
+        self,
+        task_id: str,
+        selected_features: List[str],
+        rank: bool,
+        zscore: bool,
+        gaussian: bool,
+        rank_window: int,
+        zscore_windows: List[int],
+    ) -> Dict[str, Any]:
+        import numpy as np
+        import pandas as pd
+
+        if not selected_features:
+            raise ValueError("selected_features must not be empty")
+        if not (rank or zscore or gaussian):
+            raise ValueError("At least one transform (rank / zscore / gaussian) must be enabled")
+
+        # --- 1. Get task info ---
+        with self._lock:
+            task_info = self._tasks.get(task_id)
+        if task_info is None:
+            raise ValueError(f"IC analysis task not found: {task_id}")
+
+        symbol: Optional[str] = task_info.get("req_symbol")
+        timeframe: Optional[str] = task_info.get("req_timeframe")
+        features_path: Optional[str] = task_info.get("req_features_path")
+
+        # --- 2. Load feature DataFrame ---
+        df = self._load_features_for_transforms(symbol, timeframe, features_path)
+        logger.info("[apply_transforms] Loaded features: %d rows x %d cols", len(df), len(df.columns))
+
+        # --- 3. Filter to selected_features (only those actually present) ---
+        valid_cols = [c for c in selected_features if c in df.columns]
+        missing = set(selected_features) - set(valid_cols)
+        if missing:
+            logger.warning("[apply_transforms] %d requested features not found: %s…", len(missing), list(missing)[:5])
+        if not valid_cols:
+            raise ValueError("None of the selected_features exist in the loaded feature data")
+        df = df[valid_cols].copy()
+
+        transforms_applied: List[str] = []
+
+        # --- 4a. Rank Transform ---
+        if rank:
+            df = df.rolling(rank_window, min_periods=max(rank_window // 2, 1)).rank(pct=True)
+            transforms_applied.append("rank")
+            logger.info("[apply_transforms] Applied rank transform (window=%d)", rank_window)
+
+        # --- 4b. Adaptive Z-Score ---
+        if zscore:
+            primary_window = min(zscore_windows)
+            rolling = df.rolling(primary_window, min_periods=max(primary_window // 2, 1))
+            mu = rolling.mean()
+            sigma = rolling.std().fillna(0.0).clip(lower=1e-8)
+            df = (df - mu) / sigma
+            transforms_applied.append("zscore")
+            logger.info("[apply_transforms] Applied adaptive zscore (window=%d)", primary_window)
+
+        # --- 4c. Gaussian Normalize (always last) ---
+        if gaussian:
+            try:
+                from scipy.stats import norm as _norm
+                clip_lo, clip_hi = 0.001, 0.999
+                # Gaussian is meaningful only if input is already rank-like (0-1).
+                # If rank was not applied, coerce to empirical CDF first.
+                if not rank:
+                    df = df.rank(pct=True, axis=0)
+                df = df.clip(lower=clip_lo, upper=clip_hi).apply(lambda col: _norm.ppf(col))
+                transforms_applied.append("gaussian")
+                logger.info("[apply_transforms] Applied gaussian normalize")
+            except ImportError:
+                logger.error("[apply_transforms] scipy not available, skipping gaussian")
+
+        # --- 5. Persist result ---
+        output_dir = Path("data_cache/reports")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / f"post_ic_transforms_{task_id}.h5"
+        df.to_hdf(str(output_path), key="features", mode="w", complevel=5)
+        logger.info("[apply_transforms] Saved %d x %d to %s", len(df), len(df.columns), output_path)
+
+        return {
+            "task_id": task_id,
+            "selected_feature_count": len(valid_cols),
+            "transforms_applied": transforms_applied,
+            "output_path": str(output_path),
+            "output_rows": len(df),
+            "output_cols": len(df.columns),
+        }
+
+    def _load_features_for_transforms(
+        self,
+        symbol: Optional[str],
+        timeframe: Optional[str],
+        features_path: Optional[str],
+    ):
+        """Load feature DataFrame from FeatureLibrary (symbol/timeframe) or HDF5 path."""
+        import pandas as pd
+
+        if symbol and timeframe:
+            try:
+                from momentum.FeatureEngineering.feature_library import FeatureLibrary
+                library = FeatureLibrary()
+                return library.load(symbol, timeframe)
+            except Exception as exc:
+                logger.warning("[apply_transforms] FeatureLibrary.load failed: %s; trying path fallback", exc)
+
+        if features_path:
+            p = Path(features_path)
+            if not p.exists():
+                raise FileNotFoundError(f"Features path not found: {features_path}")
+            if features_path.endswith(".h5") or features_path.endswith(".hdf5"):
+                return pd.read_hdf(features_path)
+            if features_path.endswith(".parquet"):
+                return pd.read_parquet(features_path)
+            raise ValueError(f"Unsupported features file format: {features_path}")
+
+        raise ValueError(
+            "Cannot load features: no symbol/timeframe or features_path stored in task. "
+            "Re-run IC analysis with a valid symbol+timeframe or features_path."
+        )
 
     async def refilter(self, task_id: str, thresholds: Dict[str, Any]) -> Dict[str, Any]:
         """Refilter using cached IC results."""

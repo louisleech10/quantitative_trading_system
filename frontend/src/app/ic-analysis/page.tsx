@@ -86,6 +86,7 @@ function ICAnalysisPageContent() {
     startDeepAnalysis,
     fetchDeepAnalysisResult,
     refilter,
+    applyTransforms,
     connectProgress,
   } = useICAnalysis();
   const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
@@ -96,6 +97,19 @@ function ICAnalysisPageContent() {
   const [isRefiltering, setIsRefiltering] = useState(false);
   const [isDeepRunning, setIsDeepRunning] = useState(false);
   const [neutralizationMode, setNeutralizationMode] = useState<'none' | 'beta_neutral' | 'vol_neutral'>('none');
+
+  // apply-transforms state
+  const [applyTransformRank, setApplyTransformRank] = useState(true);
+  const [applyTransformZscore, setApplyTransformZscore] = useState(true);
+  const [applyTransformGaussian, setApplyTransformGaussian] = useState(false);
+  const [isApplyingTransforms, setIsApplyingTransforms] = useState(false);
+  const [applyTransformsResult, setApplyTransformsResult] = useState<{
+    selected_feature_count: number;
+    transforms_applied: string[];
+    output_path: string;
+    output_rows: number;
+    output_cols: number;
+  } | null>(null);
 
   const summaryTable = useMemo(() => report?.summary_table ?? [], [report?.summary_table]);
 
@@ -312,6 +326,32 @@ function ICAnalysisPageContent() {
     return () => clearTimeout(timer);
   }, [config.thresholds, refilter, report, setError, status, taskId, thresholdsKey]);
 
+  const handleApplyTransforms = async () => {
+    if (!taskId) {
+      setError('請先完成 IC 分析');
+      return;
+    }
+    if (selectedFeatures.length === 0) {
+      setError('請在表格中選擇至少一個特徵');
+      return;
+    }
+    setIsApplyingTransforms(true);
+    setApplyTransformsResult(null);
+    try {
+      const result = await applyTransforms(taskId, {
+        selected_features: selectedFeatures,
+        rank: applyTransformRank,
+        zscore: applyTransformZscore,
+        gaussian: applyTransformGaussian,
+      });
+      setApplyTransformsResult(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '套用後處理失敗');
+    } finally {
+      setIsApplyingTransforms(false);
+    }
+  };
+
   const handleRunAnalysis = async () => {
     setError(null);
     setReport(null);
@@ -499,6 +539,120 @@ function ICAnalysisPageContent() {
                 crossSectionalSymbolCount={crossSectionalSymbolCount}
                 taskId={taskId}
               />
+
+              {/* Apply L6.5 post-processing panel — IC-First workflow — 常住顯示 */}
+              <div className="glass-panel rounded-2xl border border-emerald-400/30 p-5 space-y-4">
+                {/* 標題列 + 測試說明徽章 */}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-emerald-200">套用 L6.5 後處理</p>
+                      <span className="rounded-full bg-amber-400/15 border border-amber-400/40 px-2 py-0.5 text-[10px] text-amber-300 font-medium tracking-wide">
+                        待測試
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      IC-First 工作流程最後一步：對 IC 篩選後的特徵執行 Rank / Z-Score / Gaussian。
+                      套用順序固定為 <span className="text-emerald-300">Rank → Z-Score → Gaussian</span>（Gaussian 一定最後）。
+                    </p>
+                  </div>
+                </div>
+
+                {/* 待測試項目清單 */}
+                <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-4 py-3 space-y-1.5">
+                  <p className="text-[11px] font-semibold text-amber-300 uppercase tracking-wider mb-2">📋 測試項目</p>
+                  <ul className="space-y-1 text-[11px] text-slate-400 leading-relaxed list-none">
+                    <li><span className="text-amber-200 mr-1">①</span>需先完成 IC 分析（status = completed）才能呼叫，否則應顯示錯誤訊息</li>
+                    <li><span className="text-amber-200 mr-1">②</span>需在表格中勾選特徵後，按鈕才可用（未勾選應顯示 disabled）</li>
+                    <li><span className="text-amber-200 mr-1">③</span>三個轉換至少勾選一個，按鈕才可用</li>
+                    <li><span className="text-amber-200 mr-1">④</span>Rank + ZScore 預設開啟，Gaussian 預設關閉</li>
+                    <li><span className="text-amber-200 mr-1">⑤</span>執行後應顯示輸出路徑 <code className="bg-slate-800 px-1 rounded">data_cache/reports/post_ic_transforms_&lt;task_id&gt;.h5</code></li>
+                    <li><span className="text-amber-200 mr-1">⑥</span>已套用的轉換依序列出（e.g. rank → zscore）</li>
+                    <li><span className="text-amber-200 mr-1">⑦</span>若 Feature Factory 以 IC-First 模式生成，驗證輸出 .h5 只含 Rank/ZScore 結果（不含原始 legacy L6.5）</li>
+                    <li><span className="text-amber-200 mr-1">⑧</span>API <code className="bg-slate-800 px-1 rounded">POST /api/v1/ic/apply-transforms/&#123;task_id&#125;</code> 應回傳 selected_feature_count、transforms_applied、output_path、output_rows、output_cols</li>
+                  </ul>
+                </div>
+
+                {/* 前置條件提示 */}
+                {!report && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <span className="text-amber-400">⚠</span>
+                    請先執行 IC 分析並等待完成，才可使用此功能。
+                  </div>
+                )}
+                {report && selectedFeatures.length === 0 && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                    <span className="text-amber-400">⚠</span>
+                    請在上方表格中勾選至少一個特徵。
+                  </div>
+                )}
+
+                {/* 轉換勾選 */}
+                <div className="flex flex-wrap gap-5 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={applyTransformRank}
+                      onChange={(e) => setApplyTransformRank(e.target.checked)}
+                      className="accent-emerald-400"
+                    />
+                    <span className="text-slate-200">Rank Transform</span>
+                    <span className="text-slate-500 text-[10px]">（預設開）</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={applyTransformZscore}
+                      onChange={(e) => setApplyTransformZscore(e.target.checked)}
+                      className="accent-emerald-400"
+                    />
+                    <span className="text-slate-200">Adaptive Z-Score</span>
+                    <span className="text-slate-500 text-[10px]">（預設開）</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={applyTransformGaussian}
+                      onChange={(e) => setApplyTransformGaussian(e.target.checked)}
+                      className="accent-emerald-400"
+                    />
+                    <span className="text-slate-200">Gaussian Normalize</span>
+                    <span className="text-slate-500 text-[10px]">（預設關 · 最後執行）</span>
+                  </label>
+                </div>
+
+                {/* 執行按鈕 + 結果 */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={handleApplyTransforms}
+                    disabled={
+                      isApplyingTransforms ||
+                      !report ||
+                      selectedFeatures.length === 0 ||
+                      (!applyTransformRank && !applyTransformZscore && !applyTransformGaussian)
+                    }
+                    className="rounded-lg px-4 py-2 text-xs font-medium bg-emerald-500/20 text-emerald-100 border border-emerald-400/40 hover:bg-emerald-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isApplyingTransforms
+                      ? '處理中…'
+                      : selectedFeatures.length > 0
+                      ? `套用後處理（${selectedFeatures.length} 個特徵）`
+                      : '套用後處理（請先選擇特徵）'}
+                  </button>
+                  {applyTransformsResult && (
+                    <span className="text-xs text-emerald-300 flex flex-col gap-0.5">
+                      <span>
+                        ✓ 完成 <strong>{applyTransformsResult.selected_feature_count}</strong> 個特徵 ·{' '}
+                        {applyTransformsResult.output_rows} 行 · {applyTransformsResult.output_cols} 欄
+                      </span>
+                      <span>套用：{applyTransformsResult.transforms_applied.join(' → ')}</span>
+                      {applyTransformsResult.output_path && (
+                        <span className="text-slate-400 text-[10px] break-all">{applyTransformsResult.output_path}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
 
               <DeepAnalysisConfigPanel
                 selectedFeatureCount={selectedFeatures.length}

@@ -31,12 +31,229 @@ except ImportError:
     pq = None
 
 from momentum.FeatureEngineering.core.column_group_registry import FailureType
+from momentum.core.config import get_l7_codec_upgrade_enabled
 from momentum.core.logging import get_logger
 
 if TYPE_CHECKING:
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
 logger = get_logger(__name__)
+
+L7_ENCODING_REGISTRY_METADATA_KEY = "l7_encoding_registry"
+RANK_UINT16_ENCODING = "rank_uint16"
+ZSCORE_INT16_ENCODING = "zscore_int16"
+GAUSSIAN_INT16_ENCODING = "gaussian_int16"
+RANK_UINT16_NAN_SENTINEL = np.uint16(0)
+ZSCORE_INT16_NAN_SENTINEL = np.int16(-32768)
+ZSCORE_INT16_SCALE_FACTOR = 1000.0
+
+
+class EncodeFallbackRequired(ValueError):
+    """Raised when an integer codec would violate a lossless fallback gate."""
+
+
+def encode_rank_as_uint16(rank_arr: np.ndarray, window: int) -> np.ndarray:
+    """Encode rank percentiles to uint16, using 0 as the NaN sentinel."""
+
+    window_int = int(window)
+    if window_int <= 0:
+        raise EncodeFallbackRequired("rank window must be positive")
+
+    values = np.asarray(rank_arr, dtype=np.float32)
+    encoded = np.zeros(values.shape, dtype=np.uint16)
+    valid_mask = ~np.isnan(values)
+    if not valid_mask.any():
+        return encoded
+
+    valid_values = values[valid_mask]
+    if not bool(np.all(np.isfinite(valid_values))):
+        raise EncodeFallbackRequired("rank values must be finite or NaN")
+    if bool(np.any((valid_values <= 0.0) | (valid_values > 1.0))):
+        raise EncodeFallbackRequired("rank values must be in (0, 1]")
+
+    scaled = np.rint(valid_values * window_int * 2.0)
+    if bool(np.any((scaled <= 0) | (scaled > np.iinfo(np.uint16).max))):
+        raise EncodeFallbackRequired("rank scaled values exceed uint16 range")
+
+    encoded[valid_mask] = scaled.astype(np.uint16)
+    return encoded
+
+
+def decode_rank_from_uint16(uint_arr: np.ndarray, window: int) -> np.ndarray:
+    """Decode uint16 rank percentiles, restoring 0 sentinel values to NaN."""
+
+    window_int = int(window)
+    if window_int <= 0:
+        raise ValueError("rank window must be positive")
+
+    encoded = np.asarray(uint_arr, dtype=np.uint16)
+    decoded = encoded.astype(np.float32) / float(window_int * 2.0)
+    decoded[encoded == RANK_UINT16_NAN_SENTINEL] = np.nan
+    return decoded
+
+
+def encode_zscore_as_int16(zscore_arr: np.ndarray) -> np.ndarray:
+    """Encode zscore-like values to int16, using INT16_MIN as NaN sentinel."""
+
+    values = np.asarray(zscore_arr, dtype=np.float32)
+    encoded = np.full(values.shape, ZSCORE_INT16_NAN_SENTINEL, dtype=np.int16)
+    valid_mask = ~np.isnan(values)
+    if not valid_mask.any():
+        return encoded
+
+    valid_values = values[valid_mask]
+    if not bool(np.all(np.isfinite(valid_values))):
+        raise EncodeFallbackRequired("zscore values must be finite or NaN")
+
+    finite_abs_max = float(np.max(np.abs(valid_values)))
+    if finite_abs_max > 32.767:
+        raise EncodeFallbackRequired("zscore out of int16 range; fallback float32")
+
+    scaled = np.rint(valid_values * ZSCORE_INT16_SCALE_FACTOR)
+    if bool(np.any((scaled <= int(ZSCORE_INT16_NAN_SENTINEL)) | (scaled > np.iinfo(np.int16).max))):
+        raise EncodeFallbackRequired("zscore scaled values exceed int16 range")
+
+    encoded[valid_mask] = scaled.astype(np.int16)
+    return encoded
+
+
+def decode_zscore_from_int16(int_arr: np.ndarray) -> np.ndarray:
+    """Decode int16 zscore-like values, restoring INT16_MIN to NaN."""
+
+    encoded = np.asarray(int_arr, dtype=np.int16)
+    decoded = encoded.astype(np.float32) / ZSCORE_INT16_SCALE_FACTOR
+    decoded[encoded == ZSCORE_INT16_NAN_SENTINEL] = np.nan
+    return decoded
+
+
+def _write_parquet_zstd(
+    table: Any,
+    output_path: Path,
+    compression_level: int = 1,
+) -> None:
+    _, pq_module = _require_pyarrow()
+    pq_module.write_table(
+        table,
+        str(output_path),
+        compression="zstd",
+        compression_level=compression_level,
+        use_dictionary=False,
+    )
+
+
+def _write_parquet_with_codec(
+    table: Any,
+    output_path: Path,
+    *,
+    float32_cols: List[str],
+    schema_metadata: Optional[Dict[bytes, bytes]] = None,
+    compression_level: int = 1,
+) -> None:
+    """Write parquet with optional BYTE_STREAM_SPLIT for float32 fallback columns."""
+
+    if schema_metadata:
+        merged_metadata = dict(table.schema.metadata or {})
+        merged_metadata.update(schema_metadata)
+        table = table.replace_schema_metadata(merged_metadata)
+
+    table_columns = set(table.column_names)
+    valid_float32_cols = [str(column) for column in float32_cols if str(column) in table_columns]
+    if not get_l7_codec_upgrade_enabled() or not valid_float32_cols:
+        _write_parquet_zstd(table, output_path, compression_level=compression_level)
+        return
+
+    _, pq_module = _require_pyarrow()
+    column_encoding = {column: "BYTE_STREAM_SPLIT" for column in valid_float32_cols}
+    try:
+        pq_module.write_table(
+            table,
+            str(output_path),
+            compression="zstd",
+            compression_level=compression_level,
+            use_dictionary=False,
+            column_encoding=column_encoding,
+            data_page_version="2.0",
+        )
+    except Exception as exc:
+        if not _is_bss_unsupported_error(exc):
+            raise
+        if output_path.exists():
+            output_path.unlink()
+        logger.warning(
+            "[L7-Codec] BYTE_STREAM_SPLIT unavailable for %d float32 cols; fallback zstd: %s",
+            len(valid_float32_cols),
+            str(exc),
+        )
+        _write_parquet_zstd(table, output_path, compression_level=compression_level)
+
+
+def _is_bss_unsupported_error(error: Exception) -> bool:
+    message = str(error).lower()
+    markers = (
+        "byte_stream_split",
+        "byte stream split",
+        "column_encoding",
+        "column encoding",
+        "unsupported",
+        "not supported",
+        "notimplemented",
+    )
+    return any(marker in message for marker in markers)
+
+
+def build_phase2_skip_evidence(
+    *,
+    symbol: str,
+    tf: str,
+    config_hash: str,
+    feature_schema_hash: str,
+    l7_raw_size_bytes: int,
+    l7_processed_size_bytes: int,
+    fracdiff_enabled: bool,
+    float32_fallback_group_count: int,
+    reason: str,
+) -> Dict[str, Any]:
+    pa_module, _ = _require_pyarrow()
+    return {
+        "symbol": str(symbol),
+        "tf": str(tf),
+        "config_hash": str(config_hash),
+        "feature_schema_hash": str(feature_schema_hash),
+        "l7_raw_size_bytes": int(l7_raw_size_bytes),
+        "l7_processed_size_bytes": int(l7_processed_size_bytes),
+        "fracdiff_enabled": bool(fracdiff_enabled),
+        "float32_fallback_group_count": int(float32_fallback_group_count),
+        "pyarrow_version": str(getattr(pa_module, "__version__", "unknown")),
+        "reason": str(reason),
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+
+def write_phase2_skip_evidence(output_dir: Path, evidence: Dict[str, Any]) -> Path:
+    required_fields = {
+        "symbol",
+        "tf",
+        "config_hash",
+        "feature_schema_hash",
+        "l7_raw_size_bytes",
+        "l7_processed_size_bytes",
+        "fracdiff_enabled",
+        "float32_fallback_group_count",
+        "pyarrow_version",
+        "reason",
+        "created_at",
+    }
+    missing = sorted(required_fields.difference(evidence))
+    if missing:
+        raise ValueError(f"Phase 2 skip evidence missing fields: {missing}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "phase2_skip_evidence.json"
+    temp_path = output_dir / "phase2_skip_evidence.json.tmp"
+    with temp_path.open("w", encoding="utf-8") as evidence_file:
+        json.dump(evidence, evidence_file, ensure_ascii=False, indent=2, default=str)
+    os.replace(temp_path, output_path)
+    return output_path
 
 
 def _require_pyarrow() -> Tuple[Any, Any]:
@@ -60,8 +277,8 @@ class AsyncParquetCompactor:
         self._final_dir = Path(final_dir)
         self._target_rows = max(1, int(target_rows))
         self._min_files_to_compact = max(2, int(min_files_to_compact))
-        self._queue: "queue.Queue[Optional[Tuple[str, Path]]]" = queue.Queue()
-        self._pending: List[Tuple[str, Path, int]] = []
+        self._queue: "queue.Queue[Optional[Tuple[str, Path, List[str]]]]" = queue.Queue()
+        self._pending: List[Tuple[str, Path, int, List[str]]] = []
         self._lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._error: Optional[BaseException] = None
@@ -89,12 +306,12 @@ class AsyncParquetCompactor:
         self._thread = threading.Thread(target=self._run, name="l7-parquet-compactor", daemon=True)
         self._thread.start()
 
-    def enqueue(self, item: Tuple[str, Path]) -> None:
+    def enqueue(self, item: Tuple[str, Path, List[str]]) -> None:
         """Queue one staging parquet file for background compaction."""
         if self._error is not None:
             raise RuntimeError("AsyncParquetCompactor already failed") from self._error
-        part_id, staging_path = item
-        self._queue.put((part_id, Path(staging_path)))
+        part_id, staging_path, float32_cols = item
+        self._queue.put((part_id, Path(staging_path), list(float32_cols)))
 
     def finalize(self) -> List[Path]:
         """Flush remaining files, stop the worker, and return final parquet paths."""
@@ -115,14 +332,14 @@ class AsyncParquetCompactor:
                     self._flush_pending(force=True)
                     return
 
-                part_id, staging_path = item
+                part_id, staging_path, float32_cols = item
                 row_count = self._read_row_count(staging_path)
 
                 if row_count >= self._target_rows:
-                    self._compact_batch([(part_id, staging_path, row_count)])
+                    self._compact_batch([(part_id, staging_path, row_count, float32_cols)])
                     continue
 
-                self._pending.append((part_id, staging_path, row_count))
+                self._pending.append((part_id, staging_path, row_count, float32_cols))
                 if len(self._pending) >= self._min_files_to_compact:
                     self._flush_pending(force=False)
         except BaseException as exc:
@@ -137,7 +354,7 @@ class AsyncParquetCompactor:
         self._pending.clear()
         self._compact_batch(batch)
 
-    def _compact_batch(self, batch: List[Tuple[str, Path, int]]) -> None:
+    def _compact_batch(self, batch: List[Tuple[str, Path, int, List[str]]]) -> None:
         start_time = time.perf_counter()
         final_path, source_ids = self._merge_batch(batch)
         elapsed = time.perf_counter() - start_time
@@ -154,28 +371,32 @@ class AsyncParquetCompactor:
             elapsed,
         )
 
-    def _merge_batch(self, batch: List[Tuple[str, Path, int]]) -> Tuple[Path, List[str]]:
-        _, pq_module = _require_pyarrow()
+    def _merge_batch(self, batch: List[Tuple[str, Path, int, List[str]]]) -> Tuple[Path, List[str]]:
         final_path = self._next_output_path()
         temp_path = self._next_temp_path(final_path)
-        source_ids = [part_id for part_id, _path, _rows in batch]
+        source_ids = [part_id for part_id, _path, _rows, _float32_cols in batch]
 
         if len(batch) == 1:
-            part_id, staging_path, _row_count = batch[0]
+            part_id, staging_path, _row_count, _float32_cols = batch[0]
             os.replace(staging_path, final_path)
             return final_path, [part_id]
 
         try:
             merged_table = self._merge_tables(batch)
-            pq_module.write_table(
+            merged_float32_cols = sorted(
+                {
+                    column
+                    for _part_id, _path, _rows, float32_cols in batch
+                    for column in float32_cols
+                }
+            )
+            _write_parquet_with_codec(
                 merged_table,
-                str(temp_path),
-                compression="zstd",
-                compression_level=1,
-                use_dictionary=False,  # P4.1: -37% size on float16 (dict-encoding hurts halffloat)
+                temp_path,
+                float32_cols=merged_float32_cols,
             )
             os.replace(temp_path, final_path)
-            for _part_id, staging_path, _row_count in batch:
+            for _part_id, staging_path, _row_count, _float32_cols in batch:
                 if staging_path.exists():
                     staging_path.unlink()
             return final_path, source_ids
@@ -184,13 +405,13 @@ class AsyncParquetCompactor:
                 temp_path.unlink()
             raise
 
-    def _merge_tables(self, batch: List[Tuple[str, Path, int]]):
+    def _merge_tables(self, batch: List[Tuple[str, Path, int, List[str]]]):
         pa_module, pq_module = _require_pyarrow()
         expected_rows: Optional[int] = None
         arrays: List[Any] = []
         names: List[str] = []
 
-        for _part_id, staging_path, row_count in batch:
+        for _part_id, staging_path, row_count, _float32_cols in batch:
             table = pq_module.read_table(staging_path)
             if expected_rows is None:
                 expected_rows = row_count
@@ -278,6 +499,349 @@ class FeatureStorage:
             allow_empty=False,
             quality_status="complete",
         )
+
+    def write_raw_from_registry_stream(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        registry: "ColumnGroupRegistry",
+        *,
+        preprocessor: Optional[Any] = None,
+        n_workers: int = 1,
+        cleanup_intermediate: bool = True,
+        l65_mode: str = "legacy",
+        time_range: Optional[Dict[str, Optional[str]]] = None,
+        extra_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Path, Dict[str, Any]]:
+        """Stream CGSA registry groups into the canonical L7_raw artifact.
+
+        When ``preprocessor`` is provided, each group is transformed and written
+        directly to parquet without rewriting the registry ``.npy`` file. This
+        is the disk-safe L6.5 → L7_raw path used by IC-First and legacy CGSA
+        generation.
+        """
+        pa_module, _ = _require_pyarrow()
+        run_dir = self.feature_run_dir(symbol, tf, config_hash)
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        groups_list = list(registry.iter_all())
+        if not groups_list:
+            raise ValueError("write_raw_from_registry_stream requires non-empty registry groups")
+
+        self._precheck_l7_raw_stream_disk_space(run_dir, groups_list)
+
+        temp_root = run_dir / f".tmp-raw-{uuid.uuid4().hex}"
+        temp_artifact_dir = temp_root / "raw"
+        temp_artifact_dir.mkdir(parents=True, exist_ok=False)
+        final_artifact_dir = run_dir / "raw"
+        backup_dir: Optional[Path] = None
+        artifact_installed = False
+        preserve_temp = False
+
+        group_manifest: Dict[str, Dict[str, Any]] = {}
+        parquet_path_map: Dict[str, str] = {}
+        first_part_by_source_group: Dict[str, str] = {}
+        all_columns: List[str] = []
+        storage_dtypes: set[str] = set()
+        storage_dtype_counts: Dict[str, int] = {}
+        float32_fallback_parts: List[str] = []
+        row_count: Optional[int] = None
+        total_values = 0
+        non_nan_values = 0
+        total_inf = 0
+        groups_with_inf = 0
+        npy_freed = 0
+        source_deleted = False
+
+        parquet_metadata = self._build_l7_v2_parquet_metadata(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            schema_version=self.L7_RAW_SCHEMA_VERSION,
+            feature_schema_hash="streaming_pending",
+            artifact_kind="raw",
+        )
+
+        def _write_group(
+            group_id: str,
+            columns: List[str],
+            data: np.ndarray,
+            source_group_id: str,
+            source_disk_path: Optional[Path],
+            cleanup_source: bool,
+        ) -> None:
+            nonlocal row_count, total_values, non_nan_values, total_inf, groups_with_inf
+            nonlocal npy_freed, source_deleted
+
+            safe_group_id = self._safe_path_segment(str(group_id), "group_id")
+            columns_list = [str(column) for column in columns]
+            array = np.asarray(data, dtype=np.float32)
+            if array.ndim != 2:
+                raise ValueError(f"Raw stream group {safe_group_id} must be 2D, got {array.shape}")
+            if array.shape[1] != len(columns_list):
+                raise ValueError(
+                    f"Raw stream group {safe_group_id} columns mismatch: "
+                    f"expected {len(columns_list)}, got {array.shape[1]}"
+                )
+            if row_count is None:
+                row_count = int(array.shape[0])
+            elif row_count != int(array.shape[0]):
+                raise ValueError(
+                    f"L7_raw row_count mismatch: expected {row_count}, got {array.shape[0]} "
+                    f"for {safe_group_id}"
+                )
+
+            total_values += int(array.size)
+            if array.size:
+                nan_mask = np.isnan(array)
+                non_nan_values += int(array.size - nan_mask.sum())
+                inf_count = int(np.isinf(array).sum())
+                total_inf += inf_count
+                if inf_count > 0:
+                    groups_with_inf += 1
+
+            parts = self._split_large_group(safe_group_id, columns_list, array)
+            written_part_ids: List[str] = []
+            for part_id, part_cols, part_data in parts:
+                safe_part_id = self._safe_path_segment(str(part_id), "part_id")
+                data_for_parquet, storage_dtype = self._select_parquet_storage_array(part_data)
+                storage_dtypes.add(storage_dtype)
+                storage_dtype_counts[storage_dtype] = storage_dtype_counts.get(storage_dtype, 0) + 1
+                if storage_dtype != "float16":
+                    float32_fallback_parts.append(safe_part_id)
+
+                self._ensure_l7_raw_part_disk_space(
+                    temp_artifact_dir,
+                    part_id=safe_part_id,
+                    source_group_id=str(source_group_id),
+                    part_estimate_bytes=int(np.asarray(data_for_parquet).nbytes),
+                )
+
+                arrays = [pa_module.array(data_for_parquet[:, index]) for index in range(len(part_cols))]
+                table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
+                output_path = temp_artifact_dir / f"{safe_part_id}.parquet"
+                staging_path = temp_artifact_dir / f".{safe_part_id}.tmp.parquet"
+                float32_cols = list(part_cols) if storage_dtype == "float32" else []
+                _write_parquet_with_codec(
+                    table,
+                    staging_path,
+                    float32_cols=float32_cols,
+                    schema_metadata=parquet_metadata,
+                )
+                os.replace(staging_path, output_path)
+
+                group_manifest[safe_part_id] = {
+                    "path": str(Path("raw") / output_path.name),
+                    "file": output_path.name,
+                    "columns": list(part_cols),
+                    "column_count": int(len(part_cols)),
+                    "row_count": int(array.shape[0]),
+                    "dtype": storage_dtype,
+                    "nan_ratio": self._calculate_array_nan_ratio(part_data),
+                    "file_size_bytes": int(output_path.stat().st_size),
+                    "encoded_column_count": 0,
+                    "source_group_id": str(source_group_id),
+                }
+                all_columns.extend(part_cols)
+                written_part_ids.append(safe_part_id)
+                del data_for_parquet, arrays, table
+
+            if written_part_ids:
+                first_part_by_source_group.setdefault(str(source_group_id), written_part_ids[0])
+
+            if cleanup_intermediate and cleanup_source:
+                # Phase B Phase 1: sharded sources are tracked via the registry,
+                # not a single .npy path. Use registry.release_storage() so
+                # all shard files are released but the group entry stays so
+                # the post-write set_group_parquet_paths() binding still works.
+                source_group = None
+                try:
+                    source_group = registry.get(str(source_group_id))
+                except KeyError:
+                    source_group = None
+                if source_group is not None and getattr(source_group, "shards", ()):
+                    try:
+                        freed = registry.release_storage(str(source_group_id))
+                    except Exception as exc:
+                        raise OSError(
+                            f"Failed to release sharded source after raw write for {source_group_id}: {exc}"
+                        ) from exc
+                    npy_freed += freed
+                    source_deleted = True
+                elif source_disk_path is not None:
+                    try:
+                        source_path = Path(source_disk_path)
+                        if source_path.exists():
+                            file_size = source_path.stat().st_size
+                            source_path.unlink()
+                            npy_freed += file_size
+                            source_deleted = True
+                    except OSError as exc:
+                        raise OSError(
+                            f"Failed to cleanup source npy after raw write for {source_group_id}: {exc}"
+                        ) from exc
+
+            del array
+
+        try:
+            if preprocessor is not None:
+                transformed_groups = preprocessor.transform_registry_groups_to_sink(
+                    registry,
+                    _write_group,
+                    n_workers=n_workers,
+                )
+            else:
+                # Mode C passthrough: no L6.5 transform. Stream sharded sources
+                # shard-by-shard so peak in-flight bytes equal max_shard_bytes
+                # rather than full group bytes.
+                transformed_groups = 0
+                for source_group_id, group in groups_list:
+                    group_columns = list(group.columns)
+                    source_disk = getattr(group, "disk_path", None)
+                    shards = getattr(group, "shards", ()) or ()
+                    if shards:
+                        n_shards = len(shards)
+                        for shard_pos, (shard_meta, shard_arr, shard_cols) in enumerate(
+                            registry.iter_shards(str(source_group_id))
+                        ):
+                            is_last = shard_pos == n_shards - 1
+                            shard_group_id = (
+                                str(source_group_id)
+                                if n_shards == 1
+                                else f"{source_group_id}_shard{shard_meta.shard_idx:0{max(2, len(str(n_shards - 1)))}d}"
+                            )
+                            _write_group(
+                                shard_group_id,
+                                list(shard_cols),
+                                np.asarray(shard_arr, dtype=np.float32),
+                                str(source_group_id),
+                                shard_meta.disk_path,
+                                is_last,
+                            )
+                            del shard_arr
+                    else:
+                        data = registry.load_data(str(source_group_id))
+                        _write_group(
+                            str(source_group_id),
+                            group_columns,
+                            data,
+                            str(source_group_id),
+                            source_disk,
+                            True,
+                        )
+                        del data
+                    transformed_groups += 1
+
+            total_features = int(len(all_columns))
+            if total_features <= 0:
+                raise ValueError("write_raw_from_registry_stream produced no features")
+
+            ordered_group_manifest = {group_id: group_manifest[group_id] for group_id in sorted(group_manifest)}
+            feature_schema_hash = self._build_schema_hash_from_columns(
+                self.L7_RAW_SCHEMA_VERSION,
+                ordered_group_manifest,
+            )
+            resolved_row_count = int(row_count or 0)
+            resolved_time_range = time_range or {"start": None, "end": None}
+            coverage = float(non_nan_values / total_values) if total_values else 0.0
+            inf_ratio = float(total_inf / total_values) if total_values else 0.0
+            validation_summary = {
+                "has_nan": bool(non_nan_values < total_values),
+                "has_inf": bool(total_inf > 0),
+                "coverage": coverage,
+                "inf_count": int(total_inf),
+                "inf_ratio": inf_ratio,
+                "groups_with_inf": int(groups_with_inf),
+                "warnings": [],
+            }
+            stream_metadata = {
+                "artifact_kind": "raw",
+                "schema_version": self.L7_RAW_SCHEMA_VERSION,
+                "l65_mode": str(l65_mode),
+                "cleanup_intermediate": bool(cleanup_intermediate),
+                "npy_freed_bytes": int(npy_freed),
+                "transformed_groups": int(transformed_groups),
+                "dtype_summary": self._build_dtype_summary(storage_dtype_counts, float32_fallback_parts),
+            }
+            if extra_metadata:
+                stream_metadata.update(extra_metadata)
+
+            manifest = self._build_feature_manifest_v2(
+                run_dir=run_dir,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                artifact_kind="raw",
+                schema_version=self.L7_RAW_SCHEMA_VERSION,
+                quality_status="complete",
+                feature_schema_hash=feature_schema_hash,
+                row_count=resolved_row_count,
+                time_range=resolved_time_range,
+                total_features=total_features,
+                group_manifest=ordered_group_manifest,
+                extra_metadata=stream_metadata,
+            )
+
+            if final_artifact_dir.exists():
+                backup_dir = run_dir / f".previous-raw-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+                os.replace(final_artifact_dir, backup_dir)
+
+            os.replace(temp_artifact_dir, final_artifact_dir)
+            artifact_installed = True
+            self._write_feature_manifest_v2(run_dir, manifest)
+
+            if backup_dir is not None and backup_dir.exists():
+                shutil.rmtree(backup_dir)
+
+            for source_group_id, first_part_id in first_part_by_source_group.items():
+                parquet_path_map[source_group_id] = str((final_artifact_dir / f"{first_part_id}.parquet").resolve())
+            if parquet_path_map:
+                registry.set_group_parquet_paths(parquet_path_map, write_manifest=False)
+
+            summary = {
+                "raw_path": str(final_artifact_dir),
+                "manifest_path": str(run_dir / self.L7_V2_MANIFEST_NAME),
+                "feature_count": total_features,
+                "row_count": resolved_row_count,
+                "group_count": len(ordered_group_manifest),
+                "npy_freed_bytes": int(npy_freed),
+                "storage_dtype": self._summarize_storage_dtype(storage_dtypes),
+                "dtype_summary": stream_metadata["dtype_summary"],
+                "validation": validation_summary,
+                "l65_mode": str(l65_mode),
+            }
+            self.logger.info(
+                "[L7_raw] registry stream persist done: symbol=%s tf=%s groups=%d features=%d "
+                "npy_freed=%.2f GiB dtype=%s",
+                symbol,
+                tf,
+                len(ordered_group_manifest),
+                total_features,
+                npy_freed / (1024 ** 3),
+                summary["storage_dtype"],
+            )
+            return final_artifact_dir, summary
+        except Exception:
+            preserve_temp = source_deleted
+            if source_deleted:
+                self.logger.warning(
+                    "[L7_raw] late failure after source cleanup; preserving raw artifact/temp for recovery: %s",
+                    final_artifact_dir if artifact_installed else temp_root,
+                )
+            if artifact_installed and final_artifact_dir.exists() and not source_deleted:
+                shutil.rmtree(final_artifact_dir)
+            if backup_dir is not None and backup_dir.exists() and not source_deleted:
+                os.replace(backup_dir, final_artifact_dir)
+            raise
+        finally:
+            if temp_root.exists() and not preserve_temp:
+                shutil.rmtree(temp_root)
+            elif temp_root.exists() and preserve_temp:
+                self.logger.warning(
+                    "[L7_raw] preserving incomplete temp artifact after source cleanup: %s",
+                    temp_root,
+                )
 
     def write_processed(
         self,
@@ -510,16 +1074,25 @@ class FeatureStorage:
     ) -> Dict[str, Any]:
         file_name = f"{group_id}.parquet"
         output_path = artifact_dir / file_name
-        table = pa_module.Table.from_pandas(frame, preserve_index=False)
+        artifact_kind = schema_metadata.get(b"artifact_kind", b"").decode("utf-8")
+        table, float32_cols, encoding_registry = self._build_l7_v2_table(
+            pa_module=pa_module,
+            frame=frame,
+            artifact_kind=artifact_kind,
+        )
         merged_metadata = dict(table.schema.metadata or {})
         merged_metadata.update(schema_metadata)
+        if encoding_registry:
+            merged_metadata[L7_ENCODING_REGISTRY_METADATA_KEY.encode("utf-8")] = json.dumps(
+                encoding_registry,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
         table = table.replace_schema_metadata(merged_metadata)
-        pq_module.write_table(
+        _write_parquet_with_codec(
             table,
-            str(output_path),
-            compression="zstd",
-            compression_level=1,
-            use_dictionary=False,
+            output_path,
+            float32_cols=float32_cols,
         )
         return {
             "path": str(Path(artifact_dir.name) / file_name),
@@ -530,7 +1103,143 @@ class FeatureStorage:
             "dtype": self._summarize_frame_dtype(frame),
             "nan_ratio": self._calculate_nan_ratio(frame),
             "file_size_bytes": int(output_path.stat().st_size),
+            "encoded_column_count": int(len(encoding_registry)),
         }
+
+    def _build_l7_v2_table(
+        self,
+        pa_module: Any,
+        frame: pd.DataFrame,
+        artifact_kind: str,
+    ) -> Tuple[Any, List[str], Dict[str, Dict[str, Any]]]:
+        if artifact_kind != "processed" or not get_l7_codec_upgrade_enabled():
+            return pa_module.Table.from_pandas(frame, preserve_index=False), [], {}
+
+        arrays: List[Any] = []
+        names: List[str] = []
+        float32_cols: List[str] = []
+        encoding_registry: Dict[str, Dict[str, Any]] = {}
+        fallback_reasons: List[str] = []
+
+        for column in frame.columns:
+            column_name = str(column)
+            series = frame[column]
+            encoding_type, window = self._infer_l7_processed_encoding(column_name)
+            original_dtype = str(series.dtype)
+
+            if encoding_type == RANK_UINT16_ENCODING:
+                if window is None or window <= 0:
+                    fallback_reasons.append(f"{column_name}:invalid_rank_window")
+                else:
+                    values = series.to_numpy(dtype=np.float32, copy=False)
+                    try:
+                        encoded = encode_rank_as_uint16(values, window)
+                        decoded = decode_rank_from_uint16(encoded, window)
+                        self._assert_rank_roundtrip(values, decoded, window)
+                        arrays.append(pa_module.array(encoded))
+                        names.append(column_name)
+                        encoding_registry[column_name] = {
+                            "encoding_type": RANK_UINT16_ENCODING,
+                            "scale_factor": str(window * 2),
+                            "nan_sentinel": str(int(RANK_UINT16_NAN_SENTINEL)),
+                            "window": str(window),
+                            "original_dtype": original_dtype,
+                        }
+                        continue
+                    except EncodeFallbackRequired as exc:
+                        fallback_reasons.append(f"{column_name}:{exc}")
+
+                fallback_values = series.to_numpy(dtype=np.float32, copy=False)
+                arrays.append(pa_module.array(fallback_values))
+                names.append(column_name)
+                float32_cols.append(column_name)
+                continue
+
+            if encoding_type in {ZSCORE_INT16_ENCODING, GAUSSIAN_INT16_ENCODING}:
+                values = series.to_numpy(dtype=np.float32, copy=False)
+                try:
+                    encoded = encode_zscore_as_int16(values)
+                    decoded = decode_zscore_from_int16(encoded)
+                    self._assert_zscore_roundtrip(values, decoded)
+                    arrays.append(pa_module.array(encoded))
+                    names.append(column_name)
+                    encoding_registry[column_name] = {
+                        "encoding_type": encoding_type,
+                        "scale_factor": str(int(ZSCORE_INT16_SCALE_FACTOR)),
+                        "nan_sentinel": str(int(ZSCORE_INT16_NAN_SENTINEL)),
+                        "window": None,
+                        "original_dtype": original_dtype,
+                    }
+                    continue
+                except EncodeFallbackRequired as exc:
+                    fallback_reasons.append(f"{column_name}:{exc}")
+                    fallback_values = series.to_numpy(dtype=np.float32, copy=False)
+                    arrays.append(pa_module.array(fallback_values))
+                    names.append(column_name)
+                    float32_cols.append(column_name)
+                    continue
+
+            arrays.append(pa_module.array(series.to_numpy(copy=False)))
+            names.append(column_name)
+
+        if fallback_reasons:
+            self.logger.warning(
+                "[L7-Codec] integer encoding fallback columns=%d sample=%s",
+                len(fallback_reasons),
+                fallback_reasons[:5],
+            )
+
+        return pa_module.Table.from_arrays(arrays, names=names), float32_cols, encoding_registry
+
+    @classmethod
+    def _infer_l7_processed_encoding(cls, column_name: str) -> Tuple[Optional[str], Optional[int]]:
+        lowered = column_name.lower()
+        if "zscore" in lowered:
+            return ZSCORE_INT16_ENCODING, None
+        if "gaussian" in lowered or "gauss" in lowered:
+            return GAUSSIAN_INT16_ENCODING, None
+        if "rank" in lowered:
+            return RANK_UINT16_ENCODING, cls._infer_rank_window(column_name)
+        return None, None
+
+    @staticmethod
+    def _infer_rank_window(column_name: str) -> Optional[int]:
+        import re
+
+        patterns = (
+            r"(?i)(?:rank|tsrank)[_\-]?w?([0-9]+)",
+            r"(?i)w([0-9]+)[_\-]?(?:rank|tsrank)",
+        )
+        for pattern in patterns:
+            match = re.search(pattern, column_name)
+            if match:
+                try:
+                    return int(match.group(1))
+                except ValueError:
+                    return None
+        return None
+
+    @staticmethod
+    def _assert_rank_roundtrip(original: np.ndarray, decoded: np.ndarray, window: int) -> None:
+        if not np.array_equal(np.isnan(original), np.isnan(decoded)):
+            raise EncodeFallbackRequired("rank NaN mask mismatch")
+        valid_mask = ~np.isnan(original)
+        if not valid_mask.any():
+            return
+        max_diff = float(np.max(np.abs(decoded[valid_mask] - original[valid_mask])))
+        if max_diff > (1.0 / float(2 * window)):
+            raise EncodeFallbackRequired(f"rank roundtrip diff {max_diff} exceeds tolerance")
+
+    @staticmethod
+    def _assert_zscore_roundtrip(original: np.ndarray, decoded: np.ndarray) -> None:
+        if not np.array_equal(np.isnan(original), np.isnan(decoded)):
+            raise EncodeFallbackRequired("zscore NaN mask mismatch")
+        valid_mask = ~np.isnan(original)
+        if not valid_mask.any():
+            return
+        max_diff = float(np.max(np.abs(decoded[valid_mask] - original[valid_mask])))
+        if max_diff > 0.001:
+            raise EncodeFallbackRequired(f"zscore roundtrip diff {max_diff} exceeds tolerance")
 
     @staticmethod
     def _summarize_frame_dtype(frame: pd.DataFrame) -> str:
@@ -564,6 +1273,7 @@ class FeatureStorage:
         time_range: Dict[str, Optional[str]],
         total_features: int,
         group_manifest: Dict[str, Dict[str, Any]],
+        extra_metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         existing_manifest = self._load_feature_manifest_v2_if_exists(run_dir)
         if existing_manifest:
@@ -584,6 +1294,8 @@ class FeatureStorage:
             "group_count": len(group_manifest),
             "groups": group_manifest,
         }
+        if extra_metadata:
+            artifact_manifest["metadata"] = dict(extra_metadata)
         manifest = existing_manifest or {
             "version": "l7_v2",
             "symbol": symbol,
@@ -601,8 +1313,32 @@ class FeatureStorage:
         manifest["time_range"] = time_range
         manifest["total_features"] = total_features
         manifest["groups"] = group_manifest
+        if extra_metadata:
+            manifest["generation_metadata"] = dict(extra_metadata)
         manifest.setdefault("artifacts", {})[artifact_kind] = artifact_manifest
         return manifest
+
+    @staticmethod
+    def _build_schema_hash_from_columns(
+        schema_version: str,
+        group_manifest: Dict[str, Dict[str, Any]],
+    ) -> str:
+        schema_payload = {
+            "schema_version": schema_version,
+            "groups": {
+                group_id: [str(column) for column in metadata.get("columns", [])]
+                for group_id, metadata in sorted(group_manifest.items())
+            },
+        }
+        encoded = json.dumps(schema_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _calculate_array_nan_ratio(data: np.ndarray) -> float:
+        if data.size == 0:
+            return 0.0
+        missing = int(np.isnan(data).sum())
+        return float(missing / data.size)
 
     @classmethod
     def _load_feature_manifest_v2_if_exists(cls, run_dir: Path) -> Dict[str, Any]:
@@ -916,28 +1652,25 @@ class FeatureStorage:
 
     def _persist_parts_parallel(
         self,
-        parts_queue: List[Tuple[str, Any, Path, Path]],
+        parts_queue: List[Tuple[str, Any, Path, Path, List[str]]],
         n_workers: int,
         compactor: Optional[AsyncParquetCompactor] = None,
     ) -> List[str]:
         """Persist parquet parts with optional parallel writes and async compaction."""
-        _, pq_module = _require_pyarrow()
         if not parts_queue:
             return []
 
         start_time = time.perf_counter()
 
-        def _write_one(item: Tuple[str, Any, Path, Path]) -> str:
-            part_id, table, final_path, staging_path = item
-            pq_module.write_table(
+        def _write_one(item: Tuple[str, Any, Path, Path, List[str]]) -> str:
+            part_id, table, final_path, staging_path, float32_cols = item
+            _write_parquet_with_codec(
                 table,
-                str(staging_path),
-                compression="zstd",
-                compression_level=1,
-                use_dictionary=False,  # P4.1: -37% size on float16 (dict-encoding hurts halffloat)
+                staging_path,
+                float32_cols=float32_cols,
             )
             if compactor is not None:
-                compactor.enqueue((part_id, staging_path))
+                compactor.enqueue((part_id, staging_path, float32_cols))
             else:
                 os.replace(staging_path, final_path)
             return str(final_path.resolve())
@@ -988,6 +1721,27 @@ class FeatureStorage:
         """
         pa_module, _ = _require_pyarrow()
         from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
+
+        # Phase B Phase 1 Step 14: V7 path was designed for legacy single-file
+        # `.npy` groups; sharded groups must go through the streaming raw-sink
+        # (`write_raw_from_registry_stream`) which knows how to release shards
+        # incrementally. Detect sharded sources and refuse with a clear error
+        # rather than risking OOM during full registry concat.
+        sharded_groups = [
+            group_id
+            for group_id, group in registry.iter_all()
+            if getattr(group, "shards", ()) and len(group.shards) > 1
+        ]
+        if sharded_groups:
+            preview = ", ".join(sharded_groups[:3])
+            raise NotImplementedError(
+                "persist_registry_to_parquet (V7 path) does not support sharded "
+                f"CGSA groups; found {len(sharded_groups)} sharded groups (e.g. "
+                f"{preview}). Use FeatureStorage.write_raw_from_registry_stream "
+                "(L7_raw streaming path) instead. Set FFACT_CGSA_SHARD_BYTES to "
+                "a value larger than your group sizes to disable sharding for "
+                "legacy V7 testing."
+            )
 
         output_dir = self.base_path / symbol / config_hash
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1042,7 +1796,7 @@ class FeatureStorage:
                 )
                 compactor.start()
 
-            pending_parts: List[Tuple[str, Any, Path, Path]] = []
+            pending_parts: List[Tuple[str, Any, Path, Path, List[str]]] = []
             pending_disk_paths: Dict[str, Path] = {}
             # P3.1 (2026-04-25): Tier-aware batch_limit. The previous
             # ``n_workers * 2`` over-pipelined the producer on small-RAM tiers
@@ -1120,7 +1874,8 @@ class FeatureStorage:
 
                     arrays = [pa_module.array(data_for_parquet[:, ci]) for ci in range(len(part_cols))]
                     table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
-                    pending_parts.append((part_id, table, final_path, staged_path))
+                    float32_cols = list(part_cols) if storage_dtype == "float32" else []
+                    pending_parts.append((part_id, table, final_path, staged_path, float32_cols))
                     part_to_group_id[part_id] = group_id
                     first_part_by_group.setdefault(group_id, part_id)
 
@@ -1203,7 +1958,6 @@ class FeatureStorage:
             )
             return persisted_paths
         except Exception as e:
-            preserve_staging = True
             failure_type = self._classify_persist_failure(e)
             self.logger.error(
                 "CGSA per-group parquet persist failed: symbol=%s config_hash=%s failure_type=%s error=%s",
@@ -1216,10 +1970,7 @@ class FeatureStorage:
             raise
         finally:
             if staging_dir.exists() and not preserve_staging:
-                for child in staging_dir.iterdir():
-                    if child.is_file():
-                        child.unlink()
-                staging_dir.rmdir()
+                shutil.rmtree(staging_dir)
 
     @classmethod
     def _split_large_group(
@@ -1349,6 +2100,10 @@ class FeatureStorage:
             except OSError:
                 pass
 
+            shards = getattr(group, "shards", ()) or ()
+            if shards:
+                reclaimable_npy_bytes += sum(int(getattr(s, "nbytes", 0)) for s in shards)
+
         safety_factor = self._resolve_l7_disk_safety_factor()
         max_inflight_staging_bytes = largest_group_bytes * max(1, int(batch_limit))
         net_growth_bytes = max(0, estimated_final_bytes - reclaimable_npy_bytes)
@@ -1389,6 +2144,117 @@ class FeatureStorage:
             len(groups_list),
         )
 
+    def _precheck_l7_raw_stream_disk_space(
+        self,
+        output_dir: Path,
+        groups_list: List[Tuple[str, Any]],
+    ) -> None:
+        """Fail fast for the streaming L6.5 → L7_raw path.
+
+        Unlike the legacy L7 precheck, this uses the largest parquet part size
+        rather than the largest whole group because the raw writer splits each
+        group before staging. This prevents false failures on 8GB-tier runs with
+        giant WorldQuant/Momentum groups while still protecting disk headroom.
+        """
+        if not groups_list:
+            return
+
+        final_bytes_per_cell = np.dtype(np.float16).itemsize
+        fallback_bytes_per_cell = np.dtype(np.float32).itemsize
+        estimated_final_bytes = 0
+        reclaimable_npy_bytes = 0
+        largest_part_id = "<none>"
+        largest_part_bytes = 0
+
+        for group_id, group in groups_list:
+            n_rows, n_cols = group.shape
+            cell_count = int(n_rows) * int(n_cols)
+            estimated_final_bytes += cell_count * final_bytes_per_cell
+
+            part_cols = min(int(n_cols), int(self.MAX_GROUP_COLUMNS))
+            part_bytes = int(n_rows) * part_cols * fallback_bytes_per_cell
+            if part_bytes > largest_part_bytes:
+                largest_part_bytes = part_bytes
+                largest_part_id = str(group_id)
+
+            disk_path = getattr(group, "disk_path", None)
+            try:
+                if disk_path is not None and disk_path.exists():
+                    reclaimable_npy_bytes += int(disk_path.stat().st_size)
+            except OSError:
+                pass
+
+            shards = getattr(group, "shards", ()) or ()
+            if shards:
+                reclaimable_npy_bytes += sum(int(getattr(s, "nbytes", 0)) for s in shards)
+
+        safety_factor = self._resolve_l7_disk_safety_factor()
+        min_free_bytes = self._resolve_l7_min_free_bytes()
+        net_growth_bytes = max(0, estimated_final_bytes - reclaimable_npy_bytes)
+        part_required_bytes = int((net_growth_bytes + largest_part_bytes) * safety_factor)
+        required_bytes = max(part_required_bytes, min_free_bytes)
+        free_bytes = self._safe_disk_free_bytes(output_dir)
+        if free_bytes is None:
+            return
+
+        if free_bytes < required_bytes:
+            raise OSError(
+                "Insufficient disk space for L7_raw streaming persist: "
+                f"need ~{required_bytes / (1024 ** 3):.2f} GiB "
+                f"(safety_factor={safety_factor:.2f}, estimated_final="
+                f"{estimated_final_bytes / (1024 ** 3):.2f} GiB, reclaimable_npy="
+                f"{reclaimable_npy_bytes / (1024 ** 3):.2f} GiB, net_growth="
+                f"{net_growth_bytes / (1024 ** 3):.2f} GiB, max_inflight_part="
+                f"{largest_part_bytes / (1024 ** 3):.2f} GiB, largest_part_source="
+                f"{largest_part_id}, reserve_floor={min_free_bytes / (1024 ** 3):.2f} GiB), "
+                f"available {free_bytes / (1024 ** 3):.2f} GiB at {output_dir}; "
+                "clear data_cache/cgsa_work/* or lower FFACT_L7_DISK_SAFETY_FACTOR if you accept the risk."
+            )
+
+        self.logger.info(
+            "[L7_raw] Disk pre-check OK: required=%.2f GiB (safety x%.2f), "
+            "estimated_final=%.2f GiB, reclaimable_npy=%.2f GiB, net_growth=%.2f GiB, "
+            "max_inflight_part=%.2f GiB, largest_part_source=%s, reserve_floor=%.2f GiB, "
+            "free=%.2f GiB, groups=%d",
+            required_bytes / (1024 ** 3),
+            safety_factor,
+            estimated_final_bytes / (1024 ** 3),
+            reclaimable_npy_bytes / (1024 ** 3),
+            net_growth_bytes / (1024 ** 3),
+            largest_part_bytes / (1024 ** 3),
+            largest_part_id,
+            min_free_bytes / (1024 ** 3),
+            free_bytes / (1024 ** 3),
+            len(groups_list),
+        )
+
+    def _ensure_l7_raw_part_disk_space(
+        self,
+        output_dir: Path,
+        *,
+        part_id: str,
+        source_group_id: str,
+        part_estimate_bytes: int,
+    ) -> None:
+        safety_factor = self._resolve_l7_disk_safety_factor()
+        min_free_bytes = self._resolve_l7_min_free_bytes()
+        required_bytes = max(int(part_estimate_bytes * safety_factor), min_free_bytes)
+        free_bytes = self._safe_disk_free_bytes(output_dir)
+        if free_bytes is None or free_bytes >= required_bytes:
+            return
+
+        raise OSError(
+            "Insufficient disk space for L7_raw parquet part: "
+            f"need ~{required_bytes / (1024 ** 3):.2f} GiB "
+            f"(safety_factor={safety_factor:.2f}, part_estimate="
+            f"{part_estimate_bytes / (1024 ** 3):.2f} GiB, reserve_floor="
+            f"{min_free_bytes / (1024 ** 3):.2f} GiB, part_id={part_id}, "
+            f"source_group_id={source_group_id}), available "
+            f"{free_bytes / (1024 ** 3):.2f} GiB at {output_dir}; "
+            "clear data_cache/cgsa_work/* or set FFACT_L7_MIN_FREE_GIB to a lower value "
+            "only if you accept the risk."
+        )
+
     @staticmethod
     def _resolve_l7_disk_safety_factor() -> float:
         raw = os.getenv("FFACT_L7_DISK_SAFETY_FACTOR", "1.5").strip()
@@ -1401,6 +2267,17 @@ class FeatureStorage:
         if value <= 0:
             return 1.5
         return value
+
+    @staticmethod
+    def _resolve_l7_min_free_bytes() -> int:
+        raw = os.getenv("FFACT_L7_MIN_FREE_GIB", "2.0").strip()
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 2.0
+        if value < 0:
+            value = 2.0
+        return int(value * (1024 ** 3))
 
     @staticmethod
     def _safe_disk_free_bytes(path: Path) -> Optional[int]:

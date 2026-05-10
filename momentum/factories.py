@@ -24,7 +24,72 @@ from momentum.Indicators.types import DataSourceEnum
 
 
 if TYPE_CHECKING:
+    from momentum.Analysis.adversarial_validator import AdversarialValidator
+    from momentum.Analysis.analysis_exporter import AnalysisExporter
+    from momentum.Analysis.bootstrap_estimator import BootstrapEstimator
+    from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
+    from momentum.Analysis.cross_symbol_validator import CrossSymbolValidator
+    from momentum.Analysis.drift_analyzer import DriftAnalyzer
+    from momentum.Analysis.expectancy_calculator import ExpectancyCalculator
+    from momentum.Analysis.factor_centrality_analyzer import FactorCentralityAnalyzer
+    from momentum.Analysis.factor_exposure_analyzer import FactorExposureAnalyzer
+    from momentum.Analysis.factor_orthogonalizer import FactorOrthogonalizer
+    from momentum.Analysis.factor_return_analyzer import FactorReturnAnalyzer
+    from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
+    from momentum.Analysis.feature_toggle_registry import FeatureToggleRegistry
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+    from momentum.Analysis.ic_reporter import ICReporter
+    from momentum.Analysis.indicator_cache import IndicatorCache
+    from momentum.Analysis.kline_cache import KlineCache
+    from momentum.Analysis.learning_curve_analyzer import LearningCurveAnalyzer
+    from momentum.Analysis.long_short_analyzer import LongShortAnalyzer
+    from momentum.Analysis.lstm_engine import LSTMEngine
+    from momentum.Analysis.model_comparison import ModelComparison
+    from momentum.Analysis.model_config import ModelConfigManager
+    from momentum.Analysis.model_storage import ModelStorage
+    from momentum.Analysis.model_validation.combinatorial_purged_cv import CombinatorialPurgedCV
+    from momentum.Analysis.model_validation.cv_validator import CVValidator
+    from momentum.Analysis.model_validation.psi_calculator import PSICalculator
+    from momentum.Analysis.model_validation.walk_forward_validator import WalkForwardValidator
+    from momentum.Analysis.net_ic_analyzer import NetICAnalyzer
+    from momentum.Analysis.parameter_sensitivity_analyzer import ParameterSensitivityAnalyzer
+    from momentum.Analysis.pattern_definition import Pattern, PatternRule
+    from momentum.Analysis.pattern_extractor import PatternExtractor
+    from momentum.Analysis.pattern_storage import PatternStorage
+    from momentum.Analysis.pattern_validator import PatternValidator
+    from momentum.Analysis.prediction_analyzer import PredictionAnalyzer
+    from momentum.Analysis.probability_calibrator import ProbabilityCalibrator
+    from momentum.Analysis.regime_analyzer import RegimeAnalyzer
+    from momentum.Analysis.regime_detector import RegimeDetector
+    from momentum.Analysis.rolling_oos_validator import RollingOOSValidator
+    from momentum.Analysis.sample_weight_calculator import SampleWeightCalculator
+    from momentum.Analysis.signal_density_analyzer import SignalDensityAnalyzer
+    from momentum.Analysis.strategy_registry import StrategyRegistry
+    from momentum.Analysis.trend_analyzer import TrendAnalyzer
+    from momentum.Analysis.xgboost_analyzer import XGBoostAnalyzer
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    from momentum.FeatureEngineering.feature_library import FeatureLibrary
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+    from momentum.FeatureEngineering.labels.label_generator import LabelGenerator
+    from momentum.FeatureEngineering.mcp.feature_factory_mcp import FeatureFactoryMCP
     from momentum.FeatureEngineering.preprocessing._d_star_cache import PreprocessingContext
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+    from momentum.Optimization.objectives.model_hyperparam import ModelHyperparamObjective
+    from momentum.Optimization.objectives.strategy_backtest import StrategyBacktestObjective
+    from momentum.Optimization.optuna_optimizer import (
+        OptunaOptimizer,
+        OptimizationResult,
+        ParameterRanges,
+    )
+    from momentum.Optimization.result_analyzer import ResultAnalyzer
+    from momentum.core.protocols import (
+        IBacktestEngine,
+        IModelTrainer,
+        IOptimizationObjective,
+        IPositionSizer,
+    )
 
 
 def create_kline_storage_manager(cache_dir: Optional[str] = None) -> KlineStorageManager:
@@ -201,6 +266,22 @@ def create_multi_symbol_runner(
     Returns a FeatureFactory instance ready for run_multi_symbol().
     """
     return create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
+
+
+def create_feature_factory_for_ic_batch(
+    cache_dir: Optional[str] = None,
+) -> "FeatureFactory":
+    """Factory for IC-First batch processing; injects an ICEngine.
+
+    Used by feature_factory_batch_service when FFACT_MULTI_SYMBOL_IC_FIRST=1.
+    Each subprocess creates its own factory + engine instance (no shared state).
+    Never imports api.* — decoupling rule 1.
+    """
+    from momentum.Analysis.ic_engine import ICEngine
+
+    factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
+    factory._ic_engine = ICEngine({"methods": ["spearman"]})
+    return factory
 
 
 def create_feature_reader(

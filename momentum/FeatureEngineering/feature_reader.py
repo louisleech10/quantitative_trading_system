@@ -17,8 +17,17 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 
+from momentum.FeatureEngineering.feature_storage import (
+    GAUSSIAN_INT16_ENCODING,
+    L7_ENCODING_REGISTRY_METADATA_KEY,
+    RANK_UINT16_ENCODING,
+    ZSCORE_INT16_ENCODING,
+    decode_rank_from_uint16,
+    decode_zscore_from_int16,
+)
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -78,7 +87,8 @@ class FeatureReader:
             path = self._resolve_manifest_relative_path(base_dir, group_info.get("path") or group_info.get("file"))
             if not path.exists():
                 raise FileNotFoundError(f"Parquet file missing: {path}")
-            dataframe = pq.read_table(str(path)).to_pandas()
+            table = self._decode_l7_encoded_table(pq.read_table(str(path)))
+            dataframe = table.to_pandas()
             yield group_name, dataframe
             del dataframe
 
@@ -119,6 +129,7 @@ class FeatureReader:
             if not path.exists():
                 raise FileNotFoundError(f"Parquet file missing: {path}")
             table = pq.read_table(str(path), columns=needed_cols)
+            table = self._decode_l7_encoded_table(table)
             frames.append(table.to_pandas())
 
         return pd.concat(frames, axis=1) if frames else pd.DataFrame()
@@ -204,9 +215,11 @@ class FeatureReader:
             if not path.exists():
                 logger.warning("Parquet missing for group %s: %s", group_name, path)
                 continue
-            df = pq.read_table(str(path)).to_pandas()
+            group_columns = [str(column) for column in group_info.get("columns", [])]
+            table = pq.read_table(str(path), columns=group_columns or None)
+            df = table.to_pandas()
             yield group_name, df
-            del df
+            del df, table
 
     # ------------------------------------------------------------------
     # Mode 4: Cross-Symbol
@@ -340,6 +353,41 @@ class FeatureReader:
         if relative_path.is_absolute() or ".." in relative_path.parts:
             raise ValueError(f"Unsafe manifest path: {raw_path}")
         return base_dir / relative_path
+
+    @staticmethod
+    def _decode_l7_encoded_table(table: pa.Table) -> pa.Table:
+        metadata = table.schema.metadata or {}
+        raw_registry = metadata.get(L7_ENCODING_REGISTRY_METADATA_KEY.encode("utf-8"))
+        if not raw_registry:
+            return table
+
+        try:
+            registry = json.loads(raw_registry.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Invalid l7_encoding_registry metadata") from exc
+
+        arrays: List[Any] = []
+        names: List[str] = []
+        for column_name in table.column_names:
+            column_registry = registry.get(column_name)
+            if not column_registry:
+                arrays.append(table[column_name])
+                names.append(column_name)
+                continue
+
+            encoding_type = column_registry.get("encoding_type")
+            column_values = table[column_name].to_pandas().to_numpy()
+            if encoding_type == RANK_UINT16_ENCODING:
+                window = int(column_registry.get("window") or 0)
+                arrays.append(pa.array(decode_rank_from_uint16(column_values, window)))
+            elif encoding_type in {ZSCORE_INT16_ENCODING, GAUSSIAN_INT16_ENCODING}:
+                arrays.append(pa.array(decode_zscore_from_int16(column_values)))
+            else:
+                arrays.append(table[column_name])
+            names.append(column_name)
+
+        decoded_table = pa.Table.from_arrays(arrays, names=names)
+        return decoded_table.replace_schema_metadata(metadata)
 
     @staticmethod
     def _safe_path_segment(value: str, field_name: str) -> str:

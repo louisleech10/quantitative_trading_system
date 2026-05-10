@@ -475,3 +475,224 @@
 - 未執行全 repo ruff；全 repo 既有 unrelated lint 債已在 Batch 1 記錄。本 Task 以修改檔案 scoped ruff 驗證通過。
 - T1.P1/T1.P2/T1.P3 目前使用 `scripts/benchmark_l65_v2.py` scaffold；它驗證真實 HDF5 cache 存在、RSS/available RAM、artifact size scanner 與 streaming schema scanner，但不自行產生 full L7 parquet。
 - 真實 full-scale L7_raw ≤ 1.5GB / L7_processed ≤ 0.25GB 仍需在產生實際 L7 artifacts 後重跑 Frozen 前 gate。
+
+## [Task 2.1 + Task 2.2] 2026-05-09
+
+### Ultra Think 三步驟
+
+- Step 1 初版：新增 `FFACT_L7_CODEC_UPGRADE` parser、codec-aware parquet writer、rank/zscore integer encode/decode helpers、processed artifact `l7_encoding_registry` metadata，以及 FeatureReader read-time decode hook。
+- Step 2 自審：檢查 BSS 不應作用於 float16 groups、整數 encode 失敗必須 fallback float32 且不得 clip、raw artifact 不可整數編碼、old parquet 無 metadata 必須維持 legacy float path、`FFACT_L7_CODEC_UPGRADE=0` 必須可回退。
+- Step 3 優化：補上 codec disabled fallback 測試、skip evidence helper/test、V7 float16/float32 dtype 子集回歸，並以 scoped ruff / diagnostics 驗證修改檔案。
+
+### 實作摘要
+
+- `momentum/core/config.py` 新增 `get_l7_codec_upgrade_enabled()`，集中解析 `FFACT_L7_CODEC_UPGRADE`，預設關閉以維持 legacy zstd/float path。
+- `feature_storage.py` 新增 `_write_parquet_with_codec()`；僅當 codec flag 開啟且欄位被標為 float32 fallback 時嘗試 `BYTE_STREAM_SPLIT`，PyArrow 不支援時 warning 後回退 zstd，不改 float16 gate、不改 snappy。
+- `persist_registry_to_parquet()` / `AsyncParquetCompactor` 傳遞 float32 fallback 欄位清單，使 V7 CGSA float32 fallback part 可走同一 codec writer；float16 part 不使用 BSS。
+- `feature_storage.py` 新增 `encode_rank_as_uint16()` / `decode_rank_from_uint16()` 與 `encode_zscore_as_int16()` / `decode_zscore_from_int16()`；rank 使用 `0` sentinel，zscore/gaussian 使用 `-32768` sentinel；overflow、invalid rank window、roundtrip gate failure 全部 fallback float32，不 clip。
+- `write_processed()` 只在 `artifact_kind=processed` 且 codec flag 開啟時，對明確命名的 rank/zscore/gaussian columns 寫入 integer encoded parquet 與 `l7_encoding_registry` schema metadata；`write_raw()` 不做整數編碼。
+- `feature_reader.py` 在 V2 `stream_groups_v2()` / `load_columns_v2()` 讀取時，依 parquet schema metadata 自動 decode mixed rank/zscore/gaussian columns；無 `l7_encoding_registry` 的舊 parquet 維持原 float path。
+- 新增 `phase2_skip_evidence.json` helper，格式包含 TODO §0.8 要求的 symbol/tf/config/schema/file sizes/FracDiff/float32 fallback/pyarrow/reason/created_at 欄位。
+- 新增 `tests/feature_engineering/test_l7_codec.py`，覆蓋 T2.1~T2.4、T2.B1~T2.B4、T2.S1 與 codec disabled fallback。
+
+### 修改檔案與範圍
+
+- `momentum/core/config.py`：新增 `get_l7_codec_upgrade_enabled()`，約 lines 52-66。
+- `momentum/FeatureEngineering/feature_storage.py`：新增 codec 常數、encode/decode、BSS writer、skip evidence helper，約 lines 34-246；更新 compactor codec 傳遞，約 lines 266-430；更新 V2 group writer / processed encoding registry，約 lines 723-877；更新 V7 persist part writer，約 lines 1283-1324 與 1486。
+- `momentum/FeatureEngineering/feature_reader.py`：新增 registry decode imports 與 V2 table decode hook，約 lines 18-29、67-132、356-389。
+- `tests/feature_engineering/test_l7_codec.py`：新增 Batch 8 codec 測試，約 lines 1-262。
+- `docs/L65_OPTIMIZATION_TODO_V2.md`：更新 Task 2.1/2.2、Phase 2 tests、Phase 2 Gate checkbox，約 lines 573-625。
+- `docs/L65_OPTIMIZATION_VERIFICATIONv2.md`：append 本驗證紀錄。
+
+### 全域規則確認
+
+- R1.1 跨 tier 重複穩定：本 Task 新增 codec flag 預設關閉；Phase 2 / 8GB benchmark scaffold status `PASS`，無 OOM / SIGKILL。
+- R1.2 多 symbol 不 OOM：未新增跨 symbol cache 或全量 concat；reader decode 仍在 V2 per-group / projected read path 上運作。
+- R1.3 最高數據品質：不產 fake market data；整數 codec 有 roundtrip gate；overflow 不 clip；old parquet 無 metadata fallback；raw artifact 不整數編碼。
+- R1.4 最短可行計算時間：BSS / integer encoding 只在 storage codec path；不改 transform 計算、不改 rolling windows。
+- R1.5 最小可行輸出檔案：rank/zscore/gaussian processed columns 可整數編碼；float32 fallback columns 可 BSS；不以膨脹輸出換速度。
+- Rule 2~8：未新增 `api.*` import；未改 DTO 邊界；未新增 service coupling；新增函式有 Python 3.9 相容 type hints 且未使用 `X | Y`；logging 僅為 codec fallback summary warning；`FFACT_L7_CODEC_UPGRADE=0` fallback 已測試。
+
+### 驗證命令與結果
+
+- `./venv/bin/pytest tests/feature_engineering/test_l7_codec.py -q`
+  - exit code 0；10 passed。
+  - 覆蓋 `test_bss_roundtrip`、`test_rank_uint16_roundtrip`、`test_zscore_int16_roundtrip`、`test_mixed_encoding_metadata_roundtrip`、`test_codec_upgrade_disabled_fallback`、`test_rank_nan_sentinel`、`test_zscore_overflow_fallback_float32`、`test_bss_pyarrow_version_fallback`、`test_old_parquet_no_metadata`、`test_phase2_skip_evidence_manifest`。
+  - Warning：`pandas_ta/utils/_core.py` 既有 `DeprecationWarning: invalid escape sequence \g`，非本 Task 產生。
+- `./venv/bin/pytest tests/feature_engineering/test_ic_first_pipeline.py -q`
+  - exit code 0；14 passed；確認 V2 reader decode hook 未破壞 Phase 1 raw/processed manifest、IC streaming、empty selection、memory budget 合約。
+- `./venv/bin/pytest tests/momentum/test_feature_storage.py::test_cgsa_parquet_keeps_float16_when_safe tests/momentum/test_feature_storage.py::test_cgsa_manifest_dtype_summary_records_mixed_dtype -q`
+  - exit code 0；2 passed；確認 V7 float16 safe part 與 mixed float32 fallback manifest 仍正確。
+- `./venv/bin/pytest tests/momentum/test_feature_storage.py -q`
+  - 未取得可靠結果；整檔超過 180s subagent 上限且輸出檔不可讀。已改跑本次受影響 dtype 子集作替代檢查。
+- `./venv/bin/ruff check momentum/core/config.py momentum/FeatureEngineering/feature_storage.py momentum/FeatureEngineering/feature_reader.py tests/feature_engineering/test_l7_codec.py`
+  - exit code 0；all checks passed。
+- `grep -r 'from api\.' momentum/FeatureEngineering/preprocessing/ | wc -l`
+  - exit code 0；輸出 `0`。
+- `grep -r 'from api\.' momentum/FeatureEngineering momentum/Analysis | wc -l`
+  - exit code 0；輸出 `0`。
+- `./venv/bin/python scripts/benchmark_l65_v2.py --phase=2 --tier=8gb --symbols=ETHUSDT --tfs=1h --max-rows=2000 --check-bss-roi`
+  - exit code 0；status `PASS`。
+  - `phase=2`、`tier=8gb`、`check_bss_roi=true`、`available_ram_gb=1.9931`、`peak_rss_mb=51`、`wall_time_seconds=0.471568`、`oom=false`、`sigkill=false`。
+  - ETHUSDT/1h 真實 HDF5 cache 存在，`rows_available=20352`，`rows_requested=2000`。
+  - `l7_sizes` 目前全為 0 bytes，代表此 scaffold 只掃描既有 artifact，不自行產生 L7 parquet。
+- VS Code diagnostics
+  - `feature_storage.py`、`feature_reader.py`、`momentum/core/config.py`、`test_l7_codec.py` 皆 no errors found。
+
+### Batch 8 Gate 結果
+
+- `T2.1` PASS：BSS writer roundtrip bit-exact；若 PyArrow 不支援 `BYTE_STREAM_SPLIT`，自動 fallback zstd。
+- `T2.2` PASS：rank uint16 roundtrip max diff ≤ `1/(2W)`，NaN mask exact。
+- `T2.3` PASS：zscore int16 roundtrip max diff ≤ `0.001`，NaN mask exact。
+- `T2.4` PASS：mixed rank/zscore/gaussian parquet schema metadata 含 `l7_encoding_registry`，reader 可逐欄 decode。
+- `T2.B1` PASS：rank NaN sentinel `0` decode 後還原 NaN。
+- `T2.B2` PASS：zscore overflow（40.0）不 clip，fallback float32，reader roundtrip 無損。
+- `T2.B3` PASS：模擬 PyArrow 不支援 BSS 時 fallback zstd，不拋例外。
+- `T2.B4` PASS：old parquet 無 `l7_encoding_registry` metadata 時維持 legacy float path。
+- `T2.S1` PASS：`phase2_skip_evidence.json` helper 產出 TODO §0.8 要求欄位。
+- `T2.P1` PASS（scaffold / optional ROI）：Phase 2 benchmark scaffold status `PASS`，但目前沒有可掃描 L7 parquet artifact，未量到真實 BSS ROI；Frozen 前仍需用實際 float32 fallback artifact 驗證 ROI 或留下 skip evidence。
+- `T2.P2` PASS（unit + scaffold size gate）：integer encoded processed unit roundtrip 通過；benchmark scanner 回報 processed bytes 0 ≤ 0.1GB，但未產生 full L7_processed artifact。
+- Phase 2 → Phase 3 Gate：T2.1~T2.4、T2.B1~T2.B4、T2.S1、fallback env gate 全通過；T2.P1/T2.P2 目前以 scaffold / unit 證據通過，Frozen 前需真實 artifact size / ROI 證據或 accepted skip evidence。
+
+### 未驗證或警告
+
+- 未執行 full repo ruff；全 repo 既有 unrelated lint 債已在 Batch 1 記錄。本 Batch 以修改檔案 scoped ruff 驗證通過。
+- 未取得 `tests/momentum/test_feature_storage.py` 全檔結果；整檔超過 180s subagent 上限。已執行本次受影響的 V7 dtype 子集。
+- Phase 2 benchmark scaffold 不產生 L7 parquet；真實 BSS ROI、L7_processed ≤0.1GB full artifact size 仍需在實際 IC-First artifact 產出後重跑 Frozen 前 gate。
+- 目前 processed integer encoding 依明確欄名推斷 rank/zscore/gaussian；無 transform metadata 且欄名不含 transform token 的 selected-only replace-mode 欄位會保守 fallback float path，避免誤編碼 winsorized/FracDiff/raw 值。
+
+---
+
+## Batch 9 — Phase 3 Task 3.1：Multi-Symbol IC-First Batch Integration
+
+**日期**: 2026-05-09
+**執行人**: GitHub Copilot Agent
+
+### 實作概要
+
+| 步驟 | 修改檔案 | 說明 |
+|------|---------|------|
+| B1 | `momentum/core/config.py` | 新增 `get_multi_symbol_ic_first_enabled()`，env var `FFACT_MULTI_SYMBOL_IC_FIRST`，與既有 flag 相同模式 |
+| B2 | `momentum/factories.py` | 新增 `create_feature_factory_for_ic_batch()`，注入 `ICEngine({"methods": ["spearman"]})` |
+| B3 | `api/services/feature_factory_batch_service.py` | 新增 `_compute_single_ic_first()` @staticmethod（env 還原 finally）；`_resolve_concurrent_symbols()` IC-First 強制=1；`_process_item_wave()` flag-based 分發 |
+| B4 | `tests/feature_engineering/test_multi_symbol_ic_first.py` | 新建 18 個測試（T3.1/T3.2/T3.B1/T3.B2/T3.P1/T3.P2） |
+| B5 | `scripts/benchmark_l65_v2.py` | 新增 `_run_phase3_benchmark()`，`main()` 加 phase=3 分發，exit code 2 for blocked_missing_data |
+
+### 驗證指令與結果
+
+```
+grep -r 'from api\.' momentum/ | wc -l
+```
+→ 0（解耦規則 Rule 1 通過）
+
+```
+./venv/bin/ruff check momentum/core/config.py api/services/feature_factory_batch_service.py tests/feature_engineering/test_multi_symbol_ic_first.py scripts/benchmark_l65_v2.py
+```
+→ All checks passed!
+
+```
+FFACT_MULTI_SYMBOL_IC_FIRST=0 ./venv/bin/pytest tests/feature_engineering/test_multi_symbol_ic_first.py -v
+```
+→ **18 passed**, 1 warning in 0.86s
+
+```
+./venv/bin/pytest tests/feature_engineering/test_ic_first_pipeline.py tests/feature_engineering/test_l7_codec.py -q
+```
+→ **24 passed**, 1 warning in 2.46s（迴歸通過）
+
+```
+./venv/bin/python scripts/benchmark_l65_v2.py --phase=3 --tier=8gb; echo "Exit: $?"
+```
+→ status `blocked_missing_data`，Exit: 2
+
+### Phase 3 Gate 結果
+
+- `T3.1` PASS：`_compute_single_ic_first` 輸出路徑隔離；env flag finally 還原（含失敗路徑）。
+- `T3.2` PASS：`queued_items` 語意驗證；`_remove_queued_item` 正確移除已完成標的；失敗標的仍在 queued_items 可重試。
+- `T3.B1` PASS：RAM gate HTTPException(429) 正確拋出；記憶體充足時不拋例外。
+- `T3.B2` PASS：MemoryError 直接傳遞（OOM 分類）；RuntimeError 包裝含 symbol/tf 資訊；`_classify_failure` 分類正確。
+- `T3.P1` PASS（scaffold）：`_run_phase3_benchmark` 函式存在，dryrun=True 回傳 `blocked_missing_data`。
+- `T3.P2` PASS（dryrun/scaffold）：checkpoint 結構含 `batch_id`/`queued_items`/`completed_items`/`failed_items`；resume 跳過已完成標的；IC-First flag=1 強制 concurrent=1；flag=0 使用 tier-based 值。
+- `FFACT_MULTI_SYMBOL_IC_FIRST=0` 可回退：`_resolve_concurrent_symbols()` fallback 至 tier-based 路徑（tier=16GB → concurrent=2，T3.P2 最後一個測試通過）。
+
+### 未驗證或警告
+
+- T3.P1 / T3.P2 full-data benchmark（真實 HDF5 kline + API service）未執行；dryrun scaffold 已通過，真實 RSS <7GB/symbol 待 Frozen 前以真實資料執行。
+- `FFACT_MULTI_SYMBOL_IC_FIRST=1` 端對端 API 整合（`/api/v1/feature-factory/batch`）未在此 batch 執行，需在真實環境下獨立驗證。
+
+## [Task 3.2] 2026-05-09
+
+### Ultra Think 三步驟
+
+- Step 1 初版：依 TODO/SPEC 確認 Cross-Symbol Rank 屬 OPTIONAL / DEFERRED；未收到 `POST /api/v1/features/cross-symbol-rank` API contract，因此不建立 CSR API、不產生 CSR artifact、不混入 per-symbol 主線。
+- Step 2 自審：檢查品質、邊界、命名、一致性、效能、安全、測試；結論是只能封存 deferred boundary，並以 Phase 3 既有 Gate regression 驗證 no-op 不破壞主線。
+- Step 3 優化：更新 Task 3.2 checkbox 與 deferred 說明；ruff 發現 `momentum/factories.py` 既有 forward-return type F821，補齊 `TYPE_CHECKING` imports 後重跑通過，未改 runtime lazy factory 行為。
+
+### 實作摘要
+
+- `docs/L65_OPTIMIZATION_TODO_V2.md`：Task 3.2 全部 checkbox 更新為 `[x]`，並明確記錄本批次未啟用 CSR，若日後要 CSR API 必須另建 mini SPEC/TODO 與 CSR-specific tests。
+- `momentum/factories.py`：補齊 `TYPE_CHECKING` imports，讓 scoped ruff 可解析既有 factory return annotations；此修正不新增 runtime import、不改 factory 行為。
+- 未新增 CSR API、未新增 CSR artifact、未讀取或合併 multi-symbol L7_raw；避免在未定義 API contract 前擴展架構。
+
+### 修改檔案與範圍
+
+- `docs/L65_OPTIMIZATION_TODO_V2.md`：Task 3.2 deferred boundary 與 checkbox，約 lines 649-662。
+- `momentum/factories.py`：`TYPE_CHECKING` imports，約 lines 27-92。
+- `docs/L65_OPTIMIZATION_VERIFICATIONv2.md`：移除 Batch 9 日期行 trailing whitespace；append 本 Task 3.2 驗證紀錄。
+
+### 全域規則確認
+
+- R1.1 跨 tier 重複穩定：Task 3.2 不新增執行路徑或 cache；Phase 3 scaffold 維持 dryrun/blocked behavior。
+- R1.2 多 symbol 不 OOM：未建立 CSR batch，未載入多 symbol L7_raw，未新增任何跨 symbol in-memory 聚合。
+- R1.3 最高數據品質：未產 fake data；不跨 symbol 共用統計；不產 incomplete raw 的 partial CSR output；不取代 per-symbol IC selected。
+- R1.4 最短可行計算時間：未新增計算流程；現有 per-symbol IC-First 主線不受影響。
+- R1.5 最小可行輸出檔案：未新增 CSR artifact 或額外輸出。
+- Rule 2~8：未新增 `api.*` reverse import；未改 DTO 邊界或 service coupling；Python 3.9 type hints 維持；logging/error handling/config/fallback 無新增 runtime 行為；full-schema streaming 仍由既有 scaffold 驗證，不做全量 concat readback。
+
+### 驗證命令與結果
+
+```
+grep -r 'from api\.' momentum/FeatureEngineering/preprocessing/ | wc -l
+grep -r 'from api\.' momentum/FeatureEngineering momentum/Analysis | wc -l
+```
+→ 皆為 `0`。
+
+```
+grep -r 'from api\.' momentum/FeatureEngineering/preprocessing/; status=$?; echo "grep_exit=$status"
+```
+→ 無匹配輸出，`grep_exit=1`；這是 grep 無結果的正常 exit code，代表 0 筆 reverse import。
+
+```
+./venv/bin/ruff check momentum/core/config.py momentum/factories.py api/services/feature_factory_batch_service.py scripts/benchmark_l65_v2.py tests/feature_engineering/test_multi_symbol_ic_first.py
+```
+→ 初次失敗於 `momentum/factories.py` F821 forward type names；補齊 `TYPE_CHECKING` imports 後重跑 `All checks passed!`。
+
+```
+FFACT_MULTI_SYMBOL_IC_FIRST=0 ./venv/bin/pytest tests/feature_engineering/test_multi_symbol_ic_first.py -q
+```
+→ `18 passed, 1 warning in 0.91s`。Warning 為既有 `pandas_ta` deprecation warning，非本 Task 產生。
+
+```
+./venv/bin/pytest tests/feature_engineering/test_ic_first_pipeline.py tests/feature_engineering/test_l7_codec.py -q
+```
+→ `24 passed, 1 warning in 2.56s`。Warning 同為既有 `pandas_ta` deprecation warning。
+
+```
+./venv/bin/python scripts/benchmark_l65_v2.py --phase=3 --tier=8gb; status=$?; echo "benchmark_exit=$status"
+```
+→ status `blocked_missing_data`，`benchmark_exit=2`；這是 Phase 3 dryrun scaffold 的預期 blocked 結果，原因是需要真實 HDF5 與執行中的 API service 才能做 full-data benchmark。
+
+### Batch Gate 結果
+
+- `T3.1` PASS：multi-symbol IC selected output isolation regression 通過。
+- `T3.2` PASS：checkpoint/resume completed skip 與 failed rerun regression 通過。
+- `T3.B1` PASS：RAM gate skip / HTTP 429 behavior 通過。
+- `T3.B2` PASS：MemoryError 不寫 completed checkpoint，failed item 可重試。
+- `T3.P1` PASS（scaffold）：Phase 3 benchmark scaffold 回傳預期 `blocked_missing_data`。
+- `T3.P2` PASS（dryrun/scaffold）：checkpoint/resume/isolation dryrun tests 通過。
+- `FFACT_MULTI_SYMBOL_IC_FIRST=0` fallback PASS：tier-based concurrency path regression 通過。
+
+### 未驗證或警告
+
+- CSR API 未實作，因 TODO/SPEC 明確要求「僅使用者明確要求 CSR API 時」另建 mini SPEC/TODO；本批次沒有 API contract、CSR artifact contract 或 CSR-specific Test ID。
+- T3.P1/T3.P2 full-data benchmark 未執行；目前只有 dryrun scaffold 證據，真實 RSS / disk extrapolation 需在具備真實資料與 API service 的 Frozen 前驗收執行。

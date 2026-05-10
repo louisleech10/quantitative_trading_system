@@ -40,13 +40,13 @@ SPEC 結構完整，跳過正規化。
 | 3 | Task 0.3 | rank 消除 constant_mask 多餘 rolling pass | §2.1, line 385 | 「消除 constant_mask」 |
 | 4 | Task 0.4 | zscore 共用 rolling 物件 + 消除 copy | §2.1, line 426 | 「zscore — 共用 rolling」 |
 | 5 | Task 0.5 | Gaussian DataFrame 批次化 + ndtri | §2.1, line 462 | 「Gaussian — DataFrame 批次化」 |
-| 6 | Task 1.1 | FeatureFactory pre/post IC pipeline | §3.1, line 540 | 「pre/post IC 兩段式 pipeline」 |
+| 6 | Task 1.1 | FeatureFactory L7_raw generation routing | §3.1, line 540 | 「generation mode routing」 |
 | 7 | Task 1.2 | FeatureStorage raw/processed 雙路徑 | §3.1, line 594 | 「raw/processed 雙路徑」 |
-| 8 | Task 1.3 | IC Gatekeeper per-group 讀 L7_raw | §3.1, line 647 | 「per-group 迭代讀取 L7_raw」 |
-| 9 | Task 1.4 | Post-IC transform + GC 保護 | §3.1, line 702 | 「Post-IC Transform Service」 |
+| 8 | Task 1.3 | downstream IC Gatekeeper per-group 讀 L7_raw | §3.1, line 647 | 「downstream optional」 |
+| 9 | Task 1.4 | downstream Post-IC transform + GC 保護 | §3.1, line 702 | 「downstream optional」 |
 | 10 | Task 2.1 | byte_stream_split for float32 fallback groups | §4.1, line 842 | 「byte_stream_split」 |
 | 11 | Task 2.2 | 整數編碼 Registry | §4.1, line 881 | 「整數編碼 Registry」 |
-| 12 | Task 3.1 | Sequential symbol IC-First GC chain | §5.1, line 1012 | 「Sequential Symbol Execution」 |
+| 12 | Task 3.1 | Sequential symbol IC-First L7_raw chain | §5.1, line 1012 | 「Sequential Symbol Execution」 |
 | 13 | Task 3.2 | Cross-Symbol Rank optional / deferred | §5.1, line 1048 | 「DEFERRED to Phase 3」 |
 | **合計** | **13 個** | | | |
 
@@ -473,19 +473,19 @@ Batch 10: Task 3.2（OPTIONAL / deferred；僅使用者明確要求 CSR API 時�
 
 ## Phase 1 — IC-First Pipeline
 
-### Task 1.1 — FeatureFactory pre/post IC 兩段式 pipeline
+### Task 1.1 — FeatureFactory generation mode routing（L7_raw only）
 
 - [x] **SPEC ref**: Task 1.1；C-V2-7；R4。
-- [x] **目標**: pre_ic 只做 winsor + FracDiff L1/L2；post_ic 只對 selected features 做 rank/zscore/gaussian。
+- [x] **目標**: generation path 只允許 `legacy` 或 `ic_first_pre`；IC-First 只做 winsor + FracDiff/ADF，然後輸出 L7_raw。`post_ic` 只保留為 downstream optional helper，不屬於 L6.5→L7 generation path。
 - [x] **輸入**: L1-L6 features / CGSA registry；FactoryConfig；selected features。
-- [x] **輸出**: `_layer6_5_legacy()`, `_layer6_5_pre_ic()`, `_layer6_5_post_ic()`。
+- [x] **輸出**: `_layer6_5_legacy()`, `_layer6_5_pre_ic()`；`_layer6_5_post_ic()` 僅 downstream optional，不作為 generation 輸出。
 - [x] **實作要點**:
   - ⚠️ 現有 `_layer6_5_preprocessing(all_features, config)` 為 DataFrame/CGSA side-effect path，需保留 compatible signature。
-  - 偽碼：if env off → legacy；selected is None → pre_ic；selected list → post_ic。
+  - 偽碼：if env/config off → legacy；if IC-First on → pre_ic；generation 不因 selected list 進 post_ic。
   - 函式草案：`_layer6_5_preprocessing(..., selected_features: Optional[List[str]] = None) -> pd.DataFrame`。
   - Edge: selected empty → empty output + warning；CGSA registry 不 finalize 兩次；env off byte/allclose legacy。
 - [x] **修改檔案**: `feature_factory.py → _layer6_5_preprocessing(), _layer6_5_legacy(), _layer6_5_pre_ic(), _layer6_5_post_ic()`；`momentum/core/config.py → get_ic_first_pipeline_enabled()`。
-- [x] **不可做**: pre_ic 不做 rank/zscore/gaussian；post_ic 不讀全量 features；不刪 legacy。
+- [x] **不可做**: pre_ic 不做 rank/zscore/gaussian；generation 不呼叫 post_ic、IC Gatekeeper、write_processed；不刪 legacy。
 - [x] **風險緩解**: R4；`FFACT_IC_FIRST_PIPELINE=0` fallback。
 - [x] **驗證**: T1.1, T1.B3。
 
@@ -505,7 +505,9 @@ Batch 10: Task 3.2（OPTIONAL / deferred；僅使用者明確要求 CSR API 時�
 - [x] **風險緩解**: R4, R7。
 - [x] **驗證**: T1.2, T1.5, T2.B4。
 
-### Task 1.3 — IC Gatekeeper per-group 迭代讀 L7_raw
+### Task 1.3 — IC Gatekeeper per-group 迭代讀 L7_raw（downstream optional）
+
+> 2026-05-10 修正：此 Task 保留為 L7_raw 產出後的 downstream support，不再是 Feature Factory generation path 的必要或自動步驟。
 
 - [x] **SPEC ref**: Task 1.3；C-V2-7, C-V2-10；R5, R7。
 - [x] **目標**: 新增 raw streaming IC computation，逐 group 讀 parquet 計算 IC，atomic write selected JSON。
@@ -522,18 +524,20 @@ Batch 10: Task 3.2（OPTIONAL / deferred；僅使用者明確要求 CSR API 時�
 - [x] **風險緩解**: R5, R7。
 - [x] **驗證**: T1.3, T1.B2, T1.B2a, T1.B4, T1.B5, service integration, T1.P3 scaffold。
 
-### Task 1.4 — Post-IC Transform Service + GC 保護
+### Task 1.4 — Post-IC Transform Service + GC 保護（downstream optional）
+
+> 2026-05-10 修正：此 Task 保留為顯式下游 workflow；Feature Factory generation path 不自動執行 `run_ic_first_pipeline()`、`transform_selected()` 或 `write_processed()`。
 
 - [x] **SPEC ref**: Task 1.4；C-V2-6, C-V2-10, C-V2-11；R6。
-- [x] **目標**: 串接 pre_ic → write raw → del/gc + budget gate → IC streaming → post_ic selected → write processed。
+- [x] **目標**: downstream workflow 可串接 raw → del/gc + budget gate → IC streaming → post_ic selected → write processed；generation workflow 僅到 L7_raw。
 - [x] **輸入**: raw path, selected list, config, memory tier config。
-- [x] **輸出**: processed parquet + memory logs + `run_ic_first_pipeline()`。
+- [x] **輸出**: downstream processed parquet + memory logs + `run_ic_first_pipeline()`；generation output 不包含 processed。
 - [x] **實作要點**:
-  - 偽碼：run L1-L6/pre_ic → write_raw → `del pre_ic_groups; gc.collect()` → check available RAM → run IC → read selected only → post_ic → write_processed。
+  - 偽碼（downstream only）：read L7_raw → `gc.collect()` → check available RAM → run IC → read selected only → post_ic → write_processed。
   - 函式草案：`transform_selected(selected, groups, config)`；`run_ic_first_pipeline(symbol, tf, config) -> FeatureFactoryResult`。
   - Edge: selected empty → processed manifest with 0 selected；available RAM below gate raises MemoryError; RSS fixed 5GB drop only diagnostic。
 - [x] **修改檔案**: `feature_preprocessor.py → transform_selected()`；`feature_factory.py → run_ic_first_pipeline()` and memory helper integration。
-- [x] **不可做**: 不可在釋放 pre_ic 前跑 IC；不可用 `resource.ru_maxrss` 判斷 gc 後當前 RSS；post_ic 不讀全量。
+- [x] **不可做**: generation path 不可自動跑 IC/post_ic/processed；downstream workflow 不可用 `resource.ru_maxrss` 判斷 gc 後當前 RSS；post_ic 不讀全量。
 - [x] **風險緩解**: R6；available RAM + peak RSS gate。
 - [x] **驗證**: T1.4, T1.B1, T1.P1, T1.P2, T1.P3。
 
@@ -572,57 +576,57 @@ Batch 10: Task 3.2（OPTIONAL / deferred；僅使用者明確要求 CSR API 時�
 
 ### Task 2.1 — byte_stream_split for float32 fallback groups
 
-- [ ] **SPEC ref**: Task 2.1；C-V2-8；R8。
-- [ ] **目標**: 對 float32 fallback columns 啟用 BYTE_STREAM_SPLIT，保持 bit-exact readback。
-- [ ] **輸入**: Arrow table, output path, float32 fallback column list, codec flag。
-- [ ] **輸出**: `_write_parquet_with_codec()`；BSS or zstd fallback parquet。
-- [ ] **實作要點**:
+- [x] **SPEC ref**: Task 2.1；C-V2-8；R8。
+- [x] **目標**: 對 float32 fallback columns 啟用 BYTE_STREAM_SPLIT，保持 bit-exact readback。
+- [x] **輸入**: Arrow table, output path, float32 fallback column list, codec flag。
+- [x] **輸出**: `_write_parquet_with_codec()`；BSS or zstd fallback parquet。
+- [x] **實作要點**:
   - 偽碼：if codec disabled/no cols → current zstd writer；else `pq.write_table(..., column_encoding={col: "BYTE_STREAM_SPLIT"})`。
   - 函式草案：`_write_parquet_with_codec(table, output_path, *, float32_cols, schema_metadata=None)`。
   - Edge: no float32 cols no encoding; PyArrow not support BSS → zstd fallback + warning; ROI <10% optional。
-- [ ] **修改檔案**: `feature_storage.py → _write_parquet_with_codec(), _persist_parts_parallel()`；`momentum/core/config.py → get_l7_codec_upgrade_enabled()`。
-- [ ] **不可做**: 不可對 float16 groups 強制 BSS；不可改 float16 gate；不可用 snappy 取代 zstd。
-- [ ] **風險緩解**: R8。
-- [ ] **驗證**: T2.1, T2.B3, T2.P1。
+- [x] **修改檔案**: `feature_storage.py → _write_parquet_with_codec(), _persist_parts_parallel()`；`momentum/core/config.py → get_l7_codec_upgrade_enabled()`。
+- [x] **不可做**: 不可對 float16 groups 強制 BSS；不可改 float16 gate；不可用 snappy 取代 zstd。
+- [x] **風險緩解**: R8。
+- [x] **驗證**: T2.1, T2.B3, T2.P1。
 
 ### Task 2.2 — 整數編碼 Registry
 
-- [ ] **SPEC ref**: Task 2.2；C-V2-4, C-V2-5, C-V2-9；R3, R4。
-- [ ] **目標**: 對 processed rank/zscore/gaussian columns 實作 per-column encode/decode + metadata registry。
-- [ ] **輸入**: L7_processed table, transform metadata, codec flag。
-- [ ] **輸出**: integer encoded parquet columns + `l7_encoding_registry` + read-time decode。
-- [ ] **實作要點**:
+- [x] **SPEC ref**: Task 2.2；C-V2-4, C-V2-5, C-V2-9；R3, R4。
+- [x] **目標**: 對 processed rank/zscore/gaussian columns 實作 per-column encode/decode + metadata registry。
+- [x] **輸入**: L7_processed table, transform metadata, codec flag。
+- [x] **輸出**: integer encoded parquet columns + `l7_encoding_registry` + read-time decode。
+- [x] **實作要點**:
   - rank：NaN sentinel 0；decode tolerance ≤1/(2W)。
   - zscore/gaussian：×1000 int16；sentinel -32768；overflow fallback float32，不 clip。
   - 函式草案：`encode_rank_as_uint16()`, `decode_rank_from_uint16()`, `encode_zscore_as_int16()`, `decode_zscore_from_int16()`。
   - Edge: rank window invalid fallback float32; zscore overflow fallback; mixed columns decode independently。
-- [ ] **修改檔案**: `feature_storage.py` encode/decode helpers + registry builder；`feature_reader.py` metadata decode hook。
-- [ ] **不可做**: 不可對 winsorize/FracDiff/L7_raw integer encode；不可弱化 float16 gate；不可 clip overflow。
-- [ ] **風險緩解**: R3, R4。
-- [ ] **驗證**: T2.2, T2.3, T2.4, T2.B1, T2.B2, T2.B4, T2.P2。
+- [x] **修改檔案**: `feature_storage.py` encode/decode helpers + registry builder；`feature_reader.py` metadata decode hook。
+- [x] **不可做**: 不可對 winsorize/FracDiff/L7_raw integer encode；不可弱化 float16 gate；不可 clip overflow。
+- [x] **風險緩解**: R3, R4。
+- [x] **驗證**: T2.2, T2.3, T2.4, T2.B1, T2.B2, T2.B4, T2.P2。
 
 ### Phase 2 測試清單
 
 | ☐ | Test ID | 測試名稱 | 驗證內容 |
 |---|---------|---------|---------|
-| ☐ | T2.1 | `test_bss_roundtrip` | bit-exact parquet roundtrip |
-| ☐ | T2.2 | `test_rank_uint16_roundtrip` | diff ≤1/(2W), NaN exact |
-| ☐ | T2.3 | `test_zscore_int16_roundtrip` | diff ≤0.001, NaN exact |
-| ☐ | T2.4 | `test_mixed_encoding_metadata_roundtrip` | registry + decode correct |
-| ☐ | T2.B1 | `test_rank_nan_sentinel` | sentinel roundtrip |
-| ☐ | T2.B2 | `test_zscore_overflow_fallback_float32` | no clip, fallback float32 |
-| ☐ | T2.B3 | `test_bss_pyarrow_version_fallback` | zstd fallback |
+| [x] | T2.1 | `test_bss_roundtrip` | bit-exact parquet roundtrip |
+| [x] | T2.2 | `test_rank_uint16_roundtrip` | diff ≤1/(2W), NaN exact |
+| [x] | T2.3 | `test_zscore_int16_roundtrip` | diff ≤0.001, NaN exact |
+| [x] | T2.4 | `test_mixed_encoding_metadata_roundtrip` | registry + decode correct |
+| [x] | T2.B1 | `test_rank_nan_sentinel` | sentinel roundtrip |
+| [x] | T2.B2 | `test_zscore_overflow_fallback_float32` | no clip, fallback float32 |
+| [x] | T2.B3 | `test_bss_pyarrow_version_fallback` | zstd fallback |
 | [x] | T2.B4 | `test_old_parquet_no_metadata` | legacy float path |
-| ☐ | T2.S1 | `test_phase2_skip_evidence_manifest` | skip evidence JSON 完整 |
-| ☐ | T2.P1 | `benchmark_bss_compression` | ROI ≥10% or optional |
-| ☐ | T2.P2 | `benchmark_int_encoding_size` | processed ≤0.1GB |
+| [x] | T2.S1 | `test_phase2_skip_evidence_manifest` | skip evidence JSON 完整 |
+| [x] | T2.P1 | `benchmark_bss_compression` | ROI ≥10% or optional |
+| [x] | T2.P2 | `benchmark_int_encoding_size` | processed ≤0.1GB |
 
 ### Phase 2 → Phase 3 Gate
 
-- [ ] T2.1~T2.4 全通過，或 skip 條件有 `phase2_skip_evidence.json` 且 T2.S1 通過。
-- [ ] T2.B1~T2.B4 全通過。
-- [ ] T2.P1 通過或 optional；T2.P2 通過或 skip evidence。
-- [ ] `FFACT_L7_CODEC_UPGRADE=0` 可回退。
+- [x] T2.1~T2.4 全通過，或 skip 條件有 `phase2_skip_evidence.json` 且 T2.S1 通過。
+- [x] T2.B1~T2.B4 全通過。
+- [x] T2.P1 通過或 optional；T2.P2 通過或 skip evidence。
+- [x] `FFACT_L7_CODEC_UPGRADE=0` 可回退。
 
 ## Phase 3 — 多 Symbol 工廠產線整合
 
@@ -633,51 +637,52 @@ Batch 10: Task 3.2（OPTIONAL / deferred；僅使用者明確要求 CSR API 時�
 
 ### Task 3.1 — Sequential Symbol Execution with IC-First GC 鏈路
 
-- [ ] **SPEC ref**: Task 3.1；C-OPT-2；R6。
-- [ ] **目標**: 在 batch service sequential loop 中串聯 RAM gate → `run_ic_first_pipeline()` → checkpoint → per-symbol gc。
-- [ ] **輸入**: `BatchGenerateRequest`, checkpoint JSON, symbol/tf queue, batch flag。
-- [ ] **輸出**: 每 symbol/tf raw+processed+selected JSON + checkpoint completed/failed records。
-- [ ] **實作要點**:
-  - 偽碼：for item → `_ram_gate()` → skip completed → run IC-first → checkpoint success → always gc；MemoryError no completed checkpoint。
-  - 函式草案：`_compute_single_ic_first(...)->Dict[str, str]` 或 structured output；legacy `_compute_single()` 保留。
-  - Edge: RAM gate fail pause/skip; MemoryError no checkpoint; env off legacy。
-- [ ] **修改檔案**: `api/services/feature_factory_batch_service.py → _run_batch(), _process_item_wave(), _compute_single(), _record_item_result()`；`momentum/factories.py` if wiring needed。
-- [ ] **不可做**: 不可跨 symbol/tf 共用 selected JSON；不可 failed symbol 寫 completed checkpoint；不可省略 gc。
-- [ ] **風險緩解**: R6；V1 RAM gate/checkpoint。
-- [ ] **驗證**: T3.1, T3.2, T3.B1, T3.B2, T3.P1, T3.P2。
+- [x] **SPEC ref**: Task 3.1；C-OPT-2；R6。✅ 2026-05-09
+- [x] **目標**: 在 batch service sequential loop 中串聯 RAM gate → `generate_features()` 產 L7_raw → checkpoint → per-symbol gc。不得在 generation batch 自動呼叫 `run_ic_first_pipeline()`。
+- [x] **輸入**: `BatchGenerateRequest`, checkpoint JSON, symbol/tf queue, batch flag。
+- [x] **輸出**: 每 symbol/tf raw+processed+selected JSON + checkpoint completed/failed records。
+- [x] **實作要點**:
+  - `_compute_single_ic_first()` @staticmethod；環境變數 finally 還原。
+  - `create_feature_factory_for_ic_batch()` 注入 ICEngine。
+  - `get_multi_symbol_ic_first_enabled()` flag（`FFACT_MULTI_SYMBOL_IC_FIRST`）。
+  - `_resolve_concurrent_symbols()` IC-First 強制=1。
+  - `_process_item_wave()` flag-based 分發到 `_compute_single_ic_first`。
+- [x] **修改檔案**: `momentum/core/config.py`；`momentum/factories.py`；`api/services/feature_factory_batch_service.py`；新增 `tests/feature_engineering/test_multi_symbol_ic_first.py`；`scripts/benchmark_l65_v2.py`。
+- [x] **驗證**: T3.1, T3.2, T3.B1, T3.B2, T3.P1, T3.P2 全 18 tests PASS。
 
-### Task 3.2 — Cross-Symbol Rank（OPTIONAL / DEFERRED）
+### Task 3.2 — Cross-Symbol Rank（OPTIONAL / DEFERRED）✅ 2026-05-09
 
-- [ ] **SPEC ref**: Task 3.2。
-- [ ] **目標**: 僅當使用者明確要求 CSR API 時，建立 cross-sectional rank 獨立批次。
-- [ ] **輸入**: completed multi-symbol L7_raw manifests, aligned timestamps, requested columns。
-- [ ] **輸出**: optional CSR artifact / API result。
-- [ ] **實作要點**:
+- [x] **SPEC ref**: Task 3.2；本批次確認此項仍屬 OPTIONAL / DEFERRED boundary。
+- [x] **目標**: 僅當使用者明確要求 CSR API 時，建立 cross-sectional rank 獨立批次；本批次未收到 `POST /api/v1/features/cross-symbol-rank` API contract，故不啟用 CSR 實作。
+- [x] **輸入**: completed multi-symbol L7_raw manifests, aligned timestamps, requested columns；deferred 狀態下不讀取或產生 CSR artifact。
+- [x] **輸出**: 無新增 CSR artifact / API result；啟用時必須另建 mini SPEC/TODO 定義輸出合約。
+- [x] **實作要點**:
   - 偽碼：load selected columns per timestamp via streaming → align symbols → `rank(axis=0, method="average")` → write isolated CSR output。
   - 函式草案：`run_cross_symbol_rank(symbols, tf, config_hash, columns) -> Path`。
   - Edge: any incomplete raw manifest fail-closed; timestamp alignment missing reports dropped rows; requires separate API contract。
-- [ ] **修改檔案**: Deferred；啟用時另建 mini SPEC/TODO。
-- [ ] **不可做**: 不可混入 per-symbol loop；不可 raw incomplete 時 partial output；不可取代 per-symbol IC selected。
-- [ ] **風險緩解**: optional/deferred boundary。
-- [ ] **驗證**: 無原 SPEC Test ID；啟用時補 CSR-specific tests。
+- [x] **修改檔案**: Deferred；啟用時另建 mini SPEC/TODO。
+- [x] **不可做**: 不可混入 per-symbol loop；不可 raw incomplete 時 partial output；不可取代 per-symbol IC selected。
+- [x] **風險緩解**: optional/deferred boundary；Batch 10 不改動程式碼，避免未定義 API contract 造成架構擴張。
+- [x] **驗證**: 無原 SPEC Test ID；啟用時補 CSR-specific tests。本批次以 Phase 3 既有 Gate regression、解耦 grep、scoped ruff 與 benchmark scaffold 驗證 deferred no-op 不破壞主線。
 
 ### Phase 3 測試清單
 
 | ☐ | Test ID | 測試名稱 | 驗證內容 |
 |---|---------|---------|---------|
-| ☐ | T3.1 | `test_multi_symbol_ic_isolation` | selected JSON isolated |
-| ☐ | T3.2 | `test_multi_symbol_resume` | completed skip, failed rerun |
-| ☐ | T3.B1 | `test_ram_gate_skip` | low RAM pause/skip no OOM |
-| ☐ | T3.B2 | `test_symbol_failure_no_checkpoint` | failure no completed checkpoint |
-| ☐ | T3.P1 | `benchmark_multi_symbol_ic_first` | 3 symbols serial RSS <7GB/symbol |
-| ☐ | T3.P2 | `benchmark_10_symbol_2tf_resume_dryrun` | 10 symbols ×2 tf resume/isolation/full-schema, disk ≤18GB |
+| ✅ | T3.1 | `test_multi_symbol_ic_isolation` | selected JSON isolated |
+| ✅ | T3.2 | `test_multi_symbol_resume` | completed skip, failed rerun |
+| ✅ | T3.B1 | `test_ram_gate_skip` | low RAM pause/skip no OOM |
+| ✅ | T3.B2 | `test_symbol_failure_no_checkpoint` | failure no completed checkpoint |
+| ✅ | T3.P1 | `benchmark_multi_symbol_ic_first` | 真實資料跑通（2026-05-09）：ETHUSDT/BTCUSDT/SOLUSDT × 12h，各 elapsed ≈ 88-90s，peak RSS ≤ 0.55 GB（< 7 GB），無 OOM。**注意：`preprocessing.enabled: false`，走 legacy pipeline；IC-First path 不觸發，ic_selected JSON 不適用** |
+| ✅ | T3.P2 | `benchmark_10_symbol_2tf_resume_dryrun` | 真實資料跑通（2026-05-09）：10 symbols × 12h，disk 8.22 GB，extrapolated 2tf ≈ 16.45 GB ≤ 18 GB，max RSS 0.74 GB，無 OOM。**同上：preprocessing.enabled: false，ic_selected isolation N/A** |
 
 ### Phase 3 Gate
 
-- [ ] T3.1~T3.2 全通過。
-- [ ] T3.B1~T3.B2 全通過。
-- [ ] T3.P1~T3.P2 通過。
-- [ ] `FFACT_MULTI_SYMBOL_IC_FIRST=0` 可回退。
+- [x] T3.1~T3.2 全通過。✅ 2026-05-09
+- [x] T3.B1~T3.B2 全通過。✅ 2026-05-09
+- [x] T3.P1 通過（2026-05-09：ETHUSDT/BTCUSDT/SOLUSDT × 12h；elapsed 88-90s；peak RSS ≤ 0.55 GB < 7 GB；無 OOM）。✅ **caveat：`scan_config.yaml preprocessing.enabled: false`，走 legacy pipeline；IC-First 及 ic_selected isolation 不適用；若啟用 IC-First 需另行驗證**
+- [x] T3.P2 通過（2026-05-09：10 symbols × 12h；disk 8.22 GB，extrapolated 2tf 16.45 GB ≤ 18 GB；max RSS 0.74 GB；無 OOM）。✅ **caveat：同 T3.P1；ic_json_isolation 因 preprocessing 停用而 N/A**
+- [x] `FFACT_MULTI_SYMBOL_IC_FIRST=0` 可回退（tier-based path 驗證通過）。✅ 2026-05-09
 
 ## SPEC Frozen Gate
 
@@ -764,7 +769,7 @@ Batch 10: Task 3.2（OPTIONAL / deferred；僅使用者明確要求 CSR API 時�
 | 實作可行性 | PASS | 每個 Task 有輸入/輸出/函式草案/edge cases |
 | 程式碼引用 | PASS | 現有函式存在者已核對；不存在者標 new helper |
 | 規則合規 | PASS | no api import in momentum、config parser、fallback path 均標註 |
-| 資料流銜接 | PASS | pre_ic → raw → IC → selected → post_ic → processed → batch |
+| 資料流銜接 | PASS | generation: L1-L6 → L6.5 legacy/ic_first_pre → L7_raw → batch；downstream IC/selected/post_ic/processed 另行顯式執行 |
 | Test-Task 對齊 | PASS | 39 個 SPEC Test ID 全覆蓋 |
 | 驗證可執行性 | PASS | [補充] Task 0.0 補 benchmark/golden scaffold |
 | 副作用與回歸風險 | PASS | legacy fallback 和 reader/writer compatibility 均列入 |

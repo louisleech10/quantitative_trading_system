@@ -101,15 +101,19 @@ def test_fast_adf_nan_series_falls_back() -> None:
     assert np.isfinite(pvalue)
 
 
-def test_fast_adf_config_default_off(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fast_adf_config_default_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Default is now ON ("1") — Numba JIT ADF enabled out of the box
     monkeypatch.delenv("FFACT_USE_FAST_ADF", raising=False)
+    assert get_fast_adf_enabled() is True
+
+    monkeypatch.setenv("FFACT_USE_FAST_ADF", "0")
     assert get_fast_adf_enabled() is False
 
     monkeypatch.setenv("FFACT_USE_FAST_ADF", "1")
     assert get_fast_adf_enabled() is True
 
     monkeypatch.setenv("FFACT_USE_FAST_ADF", "invalid")
-    assert get_fast_adf_enabled() is False
+    assert get_fast_adf_enabled() is True
 
 
 def test_feature_preprocessor_uses_fast_adf_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:

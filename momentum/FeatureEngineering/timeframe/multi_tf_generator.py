@@ -218,23 +218,18 @@ class MultiTFGenerator:
 
         logger.info("[CGSA][multi_tf] All TFs done: %d total groups in registry", total_groups)
 
-        # L6.5 preprocessing via registry (per-group)
-        if self._config.preprocessing.enabled:
-            self._report_progress("preprocessing", 0.75, "[CGSA] Running Layer 6.5 per-group preprocessing")
-            self._factory._layer6_5_preprocessing(pd.DataFrame(), self._config)
-
-        # L7 validate + persist via registry
-        self._report_progress("persist", 0.9, "[CGSA] Running Layer 7 per-group validate and persist")
+        # L6.5 + L7_raw via registry streaming. This avoids full .npy overwrite
+        # before parquet persist and keeps IC Gatekeeper/post transforms downstream.
+        self._report_progress("persist", 0.9, "[CGSA] Running Layer 6.5 → L7_raw streaming persist")
         config_hash = self._factory._compute_config_hash(
             self._config, symbol, self._primary_tf,
             start_date=start_date, end_date=end_date,
         )
         elapsed = time.time() - start_time
-        result = self._factory._layer7_validate_and_persist(
+        result = self._factory._layer7_raw_from_cgsa_pipeline(
             symbol=symbol,
             timeframe=self._primary_tf,
             raw_data=primary_raw,
-            layers=[pd.DataFrame()],
             config=self._config,
             elapsed=elapsed,
             config_hash=config_hash,
@@ -468,23 +463,18 @@ class MultiTFGenerator:
 
         logger.info("[CGSA-parallel] All TFs done: %d total groups in registry", total_groups)
 
-        # L6.5 preprocessing via registry (per-group)
-        if self._config.preprocessing.enabled:
-            self._report_progress("preprocessing", 0.75, "[CGSA-parallel] Running Layer 6.5")
-            self._factory._layer6_5_preprocessing(pd.DataFrame(), self._config)
-
-        # L7 validate + persist
-        self._report_progress("persist", 0.9, "[CGSA-parallel] Running Layer 7")
+        # L6.5 + L7_raw via registry streaming. IC Gatekeeper and selected
+        # post-transforms remain downstream of generation.
+        self._report_progress("persist", 0.9, "[CGSA-parallel] Running Layer 6.5 → L7_raw streaming persist")
         config_hash = self._factory._compute_config_hash(
             self._config, symbol, self._primary_tf,
             start_date=start_date, end_date=end_date,
         )
         elapsed = time.time() - start_time
-        result = self._factory._layer7_validate_and_persist(
+        result = self._factory._layer7_raw_from_cgsa_pipeline(
             symbol=symbol,
             timeframe=self._primary_tf,
             raw_data=primary_raw,
-            layers=[pd.DataFrame()],
             config=self._config,
             elapsed=elapsed,
             config_hash=config_hash,

@@ -122,6 +122,20 @@ _L2_CATEGORY_WORKERS_BY_TIER: Dict[str, int] = {
     "32gb": 7,
 }
 
+# CGSA shard target bytes per shard (Phase B Phase 1).
+# Each L1-L6 group's float32 ndarray is sliced column-wise into shards of
+# ~target_bytes so that L6.5/L7 raw-sink can stream per-shard parts and
+# release source .npy bytes immediately. Smaller shard = lower in-flight peak
+# but more files / manifest overhead. Floor 32 MiB / cap 512 MiB enforced.
+_CGSA_SHARD_BYTES_BY_TIER: Dict[str, int] = {
+    "8gb": 96 * 1024 * 1024,    # ~300 MiB transform peak (3x in-RAM)
+    "16gb": 192 * 1024 * 1024,
+    "24gb": 256 * 1024 * 1024,
+    "32gb": 384 * 1024 * 1024,
+}
+_CGSA_SHARD_FLOOR_BYTES = 32 * 1024 * 1024
+_CGSA_SHARD_CAP_BYTES = 512 * 1024 * 1024
+
 _CONCURRENT_SYMBOLS_BY_TIER_GB: Dict[int, int] = {
     8: 1,
     16: 1,
@@ -164,6 +178,7 @@ def get_tier_config(tier: str) -> Dict[str, Any]:
         "l3_streaming_buffer_cols": _L3_STREAMING_BUFFER_COLS_BY_TIER.get(tier, _L3_STREAMING_BUFFER_COLS_BY_TIER["8gb"]),
         "l65_split_threshold": _L65_SPLIT_THRESHOLD_BY_TIER.get(tier, _L65_SPLIT_THRESHOLD_BY_TIER["8gb"]),
         "l2_category_workers": _L2_CATEGORY_WORKERS_BY_TIER.get(tier, _L2_CATEGORY_WORKERS_BY_TIER["8gb"]),
+        "cgsa_shard_bytes": _CGSA_SHARD_BYTES_BY_TIER.get(tier, _CGSA_SHARD_BYTES_BY_TIER["8gb"]),
         "concurrent_symbols": get_tier_concurrent_symbols(tier_gb),
     }
 
@@ -241,3 +256,67 @@ def get_l2_category_workers() -> int:
         except ValueError:
             pass
     return get_tier_config(get_memory_tier())["l2_category_workers"]
+
+
+def _parse_size_bytes(raw: str) -> Optional[int]:
+    """Parse a size string like ``96MiB``/``128MB``/``100000000`` into bytes.
+
+    Returns None for invalid input. Accepted units (case-insensitive):
+    KiB/MiB/GiB (1024-base) and KB/MB/GB (1000-base). Bare digits = bytes.
+    """
+    text = raw.strip().lower()
+    if not text:
+        return None
+    units = (
+        ("gib", 1024 ** 3), ("mib", 1024 ** 2), ("kib", 1024),
+        ("gb", 1000 ** 3), ("mb", 1000 ** 2), ("kb", 1000),
+        ("b", 1),
+    )
+    for suffix, mult in units:
+        if text.endswith(suffix):
+            head = text[: -len(suffix)].strip()
+            try:
+                return int(float(head) * mult)
+            except (ValueError, TypeError):
+                return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def get_cgsa_shard_bytes() -> int:
+    """Resolve CGSA per-shard target bytes: env override > tier auto-detect.
+
+    Env: ``FFACT_CGSA_SHARD_BYTES`` (e.g. ``96MiB``, ``134217728``, ``auto``).
+    Result is clamped to [floor, cap] to avoid pathological file count or
+    memory peaks. Invalid env values fall back to tier default with a warning.
+    """
+    import logging
+    raw = os.getenv("FFACT_CGSA_SHARD_BYTES", "auto").strip().lower()
+    if raw not in {"", "auto"}:
+        parsed = _parse_size_bytes(raw)
+        if parsed is not None and parsed > 0:
+            return max(_CGSA_SHARD_FLOOR_BYTES, min(_CGSA_SHARD_CAP_BYTES, parsed))
+        logging.getLogger(__name__).warning(
+            "[hardware] Invalid FFACT_CGSA_SHARD_BYTES=%r; falling back to tier default",
+            raw,
+        )
+    tier_value = get_tier_config(get_memory_tier())["cgsa_shard_bytes"]
+    return max(_CGSA_SHARD_FLOOR_BYTES, min(_CGSA_SHARD_CAP_BYTES, int(tier_value)))
+
+
+def get_cgsa_per_layer_pipeline_enabled() -> bool:
+    """Phase B Phase 2 master switch — default OFF.
+
+    When ON, FeatureFactory will (in a future release) flush each L1-L6 layer
+    output through the raw-sink before starting the next layer, capping
+    cgsa_work peak bytes to ``max(single_layer_output)`` instead of
+    ``sum(L1..L6 outputs)``. Requires:
+      1. Cross-layer dependency audit (``Tier A`` — fully closed) at startup.
+      2. Golden-output regression gate (Phase 2 vs Phase 1 per-cell allclose).
+    Until both gates land, env=1 is accepted but the factory logs a warning
+    and stays on Phase 1 behavior to preserve data correctness.
+    """
+    raw = os.getenv("FFACT_CGSA_PIPELINE_PER_LAYER", "0").strip().lower()
+    return raw in {"1", "true", "on", "yes"}

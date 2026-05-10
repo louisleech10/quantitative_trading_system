@@ -264,6 +264,33 @@ export function useICAnalysis() {
     [setReport]
   );
 
+  const applyTransforms = useCallback(
+    async (
+      taskId: string,
+      payload: {
+        selected_features: string[];
+        rank: boolean;
+        zscore: boolean;
+        gaussian: boolean;
+        rank_window?: number;
+        zscore_windows?: number[];
+      }
+    ) => {
+      return requestJson<{
+        task_id: string;
+        selected_feature_count: number;
+        transforms_applied: string[];
+        output_path: string;
+        output_rows: number;
+        output_cols: number;
+      }>(`/apply-transforms/${taskId}`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     return () => {
       if (reconnectTimerRef.current) {
@@ -284,6 +311,7 @@ export function useICAnalysis() {
     startDeepAnalysis,
     fetchDeepAnalysisResult,
     refilter,
+    applyTransforms,
     connectProgress,
   };
 }

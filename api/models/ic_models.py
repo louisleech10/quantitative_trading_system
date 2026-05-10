@@ -137,3 +137,25 @@ class FeatureListItem(BaseModel):
 class FeatureListResponse(BaseModel):
     total: int
     features: List[FeatureListItem]
+
+
+class ApplyTransformsRequest(BaseModel):
+    """Request body for POST /api/v1/ic/{task_id}/apply-transforms."""
+
+    selected_features: List[str] = Field(..., description="IC 篩選後的特徵名稱清單")
+    rank: bool = Field(default=True, description="套用 Rank Transform")
+    zscore: bool = Field(default=True, description="套用 Adaptive Z-Score")
+    gaussian: bool = Field(default=False, description="套用 Gaussian Normalize（在 rank/zscore 之後執行）")
+    rank_window: int = Field(default=252, ge=2, description="Rank Transform 滾動窗口（天）")
+    zscore_windows: List[int] = Field(default_factory=lambda: [100, 252], description="Adaptive Z-Score 窗口清單")
+
+
+class ApplyTransformsResponse(BaseModel):
+    """Response for apply-transforms endpoint."""
+
+    task_id: str
+    selected_feature_count: int
+    transforms_applied: List[str]
+    output_path: str
+    output_rows: int
+    output_cols: int

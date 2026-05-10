@@ -49,6 +49,34 @@ def get_ic_first_pipeline_enabled() -> bool:
     return False
 
 
+def get_l7_codec_upgrade_enabled() -> bool:
+    raw = os.getenv("FFACT_L7_CODEC_UPGRADE", "0").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"", "0", "false", "no", "off"}:
+        return False
+
+    logger.warning(
+        "Invalid FFACT_L7_CODEC_UPGRADE=%s, fallback to disabled legacy codec",
+        raw,
+    )
+    return False
+
+
+def get_multi_symbol_ic_first_enabled() -> bool:
+    raw = os.getenv("FFACT_MULTI_SYMBOL_IC_FIRST", "0").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"", "0", "false", "no", "off"}:
+        return False
+
+    logger.warning(
+        "Invalid FFACT_MULTI_SYMBOL_IC_FIRST=%s, fallback to disabled multi-symbol IC-First",
+        raw,
+    )
+    return False
+
+
 def _parse_fracdiff_layers(raw: str) -> Optional[FrozenSet[str]]:
     tokens = [token.strip().upper() for token in raw.split(",") if token.strip()]
     if not tokens:
@@ -168,33 +196,64 @@ def get_batch_nested_enabled() -> bool:
 
 
 def get_slowpath_parallel_enabled() -> bool:
-    """Return whether L6.5 joblib slow-path parallelism is explicitly enabled."""
+    """Return whether L6.5 joblib slow-path parallelism is enabled.
 
-    raw = os.getenv("FFACT_L65_SLOWPATH_PARALLEL", "0").strip().lower()
-    if raw in {"1", "true", "yes", "on"}:
-        return True
-    if raw in {"", "0", "false", "no", "off"}:
+    Priority:
+    1. If ``FFACT_L65_SLOWPATH_PARALLEL`` is explicitly set, honour it.
+    2. Otherwise auto-detect from hardware tier:
+       - Physical RAM ≥ 12 GB  (maps to ≥ 16 GB tier) → **ON**
+       - Physical RAM <  12 GB (maps to   8 GB tier)   → **OFF**  ← OOM guard
+       Mirrors ``TIER_THRESHOLDS`` in ``hardware_utils.py``.
+    """
+    raw = os.environ.get("FFACT_L65_SLOWPATH_PARALLEL")
+    if raw is not None:
+        raw = raw.strip().lower()
+        if raw in {"1", "true", "yes", "on"}:
+            return True
+        if raw in {"", "0", "false", "no", "off"}:
+            return False
+        logger.warning(
+            "Invalid FFACT_L65_SLOWPATH_PARALLEL=%s, falling back to auto-detect",
+            raw,
+        )
+
+    # Auto-detect: query physical RAM via psutil (lazy import to avoid circular dep).
+    # Threshold 12 GB matches TIER_THRESHOLDS: total ≥ 12 → "16gb", else "8gb".
+    try:
+        import psutil as _psutil_cfg  # noqa: PLC0415
+        total_gb = _psutil_cfg.virtual_memory().total / 1024 ** 3
+        if total_gb >= 12.0:
+            logger.debug(
+                "FFACT_L65_SLOWPATH_PARALLEL auto=ON  (%.1f GB physical RAM ≥ 12 GB tier threshold)",
+                total_gb,
+            )
+            return True
+        logger.debug(
+            "FFACT_L65_SLOWPATH_PARALLEL auto=OFF (%.1f GB physical RAM < 12 GB, 8 GB tier OOM guard)",
+            total_gb,
+        )
         return False
-    logger.warning(
-        "Invalid FFACT_L65_SLOWPATH_PARALLEL=%s, fallback to disabled",
-        raw,
-    )
-    return False
+    except Exception:
+        # psutil unavailable or query failed → conservative default: OFF
+        return False
 
 
 def get_fast_adf_enabled() -> bool:
-    """Return whether Phase 2 Fast ADF is explicitly enabled."""
+    """Return whether Phase 2 Fast ADF (Numba JIT) is enabled. Default ON.
 
-    raw = os.getenv("FFACT_USE_FAST_ADF", "0").strip().lower()
+    Disable with FFACT_USE_FAST_ADF=0 to force statsmodels ADF.
+    """
+
+    raw = os.getenv("FFACT_USE_FAST_ADF", "1").strip().lower()
     if raw in {"1", "true", "yes", "on"}:
         return True
     if raw in {"", "0", "false", "no", "off"}:
         return False
     logger.warning(
-        "Invalid FFACT_USE_FAST_ADF=%s, fallback to disabled",
+        "Invalid FFACT_USE_FAST_ADF=%s, fallback to enabled",
         raw,
     )
-    return False
+    return True
 
 
 def get_slowpath_n_jobs(tier_gb: int) -> int:

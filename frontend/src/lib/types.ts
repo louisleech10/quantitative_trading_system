@@ -258,6 +258,8 @@ export interface FeatureFactoryConfig {
       clip_range?: [number, number] | number[];
       apply_to?: string | string[];
     };
+    /** IC-First 兩段式路由：winsor 全特徵 → IC 選特徵 → rank/zscore 只做選出特徵 */
+    ic_first_pipeline?: boolean;
     adaptive_zscore?: {
       enabled?: boolean;
       windows?: number[];

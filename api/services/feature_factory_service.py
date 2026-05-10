@@ -2294,9 +2294,11 @@ class FeatureFactoryService:
     def _load_cgsa_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
         """Materialize a features DataFrame from a CGSA manifest.
 
-        Supports two manifest formats:
-        * V7 (version=="7.0", groups is dict): each entry has ``file`` (relative
-          parquet filename) and ``columns``. Created by feature_storage.py.
+        Supports three manifest formats:
+        * V7 / raw_v1 (version=="7.0" or "l7_v2", groups is dict): each entry has
+          ``path`` (relative path including subdirectory, e.g. ``raw/file.parquet``)
+          and ``columns``. Created by feature_storage.py. ``path`` is preferred
+          over ``file`` to correctly resolve artifacts inside ``raw/`` / ``processed/``.
         * CGSA registry (version==None, groups is list): each entry has
           ``parquet_path`` (absolute) and ``columns``. Created by
           cgsa_registry.save_state(). Used as fallback when V7 manifest is not
@@ -2313,9 +2315,12 @@ class FeatureFactoryService:
         frames: List[pd.DataFrame] = []
 
         if isinstance(groups_raw, dict):
-            # V7 format: {group_id: {"file": "...", "columns": [...]}}
+            # V7 / raw_v1 format: {group_id: {"path": "subdir/file.parquet", "file": "file.parquet", "columns": [...]}}
+            # Prefer "path" (relative to manifest_dir, includes subdirectory prefix) over
+            # "file" (bare filename) so that artifacts inside raw/ or processed/ are
+            # resolved correctly.
             for _group_id, group_meta in groups_raw.items():
-                relative = group_meta.get("file")
+                relative = group_meta.get("path") or group_meta.get("file")
                 if not relative or manifest_dir is None:
                     continue
                 parquet_path = manifest_dir / relative
@@ -2388,7 +2393,7 @@ class FeatureFactoryService:
             for _gid, meta in groups_raw.items():
                 if not isinstance(meta, dict):
                     continue
-                relative = meta.get("file")
+                relative = meta.get("path") or meta.get("file")
                 if not relative or manifest_dir is None:
                     continue
                 path = manifest_dir / relative

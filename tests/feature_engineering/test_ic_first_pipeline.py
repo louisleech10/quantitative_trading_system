@@ -29,10 +29,11 @@ def _make_factory() -> FeatureFactory:
     return factory
 
 
-def _make_config() -> Any:
+def _make_config(*, ic_first_pipeline: bool = False) -> Any:
     preprocessing = PreprocessingConfig(
         enabled=True,
         mode="replace",
+        ic_first_pipeline=ic_first_pipeline,
         winsorization={
             "enabled": True,
             "method": "quantile",
@@ -174,6 +175,31 @@ def test_routing(monkeypatch) -> None:
     assert list(post_ic.columns) == selected_features
     assert post_ic.index.equals(frame.index)
     assert "beta" not in post_ic.columns
+
+
+def test_config_flag_routes_to_pre_ic_without_env(monkeypatch) -> None:
+    monkeypatch.delenv("FFACT_IC_FIRST_PIPELINE", raising=False)
+    monkeypatch.setenv("FFACT_USE_POLARS", "0")
+    factory = _make_factory()
+    config = _make_config(ic_first_pipeline=True)
+    frame = pd.DataFrame(
+        {
+            "alpha": [1.0, 2.0, 3.0, 100.0, 5.0],
+            "beta": [10.0, 9.0, 8.0, 7.0, 6.0],
+            "gamma": [5.0, 5.0, 5.0, 5.0, 5.0],
+        }
+    )
+
+    pre_ic = factory._layer6_5_preprocessing(frame, config)
+    expected_pre_ic = _expected_pre_ic(frame, config)
+    _assert_frame_allclose(pre_ic, expected_pre_ic)
+
+    legacy = factory._layer6_5_legacy(frame, config)
+    assert not np.allclose(
+        pre_ic.to_numpy(dtype=np.float32),
+        legacy.to_numpy(dtype=np.float32),
+        equal_nan=True,
+    )
 
 
 def test_ic_first_legacy_fallback(monkeypatch) -> None:

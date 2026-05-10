@@ -12,6 +12,7 @@ import hashlib
 import json
 import time
 import threading
+import psutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
@@ -57,6 +58,7 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import Featu
 
 
 logger = get_logger(__name__)
+_PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 
 # ── Pathological-input warnings: surface once, then stay quiet ──────────
 # These two warnings come from real input pathologies (not bugs) and were
@@ -281,22 +283,37 @@ class FeatureFactory:
         layer6 = self._safe_execute("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
 
         layers = [layer1, layer2, layer3, layer4, layer5, layer6]
-        if config.preprocessing.enabled and get_ic_first_pipeline_enabled():
-            return self.run_ic_first_pipeline(
-                symbol,
-                timeframe,
-                config,
+        if self._cgsa_enabled() and self._cgsa_registry is not None:
+            self._persist_single_tf_l3_l6_to_cgsa(layer3, layer4, layer5, layer6)
+            return self._layer7_raw_from_cgsa_pipeline(
+                symbol=symbol,
+                timeframe=timeframe,
                 raw_data=raw_data,
-                layers=layers,
+                config=config,
+                elapsed=time.time() - start_time,
                 config_hash=config_hash,
                 compute_warnings=compute_warnings,
-                start_time=start_time,
                 persist=persist,
             )
 
+        _ic_first_on = self._ic_first_enabled(config)
         if config.preprocessing.enabled:
             all_features = self._combine_layers(layers, context="layer6_5_input")
-            preprocessed = self._safe_execute("Layer 6.5", self._layer6_5_preprocessing, all_features, config)
+            if _ic_first_on:
+                # IC-First: only run winsorization + fracdiff/ADF at generation time.
+                # Rank / Z-Score / Gaussian are intentionally skipped here; they will be
+                # optional downstream transforms after L7_raw is produced.
+                logger.info(
+                    "[IC-First] Generation mode: skipping rank/zscore/gaussian. "
+                    "IC Gatekeeper and selected transforms are downstream actions after L7_raw."
+                )
+                preprocessed = self._safe_execute(
+                    "Layer 6.5 (IC-First)", self._layer6_5_pre_ic, all_features, config
+                )
+            else:
+                preprocessed = self._safe_execute(
+                    "Layer 6.5", self._layer6_5_legacy, all_features, config
+                )
             if not preprocessed.empty:
                 layers = [preprocessed]
 
@@ -365,6 +382,7 @@ class FeatureFactory:
         """Execute a layer safely; return empty DataFrame on failure."""
         try:
             self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
+            logger.info("%s starting, rss=%dMB", layer_name, _PROC.memory_info().rss >> 20)
             result = func(*args)
             if result is None:
                 result = pd.DataFrame()
@@ -385,6 +403,7 @@ class FeatureFactory:
                 1.0,
                 f"{layer_name} completed: {result.shape[1]} features",
             )
+            logger.info("%s done: %d cols, rss=%dMB", layer_name, result.shape[1], _PROC.memory_info().rss >> 20)
             return result
         except Exception as exc:
             logger.error("%s failed: %s", layer_name, exc, exc_info=True)
@@ -705,6 +724,7 @@ class FeatureFactory:
                 dtype="float32",
             )
             self._cgsa_registry.save_data(group, data)
+            self._log_persisted_group_shards(group_id, "L1")
 
     def _persist_layer2_category_group(self, category: str, frame: pd.DataFrame) -> None:
         if self._cgsa_registry is None or frame is None or frame.empty:
@@ -726,6 +746,7 @@ class FeatureFactory:
             dtype="float32",
         )
         self._cgsa_registry.save_data(group, data)
+        self._log_persisted_group_shards(group_id, "L2")
 
     def _persist_layer_output_groups(
         self,
@@ -768,10 +789,35 @@ class FeatureFactory:
                 dtype="float32",
             )
             self._cgsa_registry.save_data(group, data)
+            self._log_persisted_group_shards(group_id, label)
 
         logger.info(
             "[CGSA] Persisted %s: %d cols → %d groups (tf=%s)",
             label, n_cols, chunk_idx, self._current_timeframe,
+        )
+
+    def _log_persisted_group_shards(self, group_id: str, label: str) -> None:
+        """Emit one INFO line per persisted group showing shard layout.
+
+        For single-shard small groups this is a no-op (only sharded groups
+        with >1 shards or large total bytes are logged).
+        """
+        if self._cgsa_registry is None:
+            return
+        try:
+            group = self._cgsa_registry.get(group_id)
+        except Exception:
+            return
+        n_shards = len(getattr(group, "shards", ()) or ())
+        total_bytes = int(getattr(group, "total_shard_bytes", 0) or 0)
+        if n_shards <= 1 and total_bytes < (64 << 20):
+            return
+        logger.info(
+            "[CGSA] %s persisted group=%s shards=%d total_bytes=%.1f MiB",
+            label,
+            group_id,
+            max(n_shards, 1),
+            total_bytes / (1024 * 1024),
         )
 
     @staticmethod
@@ -1597,12 +1643,18 @@ class FeatureFactory:
         selected_features: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Layer 6.5: Feature preprocessing and normalization."""
-        if get_ic_first_pipeline_enabled():
+        if self._ic_first_enabled(config):
             if selected_features is None:
                 return self._layer6_5_pre_ic(all_features, config)
             return self._layer6_5_post_ic(all_features, config, selected_features)
 
         return self._layer6_5_legacy(all_features, config)
+
+    @staticmethod
+    def _ic_first_enabled(config: "FactoryConfig") -> bool:
+        preprocessing = getattr(config, "preprocessing", None)
+        config_enabled = bool(getattr(preprocessing, "ic_first_pipeline", False))
+        return config_enabled or get_ic_first_pipeline_enabled()
 
     def _layer6_5_legacy(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
         """Legacy Layer 6.5 path: apply preprocessing config to all features."""
@@ -1610,14 +1662,49 @@ class FeatureFactory:
         return self._run_layer6_5_preprocessor(all_features, config, preprocessing_config)
 
     def _layer6_5_pre_ic(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
-        """Pre-IC path: winsorization and FracDiff only."""
+        """Pre-IC path: winsorization plus FracDiff/ADF only."""
         preprocessing_config = self._preprocessing_config_dict(config)
         self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", False)
         self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", False)
         self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "adf_differencing", False)
-        logger.info("[IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff only")
+        logger.info("[IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only")
         return self._run_layer6_5_preprocessor(all_features, config, preprocessing_config)
+
+    def _build_l7_raw_preprocessing_config(self, config: "FactoryConfig") -> Dict[str, Any]:
+        """Return the L6.5 config used by generation before writing L7_raw."""
+        preprocessing_config = self._preprocessing_config_dict(config)
+        if self._ic_first_enabled(config):
+            self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", False)
+            self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", False)
+            self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
+        return preprocessing_config
+
+    def _resolve_l65_generation_mode(self, config: "FactoryConfig") -> str:
+        # Phase B Phase 1 Step 36: strict three-way Mode A/B/C dispatch.
+        # Modes:
+        #   - "none"         (Mode C, L6.5 disabled passthrough)
+        #   - "ic_first_pre" (Mode B, IC-First: Winsor + FracDiff/ADF only)
+        #   - "legacy"       (Mode A, full L6.5 incl. Rank/ZScore/Gaussian)
+        # Any combination that cannot be unambiguously resolved must raise
+        # rather than silently default. Callers downstream rely on this exact
+        # set of three values for cache invalidation and routing decisions.
+        preprocessing = getattr(config, "preprocessing", None)
+        if preprocessing is None:
+            raise ValueError(
+                "FactoryConfig.preprocessing is missing; cannot dispatch L6.5 mode "
+                "(expected explicit Mode A/B/C selection)."
+            )
+        enabled_attr = getattr(preprocessing, "enabled", None)
+        if enabled_attr is None:
+            raise ValueError(
+                "FactoryConfig.preprocessing.enabled is missing; cannot dispatch "
+                "L6.5 mode (expected bool)."
+            )
+        if not bool(enabled_attr):
+            return "none"
+        if self._ic_first_enabled(config):
+            return "ic_first_pre"
+        return "legacy"
 
     def _layer6_5_post_ic(
         self,
@@ -1655,9 +1742,13 @@ class FeatureFactory:
         self._set_preprocessing_step_enabled(preprocessing_config, "winsorization", False)
         self._set_preprocessing_step_enabled(preprocessing_config, "fractional_differencing", False)
         self._set_preprocessing_step_enabled(preprocessing_config, "adf_differencing", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", True, selected_columns)
-        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", True, selected_columns)
-        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", True, selected_columns)
+        # 尊重使用者在 config 中的開關設定，而不是強制全開
+        _rank_on = preprocessing_config.get("rank_transform", {}).get("enabled", True)
+        _zscore_on = preprocessing_config.get("adaptive_zscore", {}).get("enabled", True)
+        _gaussian_on = preprocessing_config.get("gaussian_normalize", {}).get("enabled", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", _rank_on, selected_columns if _rank_on else None)
+        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", _zscore_on, selected_columns if _zscore_on else None)
+        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", _gaussian_on, selected_columns if _gaussian_on else None)
         logger.info(
             "[IC-First] Layer 6.5 post_ic enabled: transforming %d selected features",
             len(selected_columns),
@@ -1918,6 +2009,205 @@ class FeatureFactory:
             "groups_with_inf": len(groups_with_inf),
             "warnings": warnings,
         }
+
+    def _persist_single_tf_l3_l6_to_cgsa(
+        self,
+        layer3: pd.DataFrame,
+        layer4: pd.DataFrame,
+        layer5: pd.DataFrame,
+        layer6: pd.DataFrame,
+    ) -> None:
+        """Persist single-TF L3-L6 outputs before CGSA L6.5/L7_raw streaming."""
+        if self._cgsa_registry is None:
+            return
+        if layer3 is not None and not layer3.empty:
+            self._persist_layer_output_groups(layer3, LayerSource.L3, "L3_rolling")
+        if layer4 is not None and not layer4.empty:
+            self._persist_layer_output_groups(layer4, LayerSource.L4, "L4_lag")
+        if layer5 is not None and not layer5.empty:
+            self._persist_layer_output_groups(layer5, LayerSource.L5, "L5_cross")
+        if layer6 is not None and not layer6.empty:
+            self._persist_layer_output_groups(layer6, LayerSource.L6, "L6_meta")
+
+    def _layer7_raw_from_cgsa_pipeline(
+        self,
+        symbol: str,
+        timeframe: str,
+        raw_data: pd.DataFrame,
+        config: "FactoryConfig",
+        elapsed: float,
+        config_hash: str,
+        compute_warnings: Optional[List[str]] = None,
+        persist: bool = True,
+    ) -> FeatureGenerationResult:
+        """CGSA generation path: L1-L6 → L6.5 mode → canonical L7_raw."""
+        if self._cgsa_registry is None:
+            raise ValueError("CGSA L7_raw requested without initialized registry")
+
+        self._cgsa_registry.finalize()
+        labels_df = pd.DataFrame(index=raw_data.index)
+        if "close" in raw_data.columns:
+            label_generator = LabelGenerator(config.labels.model_dump())
+            labels_df = label_generator.generate_all(raw_data["close"])
+
+        config_payload = config.model_dump(by_alias=True)
+        training_tfs = config_payload.get("timeframes", {}).get("training", [])
+        if not isinstance(training_tfs, list):
+            training_tfs = [timeframe]
+
+        l65_mode = self._resolve_l65_generation_mode(config)
+        layer_counts_before = self._collect_cgsa_layer_counts(self._cgsa_registry)
+        stream_summary: Dict[str, Any] = {
+            "raw_path": "",
+            "manifest_path": str(self._cgsa_registry.manifest_path),
+            "feature_count": int(self._cgsa_registry.total_columns()),
+            "row_count": int(len(raw_data.index)),
+            "group_count": len(list(self._cgsa_registry.iter_all())),
+            "validation": self._scan_cgsa_registry_validation(self._cgsa_registry),
+            "l65_mode": l65_mode,
+        }
+
+        if persist:
+            preprocessor = None
+            if getattr(config.preprocessing, "enabled", False):
+                preprocessing_config = self._build_l7_raw_preprocessing_config(config)
+                context = self._build_preprocessing_context(raw_data, config)
+                preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
+
+            from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
+
+            tier = get_memory_tier()
+            tier_cfg = get_tier_config(tier)
+            n_workers = self._parse_positive_int_env(
+                "FFACT_L65_WORKERS",
+                int(tier_cfg["l65_workers"]),
+            )
+            raw_path, stream_summary = self._storage.write_raw_from_registry_stream(
+                symbol=symbol,
+                tf=timeframe,
+                config_hash=config_hash,
+                registry=self._cgsa_registry,
+                preprocessor=preprocessor,
+                n_workers=n_workers,
+                cleanup_intermediate=True,
+                l65_mode=l65_mode,
+                time_range=self._manifest_time_range_from_raw_data(raw_data),
+                extra_metadata={
+                    "preprocessing_enabled": bool(getattr(config.preprocessing, "enabled", False)),
+                    "rank_enabled": self._preprocessing_step_enabled(config.preprocessing, "rank_transform"),
+                    "zscore_enabled": self._preprocessing_step_enabled(config.preprocessing, "adaptive_zscore"),
+                    "gaussian_enabled": self._preprocessing_step_enabled(config.preprocessing, "gaussian_normalize"),
+                    "fracdiff_enabled": self._preprocessing_step_enabled(config.preprocessing, "fractional_differencing"),
+                    "adf_enabled": self._preprocessing_step_enabled(config.preprocessing, "adf_differencing"),
+                    "source_registry_manifest": str(self._cgsa_registry.manifest_path),
+                },
+            )
+            stream_summary["raw_path"] = str(raw_path)
+
+        self._cgsa_registry.save_state(
+            symbol=symbol,
+            primary_tf=timeframe,
+            training_tfs=training_tfs,
+            config_hash=config_hash,
+            config_snapshot=config_payload,
+        )
+
+        validation_summary = stream_summary.get("validation", {})
+        merged_warnings = (compute_warnings or []) + list(validation_summary.get("warnings", []))
+        feature_count = int(stream_summary.get("feature_count", self._cgsa_registry.total_columns()))
+        layer_counts = dict(layer_counts_before)
+        layer_counts["layer6_5"] = max(0, feature_count - sum(
+            int(layer_counts.get(key, 0))
+            for key in ("layer1", "layer2", "layer3", "layer4", "layer5", "layer6")
+        ))
+
+        manifest_path = str(stream_summary.get("manifest_path") or self._cgsa_registry.manifest_path)
+        raw_path_value = str(stream_summary.get("raw_path") or "")
+        metadata = {
+            "feature_names": [],
+            "feature_count": feature_count,
+            "layer_counts": layer_counts,
+            "config_hash": config_hash,
+            "generation_time": float(elapsed),
+            "compute_warnings": merged_warnings,
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "data_range": self._data_range(raw_data),
+            "config_used": config_payload,
+            "artifact_kind": "raw",
+            "schema_version": FeatureStorage.L7_RAW_SCHEMA_VERSION,
+            "l65_mode": l65_mode,
+            "manifest_path": manifest_path,
+            "raw_path": raw_path_value,
+            "npy_freed_bytes": int(stream_summary.get("npy_freed_bytes", 0)),
+            "storage_dtype": stream_summary.get("storage_dtype"),
+            "dtype_summary": stream_summary.get("dtype_summary"),
+            "validation": {
+                "has_nan": bool(validation_summary.get("has_nan", False)),
+                "has_inf": bool(validation_summary.get("has_inf", False)),
+                "max_correlation": 0.0,
+                "high_correlation_pairs": [],
+                "warnings": list(validation_summary.get("warnings", [])),
+                "coverage": float(validation_summary.get("coverage", 0.0)),
+                "inf_count": int(validation_summary.get("inf_count", 0)),
+                "inf_ratio": float(validation_summary.get("inf_ratio", 0.0)),
+                "groups_with_inf": int(validation_summary.get("groups_with_inf", 0)),
+                "constant_features_removed": [],
+            },
+        }
+
+        result = FeatureGenerationResult(
+            features_df=pd.DataFrame(index=raw_data.index),
+            labels_df=labels_df,
+            metadata=metadata,
+            feature_count=feature_count,
+            generation_time=float(elapsed),
+            layer_counts=layer_counts,
+            config_used=config_payload,
+            compute_warnings=merged_warnings,
+            hdf5_path=manifest_path if persist else "",
+        )
+
+        try:
+            self._registry.add(
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "feature_count": result.feature_count,
+                    "row_count": len(raw_data.index),
+                    "hdf5_relative_path": result.hdf5_path,
+                }
+            )
+        except Exception as exc:
+            logger.warning("Failed to update feature registry: %s", exc)
+
+        return result
+
+    @classmethod
+    def _manifest_time_range_from_raw_data(cls, raw_data: pd.DataFrame) -> Dict[str, Optional[str]]:
+        if raw_data is None or raw_data.empty:
+            return {"start": None, "end": None}
+        index = raw_data.index
+        return {
+            "start": cls._format_manifest_value(index[0]),
+            "end": cls._format_manifest_value(index[-1]),
+        }
+
+    @staticmethod
+    def _preprocessing_step_enabled(preprocessing: Any, step_name: str) -> bool:
+        step_config = getattr(preprocessing, step_name, None)
+        if isinstance(step_config, dict):
+            return bool(step_config.get("enabled", False))
+        return bool(getattr(step_config, "enabled", False))
+
+    @staticmethod
+    def _format_manifest_value(value: Any) -> str:
+        if hasattr(value, "isoformat"):
+            return str(value.isoformat())
+        if isinstance(value, np.generic):
+            return str(value.item())
+        return str(value)
 
     def _layer7_validate_and_persist_cgsa(
         self,

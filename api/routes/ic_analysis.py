@@ -16,6 +16,8 @@ from api.models.ic_models import (
     FeatureListItem,
     FeatureListResponse,
     ICAnalyzeRequest,
+    ApplyTransformsRequest,
+    ApplyTransformsResponse,
     ICAnalyzeResponse,
     ICFullAnalysisRequest,
     ICTaskStatusResponse,
@@ -391,6 +393,36 @@ async def export_filtered_csv(task_id: str):
         raise
     except Exception as exc:
         logger.error("Failed to export CSV: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/apply-transforms/{task_id}", response_model=ApplyTransformsResponse)
+async def apply_transforms(task_id: str, request: ApplyTransformsRequest):
+    """Apply L6.5 post-processing (rank/zscore/gaussian) to IC-selected features.
+
+    Designed for the IC-First workflow:
+      1. Feature Factory (IC-First mode) generates L1-L7 with winsor+fracdiff only.
+      2. IC Gatekeeper filters to the best features.
+      3. Call this endpoint to apply rank/zscore/gaussian to those features.
+
+    Transform order is always: rank → zscore → gaussian.
+    """
+    try:
+        result = await ic_analysis_service.apply_transforms(
+            task_id=task_id,
+            selected_features=request.selected_features,
+            rank=request.rank,
+            zscore=request.zscore,
+            gaussian=request.gaussian,
+            rank_window=request.rank_window,
+            zscore_windows=request.zscore_windows,
+        )
+        return ApplyTransformsResponse(**result)
+    except (FileNotFoundError, ValueError) as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=status_code, detail=str(exc))
+    except Exception as exc:
+        logger.error("apply-transforms failed for task %s: %s", task_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

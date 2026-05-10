@@ -28,6 +28,7 @@ from momentum.core.config import (
     MomentumConfig,
     batch_nested_environment,
     get_batch_nested_enabled,
+    get_multi_symbol_ic_first_enabled,
 )
 
 
@@ -349,12 +350,17 @@ class FeatureFactoryBatchService:
                 return item, None, exc
 
         wrapped_futures = []
+        compute_fn = (
+            self._compute_single_ic_first
+            if get_multi_symbol_ic_first_enabled()
+            else self._compute_single
+        )
         with batch_nested_environment(True):
             with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
                 for item in item_wave:
                     future = loop.run_in_executor(
                         executor,
-                        self._compute_single,
+                        compute_fn,
                         str(item["symbol"]),
                         str(item["timeframe"]),
                         request.config_override,
@@ -475,6 +481,14 @@ class FeatureFactoryBatchService:
 
     def _resolve_concurrent_symbols(self) -> int:
         """Resolve concurrent symbol count from tier table and nested guard."""
+
+        # IC-First pipeline 記憶體使用量顯著高於標準路徑；強制序列執行避免 OOM
+        if get_multi_symbol_ic_first_enabled():
+            logger.info(
+                "[L65] FFACT_MULTI_SYMBOL_IC_FIRST detected; forcing concurrent_symbols=1 "
+                "to prevent OOM on IC-First pipeline"
+            )
+            return 1
 
         tier_gb = get_current_tier_gb()
         concurrent_symbols = max(1, get_tier_concurrent_symbols(tier_gb))
@@ -726,6 +740,56 @@ class FeatureFactoryBatchService:
             raise RuntimeError(f"{symbol} ({timeframe}): 資料檔不存在 - {exc}") from exc
         except Exception as exc:
             raise RuntimeError(f"{symbol} ({timeframe}): 計算失敗 - {exc}") from exc
+
+    @staticmethod
+    def _compute_single_ic_first(
+        symbol: str,
+        timeframe: str,
+        config_override: Optional[Dict[str, Any]],
+        force_regenerate: bool,
+        cache_dir: Optional[str] = None,
+    ) -> str:
+        """在子進程中執行單一標的 IC-First L7_raw 特徵計算。
+
+        設計原則：
+        - 在子進程內臨時覆寫 FFACT_IC_FIRST_PIPELINE 以啟用 L6.5 IC-First 路由。
+        - 生成階段只輸出 L7_raw；IC Gatekeeper 與 selected post transforms 是下游流程。
+        - finally 區塊還原環境變數，避免污染同 worker 的後續呼叫。
+        - MemoryError 直接重新拋出，由 _classify_failure 分類為 OOM。
+        """
+        import os as _os
+
+        from momentum.factories import create_feature_factory_for_ic_batch
+
+        if cache_dir is None:
+            try:
+                from api.core.config import settings
+                cache_dir = str(settings.data_cache_path / "feature_klines")
+            except Exception:
+                pass
+
+        prev_ic_flag = _os.environ.get("FFACT_IC_FIRST_PIPELINE")
+        try:
+            _os.environ["FFACT_IC_FIRST_PIPELINE"] = "1"
+            factory = create_feature_factory_for_ic_batch(cache_dir=cache_dir)
+            result = factory.generate_features(
+                symbol=symbol,
+                timeframe=timeframe,
+                config_override=config_override,
+                force_regenerate=force_regenerate,
+            )
+            return result.hdf5_path or ""
+        except MemoryError:
+            raise
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"{symbol} ({timeframe}): IC-First 資料檔不存在 - {exc}") from exc
+        except Exception as exc:
+            raise RuntimeError(f"{symbol} ({timeframe}): IC-First 計算失敗 - {exc}") from exc
+        finally:
+            if prev_ic_flag is None:
+                _os.environ.pop("FFACT_IC_FIRST_PIPELINE", None)
+            else:
+                _os.environ["FFACT_IC_FIRST_PIPELINE"] = prev_ic_flag
 
     def register_notification_callback(
         self,

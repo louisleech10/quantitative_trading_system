@@ -6,6 +6,27 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+try:
+    from scipy.signal import fftconvolve as _scipy_fftconvolve
+    _HAS_FFTCONV = True
+except Exception:
+    _HAS_FFTCONV = False
+
+# FFT crossover: use FFT when n_signal * n_weights exceeds this threshold.
+# For fracdiff: n=20352, w≈252 → n×w≈5.1M >> 4096, always uses FFT.
+_FFT_OPS_THRESHOLD = 4096
+
+
+def _convolve_1d(signal: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    """1-D convolution (mode='valid') with automatic FFT dispatch.
+
+    Falls back to ``np.convolve`` when scipy is unavailable or the
+    operation count is below the crossover threshold.
+    """
+    if _HAS_FFTCONV and signal.size * weights.size > _FFT_OPS_THRESHOLD:
+        return np.asarray(_scipy_fftconvolve(signal, weights, mode="valid"), dtype=np.float64)
+    return np.convolve(signal, weights, mode="valid")
+
 
 AdfFunction = Callable[[np.ndarray], float]
 FracDiffFunction = Callable[[np.ndarray, float], np.ndarray]
@@ -103,7 +124,7 @@ def fractional_difference_values(
     if filled_slice.size < width:
         return output
 
-    convolution = np.convolve(filled_slice, weights, mode="valid")
+    convolution = _convolve_1d(filled_slice, weights)
     output_start = first_valid + width - 1
     output[output_start : first_valid + filled_slice.size] = convolution
     return output

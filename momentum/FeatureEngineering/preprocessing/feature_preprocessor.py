@@ -8,7 +8,8 @@ import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Tuple, Union
+import psutil
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -48,6 +49,7 @@ if TYPE_CHECKING:
 
 
 logger = get_logger(__name__)
+_PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 _FRACDIFF_LAYER_RE = re.compile(r"^(L\d+)_")
 
 
@@ -62,12 +64,30 @@ def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bo
 
 try:
     from scipy.special import ndtri
+    from scipy.signal import fftconvolve as _scipy_fftconvolve_pp
 
     HAS_SCIPY = True
+    _HAS_FFTCONV_PP = True
 except Exception:
     HAS_SCIPY = False
+    _HAS_FFTCONV_PP = False
     ndtri = None
     logger.warning("scipy not available, gaussian normalization disabled")
+
+# FFT crossover: use FFT when n_signal * n_weights exceeds this threshold.
+# For fracdiff at 20k rows with w≈252: n×w≈5.1M >> 4096, always uses FFT.
+_FRACDIFF_FFT_OPS_THRESHOLD = 4096
+
+
+def _frac_diff_convolve(signal: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    """1-D convolution (mode='valid') with automatic FFT dispatch for fracdiff.
+
+    Uses ``scipy.signal.fftconvolve`` when available and operation count
+    exceeds the crossover threshold; falls back to ``np.convolve`` otherwise.
+    """
+    if _HAS_FFTCONV_PP and signal.size * weights.size > _FRACDIFF_FFT_OPS_THRESHOLD:
+        return np.asarray(_scipy_fftconvolve_pp(signal, weights, mode="valid"), dtype=np.float64)
+    return np.convolve(signal, weights, mode="valid")
 
 try:
     from statsmodels.tsa.stattools import adfuller
@@ -193,9 +213,13 @@ class FeaturePreprocessor:
         self._set_config_step_enabled(preprocessing_config, "winsorization", False)
         self._set_config_step_enabled(preprocessing_config, "fractional_differencing", False)
         self._set_config_step_enabled(preprocessing_config, "adf_differencing", False)
-        self._set_config_step_enabled(preprocessing_config, "rank_transform", True, selected_columns)
-        self._set_config_step_enabled(preprocessing_config, "adaptive_zscore", True, selected_columns)
-        self._set_config_step_enabled(preprocessing_config, "gaussian_normalize", True, selected_columns)
+        # 尊重使用者在 config 中的開關設定
+        _rank_on = preprocessing_config.get("rank_transform", {}).get("enabled", True)
+        _zscore_on = preprocessing_config.get("adaptive_zscore", {}).get("enabled", True)
+        _gaussian_on = preprocessing_config.get("gaussian_normalize", {}).get("enabled", False)
+        self._set_config_step_enabled(preprocessing_config, "rank_transform", _rank_on, selected_columns if _rank_on else None)
+        self._set_config_step_enabled(preprocessing_config, "adaptive_zscore", _zscore_on, selected_columns if _zscore_on else None)
+        self._set_config_step_enabled(preprocessing_config, "gaussian_normalize", _gaussian_on, selected_columns if _gaussian_on else None)
         return preprocessing_config
 
     @staticmethod
@@ -288,6 +312,209 @@ class FeaturePreprocessor:
             completed = _execute()
 
         self._log_registry_io_summary(registry, io_stats_before)
+        return completed
+
+    def transform_registry_groups_to_sink(
+        self,
+        registry: "ColumnGroupRegistry",
+        sink: Callable[[str, List[str], np.ndarray, str, Optional[Path], bool], None],
+        n_workers: int = 1,
+    ) -> int:
+        """Apply L6.5 per group and stream transformed arrays to ``sink``.
+
+        This path is used by the L7_raw writer. It intentionally avoids
+        ``registry.overwrite_data()`` so large groups do not require source
+        ``.npy`` plus full-size ``.npy.tmp`` headroom before parquet persist.
+        """
+        if registry is None:
+            return 0
+
+        groups = [group for _, group in registry.iter_all() if group.n_cols > 0]
+        if not groups:
+            return 0
+
+        worker_count = max(1, int(n_workers))
+        if worker_count > 1:
+            logger.info(
+                "[L6.5] raw-sink path uses serial group streaming for disk safety "
+                "(requested_workers=%d)",
+                worker_count,
+            )
+
+        transform_context = self._build_registry_transform_context()
+        logger.info(
+            "[L6.5] Registry raw-sink config: groups=%d requested_workers=%d "
+            "effective_workers=1 mode=%s use_fast=%s can_use_numba_fast=%s "
+            "winsor=%s rank=%s zscore=%s fracdiff=%s fracdiff_apply_to=%s "
+            "fracdiff_layers=%s adf=%s gaussian=%s",
+            len(groups),
+            worker_count,
+            self.mode,
+            bool(transform_context.get("use_fast", False)),
+            bool(transform_context.get("can_use_numba_fast", False)),
+            bool(transform_context.get("do_winsorize", False)),
+            bool(transform_context.get("do_rank", False)),
+            bool(transform_context.get("do_zscore", False)),
+            bool(transform_context.get("do_fracdiff", False)),
+            self.fracdiff_config.get("apply_to", "non_stationary"),
+            sorted(self._fracdiff_apply_to_layers),
+            bool(transform_context.get("do_adf", False)),
+            bool(transform_context.get("do_gaussian", False)),
+        )
+
+        from momentum.FeatureEngineering.utils.hardware_utils import get_l65_split_threshold
+
+        split_threshold = get_l65_split_threshold()
+        group_plan: List[Tuple[object, str, bool, int]] = []
+        fast_full_count = 0
+        slow_full_count = 0
+        slow_chunked_count = 0
+        max_group_cols = 0
+        total_tasks = 0
+        for group in groups:
+            group_id = str(getattr(group, "group_id"))
+            n_cols = self._group_n_columns(group)
+            requires_slow = self._group_requires_slow_transform(group, transform_context)
+            is_chunked = requires_slow and split_threshold > 0 and n_cols > split_threshold
+            estimated_tasks = (
+                max(1, (n_cols + split_threshold - 1) // split_threshold) if is_chunked else 1
+            )
+            if is_chunked:
+                slow_chunked_count += 1
+            elif requires_slow:
+                slow_full_count += 1
+            else:
+                fast_full_count += 1
+            max_group_cols = max(max_group_cols, n_cols)
+            total_tasks += estimated_tasks
+            group_plan.append((group, group_id, is_chunked, estimated_tasks))
+
+        schedule_mode = "registry_order"
+        if self._raw_sink_largest_first_enabled():
+            group_plan.sort(key=lambda item: (-self._group_disk_size_bytes(item[0]), item[1]))
+            schedule_mode = "largest_first"
+
+        completed = 0
+        started_at = time.perf_counter()
+        heartbeat_step = max(1, total_tasks // 20)
+        heartbeat_interval_sec = 30.0
+        last_heartbeat_at = started_at
+        last_heartbeat_done = 0
+        tasks_done = 0
+
+        logger.info(
+            "[L6.5] Raw-sink start: %d full groups (fast=%d, slow=%d) + "
+            "%d big-group splits → %d sub-tasks "
+            "(requested_workers=%d, effective_workers=1, split_threshold=%d, "
+            "slow_chunked=%d, max_group_cols=%d, schedule=%s, rss=%dMB)",
+            len(groups) - slow_chunked_count,
+            fast_full_count,
+            slow_full_count,
+            slow_chunked_count,
+            total_tasks,
+            worker_count,
+            split_threshold,
+            slow_chunked_count,
+            max_group_cols,
+            schedule_mode,
+            _PROC.memory_info().rss >> 20,
+        )
+
+        for index, (group, group_id, is_chunked, estimated_tasks) in enumerate(
+            group_plan,
+            1,
+        ):
+            shards = getattr(group, "shards", ()) or ()
+            can_shard_stream = (
+                bool(shards)
+                and not is_chunked
+                and self.mode == "replace"
+                and not self._group_requires_slow_transform(group, transform_context)
+                and bool(transform_context.get("can_use_numba_fast", False))
+            )
+
+            if is_chunked:
+                source_disk_path = getattr(group, "disk_path", None)
+                outputs_written = self._stream_single_group_chunked_to_sink(
+                    registry,
+                    group,
+                    split_threshold,
+                    sink,
+                    source_disk_path,
+                )
+            elif can_shard_stream:
+                # Phase B Phase 1 Step 11: per-shard streaming.
+                # Each shard is a column slice with the FULL row axis, so
+                # column-independent fast-path kernels (winsor/rank/zscore)
+                # produce identical results per shard as on the concat.
+                # We delete the source shard `.npy` immediately after sink
+                # acknowledges the parquet part is durable.
+                outputs_written = self._stream_sharded_group_to_sink(
+                    registry,
+                    group,
+                    transform_context,
+                    sink,
+                )
+            else:
+                outputs = self._transform_single_group_to_arrays(
+                    registry,
+                    group,
+                    transform_context,
+                )
+                source_disk_path = getattr(group, "disk_path", None)
+                for output_index, (output_group_id, columns, data) in enumerate(outputs):
+                    sink(
+                        output_group_id,
+                        columns,
+                        data,
+                        group_id,
+                        source_disk_path,
+                        output_index == len(outputs) - 1,
+                    )
+                outputs_written = len(outputs)
+                del outputs
+            completed += 1
+            tasks_done += max(estimated_tasks, outputs_written, 1)
+            if is_chunked:
+                last_group_label = f"{group_id} (slow-chunked, parts={outputs_written})"
+            else:
+                last_group_label = f"{group_id} (full)"
+
+            now = time.perf_counter()
+            if (
+                tasks_done - last_heartbeat_done >= heartbeat_step
+                or (now - last_heartbeat_at) >= heartbeat_interval_sec
+                or index == len(group_plan)
+            ):
+                elapsed = now - started_at
+                rate = tasks_done / elapsed if elapsed > 0 else 0.0
+                eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
+                logger.info(
+                    "[L6.5] raw-sink heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
+                    "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
+                    tasks_done,
+                    total_tasks,
+                    100.0 * tasks_done / max(total_tasks, 1),
+                    completed,
+                    len(group_plan),
+                    elapsed,
+                    rate,
+                    eta if eta != float("inf") else -1,
+                    _PROC.memory_info().rss >> 20,
+                    last_group_label,
+                )
+                last_heartbeat_at = now
+                last_heartbeat_done = tasks_done
+
+            gc.collect()
+
+        logger.info(
+            "[L6.5] raw-sink complete: %d/%d groups in %.2fs rss=%dMB",
+            completed,
+            len(groups),
+            time.perf_counter() - started_at,
+            _PROC.memory_info().rss >> 20,
+        )
         return completed
 
     def _build_registry_transform_context(self) -> Dict[str, object]:
@@ -383,6 +610,34 @@ class FeaturePreprocessor:
         return 0
 
     @staticmethod
+    def _group_disk_size_bytes(group: object) -> int:
+        """Total persisted bytes for a group (sum of shards or single file).
+
+        Used by the largest-first raw-sink scheduler so sharded groups are
+        ordered by their full footprint (not just the first shard).
+        """
+        # Prefer explicit shard total if present (Phase B Phase 1).
+        shards = getattr(group, "shards", None) or ()
+        if shards:
+            return sum(int(getattr(shard, "nbytes", 0)) for shard in shards)
+        disk_path = getattr(group, "disk_path", None)
+        if disk_path is None:
+            return 0
+        try:
+            path = Path(disk_path)
+            if path.exists():
+                return int(path.stat().st_size)
+        except OSError:
+            return 0
+        return 0
+        return 0
+
+    @staticmethod
+    def _raw_sink_largest_first_enabled() -> bool:
+        raw = os.getenv("FFACT_L65_RAW_SINK_LARGEST_FIRST", "1").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
+
+    @staticmethod
     def _registry_io_stats(registry: "ColumnGroupRegistry") -> Dict[str, float]:
         stats = getattr(registry, "io_stats", None)
         if callable(stats):
@@ -431,8 +686,21 @@ class FeaturePreprocessor:
     ) -> bool:
         if self.mode != "replace":
             return True
+        # P1.1 fix: ADF per-layer routing — mirrors fracdiff logic (V1 SPEC intent).
+        # ADF is the prerequisite step for FracDiff and only meaningful for layers that
+        # undergo FracDiff (default: L1/L2 only). L3+ rolling groups do not need ADF and
+        # should reach the fast path. The former global check (if do_adf: return True)
+        # forced ALL 122 groups slow regardless of layer, which is a design defect.
         if bool(transform_context.get("do_adf", False)):
-            return True
+            if "ALL" in self._fracdiff_apply_to_layers:
+                return True
+            source_layer = self._group_layer_name(group)
+            if source_layer and source_layer in self._fracdiff_apply_to_layers:
+                return True
+            # source_layer known and NOT in ADF/FracDiff target set → this group
+            # does not need ADF; continue to per-layer fracdiff check below.
+            # source_layer None (unknown origin) → also falls through; the fracdiff
+            # column-based filter at the end handles unknown-layer groups correctly.
         # Gaussian with apply_to="all" is handled as a vectorised post-step after the
         # numba fast path (see _transform_single_group), so it does NOT force slow path.
         # Only non-"all" apply_to needs column names and therefore requires slow path.
@@ -479,7 +747,7 @@ class FeaturePreprocessor:
         last_heartbeat_done = 0
         last_group_label = "<none>"
 
-        logger.info("[L6.5] Serial start: %d groups", total)
+        logger.info("[L6.5] Serial start: %d groups, rss=%dMB", total, _PROC.memory_info().rss >> 20)
 
         for group in groups:
             gid = getattr(group, "group_id", "<unknown>")
@@ -517,13 +785,14 @@ class FeaturePreprocessor:
                 eta = (total - done) / rate if rate > 0 else float("inf")
                 logger.info(
                     "[L6.5] heartbeat (serial): %d/%d (%.1f%%), elapsed=%.1fs, "
-                    "rate=%.2f/s, ETA=%.0fs, last=%s",
+                    "rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
                     done,
                     total,
                     100.0 * done / max(total, 1),
                     elapsed_so_far,
                     rate,
                     eta if eta != float("inf") else -1,
+                    _PROC.memory_info().rss >> 20,
                     last_group_label,
                 )
                 last_heartbeat_at = now
@@ -531,11 +800,12 @@ class FeaturePreprocessor:
 
         elapsed = time.perf_counter() - started_at
         logger.info(
-            "[L6.5] Serial complete: %d/%d in %.2fs (%d failed)",
+            "[L6.5] Serial complete: %d/%d in %.2fs (%d failed), rss=%dMB",
             completed,
             len(groups),
             elapsed,
             failed,
+            _PROC.memory_info().rss >> 20,
         )
         return completed
 
@@ -652,7 +922,7 @@ class FeaturePreprocessor:
         logger.info(
             "[L6.5] Parallel start: %d full groups (fast=%d, slow=%d) + "
             "%d big-group splits → %d sub-tasks "
-            "(workers=%d, split_threshold=%d, slow_chunked=%d, max_group_cols=%d)",
+            "(workers=%d, split_threshold=%d, slow_chunked=%d, max_group_cols=%d, rss=%dMB)",
             len(full_groups),
             fast_full_count,
             slow_full_count,
@@ -662,6 +932,7 @@ class FeaturePreprocessor:
             split_threshold,
             len(slow_chunked_groups),
             max_group_cols,
+            _PROC.memory_info().rss >> 20,
         )
 
         # Submit task type tagging: ("full", group, None) or ("slice", group, (s, e)).
@@ -731,7 +1002,7 @@ class FeaturePreprocessor:
                     eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
                     logger.info(
                         "[L6.5] heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
-                        "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, last=%s",
+                        "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
                         tasks_done,
                         total_tasks,
                         100.0 * tasks_done / max(total_tasks, 1),
@@ -740,6 +1011,7 @@ class FeaturePreprocessor:
                         elapsed,
                         rate,
                         eta if eta != float("inf") else -1,
+                        _PROC.memory_info().rss >> 20,
                         last_group_label,
                     )
                     last_heartbeat_at = now
@@ -778,7 +1050,7 @@ class FeaturePreprocessor:
                 eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
                 logger.info(
                     "[L6.5] heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
-                    "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, last=%s",
+                    "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
                     tasks_done,
                     total_tasks,
                     100.0 * tasks_done / max(total_tasks, 1),
@@ -787,6 +1059,7 @@ class FeaturePreprocessor:
                     elapsed_so_far,
                     rate,
                     eta if eta != float("inf") else -1,
+                    _PROC.memory_info().rss >> 20,
                     last_group_label,
                 )
                 last_heartbeat_at = now
@@ -798,7 +1071,7 @@ class FeaturePreprocessor:
             total_slices = sum(len(info["slices"]) for info in split_meta.values())
             logger.info(
                 "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
-                "(%d failed, %d big-group splits → %d sub-tasks, %d slow-chunked)",
+                "(%d failed, %d big-group splits → %d sub-tasks, %d slow-chunked, rss=%dMB)",
                 completed,
                 len(groups),
                 elapsed,
@@ -807,17 +1080,19 @@ class FeaturePreprocessor:
                 split_count,
                 total_slices,
                 len(slow_chunked_groups),
+                _PROC.memory_info().rss >> 20,
             )
         else:
             logger.info(
                 "[L6.5] Parallel complete: %d/%d groups in %.2fs, %d workers "
-                "(%d failed, %d slow-chunked)",
+                "(%d failed, %d slow-chunked, rss=%dMB)",
                 completed,
                 len(groups),
                 elapsed,
                 n_workers,
                 failed,
                 len(slow_chunked_groups),
+                _PROC.memory_info().rss >> 20,
             )
         return completed
 
@@ -1064,6 +1339,333 @@ class FeaturePreprocessor:
         processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
         registry.overwrite_data(group_id, processed_array)
 
+    def _transform_single_group_to_arrays(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        transform_context: Dict[str, object],
+    ) -> List[Tuple[str, List[str], np.ndarray]]:
+        """Transform one registry group and return arrays instead of overwriting .npy."""
+        group_id = str(getattr(group, "group_id"))
+        columns = list(getattr(group, "columns"))
+        group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+        use_fast = bool(transform_context.get("can_use_numba_fast", transform_context.get("use_fast", False)))
+        requires_slow = self._group_requires_slow_transform(group, transform_context)
+
+        if use_fast and not requires_slow:
+            transform_array_fast = transform_context["transform_array_fast"]
+            processed_array = transform_array_fast(
+                group_array,
+                winsorize=bool(transform_context.get("do_winsorize", True)),
+                winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
+                winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+                rank=bool(transform_context.get("do_rank", False)),
+                rank_window=int(transform_context.get("rank_window", 252)),
+                zscore=bool(transform_context.get("do_zscore", False)),
+                zscore_window=int(transform_context.get("zscore_window", 100)),
+                zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+            )
+            if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
+                processed_array = self._gaussian_2d(
+                    processed_array.astype(np.float64, copy=False),
+                    lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
+                    upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
+                )
+            return [(group_id, columns, np.asarray(processed_array, dtype=np.float32))]
+
+        if self._can_use_optimized_dataframe_path():
+            group_df = pd.DataFrame(group_array, columns=columns, copy=False)
+            processed_df = self._transform_single_optimized_df(group_df)
+            return [(group_id, list(processed_df.columns), processed_df.to_numpy(dtype=np.float32, copy=False))]
+
+        is_append = self.mode == "append"
+        group_df = pd.DataFrame(group_array, columns=columns, copy=False)
+        processed_df = self._transform_single(
+            group_df,
+            source_layer=self._group_layer_name(group),
+        )
+
+        if is_append and len(processed_df.columns) > len(columns):
+            outputs: List[Tuple[str, List[str], np.ndarray]] = []
+            orig_array = processed_df[columns].to_numpy(dtype=np.float32, copy=False)
+            outputs.append((group_id, columns, orig_array))
+
+            new_columns = [column for column in processed_df.columns if column not in columns]
+            if new_columns:
+                new_group_id = f"{group_id}_L65"
+                suffix = 1
+                while new_group_id in registry._groups:
+                    new_group_id = f"{group_id}_L65_{suffix}"
+                    suffix += 1
+                new_array = processed_df[new_columns].to_numpy(dtype=np.float32, copy=False)
+                outputs.append((new_group_id, list(new_columns), new_array))
+            return outputs
+
+        processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
+        return [(group_id, list(processed_df.columns), processed_array)]
+
+    def _transform_single_group_chunked_to_arrays(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        chunk_size: int,
+    ) -> List[Tuple[str, List[str], np.ndarray]]:
+        """Chunked slow-path transform that streams arrays to the L7_raw writer."""
+        group_id = str(getattr(group, "group_id"))
+        col_names = list(getattr(group, "columns"))
+        n_cols = len(col_names)
+        full_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+        is_append = self.mode == "append"
+
+        use_shared_dstar_cache = bool(
+            self.fracdiff_config.get("enabled", False)
+            and self.fracdiff_config.get("cache_d_star", True)
+        )
+        previous_shared_cache = self._d_star_cache_shared
+        if use_shared_dstar_cache:
+            self._d_star_cache_shared = True
+            self._d_star_cache = None
+
+        orig_chunks: List[np.ndarray] = []
+        new_chunks: List[np.ndarray] = []
+        new_col_names_all: List[str] = []
+
+        try:
+            for chunk_start in range(0, n_cols, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, n_cols)
+                chunk_cols = col_names[chunk_start:chunk_end]
+                chunk_view = full_array[:, chunk_start:chunk_end]
+                chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
+                processed_df = self._transform_single(
+                    chunk_df,
+                    source_layer=self._group_layer_name(group),
+                )
+                orig_chunks.append(processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False))
+                if is_append:
+                    new_col_names = [column for column in processed_df.columns if column not in chunk_cols]
+                    if new_col_names:
+                        new_chunks.append(processed_df[new_col_names].to_numpy(dtype=np.float32, copy=False))
+                        new_col_names_all.extend(new_col_names)
+                del chunk_df, processed_df
+        finally:
+            if use_shared_dstar_cache and self._d_star_cache is not None:
+                self._d_star_cache.flush_atomic()
+                self._d_star_cache = None
+            self._d_star_cache_shared = previous_shared_cache
+            del full_array
+            gc.collect()
+
+        outputs: List[Tuple[str, List[str], np.ndarray]] = []
+        orig_merged = np.concatenate(orig_chunks, axis=1)
+        del orig_chunks
+        outputs.append((group_id, col_names, orig_merged))
+
+        if is_append and new_chunks:
+            new_merged = np.concatenate(new_chunks, axis=1)
+            del new_chunks
+            new_group_id = f"{group_id}_L65"
+            suffix = 1
+            while new_group_id in registry._groups:
+                new_group_id = f"{group_id}_L65_{suffix}"
+                suffix += 1
+            outputs.append((new_group_id, new_col_names_all, new_merged))
+
+        return outputs
+
+    def _stream_sharded_group_to_sink(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        transform_context: Dict[str, object],
+        sink: Callable[[str, List[str], np.ndarray, str, Optional[Path], bool], None],
+    ) -> int:
+        """Transform a sharded group shard-by-shard and free shards as we go.
+
+        Pre-conditions (enforced by caller): mode == 'replace', fast-path
+        applicable (numba), no slow ops requiring per-column-cross-shard
+        scope. Each shard is a column slice; column-independent kernels
+        (winsor/rank/zscore) yield bit-equivalent output per shard vs the
+        concatenated path. After the sink confirms parquet durability we
+        unlink the source `.npy` shard so peak cgsa_work bytes shrink
+        monotonically while the group is being written.
+        """
+        group_id = str(getattr(group, "group_id"))
+        shards = tuple(getattr(group, "shards", ()) or ())
+        n_shards = len(shards)
+        if n_shards == 0:
+            return 0
+
+        transform_array_fast = transform_context["transform_array_fast"]
+        do_gaussian = bool(transform_context.get("do_gaussian", False))
+        gaussian_apply_to = transform_context.get("gaussian_apply_to", "all")
+        gaussian_clip_lower = float(transform_context.get("gaussian_clip_lower", 0.001))
+        gaussian_clip_upper = float(transform_context.get("gaussian_clip_upper", 0.999))
+
+        outputs_written = 0
+        width = max(2, len(str(n_shards - 1)))
+
+        for shard_pos, (shard_meta, shard_arr, shard_cols) in enumerate(
+            registry.iter_shards(group_id)
+        ):
+            is_last = shard_pos == n_shards - 1
+            arr_in = np.asarray(shard_arr, dtype=np.float32)
+            processed = transform_array_fast(
+                arr_in,
+                winsorize=bool(transform_context.get("do_winsorize", True)),
+                winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
+                winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+                rank=bool(transform_context.get("do_rank", False)),
+                rank_window=int(transform_context.get("rank_window", 252)),
+                zscore=bool(transform_context.get("do_zscore", False)),
+                zscore_window=int(transform_context.get("zscore_window", 100)),
+                zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+            )
+            if do_gaussian and HAS_SCIPY and gaussian_apply_to == "all":
+                processed = self._gaussian_2d(
+                    processed.astype(np.float64, copy=False),
+                    lower=gaussian_clip_lower,
+                    upper=gaussian_clip_upper,
+                )
+            processed = np.asarray(processed, dtype=np.float32)
+
+            output_group_id = (
+                group_id if n_shards == 1 else f"{group_id}_shard{shard_meta.shard_idx:0{width}d}"
+            )
+
+            sink(
+                output_group_id,
+                list(shard_cols),
+                processed,
+                group_id,
+                shard_meta.disk_path,
+                is_last,
+            )
+            outputs_written += 1
+
+            del shard_arr, arr_in, processed
+
+            if not is_last:
+                try:
+                    registry.unlink_shard(group_id, shard_meta.shard_idx)
+                except Exception as exc:
+                    logger.warning(
+                        "[L6.5] shard cleanup skipped: group=%s shard=%d err=%s",
+                        group_id,
+                        shard_meta.shard_idx,
+                        exc,
+                    )
+            gc.collect()
+
+        return outputs_written
+
+    def _stream_single_group_chunked_to_sink(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        chunk_size: int,
+        sink: Callable[[str, List[str], np.ndarray, str, Optional[Path], bool], None],
+        source_disk_path: Optional[Path],
+    ) -> int:
+        """Transform a wide slow-path group one column chunk at a time.
+
+        The legacy chunked helper rebuilt the full transformed matrix with
+        ``np.concatenate`` before L7_raw wrote parquet. For 20k x 25k+ groups
+        that creates an avoidable multi-GB RSS spike. The raw-sink path can
+        safely persist each transformed chunk as its own parquet group and
+        delete the source ``.npy`` after the final chunk has landed.
+        """
+        group_id = str(getattr(group, "group_id"))
+        col_names = list(getattr(group, "columns"))
+        n_cols = len(col_names)
+        if n_cols <= 0:
+            return 0
+
+        full_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
+        is_append = self.mode == "append"
+        chunk_ranges = list(range(0, n_cols, chunk_size))
+        total_chunks = len(chunk_ranges)
+
+        use_shared_dstar_cache = bool(
+            self.fracdiff_config.get("enabled", False)
+            and self.fracdiff_config.get("cache_d_star", True)
+        )
+        previous_shared_cache = self._d_star_cache_shared
+        if use_shared_dstar_cache:
+            self._d_star_cache_shared = True
+            self._d_star_cache = None
+
+        outputs_written = 0
+        logger.info(
+            "[L6.5] raw-sink chunk stream start: group=%s cols=%d chunks=%d chunk_size=%d rss=%dMB",
+            group_id,
+            n_cols,
+            total_chunks,
+            chunk_size,
+            _PROC.memory_info().rss >> 20,
+        )
+
+        try:
+            for chunk_index, chunk_start in enumerate(chunk_ranges, 1):
+                chunk_end = min(chunk_start + chunk_size, n_cols)
+                chunk_cols = col_names[chunk_start:chunk_end]
+                chunk_view = full_array[:, chunk_start:chunk_end]
+                chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
+                processed_df = self._transform_single(
+                    chunk_df,
+                    source_layer=self._group_layer_name(group),
+                )
+
+                chunk_outputs: List[Tuple[str, List[str], np.ndarray]] = []
+                output_group_id = f"{group_id}_chunk{chunk_index}"
+                chunk_outputs.append(
+                    (
+                        output_group_id,
+                        chunk_cols,
+                        processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False),
+                    )
+                )
+                if is_append:
+                    new_col_names = [column for column in processed_df.columns if column not in chunk_cols]
+                    if new_col_names:
+                        chunk_outputs.append(
+                            (
+                                f"{group_id}_L65_chunk{chunk_index}",
+                                list(new_col_names),
+                                processed_df[new_col_names].to_numpy(dtype=np.float32, copy=False),
+                            )
+                        )
+
+                for output_index, (output_group_id, columns, data) in enumerate(chunk_outputs):
+                    is_last_output = chunk_index == total_chunks and output_index == len(chunk_outputs) - 1
+                    sink(
+                        output_group_id,
+                        columns,
+                        data,
+                        group_id,
+                        source_disk_path,
+                        is_last_output,
+                    )
+                    outputs_written += 1
+
+                del chunk_outputs, chunk_df, processed_df, chunk_view
+                gc.collect()
+        finally:
+            if use_shared_dstar_cache and self._d_star_cache is not None:
+                self._d_star_cache.flush_atomic()
+                self._d_star_cache = None
+            self._d_star_cache_shared = previous_shared_cache
+            del full_array
+            gc.collect()
+
+        logger.info(
+            "[L6.5] raw-sink chunk stream complete: group=%s chunks=%d outputs=%d rss=%dMB",
+            group_id,
+            total_chunks,
+            outputs_written,
+            _PROC.memory_info().rss >> 20,
+        )
+        return outputs_written
+
     def _transform_single_group_optimized(
         self,
         registry: "ColumnGroupRegistry",
@@ -1163,7 +1765,10 @@ class FeaturePreprocessor:
         ]
 
     def _winsorize_2d_legacy_equivalent(self, arr: np.ndarray) -> np.ndarray:
-        result_array = np.asarray(arr, dtype=np.float64).copy()
+        # np.ascontiguousarray: zero-copy when arr is already C-contiguous float64.
+        # Caller passes a fancy-indexed slice that NumPy has already materialised
+        # as a separate float64 array, so .copy() here is always redundant.
+        result_array = np.ascontiguousarray(arr, dtype=np.float64)
         selected = pd.DataFrame(result_array)
         method = self.winsor_config.get("method", "sigma")
 
@@ -1561,6 +2166,80 @@ class FeaturePreprocessor:
         return result
 
     @staticmethod
+    def _partition_nanquantile_2d(
+        arr: np.ndarray,
+        quantiles: List[float],
+    ) -> np.ndarray:
+        """O(n) partial-sort replacement for np.nanquantile(arr, q, axis=0).
+
+        Fast path (all columns have the same finite-element count):
+            Replaces NaN/inf with +inf to push them after all finite values,
+            then calls ``np.partition`` once for all required k-th positions.
+            Complexity: O(n × |kths|) where |kths| ≤ 2 × len(quantiles).
+
+        Slow path (heterogeneous finite-element counts across columns):
+            Falls back to ``_nanquantile_linear`` (np.nanquantile).  Triggered
+            only when columns differ in NaN count — uncommon for L6.5 rolling
+            groups where every column shares the same rolling-window warmup
+            NaN prefix.
+
+        Numerical equivalence:
+            Produces bit-identical output to
+            ``np.nanquantile(..., method='linear')`` for all inputs where the
+            fast path applies.
+        """
+        n_rows, n_cols = arr.shape
+        if n_cols == 0:
+            return np.empty((len(quantiles), 0), dtype=np.float64)
+        finite_counts = np.sum(np.isfinite(arr), axis=0)  # shape: (n_cols,)
+
+        # Fast path: uniform finite-element count across all columns.
+        # L6.5 rolling groups satisfy this because each group's rolling-window
+        # warmup NaN prefix is identical for every column in the group.
+        if int(finite_counts.min()) == int(finite_counts.max()):
+            n_valid = int(finite_counts[0])
+            if n_valid == 0:
+                # Every value in every column is NaN → return NaN bounds.
+                return np.full((len(quantiles), n_cols), np.nan, dtype=np.float64)
+
+            # Push NaN / ±inf to the end of each column so np.partition
+            # sees only finite values in the first n_valid positions.
+            tmp = arr.copy()
+            tmp[~np.isfinite(tmp)] = np.inf
+
+            # Pre-compute k-th positions and linear-interpolation fractions.
+            k_lo_list: List[int] = []
+            k_hi_list: List[int] = []
+            frac_list: List[float] = []
+            kths_seen: set = set()
+            kths_sorted: List[int] = []
+            for q in quantiles:
+                k_f = float(q) * (n_valid - 1)
+                k_lo = int(np.floor(k_f))
+                k_hi = min(k_lo + 1, n_valid - 1)
+                frac = k_f - k_lo
+                k_lo_list.append(k_lo)
+                k_hi_list.append(k_hi)
+                frac_list.append(frac)
+                for k in (k_lo, k_hi):
+                    if k not in kths_seen:
+                        kths_seen.add(k)
+                        kths_sorted.append(k)
+
+            # Single np.partition call covers all needed positions.
+            partitioned = np.partition(tmp, sorted(kths_sorted), axis=0)
+
+            results = np.empty((len(quantiles), n_cols), dtype=np.float64)
+            for q_idx in range(len(quantiles)):
+                lo = partitioned[k_lo_list[q_idx]]   # shape: (n_cols,)
+                hi = partitioned[k_hi_list[q_idx]]   # shape: (n_cols,)
+                results[q_idx] = lo + frac_list[q_idx] * (hi - lo)
+            return results
+
+        # Slow path: heterogeneous NaN counts → fall back to nanquantile.
+        return FeaturePreprocessor._nanquantile_linear(arr, quantiles)
+
+    @staticmethod
     def _nanquantile_linear(
         arr: np.ndarray,
         quantiles: List[float],
@@ -1602,7 +2281,7 @@ class FeaturePreprocessor:
         if arr.shape[0] == 0 or arr.shape[1] == 0:
             return arr
 
-        bounds = cls._nanquantile_linear(arr, [lower_q, upper_q])
+        bounds = cls._partition_nanquantile_2d(arr, [lower_q, upper_q])
         np.clip(arr, bounds[0], bounds[1], out=arr)
         return arr
 
@@ -2332,7 +3011,7 @@ class FeaturePreprocessor:
         if len(valid_slice) < width:
             return pd.Series(out, index=series.index)
 
-        conv = np.convolve(valid_slice, weights, mode="valid")
+        conv = _frac_diff_convolve(valid_slice, weights)
         # 結果起始位置：first_valid + width - 1
         out[first_valid + width - 1 : first_valid + len(valid_slice)] = conv
         return pd.Series(out, index=series.index)
@@ -2362,15 +3041,36 @@ class FeaturePreprocessor:
         weight_threshold = float(self.fracdiff_config.get("weight_threshold", 1e-5))
         values = clean.to_numpy(dtype=np.float64, copy=False)
 
+        # ── Precompute filled_slice once ─────────────────────────────────────
+        # clean = series.dropna() guarantees no NaN in values, so:
+        #   - finite_mask is all-True, first_valid = 0
+        #   - ffill() is a no-op (nothing to forward-fill)
+        # We still handle the rare edge case where inf exists in clean.
+        _finite_mask = np.isfinite(values)
+        _first_valid = int(np.argmax(_finite_mask)) if _finite_mask.any() else len(values)
+        _raw_slice = values[_first_valid:]
+        # ffill inf/nan within the slice (no-op when values is all-finite)
+        _filled_slice: np.ndarray = (
+            pd.Series(_raw_slice, dtype=float).ffill().to_numpy(dtype=np.float64)
+            if not np.all(_finite_mask[_first_valid:])
+            else _raw_slice
+        )
+        _n_total = len(values)
+
         def _fracdiff_values(raw_values: np.ndarray, d_value: float) -> np.ndarray:
+            # Use precomputed _filled_slice — avoids repeating dropna/ffill/isnan
+            # across bisection iterations (6 calls per column at precision=0.02).
             del raw_values
-            fracdiff_series = self._frac_diff_ffd(
-                clean,
-                d_value,
-                threshold=weight_threshold,
-                max_width=max_lag,
+            weights_arr = FeaturePreprocessor._get_weights_ffd(
+                d_value, weight_threshold, max_width=max_lag
             )
-            return fracdiff_series.to_numpy(dtype=np.float64, copy=False)
+            w = len(weights_arr)
+            out = np.full(_n_total, np.nan, dtype=np.float64)
+            if _filled_slice.size < w:
+                return out
+            conv = _frac_diff_convolve(_filled_slice, weights_arr)
+            out[_first_valid + w - 1 : _first_valid + _filled_slice.size] = conv
+            return out
 
         def _adf_pvalue(fracdiff_values: np.ndarray) -> float:
             clean_values = np.asarray(fracdiff_values, dtype=np.float64)
