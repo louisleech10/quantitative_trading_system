@@ -27,7 +27,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
 ];
 
 export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: FeatureExplorerProps) {
-  const { browseSummary, browseFeatures } = useFeatureFactory();
+  const { browseSummary, browseFeatures, listAvailableTasks } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
   // which triggers React 18 concurrent-mode's "getSnapshot should be cached" infinite loop.
@@ -52,6 +52,10 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  // Available tasks for recovery when the current task_id is no longer in API memory
+  const [availableTasks, setAvailableTasks] = useState<Array<{ task_id: string; symbol: string; timeframe: string; feature_count: number | null; created_at: string }>>([]);
+  const [isLoadingAvailable, setIsLoadingAvailable] = useState(false);
   const cachedSummary = taskId ? explorerSummaryByTask[taskId] : undefined;
   const hasCachedSummary = Boolean(cachedSummary);
   const cachedFeatureNames = taskId ? explorerFeatureNamesByTask[taskId] : undefined;
@@ -104,6 +108,22 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
       active = false;
     };
   }, [browseSummary, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask, pushExplorerRecentTask]);
+
+  // When task_id is not found in API memory (happens after restart), fetch the
+  // list of available browse tasks so the user can pick one to recover.
+  useEffect(() => {
+    if (!summaryError || !summaryError.includes('Result not found')) {
+      setAvailableTasks([]);
+      return;
+    }
+    let active = true;
+    setIsLoadingAvailable(true);
+    listAvailableTasks()
+      .then((tasks) => { if (active) setAvailableTasks(tasks); })
+      .catch(() => { if (active) setAvailableTasks([]); })
+      .finally(() => { if (active) setIsLoadingAvailable(false); });
+    return () => { active = false; };
+  }, [summaryError, listAvailableTasks]);
 
   useEffect(() => {
     let active = true;
@@ -212,6 +232,52 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
       {!taskId && (
         <div className="rounded-xl border border-white/5 bg-white/3 p-6 text-center text-xs text-slate-500">
           生成特徵後結果將自動顯示，或貼入過去的 Task ID 直接瀏覽
+        </div>
+      )}
+
+      {/* ——— Task ID 不存在（API 重啟後記憶體清空）：提供可用任務清單供切換 ——— */}
+      {summaryError && summaryError.includes('Result not found') && (
+        <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-amber-300 text-sm font-medium">
+            <span>⚠</span>
+            <span>Task 已失效（API 重啟後記憶體清空）</span>
+          </div>
+          <div className="text-xs text-slate-400">Task ID: <code className="text-slate-300">{taskId}</code></div>
+          {isLoadingAvailable && (
+            <div className="text-xs text-slate-500">搜尋可用任務中…</div>
+          )}
+          {!isLoadingAvailable && availableTasks.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs text-slate-400">偵測到以下可用的歷史特徵任務，請選擇切換：</div>
+              <div className="flex flex-col gap-1.5">
+                {availableTasks.map((t) => (
+                  <button
+                    key={t.task_id}
+                    type="button"
+                    onClick={() => { setManualTaskId(t.task_id); setSummaryError(null); setAvailableTasks([]); }}
+                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-cyan-400/10 hover:border-cyan-400/30 text-left"
+                  >
+                    <span>
+                      {t.symbol && t.timeframe ? (
+                        <span className="text-cyan-300 font-medium">{t.symbol} / {t.timeframe}</span>
+                      ) : null}
+                      {' '}
+                      <span className="text-slate-400 font-mono">{t.task_id.length > 24 ? `${t.task_id.slice(0, 12)}…` : t.task_id}</span>
+                    </span>
+                    <span className="text-slate-500 shrink-0 ml-3">
+                      {t.feature_count != null ? `${t.feature_count.toLocaleString()} 特徵` : ''}
+                      {t.created_at ? ` · ${t.created_at.slice(0, 10)}` : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {!isLoadingAvailable && availableTasks.length === 0 && (
+            <div className="text-xs text-slate-500">
+              目前無可用歷史任務。請重新執行特徵生成，或重啟 API 後再試（伺服器啟動時會自動還原磁碟上的特徵）。
+            </div>
+          )}
         </div>
       )}
 

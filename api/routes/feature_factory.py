@@ -399,6 +399,15 @@ async def register_hdf5_for_browse(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/browse/available")
+async def list_available_browse_tasks():
+    """列出所有已還原或已完成的 Feature Factory 任務（含重啟後自動還原的任務）。
+    前端可在 task_id 失效後呼叫此端點取得新的可用 task_id。"""
+    tasks = feature_factory_service.list_completed_tasks()
+    return {"tasks": tasks}
+
+
+
 @router.get("/browse/{task_id}/features")
 async def browse_features(
     task_id: str,

@@ -442,6 +442,14 @@ export function useFeatureFactory() {
     [setBatchTask, setError]
   );
 
+  const listAvailableTasks = useCallback(
+    async (): Promise<Array<{ task_id: string; symbol: string; timeframe: string; feature_count: number | null; created_at: string }>> => {
+      const data = await requestJson<{ tasks: Array<{ task_id: string; symbol: string; timeframe: string; feature_count: number | null; created_at: string }> }>('/browse/available');
+      return data.tasks;
+    },
+    []
+  );
+
   return {
     loadInitial,
     previewConfig,
@@ -460,5 +468,6 @@ export function useFeatureFactory() {
     applyPreset,
     startBatchGeneration,
     getBatchStatus,
+    listAvailableTasks,
   };
 }

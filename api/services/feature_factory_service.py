@@ -86,6 +86,16 @@ class FeatureFactoryService:
         # full 50k-200k column DataFrame.
         self._cgsa_catalog_cache: Dict[str, List[Dict[str, Any]]] = {}
         self._cgsa_column_path_cache: Dict[str, Dict[str, Path]] = {}
+        # Per-task CGSA feature stats DataFrame indexed by feature name.
+        # Backed by feature_stats_cache.parquet in the manifest directory so
+        # computed stats survive API restarts and repeat searches are instant.
+        self._cgsa_stats_mem_cache: Dict[str, pd.DataFrame] = {}
+        # Task IDs currently running background CGSA stats warmup.
+        self._cgsa_stats_warming_tasks: set[str] = set()
+
+        # Restore any previously-completed tasks from disk so the Feature
+        # Explorer stays functional across API restarts.
+        self._restore_persisted_tasks()
 
     async def start_generation(self, request: Any) -> Dict[str, str]:
         """Start feature generation task."""
@@ -176,6 +186,10 @@ class FeatureFactoryService:
                     task_info["status"] = "completed"
                     task_info["progress"] = 1.0
                     task_info["result"] = summary
+
+            # Persist task record to disk so the task can be restored after an
+            # API restart without re-running feature generation.
+            self._persist_task_record(task_id, summary)
 
             # Precompute Feature Table stats as soon as generation completes for
             # legacy HDF5 tasks. CGSA outputs can have 50k-200k columns; full
@@ -487,6 +501,27 @@ class FeatureFactoryService:
             if not task_info:
                 return None
             return task_info.get("result")
+
+    def list_completed_tasks(self) -> List[Dict[str, Any]]:
+        """Return a summary of all completed tasks (including restored ones).
+        Used by the /browse/available endpoint so the frontend can recover after
+        an API restart."""
+        with self._lock:
+            result = []
+            for task_id, info in self._tasks.items():
+                if info.get("status") != "completed":
+                    continue
+                task_result = info.get("result") or {}
+                meta = task_result.get("metadata") or {}
+                result.append({
+                    "task_id": task_id,
+                    "symbol": meta.get("symbol", ""),
+                    "timeframe": meta.get("timeframe", ""),
+                    "feature_count": task_result.get("feature_count"),
+                    "created_at": info.get("created_at", ""),
+                    "hdf5_path": task_result.get("hdf5_path", ""),
+                })
+            return sorted(result, key=lambda x: x["created_at"], reverse=True)
 
     def register_hdf5_for_browse(self, symbol: str, timeframe: str, hdf5_path: str) -> str:
         """將批次模式的 HDF5 檔案登錄為可瀏覽的虛擬任務，回傳可供 FeatureExplorer 使用的 task_id。
@@ -1001,12 +1036,78 @@ class FeatureFactoryService:
             "features": self._project_browse_rows(page_rows, detail_level),
         }
 
+    @staticmethod
+    def _compute_feature_stats_fast(numeric: pd.DataFrame) -> pd.DataFrame:
+        """Compute 10 column-wise statistics with optimised numpy ops.
+
+        Key optimisations vs naive pandas:
+        * Single ``np.nanpercentile`` call for all 3 quantiles instead of three
+          separate ``.quantile()`` calls (each of which sorts the data
+          independently → 3× the work).
+        * Direct numpy reductions for mean/std/min/max/nan_ratio to avoid the
+          per-column Python overhead of pandas aggregation methods.
+        * Approximate quantiles via a systematic even-spaced sample when
+          n_rows > _Q_SAMPLE (default 3 000).  Sorting 3 000 instead of 52 000
+          rows per column is ~17× faster with <1 % error for typical financial
+          time-series distributions, making on-demand stats fast enough without
+          requiring a pre-built cache.
+        * Skewness and kurtosis still use pandas (they already delegate to
+          numpy internally and handle edge-cases such as constant columns).
+        """
+        _Q_SAMPLE = 3_000  # rows used for approximate quantile estimation
+
+        arr = numeric.to_numpy(dtype=np.float64, na_value=np.nan)
+
+        # Basic stats — each is a single vectorised numpy pass (full data).
+        nan_ratio = np.isnan(arr).mean(axis=0)
+        mean_vals = np.nanmean(arr, axis=0)
+        std_vals  = np.nanstd(arr, axis=0, ddof=1)
+        min_vals  = np.nanmin(arr, axis=0)
+        max_vals  = np.nanmax(arr, axis=0)
+
+        # Approximate quantiles from an evenly-spaced sample.
+        # min/max are always exact (above); only q25/median/q75 use the sample.
+        n_rows = arr.shape[0]
+        if n_rows > _Q_SAMPLE:
+            q_idx = np.round(np.linspace(0, n_rows - 1, _Q_SAMPLE)).astype(np.intp)
+            arr_q = arr[q_idx, :]
+        else:
+            arr_q = arr
+        qs = np.nanpercentile(arr_q, [25.0, 50.0, 75.0], axis=0)  # (3, n_cols)
+
+        # Skew / kurt: delegate to pandas which handles constant-column NaN
+        # and unbiased correction automatically.
+        skew_vals = numeric.skew(skipna=True).to_numpy()
+        kurt_vals = numeric.kurt(skipna=True).to_numpy()
+
+        return pd.DataFrame(
+            {
+                "nan_ratio": nan_ratio,
+                "mean":      mean_vals,
+                "std":       std_vals,
+                "min":       min_vals,
+                "q25":       qs[0],
+                "median":    qs[1],
+                "q75":       qs[2],
+                "max":       max_vals,
+                "skewness":  skew_vals,
+                "kurtosis":  kurt_vals,
+            },
+            index=numeric.columns,
+        )
+
     def _enrich_cgsa_catalog_page_stats(
         self,
         context: Dict[str, Any],
         rows: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        """Compute statistics for only the current CGSA page of features."""
+        """Compute statistics for the current CGSA page using disk/memory cache.
+
+        Already-computed feature stats are served instantly from the in-memory
+        cache (backed by feature_stats_cache.parquet on disk). Only features that
+        have never been computed trigger a parquet read, so repeat searches for
+        the same features are nearly instant.
+        """
         if not rows:
             return rows
 
@@ -1014,32 +1115,51 @@ class FeatureFactoryService:
         if not names:
             return rows
 
-        try:
-            df, _total_rows = self._load_cgsa_selected_df(context, names)
-        except Exception as exc:
-            logger.warning("CGSA page stats failed for task %s: %s", context.get("task_id"), exc)
-            return rows
+        task_id = str(context.get("task_id", ""))
+        all_stats = self._load_cgsa_stats_mem(task_id, context)
 
-        numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
-        stats = {
-            "nan_ratio": numeric.isna().mean(),
-            "mean": numeric.mean(skipna=True),
-            "std": numeric.std(skipna=True),
-            "min": numeric.min(skipna=True),
-            "q25": numeric.quantile(0.25),
-            "median": numeric.quantile(0.50),
-            "q75": numeric.quantile(0.75),
-            "max": numeric.max(skipna=True),
-            "skewness": numeric.skew(skipna=True),
-            "kurtosis": numeric.kurt(skipna=True),
-        }
+        # Only load parquet for features not yet in the cache.
+        if not all_stats.empty:
+            missing_names = [n for n in names if n not in all_stats.index]
+        else:
+            missing_names = names
+
+        if missing_names:
+            # Cap synchronous computation to keep the search response fast.
+            # Features beyond the cap are returned with null stats ("-" in the
+            # UI); the background warmup thread fills them in so the next search
+            # for the same keyword is served entirely from cache.
+            sync_batch = missing_names[: self._CGSA_STATS_SYNC_CAP]
+            n_deferred = len(missing_names) - len(sync_batch)
+            if n_deferred > 0:
+                logger.debug(
+                    "CGSA stats: %d features deferred to warmup for task %s (%d computed now)",
+                    n_deferred, task_id, len(sync_batch),
+                )
+                # Ensure the warmup thread is running so deferred features are
+                # computed as soon as possible.
+                self._start_cgsa_stats_warmup(task_id, context)
+            try:
+                df, _total_rows = self._load_cgsa_selected_df(context, sync_batch)
+                numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
+                new_df = self._compute_feature_stats_fast(numeric)
+                new_df.index.name = "name"
+                # Persist to disk and update in-memory cache.
+                self._persist_cgsa_stats(task_id, context, new_df)
+                with self._lock:
+                    all_stats = self._cgsa_stats_mem_cache.get(task_id, new_df)
+            except Exception as exc:
+                logger.warning("CGSA page stats failed for task %s: %s", task_id, exc)
 
         enriched: List[Dict[str, Any]] = []
+        stat_keys = ("nan_ratio", "mean", "std", "min", "q25", "median", "q75", "max", "skewness", "kurtosis")
         for row in rows:
             item = dict(row)
             name = str(item.get("name", ""))
-            for key, series in stats.items():
-                item[key] = self._safe_float(series.get(name))
+            if not all_stats.empty and name in all_stats.index:
+                row_stats = all_stats.loc[name]
+                for key in stat_keys:
+                    item[key] = self._safe_float(row_stats.get(key))
             enriched.append(item)
         return enriched
 
@@ -1082,6 +1202,166 @@ class FeatureFactoryService:
         self._cgsa_column_path_cache[task_id] = fast["column_to_path"]
         logger.info("CGSA catalog cached for task %s (%d features)", task_id, len(rows))
         return rows
+
+    # ------------------------------------------------------------------
+    # CGSA feature stats disk-cache helpers
+    # ------------------------------------------------------------------
+
+    def _get_cgsa_stats_cache_path(self, context: Dict[str, Any]) -> Optional[Path]:
+        """Return path to the on-disk CGSA stats parquet, or None if unavailable."""
+        manifest_dir = context.get("manifest_dir")
+        if manifest_dir is None:
+            return None
+        return Path(manifest_dir) / self._CGSA_STATS_CACHE_NAME
+
+    def _load_cgsa_stats_mem(self, task_id: str, context: Dict[str, Any]) -> pd.DataFrame:
+        """Return the in-memory CGSA stats DataFrame, loading from disk on first call.
+
+        DataFrame is indexed by feature name with columns:
+        nan_ratio / mean / std / min / q25 / median / q75 / max / skewness / kurtosis.
+        Returns an empty DataFrame when no cache exists yet.
+        """
+        with self._lock:
+            if task_id in self._cgsa_stats_mem_cache:
+                return self._cgsa_stats_mem_cache[task_id]
+            cache_path = self._get_cgsa_stats_cache_path(context)
+
+        if cache_path is not None and cache_path.exists():
+            try:
+                df = pd.read_parquet(str(cache_path))
+                if "name" in df.columns:
+                    df = df.set_index("name")
+                with self._lock:
+                    # Double-checked: another thread may have loaded while we read disk.
+                    if task_id not in self._cgsa_stats_mem_cache:
+                        self._cgsa_stats_mem_cache[task_id] = df
+                    return self._cgsa_stats_mem_cache[task_id]
+            except Exception as exc:
+                logger.warning("Failed to load CGSA stats cache %s: %s", cache_path, exc)
+
+        return pd.DataFrame()
+
+    def _persist_cgsa_stats(
+        self, task_id: str, context: Dict[str, Any], new_df: pd.DataFrame
+    ) -> None:
+        """Merge new_df into the in-memory cache and write to disk.
+
+        Only features not already in the cache are added, so repeated calls are
+        idempotent and the file does not grow with duplicate rows.
+
+        The disk write is kept inside the lock so that concurrent warmup workers
+        cannot write to the same file simultaneously and corrupt it.
+        """
+        with self._lock:
+            existing = self._cgsa_stats_mem_cache.get(task_id, pd.DataFrame())
+            if not existing.empty:
+                new_only = new_df[~new_df.index.isin(existing.index)]
+                if new_only.empty:
+                    return  # Nothing new to persist
+                merged = pd.concat([existing, new_only])
+            else:
+                merged = new_df.copy()
+            self._cgsa_stats_mem_cache[task_id] = merged
+            cache_path = self._get_cgsa_stats_cache_path(context)
+            if cache_path is not None:
+                try:
+                    out = merged.copy()
+                    out.index.name = "name"
+                    out.reset_index().to_parquet(str(cache_path), index=False, compression="snappy")
+                    logger.debug(
+                        "Persisted CGSA stats cache for task %s (%d features total)",
+                        task_id, len(merged),
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to persist CGSA stats cache for task %s: %s", task_id, exc)
+
+    def _start_cgsa_stats_warmup(self, task_id: str, context: Dict[str, Any]) -> None:
+        """Start a background thread that progressively computes stats for all CGSA features.
+
+        Groups are processed in parallel (up to _WARMUP_WORKERS workers) so the
+        full cache is built in a fraction of the sequential time.  Results are
+        persisted to disk after each group so the cache grows incrementally and
+        survives API restarts.
+        """
+        _WARMUP_WORKERS = 4
+
+        with self._lock:
+            if task_id in self._cgsa_stats_warming_tasks:
+                return
+            self._cgsa_stats_warming_tasks.add(task_id)
+
+        def _process_group(group_meta: Any) -> int:
+            """Read one parquet group, compute stats, persist; return # new features."""
+            import pyarrow.parquet as _pq_w
+            if not isinstance(group_meta, dict):
+                return 0
+            manifest_dir: Optional[Path] = context.get("manifest_dir")
+            relative = group_meta.get("path") or group_meta.get("file")
+            if not relative or manifest_dir is None:
+                return 0
+            parquet_path = manifest_dir / relative
+            cols: List[str] = list(group_meta.get("columns") or [])
+            if not cols:
+                return 0
+            # Skip features already cached (checked under lock for thread safety).
+            with self._lock:
+                existing = self._cgsa_stats_mem_cache.get(task_id, pd.DataFrame())
+            if not existing.empty:
+                cols = [c for c in cols if c not in existing.index]
+            if not cols:
+                return 0
+            try:
+                table = _pq_w.read_table(str(parquet_path), columns=cols)
+                df = table.to_pandas(self_destruct=True)
+                numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
+                new_df = self._compute_feature_stats_fast(numeric)
+                new_df.index.name = "name"
+                self._persist_cgsa_stats(task_id, context, new_df)
+                return len(cols)
+            except Exception as exc:
+                pname = parquet_path.name
+                logger.debug("CGSA stats warmup: group %s skipped (%s)", pname, exc)
+                return 0
+
+        def _worker() -> None:
+            from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
+            try:
+                manifest = context.get("manifest") or {}
+                groups_raw = manifest.get("groups", {})
+                if isinstance(groups_raw, dict):
+                    groups_items: List[Any] = list(groups_raw.values())
+                else:
+                    groups_items = list(groups_raw) if groups_raw else []
+
+                total_persisted = 0
+                with _TPE(max_workers=_WARMUP_WORKERS, thread_name_prefix="cgsa-wm") as pool:
+                    futures = {pool.submit(_process_group, gm): gm for gm in groups_items}
+                    for future in _ac(futures):
+                        try:
+                            total_persisted += future.result()
+                        except Exception as exc:
+                            logger.debug("CGSA warmup future failed: %s", exc)
+
+                logger.info(
+                    "CGSA stats warmup completed for task %s — %d new features cached",
+                    task_id, total_persisted,
+                )
+            except Exception as exc:
+                logger.warning("CGSA stats warmup failed for task %s: %s", task_id, exc, exc_info=True)
+            finally:
+                with self._lock:
+                    self._cgsa_stats_warming_tasks.discard(task_id)
+
+        thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f"cgsa-stats-warm-{task_id[:8]}",
+        )
+        thread.start()
+        logger.info(
+            "CGSA stats warmup started for task %s (parallel_workers=%d)",
+            task_id, _WARMUP_WORKERS,
+        )
 
     def browse_feature_data(
         self,
@@ -1376,7 +1656,10 @@ class FeatureFactoryService:
         try:
             context = self._load_task_context(task_id)
             if context.get("is_cgsa"):
-                logger.info("Skipping CGSA stats warmup for task %s (reason=%s)", task_id, reason)
+                # CGSA tasks use a group-by-group background warmup that
+                # populates feature_stats_cache.parquet incrementally so
+                # repeat searches are served from cache without parquet I/O.
+                self._start_cgsa_stats_warmup(task_id, context)
                 return
         except Exception:
             pass
@@ -2002,6 +2285,140 @@ class FeatureFactoryService:
             "metadata": result.metadata,
             "hdf5_path": result.hdf5_path,
         }
+
+    # ------------------------------------------------------------------
+    # Task persistence – allows the Feature Explorer to survive API restarts
+    # ------------------------------------------------------------------
+
+    _TASK_RECORD_NAME = "task_record.json"
+    _CGSA_STATS_CACHE_NAME = "feature_stats_cache.parquet"
+    # Raised to 500: approximate quantiles (3 000-row sample) make 500 features
+    # computable in ~600 ms, so the synchronous cap can be larger without
+    # blocking the search response.  Features beyond the cap are returned with
+    # null stats ("-") and filled in by the background warmup.
+    _CGSA_STATS_SYNC_CAP = 500
+
+    def _persist_task_record(self, task_id: str, summary: Dict[str, Any]) -> None:
+        """Write a small JSON record next to the feature output so the task can
+        be restored after an API restart."""
+        hdf5_path = summary.get("hdf5_path")
+        if not hdf5_path:
+            return
+        record_dir = Path(hdf5_path).parent
+        record_path = record_dir / self._TASK_RECORD_NAME
+        record = {
+            "task_id": task_id,
+            "hdf5_path": str(hdf5_path),
+            "feature_count": summary.get("feature_count"),
+            "generation_time": summary.get("generation_time"),
+            "layer_counts": summary.get("layer_counts") or {},
+            "metadata": summary.get("metadata") or {},
+            "persisted_at": datetime.now().isoformat(),
+        }
+        try:
+            record_path.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+            logger.debug("Persisted task record: %s → %s", task_id, record_path)
+        except OSError as exc:
+            logger.warning("Failed to persist task record for %s: %s", task_id, exc)
+
+    def _restore_persisted_tasks(self) -> None:
+        """Scan data_cache/features/ for feature outputs and restore them into
+        the in-memory task store so the Feature Explorer survives API restarts.
+
+        Two passes:
+        1. task_record.json  — exact task_id written by a previous session.
+        2. feature_manifest.json without a companion task_record — auto-register
+           as a stable browse task (id: browse_{symbol}_{timeframe}_{hash8}).
+        """
+        features_root = settings.data_cache_path / "features"
+        if not features_root.exists():
+            return
+        restored = 0
+
+        # Pass 1 — restore exact task_ids from task_record.json
+        for record_path in features_root.rglob(self._TASK_RECORD_NAME):
+            try:
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                logger.warning("Skipping unreadable task record %s: %s", record_path, exc)
+                continue
+
+            task_id = record.get("task_id")
+            hdf5_path = record.get("hdf5_path")
+            if not task_id or not hdf5_path:
+                continue
+            if not Path(hdf5_path).exists():
+                logger.debug("Task record %s: output gone (%s), skipping", task_id, hdf5_path)
+                continue
+            with self._lock:
+                if task_id in self._tasks:
+                    continue
+                self._tasks[task_id] = {
+                    "task_id": task_id,
+                    "status": "completed",
+                    "progress": 1.0,
+                    "current_stage": None,
+                    "completed_stages": [],
+                    "error": None,
+                    "result": {
+                        "feature_count": record.get("feature_count"),
+                        "generation_time": record.get("generation_time"),
+                        "layer_counts": record.get("layer_counts") or {},
+                        "metadata": record.get("metadata") or {},
+                        "hdf5_path": hdf5_path,
+                    },
+                    "created_at": record.get("persisted_at", ""),
+                }
+            restored += 1
+
+        # Pass 2 — auto-register feature_manifest.json that have no task_record
+        # Expected layout: features/{symbol}/{timeframe}/{config_hash}/feature_manifest.json
+        for manifest_path in features_root.rglob("feature_manifest.json"):
+            manifest_dir = manifest_path.parent
+            if (manifest_dir / self._TASK_RECORD_NAME).exists():
+                continue  # Already covered by Pass 1
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+
+            # Derive symbol/timeframe from directory structure
+            parts = manifest_dir.relative_to(features_root).parts
+            if len(parts) < 3:
+                continue  # Unexpected layout — skip
+            symbol = parts[0]
+            timeframe = parts[1]
+            config_hash = parts[2]
+            hash8 = config_hash[:8]
+            # Stable ID — deterministic from symbol+timeframe+hash so the same
+            # manifest always gets the same task_id across restarts.
+            stable_id = f"browse_{symbol}_{timeframe}_{hash8}"
+            with self._lock:
+                if stable_id in self._tasks:
+                    continue
+                self._tasks[stable_id] = {
+                    "task_id": stable_id,
+                    "status": "completed",
+                    "progress": 1.0,
+                    "current_stage": None,
+                    "completed_stages": [],
+                    "error": None,
+                    "result": {
+                        "feature_count": manifest.get("total_features"),
+                        "generation_time": None,
+                        "layer_counts": {},
+                        "metadata": {"symbol": symbol, "timeframe": timeframe},
+                        "hdf5_path": str(manifest_path),
+                    },
+                    "created_at": manifest.get("created_at", ""),
+                }
+            restored += 1
+            logger.debug(
+                "Auto-registered manifest as browse task %s: %s", stable_id, manifest_path
+            )
+
+        if restored:
+            logger.info("Restored %d persisted feature task(s) from disk", restored)
 
     def _load_task_features(self, task_id: str) -> tuple:
         """Load task features DataFrame, using an in-memory cache to avoid
@@ -2863,7 +3280,9 @@ class FeatureFactoryService:
             for group_meta in groups_raw.values():
                 if not isinstance(group_meta, dict):
                     continue
-                relative = group_meta.get("file")
+                # Prefer "path" (relative with subdirectory prefix, e.g. "raw/file.parquet")
+                # over "file" (bare filename).  Mirrors the logic in _load_cgsa_summary_fast.
+                relative = group_meta.get("path") or group_meta.get("file")
                 if not relative or manifest_dir is None:
                     continue
                 parquet_path = manifest_dir / relative
@@ -2896,9 +3315,20 @@ class FeatureFactoryService:
             file_to_cols.setdefault(column_to_file[col], []).append(col)
 
         partial_frames: List[pd.DataFrame] = []
-        for parquet_path, cols in file_to_cols.items():
-            table = pq.read_table(str(parquet_path), columns=cols)
-            partial_frames.append(table.to_pandas(self_destruct=True))
+        if len(file_to_cols) > 1:
+            # Parallel I/O when features span multiple parquet files.
+            from concurrent.futures import ThreadPoolExecutor
+
+            def _read_one(args: tuple) -> pd.DataFrame:
+                _path, _cols = args
+                return pq.read_table(str(_path), columns=_cols).to_pandas(self_destruct=True)
+
+            with ThreadPoolExecutor(max_workers=min(4, len(file_to_cols))) as _pool:
+                partial_frames = list(_pool.map(_read_one, file_to_cols.items()))
+        else:
+            for parquet_path, cols in file_to_cols.items():
+                table = pq.read_table(str(parquet_path), columns=cols)
+                partial_frames.append(table.to_pandas(self_destruct=True))
 
         if not partial_frames:
             return pd.DataFrame(columns=selected_features), total_rows

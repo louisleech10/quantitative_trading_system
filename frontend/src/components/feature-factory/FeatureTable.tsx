@@ -53,6 +53,11 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
   const [tableScrollTop, setTableScrollTop] = useState(0);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
+  // Server-side search results — used when the search box is non-empty so
+  // features beyond the MAX_CLIENT_ROWS client cache are still searchable.
+  const [serverSearchRows, setServerSearchRows] = useState<BrowseFeatureItem[]>([]);
+  const [isServerSearching, setIsServerSearching] = useState(false);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
@@ -153,14 +158,49 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     };
   }, [browseFeatures, taskId]);
 
+  // When the debounced search term is non-empty, fetch from the server so
+  // features beyond MAX_CLIENT_ROWS are reachable (server searches all rows).
+  useEffect(() => {
+    if (!search) {
+      setServerSearchRows([]);
+      return;
+    }
+    let active = true;
+    setIsServerSearching(true);
+    browseFeatures(taskId, {
+      search,
+      limit: 5000,
+      sortBy: 'name',
+      sortOrder: 'asc',
+      detailLevel: 'table',
+    })
+      .then((resp) => {
+        if (!active) return;
+        setServerSearchRows(resp.features);
+      })
+      .catch(() => {
+        if (!active) return;
+        setServerSearchRows([]);
+      })
+      .finally(() => {
+        if (!active) return;
+        setIsServerSearching(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [search, taskId, browseFeatures]);
+
   const featureNames = useMemo(
     () => (sharedFeatureNames && sharedFeatureNames.length > 0 ? sharedFeatureNames : allRows.map((row) => row.name)),
     [allRows, sharedFeatureNames]
   );
 
-  // Client-side filter + sort (instant, no network)
+  // Client-side filter + sort (instant, no network).
+  // When search is active we use the server-returned results so that features
+  // beyond the MAX_CLIENT_ROWS local cache are always reachable.
   const filteredRows = useMemo(() => {
-    let result = allRows;
+    let result = search ? serverSearchRows : allRows;
 
     if (isSegmentFilterOpen && segmentFilteredNames.length > 0) {
       const allowed = new Set(segmentFilteredNames);
@@ -174,10 +214,8 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     if (level !== 'All') {
       result = result.filter((r) => r.level === level);
     }
-    if (search) {
-      const lower = search.toLowerCase();
-      result = result.filter((r) => r.name.toLowerCase().includes(lower));
-    }
+    // Text search is already applied server-side when search is non-empty;
+    // no additional client-side name filter needed.
 
     return [...result].sort((a, b) => {
       const mul = sortOrder === 'asc' ? 1 : -1;
@@ -186,7 +224,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       const bVal = getSortableMetric(b, sortBy);
       return mul * (aVal - bVal);
     });
-  }, [allRows, category, level, search, sortBy, sortOrder, segmentFilteredNames, isSegmentFilterOpen]);
+  }, [allRows, serverSearchRows, category, level, search, sortBy, sortOrder, segmentFilteredNames, isSegmentFilterOpen]);
 
   const visibleRows = filteredRows.slice(0, visibleCount);
   const hasMore = visibleCount < filteredRows.length;
@@ -336,6 +374,8 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
             ? ` 正在計算 ${totalCount.toLocaleString()} 個特徵的統計`
             : ' 首次載入全量資料，請稍候'}
         </div>
+      ) : isServerSearching ? (
+        <div className="text-xs text-slate-400">搜尋中...</div>
       ) : allRows.length === 0 ? (
         <div className="text-xs text-slate-400">沒有可用特徵。</div>
       ) : filteredRows.length === 0 ? (
@@ -390,6 +430,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       <div className="flex items-center justify-between text-xs text-slate-300">
         <div>
           顯示 {visibleRows.length.toLocaleString()} / 篩選 {filteredRows.length.toLocaleString()} / 總計 {serverTotal.toLocaleString()}
+          {search && !isServerSearching && <span className="ml-2 text-cyan-300">（伺服端搜尋）</span>}
           {isBackgroundLoading && <span className="ml-2 text-cyan-300">（背景載入中：{loadedCount.toLocaleString()}）</span>}
         </div>
         {hasMore && (
