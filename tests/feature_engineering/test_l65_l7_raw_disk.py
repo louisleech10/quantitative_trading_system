@@ -115,3 +115,63 @@ def test_precheck_passthrough_mode_c_uses_same_codepath(
     monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: 1)
     with pytest.raises(OSError):
         storage._precheck_l7_raw_stream_disk_space(tmp_path / "features", [("big", group)])
+
+
+def test_per_part_check_passes_with_source_reclaimable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Per-part disk check: free=1.98 GiB + source_reclaimable=2.09 GiB should pass.
+
+    Mirrors the exact log failure from case_search_api_20260511.log:
+      1h_L2_WorldQuant chunk6, source shards=22 (2090.6 MiB still on disk),
+      free=1.98 GiB, reserve_floor=2.0 GiB.
+    Old behaviour: OSError (false-fail). New behaviour: no error.
+    """
+    monkeypatch.setenv("FFACT_L7_DISK_SAFETY_FACTOR", "1.5")
+    monkeypatch.setenv("FFACT_L7_MIN_FREE_GIB", "2.0")
+
+    storage = FeatureStorage(str(tmp_path / "features"))
+    free_bytes = int(1.98 * 1024 ** 3)
+    source_reclaimable = int(2090.6 * 1024 ** 2)  # 2090.6 MiB
+    part_estimate = int(0.15 * 1024 ** 3)  # 0.15 GiB
+
+    monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: free_bytes)
+
+    # Must NOT raise: effective_free = 1.98 + 2.04 = 4.02 GiB >> 2.0 GiB
+    storage._ensure_l7_raw_part_disk_space(
+        tmp_path / "features",
+        part_id="1h_L2_WorldQuant_chunk6",
+        source_group_id="1h_L2_WorldQuant",
+        part_estimate_bytes=part_estimate,
+        source_reclaimable_bytes=source_reclaimable,
+    )
+
+
+def test_per_part_check_fails_when_no_reclaimable_and_free_too_low(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Per-part disk check: free=1.98 GiB, zero reclaimable, reserve_floor=2 GiB → fail.
+
+    Ensures the reclaimable accounting does not over-correct: when there are
+    genuinely no pending-release bytes and free disk is below reserve_floor,
+    the check must still raise OSError.
+    """
+    monkeypatch.setenv("FFACT_L7_DISK_SAFETY_FACTOR", "1.5")
+    monkeypatch.setenv("FFACT_L7_MIN_FREE_GIB", "2.0")
+
+    storage = FeatureStorage(str(tmp_path / "features"))
+    free_bytes = int(1.98 * 1024 ** 3)
+    part_estimate = int(0.15 * 1024 ** 3)
+
+    monkeypatch.setattr(storage, "_safe_disk_free_bytes", lambda _path: free_bytes)
+
+    with pytest.raises(OSError) as exc:
+        storage._ensure_l7_raw_part_disk_space(
+            tmp_path / "features",
+            part_id="some_part",
+            source_group_id="some_group",
+            part_estimate_bytes=part_estimate,
+            source_reclaimable_bytes=0,
+        )
+    assert "Insufficient disk space" in str(exc.value)
+    assert "pending release" in str(exc.value)

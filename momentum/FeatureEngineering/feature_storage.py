@@ -602,6 +602,19 @@ class FeatureStorage:
                     groups_with_inf += 1
 
             parts = self._split_large_group(safe_group_id, columns_list, array)
+            # Compute source's pending-release shard bytes so the per-part disk
+            # check mirrors the global pre-check's reclaimable accounting.
+            # For chunked big-group splits, the source shards stay on disk until
+            # the last chunk fires cleanup_source=True. Factoring them in here
+            # prevents a false-fail when accumulated parquet parts temporarily
+            # push the live free-disk reading below reserve_floor.
+            _source_reclaimable: int = 0
+            try:
+                _sg = registry.get(str(source_group_id))
+                _source_reclaimable = int(getattr(_sg, "total_shard_bytes", 0))
+            except (KeyError, AttributeError):
+                pass
+
             written_part_ids: List[str] = []
             for part_id, part_cols, part_data in parts:
                 safe_part_id = self._safe_path_segment(str(part_id), "part_id")
@@ -616,6 +629,7 @@ class FeatureStorage:
                     part_id=safe_part_id,
                     source_group_id=str(source_group_id),
                     part_estimate_bytes=int(np.asarray(data_for_parquet).nbytes),
+                    source_reclaimable_bytes=_source_reclaimable,
                 )
 
                 arrays = [pa_module.array(data_for_parquet[:, index]) for index in range(len(part_cols))]
@@ -2235,12 +2249,21 @@ class FeatureStorage:
         part_id: str,
         source_group_id: str,
         part_estimate_bytes: int,
+        source_reclaimable_bytes: int = 0,
     ) -> None:
         safety_factor = self._resolve_l7_disk_safety_factor()
         min_free_bytes = self._resolve_l7_min_free_bytes()
         required_bytes = max(int(part_estimate_bytes * safety_factor), min_free_bytes)
         free_bytes = self._safe_disk_free_bytes(output_dir)
-        if free_bytes is None or free_bytes >= required_bytes:
+        if free_bytes is None:
+            return
+        # Account for source shards that are still on disk but will be freed
+        # when cleanup_source fires on the final chunk of the current group.
+        # This mirrors the global pre-check's reclaimable_npy accounting and
+        # prevents false-fail for large chunked groups where parquet parts
+        # accumulate faster than the source can be released.
+        effective_free = free_bytes + source_reclaimable_bytes
+        if effective_free >= required_bytes:
             return
 
         raise OSError(
@@ -2250,7 +2273,10 @@ class FeatureStorage:
             f"{part_estimate_bytes / (1024 ** 3):.2f} GiB, reserve_floor="
             f"{min_free_bytes / (1024 ** 3):.2f} GiB, part_id={part_id}, "
             f"source_group_id={source_group_id}), available "
-            f"{free_bytes / (1024 ** 3):.2f} GiB at {output_dir}; "
+            f"{free_bytes / (1024 ** 3):.2f} GiB (effective "
+            f"{effective_free / (1024 ** 3):.2f} GiB with "
+            f"{source_reclaimable_bytes / (1024 ** 3):.2f} GiB pending release) "
+            f"at {output_dir}; "
             "clear data_cache/cgsa_work/* or set FFACT_L7_MIN_FREE_GIB to a lower value "
             "only if you accept the risk."
         )
