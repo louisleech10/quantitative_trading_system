@@ -112,7 +112,12 @@ class ICEngine:
         split_id: Optional[str] = None,
         ic_params: Optional[Dict[str, Any]] = None,
     ) -> ICSelectionResult:
-        """Compute IC from canonical L7 raw parquet groups without full concat."""
+        """Compute IC from canonical L7 raw parquet groups without full concat.
+
+        Cache hit path: when raw/ has been deleted (cleanup_raw=True after pipeline),
+        a previously saved ic_selected_features JSON holds all IC scores.  Re-applying
+        a different threshold only requires loading that JSON — no raw parquet reads.
+        """
 
         self._validate_selection_metadata(label_horizon, selection_window, split_id)
         resolved_method = method or (self._methods[0] if self._methods else "spearman")
@@ -131,6 +136,32 @@ class ICEngine:
             overrides=ic_params,
         )
 
+        # Resolve paths early so the cache check can run before any raw/ access.
+        run_dir = Path(feature_reader.feature_run_dir(symbol, tf, config_hash))
+        selected_path = run_dir / f"ic_selected_features_{symbol}_{tf}.json"
+        raw_dir = run_dir / "raw"
+
+        # ── Cache hit path ──────────────────────────────────────────────────────
+        # If raw/ was cleaned up but the JSON cache exists, re-apply the new
+        # threshold to previously computed IC scores without reading raw parquet.
+        if not raw_dir.exists() and selected_path.exists():
+            cache_result = self._try_reuse_cached_ic_scores(
+                selected_path=selected_path,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                label=label,
+                merged_ic_params=merged_ic_params,
+                resolved_threshold=resolved_threshold,
+            )
+            if cache_result is not None:
+                return cache_result
+            raise ICReadError(
+                f"raw/ artifact not found at {raw_dir} and cached IC scores are "
+                f"stale or missing. Re-run the IC-First pipeline to regenerate raw/."
+            )
+        # ── Full recompute path (raw/ must exist) ───────────────────────────────
+
         manifest = feature_reader.load_manifest_v2(
             symbol,
             tf,
@@ -143,9 +174,7 @@ class ICEngine:
             tf=tf,
             config_hash=config_hash,
         )
-        run_dir = Path(feature_reader.feature_run_dir(symbol, tf, config_hash))
         base_dir = self._resolve_l7_raw_base_dir(run_dir, manifest, config_hash)
-        selected_path = run_dir / f"ic_selected_features_{symbol}_{tf}.json"
 
         data_fingerprint = self._build_data_fingerprint(
             symbol=symbol,
@@ -635,6 +664,121 @@ class ICEngine:
         fingerprint["cache_valid"] = not bool(missing_required_fields)
         fingerprint["cache_status"] = "recomputed"
         return fingerprint
+
+    def _try_reuse_cached_ic_scores(
+        self,
+        selected_path: Path,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        label: pd.Series,
+        merged_ic_params: Dict[str, Any],
+        resolved_threshold: float,
+    ) -> Optional["ICSelectionResult"]:
+        """Re-apply a new IC threshold using previously cached IC scores.
+
+        Called when raw/ has been deleted (cleanup_raw=True) but the JSON cache
+        written by an earlier pipeline run still exists.  Only validates data
+        identity (symbol/tf/config_hash/row_count); the IC threshold in ic_params
+        is intentionally allowed to differ — that is the whole point of re-runs.
+
+        Returns ICSelectionResult on cache hit, None on cache miss.
+        """
+        try:
+            with selected_path.open("r", encoding="utf-8") as fh:
+                cached = json.load(fh)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            logger.warning("[IC-First] cache read failed, raw/ required: %s", exc)
+            return None
+
+        cached_ic_scores: Dict[str, float] = cached.get("ic_scores") or {}
+        if not cached_ic_scores:
+            logger.warning("[IC-First] cached ic_scores empty — raw/ required")
+            return None
+
+        fp: Dict[str, Any] = cached.get("data_fingerprint") or {}
+
+        # Validate data identity (NOT ic_params — threshold is allowed to change).
+        if (
+            fp.get("symbol") != symbol
+            or fp.get("tf") != tf
+            or fp.get("config_hash") != config_hash
+        ):
+            logger.warning(
+                "[IC-First] cache fingerprint mismatch (symbol/tf/config_hash) — raw/ required"
+            )
+            return None
+
+        # Row count: allow ±10-row tolerance for label alignment trimming.
+        cache_row_count = fp.get("row_count")
+        if cache_row_count is not None:
+            label_rows = len(label.dropna()) if hasattr(label, "dropna") else len(label)
+            if abs(int(cache_row_count) - label_rows) > 10:
+                logger.warning(
+                    "[IC-First] cache row_count mismatch: cached=%s label=%d — raw/ required",
+                    cache_row_count,
+                    label_rows,
+                )
+                return None
+
+        quality_status: str = cached.get("quality_status", "complete")
+        if quality_status not in ("complete", "partial"):
+            logger.warning(
+                "[IC-First] cached quality_status=%r not reusable — raw/ required",
+                quality_status,
+            )
+            return None
+
+        # Apply new threshold to cached IC scores.
+        selected = [
+            feature
+            for feature, ic_value in cached_ic_scores.items()
+            if self._passes_ic_threshold(ic_value, resolved_threshold)
+        ]
+
+        # Build updated fingerprint preserving all original data fields.
+        new_fingerprint: Dict[str, Any] = {k: v for k, v in fp.items() if k != "cache_status"}
+        new_fingerprint["cache_status"] = "reused_from_cache"
+        new_fingerprint["ic_params"] = merged_ic_params
+
+        skipped_groups: List[str] = cached.get("skipped_groups") or []
+        total_features = cached.get("total_features") or len(cached_ic_scores)
+        group_count: int = int(cached.get("group_count", 0))
+
+        payload = self._write_ic_selected_json_atomic(
+            output_path=selected_path,
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            selected=selected,
+            ic_scores=cached_ic_scores,
+            data_fingerprint=new_fingerprint,
+            ic_params=merged_ic_params,
+            skipped_groups=skipped_groups,
+            quality_status=quality_status,
+        )
+        logger.info(
+            "[IC-First] cache hit: reused %d IC scores, selected=%d "
+            "at threshold=%.4f (raw/ cleaned up, no parquet reads needed)",
+            len(cached_ic_scores),
+            len(selected),
+            resolved_threshold,
+        )
+        return ICSelectionResult(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            selected=selected,
+            ic_scores=cached_ic_scores,
+            skipped_groups=skipped_groups,
+            quality_status=quality_status,
+            selected_path=str(payload["selected_path"]),
+            data_fingerprint=new_fingerprint,
+            ic_params=merged_ic_params,
+            group_count=group_count,
+            total_features=int(total_features),
+            frozen_gate_eligible=quality_status == "complete",
+        )
 
     def _write_ic_selected_json_atomic(
         self,
