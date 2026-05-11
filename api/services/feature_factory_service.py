@@ -93,6 +93,40 @@ class FeatureFactoryService:
         # Task IDs currently running background CGSA stats warmup.
         self._cgsa_stats_warming_tasks: set[str] = set()
 
+        # Hardware-adaptive CGSA stats parameters (Q1 / Q2 optimisation).
+        # Detected once at startup; overridden via FFACT_MEMORY_TIER env var.
+        # Falls back to conservative 8GB defaults on detection failure.
+        try:
+            from momentum.FeatureEngineering.utils.hardware_utils import (
+                get_memory_tier as _stats_gmt,
+                get_tier_config as _stats_gtc,
+            )
+            _stats_tier = _stats_gmt()
+            _stats_tcfg = _stats_gtc(_stats_tier)
+            self._cgsa_stats_sync_cap: int = int(
+                _stats_tcfg.get("cgsa_stats_sync_cap", self._CGSA_STATS_SYNC_CAP)
+            )
+            self._cgsa_stats_q_sample: int = int(
+                _stats_tcfg.get("cgsa_stats_q_sample", 3_000)
+            )
+            self._cgsa_stats_warmup_workers: int = int(
+                _stats_tcfg.get("cgsa_stats_warmup_workers", 4)
+            )
+            logger.info(
+                "CGSA stats (tier=%s): sync_cap=%d q_sample=%d warmup_workers=%d",
+                _stats_tier,
+                self._cgsa_stats_sync_cap,
+                self._cgsa_stats_q_sample,
+                self._cgsa_stats_warmup_workers,
+            )
+        except Exception as _tier_exc:
+            logger.warning(
+                "CGSA stats tier detection failed, using conservative defaults: %s", _tier_exc
+            )
+            self._cgsa_stats_sync_cap = self._CGSA_STATS_SYNC_CAP
+            self._cgsa_stats_q_sample = 3_000
+            self._cgsa_stats_warmup_workers = 4
+
         # Restore any previously-completed tasks from disk so the Feature
         # Explorer stays functional across API restarts.
         self._restore_persisted_tasks()
@@ -1037,7 +1071,9 @@ class FeatureFactoryService:
         }
 
     @staticmethod
-    def _compute_feature_stats_fast(numeric: pd.DataFrame) -> pd.DataFrame:
+    def _compute_feature_stats_fast(
+        numeric: pd.DataFrame, q_sample: int = 3_000
+    ) -> pd.DataFrame:
         """Compute 10 column-wise statistics with optimised numpy ops.
 
         Key optimisations vs naive pandas:
@@ -1047,15 +1083,18 @@ class FeatureFactoryService:
         * Direct numpy reductions for mean/std/min/max/nan_ratio to avoid the
           per-column Python overhead of pandas aggregation methods.
         * Approximate quantiles via a systematic even-spaced sample when
-          n_rows > _Q_SAMPLE (default 3 000).  Sorting 3 000 instead of 52 000
-          rows per column is ~17× faster with <1 % error for typical financial
-          time-series distributions, making on-demand stats fast enough without
-          requiring a pre-built cache.
+          n_rows > q_sample.  Sorting q_sample instead of 52 000 rows per
+          column is ~(52k/q_sample)× faster with <1 % error for typical
+          financial time-series distributions.
         * Skewness and kurtosis still use pandas (they already delegate to
           numpy internally and handle edge-cases such as constant columns).
-        """
-        _Q_SAMPLE = 3_000  # rows used for approximate quantile estimation
 
+        Parameters
+        ----------
+        q_sample:
+            Row count used for the approximate quantile sample.  Controlled
+            per hardware tier via ``hardware_utils._CGSA_STATS_Q_SAMPLE_BY_TIER``.
+        """
         arr = numeric.to_numpy(dtype=np.float64, na_value=np.nan)
 
         # Basic stats — each is a single vectorised numpy pass (full data).
@@ -1068,8 +1107,8 @@ class FeatureFactoryService:
         # Approximate quantiles from an evenly-spaced sample.
         # min/max are always exact (above); only q25/median/q75 use the sample.
         n_rows = arr.shape[0]
-        if n_rows > _Q_SAMPLE:
-            q_idx = np.round(np.linspace(0, n_rows - 1, _Q_SAMPLE)).astype(np.intp)
+        if n_rows > q_sample:
+            q_idx = np.round(np.linspace(0, n_rows - 1, q_sample)).astype(np.intp)
             arr_q = arr[q_idx, :]
         else:
             arr_q = arr
@@ -1129,7 +1168,7 @@ class FeatureFactoryService:
             # Features beyond the cap are returned with null stats ("-" in the
             # UI); the background warmup thread fills them in so the next search
             # for the same keyword is served entirely from cache.
-            sync_batch = missing_names[: self._CGSA_STATS_SYNC_CAP]
+            sync_batch = missing_names[: self._cgsa_stats_sync_cap]
             n_deferred = len(missing_names) - len(sync_batch)
             if n_deferred > 0:
                 logger.debug(
@@ -1142,7 +1181,7 @@ class FeatureFactoryService:
             try:
                 df, _total_rows = self._load_cgsa_selected_df(context, sync_batch)
                 numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
-                new_df = self._compute_feature_stats_fast(numeric)
+                new_df = self._compute_feature_stats_fast(numeric, self._cgsa_stats_q_sample)
                 new_df.index.name = "name"
                 # Persist to disk and update in-memory cache.
                 self._persist_cgsa_stats(task_id, context, new_df)
@@ -1278,12 +1317,12 @@ class FeatureFactoryService:
     def _start_cgsa_stats_warmup(self, task_id: str, context: Dict[str, Any]) -> None:
         """Start a background thread that progressively computes stats for all CGSA features.
 
-        Groups are processed in parallel (up to _WARMUP_WORKERS workers) so the
+        Groups are processed in parallel (up to cgsa_stats_warmup_workers workers) so the
         full cache is built in a fraction of the sequential time.  Results are
         persisted to disk after each group so the cache grows incrementally and
         survives API restarts.
         """
-        _WARMUP_WORKERS = 4
+        _WARMUP_WORKERS = self._cgsa_stats_warmup_workers
 
         with self._lock:
             if task_id in self._cgsa_stats_warming_tasks:
@@ -1314,7 +1353,7 @@ class FeatureFactoryService:
                 table = _pq_w.read_table(str(parquet_path), columns=cols)
                 df = table.to_pandas(self_destruct=True)
                 numeric = df.replace([np.inf, -np.inf], np.nan).astype("float64", copy=False)
-                new_df = self._compute_feature_stats_fast(numeric)
+                new_df = self._compute_feature_stats_fast(numeric, self._cgsa_stats_q_sample)
                 new_df.index.name = "name"
                 self._persist_cgsa_stats(task_id, context, new_df)
                 return len(cols)

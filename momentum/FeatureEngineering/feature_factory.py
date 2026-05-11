@@ -1358,8 +1358,20 @@ class FeatureFactory:
         label_horizon: str = "1_bar_forward_return",
         selection_window: Optional[Dict[str, Any]] = None,
         split_id: Optional[str] = None,
+        cleanup_raw: bool = True,
     ) -> FeatureGenerationResult:
-        """Run the IC-First pipeline with raw persist, GC gate, IC, and processed persist."""
+        """Run the IC-First pipeline with raw persist, GC gate, IC, and processed persist.
+
+        Parameters
+        ----------
+        cleanup_raw:
+            When *True* (default) the ``raw/`` artifact directory is deleted
+            immediately after ``processed/`` is successfully written.  The
+            ``raw/`` data is only required for the IC gate step; retaining it
+            permanently doubles disk usage with no downstream benefit.  Set
+            *False* to keep ``raw/`` (e.g. for debugging or if you want to
+            re-run IC with a different threshold without re-running L1-L6).
+        """
         start = start_time if start_time is not None else time.time()
         resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
             config,
@@ -1464,6 +1476,30 @@ class FeatureFactory:
             resolved_config_hash,
             processed_groups,
         )
+
+        # IC-First raw/ cleanup: raw/ was needed only for the IC gate step.
+        # After processed/ is safely on disk, reclaim that space immediately.
+        # The IC metadata (selected features, scores) is preserved in the
+        # returned FeatureGenerationResult so re-analysis does not need raw/.
+        raw_freed_gb = 0.0
+        if cleanup_raw and raw_path.exists():
+            try:
+                raw_size_bytes = sum(
+                    f.stat().st_size for f in raw_path.rglob("*") if f.is_file()
+                )
+                import shutil as _ic_shutil
+                _ic_shutil.rmtree(raw_path)
+                raw_freed_gb = raw_size_bytes / 1_073_741_824
+                logger.info(
+                    "[IC-First] Cleaned up raw/ artifact (%.2f GB freed): %s",
+                    raw_freed_gb,
+                    raw_path,
+                )
+            except Exception as _cleanup_exc:
+                logger.warning(
+                    "[IC-First] raw/ cleanup failed (non-fatal, disk will not be reclaimed): %s",
+                    _cleanup_exc,
+                )
         processed_feature_count = sum(len(frame.columns) for frame in processed_groups.values())
         del processed_groups
         gc.collect()
@@ -1484,6 +1520,8 @@ class FeatureFactory:
             "run_ic_gate_peak_rss_gb": float(ic_memory.peak_rss_gb),
             "tier_peak_budget_gb": peak_budget_gb,
             "persist_requested": bool(persist),
+            "raw_cleaned_up": cleanup_raw and not raw_path.exists(),
+            "raw_freed_gb": raw_freed_gb,
         }
         logger.info(
             "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d peak_rss_gb=%.2f",

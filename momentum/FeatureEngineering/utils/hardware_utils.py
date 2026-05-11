@@ -136,6 +136,45 @@ _CGSA_SHARD_BYTES_BY_TIER: Dict[str, int] = {
 _CGSA_SHARD_FLOOR_BYTES = 32 * 1024 * 1024
 _CGSA_SHARD_CAP_BYTES = 512 * 1024 * 1024
 
+# Tier-aware L7 zstd compression level.
+# Higher level = better compression ratio but more CPU write time.
+# 8GB: disk space is precious; accept ~2× write latency for ~15-25% smaller files.
+# 32GB: level 1 (zstd speed mode) minimises write latency; disk headroom is ample.
+_L7_ZSTD_LEVEL_BY_TIER: Dict[str, int] = {
+    "8gb": 4,    # ~15-25% smaller vs level 1; ~2× write time
+    "16gb": 3,
+    "24gb": 2,
+    "32gb": 1,   # zstd speed mode (current default for all tiers)
+}
+
+# CGSA Feature Table stats: per-tier tuning for on-demand stats computation.
+#
+# sync_cap  – max features computed synchronously per page request. Higher
+#             values mean more stats visible without background warmup, but
+#             block the event loop longer.
+# q_sample  – row sample size for approximate quantile estimation. Sorting
+#             q_sample instead of the full ~52K rows is q_sample/52K× faster
+#             with <1% error for typical financial distributions.
+# warmup_workers – ThreadPool parallelism for the background warmup thread.
+_CGSA_STATS_SYNC_CAP_BY_TIER: Dict[str, int] = {
+    "8gb": 200,    # Conservative: avoids long event-loop blocks on slow hardware
+    "16gb": 500,   # Previous hardcoded default after approximation optimisation
+    "24gb": 800,
+    "32gb": 1000,
+}
+_CGSA_STATS_Q_SAMPLE_BY_TIER: Dict[str, int] = {
+    "8gb": 1500,   # Smallest sample: ~34× faster vs full 52K rows; <2% error
+    "16gb": 3000,  # Previous hardcoded default (17× faster)
+    "24gb": 5000,
+    "32gb": 8000,
+}
+_CGSA_STATS_WARMUP_WORKERS_BY_TIER: Dict[str, int] = {
+    "8gb": 2,    # OOM guard: limited concurrent parquet reads
+    "16gb": 4,   # Previous hardcoded default
+    "24gb": 6,
+    "32gb": 8,
+}
+
 _CONCURRENT_SYMBOLS_BY_TIER_GB: Dict[int, int] = {
     8: 1,
     16: 1,
@@ -180,6 +219,11 @@ def get_tier_config(tier: str) -> Dict[str, Any]:
         "l2_category_workers": _L2_CATEGORY_WORKERS_BY_TIER.get(tier, _L2_CATEGORY_WORKERS_BY_TIER["8gb"]),
         "cgsa_shard_bytes": _CGSA_SHARD_BYTES_BY_TIER.get(tier, _CGSA_SHARD_BYTES_BY_TIER["8gb"]),
         "concurrent_symbols": get_tier_concurrent_symbols(tier_gb),
+        # L7 output compression & CGSA Feature Table stats (added Q1/Q2 optimisation)
+        "l7_zstd_level": _L7_ZSTD_LEVEL_BY_TIER.get(tier, _L7_ZSTD_LEVEL_BY_TIER["8gb"]),
+        "cgsa_stats_sync_cap": _CGSA_STATS_SYNC_CAP_BY_TIER.get(tier, _CGSA_STATS_SYNC_CAP_BY_TIER["8gb"]),
+        "cgsa_stats_q_sample": _CGSA_STATS_Q_SAMPLE_BY_TIER.get(tier, _CGSA_STATS_Q_SAMPLE_BY_TIER["8gb"]),
+        "cgsa_stats_warmup_workers": _CGSA_STATS_WARMUP_WORKERS_BY_TIER.get(tier, _CGSA_STATS_WARMUP_WORKERS_BY_TIER["8gb"]),
     }
 
 

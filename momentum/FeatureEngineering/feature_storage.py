@@ -563,6 +563,22 @@ class FeatureStorage:
             artifact_kind="raw",
         )
 
+        # Tier-aware zstd level for this streaming raw write.
+        # Resolved once here so _write_group closure captures the scalar.
+        # FFACT_L7_ZSTD_LEVEL env var overrides tier auto-detect.
+        try:
+            from momentum.FeatureEngineering.utils.hardware_utils import (
+                get_memory_tier as _hw_gmt_stream,
+                get_tier_config as _hw_gtc_stream,
+            )
+            _stream_tier_cfg = _hw_gtc_stream(_hw_gmt_stream())
+            _stream_zstd_level: int = self._resolve_positive_env(
+                "FFACT_L7_ZSTD_LEVEL",
+                int(_stream_tier_cfg.get("l7_zstd_level", 1)),
+            )
+        except Exception:
+            _stream_zstd_level = 1
+
         def _write_group(
             group_id: str,
             columns: List[str],
@@ -642,6 +658,7 @@ class FeatureStorage:
                     staging_path,
                     float32_cols=float32_cols,
                     schema_metadata=parquet_metadata,
+                    compression_level=_stream_zstd_level,
                 )
                 os.replace(staging_path, output_path)
 
@@ -1669,6 +1686,7 @@ class FeatureStorage:
         parts_queue: List[Tuple[str, Any, Path, Path, List[str]]],
         n_workers: int,
         compactor: Optional[AsyncParquetCompactor] = None,
+        compression_level: int = 1,
     ) -> List[str]:
         """Persist parquet parts with optional parallel writes and async compaction."""
         if not parts_queue:
@@ -1682,6 +1700,7 @@ class FeatureStorage:
                 table,
                 staging_path,
                 float32_cols=float32_cols,
+                compression_level=compression_level,
             )
             if compactor is not None:
                 compactor.enqueue((part_id, staging_path, float32_cols))
@@ -1791,6 +1810,12 @@ class FeatureStorage:
                 "FFACT_L7_WORKERS",
                 int(tier_cfg["l7_workers"]),
             )
+            # Tier-aware zstd compression level (Q2 optimisation).
+            # Env var FFACT_L7_ZSTD_LEVEL overrides tier auto-detect.
+            zstd_level: int = self._resolve_positive_env(
+                "FFACT_L7_ZSTD_LEVEL",
+                int(tier_cfg.get("l7_zstd_level", 1)),
+            )
             compactor_enabled = os.getenv("FFACT_L7_COMPACTOR_ENABLED", "1").strip() != "0"
             target_rows = self._resolve_positive_env("FFACT_L7_COMPACTOR_TARGET_ROWS", 100_000)
             chunk_bars = tier_cfg.get("chunk_bars")
@@ -1836,6 +1861,7 @@ class FeatureStorage:
                     pending_parts,
                     n_workers=n_workers,
                     compactor=compactor,
+                    compression_level=zstd_level,
                 )
                 if compactor is None:
                     persisted_paths.extend(batch_results)
