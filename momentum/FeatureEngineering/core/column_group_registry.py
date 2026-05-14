@@ -27,7 +27,7 @@ except ImportError:
 
         return _decorator
 
-from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource, ShardMeta
+from momentum.FeatureEngineering.core.column_group import AlignmentMeta, ColumnGroup, LayerSource, ShardMeta
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -262,6 +262,9 @@ class ColumnGroupRegistry:
 
         group = self.get(group_id)
 
+        if group.alignment is not None:
+            return self._load_compact_aligned_group(group)
+
         # Sharded path: concat per-shard mmaps. We allocate one ndarray and
         # memcpy each shard slice in to avoid mmap-lifetime issues with the
         # caller (np.concatenate on mmap views can keep file handles alive
@@ -312,8 +315,18 @@ class ColumnGroupRegistry:
         For non-sharded legacy groups, yields a single synthesized shard view
         backed by ``disk_path``. The ``mmap_array`` is read-only mmap; caller
         must NOT mutate. Drop reference between iterations to release mmap.
+
+        Compact-aligned groups yield logical primary-timeframe rows. Their
+        physical source arrays are expanded with the group's ``idx_map`` one
+        shard at a time, so existing L6.5/L7 streaming callers keep the same
+        interface without storing dense aligned ``.npy`` files.
         """
         group = self.get(group_id)
+
+        if group.alignment is not None:
+            idx_map = self._load_alignment_index_map(group)
+            yield from self._iter_compact_aligned_shards(group, idx_map)
+            return
 
         # Memory-buffer fast path: synthesize as one virtual shard.
         with self._buffer_lock:
@@ -373,6 +386,329 @@ class ColumnGroupRegistry:
         )
         yield virtual, arr, tuple(group.columns)
         del arr
+
+    def _load_compact_aligned_group(self, group: ColumnGroup) -> np.ndarray:
+        """Materialize a compact-aligned group to its logical dense matrix."""
+        out = np.empty((group.n_rows, group.n_cols), dtype=np.float32)
+        for shard_meta, aligned_shard, _columns in self.iter_shards(group.group_id):
+            out[:, shard_meta.col_start:shard_meta.col_end] = aligned_shard
+            del aligned_shard
+        return out
+
+    # ------------------------------------------------------------------
+    # Native (source-resolution) read API
+    # ------------------------------------------------------------------
+    # These methods return data at the source timeframe row count for
+    # compact-aligned groups, skipping the idx_map expansion. They power
+    # the native-resolution L6.5 path that runs preprocessing on native
+    # rows and forward-fills results to primary rows post-transform.
+    # For non-compact groups the behavior is identical to load_data /
+    # iter_shards (no alignment to bypass).
+    def load_data_native(self, group_id: str) -> np.ndarray:
+        """Load source-resolution data without idx_map expansion.
+
+        For compact-aligned groups, returns shape (source_n_rows, n_cols).
+        For non-compact groups, returns shape (n_rows, n_cols) — identical
+        to ``load_data``.
+        """
+        group = self.get(group_id)
+
+        with self._buffer_lock:
+            buffered = self._memory_buffer.get(group_id)
+        if buffered is not None:
+            return np.asarray(buffered, dtype=np.float32)
+
+        if group.alignment is None:
+            return self.load_data(group_id)
+
+        # Compact-aligned: read physical source rows directly.
+        if group.shards:
+            for shard in group.shards:
+                if not shard.disk_path.exists():
+                    raise ColumnGroupRegistryError(
+                        f"Persisted shard data missing: {shard.disk_path} (group={group_id} shard={shard.shard_idx})",
+                        failure_type=FailureType.IO_ERROR,
+                    )
+            try:
+                source_n_rows = int(group.alignment.source_n_rows)
+                out = np.empty((source_n_rows, group.n_cols), dtype=np.float32)
+                for shard in group.shards:
+                    arr = np.load(shard.disk_path, mmap_mode="r", allow_pickle=False)
+                    if arr.shape[0] != source_n_rows:
+                        raise ColumnGroupRegistryError(
+                            f"Compact shard row mismatch for {group_id} shard {shard.shard_idx}: "
+                            f"expected {source_n_rows}, got {arr.shape[0]}",
+                            failure_type=FailureType.VALIDATION,
+                        )
+                    out[:, shard.col_start:shard.col_end] = arr
+                    del arr
+                return out
+            except OSError as exc:
+                raise ColumnGroupRegistryError(
+                    f"Failed to load native sharded group data for {group_id}: {exc}",
+                    failure_type=FailureType.IO_ERROR,
+                ) from exc
+
+        if group.disk_path is None or not group.disk_path.exists():
+            raise ColumnGroupRegistryError(
+                f"Compact-aligned group {group_id} has no readable disk_path or shards.",
+                failure_type=FailureType.VALIDATION,
+            )
+        try:
+            arr = np.load(group.disk_path, mmap_mode="r", allow_pickle=False)
+        except OSError as exc:
+            raise ColumnGroupRegistryError(
+                f"Failed to mmap native compact group {group_id}: {exc}",
+                failure_type=FailureType.IO_ERROR,
+            ) from exc
+        return np.asarray(arr, dtype=np.float32)
+
+    def iter_shards_native(
+        self, group_id: str
+    ) -> Iterator[tuple[ShardMeta, np.ndarray, tuple[str, ...]]]:
+        """Yield shards at source resolution without idx_map expansion.
+
+        ShardMeta.n_rows reflects source rows for compact-aligned groups.
+        For non-compact groups, behavior matches ``iter_shards``.
+        """
+        group = self.get(group_id)
+
+        if group.alignment is None:
+            yield from self.iter_shards(group_id)
+            return
+
+        source_n_rows = int(group.alignment.source_n_rows)
+
+        with self._buffer_lock:
+            buffered = self._memory_buffer.get(group_id)
+        if buffered is not None:
+            arr = np.asarray(buffered, dtype=np.float32)
+            virtual = ShardMeta(
+                shard_idx=0,
+                col_start=0,
+                col_end=group.n_cols,
+                n_rows=source_n_rows,
+                disk_path=group.disk_path or (self._work_dir / f"{group_id}.npy"),
+                nbytes=int(arr.nbytes),
+            )
+            yield virtual, arr, tuple(group.columns)
+            return
+
+        if group.shards:
+            for shard in group.shards:
+                if not shard.disk_path.exists():
+                    raise ColumnGroupRegistryError(
+                        f"Persisted shard data missing: {shard.disk_path} (group={group_id} shard={shard.shard_idx})",
+                        failure_type=FailureType.IO_ERROR,
+                    )
+                try:
+                    arr = np.load(shard.disk_path, mmap_mode="r", allow_pickle=False)
+                except OSError as exc:
+                    raise ColumnGroupRegistryError(
+                        f"Failed to mmap native shard {shard.shard_idx} for {group_id}: {exc}",
+                        failure_type=FailureType.IO_ERROR,
+                    ) from exc
+                native_meta = ShardMeta(
+                    shard_idx=shard.shard_idx,
+                    col_start=shard.col_start,
+                    col_end=shard.col_end,
+                    n_rows=source_n_rows,
+                    disk_path=shard.disk_path,
+                    nbytes=shard.nbytes,
+                )
+                shard_columns = tuple(group.columns[shard.col_start:shard.col_end])
+                yield native_meta, arr, shard_columns
+                del arr
+            return
+
+        if group.disk_path is None or not group.disk_path.exists():
+            raise ColumnGroupRegistryError(
+                f"Compact-aligned group {group_id} has no readable disk_path or shards.",
+                failure_type=FailureType.VALIDATION,
+            )
+        try:
+            arr = np.load(group.disk_path, mmap_mode="r", allow_pickle=False)
+        except OSError as exc:
+            raise ColumnGroupRegistryError(
+                f"Failed to mmap native compact single-file group {group_id}: {exc}",
+                failure_type=FailureType.IO_ERROR,
+            ) from exc
+        try:
+            source_nbytes = int(group.disk_path.stat().st_size)
+        except OSError:
+            source_nbytes = int(arr.nbytes)
+        virtual = ShardMeta(
+            shard_idx=0,
+            col_start=0,
+            col_end=group.n_cols,
+            n_rows=source_n_rows,
+            disk_path=group.disk_path,
+            nbytes=source_nbytes,
+        )
+        yield virtual, arr, tuple(group.columns)
+        del arr
+
+    def get_alignment_idx_map(self, group_id: str) -> Optional[np.ndarray]:
+        """Return idx_map (int64 array) for a compact-aligned group, else None.
+
+        The returned array has length ``alignment.primary_n_rows``. Values >= 0
+        index into the source-resolution data; -1 marks rows with no valid
+        source row available (output should be NaN).
+        """
+        group = self.get(group_id)
+        if group.alignment is None:
+            return None
+        return self._load_alignment_index_map(group)
+
+    def _iter_compact_aligned_shards(
+        self,
+        group: ColumnGroup,
+        idx_map: np.ndarray,
+    ) -> Iterator[tuple[ShardMeta, np.ndarray, tuple[str, ...]]]:
+        """Yield logical aligned shard arrays for a compact-aligned group."""
+        group_id = group.group_id
+
+        with self._buffer_lock:
+            buffered = self._memory_buffer.get(group_id)
+        if buffered is not None:
+            physical = np.asarray(buffered, dtype=np.float32)
+            aligned = self._align_physical_array(
+                physical,
+                idx_map,
+                n_primary=group.n_rows,
+                group_id=group_id,
+            )
+            virtual = ShardMeta(
+                shard_idx=0,
+                col_start=0,
+                col_end=group.n_cols,
+                n_rows=group.n_rows,
+                disk_path=group.disk_path or (self._work_dir / f"{group_id}.npy"),
+                nbytes=int(physical.nbytes),
+            )
+            yield virtual, aligned, tuple(group.columns)
+            return
+
+        if group.shards:
+            for shard in group.shards:
+                if not shard.disk_path.exists():
+                    raise ColumnGroupRegistryError(
+                        f"Persisted shard data missing: {shard.disk_path} (group={group_id} shard={shard.shard_idx})",
+                        failure_type=FailureType.IO_ERROR,
+                    )
+                try:
+                    physical = np.load(shard.disk_path, mmap_mode="r", allow_pickle=False)
+                except OSError as exc:
+                    raise ColumnGroupRegistryError(
+                        f"Failed to mmap compact shard {shard.shard_idx} for {group_id}: {exc}",
+                        failure_type=FailureType.IO_ERROR,
+                    ) from exc
+                aligned = self._align_physical_array(
+                    physical,
+                    idx_map,
+                    n_primary=group.n_rows,
+                    group_id=group_id,
+                )
+                logical_meta = ShardMeta(
+                    shard_idx=shard.shard_idx,
+                    col_start=shard.col_start,
+                    col_end=shard.col_end,
+                    n_rows=group.n_rows,
+                    disk_path=shard.disk_path,
+                    nbytes=shard.nbytes,
+                )
+                shard_columns = tuple(group.columns[shard.col_start:shard.col_end])
+                yield logical_meta, aligned, shard_columns
+                del physical, aligned
+            return
+
+        if group.disk_path is None or not group.disk_path.exists():
+            raise ColumnGroupRegistryError(
+                f"Compact-aligned group {group_id} has no readable disk_path or shards.",
+                failure_type=FailureType.VALIDATION,
+            )
+        try:
+            physical = np.load(group.disk_path, mmap_mode="r", allow_pickle=False)
+        except OSError as exc:
+            raise ColumnGroupRegistryError(
+                f"Failed to mmap compact single-file group {group_id}: {exc}",
+                failure_type=FailureType.IO_ERROR,
+            ) from exc
+        aligned = self._align_physical_array(
+            physical,
+            idx_map,
+            n_primary=group.n_rows,
+            group_id=group_id,
+        )
+        try:
+            source_nbytes = int(group.disk_path.stat().st_size)
+        except OSError:
+            source_nbytes = int(physical.nbytes)
+        virtual = ShardMeta(
+            shard_idx=0,
+            col_start=0,
+            col_end=group.n_cols,
+            n_rows=group.n_rows,
+            disk_path=group.disk_path,
+            nbytes=source_nbytes,
+        )
+        yield virtual, aligned, tuple(group.columns)
+        del physical, aligned
+
+    def _load_alignment_index_map(self, group: ColumnGroup) -> np.ndarray:
+        alignment = group.alignment
+        if alignment is None:
+            raise ColumnGroupRegistryError(
+                f"Group {group.group_id} is not compact-aligned",
+                failure_type=FailureType.VALIDATION,
+            )
+        idx_map_path = Path(alignment.idx_map_path)
+        if not idx_map_path.exists():
+            raise ColumnGroupRegistryError(
+                f"Alignment idx_map missing for group {group.group_id}: {idx_map_path}",
+                failure_type=FailureType.IO_ERROR,
+            )
+        try:
+            idx_map = np.load(idx_map_path, mmap_mode="r", allow_pickle=False)
+        except OSError as exc:
+            raise ColumnGroupRegistryError(
+                f"Failed to load alignment idx_map for {group.group_id}: {exc}",
+                failure_type=FailureType.IO_ERROR,
+            ) from exc
+        if int(idx_map.shape[0]) != group.n_rows:
+            raise ColumnGroupRegistryError(
+                f"Alignment idx_map row mismatch for {group.group_id}: "
+                f"expected {group.n_rows}, got {idx_map.shape[0]}",
+                failure_type=FailureType.VALIDATION,
+            )
+        return np.asarray(idx_map, dtype=np.int64)
+
+    @staticmethod
+    def _align_physical_array(
+        physical: np.ndarray,
+        idx_map: np.ndarray,
+        *,
+        n_primary: int,
+        group_id: str,
+    ) -> np.ndarray:
+        source = np.asarray(physical, dtype=np.float32)
+        if source.ndim != 2:
+            raise ColumnGroupRegistryError(
+                f"Compact source group {group_id} must be 2D, got shape={source.shape}",
+                failure_type=FailureType.VALIDATION,
+            )
+        out = np.full((int(n_primary), int(source.shape[1])), np.nan, dtype=np.float32)
+        if idx_map.size == 0:
+            return out
+        valid = idx_map >= 0
+        if bool(np.any(valid & (idx_map >= source.shape[0]))):
+            raise ColumnGroupRegistryError(
+                f"Alignment idx_map for {group_id} references source row beyond {source.shape[0]}",
+                failure_type=FailureType.VALIDATION,
+            )
+        if bool(np.any(valid)):
+            out[valid] = source[idx_map[valid]]
+        return out
 
     def save_data(self, group: ColumnGroup, data: np.ndarray) -> ColumnGroup:
         """Save group data sharded across one or more .npy files; updates manifest.
@@ -735,7 +1071,10 @@ class ColumnGroupRegistry:
         with self._buffer_lock:
             self._memory_buffer.clear()
 
+        alignment_paths: set[Path] = set()
         for group in self._groups.values():
+            if group.alignment is not None:
+                alignment_paths.add(Path(group.alignment.idx_map_path))
             for shard in group.shards:
                 if shard.disk_path.exists():
                     try:
@@ -751,6 +1090,16 @@ class ColumnGroupRegistry:
                 except OSError as exc:
                     raise ColumnGroupRegistryError(
                         f"Failed to delete persisted group file {group.disk_path}: {exc}",
+                        failure_type=FailureType.IO_ERROR,
+                    ) from exc
+
+        for alignment_path in alignment_paths:
+            if alignment_path.exists():
+                try:
+                    alignment_path.unlink()
+                except OSError as exc:
+                    raise ColumnGroupRegistryError(
+                        f"Failed to delete alignment idx_map file {alignment_path}: {exc}",
                         failure_type=FailureType.IO_ERROR,
                     ) from exc
 
@@ -876,6 +1225,42 @@ class ColumnGroupRegistry:
                 if parquet_candidate.exists():
                     parquet_path = parquet_candidate
 
+            alignment_meta: Optional[AlignmentMeta] = None
+            alignment_raw = group_meta.get("alignment")
+            if isinstance(alignment_raw, Mapping):
+                idx_map_value = alignment_raw.get("idx_map_path")
+                if not idx_map_value:
+                    logger.warning(
+                        "[registry] Compact alignment for group %s has no idx_map_path; skipping group",
+                        group_meta.get("group_id"),
+                    )
+                    continue
+                idx_map_path = Path(str(idx_map_value))
+                if not idx_map_path.is_absolute():
+                    idx_map_path = work_dir / idx_map_path
+                if not idx_map_path.exists():
+                    if parquet_path is not None and not shard_metas and npy_path is None:
+                        logger.debug(
+                            "[registry] Compact group %s already has parquet output but no idx_map; not restoring",
+                            group_meta.get("group_id"),
+                        )
+                        continue
+                    logger.warning(
+                        "[registry] Missing alignment idx_map %s for group %s; skipping group",
+                        idx_map_path,
+                        group_meta.get("group_id"),
+                    )
+                    continue
+                alignment_meta = AlignmentMeta(
+                    source_timeframe=str(alignment_raw.get("source_timeframe", group_meta.get("timeframe", ""))),
+                    primary_timeframe=str(alignment_raw.get("primary_timeframe", manifest.get("primary_tf") or "")),
+                    source_n_rows=int(alignment_raw.get("source_n_rows", group_meta.get("shape", [0, 0])[0])),
+                    primary_n_rows=int(alignment_raw.get("primary_n_rows", group_meta.get("shape", [0, 0])[0])),
+                    idx_map_path=idx_map_path,
+                    alignment_mode=str(alignment_raw.get("alignment_mode", "close_time")),
+                    offset_ns=int(alignment_raw.get("offset_ns", 0)),
+                )
+
             if not shard_metas and npy_path is None:
                 # Cannot resume without intermediate data. Parquet-only entries
                 # mean the previous run completed; skip silently.
@@ -905,6 +1290,7 @@ class ColumnGroupRegistry:
                     dtype=str(group_meta.get("dtype", "float32")),
                     disk_path=npy_path,
                     shards=tuple(shard_metas),
+                    alignment=alignment_meta,
                 )
             except (KeyError, ValueError, TypeError) as exc:
                 raise ColumnGroupRegistryError(
@@ -1039,10 +1425,26 @@ class ColumnGroupRegistry:
                     "dtype": group.dtype,
                     "npy_path": group.disk_path.name if group.disk_path else None,
                     "shards": shards_payload,
+                    "alignment": self._alignment_payload(group),
                     "parquet_path": self._group_parquet_paths.get(group.group_id),
                 }
             )
         return payload
+
+    @staticmethod
+    def _alignment_payload(group: ColumnGroup) -> Optional[dict[str, Any]]:
+        alignment = group.alignment
+        if alignment is None:
+            return None
+        return {
+            "source_timeframe": alignment.source_timeframe,
+            "primary_timeframe": alignment.primary_timeframe,
+            "source_n_rows": int(alignment.source_n_rows),
+            "primary_n_rows": int(alignment.primary_n_rows),
+            "idx_map_path": alignment.idx_map_path.name,
+            "alignment_mode": alignment.alignment_mode,
+            "offset_ns": int(alignment.offset_ns),
+        }
 
     def _persist_group_array(
         self,

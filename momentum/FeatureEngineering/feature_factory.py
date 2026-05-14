@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.core.config import get_ic_first_pipeline_enabled
+from momentum.core.config import get_fracdiff_layers, get_ic_first_pipeline_enabled
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -1358,19 +1358,19 @@ class FeatureFactory:
         label_horizon: str = "1_bar_forward_return",
         selection_window: Optional[Dict[str, Any]] = None,
         split_id: Optional[str] = None,
-        cleanup_raw: bool = True,
+        cleanup_raw: bool = False,
     ) -> FeatureGenerationResult:
         """Run the IC-First pipeline with raw persist, GC gate, IC, and processed persist.
 
         Parameters
         ----------
         cleanup_raw:
-            When *True* (default) the ``raw/`` artifact directory is deleted
-            immediately after ``processed/`` is successfully written.  The
-            ``raw/`` data is only required for the IC gate step; retaining it
-            permanently doubles disk usage with no downstream benefit.  Set
-            *False* to keep ``raw/`` (e.g. for debugging or if you want to
-            re-run IC with a different threshold without re-running L1-L6).
+            When *True* the ``raw/`` artifact directory is deleted immediately
+            after ``processed/`` is successfully written.  Default is *False*
+            because this is a research platform: re-running IC with a different
+            method or window requires raw/ to be present, and regenerating 100+
+            symbols takes hours.  Set *True* only in production ETL pipelines
+            where disk space is the bottleneck and re-generation is acceptable.
         """
         start = start_time if start_time is not None else time.time()
         resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
@@ -1717,6 +1717,65 @@ class FeatureFactory:
             self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
         return preprocessing_config
 
+    def _build_l7_raw_preprocessing_metadata(
+        self,
+        config: "FactoryConfig",
+        raw_preprocessing_config: Optional[Dict[str, Any]],
+        l65_mode: str,
+    ) -> Dict[str, Any]:
+        """Describe both requested preprocessing and what the raw artifact contains."""
+        preprocessing = getattr(config, "preprocessing", None)
+        config_enabled = bool(getattr(preprocessing, "enabled", False))
+        raw_enabled = bool(raw_preprocessing_config) and config_enabled
+        step_names = {
+            "winsorization": "winsorization",
+            "rank_transform": "rank_transform",
+            "adaptive_zscore": "adaptive_zscore",
+            "gaussian_normalize": "gaussian_normalize",
+            "fractional_differencing": "fractional_differencing",
+            "adf_differencing": "adf_differencing",
+        }
+
+        config_steps = {
+            public_name: self._preprocessing_step_enabled(preprocessing, step_name)
+            for public_name, step_name in step_names.items()
+        }
+        raw_steps = {
+            public_name: self._preprocessing_step_enabled(raw_preprocessing_config, step_name)
+            for public_name, step_name in step_names.items()
+        }
+
+        fracdiff_config = {}
+        if isinstance(raw_preprocessing_config, dict):
+            raw_fracdiff = raw_preprocessing_config.get("fractional_differencing")
+            if isinstance(raw_fracdiff, dict):
+                fracdiff_config = raw_fracdiff
+
+        raw_artifact_applied = {
+            "enabled": raw_enabled,
+            "mode": l65_mode,
+            "steps": raw_steps,
+            "fracdiff_apply_to": fracdiff_config.get("apply_to"),
+            "fracdiff_layers": sorted(get_fracdiff_layers()) if raw_steps["fractional_differencing"] else [],
+        }
+
+        return {
+            "preprocessing_config_enabled": {
+                "enabled": config_enabled,
+                "ic_first_pipeline": self._ic_first_enabled(config),
+                "steps": config_steps,
+            },
+            "raw_artifact_applied": raw_artifact_applied,
+            # Backward-compatible flat fields. These now intentionally describe
+            # the raw artifact, not merely the UI/config request.
+            "preprocessing_enabled": raw_enabled,
+            "rank_enabled": raw_steps["rank_transform"],
+            "zscore_enabled": raw_steps["adaptive_zscore"],
+            "gaussian_enabled": raw_steps["gaussian_normalize"],
+            "fracdiff_enabled": raw_steps["fractional_differencing"],
+            "adf_enabled": raw_steps["adf_differencing"],
+        }
+
     def _resolve_l65_generation_mode(self, config: "FactoryConfig") -> str:
         # Phase B Phase 1 Step 36: strict three-way Mode A/B/C dispatch.
         # Modes:
@@ -1965,40 +2024,76 @@ class FeatureFactory:
         groups_with_inf: List[Tuple[str, int, float]] = []  # (gid, count, ratio)
 
         for group_id, group in registry.iter_all():
-            group_data = np.asarray(registry.load_data(group_id), dtype=np.float32)
-            if group_data.ndim != 2:
-                warnings.append(f"Group {group_id} has invalid ndim={group_data.ndim}; expected 2D")
-                logger.warning("[L7][CGSA] Invalid group shape for %s: ndim=%d", group_id, group_data.ndim)
-                continue
+            group_value_count = 0
+            group_nan_count = 0
+            group_inf_count = 0
+            seen_cols = 0
 
-            if group_data.shape[1] != group.n_cols:
+            for shard_meta, shard_data, shard_columns in registry.iter_shards(group_id):
+                group_data = np.asarray(shard_data, dtype=np.float32)
+                if group_data.ndim != 2:
+                    warnings.append(f"Group {group_id} has invalid ndim={group_data.ndim}; expected 2D")
+                    logger.warning("[L7][CGSA] Invalid group shape for %s: ndim=%d", group_id, group_data.ndim)
+                    continue
+
+                if group_data.shape[0] != group.n_rows:
+                    warnings.append(
+                        f"Group {group_id} rows mismatch: expected {group.n_rows}, got {group_data.shape[0]}"
+                    )
+                    logger.warning(
+                        "[L7][CGSA] Row mismatch for %s: expected=%d got=%d",
+                        group_id,
+                        group.n_rows,
+                        group_data.shape[0],
+                    )
+
+                if group_data.shape[1] != len(shard_columns):
+                    warnings.append(
+                        f"Group {group_id} shard {shard_meta.shard_idx} columns mismatch: "
+                        f"expected {len(shard_columns)}, got {group_data.shape[1]}"
+                    )
+                    logger.warning(
+                        "[L7][CGSA] Shard column mismatch for %s shard=%d expected=%d got=%d",
+                        group_id,
+                        shard_meta.shard_idx,
+                        len(shard_columns),
+                        group_data.shape[1],
+                    )
+
+                value_count = int(group_data.size)
+                if value_count == 0:
+                    continue
+
+                group_inf_count += int(np.isinf(group_data).sum())
+                group_nan_count += int(np.isnan(group_data).sum())
+                group_value_count += value_count
+                seen_cols += int(group_data.shape[1])
+                del shard_data, group_data
+
+            if seen_cols != group.n_cols:
                 warnings.append(
-                    f"Group {group_id} columns mismatch: expected {group.n_cols}, got {group_data.shape[1]}"
+                    f"Group {group_id} columns mismatch: expected {group.n_cols}, got {seen_cols}"
                 )
                 logger.warning(
                     "[L7][CGSA] Column mismatch for %s: expected=%d got=%d",
                     group_id,
                     group.n_cols,
-                    group_data.shape[1],
+                    seen_cols,
                 )
 
-            value_count = int(group_data.size)
-            if value_count == 0:
+            if group_value_count == 0:
                 continue
 
-            inf_count = int(np.isinf(group_data).sum())
-            nan_count = int(np.isnan(group_data).sum())
-            nan_ratio = nan_count / value_count
-
-            if inf_count > 0:
+            nan_ratio = group_nan_count / group_value_count
+            if group_inf_count > 0:
                 has_inf = True
-                total_inf += inf_count
-                groups_with_inf.append((group_id, inf_count, inf_count / value_count))
-                message = f"Group {group_id} contains {inf_count} inf values"
+                total_inf += group_inf_count
+                groups_with_inf.append((group_id, group_inf_count, group_inf_count / group_value_count))
+                message = f"Group {group_id} contains {group_inf_count} inf values"
                 warnings.append(message)
                 logger.warning("[L7][CGSA] %s", message)
 
-            if nan_count > 0:
+            if group_nan_count > 0:
                 has_nan = True
 
             if nan_ratio > 0.90:
@@ -2006,8 +2101,8 @@ class FeatureFactory:
                 warnings.append(message)
                 logger.warning("[L7][CGSA] %s", message)
 
-            total_values += value_count
-            non_nan_values += value_count - nan_count
+            total_values += group_value_count
+            non_nan_values += group_value_count - group_nan_count
 
         coverage = float(non_nan_values / total_values) if total_values > 0 else 0.0
         inf_ratio = float(total_inf / total_values) if total_values > 0 else 0.0
@@ -2107,6 +2202,7 @@ class FeatureFactory:
 
         if persist:
             preprocessor = None
+            preprocessing_config: Optional[Dict[str, Any]] = None
             if getattr(config.preprocessing, "enabled", False):
                 preprocessing_config = self._build_l7_raw_preprocessing_config(config)
                 context = self._build_preprocessing_context(raw_data, config)
@@ -2131,12 +2227,11 @@ class FeatureFactory:
                 l65_mode=l65_mode,
                 time_range=self._manifest_time_range_from_raw_data(raw_data),
                 extra_metadata={
-                    "preprocessing_enabled": bool(getattr(config.preprocessing, "enabled", False)),
-                    "rank_enabled": self._preprocessing_step_enabled(config.preprocessing, "rank_transform"),
-                    "zscore_enabled": self._preprocessing_step_enabled(config.preprocessing, "adaptive_zscore"),
-                    "gaussian_enabled": self._preprocessing_step_enabled(config.preprocessing, "gaussian_normalize"),
-                    "fracdiff_enabled": self._preprocessing_step_enabled(config.preprocessing, "fractional_differencing"),
-                    "adf_enabled": self._preprocessing_step_enabled(config.preprocessing, "adf_differencing"),
+                    **self._build_l7_raw_preprocessing_metadata(
+                        config,
+                        preprocessing_config,
+                        l65_mode,
+                    ),
                     "source_registry_manifest": str(self._cgsa_registry.manifest_path),
                 },
             )
@@ -2234,7 +2329,10 @@ class FeatureFactory:
 
     @staticmethod
     def _preprocessing_step_enabled(preprocessing: Any, step_name: str) -> bool:
-        step_config = getattr(preprocessing, step_name, None)
+        if isinstance(preprocessing, dict):
+            step_config = preprocessing.get(step_name)
+        else:
+            step_config = getattr(preprocessing, step_name, None)
         if isinstance(step_config, dict):
             return bool(step_config.get("enabled", False))
         return bool(getattr(step_config, "enabled", False))

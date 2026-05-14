@@ -374,9 +374,45 @@ def test_cgsa_manifest_dtype_summary_records_mixed_dtype(tmp_path):
 
     assert manifest["dtype"] == "mixed"
     summary = manifest["dtype_summary"]
-    assert summary["counts"] == {"float16": 1, "float32": 1}
+    assert summary["counts"] == {"float16": 1, "mixed": 1}
+    assert summary["column_counts"] == {"float16": 3, "float32": 1}
     assert summary["float32_fallback_count"] == 1
     assert summary["float32_fallback_parts"] == ["grp_overflow"]
+
+
+def test_cgsa_parquet_mixed_part_falls_back_per_column(tmp_path):
+    """同一 parquet part 內只有不安全欄位應退回 float32。"""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    data = np.array(
+        [[100.0, 60000.0], [200.0, 70000.0], [300.0, 80000.0]],
+        dtype=np.float32,
+    )
+    registry.save_data(
+        ColumnGroup(
+            group_id="grp_mixed_columns",
+            layer=LayerSource.L1,
+            timeframe="12h",
+            data_source="close",
+            indicator="TEST",
+            columns=("safe_small", "unsafe_big"),
+            shape=data.shape,
+        ),
+        data,
+    )
+
+    storage = FeatureStorage(base_path=str(tmp_path / "features"))
+    storage.persist_registry_to_parquet("MIXCOLUSDT", "hash", registry)
+
+    output_dir = tmp_path / "features" / "MIXCOLUSDT" / "hash"
+    df = pd.read_parquet(output_dir / "grp_mixed_columns.parquet")
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+
+    assert str(df["safe_small"].dtype) == "float16"
+    assert str(df["unsafe_big"].dtype) == "float32"
+    assert manifest["dtype"] == "mixed"
+    assert manifest["groups"]["grp_mixed_columns"]["dtype"] == "mixed"
+    assert manifest["dtype_summary"]["counts"] == {"mixed": 1}
+    assert manifest["dtype_summary"]["column_counts"] == {"float16": 1, "float32": 1}
 
 
 def test_l7_disk_precheck_raises_when_estimate_exceeds_free_space(monkeypatch, tmp_path):

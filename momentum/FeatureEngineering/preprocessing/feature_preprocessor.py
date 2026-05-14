@@ -18,6 +18,8 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
     ADF_ENGINE_VERSION,
     DStarCache,
     PreprocessingContext,
+    _col_value_fingerprint,
+    _strong_col_value_fingerprint,
 )
 from momentum.FeatureEngineering.preprocessing._fast_adf_numba import (
     FAST_ADF_ENGINE_VERSION,
@@ -374,11 +376,15 @@ class FeaturePreprocessor:
         for group in groups:
             group_id = str(getattr(group, "group_id"))
             n_cols = self._group_n_columns(group)
+            shards = getattr(group, "shards", ()) or ()
             requires_slow = self._group_requires_slow_transform(group, transform_context)
             is_chunked = requires_slow and split_threshold > 0 and n_cols > split_threshold
-            estimated_tasks = (
-                max(1, (n_cols + split_threshold - 1) // split_threshold) if is_chunked else 1
-            )
+            if is_chunked:
+                estimated_tasks = max(1, (n_cols + split_threshold - 1) // split_threshold)
+            elif shards and self.mode == "replace" and not requires_slow and bool(transform_context.get("can_use_numba_fast", False)):
+                estimated_tasks = max(1, len(shards))
+            else:
+                estimated_tasks = 1
             if is_chunked:
                 slow_chunked_count += 1
             elif requires_slow:
@@ -432,6 +438,48 @@ class FeaturePreprocessor:
                 and not self._group_requires_slow_transform(group, transform_context)
                 and bool(transform_context.get("can_use_numba_fast", False))
             )
+
+            # Native-resolution L6.5 path for compact-aligned groups: compute
+            # transforms on source rows then forward-fill to primary rows.
+            # Avoids step-function bias in fracdiff/distribution stats.
+            native_outputs = self._maybe_run_native_l65_to_sink(
+                registry,
+                group,
+                sink,
+            )
+            if native_outputs is not None:
+                outputs_written = native_outputs
+                completed += 1
+                tasks_done += max(estimated_tasks, outputs_written, 1)
+                last_group_label = f"{group_id} (native-tf, parts={outputs_written})"
+
+                now = time.perf_counter()
+                if (
+                    tasks_done - last_heartbeat_done >= heartbeat_step
+                    or (now - last_heartbeat_at) >= heartbeat_interval_sec
+                    or index == len(group_plan)
+                ):
+                    elapsed = now - started_at
+                    rate = tasks_done / elapsed if elapsed > 0 else 0.0
+                    eta = (total_tasks - tasks_done) / rate if rate > 0 else float("inf")
+                    logger.info(
+                        "[L6.5] raw-sink heartbeat: tasks %d/%d (%.1f%%), groups %d/%d, "
+                        "elapsed=%.1fs, rate=%.2f/s, ETA=%.0fs, rss=%dMB, last=%s",
+                        tasks_done,
+                        total_tasks,
+                        100.0 * tasks_done / max(total_tasks, 1),
+                        completed,
+                        len(group_plan),
+                        elapsed,
+                        rate,
+                        eta if eta != float("inf") else -1,
+                        _PROC.memory_info().rss >> 20,
+                        last_group_label,
+                    )
+                    last_heartbeat_at = now
+                    last_heartbeat_done = tasks_done
+                gc.collect()
+                continue
 
             if is_chunked:
                 source_disk_path = getattr(group, "disk_path", None)
@@ -572,6 +620,350 @@ class FeaturePreprocessor:
             )
 
         return transform_context
+
+    # ------------------------------------------------------------------
+    # Native-resolution L6.5 path for compact-aligned groups
+    # ------------------------------------------------------------------
+    def _maybe_run_native_l65_to_sink(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+        sink: Callable[[str, List[str], np.ndarray, str, Optional[Path], bool], None],
+    ) -> Optional[int]:
+        """Try the native-resolution L6.5 path for one compact-aligned group.
+
+        Returns the number of sink outputs written, or ``None`` if the group
+        is not eligible (caller falls back to the legacy expand-then-transform
+        sub-paths).
+        """
+        from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
+            apply_idx_map_to_array,
+            scale_preprocessing_config_for_native,
+            should_use_native_path,
+        )
+        from dataclasses import replace as _dc_replace
+
+        alignment = getattr(group, "alignment", None)
+        if alignment is None:
+            return None
+
+        group_id = str(getattr(group, "group_id"))
+        columns = list(getattr(group, "columns"))
+        if not columns:
+            return None
+
+        source_tf = str(getattr(alignment, "source_timeframe", "") or "")
+        primary_tf = str(getattr(alignment, "primary_timeframe", "") or "")
+        source_n_rows = int(getattr(alignment, "source_n_rows", 0))
+        primary_n_rows = int(getattr(alignment, "primary_n_rows", 0))
+
+        scaled_config = scale_preprocessing_config_for_native(
+            self._config,
+            source_tf,
+            primary_tf,
+        )
+
+        use_native, reason = should_use_native_path(
+            is_compact_aligned=True,
+            source_timeframe=source_tf,
+            primary_timeframe=primary_tf,
+            source_n_rows=source_n_rows,
+            scaled_config=scaled_config,
+        )
+        if not use_native:
+            logger.info(
+                "[L6.5] native-tf path skipped: group=%s reason=%s "
+                "src_tf=%s primary_tf=%s native_rows=%d",
+                group_id,
+                reason,
+                source_tf,
+                primary_tf,
+                source_n_rows,
+            )
+            return None
+
+        # Load native (source-resolution) data and idx_map.
+        native_arr = np.asarray(registry.load_data_native(group_id), dtype=np.float32)
+        if native_arr.shape[0] != source_n_rows:
+            logger.warning(
+                "[L6.5] native-tf row mismatch: group=%s expected=%d got=%d, falling back",
+                group_id,
+                source_n_rows,
+                native_arr.shape[0],
+            )
+            return None
+        idx_map = registry.get_alignment_idx_map(group_id)
+        if idx_map is None:
+            return None
+
+        # Build per-group context with source-tf cache key isolation.
+        # row_count and time_range use native rows so d_star cache fingerprint
+        # naturally invalidates when the source-tf row count changes and won't
+        # collide with the primary-tf cache key for the same column.
+        native_ctx = _dc_replace(
+            self._preprocessing_context,
+            timeframe=source_tf or self._preprocessing_context.timeframe,
+            row_count=int(source_n_rows),
+            time_range=None,  # Per-group native time range not currently tracked.
+        )
+
+        # Run L6.5 on native rows using a sibling preprocessor that owns its
+        # own d_star_cache scoped to the source timeframe.
+        native_pp = FeaturePreprocessor(scaled_config, context=native_ctx)
+        native_pp._fracdiff_apply_to_layers = self._fracdiff_apply_to_layers
+
+        native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
+        try:
+            processed_df = native_pp._transform_single(
+                native_df,
+                source_layer=self._group_layer_name(group),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[L6.5] native-tf transform failed: group=%s err=%s, falling back",
+                group_id,
+                exc,
+            )
+            return None
+        finally:
+            del native_df, native_arr
+
+        is_append = self.mode == "append"
+        original_cols_present = [c for c in columns if c in processed_df.columns]
+        if not original_cols_present:
+            logger.warning(
+                "[L6.5] native-tf transform produced no original columns for group=%s, falling back",
+                group_id,
+            )
+            return None
+
+        source_disk_path = getattr(group, "disk_path", None)
+
+        # Expand original-column block back to primary rows via idx_map.
+        orig_native = processed_df[original_cols_present].to_numpy(
+            dtype=np.float32, copy=False
+        )
+        orig_aligned = apply_idx_map_to_array(orig_native, idx_map, primary_n_rows)
+        del orig_native
+
+        outputs: List[Tuple[str, List[str], np.ndarray]] = [
+            (group_id, list(original_cols_present), orig_aligned),
+        ]
+
+        if is_append:
+            new_cols = [c for c in processed_df.columns if c not in columns]
+            if new_cols:
+                new_native = processed_df[new_cols].to_numpy(dtype=np.float32, copy=False)
+                new_aligned = apply_idx_map_to_array(new_native, idx_map, primary_n_rows)
+                del new_native
+                new_group_id = f"{group_id}_L65"
+                suffix = 1
+                while new_group_id in registry._groups:
+                    new_group_id = f"{group_id}_L65_{suffix}"
+                    suffix += 1
+                outputs.append((new_group_id, list(new_cols), new_aligned))
+
+        del processed_df
+
+        for output_index, (out_group_id, out_columns, out_data) in enumerate(outputs):
+            sink(
+                out_group_id,
+                out_columns,
+                out_data,
+                group_id,
+                source_disk_path,
+                output_index == len(outputs) - 1,
+            )
+
+        logger.info(
+            "[L6.5] native-tf path completed: group=%s src_tf=%s primary_tf=%s "
+            "native_rows=%d primary_rows=%d outputs=%d",
+            group_id,
+            source_tf,
+            primary_tf,
+            source_n_rows,
+            primary_n_rows,
+            len(outputs),
+        )
+        return len(outputs)
+
+    def _maybe_run_native_l65_inplace(
+        self,
+        registry: "ColumnGroupRegistry",
+        group: object,
+    ) -> bool:
+        """Native-resolution L6.5 in-place variant.
+
+        Loads native rows, runs L6.5, expands to primary rows via idx_map,
+        and overwrites the registry entry with the primary-shaped result.
+        Returns ``True`` when the native path was taken, ``False`` otherwise.
+
+        Note: After ``overwrite_data`` the alignment metadata is stripped (the
+        on-disk array now stores fully expanded primary rows). Downstream
+        consumers using ``load_data`` see primary-shaped output, identical to
+        the legacy expand-then-transform path — only the L6.5 statistics are
+        computed correctly on native rows.
+        """
+        from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
+            apply_idx_map_to_array,
+            scale_preprocessing_config_for_native,
+            should_use_native_path,
+        )
+        from momentum.FeatureEngineering.core.column_group import (
+            ColumnGroup as _CG,
+            LayerSource as _LS,
+        )
+        from dataclasses import replace as _dc_replace
+
+        alignment = getattr(group, "alignment", None)
+        if alignment is None:
+            return False
+
+        group_id = str(getattr(group, "group_id"))
+        columns = list(getattr(group, "columns"))
+        if not columns:
+            return False
+
+        source_tf = str(getattr(alignment, "source_timeframe", "") or "")
+        primary_tf = str(getattr(alignment, "primary_timeframe", "") or "")
+        source_n_rows = int(getattr(alignment, "source_n_rows", 0))
+        primary_n_rows = int(getattr(alignment, "primary_n_rows", 0))
+
+        scaled_config = scale_preprocessing_config_for_native(
+            self._config,
+            source_tf,
+            primary_tf,
+        )
+
+        use_native, reason = should_use_native_path(
+            is_compact_aligned=True,
+            source_timeframe=source_tf,
+            primary_timeframe=primary_tf,
+            source_n_rows=source_n_rows,
+            scaled_config=scaled_config,
+        )
+        if not use_native:
+            logger.info(
+                "[L6.5] native-tf in-place skipped: group=%s reason=%s "
+                "src_tf=%s primary_tf=%s native_rows=%d",
+                group_id,
+                reason,
+                source_tf,
+                primary_tf,
+                source_n_rows,
+            )
+            return False
+
+        native_arr = np.asarray(registry.load_data_native(group_id), dtype=np.float32)
+        if native_arr.shape[0] != source_n_rows:
+            logger.warning(
+                "[L6.5] native-tf in-place row mismatch: group=%s expected=%d got=%d, "
+                "falling back",
+                group_id,
+                source_n_rows,
+                native_arr.shape[0],
+            )
+            return False
+        idx_map = registry.get_alignment_idx_map(group_id)
+        if idx_map is None:
+            return False
+
+        native_ctx = _dc_replace(
+            self._preprocessing_context,
+            timeframe=source_tf or self._preprocessing_context.timeframe,
+            row_count=int(source_n_rows),
+            time_range=None,
+        )
+
+        native_pp = FeaturePreprocessor(scaled_config, context=native_ctx)
+        native_pp._fracdiff_apply_to_layers = self._fracdiff_apply_to_layers
+
+        native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
+        try:
+            processed_df = native_pp._transform_single(
+                native_df,
+                source_layer=self._group_layer_name(group),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[L6.5] native-tf in-place transform failed: group=%s err=%s, "
+                "falling back",
+                group_id,
+                exc,
+            )
+            return False
+        finally:
+            del native_df, native_arr
+
+        is_append = self.mode == "append"
+        original_cols_present = [c for c in columns if c in processed_df.columns]
+        if not original_cols_present:
+            logger.warning(
+                "[L6.5] native-tf in-place produced no original columns: group=%s, "
+                "falling back",
+                group_id,
+            )
+            return False
+
+        orig_native = processed_df[original_cols_present].to_numpy(
+            dtype=np.float32, copy=False
+        )
+        orig_aligned = apply_idx_map_to_array(orig_native, idx_map, primary_n_rows)
+        del orig_native
+
+        # If replace mode but column subset, fill gaps with original values.
+        if len(original_cols_present) != len(columns):
+            full_aligned = np.empty((primary_n_rows, len(columns)), dtype=np.float32)
+            existing_primary = np.asarray(registry.load_data(group_id), dtype=np.float32)
+            full_aligned[:] = existing_primary
+            del existing_primary
+            present_idx = [columns.index(c) for c in original_cols_present]
+            full_aligned[:, present_idx] = orig_aligned
+            del orig_aligned
+            registry.overwrite_data(group_id, full_aligned)
+            del full_aligned
+        else:
+            registry.overwrite_data(group_id, orig_aligned)
+            del orig_aligned
+
+        if is_append:
+            new_cols = [c for c in processed_df.columns if c not in columns]
+            if new_cols:
+                new_native = processed_df[new_cols].to_numpy(
+                    dtype=np.float32, copy=False
+                )
+                new_aligned = apply_idx_map_to_array(new_native, idx_map, primary_n_rows)
+                del new_native
+                new_gid = f"{group_id}_L65"
+                suffix = 1
+                while new_gid in registry._groups:
+                    new_gid = f"{group_id}_L65_{suffix}"
+                    suffix += 1
+                new_group = _CG(
+                    group_id=new_gid,
+                    layer=_LS.L65,
+                    timeframe=getattr(group, "timeframe"),
+                    data_source="preprocessed",
+                    indicator=getattr(group, "indicator"),
+                    columns=tuple(new_cols),
+                    shape=(new_aligned.shape[0], new_aligned.shape[1]),
+                    dtype="float32",
+                )
+                registry.save_data(new_group, new_aligned)
+                del new_aligned
+
+        del processed_df
+
+        logger.info(
+            "[L6.5] native-tf in-place completed: group=%s src_tf=%s primary_tf=%s "
+            "native_rows=%d primary_rows=%d",
+            group_id,
+            source_tf,
+            primary_tf,
+            source_n_rows,
+            primary_n_rows,
+        )
+        return True
 
     def _warmup_numba_if_needed(self) -> None:
         """Compile relevant Numba kernels once before any fan-out begins."""
@@ -1127,6 +1519,11 @@ class FeaturePreprocessor:
             LayerSource as _LS,
         )
 
+        # Native-resolution L6.5 path for compact-aligned groups bypasses
+        # column chunking entirely (native rows are already small).
+        if self._maybe_run_native_l65_inplace(registry, group):
+            return
+
         group_id = getattr(group, "group_id")
         col_names = list(getattr(group, "columns"))
         n_cols = len(col_names)
@@ -1268,6 +1665,12 @@ class FeaturePreprocessor:
         """Transform a single registry group in-place."""
 
         from momentum.FeatureEngineering.core.column_group import ColumnGroup as _CG, LayerSource as _LS
+
+        # Native-resolution L6.5 path for compact-aligned groups: compute on
+        # source rows then expand to primary rows. Avoids step-function bias
+        # in fracdiff and distribution-based statistics.
+        if self._maybe_run_native_l65_inplace(registry, group):
+            return
 
         group_id = getattr(group, "group_id")
         group_array = np.asarray(registry.load_data(group_id), dtype=np.float32)
@@ -2466,12 +2869,30 @@ class FeaturePreprocessor:
             )
         )
         col_input_arrays: Dict[str, np.ndarray] = {}
+        duplicate_columns_by_rep: Dict[str, List[str]] = {}
+        item_rep_by_value: Dict[str, str] = {}
         items: List[Tuple[np.ndarray, Dict[str, object]]] = []
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
             col_input_arrays[column] = col_arr
-            cached_d_star = cache.get(column, col_arr) if cache is not None else None
+            value_key = _strong_col_value_fingerprint(col_arr)
+            cached_d_star = (
+                cache.get_by_value_fingerprint(
+                    column,
+                    weak_fp=_col_value_fingerprint(col_arr),
+                    strong_fp=value_key,
+                )
+                if cache is not None
+                else None
+            )
+            dedupe_key = f"{value_key}:{cached_d_star if cached_d_star is not None else 'miss'}"
+            representative = item_rep_by_value.get(dedupe_key)
+            if representative is not None:
+                duplicate_columns_by_rep[representative].append(column)
+                continue
+            item_rep_by_value[dedupe_key] = column
+            duplicate_columns_by_rep[column] = [column]
             metadata: Dict[str, object] = {
                 "column": column,
                 "cached_d_star": cached_d_star,
@@ -2491,13 +2912,17 @@ class FeaturePreprocessor:
             d_star = float(output["d_star"])
             fracdiff_values = np.asarray(output["fracdiff_values"], dtype=np.float64)
             fracdiff_series = pd.Series(fracdiff_values, index=result.index)
-            self._assign_fracdiff_result(result, column, fracdiff_series, self.mode)
-            self._fracdiff_processed_columns.add(column)
+            duplicate_columns = duplicate_columns_by_rep.get(column, [column])
+            for target_column in duplicate_columns:
+                self._assign_fracdiff_result(result, target_column, fracdiff_series, self.mode)
+                self._fracdiff_processed_columns.add(target_column)
 
-            if cache is not None and not bool(output.get("cache_hit", False)):
-                cache.set(column, d_star, col_input_arrays.get(column))
+                if cache is not None and (
+                    not bool(output.get("cache_hit", False)) or target_column != column
+                ):
+                    cache.set(target_column, d_star, col_input_arrays.get(target_column))
             if output.get("status") != "ok":
-                failed_columns.append(column)
+                failed_columns.extend(duplicate_columns)
 
         if failed_columns:
             logger.warning(

@@ -41,6 +41,25 @@ class ShardMeta:
 
 
 @dataclass(frozen=True)
+class AlignmentMeta:
+    """Logical alignment metadata for compact non-primary timeframe groups.
+
+    Compact-aligned groups keep the source timeframe rows on disk and carry an
+    ``idx_map`` that expands them to the primary timeframe rows at read/stream
+    time. ``ColumnGroup.shape`` remains the logical shape expected by downstream
+    L6.5/L7 code.
+    """
+
+    source_timeframe: str
+    primary_timeframe: str
+    source_n_rows: int
+    primary_n_rows: int
+    idx_map_path: Path
+    alignment_mode: str
+    offset_ns: int = 0
+
+
+@dataclass(frozen=True)
 class ColumnGroup:
     """Immutable metadata for a group of related feature columns.
 
@@ -60,6 +79,7 @@ class ColumnGroup:
     dtype: str = "float32"
     disk_path: Optional[Path] = None
     shards: Tuple[ShardMeta, ...] = field(default_factory=tuple)
+    alignment: Optional[AlignmentMeta] = None
 
     @property
     def n_rows(self) -> int:
@@ -80,15 +100,46 @@ class ColumnGroup:
         return len(self.shards) > 1
 
     @property
+    def is_compact_aligned(self) -> bool:
+        """True when physical storage is source-TF rows plus an idx_map."""
+        return self.alignment is not None
+
+    @property
+    def logical_n_rows(self) -> int:
+        """Logical row count exposed to downstream consumers."""
+        return self.n_rows
+
+    @property
+    def physical_n_rows(self) -> int:
+        """Physical row count stored on disk before logical alignment."""
+        if self.alignment is not None:
+            return int(self.alignment.source_n_rows)
+        if self.shards:
+            return int(self.shards[0].n_rows)
+        return self.n_rows
+
+    @property
     def total_shard_bytes(self) -> int:
-        """Sum of shard nbytes; falls back to ``est_bytes`` for legacy groups."""
+        """Physical persisted bytes; falls back to logical estimate if absent."""
         if self.shards:
             return sum(int(shard.nbytes) for shard in self.shards)
+        if self.disk_path is not None:
+            try:
+                if self.disk_path.exists():
+                    return int(self.disk_path.stat().st_size)
+            except OSError:
+                pass
         return self.est_bytes
 
     @property
     def max_shard_bytes(self) -> int:
-        """Largest single shard nbytes; equals ``est_bytes`` for legacy groups."""
+        """Largest physical shard/file bytes; falls back to logical estimate."""
         if self.shards:
             return max(int(shard.nbytes) for shard in self.shards)
+        if self.disk_path is not None:
+            try:
+                if self.disk_path.exists():
+                    return int(self.disk_path.stat().st_size)
+            except OSError:
+                pass
         return self.est_bytes

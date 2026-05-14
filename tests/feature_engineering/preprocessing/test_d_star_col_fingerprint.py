@@ -16,6 +16,7 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
     DStarCache,
     PreprocessingContext,
     _col_value_fingerprint,
+    _strong_col_value_fingerprint,
 )
 
 BASE_CONTEXT = PreprocessingContext(
@@ -67,6 +68,12 @@ def test_col_value_fingerprint_different_values_different_fp() -> None:
 
 def test_col_value_fingerprint_empty_returns_sentinel() -> None:
     assert _col_value_fingerprint(np.array([])) == "empty"
+
+
+def test_strong_col_value_fingerprint_tracks_nan_mask() -> None:
+    arr1 = np.array([1.0, np.nan, 3.0], dtype=np.float64)
+    arr2 = np.array([1.0, 2.0, np.nan], dtype=np.float64)
+    assert _strong_col_value_fingerprint(arr1) != _strong_col_value_fingerprint(arr2)
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +133,17 @@ def test_col_values_match_hit(tmp_path: Path) -> None:
 
     cache2 = _cache(tmp_path)
     assert cache2.get("col_A", _COL_VALUES) == 0.35
+
+
+def test_exact_value_alias_hit_for_different_column_name(tmp_path: Path) -> None:
+    """Identical values under a different name should reuse the same d-star."""
+    cache1 = _cache(tmp_path)
+    cache1.set("col_A", 0.35, _COL_VALUES)
+    cache1.flush_atomic()
+
+    cache2 = _cache(tmp_path)
+    assert cache2.get("col_B", _COL_VALUES.copy()) == 0.35
+    assert cache2.get("col_B", _COL_VALUES_CHANGED) is None
 
 
 # ---------------------------------------------------------------------------

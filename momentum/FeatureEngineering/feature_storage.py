@@ -545,6 +545,7 @@ class FeatureStorage:
         all_columns: List[str] = []
         storage_dtypes: set[str] = set()
         storage_dtype_counts: Dict[str, int] = {}
+        storage_dtype_column_counts: Dict[str, int] = {}
         float32_fallback_parts: List[str] = []
         row_count: Optional[int] = None
         total_values = 0
@@ -592,6 +593,30 @@ class FeatureStorage:
 
             safe_group_id = self._safe_path_segment(str(group_id), "group_id")
             columns_list = [str(column) for column in columns]
+
+            # Multi-TF column tf-tagging.
+            # CGSA mode skips _apply_timeframe_tag (multi_tf_generator.py) so 1h and
+            # 12h groups both produce identical column names (e.g. "close_trend_EMA_20").
+            # When IC engine calls ic_scores.update(group_ic) across groups the later
+            # TF silently overwrites the earlier one — resulting in "only 1h" output and
+            # no tf markers in feature names.  Fix: insert the group's tf as the 2nd
+            # name segment (matching legacy _apply_timeframe_tag format):
+            #   "close_trend_EMA_20"  →  "close_1h_trend_EMA_20"  (group 1h_L1_trend_EMA)
+            #   "close_trend_EMA_20"  →  "close_12h_trend_EMA_20" (group 12h_L1_trend_EMA)
+            _gid_tf = str(group_id).split("_", 1)[0]  # e.g. "1h", "12h", "4h"
+            # Valid TF: digits + one of m/h/d  (e.g. "1m", "1h", "4h", "12h", "1d")
+            if _gid_tf and _gid_tf[-1] in ("m", "h", "d") and _gid_tf[:-1].isdigit():
+                _tf_guard = _gid_tf + "_"
+                _tagged: List[str] = []
+                for _c in columns_list:
+                    _cp = _c.split("_", 1)
+                    # Idempotent: skip if already tagged with this exact tf
+                    if len(_cp) == 2 and not _cp[1].startswith(_tf_guard):
+                        _tagged.append(f"{_cp[0]}_{_gid_tf}_{_cp[1]}")
+                    else:
+                        _tagged.append(_c)
+                columns_list = _tagged
+
             array = np.asarray(data, dtype=np.float32)
             if array.ndim != 2:
                 raise ValueError(f"Raw stream group {safe_group_id} must be 2D, got {array.shape}")
@@ -634,25 +659,33 @@ class FeatureStorage:
             written_part_ids: List[str] = []
             for part_id, part_cols, part_data in parts:
                 safe_part_id = self._safe_path_segment(str(part_id), "part_id")
-                data_for_parquet, storage_dtype = self._select_parquet_storage_array(part_data)
+                (
+                    arrays,
+                    storage_dtype,
+                    float32_cols,
+                    column_dtype_counts,
+                    part_estimate_bytes,
+                ) = self._select_parquet_storage_columns(part_data, part_cols, pa_module)
                 storage_dtypes.add(storage_dtype)
                 storage_dtype_counts[storage_dtype] = storage_dtype_counts.get(storage_dtype, 0) + 1
-                if storage_dtype != "float16":
+                for dtype_name, dtype_count in column_dtype_counts.items():
+                    storage_dtype_column_counts[dtype_name] = (
+                        storage_dtype_column_counts.get(dtype_name, 0) + dtype_count
+                    )
+                if float32_cols:
                     float32_fallback_parts.append(safe_part_id)
 
                 self._ensure_l7_raw_part_disk_space(
                     temp_artifact_dir,
                     part_id=safe_part_id,
                     source_group_id=str(source_group_id),
-                    part_estimate_bytes=int(np.asarray(data_for_parquet).nbytes),
+                    part_estimate_bytes=part_estimate_bytes,
                     source_reclaimable_bytes=_source_reclaimable,
                 )
 
-                arrays = [pa_module.array(data_for_parquet[:, index]) for index in range(len(part_cols))]
                 table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
                 output_path = temp_artifact_dir / f"{safe_part_id}.parquet"
                 staging_path = temp_artifact_dir / f".{safe_part_id}.tmp.parquet"
-                float32_cols = list(part_cols) if storage_dtype == "float32" else []
                 _write_parquet_with_codec(
                     table,
                     staging_path,
@@ -673,10 +706,12 @@ class FeatureStorage:
                     "file_size_bytes": int(output_path.stat().st_size),
                     "encoded_column_count": 0,
                     "source_group_id": str(source_group_id),
+                    "dtype_counts": dict(column_dtype_counts),
+                    "float32_columns": list(float32_cols),
                 }
                 all_columns.extend(part_cols)
                 written_part_ids.append(safe_part_id)
-                del data_for_parquet, arrays, table
+                del arrays, table
 
             if written_part_ids:
                 first_part_by_source_group.setdefault(str(source_group_id), written_part_ids[0])
@@ -793,7 +828,11 @@ class FeatureStorage:
                 "cleanup_intermediate": bool(cleanup_intermediate),
                 "npy_freed_bytes": int(npy_freed),
                 "transformed_groups": int(transformed_groups),
-                "dtype_summary": self._build_dtype_summary(storage_dtype_counts, float32_fallback_parts),
+                "dtype_summary": self._build_dtype_summary(
+                    storage_dtype_counts,
+                    float32_fallback_parts,
+                    storage_dtype_column_counts,
+                ),
             }
             if extra_metadata:
                 stream_metadata.update(extra_metadata)
@@ -1793,6 +1832,7 @@ class FeatureStorage:
         # a previously-float16 group fell back to float32 on a different symbol
         # (which would silently change parquet bytes / overall_sha).
         storage_dtype_counts: Dict[str, int] = {}
+        storage_dtype_column_counts: Dict[str, int] = {}
         float32_fallback_parts: List[str] = []
         total_rows: int = 0
         npy_freed = 0
@@ -1901,20 +1941,28 @@ class FeatureStorage:
                 parts = self._split_large_group(group_id, columns_list, mmap_arr)
 
                 for part_id, part_cols, part_data in parts:
-                    data_for_parquet, storage_dtype = self._select_parquet_storage_array(part_data)
+                    (
+                        arrays,
+                        storage_dtype,
+                        float32_cols,
+                        column_dtype_counts,
+                        _part_estimate_bytes,
+                    ) = self._select_parquet_storage_columns(part_data, part_cols, pa_module)
                     storage_dtypes.add(storage_dtype)
                     storage_dtype_counts[storage_dtype] = (
                         storage_dtype_counts.get(storage_dtype, 0) + 1
                     )
-                    if storage_dtype != "float16":
+                    for dtype_name, dtype_count in column_dtype_counts.items():
+                        storage_dtype_column_counts[dtype_name] = (
+                            storage_dtype_column_counts.get(dtype_name, 0) + dtype_count
+                        )
+                    if float32_cols:
                         float32_fallback_parts.append(part_id)
 
                     staged_path = staging_dir / f"{part_id}.parquet"
                     final_path = output_dir / f"{part_id}.parquet"
 
-                    arrays = [pa_module.array(data_for_parquet[:, ci]) for ci in range(len(part_cols))]
                     table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
-                    float32_cols = list(part_cols) if storage_dtype == "float32" else []
                     pending_parts.append((part_id, table, final_path, staged_path, float32_cols))
                     part_to_group_id[part_id] = group_id
                     first_part_by_group.setdefault(group_id, part_id)
@@ -1926,7 +1974,7 @@ class FeatureStorage:
                         "dtype": storage_dtype,
                     }
                     all_columns.extend(part_cols)
-                    del data_for_parquet
+                    del arrays
 
                 if group.disk_path and group.disk_path.exists():
                     pending_disk_paths[group_id] = group.disk_path
@@ -1981,7 +2029,9 @@ class FeatureStorage:
                 compaction_sources=compaction_manifest,
                 dtype=self._summarize_storage_dtype(storage_dtypes),
                 dtype_summary=self._build_dtype_summary(
-                    storage_dtype_counts, float32_fallback_parts
+                    storage_dtype_counts,
+                    float32_fallback_parts,
+                    storage_dtype_column_counts,
                 ),
             )
             self._write_columns_json_gz(output_dir, all_columns)
@@ -2074,6 +2124,36 @@ class FeatureStorage:
 
         return data_float16, "float16"
 
+    @classmethod
+    def _select_parquet_storage_columns(
+        cls,
+        data: np.ndarray,
+        columns: List[str],
+        pa_module: Any,
+    ) -> Tuple[List[Any], str, List[str], Dict[str, int], int]:
+        """Build parquet arrays with per-column float16/float32 fallback."""
+        source = np.asarray(data, dtype=np.float32)
+        arrays: List[Any] = []
+        float32_cols: List[str] = []
+        dtype_counts: Dict[str, int] = {}
+        total_bytes = 0
+
+        for col_idx, column_name in enumerate(columns):
+            column_array, storage_dtype = cls._select_parquet_storage_array(source[:, col_idx])
+            dtype_counts[storage_dtype] = dtype_counts.get(storage_dtype, 0) + 1
+            if storage_dtype == "float32":
+                float32_cols.append(str(column_name))
+            total_bytes += int(np.asarray(column_array).nbytes)
+            arrays.append(pa_module.array(column_array))
+
+        if not dtype_counts:
+            part_dtype = "float16"
+        elif len(dtype_counts) == 1:
+            part_dtype = next(iter(dtype_counts))
+        else:
+            part_dtype = "mixed"
+        return arrays, part_dtype, float32_cols, dtype_counts, total_bytes
+
     @staticmethod
     def _summarize_storage_dtype(storage_dtypes: set[str]) -> str:
         if not storage_dtypes:
@@ -2086,6 +2166,7 @@ class FeatureStorage:
     def _build_dtype_summary(
         counts: Dict[str, int],
         float32_fallback_parts: List[str],
+        column_counts: Optional[Dict[str, int]] = None,
     ) -> Dict[str, Any]:
         """Return a structured dtype summary embedded in the V7 manifest.
 
@@ -2098,6 +2179,7 @@ class FeatureStorage:
         sorted_parts = sorted(float32_fallback_parts)
         summary: Dict[str, Any] = {
             "counts": dict(sorted(counts.items())),
+            "column_counts": dict(sorted((column_counts or {}).items())),
             "float32_fallback_count": len(sorted_parts),
             "float32_fallback_parts": sorted_parts[:max_listed],
         }

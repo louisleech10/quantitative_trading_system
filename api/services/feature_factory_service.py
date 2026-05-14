@@ -92,6 +92,7 @@ class FeatureFactoryService:
         self._cgsa_stats_mem_cache: Dict[str, pd.DataFrame] = {}
         # Task IDs currently running background CGSA stats warmup.
         self._cgsa_stats_warming_tasks: set[str] = set()
+        self._cgsa_catalog_warming_tasks: set[str] = set()
 
         # Hardware-adaptive CGSA stats parameters (Q1 / Q2 optimisation).
         # Detected once at startup; overridden via FFACT_MEMORY_TIER env var.
@@ -229,7 +230,13 @@ class FeatureFactoryService:
             # legacy HDF5 tasks. CGSA outputs can have 50k-200k columns; full
             # stats warmup materializes the whole matrix and blocks the UI for
             # minutes. CGSA Feature Explorer uses manifest/parquet metadata.
-            if not str(summary.get("hdf5_path", "")).lower().endswith(".json"):
+            if str(summary.get("hdf5_path", "")).lower().endswith(".json"):
+                try:
+                    context = self._load_task_context(task_id)
+                    self._start_cgsa_catalog_warmup(task_id, context)
+                except Exception as exc:
+                    logger.debug("CGSA catalog warmup start skipped for %s: %s", task_id, exc)
+            else:
                 self._start_stats_cache_warmup(task_id, reason="generation_completed")
 
             self._notify_callbacks(task_id, {
@@ -1211,6 +1218,10 @@ class FeatureFactoryService:
         if fast is None:
             raise FileNotFoundError(f"CGSA metadata unavailable for task {task_id}")
 
+        disk_cached = self._load_cgsa_catalog_disk_cache(task_id, context, fast)
+        if disk_cached is not None:
+            return disk_cached
+
         columns: List[str] = fast["columns"]
         nan_ratios: pd.Series = fast["nan_ratios"]
         metadata_map = self._get_feature_metadata_map(task_id, columns)
@@ -1239,8 +1250,105 @@ class FeatureFactoryService:
 
         self._cgsa_catalog_cache[task_id] = rows
         self._cgsa_column_path_cache[task_id] = fast["column_to_path"]
+        self._persist_cgsa_catalog_cache(context, fast, rows)
         logger.info("CGSA catalog cached for task %s (%d features)", task_id, len(rows))
         return rows
+
+    def _get_cgsa_catalog_cache_paths(self, context: Dict[str, Any]) -> tuple[Optional[Path], Optional[Path]]:
+        manifest_dir = context.get("manifest_dir")
+        if manifest_dir is None:
+            return None, None
+        base_dir = Path(manifest_dir)
+        return base_dir / self._CGSA_CATALOG_CACHE_NAME, base_dir / self._CGSA_CATALOG_CACHE_META_NAME
+
+    def _cgsa_catalog_cache_signature(self, context: Dict[str, Any], fast: Dict[str, Any]) -> Dict[str, Any]:
+        manifest = context.get("manifest") or {}
+        return {
+            "version": 1,
+            "feature_schema_hash": manifest.get("feature_schema_hash") or manifest.get("schema_hash") or "",
+            "total_features": int(len(fast.get("columns") or [])),
+            "total_rows": int(fast.get("total_rows") or 0),
+            "manifest_path": str(context.get("file_path") or ""),
+        }
+
+    def _load_cgsa_catalog_disk_cache(
+        self,
+        task_id: str,
+        context: Dict[str, Any],
+        fast: Dict[str, Any],
+    ) -> Optional[List[Dict[str, Any]]]:
+        cache_path, meta_path = self._get_cgsa_catalog_cache_paths(context)
+        if cache_path is None or meta_path is None or not cache_path.exists() or not meta_path.exists():
+            return None
+        try:
+            expected = self._cgsa_catalog_cache_signature(context, fast)
+            actual = json.loads(meta_path.read_text(encoding="utf-8"))
+            if actual != expected:
+                return None
+            frame = pd.read_parquet(str(cache_path))
+            frame = frame.where(pd.notna(frame), None)
+            rows = frame.to_dict(orient="records")
+            self._cgsa_catalog_cache[task_id] = rows
+            self._cgsa_column_path_cache[task_id] = fast["column_to_path"]
+            logger.info("CGSA catalog disk cache hit for task %s (%d features)", task_id, len(rows))
+            return rows
+        except Exception as exc:
+            logger.warning("Failed to load CGSA catalog cache for task %s: %s", task_id, exc)
+            return None
+
+    def _persist_cgsa_catalog_cache(
+        self,
+        context: Dict[str, Any],
+        fast: Dict[str, Any],
+        rows: List[Dict[str, Any]],
+    ) -> None:
+        cache_path, meta_path = self._get_cgsa_catalog_cache_paths(context)
+        if cache_path is None or meta_path is None:
+            return
+        tmp_cache: Optional[Path] = None
+        tmp_meta: Optional[Path] = None
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_cache = cache_path.with_suffix(cache_path.suffix + f".{uuid.uuid4().hex}.tmp")
+            tmp_meta = meta_path.with_suffix(meta_path.suffix + f".{uuid.uuid4().hex}.tmp")
+            pd.DataFrame(rows).to_parquet(str(tmp_cache), index=False, compression="snappy")
+            tmp_meta.write_text(
+                json.dumps(self._cgsa_catalog_cache_signature(context, fast), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            os.replace(tmp_cache, cache_path)
+            os.replace(tmp_meta, meta_path)
+        except Exception as exc:
+            logger.warning("Failed to persist CGSA catalog cache: %s", exc)
+        finally:
+            for tmp_path in (tmp_cache, tmp_meta):
+                if tmp_path is not None and tmp_path.exists():
+                    try:
+                        tmp_path.unlink()
+                    except OSError:
+                        pass
+
+    def _start_cgsa_catalog_warmup(self, task_id: str, context: Dict[str, Any]) -> None:
+        with self._lock:
+            if task_id in self._cgsa_catalog_cache or task_id in self._cgsa_catalog_warming_tasks:
+                return
+            self._cgsa_catalog_warming_tasks.add(task_id)
+
+        def _worker() -> None:
+            try:
+                self._build_cgsa_catalog_rows(task_id, context)
+            except Exception as exc:
+                logger.debug("CGSA catalog warmup failed for task %s: %s", task_id, exc)
+            finally:
+                with self._lock:
+                    self._cgsa_catalog_warming_tasks.discard(task_id)
+
+        thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f"cgsa-catalog-warm-{task_id[:8]}",
+        )
+        thread.start()
 
     # ------------------------------------------------------------------
     # CGSA feature stats disk-cache helpers
@@ -1252,6 +1360,12 @@ class FeatureFactoryService:
         if manifest_dir is None:
             return None
         return Path(manifest_dir) / self._CGSA_STATS_CACHE_NAME
+
+    def _get_cgsa_stats_parts_dir(self, context: Dict[str, Any]) -> Optional[Path]:
+        manifest_dir = context.get("manifest_dir")
+        if manifest_dir is None:
+            return None
+        return Path(manifest_dir) / self._CGSA_STATS_PARTS_DIR_NAME
 
     def _load_cgsa_stats_mem(self, task_id: str, context: Dict[str, Any]) -> pd.DataFrame:
         """Return the in-memory CGSA stats DataFrame, loading from disk on first call.
@@ -1265,18 +1379,29 @@ class FeatureFactoryService:
                 return self._cgsa_stats_mem_cache[task_id]
             cache_path = self._get_cgsa_stats_cache_path(context)
 
+        frames: List[pd.DataFrame] = []
         if cache_path is not None and cache_path.exists():
             try:
-                df = pd.read_parquet(str(cache_path))
-                if "name" in df.columns:
-                    df = df.set_index("name")
-                with self._lock:
-                    # Double-checked: another thread may have loaded while we read disk.
-                    if task_id not in self._cgsa_stats_mem_cache:
-                        self._cgsa_stats_mem_cache[task_id] = df
-                    return self._cgsa_stats_mem_cache[task_id]
+                frames.append(pd.read_parquet(str(cache_path)))
             except Exception as exc:
                 logger.warning("Failed to load CGSA stats cache %s: %s", cache_path, exc)
+
+        parts_dir = self._get_cgsa_stats_parts_dir(context)
+        if parts_dir is not None and parts_dir.exists():
+            for part_path in sorted(parts_dir.glob("*.parquet")):
+                try:
+                    frames.append(pd.read_parquet(str(part_path)))
+                except Exception as exc:
+                    logger.debug("Failed to load CGSA stats cache part %s: %s", part_path, exc)
+
+        if frames:
+            df = pd.concat(frames, axis=0, ignore_index=True)
+            if "name" in df.columns:
+                df = df.drop_duplicates(subset=["name"], keep="last").set_index("name")
+            with self._lock:
+                if task_id not in self._cgsa_stats_mem_cache:
+                    self._cgsa_stats_mem_cache[task_id] = df
+                return self._cgsa_stats_mem_cache[task_id]
 
         return pd.DataFrame()
 
@@ -1301,15 +1426,17 @@ class FeatureFactoryService:
             else:
                 merged = new_df.copy()
             self._cgsa_stats_mem_cache[task_id] = merged
-            cache_path = self._get_cgsa_stats_cache_path(context)
-            if cache_path is not None:
+            parts_dir = self._get_cgsa_stats_parts_dir(context)
+            if parts_dir is not None:
                 try:
-                    out = merged.copy()
+                    parts_dir.mkdir(parents=True, exist_ok=True)
+                    out = new_only.copy() if not existing.empty else new_df.copy()
                     out.index.name = "name"
-                    out.reset_index().to_parquet(str(cache_path), index=False, compression="snappy")
+                    part_path = parts_dir / f"stats_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}_{uuid.uuid4().hex[:8]}.parquet"
+                    out.reset_index().to_parquet(str(part_path), index=False, compression="snappy")
                     logger.debug(
-                        "Persisted CGSA stats cache for task %s (%d features total)",
-                        task_id, len(merged),
+                        "Persisted CGSA stats cache part for task %s (%d new, %d total)",
+                        task_id, len(out), len(merged),
                     )
                 except Exception as exc:
                     logger.warning("Failed to persist CGSA stats cache for task %s: %s", task_id, exc)
@@ -2330,7 +2457,10 @@ class FeatureFactoryService:
     # ------------------------------------------------------------------
 
     _TASK_RECORD_NAME = "task_record.json"
+    _CGSA_CATALOG_CACHE_NAME = "feature_catalog_cache.parquet"
+    _CGSA_CATALOG_CACHE_META_NAME = "feature_catalog_cache.meta.json"
     _CGSA_STATS_CACHE_NAME = "feature_stats_cache.parquet"
+    _CGSA_STATS_PARTS_DIR_NAME = "feature_stats_cache_parts"
     # Raised to 500: approximate quantiles (3 000-row sample) make 500 features
     # computable in ~600 ms, so the synchronous cap can be larger without
     # blocking the search response.  Features beyond the cap are returned with
@@ -2501,6 +2631,8 @@ class FeatureFactoryService:
         with self._lock:
             self._stats_warming_tasks.discard(task_id)
             self._adf_warming_tasks.discard(task_id)
+            self._cgsa_stats_warming_tasks.discard(task_id)
+            self._cgsa_catalog_warming_tasks.discard(task_id)
 
     def _get_feature_metadata_map(self, task_id: str, feature_names: List[str]) -> Dict[str, Dict[str, str]]:
         cache = self._feature_metadata_cache.setdefault(task_id, {})
@@ -3122,12 +3254,12 @@ class FeatureFactoryService:
             groups_raw = manifest.get("groups")
             feature_names: List[str] = []
             if isinstance(groups_raw, dict):
-                # V7 format
+                # l7_v2 format uses "row_count"; legacy V7 format uses "total_rows"
                 for group_meta in groups_raw.values():
                     feature_names.extend(group_meta.get("columns") or [])
                 return {
                     "feature_names": feature_names,
-                    "row_count": int(manifest.get("total_rows") or 0),
+                    "row_count": int(manifest.get("row_count") or manifest.get("total_rows") or 0),
                 }
             elif isinstance(groups_raw, list):
                 # CGSA registry list format — read row count from first parquet
@@ -3582,6 +3714,24 @@ class FeatureFactoryService:
                     f"Invalid columns: {invalid}. Available columns count: {len(df_full.columns)}"
                 )
             view = df_full[selected_columns].iloc[:max_rows]
+
+            # CGSA parquet files have no timestamp column; attach datetime index
+            # from the kline cache so the CSV timestamp column shows real dates.
+            if not isinstance(view.index, pd.DatetimeIndex):
+                try:
+                    ts_list = self._load_cgsa_kline_timestamps(
+                        context, 0, len(view), len(df_full)
+                    )
+                    view = view.copy()
+                    view.index = pd.to_datetime(ts_list)
+                    view.index.name = "timestamp"
+                except Exception as _ts_exc:
+                    logger.warning(
+                        "[CGSA CSV] Cannot attach datetime index for task %s; "
+                        "falling back to integer row index: %s",
+                        task_id, _ts_exc,
+                    )
+
             for start in range(0, len(view), chunk_size):
                 chunk_df = view.iloc[start:start + chunk_size]
                 if raw_df is not None and _raw_columns:

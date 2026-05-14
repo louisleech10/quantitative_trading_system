@@ -6,8 +6,9 @@ import gc
 import os
 import shutil
 import time
+from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -194,17 +195,45 @@ class MultiTFGenerator:
                 idx_map = TimeframeAligner.build_asof_index_map(primary_ms, source_ms, offset_ns=offset_ns)
 
                 n_primary = len(primary_timestamps)
-                aligned_count = 0
-                for gid in new_group_ids:
-                    src_data = np.asarray(registry.load_data(gid), dtype=np.float32)
-                    aligned_arr = self._align_group_array(src_data, idx_map, n_primary)
-                    registry.overwrite_data(gid, aligned_arr)
-                    aligned_count += 1
+                if self._compact_alignment_enabled():
+                    idx_map_path = self._persist_alignment_idx_map(
+                        registry.work_dir,
+                        source_tf=timeframe,
+                        primary_tf=self._primary_tf,
+                        alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
+                        idx_map=idx_map,
+                    )
+                    compact_count = self._mark_existing_groups_compact_aligned(
+                        registry=registry,
+                        group_ids=new_group_ids,
+                        source_tf=timeframe,
+                        n_source=len(source_dt),
+                        n_primary=n_primary,
+                        idx_map_path=idx_map_path,
+                        alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
+                        offset_ns=offset_ns,
+                    )
+                    logger.info(
+                        "[CGSA][multi_tf] Compact-aligned %d groups from %s → %s "
+                        "(source_rows=%d logical_rows=%d)",
+                        compact_count,
+                        timeframe,
+                        self._primary_tf,
+                        len(source_dt),
+                        n_primary,
+                    )
+                else:
+                    aligned_count = 0
+                    for gid in new_group_ids:
+                        src_data = np.asarray(registry.load_data(gid), dtype=np.float32)
+                        aligned_arr = self._align_group_array(src_data, idx_map, n_primary)
+                        registry.overwrite_data(gid, aligned_arr)
+                        aligned_count += 1
 
-                logger.info(
-                    "[CGSA][multi_tf] Aligned %d groups from %s → %s (idx_map built once)",
-                    aligned_count, timeframe, self._primary_tf,
-                )
+                    logger.info(
+                        "[CGSA][multi_tf] Aligned %d groups from %s → %s (idx_map built once)",
+                        aligned_count, timeframe, self._primary_tf,
+                    )
 
         if self._primary_tf in skipped_tfs:
             raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
@@ -235,9 +264,7 @@ class MultiTFGenerator:
             config_hash=config_hash,
         )
 
-        total_layer_counts = self._build_total_layer_counts(tf_layer_counts)
-        result.layer_counts = total_layer_counts
-        result.metadata["layer_counts"] = total_layer_counts
+        total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
         result.metadata["actual_timeframes"] = [
             tf for tf in self._training_tfs if tf not in skipped_tfs
@@ -333,8 +360,12 @@ class MultiTFGenerator:
                 if layer_df is not None and not layer_df.empty:
                     self._factory._persist_layer_output_groups(layer_df, layer_src, label)
 
-            tf_layer_counts[self._primary_tf] = self._collect_layer_counts(
-                [layer1, layer2, layer3, layer4, layer5, layer6]
+            # CGSA can spill intermediate DataFrames after their groups are
+            # persisted. The registry is the L7 source of truth, so primary
+            # counts must come from the manifest-backed registry rather than
+            # from possibly-empty in-memory frames.
+            tf_layer_counts[self._primary_tf] = self._collect_layer_counts_from_registry(
+                registry, self._primary_tf
             )
             del layer1, layer2, layer3, layer4, layer5, layer6
             gc.collect()
@@ -480,9 +511,7 @@ class MultiTFGenerator:
             config_hash=config_hash,
         )
 
-        total_layer_counts = self._build_total_layer_counts(tf_layer_counts)
-        result.layer_counts = total_layer_counts
-        result.metadata["layer_counts"] = total_layer_counts
+        total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
         result.metadata["actual_timeframes"] = [
             tf for tf in self._training_tfs if tf not in skipped_tfs
@@ -516,6 +545,19 @@ class MultiTFGenerator:
             idx_map = TimeframeAligner.build_asof_index_map(
                 primary_ms, source_timestamps_ms, offset_ns=offset_ns,
             )
+        else:
+            offset_ns = 0
+
+        compact_alignment = self._compact_alignment_enabled() and idx_map is not None
+        idx_map_path: Optional[Path] = None
+        if compact_alignment:
+            idx_map_path = self._persist_alignment_idx_map(
+                registry.work_dir,
+                source_tf=source_tf,
+                primary_tf=self._primary_tf,
+                alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
+                idx_map=idx_map,
+            )
 
         aligned_count = 0
         worker_dirs_to_cleanup: set[Path] = set()
@@ -527,16 +569,26 @@ class MultiTFGenerator:
         for gd in groups_data:
             columns = tuple(gd["columns"])
             n_cols = len(columns)
-            source_npy_path: Optional[Path] = None
+            if compact_alignment and idx_map_path is not None:
+                freed_bytes, moved_dirs = self._register_worker_group_compact(
+                    registry=registry,
+                    group_data=gd,
+                    source_tf=source_tf,
+                    n_primary=n_primary,
+                    idx_map_path=idx_map_path,
+                    alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
+                    offset_ns=offset_ns,
+                    keep_worker_npy=keep_worker_npy,
+                )
+                freed_worker_bytes += freed_bytes
+                worker_dirs_to_cleanup.update(moved_dirs)
+                aligned_count += 1
+                continue
 
             # OOM Fix: mmap-read the worker's .npy instead of receiving a
             # full ndarray over pickle. Backwards compatible: if a worker
             # returned the legacy "data" payload, fall back to it.
-            if "npy_path" in gd:
-                source_npy_path = Path(gd["npy_path"])
-                src_data = np.load(source_npy_path, mmap_mode="r", allow_pickle=False)
-            else:
-                src_data = gd["data"]
+            src_data, source_paths = self._load_worker_group_source_array(gd)
 
             npy_path = registry.work_dir / f"{gd['group_id']}.npy"
 
@@ -580,23 +632,24 @@ class MultiTFGenerator:
                     npy_path.unlink()
                 raise
 
-            if source_npy_path is not None and not keep_worker_npy:
+            if source_paths and not keep_worker_npy:
                 # Skip cleanup when KEEP_WORKER_NPY is enabled so the worker
                 # .npy + workdir remain intact for debugging / resume scenarios.
-                try:
-                    source_resolved = source_npy_path.resolve()
-                    target_resolved = npy_path.resolve()
-                    if source_resolved != target_resolved and source_npy_path.exists():
-                        file_size = source_npy_path.stat().st_size
-                        source_npy_path.unlink()
-                        freed_worker_bytes += file_size
-                        worker_dirs_to_cleanup.add(source_npy_path.parent)
-                except OSError as exc:
-                    logger.warning(
-                        "Failed to delete worker npy after registering %s: %s",
-                        gd["group_id"],
-                        exc,
-                    )
+                for source_path in source_paths:
+                    try:
+                        source_resolved = source_path.resolve()
+                        target_resolved = npy_path.resolve()
+                        if source_resolved != target_resolved and source_path.exists():
+                            file_size = source_path.stat().st_size
+                            source_path.unlink()
+                            freed_worker_bytes += file_size
+                            worker_dirs_to_cleanup.add(source_path.parent)
+                    except OSError as exc:
+                        logger.warning(
+                            "Failed to delete worker npy after registering %s: %s",
+                            gd["group_id"],
+                            exc,
+                        )
             aligned_count += 1
 
         if not keep_worker_npy:
@@ -611,9 +664,223 @@ class MultiTFGenerator:
         # Reclaim memory after processing a worker's full payload.
         gc.collect()
         logger.info(
-            "[CGSA-parallel] Registered %d groups from worker TF %s (freed worker npy %.2f GiB)",
-            aligned_count, source_tf, freed_worker_bytes / (1024 ** 3),
+            "[CGSA-parallel] Registered %d groups from worker TF %s (compact=%s, freed worker npy %.2f GiB)",
+            aligned_count, source_tf, compact_alignment, freed_worker_bytes / (1024 ** 3),
         )
+
+    def _mark_existing_groups_compact_aligned(
+        self,
+        *,
+        registry: object,
+        group_ids: List[str],
+        source_tf: str,
+        n_source: int,
+        n_primary: int,
+        idx_map_path: Path,
+        alignment_mode: str,
+        offset_ns: int,
+    ) -> int:
+        """Convert already-persisted non-primary groups to compact logical alignment."""
+        from momentum.FeatureEngineering.core.column_group import AlignmentMeta
+
+        compact_count = 0
+        for group_id in group_ids:
+            group = registry.get(group_id)
+            alignment = AlignmentMeta(
+                source_timeframe=source_tf,
+                primary_timeframe=self._primary_tf,
+                source_n_rows=int(n_source),
+                primary_n_rows=int(n_primary),
+                idx_map_path=idx_map_path,
+                alignment_mode=str(alignment_mode),
+                offset_ns=int(offset_ns),
+            )
+            registry._groups[group_id] = replace(
+                group,
+                shape=(int(n_primary), int(group.n_cols)),
+                alignment=alignment,
+            )
+            compact_count += 1
+        try:
+            registry.write_manifest()
+        except Exception as exc:
+            logger.warning("[CGSA][multi_tf] manifest flush after compact alignment failed: %s", exc)
+        return compact_count
+
+    def _register_worker_group_compact(
+        self,
+        *,
+        registry: object,
+        group_data: Dict,
+        source_tf: str,
+        n_primary: int,
+        idx_map_path: Path,
+        alignment_mode: str,
+        offset_ns: int,
+        keep_worker_npy: bool,
+    ) -> Tuple[int, set[Path]]:
+        """Register a worker group using physical source rows + logical idx_map."""
+        from momentum.FeatureEngineering.core.column_group import AlignmentMeta, ColumnGroup, LayerSource, ShardMeta
+
+        columns = tuple(group_data["columns"])
+        n_cols = len(columns)
+        source_shape = group_data.get("shape") or [0, n_cols]
+        n_source = int(source_shape[0])
+        group_id = str(group_data["group_id"])
+        moved_dirs: set[Path] = set()
+        freed_worker_bytes = 0
+
+        shard_payloads = sorted(
+            group_data.get("shards") or [],
+            key=lambda item: int(item.get("shard_idx", 0)),
+        )
+        shard_metas: List[ShardMeta] = []
+        disk_path: Optional[Path] = None
+
+        if shard_payloads:
+            width = max(2, len(str(len(shard_payloads) - 1)))
+            for shard_payload in shard_payloads:
+                shard_idx = int(shard_payload.get("shard_idx", 0))
+                source_path = Path(str(shard_payload.get("path") or shard_payload.get("file")))
+                target_path = registry.work_dir / f"{group_id}.shard{shard_idx:0{width}d}.npy"
+                moved_bytes = self._copy_or_move_worker_file(
+                    source_path,
+                    target_path,
+                    keep_source=keep_worker_npy,
+                )
+                freed_worker_bytes += moved_bytes
+                if moved_bytes > 0:
+                    moved_dirs.add(source_path.parent)
+                shard_metas.append(
+                    ShardMeta(
+                        shard_idx=shard_idx,
+                        col_start=int(shard_payload.get("col_start", 0)),
+                        col_end=int(shard_payload.get("col_end", 0)),
+                        n_rows=int(shard_payload.get("n_rows", n_source)),
+                        disk_path=target_path,
+                        nbytes=int(shard_payload.get("nbytes", target_path.stat().st_size)),
+                    )
+                )
+        elif "npy_path" in group_data:
+            source_path = Path(str(group_data["npy_path"]))
+            disk_path = registry.work_dir / f"{group_id}.npy"
+            moved_bytes = self._copy_or_move_worker_file(
+                source_path,
+                disk_path,
+                keep_source=keep_worker_npy,
+            )
+            freed_worker_bytes += moved_bytes
+            if moved_bytes > 0:
+                moved_dirs.add(source_path.parent)
+        elif "data" in group_data:
+            source_array = np.asarray(group_data["data"], dtype=np.float32)
+            disk_path = registry.work_dir / f"{group_id}.npy"
+            np.save(disk_path, source_array, allow_pickle=False)
+            n_source = int(source_array.shape[0])
+        else:
+            raise ValueError(f"Worker group {group_id} has no npy_path/shards/data payload")
+
+        alignment = AlignmentMeta(
+            source_timeframe=source_tf,
+            primary_timeframe=self._primary_tf,
+            source_n_rows=int(n_source),
+            primary_n_rows=int(n_primary),
+            idx_map_path=idx_map_path,
+            alignment_mode=str(alignment_mode),
+            offset_ns=int(offset_ns),
+        )
+        group = ColumnGroup(
+            group_id=group_id,
+            layer=LayerSource(group_data["layer"]),
+            timeframe=str(group_data["timeframe"]),
+            data_source=str(group_data["data_source"]),
+            indicator=str(group_data["indicator"]),
+            columns=columns,
+            shape=(int(n_primary), n_cols),
+            dtype="float32",
+            disk_path=disk_path,
+            shards=tuple(shard_metas),
+            alignment=alignment,
+        )
+        try:
+            registry.register(group)
+        except Exception:
+            for shard in shard_metas:
+                if shard.disk_path.exists():
+                    shard.disk_path.unlink()
+            if disk_path is not None and disk_path.exists():
+                disk_path.unlink()
+            raise
+        return freed_worker_bytes, moved_dirs
+
+    @staticmethod
+    def _load_worker_group_source_array(group_data: Dict) -> Tuple[np.ndarray, List[Path]]:
+        """Load worker group source data for dense fallback registration."""
+        source_paths: List[Path] = []
+        if "shards" in group_data and group_data.get("shards"):
+            shape = group_data.get("shape") or [0, len(group_data.get("columns", []))]
+            n_rows = int(shape[0])
+            n_cols = int(shape[1])
+            out = np.empty((n_rows, n_cols), dtype=np.float32)
+            for shard_payload in sorted(group_data["shards"], key=lambda item: int(item.get("shard_idx", 0))):
+                source_path = Path(str(shard_payload.get("path") or shard_payload.get("file")))
+                source_paths.append(source_path)
+                shard_arr = np.load(source_path, mmap_mode="r", allow_pickle=False)
+                col_start = int(shard_payload.get("col_start", 0))
+                col_end = int(shard_payload.get("col_end", col_start + shard_arr.shape[1]))
+                out[:, col_start:col_end] = np.asarray(shard_arr, dtype=np.float32)
+                del shard_arr
+            return out, source_paths
+
+        if "npy_path" in group_data:
+            source_path = Path(group_data["npy_path"])
+            source_paths.append(source_path)
+            return np.load(source_path, mmap_mode="r", allow_pickle=False), source_paths
+
+        return np.asarray(group_data["data"], dtype=np.float32), source_paths
+
+    @staticmethod
+    def _copy_or_move_worker_file(source_path: Path, target_path: Path, *, keep_source: bool) -> int:
+        """Move worker source file into main work_dir, or copy when debug retention is on."""
+        source_path = Path(source_path)
+        target_path = Path(target_path)
+        if not source_path.exists():
+            raise FileNotFoundError(f"Worker source file missing: {source_path}")
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if source_path.resolve() == target_path.resolve():
+                return 0
+        except OSError:
+            pass
+        if target_path.exists():
+            target_path.unlink()
+        source_size = int(source_path.stat().st_size)
+        if keep_source:
+            shutil.copy2(source_path, target_path)
+            return 0
+        shutil.move(str(source_path), str(target_path))
+        return source_size
+
+    @staticmethod
+    def _persist_alignment_idx_map(
+        work_dir: Path,
+        *,
+        source_tf: str,
+        primary_tf: str,
+        alignment_mode: str,
+        idx_map: np.ndarray,
+    ) -> Path:
+        """Persist the shared source→primary idx_map used by compact groups."""
+        safe_mode = str(alignment_mode).replace("/", "_").replace(" ", "_")
+        idx_map_path = Path(work_dir) / f".align_{source_tf}_to_{primary_tf}_{safe_mode}.npy"
+        temp_path = idx_map_path.with_suffix(idx_map_path.suffix + ".tmp")
+        if temp_path.exists():
+            temp_path.unlink()
+        idx_map_arr = np.asarray(idx_map, dtype=np.int32)
+        with temp_path.open("wb") as handle:
+            np.save(handle, idx_map_arr, allow_pickle=False)
+        os.replace(temp_path, idx_map_path)
+        return idx_map_path
 
     @classmethod
     def _persist_aligned_group_to_npy(
@@ -722,6 +989,12 @@ class MultiTFGenerator:
         """Honor FFACT_MULTI_TF_KEEP_WORKER_NPY for debug / resume scenarios."""
         raw = os.getenv("FFACT_MULTI_TF_KEEP_WORKER_NPY", "0").strip().lower()
         return raw in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _compact_alignment_enabled() -> bool:
+        """Honor FFACT_MULTI_TF_COMPACT_ALIGNMENT for non-primary TF groups."""
+        raw = os.getenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", "1").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
 
     # ------------------------------------------------------------------
     # Legacy path: wide DataFrame concat + alignment (non-CGSA)
@@ -864,9 +1137,7 @@ class MultiTFGenerator:
             config_hash=config_hash,
         )
 
-        total_layer_counts = self._build_total_layer_counts(tf_layer_counts)
-        result.layer_counts = total_layer_counts
-        result.metadata["layer_counts"] = total_layer_counts
+        total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
         result.metadata["actual_timeframes"] = [
             tf for tf in self._training_tfs if tf not in skipped_tfs
@@ -925,6 +1196,33 @@ class MultiTFGenerator:
             for layer_name, count in counts.items():
                 key = layer_name if timeframe == self._primary_tf else f"{layer_name}_{timeframe}"
                 total_layer_counts[key] = count
+        return total_layer_counts
+
+    def _apply_total_layer_counts_to_result(
+        self,
+        result: Any,
+        tf_layer_counts: Dict[str, Dict[str, int]],
+    ) -> Dict[str, int]:
+        """Write manifest-derived multi-TF counts back into the result object."""
+        total_layer_counts = self._build_total_layer_counts(tf_layer_counts)
+        counted_total = sum(int(value) for value in total_layer_counts.values())
+        feature_count = int(getattr(result, "feature_count", 0) or 0)
+
+        if counted_total != feature_count:
+            result_counts = getattr(result, "layer_counts", {}) or {}
+            l65_count = int(result_counts.get("layer6_5", 0) or 0)
+            if l65_count and counted_total + l65_count == feature_count:
+                total_layer_counts["layer6_5"] = l65_count
+            else:
+                logger.warning(
+                    "[MultiTF] Layer count total mismatch: counted=%d feature_count=%d counts=%s",
+                    counted_total,
+                    feature_count,
+                    total_layer_counts,
+                )
+
+        result.layer_counts = total_layer_counts
+        result.metadata["layer_counts"] = total_layer_counts
         return total_layer_counts
 
     @staticmethod
@@ -1122,6 +1420,36 @@ def _tf_worker_entry(
         if registry is not None:
             for group_id in sorted(registry._groups.keys()):
                 group = registry.get(group_id)
+                shards_payload = []
+                if getattr(group, "shards", ()):
+                    missing_shard = False
+                    for shard in group.shards:
+                        if not Path(shard.disk_path).exists():
+                            missing_shard = True
+                            break
+                        shards_payload.append({
+                            "shard_idx": shard.shard_idx,
+                            "col_start": shard.col_start,
+                            "col_end": shard.col_end,
+                            "n_rows": shard.n_rows,
+                            "nbytes": shard.nbytes,
+                            "path": str(shard.disk_path),
+                        })
+                    if missing_shard:
+                        continue
+                    groups_data.append({
+                        "group_id": group.group_id,
+                        "layer": group.layer.value,
+                        "timeframe": group.timeframe,
+                        "data_source": group.data_source,
+                        "indicator": group.indicator,
+                        "columns": list(group.columns),
+                        "shape": list(group.shape),
+                        "dtype": group.dtype,
+                        "shards": shards_payload,
+                    })
+                    continue
+
                 npy_path = group.disk_path
                 # If a group is still buffered in memory (no disk_path),
                 # flush it explicitly so the main process can mmap-read it.

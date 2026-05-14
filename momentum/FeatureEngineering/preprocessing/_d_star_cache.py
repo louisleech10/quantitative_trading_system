@@ -222,6 +222,23 @@ def _col_value_fingerprint(values: np.ndarray) -> str:
     return hashlib.sha256(np.ascontiguousarray(sample).view(np.uint8)).hexdigest()[:16]
 
 
+def _strong_col_value_fingerprint(values: np.ndarray) -> str:
+    """Exact per-column value fingerprint for safe cross-column d-star aliasing."""
+    arr = np.asarray(values, dtype=np.float64).ravel()
+    n = len(arr)
+    if n == 0:
+        return "empty"
+    canonical = np.ascontiguousarray(arr.copy())
+    nan_mask = np.isnan(canonical)
+    if nan_mask.any():
+        canonical[nan_mask] = np.nan
+    payload = np.ascontiguousarray(canonical.astype("<f8", copy=False)).view(np.uint8)
+    digest = hashlib.sha256()
+    digest.update(int(n).to_bytes(8, byteorder="little", signed=False))
+    digest.update(payload)
+    return digest.hexdigest()[:32]
+
+
 class DStarCache:
     """Disk-backed d_star cache isolated by (symbol, timeframe, fracdiff_params).
 
@@ -267,6 +284,7 @@ class DStarCache:
         self._hits = 0
         self._misses = 0
         self._entries: Dict[str, Dict[str, Any]] = {}
+        self._value_aliases: Dict[str, Dict[str, Any]] = {}
 
         if not self.is_enabled:
             logger.warning(
@@ -318,11 +336,32 @@ class DStarCache:
         if not isinstance(entries, dict):
             logger.warning("[d_star_cache] invalid entries cache=%s", self._path)
             return {}
-        return {
+        loaded_entries = {
             str(column): dict(entry)
             for column, entry in entries.items()
             if isinstance(entry, dict)
         }
+        aliases = payload.get("value_aliases", {})
+        if isinstance(aliases, dict):
+            self._value_aliases = {
+                str(value_fp): dict(alias)
+                for value_fp, alias in aliases.items()
+                if isinstance(alias, dict)
+            }
+
+        # Older v3 payloads do not have value_aliases. Rebuild aliases from
+        # entries that already carry exact fingerprints; legacy weak-only
+        # entries remain readable by direct column lookups.
+        for column, entry in loaded_entries.items():
+            strong_fp = entry.get("strong_value_fp")
+            raw_value = entry.get("d_star")
+            if strong_fp and raw_value is not None and strong_fp not in self._value_aliases:
+                self._value_aliases[str(strong_fp)] = {
+                    "d_star": raw_value,
+                    "source_column": column,
+                    "computed_at": entry.get("computed_at"),
+                }
+        return loaded_entries
 
     def _payload_matches(self, payload: Dict[str, Any]) -> bool:
         if payload.get("cache_version") != CACHE_VERSION:
@@ -409,21 +448,56 @@ class DStarCache:
             return None
 
         entry = self._entries.get(str(column))
+
+        if col_values is not None:
+            # Per-column value fingerprint (v3 path): tolerates config/schema changes
+            return self.get_by_value_fingerprint(
+                column,
+                weak_fp=_col_value_fingerprint(col_values),
+                strong_fp=_strong_col_value_fingerprint(col_values),
+            )
+
         if not entry:
             self._misses += 1
             return None
 
-        if col_values is not None:
-            # Per-column value fingerprint (v3 path): tolerates config/schema changes
-            if entry.get("value_fp") != _col_value_fingerprint(col_values):
-                self._misses += 1
-                return None
-        else:
+        if col_values is None:
             # Backward-compat path: whole-file data fingerprint check
             if entry.get("input_fingerprint") != self._ctx.data_fingerprint:
                 self._misses += 1
                 return None
 
+        return self._entry_value(entry)
+
+    def get_by_value_fingerprint(
+        self,
+        column: str,
+        *,
+        weak_fp: str,
+        strong_fp: str,
+    ) -> Optional[float]:
+        """Return a d-star hit using precomputed value fingerprints."""
+        if not self.is_enabled:
+            return None
+
+        entry = self._entries.get(str(column))
+        if entry and (
+            entry.get("strong_value_fp") == strong_fp
+            or (
+                entry.get("strong_value_fp") is None
+                and entry.get("value_fp") == weak_fp
+            )
+        ):
+            return self._entry_value(entry)
+
+        alias = self._value_aliases.get(strong_fp)
+        if alias:
+            return self._entry_value(alias)
+
+        self._misses += 1
+        return None
+
+    def _entry_value(self, entry: Dict[str, Any]) -> Optional[float]:
         raw_value = entry.get("d_star")
         if raw_value is None:
             self._misses += 1
@@ -449,6 +523,13 @@ class DStarCache:
         }
         if col_values is not None:
             entry["value_fp"] = _col_value_fingerprint(col_values)
+            strong_fp = _strong_col_value_fingerprint(col_values)
+            entry["strong_value_fp"] = strong_fp
+            self._value_aliases[strong_fp] = {
+                "d_star": value,
+                "source_column": str(column),
+                "computed_at": entry["computed_at"],
+            }
         else:
             entry["input_fingerprint"] = self._ctx.data_fingerprint
         self._entries[str(column)] = entry
@@ -465,6 +546,16 @@ class DStarCache:
         )
         for key in sorted_keys[:trim_count]:
             del self._entries[key]
+        remaining_strong = {
+            str(entry.get("strong_value_fp"))
+            for entry in self._entries.values()
+            if entry.get("strong_value_fp")
+        }
+        self._value_aliases = {
+            key: value
+            for key, value in self._value_aliases.items()
+            if key in remaining_strong
+        }
         logger.info(
             "[d_star_cache] GC: removed %d oldest entries, remaining=%d path=%s",
             trim_count,
@@ -478,6 +569,7 @@ class DStarCache:
         self._maybe_gc()
         payload = self._base_payload_fields()
         payload["entries"] = self._entries
+        payload["value_aliases"] = self._value_aliases
 
         tmp_path = self._path.with_name(
             f".{self._path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
