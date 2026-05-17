@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Layers, Search, X, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, X, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { FeaturePreview, FeatureSchema, SchemaIndicator } from '@/lib/types';
 import CategorySection from './CategorySection';
@@ -459,18 +459,7 @@ export default function LayerPanel({ schema }: LayerPanelProps) {
   }
 
   return (
-    <div className="glass-panel rounded-2xl p-4 space-y-4 border border-white/10">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-lg bg-violet-400/15 flex items-center justify-center">
-          <Layers className="w-4 h-4 text-violet-200" />
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-slate-100">細粒度指標控制</div>
-          <div className="text-[11px] text-slate-400">逐層配置每個指標的啟用狀態</div>
-        </div>
-      </div>
-
+      <div className="px-4 pb-4 space-y-4">
       {/* Search bar (C6) */}
       <div className="relative">
         <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />

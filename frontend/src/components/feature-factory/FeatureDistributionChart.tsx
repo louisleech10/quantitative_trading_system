@@ -23,7 +23,7 @@ interface FeatureDistributionChartProps {
   taskId: string;
 }
 
-const FEATURE_NAME_LIMIT = 300000;
+const FEATURE_NAME_LIMIT = 1000000;
 
 export default function FeatureDistributionChart({ taskId }: FeatureDistributionChartProps) {
   const { explorerSelectedFeature, setExplorerActiveTab } = useFeatureFactoryStore();
@@ -141,20 +141,6 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
     <div id="feature-distribution-chart" className="glass-panel rounded-2xl p-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="text-sm text-slate-300">Distribution</div>
-        <select
-          value={feature}
-          onChange={(e) => {
-            setFeature(e.target.value);
-            setExplorerActiveTab('distribution', e.target.value);
-          }}
-          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
-        >
-          {filteredFeatureOptions.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
         <div className="ml-auto text-xs text-slate-300">bins: {bins}</div>
         <input
           type="range"
@@ -173,17 +159,38 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
       </div>
 
       <FeatureNameSegmentFilter features={featureOptions} onFilteredFeaturesChange={setFilteredFeatureOptions} />
-
-      {loading ? (
-        <div className="text-xs text-slate-400">載入中...</div>
-      ) : error ? (
-        <div className="text-xs text-rose-300">{error}</div>
-      ) : !payload ? (
-        <div className="text-xs text-slate-400">尚無資料。</div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <div className="h-[260px]">
+      <div className="flex gap-3 min-w-0">
+        <div className="w-72 shrink-0">
+          <div className="max-h-[420px] overflow-y-auto rounded border border-white/5 bg-black/20 py-1">
+            {filteredFeatureOptions.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  setFeature(name);
+                  setExplorerActiveTab('distribution', name);
+                }}
+                title={name}
+                className={`w-full text-left truncate text-xs px-2 py-1 rounded ${
+                  feature === name ? 'bg-indigo-400/20 text-indigo-200' : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          {loading ? (
+            <div className="text-xs text-slate-400">載入中...</div>
+          ) : error ? (
+            <div className="text-xs text-rose-300">{error}</div>
+          ) : !payload ? (
+            <div className="text-xs text-slate-400">尚無資料。</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={histogramData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -195,7 +202,7 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            <div className="h-[260px]">
+            <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -226,6 +233,8 @@ export default function FeatureDistributionChart({ taskId }: FeatureDistribution
           </div>
         </>
       )}
+        </div>
+      </div>
     </div>
   );
 }

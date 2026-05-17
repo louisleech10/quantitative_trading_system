@@ -1,14 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Wand2, AlertCircle, PlayCircle } from 'lucide-react';
+import { Sparkles, Wand2, AlertCircle, PlayCircle, Database, Layers, ArrowDownUp, Eye, Download, Cpu } from 'lucide-react';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import ConfigPanel from '@/components/feature-factory/ConfigPanel';
 import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKlineDownloadPanel';
 import PreviewPanel from '@/components/feature-factory/PreviewPanel';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
-import AutoResearchPanel from '@/components/feature-factory/AutoResearchPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
 import LayerPanel from '@/components/feature-factory/LayerPanel';
@@ -49,6 +48,8 @@ export default function FeatureFactoryPage() {
     updateConfigPartial,
   } = useFeatureFactoryStore();
 
+  const setValidationSummaryForTask = useFeatureFactoryStore((state) => state.setValidationSummaryForTask);
+
   const {
     loadInitial,
     previewConfig,
@@ -69,6 +70,7 @@ export default function FeatureFactoryPage() {
   // 已下載的 Feature K 線標的（來自 FeatureKlineDownloadPanel 下載的資料）
   const [featureKlineSymbols, setFeatureKlineSymbols] = useState<string[]>([]);
   const [featureKlineSymbolsLoading, setFeatureKlineSymbolsLoading] = useState(false);
+  const [configTab, setConfigTab] = useState<'hardware' | 'kline' | 'data' | 'indicators' | 'preprocessing' | 'preview' | null>('data');
 
   const refreshFeatureKlineSymbols = useCallback(async () => {
     setFeatureKlineSymbolsLoading(true);
@@ -159,6 +161,14 @@ export default function FeatureFactoryPage() {
     void loadTaskResult(currentTask.task_id);
   }, [currentTask?.status, currentTask?.task_id, loadTaskResult]);
 
+  // 任務完成且 validation_summary 出現後，立即寫入 per-task localStorage 快取，
+  // 讓 FeatureExplorer 在 refresh 後瀏覽歷史任務時仍能顯示 L7 KPI 卡片。
+  useEffect(() => {
+    if (currentTask?.status === 'completed' && currentTask.task_id && currentTask.validation_summary) {
+      setValidationSummaryForTask(currentTask.task_id, currentTask.validation_summary);
+    }
+  }, [currentTask?.task_id, currentTask?.status, currentTask?.validation_summary, setValidationSummaryForTask]);
+
   const handleGenerate = async () => {
     if (!config) {
       setError('尚未載入設定，請稍後再試');
@@ -194,19 +204,16 @@ export default function FeatureFactoryPage() {
   };
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="relative px-6 py-8 max-w-[1400px] mx-auto space-y-6">
-        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-gradient-to-br from-amber-400/20 via-transparent to-emerald-400/20 blur-3xl" />
-        <div className="absolute -bottom-28 left-10 h-60 w-60 rounded-full bg-gradient-to-br from-cyan-400/20 via-transparent to-amber-400/20 blur-3xl" />
-
-        <div className="relative glass-panel rounded-2xl p-6 border border-white/10 overflow-hidden">
+    <div>
+      <div className="relative px-4 py-6 space-y-4">
+        <div className="relative glass-panel rounded-2xl px-6 py-4 border border-white/10 overflow-hidden">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-amber-200 text-xs uppercase tracking-[0.2em]">
                 <Sparkles className="w-4 h-4" />
                 Alpha Factory
               </div>
-              <h1 className="mt-4 text-3xl lg:text-4xl font-semibold text-slate-100">
+              <h1 className="mt-4 text-2xl font-semibold text-slate-100">
                 Feature Factory 控制中樞
               </h1>
               <p className="mt-2 text-slate-400 max-w-2xl">
@@ -235,82 +242,11 @@ export default function FeatureFactoryPage() {
           )}
         </div>
 
-        <HardwareStatusPanel />
-
         {error && (
           <div className="glass-panel rounded-xl p-4 border border-rose-400/30 text-rose-200 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
             <span>{error}</span>
           </div>
-        )}
-
-        {currentTask?.status === 'completed' && currentTask.validation_summary && (
-          (() => {
-            const v = currentTask.validation_summary;
-            const coveragePct = (v.coverage * 100).toFixed(2);
-            const infRatioPct = (v.inf_ratio * 100).toFixed(4);
-            const hasIssue = v.has_inf || v.coverage < 0.95;
-            const borderCls = v.has_inf
-              ? 'border-rose-400/40'
-              : v.coverage < 0.95
-                ? 'border-amber-400/30'
-                : 'border-emerald-400/30';
-            const titleCls = v.has_inf
-              ? 'text-rose-300'
-              : v.coverage < 0.95
-                ? 'text-amber-300'
-                : 'text-emerald-300';
-            return (
-              <div className={`glass-panel rounded-xl p-4 border ${borderCls} space-y-3`}>
-                <div className={`flex items-center gap-2 font-medium ${titleCls}`}>
-                  <AlertCircle className="w-5 h-5" />
-                  <span>
-                    L7 資料品質摘要 {hasIssue ? '— 偵測到輸入病理性訊號' : '— 通過'}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
-                    <div className="text-xs text-slate-400">Coverage</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-100">{coveragePct}%</div>
-                    <div className="text-xs text-slate-500 mt-0.5">非 NaN 比例</div>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
-                    <div className="text-xs text-slate-400">Inf Count</div>
-                    <div
-                      className={`mt-1 text-lg font-semibold ${v.inf_count > 0 ? 'text-rose-300' : 'text-emerald-300'}`}
-                    >
-                      {v.inf_count.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">Float32 溢位次數</div>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
-                    <div className="text-xs text-slate-400">Inf Ratio</div>
-                    <div
-                      className={`mt-1 text-lg font-semibold ${v.inf_ratio > 0 ? 'text-rose-300' : 'text-emerald-300'}`}
-                    >
-                      {infRatioPct}%
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">Inf / 總值</div>
-                  </div>
-                  <div className="rounded-lg border border-white/10 bg-[#141b2d]/60 p-3">
-                    <div className="text-xs text-slate-400">Groups w/ Inf</div>
-                    <div
-                      className={`mt-1 text-lg font-semibold ${v.groups_with_inf > 0 ? 'text-amber-300' : 'text-emerald-300'}`}
-                    >
-                      {v.groups_with_inf}
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">受影響 group 數</div>
-                  </div>
-                </div>
-                {v.has_inf && (
-                  <div className="text-xs text-rose-200/80">
-                    💡 Inf 通常源自比值類指標分母趨近 0 或回歸視窗常數。已套用 epsilon mask
-                    + 1e30 cap，並由 L6.5 winsorization 進一步處理。詳細位置見後端 log 的 Top-5 offending groups。
-                  </div>
-                )}
-              </div>
-            );
-          })()
         )}
 
         {currentTask?.status === 'completed' &&
@@ -332,9 +268,89 @@ export default function FeatureFactoryPage() {
             </div>
           )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-          <div className="space-y-6">
-            <FeatureKlineDownloadPanel onDownloadComplete={refreshFeatureKlineSymbols} />
+        <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+          {/* Tab 導航列 */}
+          <div className={`flex ${configTab !== null ? 'border-b border-white/10' : ''}`}>
+            <button
+              onClick={() => setConfigTab(configTab === 'hardware' ? null : 'hardware')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${
+                configTab === 'hardware'
+                  ? 'border-rose-400 text-rose-200 bg-rose-400/5'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              系統資源
+            </button>
+            <button
+              onClick={() => setConfigTab(configTab === 'kline' ? null : 'kline')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${
+                configTab === 'kline'
+                  ? 'border-emerald-400 text-emerald-200 bg-emerald-400/5'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Download className="w-4 h-4" />
+              K 線下載
+            </button>
+            <button
+              onClick={() => setConfigTab(configTab === 'data' ? null : 'data')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${
+                configTab === 'data'
+                  ? 'border-blue-400 text-blue-200 bg-blue-400/5'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              資料
+            </button>
+            <button
+              onClick={() => setConfigTab(configTab === 'indicators' ? null : 'indicators')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${
+                configTab === 'indicators'
+                  ? 'border-violet-400 text-violet-200 bg-violet-400/5'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              指標層
+            </button>
+            <button
+              onClick={() => setConfigTab(configTab === 'preprocessing' ? null : 'preprocessing')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${
+                configTab === 'preprocessing'
+                  ? 'border-cyan-400 text-cyan-200 bg-cyan-400/5'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <ArrowDownUp className="w-4 h-4" />
+              前處理
+            </button>
+            <button
+              onClick={() => setConfigTab(configTab === 'preview' ? null : 'preview')}
+              className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition border-b-2 -mb-px ${
+                configTab === 'preview'
+                  ? 'border-amber-400 text-amber-200 bg-amber-400/5'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Eye className="w-4 h-4" />
+              預覽 / 匯出
+            </button>
+          </div>
+
+          {/* Tab 內容 */}
+          {configTab === 'hardware' && (
+            <div className="px-4 py-4">
+              <HardwareStatusPanel />
+            </div>
+          )}
+          {configTab === 'kline' && (
+            <div className="px-4 py-4">
+              <FeatureKlineDownloadPanel onDownloadComplete={refreshFeatureKlineSymbols} />
+            </div>
+          )}
+          {configTab === 'data' && (
             <ConfigPanel
               config={config}
               presets={presets}
@@ -351,66 +367,68 @@ export default function FeatureFactoryPage() {
               onStartDateChange={setStartDate}
               onEndDateChange={setEndDate}
             />
+          )}
+          {configTab === 'indicators' && <LayerPanel schema={schema} />}
+          {configTab === 'preprocessing' && (
             <PreprocessingPanel
               config={config?.preprocessing}
               onChange={(next) => updateConfigPartial({ preprocessing: next })}
             />
-          </div>
-
-          <div className="space-y-6">
-            <LayerPanel schema={schema} />
-            <PreviewPanel preview={preview} />
-            <ExportButtons
-              config={config}
-              taskId={currentTask?.task_id}
-              symbol={normalizedSymbols[0] ?? symbol}
-              timeframe={timeframe}
-            />
-            <FeatureExplorer taskId={currentTask?.task_id} taskStatus={currentTask?.status} />
-            {(batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
-              batchSuccessSymbols.length > 0 && (
-                <>
-                  <BatchQualityOverview batchTaskId={batchTask.task_id} />
-                  {/* 批次模式 Symbol 選擇器 */}
-                  <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
-                    <div className="text-sm font-medium text-slate-300">Feature Explorer — 選擇標的</div>
-                    <div className="flex flex-wrap gap-2">
-                      {batchSuccessSymbols.map((sym) => (
-                        <button
-                          key={sym}
-                          onClick={() => handleSelectBatchSymbol(sym)}
-                          disabled={registeringSymbol === sym}
-                          className={`rounded-full px-3 py-1 text-xs border transition ${
-                            selectedBatchSymbol === sym
-                              ? 'bg-cyan-400/20 border-cyan-300/40 text-cyan-200'
-                              : 'border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                          } disabled:opacity-50`}
-                        >
-                          {registeringSymbol === sym ? (
-                            <span className="flex items-center gap-1">
-                              <span className="inline-block w-3 h-3 rounded-full border-2 border-cyan-400/60 border-t-cyan-300 animate-spin" />
-                              {sym}
-                            </span>
-                          ) : sym}
-                        </button>
-                      ))}
-                    </div>
-                    {selectedBatchSymbol && browseTaskIds[selectedBatchSymbol] && (
-                      <FeatureExplorer taskId={browseTaskIds[selectedBatchSymbol]} />
-                    )}
-                    {selectedBatchSymbol && !browseTaskIds[selectedBatchSymbol] && registeringSymbol === selectedBatchSymbol && (
-                      <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                        <span className="inline-block w-3 h-3 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin" />
-                        載入 {selectedBatchSymbol} 特徵資料中…
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-          </div>
+          )}
+          {configTab === 'preview' && (
+            <>
+              <PreviewPanel preview={preview} />
+              <ExportButtons
+                config={config}
+                taskId={currentTask?.task_id}
+                symbol={normalizedSymbols[0] ?? symbol}
+                timeframe={timeframe}
+              />
+            </>
+          )}
         </div>
+        <FeatureExplorer taskId={currentTask?.task_id} taskStatus={currentTask?.status} validationSummary={currentTask?.validation_summary} />
+        {(batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
+          batchSuccessSymbols.length > 0 && (
+            <>
+              <BatchQualityOverview batchTaskId={batchTask.task_id} />
+              {/* 批次模式 Symbol 選擇器 */}
+              <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
+                <div className="text-sm font-medium text-slate-300">Feature Explorer — 選擇標的</div>
+                <div className="flex flex-wrap gap-2">
+                  {batchSuccessSymbols.map((sym) => (
+                    <button
+                      key={sym}
+                      onClick={() => handleSelectBatchSymbol(sym)}
+                      disabled={registeringSymbol === sym}
+                      className={`rounded-full px-3 py-1 text-xs border transition ${
+                        selectedBatchSymbol === sym
+                          ? 'bg-cyan-400/20 border-cyan-300/40 text-cyan-200'
+                          : 'border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                      } disabled:opacity-50`}
+                    >
+                      {registeringSymbol === sym ? (
+                        <span className="flex items-center gap-1">
+                          <span className="inline-block w-3 h-3 rounded-full border-2 border-cyan-400/60 border-t-cyan-300 animate-spin" />
+                          {sym}
+                        </span>
+                      ) : sym}
+                    </button>
+                  ))}
+                </div>
+                {selectedBatchSymbol && browseTaskIds[selectedBatchSymbol] && (
+                  <FeatureExplorer taskId={browseTaskIds[selectedBatchSymbol]} />
+                )}
+                {selectedBatchSymbol && !browseTaskIds[selectedBatchSymbol] && registeringSymbol === selectedBatchSymbol && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                    <span className="inline-block w-3 h-3 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin" />
+                    載入 {selectedBatchSymbol} 特徵資料中…
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
-        <AutoResearchPanel />
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ interface FeatureCorrelationHeatmapProps {
 }
 
 const methods: Array<'pearson' | 'spearman' | 'kendall'> = ['pearson', 'spearman', 'kendall'];
-const FEATURE_NAME_LIMIT = 300000;
+const FEATURE_NAME_LIMIT = 1000000;
 
 /**
  * 業界標準 RdBu_r 色彩映射（與 matplotlib/seaborn 一致）:
@@ -362,36 +362,39 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
 
       {/* ── 特徵名稱篩選 ── */}
       <FeatureNameSegmentFilter features={available} onFilteredFeaturesChange={setFilteredAvailable} />
-
-      {/* ── 特徵選取標籤 ── */}
-      <div className="flex flex-wrap gap-2 max-h-28 overflow-auto">
-        {/* 已選但不在篩選前 500 裡的特徵：固定置頂 */}
-        {selected
-          .filter((name) => !filteredAvailable.slice(0, 500).includes(name))
-          .map((name) => (
-            <button
-              key={`pinned-${name}`}
-              onClick={() => toggleFeature(name)}
-              title={`${name}（點擊取消選取）`}
-              className="text-xs px-2 py-1 rounded-full border bg-amber-400/20 border-amber-300/40 text-amber-200 ring-1 ring-amber-300/30"
-            >
-              {name} ✕
-            </button>
-          ))}
-        {filteredAvailable.slice(0, 500).map((name) => (
-          <button
-            key={name}
-            onClick={() => toggleFeature(name)}
-            className={`text-xs px-2 py-1 rounded-full border ${
-              selected.includes(name) ? 'bg-amber-400/20 border-amber-300/40 text-amber-200' : 'border-white/10 text-slate-300'
-            }`}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-
-      {/* ── 熱力圖主體 ── */}
+      <div className="flex gap-3 min-w-0">
+        <div className="w-72 shrink-0">
+          {/* ── 特徵選取標籤 ── */}
+          <div className="max-h-[560px] overflow-y-auto rounded border border-white/5 bg-black/20 py-1">
+            {/* 已選但不在篩選前 500 裡的特徵：固定置頂 */}
+            {selected
+              .filter((name) => !filteredAvailable.slice(0, 500).includes(name))
+              .map((name) => (
+                <button
+                  key={`pinned-${name}`}
+                  onClick={() => toggleFeature(name)}
+                  title={name}
+                  className="w-full text-left truncate text-xs px-2 py-1 rounded bg-amber-400/20 text-amber-200"
+                >
+                  {name} ✕
+                </button>
+              ))}
+            {filteredAvailable.slice(0, 500).map((name) => (
+              <button
+                key={name}
+                onClick={() => toggleFeature(name)}
+                title={name}
+                className={`w-full text-left truncate text-xs px-2 py-1 rounded ${
+                  selected.includes(name) ? 'bg-amber-400/20 text-amber-200' : 'text-slate-300 hover:bg-white/5'
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          {/* ── 熱力圖主體 ── */}
       {loading ? (
         <div className="text-xs text-slate-400">載入中...</div>
       ) : error ? (
@@ -694,6 +697,8 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

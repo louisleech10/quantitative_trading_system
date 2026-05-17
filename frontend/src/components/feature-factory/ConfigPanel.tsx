@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { SlidersHorizontal, Database } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { FeatureFactoryConfig, FeatureFactoryPreset } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import PresetSelector from './PresetSelector';
@@ -118,19 +118,10 @@ export default function ConfigPanel({
   }
 
   return (
-    <div className="glass-panel rounded-2xl p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-amber-400/15 flex items-center justify-center">
-          <SlidersHorizontal className="w-5 h-5 text-amber-200" />
-        </div>
-        <div>
-          <div className="text-lg font-semibold text-slate-100">設定面板</div>
-          <div className="text-xs text-slate-400">快速建立研究設定與覆寫參數</div>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <label className="text-xs uppercase tracking-[0.2em] text-slate-400">目標標的</label>
+      <div className="px-6 pb-6 space-y-4">
+      <details open className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">目標標的</summary>
+        <div className="px-4 pb-4">
         <div className="grid grid-cols-1 gap-3">
           <input
             value={symbol}
@@ -231,66 +222,97 @@ export default function ConfigPanel({
             </div>
           </div>
         </div>
+        </div>
+      </details>
+
+      <details open className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">Preset</summary>
+        <div className="px-4 pb-4">
+          <PresetSelector
+            presets={presets}
+            selectedPreset={selectedPreset}
+            onPresetChange={handlePresetChange}
+          />
+        </div>
+      </details>
+
+      <details open className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">數據源</summary>
+        <div className="px-4 pb-4">
+          <DataSourceSelector
+            enabledSources={config.data_sources?.enabled_sources ?? []}
+            availableSources={availableSources}
+            onChange={(next) =>
+              setConfig({
+                ...config,
+                data_sources: {
+                  ...config.data_sources,
+                  enabled_sources: next,
+                },
+              })
+            }
+          />
+        </div>
+      </details>
+
+      <details open className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">指標類別</summary>
+        <div className="px-4 pb-4">
+          <IndicatorSelector
+            indicators={config.atomic_indicators}
+            onChange={(next) =>
+              setConfig({
+                ...config,
+                atomic_indicators: next,
+              })
+            }
+          />
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">全域參數</summary>
+        <div className="px-4 pb-4">
+          <GlobalParamSliders
+            globalSettings={config.global_settings}
+            onChange={(next) =>
+              setConfig({
+                ...config,
+                global_settings: next,
+              })
+            }
+          />
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">時間框架</summary>
+        <div className="px-4 pb-4">
+          <TimeframeSelector
+            timeframes={config.timeframes}
+            onChange={(next) => {
+              setAlignmentMode(next.alignment_mode ?? 'open_minus');
+              setTrainingTimeframes(next.training);
+              // Sync the outer timeframe text input so it always matches config.timeframes.primary.
+              // This prevents the API call from using a stale timeframe value.
+              if (next.primary !== timeframe) {
+                onTimeframeChange(next.primary);
+              }
+              setConfig({
+                ...config,
+                timeframes: next,
+              });
+            }}
+          />
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-white/5">
+        <summary className="cursor-pointer px-4 py-2 text-sm text-slate-200">進階覆寫</summary>
+        <div className="px-4 pb-4">
+          <JsonOverrideEditor onApply={handleConfigOverride} />
+        </div>
+      </details>
       </div>
-
-      <PresetSelector
-        presets={presets}
-        selectedPreset={selectedPreset}
-        onPresetChange={handlePresetChange}
-      />
-
-      <DataSourceSelector
-        enabledSources={config.data_sources?.enabled_sources ?? []}
-        availableSources={availableSources}
-        onChange={(next) =>
-          setConfig({
-            ...config,
-            data_sources: {
-              ...config.data_sources,
-              enabled_sources: next,
-            },
-          })
-        }
-      />
-
-      <IndicatorSelector
-        indicators={config.atomic_indicators}
-        onChange={(next) =>
-          setConfig({
-            ...config,
-            atomic_indicators: next,
-          })
-        }
-      />
-
-      <GlobalParamSliders
-        globalSettings={config.global_settings}
-        onChange={(next) =>
-          setConfig({
-            ...config,
-            global_settings: next,
-          })
-        }
-      />
-
-      <TimeframeSelector
-        timeframes={config.timeframes}
-        onChange={(next) => {
-          setAlignmentMode(next.alignment_mode ?? 'open_minus');
-          setTrainingTimeframes(next.training);
-          // Sync the outer timeframe text input so it always matches config.timeframes.primary.
-          // This prevents the API call from using a stale timeframe value.
-          if (next.primary !== timeframe) {
-            onTimeframeChange(next.primary);
-          }
-          setConfig({
-            ...config,
-            timeframes: next,
-          });
-        }}
-      />
-
-      <JsonOverrideEditor onApply={handleConfigOverride} />
-    </div>
   );
 }

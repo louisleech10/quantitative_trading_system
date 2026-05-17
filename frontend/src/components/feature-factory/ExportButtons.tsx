@@ -184,19 +184,13 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
   const btnBase = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 hover:bg-white/10 transition whitespace-nowrap disabled:opacity-50';
 
   return (
-    <div id="feature-factory-export-target" className="glass-panel rounded-2xl p-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <span className="text-sm font-semibold text-slate-100">匯出</span>
-          <span className="ml-2 text-xs text-slate-400">快速保存當前設定與特徵清單</span>
+    <div>
+      {downloadError && (
+        <div className="mx-4 mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+          {downloadError}
         </div>
-        {downloadError && (
-          <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-xs text-rose-200">
-            {downloadError}
-          </div>
-        )}
-      </div>
+      )}
+      <div id="feature-factory-export-target" className="px-4 pb-4 space-y-3">
 
       {/* 按鈕列 */}
       <div className="flex flex-wrap items-center gap-2">
@@ -303,6 +297,7 @@ export default function ExportButtons({ config, taskId, symbol, timeframe }: Exp
             <option value="en">en</option>
           </select>
         </div>
+      </div>
       </div>
     </div>
   );

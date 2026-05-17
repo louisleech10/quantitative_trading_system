@@ -164,7 +164,7 @@ export function HardwareStatusPanel() {
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const loadHardwareInfo = useCallback(async () => {
     setIsLoading(true);
@@ -194,7 +194,7 @@ export function HardwareStatusPanel() {
   }, [loadHardwareInfo]);
 
   return (
-    <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4">
+    <div className={isExpanded ? "glass-panel rounded-2xl border border-white/10 p-5 space-y-4" : "glass-panel rounded-xl border border-white/10 px-4 py-2"}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"

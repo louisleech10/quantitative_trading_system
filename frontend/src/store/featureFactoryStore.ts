@@ -12,6 +12,7 @@ import {
   AutoResearchStatus,
   AutoResearchLogEntry,
   FeatureSummary,
+  FeatureValidationSummary,
   ExplorerTab,
   FeatureSchema,
   BatchItemRss,
@@ -51,6 +52,9 @@ interface FeatureFactoryState {
   // Complete feature-name catalog per task. Shared by all explorer tabs so
   // segment filters show the same complete options everywhere.
   explorerFeatureNamesByTask: Record<string, string[]>;
+  // Per-task L7 validation summary cache. Persisted to localStorage so the
+  // KPI cards survive page reloads when browsing historical tasks.
+  validationSummaryByTask: Record<string, FeatureValidationSummary>;
   // Phase C: schema and search
   schema: FeatureSchema | null;
   indicatorSearch: string;
@@ -88,6 +92,7 @@ interface FeatureFactoryState {
   pushExplorerRecentTask: (taskId: string) => void;
   removeExplorerRecentTask: (taskId: string) => void;
   setExplorerFeatureNamesForTask: (taskId: string, featureNames: string[]) => void;
+  setValidationSummaryForTask: (taskId: string, summary: FeatureValidationSummary) => void;
   setBatchTask: (task: BatchTaskStatus | null) => void;
   applyBatchEvent: (payload: BatchPayload) => void;
   setBatchConnectionState: (status: BatchConnectionStatus, message?: string | null) => void;
@@ -296,6 +301,17 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   explorerSummary: null,
   explorerSummaryByTask: {},
   explorerFeatureNamesByTask: {},
+  validationSummaryByTask:
+    typeof window !== 'undefined'
+      ? (() => {
+          try {
+            const raw = window.localStorage.getItem('ff:validationSummaryByTask');
+            return raw ? (JSON.parse(raw) as Record<string, FeatureValidationSummary>) : {};
+          } catch {
+            return {};
+          }
+        })()
+      : {},
   explorerRecentTasks:
     typeof window !== 'undefined'
       ? (() => {
@@ -337,11 +353,29 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   setDataSources: (dataSources) => set({ dataSources }),
   setIndicators: (indicators) => set({ indicators }),
   setPreview: (preview) => set({ preview }),
-  setCurrentTask: (task) => set({ currentTask: task }),
+  setCurrentTask: (task) =>
+    set((state) => {
+      if (task?.status === 'completed' && task.validation_summary && task.task_id) {
+        const next = { ...state.validationSummaryByTask, [task.task_id]: task.validation_summary };
+        try {
+          window.localStorage.setItem('ff:validationSummaryByTask', JSON.stringify(next));
+        } catch { /* ignore quota errors */ }
+        return { currentTask: task, validationSummaryByTask: next };
+      }
+      return { currentTask: task };
+    }),
   updateCurrentTaskPartial: (patch) =>
-    set((state) => ({
-      currentTask: state.currentTask ? { ...state.currentTask, ...patch } : null,
-    })),
+    set((state) => {
+      const updated = state.currentTask ? { ...state.currentTask, ...patch } : null;
+      if (updated?.status === 'completed' && updated.validation_summary && updated.task_id) {
+        const next = { ...state.validationSummaryByTask, [updated.task_id]: updated.validation_summary };
+        try {
+          window.localStorage.setItem('ff:validationSummaryByTask', JSON.stringify(next));
+        } catch { /* ignore quota errors */ }
+        return { currentTask: updated, validationSummaryByTask: next };
+      }
+      return { currentTask: updated };
+    }),
   setProgress: (progress) => set({ progress }),
   setFeatureList: (features) => set({ featureList: features }),
   setIsGenerating: (value) => set({ isGenerating: value }),
@@ -399,12 +433,25 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       delete summaries[taskId];
       const featureNames = { ...state.explorerFeatureNamesByTask };
       delete featureNames[taskId];
-      return { explorerRecentTasks: next, explorerSummaryByTask: summaries, explorerFeatureNamesByTask: featureNames };
+      const validationSummaries = { ...state.validationSummaryByTask };
+      delete validationSummaries[taskId];
+      try {
+        window.localStorage.setItem('ff:validationSummaryByTask', JSON.stringify(validationSummaries));
+      } catch { /* ignore */ }
+      return { explorerRecentTasks: next, explorerSummaryByTask: summaries, explorerFeatureNamesByTask: featureNames, validationSummaryByTask: validationSummaries };
     }),
   setExplorerFeatureNamesForTask: (taskId, featureNames) =>
     set((state) => ({
       explorerFeatureNamesByTask: { ...state.explorerFeatureNamesByTask, [taskId]: featureNames },
     })),
+  setValidationSummaryForTask: (taskId, summary) =>
+    set((state) => {
+      const next = { ...state.validationSummaryByTask, [taskId]: summary };
+      try {
+        window.localStorage.setItem('ff:validationSummaryByTask', JSON.stringify(next));
+      } catch { /* ignore quota errors */ }
+      return { validationSummaryByTask: next };
+    }),
   setBatchTask: (batchTask) =>
     set((state) => ({
       batchTask: batchTask

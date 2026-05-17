@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ExplorerTab } from '@/lib/types';
+import { AlertCircle, Table2 } from 'lucide-react';
+import { ExplorerTab, FeatureValidationSummary } from '@/lib/types';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import OverviewDashboard from '@/components/feature-factory/OverviewDashboard';
@@ -15,6 +16,8 @@ interface FeatureExplorerProps {
   taskId?: string | null;
   /** 傳入目前任務狀態；若為 'completed' 或省略才開始載入資料 */
   taskStatus?: string | null;
+  /** 傳入目前任務的 L7 品質摘要（由 page.tsx 從 currentTask 取出後傳入） */
+  validationSummary?: FeatureValidationSummary | null;
 }
 
 const TABS: Array<{ key: ExplorerTab; label: string }> = [
@@ -26,7 +29,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
   { key: 'nan', label: 'NaN Pattern' },
 ];
 
-export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: FeatureExplorerProps) {
+export default function FeatureExplorer({ taskId: propTaskId, taskStatus, validationSummary }: FeatureExplorerProps) {
   const { browseSummary, browseFeatures, listAvailableTasks } = useFeatureFactory();
   // Use individual selectors to return stable primitives/references.
   // A combined object selector `(state) => ({ ... })` creates a new object every render,
@@ -44,11 +47,16 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
   const setExplorerFeatureNamesForTask = useFeatureFactoryStore((state) => state.setExplorerFeatureNamesForTask);
   const pushExplorerRecentTask = useFeatureFactoryStore((state) => state.pushExplorerRecentTask);
   const removeExplorerRecentTask = useFeatureFactoryStore((state) => state.removeExplorerRecentTask);
+  const validationSummaryByTask = useFeatureFactoryStore((state) => state.validationSummaryByTask);
+  const setValidationSummaryForTask = useFeatureFactoryStore((state) => state.setValidationSummaryForTask);
 
   // 允許使用者在沒有進行中任務時手動輸入 task ID 瀏覽歷史結果
   const [manualTaskId, setManualTaskId] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const taskId: string = manualTaskId || propTaskId || '';
+
+  // prop 優先（當前 session 剛完成的任務），fallback 到 per-task localStorage 快取（refresh 後瀏覽歷史任務）
+  const effectiveValidationSummary = validationSummary ?? (taskId ? validationSummaryByTask[taskId] : undefined);
 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -109,6 +117,37 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
     };
   }, [browseSummary, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask, pushExplorerRecentTask]);
 
+  // 當 taskId 切換到歷史任務（或 refresh 後），且該任務的 validation_summary 尚未快取時，
+  // 主動呼叫 /result/{taskId} 取得 L7 品質摘要並寫入 per-task localStorage 快取。
+  useEffect(() => {
+    if (!taskId || !isTaskReady) return;
+    // prop 已有（當前 session 剛完成的任務）或快取命中 → 不需再 fetch
+    if (validationSummary != null || validationSummaryByTask[taskId] != null) return;
+
+    let active = true;
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    fetch(`${API_BASE}/api/v1/features/result/${taskId}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((result: { metadata?: { validation?: Record<string, unknown> } }) => {
+        if (!active) return;
+        const v = result?.metadata?.validation;
+        if (v && typeof v === 'object') {
+          setValidationSummaryForTask(taskId, {
+            has_nan: Boolean(v.has_nan),
+            has_inf: Boolean(v.has_inf),
+            coverage: Number(v.coverage ?? 0),
+            inf_count: Number(v.inf_count ?? 0),
+            inf_ratio: Number(v.inf_ratio ?? 0),
+            groups_with_inf: Number(v.groups_with_inf ?? 0),
+            warnings: Array.isArray(v.warnings) ? (v.warnings as string[]) : undefined,
+          });
+        }
+      })
+      .catch(() => { /* silent — L7 卡片只是不顯示，不應影響主流程 */ });
+
+    return () => { active = false; };
+  }, [taskId, isTaskReady, validationSummary, validationSummaryByTask, setValidationSummaryForTask]);
+
   // When task_id is not found in API memory (happens after restart), fetch the
   // list of available browse tasks so the user can pick one to recover.
   useEffect(() => {
@@ -133,7 +172,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
 
     browseFeatures(taskId, {
       offset: 0,
-      limit: 300000,
+      limit: 1000000,
       sortBy: 'name',
       sortOrder: 'asc',
       detailLevel: 'names',
@@ -165,60 +204,133 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
   const summary = useMemo(() => cachedSummary || (explorerTaskId === taskId ? explorerSummary : null), [cachedSummary, explorerSummary, explorerTaskId, taskId]);
 
   return (
-    <div className="glass-panel rounded-2xl p-6 space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="flex-1">
-          <div className="text-lg font-semibold text-slate-100">Feature Explorer</div>
-          {taskId
-            ? <div className="text-xs text-slate-400">Task: {taskId}</div>
-            : <div className="text-xs text-slate-500">尚無進行中的任務，可貼入 Task ID 瀏覽歷史結果</div>
-          }
+    <div className="glass-panel rounded-2xl border border-white/10">
+      {/* 頂部區：左欄（標題 + task controls）與右欄（L7 卡片）stretch 同高 */}
+      <div className="flex items-stretch gap-4 px-5 py-4">
+        {/* 左欄：Feature Explorer 標題堆疊在 task controls 上方 */}
+        <div className="flex flex-col justify-between gap-3 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-violet-400/15 flex items-center justify-center flex-shrink-0">
+              <Table2 className="w-5 h-5 text-violet-200" />
+            </div>
+            <div>
+              <div className="text-base font-semibold text-slate-100">Feature Explorer</div>
+              {taskId
+                ? <div className="text-sm text-slate-400 mt-0.5">Task: {taskId}</div>
+                : <div className="text-sm text-slate-500 mt-0.5">尚無進行中的任務，可貼入 Task ID 瀏覽歷史結果</div>
+              }
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={manualTaskId}
+              onChange={(e) => setManualTaskId(e.target.value.trim())}
+              placeholder="貼入 Task ID…"
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
+            />
+            {manualTaskId && (
+              <button
+                type="button"
+                onClick={() => { setManualTaskId(''); setSummaryError(null); }}
+                className="text-slate-500 hover:text-slate-300 text-xs"
+                title={propTaskId ? '回到目前任務' : '清除手動 Task'}
+              >✕</button>
+            )}
+            {explorerRecentTasks.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v) setManualTaskId(v);
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
+                title="切換最近瀏覽的 Task"
+              >
+                <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
+                {explorerRecentTasks.map((tid) => (
+                  <option key={tid} value={tid}>
+                    {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
+                  </option>
+                ))}
+              </select>
+            )}
+            {manualTaskId && explorerRecentTasks.includes(manualTaskId) && (
+              <button
+                type="button"
+                onClick={() => { removeExplorerRecentTask(manualTaskId); setManualTaskId(''); }}
+                className="text-rose-400/70 hover:text-rose-300 text-xs"
+                title="從最近清單移除"
+              >移除</button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={manualTaskId}
-            onChange={(e) => setManualTaskId(e.target.value.trim())}
-            placeholder="貼入 Task ID…"
-            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
-          />
-          {manualTaskId && (
-            <button
-              type="button"
-              onClick={() => { setManualTaskId(''); setSummaryError(null); }}
-              className="text-slate-500 hover:text-slate-300 text-xs"
-              title={propTaskId ? '回到目前任務' : '清除手動 Task'}
-            >✕</button>
-          )}
-          {explorerRecentTasks.length > 0 && (
-            <select
-              value=""
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v) setManualTaskId(v);
-              }}
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
-              title="切換最近瀏覽的 Task"
-            >
-              <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
-              {explorerRecentTasks.map((tid) => (
-                <option key={tid} value={tid}>
-                  {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
-                </option>
-              ))}
-            </select>
-          )}
-          {manualTaskId && explorerRecentTasks.includes(manualTaskId) && (
-            <button
-              type="button"
-              onClick={() => { removeExplorerRecentTask(manualTaskId); setManualTaskId(''); }}
-              className="text-rose-400/70 hover:text-rose-300 text-xs"
-              title="從最近清單移除"
-            >移除</button>
-          )}
-        </div>
+
+        {/* 右欄：L7 品質卡片，自動撐滿左欄高度（items-stretch） */}
+        {taskId && isTaskReady && effectiveValidationSummary && (
+          (() => {
+            const v = effectiveValidationSummary;
+            const coveragePct = (v.coverage * 100).toFixed(2);
+            const infRatioPct = (v.inf_ratio * 100).toFixed(4);
+            const hasIssue = v.has_inf || v.coverage < 0.95;
+            const borderCls = v.has_inf
+              ? 'border-rose-400/40'
+              : v.coverage < 0.95
+                ? 'border-amber-400/30'
+                : 'border-emerald-400/30';
+            const titleCls = v.has_inf
+              ? 'text-rose-300'
+              : v.coverage < 0.95
+                ? 'text-amber-300'
+                : 'text-emerald-300';
+            return (
+              <div className={`flex-1 min-w-0 glass-panel rounded-lg p-2.5 border ${borderCls} flex flex-col justify-between`}>
+                <div className={`flex items-center gap-1.5 text-sm ${titleCls}`}>
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>L7 資料品質摘要 {hasIssue ? '— 偵測到輸入病理性訊號' : '— 通過'}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                  <div className="rounded border border-white/10 bg-[#141b2d]/60 px-2.5 py-1.5">
+                    <div className="text-[11px] text-slate-400">Coverage</div>
+                    <div className="text-sm font-semibold text-slate-100">{coveragePct}%</div>
+                    <div className="text-[10px] text-slate-500">非 NaN 比例</div>
+                  </div>
+                  <div className="rounded border border-white/10 bg-[#141b2d]/60 px-2.5 py-1.5">
+                    <div className="text-[11px] text-slate-400">Inf Count</div>
+                    <div className={`text-sm font-semibold ${v.inf_count > 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
+                      {v.inf_count.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-slate-500">Float32 溢位次數</div>
+                  </div>
+                  <div className="rounded border border-white/10 bg-[#141b2d]/60 px-2.5 py-1.5">
+                    <div className="text-[11px] text-slate-400">Inf Ratio</div>
+                    <div className={`text-sm font-semibold ${v.inf_ratio > 0 ? 'text-rose-300' : 'text-emerald-300'}`}>
+                      {infRatioPct}%
+                    </div>
+                    <div className="text-[10px] text-slate-500">Inf / 總值</div>
+                  </div>
+                  <div className="rounded border border-white/10 bg-[#141b2d]/60 px-2.5 py-1.5">
+                    <div className="text-[11px] text-slate-400">Groups w/ Inf</div>
+                    <div className={`text-sm font-semibold ${v.groups_with_inf > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
+                      {v.groups_with_inf}
+                    </div>
+                    <div className="text-[10px] text-slate-500">受影響 group 數</div>
+                  </div>
+                </div>
+                {v.has_inf && (
+                  <div className="text-xs text-rose-200/80 mt-2">
+                    💡 Inf 通常源自比值類指標分母趨近 0 或回歸視窗常數。已套用 epsilon mask
+                    + 1e30 cap，並由 L6.5 winsorization 進一步處理。詳細位置見後端 log 的 Top-5 offending groups。
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        )}
       </div>
+
+      <div className="px-6 pb-6 space-y-4 border-t border-white/5">
 
       {/* ——— 生成中：顯示等待狀態 ——— */}
       {!isTaskReady && (
@@ -326,6 +438,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus }: Feat
       </div>
         </>
       )}
+      </div>
     </div>
   );
 }

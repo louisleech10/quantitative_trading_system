@@ -2,6 +2,7 @@
 
 import type { FeatureFactoryConfig } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Tooltip,
@@ -201,13 +202,9 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
   const icFirstOn = Boolean(preprocessing.ic_first_pipeline);
 
   return (
-    <div className="glass-panel rounded-2xl p-6 space-y-4 border border-white/10">
-      {/* 標題列 */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold text-slate-100">前處理層 (Layer 6.5)</div>
-          <div className="text-xs text-slate-400 mt-0.5">固定接力順序：Winsor → FracDiff/ADF → Rank → Gaussian → Z-Score</div>
-        </div>
+    <div>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+        <div className="text-xs text-slate-400">固定接力順序：Winsor → FracDiff/ADF → Rank → Gaussian → Z-Score</div>
         <button
           type="button"
           onClick={() => update({ enabled: !preprocessing.enabled })}
@@ -220,8 +217,9 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
           {preprocessing.enabled ? '● 已啟用' : '○ 已停用'}
         </button>
       </div>
+      <div className="px-6 pb-6 space-y-4">
 
-      {/* 模式選擇 + 流程說明 */}
+      {/* 模式選擇 + 流程說明 */}}
       <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 space-y-2">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-400">管線模式</span>
@@ -478,6 +476,8 @@ IC-First（推薦多標的場景）：
           </div>
           <div className="text-[11px] text-rose-200/70">速度較快但差分較粗糙 · 不作為 FracDiff fallback</div>
         </div>
+
+      </div>
 
       </div>
     </div>

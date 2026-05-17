@@ -47,6 +47,9 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
   const [modes, setModes] = useState<Record<FeatureSegmentKey, SelectMode>>(
     buildSegmentMap<SelectMode>(() => 'multi'),
   );
+  const [openMap, setOpenMap] = useState<Record<FeatureSegmentKey, boolean>>(
+    buildSegmentMap<boolean>(() => false),
+  );
   const parseCacheRef = useRef(new Map<string, ReturnType<typeof parseFeatureNameSegments>>());
   const workerRef = useRef<Worker | null>(null);
   const [parsed, setParsed] = useState<ParsedFeatureItem[]>([]);
@@ -191,9 +194,44 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
     setSelected((prev) => ({ ...prev, [key]: [] }));
   };
 
+  const [panelOpen, setPanelOpen] = useState(true);
+
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-      <div className="text-xs text-slate-300">特徵命名規範段落篩選</div>
+    <div className="rounded-xl border border-white/10 bg-white/5">
+      <div
+        className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+        onClick={() => setPanelOpen((v) => !v)}
+      >
+        <div className="flex items-center gap-1.5 text-xs text-slate-300">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${panelOpen ? 'rotate-90' : 'rotate-0'}`}
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          特徵命名規範段落篩選
+        </div>
+        {panelOpen && (
+          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setOpenMap(buildSegmentMap<boolean>(() => true))}
+              className="text-xs px-2 py-0.5 rounded border border-white/10 text-slate-300 hover:bg-white/5"
+            >
+              全部展開
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenMap(buildSegmentMap<boolean>(() => false))}
+              className="text-xs px-2 py-0.5 rounded border border-white/10 text-slate-300 hover:bg-white/5"
+            >
+              全部折疊
+            </button>
+          </div>
+        )}
+      </div>
+      {panelOpen && <div className="px-3 pb-3 space-y-2">
       <input
         value={freeText}
         onChange={(e) => setFreeText(e.target.value)}
@@ -207,7 +245,12 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
           const picked = selected[seg.key];
           const mode = modes[seg.key];
           return (
-            <details key={seg.key} className="rounded-lg border border-white/10 bg-slate-900/30 px-2 py-1">
+            <details
+            key={seg.key}
+            open={openMap[seg.key]}
+            onToggle={(e) => { const isOpen = (e.currentTarget as HTMLDetailsElement).open; setOpenMap((prev) => ({ ...prev, [seg.key]: isOpen })); }}
+            className="rounded-lg border border-white/10 bg-slate-900/30 px-2 py-1"
+          >
               <summary className="cursor-pointer text-xs text-slate-200 flex items-center justify-between">
                 <span>{seg.label}</span>
                 <span className="text-slate-400">{picked.length}/{options.length}</span>
@@ -260,6 +303,7 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
       </div>
 
       <div className="text-[11px] text-slate-400">篩選後特徵數：{filtered.length.toLocaleString()}</div>
+      </div>}
     </div>
   );
 }

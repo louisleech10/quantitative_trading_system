@@ -412,7 +412,7 @@ async def list_available_browse_tasks():
 async def browse_features(
     task_id: str,
     offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=300000),
+    limit: int = Query(50, ge=1, le=1000000),
     cursor: Optional[str] = Query(None, description="游標分頁：前一頁最後一筆 name"),
     sort_by: Optional[str] = Query(None, description="排序欄位：nan_ratio, std, skewness, kurtosis, mean, name"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
@@ -455,7 +455,7 @@ async def browse_feature_data(
     task_id: str,
     features: str = Query(..., description="逗號分隔的特徵名（最多 20）"),
     offset: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=5000),
+    limit: int = Query(100, ge=1, le=200000),
 ):
     """取得指定特徵的原始數據（時間序列）。"""
     try:

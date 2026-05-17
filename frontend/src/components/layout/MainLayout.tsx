@@ -16,7 +16,9 @@ import {
   Target,
   TrendingUp,
   Brain,
-  Star
+  Star,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import WatchlistPanel from '@/components/common/WatchlistPanel';
 import { useWatchlistStore } from '@/store/watchlistStore';
@@ -111,6 +113,7 @@ const navigationItems: NavItem[] = [
 
 export default function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const pathname = usePathname();
   const watchlistCount = useWatchlistStore((state) => state.entries.length);
@@ -128,16 +131,30 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <div className="h-screen flex bg-[#0A0F1C]">
+    <div className="flex min-h-screen bg-[#0A0F1C]">
       {/* 左側導航 - 桌面版 */}
-      <div className="hidden lg:flex lg:flex-col lg:w-64 lg:bg-[#1a233a]/40 lg:backdrop-blur-xl lg:border-r lg:border-white/10">
+      <div className={`hidden lg:flex lg:flex-col lg:bg-[#1a233a]/40 lg:backdrop-blur-xl lg:border-r lg:border-white/10 transition-all duration-300 ease-in-out flex-shrink-0 sticky top-0 h-screen overflow-y-auto ${sidebarCollapsed ? 'lg:w-14' : 'lg:w-56'}`}>
         {/* Logo 區域 */}
-        <div className="flex-shrink-0 px-6 py-4 border-b border-white/10">
-          <h1 className="text-xl font-medium text-slate-100">交易策略系統</h1>
+        <div className="flex-shrink-0 border-b border-white/10 flex items-center gap-2 px-2 py-3">
+          <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+            <BarChart3 className="w-4 h-4 text-blue-400" />
+          </div>
+          {!sidebarCollapsed && (
+            <h1 className="text-sm font-semibold text-slate-100 truncate flex-1">交易策略系統</h1>
+          )}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="flex items-center justify-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-100 hover:bg-white/10 transition-colors flex-shrink-0"
+            title={sidebarCollapsed ? '展開側欄' : '收合側欄'}
+          >
+            {sidebarCollapsed
+              ? <ChevronRight className="h-4 w-4" />
+              : <ChevronLeft className="h-4 w-4" />}
+          </button>
         </div>
 
         {/* 導航選單 */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+        <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden ${sidebarCollapsed ? 'px-1.5' : 'px-2'}`}>
           {navigationItems.map((item) => {
             const Icon = item.icon;
             const hasBadge = !!item.badge;
@@ -145,33 +162,38 @@ export default function MainLayout({ children }: MainLayoutProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                title={sidebarCollapsed ? item.name : undefined}
                 className={`
-                  group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
+                  group flex items-center rounded-lg transition-all duration-200
+                  ${sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-2.5 py-2'}
                   ${isActive(item.href)
-                    ? 'bg-blue-400/10 text-blue-400 border-r-2 border-blue-400'
+                    ? `bg-blue-400/10 text-blue-400${sidebarCollapsed ? '' : ' border-r-2 border-blue-400'}`
                     : hasBadge
                       ? 'text-amber-400/70 hover:bg-amber-400/5 hover:text-amber-300 border border-amber-400/20'
                       : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
                   }
                 `}
               >
-                <Icon 
+                <Icon
                   className={`
-                    mr-3 h-5 w-5 flex-shrink-0
+                    h-[18px] w-[18px] flex-shrink-0
+                    ${sidebarCollapsed ? '' : 'mr-2.5'}
                     ${isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/60' : 'text-slate-500 group-hover:text-slate-400'}
                   `}
                 />
-                <div className="flex-1 min-w-0">
-                  <div className={`font-medium flex items-center gap-1.5 ${
-                    isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/80' : ''
-                  }`}>
-                    {item.name}
+                {!sidebarCollapsed && (
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-medium truncate ${
+                      isActive(item.href) ? 'text-blue-400' : hasBadge ? 'text-amber-400/80' : ''
+                    }`}>
+                      {item.name}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                      {item.description}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-                    {item.description}
-                  </div>
-                </div>
-                {hasBadge && (
+                )}
+                {!sidebarCollapsed && hasBadge && (
                   <span className="ml-1 flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/30 whitespace-nowrap">
                     {item.badge}
                   </span>
@@ -181,12 +203,16 @@ export default function MainLayout({ children }: MainLayoutProps) {
           })}
         </nav>
 
-        {/* 底部狀態 */}
-        <div className="flex-shrink-0 px-4 py-4 border-t border-white/10">
-          <div className="flex items-center space-x-3">
-            <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-            <span className="text-sm text-slate-400">系統在線</span>
-          </div>
+        {/* 底部：狀態 */}
+        <div className={`flex-shrink-0 border-t border-white/10 ${sidebarCollapsed ? 'px-2 py-3 flex justify-center' : 'px-3 py-3'}`}>
+          {!sidebarCollapsed ? (
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+              <span className="text-xs text-slate-400">系統在線</span>
+            </div>
+          ) : (
+            <div className="w-2 h-2 bg-emerald-400 rounded-full" title="系統在線" />
+          )}
         </div>
       </div>
 
@@ -273,7 +299,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
       )}
 
       {/* 主要內容區域 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-screen">
         {/* 頂部導航欄 - 移動端 */}
         <div className="lg:hidden bg-[#1a233a]/60 backdrop-blur-xl border-b border-white/10 px-4 py-3">
           <div className="flex items-center justify-between">
@@ -288,10 +314,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
         </div>
 
         {/* 內容區域 */}
-        <main className="flex-1 overflow-auto bg-transparent">
-          <div className="h-full">
-            {children}
-          </div>
+        <main className="flex-1 bg-transparent">
+          {children}
         </main>
       </div>
 
