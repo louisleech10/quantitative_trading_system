@@ -1,5 +1,6 @@
 export type FeatureSegmentKey =
   | 'source'
+  | 'timeframe'
   | 'category'
   | 'indicator'
   | 'params'
@@ -10,6 +11,7 @@ export type FeatureSegmentKey =
 
 export interface FeatureSegments {
   source: string;
+  timeframe: string;
   category: string;
   indicator: string;
   params: string;
@@ -259,53 +261,94 @@ export function parseFeatureNameSegments(name: string): FeatureSegments {
   // Prefix families that do not use source_category_indicator naming.
   // Keep category aligned with backend _infer_category() behavior.
   if (tokens[0] === 'ms') {
-    return {
-      source: '',
-      category: 'microstructure',
-      indicator: tokens.slice(1).join('_'),
-      params: '',
-      operator: '',
-      opParams: '',
-      window: '',
-      suffix: '',
-    };
+    let rest = tokens.slice(1);
+    let tf = '';
+    if (rest.length > 0 && isTimeframeToken(rest[0])) { tf = rest[0]; rest = rest.slice(1); }
+    const msOp = tryExtractTrailingOperator(rest); rest = msOp.baseTokens;
+    const msSuffix = tryExtractTrailingSuffix(rest); rest = msSuffix.baseTokens;
+    const msParam = rest.findIndex((t) => isNumericToken(t) || isPackedNumericParamsToken(t));
+    return { source: '', timeframe: tf, category: 'microstructure',
+      indicator: normalizeSegmentToken(msParam === -1 ? rest.join('_') : msParam === 0 ? '' : rest.slice(0, msParam).join('_')),
+      params: msParam >= 0 ? rest.slice(msParam === 0 ? 0 : msParam).join('_') : '',
+      operator: msOp.operator, opParams: msOp.opParams,
+      window: msOp.window || msSuffix.window, suffix: msSuffix.suffix };
   }
   if (tokens[0] === 'ent') {
-    return {
-      source: '',
-      category: 'entropy',
-      indicator: tokens.slice(1).join('_'),
-      params: '',
-      operator: '',
-      opParams: '',
-      window: '',
-      suffix: '',
-    };
+    let rest = tokens.slice(1);
+    let tf = '';
+    if (rest.length > 0 && isTimeframeToken(rest[0])) { tf = rest[0]; rest = rest.slice(1); }
+    const entOp = tryExtractTrailingOperator(rest); rest = entOp.baseTokens;
+    const entSuffix = tryExtractTrailingSuffix(rest); rest = entSuffix.baseTokens;
+    const entParam = rest.findIndex((t) => isNumericToken(t) || isPackedNumericParamsToken(t));
+    return { source: '', timeframe: tf, category: 'entropy',
+      indicator: normalizeSegmentToken(entParam === -1 ? rest.join('_') : entParam === 0 ? '' : rest.slice(0, entParam).join('_')),
+      params: entParam >= 0 ? rest.slice(entParam === 0 ? 0 : entParam).join('_') : '',
+      operator: entOp.operator, opParams: entOp.opParams,
+      window: entOp.window || entSuffix.window, suffix: entSuffix.suffix };
   }
   if (tokens[0] === 'tr') {
-    return {
-      source: '',
-      category: 'tail_risk',
-      indicator: tokens.slice(1).join('_'),
-      params: '',
-      operator: '',
-      opParams: '',
-      window: '',
-      suffix: '',
-    };
+    let rest = tokens.slice(1);
+    let tf = '';
+    if (rest.length > 0 && isTimeframeToken(rest[0])) { tf = rest[0]; rest = rest.slice(1); }
+    const trOp = tryExtractTrailingOperator(rest); rest = trOp.baseTokens;
+    const trSuffix = tryExtractTrailingSuffix(rest); rest = trSuffix.baseTokens;
+    const trParam = rest.findIndex((t) => isNumericToken(t) || isPackedNumericParamsToken(t));
+    return { source: '', timeframe: tf, category: 'tail_risk',
+      indicator: normalizeSegmentToken(trParam === -1 ? rest.join('_') : trParam === 0 ? '' : rest.slice(0, trParam).join('_')),
+      params: trParam >= 0 ? rest.slice(trParam === 0 ? 0 : trParam).join('_') : '',
+      operator: trOp.operator, opParams: trOp.opParams,
+      window: trOp.window || trSuffix.window, suffix: trSuffix.suffix };
   }
 
-  // meta / label families do not follow source_category_... format.
+  // meta / label families do not follow source_category_... format,
+  // but do carry timeframe, category, and operator suffixes inline.
   if (tokens[0] === 'meta' || tokens[0] === 'label') {
+    const source = tokens[0];
+    let mCursor = 1;
+
+    let mTimeframe = '';
+    if (mCursor < tokens.length && isTimeframeToken(tokens[mCursor])) {
+      mTimeframe = tokens[mCursor];
+      mCursor++;
+    }
+
+    let mCategory = '';
+    if (mCursor < tokens.length && CATEGORY_HINT_SET.has(tokens[mCursor].toLowerCase())) {
+      mCategory = normalizeSegmentToken(tokens[mCursor].toLowerCase());
+      mCursor++;
+    }
+
+    let mBody = tokens.slice(mCursor);
+    const mOp = tryExtractTrailingOperator(mBody);
+    mBody = mOp.baseTokens;
+    const mSuffix = tryExtractTrailingSuffix(mBody);
+    mBody = mSuffix.baseTokens;
+
+    let mIndicator = '';
+    let mParams = '';
+    const mFirstParam = mBody.findIndex(
+      (t) => isNumericToken(t) || isPackedNumericParamsToken(t),
+    );
+    if (mFirstParam === -1) {
+      mIndicator = mBody.join('_');
+    } else if (mFirstParam === 0) {
+      mParams = mBody.join('_');
+    } else {
+      mIndicator = mBody.slice(0, mFirstParam).join('_');
+      mParams = mBody.slice(mFirstParam).join('_');
+    }
+    mIndicator = normalizeSegmentToken(mIndicator);
+
     return {
-      source: tokens[0],
-      category: '',
-      indicator: tokens.slice(1).join('_'),
-      params: '',
-      operator: '',
-      opParams: '',
-      window: '',
-      suffix: '',
+      source,
+      timeframe: mTimeframe,
+      category: mCategory,
+      indicator: mIndicator,
+      params: mParams,
+      operator: mOp.operator,
+      opParams: mOp.opParams,
+      window: mOp.window || mSuffix.window,
+      suffix: mSuffix.suffix,
     };
   }
 
@@ -314,15 +357,17 @@ export function parseFeatureNameSegments(name: string): FeatureSegments {
   let cursor = sourceRead.nextCursor;
 
   // Multi-timeframe naming inserts timeframe after source: close_1h_trend_...
+  // Extract as independent dimension instead of absorbing into source.
+  let timeframe = '';
   if (cursor < tokens.length && isTimeframeToken(tokens[cursor])) {
-    source = `${source}_${tokens[cursor]}`;
+    timeframe = tokens[cursor];
     cursor += 1;
   }
 
   // Category exists in current backend naming (source_category_indicator_...).
   let category = '';
   if (cursor < tokens.length && CATEGORY_HINT_SET.has(tokens[cursor].toLowerCase())) {
-    category = normalizeSegmentToken(tokens[cursor]);
+    category = normalizeSegmentToken(tokens[cursor].toLowerCase());
     cursor += 1;
   }
 
@@ -358,6 +403,7 @@ export function parseFeatureNameSegments(name: string): FeatureSegments {
 
   return {
     source,
+    timeframe,
     category,
     indicator,
     params,
@@ -371,6 +417,7 @@ export function parseFeatureNameSegments(name: string): FeatureSegments {
 export function emptySegments(): FeatureSegments {
   return {
     source: '',
+    timeframe: '',
     category: '',
     indicator: '',
     params: '',

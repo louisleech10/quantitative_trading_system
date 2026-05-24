@@ -13,6 +13,17 @@ from momentum.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+# Categories whose L1 outputs are sparse / discrete and therefore unsafe to feed
+# into ratio-style derived operators (Momentum / Distance / Ratio / SignedStrength /
+# WorldQuant ts_*). On 99%-zero columns like TA-Lib CDL patterns, `(x - x.shift) /
+# x.shift.replace(0, nan)` collapses to ~99.77% NaN and the L3 cascade then
+# multiplies that into ~120k garbage features. See docs/NAN_POISONING_INVESTIGATION.md.
+#
+# Single source of truth. rolling_aggregator and feature_preprocessor import this
+# to enforce the same blacklist at L3 / L6.5 entry.
+RATIO_UNSAFE_CATEGORIES: frozenset[str] = frozenset({"pattern"})
+
+
 @dataclass
 class FeatureInfo:
     name: str
@@ -208,6 +219,8 @@ class DerivedOperatorEngine:
         apply_to = momentum_cfg.get("apply_to", "all")
         specs: List[tuple] = []
         for col, info in feature_info.items():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
             if not self._matches_apply_to(info, apply_to):
                 continue
             if col not in layer1_df.columns:
@@ -231,6 +244,8 @@ class DerivedOperatorEngine:
         apply_to = distance_cfg.get("apply_to", "all")
         pairs: List[tuple] = []
         for col, info in feature_info.items():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
             if not self._matches_apply_to(info, apply_to):
                 continue
             if info.source not in raw_data.columns:
@@ -253,6 +268,8 @@ class DerivedOperatorEngine:
         """Collect (col_a, col_b, output_name) for pair-based operators."""
         grouped: Dict[tuple, List["FeatureInfo"]] = {}
         for info in feature_info.values():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
             if not info.params or len(info.params) != 1:
                 continue
             key = (info.source, info.category, info.indicator)
@@ -458,6 +475,8 @@ class DerivedOperatorEngine:
         apply_to = config.get("apply_to", "all")
         frames: List[pd.Series] = []
         for col, info in feature_info.items():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
             if not self._matches_apply_to(info, apply_to):
                 continue
             if info.source not in raw_data.columns:
@@ -490,6 +509,8 @@ class DerivedOperatorEngine:
         """
         grouped: Dict[tuple, List[FeatureInfo]] = {}
         for info in feature_info.values():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
             if not info.params or len(info.params) != 1:
                 continue
             key = (info.source, info.category, info.indicator)
@@ -543,7 +564,10 @@ class DerivedOperatorEngine:
         apply_to = config.get("apply_to", "all")
         lags = [int(lag) for lag in config.get("lags", [3, 5, 8])]
         selected_cols = [
-            col for col, info in feature_info.items() if self._matches_apply_to(info, apply_to)
+            col
+            for col, info in feature_info.items()
+            if info.category not in RATIO_UNSAFE_CATEGORIES
+            and self._matches_apply_to(info, apply_to)
         ]
         if not selected_cols:
             return pd.DataFrame(index=layer1_df.index)
@@ -597,6 +621,8 @@ class DerivedOperatorEngine:
         apply_to = config.get("apply_to", "all")
         frames: List[pd.Series] = []
         for col, info in feature_info.items():
+            if info.category in RATIO_UNSAFE_CATEGORIES:
+                continue
             if not self._matches_apply_to(info, apply_to):
                 continue
             feature_series = self._select_feature_series(layer1_df, col)
@@ -629,7 +655,10 @@ class DerivedOperatorEngine:
         has_corr = "ts_corr" in operator_set and corr_with in raw_data.columns
 
         selected_cols = [
-            col for col, info in feature_info.items() if self._matches_apply_to(info, apply_to)
+            col
+            for col, info in feature_info.items()
+            if info.category not in RATIO_UNSAFE_CATEGORIES
+            and self._matches_apply_to(info, apply_to)
         ]
         if not selected_cols:
             return pd.DataFrame(index=layer1_df.index)

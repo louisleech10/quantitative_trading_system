@@ -305,6 +305,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
           <option value="name:asc">Name ↑</option>
           <option value="name:desc">Name ↓</option>
           <option value="nan_ratio:desc">NaN% ↓</option>
+          <option value="mean:desc">Mean ↓</option>
           <option value="std:desc">Std ↓</option>
           <option value="skewness:desc">Skew ↓</option>
           <option value="kurtosis:desc">Kurt ↓</option>
@@ -397,6 +398,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
                 <th className="px-2 py-2 text-left">Level</th>
                 <th className="px-2 py-2 text-left">Layer</th>
                 <th className="px-2 py-2 text-left">NaN%</th>
+                <th className="px-2 py-2 text-left">Mean</th>
                 <th className="px-2 py-2 text-left">Std</th>
                 <th className="px-2 py-2 text-left">Skew</th>
                 <th className="px-2 py-2 text-left">Kurt</th>
@@ -405,7 +407,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
             <tbody>
               {topSpacerHeight > 0 && (
                 <tr aria-hidden="true">
-                  <td colSpan={9} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
+                  <td colSpan={10} style={{ height: `${topSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
               )}
               {virtualRows.map((row) => (
@@ -419,7 +421,7 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
               ))}
               {bottomSpacerHeight > 0 && (
                 <tr aria-hidden="true">
-                  <td colSpan={9} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
+                  <td colSpan={10} style={{ height: `${bottomSpacerHeight}px`, padding: 0, border: 0 }} />
                 </tr>
               )}
             </tbody>
@@ -506,6 +508,7 @@ const FeatureTableRow = memo(function FeatureTableRow({
       <td className={`px-2 py-2 ${ratioColor(row.nan_ratio, 0.05, 0.1)}`}>
         {(row.nan_ratio * 100).toFixed(2)}%
       </td>
+      <td className="px-2 py-2">{formatNum(row.mean)}</td>
       <td className="px-2 py-2">{formatNum(row.std)}</td>
       <td className={`px-2 py-2 ${absColor(row.skewness, 1, 3)}`}>{formatNum(row.skewness)}</td>
       <td className={`px-2 py-2 ${absColor(row.kurtosis, 5, 10)}`}>{formatNum(row.kurtosis)}</td>

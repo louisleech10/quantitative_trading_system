@@ -542,13 +542,20 @@ async def browse_distribution(
     task_id: str,
     feature: str = Query(..., description="單一特徵名"),
     n_bins: int = Query(50, ge=10, le=200),
+    compute_adf: bool = Query(False, description="是否計算 ADF 平穩性（耗時，預設關閉）"),
 ):
     """取得單一特徵的分佈直方圖數據。"""
     try:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
-            partial(feature_factory_service.browse_distribution, task_id=task_id, feature=feature, n_bins=n_bins),
+            partial(
+                feature_factory_service.browse_distribution,
+                task_id=task_id,
+                feature=feature,
+                n_bins=n_bins,
+                compute_adf=compute_adf,
+            ),
         )
         return result
     except FileNotFoundError as exc:
@@ -579,6 +586,25 @@ async def browse_nan_pattern(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Failed to browse NaN pattern: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/browse/{task_id}/data-quality")
+async def browse_data_quality(task_id: str):
+    """取得資料品質診斷報告（warmup 分布、孔洞、尾端缺失、截面覆蓋率）。"""
+    try:
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(feature_factory_service.browse_data_quality, task_id=task_id),
+        )
+        return result
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.error("Failed to browse data quality: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

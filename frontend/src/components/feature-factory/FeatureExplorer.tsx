@@ -10,7 +10,7 @@ import FeatureTable from '@/components/feature-factory/FeatureTable';
 import FeatureTimeSeriesChart from '@/components/feature-factory/FeatureTimeSeriesChart';
 import FeatureCorrelationHeatmap from '@/components/feature-factory/FeatureCorrelationHeatmap';
 import FeatureDistributionChart from '@/components/feature-factory/FeatureDistributionChart';
-import NaNPatternChart from '@/components/feature-factory/NaNPatternChart';
+import DataQualityDashboard from '@/components/feature-factory/DataQualityDashboard';
 
 interface FeatureExplorerProps {
   taskId?: string | null;
@@ -26,7 +26,7 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
   { key: 'timeseries', label: 'Time Series' },
   { key: 'correlation', label: 'Correlation' },
   { key: 'distribution', label: 'Distribution' },
-  { key: 'nan', label: 'NaN Pattern' },
+  { key: 'nan', label: '資料品質' },
 ];
 
 export default function FeatureExplorer({ taskId: propTaskId, taskStatus, validationSummary }: FeatureExplorerProps) {
@@ -169,6 +169,17 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
     if (!taskId || !isTaskReady || hasCachedFeatureNames) {
       return;
     }
+    // P0-A: Only fetch the 442k feature-name catalog when a tab that actually
+    // needs it is active. Overview/NaN-pattern can render purely from summary.
+    const TABS_NEEDING_NAMES: ReadonlyArray<typeof explorerActiveTab> = [
+      'table',
+      'timeseries',
+      'correlation',
+      'distribution',
+    ];
+    if (!TABS_NEEDING_NAMES.includes(explorerActiveTab)) {
+      return;
+    }
 
     browseFeatures(taskId, {
       offset: 0,
@@ -192,7 +203,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId, isTaskReady, hasCachedFeatureNames, setExplorerFeatureNamesForTask]);
+  }, [browseFeatures, taskId, isTaskReady, hasCachedFeatureNames, setExplorerFeatureNamesForTask, explorerActiveTab]);
 
   // When summary loads from cache (no fetch needed), still mark as recent.
   useEffect(() => {
@@ -434,7 +445,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
         {explorerActiveTab === 'timeseries' && <FeatureTimeSeriesChart taskId={taskId} />}
         {explorerActiveTab === 'correlation' && <FeatureCorrelationHeatmap taskId={taskId} />}
         {explorerActiveTab === 'distribution' && <FeatureDistributionChart taskId={taskId} />}
-        {explorerActiveTab === 'nan' && <NaNPatternChart taskId={taskId} />}
+        {explorerActiveTab === 'nan' && <DataQualityDashboard taskId={taskId} />}
       </div>
         </>
       )}

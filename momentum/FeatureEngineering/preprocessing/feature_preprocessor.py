@@ -35,6 +35,9 @@ from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
     process_fracdiff_column_values,
 )
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
+from momentum.FeatureEngineering.operators.derived_operators import (
+    RATIO_UNSAFE_CATEGORIES,
+)
 from momentum.core.config import (
     MomentumConfig,
     get_fast_adf_enabled,
@@ -53,6 +56,18 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 _FRACDIFF_LAYER_RE = re.compile(r"^(L\d+)_")
+
+
+def _is_ratio_unsafe_column(col: str) -> bool:
+    """Belt-and-suspenders pattern guard for L6.5 entry.
+
+    L1 atomic naming convention: `<source>_<category>_<rest>` (e.g.
+    `ohlc_pattern_CDLDOJI`). Ratio-unsafe categories propagate to derived names
+    (`ohlc_pattern_CDLDOJI_Momentum_L5`) so the same positional check works for
+    L1 / L2 / L3 outputs alike. See docs/NAN_POISONING_INVESTIGATION.md § 7B / Q11.2.
+    """
+    parts = str(col).split("_", 2)
+    return len(parts) >= 2 and parts[1] in RATIO_UNSAFE_CATEGORIES
 
 
 def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bool:
@@ -137,6 +152,20 @@ class FeaturePreprocessor:
     def transform(self, features_df: pd.DataFrame) -> pd.DataFrame:
         if features_df is None or features_df.empty:
             return pd.DataFrame(index=features_df.index if features_df is not None else None)
+
+        # Belt-and-suspenders: drop ratio-unsafe (pattern) columns at L6.5 entry.
+        # In normal pipelines L3 already filters these out, but L6.5 may receive
+        # registry-loaded historical data, post-IC selections, or other paths
+        # that bypass L3. See docs/NAN_POISONING_INVESTIGATION.md § 7B / Q11.2.
+        unsafe = [c for c in features_df.columns if _is_ratio_unsafe_column(str(c))]
+        if unsafe:
+            logger.info(
+                "[L6.5] dropping %d ratio-unsafe columns (categories=%s) at preprocessor entry",
+                len(unsafe), sorted(RATIO_UNSAFE_CATEGORIES),
+            )
+            features_df = features_df.drop(columns=unsafe)
+            if features_df.empty:
+                return pd.DataFrame(index=features_df.index)
 
         from momentum.FeatureEngineering.polars_adapter import polars_enabled
 

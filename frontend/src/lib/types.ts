@@ -644,8 +644,63 @@ export interface DistributionData {
 export interface NanPatternData {
   features: string[];
   timestamps: string[];
-  matrix: boolean[][];
+  timestamps_total?: number;  // total time points before subsampling
+  matrix: boolean[][];        // [N_features, T_sampled] — one row per feature
   nan_ratios: number[];
+}
+
+// ---- Data Quality Diagnostics --------------------------------------------
+export interface DataQualityWarmupBucket {
+  bucket: string;     // e.g. "0", "1-50", "51-200", "201-1000", ">1000"
+  count: number;
+  ratio: number;
+}
+
+export interface DataQualityCoveragePoint {
+  index: number;
+  timestamp: string;
+  coverage: number;   // [0, 1]
+}
+
+export interface DataQualityFeatureHole {
+  name: string;
+  hole_count: number;
+  hole_ratio: number;
+}
+
+export interface DataQualityFeatureTrailing {
+  name: string;
+  trailing_length: number;
+}
+
+export interface DataQualityFeatureScattered {
+  name: string;
+  nan_ratio: number;
+}
+
+export interface DataQualityReport {
+  total_features: number;
+  total_timesteps: number;
+  timestamp_start: string;
+  timestamp_end: string;
+  is_clean: boolean;
+  recommended_start_index: number;
+  recommended_start_timestamp: string;
+  warmup_loss_ratio: number;
+  max_warmup: number;
+  p95_warmup: number;
+  warmup_distribution: DataQualityWarmupBucket[];
+  coverage_timeline: DataQualityCoveragePoint[];
+  min_coverage: number;
+  min_coverage_timestamp: string;
+  mid_holes: DataQualityFeatureHole[];
+  trailing_nans: DataQualityFeatureTrailing[];
+  scattered_nans: DataQualityFeatureScattered[];
+  counts: {
+    mid_holes: number;
+    trailing_nans: number;
+    high_nan: number;
+  };
 }
 
 export interface AutoResearchStatus {

@@ -249,6 +249,24 @@ export default function FeatureFactoryPage() {
           </div>
         )}
 
+        <div className="glass-panel rounded-xl p-4 border border-sky-400/20 text-sky-100/90 text-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0 text-sky-300" />
+            <div className="space-y-1">
+              <div className="font-medium text-sky-200">新增 L1/L2/L3/L6.5 組件前請先閱讀開發守則</div>
+              <div className="text-sky-100/70">
+                類別屬於高稀疏（&gt;80% 零值）或離散標籤時，必須加入
+                <code className="mx-1 px-1 rounded bg-white/10 text-sky-100 font-mono text-xs">RATIO_UNSAFE_CATEGORIES</code>
+                黑名單；否則 ratio / momentum / WorldQuant 會在 L2/L3 階段產生大量 NaN（見 2026-05-21 事故）。
+              </div>
+              <div className="flex flex-wrap gap-3 pt-1 text-xs text-sky-300/80">
+                <span>📄 docs/FEATURE_DEVELOPER_CHECKLIST.md</span>
+                <span>📄 docs/NAN_POISONING_INVESTIGATION.md</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {currentTask?.status === 'completed' &&
           currentTask.compute_warnings &&
           currentTask.compute_warnings.length > 0 && (

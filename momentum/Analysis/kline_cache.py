@@ -26,13 +26,10 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from momentum.core.protocols import IKlineReader
+from momentum.FeatureEngineering.atomic.warmup_lookup import get_warmup_bars
 
 
 logger = logging.getLogger(__name__)
-
-
-# EMA 收斂所需的 warmup 倍數
-WARMUP_MULTIPLIER = 4.5
 
 
 @dataclass
@@ -123,8 +120,8 @@ class KlineCache:
         """
         start_time = time.time()
 
-        # 計算最大 lookback（包含 warmup）
-        max_warmup = int(max_ema_period * WARMUP_MULTIPLIER)
+        # Per-indicator warmup factor from warmup_table.yaml (EMA: 1.44×)
+        max_warmup = get_warmup_bars("EMA", max_ema_period)
         self._max_lookback = far_lookback_bars + max_warmup
 
         logger.info(

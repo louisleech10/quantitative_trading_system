@@ -32,12 +32,9 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from momentum.Analysis.kline_cache import KlineCache
+from momentum.FeatureEngineering.atomic.warmup_lookup import get_warmup_bars
 
 logger = logging.getLogger(__name__)
-
-
-# EMA 收斂所需的 warmup 倍數
-WARMUP_MULTIPLIER = 4.5
 
 # 自動記憶體上限的可用記憶體比例 (50%)
 MEMORY_USAGE_RATIO = 0.5
@@ -344,9 +341,10 @@ class IndicatorCache:
             case_id = case.case_id
 
             # 從 KlineCache 獲取 K 線資料
-            # 獲取最大可能的 lookback (包含最大週期的 warmup)
+            # Per-indicator warmup factor from warmup_table.yaml
+            indicator_name = (indicator_type or "ema").upper()
             max_period = max(periods)
-            max_warmup = int(max_period * WARMUP_MULTIPLIER)
+            max_warmup = get_warmup_bars(indicator_name, max_period)
             total_lookback = far_lookback_bars + max_warmup
 
             klines = self.kline_cache.get(case_id, actual_lookback=total_lookback)

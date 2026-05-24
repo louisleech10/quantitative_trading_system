@@ -437,7 +437,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
             {/* 左上角空格 */}
             <div />
 
-            {/* 欄標籤：全名模式用 -90°（直立），短名模式用 -45° */}
+            {/* 欄標籤：全名模式用 -90°（直立），短名模式用 +45°（↘，與矩陣對角線方向一致） */}
             {labels.map((name) => (
               <div
                 key={`col-${name}`}
@@ -446,7 +446,7 @@ export default function FeatureCorrelationHeatmap({ taskId }: FeatureCorrelation
               >
                 <div
                   style={{
-                    transform: showFullLabels ? 'rotate(-90deg)' : 'rotate(-45deg)',
+                    transform: showFullLabels ? 'rotate(-90deg)' : 'rotate(45deg)',
                     transformOrigin: showFullLabels ? 'center center' : 'bottom center',
                     whiteSpace: 'nowrap',
                     fontSize: 10,

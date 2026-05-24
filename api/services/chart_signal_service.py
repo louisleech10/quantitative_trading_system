@@ -27,6 +27,10 @@ from typing import List, Dict, Any, Optional
 from fastapi import HTTPException
 
 from momentum.factories import create_indicator_engine, create_kline_storage_manager
+from momentum.FeatureEngineering.atomic.warmup_lookup import (
+    get_warmup_bars,
+    get_warmup_factor,
+)
 from api.core.config import settings
 from api.models.strategy_test_models import (
     ChartSignalCalculationRequest,
@@ -146,9 +150,8 @@ class ChartSignalService:
                     params.get("long_period", 0)
                 )
             
-            # 計算暖機期（4.5× 最大週期，確保 99.5% 精度）
-            WARMUP_MULTIPLIER = 4.5
-            warmup_bars = int(max_period * WARMUP_MULTIPLIER)
+            # 計算曖機期 (EMA factor from warmup_table.yaml)
+            warmup_bars = get_warmup_bars("EMA", max_period)
 
             # 獲取 timeframe 的秒數
             timeframe_seconds = self.kline_storage.TIMEFRAME_SECONDS.get(request.timeframe)
@@ -429,9 +432,9 @@ class ChartSignalService:
                     params.get("long_period", 0)
                 )
             
-            # 暖機充足性檢查（4.5× 最大週期）
-            WARMUP_MULTIPLIER = 4.5
-            required_warmup_bars = int(max_period * WARMUP_MULTIPLIER)
+            # 暖機充足性檢查 (EMA factor from warmup_table.yaml)
+            ema_factor = get_warmup_factor("EMA")
+            required_warmup_bars = get_warmup_bars("EMA", max_period)
             available_bars = len(klines)
 
             if available_bars < required_warmup_bars:
@@ -440,14 +443,14 @@ class ChartSignalService:
 
                 error_detail = {
                     "code": "INSUFFICIENT_WARMUP",
-                    "message": f"暖機數據不足: 最大 EMA 週期為 {max_period}，需要 {required_warmup_bars} 根K線（4.5× 週期），實際只有 {available_bars} 根",
+                    "message": f"暖機數據不足: 最大 EMA 週期為 {max_period}，需要 {required_warmup_bars} 根K線（{ema_factor:.2f}× 週期），實際只有 {available_bars} 根",
                     "max_ema_period": max_period,
                     "required_bars": required_warmup_bars,
                     "available_bars": available_bars,
                     "missing_bars": required_warmup_bars - available_bars,
                     "available_start_timestamp": first_ts,
                     "available_end_timestamp": last_ts,
-                    "suggested_action": f"請擴大時間範圍或重新批量下載數據，建議 warmup_bars >= {required_warmup_bars}（最長EMA週期 × 4.5）才能準確計算 EMA{max_period}"
+                    "suggested_action": f"請擴大時間範圍或重新批量下載數據，建議 warmup_bars >= {required_warmup_bars}（最長EMA週期 × {ema_factor:.2f}）才能準確計算 EMA{max_period}"
                 }
 
                 self.logger.error(f"暖機數據不足: {error_detail}")

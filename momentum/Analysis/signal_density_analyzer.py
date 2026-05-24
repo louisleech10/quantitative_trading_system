@@ -26,6 +26,10 @@ from scipy import stats
 from datetime import datetime
 
 from momentum.core.protocols import IKlineReader, IIndicatorEngine
+from momentum.FeatureEngineering.atomic.warmup_lookup import (
+    get_warmup_bars,
+    get_warmup_factor,
+)
 from momentum.core.contracts import (
     TrainingWindowConfig,
     StrategyConfig,
@@ -454,19 +458,15 @@ class SignalDensityAnalyzer:
         else:
             raise ValueError(f"未知的reference_point: {window_config.reference_point}")
 
-        # 計算warmup: 取最大EMA週期的4.5倍
-        # EMA 收斂精度分析：
-        # - × 3.0: ~95-99% 精度（小數點後 1-2 位）
-        # - × 4.5: ~99.5% 精度（小數點後 2-3 位）- 推薦
-        # 測試數據（EMA36）：147 根（× 4.1）達到小數點後 2 位精確匹配
-        WARMUP_MULTIPLIER = 4.5
+        # Warmup bars: per-indicator factor from warmup_table.yaml (EMA: 1.44×)
+        # See momentum/FeatureEngineering/atomic/warmup_lookup.py
         params = strategy_config.params
         max_ema_period = max(
             params.get("short_period", 0),
             params.get("mid_period", 0),
             params.get("long_period", 0)
         )
-        warmup_bars = int(max_ema_period * WARMUP_MULTIPLIER)
+        warmup_bars = get_warmup_bars("EMA", max_ema_period)
 
         # 完整讀取範圍: far_lookback + warmup
         total_lookback = window_config.far_lookback_bars + warmup_bars
@@ -496,7 +496,7 @@ class SignalDensityAnalyzer:
             # 比較計算需求 vs 實際下載的 warmup
             if warmup_bars > actual_warmup_downloaded:
                 raise ValueError(
-                    f"❌ Warmup 數據不足: 策略需要 {warmup_bars} 根 warmup（EMA{max_ema_period} × {WARMUP_MULTIPLIER}），\n"
+                    f"❌ Warmup 數據不足: 策略需要 {warmup_bars} 根 warmup（EMA{max_ema_period} × {get_warmup_factor('EMA'):.2f}），\n"
                     f"   但批量下載時只設置了 {actual_warmup_downloaded} 根 warmup。\n"
                     f"   請在批量下載時設置 warmup_bars >= {warmup_bars}，然後重新下載K線數據。"
                 )

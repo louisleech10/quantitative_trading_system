@@ -96,6 +96,30 @@ export default function DataQualityPanel({ featuresPath, selectedFeatures }: Dat
       </CardHeader>
       <CardContent className="space-y-4">
         {error && <div className="text-rose-300 text-sm">{error}</div>}
+
+        <details className="rounded border border-sky-400/20 bg-sky-500/5 p-3 text-sm text-sky-100/90">
+          <summary className="cursor-pointer font-medium text-sky-200">
+            為什麼會出現高 NaN 比例的特徵？（2026-05-21 修復後）
+          </summary>
+          <div className="mt-2 space-y-2 text-sky-100/80 leading-relaxed">
+            <p>
+              先前版本中，TA-Lib pattern 類別（~99% 為零的 CDL* 訊號）會被送入 L2 ratio/momentum
+              算子，公式 <code className="px-1 rounded bg-white/10 font-mono text-xs">(x − x.shift) / shifted.replace(0, NaN)</code>
+              產生 99.77% NaN 的輸出，再經 L3 (10 windows × 10 aggregators) 串接，造成
+              <strong className="text-sky-200"> 120,377 個高 NaN 特徵</strong>。
+            </p>
+            <p>
+              修復方案：於 L2 / L3 / L6.5 三層各加入 <code className="px-1 rounded bg-white/10 font-mono text-xs">RATIO_UNSAFE_CATEGORIES = {`{"pattern"}`}</code>
+              黑名單守門，並新增 <code className="px-1 rounded bg-white/10 font-mono text-xs">effective_n &lt; 30</code> 過濾條件。修復後 pattern
+              類別衍生欄位為 0，預期高 NaN 特徵數應 &lt; 1,000。
+            </p>
+            <div className="flex flex-wrap gap-3 pt-1 text-xs text-sky-300/80">
+              <span>📄 docs/NAN_POISONING_INVESTIGATION.md</span>
+              <span>📄 docs/FEATURE_DEVELOPER_CHECKLIST.md</span>
+            </div>
+          </div>
+        </details>
+
         <div className="rounded border border-white/10 p-3">
           <div className="text-sm text-slate-300 mb-2">覆蓋率熱力圖（Canvas）</div>
           <canvas ref={canvasRef} width={960} height={40} className="w-full h-10 bg-slate-900 rounded" />

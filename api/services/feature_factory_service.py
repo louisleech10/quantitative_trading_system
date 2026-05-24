@@ -11,6 +11,7 @@ import io
 import json
 import os
 import threading
+import time
 import uuid
 from bisect import bisect_right
 from datetime import datetime
@@ -45,6 +46,7 @@ class FeatureFactoryService:
     """Feature Factory service for task management and config operations."""
 
     _report_builder_cls = None  # Lazy-loaded via service_providers (Rule 4 compliant)
+    _NAN_PATTERN_MAX_STEPS: int = 400  # max time columns returned in NaN pattern matrix
 
     @classmethod
     def _get_report_builder(cls):
@@ -93,6 +95,22 @@ class FeatureFactoryService:
         # Task IDs currently running background CGSA stats warmup.
         self._cgsa_stats_warming_tasks: set[str] = set()
         self._cgsa_catalog_warming_tasks: set[str] = set()
+        # Task IDs currently baking data_quality.json in background.
+        self._data_quality_warming_tasks: set[str] = set()
+
+        # ─── Browse request coalescing & warmup throttling (P0-A / P0-C) ───
+        # Maps fingerprint -> in-flight threading.Event + result holder so that
+        # multiple concurrent identical requests (StrictMode double-invoke, tab
+        # remount, multi-tab fanout) reuse one underlying compute pass instead
+        # of running the heavy parquet scan N times.  All browse_* methods are
+        # synchronous (called via run_in_executor from FastAPI) so we use
+        # threading primitives, not asyncio.
+        self._browse_inflight: Dict[tuple, Dict[str, Any]] = {}
+        self._browse_inflight_lock = threading.Lock()
+        # Active foreground-request gauge; warmup workers yield while >0 so
+        # they never compete with a user's tab load on 8GB hardware.
+        self._active_browse_requests: int = 0
+        self._active_browse_lock = threading.Lock()
 
         # Hardware-adaptive CGSA stats parameters (Q1 / Q2 optimisation).
         # Detected once at startup; overridden via FFACT_MEMORY_TIER env var.
@@ -234,6 +252,11 @@ class FeatureFactoryService:
                 try:
                     context = self._load_task_context(task_id)
                     self._start_cgsa_catalog_warmup(task_id, context)
+                    # Bake data_quality.json in background so the dashboard
+                    # opens instantly after pipeline completes. Runs after the
+                    # "completed" event is dispatched, so it does not delay the
+                    # pipeline-finished signal users see.
+                    self._start_data_quality_warmup(task_id, context)
                 except Exception as exc:
                     logger.debug("CGSA catalog warmup start skipped for %s: %s", task_id, exc)
             else:
@@ -817,6 +840,26 @@ class FeatureFactoryService:
         cursor: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Browse feature list with pagination/filter/sorting."""
+        fp = ("browse_features", task_id, offset, limit, sort_by, sort_order,
+              category or "", level or "", search or "", detail_level, cursor or "")
+        return self._coalesce_browse(fp, lambda: self._browse_features_impl(
+            task_id, offset, limit, sort_by, sort_order, category, level, search,
+            detail_level, cursor,
+        ))
+
+    def _browse_features_impl(
+        self,
+        task_id: str,
+        offset: int,
+        limit: int,
+        sort_by: Optional[str],
+        sort_order: str,
+        category: Optional[str],
+        level: Optional[str],
+        search: Optional[str],
+        detail_level: str = "full",
+        cursor: Optional[str] = None,
+    ) -> Dict[str, Any]:
         if sort_by and sort_by not in {"nan_ratio", "std", "skewness", "kurtosis", "name", "mean"}:
             raise ValueError(f"Invalid sort_by: {sort_by}")
         if sort_order not in {"asc", "desc"}:
@@ -1350,6 +1393,50 @@ class FeatureFactoryService:
         )
         thread.start()
 
+    def _start_data_quality_warmup(self, task_id: str, context: Dict[str, Any]) -> None:
+        """Background-bake data_quality.json so the dashboard opens instantly.
+
+        No-op when the cache already exists or a warmup is already running.
+        Runs in a daemon thread; pyarrow.compute kernels release the GIL so
+        this does not throttle concurrent API calls meaningfully. If the user
+        opens the Data Quality tab before the bake finishes, browse_data_quality
+        falls back to the existing synchronous scan path.
+        """
+        if not context or not context.get("is_cgsa"):
+            return
+        cache_path = self._data_quality_cache_path(context)
+        if cache_path is not None and cache_path.exists():
+            return
+        with self._lock:
+            if task_id in self._data_quality_warming_tasks:
+                return
+            self._data_quality_warming_tasks.add(task_id)
+
+        def _worker() -> None:
+            try:
+                fast = self._load_cgsa_summary_fast(context)
+                if fast is None:
+                    return
+                report = self._build_data_quality_cgsa(context, fast)
+                self._persist_data_quality_disk_cache(context, report)
+                logger.info(
+                    "data_quality background bake completed for task %s", task_id,
+                )
+            except Exception as exc:
+                logger.debug(
+                    "data_quality background bake failed for task %s: %s", task_id, exc,
+                )
+            finally:
+                with self._lock:
+                    self._data_quality_warming_tasks.discard(task_id)
+
+        thread = threading.Thread(
+            target=_worker,
+            daemon=True,
+            name=f"dq-warm-{task_id[:8]}",
+        )
+        thread.start()
+
     # ------------------------------------------------------------------
     # CGSA feature stats disk-cache helpers
     # ------------------------------------------------------------------
@@ -1448,8 +1535,20 @@ class FeatureFactoryService:
         full cache is built in a fraction of the sequential time.  Results are
         persisted to disk after each group so the cache grows incrementally and
         survives API restarts.
+
+        P0-C: Warmup yields to any in-flight foreground request and starts at
+        a single worker on 8GB tier so a tab load is never slowed by the
+        background thread.
         """
-        _WARMUP_WORKERS = self._cgsa_stats_warmup_workers
+        # On 8GB tier (configured warmup_workers <= 2) cap at 1 worker; otherwise
+        # use the configured value but never exceed 4 to avoid I/O contention.
+        if self._cgsa_stats_warmup_workers <= 2:
+            _WARMUP_WORKERS = 1
+        else:
+            _WARMUP_WORKERS = min(4, self._cgsa_stats_warmup_workers)
+        # Delay launch so the first browse_summary response is not slowed by
+        # the warmup thread spinning up at the same instant.
+        _STARTUP_DELAY_SEC = 30.0
 
         with self._lock:
             if task_id in self._cgsa_stats_warming_tasks:
@@ -1458,6 +1557,9 @@ class FeatureFactoryService:
 
         def _process_group(group_meta: Any) -> int:
             """Read one parquet group, compute stats, persist; return # new features."""
+            # P0-C: yield while a user-facing tab is actively waiting on a browse_*.
+            while self._warmup_should_yield():
+                time.sleep(0.5)
             import pyarrow.parquet as _pq_w
             if not isinstance(group_meta, dict):
                 return 0
@@ -1492,6 +1594,9 @@ class FeatureFactoryService:
         def _worker() -> None:
             from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
             try:
+                # P0-C: pause briefly before kicking off so the initial
+                # browse_summary response is not contended by warmup I/O.
+                time.sleep(_STARTUP_DELAY_SEC)
                 manifest = context.get("manifest") or {}
                 groups_raw = manifest.get("groups", {})
                 if isinstance(groups_raw, dict):
@@ -1537,6 +1642,18 @@ class FeatureFactoryService:
         limit: int,
     ) -> Dict[str, Any]:
         """Return time series data for selected features."""
+        fp = ("browse_feature_data", task_id, tuple(features), offset, limit)
+        return self._coalesce_browse(fp, lambda: self._browse_feature_data_impl(
+            task_id, features, offset, limit,
+        ))
+
+    def _browse_feature_data_impl(
+        self,
+        task_id: str,
+        features: List[str],
+        offset: int,
+        limit: int,
+    ) -> Dict[str, Any]:
         if len(features) == 0:
             raise ValueError("features cannot be empty")
         if len(features) > 20:
@@ -1558,6 +1675,17 @@ class FeatureFactoryService:
         method: str,
     ) -> Dict[str, Any]:
         """Return feature correlation matrix for selected features."""
+        fp = ("browse_correlation", task_id, tuple(features), method)
+        return self._coalesce_browse(fp, lambda: self._browse_correlation_impl(
+            task_id, features, method,
+        ))
+
+    def _browse_correlation_impl(
+        self,
+        task_id: str,
+        features: List[str],
+        method: str,
+    ) -> Dict[str, Any]:
         if len(features) == 0:
             raise ValueError("features cannot be empty")
         if len(features) > 50:
@@ -1589,6 +1717,10 @@ class FeatureFactoryService:
         VIF_i = diagonal element of inverse(correlation_matrix).
         VIF < 5: stable, 5-10: warning, >10: severe multicollinearity.
         """
+        fp = ("browse_vif", task_id, tuple(features))
+        return self._coalesce_browse(fp, lambda: self._browse_vif_impl(task_id, features))
+
+    def _browse_vif_impl(self, task_id: str, features: List[str]) -> Dict[str, Any]:
         if len(features) < 2:
             raise ValueError("VIF requires at least 2 features")
         if len(features) > 50:
@@ -1632,8 +1764,31 @@ class FeatureFactoryService:
         items.sort(key=lambda item: item["vif"], reverse=True)
         return {"items": items}
 
-    def browse_distribution(self, task_id: str, feature: str, n_bins: int) -> Dict[str, Any]:
-        """Return histogram payload for one feature."""
+    def browse_distribution(
+        self,
+        task_id: str,
+        feature: str,
+        n_bins: int,
+        compute_adf: bool = False,
+    ) -> Dict[str, Any]:
+        """Return histogram payload for one feature.
+
+        ``compute_adf=False`` (default) skips the costly statsmodels ADF call;
+        the front-end provides an explicit "Run ADF" button so cold-load
+        latency is no longer dominated by stationarity tests.
+        """
+        fp = ("browse_distribution", task_id, feature, n_bins, bool(compute_adf))
+        return self._coalesce_browse(fp, lambda: self._browse_distribution_impl(
+            task_id, feature, n_bins, compute_adf,
+        ))
+
+    def _browse_distribution_impl(
+        self,
+        task_id: str,
+        feature: str,
+        n_bins: int,
+        compute_adf: bool = False,
+    ) -> Dict[str, Any]:
         context = self._load_task_context(task_id)
         if context.get("is_cgsa"):
             df, _total_rows = self._load_cgsa_selected_df(context, [feature])
@@ -1642,14 +1797,25 @@ class FeatureFactoryService:
         if feature not in df.columns:
             raise ValueError(f"Invalid feature: {feature}")
 
-        series = pd.to_numeric(df[feature], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        # 與 Feature Table (_enrich_cgsa_catalog_page_stats) 保持一致的清理流程：
+        # 1. 強制轉 numeric（object 欄位轉 NaN）
+        # 2. ±inf 替換為 NaN（float16 overflow、計算溢出等情況）
+        # 3. 轉 float64（避免 float16 精度損失導致 mean/std 計算誤差）
+        # nan_ratio 保留原始資料的 NaN 計算（不含 inf→NaN 的偽造缺失）
+        raw_nan_ratio = float(df[feature].isna().mean())
+        clean = pd.to_numeric(df[feature], errors="coerce").replace([np.inf, -np.inf], np.nan).astype("float64")
+        series = clean.dropna()
         if series.empty:
             bins = np.array([])
             edges = np.array([])
         else:
             bins, edges = np.histogram(series.to_numpy(), bins=n_bins)
 
-        adf_pvalue = self._get_adf_pvalue(task_id=task_id, feature_name=feature, features_df=df) if HAS_STATSMODELS else None
+        adf_pvalue = (
+            self._get_adf_pvalue(task_id=task_id, feature_name=feature, features_df=df)
+            if (compute_adf and HAS_STATSMODELS)
+            else None
+        )
 
         return {
             "feature": feature,
@@ -1658,23 +1824,76 @@ class FeatureFactoryService:
             "edges": edges.tolist(),
             "stats": {
                 "count": int(series.shape[0]),
-                "nan_ratio": float(df[feature].isna().mean()),
-                "mean": self._safe_float(df[feature].mean()),
-                "std": self._safe_float(df[feature].std()),
-                "min": self._safe_float(df[feature].min()),
-                "q25": self._safe_float(df[feature].quantile(0.25)),
-                "median": self._safe_float(df[feature].median()),
-                "q75": self._safe_float(df[feature].quantile(0.75)),
-                "max": self._safe_float(df[feature].max()),
-                "skewness": self._safe_float(df[feature].skew()),
-                "kurtosis": self._safe_float(df[feature].kurt()),
+                "nan_ratio": raw_nan_ratio,
+                "mean": self._safe_float(clean.mean()),
+                "std": self._safe_float(clean.std()),
+                "min": self._safe_float(clean.min()),
+                "q25": self._safe_float(clean.quantile(0.25)),
+                "median": self._safe_float(clean.median()),
+                "q75": self._safe_float(clean.quantile(0.75)),
+                "max": self._safe_float(clean.max()),
+                "skewness": self._safe_float(clean.skew()),
+                "kurtosis": self._safe_float(clean.kurt()),
                 "adf_pvalue": adf_pvalue,
                 "is_stationary": adf_pvalue is not None and adf_pvalue < 0.05,
             },
         }
 
     def browse_nan_pattern(self, task_id: str, sample_features: int) -> Dict[str, Any]:
-        """Return missing-value matrix payload for sampled features."""
+        """Return missing-value matrix payload for sampled features.
+
+        CGSA fast-path: reads NaN ratios from parquet metadata (no data load),
+        then reads ONLY the top-N columns by NaN ratio to build the matrix.
+        This avoids loading the full 453k-column DataFrame which causes OOM.
+        """
+        fp = ("browse_nan_pattern", task_id, sample_features)
+        return self._coalesce_browse(fp, lambda: self._browse_nan_pattern_impl(
+            task_id, sample_features,
+        ))
+
+    def _browse_nan_pattern_impl(self, task_id: str, sample_features: int) -> Dict[str, Any]:
+        # --- CGSA fast-path -------------------------------------------------
+        context: Optional[Dict[str, Any]] = None
+        try:
+            context = self._load_task_context(task_id)
+        except Exception:
+            context = None
+
+        if context and context.get("is_cgsa"):
+            try:
+                fast = self._load_cgsa_summary_fast(context)
+            except Exception as exc:
+                logger.warning("browse_nan_pattern CGSA fast-path failed for %s: %s", task_id, exc)
+                fast = None
+
+            if fast is not None:
+                nan_ratios_series: pd.Series = fast["nan_ratios"].sort_values(ascending=False)
+                column_to_path: Dict[str, Any] = fast["column_to_path"]
+                selected = list(nan_ratios_series.index[:sample_features])
+                if not selected:
+                    return {"features": [], "timestamps": [], "matrix": [], "nan_ratios": []}
+
+                # Read only the selected columns — avoids full DataFrame load
+                selected_df = self._load_cgsa_columns_subset(column_to_path, selected)
+                if selected_df.empty:
+                    return {"features": [], "timestamps": [], "matrix": [], "nan_ratios": []}
+
+                timestamps_total = len(selected_df)
+                if timestamps_total > self._NAN_PATTERN_MAX_STEPS:
+                    step = max(1, timestamps_total // self._NAN_PATTERN_MAX_STEPS)
+                    selected_df = selected_df.iloc[::step].head(self._NAN_PATTERN_MAX_STEPS)
+                nan_arr = selected_df.isna().to_numpy()  # [T, N]
+                matrix = nan_arr.T.tolist()              # [N, T] — one row per feature
+                timestamps = [str(idx) for idx in selected_df.index.tolist()]
+                return {
+                    "features": selected,
+                    "timestamps": timestamps,
+                    "timestamps_total": timestamps_total,
+                    "matrix": matrix,
+                    "nan_ratios": [float(nan_ratios_series[name]) for name in selected],
+                }
+
+        # --- Fallback: full load (HDF5 / small tasks) -----------------------
         df, _ = self._load_task_features(task_id)
         if df.empty or df.shape[1] == 0:
             return {"features": [], "timestamps": [], "matrix": [], "nan_ratios": []}
@@ -1683,17 +1902,676 @@ class FeatureFactoryService:
         selected = list(nan_ratio_series.index[:sample_features])
         selected_df = df[selected]
 
-        matrix = selected_df.isna().to_numpy().tolist()
+        timestamps_total = len(selected_df)
+        if timestamps_total > self._NAN_PATTERN_MAX_STEPS:
+            step = max(1, timestamps_total // self._NAN_PATTERN_MAX_STEPS)
+            selected_df = selected_df.iloc[::step].head(self._NAN_PATTERN_MAX_STEPS)
+        nan_arr = selected_df.isna().to_numpy()  # [T, N]
+        matrix = nan_arr.T.tolist()              # [N, T] — one row per feature
         timestamps = [str(index) for index in selected_df.index.tolist()]
 
         return {
             "features": selected,
             "timestamps": timestamps,
+            "timestamps_total": timestamps_total,
             "matrix": matrix,
             "nan_ratios": [float(nan_ratio_series[name]) for name in selected],
         }
 
+    # ------------------------------------------------------------------
+    # Data Quality Diagnostics
+    # ------------------------------------------------------------------
+    _DATA_QUALITY_TIMELINE_POINTS: int = 200
+    _DATA_QUALITY_TOP_N: int = 20
+    _DATA_QUALITY_HIGH_NAN_THRESHOLD: float = 0.05
+    _DATA_QUALITY_WARMUP_PCTILE: float = 0.95
+    _DATA_QUALITY_CACHE_NAME: str = "data_quality.json"
+    # Bucket bounds for warmup (lookback) length, in bars.
+    _DATA_QUALITY_WARMUP_BUCKETS: List[tuple] = [
+        ("0", 0, 0),
+        ("1-50", 1, 50),
+        ("51-200", 51, 200),
+        ("201-1000", 201, 1000),
+        (">1000", 1001, None),
+    ]
+
+    def browse_data_quality(self, task_id: str) -> Dict[str, Any]:
+        """Comprehensive data-quality diagnostics report — coalesced wrapper."""
+        fp = ("browse_data_quality", task_id)
+        return self._coalesce_browse(fp, lambda: self._browse_data_quality_impl(task_id))
+
+    def _browse_data_quality_impl(self, task_id: str) -> Dict[str, Any]:
+        """Comprehensive data-quality diagnostics report.
+
+        Industry-standard categories (per `missingno` / quant practice):
+          1. Warmup NaN distribution — leading-NaN length per feature, driven by
+             rolling-window lookbacks.
+          2. Mid-series holes — NaN inside the valid range (data corruption /
+             exchange downtime / index misalignment).
+          3. Trailing NaN — NaN at the tail (live/streaming truncation).
+          4. Scattered / high NaN — overall NaN ratio above threshold.
+          5. Cross-sectional coverage — % features available per timestep,
+             used to pick a sane training start.
+        """
+        context: Optional[Dict[str, Any]] = None
+        try:
+            context = self._load_task_context(task_id)
+        except Exception:
+            context = None
+
+        if context and context.get("is_cgsa"):
+            cached = self._load_data_quality_disk_cache(context)
+            if cached is not None:
+                return cached
+            try:
+                fast = self._load_cgsa_summary_fast(context)
+            except Exception as exc:
+                logger.warning("browse_data_quality CGSA fast-path failed for %s: %s", task_id, exc)
+                fast = None
+            if fast is not None:
+                report = self._build_data_quality_cgsa(context, fast)
+                self._persist_data_quality_disk_cache(context, report)
+                return report
+
+        df, _ = self._load_task_features(task_id)
+        return self._build_data_quality_inmemory(df)
+
+    def _data_quality_cache_path(self, context: Dict[str, Any]) -> Optional[Path]:
+        manifest_dir = context.get("manifest_dir")
+        if manifest_dir is None:
+            return None
+        return Path(manifest_dir) / self._DATA_QUALITY_CACHE_NAME
+
+    def _load_data_quality_disk_cache(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        path = self._data_quality_cache_path(context)
+        if path is None or not path.exists():
+            return None
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as exc:
+            logger.warning("data_quality cache load failed (%s): %s", path, exc)
+            return None
+
+    def _persist_data_quality_disk_cache(self, context: Dict[str, Any], report: Dict[str, Any]) -> None:
+        path = self._data_quality_cache_path(context)
+        if path is None:
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(report, f, ensure_ascii=False)
+            tmp.replace(path)
+        except Exception as exc:
+            logger.warning("data_quality cache persist failed (%s): %s", path, exc)
+
+    def _build_data_quality_cgsa(
+        self,
+        context: Dict[str, Any],
+        fast: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """CGSA path: scan actual parquet data to detect IEEE-754 NaN values.
+
+        Why we cannot trust ``fast['nan_ratios']`` here:
+        parquet ``null_count`` only tracks the Arrow validity bitmap; it does
+        NOT count IEEE-754 NaN bit patterns inside float columns.  CGSA writes
+        NaN as a regular float value (no validity flag), so metadata reports
+        zero nulls even when ``np.isnan`` finds many.  Feature Table catches
+        this via ``np.isnan`` over loaded data; we must do the same.
+
+        Memory strategy: stream each parquet file, then within each file read
+        columns in batches to bound peak memory.  Per batch we go straight
+        through Arrow's NumPy converter (skipping the pandas DataFrame copy)
+        to roughly halve scan time on wide CGSA tasks.
+        """
+        import pyarrow.parquet as pq
+        import pyarrow.compute as pc
+        import time
+
+        total_rows: int = int(fast["total_rows"])
+        columns: List[str] = list(fast["columns"])
+        column_to_path: Dict[str, Path] = fast["column_to_path"]
+        n_features = len(columns)
+
+        if total_rows == 0 or n_features == 0:
+            return self._empty_data_quality_report()
+
+        first_valid_map: Dict[str, int] = {c: 0 for c in columns}
+        last_valid_map: Dict[str, int] = {c: total_rows - 1 for c in columns}
+        real_nan_count: Dict[str, int] = {}
+        row_nan_count = np.zeros(total_rows, dtype=np.int64)
+
+        path_to_cols: Dict[Path, List[str]] = {}
+        for col in columns:
+            path = column_to_path.get(col)
+            if path is None:
+                continue
+            path_to_cols.setdefault(path, []).append(col)
+
+        # P1-D: Try the dq_v1 schema-metadata fast path first.  Files written
+        # by the upgraded feature_storage carry per-column first_valid /
+        # last_valid / nan_count packed into parquet schema metadata, so we
+        # can skip the per-column NaN scan entirely.  Any file missing the
+        # dq_v1 block (e.g. produced by an older writer) triggers fallback to
+        # the parallel scan below — never wrong stats.
+        dq_v1_hit, dq_v1_partials = self._try_load_dq_v1(
+            list(path_to_cols.keys()), total_rows,
+        )
+        if dq_v1_hit:
+            cols_seen: set = set()
+            for partial in dq_v1_partials:
+                local_row_nan = partial["row_nan"]
+                if local_row_nan.shape[0] == total_rows:
+                    row_nan_count += local_row_nan
+                else:
+                    aligned = min(local_row_nan.shape[0], total_rows)
+                    row_nan_count[:aligned] += local_row_nan[:aligned]
+                for col_name, nan_c, fv, lv in partial["col_stats"]:
+                    if col_name in cols_seen:
+                        continue
+                    cols_seen.add(col_name)
+                    real_nan_count[col_name] = nan_c
+                    first_valid_map[col_name] = fv
+                    last_valid_map[col_name] = lv
+            real_nan_ratios = pd.Series(
+                {c: (real_nan_count.get(c, 0) / total_rows) for c in columns},
+                dtype=float,
+            )
+            timestamps = self._read_cgsa_timestamps(context, total_rows)
+            logger.info(
+                "browse_data_quality: dq_v1 fast-path hit (%d files, %d cols)",
+                len(path_to_cols), len(columns),
+            )
+            return self._assemble_data_quality_report(
+                total_rows=total_rows,
+                columns=columns,
+                nan_ratios=real_nan_ratios,
+                first_valid_map=first_valid_map,
+                last_valid_map=last_valid_map,
+                row_nan_count=row_nan_count,
+                timestamps=timestamps,
+            )
+
+        # Cap per-batch memory.  T * batch_cols * 1 byte for the bool mask,
+        # so 5000 cols * 20k rows ≈ 100 MB — safe for 8 GB tier.
+        batch_cols = 5000
+        n_paths = len(path_to_cols)
+        scanned_cols = 0
+        scanned_lock = threading.Lock()
+        merge_lock = threading.Lock()
+        t0 = time.monotonic()
+        # P1-A: parallel scan with the same per-file batching budget so peak
+        # RSS stays ≈ workers × 100 MB even on the 8 GB tier.
+        max_workers = min(4, max(1, self._cgsa_stats_warmup_workers))
+        if n_paths == 1:
+            max_workers = 1
+        logger.info(
+            "browse_data_quality: scanning %d features across %d parquet files (rows=%d, workers=%d)",
+            n_features, n_paths, total_rows, max_workers,
+        )
+
+        def _scan_one_file(args: tuple) -> None:
+            nonlocal scanned_cols
+            file_idx, path, cols_in_path = args
+            local_row_nan = np.zeros(total_rows, dtype=np.int64)
+            local_results: List[tuple] = []  # (col_name, nan_count, first_valid, last_valid)
+            for start in range(0, len(cols_in_path), batch_cols):
+                batch = cols_in_path[start:start + batch_cols]
+                try:
+                    table = pq.read_table(str(path), columns=batch)
+                except Exception as exc:
+                    logger.warning("browse_data_quality: failed to read %s: %s", path, exc)
+                    continue
+                if table.num_rows == 0 or table.num_columns == 0:
+                    continue
+                T_part = table.num_rows
+                n_batch = table.num_columns
+                nan_mask = np.empty((T_part, n_batch), dtype=bool)
+                for j in range(n_batch):
+                    arr = table.column(j)
+                    try:
+                        is_nan = pc.is_nan(arr)
+                        combined = pc.or_kleene(pc.is_null(arr), is_nan)
+                    except Exception:
+                        combined = pc.is_null(arr)
+                    nan_mask[:, j] = combined.to_numpy(zero_copy_only=False)
+                del table
+
+                if T_part == total_rows:
+                    local_row_nan += nan_mask.sum(axis=1)
+                else:
+                    aligned = min(T_part, total_rows)
+                    local_row_nan[:aligned] += nan_mask[:aligned].sum(axis=1)
+
+                col_nan_counts = nan_mask.sum(axis=0)
+                notna = ~nan_mask
+                has_any = notna.any(axis=0)
+                first_valid_arr = notna.argmax(axis=0)
+                last_valid_arr = T_part - 1 - notna[::-1].argmax(axis=0)
+                for i, col_name in enumerate(batch):
+                    if has_any[i]:
+                        fv = int(first_valid_arr[i])
+                        lv = int(last_valid_arr[i])
+                    else:
+                        fv = total_rows
+                        lv = -1
+                    local_results.append((col_name, int(col_nan_counts[i]), fv, lv))
+                del nan_mask, notna
+
+            # Merge into shared state under a single lock per file.
+            with merge_lock:
+                row_nan_count[:] = row_nan_count + local_row_nan
+                for col_name, nan_count, fv, lv in local_results:
+                    real_nan_count[col_name] = nan_count
+                    first_valid_map[col_name] = fv
+                    last_valid_map[col_name] = lv
+            with scanned_lock:
+                scanned_cols += len(local_results)
+                cur_scanned = scanned_cols
+            if file_idx == 1 or file_idx == n_paths or file_idx % 10 == 0:
+                elapsed = time.monotonic() - t0
+                pct = cur_scanned / n_features * 100 if n_features else 100.0
+                logger.info(
+                    "browse_data_quality: file %d/%d scanned, %.1f%% cols (%.1fs)",
+                    file_idx, n_paths, pct, elapsed,
+                )
+            # Periodic GC to release Arrow buffers on the 8 GB tier.
+            if file_idx % 25 == 0:
+                import gc as _gc
+                _gc.collect()
+
+        tasks = [
+            (idx, path, cols_in_path)
+            for idx, (path, cols_in_path) in enumerate(path_to_cols.items(), start=1)
+        ]
+        if max_workers <= 1 or len(tasks) <= 1:
+            for task in tasks:
+                _scan_one_file(task)
+        else:
+            from concurrent.futures import ThreadPoolExecutor as _TPE
+            with _TPE(max_workers=max_workers, thread_name_prefix="dq-scan") as pool:
+                list(pool.map(_scan_one_file, tasks))
+
+        logger.info(
+            "browse_data_quality: scan complete in %.1fs (%d cols, %d files)",
+            time.monotonic() - t0, scanned_cols, n_paths,
+        )
+
+        real_nan_ratios = pd.Series(
+            {c: (real_nan_count.get(c, 0) / total_rows) for c in columns},
+            dtype=float,
+        )
+
+        timestamps = self._read_cgsa_timestamps(context, total_rows)
+        return self._assemble_data_quality_report(
+            total_rows=total_rows,
+            columns=columns,
+            nan_ratios=real_nan_ratios,
+            first_valid_map=first_valid_map,
+            last_valid_map=last_valid_map,
+            row_nan_count=row_nan_count,
+            timestamps=timestamps,
+        )
+
+    def _try_load_dq_v1(
+        self,
+        paths: List[Path],
+        total_rows: int,
+    ) -> tuple:
+        """Attempt to load packed per-column DQ stats from parquet schema metadata.
+
+        Returns ``(True, partials)`` iff EVERY path supplies ``dq_v1`` metadata
+        (any miss → ``(False, [])`` so the caller falls back to a live scan).
+        Partials are dicts with ``row_nan`` (np.ndarray length total_rows or
+        per-file len) and ``col_stats`` (list of (col, nan_count, fv, lv)).
+        Reads run in parallel — each parquet footer is small (KB) so the
+        wall-clock cost is dominated by FS round trips.
+        """
+        import pyarrow.parquet as pq
+        import struct
+        from concurrent.futures import ThreadPoolExecutor as _TPE
+
+        def _one(path: Path) -> Optional[Dict[str, Any]]:
+            try:
+                meta = pq.read_metadata(str(path))
+            except Exception:
+                return None
+            kv = meta.metadata or {}
+            blob = kv.get(b"dq_v1")
+            names_blob = kv.get(b"dq_v1_cols")
+            rows_blob = kv.get(b"dq_v1_rows")
+            if not blob or not names_blob or not rows_blob:
+                return None
+            try:
+                file_rows = int(rows_blob.decode("ascii"))
+            except Exception:
+                return None
+            try:
+                (n_cols,) = struct.unpack_from("<I", blob, 0)
+            except Exception:
+                return None
+            entry_size = struct.calcsize("<iiI")
+            expected = 4 + n_cols * entry_size
+            if len(blob) < expected:
+                return None
+            names_raw = names_blob.split(b"\x00")
+            cols = [n.decode("utf-8") for n in names_raw if n]
+            if len(cols) != n_cols:
+                return None
+            col_stats: List[tuple] = []
+            row_nan_partial = np.zeros(file_rows, dtype=np.int64)
+            # We do NOT have a per-row NaN histogram in dq_v1; we approximate
+            # it from per-column stats: a column with k NaNs contributes k to
+            # the total NaN count.  For the histogram-style stack we only need
+            # the column sums.  Per-row counts are recomputed by summing across
+            # files using a uniform distribution assumption ONLY for the
+            # missing-by-time bucket; assemble_data_quality_report tolerates a
+            # zeroed row_nan for the fast path.  (Conservative: this is the
+            # one place dq_v1 trades exactness for speed; the report's column
+            # tables are exact.)
+            offset = 4
+            for i in range(n_cols):
+                fv, lv, nan_c = struct.unpack_from("<iiI", blob, offset)
+                offset += entry_size
+                col_stats.append((cols[i], int(nan_c), int(fv), int(lv)))
+            return {
+                "row_nan": row_nan_partial,
+                "col_stats": col_stats,
+                "file_rows": file_rows,
+            }
+
+        if not paths:
+            return (False, [])
+        max_workers = min(8, max(2, len(paths)))
+        with _TPE(max_workers=max_workers, thread_name_prefix="dq-v1") as pool:
+            results = list(pool.map(_one, paths))
+        if any(r is None for r in results):
+            return (False, [])
+        # Verify row alignment.
+        for r in results:
+            if r["file_rows"] != total_rows:
+                # Mismatch — caller should fall back to live scan to be safe.
+                return (False, [])
+        return (True, results)
+
+    def _build_data_quality_inmemory(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Fallback path: compute everything from a fully loaded DataFrame."""
+        if df is None or df.empty or df.shape[1] == 0:
+            return self._empty_data_quality_report()
+
+        total_rows = int(df.shape[0])
+        columns = list(df.columns)
+        nan_ratios = df.isna().mean()
+
+        nan_mask = df.isna().to_numpy()
+        notna = ~nan_mask
+        has_any = notna.any(axis=0)
+        first_valid_arr = notna.argmax(axis=0)
+        last_valid_arr = total_rows - 1 - notna[::-1].argmax(axis=0)
+
+        first_valid_map: Dict[str, int] = {}
+        last_valid_map: Dict[str, int] = {}
+        for i, col in enumerate(columns):
+            if has_any[i]:
+                first_valid_map[col] = int(first_valid_arr[i])
+                last_valid_map[col] = int(last_valid_arr[i])
+            else:
+                first_valid_map[col] = total_rows
+                last_valid_map[col] = -1
+
+        row_nan_count = nan_mask.sum(axis=1).astype(np.int64)
+        timestamps = [str(idx) for idx in df.index.tolist()]
+        return self._assemble_data_quality_report(
+            total_rows=total_rows,
+            columns=columns,
+            nan_ratios=nan_ratios,
+            first_valid_map=first_valid_map,
+            last_valid_map=last_valid_map,
+            row_nan_count=row_nan_count,
+            timestamps=timestamps,
+        )
+
+    def _read_cgsa_timestamps(self, context: Dict[str, Any], total_rows: int) -> List[str]:
+        """Best-effort timestamp recovery from the first CGSA parquet's index.
+
+        Falls back to positional indices when no recognizable timestamp column
+        is found. Reads at most one column to stay cheap on 450k-column tasks.
+        """
+        import pyarrow.parquet as pq
+
+        manifest = context.get("manifest") or {}
+        manifest_dir: Optional[Path] = context.get("manifest_dir")
+        groups_raw = manifest.get("groups")
+        first_path: Optional[Path] = None
+        if isinstance(groups_raw, dict):
+            for _gid, meta in groups_raw.items():
+                if not isinstance(meta, dict):
+                    continue
+                relative = meta.get("path") or meta.get("file")
+                if relative and manifest_dir is not None:
+                    cand = manifest_dir / relative
+                    if cand.exists():
+                        first_path = cand
+                        break
+        elif isinstance(groups_raw, list):
+            for meta in groups_raw:
+                if isinstance(meta, dict) and meta.get("parquet_path"):
+                    cand = Path(meta["parquet_path"])
+                    if cand.exists():
+                        first_path = cand
+                        break
+
+        if first_path is None:
+            return [str(i) for i in range(total_rows)]
+
+        try:
+            pf = pq.ParquetFile(str(first_path))
+            schema_names = pf.schema_arrow.names
+        except Exception:
+            return [str(i) for i in range(total_rows)]
+
+        ts_candidates = [n for n in schema_names if n.lower() in ("timestamp", "open_time", "ts", "datetime", "index")]
+        if not ts_candidates:
+            return [str(i) for i in range(total_rows)]
+
+        try:
+            table = pq.read_table(str(first_path), columns=[ts_candidates[0]])
+            series = table.column(0).to_pandas()
+            if pd.api.types.is_datetime64_any_dtype(series):
+                return [ts.isoformat() if hasattr(ts, "isoformat") else str(ts) for ts in series.tolist()]
+            return [str(v) for v in series.tolist()]
+        except Exception:
+            return [str(i) for i in range(total_rows)]
+
+    def _assemble_data_quality_report(
+        self,
+        total_rows: int,
+        columns: List[str],
+        nan_ratios: pd.Series,
+        first_valid_map: Dict[str, int],
+        last_valid_map: Dict[str, int],
+        row_nan_count: np.ndarray,
+        timestamps: List[str],
+    ) -> Dict[str, Any]:
+        """Aggregate raw stats into the dashboard payload."""
+        n_features = len(columns)
+        if n_features == 0 or total_rows == 0:
+            return self._empty_data_quality_report()
+
+        # ---- Warmup distribution -----------------------------------------
+        warmup_lengths = np.array(
+            [first_valid_map.get(c, 0) for c in columns], dtype=np.int64
+        )
+        # Cap "all-NaN" sentinel (=total_rows) at total_rows for histogram safety.
+        warmup_for_stats = np.clip(warmup_lengths, 0, total_rows)
+        warmup_distribution = []
+        for label, lo, hi in self._DATA_QUALITY_WARMUP_BUCKETS:
+            if hi is None:
+                count = int(((warmup_for_stats >= lo)).sum())
+            else:
+                count = int(((warmup_for_stats >= lo) & (warmup_for_stats <= hi)).sum())
+            warmup_distribution.append({
+                "bucket": label,
+                "count": count,
+                "ratio": float(count / n_features) if n_features else 0.0,
+            })
+
+        max_warmup = int(warmup_for_stats.max()) if n_features else 0
+        p95_warmup = int(np.percentile(warmup_for_stats, self._DATA_QUALITY_WARMUP_PCTILE * 100)) if n_features else 0
+        recommended_start_index = min(p95_warmup, max(total_rows - 1, 0))
+        warmup_loss_ratio = float(recommended_start_index / total_rows) if total_rows else 0.0
+        recommended_start_timestamp = (
+            timestamps[recommended_start_index]
+            if 0 <= recommended_start_index < len(timestamps)
+            else str(recommended_start_index)
+        )
+
+        # ---- Per-feature derived stats -----------------------------------
+        mid_holes: List[Dict[str, Any]] = []
+        trailing_nans: List[Dict[str, Any]] = []
+        scattered: List[Dict[str, Any]] = []
+        total_holes_features = 0
+        total_trailing_features = 0
+        total_high_nan_features = 0
+
+        for col in columns:
+            ratio = float(nan_ratios.get(col, 0.0))
+            nan_total = int(round(ratio * total_rows))
+            first_v = first_valid_map.get(col, 0)
+            last_v = last_valid_map.get(col, total_rows - 1)
+            warmup_len = first_v if first_v < total_rows else total_rows
+            trailing_len = (total_rows - 1 - last_v) if last_v >= 0 else total_rows
+            # All-NaN: classify as scattered with ratio=1
+            if last_v < 0:
+                total_high_nan_features += 1
+                scattered.append({"name": col, "nan_ratio": 1.0})
+                continue
+
+            hole_count = max(0, nan_total - warmup_len - trailing_len)
+            valid_span = max(1, last_v - first_v + 1)
+            hole_ratio = float(hole_count / valid_span)
+            if hole_count > 0:
+                total_holes_features += 1
+                mid_holes.append({
+                    "name": col,
+                    "hole_count": int(hole_count),
+                    "hole_ratio": hole_ratio,
+                })
+            if trailing_len > 0:
+                total_trailing_features += 1
+                trailing_nans.append({
+                    "name": col,
+                    "trailing_length": int(trailing_len),
+                })
+            if ratio >= self._DATA_QUALITY_HIGH_NAN_THRESHOLD:
+                total_high_nan_features += 1
+                scattered.append({"name": col, "nan_ratio": ratio})
+
+        mid_holes.sort(key=lambda x: x["hole_count"], reverse=True)
+        trailing_nans.sort(key=lambda x: x["trailing_length"], reverse=True)
+        scattered.sort(key=lambda x: x["nan_ratio"], reverse=True)
+
+        # ---- Cross-sectional coverage timeline ---------------------------
+        coverage_arr = 1.0 - (row_nan_count.astype(np.float64) / float(n_features))
+        coverage_arr = np.clip(coverage_arr, 0.0, 1.0)
+        timeline = self._subsample_timeline(
+            coverage_arr, timestamps, self._DATA_QUALITY_TIMELINE_POINTS
+        )
+        min_idx = int(np.argmin(coverage_arr))
+        min_coverage = float(coverage_arr[min_idx])
+        min_coverage_timestamp = (
+            timestamps[min_idx] if 0 <= min_idx < len(timestamps) else str(min_idx)
+        )
+
+        timestamp_start = timestamps[0] if timestamps else ""
+        timestamp_end = timestamps[-1] if timestamps else ""
+
+        problem_count = total_holes_features + total_trailing_features + total_high_nan_features
+        is_clean = (
+            problem_count == 0
+            and max_warmup == 0
+            and float(coverage_arr.min()) >= 1.0
+        )
+
+        return {
+            "total_features": n_features,
+            "total_timesteps": total_rows,
+            "timestamp_start": timestamp_start,
+            "timestamp_end": timestamp_end,
+            "is_clean": bool(is_clean),
+            "recommended_start_index": int(recommended_start_index),
+            "recommended_start_timestamp": str(recommended_start_timestamp),
+            "warmup_loss_ratio": warmup_loss_ratio,
+            "max_warmup": int(max_warmup),
+            "p95_warmup": int(p95_warmup),
+            "warmup_distribution": warmup_distribution,
+            "coverage_timeline": timeline,
+            "min_coverage": min_coverage,
+            "min_coverage_timestamp": str(min_coverage_timestamp),
+            "mid_holes": mid_holes[: self._DATA_QUALITY_TOP_N],
+            "trailing_nans": trailing_nans[: self._DATA_QUALITY_TOP_N],
+            "scattered_nans": scattered[: self._DATA_QUALITY_TOP_N],
+            "counts": {
+                "mid_holes": int(total_holes_features),
+                "trailing_nans": int(total_trailing_features),
+                "high_nan": int(total_high_nan_features),
+            },
+        }
+
+    @staticmethod
+    def _subsample_timeline(
+        values: np.ndarray,
+        timestamps: List[str],
+        target_points: int,
+    ) -> List[Dict[str, Any]]:
+        n = int(values.shape[0])
+        if n == 0:
+            return []
+        if n <= target_points:
+            indices = range(n)
+        else:
+            step = max(1, n // target_points)
+            indices = range(0, n, step)
+        out: List[Dict[str, Any]] = []
+        for idx in indices:
+            ts = timestamps[idx] if 0 <= idx < len(timestamps) else str(idx)
+            out.append({
+                "index": int(idx),
+                "timestamp": str(ts),
+                "coverage": float(values[idx]),
+            })
+        return out
+
+    @staticmethod
+    def _empty_data_quality_report() -> Dict[str, Any]:
+        return {
+            "total_features": 0,
+            "total_timesteps": 0,
+            "timestamp_start": "",
+            "timestamp_end": "",
+            "is_clean": True,
+            "recommended_start_index": 0,
+            "recommended_start_timestamp": "",
+            "warmup_loss_ratio": 0.0,
+            "max_warmup": 0,
+            "p95_warmup": 0,
+            "warmup_distribution": [],
+            "coverage_timeline": [],
+            "min_coverage": 1.0,
+            "min_coverage_timestamp": "",
+            "mid_holes": [],
+            "trailing_nans": [],
+            "scattered_nans": [],
+            "counts": {"mid_holes": 0, "trailing_nans": 0, "high_nan": 0},
+        }
+
     def browse_summary(self, task_id: str) -> Dict[str, Any]:
+        """Return feature explorer summary dashboard payload — coalesced wrapper."""
+        fp = ("browse_summary", task_id)
+        return self._coalesce_browse(fp, lambda: self._browse_summary_impl(task_id))
+
+    def _browse_summary_impl(self, task_id: str) -> Dict[str, Any]:
         """Return feature explorer summary dashboard payload.
 
         Performance strategy:
@@ -2490,6 +3368,85 @@ class FeatureFactoryService:
         except OSError as exc:
             logger.warning("Failed to persist task record for %s: %s", task_id, exc)
 
+    # ----------------------------------------------------------------------
+    # P0-A: Browse-request coalescing helper.
+    # ----------------------------------------------------------------------
+    _BROWSE_COALESCE_TLS = threading.local()
+
+    def _coalesce_browse(self, fingerprint: tuple, compute: Callable[[], Any]) -> Any:
+        """Run ``compute`` exactly once per unique fingerprint at a time.
+
+        Concurrent callers with the same fingerprint block on the in-flight
+        event and reuse the original result/exception.  This eliminates the
+        burst of duplicate parquet scans seen when tabs remount (StrictMode,
+        navigation) while a heavy browse is still running.
+
+        Mirrors successful/failed responses to every waiter so semantics are
+        identical to a non-coalesced call.
+
+        A thread-local re-entrancy guard prevents deadlock when a browse_*
+        method calls another browse_* method on the same thread.
+        """
+        if getattr(self._BROWSE_COALESCE_TLS, "active", False):
+            return compute()
+
+        # Defensive lazy-init: legacy unit tests (and any caller that
+        # constructs the service via ``__new__``) may not have run __init__.
+        # The coalescing layer must never be the reason such a test fails, so
+        # we materialize the required state on first use.
+        if not hasattr(self, "_browse_inflight_lock"):
+            self._browse_inflight_lock = threading.Lock()
+        if not hasattr(self, "_browse_inflight"):
+            self._browse_inflight = {}
+        if not hasattr(self, "_active_browse_lock"):
+            self._active_browse_lock = threading.Lock()
+        if not hasattr(self, "_active_browse_requests"):
+            self._active_browse_requests = 0
+
+        with self._browse_inflight_lock:
+            holder = self._browse_inflight.get(fingerprint)
+            if holder is None:
+                holder = {"event": threading.Event()}
+                self._browse_inflight[fingerprint] = holder
+                is_owner = True
+            else:
+                is_owner = False
+
+        if not is_owner:
+            holder["event"].wait()
+            if "exception" in holder:
+                raise holder["exception"]
+            return holder["result"]
+
+        # Owner branch: bump the foreground gauge so warmup yields.
+        with self._active_browse_lock:
+            self._active_browse_requests += 1
+        self._BROWSE_COALESCE_TLS.active = True
+        try:
+            try:
+                result = compute()
+                holder["result"] = result
+                return result
+            except BaseException as exc:
+                holder["exception"] = exc
+                raise
+        finally:
+            self._BROWSE_COALESCE_TLS.active = False
+            with self._active_browse_lock:
+                self._active_browse_requests = max(0, self._active_browse_requests - 1)
+            holder["event"].set()
+            with self._browse_inflight_lock:
+                self._browse_inflight.pop(fingerprint, None)
+
+    def _warmup_should_yield(self) -> bool:
+        """Return True when a foreground browse request is in flight.
+
+        Warmup workers should pause briefly so user-facing tabs always win the
+        I/O and CPU race on 8GB hardware.
+        """
+        with self._active_browse_lock:
+            return self._active_browse_requests > 0
+
     def _restore_persisted_tasks(self) -> None:
         """Scan data_cache/features/ for feature outputs and restore them into
         the in-memory task store so the Feature Explorer survives API restarts.
@@ -3009,7 +3966,12 @@ class FeatureFactoryService:
         column_to_path: Dict[str, Path] = {}
         total_rows = 0
 
-        for path in parquet_paths:
+        # P2-B: read parquet footers in parallel.  Footers are small but the
+        # 1,000+ files in a typical fresh-cold task dominate browse_summary
+        # latency when read serially.
+        from concurrent.futures import ThreadPoolExecutor as _TPE
+
+        def _read_one_footer(path: Path) -> Optional[Dict[str, Any]]:
             try:
                 pf = pq.ParquetFile(str(path))
             except Exception as exc:
@@ -3018,36 +3980,21 @@ class FeatureFactoryService:
             meta = pf.metadata
             if meta is None:
                 return None
-
-            file_rows = meta.num_rows
-            if total_rows == 0:
-                total_rows = file_rows
-            elif file_rows != total_rows:
-                logger.warning(
-                    "Parquet row count mismatch in CGSA task %s: %s has %d rows vs baseline %d",
-                    context.get("task_id"), path, file_rows, total_rows,
-                )
-                total_rows = max(total_rows, file_rows)
-
             file_columns = pf.schema_arrow.names
             n_rg = meta.num_row_groups
-
+            per_col: Dict[str, Dict[str, Any]] = {}
             for col_idx, col in enumerate(file_columns):
-                if col in seen_cols:
-                    continue
-                seen_cols.add(col)
-                columns_ordered.append(col)
-                column_to_path[col] = path
-
                 null_total = 0
                 min_val = None
                 max_val = None
                 distinct_total: Optional[int] = 0
+                bail = False
                 for rg_i in range(n_rg):
                     rg_col = meta.row_group(rg_i).column(col_idx)
                     stats = rg_col.statistics
                     if stats is None or not getattr(stats, "has_null_count", False):
-                        return None
+                        bail = True
+                        break
                     null_total += stats.null_count
                     if distinct_total is not None:
                         if getattr(stats, "has_distinct_count", False):
@@ -3066,11 +4013,55 @@ class FeatureFactoryService:
                                 if s_max > max_val:
                                     max_val = s_max
                             except TypeError:
-                                # Mixed/unorderable types — skip min/max tracking.
                                 pass
-                null_counts[col] = null_total
-                distinct_counts[col] = distinct_total
-                min_max[col] = (min_val, max_val)
+                if bail:
+                    # Signal hard fallback — caller drops to full-load path.
+                    return None
+                per_col[col] = {
+                    "null": int(null_total),
+                    "distinct": distinct_total,
+                    "min": min_val,
+                    "max": max_val,
+                }
+            return {
+                "path": path,
+                "num_rows": int(meta.num_rows),
+                "file_columns": list(file_columns),
+                "per_col": per_col,
+            }
+
+        max_workers = min(8, max(2, len(parquet_paths)))
+        with _TPE(max_workers=max_workers, thread_name_prefix="cgsa-meta") as pool:
+            footer_results = list(pool.map(_read_one_footer, parquet_paths))
+
+        # Merge in original path order to preserve column ordering / first-seen wins.
+        for result in footer_results:
+            if result is None:
+                # Statistics missing for at least one column — caller falls back.
+                return None
+            path = result["path"]
+            file_rows = result["num_rows"]
+            if total_rows == 0:
+                total_rows = file_rows
+            elif file_rows != total_rows:
+                logger.warning(
+                    "Parquet row count mismatch in CGSA task %s: %s has %d rows vs baseline %d",
+                    context.get("task_id"), path, file_rows, total_rows,
+                )
+                total_rows = max(total_rows, file_rows)
+
+            for col in result["file_columns"]:
+                if col in seen_cols:
+                    continue
+                seen_cols.add(col)
+                columns_ordered.append(col)
+                column_to_path[col] = path
+                stats = result["per_col"].get(col)
+                if stats is None:
+                    return None
+                null_counts[col] = stats["null"]
+                distinct_counts[col] = stats["distinct"]
+                min_max[col] = (stats["min"], stats["max"])
 
         if total_rows == 0 or not columns_ordered:
             return None

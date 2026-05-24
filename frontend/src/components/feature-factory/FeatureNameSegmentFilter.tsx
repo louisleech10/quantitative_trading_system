@@ -17,11 +17,12 @@ interface ParsedFeatureItem {
 
 const SEGMENT_DEFS: Array<{ key: FeatureSegmentKey; label: string }> = [
   { key: 'source', label: 'Source' },
+  { key: 'timeframe', label: 'Timeframe' },
   { key: 'category', label: 'Category' },
   { key: 'indicator', label: 'Indicator' },
   { key: 'params', label: 'Params' },
   { key: 'operator', label: 'Operator' },
-  { key: 'opParams', label: 'OpParams' },
+  { key: 'opParams', label: 'Op Params' },
   { key: 'window', label: 'Window' },
   { key: 'suffix', label: 'Suffix' },
 ];
@@ -29,6 +30,7 @@ const SEGMENT_DEFS: Array<{ key: FeatureSegmentKey; label: string }> = [
 function buildSegmentMap<T>(factory: () => T): Record<FeatureSegmentKey, T> {
   return {
     source: factory(),
+    timeframe: factory(),
     category: factory(),
     indicator: factory(),
     params: factory(),
@@ -50,6 +52,8 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
   const [openMap, setOpenMap] = useState<Record<FeatureSegmentKey, boolean>>(
     buildSegmentMap<boolean>(() => false),
   );
+  const [indicatorSearch, setIndicatorSearch] = useState('');
+  const [paramsSearch, setParamsSearch] = useState('');
   const parseCacheRef = useRef(new Map<string, ReturnType<typeof parseFeatureNameSegments>>());
   const workerRef = useRef<Worker | null>(null);
   const [parsed, setParsed] = useState<ParsedFeatureItem[]>([]);
@@ -149,18 +153,21 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
 
   const filtered = useMemo(() => {
     const lower = freeText.trim().toLowerCase();
+    const paramsLower = paramsSearch.trim().toLowerCase();
     return parsed
       .filter((item) => {
         if (lower && !item.name.toLowerCase().includes(lower)) return false;
         for (const seg of SEGMENT_DEFS) {
+          if (seg.key === 'params') continue; // params uses text search instead
           const picked = selected[seg.key];
           if (picked.length === 0) continue;
           if (!picked.includes(item.segments[seg.key])) return false;
         }
+        if (paramsLower && !item.segments.params.toLowerCase().includes(paramsLower)) return false;
         return true;
       })
       .map((item) => item.name);
-  }, [parsed, freeText, selected]);
+  }, [parsed, freeText, selected, paramsSearch]);
 
   useEffect(() => {
     onFilteredFeaturesChange(filtered);
@@ -244,6 +251,27 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
           const options = optionsBySegment[seg.key];
           const picked = selected[seg.key];
           const mode = modes[seg.key];
+
+          // Auto-hide empty panels (except params which uses text search)
+          if (options.length === 0 && seg.key !== 'params') return null;
+
+          // For indicator: filter display options by indicatorSearch
+          const displayOptions =
+            seg.key === 'indicator' && indicatorSearch.trim()
+              ? options.filter((o) =>
+                  o.toLowerCase().includes(indicatorSearch.trim().toLowerCase()),
+                )
+              : options;
+
+          const badgeCount =
+            seg.key === 'indicator' && indicatorSearch.trim()
+              ? `${picked.length}/${displayOptions.length} (共 ${options.length})`
+              : seg.key === 'params'
+                ? paramsSearch.trim()
+                  ? '文字篩選'
+                  : '全部'
+                : `${picked.length}/${options.length}`;
+
           return (
             <details
             key={seg.key}
@@ -253,49 +281,74 @@ export default function FeatureNameSegmentFilter({ features, onFilteredFeaturesC
           >
               <summary className="cursor-pointer text-xs text-slate-200 flex items-center justify-between">
                 <span>{seg.label}</span>
-                <span className="text-slate-400">{picked.length}/{options.length}</span>
+                <span className="text-slate-400">{badgeCount}</span>
               </summary>
               <div className="mt-2 space-y-2">
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    onClick={() => setModes((prev) => ({ ...prev, [seg.key]: 'single' }))}
-                    className={`text-[11px] px-2 py-1 rounded border ${
-                      mode === 'single' ? 'border-cyan-300/50 text-cyan-200' : 'border-white/10 text-slate-300'
-                    }`}
-                    type="button"
-                  >
-                    單選
-                  </button>
-                  <button
-                    onClick={() => setModes((prev) => ({ ...prev, [seg.key]: 'multi' }))}
-                    className={`text-[11px] px-2 py-1 rounded border ${
-                      mode === 'multi' ? 'border-cyan-300/50 text-cyan-200' : 'border-white/10 text-slate-300'
-                    }`}
-                    type="button"
-                  >
-                    複選
-                  </button>
-                  <button onClick={() => setAll(seg.key)} className="text-[11px] px-2 py-1 rounded border border-white/10 text-slate-300" type="button">
-                    全選
-                  </button>
-                  <button onClick={() => clearAll(seg.key)} className="text-[11px] px-2 py-1 rounded border border-white/10 text-slate-300" type="button">
-                    全取消
-                  </button>
-                </div>
-
-                <div className="max-h-36 overflow-auto space-y-1 pr-1">
-                  {options.map((option) => (
-                    <label key={option} className="flex items-center gap-2 text-xs text-slate-200">
+                {seg.key === 'params' ? (
+                  /* Params panel: text search only */
+                  <input
+                    value={paramsSearch}
+                    onChange={(e) => setParamsSearch(e.target.value)}
+                    placeholder="輸入參數關鍵字（如 10_100）..."
+                    className="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
+                  />
+                ) : (
+                  <>
+                    {/* Indicator panel: search box above checkbox list */}
+                    {seg.key === 'indicator' && (
                       <input
-                        type="checkbox"
-                        checked={picked.includes(option)}
-                        onChange={() => toggle(seg.key, option)}
+                        value={indicatorSearch}
+                        onChange={(e) => setIndicatorSearch(e.target.value)}
+                        placeholder="搜尋指標名稱..."
+                        className="w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100"
                       />
-                      <span className="truncate">{option}</span>
-                    </label>
-                  ))}
-                  {options.length === 0 && <div className="text-[11px] text-slate-500">無可用項目</div>}
-                </div>
+                    )}
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        onClick={() => setModes((prev) => ({ ...prev, [seg.key]: 'single' }))}
+                        className={`text-[11px] px-2 py-1 rounded border ${
+                          mode === 'single' ? 'border-cyan-300/50 text-cyan-200' : 'border-white/10 text-slate-300'
+                        }`}
+                        type="button"
+                      >
+                        單選
+                      </button>
+                      <button
+                        onClick={() => setModes((prev) => ({ ...prev, [seg.key]: 'multi' }))}
+                        className={`text-[11px] px-2 py-1 rounded border ${
+                          mode === 'multi' ? 'border-cyan-300/50 text-cyan-200' : 'border-white/10 text-slate-300'
+                        }`}
+                        type="button"
+                      >
+                        複選
+                      </button>
+                      <button onClick={() => setAll(seg.key)} className="text-[11px] px-2 py-1 rounded border border-white/10 text-slate-300" type="button">
+                        全選
+                      </button>
+                      <button onClick={() => clearAll(seg.key)} className="text-[11px] px-2 py-1 rounded border border-white/10 text-slate-300" type="button">
+                        全取消
+                      </button>
+                    </div>
+
+                    <div className="max-h-36 overflow-auto space-y-1 pr-1">
+                      {displayOptions.map((option) => (
+                        <label key={option} className="flex items-center gap-2 text-xs text-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={picked.includes(option)}
+                            onChange={() => toggle(seg.key, option)}
+                          />
+                          <span className="truncate">{option}</span>
+                        </label>
+                      ))}
+                      {displayOptions.length === 0 && (
+                        <div className="text-[11px] text-slate-500">
+                          {seg.key === 'indicator' && indicatorSearch ? '無符合項目' : '無可用項目'}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </details>
           );

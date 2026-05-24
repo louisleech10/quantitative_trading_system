@@ -72,8 +72,10 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
   const [error, setError] = useState<string | null>(null);
   // 受控可見範圍（絕對 index，對應 chartData）
   const [brushRange, setBrushRange] = useState<{ start: number; end: number } | null>(null);
-  // 拖曳平移用：記錄按下時的 clientX + brushRange 快照
-  const dragRef = useRef<{ x: number; range: { start: number; end: number } } | null>(null);
+  // 拖曳平移用：記錄按下時的 clientX/Y + brushRange + Y pan 快照
+  const dragRef = useRef<{ x: number; y: number; range: { start: number; end: number }; yPanLeft: number; yPanRight: number } | null>(null);
+  // Y 軸平移比率（正 = 往上看更高的值，負 = 往下看更低的值）
+  const [yPanRatio, setYPanRatio] = useState({ left: 0, right: 0 });
   // chart div ref：掛載 non-passive wheel listener，阻止頁面捲動
   const chartDivRef = useRef<HTMLDivElement>(null);
 
@@ -224,20 +226,31 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     }
 
     const pad = (min: number, max: number) => (max - min) * 0.05;
+
+    // 套用 Y 軸拖曳平移：yPanRatio 是拖曳距離 / 圖表高度的比率
+    // 正值 = 向上拖曳 = 看到更高數值（domain 往上移）
+    const lRange = lMax !== -Infinity ? lMax - lMin : 0;
+    const rRange = rMax !== -Infinity ? rMax - rMin : 0;
+    const lPad = lRange * 0.05;
+    const rPad = rRange * 0.05;
+    const lShift = yPanRatio.left * (lRange + 2 * lPad);
+    const rShift = yPanRatio.right * (rRange + 2 * rPad);
+
     return {
       yLeftDomain:
         lMax !== -Infinity
-          ? ([lMin - pad(lMin, lMax), lMax + pad(lMin, lMax)] as [number, number])
+          ? ([lMin - lPad + lShift, lMax + lPad + lShift] as [number, number])
           : undefined,
       yRightDomain:
         rMax !== -Infinity
-          ? ([rMin - pad(rMin, rMax), rMax + pad(rMin, rMax)] as [number, number])
+          ? ([rMin - rPad + rShift, rMax + rPad + rShift] as [number, number])
           : undefined,
     };
-  }, [visibleData, selected, showRollingBand, showCloseOverlay]);
+  }, [visibleData, selected, showRollingBand, showCloseOverlay, yPanRatio]);
 
   const handleDoubleClick = () => {
     setBrushRange(null);
+    setYPanRatio({ left: 0, right: 0 });
   };
 
   /** 滾輪縮放：以當前可見中心點為基準，向內/向外縮放 */
@@ -288,26 +301,39 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (chartData.length === 0 || e.button !== 0) return;
       const cur = brushRange ?? { start: 0, end: chartData.length - 1 };
-      dragRef.current = { x: e.clientX, range: { ...cur } };
+      dragRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        range: { ...cur },
+        yPanLeft: yPanRatio.left,
+        yPanRight: yPanRatio.right,
+      };
     },
-    [chartData.length, brushRange],
+    [chartData.length, brushRange, yPanRatio],
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!dragRef.current) return;
       const total = chartData.length;
-      const { x, range } = dragRef.current;
+      const { x, y, range, yPanLeft, yPanRight } = dragRef.current;
       const span = range.end - range.start;
+
+      // X 軸平移
       const chartWidth = e.currentTarget.clientWidth;
-      // 向左拖 = 時間前進（正偏移）
-      const shift = Math.round(((dragRef.current.x - e.clientX) / chartWidth) * span);
-      if (Math.abs(shift) < 1) return;
-      let newStart = range.start + shift;
-      let newEnd = range.end + shift;
-      if (newStart < 0) { newEnd = span; newStart = 0; }
-      if (newEnd > total - 1) { newEnd = total - 1; newStart = total - 1 - span; }
-      setBrushRange({ start: newStart, end: newEnd });
+      const shift = Math.round(((x - e.clientX) / chartWidth) * span);
+      if (Math.abs(shift) >= 1) {
+        let newStart = range.start + shift;
+        let newEnd = range.end + shift;
+        if (newStart < 0) { newEnd = span; newStart = 0; }
+        if (newEnd > total - 1) { newEnd = total - 1; newStart = total - 1 - span; }
+        setBrushRange({ start: newStart, end: newEnd });
+      }
+
+      // Y 軸平移：向上拖（y 減小）= 看更高的值（正 yShift = domain 上移）
+      const chartHeight = e.currentTarget.clientHeight;
+      const yShift = (y - e.clientY) / chartHeight;
+      setYPanRatio({ left: yPanLeft + yShift, right: yPanRight + yShift });
     },
     [chartData.length],
   );
@@ -533,6 +559,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
                 domain={yLeftDomain ?? ['auto', 'auto']}
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 tickFormatter={formatYAxis}
+                tickCount={8}
               />
               <YAxis
                 yAxisId="right"
@@ -540,6 +567,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
                 domain={yRightDomain ?? ['auto', 'auto']}
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 tickFormatter={formatYAxis}
+                tickCount={8}
               />
               <Tooltip
                 cursor={{ stroke: '#64748b', strokeWidth: 1 }}

@@ -141,6 +141,55 @@ def _write_parquet_zstd(
     )
 
 
+def _pack_dq_v1_metadata(part_data: Any, part_cols: List[str]) -> Optional[Dict[bytes, bytes]]:
+    """Pack per-column data-quality stats so browse_data_quality can skip the scan.
+
+    Format (little-endian):
+        struct: <I (n_cols) + n_cols * (<iiI = first_valid_idx, last_valid_idx, nan_count)
+        col_names: null-terminated UTF-8 strings concatenated.
+
+    A column with no valid values stores first_valid=row_count, last_valid=-1.
+    Returns None when ``part_data`` is not a 2D float array (we never want to
+    add wrong stats — readers fall back to live parquet scan instead).
+    """
+    import struct
+
+    try:
+        arr = np.asarray(part_data)
+    except Exception:
+        return None
+    if arr.ndim != 2 or arr.shape[1] != len(part_cols):
+        return None
+    if not np.issubdtype(arr.dtype, np.floating):
+        return None
+
+    nan_mask = np.isnan(arr)
+    notna = ~nan_mask
+    has_any = notna.any(axis=0)
+    first_valid = notna.argmax(axis=0)
+    last_valid = arr.shape[0] - 1 - notna[::-1].argmax(axis=0)
+    nan_counts = nan_mask.sum(axis=0).astype(np.int64)
+    row_count = int(arr.shape[0])
+
+    buf = bytearray()
+    buf += struct.pack("<I", len(part_cols))
+    for i in range(len(part_cols)):
+        if has_any[i]:
+            fv = int(first_valid[i])
+            lv = int(last_valid[i])
+        else:
+            fv = row_count
+            lv = -1
+        buf += struct.pack("<iiI", fv, lv, int(nan_counts[i]))
+
+    names_blob = "\x00".join(str(c) for c in part_cols).encode("utf-8") + b"\x00"
+    return {
+        b"dq_v1": bytes(buf),
+        b"dq_v1_cols": names_blob,
+        b"dq_v1_rows": str(row_count).encode("ascii"),
+    }
+
+
 def _write_parquet_with_codec(
     table: Any,
     output_path: Path,
@@ -686,11 +735,19 @@ class FeatureStorage:
                 table = pa_module.Table.from_arrays(arrays, names=list(part_cols))
                 output_path = temp_artifact_dir / f"{safe_part_id}.parquet"
                 staging_path = temp_artifact_dir / f".{safe_part_id}.tmp.parquet"
+                # P1-D: precompute per-column data-quality stats so
+                # browse_data_quality can skip the per-column NaN scan entirely
+                # for fresh-cold reads.  Failure to pack returns None and we
+                # fall back to base schema_metadata — no read-side regression.
+                _dq_meta = _pack_dq_v1_metadata(part_data, list(part_cols))
+                _merged_schema_metadata: Dict[bytes, bytes] = dict(parquet_metadata or {})
+                if _dq_meta:
+                    _merged_schema_metadata.update(_dq_meta)
                 _write_parquet_with_codec(
                     table,
                     staging_path,
                     float32_cols=float32_cols,
-                    schema_metadata=parquet_metadata,
+                    schema_metadata=_merged_schema_metadata,
                     compression_level=_stream_zstd_level,
                 )
                 os.replace(staging_path, output_path)

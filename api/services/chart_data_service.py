@@ -36,6 +36,10 @@ from momentum.factories import (
     create_kline_download_service,
     create_kline_storage_manager,
 )
+from momentum.FeatureEngineering.atomic.warmup_lookup import (
+    get_warmup_bars,
+    get_warmup_factor,
+)
 from api.core.logging import get_logger
 
 logger = get_logger("api.chart_data_service")
@@ -48,9 +52,6 @@ class ChartDataService:
     為前端圖表提供K線數據，支援以案例時間點T為中心的數據裁切。
     支援可選的指標計算（使用 IndicatorEngine 確保與策略計算一致）。
     """
-    
-    # Warmup 乘數（與 chart_signal_service.py 一致）
-    WARMUP_MULTIPLIER = 4.5
 
     def __init__(
         self,
@@ -295,14 +296,14 @@ class ChartDataService:
             # === 可選：計算指標（含 warmup 數據獲取）===
             if indicator_config:
                 try:
-                    # 計算需要的 warmup 數據量
+                    # 計算需要的 warmup 數據量 (EMA factor from warmup_table.yaml)
                     params = indicator_config.get("params", {})
                     max_period = max(
                         params.get("short_period", 0),
                         params.get("mid_period", 0),
                         params.get("long_period", 0)
                     )
-                    required_warmup = int(max_period * self.WARMUP_MULTIPLIER)
+                    required_warmup = get_warmup_bars("EMA", max_period)
                     
                     # 獲取包含 warmup 的完整數據進行計算
                     indicators_result = self._calculate_indicators_with_warmup(
@@ -755,11 +756,11 @@ class ChartDataService:
                 period = params.get(param_name, 0)
                 max_period = max(max_period, period)
 
-            required_warmup = int(max_period * self.WARMUP_MULTIPLIER)
+            required_warmup = get_warmup_bars("EMA", max_period)
             if len(kline_df) < required_warmup:
                 logger.warning(
                     f"Insufficient data for indicator calculation: "
-                    f"need {required_warmup} bars (max_period={max_period} × 4.5), "
+                    f"need {required_warmup} bars (max_period={max_period} × {get_warmup_factor('EMA'):.2f}), "
                     f"have {len(kline_df)} bars. Indicators may be less accurate."
                 )
                 # 注意：不返回 None，仍計算（IndicatorEngine 會處理）

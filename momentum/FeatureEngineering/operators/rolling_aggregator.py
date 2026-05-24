@@ -11,9 +11,29 @@ from scipy.stats import rankdata
 
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+from momentum.FeatureEngineering.operators.derived_operators import (
+    RATIO_UNSAFE_CATEGORIES,
+)
 
 
 logger = get_logger(__name__)
+
+
+# Minimum non-NaN sample count for a rolling-aggregation output to be statistically
+# meaningful. Combined with the 0.9 NaN-rate filter as belt-and-suspenders: stats like
+# std/skew/kurt on <30 effective samples are unreliable even if NaN rate is below 90%.
+# See docs/NAN_POISONING_INVESTIGATION.md § 2.3 / Q11.3.
+_VARIANCE_FILTER_MIN_EFFECTIVE_N: int = 30
+
+
+def _is_ratio_unsafe_column(col: str) -> bool:
+    """Return True if `col` is named like an L1 atomic from a ratio-unsafe category.
+
+    L1 atomic naming convention: `<source>_<category>_<rest>` (e.g.
+    `ohlc_pattern_CDLDOJI`). Inspect the second underscore-separated segment.
+    """
+    parts = col.split("_", 2)
+    return len(parts) >= 2 and parts[1] in RATIO_UNSAFE_CATEGORIES
 
 
 # Plan A streaming persist callback: receives (step_label, chunk_df) and is
@@ -719,10 +739,10 @@ class RollingAggregator:
 
     @staticmethod
     def _variance_filter(df: pd.DataFrame, nan_threshold: float = 0.9) -> pd.DataFrame:
-        """Remove dead features: constant columns, near-all-NaN, or containing inf.
+        """Remove dead features: constant columns, near-all-NaN, low effective N, or containing inf.
 
-        Only removes features that carry zero information. This is a safe,
-        lossless filter — no Alpha is lost.
+        Only removes features that carry zero or statistically unreliable information.
+        This is a safe, lossless filter — no Alpha is lost.
         """
         if df.empty:
             return df
@@ -731,6 +751,10 @@ class RollingAggregator:
         nan_rates = df.isna().mean()
         high_nan = nan_rates > nan_threshold
 
+        # 1b. Remove columns with too few non-NaN samples (statistically unreliable)
+        effective_n = (~df.isna()).sum()
+        low_effective_n = effective_n < _VARIANCE_FILTER_MIN_EFFECTIVE_N
+
         # 2. Remove columns containing inf
         has_inf = df.isin([np.inf, -np.inf]).any()
 
@@ -738,7 +762,7 @@ class RollingAggregator:
         stds = df.std(skipna=True)
         is_constant = (stds == 0) | stds.isna()
 
-        dead_mask = high_nan | has_inf | is_constant
+        dead_mask = high_nan | low_effective_n | has_inf | is_constant
         if not dead_mask.any():
             return df
 
@@ -758,7 +782,7 @@ class RollingAggregator:
             return False
 
         valid_values = values[~np.isnan(values)]
-        if valid_values.size <= 1:
+        if valid_values.size < _VARIANCE_FILTER_MIN_EFFECTIVE_N:
             return False
 
         std_value = float(np.std(valid_values, ddof=1))
@@ -995,15 +1019,22 @@ class RollingAggregator:
         return self._compute_max(series, window) - self._compute_min(series, window)
 
     def _select_columns(self, columns: List[str]) -> List[str]:
+        # Skip pattern (and any future ratio-unsafe category) columns entirely.
+        # Rolling stats on 99%-zero CDL outputs (e.g. ohlc_pattern_CDLDOJI) produce
+        # ~6000 low-information cols per L3 run. Filter at the column-name level since
+        # L3 doesn't have feature_info plumbed through; pattern L1 cols are named
+        # `<src>_pattern_<rest>` so a positional check on the second segment is reliable.
+        # See docs/NAN_POISONING_INVESTIGATION.md § 7B / Q11.2.
+        candidates = [col for col in columns if not _is_ratio_unsafe_column(col)]
         if self._apply_to == "all" or self._apply_to is None:
-            return list(columns)
+            return candidates
         if isinstance(self._apply_to, list):
-            return [col for col in columns if any(token in col for token in self._apply_to)]
+            return [col for col in candidates if any(token in col for token in self._apply_to)]
         try:
             pattern = re.compile(self._apply_to)
         except re.error:
-            return [col for col in columns if self._apply_to in col]
-        return [col for col in columns if pattern.search(col)]
+            return [col for col in candidates if self._apply_to in col]
+        return [col for col in candidates if pattern.search(col)]
 
     def _format_agg_label(self, agg_name: str) -> str:
         mapping = {

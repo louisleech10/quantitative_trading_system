@@ -1,0 +1,387 @@
+_meta:
+  generated_by: scripts/verify_l1_warmup_requirements.py
+  data_source: symbols=['ETHUSDT', 'BTCUSDT', 'ADAUSDT'] tf=1h
+  scale_normalized_error_threshold: 0.005
+  eval_window_bars: 1000
+  test_periods:
+  - 13
+  - 55
+  - 233
+  consolidation: max ratio across symbols (worst case)
+  principle: Minimum warmup K (in bars at the indicator's native TF) such that max|test
+    - infinite_history_gt| over the eval window is less than THRESHOLD * robust_scale(gt),
+    where robust_scale = max(P75(|gt|), std(gt)).
+  usage: warmup_bars(indicator, period) = ceil(period * recommended_factor); see momentum/Analysis/warmup_lookup.py
+indicators:
+  ADX:
+    family: wilder
+    recommended_factor: 8.0
+    max_K_observed: 1863
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 6.609
+      BTCUSDT: 7.231
+      ADAUSDT: 7.996
+  ADXR:
+    family: wilder
+    recommended_factor: 8.8
+    max_K_observed: 2049
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 7.923
+      BTCUSDT: 7.923
+      ADAUSDT: 8.794
+  APO:
+    family: compound_ema
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  AROON:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  AROONOSC:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  ATR:
+    family: wilder
+    recommended_factor: 4.97
+    max_K_observed: 1158
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 4.112
+      BTCUSDT: 4.97
+      ADAUSDT: 4.112
+  CCI:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  CMO:
+    family: wilder
+    recommended_factor: 6.61
+    max_K_observed: 1540
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 5.673
+      BTCUSDT: 6.609
+      ADAUSDT: 6.609
+  DEMA:
+    family: compound_ema
+    recommended_factor: 1.2
+    max_K_observed: 256
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.2
+      BTCUSDT: 1.0
+      ADAUSDT: 1.091
+  DX:
+    family: wilder
+    recommended_factor: 6.61
+    max_K_observed: 1540
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 5.0
+      BTCUSDT: 6.609
+      ADAUSDT: 6.609
+  EMA:
+    family: ema_seeded
+    recommended_factor: 1.44
+    max_K_observed: 309
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.436
+      BTCUSDT: 1.206
+      ADAUSDT: 1.436
+  HT_DCPERIOD:
+    family: hilbert
+    recommended_factor: 1.58
+    max_K_observed: 99
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.302
+      BTCUSDT: 1.429
+      ADAUSDT: 1.571
+  HT_DCPHASE:
+    family: hilbert
+    recommended_factor: 2.05
+    max_K_observed: 129
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 2.048
+      BTCUSDT: 1.873
+      ADAUSDT: 2.0
+  HT_TRENDLINE:
+    family: hilbert
+    recommended_factor: 1.0
+    max_K_observed: 63
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  HT_TRENDMODE:
+    family: hilbert
+    recommended_factor: 1.88
+    max_K_observed: 118
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.714
+      BTCUSDT: 1.302
+      ADAUSDT: 1.873
+  KAMA:
+    family: adaptive_ema
+    recommended_factor: 1.57
+    max_K_observed: 339
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.455
+      BTCUSDT: 1.564
+      ADAUSDT: 1.564
+  MACD_line:
+    family: compound_ema
+    recommended_factor: 3.54
+    max_K_observed: 699
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 3.0
+      BTCUSDT: 3.0
+      ADAUSDT: 3.538
+  MACD_signal:
+    family: compound_ema
+    recommended_factor: 3.57
+    max_K_observed: 792
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 3.538
+      BTCUSDT: 3.0
+      ADAUSDT: 3.564
+  MFI:
+    family: wilder
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  MIDPOINT:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  MIDPRICE:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  MINUS_DI:
+    family: wilder
+    recommended_factor: 3.54
+    max_K_observed: 655
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 2.308
+      BTCUSDT: 2.811
+      ADAUSDT: 3.538
+  MINUS_DM:
+    family: wilder
+    recommended_factor: 3.85
+    max_K_observed: 596
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 2.538
+      BTCUSDT: 3.846
+      ADAUSDT: 2.964
+  MOM:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  NATR:
+    family: wilder
+    recommended_factor: 4.97
+    max_K_observed: 1158
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 4.112
+      BTCUSDT: 4.97
+      ADAUSDT: 4.112
+  PLUS_DI:
+    family: wilder
+    recommended_factor: 4.24
+    max_K_observed: 372
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 2.709
+      BTCUSDT: 3.846
+      ADAUSDT: 4.231
+  PLUS_DM:
+    family: wilder
+    recommended_factor: 4.97
+    max_K_observed: 1158
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 4.97
+      BTCUSDT: 4.97
+      ADAUSDT: 4.231
+  PPO:
+    family: compound_ema
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  ROC:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  RSI:
+    family: wilder
+    recommended_factor: 3.54
+    max_K_observed: 466
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 3.538
+      BTCUSDT: 2.538
+      ADAUSDT: 3.538
+  SAR:
+    family: stateful_pivot
+    recommended_factor: 19.0
+    max_K_observed: 19
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 12.0
+      BTCUSDT: 19.0
+      ADAUSDT: 6.0
+  SMA:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  T3:
+    family: compound_ema
+    recommended_factor: 1.76
+    max_K_observed: 409
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.755
+      BTCUSDT: 1.755
+      ADAUSDT: 1.755
+  TEMA:
+    family: compound_ema
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  TRIMA:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  TRIX:
+    family: compound_ema
+    recommended_factor: 5.47
+    max_K_observed: 1273
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 5.0
+      BTCUSDT: 5.0
+      ADAUSDT: 5.464
+  ULTOSC:
+    family: wilder
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  WILLR:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+  WMA:
+    family: window_only
+    recommended_factor: 1.0
+    max_K_observed: 233
+    all_periods_converged: true
+    per_symbol_max_ratio:
+      ETHUSDT: 1.0
+      BTCUSDT: 1.0
+      ADAUSDT: 1.0
+cumulative_special_cases:
+  OBV:
+    family: cumulative
+    strategy: burn_in_from_dataset_start
+    note: Cumulative sum; only relative changes are meaningful; differs from Binance
+      by a constant offset unless started at listing.
+  AD:
+    family: cumulative
+    strategy: burn_in_from_dataset_start
+    note: 'Same as OBV: pure accumulator; absolute level not comparable.'
+  ADOSC:
+    family: cumulative_diff_ema
+    strategy: burn_in_from_dataset_start_plus_5x_slow
+    note: EMA(fast) - EMA(slow) of AD; level differs but oscillator converges once
+      both EMAs settle (~5x slow period).
+  VWAP:
+    family: cumulative
+    strategy: session_reset_or_burn_in_from_dataset_start
+    note: Binance UI uses session resets (daily/weekly); for ML use consistent reset
+      rule across train/test/live.
+pattern_default_warmup_bars: 5

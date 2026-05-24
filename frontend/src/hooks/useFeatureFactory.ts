@@ -13,6 +13,7 @@ import {
   BrowseVifResponse,
   DistributionData,
   NanPatternData,
+  DataQualityReport,
   BrowseFeatureDataResponse,
   FeatureSchema,
   BatchToggleItem,
@@ -304,8 +305,9 @@ export function useFeatureFactory() {
     []
   );
   const browseDistribution = useCallback(
-    async (taskId: string, feature: string, nBins = 50) => {
+    async (taskId: string, feature: string, nBins = 50, computeAdf = false) => {
       const query = new URLSearchParams({ feature, n_bins: String(nBins) });
+      if (computeAdf) query.set('compute_adf', 'true');
       return requestJson<DistributionData>(`/browse/${taskId}/distribution?${query.toString()}`);
     },
     []
@@ -315,6 +317,13 @@ export function useFeatureFactory() {
     async (taskId: string, sampleFeatures = 50) => {
       const query = new URLSearchParams({ sample_features: String(sampleFeatures) });
       return requestJson<NanPatternData>(`/browse/${taskId}/nan-pattern?${query.toString()}`);
+    },
+    []
+  );
+
+  const browseDataQuality = useCallback(
+    async (taskId: string) => {
+      return requestJson<DataQualityReport>(`/browse/${taskId}/data-quality`);
     },
     []
   );
@@ -462,6 +471,7 @@ export function useFeatureFactory() {
     browseVif,
     browseDistribution,
     browseNanPattern,
+    browseDataQuality,
     browseData,
     loadSchema,
     batchToggle,
