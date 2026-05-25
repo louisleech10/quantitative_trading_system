@@ -1,0 +1,50 @@
+{
+  "skipAutoPermissionPrompt": true,
+  "permissions": {
+    "defaultMode": "auto",
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(python *)",
+      "Bash(pytest *)",
+      "Bash(npm *)",
+      "Bash(pip *)",
+      "Bash(black *)",
+      "Bash(isort *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git branch*)",
+      "Bash(git stash*)",
+      "Bash(git fetch*)",
+      "Bash(find . *)",
+      "Bash(grep *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(jq *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(touch *)",
+      "Bash(source venv/*)",
+      "Bash(./scripts/*)",
+      "Bash(which *)",
+      "Bash(open *)"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(git push*)",
+      "Bash(git reset*)",
+      "Bash(git rebase*)",
+      "Bash(git checkout -- *)",
+      "Bash(git restore *)",
+      "Bash(git branch -D*)"
+    ]
+  }
+}

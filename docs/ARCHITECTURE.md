@@ -1,10 +1,11 @@
 # 量化交易策略系統架構文檔
 
 ## 文檔版本
-- **版本**: 6.1
-- **最後更新**: 2026-05-07
+- **版本**: 7.0
+- **最後更新**: 2026-05-25
 - **狀態**: 生產中 + 持續開發
 - **更新內容**: 
+  - v7.0 (2026-05-25): 同步 Feature Factory Granular Control（per-indicator 細粒度控制、Preset API、Batch-Toggle API、175 tests）；L6.5 優化系列（native-tf path -45.4%、d_star cache v3、Numba Fast ADF、joblib 並行化）；L7 storage 增強（sharded npy、hardware-adaptive 壓縮、IC-First raw/ cleanup）；IC engine cache hit path；Feature Browser CGSA 優化；per-indicator warmup lookup；FeatureTimeSeriesChart 重構
   - v6.1 (2026-05-07): 修正 Feature Storage artifact 描述（HDF5 legacy → V7 per-group parquet）；新增 L65 V2 IC-First canonical path（`{SYMBOL}/{TF}/{config_hash}/raw|processed`）；同步 Artifact Contract Table 與目錄樹
   - v6.0 (2026-03-15): 同步 Feature Factory MultiTF 整合 + 多標的批次計算 — MultiTF 路由策略、AlignmentMode paradigm、FeatureFactoryBatchService 架構（ProcessPoolExecutor + TTL 清理）
   - v5.0 (2026-02-18): 同步全部已完成 PLAN — Phase 1 Feature Factory（7 層 Pipeline）、Phase 1.5 Feature Factory 優化（微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理）、Phase 2.4-2.12 IC Deep Analysis（10 個深度分析模組 + 特徵難度分級 + 匯出系統 + 資料瀏覽器）、Phase 3.5 模型增強（6 個增強模組：校準/Walk-Forward/樣本加權/對抗驗證/CPCV/學習曲線）、Phase 4 Optuna 重構 + Strategy Domain（VectorizedBacktest + PerformanceMetrics + PositionSizing + RiskManager + IBacktestEngine/IPositionSizer Protocol）
@@ -70,6 +71,11 @@
 | Phase 1.5 (Feature Factory 優化) | 微觀結構/資訊理論/尾部風險引擎 + Layer 6.5 前處理 | ✅ 已完成 |
 | Phase 2.4-2.12 (IC Deep Analysis) | 10 個深度分析模組 + 特徵難度分級 + 匯出系統 | ✅ 已完成 |
 | Feature Factory MultiTF + Batch | MultiTF 路由、AlignmentMode、多標的批次計算服務 | ✅ 已完成 |
+| Feature Factory Granular Control | Per-indicator 細粒度控制 + Preset + Batch-Toggle API + 前端元件 | ✅ 已完成 |
+| L6.5 優化系列 | native-tf path（-45.4%）+ d_star cache v3 + Numba ADF + joblib 並行 | ✅ 已完成 |
+| L7 Storage 增強 | Sharded npy + hardware-adaptive 壓縮 + IC-First raw/ cleanup | ✅ 已完成 |
+| IC Engine | Cache hit path（raw/ 刪除後複用 IC scores） | ✅ 已完成 |
+| Feature Browser | CGSA stats 優化（sampling quantile + parallel warmup） | ✅ 已完成 |
 
 ---
 
@@ -1504,7 +1510,7 @@ XGBoostAnalyzer                LightGBMAnalyzer
 | Layer 4 | Lag 延遲 | 時間序列延遲特徵 |
 | Layer 5 | 多時間框架 | MTF 對齊（1h/4h → 主 TF） |
 | Layer 6 | 元特徵 | Trend Consensus / Volatility Regime |
-| Layer 6.5 | 前處理 | rank/gaussian/zscore/diff/fracdiff（Phase 1.5） |
+| Layer 6.5 | 前處理 | rank/gaussian/zscore/diff/fracdiff（Phase 1.5）+ 四路徑優化（native-tf / d_star cache v3 / Numba ADF / joblib 並行） |
 | Layer 7 | Label | binary/regression 標籤生成 |
 
 #### 核心模組
@@ -1523,6 +1529,27 @@ XGBoostAnalyzer                LightGBMAnalyzer
 | EntropyIndicatorEngine | `ent_` | Shannon/Permutation Entropy、Hurst 指數、ApEn/SampEn |
 | TailRiskIndicatorEngine | `tr_` | CVaR、上下行波動率、最大回撤、極值統計 |
 | FeaturePreprocessor (Layer 6.5) | `_rank/_zscore/...` | 排名轉換、Gaussian 轉換、Z-Score、差分、分數差分 |
+
+#### L6.5 優化路徑（L6.5 Optimization Series）
+
+四條加速路徑，顯著降低 fracdiff / ADF 計算時間：
+
+| 優化 | 說明 | 效益 |
+|------|------|------|
+| **native-tf path** | 非主 TF group 跳過 fracdiff/ADF 計算，直接沿用主 TF 的 d_star | -45.4% L6.5 耗時 |
+| **d_star cache v3** | 以 per-column value fingerprint（非索引 hash）作為 fracdiff d_star 的快取鍵，提升命中率 | 避免重複 ADF |
+| **Numba Fast ADF** | ADF 統計量計算透過 Numba JIT 編譯加速，消除 Python 逐列迴圈瓶頸 | 顯著降低 ADF 計算時間 |
+| **joblib 慢路徑並行** | 需要實際計算 fracdiff 的慢路徑改用 joblib 並行處理 | 多核心利用率提升 |
+
+#### Feature Factory Granular Control（Phase A-D）
+- **Per-indicator 細粒度控制**: `IndicatorDef.enabled` 欄位支援 per-Micro/Entropy/TailRisk 原子引擎開關
+- **`migrate_config()`**: 舊版 config 自動遷移至新格式（向後相容）
+- **Preset API**: `POST /features/config/presets/{name}` — minimal/full/balanced preset
+- **Batch-Toggle API**: `PUT /config/batch-toggle` — 批次啟用/停用指標
+- **Schema API**: `GET /features/schema` — 前端動態渲染 config UI
+- **前端元件**: LayerPanel + IndicatorCheckbox + CategorySection + FeaturePreviewBar + ConfigIOButtons（5 個元件，Zustand 9 actions）
+- **Per-indicator warmup lookup**: feature_factory 內建 per-indicator warmup period lookup table，配合 NaN 處理修復
+- **Tests**: 175 tests 全部通過
 
 #### 架構特色
 - ✅ Rule 1-7 完全遵守（Protocol 注入 `IKlineReader`、Factory 建構）
@@ -1727,6 +1754,49 @@ class FeatureFactoryBatchService:
 
 ---
 
+### ✅ 21. L7 Storage 增強
+
+#### Sharded npy Storage + L7 Raw Streaming（Phase-B Phase1）
+- **Sharded npy**: L7 特徵矩陣拆分為多個 `.npy` shard 儲存，避免單一大檔案 I/O 瓶頸
+- **L7 raw streaming**: 以串流方式讀取 raw/ 目錄下的 L7 資料，降低峰值記憶體使用
+
+#### Hardware-Adaptive L7 Compression
+依硬體記憶體層級（tier）自動選擇壓縮策略：
+
+| Tier | 記憶體 | 壓縮策略 |
+|------|--------|----------|
+| T1 | 8 GB | 最高壓縮（犧牲 CPU） |
+| T2 | 16 GB | 平衡壓縮 |
+| T3 | 24 GB | 輕量壓縮 |
+| T4 | 32 GB+ | 最低壓縮（最快解壓） |
+
+#### IC-First raw/ Cleanup
+- IC 特徵篩選完成後自動清除 `raw/` 目錄，釋放磁碟空間
+- **Per-part disk check**: L7_raw 寫入前以 per-part 粒度進行磁碟空間預檢，防止寫入中途磁碟滿
+
+---
+
+### ✅ 22. IC Engine Cache Hit Path
+
+- 當 `raw/` 目錄已被 IC-First cleanup 刪除時，IC Engine 複用已計算的 IC scores，跳過原始特徵重算
+- 避免因檔案缺失觸發全量重新計算，大幅縮短二次 IC 查詢時間
+
+---
+
+### ✅ 23. Feature Browser CGSA 優化 + FeatureTimeSeriesChart 重構
+
+#### Feature Browser CGSA 優化
+- **Sampling quantile**: stats 統計改用分位數抽樣，降低全量掃描開銷
+- **Parallel warmup**: 多執行緒並行 warmup，縮短冷快取首次載入時間
+- **Sync cap 500**: 冷快取 UX 限制同步筆數上限 500，避免首次載入卡頓
+
+#### FeatureTimeSeriesChart 重構
+- 前端特徵時間序列圖表元件全面重構
+- 改善渲染性能、支援更多特徵維度的視覺化呈現
+- Zustand store 新增 `useFeatureFactory` hook 相關 9 個 actions
+
+---
+
 ## 待開發功能
 
 ### ⏳ 1. 前端 UI 整合（優先級：🔥 高）
@@ -1906,14 +1976,14 @@ class XGBoostTaskService:
 | 文檔 | 說明 |
 |------|------|
 | `docs/API_SPECIFICATION.md` | API 端點規格（100+ 端點） |
-| `docs/DEVELOPMENT_GUIDE.md` | 開發規範（Ultra Think 3 步驟） |
+| `docs/DEVELOPMENT_GUIDE.md` | 開發規範 |
 | `docs/REFACTOR_ARCHITECTURE_V4.md` | 架構重構記錄（10 個 Phase）— 歷史參考 |
 | `docs/FRONTEND_INTEGRATION_GUIDE.md` | 前端整合指南（Phase 3-6 UI） |
 | `docs/DYNAMIC_INDICATOR_SYSTEM_GUIDE.md` | 動態指標系統指南（Legacy，已被 Feature Factory 取代） |
-| `.github/copilot-instructions.md` | AI Agent 指令 |
+| `CLAUDE.md` | Claude Code AI 協作指令 |
 
 ---
 
-*文檔版本：6.1*  
-*最後更新：2026-04-14*  
-*狀態：Phase 1-4 + Feature Factory MultiTF/Batch 全部完成，前端 UI 整合進行中*
+*文檔版本：7.0*  
+*最後更新：2026-05-25*  
+*狀態：Phase 1-4 + Feature Factory（MultiTF/Batch/Granular Control）+ L6.5/L7 優化系列全部完成*

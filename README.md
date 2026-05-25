@@ -43,7 +43,7 @@
 - 🎯 **IC 篩選系統** - Information Coefficient 特徵篩選 + 10 個深度分析模組
 - 🤖 **ML優化系統** - XGBoost + LightGBM 雙引擎 + 6 個模型增強模組
 - 📈 **回測系統** - 向量化回測引擎 + 12+ 績效指標 + 部位/風險管理
-- 🏭 **特徵工廠** - 7 層 Config-Driven Pipeline + 微觀結構/資訊理論/尾部風險引擎
+- 🏭 **特徵工廠** - 7 層 Config-Driven Pipeline + 微觀結構/資訊理論/尾部風險引擎 + Per-Indicator 細粒度控制（Preset / Batch-Toggle API）
 - 📊 **完整研究流程** - 支持從假設驗證到策略回測的全流程
 - 🌐 **多市場支持** - 設計可擴展至加密貨幣、台股、美股
 
@@ -429,6 +429,30 @@ ML模型訓練 + Pattern發現
   - Rolling AUC (滾動 AUC 追蹤)
   - Case SHAP (SHAP 可解釋性)
 
+- [x] **Feature Factory Granular Control** ★ 2026-03-08
+  - Per-indicator 細粒度啟用/停用（IndicatorDef.enabled）
+  - Preset API（minimal / full / balanced）
+  - Batch-Toggle API、Schema API
+  - 前端 LayerPanel + IndicatorCheckbox + ConfigIOButtons
+  - 175 tests passed
+
+- [x] **L6.5 前處理優化**
+  - native-tf path（非主要 TF 群組跳過重複運算，-45.4% 時間）
+  - d_star cache v3（per-column value fingerprint）
+  - Numba Fast ADF + joblib 慢路徑並行化
+
+- [x] **L7 Storage 增強**
+  - Sharded npy storage + L7 raw streaming
+  - Hardware-adaptive 壓縮（tier-aware：8/16/24/32GB）
+  - IC-First raw/ 自動清理
+
+- [x] **IC Engine Cache Hit Path**
+  - raw/ 刪除後複用 IC scores，避免重新計算
+
+- [x] **Feature Browser CGSA 優化**
+  - Sampling quantile stats + parallel warmup + sync cap 500
+  - FeatureTimeSeriesChart 全面重構
+
 ### 🔨 開發中
 
 - [ ] **前端 UI 整合**
@@ -594,21 +618,6 @@ quantitative_trading_system/
 - 👨‍💻 **人工** 負責需求定義、功能驗證、錯誤報告
 - 🔄 **協作迭代** 快速開發、持續改進
 
-### Ultra Think三步驟流程
-
-**所有代碼生成必須遵循此流程**：
-
-```
-步驟1 - 初始生成：
-  根據需求生成初版代碼
-
-步驟2 - 自我審查：
-  Review代碼，列出優化To-do List
-
-步驟3 - 優化重構：
-  根據To-do List生成最終版本
-```
-
 ### 核心開發原則
 
 #### ⚠️ 數據真實性（最重要）
@@ -694,7 +703,7 @@ perf: 優化DataFrame操作使用向量化
 
 ## 開發路線圖
 
-### 當前進度（2026 Q1）
+### 當前進度（2026 Q2）
 
 ```
 ✅ 已完成 → 🔨 開發中 → 📋 計劃中
@@ -731,8 +740,26 @@ Phase 3.7: 雙引擎 ML 系統 [✅ 100%] ★ 2026-02-14
 REFACTOR V4: 架構解耦 [✅ 100%]
   ✅ 7 條規則、Protocol 注入、Factory 模式
 
+Feature Factory Granular Control [✅ 100%] ★ 2026-03-08
+  ✅ Per-indicator 細粒度啟用/停用
+  ✅ Preset / Batch-Toggle / Schema API
+  ✅ 175 tests passed
+
+L6.5 前處理優化 [✅ 100%]
+  ✅ native-tf path（-45.4% 時間）
+  ✅ d_star cache v3 + Numba Fast ADF + joblib 並行
+
+L7 Storage 增強 [✅ 100%]
+  ✅ Sharded npy + Hardware-adaptive 壓縮 + IC-First raw/ 清理
+
+IC Engine Cache Hit Path [✅ 100%]
+  ✅ raw/ 刪除後複用 IC scores
+
+Feature Browser CGSA 優化 [✅ 100%]
+  ✅ Sampling quantile + parallel warmup + FeatureTimeSeriesChart 重構
+
 📋 下一步:
-  📋 前端 UI 整合
+  📋 前端 UI 整合（完整面板）
   📋 AI 可讀檔案格式
 ```
 
@@ -741,8 +768,8 @@ REFACTOR V4: 架構解耦 [✅ 100%]
 ```
 2025 Q3-Q4: 案例搜索 + 圖表系統 + 指標引擎
 2026 Q1:    IC Gatekeeper + Feature Factory + 雙引擎 ML + 架構解耦 + 回測 + 模型增強
-2026 Q2:    前端 UI 整合 + AI 可讀導出
-2026 Q3+:   Chat 自然語言介面（V2.0）
+2026 Q2:    Feature Factory 細粒度控制 + L6.5/L7 優化 + IC Engine 增強 + Feature Browser 優化
+2026 Q3+:   前端 UI 整合 + AI 可讀導出 + Chat 自然語言介面（V2.0）
 ```
 
 詳細開發計劃見 [PRODUCT_VISION.md](docs/PRODUCT_VISION.md)
