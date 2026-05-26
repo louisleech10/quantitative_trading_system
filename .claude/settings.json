@@ -46,5 +46,37 @@
       "Bash(git restore *)",
       "Bash(git branch -D*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f HANDOFF.md ] && jq -Rs '{\"systemMessage\": (\"=== HANDOFF.md (自動注入) ===\\n\" + .)}' HANDOFF.md || echo '{}'"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"[SYSTEM] Context 即將自動壓縮。壓縮前請確保：(1) 用 Write 工具更新 HANDOFF.md，記錄當前任務、下一步、決策、阻塞，保持 30 行以內。(2) 若無法立即更新，請在 compaction summary 開頭寫明需更新 HANDOFF.md 的內容，讓下個 session 的 Claude 第一件事就執行更新。\"}'"
+          }
+        ]
+      },
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\": \"[SYSTEM] Context 即將手動壓縮。壓縮前請確保：(1) 用 Write 工具更新 HANDOFF.md，記錄當前任務、下一步、決策、阻塞，保持 30 行以內。(2) 若無法立即更新，請在 compaction summary 開頭寫明需更新 HANDOFF.md 的內容，讓下個 session 的 Claude 第一件事就執行更新。\"}'"
+          }
+        ]
+      }
+    ]
   }
 }

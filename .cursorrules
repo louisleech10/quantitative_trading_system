@@ -1,0 +1,41 @@
+# Cursor Rules — Quantitative Trading System
+
+## 協作協議（必讀）
+
+**開始前**：讀取根目錄 `HANDOFF.md`（所有 agent 的共同交接文件）
+**結束前**：更新 `HANDOFF.md`（≤ 30 行，記錄當前任務/決策/阻塞）
+
+---
+
+## 專案規則
+
+### 解耦（零容忍）
+- `momentum/` 絕不 import `api/`
+- 驗證：`grep -r "from api\." momentum/` → 必須 0 結果
+- 引擎建立：只用 `from momentum.factories import create_*`
+
+### 數據
+- 所有數據來自真實 API 或實際計算，絕不 hardcode symbols/prices/metrics
+
+### 日誌
+```python
+from api.core.logging import get_logger
+logger = get_logger(__name__)
+# 不在 hot loop 裡 log
+```
+
+### 錯誤分類
+- Retryable：rate_limit、network timeout
+- Non-retryable：invalid_symbol、logic error
+
+### Python 規範
+- 所有函式加 type hints
+- 優先 pandas/numpy 向量化，避免 Python 迴圈
+
+### TypeScript 規範
+- 所有 props/state/API response 有型別
+- 狀態管理用 Zustand
+- 圖表一律用 `<ResponsiveContainer>`
+
+## 完整規範
+見 `CLAUDE.md` 和 `AGENTS.md`。

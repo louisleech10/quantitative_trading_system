@@ -8,6 +8,17 @@ All code must support this evolution via clean decoupling.
 
 ---
 
+## Multi-Agent 協作協議
+
+`HANDOFF.md`（根目錄）是所有 agent 的共同交接文件。SessionStart hook 已設定自動注入。
+
+- **每次開始工作**：HANDOFF.md 已自動注入 context，確認當前狀態
+- **每次結束工作**：用 Write 工具更新 HANDOFF.md（≤ 30 行）
+- **Context 壓縮前**：PreCompact hook 會提醒，優先更新 HANDOFF.md 再讓壓縮發生
+- **其他 agent**：Codex 讀 `AGENTS.md`，Cursor 讀 `.cursorrules`，兩者都指向 HANDOFF.md
+
+---
+
 ## Key Directories
 
 **Backend**

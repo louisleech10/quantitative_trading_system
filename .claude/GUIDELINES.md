@@ -4,24 +4,15 @@
 
 ---
 
-## Session Status 管理
+## Handoff 協議
 
-每次工作必須追蹤 Session，格式：`SESSION_PhaseX.Y.md`
+`HANDOFF.md`（根目錄）是所有 agent 的共同交接文件，取代舊 SESSION 系統。
 
-**六大更新時機**：
-1. 提出 PLAN → 記錄到計劃列表（PLANNED）
-2. 開始執行 → PLANNED → IN_PROGRESS
-3. 完成任務 → IN_PROGRESS → COMPLETED
-4. 遇到阻塞 → BLOCKED + 原因
-5. 切換 AI → 記錄切換點
-6. Debug → 記錄問題和解決方案
+**規則只有兩條**：
+1. **開始前**：SessionStart hook 已自動注入 HANDOFF.md，確認當前狀態
+2. **結束前**：更新 HANDOFF.md（≤ 30 行）
 
-**工作流程**：
-```
-開始新工作 → 讀取 .claude/STATUS.md + 最新 SESSION_Phase*.md
-提出 PLAN → 先更新 Session，再實作
-完成後 → 更新 SESSION
-```
+**HANDOFF.md 格式**：正在做 / 待辦 / 阻塞 / 本次決策 / 踩坑提醒
 
 ---
 
