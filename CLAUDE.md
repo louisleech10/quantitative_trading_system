@@ -146,9 +146,8 @@ logger = get_logger(__name__)
 
 ## Key Documentation
 
+- `HANDOFF.md` — current task state, decisions, blockers (update before handoff)
 - `docs/ARCHITECTURE.md` — full system architecture (~1900 lines)
-- `docs/DEVELOPMENT_GUIDE.md` — Ultra Think examples, coding standards
+- `docs/DEVELOPMENT_GUIDE.md` — coding standards
 - `docs/API_SPECIFICATION.md` — all API endpoints (v5.0)
 - `docs/PRODUCT_VISION.md` — V1/V2/V3 evolution plan, decoupling rationale
-- `.claude/STATUS.md` — current project status (read at session start)
-- `.claude/SESSION_TEMPLATE.md` — session tracking template
