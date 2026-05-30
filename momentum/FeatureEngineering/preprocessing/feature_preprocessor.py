@@ -34,6 +34,7 @@ from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
     ParallelSlowPath,
     process_fracdiff_column_values,
 )
+from momentum.FeatureEngineering.utils.adf_safe_skip import filter_safe_skip
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
 from momentum.FeatureEngineering.operators.derived_operators import (
     RATIO_UNSAFE_CATEGORIES,
@@ -128,6 +129,7 @@ class FeaturePreprocessor:
         self.zscore_config = self._config.get("adaptive_zscore", {})
         self.winsor_config = self._config.get("winsorization", {})
         self.fracdiff_config = self._config.get("fractional_differencing", {})
+        self.adf_safe_skip_config = self._config.get("adf_safe_skip", {}) or {}
         # 預設 replace：確保跨標的欄位名稱一致
         self.mode = self._config.get("mode", "replace")
 
@@ -2726,11 +2728,11 @@ class FeaturePreprocessor:
         source_layer: Optional[str] = None,
     ) -> List[str]:
         if "ALL" in self._fracdiff_apply_to_layers:
-            return list(columns)
+            return self._apply_adf_safe_skip(list(columns), context="fracdiff")
 
         if source_layer:
             if source_layer in self._fracdiff_apply_to_layers:
-                return list(columns)
+                return self._apply_adf_safe_skip(list(columns), context=f"fracdiff/{source_layer}")
             logger.info(
                 "[L6.5] FracDiff skipped by registry layer: layer=%s allowed=%s columns=%d",
                 source_layer,
@@ -2763,7 +2765,35 @@ class FeaturePreprocessor:
                 parse_failed_examples,
             )
 
-        return target_columns
+        return self._apply_adf_safe_skip(target_columns, context="fracdiff")
+
+    def _apply_adf_safe_skip(self, columns: List[str], *, context: str) -> List[str]:
+        """對 columns 套用 ADF safe-skip whitelist。
+
+        對「數學上嚴格 I(0)」的欄位（嚴格有界 / 數學差分 / 共整合差）
+        bypass ADF 測試直接視為 I(0) → 不進入 fracdiff / adf_differencing。
+
+        詳見 docs/NAN_REDUCTION_STRATEGY.md §4.5。
+        """
+        if not columns:
+            return columns
+        cfg = self.adf_safe_skip_config
+        enabled = bool(cfg.get("enabled", True))
+        additional = tuple(cfg.get("additional_patterns") or ())
+        exclusions = tuple(cfg.get("exclusion_patterns") or ())
+        needs_adf, skipped = filter_safe_skip(
+            columns,
+            enabled=enabled,
+            additional_patterns=additional,
+            exclusion_patterns=exclusions,
+        )
+        if skipped:
+            pct = len(skipped) / max(len(columns), 1) * 100.0
+            logger.info(
+                "[ADF Safe-Skip][%s] bypassed %d/%d cols (%.1f%%); examples: %s",
+                context, len(skipped), len(columns), pct, skipped[:3],
+            )
+        return needs_adf
 
     @staticmethod
     def _d_star_cache_dir() -> Path:
@@ -3125,6 +3155,8 @@ class FeaturePreprocessor:
         candidate_columns = [
             column for column in columns if column not in self._fracdiff_processed_columns
         ]
+        # ADF safe-skip：對數學嚴格 I(0) 欄位 bypass ADF（詳見 utils/adf_safe_skip.py）
+        candidate_columns = self._apply_adf_safe_skip(candidate_columns, context="adf_diff")
         if not candidate_columns:
             return result
 

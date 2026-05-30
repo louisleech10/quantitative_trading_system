@@ -956,7 +956,11 @@ class FeatureFactory:
         t0 = time.perf_counter()
         logger.info("[L2] Starting derived features: %d L1 cols", layer1.shape[1])
 
-        if layer1.empty:
+        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L2 衍生計算
+        # L1 原始欄位保留於 feature store，此處只是不傳給 L2 operators
+        layer1_for_l2 = self._apply_cascade_blacklist(layer1, "L2_input", config)
+
+        if layer1_for_l2.empty:
             result = pd.DataFrame(index=layer1.index)
         elif not getattr(config.operators, 'enabled', True):
             result = pd.DataFrame(index=layer1.index)
@@ -965,9 +969,9 @@ class FeatureFactory:
 
             use_polars = polars_enabled()
             if use_polars:
-                result = self._layer2_derived_polars(layer1, data, config)
+                result = self._layer2_derived_polars(layer1_for_l2, data, config)
             else:
-                result = self._layer2_derived_pandas(layer1, data, config)
+                result = self._layer2_derived_pandas(layer1_for_l2, data, config)
 
         elapsed = time.perf_counter() - t0
         logger.info("[L2] Completed: %d cols in %.2fs", result.shape[1], elapsed)
@@ -1097,6 +1101,8 @@ class FeatureFactory:
         # feeding them into rolling aggregation would create semantically redundant features
         # and inflate the feature space by ~20× unnecessarily.
         base = self._combine_layers([layer1], context="layer3_input")
+        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L3 rolling
+        base = self._apply_cascade_blacklist(base, "L3_input", config)
         if base.empty:
             return pd.DataFrame(index=base.index)
         filtered_config = self._filter_rolling_config(config.rolling_aggregation)
@@ -1160,6 +1166,8 @@ class FeatureFactory:
             base = self._combine_layers([data, layer1], context="layer4_input")
         else:
             base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")
+        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L4 lag（含 non-CGSA fallback 路徑）
+        base = self._apply_cascade_blacklist(base, f"L4_input[{apply_to}]", config)
         if base.empty:
             return pd.DataFrame(index=base.index)
         processor = LagProcessor(config)
@@ -1858,6 +1866,9 @@ class FeatureFactory:
         config: "FactoryConfig",
         preprocessing_config: Dict[str, Any],
     ) -> pd.DataFrame:
+        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L6.5 preprocessing
+        # （legacy / ic_first_pre / post_ic 三 mode 都經由此函式 → 一處覆蓋全部）
+        all_features = self._apply_cascade_blacklist(all_features, "L65_input", config)
         context = self._build_preprocessing_context(all_features, config)
         preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
 
@@ -1879,9 +1890,91 @@ class FeatureFactory:
                 )
             finally:
                 self._cgsa_registry.finalize()
+            # CGSA streaming path: L6.5 outputs live in CGSA registry, not in this
+            # frame. L7 dead-feature drop on registry-side data is out of scope for
+            # this step (see NAN_REDUCTION_STRATEGY.md §5.3 / PLAN §2.7).
             return pd.DataFrame(index=all_features.index if all_features is not None else None)
 
-        return preprocessor.transform(all_features)
+        # Classic in-memory path: apply L7 dead-feature drop on the transformed
+        # frame (covers L1, L2, L4-fast/fallback, L5, L6 + L6.5 outputs).
+        # See NAN_REDUCTION_STRATEGY.md §5.3 — drops ONLY constant/insufficient-
+        # sample columns, NEVER drops by NaN ratio.
+        result_frame = preprocessor.transform(all_features)
+        return self._apply_l7_dead_feature_drop(result_frame, config)
+
+    def _apply_cascade_blacklist(
+        self,
+        frame: pd.DataFrame,
+        context: str,
+        config: "FactoryConfig",
+    ) -> pd.DataFrame:
+        """Cascade categorical blacklist：阻斷 CDL_PATTERN_ALL / HT_DCPHASE 的下游 derivation。
+
+        L1 原始欄位**保留**於最終 feature store；此處只剝離「進入下層 cascade 計算」的副本。
+
+        詳見 docs/NAN_REDUCTION_STRATEGY.md §5.1 與 utils/cascade_blacklist.py。
+        """
+        from momentum.FeatureEngineering.utils.cascade_blacklist import (
+            expand_blacklist_patterns,
+            strip_blacklisted,
+        )
+
+        if frame is None or frame.empty or len(frame.columns) == 0:
+            return frame
+        nan_strategy = getattr(config, "nan_strategy", None)
+        if nan_strategy is None:
+            return frame
+        patterns = getattr(nan_strategy, "categorical_blacklist", None) or []
+        if not patterns:
+            return frame
+        blacklisted = expand_blacklist_patterns(patterns, frame.columns)
+        if not blacklisted:
+            return frame
+        result = strip_blacklisted(frame, blacklisted)
+        logger.info(
+            "[NaN Blacklist][%s] stripped %d cols (e.g. %s)",
+            context, len(blacklisted), list(blacklisted)[:3],
+        )
+        return result
+
+    def _apply_l7_dead_feature_drop(
+        self,
+        frame: pd.DataFrame,
+        config: "FactoryConfig",
+    ) -> pd.DataFrame:
+        """L7 死特徵清理（frame path）。
+
+        Per-column drop only — never group-level（safety invariant I-1）。
+        詳見 docs/NAN_REDUCTION_STRATEGY.md §5.3 與 utils/dead_feature_filter.py。
+        """
+        from momentum.FeatureEngineering.utils.dead_feature_filter import (
+            drop_dead_columns,
+            find_dead_columns,
+        )
+
+        if frame is None or frame.empty or len(frame.columns) == 0:
+            return frame
+        nan_strategy = getattr(config, "nan_strategy", None)
+        if nan_strategy is None:
+            return frame
+        dead_cfg = getattr(nan_strategy, "l7_dead_feature_drop", None)
+        if dead_cfg is None:
+            return frame
+        enabled = bool(getattr(dead_cfg, "enabled", True))
+        min_valid = int(getattr(dead_cfg, "min_valid_samples", 100))
+
+        dead, diag = find_dead_columns(frame, min_valid_samples=min_valid, enabled=enabled)
+        if not dead:
+            return frame
+        result = drop_dead_columns(frame, dead)
+        logger.info(
+            "[L7 Dead Drop] dropped %d cols (constant=%d, sparse=%d); examples: %s",
+            diag.total_dropped,
+            len(diag.constant_cols),
+            len(diag.sparse_cols),
+            list(dead)[:5],
+        )
+        return result
 
     @staticmethod
     def _preprocessing_config_dict(config: "FactoryConfig") -> Dict[str, Any]:
@@ -2216,6 +2309,22 @@ class FeatureFactory:
                 "FFACT_L65_WORKERS",
                 int(tier_cfg["l65_workers"]),
             )
+            # L7 dead-drop（CGSA mode）：frame-path 不經此路徑，故在 registry stream
+            # write 時 per-column 剔除常數/樣本不足/全 NaN 欄。enabled=False → None（no-op）。
+            _nan_strat = getattr(config, "nan_strategy", None)
+            _dead_cfg = getattr(_nan_strat, "l7_dead_feature_drop", None) if _nan_strat else None
+            _dead_min_valid = (
+                int(_dead_cfg.min_valid_samples)
+                if _dead_cfg is not None and bool(getattr(_dead_cfg, "enabled", False))
+                else None
+            )
+            # Layer B 通用淨化：inf / |v|>finite_cap → NaN，覆蓋所有 streamed 特徵（含 L3）。
+            _san_cfg = getattr(_nan_strat, "numeric_sanitize", None) if _nan_strat else None
+            _sanitize_cap = (
+                float(_san_cfg.finite_cap)
+                if _san_cfg is not None and bool(getattr(_san_cfg, "enabled", False))
+                else None
+            )
             raw_path, stream_summary = self._storage.write_raw_from_registry_stream(
                 symbol=symbol,
                 tf=timeframe,
@@ -2225,6 +2334,8 @@ class FeatureFactory:
                 n_workers=n_workers,
                 cleanup_intermediate=True,
                 l65_mode=l65_mode,
+                dead_drop_min_valid=_dead_min_valid,
+                sanitize_finite_cap=_sanitize_cap,
                 time_range=self._manifest_time_range_from_raw_data(raw_data),
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
