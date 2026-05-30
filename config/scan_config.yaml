@@ -503,6 +503,14 @@ preprocessing:
     epsilon: 1.0e-8
     apply_to: all
 
+  # ADF / Fracdiff safe-skip whitelist
+  # 對數學上嚴格 I(0) 欄位（嚴格有界 / 數學差分 / 共整合差）bypass ADF
+  # 詳見 docs/NAN_REDUCTION_STRATEGY.md §4.5
+  adf_safe_skip:
+    enabled: true
+    additional_patterns: []  # 額外擴增 skip pattern（substring match）
+    exclusion_patterns: []   # 強制讓 whitelist 命中項回到 ADF（debug 用）
+
 operators:
   distance:
     enabled: true
@@ -561,6 +569,12 @@ rolling_aggregation:
     - max
     - range
   apply_to: all
+  # Layer 4 pipeline gate: skip skew/kurt for columns with at most this many
+  # distinct non-NaN values. Rolling skew/kurt of a binary/near-binary signal
+  # (e.g. HT-TRENDMODE regime flag) is degenerate-by-construction — mostly NaN
+  # in constant runs, statistically meaningless elsewhere. 2 = block binary;
+  # 0 disables the gate (no-op).
+  skip_higher_moments_max_cardinality: 2
 
 lag_features:
   enabled: true
@@ -587,3 +601,18 @@ labels:
     horizons: [5, 13]
 
 custom_indicators: []
+
+# NaN 處理策略：cascade blacklist + L7 dead feature drop
+# 詳見 docs/NAN_REDUCTION_STRATEGY.md §5
+nan_strategy:
+  # Cascade categorical blacklist：阻斷「計算本身錯誤」的下游 derivation
+  # （CDL rolling/diff/lag ≈ 全零；HT_DCPHASE 0-360° 翻轉處算錯）
+  # L1 原始欄位保留於最終 feature store。
+  categorical_blacklist:
+    - CDL_PATTERN_ALL
+    - HT-DCPHASE   # hyphen：對照真實 catalog 命名（close_12h_cycle_HT-DCPHASE）
+
+  # L7 write 前的死特徵清理：僅丟常數欄與樣本不足欄，不依 NaN ratio
+  l7_dead_feature_drop:
+    enabled: true
+    min_valid_samples: 100

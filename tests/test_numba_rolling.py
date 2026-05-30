@@ -353,3 +353,100 @@ def test_numba_rolling_nine_windows_all_valid():
         fused = fused_rolling_stats(values, window)
         assert fused.shape == (values.shape[0], 6)
         assert np.isnan(fused[: window - 1]).all()
+
+
+# ── Regression: scale-relative degeneracy guard (skew/kurt explosion fix) ──────
+# Root cause: incremental Pébay sliding-window skew/kurt exploded to ~1e32 at the
+# exact moment a window became constant (last differing value removed → m2 drifts
+# to ~1e-25 via catastrophic cancellation; absolute guard `m2 < 1e-30` missed it,
+# m3/m2**1.5 → 1e32). Triggered in production by binary signals (HT-TRENDMODE on
+# native 12h) sliding from a choppy region into a long constant run. Fix: nullify
+# when m2 is negligible RELATIVE to Σx² (scale-invariant), matching scipy.stats.
+
+def _binary_choppy_then_constant(n: int = 400, window: int = 55) -> np.ndarray:
+    """Binary 0/1 series: a choppy region then a long constant run.
+
+    Reproduces the exact pathology — a window slides from "has a few 0s" into
+    "all 1s", the variance→0 boundary that broke the incremental kernel.
+    """
+    v = np.ones(n, dtype=np.float64)
+    # choppy 0/1 in the first stretch
+    v[: 2 * window] = 0.0
+    v[window : 2 * window : 2] = 1.0  # alternating inside the early stretch
+    # everything after 2*window stays constant 1.0 (the danger zone)
+    return v
+
+
+def test_skew_kurt_no_explosion_on_constant_transition():
+    """REG: choppy→constant binary must NOT explode; constant windows → NaN."""
+    values = _binary_choppy_then_constant()
+    sk = rolling_skew_kurt(values, 55).astype(np.float64)
+    skew, kurt = sk[:, 0], sk[:, 1]
+
+    # No finite value may be astronomically large (the bug produced ~1e32).
+    assert np.nanmax(np.abs(skew)) < 1e6, "skew exploded on constant transition"
+    assert np.nanmax(np.abs(kurt)) < 1e6, "kurt exploded on constant transition"
+    assert not np.isinf(skew).any() and not np.isinf(kurt).any()
+
+    # Deep in the constant run the window is all-1.0 → undefined → NaN.
+    assert np.isnan(skew[-30:]).all()
+    assert np.isnan(kurt[-30:]).all()
+
+
+def test_skew_kurt_matches_pandas_on_nondegenerate_windows():
+    """REG: where pandas yields a finite non-zero skew, numba must agree."""
+    values = _binary_choppy_then_constant()
+    numba_skew = rolling_skew_kurt(values, 55)[:, 0].astype(np.float64)
+    pandas_skew = pd.Series(values).rolling(55).skew().to_numpy(dtype=np.float64)
+
+    # Compare only on windows pandas considers non-degenerate (|skew| > 1e-9):
+    # constant windows differ by convention (numba=NaN, pandas=0.0) but both mean
+    # "no skewness", which is not a correctness gap.
+    mask = np.isfinite(pandas_skew) & (np.abs(pandas_skew) > 1e-9)
+    assert mask.any()
+    np.testing.assert_allclose(numba_skew[mask], pandas_skew[mask], atol=1e-4)
+
+
+@pytest.mark.parametrize("scale", [1e-10, 1.0, 1e20])
+def test_skew_kurt_preserved_across_extreme_scales(scale: float):
+    """REG: scale-relative guard must NOT kill genuine variance at any scale.
+
+    Because skewness is dimensionless, a window with genuine 10%-of-scale
+    variance has a well-defined skew at 1e-10, 1.0, or 1e20 alike. Our guard
+    (relative m2/Σx²) preserves all three. NOTE: pandas' rolling().skew() uses an
+    absolute variance floor and WRONGLY nulls the entire 1e-10 series — our fix
+    is strictly more correct there, so parity is only asserted where pandas is
+    also finite.
+    """
+    rng = np.random.default_rng(7)
+    values = (scale + scale * 0.1 * rng.standard_normal(300)).astype(np.float64)
+    numba_skew = rolling_skew_kurt(values, 55)[:, 0].astype(np.float64)
+    pandas_skew = pd.Series(values).rolling(55).skew().to_numpy(dtype=np.float64)
+
+    valid = np.arange(54, len(values))
+    # Core requirement: genuine variance must stay finite & defined (not nulled).
+    assert np.isfinite(numba_skew[valid]).all(), f"guard wrongly nulled scale={scale}"
+    # Parity only where pandas is also finite (pandas nulls all of 1e-10).
+    both = valid[np.isfinite(pandas_skew[valid])]
+    if both.size:
+        np.testing.assert_allclose(numba_skew[both], pandas_skew[both], atol=1e-3)
+
+
+def test_skew_kurt_single_outlier_window_preserved():
+    """REG: a 54:1 window has a real (large) skew — must be kept, not nulled."""
+    values = np.ones(60, dtype=np.float64)
+    values[0] = 2.0  # one different value; window [0..54] is 54-ones + 1-two
+    skew = rolling_skew_kurt(values, 55)[:, 0].astype(np.float64)
+    pandas_skew = pd.Series(values).rolling(55).skew().to_numpy(dtype=np.float64)
+
+    assert np.isfinite(skew[54]), "genuine one-outlier skew was wrongly nulled"
+    assert abs(skew[54]) > 1.0
+    np.testing.assert_allclose(skew[54], pandas_skew[54], atol=1e-4)
+
+
+def test_skew_kurt_deterministic_on_binary_series():
+    """REG: repeated runs on the pathological series are bit-identical."""
+    values = _binary_choppy_then_constant()
+    r1 = rolling_skew_kurt(values, 55)[:, 0]
+    r2 = rolling_skew_kurt(values, 55)[:, 0]
+    np.testing.assert_array_equal(np.nan_to_num(r1, nan=-999.0), np.nan_to_num(r2, nan=-999.0))

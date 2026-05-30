@@ -129,25 +129,50 @@ def _batch_recompute_moments(
     return count, mean, m2, m3, m4
 
 
+# Relative degeneracy tolerance for higher moments. A window is treated as
+# constant (skew/kurt undefined → NaN) when its summed central 2nd moment m2 is
+# negligible RELATIVE to the window's sum-of-squares Σx² = m2 + count·mean².
+# This is scale-invariant (m2 and Σx² both scale as k²), unlike an absolute
+# threshold on m2: it correctly nulls a constant window at ANY magnitude
+# (binary 0/1, price 1e-10, volume 1e20) while preserving genuine tiny/huge-scale
+# variance and real fat-tail spikes. Same structure as scipy.stats.skew
+# (`m2 ≤ (resolution·mean)²`); anchoring on Σx² is more robust than mean because
+# Σx² never vanishes for return-style features centred at 0.
+# 1e-12 sits safely above the float64 relative-precision floor (~2.2e-16).
+_MOMENT_REL_EPS: float = 1e-12
+
+
 @numba.njit(cache=True)
-def _compute_skew(m2: float, m3: float, count: int) -> float:
-    """Compute sample skewness with zero-variance guard."""
-    if count < 3 or m2 < 1e-30:
+def _compute_skew(m2: float, m3: float, count: int, mean: float) -> float:
+    """Compute sample skewness with scale-relative zero-variance guard."""
+    if count < 3:
+        return np.nan
+    sumsq = m2 + count * mean * mean  # Σx², scale anchor (never vanishes unless all-0)
+    if m2 <= _MOMENT_REL_EPS * sumsq:
         return np.nan
 
     n = float(count)
-    return (n * np.sqrt(n - 1.0) / (n - 2.0)) * (m3 / (m2 ** 1.5))
+    result = (n * np.sqrt(n - 1.0) / (n - 2.0)) * (m3 / (m2 ** 1.5))
+    if not np.isfinite(result):  # belt-and-suspenders: never emit inf/overflow
+        return np.nan
+    return result
 
 
 @numba.njit(cache=True)
-def _compute_kurt(m2: float, m4: float, count: int) -> float:
-    """Compute unbiased excess kurtosis with zero-variance guard."""
-    if count < 4 or m2 < 1e-30:
+def _compute_kurt(m2: float, m4: float, count: int, mean: float) -> float:
+    """Compute unbiased excess kurtosis with scale-relative zero-variance guard."""
+    if count < 4:
+        return np.nan
+    sumsq = m2 + count * mean * mean
+    if m2 <= _MOMENT_REL_EPS * sumsq:
         return np.nan
 
     n = float(count)
     excess = n * m4 / (m2 * m2) - 3.0
-    return ((n - 1.0) / ((n - 2.0) * (n - 3.0))) * ((n + 1.0) * excess + 6.0)
+    result = ((n - 1.0) / ((n - 2.0) * (n - 3.0))) * ((n + 1.0) * excess + 6.0)
+    if not np.isfinite(result):
+        return np.nan
+    return result
 
 
 @numba.njit(cache=True)
@@ -428,8 +453,8 @@ def rolling_skew_kurt(data: np.ndarray, window: int, recalc_interval: int = 50) 
             count, mean, m2, m3, m4 = _batch_recompute_moments(ring_values, ring_valid)
 
         if row_idx >= window - 1 and count >= window:
-            output[row_idx, 0] = _compute_skew(m2, m3, count)
-            output[row_idx, 1] = _compute_kurt(m2, m4, count)
+            output[row_idx, 0] = _compute_skew(m2, m3, count, mean)
+            output[row_idx, 1] = _compute_kurt(m2, m4, count, mean)
 
     return output.astype(np.float32)
 

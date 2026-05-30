@@ -86,7 +86,9 @@ def test_unknown_layer_warning_and_skip(monkeypatch: pytest.MonkeyPatch, caplog:
 
     FeaturePreprocessor(_config()).transform(_frame())
 
-    assert "Layer parse failed col=raw_unknown" in caplog.text
+    # Log message format updated to include summary counts and examples list.
+    assert "Layer parse failed" in caplog.text
+    assert "raw_unknown" in caplog.text
 
 
 def test_layer_filter_runs_non_stationary_adf_only_for_target_layers(
@@ -103,6 +105,9 @@ def test_layer_filter_runs_non_stationary_adf_only_for_target_layers(
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d", _stub_find_min_d)
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
     monkeypatch.setattr(fp_mod, "adfuller", fake_adfuller)
+    # Force statsmodels path so fake_adfuller is actually called.
+    # (fast-ADF numba path bypasses adfuller by default.)
+    monkeypatch.setenv("FFACT_USE_FAST_ADF", "0")
 
     frame = pd.DataFrame(
         {

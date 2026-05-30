@@ -190,6 +190,24 @@ class FractionalDifferencingConfig(BaseModel):
     cache_d_star: bool = True
 
 
+class ADFSafeSkipConfig(BaseModel):
+    """ADF / Fracdiff safe-skip whitelist。
+
+    對數學上嚴格 I(0) 的欄位（嚴格有界 / 數學差分 / 共整合差），bypass ADF 測試直接
+    判定為 I(0) → 不執行 fracdiff。詳見 NAN_REDUCTION_STRATEGY.md §4.5。
+
+    為何需要：
+      (1) 省 ADF CPU（對數十萬個已知 I(0) 欄位重複跑 ADF 是純浪費）
+      (2) 跨 symbol 一致性：ADF 在 finite sample 偶會 false-positive，導致同名特徵
+          在不同 symbol 被處理到不同空間（fracdiff vs raw），破壞 IC 可比性
+    """
+    enabled: bool = True
+    # 額外擴增的 skip pattern（substring match against column name）
+    additional_patterns: List[str] = Field(default_factory=list)
+    # 強制讓某個 whitelist 命中項回到 ADF 測試（debug / 實驗用）
+    exclusion_patterns: List[str] = Field(default_factory=list)
+
+
 class RankTransformConfig(BaseModel):
     enabled: bool = True
     window: int = 252
@@ -223,6 +241,7 @@ class PreprocessingConfig(BaseModel):
     rank_transform: RankTransformConfig = Field(default_factory=RankTransformConfig)
     gaussian_normalize: GaussianNormalizeConfig = Field(default_factory=GaussianNormalizeConfig)
     adaptive_zscore: AdaptiveZScoreConfig = Field(default_factory=AdaptiveZScoreConfig)
+    adf_safe_skip: ADFSafeSkipConfig = Field(default_factory=ADFSafeSkipConfig)
 
 
 class AtomicIndicatorConfig(BaseModel):
@@ -305,6 +324,9 @@ class RollingAggConfig(BaseModel):
         }
     )
     apply_to: Union[str, List[str]] = "all"
+    # Layer 4 gate: skip skew/kurt for columns with at most this many distinct
+    # non-NaN values (2 = binary/near-binary). 0 disables. See RollingAggregator.
+    skip_higher_moments_max_cardinality: int = 2
     model_config = ConfigDict(extra="allow")
 
     @field_validator("aggregators", mode="before")
@@ -390,6 +412,35 @@ class ValidationResult(BaseModel):
     warnings: List[str] = Field(default_factory=list)
 
 
+class L7DeadFeatureDropConfig(BaseModel):
+    """L7 write 前的死特徵清理。
+
+    僅丟「真的無資訊」欄位（常數 + 樣本不足），**不**依 NaN ratio。
+    詳見 NAN_REDUCTION_STRATEGY.md §5.3。
+    """
+    enabled: bool = True
+    # XGBoost min_data_in_leaf 預設 20，搭配 5-fold CV 後每 fold 需 ~100 有效樣本
+    # 才能讓樹分裂用上該欄位；同時對應 Lopez de Prado Purged CV 的建議下限。
+    min_valid_samples: int = 100
+
+
+class NanStrategyConfig(BaseModel):
+    """NaN 處理策略總配置（cascade blacklist + dead feature drop）。
+
+    詳見 docs/NAN_REDUCTION_STRATEGY.md §5。
+    """
+    # Cascade categorical blacklist：阻斷「計算本身錯誤」的下游 derivation
+    # （CDL_PATTERN_ALL → rolling/diff/lag 後 ≈ 全零；HT_DCPHASE 0-360° 在翻轉處算錯）
+    # L1 原始欄位仍保留於最終 feature store。
+    # HT-DCPHASE 用 hyphen（已對照真實 catalog 命名；underscore 形式不存在）
+    categorical_blacklist: List[str] = Field(
+        default_factory=lambda: ["CDL_PATTERN_ALL", "HT-DCPHASE"]
+    )
+    l7_dead_feature_drop: L7DeadFeatureDropConfig = Field(
+        default_factory=L7DeadFeatureDropConfig
+    )
+
+
 class FactoryConfig(BaseModel):
     version: str = "2.2"
     global_settings: GlobalSettings = Field(alias="global")
@@ -404,6 +455,7 @@ class FactoryConfig(BaseModel):
     labels: LabelConfig
     custom_indicators: List[CustomIndicatorDef] = Field(default_factory=list)
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
+    nan_strategy: NanStrategyConfig = Field(default_factory=NanStrategyConfig)
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 

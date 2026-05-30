@@ -80,6 +80,11 @@ class RollingAggregator:
         "slope": 9,
     }
 
+    # Higher-moment aggregators that are statistically meaningless on
+    # binary/low-cardinality inputs (distribution shape of a regime flag is
+    # degenerate-by-construction). Gated by _skew_kurt_max_cardinality.
+    _HIGHER_MOMENT_AGGS = frozenset({"skew", "kurt"})
+
     def __init__(self, config: Dict | None) -> None:
         config_dict = self._normalize_config(config)
         self._enabled = config_dict.get("enabled", True)
@@ -87,6 +92,14 @@ class RollingAggregator:
         self._enabled_aggregators = config_dict.get("aggregators", list(self.AGGREGATORS.keys()))
         self._apply_to = config_dict.get("apply_to", "all")
         self._column_chunk_size = self._resolve_chunk_size()
+        # Layer 4 pipeline gate: skip skew/kurt for columns with at most this many
+        # distinct non-NaN values (default 2 = binary/near-binary). 0/negative
+        # disables the gate (no-op). Computed once per compute_all into
+        # _skew_kurt_skip_cols so every L3 path (CGSA & non-CGSA) agrees.
+        self._skew_kurt_max_cardinality = int(
+            config_dict.get("skip_higher_moments_max_cardinality", 2)
+        )
+        self._skew_kurt_skip_cols: frozenset = frozenset()
 
     def compute_all(
         self,
@@ -111,6 +124,10 @@ class RollingAggregator:
         columns = self._select_columns(features_df.columns)
         if not columns:
             return pd.DataFrame(index=features_df.index)
+
+        # Layer 4: compute the skew/kurt skip-set ONCE here so every downstream
+        # path (streaming/numba/pandas, CGSA & non-CGSA) gates identically.
+        self._skew_kurt_skip_cols = self._compute_low_cardinality_cols(features_df, columns)
 
         streaming = os.getenv("FFACT_L3_STREAMING", "1").strip() == "1"
 
@@ -234,10 +251,13 @@ class RollingAggregator:
                         result = cached["min"]
                     elif agg_name == "max":
                         result = cached["max"]
-                    elif agg_name == "skew":
-                        result = chunk_df.rolling(window).skew()
-                    elif agg_name == "kurt":
-                        result = chunk_df.rolling(window).kurt()
+                    elif agg_name in ("skew", "kurt"):
+                        # Layer 4: drop low-cardinality columns from skew/kurt.
+                        cols = self._columns_for_agg(list(chunk_df.columns), agg_name)
+                        if not cols:
+                            continue
+                        sub = chunk_df if len(cols) == chunk_df.shape[1] else chunk_df[cols]
+                        result = sub.rolling(window).skew() if agg_name == "skew" else sub.rolling(window).kurt()
                     elif agg_name == "range":
                         result = cached["max"] - cached["min"]
                     elif agg_name == "zscore":
@@ -392,10 +412,13 @@ class RollingAggregator:
                         result = self._compute_numba_rank(chunk_df, int(window), rolling_rank)
                     elif agg_name == "slope":
                         result = self._compute_slope_vectorized(chunk_df, int(window))
-                    elif agg_name == "skew":
-                        result = chunk_df.rolling(window).skew()
-                    elif agg_name == "kurt":
-                        result = chunk_df.rolling(window).kurt()
+                    elif agg_name in ("skew", "kurt"):
+                        # Layer 4: drop low-cardinality columns from skew/kurt.
+                        cols = self._columns_for_agg(list(chunk_df.columns), agg_name)
+                        if not cols:
+                            continue
+                        sub = chunk_df if len(cols) == chunk_df.shape[1] else chunk_df[cols]
+                        result = sub.rolling(window).skew() if agg_name == "skew" else sub.rolling(window).kurt()
                     else:
                         continue
 
@@ -492,11 +515,21 @@ class RollingAggregator:
                 values = chunk_df[col_name].to_numpy(dtype=np.float64, copy=False)
                 fused_all = fused_rolling_stats_multi_window(values, windows_array)
 
+                # Layer 4: skip skew/kurt for low-cardinality (binary) columns.
+                col_skip_higher_moment = (
+                    bool(self._skew_kurt_skip_cols)
+                    and str(col_name) in self._skew_kurt_skip_cols
+                )
+
                 for window_idx, window in enumerate(self._windows):
                     window_results: Dict[str, np.ndarray] = {}
                     for agg_name in valid_aggs:
                         step_key = (window, agg_name)
                         step_generated[step_key] += 1
+                        if col_skip_higher_moment and agg_name in self._HIGHER_MOMENT_AGGS:
+                            # Not extracted → absent from filtered_results → the
+                            # emit loop below counts it as dropped (single count).
+                            continue
                         window_results[agg_name] = self._extract_multi_window_stat(fused_all[:, window_idx, :], agg_name)
 
                     filtered_results = self._batch_variance_filter(window_results)
@@ -737,6 +770,31 @@ class RollingAggregator:
 
         return pd.DataFrame(slopes, index=data.index, columns=data.columns)
 
+    def _compute_low_cardinality_cols(
+        self, features_df: pd.DataFrame, columns: List[str]
+    ) -> frozenset:
+        """Columns with at most ``_skew_kurt_max_cardinality`` distinct non-NaN
+        values — skew/kurt on these are degenerate-by-construction (binary
+        regime flags, near-constant signals). Returns empty set when the gate is
+        disabled (threshold <= 0). Cheap: one nunique pass per column.
+        """
+        threshold = self._skew_kurt_max_cardinality
+        if threshold <= 0 or not columns:
+            return frozenset()
+        present = [c for c in columns if c in features_df.columns]
+        if not present:
+            return frozenset()
+        nunique = features_df[present].nunique(dropna=True)
+        low_card = nunique.index[nunique <= threshold]
+        return frozenset(str(c) for c in low_card)
+
+    def _columns_for_agg(self, chunk_cols: List[str], agg_name: str) -> List[str]:
+        """Restrict a chunk's columns for the given aggregator. Higher-moment
+        aggs (skew/kurt) exclude low-cardinality columns (Layer 4 gate)."""
+        if agg_name in self._HIGHER_MOMENT_AGGS and self._skew_kurt_skip_cols:
+            return [c for c in chunk_cols if str(c) not in self._skew_kurt_skip_cols]
+        return list(chunk_cols)
+
     @staticmethod
     def _variance_filter(df: pd.DataFrame, nan_threshold: float = 0.9) -> pd.DataFrame:
         """Remove dead features: constant columns, near-all-NaN, low effective N, or containing inf.
@@ -934,9 +992,16 @@ class RollingAggregator:
             if any(agg in {"max", "range"} for agg in valid_aggs):
                 max_df = rolling.max()
             if "skew" in valid_aggs:
-                skew_df = rolling.skew()
+                # Layer 4: drop low-cardinality columns from skew.
+                scols = self._columns_for_agg(list(data.columns), "skew")
+                if scols:
+                    sub = data if len(scols) == data.shape[1] else data[scols]
+                    skew_df = sub.rolling(window).skew()
             if "kurt" in valid_aggs:
-                kurt_df = rolling.kurt()
+                kcols = self._columns_for_agg(list(data.columns), "kurt")
+                if kcols:
+                    sub = data if len(kcols) == data.shape[1] else data[kcols]
+                    kurt_df = sub.rolling(window).kurt()
 
             for agg_name in valid_aggs:
                 agg_label = self._format_agg_label(agg_name)

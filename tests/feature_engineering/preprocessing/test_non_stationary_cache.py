@@ -19,6 +19,9 @@ def test_non_stationary_cache_reuses_adf_result(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
     monkeypatch.setattr(fp_mod, "adfuller", fake_adfuller)
+    # Force statsmodels path so fake_adfuller is actually called.
+    # (fast-ADF numba path bypasses adfuller by default.)
+    monkeypatch.setenv("FFACT_USE_FAST_ADF", "0")
 
     frame = pd.DataFrame({"L1_alpha": np.arange(80.0)})
     preprocessor = FeaturePreprocessor(
