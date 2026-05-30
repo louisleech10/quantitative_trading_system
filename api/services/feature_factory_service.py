@@ -16,7 +16,7 @@ import uuid
 from bisect import bisect_right
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, List, Optional
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
 import h5py
 import numpy as np
@@ -1089,7 +1089,23 @@ class FeatureFactoryService:
         order_key = sort_by or "name"
         if order_key not in {"nan_ratio", "std", "skewness", "kurtosis", "name", "mean"}:
             raise ValueError(f"Invalid sort_by: {order_key}")
-        rows.sort(key=lambda item: self._sortable_value(item.get(order_key)), reverse=reverse)
+
+        if order_key != "name":
+            # Catalog rows carry nan_ratio=0 (parquet null_count ≠ IEEE-754 NaN).
+            # Load the computed stats cache — 100% warmup means instant lookup after
+            # the first call; the first call loads ~2k parquet parts (~1-2s, then cached).
+            all_stats = self._load_cgsa_stats_mem(task_id, context)
+            if not all_stats.empty and order_key in all_stats.columns:
+                def _stats_sort_key(item: Dict[str, Any]) -> Any:
+                    name = item.get("name", "")
+                    if name in all_stats.index:
+                        return self._sortable_value(all_stats.at[name, order_key])
+                    return self._sortable_value(item.get(order_key))
+                rows.sort(key=_stats_sort_key, reverse=reverse)
+            else:
+                rows.sort(key=lambda item: self._sortable_value(item.get(order_key)), reverse=reverse)
+        else:
+            rows.sort(key=lambda item: self._sortable_value(item.get(order_key)), reverse=reverse)
 
         start_index = offset
         if cursor is not None:
@@ -1307,7 +1323,7 @@ class FeatureFactoryService:
     def _cgsa_catalog_cache_signature(self, context: Dict[str, Any], fast: Dict[str, Any]) -> Dict[str, Any]:
         manifest = context.get("manifest") or {}
         return {
-            "version": 1,
+            "version": 2,  # v2: nan_ratio populated from parquet null stats
             "feature_schema_hash": manifest.get("feature_schema_hash") or manifest.get("schema_hash") or "",
             "total_features": int(len(fast.get("columns") or [])),
             "total_rows": int(fast.get("total_rows") or 0),
@@ -1331,6 +1347,13 @@ class FeatureFactoryService:
             frame = pd.read_parquet(str(cache_path))
             frame = frame.where(pd.notna(frame), None)
             rows = frame.to_dict(orient="records")
+            # Guard: if the cache predates nan_ratio, backfill from fast summary so
+            # sort-by-nan_ratio works correctly without forcing a full rebuild.
+            nan_ratios: pd.Series = fast["nan_ratios"]
+            if rows and rows[0].get("nan_ratio") is None:
+                for row in rows:
+                    name = row.get("name", "")
+                    row["nan_ratio"] = self._safe_float(nan_ratios.get(name, 0.0)) or 0.0
             self._cgsa_catalog_cache[task_id] = rows
             self._cgsa_column_path_cache[task_id] = fast["column_to_path"]
             logger.info("CGSA catalog disk cache hit for task %s (%d features)", task_id, len(rows))
@@ -1922,10 +1945,14 @@ class FeatureFactoryService:
     # Data Quality Diagnostics
     # ------------------------------------------------------------------
     _DATA_QUALITY_TIMELINE_POINTS: int = 200
-    _DATA_QUALITY_TOP_N: int = 20
+    _DATA_QUALITY_SCATTERED_CAP: int = 5000   # 115k warmup features — cap to keep JSON sane
     _DATA_QUALITY_HIGH_NAN_THRESHOLD: float = 0.05
     _DATA_QUALITY_WARMUP_PCTILE: float = 0.95
     _DATA_QUALITY_CACHE_NAME: str = "data_quality.json"
+    # Bump when the report schema changes so stale on-disk caches are invalidated.
+    # dq_v2: coverage_timeline rebuilt from first/last_valid (was dead all-1.0);
+    #        added counts.warmup_only_high_nan / counts.real_problem + group_breakdown.
+    _DATA_QUALITY_SCHEMA_VERSION: str = "dq_v4"
     # Bucket bounds for warmup (lookback) length, in bars.
     _DATA_QUALITY_WARMUP_BUCKETS: List[tuple] = [
         ("0", 0, 0),
@@ -1988,10 +2015,19 @@ class FeatureFactoryService:
             return None
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                cached = json.load(f)
         except Exception as exc:
             logger.warning("data_quality cache load failed (%s): %s", path, exc)
             return None
+        # Invalidate stale-schema caches (e.g. pre-dq_v2 with the dead all-1.0
+        # coverage timeline). Returning None forces a recompute + overwrite.
+        if cached.get("schema_version") != self._DATA_QUALITY_SCHEMA_VERSION:
+            logger.info(
+                "data_quality cache schema mismatch (%s != %s) → recompute: %s",
+                cached.get("schema_version"), self._DATA_QUALITY_SCHEMA_VERSION, path,
+            )
+            return None
+        return cached
 
     def _persist_data_quality_disk_cache(self, context: Dict[str, Any], report: Dict[str, Any]) -> None:
         path = self._data_quality_cache_path(context)
@@ -2079,10 +2115,12 @@ class FeatureFactoryService:
                 dtype=float,
             )
             timestamps = self._read_cgsa_timestamps(context, total_rows)
+            group_map = self._build_group_map(column_to_path)
             logger.info(
                 "browse_data_quality: dq_v1 fast-path hit (%d files, %d cols)",
                 len(path_to_cols), len(columns),
             )
+            # dq_v1 row_nan is a zeroed placeholder → rebuild from first/last_valid.
             return self._assemble_data_quality_report(
                 total_rows=total_rows,
                 columns=columns,
@@ -2091,6 +2129,8 @@ class FeatureFactoryService:
                 last_valid_map=last_valid_map,
                 row_nan_count=row_nan_count,
                 timestamps=timestamps,
+                rebuild_row_nan_from_valid=True,
+                group_map=group_map,
             )
 
         # Cap per-batch memory.  T * batch_cols * 1 byte for the bool mask,
@@ -2204,6 +2244,8 @@ class FeatureFactoryService:
         )
 
         timestamps = self._read_cgsa_timestamps(context, total_rows)
+        group_map = self._build_group_map(column_to_path)
+        # Parallel-scan row_nan_count is exact (includes mid-holes) → no rebuild.
         return self._assemble_data_quality_report(
             total_rows=total_rows,
             columns=columns,
@@ -2212,7 +2254,39 @@ class FeatureFactoryService:
             last_valid_map=last_valid_map,
             row_nan_count=row_nan_count,
             timestamps=timestamps,
+            group_map=group_map,
         )
+
+    @staticmethod
+    def _build_group_map(
+        column_to_path: Dict[str, Path],
+    ) -> Dict[str, Tuple[str, str]]:
+        """Map each column → (layer, tf) parsed from its parquet group_id (= file stem).
+
+        Group ids follow ``{tf}_{layer}_{indicator}...`` e.g.
+        ``1h_L3_rolling_W3_Skew_1_shard00`` → (``L3``, ``1h``);
+        ``12h_L2_WorldQuant_part3`` → (``L2``, ``12h``).
+        Unparseable stems map to (``?``, ``?``) so they still aggregate visibly.
+        """
+        stem_cache: Dict[Path, Tuple[str, str]] = {}
+        group_map: Dict[str, Tuple[str, str]] = {}
+        for col, path in column_to_path.items():
+            if path is None:
+                continue
+            key = stem_cache.get(path)
+            if key is None:
+                parts = Path(path).stem.split("_")
+                tf = parts[0] if parts else "?"
+                layer = parts[1] if len(parts) > 1 else "?"
+                # Validate tf looks like a timeframe (digits + m/h/d) and layer like L\d.
+                if not (tf and tf[-1] in ("m", "h", "d") and tf[:-1].isdigit()):
+                    tf = "?"
+                if not (len(layer) >= 2 and layer[0] == "L" and layer[1:].isdigit()):
+                    layer = "?"
+                key = (layer, tf)
+                stem_cache[path] = key
+            group_map[col] = key
+        return group_map
 
     def _try_load_dq_v1(
         self,
@@ -2393,11 +2467,58 @@ class FeatureFactoryService:
         last_valid_map: Dict[str, int],
         row_nan_count: np.ndarray,
         timestamps: List[str],
+        *,
+        rebuild_row_nan_from_valid: bool = False,
+        group_map: Optional[Dict[str, Tuple[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """Aggregate raw stats into the dashboard payload."""
+        """Aggregate raw stats into the dashboard payload.
+
+        ``rebuild_row_nan_from_valid``: when True, reconstruct the per-row NaN
+        count from each column's first_valid / last_valid (leading warmup +
+        trailing). Used by the dq_v1 metadata fast path, whose ``row_nan_count``
+        is a zeroed placeholder (dq_v1 stores only per-column fv/lv/nan_count,
+        not a per-row histogram). Known approximation: mid-hole NaNs inside the
+        valid span are not reflected in coverage on this path (negligible — see
+        plan §P0). The full-scan path passes an exact row_nan_count and leaves
+        this False.
+
+        ``group_map``: optional col → (layer, tf) for the group_breakdown block.
+        """
         n_features = len(columns)
         if n_features == 0 or total_rows == 0:
             return self._empty_data_quality_report()
+
+        # ---- P0: rebuild per-row NaN count from first/last valid -----------
+        # A feature is missing at row r iff NOT (first_valid <= r <= last_valid).
+        # For a feature with at least one valid value (fv <= lv) the leading
+        # region [0, fv) and trailing region (lv, end] are disjoint, so:
+        #   row_nan[r] = #(fv > r)  +  #(lv < r)   (over normal features)
+        # All-NaN features (lv < 0) would be double-counted by that split, so
+        # they are added once flatly. Vectorized O(total_rows + features).
+        if rebuild_row_nan_from_valid:
+            fv_list: List[int] = []
+            lv_list: List[int] = []
+            all_nan_features = 0
+            for c in columns:
+                fv = first_valid_map.get(c, 0)
+                lv = last_valid_map.get(c, total_rows - 1)
+                if lv < 0 or fv > lv:
+                    all_nan_features += 1
+                    continue
+                fv_list.append(min(fv, total_rows))
+                lv_list.append(lv)
+            row_nan_count = np.full(total_rows, all_nan_features, dtype=np.int64)
+            if fv_list:
+                fv_arr = np.asarray(fv_list, dtype=np.int64)
+                lv_arr = np.asarray(lv_list, dtype=np.int64)
+                # leading_missing[r] = #(fv > r) = suffix sum of fv-histogram after r
+                h_fv = np.bincount(np.clip(fv_arr, 0, total_rows), minlength=total_rows + 1)
+                leading_missing = h_fv[::-1].cumsum()[::-1][1:]  # length total_rows
+                # trailing_missing[r] = #(lv < r) = prefix sum of (lv+1)-histogram
+                h_lv = np.bincount(np.clip(lv_arr + 1, 0, total_rows), minlength=total_rows + 1)
+                trailing_missing = h_lv.cumsum()[:total_rows]
+                row_nan_count = row_nan_count + leading_missing + trailing_missing
+            row_nan_count = row_nan_count.astype(np.int64)
 
         # ---- Warmup distribution -----------------------------------------
         warmup_lengths = np.array(
@@ -2431,9 +2552,37 @@ class FeatureFactoryService:
         mid_holes: List[Dict[str, Any]] = []
         trailing_nans: List[Dict[str, Any]] = []
         scattered: List[Dict[str, Any]] = []
+        real_problem_features: List[Dict[str, Any]] = []
         total_holes_features = 0
         total_trailing_features = 0
         total_high_nan_features = 0
+        # P1: split the misleading "high NaN" bucket into benign vs real.
+        #   warmup_only_high_nan: NaN is purely leading warmup (XGBoost handles;
+        #     trim at training start) — NOT a data-quality problem.
+        #   real_problem: mid-hole (NaN inside valid span) or all-NaN.
+        warmup_only_high_nan = 0
+        real_problem = 0
+        # P3: per (layer, tf) group aggregation.
+        group_stats: Dict[Tuple[str, str], Dict[str, float]] = {}
+
+        def _bump_group(col_name: str, *, kind: str, ratio_v: float) -> None:
+            # kind ∈ {"ok", "warmup", "real"}; called exactly once per feature so
+            # feature_count / mean_nan_ratio cover ALL features in the group.
+            if group_map is None:
+                return
+            key = group_map.get(col_name)
+            if key is None:
+                return
+            g = group_stats.setdefault(
+                key,
+                {"feature_count": 0, "nan_ratio_sum": 0.0, "warmup_only": 0, "real_problem": 0},
+            )
+            g["feature_count"] += 1
+            g["nan_ratio_sum"] += ratio_v
+            if kind == "real":
+                g["real_problem"] += 1
+            elif kind == "warmup":
+                g["warmup_only"] += 1
 
         for col in columns:
             ratio = float(nan_ratios.get(col, 0.0))
@@ -2445,7 +2594,10 @@ class FeatureFactoryService:
             # All-NaN: classify as scattered with ratio=1
             if last_v < 0:
                 total_high_nan_features += 1
+                real_problem += 1
+                _bump_group(col, kind="real", ratio_v=1.0)
                 scattered.append({"name": col, "nan_ratio": 1.0})
+                real_problem_features.append({"name": col, "nan_ratio": 1.0, "hole_count": 0, "kind": "all_nan"})
                 continue
 
             hole_count = max(0, nan_total - warmup_len - trailing_len)
@@ -2467,10 +2619,23 @@ class FeatureFactoryService:
             if ratio >= self._DATA_QUALITY_HIGH_NAN_THRESHOLD:
                 total_high_nan_features += 1
                 scattered.append({"name": col, "nan_ratio": ratio})
+                # Benign iff all the NaN is leading warmup (no mid-hole).
+                if hole_count > 0:
+                    real_problem += 1
+                    _bump_group(col, kind="real", ratio_v=ratio)
+                    real_problem_features.append({"name": col, "nan_ratio": ratio, "hole_count": int(hole_count), "kind": "high_nan_hole"})
+                else:
+                    warmup_only_high_nan += 1
+                    _bump_group(col, kind="warmup", ratio_v=ratio)
+            else:
+                # Not high-NaN: still count it in the group (kind="ok") so
+                # feature_count / mean_nan_ratio reflect the whole group.
+                _bump_group(col, kind="ok", ratio_v=ratio)
 
         mid_holes.sort(key=lambda x: x["hole_count"], reverse=True)
         trailing_nans.sort(key=lambda x: x["trailing_length"], reverse=True)
         scattered.sort(key=lambda x: x["nan_ratio"], reverse=True)
+        real_problem_features.sort(key=lambda x: x["nan_ratio"], reverse=True)
 
         # ---- Cross-sectional coverage timeline ---------------------------
         coverage_arr = 1.0 - (row_nan_count.astype(np.float64) / float(n_features))
@@ -2487,14 +2652,33 @@ class FeatureFactoryService:
         timestamp_start = timestamps[0] if timestamps else ""
         timestamp_end = timestamps[-1] if timestamps else ""
 
-        problem_count = total_holes_features + total_trailing_features + total_high_nan_features
+        # "Real" problems exclude benign leading warmup. mid_holes already means
+        # NaN inside the valid span; trailing means tail truncation; real_problem
+        # counts mid-hole + all-NaN high-NaN features (computed in the loop).
         is_clean = (
-            problem_count == 0
+            real_problem == 0
+            and total_holes_features == 0
+            and total_trailing_features == 0
             and max_warmup == 0
             and float(coverage_arr.min()) >= 1.0
         )
 
+        # P3: finalize group_breakdown (sorted by feature_count desc).
+        group_breakdown: List[Dict[str, Any]] = []
+        for (layer, tf), g in group_stats.items():
+            fc = int(g["feature_count"])
+            group_breakdown.append({
+                "layer": layer,
+                "tf": tf,
+                "feature_count": fc,
+                "mean_nan_ratio": float(g["nan_ratio_sum"] / fc) if fc else 0.0,
+                "warmup_only": int(g["warmup_only"]),
+                "real_problem": int(g["real_problem"]),
+            })
+        group_breakdown.sort(key=lambda x: x["feature_count"], reverse=True)
+
         return {
+            "schema_version": self._DATA_QUALITY_SCHEMA_VERSION,
             "total_features": n_features,
             "total_timesteps": total_rows,
             "timestamp_start": timestamp_start,
@@ -2509,14 +2693,18 @@ class FeatureFactoryService:
             "coverage_timeline": timeline,
             "min_coverage": min_coverage,
             "min_coverage_timestamp": str(min_coverage_timestamp),
-            "mid_holes": mid_holes[: self._DATA_QUALITY_TOP_N],
-            "trailing_nans": trailing_nans[: self._DATA_QUALITY_TOP_N],
-            "scattered_nans": scattered[: self._DATA_QUALITY_TOP_N],
+            "mid_holes": mid_holes,
+            "trailing_nans": trailing_nans,
+            "scattered_nans": scattered[: self._DATA_QUALITY_SCATTERED_CAP],
+            "real_problem_features": real_problem_features,
             "counts": {
                 "mid_holes": int(total_holes_features),
                 "trailing_nans": int(total_trailing_features),
                 "high_nan": int(total_high_nan_features),
+                "warmup_only_high_nan": int(warmup_only_high_nan),
+                "real_problem": int(real_problem),
             },
+            "group_breakdown": group_breakdown,
         }
 
     @staticmethod
@@ -2543,9 +2731,10 @@ class FeatureFactoryService:
             })
         return out
 
-    @staticmethod
-    def _empty_data_quality_report() -> Dict[str, Any]:
+    @classmethod
+    def _empty_data_quality_report(cls) -> Dict[str, Any]:
         return {
+            "schema_version": cls._DATA_QUALITY_SCHEMA_VERSION,
             "total_features": 0,
             "total_timesteps": 0,
             "timestamp_start": "",
@@ -2563,7 +2752,15 @@ class FeatureFactoryService:
             "mid_holes": [],
             "trailing_nans": [],
             "scattered_nans": [],
-            "counts": {"mid_holes": 0, "trailing_nans": 0, "high_nan": 0},
+            "real_problem_features": [],
+            "counts": {
+                "mid_holes": 0,
+                "trailing_nans": 0,
+                "high_nan": 0,
+                "warmup_only_high_nan": 0,
+                "real_problem": 0,
+            },
+            "group_breakdown": [],
         }
 
     def browse_summary(self, task_id: str) -> Dict[str, Any]:

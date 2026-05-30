@@ -225,8 +225,6 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
       });
     }
 
-    const pad = (min: number, max: number) => (max - min) * 0.05;
-
     // 套用 Y 軸拖曳平移：yPanRatio 是拖曳距離 / 圖表高度的比率
     // 正值 = 向上拖曳 = 看到更高數值（domain 往上移）
     const lRange = lMax !== -Infinity ? lMax - lMin : 0;
@@ -275,26 +273,6 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, [chartData.length, brushRange]);
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent<HTMLDivElement>) => {
-      // 由原生 listener 處理，此處保留以防 ref 尚未掛載
-      e.preventDefault();
-      if (chartData.length === 0) return;
-      const total = chartData.length;
-      const cur = brushRange ?? { start: 0, end: total - 1 };
-      const span = cur.end - cur.start;
-      const center = (cur.start + cur.end) / 2;
-      // deltaY > 0 滾輪向下 = 縮小（看更多），< 0 = 放大（看更少）
-      const factor = e.deltaY > 0 ? 1.25 : 0.8;
-      const newSpan = Math.round(Math.max(20, Math.min(total - 1, span * factor)));
-      const newStart = Math.max(0, Math.round(center - newSpan / 2));
-      const newEnd = Math.min(total - 1, newStart + newSpan);
-      const finalStart = newEnd === total - 1 ? Math.max(0, newEnd - newSpan) : newStart;
-      setBrushRange({ start: finalStart, end: newEnd });
-    },
-    [chartData.length, brushRange],
-  );
 
   /** 拖曳平移：mousedown 記錄快照，mousemove 計算偏移，mouseup 釋放 */
   const handleMouseDown = useCallback(

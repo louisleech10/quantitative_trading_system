@@ -219,7 +219,7 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
       </div>
       <div className="px-6 pb-6 space-y-4">
 
-      {/* 模式選擇 + 流程說明 */}}
+      {/* 模式選擇 + 流程說明 */}
       <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 space-y-2">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-400">管線模式</span>

@@ -353,7 +353,7 @@ export function parseFeatureNameSegments(name: string): FeatureSegments {
   }
 
   const sourceRead = readSourceTokens(tokens);
-  let source = sourceRead.source;
+  const source = sourceRead.source;
   let cursor = sourceRead.nextCursor;
 
   // Multi-timeframe naming inserts timeframe after source: close_1h_trend_...

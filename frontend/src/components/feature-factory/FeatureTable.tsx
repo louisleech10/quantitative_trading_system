@@ -58,6 +58,14 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
   const [serverSearchRows, setServerSearchRows] = useState<BrowseFeatureItem[]>([]);
   const [isServerSearching, setIsServerSearching] = useState(false);
 
+  // Server-sort mode — activated when sort != name:asc.
+  // The server sorts ALL rows; we just page through the results.
+  const isServerSortMode = sortBy !== 'name' || sortOrder !== 'asc';
+  const [serverSortRows, setServerSortRows] = useState<BrowseFeatureItem[]>([]);
+  const [serverSortTotal, setServerSortTotal] = useState(0);
+  const [serverSortLoading, setServerSortLoading] = useState(false);
+  const serverSortAbortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearch(searchInput);
@@ -65,6 +73,39 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // When sort is non-default, ask the server to sort ALL rows and return first page.
+  // category/level are forwarded so the result is accurate even with filters.
+  useEffect(() => {
+    if (!isServerSortMode) {
+      setServerSortRows([]);
+      setServerSortTotal(0);
+      return;
+    }
+    serverSortAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    serverSortAbortRef.current = ctrl;
+    setServerSortLoading(true);
+    setServerSortRows([]);
+    setVisibleCount(PAGE_SIZE);
+    browseFeatures(taskId, {
+      offset: 0,
+      limit: 500,
+      sortBy,
+      sortOrder,
+      category: category || undefined,
+      level: level !== 'All' ? level : undefined,
+      detailLevel: 'table',
+    })
+      .then((resp) => {
+        if (ctrl.signal.aborted) return;
+        setServerSortRows(resp.features);
+        setServerSortTotal(resp.total);
+      })
+      .catch(() => { /* aborted or error — ignore */ })
+      .finally(() => { if (!ctrl.signal.aborted) setServerSortLoading(false); });
+    return () => ctrl.abort();
+  }, [isServerSortMode, taskId, sortBy, sortOrder, category, level, browseFeatures]);
 
   // Load all features in chunks once per taskId
   useEffect(() => {
@@ -170,8 +211,8 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     browseFeatures(taskId, {
       search,
       limit: 5000,
-      sortBy: 'name',
-      sortOrder: 'asc',
+      sortBy,
+      sortOrder,
       detailLevel: 'table',
     })
       .then((resp) => {
@@ -191,43 +232,80 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     };
   }, [search, taskId, browseFeatures]);
 
+  const loadMoreServerSort = useCallback(() => {
+    if (serverSortLoading) return;
+    setServerSortLoading(true);
+    browseFeatures(taskId, {
+      offset: serverSortRows.length,
+      limit: 500,
+      sortBy,
+      sortOrder,
+      category: category || undefined,
+      level: level !== 'All' ? level : undefined,
+      detailLevel: 'table',
+    })
+      .then((resp) => {
+        setServerSortRows((prev) => [...prev, ...resp.features]);
+        setServerSortTotal(resp.total);
+      })
+      .catch(() => {})
+      .finally(() => setServerSortLoading(false));
+  }, [serverSortLoading, serverSortRows.length, taskId, sortBy, sortOrder, category, level, browseFeatures]);
+
   const featureNames = useMemo(
     () => (sharedFeatureNames && sharedFeatureNames.length > 0 ? sharedFeatureNames : allRows.map((row) => row.name)),
     [allRows, sharedFeatureNames]
   );
 
   // Client-side filter + sort (instant, no network).
-  // When search is active we use the server-returned results so that features
-  // beyond the MAX_CLIENT_ROWS local cache are always reachable.
+  // When search is active we use the server-returned results (all 437k reachable).
+  // When sort is non-default we use server-sort results (sorted across all 437k).
+  // Otherwise we operate on the locally cached allRows (up to MAX_CLIENT_ROWS).
   const filteredRows = useMemo(() => {
-    let result = search ? serverSearchRows : allRows;
+    let result: BrowseFeatureItem[];
+    if (search) {
+      result = serverSearchRows; // server already applied search + sort
+    } else if (isServerSortMode) {
+      result = serverSortRows;   // server already applied sort + category/level
+    } else {
+      result = allRows;
+    }
 
+    // Segment filter is always client-side (too granular for server)
     if (isSegmentFilterOpen && segmentFilteredNames.length > 0) {
       const allowed = new Set(segmentFilteredNames);
       result = result.filter((r) => allowed.has(r.name));
     }
 
-    if (category) {
-      const lower = category.toLowerCase();
-      result = result.filter((r) => r.category?.toLowerCase().includes(lower));
+    // category/level only need client-side filtering in client-cache mode;
+    // server-sort/server-search modes already have them applied server-side.
+    if (!isServerSortMode && !search) {
+      if (category) {
+        const lower = category.toLowerCase();
+        result = result.filter((r) => r.category?.toLowerCase().includes(lower));
+      }
+      if (level !== 'All') {
+        result = result.filter((r) => r.level === level);
+      }
     }
-    if (level !== 'All') {
-      result = result.filter((r) => r.level === level);
+
+    // Sort only needed in client-cache mode; server modes return pre-sorted data.
+    if (!isServerSortMode && !search) {
+      return [...result].sort((a, b) => {
+        const mul = sortOrder === 'asc' ? 1 : -1;
+        if (sortBy === 'name') return mul * a.name.localeCompare(b.name);
+        return mul * (getSortableMetric(a, sortBy) - getSortableMetric(b, sortBy));
+      });
     }
-    // Text search is already applied server-side when search is non-empty;
-    // no additional client-side name filter needed.
+    return result;
+  }, [allRows, serverSearchRows, serverSortRows, isServerSortMode, category, level, search, sortBy, sortOrder, segmentFilteredNames, isSegmentFilterOpen]);
 
-    return [...result].sort((a, b) => {
-      const mul = sortOrder === 'asc' ? 1 : -1;
-      if (sortBy === 'name') return mul * a.name.localeCompare(b.name);
-      const aVal = getSortableMetric(a, sortBy);
-      const bVal = getSortableMetric(b, sortBy);
-      return mul * (aVal - bVal);
-    });
-  }, [allRows, serverSearchRows, category, level, search, sortBy, sortOrder, segmentFilteredNames, isSegmentFilterOpen]);
-
-  const visibleRows = filteredRows.slice(0, visibleCount);
-  const hasMore = visibleCount < filteredRows.length;
+  // In server-sort mode show all loaded rows (virtual scroll handles rendering);
+  // in client mode slice by visibleCount for gradual reveal.
+  const visibleRows = isServerSortMode ? filteredRows : filteredRows.slice(0, visibleCount);
+  const hasMore = isServerSortMode
+    ? serverSortRows.length < serverSortTotal
+    : visibleCount < filteredRows.length;
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const virtualStartIndex = Math.max(0, Math.floor(tableScrollTop / TABLE_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
@@ -293,23 +371,30 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
           placeholder="category（可留空）"
           className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
         />
-        <select
-          value={`${sortBy}:${sortOrder}`}
-          onChange={(e) => {
-            const [nextSortBy, nextSortOrder] = e.target.value.split(':');
-            setSortBy(nextSortBy);
-            setSortOrder(nextSortOrder as 'asc' | 'desc');
-          }}
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
-        >
-          <option value="name:asc">Name ↑</option>
-          <option value="name:desc">Name ↓</option>
-          <option value="nan_ratio:desc">NaN% ↓</option>
-          <option value="mean:desc">Mean ↓</option>
-          <option value="std:desc">Std ↓</option>
-          <option value="skewness:desc">Skew ↓</option>
-          <option value="kurtosis:desc">Kurt ↓</option>
-        </select>
+        <div className="flex items-center gap-1.5">
+          <select
+            value={`${sortBy}:${sortOrder}`}
+            onChange={(e) => {
+              const [nextSortBy, nextSortOrder] = e.target.value.split(':');
+              setSortBy(nextSortBy);
+              setSortOrder(nextSortOrder as 'asc' | 'desc');
+            }}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-100"
+          >
+            <option value="name:asc">Name ↑</option>
+            <option value="name:desc">Name ↓</option>
+            <option value="nan_ratio:desc">NaN% ↓（全量）</option>
+            <option value="mean:desc">Mean ↓ *</option>
+            <option value="std:desc">Std ↓ *</option>
+            <option value="skewness:desc">Skew ↓ *</option>
+            <option value="kurtosis:desc">Kurt ↓ *</option>
+          </select>
+          {isServerSortMode && !['name', 'nan_ratio'].includes(sortBy) && (
+            <span className="text-[11px] text-amber-400/80" title="大型 CGSA 任務需等背景統計暖機完成後排序才完整；NaN% 排序不受此限制">
+              * 暖機後準確
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -430,17 +515,30 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       )}
 
       <div className="flex items-center justify-between text-xs text-slate-300">
-        <div>
-          顯示 {visibleRows.length.toLocaleString()} / 篩選 {filteredRows.length.toLocaleString()} / 總計 {serverTotal.toLocaleString()}
-          {search && !isServerSearching && <span className="ml-2 text-cyan-300">（伺服端搜尋）</span>}
-          {isBackgroundLoading && <span className="ml-2 text-cyan-300">（背景載入中：{loadedCount.toLocaleString()}）</span>}
+        <div className="flex items-center gap-2 flex-wrap">
+          {isServerSortMode ? (
+            <>
+              顯示 {visibleRows.length.toLocaleString()} / 全量排序 {serverSortTotal.toLocaleString()} 筆
+              <span className="text-cyan-300 border border-cyan-300/30 rounded px-1.5 py-0.5">伺服端全量排序</span>
+              {serverSortLoading && <span className="text-slate-400">載入中…</span>}
+            </>
+          ) : (
+            <>
+              顯示 {visibleRows.length.toLocaleString()} / 篩選 {filteredRows.length.toLocaleString()} / 總計 {serverTotal.toLocaleString()}
+              {search && !isServerSearching && <span className="text-cyan-300">（伺服端搜尋）</span>}
+              {isBackgroundLoading && <span className="text-cyan-300">（背景載入中：{loadedCount.toLocaleString()}）</span>}
+            </>
+          )}
         </div>
         {hasMore && (
           <button
-            onClick={() => setVisibleCount((prev) => prev + PAGE_SIZE)}
-            className="px-3 py-1 rounded border border-white/10 hover:border-cyan-300/40"
+            onClick={isServerSortMode ? loadMoreServerSort : () => setVisibleCount((prev) => prev + PAGE_SIZE)}
+            disabled={isServerSortMode && serverSortLoading}
+            className="px-3 py-1 rounded border border-white/10 hover:border-cyan-300/40 disabled:opacity-40"
           >
-            顯示更多 (+{Math.min(PAGE_SIZE, filteredRows.length - visibleCount)})
+            {isServerSortMode
+              ? `載入更多 (${serverSortRows.length.toLocaleString()} / ${serverSortTotal.toLocaleString()})`
+              : `顯示更多 (+${Math.min(PAGE_SIZE, filteredRows.length - visibleCount)})`}
           </button>
         )}
       </div>

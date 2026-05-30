@@ -165,7 +165,9 @@ function normalizeOutputPaths(payload: BatchPayload, previous?: BatchTaskStatus 
   if (Array.isArray(rawOutputPaths)) {
     rawOutputPaths.forEach((item) => {
       if (!item || typeof item !== 'object') return;
-      const record = item as Record<string, unknown>;
+      // Runtime payload may carry loosely-typed extra keys not on the static
+      // type; widen through unknown to read them defensively.
+      const record = item as unknown as Record<string, unknown>;
       const symbol = String(record.symbol ?? '');
       const timeframe = String(record.timeframe ?? payload.current_timeframe ?? '');
       const path = String(record.path ?? record.hdf5_path ?? '');
@@ -201,7 +203,9 @@ function normalizePerItemRss(payload: BatchPayload, previous?: BatchTaskStatus |
   if (Array.isArray(rawItems)) {
     rawItems.forEach((item) => {
       if (!item || typeof item !== 'object') return;
-      const record = item as Record<string, unknown>;
+      // Runtime payload may carry loosely-typed extra keys not on the static
+      // type; widen through unknown to read them defensively.
+      const record = item as unknown as Record<string, unknown>;
       const symbol = String(record.symbol ?? '');
       const timeframe = String(record.timeframe ?? '');
       const rssPeakMB = toNumber(record.rssPeakMB ?? record.rss_peak_item_mb, NaN);
@@ -455,7 +459,13 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   setBatchTask: (batchTask) =>
     set((state) => ({
       batchTask: batchTask
-        ? normalizeBatchTask(batchTask, state.batchTask, state.batchStartedAtMs ?? Date.now())
+        // normalizeBatchTask reads loose raw keys (total_items, …) not on the
+        // static BatchTaskStatus; widen through unknown to the payload shape.
+        ? normalizeBatchTask(
+            batchTask as unknown as BatchPayload,
+            state.batchTask,
+            state.batchStartedAtMs ?? Date.now(),
+          )
         : null,
       batchStartedAtMs: batchTask ? state.batchStartedAtMs ?? Date.now() : null,
       batchConnectionStatus: batchTask ? state.batchConnectionStatus : 'idle',

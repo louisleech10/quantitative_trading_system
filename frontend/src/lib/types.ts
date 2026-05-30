@@ -678,7 +678,24 @@ export interface DataQualityFeatureScattered {
   nan_ratio: number;
 }
 
+export interface DataQualityGroupStat {
+  layer: string;
+  tf: string;
+  feature_count: number;
+  mean_nan_ratio: number;
+  warmup_only: number;
+  real_problem: number;
+}
+
+export interface DataQualityRealProblemFeature {
+  name: string;
+  nan_ratio: number;
+  hole_count: number;
+  kind: 'all_nan' | 'high_nan_hole';
+}
+
 export interface DataQualityReport {
+  schema_version?: string;
   total_features: number;
   total_timesteps: number;
   timestamp_start: string;
@@ -696,11 +713,15 @@ export interface DataQualityReport {
   mid_holes: DataQualityFeatureHole[];
   trailing_nans: DataQualityFeatureTrailing[];
   scattered_nans: DataQualityFeatureScattered[];
+  real_problem_features?: DataQualityRealProblemFeature[];
   counts: {
     mid_holes: number;
     trailing_nans: number;
     high_nan: number;
+    warmup_only_high_nan?: number;
+    real_problem?: number;
   };
+  group_breakdown?: DataQualityGroupStat[];
 }
 
 export interface AutoResearchStatus {
