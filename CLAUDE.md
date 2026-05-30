@@ -93,6 +93,22 @@ logger = get_logger(__name__)
 - Retryable: rate_limit, network timeout
 - Non-retryable: invalid_symbol, logic error, data format
 
+### Validate Assumptions Before Acting（實測 > 假設）
+
+**Before writing any code, ask: "What am I assuming here, and do I actually know it's true?"**
+
+A belief is not evidence. "It should work like X" is not "I verified it works like X."
+
+The discipline:
+1. **Name the assumption explicitly** — write it down in one sentence ("I assume the column uses underscore, not hyphen")
+2. **Find the cheapest verification** — grep, read a real file, load actual data, add a temporary log
+3. **Verify first, then plan, then code** — never the other way around
+4. **If evidence contradicts the plan: stop, document the finding, update the plan** — do not implement what the evidence has disproved
+
+This applies to everything: naming conventions, NaN patterns, execution paths, test fixtures, bug hypotheses, "obviously" true facts about the codebase, and anything else that would cause wasted or wrong work if it turned out to be false.
+
+*Established after two incidents: (1) assumed `underscore` naming → missed real `hyphen` across entire run; (2) assumed "frontend misclassifies warmup as mid-hole" → nearly modified a correct classifier.*
+
 ---
 
 ## The 7 Decoupling Rules (Zero Tolerance)
