@@ -562,6 +562,8 @@ class FeatureStorage:
         l65_mode: str = "legacy",
         time_range: Optional[Dict[str, Optional[str]]] = None,
         extra_metadata: Optional[Dict[str, Any]] = None,
+        dead_drop_min_valid: Optional[int] = None,
+        sanitize_finite_cap: Optional[float] = None,
     ) -> Tuple[Path, Dict[str, Any]]:
         """Stream CGSA registry groups into the canonical L7_raw artifact.
 
@@ -569,6 +571,16 @@ class FeatureStorage:
         directly to parquet without rewriting the registry ``.npy`` file. This
         is the disk-safe L6.5 → L7_raw path used by IC-First and legacy CGSA
         generation.
+
+        ``dead_drop_min_valid``: 若不為 None，對每組 post-transform array 套用
+        per-column dead-drop（常數欄 / valid_count < 此值 / 全 NaN）。這是 CGSA
+        模式下 L7 dead feature drop 的實現（frame-path 不經過此路徑）。None = 停用，
+        write 行為與現況 byte-identical。詳見 NAN_REDUCTION_STRATEGY.md §5.3。
+
+        ``sanitize_finite_cap``: Layer B 通用淨化。若不為 None，對每組 post-transform
+        array 將非有限值（±inf）與 |v| > cap 的絕對垃圾設為 NaN（在 dead-drop 之前），
+        覆蓋所有 CGSA-streamed 特徵（含 L3）。攔截 Layer A 漏掉的 overflow stragglers；
+        Class B 真實大值（如 volume VAR ~3e10）遠低於 cap → 保留。None = 停用。
         """
         pa_module, _ = _require_pyarrow()
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
@@ -603,6 +615,9 @@ class FeatureStorage:
         groups_with_inf = 0
         npy_freed = 0
         source_deleted = False
+        dead_dropped_cols = 0
+        dead_affected_groups = 0
+        total_sanitized = 0
 
         parquet_metadata = self._build_l7_v2_parquet_metadata(
             symbol=symbol,
@@ -638,7 +653,8 @@ class FeatureStorage:
             cleanup_source: bool,
         ) -> None:
             nonlocal row_count, total_values, non_nan_values, total_inf, groups_with_inf
-            nonlocal npy_freed, source_deleted
+            nonlocal npy_freed, source_deleted, dead_dropped_cols, dead_affected_groups
+            nonlocal total_sanitized
 
             safe_group_id = self._safe_path_segment(str(group_id), "group_id")
             columns_list = [str(column) for column in columns]
@@ -682,6 +698,30 @@ class FeatureStorage:
                     f"for {safe_group_id}"
                 )
 
+            # Layer B 通用淨化（CGSA mode）：在 dead-drop 之前，將 ±inf / 非有限值
+            # 與 |v| > finite_cap 的絕對垃圾設為 NaN，覆蓋所有特徵（含 L3）。淨化後若
+            # 整欄變 all-NaN，下方 dead-drop 順帶剔除。Class B 真實大值低於 cap → 保留。
+            if sanitize_finite_cap is not None and array.size:
+                from momentum.FeatureEngineering.utils.numeric_guards import sanitize_array_inplace
+
+                _n_sanitized = sanitize_array_inplace(array, finite_cap=sanitize_finite_cap)
+                if _n_sanitized:
+                    total_sanitized += _n_sanitized
+
+            # L7 dead-drop（CGSA mode）：per-column 剔除常數欄 / 樣本不足欄 / 全 NaN 欄。
+            # 對實際 post-transform array 計算（不依賴快取統計）。整組全 dead 時 columns_list
+            # 與 array 變空，下方 parts 為空 → 不寫 parquet，但源頭清理仍照常執行（I-6）。
+            if dead_drop_min_valid is not None and array.shape[1] > 0:
+                from momentum.FeatureEngineering.utils.dead_feature_filter import dead_column_mask
+
+                _dmask = dead_column_mask(array, min_valid_samples=dead_drop_min_valid)
+                if _dmask.any():
+                    _keep = ~_dmask
+                    dead_dropped_cols += int(_dmask.sum())
+                    dead_affected_groups += 1
+                    columns_list = [c for c, k in zip(columns_list, _keep) if k]
+                    array = array[:, _keep]
+
             total_values += int(array.size)
             if array.size:
                 nan_mask = np.isnan(array)
@@ -691,7 +731,12 @@ class FeatureStorage:
                 if inf_count > 0:
                     groups_with_inf += 1
 
-            parts = self._split_large_group(safe_group_id, columns_list, array)
+            # 整組全 dead → parts 為空，不寫 parquet（下方源頭清理仍執行）
+            parts = (
+                self._split_large_group(safe_group_id, columns_list, array)
+                if array.shape[1] > 0
+                else []
+            )
             # Compute source's pending-release shard bytes so the per-part disk
             # check mirrors the global pre-check's reclaimable accounting.
             # For chunked big-group splits, the source shards stay on disk until
@@ -860,6 +905,20 @@ class FeatureStorage:
             if total_features <= 0:
                 raise ValueError("write_raw_from_registry_stream produced no features")
 
+            if dead_drop_min_valid is not None and dead_dropped_cols > 0:
+                logger.info(
+                    "[L7 Dead Drop][CGSA] dropped %d cols across %d groups "
+                    "(min_valid=%d); final features=%d",
+                    dead_dropped_cols, dead_affected_groups, dead_drop_min_valid, total_features,
+                )
+
+            if sanitize_finite_cap is not None and total_sanitized > 0:
+                logger.info(
+                    "[Layer B Sanitize][CGSA] nulled %d non-finite/over-cap values "
+                    "(finite_cap=%.0e) across all streamed features",
+                    total_sanitized, sanitize_finite_cap,
+                )
+
             ordered_group_manifest = {group_id: group_manifest[group_id] for group_id in sorted(group_manifest)}
             feature_schema_hash = self._build_schema_hash_from_columns(
                 self.L7_RAW_SCHEMA_VERSION,
@@ -885,6 +944,8 @@ class FeatureStorage:
                 "cleanup_intermediate": bool(cleanup_intermediate),
                 "npy_freed_bytes": int(npy_freed),
                 "transformed_groups": int(transformed_groups),
+                "dead_dropped_cols": int(dead_dropped_cols),
+                "dead_affected_groups": int(dead_affected_groups),
                 "dtype_summary": self._build_dtype_summary(
                     storage_dtype_counts,
                     float32_fallback_parts,
@@ -937,6 +998,8 @@ class FeatureStorage:
                 "dtype_summary": stream_metadata["dtype_summary"],
                 "validation": validation_summary,
                 "l65_mode": str(l65_mode),
+                "dead_dropped_cols": int(dead_dropped_cols),
+                "dead_affected_groups": int(dead_affected_groups),
             }
             self.logger.info(
                 "[L7_raw] registry stream persist done: symbol=%s tf=%s groups=%d features=%d "

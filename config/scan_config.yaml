@@ -616,3 +616,10 @@ nan_strategy:
   l7_dead_feature_drop:
     enabled: true
     min_valid_samples: 100
+
+  # Layer B 通用數值淨化（CGSA L7 write 前最後防線）：±inf / |v|>finite_cap → NaN，
+  # 覆蓋所有 streamed 特徵（含 L3）。攔截 Layer A（kernel √n 界 + 除法近零守衛）
+  # 漏掉的 overflow stragglers。Class B 真實大值（如 volume VAR ~3e10）遠低於 cap → 保留。
+  numeric_sanitize:
+    enabled: true
+    finite_cap: 1.0e18

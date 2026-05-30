@@ -26,11 +26,35 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.utils.numeric_guards import DEFAULT_DENOM_REL_EPS
 
 if TYPE_CHECKING:
     import polars as pl
 
 logger = get_logger(__name__)
+
+
+def _safe_denom_expr(
+    pl_df: "pl.DataFrame",
+    denom_col: str,
+    rel_eps: float = DEFAULT_DENOM_REL_EPS,
+) -> "pl.Expr":
+    """Polars 版近零分母守衛：回傳 denom 的 expr，將 exact-0 與相對近零設為 null。
+
+    門檻 = `rel_eps × median(|nonzero values|)`（per-column robust scale，與 pandas
+    `safe_denominator` 同邏輯）。擋 TA-Lib 振盪器邊界的 ~1e-14 浮點噪音、保留真實小值。
+    """
+    import polars as pl
+
+    d = pl.col(denom_col)
+    if rel_eps <= 0:
+        return pl.when(d == 0.0).then(None).otherwise(d)
+
+    abs_col = pl_df.get_column(denom_col).abs()
+    nonzero = abs_col.filter(abs_col > 0)
+    scale = float(nonzero.median()) if nonzero.len() > 0 and nonzero.median() is not None else 0.0
+    threshold = scale * rel_eps
+    return pl.when((d.abs() < threshold) | (d == 0.0)).then(None).otherwise(d)
 
 # Lazy import to avoid import error when polars not installed
 _polars_available: Optional[bool] = None
@@ -200,8 +224,8 @@ def polars_l2_derived_ratio(
     for col_a, col_b, output_name in pairs:
         if col_a not in pl_df.columns or col_b not in pl_df.columns:
             continue
-        # Replace zero denominator with null (-> NaN in pandas)
-        denom = pl.when(pl.col(col_b) == 0.0).then(None).otherwise(pl.col(col_b))
+        # Replace zero / near-zero (float-noise) denominator with null (-> NaN)
+        denom = _safe_denom_expr(pl_df, col_b)
         exprs.append((pl.col(col_a) / denom).alias(output_name))
 
     if not exprs:
@@ -274,8 +298,8 @@ def polars_l2_derived_distance(
         if price_col not in pl_df.columns or indicator_col not in pl_df.columns:
             continue
         # Distance = (price - indicator) / indicator
-        # Replace zero denominator with null to produce NaN instead of inf
-        safe_denom = pl.when(pl.col(indicator_col) != 0.0).then(pl.col(indicator_col)).otherwise(None)
+        # Replace zero / near-zero (float-noise) denominator with null → NaN not inf
+        safe_denom = _safe_denom_expr(pl_df, indicator_col)
         expr = ((pl.col(price_col) - pl.col(indicator_col)) / safe_denom).alias(output_name)
         exprs.append(expr)
 
@@ -309,13 +333,19 @@ def polars_l2_derived_momentum(
     if not specs:
         return pl.DataFrame()
 
+    # Near-zero threshold uses the column's own robust scale (shift preserves the
+    # value distribution → same scale as the un-shifted column).
     exprs = []
     for col_name, lag, output_name in specs:
         if col_name not in pl_df.columns:
             continue
         col = pl.col(col_name)
         shifted = col.shift(lag)
-        denom = pl.when(shifted == 0.0).then(None).otherwise(shifted)
+        abs_col = pl_df.get_column(col_name).abs()
+        nonzero = abs_col.filter(abs_col > 0)
+        scale = float(nonzero.median()) if nonzero.len() > 0 and nonzero.median() is not None else 0.0
+        threshold = scale * DEFAULT_DENOM_REL_EPS
+        denom = pl.when((shifted.abs() < threshold) | (shifted == 0.0)).then(None).otherwise(shifted)
         exprs.append(((col - shifted) / denom).alias(output_name))
 
     if not exprs:

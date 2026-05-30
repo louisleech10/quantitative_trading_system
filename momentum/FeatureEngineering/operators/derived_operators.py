@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.utils.numeric_guards import safe_denominator
 
 
 logger = get_logger(__name__)
@@ -390,7 +391,7 @@ class DerivedOperatorEngine:
             left_name=f"{name_prefix}:price",
             right_name=f"{name_prefix}:indicator",
         )
-        denom = aligned_indicator.replace(0, np.nan)
+        denom = safe_denominator(aligned_indicator)
         return (aligned_price - aligned_indicator) / denom
 
     def compute_cross(self, fast: pd.Series, slow: pd.Series, name_prefix: str) -> pd.Series:
@@ -402,7 +403,7 @@ class DerivedOperatorEngine:
         frames: List[pd.Series] = []
         for lag in lags:
             shifted = series.shift(lag)
-            denom = shifted.replace(0, np.nan)
+            denom = safe_denominator(shifted)
             momentum = (series - shifted) / denom
             frames.append(momentum.rename(f"{name_prefix}_Momentum_L{lag}"))
         if not frames:
@@ -411,7 +412,7 @@ class DerivedOperatorEngine:
 
     def compute_ratio(self, a: pd.Series, b: pd.Series, name_prefix: str) -> pd.Series:
         """A / B"""
-        denom = b.replace(0, np.nan)
+        denom = safe_denominator(b)
         return a / denom
 
     def compute_binary_signal(self, series: pd.Series, condition: str, name_prefix: str) -> pd.Series:
@@ -576,7 +577,7 @@ class DerivedOperatorEngine:
         frames: List[pd.DataFrame] = []
         for lag in lags:
             shifted = selected.shift(lag)
-            denom = shifted.replace(0, np.nan)
+            denom = safe_denominator(shifted)
             momentum = (selected - shifted) / denom
             momentum.columns = [f"{col}_Momentum_L{lag}" for col in selected_cols]
             frames.append(momentum)

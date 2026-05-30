@@ -3,7 +3,29 @@
 **Agent**: Claude Code | **Time**: 2026-05-30 | **Branch**: main
 
 ## 正在做
-無（本 session 完成 rolling skew/kurt 數值爆炸修正 L1–L4 + preprocessing 測試對齊）
+無（本 session 完成數值品質系統性提升 A1/A2/B + 前次 skew/kurt L1–L4）
+
+## 最新（數值品質系統性提升，2026-05-30 PM）
+全量掃描 437k 特徵發現先前 skew/kurt 修正有 gap（零中心 roll_spread 仍爆炸）+ 更多類型。
+分 Class A（數值垃圾→NaN）/ Class B（真實大值→保留，樹模型尺度不變）。
+
+- **A1 數學界守衛**（[numba_rolling.py](momentum/FeatureEngineering/operators/numba_rolling.py)）：
+  `_compute_skew/_compute_kurt` 用**精確樣本界** `|skew|≤√n`、`-2(n-1)/(n-3)≤excess_kurt≤n`
+  取代有 gap 的 Σx² 守衛（保留相對退化守衛擋常數窗）。**中心無關** → 修好零中心
+  roll_spread（61→0 爆炸）。kurt 下界對小 n 是 -2(n-1)/(n-3) 非 -2（否則誤殺）。
+- **A2 除法近零守衛**（[utils/numeric_guards.py](momentum/FeatureEngineering/utils/numeric_guards.py) `safe_denominator`）：
+  分母 `|denom| < rel_eps×median(|nonzero|)` 設 NaN，取代 exact-0 守衛。修 STOCHRSI
+  momentum（TA-Lib 邊界回傳 ±1e-14 → 92→0 爆炸）。整合 pandas 4 站點（derived_operators）
+  + polars 3 站點（polars_adapter，CGSA 生產路徑）。
+- **B 通用淨化**（`sanitize_array_inplace` @ [feature_storage.py](momentum/FeatureEngineering/feature_storage.py) `_write_group`）：
+  inf/|v|>finite_cap(1e18) → NaN，覆蓋所有 CGSA-streamed 特徵（含 L3）。Class B（volume
+  VAR ~3e10）保留。config `nan_strategy.numeric_sanitize`。
+- **不做**：特徵縮放（模型只有 XGBoost/LightGBM，逐特徵尺度不變）。
+- **winsorization 救不了 Class A**：爆炸比例 ~5% ≫ 1% 尾 → 根因 NaN 是必須。
+- 測試：numba_rolling 47、numeric_guards 9、feature_engineering 425 全 pass。
+- **待使用者重跑**：feature pipeline 重生成後 `|mean| or |std|>1e12` 應降為 0。
+
+## 前次（Rolling Skew/Kurt 修正 L1–L4，已 commit 359ab61）
 
 ## 最新（Rolling Skew/Kurt 爆炸修正，2026-05-30）
 

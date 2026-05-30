@@ -450,3 +450,35 @@ def test_skew_kurt_deterministic_on_binary_series():
     r1 = rolling_skew_kurt(values, 55)[:, 0]
     r2 = rolling_skew_kurt(values, 55)[:, 0]
     np.testing.assert_array_equal(np.nan_to_num(r1, nan=-999.0), np.nan_to_num(r2, nan=-999.0))
+
+
+def test_skew_kurt_zero_centered_no_explosion():
+    """REG: ZERO-CENTERED near-constant (microstructure spread) must not explode.
+
+    The earlier Σx²-relative guard degenerated when mean≈0 (Σx²≈m2), leaving the
+    explosion on zero-centred data (e.g. roll_spread: 61 values ~1e36). The exact
+    √n / n sample bounds are centring-independent and catch it. Constant-run of
+    zeros + a sparse choppy lead-in reproduces the pattern.
+    """
+    rng = np.random.default_rng(3)
+    n = 400
+    v = np.zeros(n, dtype=np.float64)
+    v[:60] = rng.standard_normal(60) * 1e-3  # tiny choppy lead-in near zero
+    # rest stays exactly 0.0 → windows slide from "tiny spread" into "all-zero"
+    sk = rolling_skew_kurt(v, 34).astype(np.float64)
+    skew, kurt = sk[:, 0], sk[:, 1]
+    assert np.nanmax(np.abs(skew)) <= np.sqrt(34) * (1 + 1e-6), "skew exceeded √n bound"
+    assert not np.isinf(skew).any() and not np.isinf(kurt).any()
+    assert int((np.abs(np.nan_to_num(skew)) > 1e10).sum()) == 0
+
+
+@pytest.mark.parametrize("window", [5, 21, 55])
+def test_skew_within_sqrt_n_bound(window: int):
+    """REG: sample skewness can never exceed √n; assert the hard bound holds."""
+    rng = np.random.default_rng(11)
+    # adversarial: mostly-constant with rare spikes (maximises |skew| toward √n)
+    v = np.ones(600, dtype=np.float64)
+    v[::97] = 50.0
+    skew = rolling_skew_kurt(v, window)[:, 0].astype(np.float64)
+    finite = skew[np.isfinite(skew)]
+    assert (np.abs(finite) <= np.sqrt(window) * (1 + 1e-6)).all()

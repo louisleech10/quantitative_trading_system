@@ -424,8 +424,21 @@ class L7DeadFeatureDropConfig(BaseModel):
     min_valid_samples: int = 100
 
 
+class NumericSanitizeConfig(BaseModel):
+    """Layer B 通用數值淨化（CGSA L7 write 前的最後防線）。
+
+    將 ±inf / 非有限值與 |v| > finite_cap 的絕對垃圾設為 NaN，覆蓋所有 streamed
+    特徵（含 CGSA L3）。攔截 Layer A（kernel √n 界 + 除法近零守衛）漏掉的 overflow
+    stragglers。Class B 真實大值（如 volume VAR ~3e10）遠低於 cap → 保留。
+    詳見 plans/kind-questing-newell.md Layer B。
+    """
+    enabled: bool = True
+    # 遠高於任何合法特徵的最大量級（實測真實最大 ~1e11），只殺數值垃圾。
+    finite_cap: float = 1e18
+
+
 class NanStrategyConfig(BaseModel):
-    """NaN 處理策略總配置（cascade blacklist + dead feature drop）。
+    """NaN 處理策略總配置（cascade blacklist + dead feature drop + 數值淨化）。
 
     詳見 docs/NAN_REDUCTION_STRATEGY.md §5。
     """
@@ -438,6 +451,9 @@ class NanStrategyConfig(BaseModel):
     )
     l7_dead_feature_drop: L7DeadFeatureDropConfig = Field(
         default_factory=L7DeadFeatureDropConfig
+    )
+    numeric_sanitize: NumericSanitizeConfig = Field(
+        default_factory=NumericSanitizeConfig
     )
 
 

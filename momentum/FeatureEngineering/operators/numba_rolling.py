@@ -129,49 +129,67 @@ def _batch_recompute_moments(
     return count, mean, m2, m3, m4
 
 
-# Relative degeneracy tolerance for higher moments. A window is treated as
-# constant (skew/kurt undefined → NaN) when its summed central 2nd moment m2 is
-# negligible RELATIVE to the window's sum-of-squares Σx² = m2 + count·mean².
-# This is scale-invariant (m2 and Σx² both scale as k²), unlike an absolute
-# threshold on m2: it correctly nulls a constant window at ANY magnitude
-# (binary 0/1, price 1e-10, volume 1e20) while preserving genuine tiny/huge-scale
-# variance and real fat-tail spikes. Same structure as scipy.stats.skew
-# (`m2 ≤ (resolution·mean)²`); anchoring on Σx² is more robust than mean because
-# Σx² never vanishes for return-style features centred at 0.
-# 1e-12 sits safely above the float64 relative-precision floor (~2.2e-16).
+# Two complementary guards make higher moments numerically safe across ALL data:
+#
+# (1) Relative degeneracy guard — a window is "effectively constant" (skew/kurt
+#     undefined → NaN) when its summed 2nd central moment m2 is negligible
+#     relative to Σx² = m2 + count·mean². Scale-invariant; catches constant runs
+#     whose incremental m2 drifts to float-noise (e.g. EMA/HT-TRENDMODE all-equal
+#     → m2≈1e-30 → leaks a spurious ~1e-15 skew without this).
+#
+# (2) Exact mathematical sample bound — for n real observations the bias-corrected
+#     sample moments satisfy |skewness| ≤ √n and -2 ≤ excess_kurtosis ≤ n (attained
+#     by the "n-1 equal + 1 outlier" extremal window). Any value beyond is
+#     mathematically impossible for n real points → pure floating-point garbage.
+#     This is centring-INDEPENDENT, so it catches the explosion on zero-centred
+#     data (microstructure spread) where guard (1) degenerates (Σx²≈m2).
+#
+# Together they cover both failure modes; the genuine max |skew|=√55=7.4162 on a
+# 54:1 window is preserved.
 _MOMENT_REL_EPS: float = 1e-12
+_MOMENT_BOUND_TOL: float = 1e-9
 
 
 @numba.njit(cache=True)
 def _compute_skew(m2: float, m3: float, count: int, mean: float) -> float:
-    """Compute sample skewness with scale-relative zero-variance guard."""
-    if count < 3:
+    """Sample skewness with degeneracy guard + exact |skew| ≤ √n bound."""
+    if count < 3 or m2 <= 0.0:
         return np.nan
-    sumsq = m2 + count * mean * mean  # Σx², scale anchor (never vanishes unless all-0)
+    sumsq = m2 + count * mean * mean  # Σx², scale anchor
     if m2 <= _MOMENT_REL_EPS * sumsq:
-        return np.nan
+        return np.nan  # effectively-constant window → undefined
 
     n = float(count)
     result = (n * np.sqrt(n - 1.0) / (n - 2.0)) * (m3 / (m2 ** 1.5))
-    if not np.isfinite(result):  # belt-and-suspenders: never emit inf/overflow
-        return np.nan
+    bound = np.sqrt(n)
+    if not np.isfinite(result) or abs(result) > bound * (1.0 + _MOMENT_BOUND_TOL):
+        return np.nan  # beyond the exact sample bound → numerical garbage
     return result
 
 
 @numba.njit(cache=True)
 def _compute_kurt(m2: float, m4: float, count: int, mean: float) -> float:
-    """Compute unbiased excess kurtosis with scale-relative zero-variance guard."""
-    if count < 4:
+    """Sample excess kurtosis with degeneracy guard + exact -2 ≤ k ≤ n bound."""
+    if count < 4 or m2 <= 0.0:
         return np.nan
     sumsq = m2 + count * mean * mean
     if m2 <= _MOMENT_REL_EPS * sumsq:
-        return np.nan
+        return np.nan  # effectively-constant window → undefined
 
     n = float(count)
     excess = n * m4 / (m2 * m2) - 3.0
     result = ((n - 1.0) / ((n - 2.0) * (n - 3.0))) * ((n + 1.0) * excess + 6.0)
-    if not np.isfinite(result):
-        return np.nan
+    # Exact bounds for the bias-corrected sample excess kurtosis:
+    #   upper = n  (n-1 equal + 1 outlier);  lower = -2(n-1)/(n-3)  (perfect bimodal,
+    #   = -4 at n=5, → -2 as n→∞). Beyond these is numerically impossible.
+    upper = n
+    lower = -2.0 * (n - 1.0) / (n - 3.0)
+    if (
+        not np.isfinite(result)
+        or result > upper * (1.0 + _MOMENT_BOUND_TOL)
+        or result < lower * (1.0 + _MOMENT_BOUND_TOL)
+    ):
+        return np.nan  # outside the exact sample bound → numerical garbage
     return result
 
 
