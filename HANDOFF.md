@@ -5,14 +5,16 @@
 ## 正在做
 無（本 session 完成數值品質系統性提升 A1/A2/B + 前次 skew/kurt L1–L4）
 
-## Multi-Agent 工具就緒（2026-05-31）
-三個執行端已裝且驗證可非互動驅動：Codex（`codex exec`, v0.135, GPT-5.5）、
-Cursor（`cursor-agent -p`, Composer 2.5）、Antigravity（`agy -p`, v1.0.3, Gemini；
-Gemini CLI 2026-06-18 退役，agy 接棒）。規劃委員會 = Claude+Codex+agy 三家族。
-使用者需登入：`codex login`、`cursor-agent login`（皆瀏覽器 OAuth）；
-agy 無 login 子命令 → 首次直接跑 `agy`（互動 TUI）觸發 Google 帳號授權。
-編排手冊 `docs/MULTI_AGENT_ORCHESTRATION.md`；執行合約在 AGENTS.md / .cursorrules「執行任務時」。
-分派規則在 CLAUDE.md「任務分派規則」（Claude 每次先報任務大小+流程）。
+## Multi-Agent 協作體系（2026-05-31 驗證完成）
+三執行端登入+驗證：codex(GPT-5.5)、cursor(composer-2.5)、agy(Gemini 3.1 Pro)。
+- **可寫入**：codex（過 T-A/B/C）、cursor（過 T-D）。**僅 read-only 委員**：agy（coding 評測失敗）。
+- **規劃委員會 4 家族**（皆過委員資格）：Claude + codex + cursor + Gemini。
+- 驗收全綠：T-A/B/C/D/E + 兩輪對抗式 council；高優先修正兩輪已套用
+  （HANDOFF 競態→handoffs/、data_cache 實體防線 preflight/postflight、宏觀斷路器、防測試篡改、結構化收尾報告）。
+- 文件：編排手冊 `docs/MULTI_AGENT_ORCHESTRATION.md`、可複用 `docs/MULTI_AGENT_BOOTSTRAP.md`、
+  審查 transcript `docs/reviews/council_E_orchestration_review.md`；合約在 AGENTS.md/.cursorrules；分派規則在 CLAUDE.md。
+- **開放項**：主力 codex vs cursor 由真實任務記分卡累積決定（§6）；延後項見 BOOTSTRAP Part F。
+- 安全：寫入派工前後跑 `scripts/agent_preflight.sh`/`agent_postflight.sh`。執行端交接寫 `handoffs/`，不覆蓋本檔。
 
 ## 最新（數值品質系統性提升，2026-05-30 PM）
 全量掃描 437k 特徵發現先前 skew/kurt 修正有 gap（零中心 roll_spread 仍爆炸）+ 更多類型。
