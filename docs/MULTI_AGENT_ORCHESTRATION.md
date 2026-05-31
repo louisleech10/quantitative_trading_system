@@ -40,16 +40,23 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 > 現況（2026-05-31）：**可寫入** = codex（GPT-5.5）、cursor（composer-2.5，過 T-D）；**僅 read-only** = agy（Gemini 3.5 Flash，coding 評測失敗 → 規劃委員會用）。
 > **派工前後**：寫入型任務派工**前** `bash scripts/agent_preflight.sh` 快照、**後** `bash scripts/agent_postflight.sh` 比對（data_cache 被 gitignore，須用檔案系統快照偵測刪除/縮減），PASS 才進驗收。
 
-### 規劃委員會（高風險不可逆決策才開全員）
-研究 / SPEC 階段可 fan-out 多模型家族「諮詢」（read-only，不 exec）以防單一盲點：
+### 規劃委員會（read-only 多家族思辨，防單一盲點）
+研究 / SPEC 階段 fan-out 多模型「諮詢」（read-only，不 exec）。現役 4 家族（皆過委員資格）：
 
 | 成員 | 工具 | 家族 |
 |------|------|------|
-| Claude (Opus) | 本體 | Anthropic |
+| Claude (Opus) | 本體（綜合者） | Anthropic |
 | Codex | `codex exec`（或 `codex consult`） | OpenAI GPT |
-| Antigravity | `agy -p` | Google Gemini |
+| Cursor | `cursor-agent -p --model composer-2.5` | Cursor Composer |
+| Antigravity | `agy -p`（Gemini 3.1 Pro） | Google Gemini |
 
-Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，只凸顯打架的點，不丟原始 4 份輸出。日常規劃 2 個聲音即可；架構 / pipeline 本身設計才開全員。`/benchmark-models` 也可做 Claude/Codex/Gemini 三方比較（不含 Cursor）。
+**委員數隨「賭注 + 不可逆性」浮動（非固定）**：
+- 低風險日常 → **2**（Claude + 1）；中 → **3**；高風險 / 不可逆 / 基礎建設 → **全 4**。
+- **加委員成本低**：委員燒各自額度，不燒 Claude Opus；真正成本是 Claude 綜合更多輸出的負擔。
+- **多委員的獨有價值 = 收斂信號**：當 ≥2 個不同家族**獨立**點到同一問題（如 Round 2 的「假綠」「宏觀迴圈」），即高信號優先項——2 個委員看不出收斂。
+- **天花板：4 個不同家族是甜蜜點**；再加**同家族**模型邊際價值趨近零。要的是「家族多元」不是「數量多」。
+
+Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，凸顯打架與收斂點，**不丟原始多份輸出**；完整 transcript 存檔供稽核（見 `docs/reviews/`）。`/benchmark-models` 另可做 Claude/Codex/Gemini 三方量化比較（不含 Cursor）。
 
 ---
 
@@ -113,10 +120,11 @@ git log --oneline -5  # 執行端的 commit
 
 1. **跑驗收測試**（Claude 自己跑，便宜且客觀）：`pytest <對應測試>`。
 2. **讀 diff**：是否符合 TODO、是否越界改了範圍外檔案。
-3. **品質 gate 抽查**：`grep -r "from api\." momentum/` → 0；無 fake data；NaN/inf gate 未被弱化。
-4. **讀 STATUS 行 + HANDOFF.md** 的一段摘要。
+3. **防測試篡改（假綠）**（council Round 2 #Gemini2/#Composer4）：**「測試全過」不等於「做對」**。必 `git diff` **既有測試檔的斷言**，確認執行端沒放寬門檻 / 刪斷言 / 跳過用例來交差；新測試要看斷言**真能抓反例**（必要時自加一個反例斷言重跑）。
+4. **品質 gate 抽查**：`grep -r "from api\." momentum/` → 0；無 fake data；NaN/inf gate 未被弱化。
+5. **讀 STATUS 行 + 結構化收尾報告**（ASSUMPTIONS/TESTS/FAILURES/SCOPE/NUMERIC）。
 
-通過 → 收。失敗 → 帶著具體失敗點再派一輪。
+通過 → 收。失敗 → 帶著具體失敗點再派一輪（注意 §5 宏觀斷路器上限）。
 
 ---
 
@@ -134,6 +142,12 @@ headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `
 **debug 卡關時**：
 - Claude 用 `/investigate`（gstack skill）做 root-cause，只吃摘要 + 關鍵幾檔，不吃全 trace。
 - 難 bug 的 debug 優先用便宜模型（Codex/Cursor），**不要動用 Opus 硬啃**。
+
+### 宏觀斷路器（council Round 2 #Gemini1，防 Claude↔執行端無限拋接燒額度）
+執行端內部已有 `debug ≤3 輪`；**但「Claude 改 SPEC/指令 → 重派 → 又 BLOCKED」這層外迴圈也要上限**：
+- **同一任務的重派 ≤ 2 輪**。第 2 輪仍 BLOCKED → **停，升級使用者**：很可能 SPEC 有根本性缺陷，不是執行端能修的。**不得自動無限重派**。
+- 升級時給使用者：兩輪各自的 SPEC 調整、執行端 BLOCKED 原因、我的根因假設。
+- 背景任務一律帶 `timeout`（已實行），避免掛死燒額度。
 
 ---
 

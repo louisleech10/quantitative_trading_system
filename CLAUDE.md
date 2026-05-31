@@ -36,7 +36,8 @@ All code must support this evolution via clean decoupling.
 - **執行端選層**：可寫入 = **`codex exec`**（GPT-5.5，過 T-A/B/C）、**`cursor-agent --model composer-2.5`**（過 T-D）。routine/多檔編輯/Codex 額度吃緊 → 切 Cursor。⚠️ **`agy`（Gemini 3.5 Flash）coding 評測失敗（探索亂跑 + 假 DONE），僅當規劃委員會 read-only 諮詢，不得寫入**。選哪個對使用者透明，準則見手冊 §1。
 - **派工前後安全檢查**：寫入型 headless 派工**前**跑 `bash scripts/agent_preflight.sh` 快照、**後**跑 `bash scripts/agent_postflight.sh` 比對（data_cache 被 gitignore，用檔案系統快照而非 git 偵測刪除/縮減），PASS 才驗收。執行端交接寫 `handoffs/<date>-<task>.md`，不覆蓋根 HANDOFF。
 - **分工原則**：規劃 / SPEC / 驗收留在 Claude（省 Opus）；長時間實作與 debug 迴圈交執行端在自身 context 跑。debug 用較便宜模型，不回灌 Claude context。
-- **接回機制**：執行端（Codex/Cursor）直接寫檔到 repo；Claude 只讀 **git diff + 測試 pass/fail + 一段摘要**，靠 SPEC §1.0 可測性準則驗收，不重讀 debug 過程。
+- **接回機制**：執行端（Codex/Cursor）直接寫檔到 repo；Claude 只讀 **git diff + 測試 pass/fail + 一段摘要**，靠 SPEC §1.0 可測性準則驗收，不重讀 debug 過程。驗收必 **diff 既有測試斷言防假綠**（執行端可能放寬門檻交差）。
+- **宏觀斷路器**：「Claude 調 SPEC → 重派 → 又 BLOCKED」外迴圈**重派 ≤ 2 輪**；第 2 輪仍卡 → 停、升級使用者（SPEC 恐有根本缺陷），**不自動無限重派燒額度**。
 - **完整編排手冊**：`docs/MULTI_AGENT_ORCHESTRATION.md`（派工/查進度/驗收指令模板、執行池選層、卡關升級）。執行端合約在 `AGENTS.md` / `.cursorrules`「執行任務時」。
 
 ---
