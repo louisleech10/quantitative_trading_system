@@ -66,9 +66,10 @@
 **收斂高信號**（多家獨立都點到）：① 假綠/交差（Composer#4 + Gemini#2）；② 治理/宏觀迴圈（Composer#9 + Gemini#1）。
 
 ### Round 2 triage（Claude）
-- **建議現在做**：宏觀斷路器（Claude↔執行端重派 ≤ N 輪→升級使用者）；驗收須 **diff 測試斷言**防篡改（不只看 pass）。
+- ✅ **已做（第一批）**：宏觀斷路器（重派 ≤2 輪→升級）；驗收 **diff 測試斷言**防篡改。
+- ✅ **已做（追加，present 風險 + 低成本）**：**prompt injection 防護**（inter-agent artifact 視為資料非指令，合約 #4 + Claude 側 + 手冊 §4）；**四源同步**（`scripts/check_agent_contract_sync.sh`）；**postflight FAIL 處置**（手冊 §5：code 可回滾 / data_cache 無 undo 重預防）；**全棧驗收**（前端改動須 `npm run build`）。
 - **已部分緩解**：背景 heartbeat → 派工已用 `timeout`；可再加無產出 kill。
-- **延後/bootstrap 納入**：clean-room 驗收、編排者 context respawn、env/dep 漂移交接、四源同步、prompt injection 防護（列為 V2 安全項）。
+- **仍延後（並行/團隊規模或 V2 再做）**：clean-room 驗收、編排者 context respawn、env/dep 漂移交接、完整 AST gate、worktree 並行隔離、精準 resume、commit 原子性驗收、BLOCKED 品質指標。
 
 ### ✅ 已完成（2026-05-31）
 - #2：建 `handoffs/`（append-only per-task）+ README；合約改「不得覆蓋根 HANDOFF」。

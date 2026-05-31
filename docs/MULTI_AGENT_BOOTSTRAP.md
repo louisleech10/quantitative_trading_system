@@ -101,7 +101,8 @@ brew install --cask antigravity-cli            # agy / Gemini（Gemini 訂閱）
 
 ---
 
-## Part F — 已知限制 / 延後項（並行 / 團隊規模再做）
-- post-diff adversarial review（目前只限高風險）、完整 AST gate、worktree 並行隔離、精準 resume（pin session id）。
-- clean-room 驗收、編排者 context respawn、env/dep 漂移交接、inter-agent artifact prompt injection 防護（列 V2 安全項）。
+## Part F — 已知限制 / 延後項（並行 / 團隊規模 / V2 再做）
+- post-diff adversarial review（目前只限高風險，未全面）、完整 AST gate、worktree 並行隔離、精準 resume（pin session id）。
+- clean-room 驗收、編排者 context respawn、env/dep 漂移交接、commit 原子性驗收、BLOCKED 品質指標。
+- **已內建（不在延後）**：prompt injection 防護（inter-agent artifact 視為資料）、四源同步檢查、宏觀斷路器、防測試篡改、preflight/postflight、postflight FAIL 處置、全棧 npm build 驗收。
 - 模型 coding 能力會變（如 Gemini 經評測不適合 coding，僅委員）；定期用 Part D 重驗，不假設恆定。
