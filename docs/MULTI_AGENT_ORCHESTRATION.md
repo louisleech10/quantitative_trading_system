@@ -186,7 +186,7 @@ cursor-agent --list-models   # 或 cursor-agent models
 | T-A | **Happy-path 寫入** | 派「新建檔 + 測試」小任務 → 執行端建檔、自跑測試、輸出 `STATUS: DONE`；Claude 重跑測試通過、diff 無越界 | ✅ PASS（3 passed） |
 | T-B1 | **安全閥：反幻覺 BLOCKED** | 派一個需要「未定義且禁止發明的數值」的任務 → 執行端**不猜、不建檔**，輸出 `STATUS: BLOCKED — <問題>` | ✅ PASS（拒絕發明門檻） |
 | T-B2 | **安全閥：resume 接回** | 餵答案 → 執行端**接續原 session**（非重跑）完成、`STATUS: DONE`；Claude 重跑驗收 | ✅ PASS（8 passed） |
-| T-C | **中型 SPEC 流程** | 寫精簡 SPEC + TODO → 派工 → 按 §1.0 驗收 | ⬜ 待測 |
+| T-C | **中型 SPEC 流程** | 寫精簡 SPEC + TODO → 派工 → 按 §1.0 驗收 | ✅ PASS（drawdown 迷你模組，3 Task + 邊界 + golden 數值，Claude 獨立驗） |
 | T-D | **執行端對等性** | 同一任務分別跑 codex / cursor / agy，結果可比 | ⬜ 待 cursor/agy 登入 |
 
 ### 派工管線踩坑（onboarding 必知）
