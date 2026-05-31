@@ -200,6 +200,11 @@ cursor-agent --list-models   # 或 cursor-agent models
 - **印證合約價值**：假 DONE 被 Claude 獨立驗收（無建檔）當場抓到——驗收不採信 STATUS 是必要的。
 - 注意：測的是 Flash **Medium**（agy 無 `--model` 旗標，模型於 TUI 選）；Lite 預期更弱，未單獨測。agy 的 agent loop 也可能放大此失敗，非純模型因素。
 
+### 委員資格（read-only 思辨，與 coding 能力分開）2026-05-31
+- **Composer 2.5 ✅、Gemini 3.1 Pro ✅**：兩者 read-only 反應 codex 12 條 + 找出大量新盲點，輸出乾淨無越界 → **皆通過委員資格**。
+- **規劃委員會現役**：Claude (Opus) + codex (GPT-5.5) + cursor (Composer 2.5) + agy (Gemini 3.1 Pro)，四個模型家族。
+- Round 2 新發現與 triage 見 `docs/reviews/council_E_orchestration_review.md` 第四部分。
+
 ### 派工管線踩坑（onboarding 必知）
 - **stdin 卡住**：背景/管線環境下 `codex exec` 會等 stdin → 指令末尾加 `< /dev/null` 關閉。
 - **resume 旗標**：`codex exec resume` **不吃** `-s`/`-o`（那是 `exec` 的）；sandbox 沿用原 session，prompt 直接當參數。

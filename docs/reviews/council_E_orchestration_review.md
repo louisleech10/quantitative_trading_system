@@ -55,6 +55,21 @@
 **現在就改（便宜高值）**：#2 HANDOFF append-only+索引、#4 結構化收尾報告、#5 最低限 git preflight/postflight+denylist、#6 SMALL_INLINE、#7 iteration 定義、#11 未過 T-D 只能 read-only、#12 HANDOFF 例外。
 **分期延後（並行/團隊規模再做）**：#1 post-diff review（先限高風險）、#8 完整 AST gate、#9 worktree 隔離、#10 精準 resume（先記文件提醒）。
 
+## 第四部分：Round 2 委員會（cursor + gemini，2026-05-31）
+
+兩位新委員 read-only 反應 codex 的 12 條 + 找盲點，皆通過委員資格（輸出乾淨、無越界寫入）。
+
+**Composer 2.5 新增盲點（節錄高值）**：驗收非 clean-room、執行中 SPEC/HANDOFF 漂移無 hash 校驗、**inter-agent artifact prompt injection**、真 DONE 但只完成部分 phase、postflight FAIL 無回滾協議、四份規則源無同步機制、Claude 球員兼裁判（成本翻轉誘因）、背景任務無 heartbeat。
+
+**Gemini 3.1 Pro 新增盲點（節錄高值）**：**宏觀死鎖——Claude↔執行端重派迴圈無斷路器（會燒光額度）**、**測試篡改假綠（執行端偷放寬斷言交差）**、編排者 Context 退化無 respawn、環境/依賴狀態漂移未交接。
+
+**收斂高信號**（多家獨立都點到）：① 假綠/交差（Composer#4 + Gemini#2）；② 治理/宏觀迴圈（Composer#9 + Gemini#1）。
+
+### Round 2 triage（Claude）
+- **建議現在做**：宏觀斷路器（Claude↔執行端重派 ≤ N 輪→升級使用者）；驗收須 **diff 測試斷言**防篡改（不只看 pass）。
+- **已部分緩解**：背景 heartbeat → 派工已用 `timeout`；可再加無產出 kill。
+- **延後/bootstrap 納入**：clean-room 驗收、編排者 context respawn、env/dep 漂移交接、四源同步、prompt injection 防護（列為 V2 安全項）。
+
 ### ✅ 已完成（2026-05-31）
 - #2：建 `handoffs/`（append-only per-task）+ README；合約改「不得覆蓋根 HANDOFF」。
 - #4：執行合約加結構化收尾報告（ASSUMPTIONS_VERIFIED/TESTS_RUN/FAILURES_SEEN/SCOPE_CHANGES/NUMERIC_OR_SCHEMA_IMPACT）。
