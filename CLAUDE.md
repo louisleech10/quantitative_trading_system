@@ -17,6 +17,27 @@ All code must support this evolution via clean decoupling.
 - **Context 壓縮前**：PreCompact hook 會提醒，優先更新 HANDOFF.md 再讓壓縮發生
 - **其他 agent**：Codex 讀 `AGENTS.md`，Cursor 讀 `.cursorrules`，兩者都指向 HANDOFF.md
 
+### 任務分派規則（Claude 每次必做）
+
+收到任何需求時，**回覆的第一句話**必須先判斷並宣告任務大小與建議流程，讓使用者只需「同意 / 改」：
+
+> 「這是 **小 / 中 / 大** 任務 → 我打算走 X 流程」
+
+- **小**：改 1 函式 / 加 test / 修局部 bug，不碰共用路徑 → 直接寫指令交執行端，不寫 SPEC
+- **中**：單一 module、會動到既有 caller → 精簡 SPEC（只填相關章節）+ TODO
+- **大**：命中任一**高風險原則**（模組會變、原則不變）→ 完整 SPEC + 跨模型 adversarial review（`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`）：
+  - (a) 改變數值正確性 / 資料品質（NaN·inf gate、精度、淨化）
+  - (b) 跨模組 / 共用路徑 / 多下游消費者（改一處影響一片）
+  - (c) 多 phase，或難回退
+  - (d) 碰 ML 訓練/驗證正確性 或 回測真實性（防 overfit / data leakage / look-ahead）
+  - *當期高風險區範例*（隨 V1→V2→V3 階段更新）：Feature Factory / cache / 多 symbol / rolling 統計、IC Gatekeeper / walk-forward / 回測引擎（ML·回測正確性，命中 (d)）。
+- **判不出大小（認知外的東西）**：明講「我不確定這屬於哪級、原因是 X」並問，或先當「中」起步——**絕不靜默假設**。風險原則 (a)-(d) 是抽象的，正是為了接住沒列名的模組（如 IC Gatekeeper 命中 (b)(d)）。
+- **規模膨脹偵測（中→大 升級觸發）**：出現任一訊號立刻喊停建議升級——① 改動檔案數超出預期、② 碰到 `factories.py`/`protocols.py`/`config.py` 等共用路徑、③ 發現新的既有 caller、④ 測試面擴大、⑤ 觸及 (a)-(d) 任一原則。
+- **執行端選層**：預設 **`codex exec`**（terminal-heavy / 長自主 / 難 root-cause）；routine / 多檔編輯 / Codex 額度吃緊 → **`cursor-agent -p`**（便宜 10–60×）。選哪個對使用者透明，準則見手冊 §1。
+- **分工原則**：規劃 / SPEC / 驗收留在 Claude（省 Opus）；長時間實作與 debug 迴圈交執行端在自身 context 跑。debug 用較便宜模型，不回灌 Claude context。
+- **接回機制**：執行端（Codex/Cursor）直接寫檔到 repo；Claude 只讀 **git diff + 測試 pass/fail + 一段摘要**，靠 SPEC §1.0 可測性準則驗收，不重讀 debug 過程。
+- **完整編排手冊**：`docs/MULTI_AGENT_ORCHESTRATION.md`（派工/查進度/驗收指令模板、執行池選層、卡關升級）。執行端合約在 `AGENTS.md` / `.cursorrules`「執行任務時」。
+
 ---
 
 ## Key Directories

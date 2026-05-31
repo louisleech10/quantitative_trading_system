@@ -5,6 +5,15 @@
 ## 正在做
 無（本 session 完成數值品質系統性提升 A1/A2/B + 前次 skew/kurt L1–L4）
 
+## Multi-Agent 工具就緒（2026-05-31）
+三個執行端已裝且驗證可非互動驅動：Codex（`codex exec`, v0.135, GPT-5.5）、
+Cursor（`cursor-agent -p`, Composer 2.5）、Antigravity（`agy -p`, v1.0.3, Gemini；
+Gemini CLI 2026-06-18 退役，agy 接棒）。規劃委員會 = Claude+Codex+agy 三家族。
+使用者需登入：`codex login`、`cursor-agent login`（皆瀏覽器 OAuth）；
+agy 無 login 子命令 → 首次直接跑 `agy`（互動 TUI）觸發 Google 帳號授權。
+編排手冊 `docs/MULTI_AGENT_ORCHESTRATION.md`；執行合約在 AGENTS.md / .cursorrules「執行任務時」。
+分派規則在 CLAUDE.md「任務分派規則」（Claude 每次先報任務大小+流程）。
+
 ## 最新（數值品質系統性提升，2026-05-30 PM）
 全量掃描 437k 特徵發現先前 skew/kurt 修正有 gap（零中心 roll_spread 仍爆炸）+ 更多類型。
 分 Class A（數值垃圾→NaN）/ Class B（真實大值→保留，樹模型尺度不變）。
