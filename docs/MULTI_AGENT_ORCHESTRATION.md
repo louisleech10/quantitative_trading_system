@@ -36,6 +36,9 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 
 **選層原則**：預設 Codex 主力；Codex 額度告警或任務偏 routine/多檔編輯 → 切 Cursor 或 agy。切哪個對使用者透明，使用者只跟 Claude 講需求。
 
+> ⚠️ **能力閘門（council review #11）**：執行端**未通過 T-D（§8 對等性測試）前只能 read-only 諮詢/審查，不得寫入**。目前僅 **codex 已過 T-A/B/C 可寫入**；cursor / agy 登入後須先過 T-D 才解鎖寫入。
+> **派工前後**：寫入型任務派工**前** `bash scripts/agent_preflight.sh` 快照、**後** `bash scripts/agent_postflight.sh` 比對（data_cache 被 gitignore，須用檔案系統快照偵測刪除/縮減），PASS 才進驗收。
+
 ### 規劃委員會（高風險不可逆決策才開全員）
 研究 / SPEC 階段可 fan-out 多模型家族「諮詢」（read-only，不 exec）以防單一盲點：
 
