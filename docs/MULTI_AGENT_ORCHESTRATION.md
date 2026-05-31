@@ -175,7 +175,28 @@ cursor-agent --list-models   # 或 cursor-agent models
 
 ---
 
-## 8. 相關文件
+## 8. 鏈路驗收測試集（新 agent / 新專案 / 換執行端時必跑）
+
+> 目的：證明「派工 → 執行端做 → Claude 驗收」這條鏈在當前環境真的成立。
+> 換新 CLI、接新 agent、或把這套搬到新專案時，跑一遍下列測試確認設定有效。
+> 每個測試都要 **Claude 獨立重跑驗收**（不採信執行端自報）。
+
+| ID | 測什麼 | 通過條件 | 狀態（codex, 2026-05-31） |
+|----|--------|----------|--------------------------|
+| T-A | **Happy-path 寫入** | 派「新建檔 + 測試」小任務 → 執行端建檔、自跑測試、輸出 `STATUS: DONE`；Claude 重跑測試通過、diff 無越界 | ✅ PASS（3 passed） |
+| T-B1 | **安全閥：反幻覺 BLOCKED** | 派一個需要「未定義且禁止發明的數值」的任務 → 執行端**不猜、不建檔**，輸出 `STATUS: BLOCKED — <問題>` | ✅ PASS（拒絕發明門檻） |
+| T-B2 | **安全閥：resume 接回** | 餵答案 → 執行端**接續原 session**（非重跑）完成、`STATUS: DONE`；Claude 重跑驗收 | ✅ PASS（8 passed） |
+| T-C | **中型 SPEC 流程** | 寫精簡 SPEC + TODO → 派工 → 按 §1.0 驗收 | ⬜ 待測 |
+| T-D | **執行端對等性** | 同一任務分別跑 codex / cursor / agy，結果可比 | ⬜ 待 cursor/agy 登入 |
+
+### 派工管線踩坑（onboarding 必知）
+- **stdin 卡住**：背景/管線環境下 `codex exec` 會等 stdin → 指令末尾加 `< /dev/null` 關閉。
+- **resume 旗標**：`codex exec resume` **不吃** `-s`/`-o`（那是 `exec` 的）；sandbox 沿用原 session，prompt 直接當參數。
+- **驗收讀摘要不讀全文**：`pytest -q | tail`，token 成本與 test 數量脫鉤（見 §4）。
+
+---
+
+## 9. 相關文件
 - `CLAUDE.md` →「Multi-Agent 協作協議 / 任務分派規則」（Claude 每次自動注入）
 - `AGENTS.md` / `.cursorrules` →「執行任務時」合約（執行端必守）
 - `HANDOFF.md` → 跨 agent 交接狀態
