@@ -176,8 +176,10 @@ headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `
 | 成本 / wall-clock | 每任務 $ 與耗時 |
 | BLOCKED 頻率 | 多常卡住需 Claude 介入 |
 
-工具：gstack **`/benchmark-models`**（同 prompt 跑 Claude / Codex / Cursor，比 latency·tokens·cost，可加 LLM judge 比品質）。
-翻轉規則：若 Cursor 在某任務類型上**品質追平、成本低 10–60×** → Cursor 當該類日常主力，Codex 留給 terminal-heavy / 難 root-cause。
+**記錄機制**：每次寫入派工**驗收當下** append 一列到 `docs/reviews/executor_scorecard.md`（數據驗收時已在手，near-zero 成本）。**不**每任務都對打——真實任務只派一個執行端，靠累積各自 track record；偶爾刻意 cross-assign 取對照。
+**偏差防範**：只記客觀指標、標任務類型只比同類、樣本夠（每類 ~5+）才下結論，否則維持預設 codex 主力。
+**翻轉規則**：某任務類型上 Cursor **品質（pass@1/scope）追平、成本低 10–60×** → Cursor 當該類主力，Codex 留 terminal-heavy / 難 root-cause。
+工具：gstack **`/benchmark-models`**（同 prompt 跑 Claude/Codex/Gemini，量化比較，不含 Cursor）。
 
 ---
 
