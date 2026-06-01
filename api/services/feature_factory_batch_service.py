@@ -39,6 +39,9 @@ BYTES_PER_GB = 1024 ** 3
 BYTES_PER_MB = 1024 ** 2
 RAM_GATE_MIN_AVAILABLE_GB = 4.0
 RAM_GATE_BASE_PER_SYMBOL_GB = 2.0
+# concurrent=1（8/16GB tier 序列跑）：每波單 symbol、獨立子進程、gc 釋放，
+# 峰值≈單 symbol，與單 symbol IC gate 一致用 1.0GB（不沿用 2.0×1）。
+RAM_GATE_SEQUENTIAL_GB = 1.0
 RSS_CUMULATIVE_WINDOW = 20
 RSS_CUMULATIVE_LIMIT_MB = 1536
 
@@ -513,6 +516,9 @@ class FeatureFactoryBatchService:
 
         tier_gb = get_current_tier_gb()
         concurrent_symbols = max(1, get_tier_concurrent_symbols(tier_gb))
+        if concurrent_symbols <= 1:
+            # 序列跑：與單 symbol 路徑一致，不為「未並行」要求額外 headroom
+            return RAM_GATE_SEQUENTIAL_GB
         return RAM_GATE_BASE_PER_SYMBOL_GB * concurrent_symbols
 
     def _ram_gate(self, min_available_gb: Optional[float] = None) -> None:

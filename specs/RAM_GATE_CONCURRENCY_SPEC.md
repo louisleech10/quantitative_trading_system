@@ -42,7 +42,7 @@
 ## 3. 測試（具體斷言）
 | ID | 條件 | 通過 |
 |----|------|------|
-| T1 | concurrent=1（8/16GB）、無 env | `_resolve_ram_gate_min_gb()==2.0` |
+| T1 | concurrent=1（8/16GB）、無 env | `_resolve_ram_gate_min_gb()==1.0`（V2 修正：與單 symbol IC gate 一致，序列跑不要額外 headroom） |
 | T2 | concurrent=2 | `==4.0` |
 | T3 | concurrent=3 | `==6.0` |
 | T4 | env FFACT_RAM_GATE_MIN_GB=1.2 | `==1.2`（不論 concurrent） |

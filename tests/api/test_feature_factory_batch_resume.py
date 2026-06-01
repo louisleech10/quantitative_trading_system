@@ -16,6 +16,7 @@ from api.routes.feature_factory import get_batch_service
 from api.services.feature_factory_batch_service import (
     FeatureFactoryBatchService,
     RAM_GATE_BASE_PER_SYMBOL_GB,
+    RAM_GATE_SEQUENTIAL_GB,
 )
 
 
@@ -74,7 +75,7 @@ def test_resolve_ram_gate_min_gb_scales_with_concurrency(monkeypatch, tmp_path):
         "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
         lambda _tier_gb: 1,
     )
-    assert service._resolve_ram_gate_min_gb() == RAM_GATE_BASE_PER_SYMBOL_GB
+    assert service._resolve_ram_gate_min_gb() == RAM_GATE_SEQUENTIAL_GB
 
     monkeypatch.setattr(
         "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
@@ -116,7 +117,7 @@ def test_resolve_ram_gate_min_gb_invalid_env_falls_back(monkeypatch, tmp_path):
         lambda _tier_gb: 1,
     )
 
-    assert service._resolve_ram_gate_min_gb() == 2.0
+    assert service._resolve_ram_gate_min_gb() == RAM_GATE_SEQUENTIAL_GB
 
 
 def test_resolve_ram_gate_min_gb_zero_env_is_valid(monkeypatch, tmp_path):
@@ -196,9 +197,10 @@ async def test_batch_resume_skips_completed_items(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_ram_gate(monkeypatch, tmp_path):
+    # 0.5GB：明確低於最低 tier 的 gate（concurrent=1 → 1.0GB），確保各 tier 都觸發
     monkeypatch.setattr(
         "api.services.feature_factory_batch_service.psutil.virtual_memory",
-        lambda: _VirtualMemory(available=1024 ** 3),
+        lambda: _VirtualMemory(available=1024 ** 3 // 2),
     )
 
     service = FeatureFactoryBatchService(checkpoint_dir=tmp_path)
