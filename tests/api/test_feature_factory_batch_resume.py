@@ -11,10 +11,12 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from api.main import app
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service
-from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+from api.services.feature_factory_batch_service import (
+    FeatureFactoryBatchService,
+    RAM_GATE_BASE_PER_SYMBOL_GB,
+)
 
 
 class _VirtualMemory:
@@ -58,6 +60,90 @@ def _compute_success(
     _cache_dir: Optional[str] = None,
 ) -> str:
     return f"/tmp/{symbol}_{timeframe}.h5"
+
+
+def test_resolve_ram_gate_min_gb_scales_with_concurrency(monkeypatch, tmp_path):
+    service = FeatureFactoryBatchService(checkpoint_dir=tmp_path)
+    monkeypatch.delenv("FFACT_RAM_GATE_MIN_GB", raising=False)
+
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_current_tier_gb",
+        lambda: 8.0,
+    )
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
+        lambda _tier_gb: 1,
+    )
+    assert service._resolve_ram_gate_min_gb() == RAM_GATE_BASE_PER_SYMBOL_GB
+
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
+        lambda _tier_gb: 2,
+    )
+    assert service._resolve_ram_gate_min_gb() == 4.0
+
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
+        lambda _tier_gb: 3,
+    )
+    assert service._resolve_ram_gate_min_gb() == 6.0
+
+
+def test_resolve_ram_gate_min_gb_env_override(monkeypatch, tmp_path):
+    service = FeatureFactoryBatchService(checkpoint_dir=tmp_path)
+    monkeypatch.setenv("FFACT_RAM_GATE_MIN_GB", "1.2")
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_current_tier_gb",
+        lambda: 32.0,
+    )
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
+        lambda _tier_gb: 3,
+    )
+
+    assert service._resolve_ram_gate_min_gb() == 1.2
+
+
+def test_resolve_ram_gate_min_gb_invalid_env_falls_back(monkeypatch, tmp_path):
+    service = FeatureFactoryBatchService(checkpoint_dir=tmp_path)
+    monkeypatch.setenv("FFACT_RAM_GATE_MIN_GB", "abc")
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_current_tier_gb",
+        lambda: 8.0,
+    )
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
+        lambda _tier_gb: 1,
+    )
+
+    assert service._resolve_ram_gate_min_gb() == 2.0
+
+
+def test_resolve_ram_gate_min_gb_zero_env_is_valid(monkeypatch, tmp_path):
+    service = FeatureFactoryBatchService(checkpoint_dir=tmp_path)
+    monkeypatch.setenv("FFACT_RAM_GATE_MIN_GB", "0")
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
+        lambda _tier_gb: 3,
+    )
+
+    assert service._resolve_ram_gate_min_gb() == 0.0
+
+
+def test_ram_gate_uses_resolved_required_gb(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "api.services.feature_factory_batch_service.psutil.virtual_memory",
+        lambda: _VirtualMemory(available=1 * 1024 ** 3),
+    )
+    service = FeatureFactoryBatchService(checkpoint_dir=tmp_path)
+    monkeypatch.setattr(service, "_resolve_ram_gate_min_gb", lambda: 2.0)
+
+    with pytest.raises(HTTPException) as exc_info:
+        service._ram_gate()
+
+    assert exc_info.value.status_code == 429
+    assert "RAM gate" in str(exc_info.value.detail)
+    assert "required=2.00GB" in str(exc_info.value.detail)
 
 
 @pytest.mark.asyncio
@@ -155,6 +241,30 @@ class _ResumeNotFoundServiceStub:
 
 
 def test_resume_not_found():
+    class _ProviderStub:
+        pass
+
+    class _RegistryStub:
+        def register(self, _name: str, _provider: object) -> None:
+            return None
+
+    class _DownloadServiceStub:
+        registry = _RegistryStub()
+
+    monkeypatch_context = pytest.MonkeyPatch()
+    monkeypatch_context.setattr(
+        "momentum.factories.create_binance_provider",
+        lambda: _ProviderStub(),
+    )
+    monkeypatch_context.setattr(
+        "momentum.factories.create_kline_download_service",
+        lambda storage_manager=None: _DownloadServiceStub(),
+    )
+    try:
+        from api.main import app
+    finally:
+        monkeypatch_context.undo()
+
     app.dependency_overrides[get_batch_service] = lambda: _ResumeNotFoundServiceStub()
 
     try:

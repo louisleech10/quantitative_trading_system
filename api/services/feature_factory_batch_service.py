@@ -6,6 +6,7 @@ import asyncio
 import gc
 import hashlib
 import json
+import os
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor
@@ -37,6 +38,7 @@ logger = get_logger("api.feature_factory_batch_service")
 BYTES_PER_GB = 1024 ** 3
 BYTES_PER_MB = 1024 ** 2
 RAM_GATE_MIN_AVAILABLE_GB = 4.0
+RAM_GATE_BASE_PER_SYMBOL_GB = 2.0
 RSS_CUMULATIVE_WINDOW = 20
 RSS_CUMULATIVE_LIMIT_MB = 1536
 
@@ -499,8 +501,25 @@ class FeatureFactoryBatchService:
             return 1
         return concurrent_symbols
 
-    def _ram_gate(self, min_available_gb: float = RAM_GATE_MIN_AVAILABLE_GB) -> None:
+    def _resolve_ram_gate_min_gb(self) -> float:
+        """Resolve RAM gate GB threshold from env override or concurrent tier."""
+
+        env_value = os.getenv("FFACT_RAM_GATE_MIN_GB")
+        if env_value:
+            try:
+                return float(env_value)
+            except ValueError:
+                pass
+
+        tier_gb = get_current_tier_gb()
+        concurrent_symbols = max(1, get_tier_concurrent_symbols(tier_gb))
+        return RAM_GATE_BASE_PER_SYMBOL_GB * concurrent_symbols
+
+    def _ram_gate(self, min_available_gb: Optional[float] = None) -> None:
         """Reject new heavy work when available RAM is below the safety gate."""
+
+        if min_available_gb is None:
+            min_available_gb = self._resolve_ram_gate_min_gb()
 
         available_bytes = psutil.virtual_memory().available
         min_available_bytes = int(min_available_gb * BYTES_PER_GB)
