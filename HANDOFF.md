@@ -1,88 +1,28 @@
 # Handoff
-
-**Agent**: Claude Code | **Time**: 2026-05-30 | **Branch**: main
+**Agent**: Codex | **Time**: 2026-06-02 | **Branch**: main
 
 ## 正在做
-無（本 session 完成數值品質系統性提升 A1/A2/B + 前次 skew/kurt L1–L4）
+- Multi-symbol fix **Phase 4（C3 IC-First 清理）已完成**；建於 Phase 1-3 工作樹上。
 
-## Multi-Agent 協作體系（2026-05-31 驗證完成）
-三執行端登入+驗證：codex(GPT-5.5)、cursor(composer-2.5)、agy(Gemini 3.1 Pro)。
-- **可寫入**：codex（過 T-A/B/C）、cursor（過 T-D）。**僅 read-only 委員**：agy（coding 評測失敗）。
-- **規劃委員會 4 家族**（皆過委員資格）：Claude + codex + cursor + Gemini。
-- 驗收全綠：T-A/B/C/D/E + 兩輪對抗式 council；高優先修正兩輪已套用
-  （HANDOFF 競態→handoffs/、data_cache 實體防線 preflight/postflight、宏觀斷路器、防測試篡改、結構化收尾報告）。
-- 文件：編排手冊 `docs/MULTI_AGENT_ORCHESTRATION.md`、可複用 `docs/MULTI_AGENT_BOOTSTRAP.md`、
-  審查 transcript `docs/reviews/council_E_orchestration_review.md`；合約在 AGENTS.md/.cursorrules；分派規則在 CLAUDE.md。
-- **開放項**：主力 codex vs cursor 由真實任務記分卡累積決定（§6）；延後項見 BOOTSTRAP Part F。
-- 安全：寫入派工前後跑 `scripts/agent_preflight.sh`/`agent_postflight.sh`。執行端交接寫 `handoffs/`，不覆蓋本檔。
-
-## 最新（數值品質系統性提升，2026-05-30 PM）
-全量掃描 437k 特徵發現先前 skew/kurt 修正有 gap（零中心 roll_spread 仍爆炸）+ 更多類型。
-分 Class A（數值垃圾→NaN）/ Class B（真實大值→保留，樹模型尺度不變）。
-
-- **A1 數學界守衛**（[numba_rolling.py](momentum/FeatureEngineering/operators/numba_rolling.py)）：
-  `_compute_skew/_compute_kurt` 用**精確樣本界** `|skew|≤√n`、`-2(n-1)/(n-3)≤excess_kurt≤n`
-  取代有 gap 的 Σx² 守衛（保留相對退化守衛擋常數窗）。**中心無關** → 修好零中心
-  roll_spread（61→0 爆炸）。kurt 下界對小 n 是 -2(n-1)/(n-3) 非 -2（否則誤殺）。
-- **A2 除法近零守衛**（[utils/numeric_guards.py](momentum/FeatureEngineering/utils/numeric_guards.py) `safe_denominator`）：
-  分母 `|denom| < rel_eps×median(|nonzero|)` 設 NaN，取代 exact-0 守衛。修 STOCHRSI
-  momentum（TA-Lib 邊界回傳 ±1e-14 → 92→0 爆炸）。整合 pandas 4 站點（derived_operators）
-  + polars 3 站點（polars_adapter，CGSA 生產路徑）。
-- **B 通用淨化**（`sanitize_array_inplace` @ [feature_storage.py](momentum/FeatureEngineering/feature_storage.py) `_write_group`）：
-  inf/|v|>finite_cap(1e18) → NaN，覆蓋所有 CGSA-streamed 特徵（含 L3）。Class B（volume
-  VAR ~3e10）保留。config `nan_strategy.numeric_sanitize`。
-- **不做**：特徵縮放（模型只有 XGBoost/LightGBM，逐特徵尺度不變）。
-- **winsorization 救不了 Class A**：爆炸比例 ~5% ≫ 1% 尾 → 根因 NaN 是必須。
-- 測試：numba_rolling 47、numeric_guards 9、feature_engineering 425 全 pass。
-- **待使用者重跑**：feature pipeline 重生成後 `|mean| or |std|>1e12` 應降為 0。
-
-## 前次（Rolling Skew/Kurt 修正 L1–L4，已 commit 359ab61）
-
-## 最新（Rolling Skew/Kurt 爆炸修正，2026-05-30）
-
-**根因**（實測確認，推翻所有先前假設）：
-- L3 rolling skew/kurt 在 **原生 12h 序列**（HT-TRENDMODE 二元 0/1）計算，再前向填充到 1h index
-- `rolling_skew_kurt`（增量 Pébay 滑動窗口）在**窗口從「含幾個 0」滑進「全 1」的瞬間爆炸**
-- `_pebay_remove` 移除最後一個 0 時 catastrophic cancellation → m2 殘留 ~1e-25
-- 舊絕對守衛 `m2 < 1e-30` 攔不住 → `m3/m2^1.5 → 2.6e+32`
-- 確認推翻：非 parallel/cache 問題、非資料版本不一致
-
-**修正 L1–L4（全部雙模式 CGSA + non-CGSA 驗證）**：
-1. **L1 kernel（核心）**：`_compute_skew/_compute_kurt` 換成尺度相對守衛 `m2 ≤ 1e-12 × Σx²`（SciPy 同結構，1e-10 price / 1e20 volume / 報酬類 mean≈0 全正確；保留真實 fat-tail）
-2. **L2 輸出衛生**：`if not isfinite: return NaN`（只攔 inf/overflow，不 clip 有限值）
-3. **L3 快取+測試**：清 numba `__pycache__/*.nbc/.nbi`；`test_numba_rolling.py` 新增 6 個回歸測試（choppy→constant、1e-10/1e20 尺度、單離群值、determinism）
-4. **L4 Pipeline 把關**：`compute_all` 一次算低基數欄位集合（`skip_higher_moments_max_cardinality: 2`，config 可調），4 個 skew/kurt 產出點共用，二元欄不輸出 skew/kurt 但保留 mean/std。CGSA / non-CGSA / numba / pandas fallback 4 路徑一致
-
-**測試**：43 passed (test_numba_rolling)、197 passed 全 preprocessing suite
-
-**資料重生成**：磁碟上 52 個 `|mean|>1e20` / 1107 個 `|mean|>1e10` L3 Skew/Kurt 特徵仍為舊爆炸值，需使用者觸發完整 feature pipeline 重跑後消失。
-
-**副修**：3 個 preprocessing 測試對齊現行程式碼（fast-ADF 繞過了 monkeypatch 的 adfuller / log 字串改寫）。
-
-## 踩坑提醒（本次新增）
-- `rolling_skew_kurt` 的退化守衛必須是**尺度相對**（`m2/Σx²`），絕不用絕對門檻；pandas 在 1e-10 尺度會誤殺，我們的實作更正確
-- numba `parallel=True` + `prange` 跨 window 的浮點 reordering 是非確定性來源（P4 已改成 sequential `range`，勿回退）
-- L3 Skew/Kurt 對二元/低基數 L1 特徵（如 HT-TRENDMODE）本質退化，Layer 4 gate 在源頭阻斷，`skip_higher_moments_max_cardinality: 2` 控制
-- fast-ADF（`FFACT_USE_FAST_ADF`，預設 1）繞過 statsmodels `adfuller`；測試需 `monkeypatch.setenv("FFACT_USE_FAST_ADF", "0")` 才能 patch adfuller
+## 本次決策
+- P4-1 golden 使用本批指令指定的最小可重現 config：BTCUSDT 1h、IC-First on、L1 trend EMA(21)、L2-6.5 最小集合。
+- golden 只寫 `tests/fixtures/golden/multi_symbol_c3/`；計算時 `persist=False`、`FFACT_USE_CGSA=0`、registry 指到 temp，避免寫 data_cache 作 golden。
+- P4-2 batch compute 統一走 `_compute_single`；IC-First 由 `config_override.preprocessing.ic_first_pipeline` 路由。
+- `_resolve_concurrent_symbols(config_override)` 在 config IC-First 時 force `concurrent_symbols=1`；不再靠 `FFACT_MULTI_SYMBOL_IC_FIRST` 選 compute function。
+- `create_feature_factory_for_ic_batch` 已移除（無 caller）。
 
 ## 待辦
-- **使用者觸發**：feature pipeline 重跑後在 Feature Table `Mean ↓` 確認頂端無 `|mean|>1e10` 特徵
-- （既有）large_trade_ratio fail-fast + warmup 誤判（RUN_COMPARISON_20260521 §3.2/3.3）
+- Claude 驗收 diff 時注意工作樹含 Phase 1-3 既有變更，本批新增/修改重點：golden script+fixture、batch service P4-2、factory cleanup、multi-symbol IC-first tests。
 
 ## 阻塞
-- （無）
+- 無。
 
-## 前次完成（資料品質 Dashboard 重設計，2026-05-29）
-- P0 coverage bug、P0 cache 失效、P1 誠實分類（warmup_only_high_nan/real_problem）、P3 group_breakdown
-- 前端 types.ts、DataQualityDashboard 新增 tradeoff chart + group NaN stacked bar
+## 驗證摘要
+- PASS: `python scripts/golden_multi_symbol_c3.py freeze` 產 `baseline.parquet` + `env_snapshot.json`，ETH/BTC/DOGE 1h smoke 讀真實 kline。
+- PASS: `python scripts/golden_multi_symbol_c3.py compare`（P4-2 改後 == P4-1 baseline）。
+- PASS: `python -m pytest tests/feature_engineering/test_multi_symbol_ic_first.py tests/api/test_feature_factory_batch_resume.py -q`（36 passed, 1 warning）。
+- PASS: `grep -rn _compute_single_ic_first momentum api` → 0；`grep -r "from api\." momentum/` → 0。
 
-## 前次完成（NaN 處理三 step，2026-05-28）
-1. Cascade Blacklist（CDL_PATTERN_ALL + HT_DCPHASE 5 入口）
-2. L7 Dead Feature Drop（frame path，`nunique<2` OR `valid_count<100`）
-3. ADF Safe-Skip Whitelist（47 patterns，bypass 嚴格 I(0)）
-- 179 tests pass；decoupling Phase 4.6.2 PASSED
-
-## 不變的規則
-- `momentum/` 絕不 import `api/`（7 Decoupling Rules）
-- NaN ratio **不**是欄位品質指標；絕不以 NaN ratio 作為 drop 條件
-- 退化守衛必須尺度相對；fat-tail 有限值不 clip
+## 踩坑提醒
+- `persist=False` 仍會更新預設 `FeatureRegistry`，golden 腳本已把 `_registry` 指到 temp；後續改腳本勿移除。
+- `pyarrow` compare 會印 macOS sandbox `sysctlbyname` IOError，但命令 exit 0 且 PASS。
