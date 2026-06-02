@@ -22,6 +22,10 @@ from api.services.feature_factory_batch_service import (
     get_feature_factory_batch_service,
     set_feature_factory_batch_service,
 )
+from api.services.feature_factory_batch_adapters import (
+    FeatureFactoryBrowseAdapter,
+    FeatureFactoryQualityAdapter,
+)
 
 
 batch_service: Optional[FeatureFactoryBatchService] = None
@@ -50,7 +54,10 @@ async def lifespan(app: FastAPI):
     # 初始化 Feature Factory 批次服務單例
     global batch_service
     if batch_service is None:
-        batch_service = FeatureFactoryBatchService()
+        batch_service = FeatureFactoryBatchService(
+            browse_registrar=FeatureFactoryBrowseAdapter(),
+            quality_computer=FeatureFactoryQualityAdapter(),
+        )
         set_feature_factory_batch_service(batch_service)
     
     logger.info(f"API 服務器啟動成功 - {settings.app_name} v{settings.app_version}")

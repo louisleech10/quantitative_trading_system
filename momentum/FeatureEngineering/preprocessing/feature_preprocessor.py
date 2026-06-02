@@ -45,6 +45,7 @@ from momentum.core.config import (
     get_fracdiff_layers,
     get_fracdiff_precision,
     get_l65_optimization_profile,
+    get_batch_symbol_concurrency,
     get_slowpath_n_jobs,
 )
 from momentum.core.logging import get_logger
@@ -2861,7 +2862,8 @@ class FeaturePreprocessor:
             tier_gb = get_current_tier_gb()
         except Exception:
             tier_gb = 8
-        return get_slowpath_n_jobs(tier_gb)
+        concurrent_symbols = get_batch_symbol_concurrency()
+        return get_slowpath_n_jobs(tier_gb, concurrent_symbols=concurrent_symbols)
 
     def _apply_fractional_differencing_serial(
         self,

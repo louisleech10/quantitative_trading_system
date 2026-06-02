@@ -1,0 +1,57 @@
+{
+  "compute_fn": "_compute_single",
+  "config_declared_hash": "f16b985c3846",
+  "config_hash": "f16b985c3846",
+  "env": {
+    "FFACT_USE_CGSA": "0"
+  },
+  "metadata": {
+    "config_hash": "b5fdf39aa015204ba3f5d3a3cd8de5b0",
+    "data_range": [
+      "2024-01-01T00:00:00",
+      "2026-04-27T23:00:00"
+    ],
+    "feature_count": 1,
+    "layer_counts": {
+      "layer1": 1,
+      "layer2": 0,
+      "layer3": 0,
+      "layer4": 0,
+      "layer5": 0,
+      "layer6": 0
+    }
+  },
+  "numpy": "1.26.4",
+  "pandas": "2.3.2",
+  "platform": "macOS-26.3-arm64-arm-64bit",
+  "python": "3.9.6 (default, Dec  2 2025, 07:27:58) \n[Clang 17.0.0 (clang-1700.6.3.2)]",
+  "smoke_symbols": [
+    {
+      "config_hash": "f16b985c3846",
+      "feature_count": 1,
+      "feature_set_sha256": "f8ccf5e7e5c00d9af7cd58a739cb6c44a1fbee155fcdc92c9219cfbd707bb336",
+      "row_count": 20352,
+      "schema_sha256": "42291dd8c2c5ef2a19526aeacd10c515f390dca4e4cf11b8f8f5b2faf6268a2b",
+      "symbol": "ETHUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "config_hash": "f16b985c3846",
+      "feature_count": 1,
+      "feature_set_sha256": "f8ccf5e7e5c00d9af7cd58a739cb6c44a1fbee155fcdc92c9219cfbd707bb336",
+      "row_count": 20352,
+      "schema_sha256": "42291dd8c2c5ef2a19526aeacd10c515f390dca4e4cf11b8f8f5b2faf6268a2b",
+      "symbol": "BTCUSDT",
+      "timeframe": "1h"
+    },
+    {
+      "config_hash": "f16b985c3846",
+      "feature_count": 1,
+      "feature_set_sha256": "f8ccf5e7e5c00d9af7cd58a739cb6c44a1fbee155fcdc92c9219cfbd707bb336",
+      "row_count": 20352,
+      "schema_sha256": "42291dd8c2c5ef2a19526aeacd10c515f390dca4e4cf11b8f8f5b2faf6268a2b",
+      "symbol": "DOGEUSDT",
+      "timeframe": "1h"
+    }
+  ]
+}

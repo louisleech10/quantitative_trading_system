@@ -184,6 +184,7 @@ class BatchTaskStatusResponse(BaseModel):
     memory_sanity_failed: Optional[bool] = None
     last_item_metrics: Optional[Dict[str, Any]] = None
     results: Optional[Dict[str, str]] = None
+    browse_task_ids: Optional[Dict[str, str]] = None
     errors: Optional[Dict[str, str]] = None
 
 

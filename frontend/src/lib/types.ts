@@ -449,6 +449,7 @@ export interface BatchTaskStatus {
   per_item_rss?: BatchItemRss[];
   last_item_metrics?: BatchItemMetrics | null;
   results?: Record<string, string>;
+  browse_task_ids?: Record<string, string>;
   errors?: Record<string, string>;
 }
 

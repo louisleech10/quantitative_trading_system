@@ -17,7 +17,7 @@ DEFAULT_REGISTRY_PATH = Path("data_cache/features/registry.json")
 
 
 class FeatureRegistry:
-    """Append-only registry persisted as a JSON file."""
+    """Registry persisted as a JSON file with per-config upsert semantics."""
 
     def __init__(self, path: Optional[Path] = None) -> None:
         self._path = path or DEFAULT_REGISTRY_PATH
@@ -39,7 +39,7 @@ class FeatureRegistry:
             self._entries = []
 
     def add(self, entry: Dict[str, Any]) -> None:
-        """Add one entry and persist the registry atomically."""
+        """Add or update one entry and persist the registry atomically."""
         required_keys = {"symbol", "timeframe", "config_hash"}
         missing = required_keys - set(entry.keys())
         if missing:
@@ -47,6 +47,22 @@ class FeatureRegistry:
 
         if "created_at" not in entry:
             entry["created_at"] = time.time()
+
+        key = (
+            str(entry["symbol"]),
+            str(entry["timeframe"]),
+            str(entry["config_hash"]),
+        )
+        for idx, existing in enumerate(self._entries):
+            existing_key = (
+                str(existing.get("symbol")),
+                str(existing.get("timeframe")),
+                str(existing.get("config_hash")),
+            )
+            if existing_key == key:
+                self._entries[idx] = entry
+                self._persist()
+                return
 
         self._entries.append(entry)
         self._persist()

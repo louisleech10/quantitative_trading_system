@@ -3651,7 +3651,7 @@ class FeatureFactoryService:
         Two passes:
         1. task_record.json  — exact task_id written by a previous session.
         2. feature_manifest.json without a companion task_record — auto-register
-           as a stable browse task (id: browse_{symbol}_{timeframe}_{hash8}).
+           as a stable browse task (id: browse_{symbol}_{timeframe}).
         """
         features_root = settings.data_cache_path / "features"
         if not features_root.exists():
@@ -3711,11 +3711,9 @@ class FeatureFactoryService:
                 continue  # Unexpected layout — skip
             symbol = parts[0]
             timeframe = parts[1]
-            config_hash = parts[2]
-            hash8 = config_hash[:8]
-            # Stable ID — deterministic from symbol+timeframe+hash so the same
-            # manifest always gets the same task_id across restarts.
-            stable_id = f"browse_{symbol}_{timeframe}_{hash8}"
+            # Stable ID — latest-overwrite by symbol+timeframe. Older
+            # browse_{symbol}_{timeframe}_{hash8} ids are ignored on restore.
+            stable_id = f"browse_{symbol}_{timeframe}"
             with self._lock:
                 if stable_id in self._tasks:
                     continue

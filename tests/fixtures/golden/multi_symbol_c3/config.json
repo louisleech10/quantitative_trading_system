@@ -1,0 +1,83 @@
+{
+  "preset": "minimal",
+  "config_hash": "f16b985c3846",
+  "timeframes": {
+    "primary": "1h",
+    "training": ["1h"]
+  },
+  "data_sources": {
+    "enabled_sources": ["close"]
+  },
+  "atomic_indicators": {
+    "trend": {
+      "enabled": true,
+      "indicators": [
+        {
+          "name": "EMA",
+          "periods": [21]
+        }
+      ]
+    },
+    "momentum": {
+      "enabled": false,
+      "indicators": []
+    },
+    "volatility": {
+      "enabled": false,
+      "indicators": []
+    },
+    "volume": {
+      "enabled": false,
+      "indicators": []
+    },
+    "cycle": {
+      "enabled": false,
+      "indicators": []
+    },
+    "pattern": {
+      "enabled": false,
+      "indicators": []
+    },
+    "statistics": {
+      "enabled": false,
+      "indicators": []
+    }
+  },
+  "operators": {
+    "enabled": false
+  },
+  "rolling_aggregation": {
+    "enabled": false
+  },
+  "lag_features": {
+    "enabled": false
+  },
+  "cross_sectional": {
+    "enabled": false
+  },
+  "meta_features": {
+    "enabled": false
+  },
+  "preprocessing": {
+    "enabled": true,
+    "ic_first_pipeline": true,
+    "winsorization": {
+      "enabled": true
+    },
+    "adf_differencing": {
+      "enabled": false
+    },
+    "fractional_differencing": {
+      "enabled": false
+    },
+    "rank_transform": {
+      "enabled": false
+    },
+    "adaptive_zscore": {
+      "enabled": false
+    },
+    "gaussian_normalize": {
+      "enabled": false
+    }
+  }
+}

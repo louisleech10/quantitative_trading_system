@@ -22,6 +22,54 @@ def test_registry_add_and_list() -> None:
         assert len(entries) == 2
 
 
+def test_registry_upserts_same_symbol_timeframe_config_hash() -> None:
+    """Same key should update the existing entry instead of appending."""
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry = FeatureRegistry(Path(tmpdir) / "registry.json")
+        registry.add(
+            {
+                "symbol": "BTCUSDT",
+                "timeframe": "1h",
+                "config_hash": "same-hash",
+                "feature_count": 10,
+                "path": "/tmp/old.parquet",
+                "created_at": 100,
+            }
+        )
+        registry.add(
+            {
+                "symbol": "BTCUSDT",
+                "timeframe": "1h",
+                "config_hash": "same-hash",
+                "feature_count": 12,
+                "path": "/tmp/new.parquet",
+                "created_at": 200,
+            }
+        )
+
+        entries = registry.list_all()
+        assert len(entries) == 1
+        assert entries[0]["feature_count"] == 12
+        assert entries[0]["path"] == "/tmp/new.parquet"
+        assert entries[0]["created_at"] == 200
+
+
+def test_registry_keeps_distinct_config_hash_versions() -> None:
+    """Different config_hash values remain separate historical versions."""
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry = FeatureRegistry(Path(tmpdir) / "registry.json")
+        registry.add({"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": "hash-a"})
+        registry.add({"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": "hash-b"})
+
+        entries = registry.list_all()
+        assert len(entries) == 2
+        assert {entry["config_hash"] for entry in entries} == {"hash-a", "hash-b"}
+
+
 def test_registry_persist_and_reload() -> None:
     """Entries should persist to disk and be loaded by a new instance."""
     from momentum.FeatureEngineering.feature_registry import FeatureRegistry

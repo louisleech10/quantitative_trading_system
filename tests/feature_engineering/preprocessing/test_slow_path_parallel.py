@@ -54,6 +54,79 @@ def test_nested_protection_forces_single_job(monkeypatch: pytest.MonkeyPatch) ->
     assert get_slowpath_n_jobs(8) == 1
 
 
+def test_get_slowpath_n_jobs_concurrent_aware(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FFACT_BATCH_NESTED", raising=False)
+    monkeypatch.setattr(
+        "momentum.core.config.get_slowpath_parallel_enabled",
+        lambda: False,
+    )
+    assert get_slowpath_n_jobs(8, 1) == 1
+
+    monkeypatch.setenv("FFACT_L65_SLOWPATH_PARALLEL", "1")
+    monkeypatch.setattr(
+        "momentum.core.config.get_slowpath_parallel_enabled",
+        lambda: True,
+    )
+    assert get_slowpath_n_jobs(16, 1) == 4
+    assert get_slowpath_n_jobs(16, 2) == 2
+    assert get_slowpath_n_jobs(32, 4) == 2
+    assert get_slowpath_n_jobs(16, 0) == 4
+
+
+def test_resolve_slowpath_n_jobs_batch_concurrency(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FFACT_L65_SLOWPATH_PARALLEL", "1")
+    monkeypatch.delenv("FFACT_BATCH_NESTED", raising=False)
+    monkeypatch.setenv("FFACT_PARALLEL_BUDGET", "1")
+    monkeypatch.setenv("FFACT_BATCH_SYMBOL_CONCURRENCY", "2")
+    monkeypatch.setattr(
+        "momentum.core.config.get_slowpath_parallel_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "momentum.FeatureEngineering.preprocessing.feature_preprocessor.get_current_tier_gb",
+        lambda: 16,
+    )
+
+    preprocessor = FeaturePreprocessor({})
+    assert preprocessor._resolve_slowpath_n_jobs() == 2
+
+
+def test_resolve_slowpath_n_jobs_parallel_budget_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FFACT_L65_SLOWPATH_PARALLEL", "1")
+    monkeypatch.delenv("FFACT_PARALLEL_BUDGET", raising=False)
+    monkeypatch.setenv("FFACT_BATCH_NESTED", "1")
+    monkeypatch.setenv("FFACT_BATCH_SYMBOL_CONCURRENCY", "2")
+    monkeypatch.setattr(
+        "momentum.core.config.get_slowpath_parallel_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "momentum.FeatureEngineering.preprocessing.feature_preprocessor.get_current_tier_gb",
+        lambda: 16,
+    )
+
+    preprocessor = FeaturePreprocessor({})
+    assert preprocessor._resolve_slowpath_n_jobs() == 1
+
+
+def test_resolve_slowpath_n_jobs_ops_nested_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FFACT_L65_SLOWPATH_PARALLEL", "1")
+    monkeypatch.setenv("FFACT_PARALLEL_BUDGET", "1")
+    monkeypatch.setenv("FFACT_BATCH_NESTED", "1")
+    monkeypatch.setenv("FFACT_BATCH_SYMBOL_CONCURRENCY", "2")
+    monkeypatch.setattr(
+        "momentum.core.config.get_slowpath_parallel_enabled",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "momentum.FeatureEngineering.preprocessing.feature_preprocessor.get_current_tier_gb",
+        lambda: 16,
+    )
+
+    preprocessor = FeaturePreprocessor({})
+    assert preprocessor._resolve_slowpath_n_jobs() == 1
+
+
 def test_slow_path_parallel_default_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FFACT_L65_SLOWPATH_PARALLEL", raising=False)
     monkeypatch.delenv("FFACT_BATCH_NESTED", raising=False)

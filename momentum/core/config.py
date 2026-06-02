@@ -188,11 +188,38 @@ def get_concurrent_symbols_override() -> Optional[int]:
     return value
 
 
+def get_parallel_budget_enabled() -> bool:
+    """Return whether batch parallel worker budget (C2) is enabled.
+
+    預設 off：batch 子進程維持 n_jobs=1（與改動前行為一致）。
+    """
+
+    raw = os.getenv("FFACT_PARALLEL_BUDGET", "0").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def get_batch_nested_enabled() -> bool:
-    """Return whether the current process is already inside a heavy batch layer."""
+    """Return whether ops forced batch safe mode (n_jobs=1 / 序列 symbol wave)."""
 
     raw = os.getenv("FFACT_BATCH_NESTED", "0").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def get_batch_symbol_concurrency() -> int:
+    """Return outer batch symbol concurrency injected by the parent wave."""
+
+    raw = os.getenv("FFACT_BATCH_SYMBOL_CONCURRENCY")
+    if raw is None or not str(raw).strip():
+        return 1
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        logger.warning(
+            "Invalid FFACT_BATCH_SYMBOL_CONCURRENCY=%s, fallback to 1",
+            raw,
+        )
+        return 1
+    return max(1, value)
 
 
 def get_slowpath_parallel_enabled() -> bool:
@@ -256,11 +283,16 @@ def get_fast_adf_enabled() -> bool:
     return True
 
 
-def get_slowpath_n_jobs(tier_gb: int) -> int:
-    """Return safe L6.5 slow-path joblib worker count for the memory tier."""
+def get_slowpath_n_jobs(tier_gb: int, concurrent_symbols: int = 1) -> int:
+    """Return safe L6.5 slow-path joblib worker count for the memory tier.
+
+    ``concurrent_symbols`` 為 batch 外層同 wave 並行 symbol 數；預設 1 不影響單 symbol 路徑。
+    """
 
     if get_batch_nested_enabled():
-        logger.warning("[L6.5] slow-path joblib disabled by FFACT_BATCH_NESTED=1")
+        logger.warning(
+            "[L6.5] slow-path joblib forced safe mode (FFACT_BATCH_NESTED=1)"
+        )
         return 1
     if not get_slowpath_parallel_enabled():
         return 1
@@ -272,17 +304,27 @@ def get_slowpath_n_jobs(tier_gb: int) -> int:
         tier_value = int(tier_gb)
     except (TypeError, ValueError):
         tier_value = 8
-    return _SLOWPATH_NJOBS_BY_TIER_GB.get(tier_value, 2)
+    try:
+        concurrent_value = int(concurrent_symbols)
+    except (TypeError, ValueError):
+        concurrent_value = 1
+    concurrent_value = max(1, concurrent_value)
+    tier_cap = _SLOWPATH_NJOBS_BY_TIER_GB.get(tier_value, 2)
+    return max(1, tier_cap // concurrent_value)
 
 
 @contextmanager
 def batch_nested_environment(enabled: bool = True) -> Iterator[None]:
-    """Temporarily mark child workers as nested batch execution context."""
+    """Temporarily mark child workers as batch execution context.
+
+    ``FFACT_PARALLEL_BUDGET=off`` 時仍注入 ``FFACT_BATCH_NESTED=1``（維持現狀 n_jobs=1）。
+    budget on 時不注入 nested，改由 ``FFACT_BATCH_SYMBOL_CONCURRENCY`` 傳遞外層並行度。
+    """
 
     previous = os.environ.get("FFACT_BATCH_NESTED")
-    if enabled:
+    if enabled and not get_parallel_budget_enabled():
         os.environ["FFACT_BATCH_NESTED"] = "1"
-    else:
+    elif not enabled:
         os.environ.pop("FFACT_BATCH_NESTED", None)
 
     try:

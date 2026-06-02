@@ -268,22 +268,6 @@ def create_multi_symbol_runner(
     return create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
 
 
-def create_feature_factory_for_ic_batch(
-    cache_dir: Optional[str] = None,
-) -> "FeatureFactory":
-    """Factory for IC-First batch processing; injects an ICEngine.
-
-    Used by feature_factory_batch_service when FFACT_MULTI_SYMBOL_IC_FIRST=1.
-    Each subprocess creates its own factory + engine instance (no shared state).
-    Never imports api.* — decoupling rule 1.
-    """
-    from momentum.Analysis.ic_engine import ICEngine
-
-    factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
-    factory._ic_engine = ICEngine({"methods": ["spearman"]})
-    return factory
-
-
 def create_feature_reader(
     feature_base_path: Optional[str] = None,
 ) -> "FeatureReader":

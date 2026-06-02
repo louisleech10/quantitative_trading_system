@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle, Database, Layers, ArrowDownUp, Eye, Download, Cpu } from 'lucide-react';
+import { getBackendBrowseTaskId } from '@/lib/batchBrowse';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import ConfigPanel from '@/components/feature-factory/ConfigPanel';
@@ -110,6 +111,11 @@ export default function FeatureFactoryPage() {
   const handleSelectBatchSymbol = async (sym: string) => {
     setSelectedBatchSymbol(sym);
     if (browseTaskIds[sym]) return; // 已登錄，無需重複呼叫
+    const backendBrowseTaskId = getBackendBrowseTaskId(batchTask, sym);
+    if (backendBrowseTaskId) {
+      setBrowseTaskIds((prev) => ({ ...prev, [sym]: backendBrowseTaskId }));
+      return;
+    }
     const hdf5Path = batchResults[sym];
     if (!hdf5Path) return;
     setRegisteringSymbol(sym);

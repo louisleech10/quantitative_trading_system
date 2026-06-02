@@ -60,11 +60,11 @@ async def _wait_until_done(service: FeatureFactoryBatchService, task_id: str, ti
 
 
 @pytest.mark.asyncio
-async def test_batch_service_completed(monkeypatch):
+async def test_batch_service_completed(monkeypatch, batch_service_factory):
     monkeypatch.setattr("api.services.feature_factory_batch_service.ProcessPoolExecutor", ThreadPoolExecutor)
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute_success))
 
-    service = FeatureFactoryBatchService()
+    service = batch_service_factory()
     request = BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT", "SOLUSDT"], timeframe="12h")
 
     task_id = await service.start_batch(request)
@@ -77,11 +77,11 @@ async def test_batch_service_completed(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_batch_service_partial(monkeypatch):
+async def test_batch_service_partial(monkeypatch, batch_service_factory):
     monkeypatch.setattr("api.services.feature_factory_batch_service.ProcessPoolExecutor", ThreadPoolExecutor)
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute_partial))
 
-    service = FeatureFactoryBatchService()
+    service = batch_service_factory()
     request = BatchGenerateRequest(symbols=["BTCUSDT", "BAD", "ETHUSDT"], timeframe="12h")
 
     task_id = await service.start_batch(request)
@@ -94,11 +94,11 @@ async def test_batch_service_partial(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_batch_service_all_failed(monkeypatch):
+async def test_batch_service_all_failed(monkeypatch, batch_service_factory):
     monkeypatch.setattr("api.services.feature_factory_batch_service.ProcessPoolExecutor", ThreadPoolExecutor)
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute_fail))
 
-    service = FeatureFactoryBatchService()
+    service = batch_service_factory()
     request = BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="12h")
 
     task_id = await service.start_batch(request)
@@ -110,8 +110,8 @@ async def test_batch_service_all_failed(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_batch_service_concurrent_limit():
-    service = FeatureFactoryBatchService()
+async def test_batch_service_concurrent_limit(batch_service_factory):
+    service = batch_service_factory()
     service._running_batch_count = service._max_concurrent_batches
     request = BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="12h")
 
@@ -119,8 +119,8 @@ async def test_batch_service_concurrent_limit():
         await service.start_batch(request)
 
 
-def test_batch_service_ttl_cleanup():
-    service = FeatureFactoryBatchService()
+def test_batch_service_ttl_cleanup(batch_service_factory):
+    service = batch_service_factory()
     service._task_ttl_seconds = 1
     service._tasks["expired"] = {
         "task_id": "expired",

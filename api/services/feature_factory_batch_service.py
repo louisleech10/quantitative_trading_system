@@ -29,8 +29,9 @@ from momentum.core.config import (
     MomentumConfig,
     batch_nested_environment,
     get_batch_nested_enabled,
-    get_multi_symbol_ic_first_enabled,
+    get_parallel_budget_enabled,
 )
+from momentum.core.protocols import IBrowseRegistrar, IQualityComputer
 
 
 logger = get_logger("api.feature_factory_batch_service")
@@ -69,9 +70,21 @@ class FeatureFactoryBatchService:
     _heavy_batch_reserved = False
     _class_state_lock = threading.Lock()
 
-    def __init__(self, checkpoint_dir: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        checkpoint_dir: Optional[Path] = None,
+        *,
+        browse_registrar: Optional[IBrowseRegistrar] = None,
+        quality_computer: Optional[IQualityComputer] = None,
+    ) -> None:
+        if browse_registrar is None or quality_computer is None:
+            raise ValueError(
+                "FeatureFactoryBatchService requires browse_registrar and quality_computer"
+            )
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._notification_callbacks: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
+        self._browse_registrar = browse_registrar
+        self._quality_computer = quality_computer
         self._running_batch_count: int = 0
         self._max_concurrent_batches: int = 1
         self._task_ttl_seconds: int = 3600
@@ -247,9 +260,10 @@ class FeatureFactoryBatchService:
 
             task["status"] = "running"
             task["started_at"] = task.get("started_at") or time.time()
-            concurrent_symbols = self._resolve_concurrent_symbols()
+            concurrent_symbols = self._resolve_concurrent_symbols(request.config_override)
             task["concurrent_symbols"] = concurrent_symbols
             checkpoint["concurrent_symbols"] = concurrent_symbols
+            checkpoint["child_metrics_path"] = str(self._child_metrics_path(task_id))
             checkpoint["last_updated_at"] = datetime.now().isoformat()
             self._safe_persist_checkpoint(checkpoint)
             self._notify_progress(task_id)
@@ -289,7 +303,11 @@ class FeatureFactoryBatchService:
                     request,
                     batch_cache_dir,
                 )
-                if oom_seen or task.get("memory_sanity_failed"):
+                if (
+                    oom_seen
+                    or task.get("memory_sanity_failed")
+                    or task.get("rss_soft_limit_exceeded")
+                ):
                     concurrent_symbols = 1
                     task["concurrent_symbols"] = 1
                     checkpoint["concurrent_symbols"] = 1
@@ -337,7 +355,12 @@ class FeatureFactoryBatchService:
 
         loop = asyncio.get_running_loop()
         task_id = str(task["task_id"])
+        child_metrics_path = self._child_metrics_path(task_id)
         rss_before_by_item: Dict[Tuple[str, str], int] = {}
+        wave_concurrency = max(1, len(item_wave))
+        rss_soft_limit_mb = self._rss_soft_limit_mb()
+        wave_parent_peak_mb = self._rss_mb()
+        wave_child_peak_mb = 0
 
         for item in item_wave:
             symbol = str(item["symbol"])
@@ -355,24 +378,45 @@ class FeatureFactoryBatchService:
                 return item, None, exc
 
         wrapped_futures = []
-        compute_fn = (
-            self._compute_single_ic_first
-            if get_multi_symbol_ic_first_enabled()
-            else self._compute_single
-        )
+        compute_fn = self._compute_single
         with batch_nested_environment(True):
+            previous_metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
+            previous_symbol_concurrency = os.environ.get("FFACT_BATCH_SYMBOL_CONCURRENCY")
+            previous_thread_caps = self._snapshot_batch_thread_env()
+            os.environ["FFACT_CHILD_METRICS_PATH"] = str(child_metrics_path)
+            os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = str(wave_concurrency)
+            if get_parallel_budget_enabled():
+                self._apply_batch_thread_caps()
             with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
-                for item in item_wave:
-                    future = loop.run_in_executor(
-                        executor,
-                        compute_fn,
-                        str(item["symbol"]),
-                        str(item["timeframe"]),
-                        request.config_override,
-                        request.force_regenerate,
-                        batch_cache_dir,
-                    )
-                    wrapped_futures.append(_wait_one(item, future))
+                try:
+                    for item in item_wave:
+                        symbol = str(item["symbol"])
+                        timeframe = str(item["timeframe"])
+                        task["current_symbol"] = symbol
+                        task["current_timeframe"] = timeframe
+                        self._notify_progress(task_id)
+                        future = loop.run_in_executor(
+                            executor,
+                            compute_fn,
+                            symbol,
+                            timeframe,
+                            request.config_override,
+                            request.force_regenerate,
+                            batch_cache_dir,
+                        )
+                        wrapped_futures.append(_wait_one(item, future))
+                finally:
+                    if previous_metrics_path is None:
+                        os.environ.pop("FFACT_CHILD_METRICS_PATH", None)
+                    else:
+                        os.environ["FFACT_CHILD_METRICS_PATH"] = previous_metrics_path
+                    if previous_symbol_concurrency is None:
+                        os.environ.pop("FFACT_BATCH_SYMBOL_CONCURRENCY", None)
+                    else:
+                        os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = (
+                            previous_symbol_concurrency
+                        )
+                    self._restore_batch_thread_env(previous_thread_caps)
 
                 oom_seen = False
                 for wrapped_future in asyncio.as_completed(wrapped_futures):
@@ -383,6 +427,8 @@ class FeatureFactoryBatchService:
                     rss_peak = max(rss_before, self._rss_mb())
                     gc.collect()
                     rss_after = self._rss_mb()
+                    wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
+                    wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
                     failure_type = self._classify_failure(error) if error else None
                     oom_seen = oom_seen or failure_type == BatchFailureType.OOM
 
@@ -398,7 +444,34 @@ class FeatureFactoryBatchService:
                         rss_peak,
                         rss_after,
                     )
+                    self._append_child_metrics_if_missing(
+                        child_metrics_path,
+                        symbol,
+                        timeframe,
+                        {
+                            "symbol": symbol,
+                            "timeframe": timeframe,
+                            "pid": os.getpid(),
+                            "peak_rss_mb": rss_peak,
+                            "duration_s": 0.0,
+                            "status": "failed" if error else "ok",
+                        },
+                    )
                     self._notify_progress(task_id)
+
+        wave_total_peak_mb = max(wave_parent_peak_mb, wave_child_peak_mb)
+        if wave_total_peak_mb > rss_soft_limit_mb:
+            task["rss_soft_limit_exceeded"] = True
+            checkpoint["rss_soft_limit_exceeded"] = True
+            logger.warning(
+                "[L6.5] Batch RSS soft limit exceeded task_id=%s wave_peak_mb=%s "
+                "limit_mb=%.0f concurrency=%s; next wave will run concurrent_symbols=1",
+                task_id,
+                wave_total_peak_mb,
+                rss_soft_limit_mb,
+                wave_concurrency,
+            )
+            return True
         return oom_seen
 
     def _record_item_result(
@@ -416,8 +489,16 @@ class FeatureFactoryBatchService:
     ) -> None:
         """Record one completed or failed item in memory and checkpoint state."""
 
-        task["current_symbol"] = symbol
-        task["current_timeframe"] = timeframe
+        browse_task_id: Optional[str] = None
+        effective_error = error
+        effective_failure_type = failure_type
+        if effective_error is None and hdf5_path:
+            try:
+                browse_task_id = self._browse_registrar.register(symbol, timeframe, hdf5_path)
+            except Exception as exc:
+                effective_error = exc
+                effective_failure_type = BatchFailureType.COMPUTE_ERROR
+
         output_paths = [hdf5_path] if hdf5_path else []
         metrics = {
             "current_symbol": symbol,
@@ -430,24 +511,27 @@ class FeatureFactoryBatchService:
 
         self._remove_queued_item(checkpoint, symbol, timeframe)
 
-        if error is None:
+        if effective_error is None:
             task["completed"] += 1
             task["results"][symbol] = hdf5_path
+            if browse_task_id:
+                task.setdefault("browse_task_ids", {})[symbol] = browse_task_id
             checkpoint.setdefault("completed_items", []).append({
                 "symbol": symbol,
                 "timeframe": timeframe,
                 "output_paths": output_paths,
+                "browse_task_id": browse_task_id,
                 "rss_peak_item_mb": rss_peak_mb,
                 "rss_after_gc_mb": rss_after_gc_mb,
             })
         else:
             task["failed"] += 1
-            task["errors"][symbol] = str(error)
-            resolved_failure_type = failure_type or BatchFailureType.COMPUTE_ERROR
+            task["errors"][symbol] = str(effective_error)
+            resolved_failure_type = effective_failure_type or BatchFailureType.COMPUTE_ERROR
             checkpoint.setdefault("failed_items", []).append({
                 "symbol": symbol,
                 "timeframe": timeframe,
-                "reason": str(error),
+                "reason": str(effective_error),
                 "failure_type": resolved_failure_type.value,
             })
             logger.error(
@@ -455,8 +539,12 @@ class FeatureFactoryBatchService:
                 task["task_id"],
                 symbol,
                 timeframe,
-                error,
-                exc_info=(type(error), error, error.__traceback__),
+                effective_error,
+                exc_info=(
+                    type(effective_error),
+                    effective_error,
+                    effective_error.__traceback__,
+                ),
             )
 
         memory_failed = self._memory_sanity_failed(
@@ -484,13 +572,16 @@ class FeatureFactoryBatchService:
         checkpoint["last_updated_at"] = datetime.now().isoformat()
         self._safe_persist_checkpoint(checkpoint)
 
-    def _resolve_concurrent_symbols(self) -> int:
-        """Resolve concurrent symbol count from tier table and nested guard."""
+    def _resolve_concurrent_symbols(
+        self,
+        config_override: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Resolve concurrent symbol count from tier table, config, and nested guard."""
 
         # IC-First pipeline 記憶體使用量顯著高於標準路徑；強制序列執行避免 OOM
-        if get_multi_symbol_ic_first_enabled():
+        if self._config_enables_ic_first(config_override):
             logger.info(
-                "[L65] FFACT_MULTI_SYMBOL_IC_FIRST detected; forcing concurrent_symbols=1 "
+                "[L65] IC-First config detected; forcing concurrent_symbols=1 "
                 "to prevent OOM on IC-First pipeline"
             )
             return 1
@@ -503,6 +594,17 @@ class FeatureFactoryBatchService:
             )
             return 1
         return concurrent_symbols
+
+    @staticmethod
+    def _config_enables_ic_first(config_override: Optional[Dict[str, Any]]) -> bool:
+        """Return True when request config enables generation-time IC-First routing."""
+
+        if not isinstance(config_override, dict):
+            return False
+        preprocessing = config_override.get("preprocessing")
+        if not isinstance(preprocessing, dict):
+            return False
+        return bool(preprocessing.get("ic_first_pipeline", False))
 
     def _resolve_ram_gate_min_gb(self) -> float:
         """Resolve RAM gate GB threshold from env override or concurrent tier."""
@@ -545,6 +647,55 @@ class FeatureFactoryBatchService:
         safe_batch_id = "".join(ch for ch in batch_id if ch.isalnum() or ch in {"-", "_"})
         return self._checkpoint_dir / f"batch_state_{safe_batch_id}.json"
 
+    def _task_artifact_dir(self, batch_id: str) -> Path:
+        """Return artifact directory for per-batch sidecar files."""
+
+        safe_batch_id = "".join(ch for ch in batch_id if ch.isalnum() or ch in {"-", "_"})
+        return self._checkpoint_dir / safe_batch_id
+
+    def _child_metrics_path(self, batch_id: str) -> Path:
+        """Return child metrics JSONL path for a batch id."""
+
+        return self._task_artifact_dir(batch_id) / "child_metrics.jsonl"
+
+    @staticmethod
+    def _append_child_metrics_jsonl(path: Path, row: Dict[str, Any]) -> None:
+        """Append one child metrics row using a single O_APPEND write."""
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+        fd = os.open(str(path), os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o644)
+        try:
+            os.write(fd, payload.encode("utf-8"))
+        finally:
+            os.close(fd)
+
+    @classmethod
+    def _append_child_metrics_if_missing(
+        cls,
+        path: Path,
+        symbol: str,
+        timeframe: str,
+        row: Dict[str, Any],
+    ) -> None:
+        """Append parent fallback metrics only when the child did not write them."""
+
+        if path.exists():
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        existing = json.loads(line)
+                        if (
+                            str(existing.get("symbol")) == symbol
+                            and str(existing.get("timeframe")) == timeframe
+                        ):
+                            return
+            except (OSError, json.JSONDecodeError):
+                pass
+        cls._append_child_metrics_jsonl(path, row)
+
     def _build_initial_checkpoint(
         self,
         task_id: str,
@@ -569,7 +720,7 @@ class FeatureFactoryBatchService:
             "completed_items": [],
             "failed_items": [],
             "queued_items": queued_items,
-            "concurrent_symbols": self._resolve_concurrent_symbols(),
+            "concurrent_symbols": self._resolve_concurrent_symbols(request.config_override),
             "memory_sanity_failed": False,
             "rss_after_gc_history_mb": [],
         }
@@ -593,6 +744,9 @@ class FeatureFactoryBatchService:
             "current_symbol": None,
             "current_timeframe": None,
             "results": self._results_from_completed(checkpoint.get("completed_items", [])),
+            "browse_task_ids": self._browse_task_ids_from_completed(
+                checkpoint.get("completed_items", [])
+            ),
             "errors": self._errors_from_failed(checkpoint.get("failed_items", [])),
             "created_at": time.time(),
             "concurrent_symbols": checkpoint.get("concurrent_symbols", 1),
@@ -631,6 +785,19 @@ class FeatureFactoryBatchService:
             if output_paths:
                 results[str(item.get("symbol", ""))] = str(output_paths[0])
         return results
+
+    @staticmethod
+    def _browse_task_ids_from_completed(
+        completed_items: List[Dict[str, Any]],
+    ) -> Dict[str, str]:
+        """Build browse task id map from checkpoint completed items."""
+
+        browse_task_ids: Dict[str, str] = {}
+        for item in completed_items:
+            browse_task_id = item.get("browse_task_id")
+            if browse_task_id:
+                browse_task_ids[str(item.get("symbol", ""))] = str(browse_task_id)
+        return browse_task_ids
 
     @staticmethod
     def _errors_from_failed(failed_items: List[Dict[str, Any]]) -> Dict[str, str]:
@@ -706,6 +873,40 @@ class FeatureFactoryBatchService:
         return BatchFailureType.COMPUTE_ERROR
 
     @staticmethod
+    def _rss_soft_limit_mb() -> float:
+        """Return tier-scaled RSS soft cap (MB) for batch wave downgrade."""
+
+        tier_gb = get_current_tier_gb()
+        return float(tier_gb) * 0.6 * 1024.0
+
+    _BATCH_THREAD_ENV_KEYS = (
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "NUMBA_NUM_THREADS",
+        "POLARS_MAX_THREADS",
+    )
+
+    @classmethod
+    def _snapshot_batch_thread_env(cls) -> Dict[str, Optional[str]]:
+        return {key: os.environ.get(key) for key in cls._BATCH_THREAD_ENV_KEYS}
+
+    @classmethod
+    def _apply_batch_thread_caps(cls) -> None:
+        """Cap BLAS/Numba/Polars threads in batch child workers when C2 budget is on."""
+
+        for key in cls._BATCH_THREAD_ENV_KEYS:
+            os.environ[key] = "1"
+
+    @classmethod
+    def _restore_batch_thread_env(cls, snapshot: Dict[str, Optional[str]]) -> None:
+        for key, previous in snapshot.items():
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
+
+    @staticmethod
     def _rss_mb() -> int:
         """Return current parent process RSS in MB."""
 
@@ -744,6 +945,10 @@ class FeatureFactoryBatchService:
         """在子進程中執行單一標的特徵計算。"""
         from momentum.factories import create_feature_factory
 
+        started_at = time.perf_counter()
+        process = psutil.Process(os.getpid())
+        metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
+
         # 子進程無法存取父進程的 module-level 單例，必須重新計算 cache_dir
         if cache_dir is None:
             try:
@@ -760,61 +965,47 @@ class FeatureFactoryBatchService:
                 config_override=config_override,
                 force_regenerate=force_regenerate,
             )
+            if metrics_path:
+                FeatureFactoryBatchService._append_child_metrics_jsonl(
+                    Path(metrics_path),
+                    {
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "pid": os.getpid(),
+                        "peak_rss_mb": int(process.memory_info().rss // BYTES_PER_MB),
+                        "duration_s": round(time.perf_counter() - started_at, 6),
+                        "status": "ok",
+                    },
+                )
             return result.hdf5_path or ""
         except FileNotFoundError as exc:
+            if metrics_path:
+                FeatureFactoryBatchService._append_child_metrics_jsonl(
+                    Path(metrics_path),
+                    {
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "pid": os.getpid(),
+                        "peak_rss_mb": int(process.memory_info().rss // BYTES_PER_MB),
+                        "duration_s": round(time.perf_counter() - started_at, 6),
+                        "status": "failed",
+                    },
+                )
             raise RuntimeError(f"{symbol} ({timeframe}): 資料檔不存在 - {exc}") from exc
         except Exception as exc:
+            if metrics_path:
+                FeatureFactoryBatchService._append_child_metrics_jsonl(
+                    Path(metrics_path),
+                    {
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "pid": os.getpid(),
+                        "peak_rss_mb": int(process.memory_info().rss // BYTES_PER_MB),
+                        "duration_s": round(time.perf_counter() - started_at, 6),
+                        "status": "failed",
+                    },
+                )
             raise RuntimeError(f"{symbol} ({timeframe}): 計算失敗 - {exc}") from exc
-
-    @staticmethod
-    def _compute_single_ic_first(
-        symbol: str,
-        timeframe: str,
-        config_override: Optional[Dict[str, Any]],
-        force_regenerate: bool,
-        cache_dir: Optional[str] = None,
-    ) -> str:
-        """在子進程中執行單一標的 IC-First L7_raw 特徵計算。
-
-        設計原則：
-        - 在子進程內臨時覆寫 FFACT_IC_FIRST_PIPELINE 以啟用 L6.5 IC-First 路由。
-        - 生成階段只輸出 L7_raw；IC Gatekeeper 與 selected post transforms 是下游流程。
-        - finally 區塊還原環境變數，避免污染同 worker 的後續呼叫。
-        - MemoryError 直接重新拋出，由 _classify_failure 分類為 OOM。
-        """
-        import os as _os
-
-        from momentum.factories import create_feature_factory_for_ic_batch
-
-        if cache_dir is None:
-            try:
-                from api.core.config import settings
-                cache_dir = str(settings.data_cache_path / "feature_klines")
-            except Exception:
-                pass
-
-        prev_ic_flag = _os.environ.get("FFACT_IC_FIRST_PIPELINE")
-        try:
-            _os.environ["FFACT_IC_FIRST_PIPELINE"] = "1"
-            factory = create_feature_factory_for_ic_batch(cache_dir=cache_dir)
-            result = factory.generate_features(
-                symbol=symbol,
-                timeframe=timeframe,
-                config_override=config_override,
-                force_regenerate=force_regenerate,
-            )
-            return result.hdf5_path or ""
-        except MemoryError:
-            raise
-        except FileNotFoundError as exc:
-            raise RuntimeError(f"{symbol} ({timeframe}): IC-First 資料檔不存在 - {exc}") from exc
-        except Exception as exc:
-            raise RuntimeError(f"{symbol} ({timeframe}): IC-First 計算失敗 - {exc}") from exc
-        finally:
-            if prev_ic_flag is None:
-                _os.environ.pop("FFACT_IC_FIRST_PIPELINE", None)
-            else:
-                _os.environ["FFACT_IC_FIRST_PIPELINE"] = prev_ic_flag
 
     def register_notification_callback(
         self,
@@ -909,60 +1100,20 @@ class FeatureFactoryBatchService:
             "computed_at": datetime.now().isoformat(),
         }
 
-    @staticmethod
-    def _compute_symbol_quality(symbol: str, hdf5_path: str) -> Optional[Dict[str, Any]]:
-        """在 thread executor 中直接讀取 HDF5 計算品質指標（向量化，不含 ADF）。"""
-        import h5py
-        import numpy as np
-        from pathlib import Path
+    def _compute_symbol_quality(
+        self,
+        symbol: str,
+        manifest_path: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Compute batch quality through the injected manifest/parquet adapter."""
 
-        file_path = Path(hdf5_path)
+        file_path = Path(manifest_path)
         if not file_path.exists():
             return None
 
-        with h5py.File(file_path, "r") as h5f:
-            top_keys = list(h5f.keys())
-            if not top_keys:
-                return None
-            sym_key = top_keys[0]
-            tf_keys = list(h5f[sym_key].keys())
-            if not tf_keys:
-                return None
-            tf_key = tf_keys[0]
-            group = h5f[f"{sym_key}/{tf_key}"]
-            if "features" not in group:
-                return None
-            features = group["features"][:]  # shape: (bars, feature_count)
-
-        bar_count = int(features.shape[0])
-        feature_count = int(features.shape[1])
-
-        nan_ratios = np.isnan(features).mean(axis=0)  # per-feature NaN ratio
-        nan_ratio_mean = float(nan_ratios.mean())
-        nan_ratio_max = float(nan_ratios.max())
-
-        stds = np.nanstd(features, axis=0)
-        constant_feature_count = int((stds == 0).sum())
-        alert_count = int((nan_ratios > 0.1).sum())
-
-        # 量化業界標準評級
-        if nan_ratio_mean > 0.3 or constant_feature_count > 0 or bar_count < 200:
-            grade = "reject"
-        elif nan_ratio_mean > 0.1 or alert_count > 5 or bar_count < 500:
-            grade = "watch"
-        else:
-            grade = "pass"
-
-        return {
-            "symbol": symbol,
-            "bar_count": bar_count,
-            "feature_count": feature_count,
-            "nan_ratio_mean": round(nan_ratio_mean, 6),
-            "nan_ratio_max": round(nan_ratio_max, 6),
-            "constant_feature_count": constant_feature_count,
-            "alert_count": alert_count,
-            "grade": grade,
-        }
+        quality = self._quality_computer.compute(manifest_path)
+        quality["symbol"] = symbol
+        return quality
 
     def get_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """取得任務狀態。"""
@@ -988,6 +1139,7 @@ class FeatureFactoryBatchService:
             "memory_sanity_failed": bool(task.get("memory_sanity_failed", False)),
             "last_item_metrics": task.get("last_item_metrics"),
             "results": dict(task["results"]),
+            "browse_task_ids": dict(task.get("browse_task_ids", {})),
             "errors": dict(task["errors"]),
         }
 
@@ -1003,7 +1155,6 @@ def set_feature_factory_batch_service(service: FeatureFactoryBatchService) -> No
 
 def get_feature_factory_batch_service() -> FeatureFactoryBatchService:
     """取得全域 batch service 單例。"""
-    global _feature_factory_batch_service
     if _feature_factory_batch_service is None:
-        _feature_factory_batch_service = FeatureFactoryBatchService()
+        raise RuntimeError("FeatureFactoryBatchService has not been initialized")
     return _feature_factory_batch_service

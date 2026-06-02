@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from api.models.feature_factory_models import BatchGenerateRequest
+from api.services.feature_factory_batch_adapters import (
+    FeatureFactoryBrowseAdapter,
+    FeatureFactoryQualityAdapter,
+)
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
 from momentum.factories import create_feature_factory, create_kline_storage_manager
 
@@ -140,7 +144,10 @@ async def main() -> None:
 
     single_stats = _benchmark_single_symbol(factory, single_symbol)
 
-    service = FeatureFactoryBatchService()
+    service = FeatureFactoryBatchService(
+        browse_registrar=FeatureFactoryBrowseAdapter(),
+        quality_computer=FeatureFactoryQualityAdapter(),
+    )
     batch_1tf: Optional[Dict[str, Any]] = None
     batch_3tf: Optional[Dict[str, Any]] = None
     single_batch_1tf: Optional[Dict[str, Any]] = None

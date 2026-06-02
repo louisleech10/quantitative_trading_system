@@ -278,6 +278,7 @@ function normalizeBatchTask(
     per_item_rss: normalizePerItemRss(payload, previous),
     last_item_metrics: (payload.last_item_metrics as BatchTaskStatus['last_item_metrics']) ?? previous?.last_item_metrics ?? null,
     results: (payload.results as Record<string, string> | undefined) ?? previous?.results ?? {},
+    browse_task_ids: (payload.browse_task_ids as Record<string, string> | undefined) ?? previous?.browse_task_ids ?? {},
     errors: (payload.errors as Record<string, string> | undefined) ?? previous?.errors ?? {},
   };
 }
@@ -601,6 +602,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
           output_paths: [],
           per_item_rss: [],
           results: {},
+          browse_task_ids: {},
           errors: {},
         },
         batchStartedAtMs: Date.now(),
@@ -616,13 +618,18 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   },
   pollBatchStatus: async (taskId) => {
     const pollIntervalMs = 1200;
-    const maxAttempts = 600;
 
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    while (true) {
       const response = await fetch(`${API_BASE_URL}${API_PREFIX}/batch/${taskId}`);
       if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.detail || payload?.error || response.statusText);
+        const message = payload?.detail || payload?.error || response.statusText;
+        if (response.status >= 500) {
+          set({ error: message });
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+          continue;
+        }
+        throw new Error(message);
       }
 
       const status = (await response.json()) as BatchTaskStatus;
@@ -634,8 +641,6 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
 
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
-
-    set({ error: '批次任務輪詢逾時' });
   },
   setAlignmentMode: (mode) =>
     set((state) => ({

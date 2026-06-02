@@ -9,7 +9,7 @@ Test IDs:
   T3.P2 benchmark_10_symbol_2tf_resume_dryrun
 
 執行：
-    FFACT_MULTI_SYMBOL_IC_FIRST=0 ./venv/bin/pytest tests/feature_engineering/test_multi_symbol_ic_first.py -v
+    ./venv/bin/pytest tests/feature_engineering/test_multi_symbol_ic_first.py -v
 """
 from __future__ import annotations
 
@@ -67,9 +67,38 @@ def _make_service(tmp_path: Any) -> Any:
 class TestMultiSymbolIcIsolation:
     """T3.1: 每個標的的輸出路徑必須互相隔離，不能相互覆寫。"""
 
-    def test_compute_single_ic_first_returns_isolated_paths(self, tmp_path):
+    def test_ic_first_config_routes_l65_to_pre_ic(self, tmp_path):
         """
-        Given: 兩個不同標的分別呼叫 _compute_single_ic_first
+        Given: preprocessing.ic_first_pipeline=true
+        When:  FeatureFactory 執行 L6.5 preprocessing dispatch
+        Then:  走 _layer6_5_pre_ic，不走 legacy rank/zscore/gaussian 路徑
+        """
+        import pandas as pd
+
+        from momentum.factories import create_feature_factory
+
+        factory = create_feature_factory(cache_dir=str(tmp_path), validate_continuity=False)
+        config = factory._resolve_config(
+            {
+                "preset": "minimal",
+                "preprocessing": {"enabled": True, "ic_first_pipeline": True},
+            }
+        )
+        frame = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
+        expected = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
+
+        with patch.object(factory, "_layer6_5_pre_ic", return_value=expected) as pre_ic, patch.object(
+            factory, "_layer6_5_legacy", return_value=pd.DataFrame({"legacy": [1.0]})
+        ) as legacy:
+            result = factory._layer6_5_preprocessing(frame, config)
+
+        pre_ic.assert_called_once()
+        legacy.assert_not_called()
+        assert result.equals(expected)
+
+    def test_compute_single_ic_first_config_returns_isolated_paths(self, tmp_path):
+        """
+        Given: 兩個不同標的分別用 ic_first_pipeline config 呼叫 _compute_single
         When:  generate_features 回傳不同的 hdf5_path
         Then:  兩條路徑互不相同（輸出隔離）
         """
@@ -90,7 +119,7 @@ class TestMultiSymbolIcIsolation:
             result.hdf5_path = path_eth
             return result
 
-        # Patch create_feature_factory_for_ic_batch to avoid real computation
+        # Patch create_feature_factory to avoid real computation
         factory_btc = MagicMock()
         factory_btc.generate_features.side_effect = fake_generate_btc
         factory_eth = MagicMock()
@@ -102,28 +131,27 @@ class TestMultiSymbolIcIsolation:
             call_count[0] += 1
             return factory_btc if call_count[0] == 1 else factory_eth
 
-        with patch.dict(os.environ, {"FFACT_MULTI_SYMBOL_IC_FIRST": "0"}):
-            # Temporarily override FFACT_IC_FIRST_PIPELINE inside the static method
-            with patch(
-                "momentum.factories.create_feature_factory_for_ic_batch",
-                side_effect=mock_create_factory,
-            ):
-                result1 = FeatureFactoryBatchService._compute_single_ic_first(
-                    "BTCUSDT", "1h", {}, False, str(tmp_path)
-                )
-                result2 = FeatureFactoryBatchService._compute_single_ic_first(
-                    "ETHUSDT", "1h", {}, False, str(tmp_path)
-                )
+        config = {"preprocessing": {"ic_first_pipeline": True}}
+        with patch(
+            "momentum.factories.create_feature_factory",
+            side_effect=mock_create_factory,
+        ):
+            result1 = FeatureFactoryBatchService._compute_single(
+                "BTCUSDT", "1h", config, False, str(tmp_path)
+            )
+            result2 = FeatureFactoryBatchService._compute_single(
+                "ETHUSDT", "1h", config, False, str(tmp_path)
+            )
 
         assert result1 != result2, "兩標的輸出路徑不應相同（output isolation 違反）"
         assert result1 == path_btc
         assert result2 == path_eth
 
-    def test_compute_single_ic_first_env_flag_restored(self, tmp_path):
+    def test_compute_single_ic_first_config_does_not_set_env_flag_on_failure(self, tmp_path):
         """
         Given: FFACT_IC_FIRST_PIPELINE 在執行前未設定
-        When:  _compute_single_ic_first 執行完畢（成功或失敗）
-        Then:  FFACT_IC_FIRST_PIPELINE 環境變數恢復原始狀態（finally 區塊）
+        When:  _compute_single 以 ic_first_pipeline config 執行失敗
+        Then:  FFACT_IC_FIRST_PIPELINE 環境變數不被 batch service 設定
         """
         from api.services.feature_factory_batch_service import (
             FeatureFactoryBatchService,
@@ -137,24 +165,27 @@ class TestMultiSymbolIcIsolation:
         factory_mock.generate_features.side_effect = RuntimeError("模擬計算失敗")
 
         with patch(
-            "momentum.factories.create_feature_factory_for_ic_batch",
+            "momentum.factories.create_feature_factory",
             return_value=factory_mock,
         ):
             with pytest.raises(RuntimeError):
-                FeatureFactoryBatchService._compute_single_ic_first(
-                    "BTCUSDT", "1h", {}, False, str(tmp_path)
+                FeatureFactoryBatchService._compute_single(
+                    "BTCUSDT",
+                    "1h",
+                    {"preprocessing": {"ic_first_pipeline": True}},
+                    False,
+                    str(tmp_path),
                 )
 
-        # finally 應還原：移除 FFACT_IC_FIRST_PIPELINE
         assert "FFACT_IC_FIRST_PIPELINE" not in os.environ, (
-            "FFACT_IC_FIRST_PIPELINE 應在 finally 中被移除，但仍殘留"
+            "FFACT_IC_FIRST_PIPELINE 不應由 batch service 設定"
         )
 
-    def test_compute_single_ic_first_env_flag_preserved_if_preset(self, tmp_path):
+    def test_compute_single_ic_first_config_preserves_existing_env_flag(self, tmp_path):
         """
         Given: FFACT_IC_FIRST_PIPELINE 在執行前已設為 "0"
-        When:  _compute_single_ic_first 執行完畢
-        Then:  FFACT_IC_FIRST_PIPELINE 仍為 "0"（原值被還原）
+        When:  _compute_single 以 ic_first_pipeline config 執行完畢
+        Then:  FFACT_IC_FIRST_PIPELINE 仍為 "0"（batch service 不覆寫）
         """
         from api.services.feature_factory_batch_service import (
             FeatureFactoryBatchService,
@@ -168,11 +199,15 @@ class TestMultiSymbolIcIsolation:
         factory_mock.generate_features.return_value = result_mock
 
         with patch(
-            "momentum.factories.create_feature_factory_for_ic_batch",
+            "momentum.factories.create_feature_factory",
             return_value=factory_mock,
         ):
-            FeatureFactoryBatchService._compute_single_ic_first(
-                "BTCUSDT", "1h", {}, False, str(tmp_path)
+            FeatureFactoryBatchService._compute_single(
+                "BTCUSDT",
+                "1h",
+                {"preprocessing": {"ic_first_pipeline": True}},
+                False,
+                str(tmp_path),
             )
 
         assert os.environ.get("FFACT_IC_FIRST_PIPELINE") == "0", (
@@ -319,7 +354,7 @@ class TestSymbolFailureNoCheckpoint:
 
     def test_memory_error_classified_as_oom(self, tmp_path):
         """
-        Given: _compute_single_ic_first 拋出 MemoryError
+        Given: _compute_single 路徑出現 OOM 訊息
         When:  _classify_failure 處理
         Then:  failure_type == BatchFailureType.OOM
         """
@@ -335,7 +370,7 @@ class TestSymbolFailureNoCheckpoint:
 
     def test_runtime_error_not_oom(self, tmp_path):
         """
-        Given: _compute_single_ic_first 拋出 RuntimeError（非 OOM）
+        Given: _compute_single 拋出 RuntimeError（非 OOM）
         When:  _classify_failure 處理
         Then:  failure_type != BatchFailureType.OOM
         """
@@ -349,13 +384,14 @@ class TestSymbolFailureNoCheckpoint:
 
         assert failure_type != BatchFailureType.OOM
 
-    def test_compute_single_ic_first_memory_error_propagates(self, tmp_path):
+    def test_compute_single_ic_first_memory_error_remains_classifiable(self, tmp_path):
         """
         Given: generate_features 內部拋出 MemoryError
-        When:  _compute_single_ic_first 執行
-        Then:  MemoryError 直接重新拋出（不被包裝成 RuntimeError）
+        When:  _compute_single 以 ic_first_pipeline config 執行
+        Then:  包裝後的 RuntimeError 仍可被分類為 OOM
         """
         from api.services.feature_factory_batch_service import (
+            BatchFailureType,
             FeatureFactoryBatchService,
         )
 
@@ -363,18 +399,23 @@ class TestSymbolFailureNoCheckpoint:
         factory_mock.generate_features.side_effect = MemoryError("OOM in IC compute")
 
         with patch(
-            "momentum.factories.create_feature_factory_for_ic_batch",
+            "momentum.factories.create_feature_factory",
             return_value=factory_mock,
         ):
-            with pytest.raises(MemoryError):
-                FeatureFactoryBatchService._compute_single_ic_first(
-                    "BTCUSDT", "1h", {}, False, str(tmp_path)
+            with pytest.raises(RuntimeError) as exc_info:
+                FeatureFactoryBatchService._compute_single(
+                    "BTCUSDT",
+                    "1h",
+                    {"preprocessing": {"ic_first_pipeline": True}},
+                    False,
+                    str(tmp_path),
                 )
+        assert FeatureFactoryBatchService._classify_failure(exc_info.value) == BatchFailureType.OOM
 
-    def test_compute_single_ic_first_runtime_error_wrapped(self, tmp_path):
+    def test_compute_single_ic_first_config_runtime_error_wrapped(self, tmp_path):
         """
         Given: generate_features 拋出一般 Exception
-        When:  _compute_single_ic_first 執行
+        When:  _compute_single 以 ic_first_pipeline config 執行
         Then:  回傳 RuntimeError（含 symbol + timeframe 資訊）
         """
         from api.services.feature_factory_batch_service import (
@@ -385,12 +426,16 @@ class TestSymbolFailureNoCheckpoint:
         factory_mock.generate_features.side_effect = ValueError("bad config")
 
         with patch(
-            "momentum.factories.create_feature_factory_for_ic_batch",
+            "momentum.factories.create_feature_factory",
             return_value=factory_mock,
         ):
             with pytest.raises(RuntimeError) as exc_info:
-                FeatureFactoryBatchService._compute_single_ic_first(
-                    "BTCUSDT", "1h", {}, False, str(tmp_path)
+                FeatureFactoryBatchService._compute_single(
+                    "BTCUSDT",
+                    "1h",
+                    {"preprocessing": {"ic_first_pipeline": True}},
+                    False,
+                    str(tmp_path),
                 )
 
         assert "BTCUSDT" in str(exc_info.value)
@@ -516,39 +561,29 @@ class TestBenchmark10SymbolDryrun:
         assert len(queued_symbols) == 5, f"queued_items 應有 5 個標的，實際為 {len(queued_symbols)}"
         assert len(completed_symbols) == 5, f"completed_items 應有 5 個標的，實際為 {len(completed_symbols)}"
 
-    def test_ic_first_flag_controls_resolve_concurrent(self, tmp_path, monkeypatch):
+    def test_ic_first_config_controls_resolve_concurrent(self, tmp_path):
         """
-        Given: FFACT_MULTI_SYMBOL_IC_FIRST=1
+        Given: config_override.preprocessing.ic_first_pipeline=true
         When:  _resolve_concurrent_symbols() 被呼叫
         Then:  回傳 1（強制序列）
         """
 
-        monkeypatch.setenv("FFACT_MULTI_SYMBOL_IC_FIRST", "1")
-        # 強制重新載入 config module 的快取
-        import importlib
-
-        import momentum.core.config as cfg_mod
-
-        importlib.reload(cfg_mod)
-
         svc = _make_service(tmp_path)
-        concurrent = svc._resolve_concurrent_symbols()
-
-        monkeypatch.delenv("FFACT_MULTI_SYMBOL_IC_FIRST", raising=False)
-        importlib.reload(cfg_mod)
+        concurrent = svc._resolve_concurrent_symbols(
+            {"preprocessing": {"ic_first_pipeline": True}}
+        )
 
         assert concurrent == 1, (
             f"IC-First 模式下 concurrent_symbols 應為 1，實際為 {concurrent}"
         )
 
-    def test_ic_first_flag_disabled_uses_tier(self, tmp_path, monkeypatch):
+    def test_ic_first_config_disabled_uses_tier(self, tmp_path, monkeypatch):
         """
-        Given: FFACT_MULTI_SYMBOL_IC_FIRST=0
+        Given: config_override.preprocessing.ic_first_pipeline=false
         When:  _resolve_concurrent_symbols() 被呼叫
         Then:  回傳 tier-based 值（>= 1，不強制為 1 by IC-First）
         Boundary: FFACT_BATCH_NESTED=0 以排除 nested guard
         """
-        monkeypatch.setenv("FFACT_MULTI_SYMBOL_IC_FIRST", "0")
         monkeypatch.setenv("FFACT_BATCH_NESTED", "0")
 
         import importlib
@@ -567,9 +602,10 @@ class TestBenchmark10SymbolDryrun:
             "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
             return_value=2,
         ):
-            concurrent = svc._resolve_concurrent_symbols()
+            concurrent = svc._resolve_concurrent_symbols(
+                {"preprocessing": {"ic_first_pipeline": False}}
+            )
 
-        monkeypatch.delenv("FFACT_MULTI_SYMBOL_IC_FIRST", raising=False)
         monkeypatch.delenv("FFACT_BATCH_NESTED", raising=False)
         importlib.reload(cfg_mod)
 

@@ -181,6 +181,22 @@ class IICAnalyzer(Protocol):
 
 
 @runtime_checkable
+class IBrowseRegistrar(Protocol):
+    """Register persisted feature outputs for Feature Explorer browsing."""
+
+    def register(self, symbol: str, timeframe: str, manifest_path: str) -> str:
+        ...
+
+
+@runtime_checkable
+class IQualityComputer(Protocol):
+    """Compute batch quality summaries from a persisted feature manifest."""
+
+    def compute(self, manifest_path: str) -> dict:
+        ...
+
+
+@runtime_checkable
 class ILabelGenerator(Protocol):
     """Label generator interface for IC analysis."""
 
