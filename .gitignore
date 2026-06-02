@@ -141,3 +141,7 @@ sessions/數據遷移總結.md
 
 # Antigravity CLI 本地設定（agy）
 .antigravitycli/
+
+# fail-closed gate runtime tokens/audit (transient)
+.claude/gate/*.token
+.claude/gate/audit.log

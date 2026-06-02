@@ -58,6 +58,80 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 
 Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，凸顯打架與收斂點，**不丟原始多份輸出**；完整 transcript 存檔供稽核（見 `docs/reviews/`）。`/benchmark-models` 另可做 Claude/Codex/Gemini 三方量化比較（不含 Cursor）。
 
+⚠️ **獨立性陷阱（C3 事故）**：餵相同框架 + 相同事實給多模型 = **相關性錯誤**，不是獨立校驗（會一起錯）。開會前必做:(1) 分離「已驗證事實 vs 待答問題」;(2) 指派 ≥1 人**挑戰前提/當 adversary**，不要全員答 Claude 框好的同一題;(3) **code/log 推不出的事實（使用者 UI 選擇、預期 tier、是否並行…）先問使用者**再開會。此三點由 `scripts/gate.sh dispatch` 的 `--facts-asked`/`--review-role` 必填強制（見「Gate」節）。
+
+---
+
+## Gate（fail-closed 強制閘門，不靠 Claude 記性）
+
+**為何存在（兩次事故）**：(1) 寫 SPEC 沒開 canonical `templates/SPEC_TEMPLATE.md`，漏 §1.4 Golden；
+(2) 開委員會時餵相同框架給多模型 → 相關性錯誤,C3 前提錯到使用者才抓出。兩次的共同根因:
+**靠「我會記得」的機制(memory/doc/CLAUDE.md 原則)都會漏**——那條原則當時就在 context 裡仍被略過。
+結論:唯一不依賴 Claude 當下遵守的是 **harness 層 PreToolUse hook DENY**。
+
+**機制**：`scripts/gate_check.sh`（PreToolUse hook，matcher `Task|Bash|Write`）守**通道**不守實例：
+- `Task` 工具 = 全涵蓋（零列舉）；`Bash` = 比對 executor pattern（codex/cursor-agent/agy/gemini…）；
+- `Write` 到新 `docs/*{SPEC,TODO,PLAN}*.md` = 創建治理文件。
+- 無對應 fresh token（TTL 900s）→ **exit 2 擋下**，Claude 無法靜默跳過。
+
+**範本（V13 緊湊+錨點版，compliance-first）**：`templates/SPEC_TEMPLATE.md`（§RISK/§A/§C/§G/§P/§V/§R/§N 必填錨點）、
+`TODO_GENERATION_PROMPT.md`（蒸餾 1030→緊湊；產出 §0/§B/Task 驗證·邊界·不可做）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」）。
+為何重寫：舊版過長 → 被 grep 一下就改寫成扁平 checklist（compliance 失敗）。新版緊湊到「讀的成本 < 改寫的成本」+ 錨點綁 gate 機檢。
+
+**開門**：`bash scripts/gate.sh dispatch|artifact <必填>`，缺欄位拒發 token。**對 SPEC/TODO 派工附 `--spec/--todo`（可選 `--manifest`）→ 三道機檢，任一不過=拒發**：
+① `template_check.sh` 必填錨點；② 反空殼（空表/樣板殘留/驗證無可證偽 token，抓「只寫表頭內容空」）；③ `coverage_check.sh` 比對 manifest 每個 `[A-1]` ID 落進文件沒（抓掉項 churn）。
+誠實邊界：機械只抓明顯空殼；「貌似合理但邏輯空」靠 adversarial（不同模型、作者不自審）+ 執行閘兜底。必填即「會漏的事」清單：
+- `--facts-asked`：code/log 推不出、**該先問使用者**的事實（如 tier、是否 concurrent>1、IC-First 選擇）問了沒。
+- `--review-role`：委員會**指派誰挑戰前提/當 adversary**（避免全員答 Claude 框好的同一題 → 相關性錯誤）。
+- `--template`：對 SPEC/TODO 派工有沒有跟 canonical template。
+- `--risk high` 時 `--adversarial`：adversarial review 輸出路徑（gate **真實檢查檔存在**）。
+- artifact：`--template-opened`（gate 真實檢查 template 存在）+ `--sections`（§1.4 Golden 等覆蓋陳述）。
+
+**留痕供稽核**：token + `.claude/gate/audit.log` 記下何時/何意圖/聲稱跑了什麼。使用者 `cat .claude/gate/audit.log` 可抓「聲稱問了但其實沒問」。
+
+**誠實邊界與殘量**（不假裝是絕對保證）：
+- gate **不驗證填入內容為真**，只保證「沒跑不能派工/創檔」+ 可稽核。把無聲遺漏變成有紀錄的明確聲明。
+- 殘量:`Bash` executor pattern 是可維護清單,**全新未列入的 CLI 會漏 Bash**(但 `Task` 全涵蓋);hook 可被停用/設錯;parse 失敗 fail-open(避免 jq 壞掉鎖死 session)。
+- 設定變更**需 session 重啟才生效**(Claude Code 啟動時載入 hook),且新 hook 可能需使用者在 `/hooks` 核准。
+- 最終仍有一道閘門 = **使用者本人**;gate 是減少對使用者的依賴,不是取代。
+
+---
+
+## SPEC/TODO 作者流程（短文件優先 + 分層 + 信任分工）
+
+> **為何**：3000 行 SPEC 超過模型可靠指令預算(~150-200) → 每次重生成隨機掉一批項 → V1-V6 churn 燒 Opus。
+> 深度只能 Opus（GPT-5.5 廣度深度不足，不可外包）→ 省 token 只能靠「**Opus 每單位只寫一次、不重生成整份**」。
+> 來源：CRISPY（短文件優先 / 指令預算 / 垂直切分）+ 本專案 gate 機檢。
+
+### 分層（依 §RISK，別對中型任務跑完整管線）
+| 大小 | 流程 |
+|---|---|
+| 小 | 不寫 SPEC，直接派工指令 + 驗收命令 |
+| 中 | 寫 SPEC（含 per-Task 檔案/驗證/邊界欄）→ **直接從 SPEC 派工，跳獨立 TODO + 跳一次 adversarial** |
+| 大 / 高風險(a/b/c/d) | 完整管線（下方） |
+
+> **前置鐵律（反 C3，最高優先）**：開審前，SPEC §A 的「待使用者確認事實」必須**真的問過使用者並填入回覆**。
+> C3 事故證明 **Opus+GPT-5.5+Composer 2.5 三家族全沒抓到**——因為那是「缺一個只有使用者知道的事實 + 共享我框的錯前提」，不是推理盲點。**家族再多也救不了缺事實。** 故 facts-first 比加審查者更重要；gate `--facts-asked` 擋。
+
+### 大任務管線（每步都是小單位，Opus 不重生成整份）
+1. **決策文件 ~200 行**：拍板了什麼 + 待使用者確認的事實（→ SPEC §A/§RISK）。**使用者讀這層確認 scope/取捨；待確認事實必須先問到答案。**
+2. **Manifest ~2 頁**：每 Phase×子項攤成扁平 `[A-1]` ID 清單 + 各自驗證點。小、在指令預算內 → 一次寫全不掉。
+   **使用者讀這 2 頁確認範圍**（不是讀 3000 行）；機器用 `coverage_check.sh` 逐 ID 驗。
+3. **逐 Phase 展開**：Opus 一次只展開一個 Phase（遠低於指令預算 → 結構上不可能掉別的 Phase），拼成 SPEC。缺項時 coverage 列出 → **只補缺項，不重生成整份**。
+4. **機器把關**：`template_check`（錨點+反空殼）+ `coverage_check`（manifest 全覆蓋）。皆綠才往下。
+5. **adversarial 稽核 = GPT-5.5 + Composer 2.5 兩家族都跑**（買保險、各自獨立輸出、`-o` 只讀結論）：查語義/跨 Phase 銜接/空殼/挑戰前提。Claude 綜合「收斂 vs 分歧」給使用者。
+   **誠實界定**：兩家族保「推理/結構/空殼漏看」（C1/C2 實證有效）；**不保「共享錯前提+缺使用者事實」**（C3 全滅）→ 靠前置鐵律 + 挑戰前提 + 使用者驗 scope + Golden/執行閘。
+6. **TODO 預設 Opus 寫**（深度只能 Opus；GPT-5.5/Composer 廣度深度不足）；**交執行端生成僅 Opus 額度吃緊時 fallback，且須配 Opus adversarial 抓淺**。機器把關（template+coverage+反空殼）+ 雙家族 adversarial 同 SPEC。
+
+### 信任分工（解「使用者看不懂 3000 行程式/量化」）
+| 誰 | 驗什麼 |
+|---|---|
+| **使用者** | 只讀 決策(~200) + manifest(~2頁) = **scope**；+ adversarial 的空殼/findings verdict(~5 行) |
+| **機器**（gate） | 完整性(coverage) + 格式/反空殼(template) |
+| **不同模型**（adversarial，作者不自審） | 正確性 / 深度 / 跨層銜接 / 精緻空殼 |
+| **執行閘 + Golden/測試** | 最終後盾：空殼 Task 寫不出→BLOCKED；空殼實作過不了 Golden |
+**使用者全程不需讀完整 SPEC/TODO**——那是給執行端的。
+
 ---
 
 ## 2. 派工（dispatch）
@@ -66,29 +140,35 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 1. 依 CLAUDE.md「任務分派規則」判定 小 / 中 / 大，並向使用者宣告。
 2. 中 / 大任務：先寫好 SPEC（+ TODO）落地成檔，路徑明確。
 3. 確認 `HANDOFF.md` 反映當前狀態（執行端會先讀它）。
+4. **過 Gate**：`bash scripts/gate.sh dispatch …`（見上「Gate」節）。無 token → hook 擋死。
+
+> ⚠️ **背景派工防卡死鐵律（2026-06-02 事故）**：harness **只在進程「結束」時通知 Claude**；卡死的進程永不結束 → 永不通知 → Claude 盲等、浪費時間且不自知。故背景派工**一律**：
+> 1. **`< /dev/null`** — 防 stdin 卡死（`-s workspace-write` 背景跑時 stdin 是未關 pipe，codex 當「追加 prompt」等 EOF → 卡在 `Reading additional input from stdin...`）。
+> 2. **`timeout <秒>`** 包住 — 把「無聲無限卡死」轉成「逾時被殺 → 進程結束 → harness 通知」。
+> 3. **派工後 ~20-30s 主動查一次 liveness**（log 有沒有長、進程在不在），確認真的動起來才轉被動等通知，**不要派完就盲等**。
 
 ### Codex 派工模板
 ```bash
-codex exec -m <GPT-5.5 model id> -s workspace-write \
+timeout 1800 codex exec -m <GPT-5.5 model id> -s workspace-write \
   -o /tmp/codex_last.txt \
   "讀 HANDOFF.md、CLAUDE.md、AGENTS.md。\
 依 specs/<NAME>_SPEC.md 與其 TODO 實作 <Phase/Task 範圍>。\
 嚴守 AGENTS.md「執行任務時」合約：只改範圍內檔案、不弱化品質 gate、不腦補數值。\
-完成後跑 <pytest 指令>。結束時更新 HANDOFF.md，最後輸出一行 STATUS: DONE 或 STATUS: BLOCKED — <原因>。"
+完成後跑 <pytest 指令>。結束時更新 HANDOFF.md，最後輸出一行 STATUS: DONE 或 STATUS: BLOCKED — <原因>。" \
+  < /dev/null > /tmp/codex_full.log 2>&1
 ```
-- `-m` 顯式釘模型（見 §8 模型釘選）；`-s workspace-write` = sandbox 只能寫工作目錄（安全，命令自動執行不互動提問）。
-- `-o <FILE>` 把 agent 最後一則訊息寫檔，Claude 讀它取 STATUS，不必撈整段 log。`--json` 可取 JSONL 事件流。
-- 長任務用 `run_in_background: true`（Claude 的 Bash 工具），跑完通知 Claude。
-- 一次性小任務可不寫 SPEC，prompt 內直接給明確指令 + 範圍 + 驗收命令。
+- `-m` 顯式釘模型（見 §8）；`-s workspace-write` = 只能寫工作目錄。
+- `-o <FILE>` 截 agent 最後訊息，讀它取 STATUS 不撈整段 log。
+- 長任務 `run_in_background: true`；**務必 `timeout` + `< /dev/null`**（見上鐵律）。
 
 ### Cursor 派工模板（非互動 print 模式）
 ```bash
-cursor-agent -p --force --output-format text --model <Composer 2.5 model id> \
+timeout 1800 cursor-agent -p --force --output-format text --model <Composer 2.5 model id> \
   "讀 HANDOFF.md、CLAUDE.md、.cursorrules。<同上任務描述與合約要求>。\
-完成輸出 STATUS: DONE 或 STATUS: BLOCKED — <原因>。"
+完成輸出 STATUS: DONE 或 STATUS: BLOCKED — <原因>。" < /dev/null > /tmp/cursor_full.log 2>&1
 ```
-- `--force`（= `--yolo`）自動允許命令，不互動提問；`--output-format text|stream-json`。
-> ✅ **已驗證**（2026-05-31）：codex `-m/-s/-o/--json/resume`、cursor `-p/--force/--model/--output-format/--list-models` 旗標均存在。
+- `--force`（= `--yolo`）自動允許命令；同樣 `timeout` + `< /dev/null`。
+> ✅ **已驗證**：codex `-m/-s/-o/--json/resume`、cursor `-p/--force/--model/--output-format`；`< /dev/null` 解 stdin 卡死（2026-06-02 實測）。
 
 ### Adversarial review = 跨模型（大任務必做）
 SPEC freeze 前，Claude 寫的 SPEC 由**對方模型**審：

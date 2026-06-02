@@ -48,6 +48,17 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task|Bash|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/gate_check.sh"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [
