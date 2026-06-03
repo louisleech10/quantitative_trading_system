@@ -59,10 +59,12 @@ def mock_quality_computer() -> MockQualityComputer:
 
 
 @pytest.fixture
-def batch_service_factory(mock_browse_registrar, mock_quality_computer):
+def batch_service_factory(mock_browse_registrar, mock_quality_computer, tmp_path):
     def _factory(checkpoint_dir: Optional[Path] = None) -> FeatureFactoryBatchService:
+        # 縱深防禦:checkpoint_dir 省略時落到 tmp,絕不寫進正式 data_cache/feature_preprocessing
+        # (否則測試批次會出現在使用者「歷史批次」下拉並無限增長)。
         return FeatureFactoryBatchService(
-            checkpoint_dir=checkpoint_dir,
+            checkpoint_dir=checkpoint_dir or tmp_path / "batch_checkpoints",
             browse_registrar=mock_browse_registrar,
             quality_computer=mock_quality_computer,
         )
