@@ -4,6 +4,7 @@ import json
 import threading
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
 from api.services.feature_factory_service import FeatureFactoryService
@@ -14,7 +15,12 @@ def _build_service_for_unit() -> FeatureFactoryService:
     service._stats_cache = {}
     service._stats_name_sorted_cache = {}
     service._stats_name_keys_cache = {}
+    service._stats_warming_tasks = set()
+    service._cgsa_stats_mem_cache = {}
+    service._cgsa_stats_warming_tasks = set()
     service._adf_cache = {}
+    service._lock = threading.Lock()
+    service._coalesce_browse = lambda _fp, fn: fn()
     service._export_service = SimpleNamespace(
         _infer_category=lambda _name: "other",
         _infer_layer=lambda _name: "layer1",
@@ -92,6 +98,83 @@ def test_cgsa_catalog_disk_cache_roundtrip(tmp_path):
     meta = json.loads((tmp_path / FeatureFactoryService._CGSA_CATALOG_CACHE_META_NAME).read_text())
     assert meta["feature_schema_hash"] == "schema-1"
     assert service._cgsa_column_path_cache["task-catalog"] == fast["column_to_path"]
+
+
+def test_browse_summary_exposes_stats_warmup(monkeypatch):
+    """browse_summary 須含 stats_warmup 結構化進度欄位。"""
+    service = _build_service_for_unit()
+    service._stats_warming_tasks = set()
+    service._cgsa_stats_mem_cache = {}
+    service._cgsa_stats_warming_tasks = set()
+    service._lock = threading.Lock()
+    service._coalesce_browse = lambda _fp, fn: fn()
+
+    monkeypatch.setattr(
+        service,
+        "_load_task_features",
+        lambda _task_id: (
+            pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]}),
+            {"symbol": "BTCUSDT", "timeframe": "1h", "metadata": {}},
+        ),
+    )
+    monkeypatch.setattr(service, "_start_stats_cache_warmup", lambda *_a, **_k: None)
+    monkeypatch.setattr(service, "_start_adf_cache_warmup", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        service,
+        "_get_stats_warmup_progress",
+        lambda *_a, **_k: {
+            "computed": 1,
+            "total": 2,
+            "pct": 50.0,
+            "complete": False,
+        },
+    )
+
+    result = service.browse_summary("task-stats-warmup")
+
+    warmup = result.get("stats_warmup")
+    assert warmup is not None
+    assert warmup["computed"] == 1
+    assert warmup["total"] == 2
+    assert warmup["pct"] == 50.0
+    assert warmup["complete"] is False
+
+
+def test_get_stats_warmup_progress_complete_when_cache_full(monkeypatch):
+    """stats 全快取時 complete=True、pct=100。"""
+    service = _build_service_for_unit()
+    service._stats_cache = {
+        "task-full": [{"name": "a"}, {"name": "b"}],
+    }
+    service._lock = threading.Lock()
+
+    progress = service._get_stats_warmup_progress("task-full", total_features=2)
+
+    assert progress["computed"] == 2
+    assert progress["total"] == 2
+    assert progress["pct"] == 100.0
+    assert progress["complete"] is True
+
+
+def test_assemble_data_quality_report_includes_nan_ratio_fields():
+    """dq report 須含 nan_ratio_mean/max（供 batch adapter 取用）。"""
+    service = _build_service_for_unit()
+    columns = ["feat_a", "feat_b"]
+    nan_ratios = pd.Series({"feat_a": 0.8, "feat_b": 0.1})
+
+    report = service._assemble_data_quality_report(
+        total_rows=100,
+        columns=columns,
+        nan_ratios=nan_ratios,
+        first_valid_map={"feat_a": 80, "feat_b": 0},
+        last_valid_map={"feat_a": 99, "feat_b": 99},
+        row_nan_count=np.zeros(100, dtype=np.int64),
+        timestamps=[str(i) for i in range(100)],
+    )
+
+    assert report["schema_version"] == "dq_v5"
+    assert abs(report["nan_ratio_mean"] - 0.45) <= 0.01
+    assert abs(report["nan_ratio_max"] - 0.8) <= 0.01
 
 
 def test_cgsa_stats_persist_uses_incremental_parts(tmp_path):

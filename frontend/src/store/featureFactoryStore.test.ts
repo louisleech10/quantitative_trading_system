@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useFeatureFactoryStore } from './featureFactoryStore';
+import {
+  LAST_BATCH_TASK_ID_KEY,
+  readLastBatchTaskId,
+  useFeatureFactoryStore,
+} from './featureFactoryStore';
 
 function resetStore(): void {
   useFeatureFactoryStore.setState({
@@ -91,5 +95,49 @@ describe('featureFactoryStore pollBatchStatus', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(state.error).toBe('temporary backend failure');
     expect(state.batchTask?.status).toBe('completed');
+  });
+});
+
+describe('featureFactoryStore lastBatchTaskId persistence', () => {
+  beforeEach(() => {
+    resetStore();
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    resetStore();
+  });
+
+  it('persists batch task id when polling reaches a terminal status', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        response(200, {
+          task_id: 'batch-persist-1',
+          batch_id: 'batch-persist-1',
+          status: 'completed',
+          total: 1,
+          completed: 1,
+          failed: 0,
+          progress: 1,
+          results: { BTCUSDT: '/tmp/BTCUSDT_1h.h5' },
+          errors: {},
+        }),
+      ),
+    );
+
+    await useFeatureFactoryStore.getState().pollBatchStatus('batch-persist-1');
+
+    expect(window.localStorage.getItem(LAST_BATCH_TASK_ID_KEY)).toBe('batch-persist-1');
+    expect(readLastBatchTaskId()).toBe('batch-persist-1');
+  });
+
+  it('exposes persisted id after store reset to simulate page reload', async () => {
+    window.localStorage.setItem(LAST_BATCH_TASK_ID_KEY, 'batch-reload-42');
+    resetStore();
+
+    expect(useFeatureFactoryStore.getState().batchTask).toBeNull();
+    expect(readLastBatchTaskId()).toBe('batch-reload-42');
   });
 });

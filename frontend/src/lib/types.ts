@@ -430,6 +430,15 @@ export interface BatchItemMetrics {
   rss_after_gc_mb?: number;
 }
 
+/** GET /batch/list 單筆可恢復批次摘要 */
+export interface RecoverableBatchSummary {
+  batch_id: string;
+  symbols: string[];
+  timeframe: string;
+  completed_count: number;
+  updated_at: string;
+}
+
 export interface BatchTaskStatus {
   task_id: string;
   batch_id?: string;
@@ -544,6 +553,12 @@ export interface FeatureSummary {
       feature: string;
       message: string;
     }>;
+  };
+  stats_warmup?: {
+    computed: number;
+    total: number;
+    pct: number;
+    complete: boolean;
   };
   generation_info: {
     task_id: string;

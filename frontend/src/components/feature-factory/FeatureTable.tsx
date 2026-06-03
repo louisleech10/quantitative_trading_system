@@ -5,6 +5,27 @@ import { BrowseFeatureItem } from '@/lib/types';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import FeatureNameSegmentFilter from '@/components/feature-factory/FeatureNameSegmentFilter';
+import type { FeatureSummary } from '@/lib/types';
+
+/** stats 暖機進度提示（獨立元件便於 unit test） */
+export function StatsWarmupBanner({
+  statsWarmup,
+}: {
+  statsWarmup?: FeatureSummary['stats_warmup'];
+}) {
+  if (!statsWarmup || statsWarmup.complete) return null;
+  return (
+    <div className="text-xs text-amber-200/90 border border-amber-300/30 bg-amber-400/10 rounded-lg px-3 py-2">
+      暖機 {statsWarmup.pct.toFixed(0)}%，排序暫定
+      {statsWarmup.total > 0 && (
+        <span className="text-amber-200/70">
+          {' '}
+          （{statsWarmup.computed.toLocaleString()} / {statsWarmup.total.toLocaleString()} 特徵統計已就緒）
+        </span>
+      )}
+    </div>
+  );
+}
 
 interface FeatureTableProps {
   taskId: string;
@@ -27,8 +48,12 @@ const TABLE_ROW_HEIGHT = 34;
 const VIRTUAL_OVERSCAN = 12;
 
 export default function FeatureTable({ taskId, totalCount, onOpenDistribution, onOpenCorrelation }: FeatureTableProps) {
-  const { browseFeatures } = useFeatureFactory();
+  const { browseFeatures, browseSummary } = useFeatureFactory();
   const sharedFeatureNames = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask[taskId]);
+  const statsWarmup = useFeatureFactoryStore(
+    (state) => state.explorerSummaryByTask[taskId]?.stats_warmup,
+  );
+  const setExplorerSummaryForTask = useFeatureFactoryStore((state) => state.setExplorerSummaryForTask);
 
   // All features loaded once from the server (up to 5000)
   const [allRows, setAllRows] = useState<BrowseFeatureItem[]>([]);
@@ -73,6 +98,17 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // stats 暖機未完成時輪詢 summary 以更新進度條
+  useEffect(() => {
+    if (!taskId || !statsWarmup || statsWarmup.complete) return;
+    const interval = setInterval(() => {
+      browseSummary(taskId)
+        .then((payload) => setExplorerSummaryForTask(taskId, payload))
+        .catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [taskId, statsWarmup, browseSummary, setExplorerSummaryForTask]);
 
   // When sort is non-default, ask the server to sort ALL rows and return first page.
   // category/level are forwarded so the result is accurate even with filters.
@@ -449,6 +485,10 @@ export default function FeatureTable({ taskId, totalCount, onOpenDistribution, o
       <div className="text-[11px] text-slate-400">
         提示：表格會先載入前段資料並在背景補齊；統計值以目前已載入的特徵列為準。
       </div>
+
+      {statsWarmup && !statsWarmup.complete && (
+        <StatsWarmupBanner statsWarmup={statsWarmup} />
+      )}
 
       {error && <div className="text-xs text-rose-300">{error}</div>}
       {loading ? (

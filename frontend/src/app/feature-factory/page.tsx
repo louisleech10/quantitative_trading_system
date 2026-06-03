@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle, Database, Layers, ArrowDownUp, Eye, Download, Cpu } from 'lucide-react';
 import { getBackendBrowseTaskId } from '@/lib/batchBrowse';
-import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import { useFeatureFactoryStore, readLastBatchTaskId } from '@/store/featureFactoryStore';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import ConfigPanel from '@/components/feature-factory/ConfigPanel';
 import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKlineDownloadPanel';
@@ -13,7 +13,10 @@ import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
 import LayerPanel from '@/components/feature-factory/LayerPanel';
 import FeatureExplorer from '@/components/feature-factory/FeatureExplorer';
-import BatchQualityOverview from '@/components/feature-factory/BatchQualityOverview';
+import BatchQualityOverview, {
+  BatchRecoverableSelect,
+  type RecoverableBatchSummary,
+} from '@/components/feature-factory/BatchQualityOverview';
 import HardwareStatusPanel from '@/components/feature-factory/HardwareStatusPanel';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
@@ -72,6 +75,56 @@ export default function FeatureFactoryPage() {
   const [featureKlineSymbols, setFeatureKlineSymbols] = useState<string[]>([]);
   const [featureKlineSymbolsLoading, setFeatureKlineSymbolsLoading] = useState(false);
   const [configTab, setConfigTab] = useState<'hardware' | 'kline' | 'data' | 'indicators' | 'preprocessing' | 'preview' | null>('data');
+  const [restoredBatchExpired, setRestoredBatchExpired] = useState(false);
+  const [recoverableBatches, setRecoverableBatches] = useState<RecoverableBatchSummary[]>([]);
+  const [recoverableBatchesLoaded, setRecoverableBatchesLoaded] = useState(false);
+  const [selectedRecoverableBatchId, setSelectedRecoverableBatchId] = useState<string | null>(
+    null,
+  );
+
+  // 無 live batchTask 時從 checkpoint 列舉歷史批次（救 R2 之前的舊批次）
+  useEffect(() => {
+    if (batchTask) {
+      setRecoverableBatches([]);
+      setRecoverableBatchesLoaded(false);
+      setSelectedRecoverableBatchId(null);
+      setRestoredBatchExpired(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRecoverableBatchesLoaded(false);
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/features/batch/list`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = (await res.json()) as { batches?: RecoverableBatchSummary[] };
+        if (cancelled) return;
+        const batches = json.batches ?? [];
+        setRecoverableBatches(batches);
+        const persistedId = readLastBatchTaskId();
+        const persistedInList = persistedId
+          ? batches.find((b) => b.batch_id === persistedId)
+          : undefined;
+        setSelectedRecoverableBatchId(
+          persistedInList?.batch_id ?? batches[0]?.batch_id ?? null,
+        );
+        setRestoredBatchExpired(false);
+      } catch {
+        if (!cancelled) {
+          setRecoverableBatches([]);
+          setSelectedRecoverableBatchId(readLastBatchTaskId());
+        }
+      } finally {
+        if (!cancelled) setRecoverableBatchesLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batchTask]);
 
   const refreshFeatureKlineSymbols = useCallback(async () => {
     setFeatureKlineSymbolsLoading(true);
@@ -96,6 +149,22 @@ export default function FeatureFactoryPage() {
 
   const batchResults = batchTask?.results ?? {};
   const batchSuccessSymbols = Object.keys(batchResults);
+
+  const activeQualityBatchId =
+    batchTask?.status === 'completed' || batchTask?.status === 'partial'
+      ? batchTask.task_id
+      : !batchTask && !restoredBatchExpired
+        ? selectedRecoverableBatchId
+        : null;
+
+  const showBatchQualitySection =
+    Boolean(batchTask?.status === 'completed' || batchTask?.status === 'partial') ||
+    (!batchTask && recoverableBatchesLoaded);
+
+  const showBatchQualityOverview = Boolean(activeQualityBatchId);
+  const showBatchExplorer =
+    (batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
+    batchSuccessSymbols.length > 0;
 
   // 批次完成後自動選擇第一個成功的 symbol
   useEffect(() => {
@@ -412,10 +481,35 @@ export default function FeatureFactoryPage() {
           )}
         </div>
         <FeatureExplorer taskId={currentTask?.task_id} taskStatus={currentTask?.status} validationSummary={currentTask?.validation_summary} />
-        {(batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
-          batchSuccessSymbols.length > 0 && (
+        {(showBatchQualitySection || showBatchExplorer) && (
             <>
-              <BatchQualityOverview batchTaskId={batchTask.task_id} />
+              {showBatchQualitySection && !batchTask && (
+                <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
+                  <div className="text-sm font-medium text-slate-300">批次品質 — 歷史批次</div>
+                  {recoverableBatches.length > 0 ? (
+                    <BatchRecoverableSelect
+                      batches={recoverableBatches}
+                      value={selectedRecoverableBatchId ?? ''}
+                      onChange={(id) => {
+                        setSelectedRecoverableBatchId(id);
+                        setRestoredBatchExpired(false);
+                      }}
+                    />
+                  ) : recoverableBatchesLoaded ? (
+                    <p className="text-xs text-slate-500">無歷史批次（尚無可恢復的 checkpoint）</p>
+                  ) : (
+                    <p className="text-xs text-slate-500">載入歷史批次…</p>
+                  )}
+                </div>
+              )}
+              {showBatchQualityOverview && activeQualityBatchId && (
+                <BatchQualityOverview
+                  batchTaskId={activeQualityBatchId}
+                  onBatchExpired={() => setRestoredBatchExpired(true)}
+                />
+              )}
+              {showBatchExplorer && (
+              <>
               {/* 批次模式 Symbol 選擇器 */}
               <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
                 <div className="text-sm font-medium text-slate-300">Feature Explorer — 選擇標的</div>
@@ -450,6 +544,8 @@ export default function FeatureFactoryPage() {
                   </div>
                 )}
               </div>
+              </>
+              )}
             </>
           )}
 

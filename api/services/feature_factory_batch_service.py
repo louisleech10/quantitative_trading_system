@@ -808,6 +808,68 @@ class FeatureFactoryBatchService:
             for item in failed_items
         }
 
+    def list_recoverable_batches(self) -> List[Dict[str, Any]]:
+        """從 checkpoint 目錄列出可恢復的批次（唯讀，completed_items 非空）。"""
+
+        entries: List[Dict[str, Any]] = []
+        try:
+            paths = sorted(self._checkpoint_dir.glob("batch_state_*.json"))
+        except OSError as exc:
+            logger.warning("Failed to scan batch checkpoint dir: %s", exc)
+            return []
+
+        for path in paths:
+            try:
+                with path.open("r", encoding="utf-8") as file_obj:
+                    payload = json.load(file_obj)
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+
+            completed_items = payload.get("completed_items")
+            if not isinstance(completed_items, list) or not completed_items:
+                continue
+
+            batch_id = str(payload.get("batch_id") or "").strip()
+            if not batch_id:
+                stem = path.stem
+                if stem.startswith("batch_state_"):
+                    batch_id = stem[len("batch_state_") :]
+            if not batch_id:
+                continue
+
+            request_payload = payload.get("request_payload")
+            timeframe = ""
+            if isinstance(request_payload, dict):
+                timeframe = str(request_payload.get("timeframe") or "")
+
+            symbols: List[str] = []
+            seen_symbols: set[str] = set()
+            for item in completed_items:
+                if not isinstance(item, dict):
+                    continue
+                symbol = str(item.get("symbol") or "").strip()
+                if symbol and symbol not in seen_symbols:
+                    seen_symbols.add(symbol)
+                    symbols.append(symbol)
+
+            updated_at = str(
+                payload.get("last_updated_at") or payload.get("started_at") or ""
+            )
+            entries.append(
+                {
+                    "batch_id": batch_id,
+                    "symbols": symbols,
+                    "timeframe": timeframe,
+                    "completed_count": len(completed_items),
+                    "updated_at": updated_at,
+                }
+            )
+
+        entries.sort(key=lambda row: row.get("updated_at", ""), reverse=True)
+        return entries
+
     def _load_checkpoint(self, batch_id: str) -> Optional[Dict[str, Any]]:
         """Load a checkpoint if it exists."""
 
@@ -1054,10 +1116,13 @@ class FeatureFactoryBatchService:
     async def get_batch_quality_summary(self, batch_task_id: str) -> Optional[Dict[str, Any]]:
         """計算批次任務中所有成功標的的快速品質彙整（NaN/常數/警告，跳過 ADF）。"""
         task = self._tasks.get(batch_task_id)
-        if not task:
-            return None
-
-        results: Dict[str, str] = dict(task.get("results", {}))
+        if task:
+            results: Dict[str, str] = dict(task.get("results", {}))
+        else:
+            checkpoint = self._load_checkpoint(batch_task_id)
+            if not checkpoint:
+                return None
+            results = self._results_from_completed(checkpoint.get("completed_items", []))
         if not results:
             return {
                 "batch_task_id": batch_task_id,

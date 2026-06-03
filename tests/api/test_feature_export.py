@@ -482,7 +482,7 @@ async def test_browse_correlation_success(async_client, monkeypatch):
 async def test_browse_distribution_success(async_client, monkeypatch):
     """Browse distribution：成功回傳 histogram。"""
 
-    def fake_browse_distribution(task_id, feature, n_bins):
+    def fake_browse_distribution(task_id, feature, n_bins, **kwargs):
         assert feature == "ent_a"
         return {"feature": feature, "n_bins": n_bins, "bins": [1, 2], "edges": [0.0, 1.0, 2.0], "stats": {}}
 

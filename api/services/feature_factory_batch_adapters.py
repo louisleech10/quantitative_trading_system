@@ -72,22 +72,28 @@ class FeatureFactoryQualityAdapter:
         quality = summary.get("quality") or {}
         bar_count = int(summary.get("total_rows") or dq.get("total_timesteps") or 0)
         feature_count = int(summary.get("total_features") or dq.get("total_features") or 0)
-        nan_ratio_mean = float(quality.get("nan_ratio_mean") or 0.0)
-        nan_ratio_max = float(quality.get("nan_ratio_max") or 0.0)
         constant_feature_count = len(quality.get("constant_features") or [])
 
-        quality_alerts = quality.get("quality_alerts") or []
         counts = dq.get("counts") or {}
-        alert_count = max(
-            len(quality_alerts),
-            int(counts.get("real_problem") or 0),
-            int(counts.get("mid_holes") or 0),
-            int(counts.get("trailing_nans") or 0),
-        )
+        real_problem_count = int(counts.get("real_problem") or 0)
+        warmup_only_count = int(counts.get("warmup_only_high_nan") or 0)
 
-        if nan_ratio_mean > 0.3 or constant_feature_count > 0 or bar_count < 200:
+        # 真實 NaN 均/峰：優先 dq 掃描（np.isnan），避免 parquet null_count 盲點。
+        if dq.get("nan_ratio_mean") is not None:
+            nan_ratio_mean = float(dq["nan_ratio_mean"])
+        else:
+            nan_ratio_mean = float(quality.get("nan_ratio_mean") or 0.0)
+        if dq.get("nan_ratio_max") is not None:
+            nan_ratio_max = float(dq["nan_ratio_max"])
+        else:
+            nan_ratio_max = float(quality.get("nan_ratio_max") or 0.0)
+
+        # 警告數 = 真問題（mid-hole / all-NaN），不含純暖機 leading NaN。
+        alert_count = real_problem_count
+
+        if constant_feature_count > 0 or bar_count < 200:
             grade = "reject"
-        elif nan_ratio_mean > 0.1 or alert_count > 5 or bar_count < 500:
+        elif real_problem_count > 5 or bar_count < 500:
             grade = "watch"
         else:
             grade = "pass"
@@ -100,5 +106,6 @@ class FeatureFactoryQualityAdapter:
             "nan_ratio_max": round(nan_ratio_max, 6),
             "constant_feature_count": constant_feature_count,
             "alert_count": alert_count,
+            "warmup_only_count": warmup_only_count,
             "grade": grade,
         }

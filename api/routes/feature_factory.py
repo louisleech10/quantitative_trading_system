@@ -201,6 +201,18 @@ async def resume_batch_generation(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/batch/list")
+async def list_recoverable_batches(
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """列出磁碟 checkpoint 上可恢復的歷史批次（唯讀）。"""
+    try:
+        return {"batches": service.list_recoverable_batches()}
+    except Exception as exc:
+        logger.error("Failed to list recoverable batches: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/batch/{task_id}", response_model=BatchTaskStatusResponse)
 async def get_batch_status(
     task_id: str,

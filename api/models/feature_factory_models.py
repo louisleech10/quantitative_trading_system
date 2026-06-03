@@ -208,6 +208,7 @@ class SymbolQualitySummary(BaseModel):
     nan_ratio_max: float
     constant_feature_count: int
     alert_count: int
+    warmup_only_count: int = 0
     grade: str  # 'pass' | 'watch' | 'reject'
 
 

@@ -168,13 +168,70 @@ function nanColor(ratio: number): string {
   return 'text-emerald-300';
 }
 
+/* ---------- Batch discovery (checkpoint list) ---------- */
+
+export interface RecoverableBatchSummary {
+  batch_id: string;
+  symbols: string[];
+  timeframe: string;
+  completed_count: number;
+  updated_at: string;
+}
+
+function formatBatchOptionLabel(batch: RecoverableBatchSummary): string {
+  const symPreview =
+    batch.symbols.length > 2
+      ? `${batch.symbols.slice(0, 2).join(', ')}+${batch.symbols.length - 2}`
+      : batch.symbols.join(', ');
+  const idShort =
+    batch.batch_id.length > 20
+      ? `${batch.batch_id.slice(0, 8)}…${batch.batch_id.slice(-8)}`
+      : batch.batch_id;
+  return `${symPreview || idShort} · ${batch.timeframe || '?'} · ${batch.completed_count}`;
+}
+
+interface BatchRecoverableSelectProps {
+  batches: RecoverableBatchSummary[];
+  value: string;
+  onChange: (batchId: string) => void;
+  disabled?: boolean;
+}
+
+export function BatchRecoverableSelect({
+  batches,
+  value,
+  onChange,
+  disabled = false,
+}: BatchRecoverableSelectProps) {
+  return (
+    <select
+      value={value}
+      disabled={disabled || batches.length === 0}
+      onChange={(e) => {
+        const next = e.target.value;
+        if (next) onChange(next);
+      }}
+      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-full min-w-[12rem]"
+      title="切換最近批次"
+    >
+      <option value="">最近批次 ({batches.length})…</option>
+      {batches.map((batch) => (
+        <option key={batch.batch_id} value={batch.batch_id}>
+          {formatBatchOptionLabel(batch)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /* ---------- Component ---------- */
 
 interface BatchQualityOverviewProps {
   batchTaskId: string;
+  onBatchExpired?: () => void;
 }
 
-export default function BatchQualityOverview({ batchTaskId }: BatchQualityOverviewProps) {
+export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: BatchQualityOverviewProps) {
   const [data, setData] = useState<BatchQualityResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +243,11 @@ export default function BatchQualityOverview({ batchTaskId }: BatchQualityOvervi
     setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/features/batch/${batchTaskId}/quality`);
+      if (res.status === 404) {
+        setError('批次已失效');
+        onBatchExpired?.();
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as BatchQualityResponse;
       setData(json);
@@ -194,7 +256,7 @@ export default function BatchQualityOverview({ batchTaskId }: BatchQualityOvervi
     } finally {
       setIsLoading(false);
     }
-  }, [batchTaskId]);
+  }, [batchTaskId, onBatchExpired]);
 
   useEffect(() => {
     fetchQuality();

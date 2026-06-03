@@ -1349,8 +1349,8 @@ class FeatureFactoryService:
             rows = frame.to_dict(orient="records")
             # Guard: if the cache predates nan_ratio, backfill from fast summary so
             # sort-by-nan_ratio works correctly without forcing a full rebuild.
-            nan_ratios: pd.Series = fast["nan_ratios"]
-            if rows and rows[0].get("nan_ratio") is None:
+            nan_ratios = fast.get("nan_ratios")
+            if nan_ratios is not None and rows and rows[0].get("nan_ratio") is None:
                 for row in rows:
                     name = row.get("name", "")
                     row["nan_ratio"] = self._safe_float(nan_ratios.get(name, 0.0)) or 0.0
@@ -1952,7 +1952,7 @@ class FeatureFactoryService:
     # Bump when the report schema changes so stale on-disk caches are invalidated.
     # dq_v2: coverage_timeline rebuilt from first/last_valid (was dead all-1.0);
     #        added counts.warmup_only_high_nan / counts.real_problem + group_breakdown.
-    _DATA_QUALITY_SCHEMA_VERSION: str = "dq_v4"
+    _DATA_QUALITY_SCHEMA_VERSION: str = "dq_v5"
     # Bucket bounds for warmup (lookback) length, in bars.
     _DATA_QUALITY_WARMUP_BUCKETS: List[tuple] = [
         ("0", 0, 0),
@@ -2677,8 +2677,13 @@ class FeatureFactoryService:
             })
         group_breakdown.sort(key=lambda x: x["feature_count"], reverse=True)
 
+        nan_ratio_mean = float(nan_ratios.mean()) if n_features else 0.0
+        nan_ratio_max = float(nan_ratios.max()) if n_features else 0.0
+
         return {
             "schema_version": self._DATA_QUALITY_SCHEMA_VERSION,
+            "nan_ratio_mean": nan_ratio_mean,
+            "nan_ratio_max": nan_ratio_max,
             "total_features": n_features,
             "total_timesteps": total_rows,
             "timestamp_start": timestamp_start,
@@ -2761,6 +2766,68 @@ class FeatureFactoryService:
                 "real_problem": 0,
             },
             "group_breakdown": [],
+            "nan_ratio_mean": 0.0,
+            "nan_ratio_max": 0.0,
+        }
+
+    def _get_stats_warmup_progress(
+        self,
+        task_id: str,
+        *,
+        total_features: Optional[int] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """回傳 stats 暖機進度，供 Feature Table 顯示排序暫定提示。
+
+        沿用既有 cache 計數，不新增阻塞掃描。
+        """
+        total = int(total_features or 0)
+        computed = 0
+        ctx = context
+
+        if ctx is None:
+            try:
+                ctx = self._load_task_context(task_id)
+            except Exception:
+                ctx = None
+
+        if ctx and ctx.get("is_cgsa"):
+            if total <= 0:
+                try:
+                    fast = self._load_cgsa_summary_fast(ctx)
+                    if fast is not None:
+                        total = len(fast.get("columns") or [])
+                except Exception:
+                    pass
+            stats_df = self._load_cgsa_stats_mem(task_id, ctx)
+            computed = int(len(stats_df.index)) if not stats_df.empty else 0
+        else:
+            with self._lock:
+                cached_rows = self._stats_cache.get(task_id)
+            if cached_rows is not None:
+                computed = len(cached_rows)
+            if total <= 0:
+                try:
+                    features_df, _meta = self._load_task_features(task_id)
+                    total = int(features_df.shape[1])
+                except Exception:
+                    pass
+
+        if total <= 0:
+            return {
+                "computed": 0,
+                "total": 0,
+                "pct": 100.0,
+                "complete": True,
+            }
+
+        computed = min(computed, total)
+        pct = round(float(computed) / float(total) * 100.0, 1)
+        return {
+            "computed": computed,
+            "total": total,
+            "pct": pct,
+            "complete": computed >= total,
         }
 
     def browse_summary(self, task_id: str) -> Dict[str, Any]:
@@ -2867,6 +2934,11 @@ class FeatureFactoryService:
         self._start_stats_cache_warmup(task_id, reason="browse_summary")
         self._start_adf_cache_warmup(task_id, reason="browse_summary")
 
+        stats_warmup = self._get_stats_warmup_progress(
+            task_id,
+            total_features=int(features_df.shape[1]),
+        )
+
         return {
             "total_features": int(features_df.shape[1]),
             "total_rows": int(features_df.shape[0]),
@@ -2882,6 +2954,7 @@ class FeatureFactoryService:
                 "stationary_ratio": stationary_ratio,
                 "quality_alerts": quality_alerts,
             },
+            "stats_warmup": stats_warmup,
             "generation_info": {
                 "task_id": task_id,
                 "symbol": export_meta.get("symbol"),
@@ -4406,6 +4479,12 @@ class FeatureFactoryService:
         self._start_stats_cache_warmup(task_id, reason="browse_summary")
         self._start_adf_cache_warmup(task_id, reason="browse_summary")
 
+        stats_warmup = self._get_stats_warmup_progress(
+            task_id,
+            total_features=len(columns),
+            context=context,
+        )
+
         task_result = context.get("task_result") or {}
         metadata = context.get("metadata") or {}
 
@@ -4424,6 +4503,7 @@ class FeatureFactoryService:
                 "stationary_ratio": stationary_ratio,
                 "quality_alerts": quality_alerts,
             },
+            "stats_warmup": stats_warmup,
             "generation_info": {
                 "task_id": task_id,
                 "symbol": context.get("symbol"),

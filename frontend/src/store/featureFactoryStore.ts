@@ -142,6 +142,35 @@ const mergeDeep = (
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1/features';
+export const LAST_BATCH_TASK_ID_KEY = 'ff:lastBatchTaskId';
+
+export function readLastBatchTaskId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LAST_BATCH_TASK_ID_KEY);
+    return raw && raw.trim().length > 0 ? raw.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistLastBatchTaskId(taskId: string | null | undefined): void {
+  if (typeof window === 'undefined' || !taskId) return;
+  try {
+    window.localStorage.setItem(LAST_BATCH_TASK_ID_KEY, taskId);
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+function maybePersistLastBatchTaskId(batchTask: BatchTaskStatus | null | undefined): void {
+  if (!batchTask) return;
+  const taskId = batchTask.batch_id ?? batchTask.task_id;
+  if (!taskId) return;
+  if (['pending', 'running', 'completed', 'partial'].includes(batchTask.status)) {
+    persistLastBatchTaskId(taskId);
+  }
+}
 
 function toNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
@@ -458,25 +487,29 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       return { validationSummaryByTask: next };
     }),
   setBatchTask: (batchTask) =>
-    set((state) => ({
-      batchTask: batchTask
-        // normalizeBatchTask reads loose raw keys (total_items, …) not on the
-        // static BatchTaskStatus; widen through unknown to the payload shape.
+    set((state) => {
+      const nextBatchTask = batchTask
         ? normalizeBatchTask(
             batchTask as unknown as BatchPayload,
             state.batchTask,
             state.batchStartedAtMs ?? Date.now(),
           )
-        : null,
-      batchStartedAtMs: batchTask ? state.batchStartedAtMs ?? Date.now() : null,
-      batchConnectionStatus: batchTask ? state.batchConnectionStatus : 'idle',
-      batchConnectionMessage: batchTask ? state.batchConnectionMessage : null,
-    })),
+        : null;
+      maybePersistLastBatchTaskId(nextBatchTask);
+      return {
+        batchTask: nextBatchTask,
+        batchStartedAtMs: batchTask ? state.batchStartedAtMs ?? Date.now() : null,
+        batchConnectionStatus: batchTask ? state.batchConnectionStatus : 'idle',
+        batchConnectionMessage: batchTask ? state.batchConnectionMessage : null,
+      };
+    }),
   applyBatchEvent: (payload) =>
     set((state) => {
       const startedAtMs = state.batchStartedAtMs ?? Date.now();
+      const nextBatchTask = normalizeBatchTask(payload, state.batchTask, startedAtMs);
+      maybePersistLastBatchTaskId(nextBatchTask);
       return {
-        batchTask: normalizeBatchTask(payload, state.batchTask, startedAtMs),
+        batchTask: nextBatchTask,
         batchStartedAtMs: startedAtMs,
       };
     }),
@@ -609,6 +642,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
         batchConnectionStatus: 'connecting',
         batchConnectionMessage: null,
       });
+      persistLastBatchTaskId(payload.task_id);
 
       await get().pollBatchStatus(payload.task_id);
     } catch (err) {
@@ -633,6 +667,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       }
 
       const status = (await response.json()) as BatchTaskStatus;
+      maybePersistLastBatchTaskId(status);
       set({ batchTask: status });
 
       if (['completed', 'failed', 'partial'].includes(status.status)) {
