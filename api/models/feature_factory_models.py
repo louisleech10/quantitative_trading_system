@@ -198,6 +198,16 @@ class BatchResumeResponse(BaseModel):
     status: str
 
 
+class NanQuantiles(BaseModel):
+    """各特徵真實缺值率（np.isnan）的 5 數摘要。"""
+
+    min: float = 0.0
+    q1: float = 0.0
+    median: float = 0.0
+    q3: float = 0.0
+    max: float = 0.0
+
+
 class SymbolQualitySummary(BaseModel):
     """單一標的特徵品質摘要（批次彙整用）。"""
 
@@ -206,6 +216,7 @@ class SymbolQualitySummary(BaseModel):
     feature_count: int
     nan_ratio_mean: float
     nan_ratio_max: float
+    nan_quantiles: NanQuantiles = NanQuantiles()  # 5 數摘要;未宣告會被 response_model 濾掉→前端顯示 0
     constant_feature_count: int
     alert_count: int
     warmup_only_count: int = 0
