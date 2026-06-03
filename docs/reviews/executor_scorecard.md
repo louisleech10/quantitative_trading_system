@@ -38,3 +38,14 @@
 | 06-02 | multi-sym Phase 4 (P4-1 golden+P4-2 IC-First清理,ML高風險) | codex | ✅ 36 passed;**golden compare PASS(數值不變)** | ✅(揭露golden fixture) | 無 | ❌無 | C3 (d) 硬 gate 過;_compute_single_ic_first 0 caller(getter 殘 dead code 小 cruft) |
 
 **累積觀察**：codex 3 批(P1/P2/P4)、cursor 2 任務(A/B P3-1、Phase 3)。兩邊真實任務皆 pass@1、零假綠、scope 乾淨。cursor 在 config/worker 類追平 codex。codex 仍處理最高風險(P2 注入、P4 ML)。**維持 codex 主力、cursor 可靠溢出**;cursor 樣本累積中,config/routine 類已具翻轉潛力,待 ~5 樣本再定。
+
+## 2026-06-03 離線 coding A/B benchmark(Aider-polyglot 風格自含題,held-out grader)
+3 題:A merge_intervals(演算法)/ B paginate bugfix(除錯)/ C eval_expr 解析器。隔離 /tmp、grader Claude 手握防作弊。
+| 指標 | codex(GPT-5.5) | cursor(Composer 2.5) |
+|------|------|------|
+| pass@1(含 edge) | **21/21**(7+6+8) | **21/21**(7+6+8) |
+| 程式穩健度 | 略勝:B 防 page<1、C 處理一元負號、註解乾淨 | B 漏 page<1 guard、註解 header 重複貼;C tokenizer 分離較乾淨 |
+| 派工摩擦 | 非 git repo 目錄拒跑,需 `--skip-git-repo-check` | `--force` 任何目錄首跑即動 |
+
+**結論**:能力打平(都 21/21);codex 程式略穩健(防呆周全),cursor 派工省事(無 repo 限制)。與既有觀察一致——codex 嚴謹度高(高風險/ML 主力)、cursor 順手(routine/隔離溢出)。**維持預設 codex 主力、cursor 可靠溢出**;樣本累積中。
+**派工坑記錄**:`codex exec` 在非 git repo 目錄需 `--skip-git-repo-check`(2026-06-03 A/B 實測)。

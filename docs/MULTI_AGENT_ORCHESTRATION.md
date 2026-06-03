@@ -29,12 +29,14 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 
 | 層 | 角色 | 工具 | 何時用 |
 |----|------|------|--------|
-| 1 | 規劃 / SPEC / 驗收 | **Claude (Opus)** | 高價值思考，額度集中於此 |
-| 2 | 主力執行 | **`codex exec`**（GPT-5.5） | terminal-heavy、長自主任務、需嚴謹 root-cause |
-| 3 | 溢出 / 廉價執行 | **`cursor-agent -p`**（Composer 2.5） | Codex 額度吃緊、或大量 routine 實作（便宜 10–60×） |
-| 3 | 溢出執行（Gemini 家族） | **`agy -p`**（Gemini） | Gemini 訂閱額度可用時的另一個執行端 |
+| 1 | 規劃 / SPEC / 驗收 + **小任務實作** | **Claude (Opus)** | 高價值思考;**小任務自己做+自驗(派工 ceremony 對小任務更貴 → 省 token)** |
+| 2 | **中任務主力執行** | **`cursor-agent --model composer-2.5`**（Composer 2.5） | 中型(單 module、不命中 a-d);A/B 實證正確性對等 + 派工省事 |
+| 3 | **大任務實作** | **`codex exec`**（GPT-5.5） | 大型/高風險(a-d);嚴謹 root-cause 紀錄佳 |
+| 3 | **大任務 code review** | **`cursor-agent`**（Composer 2.5） | 對 codex 大任務 diff 做跨家族複查 |
+| — | 規劃委員會 read-only | **`agy -p`**（Gemini） | 諮詢用,不得寫入 |
 
-**選層原則**：預設 Codex 主力；Codex 額度告警或任務偏 routine/多檔編輯 → 切 Cursor 或 agy。切哪個對使用者透明，使用者只跟 Claude 講需求。
+**選層原則（2026-06-03 A/B 實證後定）**：**小=Claude 自己做、中=Composer 2.5、大=Codex 實作 + Composer code review**。對使用者透明,使用者只講需求。
+誠實邊界：A/B 顯示 codex≈cursor 正確性對等(標準題天花板),選層差異在**人體工學/成本與高風險嚴謹度紀錄**,非 coding 能力;cursor review codex 擋推理/結構盲點,**擋不了共享錯前提/缺使用者事實**(C3)→ facts-first 仍最優先。
 
 > ⚠️ **能力閘門（council review #11）**：執行端**未通過 T-D（§8 對等性測試）前只能 read-only，不得寫入**。
 > 現況（2026-05-31）：**可寫入** = codex（GPT-5.5）、cursor（composer-2.5，過 T-D）；**僅 read-only** = agy（Gemini 3.5 Flash，coding 評測失敗 → 規劃委員會用）。

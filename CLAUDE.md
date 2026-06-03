@@ -23,9 +23,9 @@ All code must support this evolution via clean decoupling.
 
 > 「這是 **小 / 中 / 大** 任務 → 我打算走 X 流程」
 
-- **小**：改 1 函式 / 加 test / 修局部 bug，不碰共用路徑 → 直接寫指令交執行端，不寫 SPEC
-- **中**：單一 module、會動到既有 caller → 精簡 SPEC（含 per-Task 檔案/驗證/邊界欄）→ **直接從 SPEC 派工，跳獨立 TODO + 跳一次 adversarial**（省 Opus；分層見編排手冊「SPEC/TODO 作者流程」節）
-- **大**：命中任一**高風險原則**（模組會變、原則不變）→ **短文件優先管線**（決策~200行 → manifest~2頁[扁平 `[A-1]` ID] → 逐 Phase 展開 → 機檢 → 一次 adversarial → TODO 生成）避免 V1-V6 重生成 churn（指令預算~150-200，整份重生成必掉項）；完整 SPEC + 跨模型 adversarial review（`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`）：
+- **小**：改 1 函式 / 加 test / 修局部 bug，不碰共用路徑、**能本地驗證** → **Claude 自己做 + 自跑測試驗證,不派工**（派工的 gate/preflight/監看/接回 ceremony 對小任務反而更貴；自己做省 token）。前提:不命中 (a)-(d)、可本地 pytest 驗;一旦規模膨脹立刻升級,不硬塞。
+- **中**：單一 module、會動到既有 caller、**不命中 (a)-(d)** → **派 Composer 2.5（`cursor-agent`）**（A/B 實證正確性對等 + 派工省事）；精簡 SPEC（含 per-Task 檔案/驗證/邊界欄）→ 直接從 SPEC 派工，跳獨立 TODO + 跳一次 adversarial。**若其實命中高風險原則 → 當「大」辦,不是看檔案數。**
+- **大**：命中任一**高風險原則**（模組會變、原則不變）→ **Codex（GPT-5.5）實作 + Composer 2.5 code review**（嚴謹實作 + 跨家族複查 diff）；走**短文件優先管線**（決策~200行 → manifest~2頁[扁平 `[A-1]` ID] → 逐 Phase 展開 → 機檢 → SPEC 前一次雙家族 adversarial → TODO 生成）避免 V1-V6 重生成 churn；完整 SPEC + 跨模型 adversarial review（`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`）：
   - (a) 改變數值正確性 / 資料品質（NaN·inf gate、精度、淨化）
   - (b) 跨模組 / 共用路徑 / 多下游消費者（改一處影響一片）
   - (c) 多 phase，或難回退
@@ -33,7 +33,7 @@ All code must support this evolution via clean decoupling.
   - *當期高風險區範例*（隨 V1→V2→V3 階段更新）：Feature Factory / cache / 多 symbol / rolling 統計、IC Gatekeeper / walk-forward / 回測引擎（ML·回測正確性，命中 (d)）。
 - **判不出大小（認知外的東西）**：明講「我不確定這屬於哪級、原因是 X」並問，或先當「中」起步——**絕不靜默假設**。風險原則 (a)-(d) 是抽象的，正是為了接住沒列名的模組（如 IC Gatekeeper 命中 (b)(d)）。
 - **規模膨脹偵測（中→大 升級觸發）**：出現任一訊號立刻喊停建議升級——① 改動檔案數超出預期、② 碰到 `factories.py`/`protocols.py`/`config.py` 等共用路徑、③ 發現新的既有 caller、④ 測試面擴大、⑤ 觸及 (a)-(d) 任一原則。
-- **執行端選層**：可寫入 = **`codex exec`**（GPT-5.5，過 T-A/B/C）、**`cursor-agent --model composer-2.5`**（過 T-D）。routine/多檔編輯/Codex 額度吃緊 → 切 Cursor。⚠️ **`agy`（Gemini 3.5 Flash）coding 評測失敗（探索亂跑 + 假 DONE），僅當規劃委員會 read-only 諮詢，不得寫入**。選哪個對使用者透明，準則見手冊 §1。
+- **執行端選層（2026-06-03 分層,A/B 實證後定）**：**小=Claude 自己做**(省 token);**中=Composer 2.5**(`cursor-agent --model composer-2.5`,過 T-D;正確性對等、派工省事);**大=Codex(GPT-5.5)實作 + Composer 2.5 code review**(codex 高風險嚴謹度紀錄佳;cursor 跨家族複查)。codex 在非 git repo 目錄派工需 `--skip-git-repo-check`,背景派工一律 `timeout N ... < /dev/null`(見手冊「背景派工防卡死鐵律」)。⚠️ **`agy`（Gemini）coding 評測失敗,僅當規劃委員會 read-only 諮詢,不得寫入**。選哪個對使用者透明,準則見手冊 §1。
 - **派工前後安全檢查**：寫入型 headless 派工**前**跑 `bash scripts/agent_preflight.sh` 快照、**後**跑 `bash scripts/agent_postflight.sh` 比對（data_cache 被 gitignore，用檔案系統快照而非 git 偵測刪除/縮減），PASS 才驗收。執行端交接寫 `handoffs/<date>-<task>.md`，不覆蓋根 HANDOFF。
 - **Fail-closed Gate（強制,非靠記性）**：委派（`Task` 工具 / `Bash` executor）與創建治理文件（`docs/*{SPEC,TODO,PLAN}*.md`）被 PreToolUse hook `scripts/gate_check.sh` 擋住,無 fresh token → 系統 deny。開門先跑 `bash scripts/gate.sh dispatch|artifact <必填檢查>`（含:該問使用者的事實問了沒、委員會誰挑戰前提、template 跟過沒、高風險 adversarial review 跑過沒）。**對 SPEC/TODO 派工須附 `--spec/--todo`(可選 `--manifest`),gate 跑三道機檢,任一不過→拒發 token**：① `template_check.sh` grep 必填錨點(SPEC:§RISK/§A/§C/§G/§P/§V/§R/§N;TODO:§0/§B/Task 驗證·邊界·不可做)+ **§A facts-resolved**(§A 須含『已確認』或『待確認：無』,C3 反制:缺使用者事實不准在錯前提上寫完 SPEC 過機檢);② 反空殼(空表/樣板殘留 {{}}·TODO/驗證欄無可證偽 token);③ `coverage_check.sh` 比對 manifest 每個 `[A-1]` 式 ID 是否都落進文件(抓「掉項目」churn)。把「照沒照範本·有沒有空殼·掉沒掉項」變機器可驗,非靠 Claude 聲稱。**誠實邊界:機械只抓明顯空殼,「貌似合理但邏輯空」靠 adversarial(不同模型,作者不自審)+ 執行閘兜底。**範本:`templates/SPEC_TEMPLATE.md`、`TODO_GENERATION_PROMPT.md`、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`(皆 V13 緊湊+錨點版)。gate 寫 token + `.claude/gate/audit.log` 供**使用者稽核**。**設計理由見兩次事故**:always-loaded 原則(本節下方「Validate Assumptions」)曾在 context 卻仍被漏 → 改用系統閘門+留痕,不靠 Claude 記得。誠實邊界:gate 不驗證填入為真,只保證不能靜默跳過+可稽核。詳見 `docs/MULTI_AGENT_ORCHESTRATION.md`「Gate」節。
 - **分工原則**：規劃 / SPEC / 驗收留在 Claude（省 Opus）；長時間實作與 debug 迴圈交執行端在自身 context 跑。debug 用較便宜模型，不回灌 Claude context。
