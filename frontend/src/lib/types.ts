@@ -544,6 +544,13 @@ export interface FeatureSummary {
   quality: {
     nan_ratio_mean: number;
     nan_ratio_max: number;
+    nan_ratio_quantiles?: {
+      min: number;
+      q1: number;
+      median: number;
+      q3: number;
+      max: number;
+    };
     nan_ratio_distribution: number[];
     constant_features: string[];
     high_corr_pairs_count: number;
@@ -710,8 +717,19 @@ export interface DataQualityRealProblemFeature {
   kind: 'all_nan' | 'high_nan_hole';
 }
 
+export interface NanRatioQuantiles {
+  min: number;
+  q1: number;
+  median: number;
+  q3: number;
+  max: number;
+}
+
 export interface DataQualityReport {
   schema_version?: string;
+  nan_ratio_mean?: number;
+  nan_ratio_max?: number;
+  nan_ratio_quantiles?: NanRatioQuantiles;
   total_features: number;
   total_timesteps: number;
   timestamp_start: string;

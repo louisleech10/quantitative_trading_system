@@ -65,6 +65,13 @@ def test_browse_summary_with_no_columns_has_json_safe_quality(monkeypatch):
     assert result["total_features"] == 0
     assert result["quality"]["nan_ratio_mean"] == 0.0
     assert result["quality"]["nan_ratio_max"] == 0.0
+    assert result["quality"]["nan_ratio_quantiles"] == {
+        "min": 0.0,
+        "q1": 0.0,
+        "median": 0.0,
+        "q3": 0.0,
+        "max": 0.0,
+    }
 
 
 def test_cgsa_catalog_disk_cache_roundtrip(tmp_path):
@@ -172,9 +179,50 @@ def test_assemble_data_quality_report_includes_nan_ratio_fields():
         timestamps=[str(i) for i in range(100)],
     )
 
-    assert report["schema_version"] == "dq_v5"
+    assert report["schema_version"] == "dq_v6"
     assert abs(report["nan_ratio_mean"] - 0.45) <= 0.01
     assert abs(report["nan_ratio_max"] - 0.8) <= 0.01
+    independent = np.percentile(nan_ratios.values, [0, 25, 50, 75, 100])
+    quantiles = report["nan_ratio_quantiles"]
+    for key, idx in [("min", 0), ("q1", 1), ("median", 2), ("q3", 3), ("max", 4)]:
+        assert abs(quantiles[key] - float(independent[idx])) <= 0.01
+
+
+def test_browse_summary_nan_quantiles_match_percentile(monkeypatch):
+    """browse_summary quality 須含真實 NaN 五數摘要，與 np.percentile 一致。"""
+    service = _build_service_for_unit()
+
+    frame = pd.DataFrame(
+        {
+            "feat_low": [1.0, 2.0, 3.0, 4.0, 5.0],
+            "feat_mid": [np.nan, np.nan, 3.0, 4.0, 5.0],
+            "feat_high": [np.nan, np.nan, np.nan, np.nan, 5.0],
+        }
+    )
+    monkeypatch.setattr(
+        service,
+        "_load_task_features",
+        lambda _task_id: (
+            frame,
+            {"symbol": "BTCUSDT", "timeframe": "1h", "metadata": {}},
+        ),
+    )
+    monkeypatch.setattr(service, "_start_stats_cache_warmup", lambda *_a, **_k: None)
+    monkeypatch.setattr(service, "_start_adf_cache_warmup", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        service,
+        "_get_stats_warmup_progress",
+        lambda *_a, **_k: {"computed": 3, "total": 3, "pct": 100.0, "complete": True},
+    )
+
+    result = service.browse_summary("task-nan-quantiles")
+    quantiles = result["quality"]["nan_ratio_quantiles"]
+    expected = np.percentile(frame.isna().mean().values, [0, 25, 50, 75, 100])
+
+    assert result["quality"]["nan_ratio_mean"] > 0.0
+    assert quantiles["median"] > 0.0
+    for key, idx in [("min", 0), ("q1", 1), ("median", 2), ("q3", 3), ("max", 4)]:
+        assert abs(quantiles[key] - float(expected[idx])) <= 0.01
 
 
 def test_cgsa_stats_persist_uses_incremental_parts(tmp_path):

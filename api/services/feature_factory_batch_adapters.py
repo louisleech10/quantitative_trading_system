@@ -88,6 +88,15 @@ class FeatureFactoryQualityAdapter:
         else:
             nan_ratio_max = float(quality.get("nan_ratio_max") or 0.0)
 
+        raw_quantiles = dq.get("nan_ratio_quantiles") or quality.get("nan_ratio_quantiles") or {}
+        nan_quantiles = {
+            "min": float(raw_quantiles.get("min", 0.0)),
+            "q1": float(raw_quantiles.get("q1", 0.0)),
+            "median": float(raw_quantiles.get("median", 0.0)),
+            "q3": float(raw_quantiles.get("q3", 0.0)),
+            "max": float(raw_quantiles.get("max", 0.0)),
+        }
+
         # 警告數 = 真問題（mid-hole / all-NaN），不含純暖機 leading NaN。
         alert_count = real_problem_count
 
@@ -104,8 +113,10 @@ class FeatureFactoryQualityAdapter:
             "feature_count": feature_count,
             "nan_ratio_mean": round(nan_ratio_mean, 6),
             "nan_ratio_max": round(nan_ratio_max, 6),
+            "nan_quantiles": nan_quantiles,
             "constant_feature_count": constant_feature_count,
             "alert_count": alert_count,
+            "real_problem_count": real_problem_count,
             "warmup_only_count": warmup_only_count,
             "grade": grade,
         }

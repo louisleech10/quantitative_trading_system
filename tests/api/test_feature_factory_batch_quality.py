@@ -72,6 +72,8 @@ def test_batch_quality_uses_real_nan_not_null_count(monkeypatch, tmp_path):
     assert result["nan_ratio_max"] > 0.5
     assert abs(result["nan_ratio_max"] - independent_max) <= 0.01
     assert result["nan_ratio_mean"] > 0.0
+    assert result["nan_quantiles"]["median"] > 0.0
+    assert result["real_problem_count"] == result["alert_count"]
 
 
 def test_batch_quality_invalidates_dq_v4_disk_cache_and_persists_nan_ratio(monkeypatch, tmp_path):
@@ -113,9 +115,13 @@ def test_batch_quality_invalidates_dq_v4_disk_cache_and_persists_nan_ratio(monke
     assert abs(result["nan_ratio_mean"] - float(independent.mean())) <= 0.01
 
     persisted = json.loads(cache_path.read_text(encoding="utf-8"))
-    assert persisted["schema_version"] == "dq_v5"
+    assert persisted["schema_version"] == "dq_v6"
     assert persisted["nan_ratio_max"] > 0.5
     assert abs(float(persisted["nan_ratio_max"]) - float(independent.max())) <= 0.01
+    quantiles = persisted["nan_ratio_quantiles"]
+    expected_q = np.percentile(independent.values, [0, 25, 50, 75, 100])
+    for key, idx in [("min", 0), ("q1", 1), ("median", 2), ("q3", 3), ("max", 4)]:
+        assert abs(float(quantiles[key]) - float(expected_q[idx])) <= 0.01
 
 
 def test_batch_quality_warmup_only_does_not_trigger_watch(monkeypatch, tmp_path):
@@ -138,8 +144,10 @@ def test_batch_quality_warmup_only_does_not_trigger_watch(monkeypatch, tmp_path)
     result = FeatureFactoryQualityAdapter(service).compute(str(manifest_path))
 
     assert result["alert_count"] == 0
+    assert result["real_problem_count"] == 0
     assert result["warmup_only_count"] > 0
     assert result["grade"] == "pass"
+    assert "median" in result["nan_quantiles"]
 
 
 def test_batch_quality_mid_hole_triggers_watch(monkeypatch, tmp_path):

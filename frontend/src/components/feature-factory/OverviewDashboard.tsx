@@ -54,10 +54,18 @@ const qualityClass = (score: number) => {
   return 'text-rose-300';
 };
 
+function displayNanMedian(summary: FeatureSummary): number {
+  const q = summary.quality.nan_ratio_quantiles;
+  if (q && typeof q.median === 'number') {
+    return q.median;
+  }
+  return summary.quality.nan_ratio_mean;
+}
+
 export default function OverviewDashboard({ summary, loading, error, taskId }: OverviewDashboardProps) {
   const qualityScore = useMemo(() => {
     if (!summary || summary.total_features <= 0) return 0;
-    const nanRatio = summary.quality.nan_ratio_mean;
+    const nanRatio = displayNanMedian(summary);
     const stationaryRatio = summary.quality.stationary_ratio;
     const constantRatio = summary.quality.constant_features.length / summary.total_features;
     const denominator = (summary.total_features * (summary.total_features - 1)) / 2;
@@ -124,7 +132,11 @@ export default function OverviewDashboard({ summary, loading, error, taskId }: O
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <KpiCard label="Features" value={summary.total_features.toLocaleString()} />
         <KpiCard label="Rows" value={summary.total_rows.toLocaleString()} />
-        <KpiCard label="NaN Avg" value={`${(summary.quality.nan_ratio_mean * 100).toFixed(2)}%`} />
+        <KpiCard
+          label="NaN Med"
+          value={`${(displayNanMedian(summary) * 100).toFixed(2)}%`}
+          hint="per-feature 真實 NaN 率中位數"
+        />
         <KpiCard label="Quality" value={qualityScore.toFixed(1)} valueClass={qualityClass(qualityScore)} />
       </div>
 
@@ -199,11 +211,22 @@ export default function OverviewDashboard({ summary, loading, error, taskId }: O
   );
 }
 
-function KpiCard({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
+function KpiCard({
+  label,
+  value,
+  valueClass,
+  hint,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+  hint?: string;
+}) {
   return (
     <div className="glass-panel rounded-2xl p-4 border border-white/10">
       <div className="text-xs text-slate-400">{label}</div>
       <div className={`text-xl font-semibold text-slate-100 ${valueClass || ''}`}>{value}</div>
+      {hint && <div className="text-[10px] text-slate-500 mt-0.5">{hint}</div>}
     </div>
   );
 }

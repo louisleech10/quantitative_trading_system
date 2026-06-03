@@ -4,16 +4,12 @@
  * BatchQualityOverview.tsx
  *
  * 批次特徵生成完成後的 Symbol 品質彙整總覽。
- * 量化業界標準：NaN 率 / Bar 數 / 常數特徵 / 警告數 → 交通燈評級。
- *
- * 評級標準：
- *   Pass   : NaN 均值 < 10%、常數特徵 = 0、bar ≥ 500
- *   Watch  : NaN 均值 10-30% 或 警告數 > 5 或 bar 500↓200
- *   Reject : NaN 均值 > 30% 或 常數特徵 > 0 或 bar < 200
+ * 主指標：real_problem（真問題數）；NaN 以五數摘要（Min/Q1/Median/Q3/Max）呈現。
  */
 
 import { useEffect, useState, useCallback } from 'react';
 import { ChevronUp, ChevronDown, RefreshCw, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
+import type { NanRatioQuantiles } from '@/lib/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -25,8 +21,11 @@ interface SymbolQualitySummary {
   feature_count: number;
   nan_ratio_mean: number;
   nan_ratio_max: number;
+  nan_quantiles?: NanRatioQuantiles;
   constant_feature_count: number;
   alert_count: number;
+  real_problem_count?: number;
+  warmup_only_count?: number;
   grade: 'pass' | 'watch' | 'reject';
 }
 
@@ -40,14 +39,62 @@ interface BatchQualityResponse {
   computed_at: string;
 }
 
-type SortKey = keyof Pick<
-  SymbolQualitySummary,
-  'symbol' | 'bar_count' | 'feature_count' | 'nan_ratio_mean' | 'nan_ratio_max' | 'constant_feature_count' | 'alert_count' | 'grade'
->;
+type SortKey =
+  | 'symbol'
+  | 'bar_count'
+  | 'feature_count'
+  | 'real_problem'
+  | 'nan_min'
+  | 'nan_q1'
+  | 'nan_median'
+  | 'nan_q3'
+  | 'nan_max'
+  | 'nan_ratio_mean'
+  | 'nan_ratio_max'
+  | 'constant_feature_count'
+  | 'grade';
 
 /* ---------- Helpers ---------- */
 
 const GRADE_ORDER: Record<string, number> = { reject: 0, watch: 1, pass: 2 };
+
+const EMPTY_QUANTILES: NanRatioQuantiles = {
+  min: 0,
+  q1: 0,
+  median: 0,
+  q3: 0,
+  max: 0,
+};
+
+function resolveQuantiles(summary: SymbolQualitySummary): NanRatioQuantiles {
+  return summary.nan_quantiles ?? EMPTY_QUANTILES;
+}
+
+function realProblemCount(summary: SymbolQualitySummary): number {
+  return summary.real_problem_count ?? summary.alert_count;
+}
+
+function sortValue(summary: SymbolQualitySummary, key: SortKey): string | number {
+  const q = resolveQuantiles(summary);
+  switch (key) {
+    case 'real_problem':
+      return realProblemCount(summary);
+    case 'nan_min':
+      return q.min;
+    case 'nan_q1':
+      return q.q1;
+    case 'nan_median':
+      return q.median;
+    case 'nan_q3':
+      return q.q3;
+    case 'nan_max':
+      return q.max;
+    case 'grade':
+      return GRADE_ORDER[summary.grade] ?? 3;
+    default:
+      return summary[key as keyof SymbolQualitySummary] as string | number;
+  }
+}
 
 function CriteriaLegend() {
   const [open, setOpen] = useState(false);
@@ -69,57 +116,45 @@ function CriteriaLegend() {
             <thead>
               <tr className="border-b border-white/10">
                 <th className="text-left py-1 pr-2 text-slate-400 font-medium">評級</th>
-                <th className="text-left py-1 pr-2 text-slate-400 font-medium">NaN 均值</th>
+                <th className="text-left py-1 pr-2 text-slate-400 font-medium">真問題數</th>
                 <th className="text-left py-1 pr-2 text-slate-400 font-medium">Bar 數</th>
                 <th className="text-left py-1 pr-2 text-slate-400 font-medium">常數特徵</th>
-                <th className="text-left py-1 text-slate-400 font-medium">警告數</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               <tr>
                 <td className="py-1 pr-2"><GradeBadge grade="pass" /></td>
-                <td className="py-1 pr-2 text-emerald-300">&lt; 10%</td>
+                <td className="py-1 pr-2 text-emerald-300">= 0</td>
                 <td className="py-1 pr-2 text-emerald-300">≥ 500</td>
                 <td className="py-1 pr-2 text-emerald-300">= 0</td>
-                <td className="py-1 text-emerald-300">= 0</td>
               </tr>
               <tr>
                 <td className="py-1 pr-2"><GradeBadge grade="watch" /></td>
-                <td className="py-1 pr-2 text-amber-300">10–30%</td>
+                <td className="py-1 pr-2 text-amber-300">&gt; 5</td>
                 <td className="py-1 pr-2 text-amber-300">200–500</td>
                 <td className="py-1 pr-2 text-amber-300">-</td>
-                <td className="py-1 text-amber-300">&gt; 5</td>
               </tr>
               <tr>
                 <td className="py-1 pr-2"><GradeBadge grade="reject" /></td>
-                <td className="py-1 pr-2 text-rose-300">&gt; 30%</td>
+                <td className="py-1 pr-2 text-rose-300">-</td>
                 <td className="py-1 pr-2 text-rose-300">&lt; 200</td>
                 <td className="py-1 pr-2 text-rose-300">&gt; 0</td>
-                <td className="py-1 text-rose-300">-</td>
               </tr>
             </tbody>
           </table>
           <div className="space-y-1.5 border-t border-white/10 pt-2">
             <div className="text-slate-400 font-medium mb-1">欄位說明</div>
             <div className="flex gap-2">
-              <span className="text-slate-300 w-16 shrink-0">Bar 數</span>
-              <span className="text-slate-500">此 symbol 的 K 線根數。因各幣種上市時間不同，新幣 bar 數天然較少，bar &lt; 200 或 bar &lt; 500 將影響指標計算完整性。</span>
+              <span className="text-slate-300 w-20 shrink-0">真問題</span>
+              <span className="text-slate-500">mid-hole / 全 NaN 特徵數（不含純暖機 leading NaN）。評級以此為主。</span>
             </div>
             <div className="flex gap-2">
-              <span className="text-slate-300 w-16 shrink-0">NaN 均</span>
-              <span className="text-slate-500">所有特徵的缺值率平均值。代表整體資料覆蓋程度，過高表示多數指標因 bar 不足而無法計算。</span>
+              <span className="text-slate-300 w-20 shrink-0">NaN 五數</span>
+              <span className="text-slate-500">各特徵真實缺值率（np.isnan）的 Min / Q1 / Median / Q3 / Max，比單一均值更能反映分布。</span>
             </div>
             <div className="flex gap-2">
-              <span className="text-slate-300 w-16 shrink-0">NaN 峰</span>
-              <span className="text-slate-500">所有特徵中缺值率最高的特徵值。峰值高代表有特定長週期指標（如 200MA）完全失效，即使均值尚可。</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-slate-300 w-16 shrink-0">常數特徵</span>
-              <span className="text-slate-500">標準差 = 0 的特徵數，即所有時間點都是同一個值。對 ML 完全無資訊量，需在訓練前過濾。</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="text-slate-300 w-16 shrink-0">警告數</span>
-              <span className="text-slate-500">缺值率 &gt; 10% 的特徵個數。補充 NaN 均的盲點：均值低但警告數高表示少數特徵嚴重缺值。</span>
+              <span className="text-slate-300 w-20 shrink-0">均/峰</span>
+              <span className="text-slate-500 text-slate-600">含暖機僅供參考；主判斷請看五數與真問題數。</span>
             </div>
           </div>
         </div>
@@ -273,21 +308,17 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
 
   const sorted = data
     ? [...data.summaries].sort((a, b) => {
-        let va: string | number = a[sortKey];
-        let vb: string | number = b[sortKey];
-        if (sortKey === 'grade') {
-          va = GRADE_ORDER[va as string] ?? 3;
-          vb = GRADE_ORDER[vb as string] ?? 3;
-        }
+        const va = sortValue(a, sortKey);
+        const vb = sortValue(b, sortKey);
         const cmp = va < vb ? -1 : va > vb ? 1 : 0;
         return sortDir === 'asc' ? cmp : -cmp;
       })
     : [];
 
   const thCls =
-    'px-3 py-2 text-left text-xs text-slate-400 font-medium cursor-pointer select-none hover:text-slate-200 transition whitespace-nowrap';
+    'px-2 py-2 text-left text-xs text-slate-400 font-medium cursor-pointer select-none hover:text-slate-200 transition whitespace-nowrap';
 
-  const tdCls = 'px-3 py-2 text-xs';
+  const tdCls = 'px-2 py-2 text-xs';
 
   const renderTh = (key: SortKey, label: string) => (
     <th className={thCls} onClick={() => handleSort(key)}>
@@ -300,12 +331,11 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
 
   return (
     <div className="glass-panel rounded-xl p-5 border border-white/10 space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-100">批次品質彙整</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            依 NaN 率、Bar 數、常數特徵評級 — 問題標的優先顯示
+            真問題數 + NaN 五數摘要 — 問題標的優先顯示
           </p>
         </div>
         <button
@@ -318,7 +348,6 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
         </button>
       </div>
 
-      {/* Loading skeleton */}
       {isLoading && (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
@@ -327,7 +356,6 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
         </div>
       )}
 
-      {/* Error */}
       {!isLoading && error && (
         <div className="rounded-lg bg-rose-500/10 border border-rose-400/30 px-4 py-3 text-xs text-rose-200 flex items-center gap-2">
           <XCircle className="w-4 h-4 shrink-0" />
@@ -335,7 +363,6 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
         </div>
       )}
 
-      {/* Summary cards */}
       {!isLoading && data && (
         <>
           <div className="grid grid-cols-3 gap-2 text-xs">
@@ -355,47 +382,82 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
 
           <CriteriaLegend />
 
-          {/* Table */}
           {sorted.length === 0 ? (
             <div className="text-xs text-slate-500 text-center py-4">無可分析的標的</div>
           ) : (
             <div className="overflow-auto rounded-xl border border-white/10 bg-white/[0.03] max-h-72">
-              <table className="w-full min-w-[560px]">
+              <table className="w-full min-w-[900px]">
                 <thead className="sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm border-b border-white/10">
                   <tr>
                     {renderTh('grade', '評級')}
                     {renderTh('symbol', 'Symbol')}
-                    {renderTh('bar_count', 'Bar 數')}
-                    {renderTh('feature_count', '特徵數')}
-                    {renderTh('nan_ratio_mean', 'NaN 均')}
-                    {renderTh('nan_ratio_max', 'NaN 峰')}
-                    {renderTh('constant_feature_count', '常數特徵')}
-                    {renderTh('alert_count', '警告數')}
+                    {renderTh('bar_count', 'Bar')}
+                    {renderTh('feature_count', '特徵')}
+                    {renderTh('real_problem', '真問題')}
+                    {renderTh('nan_min', 'Min')}
+                    {renderTh('nan_q1', 'Q1')}
+                    {renderTh('nan_median', 'Med')}
+                    {renderTh('nan_q3', 'Q3')}
+                    {renderTh('nan_max', 'Max')}
+                    {renderTh('nan_ratio_mean', '均†')}
+                    {renderTh('nan_ratio_max', '峰†')}
+                    {renderTh('constant_feature_count', '常數')}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {sorted.map((s) => (
-                    <tr key={s.symbol} className="hover:bg-white/5 transition">
-                      <td className={tdCls}>
-                        <GradeBadge grade={s.grade} />
-                      </td>
-                      <td className={`${tdCls} text-slate-200 font-mono font-medium`}>{s.symbol}</td>
-                      <td className={`${tdCls} ${s.bar_count < 200 ? 'text-rose-300' : s.bar_count < 500 ? 'text-amber-300' : 'text-slate-300'}`}>
-                        {s.bar_count.toLocaleString()}
-                      </td>
-                      <td className={`${tdCls} text-slate-400`}>{s.feature_count.toLocaleString()}</td>
-                      <td className={`${tdCls} ${nanColor(s.nan_ratio_mean)}`}>{formatPct(s.nan_ratio_mean)}</td>
-                      <td className={`${tdCls} ${nanColor(s.nan_ratio_max)}`}>{formatPct(s.nan_ratio_max)}</td>
-                      <td className={`${tdCls} ${s.constant_feature_count > 0 ? 'text-rose-300' : 'text-slate-400'}`}>
-                        {s.constant_feature_count}
-                      </td>
-                      <td className={`${tdCls} ${s.alert_count > 5 ? 'text-rose-300' : s.alert_count > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
-                        {s.alert_count}
-                      </td>
-                    </tr>
-                  ))}
+                  {sorted.map((s) => {
+                    const q = resolveQuantiles(s);
+                    return (
+                      <tr key={s.symbol} className="hover:bg-white/5 transition">
+                        <td className={tdCls}>
+                          <GradeBadge grade={s.grade} />
+                        </td>
+                        <td className={`${tdCls} text-slate-200 font-mono font-medium`}>{s.symbol}</td>
+                        <td
+                          className={`${tdCls} ${
+                            s.bar_count < 200
+                              ? 'text-rose-300'
+                              : s.bar_count < 500
+                                ? 'text-amber-300'
+                                : 'text-slate-300'
+                          }`}
+                        >
+                          {s.bar_count.toLocaleString()}
+                        </td>
+                        <td className={`${tdCls} text-slate-400`}>{s.feature_count.toLocaleString()}</td>
+                        <td
+                          className={`${tdCls} ${
+                            realProblemCount(s) > 5
+                              ? 'text-rose-300'
+                              : realProblemCount(s) > 0
+                                ? 'text-amber-300'
+                                : 'text-emerald-300'
+                          }`}
+                        >
+                          {realProblemCount(s)}
+                        </td>
+                        <td className={`${tdCls} ${nanColor(q.min)}`}>{formatPct(q.min)}</td>
+                        <td className={`${tdCls} ${nanColor(q.q1)}`}>{formatPct(q.q1)}</td>
+                        <td className={`${tdCls} ${nanColor(q.median)} font-medium`}>{formatPct(q.median)}</td>
+                        <td className={`${tdCls} ${nanColor(q.q3)}`}>{formatPct(q.q3)}</td>
+                        <td className={`${tdCls} ${nanColor(q.max)}`}>{formatPct(q.max)}</td>
+                        <td className={`${tdCls} text-slate-500`} title="含暖機僅參考">
+                          {formatPct(s.nan_ratio_mean)}
+                        </td>
+                        <td className={`${tdCls} text-slate-500`} title="含暖機僅參考">
+                          {formatPct(s.nan_ratio_max)}
+                        </td>
+                        <td
+                          className={`${tdCls} ${s.constant_feature_count > 0 ? 'text-rose-300' : 'text-slate-400'}`}
+                        >
+                          {s.constant_feature_count}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+              <div className="px-3 py-1 text-[10px] text-slate-600 border-t border-white/5">† 均/峰含暖機，僅參考</div>
             </div>
           )}
 

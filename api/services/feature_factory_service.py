@@ -1952,7 +1952,7 @@ class FeatureFactoryService:
     # Bump when the report schema changes so stale on-disk caches are invalidated.
     # dq_v2: coverage_timeline rebuilt from first/last_valid (was dead all-1.0);
     #        added counts.warmup_only_high_nan / counts.real_problem + group_breakdown.
-    _DATA_QUALITY_SCHEMA_VERSION: str = "dq_v5"
+    _DATA_QUALITY_SCHEMA_VERSION: str = "dq_v6"
     # Bucket bounds for warmup (lookback) length, in bars.
     _DATA_QUALITY_WARMUP_BUCKETS: List[tuple] = [
         ("0", 0, 0),
@@ -2458,6 +2458,62 @@ class FeatureFactoryService:
         except Exception:
             return [str(i) for i in range(total_rows)]
 
+    @staticmethod
+    def _compute_nan_ratio_quantiles(nan_ratios: pd.Series) -> Dict[str, float]:
+        """由 per-feature 真實 nan_ratio 序列計算五數摘要（與 np.percentile 對齊）。"""
+        if len(nan_ratios) == 0:
+            return {"min": 0.0, "q1": 0.0, "median": 0.0, "q3": 0.0, "max": 0.0}
+        values = np.asarray(nan_ratios.astype(float).values, dtype=np.float64)
+        percentiles = np.percentile(values, [0, 25, 50, 75, 100])
+        return {
+            "min": float(percentiles[0]),
+            "q1": float(percentiles[1]),
+            "median": float(percentiles[2]),
+            "q3": float(percentiles[3]),
+            "max": float(percentiles[4]),
+        }
+
+    def _resolve_true_nan_quality_metrics(
+        self,
+        context: Optional[Dict[str, Any]],
+        fast: Optional[Dict[str, Any]],
+        nan_ratios: pd.Series,
+    ) -> Dict[str, Any]:
+        """真實 per-feature NaN 均/峰/五數摘要；CGSA 快路徑須走 dq isna 掃描，不用 parquet null_count。"""
+        dq: Optional[Dict[str, Any]] = None
+        if context is not None and context.get("is_cgsa") and fast is not None:
+            dq = self._load_data_quality_disk_cache(context)
+            if dq is None or dq.get("nan_ratio_quantiles") is None:
+                try:
+                    dq = self._build_data_quality_cgsa(context, fast)
+                    if int(dq.get("total_features") or 0) > 0:
+                        self._persist_data_quality_disk_cache(context, dq)
+                except Exception as exc:
+                    logger.warning(
+                        "browse_summary: dq nan metrics build failed for %s: %s",
+                        context.get("task_id"),
+                        exc,
+                    )
+                    dq = None
+            if dq is not None and dq.get("nan_ratio_quantiles") is not None:
+                return {
+                    "nan_ratio_mean": float(dq.get("nan_ratio_mean") or 0.0),
+                    "nan_ratio_max": float(dq.get("nan_ratio_max") or 0.0),
+                    "nan_ratio_quantiles": dict(dq["nan_ratio_quantiles"]),
+                }
+
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            nan_ratio_mean = self._safe_float(nan_ratios.mean()) or 0.0
+            nan_ratio_max = float(nan_ratios.max()) if len(nan_ratios) else 0.0
+        return {
+            "nan_ratio_mean": nan_ratio_mean,
+            "nan_ratio_max": nan_ratio_max,
+            "nan_ratio_quantiles": self._compute_nan_ratio_quantiles(nan_ratios),
+        }
+
     def _assemble_data_quality_report(
         self,
         total_rows: int,
@@ -2679,11 +2735,13 @@ class FeatureFactoryService:
 
         nan_ratio_mean = float(nan_ratios.mean()) if n_features else 0.0
         nan_ratio_max = float(nan_ratios.max()) if n_features else 0.0
+        nan_ratio_quantiles = self._compute_nan_ratio_quantiles(nan_ratios)
 
         return {
             "schema_version": self._DATA_QUALITY_SCHEMA_VERSION,
             "nan_ratio_mean": nan_ratio_mean,
             "nan_ratio_max": nan_ratio_max,
+            "nan_ratio_quantiles": nan_ratio_quantiles,
             "total_features": n_features,
             "total_timesteps": total_rows,
             "timestamp_start": timestamp_start,
@@ -2768,6 +2826,13 @@ class FeatureFactoryService:
             "group_breakdown": [],
             "nan_ratio_mean": 0.0,
             "nan_ratio_max": 0.0,
+            "nan_ratio_quantiles": {
+                "min": 0.0,
+                "q1": 0.0,
+                "median": 0.0,
+                "q3": 0.0,
+                "max": 0.0,
+            },
         }
 
     def _get_stats_warmup_progress(
@@ -2905,8 +2970,7 @@ class FeatureFactoryService:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
             nan_ratios = features_df.isna().mean()
-            nan_ratio_mean = self._safe_float(nan_ratios.mean()) or 0.0
-            nan_ratio_max = float(nan_ratios.max()) if len(nan_ratios) else 0.0
+        nan_metrics = self._resolve_true_nan_quality_metrics(context, None, nan_ratios)
 
         # Constant features: nunique <= 1 (vectorized)
         numeric_df = features_df.select_dtypes(include=["number"])
@@ -2946,8 +3010,9 @@ class FeatureFactoryService:
             "by_level": by_level,
             "by_layer": by_layer,
             "quality": {
-                "nan_ratio_mean": nan_ratio_mean,
-                "nan_ratio_max": nan_ratio_max,
+                "nan_ratio_mean": nan_metrics["nan_ratio_mean"],
+                "nan_ratio_max": nan_metrics["nan_ratio_max"],
+                "nan_ratio_quantiles": nan_metrics["nan_ratio_quantiles"],
                 "nan_ratio_distribution": self._nan_ratio_distribution(features_df, nan_ratios),
                 "constant_features": constant_features_list,
                 "high_corr_pairs_count": high_corr_pairs_count,
@@ -4444,10 +4509,7 @@ class FeatureFactoryService:
             "Layer 6.5 (Preproc)": by_layer_raw.get("layer6_5", 0),
         }
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            nan_ratio_mean = self._safe_float(nan_ratios.mean()) or 0.0
-            nan_ratio_max = float(nan_ratios.max()) if len(nan_ratios) else 0.0
+        nan_metrics = self._resolve_true_nan_quality_metrics(context, fast, nan_ratios)
 
         HIGH_CORR_SAMPLE_LIMIT = 500
         high_corr_pairs_count: Optional[int] = None
@@ -4495,8 +4557,9 @@ class FeatureFactoryService:
             "by_level": by_level,
             "by_layer": by_layer,
             "quality": {
-                "nan_ratio_mean": nan_ratio_mean,
-                "nan_ratio_max": nan_ratio_max,
+                "nan_ratio_mean": nan_metrics["nan_ratio_mean"],
+                "nan_ratio_max": nan_metrics["nan_ratio_max"],
+                "nan_ratio_quantiles": nan_metrics["nan_ratio_quantiles"],
                 "nan_ratio_distribution": self._nan_ratio_distribution(nan_ratios=nan_ratios),
                 "constant_features": constant_features_list,
                 "high_corr_pairs_count": high_corr_pairs_count,
