@@ -164,7 +164,8 @@ function CriteriaLegend() {
 }
 
 function formatPct(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
+  // NaN 統計(5-number + 均/峰)用小數第三位:小比例(如 q1=0.47%)在 1 位會被抹成 0.5%/0%,失真
+  return `${(value * 100).toFixed(3)}%`;
 }
 
 function GradeBadge({ grade }: { grade: 'pass' | 'watch' | 'reject' }) {
