@@ -7,7 +7,7 @@
  * 主指標：real_problem（真問題數）；NaN 以五數摘要（Min/Q1/Median/Q3/Max）呈現。
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChevronUp, ChevronDown, RefreshCw, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
 import type { NanRatioQuantiles } from '@/lib/types';
 
@@ -274,6 +274,14 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
   const [sortKey, setSortKey] = useState<SortKey>('grade');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
+  // onBatchExpired 以 ref 保存：避免父層傳 inline callback 時，每次 re-render 都
+  // 產生新 reference → fetchQuality 變新 → useEffect 重跑 → 對 /quality 重複請求
+  // （12s 級慢端點）。fetch 僅應在 batchTaskId 改變時觸發。
+  const onBatchExpiredRef = useRef(onBatchExpired);
+  useEffect(() => {
+    onBatchExpiredRef.current = onBatchExpired;
+  }, [onBatchExpired]);
+
   const fetchQuality = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -281,7 +289,7 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
       const res = await fetch(`${API_BASE_URL}/api/v1/features/batch/${batchTaskId}/quality`);
       if (res.status === 404) {
         setError('批次已失效');
-        onBatchExpired?.();
+        onBatchExpiredRef.current?.();
         return;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -292,7 +300,7 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
     } finally {
       setIsLoading(false);
     }
-  }, [batchTaskId, onBatchExpired]);
+  }, [batchTaskId]);
 
   useEffect(() => {
     fetchQuality();

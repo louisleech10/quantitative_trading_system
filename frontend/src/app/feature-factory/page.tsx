@@ -83,6 +83,8 @@ export default function FeatureFactoryPage() {
   const [featureKlineSymbolsLoading, setFeatureKlineSymbolsLoading] = useState(false);
   const [configTab, setConfigTab] = useState<'hardware' | 'kline' | 'data' | 'indicators' | 'preprocessing' | 'preview' | null>('data');
   const [restoredBatchExpired, setRestoredBatchExpired] = useState(false);
+  // 穩定 reference：傳給 BatchQualityOverview，避免 inline callback 每次 render 變新 → 重打 /quality
+  const handleBatchExpired = useCallback(() => setRestoredBatchExpired(true), []);
   const [recoverableBatches, setRecoverableBatches] = useState<RecoverableBatchSummary[]>([]);
   const [recoverableBatchesLoaded, setRecoverableBatchesLoaded] = useState(false);
   const [selectedRecoverableBatchId, setSelectedRecoverableBatchId] = useState<string | null>(
@@ -516,7 +518,7 @@ export default function FeatureFactoryPage() {
               {showBatchQualityOverview && activeQualityBatchId && (
                 <BatchQualityOverview
                   batchTaskId={activeQualityBatchId}
-                  onBatchExpired={() => setRestoredBatchExpired(true)}
+                  onBatchExpired={handleBatchExpired}
                 />
               )}
               {showBatchExplorer && (
