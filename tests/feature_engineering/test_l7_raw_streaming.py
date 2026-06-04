@@ -65,6 +65,47 @@ def _preprocessor_config(*, ic_first: bool = False) -> dict:
     return config.model_dump()
 
 
+def test_raw_streaming_sanitizes_readonly_memmap_source(tmp_path) -> None:
+    """回歸：registry.load_data 回唯讀 memmap（disk-spill），sanitize_finite_cap
+    就地寫 NaN 不得崩潰（原 bug：ValueError assignment destination is read-only）。"""
+    registry = ColumnGroupRegistry(tmp_path / "work", memory_buffer_groups=0)
+    data = np.array(
+        [
+            [1.0, np.inf],
+            [2.0, 1e20],
+            [3.0, 3.0],
+            [4.0, 4.0],
+        ],
+        dtype=np.float32,
+    )
+    registry.save_data(_build_group("ro_group", data.shape), data)
+
+    # 確認來源確實唯讀（memmap mode="r"），否則此回歸測試無效
+    loaded = registry.load_data("ro_group")
+    assert not np.asarray(loaded).flags.writeable, "前置條件失敗：來源應為唯讀 memmap"
+
+    storage = FeatureStorage(str(tmp_path / "features"))
+
+    # preprocessor=None → 走 data=load_data() 直接進 _write_group + sanitize 的崩潰分支
+    raw_dir, summary = storage.write_raw_from_registry_stream(
+        symbol="ROUSDT",
+        tf="1h",
+        config_hash="cfg_ro",
+        registry=registry,
+        preprocessor=None,
+        sanitize_finite_cap=1e18,
+        cleanup_intermediate=False,
+        l65_mode="legacy",
+    )
+
+    df = pd.read_parquet(raw_dir / "ro_group.parquet")
+    col1 = df["ro_group_col_1"].to_numpy()
+    # inf 與 1e20 (>1e18 cap) 應被淨化為 NaN，有限值保留
+    assert np.isnan(col1[0]) and np.isnan(col1[1])
+    assert col1[2] == 3.0 and col1[3] == 4.0
+    assert np.isinf(col1).sum() == 0
+
+
 def test_raw_streaming_transforms_without_registry_overwrite(tmp_path, monkeypatch) -> None:
     registry = _make_registry(tmp_path)
     source_path = registry.get("group_1").disk_path

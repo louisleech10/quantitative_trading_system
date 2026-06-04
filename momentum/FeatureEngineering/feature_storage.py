@@ -683,6 +683,10 @@ class FeatureStorage:
                 columns_list = _tagged
 
             array = np.asarray(data, dtype=np.float32)
+            # registry 來源可能是 memmap / arrow 零拷貝（唯讀）；下方 Layer B 淨化與
+            # dead-drop 需就地寫入 → 唯讀時複製成可寫副本（可寫來源維持零拷貝省記憶體）。
+            if not array.flags.writeable:
+                array = array.copy()
             if array.ndim != 2:
                 raise ValueError(f"Raw stream group {safe_group_id} must be 2D, got {array.shape}")
             if array.shape[1] != len(columns_list):
