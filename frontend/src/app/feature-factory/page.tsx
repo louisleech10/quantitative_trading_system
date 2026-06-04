@@ -18,6 +18,7 @@ import BatchQualityOverview, {
   type RecoverableBatchSummary,
 } from '@/components/feature-factory/BatchQualityOverview';
 import HardwareStatusPanel from '@/components/feature-factory/HardwareStatusPanel';
+import SymbolCoverageMatrix from '@/components/feature-factory/SymbolCoverageMatrix';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
@@ -53,6 +54,12 @@ export default function FeatureFactoryPage() {
   } = useFeatureFactoryStore();
 
   const setValidationSummaryForTask = useFeatureFactoryStore((state) => state.setValidationSummaryForTask);
+  const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
+  const fetchRegistry = useFeatureFactoryStore((state) => state.fetchRegistry);
+  const distinctSymbolCount = useMemo(
+    () => new Set(registryEntries.map((entry) => entry.symbol)).size,
+    [registryEntries],
+  );
 
   const {
     loadInitial,
@@ -210,6 +217,10 @@ export default function FeatureFactoryPage() {
   useEffect(() => {
     loadInitial();
   }, [loadInitial]);
+
+  useEffect(() => {
+    fetchRegistry().catch(() => undefined);
+  }, [fetchRegistry]);
 
   useEffect(() => {
     if (!config) {
@@ -548,6 +559,22 @@ export default function FeatureFactoryPage() {
               )}
             </>
           )}
+
+        <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
+          <div>
+            <div className="text-sm font-medium text-slate-300">跨 Symbol Coverage Matrix</div>
+            <p className="text-xs text-slate-500 mt-1">
+              比對多個 Symbol 在同一 timeframe 下各 feature 的覆蓋率（= 非 NaN 比率 = 1 − NaN 比率，越高越好），找出跨標的不穩定的特徵。需先在 Feature Factory 生成至少 2 個 Symbol 的特徵。
+            </p>
+          </div>
+          {distinctSymbolCount >= 2 ? (
+            <SymbolCoverageMatrix entries={registryEntries} />
+          ) : (
+            <div className="rounded-md border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-400">
+              需至少 2 個 Symbol 的特徵資料，請先生成更多 Symbol 的特徵。
+            </div>
+          )}
+        </div>
 
       </div>
     </div>

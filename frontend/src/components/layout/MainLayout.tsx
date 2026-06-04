@@ -61,12 +61,6 @@ const navigationItems: NavItem[] = [
     description: '建立特徵組合與產生設定'
   },
   {
-    name: '特徵瀏覽器',
-    href: '/feature-browser',
-    icon: Database,
-    description: '特徵分佈、相關性與品質檢測'
-  },
-  {
     name: '圖表查看',
     href: '/charts',
     icon: LineChart,

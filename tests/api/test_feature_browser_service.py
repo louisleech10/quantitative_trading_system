@@ -4,25 +4,13 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+import pandas as pd
 import pytest
 
 from api.services.feature_browser_service import FeatureBrowserService
-
-
-def _write_sample_feature_h5(path: Path, rows: int = 300, cols: int = 16) -> None:
-    rng = np.random.default_rng(42)
-    data = rng.normal(size=(rows, cols)).astype(np.float64)
-    data[:, 0] = np.linspace(0.0, 2.0, rows)
-    data[:, 1] = np.sin(np.linspace(0, 10, rows))
-    data[::9, 2] = np.nan
-    names = np.array([f"feature_{idx}" for idx in range(cols)], dtype=object)
-    timestamps = np.arange(rows, dtype=np.int64)
-
-    with h5py.File(path, "w") as h5_file:
-        group = h5_file.create_group("data")
-        group.create_dataset("features", data=data)
-        group.create_dataset("feature_names", data=names, dtype=h5py.string_dtype(encoding="utf-8"))
-        group.create_dataset("timestamps", data=timestamps)
+from momentum.Analysis.coverage_analyzer import CoverageAnalyzer
+from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from momentum.factories import create_feature_reader
 
 
 def _write_symbol_feature_h5(path: Path, data: np.ndarray, feature_names: list[str]) -> None:
@@ -37,71 +25,8 @@ def _write_symbol_feature_h5(path: Path, data: np.ndarray, feature_names: list[s
 
 
 @pytest.fixture(scope="module")
-def sample_h5(tmp_path_factory: pytest.TempPathFactory) -> str:
-    file_path = tmp_path_factory.mktemp("feature_browser_service") / "sample_features.h5"
-    _write_sample_feature_h5(file_path)
-    return str(file_path)
-
-
-@pytest.fixture(scope="module")
 def service() -> FeatureBrowserService:
     return FeatureBrowserService()
-
-
-def test_get_overview(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_overview(sample_h5)
-    assert payload["total_features"] == 16
-    assert len(payload["items"]) == 16
-
-
-def test_get_ic_dashboard(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_ic_dashboard(sample_h5, top_k=10)
-    assert "available" in payload
-    assert "entries" in payload
-
-
-def test_get_rolling_ic(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_rolling_ic(sample_h5, "feature_1", window=40)
-    assert payload["feature_name"] == "feature_1"
-    assert "points" in payload
-
-
-def test_get_quality_scorecard(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_quality_scorecard(sample_h5, top_k=50)
-    assert "items" in payload
-    assert "funnel" in payload
-
-
-def test_get_correlation_matrix_truncation(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_correlation_matrix(sample_h5, method="spearman", max_features=5)
-    assert payload["original_feature_count"] >= 5
-    assert len(payload["features"]) == 5
-
-
-def test_get_vif(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_vif(sample_h5, max_features=10)
-    assert len(payload["items"]) > 0
-
-
-def test_get_drift_monitor(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_drift_monitor(sample_h5, max_features=20)
-    assert "items" in payload
-
-
-def test_get_shap_summary(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_shap_summary(sample_h5, top_k=8)
-    assert payload["available"] in {True, False}
-    assert "items" in payload
-
-
-def test_get_importance_comparison(service: FeatureBrowserService, sample_h5: str) -> None:
-    payload = service.get_importance_comparison(sample_h5, top_k=10)
-    assert len(payload["items"]) <= 10
-
-
-def test_missing_file_raises(service: FeatureBrowserService) -> None:
-    with pytest.raises(FileNotFoundError):
-        service.get_overview("/tmp/does_not_exist.h5")
 
 
 def test_get_coverage_matrix(service: FeatureBrowserService, tmp_path: Path) -> None:
@@ -131,3 +56,189 @@ def test_get_coverage_matrix(service: FeatureBrowserService, tmp_path: Path) -> 
     assert np.isclose(payload["matrix"]["feature_a"]["BTCUSDT"], 0.0)
     assert np.isclose(payload["matrix"]["feature_b"]["BTCUSDT"], 0.5)
     assert payload["summary"]["worst_symbol"] == "BTCUSDT"
+
+
+def test_coverage_matrix_requires_two_symbols(service: FeatureBrowserService) -> None:
+    with pytest.raises(ValueError):
+        service.get_coverage_matrix(symbols=["BTCUSDT"], timeframe="12h")
+
+
+def _write_v2_raw_fixture(
+    feature_base: Path,
+    *,
+    symbol: str,
+    timeframe: str,
+    config_hash: str,
+    raw_groups: dict[str, pd.DataFrame],
+) -> None:
+    storage = FeatureStorage(str(feature_base))
+    storage.write_raw(symbol, timeframe, config_hash, raw_groups)
+
+
+@pytest.fixture(scope="module")
+def analyzer() -> CoverageAnalyzer:
+    return CoverageAnalyzer(feature_reader_factory=create_feature_reader)
+
+
+def test_v2_layout_loads(analyzer: CoverageAnalyzer, tmp_path: Path) -> None:
+    feature_base = tmp_path / "features"
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_v2_a",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, 2.0], dtype=np.float32),
+                    "feature_b": np.array([3.0, 4.0], dtype=np.float32),
+                }
+            )
+        },
+    )
+
+    frame = analyzer._load_symbol_features("BTCUSDT", "12h", str(feature_base))
+    assert frame is not None
+    assert not frame.empty
+    assert set(frame.columns) == {"feature_a", "feature_b"}
+
+
+def test_group_coverage_from_manifest(analyzer: CoverageAnalyzer, tmp_path: Path) -> None:
+    feature_base = tmp_path / "features"
+    rows = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_grp",
+        raw_groups={"group_alpha": pd.DataFrame({"feature_a": rows})},
+    )
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="ETHUSDT",
+        timeframe="12h",
+        config_hash="cfg_grp",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {"feature_a": np.array([1.0, np.nan, 3.0, np.nan], dtype=np.float32)}
+            )
+        },
+    )
+
+    payload = analyzer.compute_group_coverage_matrix(
+        symbols=["BTCUSDT", "ETHUSDT"],
+        timeframe="12h",
+        feature_base_path=str(feature_base),
+    )
+
+    assert payload["symbols"] == ["BTCUSDT", "ETHUSDT"]
+    assert "group_alpha" in payload["groups"]
+    assert np.isclose(payload["matrix"]["group_alpha"]["BTCUSDT"], 1.0)
+    assert np.isclose(payload["matrix"]["group_alpha"]["ETHUSDT"], 0.5)
+    assert payload["divergence"]["group_alpha"] > 0.0
+    assert payload["groups"][0] == "group_alpha"
+
+
+def test_group_drilldown_per_feature(analyzer: CoverageAnalyzer, tmp_path: Path) -> None:
+    feature_base = tmp_path / "features"
+    rows = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_drill",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": rows,
+                    "feature_b": np.array([1.0, 1.0, 1.0, 1.0], dtype=np.float32),
+                }
+            )
+        },
+    )
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="ETHUSDT",
+        timeframe="12h",
+        config_hash="cfg_drill",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {
+                    "feature_a": np.array([1.0, np.nan, 3.0, np.nan], dtype=np.float32),
+                    "feature_b": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
+                }
+            )
+        },
+    )
+
+    payload = analyzer.compute_group_feature_coverage(
+        symbols=["BTCUSDT", "ETHUSDT"],
+        timeframe="12h",
+        group_name="group_alpha",
+        feature_base_path=str(feature_base),
+        top_n=100,
+    )
+
+    assert set(payload["features"]) <= {"feature_a", "feature_b"}
+    assert np.isclose(payload["matrix"]["feature_a"]["BTCUSDT"], 1.0)
+    assert np.isclose(payload["matrix"]["feature_a"]["ETHUSDT"], 0.5)
+    divergences = [payload["divergence"][name] for name in payload["features"]]
+    assert divergences == sorted(divergences, reverse=True)
+
+
+def test_group_drilldown_unknown_group(analyzer: CoverageAnalyzer, tmp_path: Path) -> None:
+    feature_base = tmp_path / "features"
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_missing",
+        raw_groups={"group_alpha": pd.DataFrame({"feature_a": np.array([1.0, 2.0], dtype=np.float32)})},
+    )
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="ETHUSDT",
+        timeframe="12h",
+        config_hash="cfg_missing",
+        raw_groups={"group_alpha": pd.DataFrame({"feature_a": np.array([1.0, 2.0], dtype=np.float32)})},
+    )
+
+    with pytest.raises(ValueError, match="group not found"):
+        analyzer.compute_group_feature_coverage(
+            symbols=["BTCUSDT", "ETHUSDT"],
+            timeframe="12h",
+            group_name="group_missing",
+            feature_base_path=str(feature_base),
+        )
+
+
+def test_get_group_coverage_service(service: FeatureBrowserService, tmp_path: Path) -> None:
+    feature_base = tmp_path / "features"
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="BTCUSDT",
+        timeframe="12h",
+        config_hash="cfg_svc",
+        raw_groups={"group_alpha": pd.DataFrame({"feature_a": np.array([1.0, 2.0], dtype=np.float32)})},
+    )
+    _write_v2_raw_fixture(
+        feature_base,
+        symbol="ETHUSDT",
+        timeframe="12h",
+        config_hash="cfg_svc",
+        raw_groups={
+            "group_alpha": pd.DataFrame(
+                {"feature_a": np.array([1.0, np.nan], dtype=np.float32)}
+            )
+        },
+    )
+
+    payload = service.get_group_coverage(
+        symbols=["BTCUSDT", "ETHUSDT"],
+        timeframe="12h",
+        feature_base_path=str(feature_base),
+    )
+    assert payload["symbols"] == ["BTCUSDT", "ETHUSDT"]
+    assert "group_alpha" in payload["matrix"]

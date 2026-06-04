@@ -2295,172 +2295,6 @@ export interface NetICAnalysisData {
   };
 }
 
-export interface FeatureBrowserCatalogItem {
-  name: string;
-  category: string;
-  source: string;
-  layer: string;
-  family: string;
-  params: Record<string, unknown>;
-  coverage: number;
-  mean: number | null;
-  std: number | null;
-  nan_pct: number;
-}
-
-export interface FeatureBrowserCatalogSummary {
-  total_features: number;
-  total_categories: number;
-  avg_coverage: number;
-  stationary_ratio: number;
-  low_quality_count: number;
-  redundant_pairs: number;
-}
-
-export interface FeatureBrowserCatalogResponse {
-  items: FeatureBrowserCatalogItem[];
-  summary: FeatureBrowserCatalogSummary;
-}
-
-export interface FeatureBrowserHistogramBin {
-  left: number;
-  right: number;
-  count: number;
-  density: number;
-}
-
-export interface FeatureBrowserDistributionStatistics {
-  mean: number | null;
-  std: number | null;
-  skew: number | null;
-  kurtosis: number | null;
-  min: number | null;
-  max: number | null;
-  median: number | null;
-  q25: number | null;
-  q75: number | null;
-  nan_pct: number;
-  unique_count: number;
-  zero_count: number;
-  jb_stat: number | null;
-  jb_pvalue: number | null;
-}
-
-export interface FeatureBrowserDistributionResponse {
-  feature_name: string;
-  bins: number;
-  histogram: FeatureBrowserHistogramBin[];
-  kde_x: number[];
-  kde_y: number[];
-  statistics: FeatureBrowserDistributionStatistics;
-}
-
-export interface FeatureBrowserTimeSeriesPoint {
-  timestamp: string | null;
-  values: Record<string, number | null>;
-}
-
-export interface FeatureBrowserACFItem {
-  lag: number;
-  value: number;
-}
-
-export interface FeatureBrowserFrequencyItem {
-  frequency: number;
-  amplitude: number;
-}
-
-export interface FeatureBrowserTimeSeriesResponse {
-  features: string[];
-  sample_rate: number;
-  points: FeatureBrowserTimeSeriesPoint[];
-  acf: Record<string, FeatureBrowserACFItem[]>;
-  periodicity: Record<string, FeatureBrowserFrequencyItem[]>;
-}
-
-export interface FeatureBrowserCorrelationResponse {
-  method: 'pearson' | 'spearman' | 'kendall';
-  features: string[];
-  matrix: number[][];
-  mode: string;
-}
-
-export interface FeatureBrowserQualityItem {
-  feature: string;
-  adf_pvalue: number | null;
-  is_stationary: boolean;
-  coverage: number;
-  nan_pct: number;
-}
-
-export interface FeatureBrowserQualityResponse {
-  results: FeatureBrowserQualityItem[];
-}
-
-export interface FeatureBrowserDataTableResponse {
-  total_rows: number;
-  page: number;
-  page_size: number;
-  columns: string[];
-  rows: Record<string, unknown>[];
-}
-
-export interface FeatureOverviewItem {
-  feature_name: string;
-  data_type: string;
-  mean: number | null;
-  std: number | null;
-  min: number | null;
-  max: number | null;
-  nan_pct: number;
-}
-
-export interface FeatureOverview {
-  total_rows: number;
-  total_features: number;
-  numeric_features: number;
-  mean_nan_pct: number;
-  items: FeatureOverviewItem[];
-}
-
-export interface ICDashboardEntry {
-  feature_name: string;
-  ic_mean: number;
-  ic_std: number;
-  ir: number;
-  t_stat: number;
-  significance: string;
-  sparkline: number[];
-}
-
-export interface ICDashboardResult {
-  available: boolean;
-  message: string | null;
-  entries: ICDashboardEntry[];
-}
-
-export interface RollingICPoint {
-  timestamp: string;
-  ic: number;
-  ir: number | null;
-}
-
-export interface RollingIC {
-  feature_name: string;
-  window: number;
-  points: RollingICPoint[];
-}
-
-export interface FeatureQualityScore {
-  feature_name: string;
-  stationarity_score: number;
-  coverage_score: number;
-  drift_score: number;
-  redundancy_score: number;
-  total_score: number;
-  grade: string;
-}
-
 export interface CorrelationMatrix {
   method?: 'pearson' | 'spearman' | 'kendall';
   features: string[];
@@ -2469,58 +2303,24 @@ export interface CorrelationMatrix {
   original_feature_count?: number;
 }
 
-export interface DriftMonitorEntry {
-  feature_name: string;
-  psi: number;
-  ks_stat: number;
-  ks_pvalue: number;
-  status: 'stable' | 'warning' | 'severe';
-}
-
-export interface SHAPSummary {
-  available: boolean;
-  message: string | null;
-  items: Array<{
-    feature_name: string;
-    mean_abs_shap: number;
-    mean_shap: number;
-  }>;
-}
-
-export interface ImportanceComparison {
-  items: Array<{
-    feature_name: string;
-    lightgbm_importance: number;
-    xgboost_importance: number;
-  }>;
-}
-
-export interface CoverageMatrixRequestPayload {
+export interface GroupCoverageResponsePayload {
+  groups: string[];
   symbols: string[];
-  timeframe: string;
-  feature_names: string[];
-  feature_base_path?: string;
-  timeout_seconds?: number;
-}
-
-export interface CoverageMatrixResponsePayload {
   matrix: Record<string, Record<string, number | null>>;
-  valid_counts: Record<string, Record<string, number>>;
-  row_counts: Record<string, number>;
-  symbols: string[];
-  features: string[];
+  divergence: Record<string, number>;
   summary: {
     avg_coverage: number;
     worst_symbol: string | null;
-    worst_feature: string | null;
+    worst_group: string | null;
+    missing_symbols: string[];
   };
 }
 
-export type FeatureBrowserTab =
-  | 'overview'
-  | 'ic_dashboard'
-  | 'quality'
-  | 'correlation'
-  | 'drift'
-  | 'attribution'
-  | 'coverage';
+export interface GroupFeatureCoverageResponsePayload {
+  group_name: string;
+  features: string[];
+  symbols: string[];
+  matrix: Record<string, Record<string, number | null>>;
+  divergence: Record<string, number>;
+  row_counts: Record<string, number>;
+}

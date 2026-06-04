@@ -60,17 +60,13 @@ _EXPORT_MAP: Dict[str, str] = {
     "ExportQuery": "api.models.export_models",
     "ExportErrorResponse": "api.models.export_models",
 
-    # Phase 8 Task 8.1 模型
-    "FeatureOverviewResponse": "api.models.feature_browser_models",
-    "FeatureDistributionResponse": "api.models.feature_browser_models",
-    "ICDashboardResponse": "api.models.feature_browser_models",
-    "RollingICResponse": "api.models.feature_browser_models",
-    "QualityScorecardResponse": "api.models.feature_browser_models",
-    "CorrelationMatrixResponse": "api.models.feature_browser_models",
-    "VIFResponse": "api.models.feature_browser_models",
-    "DriftMonitorResponse": "api.models.feature_browser_models",
-    "SHAPSummaryResponse": "api.models.feature_browser_models",
-    "ImportanceComparisonResponse": "api.models.feature_browser_models",
+    # Feature Browser（Coverage Matrix + Group 聚合/下鑽）
+    "CoverageMatrixRequest": "api.models.feature_browser_models",
+    "CoverageMatrixResponse": "api.models.feature_browser_models",
+    "GroupCoverageRequest": "api.models.feature_browser_models",
+    "GroupCoverageResponse": "api.models.feature_browser_models",
+    "GroupFeatureCoverageRequest": "api.models.feature_browser_models",
+    "GroupFeatureCoverageResponse": "api.models.feature_browser_models",
 }
 
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { ICAnalysisConfig, ICFeatureInfo, WatchlistStatus } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -416,13 +415,7 @@ export default function ICSummaryTable({
                       )}
                       <TableCell className="text-sm text-slate-300">#{item.rank ?? index + 1}</TableCell>
                       <TableCell className="font-medium text-slate-100">
-                        <Link
-                          href={`/feature-browser?feature=${encodeURIComponent(item.feature_name)}&tab=distribution`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="text-cyan-300 hover:text-cyan-200 underline-offset-2 hover:underline"
-                        >
-                          {item.feature_name}
-                        </Link>
+                        {item.feature_name}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-slate-200">
                         {item.ic_mean?.toFixed(4)}
