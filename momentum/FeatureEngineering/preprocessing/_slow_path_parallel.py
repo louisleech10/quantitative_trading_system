@@ -129,6 +129,7 @@ def process_fracdiff_column_values(values: np.ndarray, column_metadata: Dict[str
     precision = float(column_metadata.get("precision", 0.02))
     adf_threshold = float(column_metadata.get("adf_threshold", 0.05))
     sample_size = int(column_metadata.get("sample_size", 500))
+    calibration_bars = int(column_metadata.get("calibration_bars", 0))
     d_range_raw = column_metadata.get("d_range", (0.0, 1.0))
     d_range = (float(d_range_raw[0]), float(d_range_raw[1]))
     cached_d_star = column_metadata.get("cached_d_star")
@@ -151,8 +152,11 @@ def process_fracdiff_column_values(values: np.ndarray, column_metadata: Dict[str
         if cache_hit:
             d_star = float(cached_d_star)
         else:
+            decision_values = values
+            if calibration_bars > 0:
+                decision_values = values[: min(len(values), calibration_bars)]
             d_star = find_min_d_with_prior(
-                values,
+                decision_values,
                 precision=precision,
                 adf_threshold=adf_threshold,
                 adf_fn=adf_fn,

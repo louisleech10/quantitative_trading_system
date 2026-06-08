@@ -29,6 +29,7 @@ def _rank_config(window: int = 3) -> dict:
 def _gaussian_config() -> dict:
     return {
         "mode": "replace",
+        "causal_preprocessing": False,
         "gaussian_normalize": {
             "enabled": True,
             "clip_range": [0.001, 0.999],
@@ -40,6 +41,7 @@ def _gaussian_config() -> dict:
 def _winsor_quantile_config(lower: float = 0.25, upper: float = 0.75) -> dict:
     return {
         "mode": "replace",
+        "causal_preprocessing": False,
         "winsorization": {
             "enabled": True,
             "method": "quantile",

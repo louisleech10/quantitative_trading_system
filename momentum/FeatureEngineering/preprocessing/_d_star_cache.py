@@ -195,6 +195,8 @@ def _compute_fracdiff_hash(
     sample_size: Optional[int],
     nan_policy: str,
     adf_engine_version: str,
+    causal_preprocessing: bool = True,
+    calibration_bars: int = 0,
 ) -> str:
     """Deterministic MD5 of only the fracdiff algorithm parameters."""
     payload = {
@@ -205,6 +207,8 @@ def _compute_fracdiff_hash(
         "sample_size": None if sample_size is None else int(sample_size),
         "nan_policy": nan_policy,
         "adf_engine_version": adf_engine_version,
+        "causal_preprocessing": bool(causal_preprocessing),
+        "calibration_bars": int(calibration_bars),
     }
     return hashlib.md5(
         json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
@@ -263,6 +267,8 @@ class DStarCache:
         sample_size: Optional[int] = None,
         nan_policy: str = "dropna",
         adf_engine_version: str = ADF_ENGINE_VERSION,
+        causal_preprocessing: bool = True,
+        calibration_bars: int = 0,
     ) -> None:
         self._ctx = context
         self._dir = cache_dir
@@ -274,10 +280,14 @@ class DStarCache:
             "sample_size": sample_size,
             "nan_policy": nan_policy,
             "adf_engine_version": adf_engine_version,
+            "causal_preprocessing": bool(causal_preprocessing),
+            "calibration_bars": int(calibration_bars),
         }
         self._fracdiff_hash = _compute_fracdiff_hash(
             adf_threshold, precision, max_lag, weight_threshold,
             sample_size, nan_policy, adf_engine_version,
+            causal_preprocessing=causal_preprocessing,
+            calibration_bars=calibration_bars,
         )
         self._path = self._build_path(cache_dir, context, self._fracdiff_hash)
         self._dirty = False
@@ -380,6 +390,7 @@ class DStarCache:
             "source_data_version",
             "nan_policy",
             "adf_engine_version",
+            "causal_preprocessing",
         )
         for field_name in exact_fields:
             if payload.get(field_name) != expected.get(field_name):
@@ -409,7 +420,7 @@ class DStarCache:
                 )
                 return False
 
-        integer_fields = ("max_lag", "sample_size")
+        integer_fields = ("max_lag", "sample_size", "calibration_bars")
         for field_name in integer_fields:
             if not _int_equal(payload.get(field_name), expected.get(field_name)):
                 logger.info(
@@ -436,6 +447,8 @@ class DStarCache:
             "max_lag": self._metadata["max_lag"],
             "weight_threshold": self._metadata["weight_threshold"],
             "adf_engine_version": self._metadata["adf_engine_version"],
+            "causal_preprocessing": self._metadata["causal_preprocessing"],
+            "calibration_bars": self._metadata["calibration_bars"],
             "time_range": time_range,
             "row_count": int(self._ctx.row_count),
             "sample_size": self._metadata["sample_size"],

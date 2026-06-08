@@ -47,6 +47,7 @@ def test_preprocess_constant_column() -> None:
     df = pd.DataFrame({"f1": [5.0] * 120})
     pre = FeaturePreprocessor(
         {
+            "causal_preprocessing": False,
             "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
             "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
@@ -66,6 +67,7 @@ def test_adf_nan_heavy() -> None:
     df.loc[df.index[:80], "f1"] = np.nan
     pre = FeaturePreprocessor(
         {
+            "causal_preprocessing": False,
             "adf_differencing": {"enabled": True, "apply_to": ["f1"], "max_diff": 2},
             "mode": "append",
         }
@@ -79,6 +81,7 @@ def test_gaussian_boundary() -> None:
     df = pd.DataFrame({"f1": np.concatenate([np.zeros(50), np.ones(50)])})
     pre = FeaturePreprocessor(
         {
+            "causal_preprocessing": False,
             "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
             "mode": "append",
         }
@@ -91,6 +94,7 @@ def test_winsor_then_zscore() -> None:
     df = pd.DataFrame({"f1": [1.0] * 100 + [1000.0]})
     pre = FeaturePreprocessor(
         {
+            "causal_preprocessing": False,
             "winsorization": {"enabled": True, "method": "sigma", "sigma_k": 0.0, "apply_to": "all"},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
             "mode": "append",
@@ -151,11 +155,13 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     if not fp_mod.HAS_STATSMODELS:
         pytest.skip("statsmodels unavailable")
     df = _base_df(160)
+    df = df.rename(columns={"f2": "L1_f2"})
     pre = FeaturePreprocessor(
         {
+            "causal_preprocessing": False,
             "fractional_differencing": {
                 "enabled": True,
-                "apply_to": ["f2"],
+                "apply_to": ["L1_f2"],
                 "d_range": [0.0, 1.0],
                 "adf_threshold": 0.05,
                 "weight_threshold": 1e-5,
@@ -171,7 +177,7 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(pre, "_find_min_d", _raise)
     out = pre.transform(df)
-    assert "f2_fracdiff" in out.columns
+    assert "L1_f2_fracdiff" in out.columns
 
 
 def test_fracdiff_short_data() -> None:
@@ -184,16 +190,18 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
     if not fp_mod.HAS_STATSMODELS:
         pytest.skip("statsmodels unavailable")
     df = _base_df(180)
+    df = df.rename(columns={"f2": "L1_f2"})
     pre = FeaturePreprocessor(
         {
+            "causal_preprocessing": False,
             "fractional_differencing": {
                 "enabled": True,
-                "apply_to": ["f2"],
+                "apply_to": ["L1_f2"],
                 "cache_d_star": False,
             },
             "adf_differencing": {
                 "enabled": True,
-                "apply_to": ["f2"],
+                "apply_to": ["L1_f2"],
                 "max_diff": 2,
             },
             "mode": "append",
@@ -202,9 +210,9 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(pre, "_find_min_d", lambda *_args, **_kwargs: 0.5)
     out = pre.transform(df)
-    assert "f2_fracdiff" in out.columns
-    assert "f2_diff1" not in out.columns
-    assert "f2_diff2" not in out.columns
+    assert "L1_f2_fracdiff" in out.columns
+    assert "L1_f2_diff1" not in out.columns
+    assert "L1_f2_diff2" not in out.columns
 
 
 def test_transform_fixed_order(monkeypatch: pytest.MonkeyPatch) -> None:

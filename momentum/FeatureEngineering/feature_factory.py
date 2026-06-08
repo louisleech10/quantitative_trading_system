@@ -2744,6 +2744,9 @@ class FeatureFactory:
         end_date: Optional[str] = None,
     ) -> str:
         config_payload = config.model_dump(by_alias=True)
+        preprocessing_payload = config_payload.get("preprocessing")
+        if isinstance(preprocessing_payload, dict):
+            preprocessing_payload.setdefault("causal_preprocessing", True)
         timeframes = config_payload.get("timeframes")
         if isinstance(timeframes, dict) and isinstance(timeframes.get("training"), list):
             # Canonicalize list order so semantically identical training TF sets share cache key.

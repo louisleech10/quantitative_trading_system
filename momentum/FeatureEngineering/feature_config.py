@@ -167,6 +167,7 @@ class WinsorConfig(BaseModel):
     method: str = "quantile"
     sigma_k: float = 3.0
     quantile_range: List[float] = Field(default_factory=lambda: [0.01, 0.99])
+    window: int = 252
     apply_to: Union[str, List[str]] = "all"
 
 
@@ -229,6 +230,8 @@ class AdaptiveZScoreConfig(BaseModel):
 
 class PreprocessingConfig(BaseModel):
     enabled: bool = True
+    causal_preprocessing: bool = True
+    calibration_bars: int = 500
     # replace：原地覆蓋，確保跨標的欄位名稱一致（業界標準）
     # append 會產生 _diff1/_diff2/_fracdiff，不同標的欄位名可能不同 → 多標的訓練 schema 錯誤
     mode: str = "replace"

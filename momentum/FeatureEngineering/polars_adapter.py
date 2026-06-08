@@ -26,6 +26,10 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.preprocessing._numba_transforms import (
+    _rolling_mean_std,
+    rolling_quantile_2d,
+)
 from momentum.FeatureEngineering.utils.numeric_guards import DEFAULT_DENOM_REL_EPS
 
 if TYPE_CHECKING:
@@ -361,6 +365,9 @@ def polars_l65_winsorization(
     method: str = "sigma",
     sigma_k: float = 3.0,
     quantile_range: Tuple[float, float] = (0.01, 0.99),
+    causal_preprocessing: bool = True,
+    window: int = 252,
+    min_periods: int = 63,
 ) -> "pl.DataFrame":
     """Apply winsorization using Polars expressions.
 
@@ -390,6 +397,31 @@ def polars_l65_winsorization(
     valid_columns = [c for c in columns if c in pl_df.columns]
     if not valid_columns:
         return pl_df
+
+    if causal_preprocessing:
+        pdf = pl_df.to_pandas()
+        arr = pdf.loc[:, valid_columns].to_numpy(dtype=np.float64, copy=True)
+        if method == "sigma":
+            mean, std = _rolling_mean_std(arr, int(window), min_periods=int(min_periods))
+            lower = mean.astype(np.float64) - float(sigma_k) * std.astype(np.float64)
+            upper = mean.astype(np.float64) + float(sigma_k) * std.astype(np.float64)
+        elif method == "quantile":
+            lower, upper = rolling_quantile_2d(
+                arr,
+                float(quantile_range[0]),
+                float(quantile_range[1]),
+                int(window),
+                int(min_periods),
+            )
+        else:
+            raise ValueError(f"Unsupported winsorization method: {method}")
+        nan_mask = np.isnan(arr)
+        valid_bounds = np.isfinite(lower) & np.isfinite(upper)
+        clipped = np.clip(arr, lower, upper)
+        arr[valid_bounds] = clipped[valid_bounds]
+        arr[nan_mask] = np.nan
+        pdf.loc[:, valid_columns] = arr.astype(np.float32, copy=False)
+        return pl.from_pandas(pdf)
 
     if method == "sigma":
         exprs = []

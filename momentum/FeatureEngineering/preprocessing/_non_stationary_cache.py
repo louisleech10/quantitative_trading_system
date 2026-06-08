@@ -8,7 +8,7 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-NonStationaryKey = Tuple[str, float, int, str, str, Tuple[int, ...], int, str, str, str]
+NonStationaryKey = Tuple[str, float, int, str, bool, int, str, str, Tuple[int, ...], int, str, str, str]
 
 
 class NonStationaryCache:
@@ -24,6 +24,9 @@ class NonStationaryCache:
         sample_size: int,
         nan_policy: str,
         series: pd.Series,
+        *,
+        causal_preprocessing: bool = True,
+        calibration_bars: int = 0,
     ) -> NonStationaryKey:
         numeric = pd.to_numeric(series, errors="coerce")
         values = numeric.to_numpy(dtype=np.float64, copy=False)
@@ -49,6 +52,8 @@ class NonStationaryCache:
             round(float(threshold), 8),
             int(sample_size),
             str(nan_policy),
+            bool(causal_preprocessing),
+            int(calibration_bars),
             str(series.dtype),
             tuple(int(part) for part in series.shape),
             int(nan_mask.sum()),

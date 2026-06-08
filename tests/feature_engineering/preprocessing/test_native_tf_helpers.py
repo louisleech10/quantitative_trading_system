@@ -68,19 +68,23 @@ class TestScaleConfig:
     def test_native_long_tf_scales_windows(self):
         cfg = {
             "rank_transform": {"window": 360, "enabled": True},
+            "winsorization": {"window": 252, "enabled": True},
             "adaptive_zscore": {
                 "window": 240,
                 "windows": [60, 120, 240],
                 "enabled": True,
             },
+            "calibration_bars": 600,
         }
         scaled = scale_preprocessing_config_for_native(cfg, "12h", "1h")
         # 360 / 12 = 30
         assert scaled["rank_transform"]["window"] == 30
+        assert scaled["winsorization"]["window"] == 21
         # 240 / 12 = 20
         assert scaled["adaptive_zscore"]["window"] == 20
         # [60/12, 120/12, 240/12] = [5, 10, 20]
         assert scaled["adaptive_zscore"]["windows"] == [5, 10, 20]
+        assert scaled["calibration_bars"] == 50
         # enabled flags preserved
         assert scaled["rank_transform"]["enabled"] is True
         assert scaled["adaptive_zscore"]["enabled"] is True
@@ -109,11 +113,14 @@ class TestScaleConfig:
         assert scaled["fractional_differencing"]["sample_size"] == 5000
         assert scaled["fractional_differencing"]["max_lag"] == 50
         assert scaled["winsorization"]["lower_q"] == 0.01
+        assert scaled["winsorization"]["window"] == 21
+        assert scaled["calibration_bars"] == 42
 
     def test_missing_keys_no_error(self):
         cfg = {"winsorization": {"lower_q": 0.01}}
         scaled = scale_preprocessing_config_for_native(cfg, "12h", "1h")
-        assert scaled == cfg
+        assert scaled["winsorization"] == {"lower_q": 0.01, "window": 21}
+        assert scaled["calibration_bars"] == 42
         assert scaled is not cfg
 
     def test_deep_copy_isolation(self):

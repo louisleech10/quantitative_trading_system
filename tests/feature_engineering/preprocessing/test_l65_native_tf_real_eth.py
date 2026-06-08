@@ -256,10 +256,49 @@ class TestRealEthStatisticalDivergence:
         )
         native_result = native_reg.load_data("12h_L1_eth_close")
 
-        # Both must share NaN positions
-        legacy_nan = np.isnan(legacy_result)
-        native_nan = np.isnan(native_result)
-        np.testing.assert_array_equal(legacy_nan, native_nan)
+        # NaN-mask equality was a pre-causal artifact: under full-sample winsor
+        # neither path had a real warmup, so both masks were ~all-finite and
+        # trivially equal. With causal rolling preprocessing each path now has a
+        # grid-dependent warmup NaN prefix — they legitimately DIFFER in length:
+        #   - legacy warms up on the dense 1h step-series with winsor.window=252
+        #     (min_periods=max(20,252//4)) -> ~71-row prefix in primary space.
+        #   - native warms up on the coarse 12h grid with the source-scaled
+        #     window, whose finite values map back to far fewer 1h rows -> ~12.
+        # The real invariant is: both have a non-empty warmup prefix, legacy's is
+        # longer (dense grid + larger window), and the STEADY-STATE region (past
+        # the longer prefix) shares identical NaN positions (no leaked warmup
+        # difference downstream). Measured 2026-06-08: legacy=71, native=12.
+        legacy_nan = np.isnan(legacy_result).ravel()
+        native_nan = np.isnan(native_result).ravel()
+
+        def _warmup_prefix(mask: np.ndarray) -> int:
+            i = 0
+            while i < len(mask) and mask[i]:
+                i += 1
+            return i
+
+        legacy_prefix = _warmup_prefix(legacy_nan)
+        native_prefix = _warmup_prefix(native_nan)
+        assert 40 <= legacy_prefix <= 120, (
+            f"legacy warmup prefix {legacy_prefix} outside expected causal range "
+            f"(window=252, min_periods~63 on 1h step-series)"
+        )
+        assert 1 <= native_prefix <= 40, (
+            f"native warmup prefix {native_prefix} outside expected causal range "
+            f"(source-scaled window on 12h grid)"
+        )
+        assert native_prefix < legacy_prefix, (
+            f"native prefix {native_prefix} should be shorter than legacy "
+            f"{legacy_prefix} (coarse grid + smaller scaled window)"
+        )
+
+        # Steady-state (past the longer warmup) must share identical NaN positions.
+        steady_start = max(legacy_prefix, native_prefix)
+        np.testing.assert_array_equal(
+            legacy_nan[steady_start:],
+            native_nan[steady_start:],
+            err_msg="steady-state NaN masks diverge -> leaked warmup difference",
+        )
 
         common = np.isfinite(legacy_result) & np.isfinite(native_result)
         diffs = np.abs(legacy_result[common] - native_result[common])

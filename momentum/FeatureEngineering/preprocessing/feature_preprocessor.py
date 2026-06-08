@@ -34,6 +34,11 @@ from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
     ParallelSlowPath,
     process_fracdiff_column_values,
 )
+from momentum.FeatureEngineering.preprocessing._numba_transforms import (
+    _rolling_mean_std,
+    _rolling_rank_numba,
+    rolling_quantile_2d,
+)
 from momentum.FeatureEngineering.utils.adf_safe_skip import filter_safe_skip
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
 from momentum.FeatureEngineering.operators.derived_operators import (
@@ -133,6 +138,7 @@ class FeaturePreprocessor:
         self.adf_safe_skip_config = self._config.get("adf_safe_skip", {}) or {}
         # 預設 replace：確保跨標的欄位名稱一致
         self.mode = self._config.get("mode", "replace")
+        self.causal_preprocessing = bool(self._config.get("causal_preprocessing", True))
 
         self._fracdiff_processed_columns: set[str] = set()
         self._fracdiff_apply_to_layers = get_fracdiff_layers()
@@ -141,6 +147,28 @@ class FeaturePreprocessor:
         self._d_star_cache: Optional[DStarCache] = None
         self._d_star_cache_shared = False
         self._numba_warmed_up = False
+
+    def _rolling_window(self) -> int:
+        window = int(self.winsor_config.get("window", self.rank_config.get("window", 252)))
+        return max(window, 1)
+
+    @staticmethod
+    def _rolling_min_periods(window: int) -> int:
+        return max(20, int(window) // 4)
+
+    def _calibration_bars(self) -> int:
+        adf_sample = int(self.adf_config.get("sample_size", self.fracdiff_config.get("sample_size", 500)))
+        configured = int(self._config.get("calibration_bars", 500))
+        return max(adf_sample, configured, 500)
+
+    def _calibration_series(self, series: pd.Series) -> pd.Series:
+        bars = min(len(series), self._calibration_bars())
+        return series.iloc[:bars]
+
+    def _calibration_values(self, values: np.ndarray) -> np.ndarray:
+        arr = np.asarray(values)
+        bars = min(len(arr), self._calibration_bars())
+        return arr[:bars]
 
     @staticmethod
     def _resolve_column_chunk_size() -> int:
@@ -624,6 +652,9 @@ class FeaturePreprocessor:
             "do_adf": do_adf,
             "do_gaussian": do_gaussian,
             "gaussian_apply_to": gaussian_apply_to,
+            "causal_preprocessing": self.causal_preprocessing,
+            "winsor_window": self._rolling_window(),
+            "winsor_min_periods": self._rolling_min_periods(self._rolling_window()),
         }
 
         if can_use_numba_fast:
@@ -632,6 +663,8 @@ class FeaturePreprocessor:
             from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
 
             winsor_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            winsor_method = str(self.winsor_config.get("method", "quantile"))
+            winsor_sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
             zscore_windows = self.zscore_config.get("windows", [100, 252])
             gaussian_clip = self.gaussian_config.get("clip_range", [0.001, 0.999])
 
@@ -639,6 +672,8 @@ class FeaturePreprocessor:
                 {
                     "transform_array_fast": transform_array_fast,
                     "do_winsorize": do_winsorize,
+                    "winsor_method": winsor_method,
+                    "winsor_sigma_k": winsor_sigma_k,
                     "winsor_lower_q": float(winsor_range[0]),
                     "winsor_upper_q": float(winsor_range[1]),
                     "do_rank": do_rank,
@@ -648,6 +683,9 @@ class FeaturePreprocessor:
                     "zscore_epsilon": float(self.zscore_config.get("epsilon", 1e-8)),
                     "gaussian_clip_lower": float(gaussian_clip[0]),
                     "gaussian_clip_upper": float(gaussian_clip[1]),
+                    "causal_preprocessing": self.causal_preprocessing,
+                    "winsor_window": self._rolling_window(),
+                    "winsor_min_periods": self._rolling_min_periods(self._rolling_window()),
                 }
             )
 
@@ -1679,13 +1717,18 @@ class FeaturePreprocessor:
         return transform_array_fast(
             array_slice,
             winsorize=bool(transform_context.get("do_winsorize", True)),
+            winsor_method=str(transform_context.get("winsor_method", "quantile")),
             winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
             winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+            winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
             rank=bool(transform_context.get("do_rank", False)),
             rank_window=int(transform_context.get("rank_window", 252)),
             zscore=bool(transform_context.get("do_zscore", False)),
             zscore_window=int(transform_context.get("zscore_window", 100)),
             zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+            causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
+            winsor_window=int(transform_context.get("winsor_window", 252)),
+            winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
         )
 
     def _transform_single_group(
@@ -1714,13 +1757,18 @@ class FeaturePreprocessor:
             processed_array = transform_array_fast(
                 group_array,
                 winsorize=bool(transform_context.get("do_winsorize", True)),
+                winsor_method=str(transform_context.get("winsor_method", "quantile")),
                 winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
                 winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+                winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
                 rank=bool(transform_context.get("do_rank", False)),
                 rank_window=int(transform_context.get("rank_window", 252)),
                 zscore=bool(transform_context.get("do_zscore", False)),
                 zscore_window=int(transform_context.get("zscore_window", 100)),
                 zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+                causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
+                winsor_window=int(transform_context.get("winsor_window", 252)),
+                winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
             )
             # Gaussian post-step: apply_to="all" can be vectorised directly on the
             # numpy array without needing column names, so we handle it here instead
@@ -1730,6 +1778,9 @@ class FeaturePreprocessor:
                     processed_array.astype(np.float64, copy=False),
                     lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
                     upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
+                    causal=bool(transform_context.get("causal_preprocessing", True)),
+                    window=int(transform_context.get("winsor_window", 252)),
+                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
                 )
             registry.overwrite_data(group_id, processed_array)
             return
@@ -1792,19 +1843,27 @@ class FeaturePreprocessor:
             processed_array = transform_array_fast(
                 group_array,
                 winsorize=bool(transform_context.get("do_winsorize", True)),
+                winsor_method=str(transform_context.get("winsor_method", "quantile")),
                 winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
                 winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+                winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
                 rank=bool(transform_context.get("do_rank", False)),
                 rank_window=int(transform_context.get("rank_window", 252)),
                 zscore=bool(transform_context.get("do_zscore", False)),
                 zscore_window=int(transform_context.get("zscore_window", 100)),
                 zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+                causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
+                winsor_window=int(transform_context.get("winsor_window", 252)),
+                winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
             )
             if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
                 processed_array = self._gaussian_2d(
                     processed_array.astype(np.float64, copy=False),
                     lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
                     upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
+                    causal=bool(transform_context.get("causal_preprocessing", True)),
+                    window=int(transform_context.get("winsor_window", 252)),
+                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
                 )
             return [(group_id, columns, np.asarray(processed_array, dtype=np.float32))]
 
@@ -1947,19 +2006,27 @@ class FeaturePreprocessor:
             processed = transform_array_fast(
                 arr_in,
                 winsorize=bool(transform_context.get("do_winsorize", True)),
+                winsor_method=str(transform_context.get("winsor_method", "quantile")),
                 winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
                 winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+                winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
                 rank=bool(transform_context.get("do_rank", False)),
                 rank_window=int(transform_context.get("rank_window", 252)),
                 zscore=bool(transform_context.get("do_zscore", False)),
                 zscore_window=int(transform_context.get("zscore_window", 100)),
                 zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+                causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
+                winsor_window=int(transform_context.get("winsor_window", 252)),
+                winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
             )
             if do_gaussian and HAS_SCIPY and gaussian_apply_to == "all":
                 processed = self._gaussian_2d(
                     processed.astype(np.float64, copy=False),
                     lower=gaussian_clip_lower,
                     upper=gaussian_clip_upper,
+                    causal=bool(transform_context.get("causal_preprocessing", True)),
+                    window=int(transform_context.get("winsor_window", 252)),
+                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
                 )
             processed = np.asarray(processed, dtype=np.float32)
 
@@ -2209,27 +2276,55 @@ class FeaturePreprocessor:
 
         if method == "sigma":
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            means = selected.mean(skipna=True)
-            stds = selected.std(skipna=True)
-            valid_std = (~stds.isna()) & (stds != 0.0)
-            if not valid_std.any():
-                return result_array
+            if self.causal_preprocessing:
+                window = self._rolling_window()
+                min_periods = self._rolling_min_periods(window)
+                means, stds = _rolling_mean_std(result_array, window, min_periods=min_periods)
+                lowers = means.astype(np.float64) - sigma_k * stds.astype(np.float64)
+                uppers = means.astype(np.float64) + sigma_k * stds.astype(np.float64)
+                nan_mask = np.isnan(result_array)
+                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+                clipped = np.clip(result_array, lowers, uppers)
+                result_array[valid_bounds] = clipped[valid_bounds]
+                result_array[nan_mask] = np.nan
+            else:
+                means = selected.mean(skipna=True)
+                stds = selected.std(skipna=True)
+                valid_std = (~stds.isna()) & (stds != 0.0)
+                if not valid_std.any():
+                    return result_array
 
-            valid_positions = valid_std[valid_std].index.tolist()
-            lowers = means.loc[valid_positions] - sigma_k * stds.loc[valid_positions]
-            uppers = means.loc[valid_positions] + sigma_k * stds.loc[valid_positions]
-            clipped = selected.loc[:, valid_positions].clip(
-                lower=lowers,
-                upper=uppers,
-                axis=1,
-            )
-            result_array[:, valid_positions] = clipped.to_numpy(dtype=np.float32, copy=False)
+                valid_positions = valid_std[valid_std].index.tolist()
+                lowers = means.loc[valid_positions] - sigma_k * stds.loc[valid_positions]
+                uppers = means.loc[valid_positions] + sigma_k * stds.loc[valid_positions]
+                clipped = selected.loc[:, valid_positions].clip(
+                    lower=lowers,
+                    upper=uppers,
+                    axis=1,
+                )
+                result_array[:, valid_positions] = clipped.to_numpy(dtype=np.float32, copy=False)
             return result_array
 
         if method == "quantile":
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             lower_q = float(quantile_range[0])
             upper_q = float(quantile_range[1])
+            if self.causal_preprocessing:
+                window = self._rolling_window()
+                min_periods = self._rolling_min_periods(window)
+                lowers, uppers = rolling_quantile_2d(
+                    result_array,
+                    lower_q,
+                    upper_q,
+                    window,
+                    min_periods,
+                )
+                nan_mask = np.isnan(result_array)
+                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+                clipped = np.clip(result_array, lowers, uppers)
+                result_array[valid_bounds] = clipped[valid_bounds]
+                result_array[nan_mask] = np.nan
+                return result_array.astype(np.float32, copy=False)
             return self._winsorize_2d_inplace(
                 result_array,
                 lower_q,
@@ -2329,6 +2424,9 @@ class FeaturePreprocessor:
                         working_values[:, gaussian_positions],
                         lower=float(clip_range[0]),
                         upper=float(clip_range[1]),
+                        causal=self.causal_preprocessing,
+                        window=self._rolling_window(),
+                        min_periods=self._rolling_min_periods(self._rolling_window()),
                     )
             else:
                 logger.warning("Gaussian normalization skipped: scipy unavailable")
@@ -2429,6 +2527,9 @@ class FeaturePreprocessor:
                 method=method,
                 sigma_k=sigma_k,
                 quantile_range=(float(quantile_range[0]), float(quantile_range[1])),
+                causal_preprocessing=self.causal_preprocessing,
+                window=self._rolling_window(),
+                min_periods=self._rolling_min_periods(self._rolling_window()),
             )
 
         # ADF differencing (pandas fallback — not supported in Polars)
@@ -2567,28 +2668,63 @@ class FeaturePreprocessor:
 
         if method == "sigma":
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            means = selected.mean(skipna=True)
-            stds = selected.std(skipna=True)
-            valid_std = (~stds.isna()) & (stds != 0.0)
-            if not valid_std.any():
-                return result
+            if self.causal_preprocessing:
+                window = self._rolling_window()
+                min_periods = self._rolling_min_periods(window)
+                arr = selected.to_numpy(dtype=np.float64, copy=True)
+                means, stds = _rolling_mean_std(arr, window, min_periods=min_periods)
+                lowers = means.astype(np.float64) - sigma_k * stds.astype(np.float64)
+                uppers = means.astype(np.float64) + sigma_k * stds.astype(np.float64)
+                nan_mask = np.isnan(arr)
+                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+                clipped = np.clip(arr, lowers, uppers)
+                arr[valid_bounds] = clipped[valid_bounds]
+                arr[nan_mask] = np.nan
+                result.loc[:, columns] = pd.DataFrame(
+                    arr.astype(np.float32, copy=False),
+                    index=selected.index,
+                    columns=columns,
+                )
+            else:
+                means = selected.mean(skipna=True)
+                stds = selected.std(skipna=True)
+                valid_std = (~stds.isna()) & (stds != 0.0)
+                if not valid_std.any():
+                    return result
 
-            valid_columns = valid_std[valid_std].index.tolist()
-            lowers = means.loc[valid_columns] - sigma_k * stds.loc[valid_columns]
-            uppers = means.loc[valid_columns] + sigma_k * stds.loc[valid_columns]
-            clipped = selected.loc[:, valid_columns].clip(lower=lowers, upper=uppers, axis=1)
-            clipped = clipped.astype(np.float32, copy=False)
-            result.loc[:, valid_columns] = clipped
+                valid_columns = valid_std[valid_std].index.tolist()
+                lowers = means.loc[valid_columns] - sigma_k * stds.loc[valid_columns]
+                uppers = means.loc[valid_columns] + sigma_k * stds.loc[valid_columns]
+                clipped = selected.loc[:, valid_columns].clip(lower=lowers, upper=uppers, axis=1)
+                clipped = clipped.astype(np.float32, copy=False)
+                result.loc[:, valid_columns] = clipped
         elif method == "quantile":
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             lower_q = float(quantile_range[0])
             upper_q = float(quantile_range[1])
             selected_array = selected.to_numpy(dtype=np.float64, copy=True)
-            clipped_array = self._winsorize_2d_inplace(
-                selected_array,
-                lower_q,
-                upper_q,
-            )
+            if self.causal_preprocessing:
+                window = self._rolling_window()
+                min_periods = self._rolling_min_periods(window)
+                lowers, uppers = rolling_quantile_2d(
+                    selected_array,
+                    lower_q,
+                    upper_q,
+                    window,
+                    min_periods,
+                )
+                nan_mask = np.isnan(selected_array)
+                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+                clipped = np.clip(selected_array, lowers, uppers)
+                selected_array[valid_bounds] = clipped[valid_bounds]
+                selected_array[nan_mask] = np.nan
+                clipped_array = selected_array
+            else:
+                clipped_array = self._winsorize_2d_inplace(
+                    selected_array,
+                    lower_q,
+                    upper_q,
+                )
             clipped = pd.DataFrame(
                 clipped_array.astype(np.float32, copy=False),
                 index=selected.index,
@@ -2824,6 +2960,8 @@ class FeaturePreprocessor:
             sample_size=sample_size,
             nan_policy="dropna",
             adf_engine_version=self._adf_engine_version(),
+            causal_preprocessing=self.causal_preprocessing,
+            calibration_bars=self._calibration_bars() if self.causal_preprocessing else 0,
         )
 
     @staticmethod
@@ -2880,9 +3018,10 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
+            cache_arr = self._calibration_values(col_arr) if self.causal_preprocessing else col_arr
 
             try:
-                cached_d_star = cache.get(column, col_arr) if cache is not None else None
+                cached_d_star = cache.get(column, cache_arr) if cache is not None else None
                 if cached_d_star is not None:
                     d_star = cached_d_star
                 else:
@@ -2894,7 +3033,7 @@ class FeaturePreprocessor:
                         max_lag=max_lag,
                     )
                     if cache is not None:
-                        cache.set(column, d_star, col_arr)
+                        cache.set(column, d_star, cache_arr)
             except Exception as exc:
                 logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
                 d_star = 1.0
@@ -2936,13 +3075,14 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
+            cache_arr = self._calibration_values(col_arr) if self.causal_preprocessing else col_arr
             col_input_arrays[column] = col_arr
             value_key = _strong_col_value_fingerprint(col_arr)
             cached_d_star = (
                 cache.get_by_value_fingerprint(
                     column,
-                    weak_fp=_col_value_fingerprint(col_arr),
-                    strong_fp=value_key,
+                    weak_fp=_col_value_fingerprint(cache_arr),
+                    strong_fp=_strong_col_value_fingerprint(cache_arr),
                 )
                 if cache is not None
                 else None
@@ -2963,6 +3103,7 @@ class FeaturePreprocessor:
                 "max_lag": max_lag,
                 "weight_threshold": weight_threshold,
                 "sample_size": sample_size,
+                "calibration_bars": self._calibration_bars() if self.causal_preprocessing else 0,
             }
             items.append((col_arr, metadata))
 
@@ -2981,7 +3122,10 @@ class FeaturePreprocessor:
                 if cache is not None and (
                     not bool(output.get("cache_hit", False)) or target_column != column
                 ):
-                    cache.set(target_column, d_star, col_input_arrays.get(target_column))
+                    target_values = col_input_arrays.get(target_column)
+                    if target_values is not None and self.causal_preprocessing:
+                        target_values = self._calibration_values(target_values)
+                    cache.set(target_column, d_star, target_values)
             if output.get("status") != "ok":
                 failed_columns.extend(duplicate_columns)
 
@@ -3173,13 +3317,15 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
 
-            working = series.copy()
+            decision_source = self._calibration_series(series) if self.causal_preprocessing else series
+            decision_working = decision_source.copy()
+            full_working = series.copy()
             chosen_diff = 0
             for diff_order in range(max_diff + 1):
-                clean = working.dropna()
+                clean = decision_working.dropna()
                 if len(clean) < 20:
                     break
-                sample = clean.tail(sample_size)
+                sample = clean.head(sample_size) if self.causal_preprocessing else clean.tail(sample_size)
                 pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
 
                 if pvalue <= threshold:
@@ -3187,15 +3333,16 @@ class FeaturePreprocessor:
                     break
 
                 if diff_order < max_diff:
-                    working = working.diff()
+                    decision_working = decision_working.diff()
+                    full_working = full_working.diff()
 
             if chosen_diff == 0:
                 continue
 
             if self.mode == "replace":
-                result[column] = working
+                result[column] = full_working
             else:
-                result[f"{column}_diff{chosen_diff}"] = working
+                result[f"{column}_diff{chosen_diff}"] = full_working
 
         if skipped_high_nan:
             logger.warning(
@@ -3273,20 +3420,32 @@ class FeaturePreprocessor:
         arr: np.ndarray,
         lower: float = 0.001,
         upper: float = 0.999,
+        *,
+        causal: bool = True,
+        window: int = 252,
+        min_periods: int = 63,
     ) -> np.ndarray:
         if not HAS_SCIPY or ndtri is None:
             raise RuntimeError("scipy is required for gaussian normalization")
 
         selected = pd.DataFrame(np.asarray(arr, dtype=np.float64))
-        ranked_df = selected.rank(pct=True)
-        nunique = selected.nunique(dropna=True)
-        constant_columns = nunique[nunique <= 1].index.tolist()
-        if constant_columns:
-            constant_values = ranked_df.loc[:, constant_columns].where(
-                selected.loc[:, constant_columns].isna(),
-                0.5,
+        if causal:
+            ranked_arr = _rolling_rank_numba(
+                selected.to_numpy(dtype=np.float64, copy=False),
+                int(window),
+                int(min_periods),
             )
-            ranked_df.loc[:, constant_columns] = constant_values
+            ranked_df = pd.DataFrame(ranked_arr, index=selected.index, columns=selected.columns)
+        else:
+            ranked_df = selected.rank(pct=True)
+            nunique = selected.nunique(dropna=True)
+            constant_columns = nunique[nunique <= 1].index.tolist()
+            if constant_columns:
+                constant_values = ranked_df.loc[:, constant_columns].where(
+                    selected.loc[:, constant_columns].isna(),
+                    0.5,
+                )
+                ranked_df.loc[:, constant_columns] = constant_values
 
         clipped = ranked_df.clip(lower=lower, upper=upper)
         gaussian_arr = ndtri(clipped.to_numpy(dtype=np.float64, copy=False))
@@ -3314,6 +3473,9 @@ class FeaturePreprocessor:
                 selected.to_numpy(dtype=np.float64, copy=False),
                 lower=lower,
                 upper=upper,
+                causal=self.causal_preprocessing,
+                window=self._rolling_window(),
+                min_periods=self._rolling_min_periods(self._rolling_window()),
             ),
             index=selected.index,
             columns=columns,
@@ -3414,12 +3576,15 @@ class FeaturePreprocessor:
 
         for column in df.columns:
             raw_series = df[column]
+            decision_series = self._calibration_series(raw_series) if self.causal_preprocessing else raw_series
             cache_key = self._non_stationary_cache.make_key(
                 str(column),
                 threshold,
                 sample_size,
                 nan_policy,
-                raw_series,
+                decision_series,
+                causal_preprocessing=self.causal_preprocessing,
+                calibration_bars=self._calibration_bars() if self.causal_preprocessing else 0,
             )
             cached = self._non_stationary_cache.get(cache_key)
             if cached is not None:
@@ -3427,11 +3592,11 @@ class FeaturePreprocessor:
                     non_stationary.append(column)
                 continue
 
-            if float(raw_series.isna().mean()) > 0.5:
+            if float(decision_series.isna().mean()) > 0.5:
                 self._non_stationary_cache.set(cache_key, False)
                 continue
 
-            series = raw_series.dropna()
+            series = decision_series.dropna()
             if len(series) < 20:
                 is_non_stationary = True
                 self._non_stationary_cache.set(cache_key, is_non_stationary)
@@ -3439,7 +3604,7 @@ class FeaturePreprocessor:
                 continue
 
             pvalue = self._adf_pvalue_for_values(
-                series.tail(sample_size).to_numpy(dtype=np.float64),
+                (series.head(sample_size) if self.causal_preprocessing else series.tail(sample_size)).to_numpy(dtype=np.float64),
                 sample_size=sample_size,
             )
 
@@ -3516,7 +3681,8 @@ class FeaturePreprocessor:
         if not HAS_STATSMODELS:
             return 1.0
 
-        clean = series.dropna()
+        decision_series = self._calibration_series(series) if self.causal_preprocessing else series
+        clean = decision_series.dropna()
         if len(clean) < 20:
             return 1.0
 

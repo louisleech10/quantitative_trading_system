@@ -109,8 +109,10 @@ def scale_preprocessing_config_for_native(
     section dicts):
 
     * ``rank_transform.window`` -> primary->source rows
+    * ``winsorization.window`` -> primary->source rows
     * ``adaptive_zscore.windows`` -> list of primary->source rows
     * ``adaptive_zscore.window`` (legacy)
+    * top-level ``calibration_bars`` -> primary->source rows
     * ``fractional_differencing.sample_size`` -> kept (sample size is
       observation count for ADF, not a time window). NOT scaled.
     * ``fractional_differencing.max_lag`` -> kept (lag in observations).
@@ -137,6 +139,11 @@ def scale_preprocessing_config_for_native(
             if key in rank_cfg:
                 rank_cfg[key] = _scale_window(rank_cfg[key])
 
+    # winsorization
+    winsor_cfg = scaled.get("winsorization")
+    if isinstance(winsor_cfg, dict):
+        winsor_cfg["window"] = _scale_window(winsor_cfg.get("window", 252))
+
     # adaptive_zscore
     zscore_cfg = scaled.get("adaptive_zscore")
     if isinstance(zscore_cfg, dict):
@@ -146,6 +153,8 @@ def scale_preprocessing_config_for_native(
         for key in _WINDOWS_LIST_KEYS:
             if key in zscore_cfg and isinstance(zscore_cfg[key], (list, tuple)):
                 zscore_cfg[key] = [_scale_window(w) for w in zscore_cfg[key]]
+
+    scaled["calibration_bars"] = _scale_window(scaled.get("calibration_bars", 500))
 
     return scaled
 

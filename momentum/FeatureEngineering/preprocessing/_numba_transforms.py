@@ -27,7 +27,7 @@ except ImportError:
 if _HAS_NUMBA:
 
     @njit(cache=True)
-    def _rolling_rank_numba(arr: np.ndarray, window: int) -> np.ndarray:
+    def _rolling_rank_numba(arr: np.ndarray, window: int, min_periods: int = 1) -> np.ndarray:
         """Rolling percentile rank along axis-0.
 
         Returns float32 array same shape as *arr*.
@@ -64,7 +64,7 @@ if _HAS_NUMBA:
                             less += 1
                         elif v == val:
                             equal += 1
-                if count == 0:
+                if count < min_periods:
                     continue
                 # Check constant window: all equal → 0.5
                 if less == 0 and equal == count:
@@ -76,7 +76,7 @@ if _HAS_NUMBA:
 
 else:
 
-    def _rolling_rank_numba(arr: np.ndarray, window: int) -> np.ndarray:  # type: ignore[misc]
+    def _rolling_rank_numba(arr: np.ndarray, window: int, min_periods: int = 1) -> np.ndarray:  # type: ignore[misc]
         """Fallback: pure numpy rolling rank (slower but correct)."""
         n_rows, n_cols = arr.shape
         out = np.full((n_rows, n_cols), np.nan, dtype=np.float32)
@@ -90,7 +90,7 @@ else:
                     continue
                 col_valid = win[:, c][valid_mask[:, c]]
                 cnt = len(col_valid)
-                if cnt == 0:
+                if cnt < min_periods:
                     continue
                 less = np.sum(col_valid < val_row[c])
                 equal = np.sum(col_valid == val_row[c])
@@ -114,19 +114,19 @@ except ImportError:
     bn = None  # type: ignore[assignment]
 
 
-def _rolling_mean_std(arr: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray]:
+def _rolling_mean_std(arr: np.ndarray, window: int, min_periods: int = 1) -> tuple[np.ndarray, np.ndarray]:
     """Compute rolling mean and std along axis-0 for a 2-D float32 array.
 
     Returns (mean, std) both float32.
     """
-    if _HAS_BN:
-        mean = bn.move_mean(arr, window=window, min_count=1, axis=0).astype(np.float32)
-        std = bn.move_std(arr, window=window, min_count=1, axis=0, ddof=1).astype(np.float32)
+    if _HAS_BN and window <= arr.shape[0] and min_periods <= window:
+        mean = bn.move_mean(arr, window=window, min_count=min_periods, axis=0).astype(np.float32)
+        std = bn.move_std(arr, window=window, min_count=min_periods, axis=0, ddof=1).astype(np.float32)
         return mean, std
 
     # Fallback: cumsum-based rolling mean/std (O(n) per column).
     n_rows, n_cols = arr.shape
-    # Replace NaN with 0 for cumsum; track valid counts for min_periods=1.
+    # Replace NaN with 0 for cumsum; track valid counts for min_periods.
     mask = ~np.isnan(arr)
     safe = np.where(mask, arr, 0.0)
 
@@ -157,11 +157,96 @@ def _rolling_mean_std(arr: np.ndarray, window: int) -> tuple[np.ndarray, np.ndar
     std = np.sqrt(variance).astype(np.float32)
 
     # Mask where no valid values
-    no_data = win_cnt == 0
+    no_data = win_cnt < min_periods
     mean[no_data] = np.nan
     std[no_data] = np.nan
 
     return mean, std
+
+
+if _HAS_NUMBA:
+
+    @njit(cache=True)
+    def _rolling_quantile_numba(
+        arr: np.ndarray,
+        lower_q: float,
+        upper_q: float,
+        window: int,
+        min_periods: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        n_rows, n_cols = arr.shape
+        lower = np.empty((n_rows, n_cols), dtype=np.float32)
+        upper = np.empty((n_rows, n_cols), dtype=np.float32)
+        lower[:] = np.nan
+        upper[:] = np.nan
+
+        for c in range(n_cols):
+            scratch = np.empty(window, dtype=np.float64)
+            for r in range(n_rows):
+                start = max(0, r - window + 1)
+                count = 0
+                for k in range(start, r + 1):
+                    v = arr[k, c]
+                    if not np.isnan(v) and np.isfinite(v):
+                        scratch[count] = v
+                        count += 1
+                if count < min_periods:
+                    continue
+                sorted_vals = np.sort(scratch[:count])
+                for q_idx in range(2):
+                    q = lower_q if q_idx == 0 else upper_q
+                    pos = q * (count - 1)
+                    lo = int(np.floor(pos))
+                    hi = min(lo + 1, count - 1)
+                    frac = pos - lo
+                    value = sorted_vals[lo] + frac * (sorted_vals[hi] - sorted_vals[lo])
+                    if q_idx == 0:
+                        lower[r, c] = np.float32(value)
+                    else:
+                        upper[r, c] = np.float32(value)
+        return lower, upper
+
+else:
+
+    def _rolling_quantile_numba(
+        arr: np.ndarray,
+        lower_q: float,
+        upper_q: float,
+        window: int,
+        min_periods: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        n_rows, n_cols = arr.shape
+        lower = np.full((n_rows, n_cols), np.nan, dtype=np.float32)
+        upper = np.full((n_rows, n_cols), np.nan, dtype=np.float32)
+        for c in range(n_cols):
+            for r in range(n_rows):
+                start = max(0, r - window + 1)
+                values = arr[start : r + 1, c]
+                values = values[np.isfinite(values)]
+                if len(values) < min_periods:
+                    continue
+                bounds = np.nanquantile(values, [lower_q, upper_q]).astype(np.float32)
+                lower[r, c] = bounds[0]
+                upper[r, c] = bounds[1]
+        return lower, upper
+
+
+def rolling_quantile_2d(
+    arr: np.ndarray,
+    lower_q: float,
+    upper_q: float,
+    window: int,
+    min_periods: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return row-wise causal quantile bounds for each column."""
+    if window <= 0:
+        raise ValueError("rolling quantile window must be positive")
+    if min_periods <= 0:
+        raise ValueError("rolling quantile min_periods must be positive")
+    data = np.asarray(arr, dtype=np.float64)
+    if data.ndim != 2:
+        raise ValueError("rolling quantile input must be 2D")
+    return _rolling_quantile_numba(data, float(lower_q), float(upper_q), int(window), int(min_periods))
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +287,24 @@ def winsorize_array(arr: np.ndarray, lower_q: float = 0.01, upper_q: float = 0.9
     return arr
 
 
+def rolling_winsorize_array(
+    arr: np.ndarray,
+    lower_q: float = 0.01,
+    upper_q: float = 0.99,
+    *,
+    window: int = 252,
+    min_periods: int = 63,
+) -> np.ndarray:
+    """Causal quantile winsorization on float32 array, column-wise."""
+    lowers, uppers = rolling_quantile_2d(arr, lower_q, upper_q, window, min_periods)
+    nan_mask = np.isnan(arr)
+    valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+    clipped = np.clip(arr, lowers, uppers)
+    arr[valid_bounds] = clipped[valid_bounds]
+    arr[nan_mask] = np.nan
+    return arr
+
+
 # ---------------------------------------------------------------------------
 # Combined fast transform for CGSA per-group
 # ---------------------------------------------------------------------------
@@ -210,13 +313,18 @@ def transform_array_fast(
     arr: np.ndarray,
     *,
     winsorize: bool = True,
+    winsor_method: str = "quantile",
     winsor_lower_q: float = 0.01,
     winsor_upper_q: float = 0.99,
+    winsor_sigma_k: float = 3.0,
     rank: bool = True,
     rank_window: int = 252,
     zscore: bool = True,
     zscore_window: int = 100,
     zscore_epsilon: float = 1e-8,
+    causal_preprocessing: bool = True,
+    winsor_window: int = 252,
+    winsor_min_periods: int = 63,
 ) -> np.ndarray:
     """Apply L6.5 transforms on a raw float32 array (rows × cols).
 
@@ -234,11 +342,34 @@ def transform_array_fast(
     data = arr.astype(np.float32, copy=True)
 
     if winsorize:
-        data = winsorize_array(data, winsor_lower_q, winsor_upper_q)
+        if winsor_method == "sigma":
+            if causal_preprocessing:
+                mean, std = _rolling_mean_std(data, winsor_window, min_periods=winsor_min_periods)
+            else:
+                mean = np.nanmean(data, axis=0, keepdims=True).astype(np.float32)
+                std = np.nanstd(data, axis=0, ddof=1, keepdims=True).astype(np.float32)
+            lower = mean.astype(np.float64) - float(winsor_sigma_k) * std.astype(np.float64)
+            upper = mean.astype(np.float64) + float(winsor_sigma_k) * std.astype(np.float64)
+            nan_mask = np.isnan(data)
+            valid_bounds = np.isfinite(lower) & np.isfinite(upper)
+            clipped = np.clip(data, lower, upper)
+            data[valid_bounds] = clipped[valid_bounds]
+            data[nan_mask] = np.nan
+        elif causal_preprocessing:
+            data = rolling_winsorize_array(
+                data,
+                winsor_lower_q,
+                winsor_upper_q,
+                window=winsor_window,
+                min_periods=winsor_min_periods,
+            )
+        else:
+            data = winsorize_array(data, winsor_lower_q, winsor_upper_q)
 
     if rank:
         # rank produces a fresh out array; safe to discard the prior `data`.
-        data = _rolling_rank_numba(data, rank_window)
+        rank_min_periods = max(20, rank_window // 4)
+        data = _rolling_rank_numba(data, rank_window, rank_min_periods)
 
     if zscore:
         mean, std = _rolling_mean_std(data, zscore_window)

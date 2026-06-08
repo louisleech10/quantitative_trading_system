@@ -1,0 +1,15 @@
+{
+  "source": "tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet",
+  "rows": 320,
+  "columns": [
+    "L1_binance_open",
+    "L1_binance_high",
+    "L1_binance_low"
+  ],
+  "shape": [
+    320,
+    3
+  ],
+  "legacy_value_sha256": "eb840e1a62a205a3763496fedd71a57b0b86fcd11cf463c41b4d3f5527b58ac1",
+  "legacy_nan_mask_sha256": "4a7c5bcc57017df67021585866d7ae711b94a77ce59c1938d13a11011553c62f"
+}
