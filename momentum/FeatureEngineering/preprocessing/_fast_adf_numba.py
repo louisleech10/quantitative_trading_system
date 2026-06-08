@@ -114,7 +114,7 @@ def _resolve_lag(row_count: int, lag: Optional[int]) -> int:
 def _prepare_values(series: np.ndarray, sample_size: int) -> np.ndarray:
     values = np.asarray(series, dtype=np.float64).reshape(-1)
     if int(sample_size) > 0 and values.size > int(sample_size):
-        values = values[-int(sample_size) :]
+        values = values[: int(sample_size)]
     return np.ascontiguousarray(values, dtype=np.float64)
 
 
@@ -122,7 +122,7 @@ def _finite_tail_values(series: np.ndarray, sample_size: int) -> np.ndarray:
     values = np.asarray(series, dtype=np.float64).reshape(-1)
     values = values[np.isfinite(values)]
     if int(sample_size) > 0 and values.size > int(sample_size):
-        values = values[-int(sample_size) :]
+        values = values[: int(sample_size)]
     return np.ascontiguousarray(values, dtype=np.float64)
 
 

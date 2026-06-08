@@ -256,18 +256,16 @@ class TestRealEthStatisticalDivergence:
         )
         native_result = native_reg.load_data("12h_L1_eth_close")
 
-        # NaN-mask equality was a pre-causal artifact: under full-sample winsor
-        # neither path had a real warmup, so both masks were ~all-finite and
-        # trivially equal. With causal rolling preprocessing each path now has a
-        # grid-dependent warmup NaN prefix — they legitimately DIFFER in length:
-        #   - legacy warms up on the dense 1h step-series with winsor.window=252
-        #     (min_periods=max(20,252//4)) -> ~71-row prefix in primary space.
-        #   - native warms up on the coarse 12h grid with the source-scaled
-        #     window, whose finite values map back to far fewer 1h rows -> ~12.
-        # The real invariant is: both have a non-empty warmup prefix, legacy's is
-        # longer (dense grid + larger window), and the STEADY-STATE region (past
-        # the longer prefix) shares identical NaN positions (no leaked warmup
-        # difference downstream). Measured 2026-06-08: legacy=71, native=12.
+        # Causal rolling preprocessing gives each path a grid-dependent warmup
+        # NaN prefix. After C-1 rank/zscore min_periods alignment (2026-06-08):
+        #   - legacy: dense 1h step-series, winsor+rank+zscore all use
+        #     min_periods=max(20, window//4) on primary windows -> ~71 rows.
+        #   - native: transforms on scaled 12h grid (rank/zscore min_periods=20
+        #     on windows ~20/10), then forward-fill to 1h -> ~20 native bars *
+        #     ~12 primary rows/bar -> ~240 primary rows.
+        # Invariant: both have non-empty warmup; steady-state (past max prefix)
+        # shares identical NaN positions. Measured 2026-06-08: legacy=71,
+        # native=240.
         legacy_nan = np.isnan(legacy_result).ravel()
         native_nan = np.isnan(native_result).ravel()
 
@@ -281,15 +279,15 @@ class TestRealEthStatisticalDivergence:
         native_prefix = _warmup_prefix(native_nan)
         assert 40 <= legacy_prefix <= 120, (
             f"legacy warmup prefix {legacy_prefix} outside expected causal range "
-            f"(window=252, min_periods~63 on 1h step-series)"
+            f"(winsor/rank/zscore min_periods on 1h step-series; measured=71)"
         )
-        assert 1 <= native_prefix <= 40, (
+        assert 200 <= native_prefix <= 280, (
             f"native warmup prefix {native_prefix} outside expected causal range "
-            f"(source-scaled window on 12h grid)"
+            f"(scaled rank/zscore min_periods on 12h grid × ffill; measured=240)"
         )
-        assert native_prefix < legacy_prefix, (
-            f"native prefix {native_prefix} should be shorter than legacy "
-            f"{legacy_prefix} (coarse grid + smaller scaled window)"
+        assert native_prefix > legacy_prefix, (
+            f"native prefix {native_prefix} should exceed legacy {legacy_prefix} "
+            f"(coarse-grid min_periods upscaled via forward-fill)"
         )
 
         # Steady-state (past the longer warmup) must share identical NaN positions.

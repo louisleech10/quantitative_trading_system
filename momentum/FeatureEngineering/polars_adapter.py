@@ -454,11 +454,12 @@ def _make_rolling_pct_rank_fn(window: int):
     - Constant window (max==min) → 0.5 exactly.
     - Otherwise: 1-indexed average rank / count of non-null values in window.
     Numerically equivalent to pandas rolling.rank(pct=True, method='average',
-    min_periods=1) within float32 precision (atol < 1e-5).
+    min_periods=max(20, window//4)) within float32 precision (atol < 1e-5).
     """
     from scipy.stats import rankdata as _rankdata
 
-    _w = window
+    _w = max(1, int(window))
+    _min_periods = min(_w, max(20, _w // 4))
 
     def _fn(s: "pl.Series") -> "pl.Series":
         import polars as pl
@@ -477,7 +478,7 @@ def _make_rolling_pct_rank_fn(window: int):
             w_data = arr[start : i + 1]
             valid = w_data[~np.isnan(w_data)]
             n_valid = len(valid)
-            if n_valid == 0:
+            if n_valid < _min_periods:
                 continue
 
             # Constant window → 0.5 (matches pandas constant_mask behaviour)

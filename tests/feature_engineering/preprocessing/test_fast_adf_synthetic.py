@@ -39,7 +39,7 @@ def _statsmodels_fixed_lag_pvalue(
     sample = np.asarray(values, dtype=np.float64)
     sample = sample[np.isfinite(sample)]
     if sample.size > sample_size:
-        sample = sample[-sample_size:]
+        sample = sample[:sample_size]
     if sample.size < fast_adf.MIN_ADF_OBSERVATIONS:
         return 1.0
     effective_lag = fast_adf._resolve_lag(int(sample.size), lag)

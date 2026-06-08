@@ -114,6 +114,12 @@ except ImportError:
     bn = None  # type: ignore[assignment]
 
 
+def _rolling_min_periods(window: int) -> int:
+    """因果 rolling 暖機門檻，與 slow/legacy winsor 路徑一致。"""
+    w = max(1, int(window))
+    return min(w, max(20, w // 4))
+
+
 def _rolling_mean_std(arr: np.ndarray, window: int, min_periods: int = 1) -> tuple[np.ndarray, np.ndarray]:
     """Compute rolling mean and std along axis-0 for a 2-D float32 array.
 
@@ -351,6 +357,7 @@ def transform_array_fast(
             lower = mean.astype(np.float64) - float(winsor_sigma_k) * std.astype(np.float64)
             upper = mean.astype(np.float64) + float(winsor_sigma_k) * std.astype(np.float64)
             nan_mask = np.isnan(data)
+            # 暖機期 bounds 無效 → pass-through 原值（非輸出 NaN）；僅 valid_bounds 列 clip。
             valid_bounds = np.isfinite(lower) & np.isfinite(upper)
             clipped = np.clip(data, lower, upper)
             data[valid_bounds] = clipped[valid_bounds]
@@ -368,11 +375,14 @@ def transform_array_fast(
 
     if rank:
         # rank produces a fresh out array; safe to discard the prior `data`.
-        rank_min_periods = max(20, rank_window // 4)
-        data = _rolling_rank_numba(data, rank_window, rank_min_periods)
+        data = _rolling_rank_numba(data, rank_window, _rolling_min_periods(rank_window))
 
     if zscore:
-        mean, std = _rolling_mean_std(data, zscore_window)
+        mean, std = _rolling_mean_std(
+            data,
+            zscore_window,
+            min_periods=_rolling_min_periods(zscore_window),
+        )
         # Cache masks BEFORE mutating any input — preserves bit-exact parity
         # with the original (data-mean)/(std+eps) + np.where(std>0,..) formula.
         # NB: ``~(std > 0)`` matches BOTH std==0 and std==NaN (mirrors the

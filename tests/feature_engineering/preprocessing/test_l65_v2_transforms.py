@@ -92,7 +92,9 @@ def _single_copy_config() -> dict:
 
 def _legacy_rank(frame: pd.DataFrame, window: int) -> pd.DataFrame:
     selected = frame.astype(float)
-    rolling = selected.rolling(window, min_periods=1)
+    w = max(1, int(window))
+    min_periods = min(w, max(20, w // 4))
+    rolling = selected.rolling(window, min_periods=min_periods)
     ranked = rolling.rank(method="average", pct=True)
     constant_mask = rolling.max() == rolling.min()
     ranked = ranked.mask(constant_mask, 0.5)
@@ -301,9 +303,11 @@ def test_rank_constant_window() -> None:
     )
     result = FeaturePreprocessor(_rank_config(window=3))._apply_rank_transform(frame)
 
-    assert result["constant"].eq(0.5).all()
-    assert np.isnan(result["nan_prefixed_constant"].iloc[0])
-    assert result["nan_prefixed_constant"].iloc[1:].eq(0.5).all()
+    # window=3 -> min_periods=3 (C-1 warmup); constant rank needs full window.
+    assert np.isnan(result["constant"].iloc[:2]).all()
+    assert result["constant"].iloc[2:].eq(0.5).all()
+    assert np.isnan(result["nan_prefixed_constant"].iloc[:3]).all()
+    assert result["nan_prefixed_constant"].iloc[3:].eq(0.5).all()
 
 
 def test_winsorize_numpy_equivalence() -> None:

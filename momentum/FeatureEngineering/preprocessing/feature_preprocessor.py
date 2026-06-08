@@ -154,7 +154,8 @@ class FeaturePreprocessor:
 
     @staticmethod
     def _rolling_min_periods(window: int) -> int:
-        return max(20, int(window) // 4)
+        w = max(1, int(window))
+        return min(w, max(20, w // 4))
 
     def _calibration_bars(self) -> int:
         adf_sample = int(self.adf_config.get("sample_size", self.fracdiff_config.get("sample_size", 500)))
@@ -2320,6 +2321,7 @@ class FeaturePreprocessor:
                     min_periods,
                 )
                 nan_mask = np.isnan(result_array)
+                # 暖機期 quantile bounds 無效 → pass-through 原值（非輸出 NaN）。
                 valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
                 clipped = np.clip(result_array, lowers, uppers)
                 result_array[valid_bounds] = clipped[valid_bounds]
@@ -2979,7 +2981,7 @@ class FeaturePreprocessor:
         if get_fast_adf_enabled():
             return float(adf_pvalue_fast(clean_values, sample_size=sample_size)[0])
         try:
-            return float(adfuller(pd.Series(clean_values).tail(sample_size), autolag="AIC")[1])
+            return float(adfuller(pd.Series(clean_values).head(sample_size), autolag="AIC")[1])
         except Exception:
             return 1.0
 
@@ -3359,7 +3361,8 @@ class FeaturePreprocessor:
             raise ValueError("rank window must be positive")
 
         selected = pd.DataFrame(np.asarray(arr, dtype=np.float64))
-        rolling = selected.rolling(window, min_periods=1)
+        min_periods = FeaturePreprocessor._rolling_min_periods(window)
+        rolling = selected.rolling(window, min_periods=min_periods)
         ranked_df = rolling.rank(method="average", pct=True)
         constant_mask = rolling.std(ddof=0) == 0.0
         ranked_df = ranked_df.mask(constant_mask, 0.5)
