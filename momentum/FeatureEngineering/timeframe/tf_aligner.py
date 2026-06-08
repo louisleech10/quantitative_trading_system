@@ -19,6 +19,9 @@ from momentum.FeatureEngineering.memmap_utils import (
 
 logger = get_logger(__name__)
 
+CURRENT_MTF_ALIGN_VERSION = 2
+_NS_PER_SECOND = np.int64(1_000_000_000)
+
 
 class TimeframeAligner:
     """Timeframe aligner to avoid future leakage."""
@@ -44,6 +47,13 @@ class TimeframeAligner:
         if source_index.empty:
             return pd.DataFrame(index=primary_index)
 
+        if source_tf == primary_tf:
+            aligned = source_values.copy(deep=False)
+            aligned.index = source_index
+            aligned = aligned.reindex(primary_index)
+            aligned.attrs["source_timestamps"] = pd.DatetimeIndex(aligned.index)
+            return aligned
+
         source_seconds = TimeframeAligner._timeframe_to_seconds(source_tf)
         primary_seconds = TimeframeAligner._timeframe_to_seconds(primary_tf)
         if source_seconds and primary_seconds:
@@ -53,23 +63,25 @@ class TimeframeAligner:
                 logger.info("Aligning lower-frequency %s to %s", source_tf, primary_tf)
 
         use_searchsorted = os.environ.get("FFACT_USE_SEARCHSORTED", "1").strip() == "1"
-        if alignment_mode == AlignmentMode.OPEN_MINUS and source_tf != primary_tf:
-            # OPEN_MINUS only shifts anchor for non-primary TFs to avoid same-open bar leakage.
-            offset_ns = -1
-            anchor_index = primary_index - pd.Timedelta(nanoseconds=1)
-        else:
-            offset_ns = 0
-            anchor_index = primary_index
 
         if use_searchsorted:
             aligned = TimeframeAligner._searchsorted_align(
                 source_values,
                 source_index,
                 primary_index,
-                offset_ns=offset_ns,
+                source_tf=source_tf,
+                primary_tf=primary_tf,
+                alignment_mode=alignment_mode,
             )
         else:
-            aligned = TimeframeAligner._merge_asof_align(source_values, source_index, anchor_index)
+            aligned = TimeframeAligner._merge_asof_align(
+                source_values,
+                source_index,
+                primary_index,
+                source_tf=source_tf,
+                primary_tf=primary_tf,
+                alignment_mode=alignment_mode,
+            )
             aligned.index = primary_index
 
         return aligned
@@ -99,18 +111,25 @@ class TimeframeAligner:
     def build_asof_index_map(
         primary_ts: np.ndarray,
         source_ts: np.ndarray,
-        offset_ns: int = 0,
+        source_dur_ns: int,
+        primary_dur_ns: int,
+        mode: str,
     ) -> np.ndarray:
-        """Build index map equivalent to merge_asof(direction='backward').
+        """Build source-close based index map equivalent to merge_asof backward.
 
         Parameters
         ----------
         primary_ts : np.ndarray
-            Primary timeframe timestamps in milliseconds. Must be sorted ascending.
+            Primary timeframe open timestamps in epoch seconds. Must be sorted ascending.
         source_ts : np.ndarray
-            Source timeframe timestamps in milliseconds. Must be sorted ascending.
-        offset_ns : int, default 0
-            Offset in nanoseconds for OPEN_MINUS alignment.
+            Source timeframe open timestamps in epoch seconds. Must be sorted ascending.
+        source_dur_ns : int
+            Source bar duration in nanoseconds.
+        primary_dur_ns : int
+            Primary bar duration in nanoseconds.
+        mode : str
+            ``"open_time"`` for event/open decisions, ``"close_time"`` for
+            decisions at primary bar close.
 
         Returns
         -------
@@ -122,28 +141,30 @@ class TimeframeAligner:
         ValueError
             If ``source_ts`` is not sorted in ascending order.
         """
-        primary_ms = np.asarray(primary_ts, dtype=np.int64)
-        source_ms = np.asarray(source_ts, dtype=np.int64)
+        primary_s = np.asarray(primary_ts, dtype=np.int64)
+        source_s = np.asarray(source_ts, dtype=np.int64)
 
-        if source_ms.size > 1 and np.any(source_ms[1:] < source_ms[:-1]):
+        if source_s.size > 1 and np.any(source_s[1:] < source_s[:-1]):
             raise ValueError("source_ts must be sorted in ascending order")
 
-        if primary_ms.size == 0:
+        if primary_s.size == 0:
             return np.empty(0, dtype=np.int64)
 
-        if source_ms.size == 0:
-            return np.full(primary_ms.shape[0], -1, dtype=np.int64)
+        if source_s.size == 0:
+            return np.full(primary_s.shape[0], -1, dtype=np.int64)
 
-        primary_ns = primary_ms * 1_000_000 + np.int64(offset_ns)
-        source_ns = source_ms * 1_000_000
+        decision_mode = TimeframeAligner._normalize_decision_mode(mode)
+        primary_ns = primary_s * _NS_PER_SECOND
+        decision_ns = primary_ns + (np.int64(primary_dur_ns) if decision_mode == "close_time" else np.int64(0))
+        source_close_ns = source_s * _NS_PER_SECOND + np.int64(source_dur_ns)
 
-        idx = np.searchsorted(source_ns, primary_ns, side="right") - 1
+        idx = np.searchsorted(source_close_ns, decision_ns, side="right") - 1
         idx = idx.astype(np.int64, copy=False)
         idx[idx < 0] = -1
 
         valid_positions = np.flatnonzero(idx >= 0)
         if valid_positions.size > 0:
-            mismatch_mask = source_ns[idx[valid_positions]] > primary_ns[valid_positions]
+            mismatch_mask = source_close_ns[idx[valid_positions]] > decision_ns[valid_positions]
             if np.any(mismatch_mask):
                 idx[valid_positions[mismatch_mask]] = -1
 
@@ -154,7 +175,9 @@ class TimeframeAligner:
         source_values: pd.DataFrame,
         source_index: pd.DatetimeIndex,
         primary_index: pd.DatetimeIndex,
-        offset_ns: int = 0,
+        source_tf: str,
+        primary_tf: str,
+        alignment_mode: AlignmentMode = AlignmentMode.OPEN_MINUS,
     ) -> pd.DataFrame:
         """Align via searchsorted index map with memmap fallback for wide outputs."""
         n_rows = len(primary_index)
@@ -167,13 +190,18 @@ class TimeframeAligner:
             )
             return aligned
 
-        source_ms = (source_index.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000).astype(np.int64)
-        primary_ms = (primary_index.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000).astype(np.int64)
+        source_s = TimeframeAligner._datetime_index_to_epoch_seconds(source_index)
+        primary_s = TimeframeAligner._datetime_index_to_epoch_seconds(primary_index)
+        source_dur_ns, primary_dur_ns, mode = TimeframeAligner._alignment_params(
+            source_tf, primary_tf, alignment_mode
+        )
 
         idx_map = TimeframeAligner.build_asof_index_map(
-            primary_ms,
-            source_ms,
-            offset_ns=offset_ns,
+            primary_s,
+            source_s,
+            source_dur_ns=source_dur_ns,
+            primary_dur_ns=primary_dur_ns,
+            mode=mode,
         )
 
         est_bytes = n_rows * n_cols * np.dtype(np.float32).itemsize
@@ -226,7 +254,8 @@ class TimeframeAligner:
         aligned = pd.DataFrame(out, index=primary_index, columns=source_values.columns, copy=False)
         source_ts_mapped = np.full(n_rows, np.datetime64("NaT"), dtype="datetime64[ns]")
         if np.any(valid_mask):
-            source_ts_mapped[valid_mask] = source_index.to_numpy()[idx_map[valid_mask]]
+            source_close = source_index + pd.to_timedelta(source_dur_ns, unit="ns")
+            source_ts_mapped[valid_mask] = source_close.to_numpy()[idx_map[valid_mask]]
         aligned.attrs["source_timestamps"] = pd.DatetimeIndex(source_ts_mapped)
         return aligned
 
@@ -235,6 +264,9 @@ class TimeframeAligner:
         source_values: pd.DataFrame,
         source_index: pd.DatetimeIndex,
         primary_index: pd.DatetimeIndex,
+        source_tf: str,
+        primary_tf: str,
+        alignment_mode: AlignmentMode = AlignmentMode.OPEN_MINUS,
     ) -> pd.DataFrame:
         chunk_size = TimeframeAligner._resolve_merge_chunk_size()
         n_cols = source_values.shape[1]
@@ -242,9 +274,11 @@ class TimeframeAligner:
         if chunk_size > 0 and n_cols > chunk_size:
             return TimeframeAligner._merge_asof_align_chunked(
                 source_values, source_index, primary_index, chunk_size,
+                source_tf=source_tf, primary_tf=primary_tf, alignment_mode=alignment_mode,
             )
         return TimeframeAligner._merge_asof_align_single(
             source_values, source_index, primary_index,
+            source_tf=source_tf, primary_tf=primary_tf, alignment_mode=alignment_mode,
         )
 
     @staticmethod
@@ -261,13 +295,22 @@ class TimeframeAligner:
         source_values: pd.DataFrame,
         source_index: pd.DatetimeIndex,
         primary_index: pd.DatetimeIndex,
+        source_tf: str,
+        primary_tf: str,
+        alignment_mode: AlignmentMode = AlignmentMode.OPEN_MINUS,
     ) -> pd.DataFrame:
         """Original merge_asof path for narrow DataFrames."""
+        source_dur_ns, primary_dur_ns, mode = TimeframeAligner._alignment_params(
+            source_tf, primary_tf, alignment_mode
+        )
+        source_close_index = source_index + pd.to_timedelta(source_dur_ns, unit="ns")
+        decision_index = TimeframeAligner._decision_index(primary_index, primary_dur_ns, mode)
+
         source_work = source_values.copy()
-        source_work["_source_ts"] = source_index.to_numpy()
+        source_work["_source_ts"] = source_close_index.to_numpy()
         source_work = source_work.sort_values("_source_ts")
 
-        primary_df = pd.DataFrame({"_primary_ts": primary_index})
+        primary_df = pd.DataFrame({"_primary_ts": decision_index})
         primary_df["_order"] = range(len(primary_df))
         primary_sorted = primary_df.sort_values("_primary_ts")
 
@@ -291,6 +334,9 @@ class TimeframeAligner:
         source_index: pd.DatetimeIndex,
         primary_index: pd.DatetimeIndex,
         chunk_size: int,
+        source_tf: str,
+        primary_tf: str,
+        alignment_mode: AlignmentMode = AlignmentMode.OPEN_MINUS,
     ) -> pd.DataFrame:
         """Column-batch merge_asof for wide DataFrames to reduce peak memory.
 
@@ -310,11 +356,17 @@ class TimeframeAligner:
             chunk_size,
         )
 
-        # Pre-compute the sorted source timestamps once
-        source_ts_arr = source_index.to_numpy()
+        source_dur_ns, primary_dur_ns, mode = TimeframeAligner._alignment_params(
+            source_tf, primary_tf, alignment_mode
+        )
+        source_close_index = source_index + pd.to_timedelta(source_dur_ns, unit="ns")
+        decision_index = TimeframeAligner._decision_index(primary_index, primary_dur_ns, mode)
+
+        # Pre-compute the sorted source close timestamps once
+        source_ts_arr = source_close_index.to_numpy()
         sort_order = source_ts_arr.argsort()
 
-        primary_df = pd.DataFrame({"_primary_ts": primary_index})
+        primary_df = pd.DataFrame({"_primary_ts": decision_index})
         primary_df["_order"] = range(len(primary_df))
         primary_sorted = primary_df.sort_values("_primary_ts")
 
@@ -387,7 +439,56 @@ class TimeframeAligner:
     def _to_datetime_index(timestamps: Iterable) -> pd.DatetimeIndex:
         if isinstance(timestamps, pd.DatetimeIndex):
             return timestamps
-        return pd.to_datetime(pd.Series(timestamps), unit="ms")
+        series = pd.Series(timestamps)
+        if pd.api.types.is_datetime64_any_dtype(series):
+            return pd.DatetimeIndex(series)
+        numeric = pd.to_numeric(series, errors="coerce")
+        if numeric.notna().all():
+            max_abs = int(numeric.abs().max()) if len(numeric) else 0
+            # Modern epoch seconds are ~1.7e9; epoch milliseconds are ~1.7e12.
+            # Small relative test axes keep the legacy millisecond convention.
+            unit = "s" if 1_000_000_000 <= max_abs < 100_000_000_000 else "ms"
+            return pd.to_datetime(numeric.astype("int64"), unit=unit)
+        return pd.DatetimeIndex(pd.to_datetime(series))
+
+    @staticmethod
+    def _datetime_index_to_epoch_seconds(index: pd.DatetimeIndex) -> np.ndarray:
+        return (index.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000_000).astype(np.int64)
+
+    @staticmethod
+    def _normalize_decision_mode(mode: str) -> str:
+        value = str(mode.value if hasattr(mode, "value") else mode)
+        if value == "close_time":
+            return "close_time"
+        if value in {"open_time", "open_minus"}:
+            return "open_time"
+        raise ValueError(f"Unsupported alignment mode: {mode}")
+
+    @staticmethod
+    def _alignment_params(
+        source_tf: str,
+        primary_tf: str,
+        alignment_mode: AlignmentMode,
+    ) -> tuple[int, int, str]:
+        source_seconds = TimeframeAligner._timeframe_to_seconds(source_tf)
+        primary_seconds = TimeframeAligner._timeframe_to_seconds(primary_tf)
+        if source_seconds is None or primary_seconds is None:
+            raise ValueError(f"Unsupported timeframe for alignment: source={source_tf}, primary={primary_tf}")
+        return (
+            int(source_seconds) * int(_NS_PER_SECOND),
+            int(primary_seconds) * int(_NS_PER_SECOND),
+            TimeframeAligner._normalize_decision_mode(alignment_mode),
+        )
+
+    @staticmethod
+    def _decision_index(
+        primary_index: pd.DatetimeIndex,
+        primary_dur_ns: int,
+        mode: str,
+    ) -> pd.DatetimeIndex:
+        if TimeframeAligner._normalize_decision_mode(mode) == "close_time":
+            return primary_index + pd.to_timedelta(primary_dur_ns, unit="ns")
+        return primary_index
 
     @staticmethod
     def _timeframe_to_seconds(timeframe: str) -> int | None:

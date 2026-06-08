@@ -48,6 +48,7 @@ from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicat
 from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
 from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry, ColumnGroupRegistryError
+from momentum.FeatureEngineering.timeframe.tf_aligner import CURRENT_MTF_ALIGN_VERSION
 from momentum.FeatureEngineering.preprocessing._d_star_cache import (
     PreprocessingContext,
     WEAK_FINGERPRINT,
@@ -1417,7 +1418,13 @@ class FeatureFactory:
         pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
         pre_ic_groups = self._frame_to_l7_groups(pre_ic_frame, "pre_ic")
         raw_feature_count = sum(len(frame.columns) for frame in pre_ic_groups.values())
-        raw_path = storage_manager.write_raw(symbol, tf, resolved_config_hash, pre_ic_groups)
+        raw_path = storage_manager.write_raw(
+            symbol,
+            tf,
+            resolved_config_hash,
+            pre_ic_groups,
+            row_index=self._derive_row_index_for_artifact(raw_data),
+        )
 
         rss_before_gc_gb = _current_rss_gb()
         del pre_ic_groups
@@ -2255,6 +2262,45 @@ class FeatureFactory:
         if layer6 is not None and not layer6.empty:
             self._persist_layer_output_groups(layer6, LayerSource.L6, "L6_meta")
 
+    def _derive_row_index_for_artifact(self, raw_data: pd.DataFrame) -> Optional[pd.DatetimeIndex]:
+        """萃取 primary 時間軸供 timestamps sidecar（V2 持久化）使用。
+
+        **單位實測**：CGSA 路徑的 `raw_data.index` 為 **int64 epoch 秒**（如 1767225600；
+        由 `_manifest_time_range_from_raw_data` 產出 '1767225600' 字串證實），亦可能是
+        毫秒（Binance ~1.7e12）或已是 DatetimeIndex。**不可**沿用 `_to_datetime_index`
+        （硬編 unit="ms"，會把秒當毫秒 → 1970-01-21 錯軸）。此處自行偵測單位（秒/毫秒）。
+
+        timestamps sidecar 是**附加功能**：取不到對齊乾淨的軸 → 回 None（跳 sidecar，
+        **不中斷生成**）。fail-closed 僅在於「不寫錯軸」，非「不生成」。
+        """
+        try:
+            if "timestamp" in raw_data.columns:
+                raw_ts = raw_data["timestamp"]
+            else:
+                raw_ts = pd.Series(raw_data.index)
+
+            if pd.api.types.is_datetime64_any_dtype(raw_ts):
+                ts = pd.DatetimeIndex(pd.to_datetime(raw_ts))
+            else:
+                vals = pd.to_numeric(raw_ts, errors="coerce")
+                sample = vals.dropna()
+                if sample.empty:
+                    return None
+                # 自動偵測 epoch 單位：秒 ~1.7e9、毫秒 ~1.7e12（與 _load_hdf5_features 同慣例）
+                unit = "ms" if abs(float(sample.iloc[0])) >= 1e12 else "s"
+                ts = pd.DatetimeIndex(pd.to_datetime(vals, unit=unit, errors="coerce"))
+
+            if len(ts) != int(len(raw_data.index)) or ts.isna().any():
+                logger.warning(
+                    "[L7] timestamp 軸長度不符/含 NaT（len=%d vs rows=%d），跳過 sidecar（生成續行）",
+                    len(ts), int(len(raw_data.index)),
+                )
+                return None
+            return ts
+        except Exception as exc:
+            logger.warning("[L7] 萃取 timestamp 軸失敗，跳過 timestamps sidecar（生成續行）: %s", exc)
+            return None
+
     def _layer7_raw_from_cgsa_pipeline(
         self,
         symbol: str,
@@ -2336,6 +2382,7 @@ class FeatureFactory:
                 l65_mode=l65_mode,
                 dead_drop_min_valid=_dead_min_valid,
                 sanitize_finite_cap=_sanitize_cap,
+                row_index=self._derive_row_index_for_artifact(raw_data),
                 time_range=self._manifest_time_range_from_raw_data(raw_data),
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
@@ -2707,6 +2754,7 @@ class FeatureFactory:
         config_payload["_end_date"] = end_date
         # Explicitly include timeframe kwarg in hash to ensure 12h/1h results never share cache.
         config_payload["_timeframe"] = timeframe
+        config_payload["_mtf_align_version"] = CURRENT_MTF_ALIGN_VERSION
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 

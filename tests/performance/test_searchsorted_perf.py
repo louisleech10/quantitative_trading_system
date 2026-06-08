@@ -32,7 +32,9 @@ def test_searchsorted_align_speed():
         source_values=source_values,
         source_index=source_index,
         primary_index=primary_index,
-        offset_ns=-1,
+        source_tf="1h",
+        primary_tf="12h",
+        alignment_mode=AlignmentMode.OPEN_MINUS,
     )
     elapsed = time.perf_counter() - start
 
@@ -67,7 +69,9 @@ def test_searchsorted_align_memory():
         source_values=source_values,
         source_index=source_index,
         primary_index=primary_index,
-        offset_ns=-1,
+        source_tf="1h",
+        primary_tf="12h",
+        alignment_mode=AlignmentMode.OPEN_MINUS,
     )
     gc.collect()
     rss_after = process.memory_info().rss
@@ -206,7 +210,9 @@ def test_phase1_gate_b2_plus_d_under_50s(monkeypatch):
         source_values=source_values,
         source_index=source_index,
         primary_index=primary_index,
-        offset_ns=-1,
+        source_tf="1h",
+        primary_tf="12h",
+        alignment_mode=AlignmentMode.OPEN_MINUS,
     )
     d_elapsed = time.perf_counter() - d_start
 

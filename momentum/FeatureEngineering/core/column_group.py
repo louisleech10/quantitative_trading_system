@@ -57,6 +57,10 @@ class AlignmentMeta:
     idx_map_path: Path
     alignment_mode: str
     offset_ns: int = 0
+    source_dur_ns: int = 0
+    primary_dur_ns: int = 0
+    mode: str = "close_time"
+    align_algo_version: int = 1
 
 
 @dataclass(frozen=True)

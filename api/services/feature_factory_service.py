@@ -4248,6 +4248,7 @@ class FeatureFactoryService:
                 context["task_id"], duplicate_count,
             )
             df = df.loc[:, ~df.columns.duplicated(keep="first")]
+        self._attach_cgsa_row_index(context, df)
         return df
 
     def _load_cgsa_summary_fast(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -4736,11 +4737,15 @@ class FeatureFactoryService:
                 context=context,
                 selected_features=selected_features,
             )
+            self._attach_cgsa_row_index(context, selected_df)
             start = min(offset, total_rows)
             end = min(offset + limit, total_rows)
             slice_df = selected_df.iloc[start:end][selected_features]
             chunk_values = slice_df.to_numpy()
-            timestamps = self._load_cgsa_kline_timestamps(context, start, end, total_rows)
+            if isinstance(selected_df.index, pd.DatetimeIndex):
+                timestamps = self._format_cgsa_timestamps(selected_df.index, start, end)
+            else:
+                timestamps = self._load_cgsa_kline_timestamps(context, start, end, total_rows)
 
         data_rows: List[Dict[str, Any]] = []
         for row_idx in range(chunk_values.shape[0]):
@@ -4839,6 +4844,64 @@ class FeatureFactoryService:
         if total_rows == 0:
             total_rows = int(combined.shape[0])
         return combined[selected_features], total_rows
+
+    def _resolve_cgsa_config_hash(self, context: Dict[str, Any]) -> Optional[str]:
+        """Resolve the V2 config hash from manifest, path, or task metadata."""
+        manifest = context.get("manifest") or {}
+        manifest_hash = manifest.get("config_hash")
+        if manifest_hash:
+            return str(manifest_hash)
+
+        manifest_dir = context.get("manifest_dir")
+        if manifest_dir is not None:
+            path_hash = Path(manifest_dir).name
+            if path_hash:
+                return str(path_hash)
+
+        metadata = context.get("metadata") or {}
+        metadata_hash = metadata.get("config_hash")
+        return str(metadata_hash) if metadata_hash else None
+
+    def _cgsa_feature_base_path(self, context: Dict[str, Any]) -> Path:
+        """Resolve the features root for a canonical V2 manifest directory."""
+        manifest_dir = context.get("manifest_dir")
+        if manifest_dir is not None:
+            path = Path(manifest_dir)
+            if len(path.parents) >= 3:
+                return path.parents[2]
+        return settings.data_cache_path / "features"
+
+    def _load_cgsa_row_index(self, context: Dict[str, Any]) -> Optional[pd.DatetimeIndex]:
+        """Load V2 sidecar timestamps; no manifest key means an old run."""
+        manifest = context.get("manifest") or {}
+        if "row_index" not in manifest:
+            return None
+
+        config_hash = self._resolve_cgsa_config_hash(context)
+        if not config_hash:
+            raise ValueError("CGSA row_index is declared but config_hash is unavailable")
+
+        from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+        reader = FeatureReader(str(self._cgsa_feature_base_path(context)))
+        return reader.load_row_index_v2(
+            str(context["symbol"]),
+            str(context["timeframe"]),
+            config_hash,
+        )
+
+    def _attach_cgsa_row_index(self, context: Dict[str, Any], df: pd.DataFrame) -> None:
+        """Attach persisted V2 timestamps to a CGSA DataFrame when available."""
+        row_index = self._load_cgsa_row_index(context)
+        if row_index is None:
+            return
+        if len(row_index) != len(df):
+            raise ValueError(
+                f"CGSA row_index length mismatch for task {context['task_id']}: "
+                f"{len(row_index)} != {len(df)}"
+            )
+        df.index = row_index
+        df.index.name = "timestamp"
 
     def _load_cgsa_kline_timestamps(
         self,
@@ -5044,8 +5107,8 @@ class FeatureFactoryService:
                 )
             view = df_full[selected_columns].iloc[:max_rows]
 
-            # CGSA parquet files have no timestamp column; attach datetime index
-            # from the kline cache so the CSV timestamp column shows real dates.
+            # New V2 runs may already carry a persisted primary timestamp axis.
+            # Legacy runs without that sidecar still fall back to kline lookup.
             if not isinstance(view.index, pd.DatetimeIndex):
                 try:
                     ts_list = self._load_cgsa_kline_timestamps(
@@ -5069,6 +5132,12 @@ class FeatureFactoryService:
                     except Exception:
                         raw_chunk = pd.DataFrame(index=chunk_df.index, columns=_raw_columns)
                     chunk_df = pd.concat([raw_chunk, chunk_df], axis=1)
+                if isinstance(chunk_df.index, pd.DatetimeIndex):
+                    chunk_df = chunk_df.copy()
+                    chunk_df.index = pd.Index(
+                        [value.isoformat() if pd.notna(value) else "" for value in chunk_df.index],
+                        name="timestamp",
+                    )
                 buffer = io.StringIO()
                 chunk_df.to_csv(buffer, header=False, index=True)
                 yield buffer.getvalue()

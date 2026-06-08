@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import pandas as pd
+import pytest
 import pyarrow.parquet as pq
 
 from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
@@ -143,6 +144,82 @@ def test_raw_streaming_transforms_without_registry_overwrite(tmp_path, monkeypat
     schema = pq.read_schema(raw_dir / "group_1.parquet")
     assert schema.metadata[b"schema_version"] == b"raw_v1"
     assert schema.metadata[b"artifact_kind"] == b"raw"
+
+
+def test_writes_timestamps_artifact(tmp_path) -> None:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    row_index = pd.date_range("2026-01-01", periods=4, freq="h")
+    groups = {
+        "g": pd.DataFrame(
+            {"a": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)},
+            index=row_index,
+        )
+    }
+
+    raw_dir = storage.write_raw(
+        "SYNTHETIC",
+        "1h",
+        "cfg_ts",
+        groups,
+        row_index=row_index,
+    )
+
+    ts_path = raw_dir.parent / "timestamps.parquet"
+    assert ts_path.exists()
+    ts_table = pq.read_table(ts_path)
+    assert ts_table.num_rows == 4
+    expected_epoch_s = (row_index.view("int64") // 1_000_000_000).astype("int64")
+    np.testing.assert_array_equal(ts_table.column("timestamp").to_numpy(), expected_epoch_s)
+
+    manifest = json.loads((raw_dir.parent / "feature_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["row_index"] == {
+        "path": "timestamps.parquet",
+        "count": 4,
+        "unit": "s",
+        "tz": "UTC",
+    }
+
+    with pytest.raises(ValueError, match="row_index 3 != row_count 4"):
+        storage.write_raw(
+            "SYNTHETIC",
+            "1h",
+            "cfg_bad_ts",
+            groups,
+            row_index=row_index[:3],
+        )
+
+    no_ts_dir = storage.write_raw("SYNTHETIC", "1h", "cfg_no_ts", groups)
+    no_ts_manifest = json.loads((no_ts_dir.parent / "feature_manifest.json").read_text(encoding="utf-8"))
+    assert not (no_ts_dir.parent / "timestamps.parquet").exists()
+    assert "row_index" not in no_ts_manifest
+
+
+def test_both_write_paths_emit_timestamps(tmp_path) -> None:
+    row_index = pd.date_range("2026-02-01", periods=4, freq="h")
+
+    ic_storage = FeatureStorage(str(tmp_path / "ic_features"))
+    ic_groups = {
+        "ic_g": pd.DataFrame(
+            {"ic_a": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)},
+            index=row_index,
+        )
+    }
+    ic_raw_dir = ic_storage.write_raw("IC", "1h", "cfg_ic", ic_groups, row_index=row_index)
+    assert (ic_raw_dir.parent / "timestamps.parquet").exists()
+
+    registry = _make_registry(tmp_path / "stream")
+    stream_storage = FeatureStorage(str(tmp_path / "stream_features"))
+    stream_raw_dir, _summary = stream_storage.write_raw_from_registry_stream(
+        symbol="CGSA",
+        tf="1h",
+        config_hash="cfg_stream",
+        registry=registry,
+        preprocessor=None,
+        cleanup_intermediate=False,
+        l65_mode="disabled",
+        row_index=row_index,
+    )
+    assert (stream_raw_dir.parent / "timestamps.parquet").exists()
 
 
 def test_raw_streaming_logs_start_and_task_heartbeat(tmp_path, caplog) -> None:
@@ -390,7 +467,10 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
     factory._reference_data_cache = {}
     factory._progress_callback = None
 
-    raw_data = pd.DataFrame({"close": np.array([10.0, 11.0, 12.0, 13.0], dtype=np.float32)})
+    raw_data = pd.DataFrame(
+        {"close": np.array([10.0, 11.0, 12.0, 13.0], dtype=np.float32)},
+        index=pd.date_range("2026-01-01", periods=4, freq="h"),
+    )
 
     result = factory._layer7_raw_from_cgsa_pipeline(
         symbol="SYNTHETIC",
@@ -402,6 +482,7 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
     )
 
     storage.write_raw_from_registry_stream.assert_called_once()
+    assert storage.write_raw_from_registry_stream.call_args.kwargs["row_index"].equals(raw_data.index)
     storage.persist_registry_to_parquet.assert_not_called()
     # hdf5_path now stores the manifest JSON path (not the raw directory) so
     # that service-layer routing detects the .json suffix and loads CGSA format.
@@ -614,3 +695,40 @@ def test_raw_streaming_sharded_largest_first_uses_total_shard_bytes(
     assert completed == 2
     # Big sharded group (z_big_sharded) total bytes >> small single → must come first.
     assert output_order[0].startswith("z_big_sharded")
+
+
+def test_derive_row_index_handles_non_datetimeindex_raw_data() -> None:
+    """回歸：CGSA raw_data.index 非 DatetimeIndex 時不得 abort 生成（原 TypeError 回歸）。
+
+    管線的 primary_raw 常為 RangeIndex + 'timestamp' 欄；timestamps sidecar 為附加功能，
+    取不到乾淨軸應回 None（跳 sidecar）而非中斷整個 run。
+    """
+    import pandas as pd
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+    ff = FeatureFactory.__new__(FeatureFactory)
+    idx = pd.date_range("2026-01-01", periods=4, freq="1h")
+    epoch_s = idx.view("int64") // 10**9    # epoch 秒(CGSA raw_data.index 的真實形式)
+    epoch_ms = idx.view("int64") // 10**6   # epoch 毫秒(Binance)
+
+    # ① raw_data.index 是 int64 epoch 秒(真實 CGSA 場景) → 必須得 2026,不得 1970-01-21
+    df_sec = pd.DataFrame({"c": [1, 2, 3, 4]}, index=pd.Index(epoch_s, dtype="int64"))
+    out_sec = ff._derive_row_index_for_artifact(df_sec)
+    assert isinstance(out_sec, pd.DatetimeIndex)
+    assert out_sec[0].year == 2026, f"秒被當毫秒讀→錯軸: {out_sec[0]}"  # 防 1970 回歸
+    assert (out_sec == idx).all()
+
+    # ② 'timestamp' 欄為毫秒(Binance) → 偵測為 ms
+    df_ms = pd.DataFrame({"timestamp": pd.Index(epoch_ms, dtype="int64"), "c": [1, 2, 3, 4]})
+    out_ms = ff._derive_row_index_for_artifact(df_ms)
+    assert isinstance(out_ms, pd.DatetimeIndex) and (out_ms == idx).all()
+
+    # ③ 已是 DatetimeIndex → 原樣
+    df_dt = pd.DataFrame({"c": [1, 2, 3, 4]}, index=idx)
+    out_dt = ff._derive_row_index_for_artifact(df_dt)
+    assert isinstance(out_dt, pd.DatetimeIndex) and (out_dt == idx).all()
+
+    # ④ 純 RangeIndex 小整數無 timestamp → 不得拋例外(不 abort 生成)
+    df_range = pd.DataFrame({"c": [1, 2, 3, 4]})
+    out_range = ff._derive_row_index_for_artifact(df_range)
+    assert out_range is None or isinstance(out_range, pd.DatetimeIndex)

@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+from momentum.FeatureEngineering.timeframe.tf_aligner import CURRENT_MTF_ALIGN_VERSION, TimeframeAligner
 
 
 logger = get_logger(__name__)
@@ -109,6 +109,8 @@ class MultiTFGenerator:
         skipped_tfs: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         total_tfs = len(self._training_tfs)
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+        _RESUME_LAYERS = (_LS.L1, _LS.L2, _LS.L3, _LS.L4, _LS.L5, _LS.L6)
 
         for index, timeframe in enumerate(self._training_tfs):
             self._report_progress(
@@ -116,6 +118,23 @@ class MultiTFGenerator:
                 ((index + 1) / max(total_tfs, 1)) * 0.7,
                 f"[CGSA] Processing timeframe {timeframe} ({index + 1}/{total_tfs})",
             )
+
+            if registry.has_layers_for_timeframe(timeframe, _RESUME_LAYERS):
+                if timeframe != self._primary_tf and not self._tf_alignment_version_current(
+                    registry, timeframe, _RESUME_LAYERS
+                ):
+                    logger.warning(
+                        "[CGSA:resume] TF %s has stale/missing align_algo_version; rebuilding.",
+                        timeframe,
+                    )
+                    self._drop_timeframe_groups_from_registry(registry, timeframe, _RESUME_LAYERS)
+                else:
+                    logger.info(
+                        "[CGSA:resume] TF %s already has L1-L6 in manifest; skipping.",
+                        timeframe,
+                    )
+                    tf_layer_counts[timeframe] = self._collect_layer_counts_from_registry(registry, timeframe)
+                    continue
 
             try:
                 raw_data = (
@@ -159,7 +178,6 @@ class MultiTFGenerator:
                 continue
 
             # Persist L3/L4/L5/L6 to CGSA registry (L1/L2 are persisted inside their layer methods).
-            from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
             if layer3 is not None and not layer3.empty:
                 self._factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
             if layer4 is not None and not layer4.empty:
@@ -188,11 +206,18 @@ class MultiTFGenerator:
                 source_dt = TimeframeAligner._to_datetime_index(source_index)
 
                 alignment_mode = self._config.timeframes.alignment_mode
-                offset_ns = -1 if alignment_mode == AlignmentMode.OPEN_MINUS else 0
+                source_dur_ns, primary_dur_ns, mode = self._alignment_params_or_raise(timeframe)
+                self._log_gap_source_if_any(timeframe, source_dt, source_dur_ns)
 
-                source_ms = (source_dt.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000).astype(np.int64)
-                primary_ms = (primary_timestamps.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000).astype(np.int64)
-                idx_map = TimeframeAligner.build_asof_index_map(primary_ms, source_ms, offset_ns=offset_ns)
+                source_s = TimeframeAligner._datetime_index_to_epoch_seconds(source_dt)
+                primary_s = TimeframeAligner._datetime_index_to_epoch_seconds(primary_timestamps)
+                idx_map = TimeframeAligner.build_asof_index_map(
+                    primary_s,
+                    source_s,
+                    source_dur_ns=source_dur_ns,
+                    primary_dur_ns=primary_dur_ns,
+                    mode=mode,
+                )
 
                 n_primary = len(primary_timestamps)
                 if self._compact_alignment_enabled():
@@ -211,7 +236,9 @@ class MultiTFGenerator:
                         n_primary=n_primary,
                         idx_map_path=idx_map_path,
                         alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
-                        offset_ns=offset_ns,
+                        source_dur_ns=source_dur_ns,
+                        primary_dur_ns=primary_dur_ns,
+                        mode=mode,
                     )
                     logger.info(
                         "[CGSA][multi_tf] Compact-aligned %d groups from %s → %s "
@@ -385,6 +412,14 @@ class MultiTFGenerator:
         non_primary_tfs: List[str] = []
         for _tf in all_non_primary:
             if registry.has_layers_for_timeframe(_tf, _RESUME_LAYERS):
+                if not self._tf_alignment_version_current(registry, _tf, _RESUME_LAYERS):
+                    logger.warning(
+                        "[CGSA-parallel:resume] TF %s has stale/missing align_algo_version; rebuilding.",
+                        _tf,
+                    )
+                    self._drop_timeframe_groups_from_registry(registry, _tf, _RESUME_LAYERS)
+                    non_primary_tfs.append(_tf)
+                    continue
                 logger.info(
                     "[CGSA-parallel:resume] TF %s already has L1-L6 in manifest; skipping worker spawn.",
                     _tf,
@@ -534,19 +569,23 @@ class MultiTFGenerator:
         from momentum.FeatureEngineering.feature_config import AlignmentMode
 
         n_primary = len(primary_timestamps)
-        primary_ms = (
-            primary_timestamps.to_numpy(dtype="datetime64[ns]").astype(np.int64) // 1_000_000
-        ).astype(np.int64)
+        primary_s = TimeframeAligner._datetime_index_to_epoch_seconds(primary_timestamps)
 
         # Build alignment index map from source → primary timestamps
         idx_map: Optional[np.ndarray] = None
+        source_dur_ns = 0
+        primary_dur_ns = 0
+        mode = TimeframeAligner._normalize_decision_mode(alignment_mode)
         if source_timestamps_ms is not None:
-            offset_ns = -1 if alignment_mode == AlignmentMode.OPEN_MINUS else 0
+            source_dur_ns, primary_dur_ns, mode = self._alignment_params_or_raise(source_tf, alignment_mode)
+            source_s = self._coerce_worker_timestamps_to_epoch_seconds(source_timestamps_ms)
             idx_map = TimeframeAligner.build_asof_index_map(
-                primary_ms, source_timestamps_ms, offset_ns=offset_ns,
+                primary_s,
+                source_s,
+                source_dur_ns=source_dur_ns,
+                primary_dur_ns=primary_dur_ns,
+                mode=mode,
             )
-        else:
-            offset_ns = 0
 
         compact_alignment = self._compact_alignment_enabled() and idx_map is not None
         idx_map_path: Optional[Path] = None
@@ -577,7 +616,9 @@ class MultiTFGenerator:
                     n_primary=n_primary,
                     idx_map_path=idx_map_path,
                     alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
-                    offset_ns=offset_ns,
+                    source_dur_ns=source_dur_ns,
+                    primary_dur_ns=primary_dur_ns,
+                    mode=mode,
                     keep_worker_npy=keep_worker_npy,
                 )
                 freed_worker_bytes += freed_bytes
@@ -678,7 +719,9 @@ class MultiTFGenerator:
         n_primary: int,
         idx_map_path: Path,
         alignment_mode: str,
-        offset_ns: int,
+        source_dur_ns: int,
+        primary_dur_ns: int,
+        mode: str,
     ) -> int:
         """Convert already-persisted non-primary groups to compact logical alignment."""
         from momentum.FeatureEngineering.core.column_group import AlignmentMeta
@@ -693,7 +736,11 @@ class MultiTFGenerator:
                 primary_n_rows=int(n_primary),
                 idx_map_path=idx_map_path,
                 alignment_mode=str(alignment_mode),
-                offset_ns=int(offset_ns),
+                offset_ns=0,
+                source_dur_ns=int(source_dur_ns),
+                primary_dur_ns=int(primary_dur_ns),
+                mode=str(mode),
+                align_algo_version=CURRENT_MTF_ALIGN_VERSION,
             )
             registry._groups[group_id] = replace(
                 group,
@@ -716,7 +763,9 @@ class MultiTFGenerator:
         n_primary: int,
         idx_map_path: Path,
         alignment_mode: str,
-        offset_ns: int,
+        source_dur_ns: int,
+        primary_dur_ns: int,
+        mode: str,
         keep_worker_npy: bool,
     ) -> Tuple[int, set[Path]]:
         """Register a worker group using physical source rows + logical idx_map."""
@@ -787,7 +836,11 @@ class MultiTFGenerator:
             primary_n_rows=int(n_primary),
             idx_map_path=idx_map_path,
             alignment_mode=str(alignment_mode),
-            offset_ns=int(offset_ns),
+            offset_ns=0,
+            source_dur_ns=int(source_dur_ns),
+            primary_dur_ns=int(primary_dur_ns),
+            mode=str(mode),
+            align_algo_version=CURRENT_MTF_ALIGN_VERSION,
         )
         group = ColumnGroup(
             group_id=group_id,
@@ -995,6 +1048,92 @@ class MultiTFGenerator:
         """Honor FFACT_MULTI_TF_COMPACT_ALIGNMENT for non-primary TF groups."""
         raw = os.getenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", "1").strip().lower()
         return raw not in {"0", "false", "no", "off"}
+
+    def _alignment_params_or_raise(
+        self,
+        source_tf: str,
+        alignment_mode: Optional[object] = None,
+    ) -> tuple[int, int, str]:
+        """Return validated source/primary durations and decision mode."""
+        source_sec = TimeframeAligner._timeframe_to_seconds(source_tf)
+        primary_sec = TimeframeAligner._timeframe_to_seconds(self._primary_tf)
+        if source_sec is None or primary_sec is None:
+            raise ValueError(f"Unsupported timeframe for alignment: source={source_tf}, primary={self._primary_tf}")
+        if int(source_sec) % int(primary_sec) != 0 and int(primary_sec) % int(source_sec) != 0:
+            raise ValueError(
+                f"Non-divisible timeframe alignment is unsupported: source={source_tf}({source_sec}s), "
+                f"primary={self._primary_tf}({primary_sec}s)"
+            )
+        resolved_mode = alignment_mode
+        if resolved_mode is None:
+            resolved_mode = self._config.timeframes.alignment_mode
+        mode = TimeframeAligner._normalize_decision_mode(resolved_mode)
+        return (
+            int(source_sec) * 1_000_000_000,
+            int(primary_sec) * 1_000_000_000,
+            mode,
+        )
+
+    @staticmethod
+    def _coerce_worker_timestamps_to_epoch_seconds(timestamps: np.ndarray) -> np.ndarray:
+        """Normalize worker timestamp payloads from legacy ms or new epoch seconds."""
+        arr = np.asarray(timestamps, dtype=np.int64)
+        if arr.size == 0:
+            return arr
+        max_abs = int(np.max(np.abs(arr)))
+        if max_abs >= 100_000_000_000:
+            return (arr // 1_000).astype(np.int64)
+        return arr.astype(np.int64, copy=False)
+
+    @staticmethod
+    def _log_gap_source_if_any(source_tf: str, source_dt: pd.DatetimeIndex, source_dur_ns: int) -> None:
+        """Log source bars with open gaps without changing alignment semantics."""
+        if len(source_dt) < 2:
+            return
+        source_s = TimeframeAligner._datetime_index_to_epoch_seconds(source_dt)
+        expected_s = int(source_dur_ns // 1_000_000_000)
+        if expected_s <= 0:
+            return
+        gap_count = int(np.count_nonzero(np.diff(source_s) != expected_s))
+        if gap_count:
+            logger.warning(
+                "[multi_tf] Source timeframe %s has %d non-contiguous open timestamp gaps",
+                source_tf,
+                gap_count,
+            )
+
+    @staticmethod
+    def _tf_alignment_version_current(registry: object, timeframe: str, layers: Iterable[object]) -> bool:
+        """Return True only when every existing non-primary layer group has current alignment metadata."""
+        layer_values = {getattr(layer, "value", str(layer)) for layer in layers}
+        matched = 0
+        for _gid, group in registry.iter_all():
+            if getattr(group, "timeframe", None) != timeframe:
+                continue
+            group_layer = getattr(getattr(group, "layer", ""), "value", str(getattr(group, "layer", "")))
+            if group_layer not in layer_values:
+                continue
+            matched += 1
+            alignment = getattr(group, "alignment", None)
+            if alignment is None:
+                return False
+            if int(getattr(alignment, "align_algo_version", 1)) != CURRENT_MTF_ALIGN_VERSION:
+                return False
+        return matched > 0
+
+    @staticmethod
+    def _drop_timeframe_groups_from_registry(registry: object, timeframe: str, layers: Iterable[object]) -> None:
+        """Remove stale groups for one timeframe so resume can rebuild without duplicate ids."""
+        layer_values = {getattr(layer, "value", str(layer)) for layer in layers}
+        stale_group_ids: List[str] = []
+        for gid, group in registry.iter_all():
+            if getattr(group, "timeframe", None) != timeframe:
+                continue
+            group_layer = getattr(getattr(group, "layer", ""), "value", str(getattr(group, "layer", "")))
+            if group_layer in layer_values:
+                stale_group_ids.append(gid)
+        for gid in stale_group_ids:
+            registry.unregister_group(gid)
 
     # ------------------------------------------------------------------
     # Legacy path: wide DataFrame concat + alignment (non-CGSA)

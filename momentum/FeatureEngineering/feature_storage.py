@@ -536,8 +536,14 @@ class FeatureStorage:
         tf: str,
         config_hash: str,
         groups: Dict[str, pd.DataFrame],
+        *,
+        row_index: Optional[pd.DatetimeIndex] = None,
     ) -> Path:
-        """Write IC-First raw L7 groups to the canonical V2 raw path."""
+        """Write IC-First raw L7 groups to the canonical V2 raw path.
+
+        ``row_index`` is the primary timestamp axis.  When provided, its length
+        must equal the raw row count; mismatch aborts the write.
+        """
         return self._write_l7_v2_artifact(
             symbol=symbol,
             tf=tf,
@@ -547,6 +553,7 @@ class FeatureStorage:
             schema_version=self.L7_RAW_SCHEMA_VERSION,
             allow_empty=False,
             quality_status="complete",
+            row_index=row_index,
         )
 
     def write_raw_from_registry_stream(
@@ -564,6 +571,7 @@ class FeatureStorage:
         extra_metadata: Optional[Dict[str, Any]] = None,
         dead_drop_min_valid: Optional[int] = None,
         sanitize_finite_cap: Optional[float] = None,
+        row_index: Optional[pd.DatetimeIndex] = None,
     ) -> Tuple[Path, Dict[str, Any]]:
         """Stream CGSA registry groups into the canonical L7_raw artifact.
 
@@ -581,6 +589,9 @@ class FeatureStorage:
         array 將非有限值（±inf）與 |v| > cap 的絕對垃圾設為 NaN（在 dead-drop 之前），
         覆蓋所有 CGSA-streamed 特徵（含 L3）。攔截 Layer A 漏掉的 overflow stragglers；
         Class B 真實大值（如 volume VAR ~3e10）遠低於 cap → 保留。None = 停用。
+
+        ``row_index``: primary timestamp axis for the run.  When provided, its
+        length must match the streamed row_count; mismatch aborts the write.
         """
         pa_module, _ = _require_pyarrow()
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
@@ -929,6 +940,11 @@ class FeatureStorage:
                 ordered_group_manifest,
             )
             resolved_row_count = int(row_count or 0)
+            row_index_manifest = self._write_row_index_artifact(
+                run_dir=run_dir,
+                row_index=row_index,
+                row_count=resolved_row_count,
+            )
             resolved_time_range = time_range or {"start": None, "end": None}
             coverage = float(non_nan_values / total_values) if total_values else 0.0
             inf_ratio = float(total_inf / total_values) if total_values else 0.0
@@ -973,6 +989,7 @@ class FeatureStorage:
                 total_features=total_features,
                 group_manifest=ordered_group_manifest,
                 extra_metadata=stream_metadata,
+                row_index=row_index_manifest,
             )
 
             if final_artifact_dir.exists():
@@ -1067,6 +1084,7 @@ class FeatureStorage:
         schema_version: str,
         allow_empty: bool,
         quality_status: str,
+        row_index: Optional[pd.DatetimeIndex] = None,
     ) -> Path:
         pa_module, pq_module = _require_pyarrow()
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
@@ -1084,6 +1102,11 @@ class FeatureStorage:
             group_items=group_items,
         )
         row_count = self._resolve_l7_v2_row_count(group_items)
+        row_index_manifest = self._write_row_index_artifact(
+            run_dir=run_dir,
+            row_index=row_index,
+            row_count=row_count,
+        )
         time_range = self._resolve_l7_v2_time_range(group_items)
 
         temp_root = run_dir / f".tmp-{artifact_kind}-{uuid.uuid4().hex}"
@@ -1128,6 +1151,7 @@ class FeatureStorage:
                 time_range=time_range,
                 total_features=total_features,
                 group_manifest=group_manifest,
+                row_index=row_index_manifest,
             )
 
             if final_artifact_dir.exists():
@@ -1229,6 +1253,31 @@ class FeatureStorage:
         return {
             "start": cls._format_manifest_value(min(starts)),
             "end": cls._format_manifest_value(max(ends)),
+        }
+
+    @staticmethod
+    def _write_row_index_artifact(
+        run_dir: Path,
+        row_index: Optional[pd.DatetimeIndex],
+        row_count: int,
+    ) -> Optional[Dict[str, Any]]:
+        """Persist the primary timestamp axis as UTC epoch seconds."""
+        if row_index is None:
+            return None
+        if len(row_index) != row_count:
+            raise ValueError(f"row_index {len(row_index)} != row_count {row_count}")
+        if not isinstance(row_index, pd.DatetimeIndex):
+            raise TypeError("row_index must be a pandas DatetimeIndex")
+
+        pa_module, pq_module = _require_pyarrow()
+        epoch_s = (row_index.view("int64") // 1_000_000_000).astype("int64")
+        table = pa_module.table({"timestamp": epoch_s})
+        pq_module.write_table(table, run_dir / "timestamps.parquet")
+        return {
+            "path": "timestamps.parquet",
+            "count": int(len(row_index)),
+            "unit": "s",
+            "tz": "UTC",
         }
 
     @staticmethod
@@ -1468,6 +1517,7 @@ class FeatureStorage:
         total_features: int,
         group_manifest: Dict[str, Dict[str, Any]],
         extra_metadata: Optional[Dict[str, Any]] = None,
+        row_index: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         existing_manifest = self._load_feature_manifest_v2_if_exists(run_dir)
         if existing_manifest:
@@ -1507,6 +1557,10 @@ class FeatureStorage:
         manifest["time_range"] = time_range
         manifest["total_features"] = total_features
         manifest["groups"] = group_manifest
+        if row_index is not None:
+            manifest["row_index"] = dict(row_index)
+        elif artifact_kind == "raw":
+            manifest.pop("row_index", None)
         if extra_metadata:
             manifest["generation_metadata"] = dict(extra_metadata)
         manifest.setdefault("artifacts", {})[artifact_kind] = artifact_manifest

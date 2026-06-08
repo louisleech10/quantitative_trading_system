@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import json
+import threading
+from pathlib import Path
+
+import h5py
 import httpx
+import numpy as np
 import pytest
 import pytest_asyncio
 import pandas as pd
@@ -10,7 +16,9 @@ from fastapi import FastAPI
 
 from api.routes.feature_factory import router as feature_factory_router
 from api.services.feature_export_service import FeatureExportService
-from api.services.feature_factory_service import feature_factory_service
+from api.services.feature_factory_service import FeatureFactoryService, feature_factory_service
+import api.services.feature_factory_service as feature_service_module
+from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
 
 @pytest.fixture
@@ -168,6 +176,254 @@ async def test_export_csv_not_found(async_client, monkeypatch):
     response = await async_client.get("/api/v1/features/export/missing/csv")
 
     assert response.status_code == 404
+
+
+def _build_cgsa_v2_service(tmp_path):
+    storage = FeatureStorage(str(tmp_path / "features"))
+    row_index = pd.date_range("2026-04-01", periods=4, freq="h")
+    groups = {
+        "g": pd.DataFrame(
+            {
+                "feat_a": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
+                "feat_b": np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float32),
+            },
+            index=row_index,
+        )
+    }
+    raw_dir = storage.write_raw("BTCUSDT", "1h", "cfg_ts", groups, row_index=row_index)
+    service = FeatureFactoryService.__new__(FeatureFactoryService)
+    service._lock = threading.Lock()
+    service._df_cache = {}
+    service._tasks = {
+        "task-ts": {
+            "task_id": "task-ts",
+            "status": "completed",
+            "result": {
+                "hdf5_path": str(raw_dir.parent / "feature_manifest.json"),
+                "metadata": {
+                    "symbol": "BTCUSDT",
+                    "timeframe": "1h",
+                    "config_hash": "cfg_ts",
+                },
+                "generation_time": 1.0,
+                "layer_counts": {},
+            },
+        }
+    }
+    return service, row_index, raw_dir.parent
+
+
+def _write_full_kline_cache(cache_root, symbol: str, timeframe: str, row_count: int) -> None:
+    h5_path = cache_root / "feature_klines" / "kline_cache.h5"
+    h5_path.parent.mkdir(parents=True, exist_ok=True)
+    dtype = np.dtype(
+        [
+            ("timestamp", "i8"),
+            ("open", "f4"),
+            ("high", "f4"),
+            ("low", "f4"),
+            ("close", "f4"),
+            ("volume", "f4"),
+            ("taker_buy_volume", "f4"),
+            ("taker_ratio", "f4"),
+            ("quote_volume", "f4"),
+            ("number_of_trades", "i4"),
+        ]
+    )
+    data = np.zeros(row_count, dtype=dtype)
+    data["timestamp"] = (
+        pd.date_range("2023-01-01", periods=row_count, freq="h").view("int64")
+        // 1_000_000_000
+    )
+    data["open"] = np.arange(row_count, dtype=np.float32)
+    data["high"] = data["open"] + 1
+    data["low"] = data["open"] - 1
+    data["close"] = data["open"] + 0.5
+    data["volume"] = 1.0
+
+    with h5py.File(h5_path, "w") as h5_file:
+        h5_file.create_dataset(f"{symbol}/{timeframe}/data", data=data)
+
+
+def _build_date_subset_cgsa_service(
+    tmp_path,
+    *,
+    config_hash: str,
+    with_row_index: bool,
+    feature_rows: int = 121,
+) -> tuple[FeatureFactoryService, pd.DatetimeIndex, Path]:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    row_index = pd.date_range("2024-12-01", periods=feature_rows, freq="h")
+    groups = {
+        "g": pd.DataFrame(
+            {
+                "feat_a": np.linspace(1.0, 2.0, feature_rows, dtype=np.float32),
+                "feat_b": np.linspace(10.0, 20.0, feature_rows, dtype=np.float32),
+            },
+            index=row_index,
+        )
+    }
+    raw_dir = storage.write_raw(
+        "BTCUSDT",
+        "1h",
+        config_hash,
+        groups,
+        row_index=row_index if with_row_index else None,
+    )
+    service = FeatureFactoryService.__new__(FeatureFactoryService)
+    service._lock = threading.Lock()
+    service._df_cache = {}
+    service._tasks = {
+        f"task-{config_hash}": {
+            "task_id": f"task-{config_hash}",
+            "status": "completed",
+            "result": {
+                "hdf5_path": str(raw_dir.parent / "feature_manifest.json"),
+                "metadata": {
+                    "symbol": "BTCUSDT",
+                    "timeframe": "1h",
+                    "config_hash": config_hash,
+                },
+                "generation_time": 1.0,
+                "layer_counts": {},
+            },
+        }
+    }
+    return service, row_index, raw_dir.parent
+
+
+def test_cgsa_csv_has_real_timestamps_on_date_range(tmp_path) -> None:
+    service, row_index, _run_dir = _build_cgsa_v2_service(tmp_path)
+
+    payload = service.export_csv_stream(
+        "task-ts",
+        columns=["feat_a"],
+        max_rows=2,
+        include_metadata_header=False,
+    )
+    csv_text = "".join(payload["generator"])
+
+    lines = csv_text.strip().splitlines()
+    assert lines[0] == "timestamp,feat_a"
+    assert lines[1].split(",", 1)[0] == row_index[0].isoformat()
+    assert lines[2].split(",", 1)[0] == row_index[1].isoformat()
+    assert [line.split(",", 1)[0] for line in lines[1:]] != ["0", "1"]
+
+
+def test_cgsa_preview_rows_have_timestamps(tmp_path) -> None:
+    service, row_index, _run_dir = _build_cgsa_v2_service(tmp_path)
+    context = service._load_task_context("task-ts")
+
+    payload = service._load_cgsa_selected_rows(
+        context,
+        selected_features=["feat_a"],
+        offset=1,
+        limit=2,
+    )
+
+    assert [row["timestamp"] for row in payload["rows"]] == [
+        row_index[1].isoformat(),
+        row_index[2].isoformat(),
+    ]
+
+
+def test_cgsa_row_index_mismatch_does_not_fallback_to_integer(tmp_path) -> None:
+    service, _row_index, run_dir = _build_cgsa_v2_service(tmp_path)
+    manifest_path = run_dir / "feature_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["row_index"]["count"] = 3
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="row_index length mismatch"):
+        payload = service.export_csv_stream(
+            "task-ts",
+            columns=["feat_a"],
+            max_rows=2,
+            include_metadata_header=False,
+        )
+        "".join(payload["generator"])
+
+
+def test_cgsa_csv_date_subset_uses_sidecar_not_full_kline_cache(
+    tmp_path,
+    monkeypatch,
+    caplog,
+) -> None:
+    """Reproduce the original 121 feature rows vs 20352 kline rows bug.
+
+    A V2 run with row_index sidecar must export ISO timestamps from the sidecar
+    and must not touch the old kline fallback path that length-mismatches.
+    """
+    monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
+    _write_full_kline_cache(tmp_path, "BTCUSDT", "1h", row_count=20352)
+    service, row_index, _run_dir = _build_date_subset_cgsa_service(
+        tmp_path,
+        config_hash="cfg_subset_sidecar",
+        with_row_index=True,
+        feature_rows=121,
+    )
+
+    kline_called = False
+
+    def fail_if_kline_called(*args, **kwargs):
+        nonlocal kline_called
+        kline_called = True
+        raise AssertionError("sidecar run must not call kline fallback")
+
+    monkeypatch.setattr(service, "_load_cgsa_kline_timestamps", fail_if_kline_called)
+
+    with caplog.at_level("WARNING", logger="api.feature_factory_service"):
+        payload = service.export_csv_stream(
+            "task-cfg_subset_sidecar",
+            columns=["feat_a"],
+            max_rows=3,
+            include_metadata_header=False,
+        )
+        csv_text = "".join(payload["generator"])
+
+    lines = csv_text.strip().splitlines()
+    assert lines[0] == "timestamp,feat_a"
+    assert [line.split(",", 1)[0] for line in lines[1:]] == [
+        row_index[0].isoformat(),
+        row_index[1].isoformat(),
+        row_index[2].isoformat(),
+    ]
+    assert not kline_called
+    assert "Kline timestamp length mismatch" not in caplog.text
+
+
+def test_cgsa_csv_legacy_without_row_index_falls_back_to_integer_on_full_kline_mismatch(
+    tmp_path,
+    monkeypatch,
+    caplog,
+) -> None:
+    """Control case: old runs without row_index still use kline fallback.
+
+    The same 121 vs 20352 layout falls back to integer rows, proving the sidecar
+    is what fixes the real date-range subset bug.
+    """
+    monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
+    _write_full_kline_cache(tmp_path, "BTCUSDT", "1h", row_count=20352)
+    service, _row_index, _run_dir = _build_date_subset_cgsa_service(
+        tmp_path,
+        config_hash="cfg_subset_legacy",
+        with_row_index=False,
+        feature_rows=121,
+    )
+
+    with caplog.at_level("WARNING", logger="api.feature_factory_service"):
+        payload = service.export_csv_stream(
+            "task-cfg_subset_legacy",
+            columns=["feat_a"],
+            max_rows=3,
+            include_metadata_header=False,
+        )
+        csv_text = "".join(payload["generator"])
+
+    lines = csv_text.strip().splitlines()
+    assert lines[0] == "timestamp,feat_a"
+    assert [line.split(",", 1)[0] for line in lines[1:]] == ["0", "1", "2"]
+    assert "Kline timestamp length mismatch for BTCUSDT/1h/data: 20352 != 121" in caplog.text
 
 
 # ==================== JSON 匯出（5） ====================

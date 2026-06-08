@@ -1,0 +1,45 @@
+{
+  "feature_fingerprint": {
+    "g.parquet": {
+      "column_sha256": "0473ef2dc0d324ab659d3580c1134e9d812035905c4781fdd6d529b0c6860e13",
+      "stats": {
+        "a": {
+          "mean": 3.0,
+          "nan_count": 1,
+          "std": 1.8257418870925903,
+          "value_hash": "6482387c6025cce22353c82287a12c51b5e8af9f821f50358cad3581940bc7c4"
+        },
+        "b": {
+          "mean": 3.0,
+          "nan_count": 0,
+          "std": 1.5811388492584229,
+          "value_hash": "f778b4ff8d606546a6af729902155188171f858bac701671164df5a3a17d30f3"
+        }
+      }
+    }
+  },
+  "manifest_allowlist": {
+    "dtype": {
+      "g": "float32"
+    },
+    "feature_schema_hash": "d04e1ae095cd22034a2a9f19147173f0298dba01934cdf0b69674bd55b86191d",
+    "groups": {
+      "g": {
+        "column_count": 2,
+        "columns": [
+          "a",
+          "b"
+        ],
+        "dtype": "float32",
+        "encoded_column_count": 0,
+        "file": "g.parquet",
+        "file_size_bytes": 2154,
+        "nan_ratio": 0.1,
+        "path": "raw/g.parquet",
+        "row_count": 5
+      }
+    },
+    "row_count": 5,
+    "total_features": 2
+  }
+}

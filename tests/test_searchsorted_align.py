@@ -7,8 +7,59 @@ from momentum.FeatureEngineering.timeframe import tf_aligner as tf_aligner_modul
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
 
+NS = 1_000_000_000
+
+
 def _to_ms(series: pd.DatetimeIndex) -> pd.Series:
     return pd.Series((series.view("int64") // 1_000_000).astype(np.int64))
+
+
+def _build_map(
+    primary: np.ndarray,
+    source: np.ndarray,
+    source_dur_s: int = 0,
+    primary_dur_s: int = 0,
+    mode: str = "open_time",
+) -> np.ndarray:
+    return TimeframeAligner.build_asof_index_map(
+        primary,
+        source,
+        source_dur_ns=source_dur_s * NS,
+        primary_dur_ns=primary_dur_s * NS,
+        mode=mode,
+    )
+
+
+def _searchsorted_open_minus(
+    source_values: pd.DataFrame,
+    source_index: pd.DatetimeIndex,
+    primary_index: pd.DatetimeIndex,
+) -> pd.DataFrame:
+    return TimeframeAligner._searchsorted_align(
+        source_values,
+        source_index,
+        primary_index,
+        source_tf="1h",
+        primary_tf="12h",
+        alignment_mode=AlignmentMode.OPEN_MINUS,
+    )
+
+
+def _merge_open_minus(
+    source_values: pd.DataFrame,
+    source_index: pd.DatetimeIndex,
+    primary_index: pd.DatetimeIndex,
+) -> pd.DataFrame:
+    aligned = TimeframeAligner._merge_asof_align(
+        source_values=source_values,
+        source_index=source_index,
+        primary_index=primary_index,
+        source_tf="1h",
+        primary_tf="12h",
+        alignment_mode=AlignmentMode.OPEN_MINUS,
+    )
+    aligned.index = primary_index
+    return aligned
 
 
 def _make_source_values(source_index: pd.DatetimeIndex) -> pd.DataFrame:
@@ -24,23 +75,25 @@ def _make_source_values(source_index: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 def test_build_asof_index_map_basic():
-    """T1.1: 基本 backward 對齊應回傳正確 index map。"""
+    """T1.1: source close <= primary open 才可對齊。"""
     primary = np.array([5, 15, 25], dtype=np.int64)
     source = np.array([0, 10, 20], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source)
+    result = _build_map(primary, source, source_dur_s=10)
 
-    np.testing.assert_array_equal(result, np.array([0, 1, 2], dtype=np.int64))
+    # source_close=[10,20,30], decision=[5,15,25] -> [-1,0,1].
+    np.testing.assert_array_equal(result, np.array([-1, 0, 1], dtype=np.int64))
 
 
-def test_build_asof_index_map_with_offset():
-    """T1.2: offset=-1ns 時，邊界點應取上一根。"""
+def test_build_asof_index_map_source_close_boundary():
+    """T1.2: source close 等於 decision time 時可用，不需 offset_ns。"""
     primary = np.array([10, 20], dtype=np.int64)
-    source = np.array([10, 20], dtype=np.int64)
+    source = np.array([0, 10], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source, offset_ns=-1)
+    result = _build_map(primary, source, source_dur_s=10)
 
-    np.testing.assert_array_equal(result, np.array([-1, 0], dtype=np.int64))
+    # source_close=[10,20], decision=[10,20] -> both exact closes are visible.
+    np.testing.assert_array_equal(result, np.array([0, 1], dtype=np.int64))
 
 
 def test_searchsorted_vs_merge_asof_numeric_equivalence():
@@ -49,19 +102,8 @@ def test_searchsorted_vs_merge_asof_numeric_equivalence():
     primary_index = pd.date_range("2026-01-01", periods=20, freq="12h")
     source_values = _make_source_values(source_index)
 
-    expected = TimeframeAligner._merge_asof_align(
-        source_values=source_values,
-        source_index=source_index,
-        primary_index=primary_index - pd.Timedelta(nanoseconds=1),
-    )
-    expected.index = primary_index
-
-    actual = TimeframeAligner._searchsorted_align(
-        source_values=source_values,
-        source_index=source_index,
-        primary_index=primary_index,
-        offset_ns=-1,
-    )
+    expected = _merge_open_minus(source_values, source_index, primary_index)
+    actual = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     np.testing.assert_allclose(
         actual.to_numpy(dtype=np.float64),
@@ -77,7 +119,7 @@ def test_searchsorted_align_preserves_column_names():
     primary_index = pd.date_range("2026-01-01", periods=6, freq="12h")
     source_values = _make_source_values(source_index)
 
-    aligned = TimeframeAligner._searchsorted_align(source_values, source_index, primary_index, offset_ns=-1)
+    aligned = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     assert list(aligned.columns) == list(source_values.columns)
 
@@ -88,19 +130,8 @@ def test_searchsorted_align_nan_pattern():
     primary_index = pd.date_range("2026-01-01", periods=18, freq="12h")
     source_values = _make_source_values(source_index)
 
-    expected = TimeframeAligner._merge_asof_align(
-        source_values,
-        source_index,
-        primary_index - pd.Timedelta(nanoseconds=1),
-    )
-    expected.index = primary_index
-
-    actual = TimeframeAligner._searchsorted_align(
-        source_values,
-        source_index,
-        primary_index,
-        offset_ns=-1,
-    )
+    expected = _merge_open_minus(source_values, source_index, primary_index)
+    actual = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     assert np.array_equal(np.isnan(actual.to_numpy()), np.isnan(expected.to_numpy()))
 
@@ -131,7 +162,7 @@ def test_searchsorted_align_preserves_source_timestamps_attr():
     primary_index = pd.date_range("2026-01-01", periods=5, freq="12h")
     source_values = _make_source_values(source_index)
 
-    aligned = TimeframeAligner._searchsorted_align(source_values, source_index, primary_index, offset_ns=-1)
+    aligned = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     assert "source_timestamps" in aligned.attrs
     assert isinstance(aligned.attrs["source_timestamps"], pd.DatetimeIndex)
@@ -156,12 +187,7 @@ def test_env_var_fallback_to_merge_asof(monkeypatch):
         alignment_mode=AlignmentMode.OPEN_MINUS,
     )
 
-    expected = TimeframeAligner._merge_asof_align(
-        source_values,
-        source_index,
-        primary_index - pd.Timedelta(nanoseconds=1),
-    )
-    expected.index = primary_index
+    expected = _merge_open_minus(source_values, source_index, primary_index)
 
     np.testing.assert_allclose(
         aligned.to_numpy(dtype=np.float64),
@@ -175,7 +201,7 @@ def test_build_asof_index_map_empty_source():
     """T1.B1: source 為空時應回傳全 -1。"""
     primary = np.array([1, 2, 3], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, np.array([], dtype=np.int64))
+    result = _build_map(primary, np.array([], dtype=np.int64))
 
     np.testing.assert_array_equal(result, np.array([-1, -1, -1], dtype=np.int64))
 
@@ -184,7 +210,7 @@ def test_build_asof_index_map_empty_primary():
     """T1.B2: primary 為空時應回傳空陣列。"""
     source = np.array([1, 2, 3], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(np.array([], dtype=np.int64), source)
+    result = _build_map(np.array([], dtype=np.int64), source)
 
     assert result.size == 0
 
@@ -194,7 +220,7 @@ def test_build_asof_index_map_single_row():
     primary = np.array([90, 100, 110], dtype=np.int64)
     source = np.array([100], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source)
+    result = _build_map(primary, source)
 
     np.testing.assert_array_equal(result, np.array([-1, 0, 0], dtype=np.int64))
 
@@ -204,7 +230,7 @@ def test_build_asof_index_map_primary_before_all():
     primary = np.array([1, 50], dtype=np.int64)
     source = np.array([100, 200], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source)
+    result = _build_map(primary, source)
 
     np.testing.assert_array_equal(result, np.array([-1, -1], dtype=np.int64))
 
@@ -214,7 +240,7 @@ def test_build_asof_index_map_primary_after_all():
     primary = np.array([250, 300], dtype=np.int64)
     source = np.array([100, 200], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source)
+    result = _build_map(primary, source)
 
     np.testing.assert_array_equal(result, np.array([1, 1], dtype=np.int64))
 
@@ -224,7 +250,7 @@ def test_build_asof_index_map_duplicate_timestamps():
     primary = np.array([10, 11], dtype=np.int64)
     source = np.array([0, 10, 10, 20], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source)
+    result = _build_map(primary, source)
 
     np.testing.assert_array_equal(result, np.array([2, 2], dtype=np.int64))
 
@@ -235,7 +261,7 @@ def test_build_asof_index_map_unsorted_source():
     source = np.array([0, 20, 10], dtype=np.int64)
 
     with pytest.raises(ValueError, match="source_ts must be sorted"):
-        TimeframeAligner.build_asof_index_map(primary, source)
+        _build_map(primary, source)
 
 
 def test_searchsorted_align_all_nan_columns():
@@ -250,7 +276,7 @@ def test_searchsorted_align_all_nan_columns():
         index=source_index,
     )
 
-    aligned = TimeframeAligner._searchsorted_align(source_values, source_index, primary_index, offset_ns=-1)
+    aligned = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     assert aligned.isna().all().all()
 
@@ -268,7 +294,7 @@ def test_searchsorted_align_mixed_dtypes():
         index=source_index,
     )
 
-    aligned = TimeframeAligner._searchsorted_align(source_values, source_index, primary_index, offset_ns=-1)
+    aligned = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     assert set(aligned.dtypes.unique()) == {np.dtype(np.float32)}
 
@@ -294,30 +320,37 @@ def test_searchsorted_align_very_wide_df(monkeypatch):
     monkeypatch.setattr(tf_aligner_module, "MEMMAP_THRESHOLD_BYTES", 1)
     monkeypatch.setattr(tf_aligner_module, "create_temp_memmap", _fake_memmap)
 
-    aligned = TimeframeAligner._searchsorted_align(source_values, source_index, primary_index, offset_ns=-1)
+    aligned = _searchsorted_open_minus(source_values, source_index, primary_index)
 
     assert called["memmap"]
     assert aligned.shape == (len(primary_index), n_cols)
 
 
-def test_offset_ns_minus_one_at_exact_boundary():
-    """T1.B14: exact boundary + offset=-1ns 需取上一根。"""
+def test_source_close_exact_boundary_inclusive():
+    """T1.B14: exact boundary 依 source_close <= decision_time 手算。"""
     primary = np.array([100, 200], dtype=np.int64)
-    source = np.array([100, 200], dtype=np.int64)
+    source = np.array([0, 100, 200], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source, offset_ns=-1)
+    result = _build_map(primary, source, source_dur_s=100)
 
-    np.testing.assert_array_equal(result, np.array([-1, 0], dtype=np.int64))
+    # source_close=[100,200,300], decision=[100,200] -> [0,1].
+    np.testing.assert_array_equal(result, np.array([0, 1], dtype=np.int64))
 
 
 def test_build_asof_index_map_int_overflow():
     """T1.B15: 極大 timestamp 轉 ns 不應 overflow。"""
-    max_ms = np.int64(np.iinfo(np.int64).max // 1_000_000 - 4)
-    source = np.array([max_ms - 2, max_ms], dtype=np.int64)
-    primary = np.array([max_ms], dtype=np.int64)
+    max_s = np.int64(np.iinfo(np.int64).max // 1_000_000_000 - 4)
+    source = np.array([max_s - 2, max_s], dtype=np.int64)
+    primary = np.array([max_s], dtype=np.int64)
 
-    result = TimeframeAligner.build_asof_index_map(primary, source, offset_ns=0)
-    result_minus = TimeframeAligner.build_asof_index_map(primary, source, offset_ns=-1)
+    result = _build_map(primary, source)
+    result_with_one_ns_duration = TimeframeAligner.build_asof_index_map(
+        primary,
+        source,
+        source_dur_ns=1,
+        primary_dur_ns=0,
+        mode="open_time",
+    )
 
     np.testing.assert_array_equal(result, np.array([1], dtype=np.int64))
-    np.testing.assert_array_equal(result_minus, np.array([0], dtype=np.int64))
+    np.testing.assert_array_equal(result_with_one_ns_duration, np.array([0], dtype=np.int64))

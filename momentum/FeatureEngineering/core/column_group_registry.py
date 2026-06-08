@@ -1259,6 +1259,10 @@ class ColumnGroupRegistry:
                     idx_map_path=idx_map_path,
                     alignment_mode=str(alignment_raw.get("alignment_mode", "close_time")),
                     offset_ns=int(alignment_raw.get("offset_ns", 0)),
+                    source_dur_ns=int(alignment_raw.get("source_dur_ns", 0)),
+                    primary_dur_ns=int(alignment_raw.get("primary_dur_ns", 0)),
+                    mode=str(alignment_raw.get("mode", alignment_raw.get("alignment_mode", "close_time"))),
+                    align_algo_version=int(alignment_raw.get("align_algo_version", 1)),
                 )
 
             if not shard_metas and npy_path is None:
@@ -1444,6 +1448,10 @@ class ColumnGroupRegistry:
             "idx_map_path": alignment.idx_map_path.name,
             "alignment_mode": alignment.alignment_mode,
             "offset_ns": int(alignment.offset_ns),
+            "source_dur_ns": int(alignment.source_dur_ns),
+            "primary_dur_ns": int(alignment.primary_dur_ns),
+            "mode": alignment.mode,
+            "align_algo_version": int(alignment.align_algo_version),
         }
 
     def _persist_group_array(

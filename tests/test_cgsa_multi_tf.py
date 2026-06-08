@@ -286,18 +286,19 @@ class TestCGSABoundary:
 
     def test_build_asof_index_map_basic(self):
         """Verify build_asof_index_map used by CGSA alignment."""
-        primary_ms = np.array([0, 3600000, 7200000, 10800000], dtype=np.int64)
-        source_ms = np.array([0, 7200000], dtype=np.int64)
-        idx_map = TimeframeAligner.build_asof_index_map(primary_ms, source_ms)
+        primary_s = np.array([0, 3600, 7200, 10800], dtype=np.int64)
+        source_s = np.array([0, 7200], dtype=np.int64)
+        idx_map = TimeframeAligner.build_asof_index_map(
+            primary_s,
+            source_s,
+            source_dur_ns=2 * 3600 * 1_000_000_000,
+            primary_dur_ns=3600 * 1_000_000_000,
+            mode="open_time",
+        )
 
-        # primary[0]=0 → source[0]=0 (exact match)
-        assert idx_map[0] == 0
-        # primary[1]=3600000 → source[0]=0 (searchsorted backward)
-        assert idx_map[1] == 0
-        # primary[2]=7200000 → source[1]=7200000 (exact match)
-        assert idx_map[2] == 1
-        # primary[3]=10800000 → source[1]=7200000
-        assert idx_map[3] == 1
+        # OPEN_MINUS/open_time uses source close <= primary decision time.
+        # source[0] closes at 7200s; source[1] closes at 14400s.
+        np.testing.assert_array_equal(idx_map, np.array([-1, -1, 0, 0], dtype=np.int64))
 
     def test_registry_total_columns_after_alignment(self, tmp_path):
         """After alignment, registry total_columns should stay the same."""

@@ -134,6 +134,51 @@ class FeatureReader:
 
         return pd.concat(frames, axis=1) if frames else pd.DataFrame()
 
+    def load_row_index_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> Optional[pd.DatetimeIndex]:
+        """Load the persisted V2 primary timestamp axis.
+
+        Manifest without ``row_index`` is treated as an old run.  A declared
+        row_index must be readable and length-consistent.
+        """
+        manifest, base_dir, _is_legacy = self._resolve_manifest_v2(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            artifact_kind=artifact_kind,
+        )
+        row_index = manifest.get("row_index")
+        if row_index is None:
+            return None
+        if not isinstance(row_index, dict):
+            raise ValueError("row_index metadata must be a dictionary")
+
+        raw_path = row_index.get("path")
+        path = self._resolve_manifest_relative_path(base_dir, raw_path)
+        if not path.exists():
+            raise ValueError(f"row_index declared but file missing: {path}")
+
+        try:
+            table = pq.read_table(str(path), columns=["timestamp"])
+            values = table.column("timestamp").to_numpy()
+        except Exception as exc:
+            raise ValueError(f"Failed to read row_index artifact: {path}") from exc
+
+        try:
+            expected_count = int(row_index.get("count"))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("row_index count must be a non-null integer") from exc
+        if len(values) != expected_count:
+            raise ValueError(
+                f"row_index length mismatch: {len(values)} != {expected_count}"
+            )
+        return pd.DatetimeIndex(pd.to_datetime(values, unit="s"))
+
     # ------------------------------------------------------------------
     # Mode 1: Metadata-Only
     # ------------------------------------------------------------------

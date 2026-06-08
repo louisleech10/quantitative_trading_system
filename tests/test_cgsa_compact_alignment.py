@@ -127,7 +127,9 @@ def test_parallel_worker_registration_uses_compact_alignment(monkeypatch, tmp_pa
     )
 
     persisted = registry.get("12h_L1_test")
-    expected_idx = np.array([0, 0, 1, 1, 2], dtype=np.int64)
+    # source_tf is 12h, so each source row is unavailable until source_open+12h.
+    # The 1h primary decisions here end at 4h, before the first 12h source close.
+    expected_idx = np.array([-1, -1, -1, -1, -1], dtype=np.int64)
     expected = MultiTFGenerator._align_group_array(source, expected_idx, n_primary=5)
 
     assert persisted.is_compact_aligned
@@ -186,7 +188,9 @@ def test_parallel_worker_registration_compact_sharded_group(tmp_path: Path, monk
     )
 
     persisted = registry.get("12h_L2_test")
-    expected = MultiTFGenerator._align_group_array(source, np.array([0, 0, 1, 1]), n_primary=4)
+    # source_tf is 12h; all 1h primary decisions in this fixture occur before
+    # the first source close, so no source row is available without look-ahead.
+    expected = MultiTFGenerator._align_group_array(source, np.array([-1, -1, -1, -1]), n_primary=4)
 
     assert persisted.is_compact_aligned
     assert len(persisted.shards) == 2
