@@ -24,13 +24,14 @@ All code must support this evolution via clean decoupling.
 > 「這是 **小 / 中 / 大** 任務 → 我打算走 X 流程」
 
 - **小**：改 1 函式 / 加 test / 修局部 bug，不碰共用路徑、**能本地驗證** → **Claude 自己做 + 自跑測試驗證,不派工**（派工的 gate/preflight/監看/接回 ceremony 對小任務反而更貴；自己做省 token）。前提:不命中 (a)-(d)、可本地 pytest 驗;一旦規模膨脹立刻升級,不硬塞。
-- **中**：單一 module、會動到既有 caller、**不命中 (a)-(d)** → **派 Composer 2.5（`cursor-agent`）**（A/B 實證正確性對等 + 派工省事）；精簡 SPEC（含 per-Task 檔案/驗證/邊界欄）→ 直接從 SPEC 派工，跳獨立 TODO + 跳一次 adversarial。**若其實命中高風險原則 → 當「大」辦,不是看檔案數。**
-- **大**：命中任一**高風險原則**（模組會變、原則不變）→ **Codex（GPT-5.5）實作 + Composer 2.5 code review**（嚴謹實作 + 跨家族複查 diff）；走**短文件優先管線**（決策~200行 → manifest~2頁[扁平 `[A-1]` ID] → 逐 Phase 展開 → 機檢 → SPEC 前一次雙家族 adversarial → TODO 生成）避免 V1-V6 重生成 churn；完整 SPEC + 跨模型 adversarial review（`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`）：
+- **中**：單一 module、會動到既有 caller、**不命中 (a)-(d)** → **派 Composer 2.5（`cursor-agent`）實作**。**完整管線不得判斷跳過（2026-06-05 使用者定死）**：SPEC（per-Task 檔案/驗證/邊界）+ **TODO 生成** + **第三方 adversarial 稽核 SPEC**（不同模型，作者不自審）→ 過 gate 派工 → 接回 **diff 既有斷言防假綠** + **派另一方做 code review**。**若命中高風險原則 → 當「大」辦,不是看檔案數。**
+- **大**：命中任一**高風險原則**（模組會變、原則不變）→ **Codex（GPT-5.5）實作 + Composer 2.5 code review**（嚴謹實作 + 跨家族複查 diff）；走**短文件優先管線且不得判斷跳過任一步（2026-06-05 定死）**（**給使用者的簡述/決策文件~200行** → manifest~2頁[扁平 `[A-1]` ID] → 逐 Phase 展開 → 機檢 → SPEC 前一次雙家族 adversarial → **TODO 生成**）避免 V1-V6 重生成 churn；完整 SPEC + 跨模型 adversarial review（`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`）+ **派另一方 code review**：
   - (a) 改變數值正確性 / 資料品質（NaN·inf gate、精度、淨化）
   - (b) 跨模組 / 共用路徑 / 多下游消費者（改一處影響一片）
   - (c) 多 phase，或難回退
   - (d) 碰 ML 訓練/驗證正確性 或 回測真實性（防 overfit / data leakage / look-ahead）
   - *當期高風險區範例*（隨 V1→V2→V3 階段更新）：Feature Factory / cache / 多 symbol / rolling 統計、IC Gatekeeper / walk-forward / 回測引擎（ML·回測正確性，命中 (d)）。
+- **中/大鐵律（2026-06-05 使用者定死，覆蓋一切「夠細可省」的判斷）**：① 中、大一律走完整管線，**不得以「粒度夠/夠收斂」為由判斷跳過任一步**（SPEC / **TODO** / **第三方 adversarial** 都要，中型也要）；② 中、大都**必派另一方做 code review**（實作者不自審）；③ 大任務**必附給使用者看的簡述/決策文件**；④ 若真要省某步，**唯一允許**是「動工前明列『打算跳哪步＋理由』讓使用者否決」，不准靜默合併；⑤ **派工進度每 5 分鐘回報一次**（簡述即可，不必每分鐘）。違反即制度事故。
 - **判不出大小（認知外的東西）**：明講「我不確定這屬於哪級、原因是 X」並問，或先當「中」起步——**絕不靜默假設**。風險原則 (a)-(d) 是抽象的，正是為了接住沒列名的模組（如 IC Gatekeeper 命中 (b)(d)）。
 - **規模膨脹偵測（中→大 升級觸發）**：出現任一訊號立刻喊停建議升級——① 改動檔案數超出預期、② 碰到 `factories.py`/`protocols.py`/`config.py` 等共用路徑、③ 發現新的既有 caller、④ 測試面擴大、⑤ 觸及 (a)-(d) 任一原則。
 - **執行端選層（2026-06-03 分層,A/B 實證後定）**：**小=Claude 自己做**(省 token);**中=Composer 2.5**(`cursor-agent --model composer-2.5`,過 T-D;正確性對等、派工省事);**大=Codex(GPT-5.5)實作 + Composer 2.5 code review**(codex 高風險嚴謹度紀錄佳;cursor 跨家族複查)。codex 在非 git repo 目錄派工需 `--skip-git-repo-check`,背景派工一律 `timeout N ... < /dev/null`(見手冊「背景派工防卡死鐵律」)。⚠️ **`agy`（Gemini）coding 評測失敗,僅當規劃委員會 read-only 諮詢,不得寫入**。選哪個對使用者透明,準則見手冊 §1。
@@ -134,6 +135,16 @@ The discipline:
 This applies to everything: naming conventions, NaN patterns, execution paths, test fixtures, bug hypotheses, "obviously" true facts about the codebase, and anything else that would cause wasted or wrong work if it turned out to be false.
 
 *Established after two incidents: (1) assumed `underscore` naming → missed real `hyphen` across entire run; (2) assumed "frontend misclassifies warmup as mid-hole" → nearly modified a correct classifier.*
+
+#### 驗證保真度鐵律（2026-06-05 定死，第三次事故後）
+
+預測 ≠ 預防：adversarial / code review 指出風險，只有「驗證真的碰到真實程式路徑」才擋得住。三條強制：
+
+1. **§A「已驗證事實」凡涉及資料結構的型別/形狀/單位，必須附「實際跑了什麼、印出什麼」**（如 `type(raw_data.index)`、值樣本、epoch 秒 vs 毫秒的實測輸出），不准以推論當已驗證。違反＝在錯前提上寫 SPEC。
+2. **adversarial / code review 中「要測真實路徑/真實 run」的 finding，不得降級為 NON-BLOCKING**——除非那個真實路徑測試**已存在並通過**。合成 fixture 不算數。
+3. **回歸測試禁用「會掩蓋真實差異」的 sanitized fixture**：要嘛走真實 ingestion，要嘛 fixture **byte-faithful 重現真實輸出**（含 index 型別 **與單位**）。fixture 用 ms、真實是秒 = 假綠。
+
+*第三次事故：V2 timestamp（a）§A 把「raw_data.index 是 DatetimeIndex」當已驗證卻沒跑 `_layer0`（實為 int64 epoch 秒）→ fail-closed abort 整個 run（adversarial #7 早預言，未擋住）；（b）回歸測試用 ms 構造、真實是秒 → 綠燈卻 1970-01-21 錯軸；（c）code review 點名「multi-TF 是玩具 fixture」被我降級放走。三道防線全因「測試沒碰真實路徑」失效。*
 
 ---
 
