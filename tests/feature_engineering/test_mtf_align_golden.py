@@ -119,8 +119,18 @@ class _RealLayer0Factory:
     def _persist_layer_output_groups(self, frame, layer, label):
         del frame, layer, label
 
-    def _layer7_raw_from_cgsa_pipeline(self, symbol, timeframe, raw_data, config, elapsed, config_hash):
-        del symbol, timeframe, config
+    def _layer7_raw_from_cgsa_pipeline(
+        self,
+        symbol,
+        timeframe,
+        raw_data,
+        config,
+        elapsed,
+        config_hash,
+        compute_warnings=None,
+        persist: bool = True,
+    ):
+        del symbol, timeframe, config, compute_warnings, persist
         if self._cgsa_registry is None:
             raise ValueError("CGSA registry missing in golden test factory")
         frames = []

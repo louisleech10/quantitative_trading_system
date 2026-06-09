@@ -244,6 +244,7 @@ class FeatureFactory:
                 symbol,
                 start_date=start_date,
                 end_date=end_date,
+                persist=persist,
             )
 
         try:

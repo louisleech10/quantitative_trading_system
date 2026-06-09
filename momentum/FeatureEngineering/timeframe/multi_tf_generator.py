@@ -40,6 +40,7 @@ class MultiTFGenerator:
         symbol: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        persist: bool = True,
     ) -> "FeatureGenerationResult":
         """Generate features across training timeframes and align to primary."""
         start_time = time.time()
@@ -75,7 +76,7 @@ class MultiTFGenerator:
         if use_cgsa:
             return self._generate_multi_tf_cgsa(
                 symbol, primary_raw, primary_timestamps, start_time,
-                start_date=start_date, end_date=end_date,
+                start_date=start_date, end_date=end_date, persist=persist,
             )
 
         return self._generate_multi_tf_legacy(
@@ -94,6 +95,7 @@ class MultiTFGenerator:
         start_time: float,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        persist: bool = True,
     ) -> "FeatureGenerationResult":
         """CGSA multi-TF: compute layers per TF, align registry groups, then L6.5 + L7."""
         from momentum.FeatureEngineering.feature_config import AlignmentMode
@@ -102,12 +104,17 @@ class MultiTFGenerator:
         if self._multi_tf_parallel_enabled() and len(self._training_tfs) > 1:
             return self._generate_multi_tf_cgsa_parallel(
                 symbol, primary_raw, primary_timestamps, start_time,
-                start_date=start_date, end_date=end_date,
+                start_date=start_date, end_date=end_date, persist=persist,
             )
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
+        stage_seconds: Dict[str, float] = {
+            "dual_tf_l1_l6": 0.0,
+            "alignment": 0.0,
+            "l65_l7": 0.0,
+        }
         total_tfs = len(self._training_tfs)
         from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
         _RESUME_LAYERS = (_LS.L1, _LS.L2, _LS.L3, _LS.L4, _LS.L5, _LS.L6)
@@ -165,6 +172,7 @@ class MultiTFGenerator:
             # Set current timeframe so CGSA group IDs use the correct TF prefix.
             self._factory._current_timeframe = timeframe
 
+            l1_l6_start = time.perf_counter()
             try:
                 layer1 = self._factory._layer1_atomic_indicators(raw_data, self._config)
                 layer2 = self._factory._layer2_derived_features(layer1, raw_data, self._config)
@@ -187,6 +195,8 @@ class MultiTFGenerator:
             if layer6 is not None and not layer6.empty:
                 self._factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
 
+            stage_seconds["dual_tf_l1_l6"] += time.perf_counter() - l1_l6_start
+
             tf_layer_counts[timeframe] = self._collect_layer_counts(
                 [layer1, layer2, layer3, layer4, layer5, layer6]
             )
@@ -202,6 +212,7 @@ class MultiTFGenerator:
                 )
             else:
                 # Align each new group from source TF rows to primary TF rows.
+                align_start = time.perf_counter()
                 source_index, _ = TimeframeAligner._split_timestamp_index(raw_data)
                 source_dt = TimeframeAligner._to_datetime_index(source_index)
 
@@ -261,6 +272,7 @@ class MultiTFGenerator:
                         "[CGSA][multi_tf] Aligned %d groups from %s → %s (idx_map built once)",
                         aligned_count, timeframe, self._primary_tf,
                     )
+                stage_seconds["alignment"] += time.perf_counter() - align_start
 
         if self._primary_tf in skipped_tfs:
             raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
@@ -281,15 +293,25 @@ class MultiTFGenerator:
             self._config, symbol, self._primary_tf,
             start_date=start_date, end_date=end_date,
         )
-        elapsed = time.time() - start_time
+        pre_l7_elapsed = time.time() - start_time
+        l65_l7_start = time.perf_counter()
         result = self._factory._layer7_raw_from_cgsa_pipeline(
             symbol=symbol,
             timeframe=self._primary_tf,
             raw_data=primary_raw,
             config=self._config,
-            elapsed=elapsed,
+            elapsed=pre_l7_elapsed,
             config_hash=config_hash,
+            persist=persist,
         )
+        stage_seconds["l65_l7"] = time.perf_counter() - l65_l7_start
+        total_elapsed = time.time() - start_time
+        result.generation_time = total_elapsed
+        result.metadata["generation_time"] = total_elapsed
+        for key, value in stage_seconds.items():
+            stage_seconds[key] = round(float(value), 3)
+        result.metadata["multi_tf_stage_seconds"] = stage_seconds
+        result.metadata["multi_tf_stage_timing_complete"] = True
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
@@ -297,7 +319,7 @@ class MultiTFGenerator:
             tf for tf in self._training_tfs if tf not in skipped_tfs
         ]
 
-        self._report_progress("complete", 1.0, f"[CGSA] MultiTF generation completed ({elapsed:.2f}s)")
+        self._report_progress("complete", 1.0, f"[CGSA] MultiTF generation completed ({total_elapsed:.2f}s)")
         return result
 
     @staticmethod
@@ -325,6 +347,7 @@ class MultiTFGenerator:
         start_time: float,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        persist: bool = True,
     ) -> "FeatureGenerationResult":
         """CGSA multi-TF with ProcessPoolExecutor + spawn for non-primary TFs."""
         import multiprocessing as mp
@@ -336,6 +359,13 @@ class MultiTFGenerator:
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
+        # dual_tf_l1_l6: worker L1-L6 runs in child processes; parent cannot
+        # measure it (future.result() wait ≈ 0). Leave None — not 0.
+        stage_seconds: Dict[str, Optional[float]] = {
+            "dual_tf_l1_l6": None,
+            "alignment": 0.0,
+            "l65_l7": 0.0,
+        }
 
         # ── Resume support ────────────────────────────────────────────────
         # When `_prepare_cgsa_registry` resumed an existing manifest, the
@@ -497,11 +527,13 @@ class MultiTFGenerator:
                     tf_layer_counts[tf] = result.get("layer_counts", {})
                     groups_data = result.get("groups", [])
                     source_ts_ms = result.get("source_timestamps_ms")
+                    align_start = time.perf_counter()
                     self._register_worker_groups(
                         registry, groups_data, tf,
                         primary_timestamps, self._config.timeframes.alignment_mode,
                         source_timestamps_ms=source_ts_ms,
                     )
+                    stage_seconds["alignment"] += time.perf_counter() - align_start
                     # Resume support: persist worker progress to manifest now,
                     # so a SIGKILL during the next worker / L6.5 leaves a
                     # resumable state. `register()` only updates in-memory
@@ -536,15 +568,26 @@ class MultiTFGenerator:
             self._config, symbol, self._primary_tf,
             start_date=start_date, end_date=end_date,
         )
-        elapsed = time.time() - start_time
+        pre_l7_elapsed = time.time() - start_time
+        l65_l7_start = time.perf_counter()
         result = self._factory._layer7_raw_from_cgsa_pipeline(
             symbol=symbol,
             timeframe=self._primary_tf,
             raw_data=primary_raw,
             config=self._config,
-            elapsed=elapsed,
+            elapsed=pre_l7_elapsed,
             config_hash=config_hash,
+            persist=persist,
         )
+        stage_seconds["l65_l7"] = time.perf_counter() - l65_l7_start
+        total_elapsed = time.time() - start_time
+        result.generation_time = total_elapsed
+        result.metadata["generation_time"] = total_elapsed
+        for key, value in stage_seconds.items():
+            if value is not None:
+                stage_seconds[key] = round(float(value), 3)
+        result.metadata["multi_tf_stage_seconds"] = stage_seconds
+        result.metadata["multi_tf_stage_timing_complete"] = False
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
@@ -552,7 +595,7 @@ class MultiTFGenerator:
             tf for tf in self._training_tfs if tf not in skipped_tfs
         ]
 
-        self._report_progress("complete", 1.0, f"[CGSA-parallel] MultiTF completed ({elapsed:.2f}s)")
+        self._report_progress("complete", 1.0, f"[CGSA-parallel] MultiTF completed ({total_elapsed:.2f}s)")
         return result
 
     def _register_worker_groups(
