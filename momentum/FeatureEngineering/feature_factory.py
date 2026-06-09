@@ -15,13 +15,14 @@ import threading
 import psutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
 from momentum.core.config import get_fracdiff_layers, get_ic_first_pipeline_enabled
+from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -190,6 +191,7 @@ class FeatureFactory:
         self._cgsa_force_fresh: bool = False
         self._memory_profiler = _MemoryProfiler()
         self._ic_engine: Optional[Any] = None
+        self.layer_results: Dict[str, LayerExecutionResult] = {}
 
     def generate_features(
         self,
@@ -213,6 +215,7 @@ class FeatureFactory:
         self._current_timeframe = timeframe
         self._current_config_hash = None
         self._cgsa_registry = None
+        self.layer_results = {}
         start_time = time.time()
 
         config_hash = self._compute_config_hash(
@@ -268,8 +271,8 @@ class FeatureFactory:
         self._current_raw_data = raw_data
 
         compute_warnings = self._collect_layer1_warnings(raw_data, config)
-        layer1 = self._safe_execute("Layer 1", self._layer1_atomic_indicators, raw_data, config)
-        layer2 = self._safe_execute("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config)
+        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
 
         # Spill layer2 to disk-backed memmap BEFORE L3.
         # L3 only uses layer1, but layer2 stays alive (needed for L4/L5/L6).
@@ -279,10 +282,10 @@ class FeatureFactory:
         # when accessed later by L4/L5/L6).
         layer2 = self._spill_to_memmap(layer2, "layer2")
 
-        layer3 = self._safe_execute("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
-        layer4 = self._safe_execute("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
-        layer5 = self._safe_execute("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
-        layer6 = self._safe_execute("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
+        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
+        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
+        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
+        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
 
         layers = [layer1, layer2, layer3, layer4, layer5, layer6]
         if self._cgsa_enabled() and self._cgsa_registry is not None:
@@ -380,8 +383,52 @@ class FeatureFactory:
         )
         return result
 
+    def _execute_layer1_6(self, layer_name: str, func: Callable, *args) -> pd.DataFrame:
+        """執行 L1-L6：L1 required 失敗回傳 LayerExecutionResult；L2-L6 維持 _safe_execute fail-open。"""
+        if layer_name != "Layer 1":
+            return self._safe_execute(layer_name, func, *args)
+        self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
+        logger.info("%s starting, rss=%dMB", layer_name, _PROC.memory_info().rss >> 20)
+        raw = func(*args)
+        if isinstance(raw, LayerExecutionResult):
+            self.layer_results[layer_name] = raw
+            if raw.status == LayerStatus.layer_failed:
+                logger.error(
+                    "%s layer_failed: %s failed_engines=%s",
+                    layer_name,
+                    raw.reason,
+                    raw.failed_engines,
+                    exc_info=False,
+                )
+                self._report_progress(layer_name, 1.0, f"{layer_name} failed: {raw.reason}")
+                return raw.data
+            result = raw.data
+        else:
+            result = raw
+        if result is None:
+            result = pd.DataFrame()
+        if not result.empty:
+            result = self._ensure_float32(result)
+            if result.columns.has_duplicates:
+                duplicate_counts = result.columns[result.columns.duplicated(keep=False)].value_counts()
+                duplicate_total = int(result.columns.duplicated(keep="first").sum())
+                logger.warning(
+                    "%s output contains duplicated columns (%d duplicates across %d names): %s",
+                    layer_name,
+                    duplicate_total,
+                    len(duplicate_counts),
+                    duplicate_counts.head(20).to_dict(),
+                )
+        self._report_progress(
+            layer_name,
+            1.0,
+            f"{layer_name} completed: {result.shape[1]} features",
+        )
+        logger.info("%s done: %d cols, rss=%dMB", layer_name, result.shape[1], _PROC.memory_info().rss >> 20)
+        return result
+
     def _safe_execute(self, layer_name: str, func: Callable, *args) -> pd.DataFrame:
-        """Execute a layer safely; return empty DataFrame on failure."""
+        """Execute a layer safely; return empty DataFrame on failure (L6.5 等非 L1-L6 路徑)."""
         try:
             self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
             logger.info("%s starting, rss=%dMB", layer_name, _PROC.memory_info().rss >> 20)
@@ -456,7 +503,32 @@ class FeatureFactory:
             data = data[~data.index.duplicated(keep="last")]
         return data
 
-    def _layer1_atomic_indicators(self, data: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
+    def _layer1_required_failure_result(
+        self,
+        data: pd.DataFrame,
+        tasks: List[Tuple[str, bool, Callable[[], pd.DataFrame]]],
+        failed_engine: str,
+        reason: str,
+        frames_so_far: List[pd.DataFrame],
+    ) -> LayerExecutionResult:
+        """required engine 失敗時回傳 layer_failed（不再 re-raise 給 _safe_execute 吞掉）。"""
+        configured = len(tasks)
+        required_count = sum(1 for _, required, _ in tasks if required)
+        present = sum(1 for frame in frames_so_far if frame is not None and not frame.empty)
+        return LayerExecutionResult(
+            data=pd.DataFrame(index=data.index),
+            status=LayerStatus.layer_failed,
+            failed_engines=(failed_engine,),
+            reason=reason,
+            configured_engines=configured,
+            present_engines=present,
+            required_engines=required_count,
+            dependency_error=False,
+        )
+
+    def _layer1_atomic_indicators(
+        self, data: pd.DataFrame, config: "FactoryConfig"
+    ) -> Union[pd.DataFrame, LayerExecutionResult]:
         if data.empty:
             return pd.DataFrame(index=data.index)
 
@@ -531,7 +603,14 @@ class FeatureFactory:
                         frame = future.result()
                     except Exception as exc:
                         if required:
-                            raise
+                            frames_so_far = [
+                                ordered_results[i]
+                                for i in sorted(ordered_results)
+                                if ordered_results.get(i) is not None
+                            ]
+                            return self._layer1_required_failure_result(
+                                data, tasks, task_name, str(exc), frames_so_far
+                            )
                         logger.warning("%s engine failed: %s", task_name.capitalize(), exc)
                         frame = pd.DataFrame(index=data.index)
                     ordered_results[idx] = frame
@@ -549,7 +628,9 @@ class FeatureFactory:
                     self._persist_layer1_indicator_groups(frame, category_hint=task_name)
                 except Exception as exc:
                     if required:
-                        raise
+                        return self._layer1_required_failure_result(
+                            data, tasks, task_name, str(exc), frames
+                        )
                     logger.warning("%s engine failed: %s", task_name.capitalize(), exc)
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
@@ -1570,13 +1651,13 @@ class FeatureFactory:
     ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
         raw_data = self._layer0_data_ingestion(symbol, tf, config)
         self._current_raw_data = raw_data
-        layer1 = self._safe_execute("Layer 1", self._layer1_atomic_indicators, raw_data, config)
-        layer2 = self._safe_execute("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config)
+        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
         layer2 = self._spill_to_memmap(layer2, "layer2")
-        layer3 = self._safe_execute("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
-        layer4 = self._safe_execute("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
-        layer5 = self._safe_execute("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
-        layer6 = self._safe_execute("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
+        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
+        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
+        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
+        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
         return raw_data, [layer1, layer2, layer3, layer4, layer5, layer6]
 
     @staticmethod

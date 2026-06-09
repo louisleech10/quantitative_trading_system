@@ -10,8 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import pandas as pd
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ── Lazy re-exports from domain modules ─────────────────────────────────────
@@ -341,3 +342,72 @@ class FeatureNotFoundError(Exception):
         if detail:
             msg += f": {detail}"
         super().__init__(msg)
+
+
+class LayerStatus(str, Enum):
+    """Feature Factory 單層執行狀態（SPEC §P-4 九類互斥 enum）。"""
+
+    ok = "ok"
+    engine_partial = "engine_partial"
+    all_engines_failed = "all_engines_failed"
+    empty_disabled = "empty_disabled"
+    empty_short_data = "empty_short_data"
+    empty_not_applicable = "empty_not_applicable"
+    offloaded_to_registry = "offloaded_to_registry"
+    dependency_failed = "dependency_failed"
+    layer_failed = "layer_failed"
+
+
+@dataclass(frozen=True)
+class LayerExecutionResult:
+    """Feature Factory 單層執行結果 contract（Batch1 / SPEC §P-1）。"""
+
+    data: pd.DataFrame
+    status: LayerStatus
+    failed_engines: Tuple[str, ...]
+    reason: Optional[str]
+    configured_engines: int
+    present_engines: int
+    required_engines: int
+    dependency_error: bool
+
+    def __post_init__(self) -> None:
+        """強制 failed_engines 為 tuple，確保 frozen dataclass 真不可變。"""
+        if not isinstance(self.failed_engines, tuple):
+            object.__setattr__(self, "failed_engines", tuple(self.failed_engines))
+
+
+def derive_status(
+    *,
+    configured_engines: int,
+    present_engines: int,
+    required_engines: int,
+    failed_engines: Tuple[str, ...] = (),
+    layer_enabled: bool = True,
+    short_data: bool = False,
+    offloaded: bool = False,
+    dependency_error: bool = False,
+    layer_exception: bool = False,
+) -> LayerStatus:
+    """依 SPEC §P-4 真值表優先級由上而下判定 layer status（每組唯一映射）。"""
+    if not layer_enabled or configured_engines == 0:
+        return LayerStatus.empty_disabled
+    if layer_exception:
+        return LayerStatus.layer_failed
+    if dependency_error:
+        return LayerStatus.dependency_failed
+    if (
+        configured_engines > 0
+        and present_engines == 0
+        and (required_engines > 0 or bool(failed_engines))
+    ):
+        return LayerStatus.all_engines_failed
+    if short_data:
+        return LayerStatus.empty_short_data
+    if offloaded:
+        return LayerStatus.offloaded_to_registry
+    if configured_engines > 0 and present_engines == 0:
+        return LayerStatus.empty_not_applicable
+    if failed_engines and present_engines > 0:
+        return LayerStatus.engine_partial
+    return LayerStatus.ok
