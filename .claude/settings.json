@@ -34,6 +34,11 @@
       "Bash(touch *)",
       "Bash(source venv/*)",
       "Bash(./scripts/*)",
+      "Bash(bash scripts/gate.sh:*)",
+      "Bash(bash scripts/template_check.sh:*)",
+      "Bash(bash scripts/coverage_check.sh:*)",
+      "Bash(bash scripts/agent_preflight.sh:*)",
+      "Bash(bash scripts/agent_postflight.sh:*)",
       "Bash(which *)",
       "Bash(open *)"
     ],
