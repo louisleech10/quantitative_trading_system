@@ -126,8 +126,8 @@ def test_sliding_kernel_fuzz_byte_identical(
     _assert_byte_identical(actual[1], expected[1], f"fuzz upper(seed={seed})")
 
 
-def test_default_legacy_kernel_byte_identical(monkeypatch: pytest.MonkeyPatch) -> None:
-    """未設定 flag 時 production 維持 vendored legacy 路徑。"""
+def test_default_kernel_byte_identical(monkeypatch: pytest.MonkeyPatch) -> None:
+    """未設定 flag 時 production 走預設 kernel(現為 sliding),且對 vendored legacy 逐位元相同。"""
     from momentum.FeatureEngineering.preprocessing._numba_transforms import rolling_quantile_2d
 
     monkeypatch.delenv("FFACT_ROLLING_QUANTILE_KERNEL", raising=False)

@@ -324,7 +324,9 @@ def rolling_quantile_2d(
     data = np.asarray(arr, dtype=np.float64)
     if data.ndim != 2:
         raise ValueError("rolling quantile input must be 2D")
-    if _HAS_NUMBA and os.getenv("FFACT_ROLLING_QUANTILE_KERNEL", "legacy") == "sliding":
+    # 預設 sliding(byte-identical 已三方簽核 + e2e 雙路徑 19-20x 驗證);
+    # FFACT_ROLLING_QUANTILE_KERNEL=legacy 一鍵回退舊 full-sort kernel。
+    if _HAS_NUMBA and os.getenv("FFACT_ROLLING_QUANTILE_KERNEL", "sliding") != "legacy":
         return _rolling_quantile_sliding_numba(
             data, float(lower_q), float(upper_q), int(window), int(min_periods)
         )
