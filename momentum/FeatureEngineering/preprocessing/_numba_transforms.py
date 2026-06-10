@@ -4,6 +4,8 @@ These operate on raw numpy float32 arrays and avoid pandas overhead entirely.
 """
 from __future__ import annotations
 
+import os
+
 import numpy as np
 from momentum.core.logging import get_logger
 
@@ -212,6 +214,76 @@ if _HAS_NUMBA:
                         upper[r, c] = np.float32(value)
         return lower, upper
 
+    @njit(cache=True)
+    def _rolling_quantile_sliding_numba(
+        arr: np.ndarray,
+        lower_q: float,
+        upper_q: float,
+        window: int,
+        min_periods: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """以滑動有序視窗計算逐欄因果分位數。"""
+        n_rows, n_cols = arr.shape
+        lower = np.empty((n_rows, n_cols), dtype=np.float32)
+        upper = np.empty((n_rows, n_cols), dtype=np.float32)
+        lower[:] = np.nan
+        upper[:] = np.nan
+
+        for c in range(n_cols):
+            # 容量 window+1:r>=window 時先 insert(count 瞬達 window+1)後 remove,
+            # 多留一格避免 numba 無邊界檢查的瞬態越界寫(Composer review MAJOR)。
+            sorted_vals = np.empty(window + 1, dtype=np.float64)
+            count = 0
+            for r in range(n_rows):
+                value = arr[r, c]
+                if not np.isnan(value) and np.isfinite(value):
+                    # Upper-bound insertion preserves input order among equal values,
+                    # including the byte-distinct +0.0 and -0.0 values.
+                    left = 0
+                    right = count
+                    while left < right:
+                        mid = (left + right) // 2
+                        if value < sorted_vals[mid]:
+                            right = mid
+                        else:
+                            left = mid + 1
+                    for k in range(count, left, -1):
+                        sorted_vals[k] = sorted_vals[k - 1]
+                    sorted_vals[left] = value
+                    count += 1
+
+                if r >= window:
+                    outgoing = arr[r - window, c]
+                    if not np.isnan(outgoing) and np.isfinite(outgoing):
+                        # Equal values are chronological because insertion uses upper bound;
+                        # the outgoing observation is therefore the first equal element.
+                        left = 0
+                        right = count
+                        while left < right:
+                            mid = (left + right) // 2
+                            if sorted_vals[mid] < outgoing:
+                                left = mid + 1
+                            else:
+                                right = mid
+                        for k in range(left, count - 1):
+                            sorted_vals[k] = sorted_vals[k + 1]
+                        count -= 1
+
+                if count < min_periods:
+                    continue
+                for q_idx in range(2):
+                    q = lower_q if q_idx == 0 else upper_q
+                    pos = q * (count - 1)
+                    lo = int(np.floor(pos))
+                    hi = min(lo + 1, count - 1)
+                    frac = pos - lo
+                    quantile = sorted_vals[lo] + frac * (sorted_vals[hi] - sorted_vals[lo])
+                    if q_idx == 0:
+                        lower[r, c] = np.float32(quantile)
+                    else:
+                        upper[r, c] = np.float32(quantile)
+        return lower, upper
+
 else:
 
     def _rolling_quantile_numba(
@@ -252,6 +324,10 @@ def rolling_quantile_2d(
     data = np.asarray(arr, dtype=np.float64)
     if data.ndim != 2:
         raise ValueError("rolling quantile input must be 2D")
+    if _HAS_NUMBA and os.getenv("FFACT_ROLLING_QUANTILE_KERNEL", "legacy") == "sliding":
+        return _rolling_quantile_sliding_numba(
+            data, float(lower_q), float(upper_q), int(window), int(min_periods)
+        )
     return _rolling_quantile_numba(data, float(lower_q), float(upper_q), int(window), int(min_periods))
 
 
