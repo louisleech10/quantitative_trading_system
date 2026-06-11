@@ -27,6 +27,7 @@ from momentum.FeatureEngineering.feature_storage import (
     ZSCORE_INT16_ENCODING,
     decode_rank_from_uint16,
     decode_zscore_from_int16,
+    resolve_run_status as merge_manifest_run_status,
 )
 from momentum.core.logging import get_logger
 
@@ -63,6 +64,11 @@ class FeatureReader:
             artifact_kind=artifact_kind,
         )
         return manifest
+
+    @staticmethod
+    def resolve_run_status(manifest: dict) -> str:
+        """解析 run-level quality status（含 legacy / 未遷移 V2 偵測）。"""
+        return merge_manifest_run_status(manifest)
 
     def stream_groups_v2(
         self,
@@ -382,6 +388,7 @@ class FeatureReader:
             "config_hash": config_hash,
             "schema_version": "legacy_v7",
             "quality_status": "legacy",
+            "run_status": "legacy",
             "feature_schema_hash": artifact["feature_schema_hash"],
             "row_count": total_rows,
             "time_range": artifact["time_range"],

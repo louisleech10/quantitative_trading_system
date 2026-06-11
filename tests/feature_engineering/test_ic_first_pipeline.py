@@ -26,6 +26,7 @@ def _make_factory() -> FeatureFactory:
     factory._current_config_hash = "ic-first-test"
     factory._current_raw_data = None
     factory._cgsa_registry = None
+    factory.layer_results = {}
     return factory
 
 
@@ -312,15 +313,15 @@ def test_l7_schema_version_metadata(tmp_path) -> None:
 
     manifest = reader.load_manifest_v2(symbol, tf, config_hash, artifact_kind="raw")
     assert manifest["complete"] is True
-    assert manifest["artifacts"]["raw"]["schema_version"] == "raw_v1"
+    assert manifest["artifacts"]["raw"]["schema_version"] == "raw_v2"
     assert manifest["artifacts"]["raw"]["total_features"] == 3
-    assert manifest["artifacts"]["processed"]["schema_version"] == "processed_v1"
+    assert manifest["artifacts"]["processed"]["schema_version"] == "processed_v2"
     assert manifest["artifacts"]["processed"]["total_features"] == 1
 
     raw_schema = pq.read_schema(str(raw_dir / "group_alpha.parquet"))
     processed_schema = pq.read_schema(str(processed_dir / "selected.parquet"))
-    assert raw_schema.metadata[b"schema_version"] == b"raw_v1"
-    assert processed_schema.metadata[b"schema_version"] == b"processed_v1"
+    assert raw_schema.metadata[b"schema_version"] == b"raw_v2"
+    assert processed_schema.metadata[b"schema_version"] == b"processed_v2"
 
     streamed_raw = dict(reader.stream_groups_v2(symbol, tf, config_hash, artifact_kind="raw"))
     assert set(streamed_raw) == {"group_alpha", "group_gamma"}

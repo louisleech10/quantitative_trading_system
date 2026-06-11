@@ -26,7 +26,10 @@ from momentum.core.contracts import LayerExecutionResult, LayerStatus, derive_st
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
-from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from momentum.FeatureEngineering.feature_storage import (
+    FeatureStorage,
+    build_completeness_meta_from_layer_results,
+)
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
 from momentum.FeatureEngineering.labels.label_generator import LabelGenerator
 from momentum.FeatureEngineering.meta_features.consensus_features import ConsensusFeatureEngine
@@ -1829,6 +1832,7 @@ class FeatureFactory:
             resolved_config_hash,
             pre_ic_groups,
             row_index=self._derive_row_index_for_artifact(raw_data),
+            layer_results=self.layer_results,
         )
 
         rss_before_gc_gb = _current_rss_gb()
@@ -1895,6 +1899,7 @@ class FeatureFactory:
             tf,
             resolved_config_hash,
             processed_groups,
+            layer_results=self.layer_results,
         )
 
         # IC-First raw/ cleanup: raw/ was needed only for the IC gate step.
@@ -2789,6 +2794,7 @@ class FeatureFactory:
                 sanitize_finite_cap=_sanitize_cap,
                 row_index=self._derive_row_index_for_artifact(raw_data),
                 time_range=self._manifest_time_range_from_raw_data(raw_data),
+                layer_results=self.layer_results,
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
                         config,
@@ -2819,6 +2825,10 @@ class FeatureFactory:
 
         manifest_path = str(stream_summary.get("manifest_path") or self._cgsa_registry.manifest_path)
         raw_path_value = str(stream_summary.get("raw_path") or "")
+        completeness_meta = build_completeness_meta_from_layer_results(
+            self.layer_results,
+            timeframe=timeframe,
+        )
         metadata = {
             "feature_names": [],
             "feature_count": feature_count,
@@ -2850,6 +2860,10 @@ class FeatureFactory:
                 "groups_with_inf": int(validation_summary.get("groups_with_inf", 0)),
                 "constant_features_removed": [],
             },
+            "quality_status": str(completeness_meta["quality_status"]),
+            "run_status": str(completeness_meta["quality_status"]),
+            "failed_layers": list(completeness_meta.get("failed_layers", [])),
+            "failure_reasons": list(completeness_meta.get("failure_reasons", [])),
         }
 
         result = FeatureGenerationResult(
@@ -3062,6 +3076,10 @@ class FeatureFactory:
         }
 
         data_range = self._data_range(raw_data)
+        completeness_meta = build_completeness_meta_from_layer_results(
+            self.layer_results,
+            timeframe=timeframe,
+        )
         metadata = {
             "feature_names": list(features_df.columns),
             "feature_count": int(features_df.shape[1]),
@@ -3073,6 +3091,10 @@ class FeatureFactory:
             "timeframe": timeframe,
             "data_range": data_range,
             "config_used": config.model_dump(by_alias=True),
+            "quality_status": str(completeness_meta["quality_status"]),
+            "run_status": str(completeness_meta["quality_status"]),
+            "failed_layers": list(completeness_meta.get("failed_layers", [])),
+            "failure_reasons": list(completeness_meta.get("failure_reasons", [])),
         }
 
         result = FeatureGenerationResult(

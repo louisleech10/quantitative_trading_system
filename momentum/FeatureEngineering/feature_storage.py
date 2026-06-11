@@ -7,10 +7,12 @@ Author: AI Agent
 Date: 2026-01-10
 """
 
+import fcntl
 import os
 import queue
 import threading
 import time
+from contextlib import contextmanager
 import h5py
 import pandas as pd
 import numpy as np
@@ -32,6 +34,7 @@ except ImportError:
 
 from momentum.FeatureEngineering.core.column_group_registry import FailureType
 from momentum.core.config import get_l7_codec_upgrade_enabled
+from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
 
 if TYPE_CHECKING:
@@ -491,6 +494,168 @@ class AsyncParquetCompactor:
         return final_path.parent / f".{final_path.stem}.tmp{final_path.suffix}"
 
 
+LAYER_NAME_TO_ID: Dict[str, str] = {
+    "Layer 1": "L1",
+    "Layer 2": "L2",
+    "Layer 3": "L3",
+    "Layer 4": "L4",
+    "Layer 5": "L5",
+    "Layer 6": "L6",
+}
+
+FAILOPEN_LAYER_FAILURE_STATUSES = frozenset(
+    {
+        LayerStatus.layer_failed,
+        LayerStatus.all_engines_failed,
+        LayerStatus.dependency_failed,
+    }
+)
+
+V2_FAILOPEN_SCHEMA_VERSIONS = frozenset({"raw_v2", "processed_v2"})
+
+QUALITY_STATUS_PRECEDENCE: Tuple[str, ...] = (
+    "failed",
+    "unknown",
+    "legacy",
+    "partial",
+    "empty_selection",
+    "complete",
+)
+
+COMPLETENESS_FIELD_NAMES: Tuple[str, ...] = (
+    "expected_layers",
+    "present_layers",
+    "failed_layers",
+    "expected_timeframes",
+    "present_timeframes",
+    "failed_timeframes",
+)
+
+
+def default_completeness_meta(timeframe: str) -> Dict[str, Any]:
+    """無 layer_results 證據時的 completeness 預設（quality_status=unknown）。"""
+    return {
+        "expected_layers": [],
+        "present_layers": [],
+        "failed_layers": [],
+        "expected_timeframes": [timeframe],
+        "present_timeframes": [],
+        "failed_timeframes": [],
+        "quality_status": "unknown",
+        "failure_reasons": [],
+    }
+
+
+def build_completeness_meta_from_layer_results(
+    layer_results: Dict[str, LayerExecutionResult],
+    *,
+    timeframe: str,
+) -> Dict[str, Any]:
+    """由 Batch2 layer_results 衍生 manifest completeness 欄（SPEC M-1~M-3）。"""
+    if not layer_results:
+        return default_completeness_meta(timeframe)
+
+    expected_layers: List[str] = []
+    present_layers: List[str] = []
+    failed_layers: List[str] = []
+    missing_layers: List[str] = []
+    failure_reasons: List[str] = []
+
+    for layer_name, layer_id in LAYER_NAME_TO_ID.items():
+        result = layer_results.get(layer_name)
+        if result is None:
+            missing_layers.append(layer_id)
+            continue
+        if result.status == LayerStatus.empty_disabled:
+            continue
+        expected_layers.append(layer_id)
+        if result.status in FAILOPEN_LAYER_FAILURE_STATUSES:
+            failed_layers.append(layer_id)
+            if result.reason:
+                failure_reasons.append(f"{layer_id}:{result.reason}")
+            continue
+        present_layers.append(layer_id)
+
+    if not expected_layers or missing_layers:
+        quality_status = "unknown"
+    elif failed_layers:
+        quality_status = "partial"
+    else:
+        quality_status = "complete"
+
+    return {
+        "expected_layers": expected_layers,
+        "present_layers": present_layers,
+        "failed_layers": failed_layers,
+        "expected_timeframes": [timeframe],
+        "present_timeframes": [timeframe],
+        "failed_timeframes": [],
+        "quality_status": quality_status,
+        "failure_reasons": failure_reasons,
+    }
+
+
+def resolve_completeness_meta(
+    layer_results: Optional[Dict[str, LayerExecutionResult]],
+    timeframe: str,
+    *,
+    override_quality_status: Optional[str] = None,
+) -> Dict[str, Any]:
+    """組裝 artifact completeness；僅 consumer 政策（如 empty_selection）可覆寫 layer 衍生狀態。"""
+    if layer_results:
+        meta = build_completeness_meta_from_layer_results(layer_results, timeframe=timeframe)
+    else:
+        meta = default_completeness_meta(timeframe)
+    if override_quality_status is not None:
+        meta = dict(meta)
+        meta["quality_status"] = override_quality_status
+    return meta
+
+
+def _consumer_quality_override(quality_status: str) -> Optional[str]:
+    """僅 empty_selection 等 consumer 政策覆寫 layer 衍生 quality_status。"""
+    if quality_status == "empty_selection":
+        return quality_status
+    return None
+
+
+def artifact_quality_status_for_merge(artifact: Dict[str, Any]) -> str:
+    """單一 artifact 的有效 quality status（含遷移偵測 S-4）。"""
+    schema_version = str(artifact.get("schema_version", ""))
+    if schema_version == "legacy_v7":
+        return "legacy"
+    if schema_version not in V2_FAILOPEN_SCHEMA_VERSIONS:
+        return "unknown"
+    if not all(field in artifact for field in COMPLETENESS_FIELD_NAMES):
+        return "unknown"
+    return str(artifact.get("quality_status", "unknown"))
+
+
+def merge_quality_status(artifacts: Dict[str, Any]) -> str:
+    """跨 artifact 偏序聚合 run_status（failed>unknown>legacy>partial>empty_selection>complete）。"""
+    if not isinstance(artifacts, dict) or not artifacts:
+        return "unknown"
+    statuses = [
+        artifact_quality_status_for_merge(artifact)
+        for artifact in artifacts.values()
+        if isinstance(artifact, dict)
+    ]
+    if not statuses:
+        return "unknown"
+    for candidate in QUALITY_STATUS_PRECEDENCE:
+        if candidate in statuses:
+            return candidate
+    return "unknown"
+
+
+def resolve_run_status(manifest: Dict[str, Any]) -> str:
+    """由 manifest artifacts 解析 run-level status。"""
+    artifacts = manifest.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return "unknown"
+    return merge_quality_status(artifacts)
+
+
 class FeatureStorage:
     """
     特徵儲存管理器
@@ -507,8 +672,8 @@ class FeatureStorage:
             /metadata          # Attributes
     """
 
-    L7_RAW_SCHEMA_VERSION = "raw_v1"
-    L7_PROCESSED_SCHEMA_VERSION = "processed_v1"
+    L7_RAW_SCHEMA_VERSION = "raw_v2"
+    L7_PROCESSED_SCHEMA_VERSION = "processed_v2"
     L7_V2_MANIFEST_NAME = "feature_manifest.json"
     
     def __init__(self, base_path: str = "data_cache/features"):
@@ -538,6 +703,7 @@ class FeatureStorage:
         groups: Dict[str, pd.DataFrame],
         *,
         row_index: Optional[pd.DatetimeIndex] = None,
+        layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
     ) -> Path:
         """Write IC-First raw L7 groups to the canonical V2 raw path.
 
@@ -554,6 +720,7 @@ class FeatureStorage:
             allow_empty=False,
             quality_status="complete",
             row_index=row_index,
+            layer_results=layer_results,
         )
 
     def write_raw_from_registry_stream(
@@ -572,6 +739,7 @@ class FeatureStorage:
         dead_drop_min_valid: Optional[int] = None,
         sanitize_finite_cap: Optional[float] = None,
         row_index: Optional[pd.DatetimeIndex] = None,
+        layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
     ) -> Tuple[Path, Dict[str, Any]]:
         """Stream CGSA registry groups into the canonical L7_raw artifact.
 
@@ -975,22 +1143,7 @@ class FeatureStorage:
             if extra_metadata:
                 stream_metadata.update(extra_metadata)
 
-            manifest = self._build_feature_manifest_v2(
-                run_dir=run_dir,
-                symbol=symbol,
-                tf=tf,
-                config_hash=config_hash,
-                artifact_kind="raw",
-                schema_version=self.L7_RAW_SCHEMA_VERSION,
-                quality_status="complete",
-                feature_schema_hash=feature_schema_hash,
-                row_count=resolved_row_count,
-                time_range=resolved_time_range,
-                total_features=total_features,
-                group_manifest=ordered_group_manifest,
-                extra_metadata=stream_metadata,
-                row_index=row_index_manifest,
-            )
+            completeness_meta = resolve_completeness_meta(layer_results, tf)
 
             if final_artifact_dir.exists():
                 backup_dir = run_dir / f".previous-raw-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
@@ -998,7 +1151,23 @@ class FeatureStorage:
 
             os.replace(temp_artifact_dir, final_artifact_dir)
             artifact_installed = True
-            self._write_feature_manifest_v2(run_dir, manifest)
+            self._atomic_merge_feature_manifest_v2(
+                run_dir,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                artifact_kind="raw",
+                schema_version=self.L7_RAW_SCHEMA_VERSION,
+                quality_status=str(completeness_meta["quality_status"]),
+                feature_schema_hash=feature_schema_hash,
+                row_count=resolved_row_count,
+                time_range=resolved_time_range,
+                total_features=total_features,
+                group_manifest=ordered_group_manifest,
+                extra_metadata=stream_metadata,
+                row_index=row_index_manifest,
+                completeness_meta=completeness_meta,
+            )
 
             if backup_dir is not None and backup_dir.exists():
                 shutil.rmtree(backup_dir)
@@ -1060,6 +1229,8 @@ class FeatureStorage:
         tf: str,
         config_hash: str,
         groups: Dict[str, pd.DataFrame],
+        *,
+        layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
     ) -> Path:
         """Write IC-First processed L7 groups to the canonical V2 processed path."""
         quality_status = "empty_selection" if not groups else "complete"
@@ -1072,6 +1243,7 @@ class FeatureStorage:
             schema_version=self.L7_PROCESSED_SCHEMA_VERSION,
             allow_empty=True,
             quality_status=quality_status,
+            layer_results=layer_results,
         )
 
     def _write_l7_v2_artifact(
@@ -1085,6 +1257,7 @@ class FeatureStorage:
         allow_empty: bool,
         quality_status: str,
         row_index: Optional[pd.DatetimeIndex] = None,
+        layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
     ) -> Path:
         pa_module, pq_module = _require_pyarrow()
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
@@ -1096,6 +1269,13 @@ class FeatureStorage:
             raise ValueError("write_raw requires non-empty feature groups")
         if allow_empty and total_features <= 0:
             quality_status = "empty_selection"
+
+        completeness_meta = resolve_completeness_meta(
+            layer_results,
+            tf,
+            override_quality_status=_consumer_quality_override(quality_status),
+        )
+        resolved_quality_status = str(completeness_meta["quality_status"])
 
         feature_schema_hash = self._build_l7_v2_schema_hash(
             schema_version=schema_version,
@@ -1138,29 +1318,28 @@ class FeatureStorage:
                     schema_metadata=parquet_metadata,
                 )
 
-            manifest = self._build_feature_manifest_v2(
-                run_dir=run_dir,
-                symbol=symbol,
-                tf=tf,
-                config_hash=config_hash,
-                artifact_kind=artifact_kind,
-                schema_version=schema_version,
-                quality_status=quality_status,
-                feature_schema_hash=feature_schema_hash,
-                row_count=row_count,
-                time_range=time_range,
-                total_features=total_features,
-                group_manifest=group_manifest,
-                row_index=row_index_manifest,
-            )
-
             if final_artifact_dir.exists():
                 backup_dir = run_dir / f".previous-{artifact_kind}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
                 os.replace(final_artifact_dir, backup_dir)
 
             os.replace(temp_artifact_dir, final_artifact_dir)
             artifact_installed = True
-            self._write_feature_manifest_v2(run_dir, manifest)
+            self._atomic_merge_feature_manifest_v2(
+                run_dir,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                artifact_kind=artifact_kind,
+                schema_version=schema_version,
+                quality_status=resolved_quality_status,
+                feature_schema_hash=feature_schema_hash,
+                row_count=row_count,
+                time_range=time_range,
+                total_features=total_features,
+                group_manifest=group_manifest,
+                row_index=row_index_manifest,
+                completeness_meta=completeness_meta,
+            )
 
             if backup_dir is not None and backup_dir.exists():
                 shutil.rmtree(backup_dir)
@@ -1502,9 +1681,32 @@ class FeatureStorage:
         missing = int(frame.isna().to_numpy().sum())
         return float(missing / frame.size)
 
-    def _build_feature_manifest_v2(
+    # 單一全域 Lock(非 per-run_dir dict):RMW 為毫秒級 json 讀寫、非熱路徑,
+    # 跨 run_dir 串行化代價可忽略;換取長駐進程零無界增長(Codex r3 finding)。
+    _manifest_v2_thread_lock = threading.Lock()
+
+    @classmethod
+    @contextmanager
+    def _manifest_v2_lock(cls, run_dir: Path):
+        """Serialize manifest read-modify-write (in-process thread lock + cross-process flock)."""
+        run_dir.mkdir(parents=True, exist_ok=True)
+        thread_lock = cls._manifest_v2_thread_lock
+        thread_lock.acquire()
+        try:
+            lock_path = run_dir / f"{cls.L7_V2_MANIFEST_NAME}.lock"
+            with lock_path.open("a+", encoding="utf-8") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        finally:
+            thread_lock.release()
+
+    def _atomic_merge_feature_manifest_v2(
         self,
         run_dir: Path,
+        *,
         symbol: str,
         tf: str,
         config_hash: str,
@@ -1518,8 +1720,50 @@ class FeatureStorage:
         group_manifest: Dict[str, Dict[str, Any]],
         extra_metadata: Optional[Dict[str, Any]] = None,
         row_index: Optional[Dict[str, Any]] = None,
+        completeness_meta: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        existing_manifest = self._load_feature_manifest_v2_if_exists(run_dir)
+        """Locked read-modify-write so raw/processed writers cannot clobber each other."""
+        with self._manifest_v2_lock(run_dir):
+            existing_manifest = self._load_feature_manifest_v2_if_exists(run_dir)
+            manifest = self._build_feature_manifest_v2(
+                existing_manifest=existing_manifest or None,
+                symbol=symbol,
+                tf=tf,
+                config_hash=config_hash,
+                artifact_kind=artifact_kind,
+                schema_version=schema_version,
+                quality_status=quality_status,
+                feature_schema_hash=feature_schema_hash,
+                row_count=row_count,
+                time_range=time_range,
+                total_features=total_features,
+                group_manifest=group_manifest,
+                extra_metadata=extra_metadata,
+                row_index=row_index,
+                completeness_meta=completeness_meta,
+            )
+            self._write_feature_manifest_v2_unlocked(run_dir, manifest)
+            return manifest
+
+    def _build_feature_manifest_v2(
+        self,
+        *,
+        existing_manifest: Optional[Dict[str, Any]],
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str,
+        schema_version: str,
+        quality_status: str,
+        feature_schema_hash: str,
+        row_count: int,
+        time_range: Dict[str, Optional[str]],
+        total_features: int,
+        group_manifest: Dict[str, Dict[str, Any]],
+        extra_metadata: Optional[Dict[str, Any]] = None,
+        row_index: Optional[Dict[str, Any]] = None,
+        completeness_meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         if existing_manifest:
             for key, expected in (("symbol", symbol), ("tf", tf), ("config_hash", config_hash)):
                 actual = existing_manifest.get(key)
@@ -1538,6 +1782,9 @@ class FeatureStorage:
             "group_count": len(group_manifest),
             "groups": group_manifest,
         }
+        if completeness_meta:
+            artifact_manifest.update(completeness_meta)
+            artifact_manifest["quality_status"] = str(completeness_meta.get("quality_status", quality_status))
         if extra_metadata:
             artifact_manifest["metadata"] = dict(extra_metadata)
         manifest = existing_manifest or {
@@ -1551,7 +1798,6 @@ class FeatureStorage:
         manifest["created_at"] = manifest.get("created_at") or datetime.utcnow().isoformat()
         manifest["updated_at"] = datetime.utcnow().isoformat()
         manifest["schema_version"] = schema_version
-        manifest["quality_status"] = quality_status
         manifest["feature_schema_hash"] = feature_schema_hash
         manifest["row_count"] = row_count
         manifest["time_range"] = time_range
@@ -1564,6 +1810,16 @@ class FeatureStorage:
         if extra_metadata:
             manifest["generation_metadata"] = dict(extra_metadata)
         manifest.setdefault("artifacts", {})[artifact_kind] = artifact_manifest
+
+        run_status = resolve_run_status(manifest)
+        manifest["run_status"] = run_status
+        manifest["quality_status"] = run_status
+        if completeness_meta:
+            for field in COMPLETENESS_FIELD_NAMES:
+                if field in completeness_meta:
+                    manifest[field] = completeness_meta[field]
+            if "failure_reasons" in completeness_meta:
+                manifest["failure_reasons"] = list(completeness_meta["failure_reasons"])
         return manifest
 
     @staticmethod
@@ -1600,12 +1856,19 @@ class FeatureStorage:
         return loaded
 
     @classmethod
-    def _write_feature_manifest_v2(cls, run_dir: Path, manifest: Dict[str, Any]) -> None:
+    def _write_feature_manifest_v2_unlocked(cls, run_dir: Path, manifest: Dict[str, Any]) -> None:
+        """Write manifest JSON atomically; caller must hold ``_manifest_v2_lock``."""
         manifest_path = run_dir / cls.L7_V2_MANIFEST_NAME
-        temp_path = run_dir / f"{cls.L7_V2_MANIFEST_NAME}.tmp"
+        temp_path = run_dir / f"{cls.L7_V2_MANIFEST_NAME}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
         with temp_path.open("w", encoding="utf-8") as manifest_file:
             json.dump(manifest, manifest_file, ensure_ascii=False, indent=2, default=str)
         os.replace(temp_path, manifest_path)
+
+    @classmethod
+    def _write_feature_manifest_v2(cls, run_dir: Path, manifest: Dict[str, Any]) -> None:
+        """Backward-compatible manifest write with exclusive lock."""
+        with cls._manifest_v2_lock(run_dir):
+            cls._write_feature_manifest_v2_unlocked(run_dir, manifest)
     
     def save_features_to_hdf5(
         self,

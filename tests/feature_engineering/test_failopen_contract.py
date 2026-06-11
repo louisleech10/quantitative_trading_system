@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 import tempfile
 from functools import lru_cache
 from pathlib import Path
@@ -25,6 +27,7 @@ TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
 BASELINE_PATH = ROOT / "tests/_golden/failopen/baseline.json"
 BASELINE_SYMBOL = "BTCUSDT"
 BASELINE_TIMEFRAME = "12h"
+L1_ORACLE_WORKER_ENV = "_FAILOPEN_L1_ORACLE_WORKER"
 
 
 @lru_cache(maxsize=1)
@@ -47,9 +50,6 @@ def _apply_baseline_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _compute_l1_canonical_sha256(monkeypatch: pytest.MonkeyPatch) -> str:
     """以 baseline 固定 config/窗 跑 L1，用 freeze 腳本同規則 hash registry L1 群組。"""
-    if os.environ.get("PYTHONHASHSEED") != "0":
-        pytest.skip("L1 baseline hash oracle requires PYTHONHASHSEED=0")
-
     freeze = _freeze_baseline_module()
     _apply_baseline_env(monkeypatch)
 
@@ -260,6 +260,46 @@ def test_failed_engines_tuple_is_immutable() -> None:
         result.failed_engines.append("other")  # type: ignore[attr-defined]
 
 
+def _assert_l1_baseline_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    expected_l1_hash = baseline["single_tf"][BASELINE_SYMBOL][BASELINE_TIMEFRAME]["layers"]["L1"][
+        "canonical_sha256"
+    ]
+    actual_l1_hash = _compute_l1_canonical_sha256(monkeypatch)
+    assert actual_l1_hash == expected_l1_hash, (
+        "L1 healthy output must match frozen baseline canonical_sha256 "
+        f"(got {actual_l1_hash}, expected {expected_l1_hash})"
+    )
+
+
+def test_l1_baseline_hash_matches_frozen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI 預設路徑必跑 L1 oracle：非 PYTHONHASHSEED=0 時 subprocess 重入。"""
+    if os.environ.get(L1_ORACLE_WORKER_ENV) == "1":
+        assert os.environ.get("PYTHONHASHSEED") == "0"
+        _assert_l1_baseline_hash(monkeypatch)
+        return
+
+    env = os.environ.copy()
+    env["PYTHONHASHSEED"] = "0"
+    env[L1_ORACLE_WORKER_ENV] = "1"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            f"{__file__}::test_l1_baseline_hash_matches_frozen",
+            "-q",
+            "--tb=short",
+        ],
+        cwd=str(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=1800,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def test_required_fail_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
     """required engine 例外 → layer_failed LayerExecutionResult，健康路徑數值不變。"""
     factory = create_feature_factory(
@@ -286,15 +326,7 @@ def test_required_fail_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
         err_msg="healthy L1 path must be deterministic across invocations",
     )
 
-    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
-    expected_l1_hash = baseline["single_tf"][BASELINE_SYMBOL][BASELINE_TIMEFRAME]["layers"]["L1"][
-        "canonical_sha256"
-    ]
-    actual_l1_hash = _compute_l1_canonical_sha256(monkeypatch)
-    assert actual_l1_hash == expected_l1_hash, (
-        "L1 healthy output must match frozen baseline canonical_sha256 "
-        f"(got {actual_l1_hash}, expected {expected_l1_hash})"
-    )
+    test_l1_baseline_hash_matches_frozen(monkeypatch)
 
     def _boom(self, ohlcv):  # noqa: ANN001
         del self, ohlcv

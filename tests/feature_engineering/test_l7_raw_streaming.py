@@ -137,12 +137,12 @@ def test_raw_streaming_transforms_without_registry_overwrite(tmp_path, monkeypat
 
     manifest = json.loads((raw_dir.parent / "feature_manifest.json").read_text(encoding="utf-8"))
     assert manifest["complete"] is True
-    assert manifest["artifacts"]["raw"]["schema_version"] == "raw_v1"
+    assert manifest["artifacts"]["raw"]["schema_version"] == "raw_v2"
     assert manifest["generation_metadata"]["l65_mode"] == "legacy"
     assert manifest["generation_metadata"]["cleanup_intermediate"] is True
 
     schema = pq.read_schema(raw_dir / "group_1.parquet")
-    assert schema.metadata[b"schema_version"] == b"raw_v1"
+    assert schema.metadata[b"schema_version"] == b"raw_v2"
     assert schema.metadata[b"artifact_kind"] == b"raw"
 
 
@@ -466,6 +466,7 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
     factory._current_raw_data = None
     factory._reference_data_cache = {}
     factory._progress_callback = None
+    factory.layer_results = {}
 
     raw_data = pd.DataFrame(
         {"close": np.array([10.0, 11.0, 12.0, 13.0], dtype=np.float32)},
@@ -488,7 +489,7 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
     # that service-layer routing detects the .json suffix and loads CGSA format.
     assert result.hdf5_path == str(raw_path.parent / "feature_manifest.json")
     assert result.metadata["artifact_kind"] == "raw"
-    assert result.metadata["schema_version"] == "raw_v1"
+    assert result.metadata["schema_version"] == "raw_v2"
     assert result.metadata["l65_mode"] == "ic_first_pre"
     assert result.metadata["npy_freed_bytes"] == 128
 
