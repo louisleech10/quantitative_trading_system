@@ -93,6 +93,13 @@ class _PrimaryOnlyConfig:
         enabled = False
 
 
+from tests._helpers.stub_layer_execute import (
+    stub_execute_layer1_6,
+    stub_layer_data,
+    stub_spill_to_memmap,
+)
+
+
 class _PrimaryOnlyFactory:
     def __init__(self, primary_df: pd.DataFrame, n_cols: int = 256):
         self._primary_df = primary_df
@@ -103,6 +110,13 @@ class _PrimaryOnlyFactory:
         if timeframe != "12h":
             raise FileNotFoundError(timeframe)
         return self._primary_df
+
+    def _execute_layer1_6(self, layer_name, func, *args):
+        del layer_name
+        return stub_execute_layer1_6(func, *args)
+
+    _spill_to_memmap = staticmethod(stub_spill_to_memmap)
+    layer_data = stub_layer_data
 
     def _layer1_atomic_indicators(self, data, config):
         del config

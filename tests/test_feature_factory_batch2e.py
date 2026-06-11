@@ -126,8 +126,8 @@ def test_cgsa_l2_cross_group_operators(tmp_path, monkeypatch):
     monkeypatch.setattr(cgsa_factory, "_build_indicator_specs", lambda _l1, _cfg: indicator_specs)
     monkeypatch.setattr(legacy_factory, "_build_indicator_specs", lambda _l1, _cfg: indicator_specs)
 
-    cgsa_result = cgsa_factory._layer2_derived_features(layer1, raw_data, cfg)
-    legacy_result = legacy_factory._layer2_derived_features(layer1, raw_data, cfg)
+    cgsa_result = cgsa_factory._layer2_derived_features(layer1, raw_data, cfg).data
+    legacy_result = legacy_factory._layer2_derived_features(layer1, raw_data, cfg).data
 
     assert cgsa_result.columns.tolist() == legacy_result.columns.tolist()
     np.testing.assert_allclose(
@@ -185,7 +185,7 @@ def test_t2b2_l2_without_cross_group_ops_direct_emit(tmp_path, monkeypatch):
     monkeypatch.setattr(factory, "_build_indicator_specs", lambda _l1, _cfg: indicator_specs)
 
     cfg = _DummyConfig(_operators_payload(momentum_enabled=True))
-    result = factory._layer2_derived_features(layer1, raw_data, cfg)
+    result = factory._layer2_derived_features(layer1, raw_data, cfg).data
 
     group_ids = [g.group_id for g in factory._cgsa_registry.list_by_layer(LayerSource.L2)]
     assert group_ids == ["1h_L2_Momentum"]
@@ -339,15 +339,15 @@ def test_t2b8_l65_fracdiff_per_group_feasible(tmp_path, monkeypatch):
     """T2.B8: L6.5 fracdiff 在 per-group 路徑可被逐群執行。"""
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
     g1 = _make_group(
-        group_id="1h_L3_group_a",
-        layer=LayerSource.L3,
+        group_id="1h_L1_group_a",
+        layer=LayerSource.L1,
         timeframe="1h",
         columns=("f_a_1", "f_a_2"),
         indicator="EMA",
     )
     g2 = _make_group(
-        group_id="1h_L3_group_b",
-        layer=LayerSource.L3,
+        group_id="1h_L1_group_b",
+        layer=LayerSource.L1,
         timeframe="1h",
         columns=("f_b_1",),
         indicator="RSI",
@@ -367,7 +367,7 @@ def test_t2b8_l65_fracdiff_per_group_feasible(tmp_path, monkeypatch):
 
     calls = {"count": 0}
 
-    def _fake_fracdiff(df: pd.DataFrame) -> pd.DataFrame:
+    def _fake_fracdiff(df: pd.DataFrame, source_layer=None) -> pd.DataFrame:
         calls["count"] += 1
         return df
 

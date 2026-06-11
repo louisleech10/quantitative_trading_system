@@ -15,6 +15,12 @@ from momentum.FeatureEngineering.feature_config import AlignmentMode
 from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
+from tests._helpers.stub_layer_execute import (
+    stub_execute_layer1_6,
+    stub_layer_data,
+    stub_spill_to_memmap,
+)
+
 
 HOUR = 3600
 NS = 1_000_000_000
@@ -65,6 +71,13 @@ class _RealLayer0Factory:
                 mask &= np.asarray(dt <= pd.Timestamp(end_date))
             df = df.loc[mask]
         return df
+
+    def _execute_layer1_6(self, layer_name, func, *args):
+        del layer_name
+        return stub_execute_layer1_6(func, *args)
+
+    _spill_to_memmap = staticmethod(stub_spill_to_memmap)
+    layer_data = stub_layer_data
 
     def _layer1_atomic_indicators(self, data, config):
         del config

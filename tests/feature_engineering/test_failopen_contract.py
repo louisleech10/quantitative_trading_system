@@ -86,7 +86,7 @@ def _compute_l1_canonical_sha256(monkeypatch: pytest.MonkeyPatch) -> str:
         )
         layer1 = factory._execute_layer1_6(
             "Layer 1", factory._layer1_atomic_indicators, raw, config
-        )
+        ).data
         assert isinstance(layer1, pd.DataFrame)
         assert not layer1.empty
         assert factory._cgsa_registry is not None
@@ -271,13 +271,13 @@ def test_required_fail_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
 
     healthy_once = factory._execute_layer1_6(
         "Layer 1", factory._layer1_atomic_indicators, data, config
-    )
+    ).data
     assert isinstance(healthy_once, pd.DataFrame)
     assert not healthy_once.empty
 
     healthy_repeat = factory._execute_layer1_6(
         "Layer 1", factory._layer1_atomic_indicators, data, config
-    )
+    ).data
     assert isinstance(healthy_repeat, pd.DataFrame)
     assert list(healthy_repeat.columns) == list(healthy_once.columns)
     np.testing.assert_array_equal(
@@ -312,16 +312,17 @@ def test_required_fail_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
     executed = factory._execute_layer1_6(
         "Layer 1", factory._layer1_atomic_indicators, data, config
     )
-    assert isinstance(executed, pd.DataFrame)
-    assert executed.empty
-    assert list(executed.index) == list(data.index)
+    assert isinstance(executed, LayerExecutionResult)
+    assert executed.status == LayerStatus.layer_failed
+    assert executed.data.empty
+    assert list(executed.data.index) == list(data.index)
     assert "Layer 1" in factory.layer_results
     assert factory.layer_results["Layer 1"].status == LayerStatus.layer_failed
     assert factory.layer_results["Layer 1"].failed_engines == ("trend",)
 
 
 def test_layer2_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
-    """L2 未分類例外 → _safe_execute 回空表，不中斷 pipeline。"""
+    """L2 未分類例外 → layer_failed + 保留 index，不中斷 pipeline。"""
     factory = create_feature_factory(
         cache_dir=TEST_KLINE_CACHE_DIR,
         validate_continuity=False,
@@ -330,7 +331,7 @@ def test_layer2_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
     data = _load_ohlcv().iloc[:128].copy()
     layer1 = factory._execute_layer1_6(
         "Layer 1", factory._layer1_atomic_indicators, data, config
-    )
+    ).data
     assert isinstance(layer1, pd.DataFrame)
     assert not layer1.empty
 
@@ -338,23 +339,26 @@ def test_layer2_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
         del self, layer1_df, ohlcv, cfg
         raise RuntimeError("injected L2 failure")
 
+    import types
+
     monkeypatch.setattr(
-        type(factory),
+        factory,
         "_layer2_derived_features",
-        _boom,
+        types.MethodType(_boom, factory),
     )
 
     layer2 = factory._execute_layer1_6(
         "Layer 2", factory._layer2_derived_features, layer1, data, config
     )
-    assert isinstance(layer2, pd.DataFrame)
-    assert layer2.empty
-    assert len(layer2.index) == 0
-    assert "Layer 2" not in factory.layer_results
+    assert isinstance(layer2, LayerExecutionResult)
+    assert layer2.status == LayerStatus.layer_failed
+    assert layer2.data.empty
+    assert len(layer2.data.index) == len(data.index)
+    assert "Layer 2" in factory.layer_results
 
 
 def test_layer3_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
-    """L3 未分類例外 → _safe_execute 回空表，不中斷 pipeline。"""
+    """L3 未分類例外 → layer_failed + 保留 index，不中斷 pipeline。"""
     factory = create_feature_factory(
         cache_dir=TEST_KLINE_CACHE_DIR,
         validate_continuity=False,
@@ -363,10 +367,10 @@ def test_layer3_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
     data = _load_ohlcv().iloc[:128].copy()
     layer1 = factory._execute_layer1_6(
         "Layer 1", factory._layer1_atomic_indicators, data, config
-    )
+    ).data
     layer2 = factory._execute_layer1_6(
         "Layer 2", factory._layer2_derived_features, layer1, data, config
-    )
+    ).data
     assert isinstance(layer1, pd.DataFrame)
     assert isinstance(layer2, pd.DataFrame)
 
@@ -374,16 +378,19 @@ def test_layer3_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
         del self, l1, l2, cfg
         raise RuntimeError("injected L3 failure")
 
+    import types
+
     monkeypatch.setattr(
-        type(factory),
+        factory,
         "_layer3_rolling_aggregation",
-        _boom,
+        types.MethodType(_boom, factory),
     )
 
     layer3 = factory._execute_layer1_6(
         "Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config
     )
-    assert isinstance(layer3, pd.DataFrame)
-    assert layer3.empty
-    assert len(layer3.index) == 0
-    assert "Layer 3" not in factory.layer_results
+    assert isinstance(layer3, LayerExecutionResult)
+    assert layer3.status == LayerStatus.layer_failed
+    assert layer3.data.empty
+    assert len(layer3.data.index) == len(data.index)
+    assert "Layer 3" in factory.layer_results

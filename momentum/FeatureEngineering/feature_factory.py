@@ -22,7 +22,7 @@ import pandas as pd
 
 from momentum.core.logging import get_logger
 from momentum.core.config import get_fracdiff_layers, get_ic_first_pipeline_enabled
-from momentum.core.contracts import LayerExecutionResult, LayerStatus
+from momentum.core.contracts import LayerExecutionResult, LayerStatus, derive_status
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -61,6 +61,11 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import Featu
 
 logger = get_logger(__name__)
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
+
+
+def _derived_operator_engine_cls() -> type:
+    """Return L2 operator engine class (module global for test monkeypatch)."""
+    return globals()["DerivedOperatorEngine"]
 
 # ── Pathological-input warnings: surface once, then stay quiet ──────────
 # These two warnings come from real input pathologies (not bugs) and were
@@ -271,8 +276,8 @@ class FeatureFactory:
         self._current_raw_data = raw_data
 
         compute_warnings = self._collect_layer1_warnings(raw_data, config)
-        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config)
-        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config).data
+        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config).data
 
         # Spill layer2 to disk-backed memmap BEFORE L3.
         # L3 only uses layer1, but layer2 stays alive (needed for L4/L5/L6).
@@ -282,10 +287,10 @@ class FeatureFactory:
         # when accessed later by L4/L5/L6).
         layer2 = self._spill_to_memmap(layer2, "layer2")
 
-        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
-        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
-        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
-        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
+        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config).data
+        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config).data
+        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config).data
+        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config).data
 
         layers = [layer1, layer2, layer3, layer4, layer5, layer6]
         if self._cgsa_enabled() and self._cgsa_registry is not None:
@@ -383,35 +388,112 @@ class FeatureFactory:
         )
         return result
 
-    def _execute_layer1_6(self, layer_name: str, func: Callable, *args) -> pd.DataFrame:
-        """執行 L1-L6：L1 required 失敗回傳 LayerExecutionResult；L2-L6 維持 _safe_execute fail-open。"""
-        if layer_name != "Layer 1":
-            return self._safe_execute(layer_name, func, *args)
+    @staticmethod
+    def layer_data(layer: Union[pd.DataFrame, LayerExecutionResult, None]) -> pd.DataFrame:
+        """從 LayerExecutionResult 或 DataFrame 取出層輸出（caller 原子遷移用）。"""
+        if layer is None:
+            return pd.DataFrame()
+        if isinstance(layer, LayerExecutionResult):
+            return layer.data
+        return layer
+
+    @staticmethod
+    def _infer_layer_index(args: tuple) -> pd.Index:
+        """從層函式參數推斷輸出 index（失敗時保留對齊軸）。"""
+        for arg in args:
+            if isinstance(arg, LayerExecutionResult) and len(arg.data.index) > 0:
+                return arg.data.index
+            if isinstance(arg, pd.DataFrame) and len(arg.index) > 0:
+                return arg.index
+        return pd.Index([])
+
+    @staticmethod
+    def _build_layer_result(
+        *,
+        data: pd.DataFrame,
+        configured_engines: int,
+        present_engines: int,
+        required_engines: int = 0,
+        failed_engines: Tuple[str, ...] = (),
+        reason: Optional[str] = None,
+        layer_enabled: bool = True,
+        short_data: bool = False,
+        offloaded: bool = False,
+        dependency_error: bool = False,
+        layer_exception: bool = False,
+    ) -> LayerExecutionResult:
+        """依 derive_status 真值表組裝 LayerExecutionResult。"""
+        status = derive_status(
+            configured_engines=configured_engines,
+            present_engines=present_engines,
+            required_engines=required_engines,
+            failed_engines=failed_engines,
+            layer_enabled=layer_enabled,
+            short_data=short_data,
+            offloaded=offloaded,
+            dependency_error=dependency_error,
+            layer_exception=layer_exception,
+        )
+        return LayerExecutionResult(
+            data=data,
+            status=status,
+            failed_engines=failed_engines,
+            reason=reason,
+            configured_engines=configured_engines,
+            present_engines=present_engines,
+            required_engines=required_engines,
+            dependency_error=dependency_error,
+        )
+
+    def _execute_layer1_6(self, layer_name: str, func: Callable, *args) -> LayerExecutionResult:
+        """執行 L1-L6：回傳 typed LayerExecutionResult（不再經 _safe_execute 吞錯）。"""
         self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
         logger.info("%s starting, rss=%dMB", layer_name, _PROC.memory_info().rss >> 20)
-        raw = func(*args)
+        index = self._infer_layer_index(args)
+        try:
+            raw = func(*args)
+        except Exception as exc:
+            result = self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                required_engines=0,
+                reason=str(exc),
+                layer_exception=True,
+            )
+            self.layer_results[layer_name] = result
+            logger.error("%s layer_failed: %s", layer_name, exc, exc_info=True)
+            self._report_progress(layer_name, 1.0, f"{layer_name} failed: {exc}")
+            return result
+
         if isinstance(raw, LayerExecutionResult):
-            self.layer_results[layer_name] = raw
-            if raw.status == LayerStatus.layer_failed:
-                logger.error(
-                    "%s layer_failed: %s failed_engines=%s",
-                    layer_name,
-                    raw.reason,
-                    raw.failed_engines,
-                    exc_info=False,
-                )
-                self._report_progress(layer_name, 1.0, f"{layer_name} failed: {raw.reason}")
-                return raw.data
-            result = raw.data
-        else:
             result = raw
-        if result is None:
-            result = pd.DataFrame()
-        if not result.empty:
-            result = self._ensure_float32(result)
-            if result.columns.has_duplicates:
-                duplicate_counts = result.columns[result.columns.duplicated(keep=False)].value_counts()
-                duplicate_total = int(result.columns.duplicated(keep="first").sum())
+        elif isinstance(raw, pd.DataFrame):
+            cols = 0 if raw is None or raw.empty else raw.shape[1]
+            result = self._build_layer_result(
+                data=raw if raw is not None else pd.DataFrame(index=index),
+                configured_engines=1 if cols > 0 else 0,
+                present_engines=1 if cols > 0 else 0,
+            )
+        else:
+            result = self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                reason=f"unexpected return type {type(raw).__name__}",
+                layer_exception=True,
+            )
+
+        data = result.data
+        if data is None:
+            data = pd.DataFrame(index=index)
+        elif data.empty and len(data.index) == 0 and len(index) > 0:
+            data = pd.DataFrame(index=index)
+        if not data.empty:
+            data = self._ensure_float32(data)
+            if data.columns.has_duplicates:
+                duplicate_counts = data.columns[data.columns.duplicated(keep=False)].value_counts()
+                duplicate_total = int(data.columns.duplicated(keep="first").sum())
                 logger.warning(
                     "%s output contains duplicated columns (%d duplicates across %d names): %s",
                     layer_name,
@@ -419,13 +501,41 @@ class FeatureFactory:
                     len(duplicate_counts),
                     duplicate_counts.head(20).to_dict(),
                 )
-        self._report_progress(
-            layer_name,
-            1.0,
-            f"{layer_name} completed: {result.shape[1]} features",
+
+        final = LayerExecutionResult(
+            data=data,
+            status=result.status,
+            failed_engines=result.failed_engines,
+            reason=result.reason,
+            configured_engines=result.configured_engines,
+            present_engines=result.present_engines,
+            required_engines=result.required_engines,
+            dependency_error=result.dependency_error,
         )
-        logger.info("%s done: %d cols, rss=%dMB", layer_name, result.shape[1], _PROC.memory_info().rss >> 20)
-        return result
+        self.layer_results[layer_name] = final
+        if final.status == LayerStatus.layer_failed:
+            logger.error(
+                "%s layer_failed: %s failed_engines=%s",
+                layer_name,
+                final.reason,
+                final.failed_engines,
+                exc_info=False,
+            )
+            self._report_progress(layer_name, 1.0, f"{layer_name} failed: {final.reason}")
+        else:
+            self._report_progress(
+                layer_name,
+                1.0,
+                f"{layer_name} completed: {final.data.shape[1]} features",
+            )
+            logger.info(
+                "%s done: %d cols, status=%s, rss=%dMB",
+                layer_name,
+                final.data.shape[1],
+                final.status.value,
+                _PROC.memory_info().rss >> 20,
+            )
+        return final
 
     def _safe_execute(self, layer_name: str, func: Callable, *args) -> pd.DataFrame:
         """Execute a layer safely; return empty DataFrame on failure (L6.5 等非 L1-L6 路徑)."""
@@ -528,9 +638,14 @@ class FeatureFactory:
 
     def _layer1_atomic_indicators(
         self, data: pd.DataFrame, config: "FactoryConfig"
-    ) -> Union[pd.DataFrame, LayerExecutionResult]:
+    ) -> LayerExecutionResult:
         if data.empty:
-            return pd.DataFrame(index=data.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=data.index),
+                configured_engines=0,
+                present_engines=0,
+                short_data=True,
+            )
 
         sources = self._select_single_series_sources(config)
         tasks: List[Tuple[str, bool, Callable[[], pd.DataFrame]]] = []
@@ -585,7 +700,17 @@ class FeatureFactory:
                 )
             )
 
+        if not tasks:
+            return self._build_layer_result(
+                data=pd.DataFrame(index=data.index),
+                configured_engines=0,
+                present_engines=0,
+                required_engines=0,
+            )
+
         frames: List[pd.DataFrame] = []
+        failed_engines: List[str] = []
+        required_count = sum(1 for _, required, _ in tasks if required)
         use_parallel = self._layer1_parallel_enabled() and len(tasks) > 1
 
         if use_parallel:
@@ -612,6 +737,7 @@ class FeatureFactory:
                                 data, tasks, task_name, str(exc), frames_so_far
                             )
                         logger.warning("%s engine failed: %s", task_name.capitalize(), exc)
+                        failed_engines.append(task_name)
                         frame = pd.DataFrame(index=data.index)
                     ordered_results[idx] = frame
 
@@ -632,12 +758,22 @@ class FeatureFactory:
                             data, tasks, task_name, str(exc), frames
                         )
                     logger.warning("%s engine failed: %s", task_name.capitalize(), exc)
+                    failed_engines.append(task_name)
 
-        frames = [frame for frame in frames if frame is not None and not frame.empty]
-        if not frames:
-            return pd.DataFrame(index=data.index)
+        non_empty_frames = [frame for frame in frames if frame is not None and not frame.empty]
+        present_count = len(non_empty_frames)
+        if not non_empty_frames:
+            output = pd.DataFrame(index=data.index)
+        else:
+            output = pd.concat(non_empty_frames, axis=1)
 
-        return pd.concat(frames, axis=1)
+        return self._build_layer_result(
+            data=output,
+            configured_engines=len(tasks),
+            present_engines=present_count,
+            required_engines=required_count,
+            failed_engines=tuple(failed_engines),
+        )
 
     @staticmethod
     def _layer1_parallel_enabled() -> bool:
@@ -1035,34 +1171,54 @@ class FeatureFactory:
 
     def _layer2_derived_features(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
-    ) -> pd.DataFrame:
+    ) -> LayerExecutionResult:
         t0 = time.perf_counter()
         logger.info("[L2] Starting derived features: %d L1 cols", layer1.shape[1])
+        index = layer1.index
+        op_engine_cls = _derived_operator_engine_cls()
+        categories = list(op_engine_cls.OPERATOR_CATEGORIES)
+        configured = len(categories) if getattr(config.operators, "enabled", True) else 0
+
+        if not getattr(config.operators, "enabled", True):
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=0,
+                present_engines=0,
+                layer_enabled=False,
+            )
 
         # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L2 衍生計算
-        # L1 原始欄位保留於 feature store，此處只是不傳給 L2 operators
         layer1_for_l2 = self._apply_cascade_blacklist(layer1, "L2_input", config)
 
         if layer1_for_l2.empty:
-            result = pd.DataFrame(index=layer1.index)
-        elif not getattr(config.operators, 'enabled', True):
-            result = pd.DataFrame(index=layer1.index)
+            result_df = pd.DataFrame(index=index)
+            failed_engines: Tuple[str, ...] = ()
+            present = 0
         else:
             from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
             use_polars = polars_enabled()
             if use_polars:
-                result = self._layer2_derived_polars(layer1_for_l2, data, config)
+                result_df, failed_engines, present = self._layer2_derived_polars(
+                    layer1_for_l2, data, config
+                )
             else:
-                result = self._layer2_derived_pandas(layer1_for_l2, data, config)
+                result_df, failed_engines, present = self._layer2_derived_pandas(
+                    layer1_for_l2, data, config
+                )
 
         elapsed = time.perf_counter() - t0
-        logger.info("[L2] Completed: %d cols in %.2fs", result.shape[1], elapsed)
-        return result
+        logger.info("[L2] Completed: %d cols in %.2fs", result_df.shape[1], elapsed)
+        return self._build_layer_result(
+            data=result_df,
+            configured_engines=configured,
+            present_engines=present,
+            failed_engines=failed_engines,
+        )
 
     def _layer2_derived_pandas(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, Tuple[str, ...], int]:
         """Legacy pandas path for L2 derived features.
 
         P1.3 — When per-category mode is in effect (registry persistence),
@@ -1074,11 +1230,25 @@ class FeatureFactory:
         serialised in the main thread to avoid concurrent-write races.
         """
         filtered_ops = self._filter_operators_config(config.operators)
-        engine = DerivedOperatorEngine(filtered_ops)
+        op_engine_cls = _derived_operator_engine_cls()
+        engine = op_engine_cls(filtered_ops)
         indicator_specs = self._build_indicator_specs(layer1, config)
 
+        categories = list(op_engine_cls.OPERATOR_CATEGORIES)
+        failed_engines: List[str] = []
+
         if self._cgsa_registry is None:
-            return engine.compute_all(layer1, data, indicator_specs)
+            try:
+                result = engine.compute_all(layer1, data, indicator_specs)
+            except Exception as exc:
+                logger.error("[L2] compute_all failed: %s", exc, exc_info=True)
+                return pd.DataFrame(index=layer1.index), ("all_operators",), 0
+            present = 1 if result is not None and not result.empty else 0
+            return (
+                result if result is not None else pd.DataFrame(index=layer1.index),
+                (),
+                present,
+            )
 
         estimated_cols = self._estimate_l2_output_cols(layer1.shape[1], filtered_ops)
         if estimated_cols > MAX_L2_ESTIMATED_COLS:
@@ -1091,13 +1261,17 @@ class FeatureFactory:
         from momentum.FeatureEngineering.utils.hardware_utils import get_l2_category_workers
 
         category_workers = get_l2_category_workers()
-        categories = list(DerivedOperatorEngine.OPERATOR_CATEGORIES)
 
         if category_workers <= 1 or len(categories) <= 1:
             # Serial fallback (or trivial single-category case).
             category_frames: List[pd.DataFrame] = []
             for category in categories:
-                category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+                try:
+                    category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+                except Exception as error:
+                    logger.error("[L2] Category %s failed: %s", category, error, exc_info=True)
+                    failed_engines.append(category)
+                    continue
                 if category_frame is None or category_frame.empty:
                     continue
                 self._persist_layer2_category_group(category, category_frame)
@@ -1122,6 +1296,7 @@ class FeatureFactory:
                         logger.error(
                             "[L2] Category %s failed: %s", category, error, exc_info=True
                         )
+                        failed_engines.append(category)
                         continue
                     if category_frame is None or category_frame.empty:
                         continue
@@ -1145,56 +1320,68 @@ class FeatureFactory:
                 time.perf_counter() - t0,
             )
 
+        present = len(category_frames)
         if category_frames:
-            return pd.concat(category_frames, axis=1)
-        return pd.DataFrame(index=layer1.index)
+            return pd.concat(category_frames, axis=1), tuple(failed_engines), present
+        return pd.DataFrame(index=layer1.index), tuple(failed_engines), present
 
     def _layer2_derived_polars(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
-    ) -> pd.DataFrame:
+    ) -> Tuple[pd.DataFrame, Tuple[str, ...], int]:
         """Polars-based path for L2 derived features (Task 4.1 + 4.2).
 
         Converts L1 to Polars for batch with_columns() operations,
         then converts back to pandas for downstream compatibility.
         """
         filtered_ops = self._filter_operators_config(config.operators)
-        engine = DerivedOperatorEngine(filtered_ops)
+        op_engine_cls = _derived_operator_engine_cls()
+        engine = op_engine_cls(filtered_ops)
         indicator_specs = self._build_indicator_specs(layer1, config)
 
-        # Use Polars batch computation via engine's polars path
-        result = engine.compute_all_polars(layer1, data, indicator_specs)
+        failed_engines: List[str] = []
+        try:
+            result = engine.compute_all_polars(layer1, data, indicator_specs)
+        except Exception as exc:
+            logger.error("[L2] Polars compute_all failed: %s", exc, exc_info=True)
+            return pd.DataFrame(index=layer1.index), ("all_operators",), 0
 
         if result is None or result.empty:
-            return pd.DataFrame(index=layer1.index)
+            return pd.DataFrame(index=layer1.index), (), 0
 
-        # Persist to CGSA registry if enabled
+        present = 1
         if self._cgsa_registry is not None:
-            for category in DerivedOperatorEngine.OPERATOR_CATEGORIES:
-                category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+            present = 0
+            for category in op_engine_cls.OPERATOR_CATEGORIES:
+                try:
+                    category_frame = engine.compute_category(layer1, data, indicator_specs, category)
+                except Exception as error:
+                    logger.error("[L2] Category %s failed: %s", category, error, exc_info=True)
+                    failed_engines.append(category)
+                    continue
                 if category_frame is not None and not category_frame.empty:
                     self._persist_layer2_category_group(category, category_frame)
+                    present += 1
+            if present == 0 and not result.empty:
+                present = 1
 
-        return result
+        return result, tuple(failed_engines), present
 
     def _layer3_rolling_aggregation(
         self, layer1: pd.DataFrame, layer2: pd.DataFrame, config: "FactoryConfig"
-    ) -> pd.DataFrame:
+    ) -> LayerExecutionResult:
         # Only apply rolling aggregation to Layer 1 atomic indicators.
-        # Layer 2 derived features (e.g. %change, log_return) must NOT be included here:
-        # feeding them into rolling aggregation would create semantically redundant features
-        # and inflate the feature space by ~20× unnecessarily.
         base = self._combine_layers([layer1], context="layer3_input")
-        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L3 rolling
         base = self._apply_cascade_blacklist(base, "L3_input", config)
+        index = base.index if len(base.index) > 0 else layer1.index
         if base.empty:
-            return pd.DataFrame(index=base.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
         filtered_config = self._filter_rolling_config(config.rolling_aggregation)
         aggregator = RollingAggregator(filtered_config)
 
-        # Plan A: streaming persist when CGSA is enabled and tier prefers it.
-        # The persister buffers small chunks per step and flushes to
-        # ColumnGroupRegistry as soon as buffer reaches the tier-specific limit,
-        # so the wide L3 DataFrame (~10 GB at 1h timeframe) is never materialised.
         from momentum.FeatureEngineering.utils.hardware_utils import (
             get_l3_persist_mode,
             get_l3_streaming_buffer_cols,
@@ -1209,18 +1396,45 @@ class FeatureFactory:
             )
             try:
                 _ = aggregator.compute_all(base, persist_callback=persister)
+            except Exception as exc:
+                logger.error("[L3] streaming persist failed: %s", exc, exc_info=True)
+                return self._build_layer_result(
+                    data=pd.DataFrame(index=index),
+                    configured_engines=1,
+                    present_engines=0,
+                    reason=str(exc),
+                    layer_exception=True,
+                )
             finally:
                 persister.flush_all()
             logger.info(
                 "[L3] streaming persist (mode=%s) complete: %d cols persisted in %d groups",
                 persist_mode, persister.total_cols, persister.total_groups,
             )
-            # Return an empty DataFrame keyed by the input index so downstream
-            # layers (L4 fast path uses only L1+raw) compose correctly.
-            return pd.DataFrame(index=base.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                offloaded=True,
+            )
 
-        # Classic in-memory path (tier_xlarge or CGSA disabled).
-        return aggregator.compute_all(base)
+        try:
+            result = aggregator.compute_all(base)
+        except Exception as exc:
+            logger.error("[L3] compute_all failed: %s", exc, exc_info=True)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                reason=str(exc),
+                layer_exception=True,
+            )
+        present = 1 if result is not None and not result.empty else 0
+        return self._build_layer_result(
+            data=result if result is not None else pd.DataFrame(index=index),
+            configured_engines=1,
+            present_engines=present,
+        )
 
     def _layer4_lag_features(
         self,
@@ -1229,7 +1443,7 @@ class FeatureFactory:
         layer3: pd.DataFrame,
         data: pd.DataFrame,
         config: "FactoryConfig",
-    ) -> pd.DataFrame:
+    ) -> LayerExecutionResult:
         # LagProcessor.apply_to is typically "layer1_and_raw", which only
         # selects L1 and raw-data columns.  Passing the full
         # [data, layer1, layer2, layer3] creates a massive intermediate
@@ -1251,49 +1465,110 @@ class FeatureFactory:
             base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")
         # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L4 lag（含 non-CGSA fallback 路徑）
         base = self._apply_cascade_blacklist(base, f"L4_input[{apply_to}]", config)
+        index = base.index if len(base.index) > 0 else layer1.index
         if base.empty:
-            return pd.DataFrame(index=base.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
         processor = LagProcessor(config)
-        return processor.compute_all(base)
+        try:
+            result = processor.compute_all(base)
+        except Exception as exc:
+            logger.error("[L4] compute_all failed: %s", exc, exc_info=True)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                reason=str(exc),
+                layer_exception=True,
+            )
+        present = 1 if result is not None and not result.empty else 0
+        return self._build_layer_result(
+            data=result if result is not None else pd.DataFrame(index=index),
+            configured_engines=1,
+            present_engines=present,
+        )
 
     def _layer5_cross_sectional(
         self, layer1: pd.DataFrame, layer2: pd.DataFrame, config: "FactoryConfig"
-    ) -> pd.DataFrame:
+    ) -> LayerExecutionResult:
+        index = layer1.index
         if not config.cross_sectional.enabled:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=0,
+                present_engines=0,
+                layer_enabled=False,
+            )
 
         symbol = self._current_symbol
         timeframe = self._current_timeframe
         if not symbol or not timeframe:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
 
         reference_symbol = config.cross_sectional.reference_symbol
         if not reference_symbol or reference_symbol == symbol:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
 
+        cache_key = (reference_symbol, timeframe)
         try:
-            cache_key = (reference_symbol, timeframe)
             if cache_key in self._reference_data_cache:
                 ref_data = self._reference_data_cache[cache_key]
-                # Cached negative lookup: reference data unavailable in this run.
                 if ref_data is None:
-                    return pd.DataFrame(index=layer1.index)
+                    return self._build_layer_result(
+                        data=pd.DataFrame(index=index),
+                        configured_engines=1,
+                        present_engines=0,
+                        dependency_error=True,
+                        reason="reference fetch cached failure",
+                    )
             else:
                 ref_data = self._layer0_data_ingestion(reference_symbol, timeframe, config)
                 self._reference_data_cache[cache_key] = ref_data
         except Exception as exc:
-            # Cache negative result to avoid repeated failing fetch attempts.
             self._reference_data_cache[cache_key] = None
             logger.error("Cross-sectional reference fetch failed: %s", exc, exc_info=True)
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                dependency_error=True,
+                reason=str(exc),
+            )
 
         if ref_data.empty:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                dependency_error=True,
+                reason="reference data empty",
+            )
 
         if self._current_raw_data is None or "close" not in self._current_raw_data.columns:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
         if "close" not in ref_data.columns:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+                dependency_error=True,
+                reason="reference close column missing",
+            )
 
         processor = RelativeStrengthProcessor()
         symbol_close = self._current_raw_data["close"]
@@ -1303,7 +1578,11 @@ class FeatureFactory:
             axis=1,
         ).dropna()
         if aligned.empty:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
         symbol_close = aligned["symbol"]
         btc_close = aligned["btc"]
         symbol_returns = symbol_close.pct_change()
@@ -1325,9 +1604,18 @@ class FeatureFactory:
             )
 
         if not frames:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
 
-        return pd.concat(frames, axis=1).reindex(layer1.index)
+        output = pd.concat(frames, axis=1).reindex(layer1.index)
+        return self._build_layer_result(
+            data=output,
+            configured_engines=1,
+            present_engines=1,
+        )
 
     def _layer6_meta_features(
         self,
@@ -1335,7 +1623,7 @@ class FeatureFactory:
         layer2: pd.DataFrame,
         data: pd.DataFrame,
         config: "FactoryConfig",
-    ) -> pd.DataFrame:
+    ) -> LayerExecutionResult:
         """
         Layer 6 — Meta Features（元特徵層）
 
@@ -1387,46 +1675,81 @@ class FeatureFactory:
             → 使用者可在 scan_config.yaml 指定 meta_features.consensus_indicators
             → 無需改 Python 程式碼即可擴展 sub-engine 使用的指標集
         """
+        index = layer1.index
         if not config.meta_features.enabled:
-            return pd.DataFrame(index=layer1.index)
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=0,
+                present_engines=0,
+                layer_enabled=False,
+            )
 
-        frames: List[pd.DataFrame] = []
+        sub_tasks: List[Tuple[str, Callable[[], Optional[pd.DataFrame]]]] = []
         consensus_engine = ConsensusFeatureEngine()
         interaction_engine = InteractionFeatureEngine()
         time_engine = TimeFeatureEngine()
 
         if config.meta_features.trend_consensus:
-            frames.append(consensus_engine.compute_trend_consensus(layer1).to_frame())
+            sub_tasks.append(
+                ("trend_consensus", lambda: consensus_engine.compute_trend_consensus(layer1).to_frame())
+            )
         if config.meta_features.momentum_divergence:
-            frames.append(consensus_engine.compute_momentum_divergence(layer1).to_frame())
+            sub_tasks.append(
+                ("momentum_divergence", lambda: consensus_engine.compute_momentum_divergence(layer1).to_frame())
+            )
         if config.meta_features.volume_price_divergence:
-            frames.append(consensus_engine.compute_volume_price_divergence(layer1, data).to_frame())
+            sub_tasks.append(
+                (
+                    "volume_price_divergence",
+                    lambda: consensus_engine.compute_volume_price_divergence(layer1, data).to_frame(),
+                )
+            )
         if config.meta_features.volatility_regime:
-            frames.append(consensus_engine.compute_volatility_regime(layer1).to_frame())
-
+            sub_tasks.append(
+                ("volatility_regime", lambda: consensus_engine.compute_volatility_regime(layer1).to_frame())
+            )
         if config.meta_features.interaction:
-            frames.append(interaction_engine.compute_all(layer1, data))
-
+            sub_tasks.append(
+                ("interaction", lambda: interaction_engine.compute_all(layer1, data))
+            )
         if config.meta_features.time_features:
-            # data.index 在本專案中存儲的是 Unix 秒（int64）。
-            # 必須先用 _coerce_index_to_datetime()（可自動偵測 s/ms/us/ns 單位）
-            # 轉換為 datetime64 Series，再傳入 TimeFeatureEngine，
-            # 否則 unit="ms" 會把秒當毫秒，將所有日期錯誤映射到 1970-01-21，
-            # 導致 DayOfWeek/IsWeekend/MonthOfYear 全為常數並被 Layer 7 丟棄。
-            #
-            # 重要：_coerce_index_to_datetime 內部使用 pd.Series(index)，
-            # 回傳的 Series 帶有預設 RangeIndex(0,1,2...)。
-            # 必須將其 index 重設回 data.index，
-            # 才能在 pd.concat(frames, axis=1) 時與其他 frames 正確對齊。
-            dt_index = self._coerce_index_to_datetime(data.index)
-            dt_index.index = data.index  # 恢復原始 index，避免 concat 時全行變 NaN
-            frames.append(time_engine.compute_all(dt_index))
+            def _time_features() -> pd.DataFrame:
+                dt_index = self._coerce_index_to_datetime(data.index)
+                dt_index.index = data.index
+                return time_engine.compute_all(dt_index)
 
-        frames = [frame for frame in frames if frame is not None and not frame.empty]
+            sub_tasks.append(("time_features", _time_features))
+
+        if not sub_tasks:
+            return self._build_layer_result(
+                data=pd.DataFrame(index=index),
+                configured_engines=1,
+                present_engines=0,
+            )
+
+        frames: List[pd.DataFrame] = []
+        failed_engines: List[str] = []
+        for name, builder in sub_tasks:
+            try:
+                frame = builder()
+            except Exception as exc:
+                logger.warning("[L6] sub-engine %s failed: %s", name, exc)
+                failed_engines.append(name)
+                continue
+            if frame is not None and not frame.empty:
+                frames.append(frame)
+
         if not frames:
-            return pd.DataFrame(index=layer1.index)
+            output = pd.DataFrame(index=index)
+        else:
+            output = pd.concat(frames, axis=1)
 
-        return pd.concat(frames, axis=1)
+        return self._build_layer_result(
+            data=output,
+            configured_engines=len(sub_tasks),
+            present_engines=len(frames),
+            failed_engines=tuple(failed_engines),
+        )
 
     def run_ic_first_pipeline(
         self,
@@ -1651,13 +1974,13 @@ class FeatureFactory:
     ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
         raw_data = self._layer0_data_ingestion(symbol, tf, config)
         self._current_raw_data = raw_data
-        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config)
-        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config).data
+        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config).data
         layer2 = self._spill_to_memmap(layer2, "layer2")
-        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
-        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config)
-        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
-        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
+        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config).data
+        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config).data
+        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config).data
+        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config).data
         return raw_data, [layer1, layer2, layer3, layer4, layer5, layer6]
 
     @staticmethod
@@ -2962,6 +3285,13 @@ class FeatureFactory:
             if pd.api.types.is_numeric_dtype(df[column_name])
         ]
         if not numeric_columns:
+            return df
+
+        if all(
+            pd.api.types.is_float_dtype(df[column_name])
+            and df[column_name].dtype == np.float32
+            for column_name in numeric_columns
+        ):
             return df
 
         # Batched conversion avoids costly per-column block fragmentation on very wide DataFrames.

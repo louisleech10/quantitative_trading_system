@@ -113,7 +113,7 @@ def test_task24_l2_per_category_emit_and_registry_save(tmp_path, monkeypatch):
     monkeypatch.setattr(factory, "_build_indicator_specs", lambda _layer1, _config: indicator_specs)
 
     config = _DummyConfig(_operators_payload(cross_enabled=True))
-    result = factory._layer2_derived_features(layer1, raw_data, config)
+    result = factory._layer2_derived_features(layer1, raw_data, config).data
 
     assert list(result.columns) == ["close_trend_EMA_5_21_Cross"]
 

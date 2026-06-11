@@ -7,12 +7,13 @@ import pandas as pd
 try:
     from momentum.FeatureEngineering.config_manager import ConfigManager
     from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from momentum.factories import create_feature_factory
 
     cfg = ConfigManager().get_merged_config()
     factory = create_feature_factory()
     raw = factory._layer0_data_ingestion("ETHUSDT", "12h", cfg)
-    layer1 = factory._layer1_atomic_indicators(raw, cfg)
+    layer1 = FeatureFactory.layer_data(factory._layer1_atomic_indicators(raw, cfg))
     subset = layer1.iloc[:, :64]
 
     roll_cfg = cfg.rolling_aggregation.model_dump(by_alias=True)

@@ -13,6 +13,8 @@ from momentum.FeatureEngineering import memmap_utils
 
 
 class _DummyDerivedOperatorEngine:
+    OPERATOR_CATEGORIES = ("dummy",)
+
     def __init__(self, _config):
         self._config = _config
 
@@ -66,6 +68,7 @@ def _make_result(features_df: pd.DataFrame):
 
 def test_l2_timing_log_emitted(monkeypatch, caplog):
     """測試 T0.1：L2 應輸出 Starting 與 Completed 計時日誌。"""
+    monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = feature_factory_module.FeatureFactory.__new__(feature_factory_module.FeatureFactory)
     factory._cgsa_registry = None
     monkeypatch.setattr(factory, "_filter_operators_config", lambda _operators: {})
@@ -77,7 +80,7 @@ def test_l2_timing_log_emitted(monkeypatch, caplog):
     config = SimpleNamespace(operators=SimpleNamespace(enabled=True))
 
     caplog.set_level(logging.INFO, logger=feature_factory_module.logger.name)
-    result = factory._layer2_derived_features(layer1, raw_data, config)
+    result = factory._layer2_derived_features(layer1, raw_data, config).data
 
     assert "derived" in result.columns
     assert any("[L2] Starting derived features:" in rec.message for rec in caplog.records)
@@ -85,7 +88,7 @@ def test_l2_timing_log_emitted(monkeypatch, caplog):
 
     # 邊界情況：L1 為空時不應崩潰。
     empty_layer1 = pd.DataFrame(index=layer1.index)
-    empty_result = factory._layer2_derived_features(empty_layer1, raw_data, config)
+    empty_result = factory._layer2_derived_features(empty_layer1, raw_data, config).data
     assert empty_result.empty
 
 

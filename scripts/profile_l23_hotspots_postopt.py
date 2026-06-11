@@ -11,7 +11,7 @@ def main() -> None:
     cfg = ConfigManager().get_merged_config()
     factory = create_feature_factory()
     raw = factory._layer0_data_ingestion("ETHUSDT", "12h", cfg)
-    layer1 = factory._layer1_atomic_indicators(raw, cfg)
+    layer1 = factory._layer1_atomic_indicators(raw, cfg).data
 
     sections = [
         "distance",

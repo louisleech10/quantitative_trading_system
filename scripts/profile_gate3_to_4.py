@@ -37,7 +37,7 @@ def main() -> None:
 
     # L1
     t0 = time.perf_counter()
-    layer1 = factory._layer1_atomic_indicators(raw, cfg)
+    layer1 = factory._layer1_atomic_indicators(raw, cfg).data
     l1_time = time.perf_counter() - t0
     print(f"[L1] atomic_indicators: {l1_time:.3f}s, shape={layer1.shape}")
 

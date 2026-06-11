@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.timeframe.tf_aligner import CURRENT_MTF_ALIGN_VERSION, TimeframeAligner
 
@@ -174,19 +175,17 @@ class MultiTFGenerator:
 
             l1_l6_start = time.perf_counter()
             try:
-                layer1 = self._factory._layer1_atomic_indicators(raw_data, self._config)
-                layer2 = self._factory._layer2_derived_features(layer1, raw_data, self._config)
-                layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
-                layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, raw_data, self._config)
-                layer5 = self._factory._layer5_cross_sectional(layer1, layer2, self._config)
-                layer6 = self._factory._layer6_meta_features(layer1, layer2, raw_data, self._config)
+                layer_results = self._run_tf_l1_l6_results(raw_data)
+                layer1, layer2, layer3, layer4, layer5, layer6 = [
+                    self._factory.layer_data(item) for item in layer_results
+                ]
             except Exception as exc:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
                 continue
 
             # Persist L3/L4/L5/L6 to CGSA registry (L1/L2 are persisted inside their layer methods).
-            if layer3 is not None and not layer3.empty:
+            if layer_results[2].status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
                 self._factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
             if layer4 is not None and not layer4.empty:
                 self._factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
@@ -198,7 +197,7 @@ class MultiTFGenerator:
             stage_seconds["dual_tf_l1_l6"] += time.perf_counter() - l1_l6_start
 
             tf_layer_counts[timeframe] = self._collect_layer_counts(
-                [layer1, layer2, layer3, layer4, layer5, layer6]
+                layer_results, registry=registry, timeframe=timeframe
             )
             del layer1, layer2, layer3, layer4, layer5, layer6
             gc.collect()
@@ -400,20 +399,20 @@ class MultiTFGenerator:
             self._factory._current_timeframe = self._primary_tf
 
             try:
-                layer1 = self._factory._layer1_atomic_indicators(primary_raw, self._config)
-                layer2 = self._factory._layer2_derived_features(layer1, primary_raw, self._config)
-                layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
-                layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, primary_raw, self._config)
-                layer5 = self._factory._layer5_cross_sectional(layer1, layer2, self._config)
-                layer6 = self._factory._layer6_meta_features(layer1, layer2, primary_raw, self._config)
+                layer_results = self._run_tf_l1_l6_results(primary_raw)
             except Exception as exc:
                 logger.error("Primary TF pipeline failed: %s", exc, exc_info=True)
                 raise
 
-            for layer_df, layer_src, label in [
-                (layer3, _LS.L3, "L3_rolling"), (layer4, _LS.L4, "L4_lag"),
-                (layer5, _LS.L5, "L5_cross"), (layer6, _LS.L6, "L6_meta"),
+            for layer_result, layer_src, label in [
+                (layer_results[2], _LS.L3, "L3_rolling"),
+                (layer_results[3], _LS.L4, "L4_lag"),
+                (layer_results[4], _LS.L5, "L5_cross"),
+                (layer_results[5], _LS.L6, "L6_meta"),
             ]:
+                if layer_result.status == LayerStatus.offloaded_to_registry:
+                    continue
+                layer_df = layer_result.data
                 if layer_df is not None and not layer_df.empty:
                     self._factory._persist_layer_output_groups(layer_df, layer_src, label)
 
@@ -424,7 +423,6 @@ class MultiTFGenerator:
             tf_layer_counts[self._primary_tf] = self._collect_layer_counts_from_registry(
                 registry, self._primary_tf
             )
-            del layer1, layer2, layer3, layer4, layer5, layer6
             gc.collect()
 
             # Persist primary TF progress immediately so a crash before workers
@@ -1227,37 +1225,22 @@ class MultiTFGenerator:
                 continue
 
             try:
-                layer1 = self._factory._layer1_atomic_indicators(raw_data, self._config)
-                layer2 = self._factory._layer2_derived_features(layer1, raw_data, self._config)
-
-                # Spill layer2 to memmap before L3 to avoid OOM on 8 GB M1.
-                # In single-TF path this is done in feature_factory.py; multi-TF
-                # calls layer methods directly so we must spill here too.
-                spill_to_memmap = getattr(self._factory, "_spill_to_memmap", None)
-                if not callable(spill_to_memmap):
-                    from momentum.FeatureEngineering.feature_factory import FeatureFactory
-
-                    spill_to_memmap = FeatureFactory._spill_to_memmap
-                layer2 = spill_to_memmap(layer2, "layer2")
-
-                layer3 = self._factory._layer3_rolling_aggregation(layer1, layer2, self._config)
-                layer4 = self._factory._layer4_lag_features(layer1, layer2, layer3, raw_data, self._config)
-                layer5 = self._factory._layer5_cross_sectional(layer1, layer2, self._config)
-                layer6 = self._factory._layer6_meta_features(layer1, layer2, raw_data, self._config)
+                layer_results = self._run_tf_l1_l6_results(raw_data)
+                layer1, layer2, layer3, layer4, layer5, layer6 = [
+                    self._factory.layer_data(item) for item in layer_results
+                ]
             except Exception as exc:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
                 continue
 
-            tf_layer_counts[timeframe] = self._collect_layer_counts(
-                [layer1, layer2, layer3, layer4, layer5, layer6]
-            )
+            tf_layer_counts[timeframe] = self._collect_layer_counts(layer_results)
 
             combined = self._factory._combine_layers(
                 [layer1, layer2, layer3, layer4, layer5, layer6],
                 context="multi_tf_layers",
             )
-            del layer1, layer2, layer3, layer4, layer5, layer6
+            del layer1, layer2, layer3, layer4, layer5, layer6, layer_results
             gc.collect()
             if timeframe == self._primary_tf:
                 if len(combined.index) != len(primary_timestamps):
@@ -1333,17 +1316,68 @@ class MultiTFGenerator:
             self._progress_callback({"stage": stage, "progress": progress, "message": message})
         logger.info("[multi_tf:%s] %0.0f%% - %s", stage, progress * 100, message)
 
+    def _run_tf_l1_l6_results(self, raw_data: pd.DataFrame) -> List[LayerExecutionResult]:
+        """執行 L1-L6（typed executor + L2 spill），回傳六層 LayerExecutionResult。"""
+        factory = self._factory
+        config = self._config
+        r1 = factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw_data, config)
+        layer1 = r1.data
+        r2 = factory._execute_layer1_6("Layer 2", factory._layer2_derived_features, layer1, raw_data, config)
+        layer2 = factory._spill_to_memmap(r2.data, "layer2")
+        r3 = factory._execute_layer1_6("Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config)
+        r4 = factory._execute_layer1_6(
+            "Layer 4",
+            factory._layer4_lag_features,
+            layer1,
+            layer2,
+            r3.data,
+            raw_data,
+            config,
+        )
+        r5 = factory._execute_layer1_6("Layer 5", factory._layer5_cross_sectional, layer1, layer2, config)
+        r6 = factory._execute_layer1_6(
+            "Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config
+        )
+        return [r1, r2, r3, r4, r5, r6]
+
     @staticmethod
-    def _collect_layer_counts(layers: Iterable[pd.DataFrame]) -> Dict[str, int]:
+    def _collect_layer_counts(
+        layers: Iterable[pd.DataFrame | LayerExecutionResult],
+        registry: Optional[object] = None,
+        timeframe: Optional[str] = None,
+    ) -> Dict[str, int]:
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+
+        layer_keys = ["layer1", "layer2", "layer3", "layer4", "layer5", "layer6"]
+        layer_sources = [_LS.L1, _LS.L2, _LS.L3, _LS.L4, _LS.L5, _LS.L6]
         layer_list = list(layers)
-        return {
-            "layer1": layer_list[0].shape[1] if len(layer_list) > 0 and layer_list[0] is not None else 0,
-            "layer2": layer_list[1].shape[1] if len(layer_list) > 1 and layer_list[1] is not None else 0,
-            "layer3": layer_list[2].shape[1] if len(layer_list) > 2 and layer_list[2] is not None else 0,
-            "layer4": layer_list[3].shape[1] if len(layer_list) > 3 and layer_list[3] is not None else 0,
-            "layer5": layer_list[4].shape[1] if len(layer_list) > 4 and layer_list[4] is not None else 0,
-            "layer6": layer_list[5].shape[1] if len(layer_list) > 5 and layer_list[5] is not None else 0,
-        }
+        counts: Dict[str, int] = {}
+        for index, key in enumerate(layer_keys):
+            if index >= len(layer_list):
+                counts[key] = 0
+                continue
+            layer = layer_list[index]
+            if isinstance(layer, LayerExecutionResult):
+                if (
+                    layer.status == LayerStatus.offloaded_to_registry
+                    and registry is not None
+                    and timeframe is not None
+                ):
+                    counts[key] = sum(
+                        group.shape[1]
+                        for _, group in registry.iter_all()  # type: ignore[attr-defined]
+                        if getattr(group, "timeframe", None) == timeframe
+                        and group.layer == layer_sources[index]
+                    )
+                elif layer.data is not None:
+                    counts[key] = layer.data.shape[1]
+                else:
+                    counts[key] = 0
+            elif isinstance(layer, pd.DataFrame):
+                counts[key] = layer.shape[1] if layer is not None else 0
+            else:
+                counts[key] = 0
+        return counts
 
     @staticmethod
     def _collect_layer_counts_from_registry(registry: object, tf: str) -> Dict[str, int]:
@@ -1543,53 +1577,45 @@ def _tf_worker_entry(
         from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
         import gc as _gc
 
-        layer1 = factory._layer1_atomic_indicators(raw_data, config)
-        layer2 = factory._layer2_derived_features(layer1, raw_data, config)
-        layer3 = factory._layer3_rolling_aggregation(layer1, layer2, config)
-        # Plan A streaming: when L3 streaming-persist is active, layer3 is an
-        # empty index-only DataFrame because survivors are already in registry.
-        # Read true count from the registry instead of layer3.shape.
-        if layer3 is not None and not layer3.empty:
+        r1 = factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw_data, config)
+        layer1 = r1.data
+        r2 = factory._execute_layer1_6("Layer 2", factory._layer2_derived_features, layer1, raw_data, config)
+        layer2 = r2.data
+        r3 = factory._execute_layer1_6("Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config)
+        layer3 = r3.data
+        if r3.status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
             factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
-            layer_counts_l3 = layer3.shape[1]
-        else:
-            registry = getattr(factory, "_cgsa_registry", None)
-            layer_counts_l3 = sum(
-                g.shape[1] for _, g in registry.iter_all() if g.layer == _LS.L3
-            ) if registry is not None else 0
         del layer3
         _gc.collect()
 
-        layer4 = factory._layer4_lag_features(layer1, layer2, None, raw_data, config)
-        layer_counts_l4 = layer4.shape[1] if layer4 is not None else 0
+        r4 = factory._execute_layer1_6(
+            "Layer 4", factory._layer4_lag_features, layer1, layer2, None, raw_data, config
+        )
+        layer4 = r4.data
         if layer4 is not None and not layer4.empty:
             factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
         del layer4
         _gc.collect()
 
-        layer5 = factory._layer5_cross_sectional(layer1, layer2, config)
-        layer_counts_l5 = layer5.shape[1] if layer5 is not None else 0
+        r5 = factory._execute_layer1_6("Layer 5", factory._layer5_cross_sectional, layer1, layer2, config)
+        layer5 = r5.data
         if layer5 is not None and not layer5.empty:
             factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
         del layer5
         _gc.collect()
 
-        layer6 = factory._layer6_meta_features(layer1, layer2, raw_data, config)
-        layer_counts_l6 = layer6.shape[1] if layer6 is not None else 0
+        r6 = factory._execute_layer1_6("Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config)
+        layer6 = r6.data
         if layer6 is not None and not layer6.empty:
             factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
         del layer6
 
-        # L1/L2 already persisted inside their layer methods; capture counts
-        # then drop wide DataFrames before collecting group metadata.
-        layer_counts = {
-            "layer1": layer1.shape[1] if layer1 is not None else 0,
-            "layer2": layer2.shape[1] if layer2 is not None else 0,
-            "layer3": layer_counts_l3,
-            "layer4": layer_counts_l4,
-            "layer5": layer_counts_l5,
-            "layer6": layer_counts_l6,
-        }
+        registry = getattr(factory, "_cgsa_registry", None)
+        layer_counts = MultiTFGenerator._collect_layer_counts(
+            [r1, r2, r3, r4, r5, r6],
+            registry=registry,
+            timeframe=timeframe,
+        )
         del layer1, layer2
         _gc.collect()
 

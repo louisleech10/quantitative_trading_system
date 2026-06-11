@@ -8,6 +8,12 @@ from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGene
 from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 from momentum.FeatureEngineering.feature_config import AlignmentMode
 
+from tests._helpers.stub_layer_execute import (
+    stub_execute_layer1_6,
+    stub_layer_data,
+    stub_spill_to_memmap,
+)
+
 
 class DummyTimeframes:
     primary = "12h"
@@ -30,6 +36,13 @@ class StubFactory:
         if timeframe not in self._data_by_tf:
             raise FileNotFoundError(timeframe)
         return self._data_by_tf[timeframe]
+
+    def _execute_layer1_6(self, layer_name, func, *args):
+        del layer_name
+        return stub_execute_layer1_6(func, *args)
+
+    _spill_to_memmap = staticmethod(stub_spill_to_memmap)
+    layer_data = stub_layer_data
 
     def _layer1_atomic_indicators(self, data, config):
         return pd.DataFrame(
