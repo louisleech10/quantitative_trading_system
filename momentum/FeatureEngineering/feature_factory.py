@@ -889,7 +889,42 @@ class FeatureFactory:
 
         manifest_path = work_dir / "manifest.json"
         force_fresh = bool(getattr(self, "_cgsa_force_fresh", False))
-        if manifest_path.exists() and not force_fresh:
+        resume_allowed = manifest_path.exists() and not force_fresh
+        if resume_allowed:
+            from momentum.FeatureEngineering.consumer_gate import is_run_status_cacheable
+            from momentum.FeatureEngineering.feature_storage import resolve_run_status
+
+            l7_manifest_path = (
+                self._storage.feature_run_dir(symbol, timeframe, config_hash)
+                / self._storage.L7_V2_MANIFEST_NAME
+            )
+            if config_hash:
+                if not l7_manifest_path.exists():
+                    logger.info(
+                        "[CGSA] Skipping resume at %s: L7 manifest missing at %s",
+                        work_dir,
+                        l7_manifest_path,
+                    )
+                    resume_allowed = False
+                else:
+                    try:
+                        l7_manifest = json.loads(l7_manifest_path.read_text(encoding="utf-8"))
+                        l7_status = resolve_run_status(l7_manifest)
+                    except (OSError, json.JSONDecodeError) as exc:
+                        logger.warning(
+                            "[CGSA] L7 manifest unreadable for resume gate %s: %s",
+                            l7_manifest_path,
+                            exc,
+                        )
+                        l7_status = "unknown"
+                    if not is_run_status_cacheable(l7_status):
+                        logger.info(
+                            "[CGSA] Skipping resume at %s: L7 run_status=%s",
+                            work_dir,
+                            l7_status,
+                        )
+                        resume_allowed = False
+        if resume_allowed:
             try:
                 with manifest_path.open("r", encoding="utf-8") as handle:
                     manifest_payload = json.load(handle)
@@ -3370,6 +3405,8 @@ class FeatureFactory:
         # fragment the numerical cache key.
         config_payload.pop("allow_partial_layers", None)
         config_payload.pop("allow_partial_timeframes", None)
+        config_payload.pop("allow_partial_ic", None)
+        config_payload.pop("allow_partial_training", None)
         preprocessing_payload = config_payload.get("preprocessing")
         if isinstance(preprocessing_payload, dict):
             preprocessing_payload.setdefault("causal_preprocessing", True)
@@ -3388,6 +3425,12 @@ class FeatureFactory:
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
     def _try_load_cache(self, symbol: str, timeframe: str, config_hash: str) -> Optional[FeatureGenerationResult]:
+        from momentum.FeatureEngineering.consumer_gate import (
+            effective_run_status_from_metadata,
+            is_run_status_cacheable,
+        )
+        from momentum.FeatureEngineering.feature_storage import resolve_run_status
+
         try:
             cached = self._storage.load_factory_output(symbol, timeframe)
         except Exception as exc:
@@ -3397,6 +3440,44 @@ class FeatureFactory:
             return None
         cached_hash = cached.metadata.get("config_hash") if isinstance(cached.metadata, dict) else None
         if cached_hash != config_hash:
+            return None
+        metadata = cached.metadata if isinstance(cached.metadata, dict) else {}
+        run_status = effective_run_status_from_metadata(metadata)
+        if not is_run_status_cacheable(run_status):
+            logger.info(
+                "Cache miss for %s/%s [hash=%s]: run_status=%s",
+                symbol,
+                timeframe,
+                config_hash[:8],
+                run_status,
+            )
+            return None
+        manifest_path = (
+            self._storage.feature_run_dir(symbol, timeframe, config_hash)
+            / self._storage.L7_V2_MANIFEST_NAME
+        )
+        if not manifest_path.exists():
+            logger.info(
+                "Cache miss for %s/%s [hash=%s]: L7 manifest missing",
+                symbol,
+                timeframe,
+                config_hash[:8],
+            )
+            return None
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest_status = resolve_run_status(manifest)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Cache manifest read failed for %s/%s: %s", symbol, timeframe, exc)
+            return None
+        if not is_run_status_cacheable(manifest_status):
+            logger.info(
+                "Cache miss for %s/%s [hash=%s]: manifest run_status=%s",
+                symbol,
+                timeframe,
+                config_hash[:8],
+                manifest_status,
+            )
             return None
         logger.info("Cache hit for %s/%s [hash=%s]", symbol, timeframe, config_hash[:8])
         return cached

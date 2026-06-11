@@ -461,7 +461,20 @@ class NanStrategyConfig(BaseModel):
 
 
 class FactoryConfig(BaseModel):
+    """Feature Factory 主配置。
+
+    Fail-open gate 預設矩陣（§C-2）：allow_partial_* 全 False；max_inf_ratio=0；
+    max_nan_ratio=None 時 producer 讀 Phase0 baseline 上界。allow_partial_* 不進
+    config_hash；max_* 進 config_hash（影響數值輸出）。
+    """
+
     version: str = "2.2"
+    allow_partial_layers: bool = False
+    allow_partial_timeframes: bool = False
+    allow_partial_ic: bool = False
+    allow_partial_training: bool = False
+    max_inf_ratio: float = 0.0
+    max_nan_ratio: Optional[float] = None
     global_settings: GlobalSettings = Field(alias="global")
     data_sources: DataSourceConfig
     timeframes: TimeframeConfig

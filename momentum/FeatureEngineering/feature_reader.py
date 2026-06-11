@@ -20,6 +20,10 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from momentum.FeatureEngineering.consumer_gate import (
+    ConsumerPolicy,
+    assert_consumer_run_status,
+)
 from momentum.FeatureEngineering.feature_storage import (
     GAUSSIAN_INT16_ENCODING,
     L7_ENCODING_REGISTRY_METADATA_KEY,
@@ -55,6 +59,9 @@ class FeatureReader:
         tf: str,
         config_hash: str,
         artifact_kind: str = "raw",
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
     ) -> dict:
         """Load a complete V2 manifest, falling back to V7 legacy metadata."""
         manifest, _base_dir, _is_legacy = self._resolve_manifest_v2(
@@ -62,6 +69,8 @@ class FeatureReader:
             tf=tf,
             config_hash=config_hash,
             artifact_kind=artifact_kind,
+            consumer=consumer,
+            allow_partial=allow_partial,
         )
         return manifest
 
@@ -76,6 +85,9 @@ class FeatureReader:
         tf: str,
         config_hash: str,
         artifact_kind: str = "raw",
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
     ) -> Iterator[Tuple[str, pd.DataFrame]]:
         """Yield V2 groups one at a time from raw or processed canonical paths."""
         manifest, base_dir, is_legacy = self._resolve_manifest_v2(
@@ -83,6 +95,8 @@ class FeatureReader:
             tf=tf,
             config_hash=config_hash,
             artifact_kind=artifact_kind,
+            consumer=consumer,
+            allow_partial=allow_partial,
         )
         if is_legacy:
             yield from self.stream_groups(symbol, config_hash)
@@ -105,6 +119,9 @@ class FeatureReader:
         config_hash: str,
         columns: List[str],
         artifact_kind: str = "raw",
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
     ) -> pd.DataFrame:
         """Column projection for V2 raw/processed artifacts with legacy fallback."""
         manifest, base_dir, is_legacy = self._resolve_manifest_v2(
@@ -112,6 +129,8 @@ class FeatureReader:
             tf=tf,
             config_hash=config_hash,
             artifact_kind=artifact_kind,
+            consumer=consumer,
+            allow_partial=allow_partial,
         )
         if is_legacy:
             return self.load_columns(symbol, config_hash, columns)
@@ -316,30 +335,49 @@ class FeatureReader:
         tf: str,
         config_hash: str,
         artifact_kind: str,
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
     ) -> Tuple[dict, Path, bool]:
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
         manifest_path = run_dir / self.V2_MANIFEST_NAME
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self._validate_manifest_v2(manifest, artifact_kind, manifest_path)
+            self._validate_manifest_v2(
+                manifest,
+                artifact_kind,
+                manifest_path,
+                consumer=consumer,
+                allow_partial=allow_partial,
+            )
             return manifest, run_dir, False
 
         legacy_manifest = self.load_manifest(symbol, config_hash)
         legacy_dir = self._base / symbol / config_hash
-        return (
-            self._adapt_legacy_manifest_v2(
-                manifest=legacy_manifest,
-                symbol=symbol,
-                tf=tf,
-                config_hash=config_hash,
-                artifact_kind=artifact_kind,
-            ),
-            legacy_dir,
-            True,
+        adapted = self._adapt_legacy_manifest_v2(
+            manifest=legacy_manifest,
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            artifact_kind=artifact_kind,
         )
+        if consumer == "strict":
+            assert_consumer_run_status(
+                adapted,
+                consumer=consumer,
+                allow_partial=allow_partial,
+            )
+        return adapted, legacy_dir, True
 
     @staticmethod
-    def _validate_manifest_v2(manifest: dict, artifact_kind: str, manifest_path: Path) -> None:
+    def _validate_manifest_v2(
+        manifest: dict,
+        artifact_kind: str,
+        manifest_path: Path,
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
+    ) -> str:
         if not isinstance(manifest, dict):
             raise ValueError(f"Invalid V2 manifest: {manifest_path}")
         if not manifest.get("complete"):
@@ -347,6 +385,11 @@ class FeatureReader:
         artifact = FeatureReader._get_v2_artifact(manifest, artifact_kind)
         if not artifact.get("complete"):
             raise ValueError(f"Incomplete V2 artifact is not readable: {artifact_kind}")
+        return assert_consumer_run_status(
+            manifest,
+            consumer=consumer,
+            allow_partial=allow_partial,
+        )
 
     @staticmethod
     def _get_v2_artifact(manifest: dict, artifact_kind: str) -> Dict[str, Any]:

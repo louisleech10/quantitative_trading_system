@@ -205,6 +205,7 @@ class FeatureFactoryService:
 
         try:
             config_override = getattr(request, "config_override", None)
+            fail_open = getattr(request, "fail_open", None)
             force_regenerate = bool(getattr(request, "force_regenerate", False))
             timeframe = getattr(request, "timeframe", "12h")
             symbol = getattr(request, "symbol", None)
@@ -214,7 +215,9 @@ class FeatureFactoryService:
             if not symbol:
                 raise ValueError("symbol is required")
 
-            resolved_override = self._resolve_config_override(config_override)
+            resolved_override = self._resolve_config_override(
+                self._merge_fail_open_flags(config_override, fail_open)
+            )
 
             # Offload the blocking call to a thread pool worker.
             result = await loop.run_in_executor(
@@ -612,13 +615,14 @@ class FeatureFactoryService:
             "layer_counts": {},
         }
 
+        quality_status = str((result.get("metadata") or {}).get("quality_status", "complete"))
         with self._lock:
             if task_id not in self._tasks:
                 self._tasks[task_id] = {
                     "task_id": task_id,
                     "status": (
                         "completed"
-                        if str((record.get("metadata") or {}).get("quality_status", "complete")) == "complete"
+                        if quality_status == "complete"
                         else "completed_degraded"
                     ),
                     "progress": 1.0,
@@ -3638,6 +3642,19 @@ class FeatureFactoryService:
                 }
                 for task_id, info in self._research_tasks.items()
             ]
+
+    @staticmethod
+    def _merge_fail_open_flags(
+        config_override: Optional[Dict[str, Any]],
+        fail_open: Optional[Any],
+    ) -> Optional[Dict[str, Any]]:
+        """將 API fail_open 旗標合併進 config_override，供 FactoryConfig 消費。"""
+        if fail_open is None:
+            return config_override
+        flags = fail_open.model_dump() if hasattr(fail_open, "model_dump") else dict(fail_open)
+        merged: Dict[str, Any] = dict(config_override or {})
+        merged.update(flags)
+        return merged
 
     def _resolve_config_override(self, config_override: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if not isinstance(config_override, dict):

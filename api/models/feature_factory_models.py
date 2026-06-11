@@ -15,12 +15,27 @@ from momentum.FeatureEngineering.feature_config import SUPPORTED_TIMEFRAMES
 logger = get_logger("api.models.feature_factory")
 
 
+class FailOpenGateFlags(BaseModel):
+    """Fail-open consumer/producer gate flags（對應 FactoryConfig §C-1）。"""
+
+    allow_partial_layers: bool = False
+    allow_partial_timeframes: bool = False
+    allow_partial_ic: bool = False
+    allow_partial_training: bool = False
+    max_inf_ratio: float = 0.0
+    max_nan_ratio: Optional[float] = None
+
+
 class FeatureGenerateRequest(BaseModel):
     """Feature Factory generate request."""
 
     symbol: str = Field(..., description="交易標的")
     timeframe: str = Field("12h", description="時間週期")
     config_override: Optional[Dict] = Field(default=None, description="配置覆寫")
+    fail_open: Optional[FailOpenGateFlags] = Field(
+        default=None,
+        description="可選 fail-open gate 旗標（亦可在 config_override 內傳）",
+    )
     start_date: Optional[str] = Field(default=None, description="起始日期 (YYYY-MM-DD)")
     end_date: Optional[str] = Field(default=None, description="結束日期 (YYYY-MM-DD)")
     force_regenerate: bool = Field(default=False, description="是否跳過快取")

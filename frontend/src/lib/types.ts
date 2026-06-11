@@ -161,7 +161,22 @@ export interface ApiResponse<T> {
 
 // ===== Feature Factory 類型定義 =====
 
+export interface FailOpenGateFlags {
+  allow_partial_layers?: boolean;
+  allow_partial_timeframes?: boolean;
+  allow_partial_ic?: boolean;
+  allow_partial_training?: boolean;
+  max_inf_ratio?: number;
+  max_nan_ratio?: number | null;
+}
+
 export interface FeatureFactoryConfig {
+  allow_partial_layers?: boolean;
+  allow_partial_timeframes?: boolean;
+  allow_partial_ic?: boolean;
+  allow_partial_training?: boolean;
+  max_inf_ratio?: number;
+  max_nan_ratio?: number | null;
   global_settings: {
     sequence_length: number;
     max_lag_ratio: number;

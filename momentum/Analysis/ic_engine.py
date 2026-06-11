@@ -14,6 +14,11 @@ import numpy as np
 import pandas as pd
 from scipy import optimize, stats
 
+from momentum.FeatureEngineering.consumer_gate import (
+    assert_consumer_run_status,
+    effective_run_status,
+    is_source_run_status_reusable,
+)
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IFeatureReader
 
@@ -153,6 +158,7 @@ class ICEngine:
                 label=label,
                 merged_ic_params=merged_ic_params,
                 resolved_threshold=resolved_threshold,
+                allow_partial_ic=allow_partial_ic,
             )
             if cache_result is not None:
                 return cache_result
@@ -167,12 +173,15 @@ class ICEngine:
             tf,
             config_hash,
             artifact_kind="raw",
+            consumer="strict",
+            allow_partial=allow_partial_ic,
         )
         raw_artifact = self._validate_l7_raw_manifest(
             manifest,
             symbol=symbol,
             tf=tf,
             config_hash=config_hash,
+            allow_partial_ic=allow_partial_ic,
         )
         base_dir = self._resolve_l7_raw_base_dir(run_dir, manifest, config_hash)
 
@@ -478,7 +487,15 @@ class ICEngine:
         symbol: str,
         tf: str,
         config_hash: str,
+        *,
+        allow_partial_ic: bool = False,
     ) -> Dict[str, Any]:
+        assert_consumer_run_status(
+            manifest,
+            consumer="strict",
+            allow_partial=allow_partial_ic,
+            error_type=ICReadError,
+        )
         if not manifest.get("complete"):
             raise ICReadError("L7 raw manifest is incomplete")
         if str(manifest.get("symbol")) != str(symbol):
@@ -622,9 +639,11 @@ class ICEngine:
         if not source_checksum and isinstance(source_info, dict):
             source_checksum = source_info.get("checksum")
         hdf5_metadata = manifest.get("hdf5_metadata") or manifest.get("source_metadata")
+        source_run_status = effective_run_status(manifest)
         fingerprint: Dict[str, Any] = {
             "symbol": symbol,
             "tf": tf,
+            "source_run_status": source_run_status,
             "time_range": raw_artifact.get("time_range") or manifest.get("time_range"),
             "row_count": raw_artifact.get("row_count") or manifest.get("row_count"),
             "source_checksum": source_checksum,
@@ -674,6 +693,7 @@ class ICEngine:
         label: pd.Series,
         merged_ic_params: Dict[str, Any],
         resolved_threshold: float,
+        allow_partial_ic: bool = False,
     ) -> Optional["ICSelectionResult"]:
         """Re-apply a new IC threshold using previously cached IC scores.
 
@@ -721,11 +741,33 @@ class ICEngine:
                 )
                 return None
 
-        quality_status: str = cached.get("quality_status", "complete")
+        source_run_status = (
+            fp.get("source_run_status")
+            or cached.get("source_run_status")
+            or cached.get("run_status")
+        )
+        if not is_source_run_status_reusable(
+            str(source_run_status) if source_run_status is not None else None,
+            allow_partial=allow_partial_ic,
+        ):
+            logger.warning(
+                "[IC-First] cached source_run_status=%r not reusable — raw/ required",
+                source_run_status,
+            )
+            return None
+
+        quality_status = cached.get("quality_status")
+        if quality_status is None:
+            quality_status = "unknown"
         if quality_status not in ("complete", "partial"):
             logger.warning(
                 "[IC-First] cached quality_status=%r not reusable — raw/ required",
                 quality_status,
+            )
+            return None
+        if quality_status == "partial" and not allow_partial_ic:
+            logger.warning(
+                "[IC-First] cached partial quality_status without allow_partial_ic — raw/ required"
             )
             return None
 
@@ -806,6 +848,7 @@ class ICEngine:
             "ic_scores": ic_scores,
             "skipped_groups": skipped_groups,
             "quality_status": quality_status,
+            "source_run_status": data_fingerprint.get("source_run_status"),
             "frozen_gate_eligible": quality_status == "complete",
             "data_fingerprint": data_fingerprint,
             "ic_params": ic_params,

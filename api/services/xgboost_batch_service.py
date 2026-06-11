@@ -34,6 +34,10 @@ from api.core.logging import get_logger
 from api.utils.case_storage import get_case_storage_manager
 from api.utils.json_serializer import sanitize_for_json
 from momentum.core.contracts import FeatureNotFoundError
+from momentum.FeatureEngineering.consumer_gate import (
+    TrainingReadError,
+    intersect_columns_without_masking,
+)
 from momentum.factories import (
     create_binance_provider,
     create_bootstrap_estimator,
@@ -446,7 +450,7 @@ class XGBoostBatchService:
                 self.logger.info(f"開始為 {sym} 計算特徵...")
 
                 try:
-                    library_df = self._feature_library.load(sym, timeframe)
+                    library_df = self._feature_library.load_for_training(sym, timeframe)
                     if "timestamp" not in library_df.columns:
                         library_df = library_df.copy()
                         if isinstance(library_df.index, pd.DatetimeIndex):
@@ -488,14 +492,15 @@ class XGBoostBatchService:
                     if shared_feature_names is None:
                         shared_feature_names = candidate_columns
                     else:
-                        shared_feature_names = [
-                            column_name
-                            for column_name in shared_feature_names
-                            if column_name in candidate_columns
-                        ]
+                        shared_feature_names = intersect_columns_without_masking(
+                            [shared_feature_names, candidate_columns],
+                            error_type=TrainingReadError,
+                        )
 
                     self.logger.info("從 FeatureLibrary 載入 %s/%s 預計算特徵", sym, timeframe)
                     continue
+                except TrainingReadError:
+                    raise
                 except FeatureNotFoundError:
                     self.logger.info("FeatureLibrary 無資料，改用即時計算 %s/%s", sym, timeframe)
                 except Exception as exc:

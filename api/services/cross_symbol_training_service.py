@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from api.core.logging import get_logger
+from momentum.FeatureEngineering.consumer_gate import TrainingReadError
 from momentum.factories import create_cross_symbol_validator, create_feature_library
 
 
@@ -26,13 +27,23 @@ class CrossSymbolTrainingService:
         timeframe: str,
         label_column: str = "label",
         feature_columns: Optional[List[str]] = None,
+        allow_partial_training: bool = False,
     ) -> Dict[str, Any]:
         """Run leave-one-symbol-out validation using FeatureLibrary features."""
 
         if len(symbols) < 2:
             raise ValueError("cross-symbol validation requires at least 2 symbols")
 
-        multi_features = self._feature_library.load_multi(symbols, timeframe)
+        try:
+            multi_features = self._feature_library.load_multi(
+                symbols,
+                timeframe,
+                for_training=True,
+                allow_partial_training=allow_partial_training,
+                feature_columns=feature_columns,
+            )
+        except TrainingReadError as exc:
+            raise ValueError(str(exc)) from exc
 
         x_by_symbol: Dict[str, np.ndarray] = {}
         y_by_symbol: Dict[str, np.ndarray] = {}

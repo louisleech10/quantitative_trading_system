@@ -20,7 +20,13 @@ class FeatureRegistry:
     """Registry persisted as a JSON file with per-config upsert semantics."""
 
     def __init__(self, path: Optional[Path] = None) -> None:
-        self._path = path or DEFAULT_REGISTRY_PATH
+        env_path = os.getenv("FFACT_FEATURE_REGISTRY_PATH", "").strip()
+        if path is not None:
+            self._path = path
+        elif env_path:
+            self._path = Path(env_path).expanduser()
+        else:
+            self._path = DEFAULT_REGISTRY_PATH
         self._entries: List[Dict[str, Any]] = []
         self._load()
 

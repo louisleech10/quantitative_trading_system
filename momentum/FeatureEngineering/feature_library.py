@@ -8,6 +8,11 @@ import pandas as pd
 
 from momentum.core.contracts import FeatureLibraryEntry, FeatureNotFoundError
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.consumer_gate import (
+    TrainingReadError,
+    assert_consumer_run_status,
+    assert_required_columns_present,
+)
 from momentum.FeatureEngineering.feature_reader import FeatureReader
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
@@ -46,41 +51,111 @@ class FeatureLibrary:
             entries = [entry for entry in entries if entry.get("timeframe") == timeframe]
         return [self._to_entry(entry) for entry in entries]
 
-    def load(self, symbol: str, timeframe: str) -> pd.DataFrame:
+    def load(
+        self,
+        symbol: str,
+        timeframe: str,
+        *,
+        for_training: bool = False,
+        allow_partial_training: bool = False,
+    ) -> pd.DataFrame:
         """Load latest features for a symbol/timeframe pair.
 
         V7: tries FeatureReader (Parquet) first; falls back to legacy HDF5.
         """
+        return self._load_internal(
+            symbol,
+            timeframe,
+            for_training=for_training,
+            allow_partial_training=allow_partial_training,
+        )
+
+    def load_for_training(
+        self,
+        symbol: str,
+        timeframe: str,
+        *,
+        allow_partial_training: bool = False,
+    ) -> pd.DataFrame:
+        """Strict consumer load for ML/training paths."""
+        return self._load_internal(
+            symbol,
+            timeframe,
+            for_training=True,
+            allow_partial_training=allow_partial_training,
+        )
+
+    def _load_internal(
+        self,
+        symbol: str,
+        timeframe: str,
+        *,
+        for_training: bool,
+        allow_partial_training: bool,
+    ) -> pd.DataFrame:
         entry = self._registry.find_latest(symbol, timeframe)
         if entry is None:
             raise FeatureNotFoundError(symbol, timeframe, "No registry entry")
 
         config_hash = entry.get("config_hash", "")
 
-        # V7 path: load via FeatureReader if manifest.json exists
         if config_hash:
             try:
-                self._reader.load_manifest(symbol, config_hash)  # validate exists
+                manifest = self._reader.load_manifest_v2(
+                    symbol,
+                    timeframe,
+                    config_hash,
+                    artifact_kind="raw",
+                    consumer="strict" if for_training else "browse",
+                    allow_partial=allow_partial_training,
+                )
                 columns = self._reader.list_features(symbol, config_hash)
                 if columns:
-                    features_df = self._reader.load_columns(symbol, config_hash, columns)
+                    features_df = self._reader.load_columns_v2(
+                        symbol,
+                        timeframe,
+                        config_hash,
+                        columns,
+                        artifact_kind="raw",
+                        consumer="strict" if for_training else "browse",
+                        allow_partial=allow_partial_training,
+                    )
                     if not features_df.empty:
+                        if for_training:
+                            assert_consumer_run_status(
+                                manifest,
+                                consumer="strict",
+                                allow_partial=allow_partial_training,
+                                error_type=TrainingReadError,
+                            )
                         logger.info(
-                            "Loaded features via FeatureReader for %s/%s: %d rows x %d cols",
+                            "Loaded features via FeatureReader for %s/%s: %d rows x %d cols "
+                            "(run_status=%s)",
                             symbol,
                             timeframe,
                             len(features_df),
                             len(features_df.columns),
+                            manifest.get("run_status", manifest.get("quality_status")),
                         )
                         return features_df
             except FileNotFoundError:
-                pass  # No V7 output, fall through to legacy
+                pass
 
-        # Legacy HDF5 fallback
         result = self._storage.load_factory_output(symbol, timeframe)
         features_df = getattr(result, "features_df", None) if result is not None else None
         if features_df is None or features_df.empty:
             raise FeatureNotFoundError(symbol, timeframe, "HDF5 file missing or empty")
+
+        metadata = getattr(result, "metadata", None) or {}
+        if for_training:
+            from momentum.FeatureEngineering.consumer_gate import effective_run_status_from_metadata
+
+            run_status = effective_run_status_from_metadata(metadata)
+            if run_status != "complete" and not (allow_partial_training and run_status == "partial"):
+                raise TrainingReadError(
+                    f"run_status={run_status!r} is not consumable for training "
+                    f"(allow_partial_training={allow_partial_training})"
+                )
 
         logger.info(
             "Loaded features for %s/%s: %d rows x %d cols",
@@ -91,11 +166,26 @@ class FeatureLibrary:
         )
         return features_df
 
-    def load_multi(self, symbols: List[str], timeframe: str) -> Dict[str, pd.DataFrame]:
+    def load_multi(
+        self,
+        symbols: List[str],
+        timeframe: str,
+        *,
+        for_training: bool = False,
+        allow_partial_training: bool = False,
+        feature_columns: Optional[List[str]] = None,
+    ) -> Dict[str, pd.DataFrame]:
         """Load features for multiple symbols. Raises if any symbol is missing."""
         loaded: Dict[str, pd.DataFrame] = {}
         for symbol in symbols:
-            loaded[symbol] = self.load(symbol, timeframe)
+            loaded[symbol] = self.load(
+                symbol,
+                timeframe,
+                for_training=for_training,
+                allow_partial_training=allow_partial_training,
+            )
+        if feature_columns:
+            assert_required_columns_present(loaded, feature_columns, error_type=TrainingReadError)
         return loaded
 
     def ensure_fresh(self, symbol: str, timeframe: str, current_config_hash: str) -> bool:
