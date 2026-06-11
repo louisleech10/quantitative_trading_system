@@ -200,6 +200,8 @@ class FeatureFactory:
         self._memory_profiler = _MemoryProfiler()
         self._ic_engine: Optional[Any] = None
         self.layer_results: Dict[str, LayerExecutionResult] = {}
+        self._preprocessing_applied: Optional[bool] = None
+        self._effective_preprocessing_config: Optional[Dict[str, Any]] = None
 
     def generate_features(
         self,
@@ -224,6 +226,8 @@ class FeatureFactory:
         self._current_config_hash = None
         self._cgsa_registry = None
         self.layer_results = {}
+        self._preprocessing_applied = None
+        self._effective_preprocessing_config = None
         start_time = time.time()
 
         config_hash = self._compute_config_hash(
@@ -279,8 +283,12 @@ class FeatureFactory:
         self._current_raw_data = raw_data
 
         compute_warnings = self._collect_layer1_warnings(raw_data, config)
-        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config).data
-        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config).data
+        layer1_result = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config)
+        self._raise_for_failed_layer(layer1_result, "Layer 1", config)
+        layer1 = layer1_result.data
+        layer2_result = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config)
+        self._raise_for_failed_layer(layer2_result, "Layer 2", config)
+        layer2 = layer2_result.data
 
         # Spill layer2 to disk-backed memmap BEFORE L3.
         # L3 only uses layer1, but layer2 stays alive (needed for L4/L5/L6).
@@ -290,10 +298,20 @@ class FeatureFactory:
         # when accessed later by L4/L5/L6).
         layer2 = self._spill_to_memmap(layer2, "layer2")
 
-        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config).data
-        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config).data
-        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config).data
-        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config).data
+        layer3_result = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config)
+        self._raise_for_failed_layer(layer3_result, "Layer 3", config)
+        layer3 = layer3_result.data
+        layer4_result = self._execute_layer1_6(
+            "Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config
+        )
+        self._raise_for_failed_layer(layer4_result, "Layer 4", config)
+        layer4 = layer4_result.data
+        layer5_result = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config)
+        self._raise_for_failed_layer(layer5_result, "Layer 5", config)
+        layer5 = layer5_result.data
+        layer6_result = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config)
+        self._raise_for_failed_layer(layer6_result, "Layer 6", config)
+        layer6 = layer6_result.data
 
         layers = [layer1, layer2, layer3, layer4, layer5, layer6]
         if self._cgsa_enabled() and self._cgsa_registry is not None:
@@ -320,11 +338,11 @@ class FeatureFactory:
                     "[IC-First] Generation mode: skipping rank/zscore/gaussian. "
                     "IC Gatekeeper and selected transforms are downstream actions after L7_raw."
                 )
-                preprocessed = self._safe_execute(
+                preprocessed = self._execute_l65_with_degradation(
                     "Layer 6.5 (IC-First)", self._layer6_5_pre_ic, all_features, config
                 )
             else:
-                preprocessed = self._safe_execute(
+                preprocessed = self._execute_l65_with_degradation(
                     "Layer 6.5", self._layer6_5_legacy, all_features, config
                 )
             if not preprocessed.empty:
@@ -539,6 +557,50 @@ class FeatureFactory:
                 _PROC.memory_info().rss >> 20,
             )
         return final
+
+    @staticmethod
+    def _runtime_config_value(config: "FactoryConfig", name: str, default: Any) -> Any:
+        """讀取不參與數值計算的 runtime gate 設定。"""
+        if isinstance(config, dict):
+            return config.get(name, default)
+        return getattr(config, name, default)
+
+    def _raise_for_failed_layer(
+        self,
+        result: LayerExecutionResult,
+        layer_name: str,
+        config: "FactoryConfig",
+    ) -> None:
+        """預設 fail-closed；僅明示 allow_partial_layers 才保留失敗層續行。"""
+        if result.status != LayerStatus.layer_failed:
+            return
+        if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
+            return
+        reason = result.reason or "unknown layer failure"
+        raise RuntimeError(f"{layer_name} failed: {reason}")
+
+    def _execute_l65_with_degradation(
+        self,
+        layer_name: str,
+        func: Callable,
+        all_features: pd.DataFrame,
+        config: "FactoryConfig",
+    ) -> pd.DataFrame:
+        """L6.5 失敗時保留原始特徵並記錄實際生效設定。"""
+        self._effective_preprocessing_config = self._preprocessing_config_dict(config)
+        try:
+            self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
+            result = func(all_features, config)
+            if result is None or (result.empty and not all_features.empty):
+                raise ValueError("preprocessing returned empty output")
+            self._preprocessing_applied = True
+            self._report_progress(layer_name, 1.0, f"{layer_name} completed: {result.shape[1]} features")
+            return self._ensure_float32(result) if not result.empty else result
+        except Exception as exc:
+            self._preprocessing_applied = False
+            logger.error("%s failed; continuing without preprocessing: %s", layer_name, exc, exc_info=True)
+            self._report_progress(layer_name, 1.0, f"{layer_name} degraded: {exc}")
+            return all_features
 
     def _safe_execute(self, layer_name: str, func: Callable, *args) -> pd.DataFrame:
         """Execute a layer safely; return empty DataFrame on failure (L6.5 等非 L1-L6 路徑)."""
@@ -2524,6 +2586,7 @@ class FeatureFactory:
         warnings: List[str] = []
         total_values = 0
         non_nan_values = 0
+        abnormal_nan_values = 0
 
         # Aggregate inf tracking — surfaces pathological-input quality signal.
         # Although L6.5 winsorization clips inf to finite, residual inf can
@@ -2576,6 +2639,7 @@ class FeatureFactory:
 
                 group_inf_count += int(np.isinf(group_data).sum())
                 group_nan_count += int(np.isnan(group_data).sum())
+                abnormal_nan_values += self._abnormal_nan_count(group_data)
                 group_value_count += value_count
                 seen_cols += int(group_data.shape[1])
                 del shard_data, group_data
@@ -2616,6 +2680,7 @@ class FeatureFactory:
 
         coverage = float(non_nan_values / total_values) if total_values > 0 else 0.0
         inf_ratio = float(total_inf / total_values) if total_values > 0 else 0.0
+        nan_ratio = float(abnormal_nan_values / total_values) if total_values > 0 else 0.0
 
         # Emit a one-shot quality summary so the inf metric is always visible
         # (instead of buried under per-group warnings). Top-5 offending groups
@@ -2649,9 +2714,99 @@ class FeatureFactory:
             "coverage": coverage,
             "inf_count": total_inf,
             "inf_ratio": inf_ratio,
+            "nan_ratio": nan_ratio,
             "groups_with_inf": len(groups_with_inf),
             "warnings": warnings,
         }
+
+    @staticmethod
+    def _abnormal_nan_count(values: np.ndarray) -> int:
+        """計算各欄首尾有效值之間的 NaN；合法前導/尾端 warmup 不計。"""
+        array = np.asarray(values)
+        if array.ndim != 2 or array.size == 0:
+            return 0
+        nan_mask = np.isnan(array)
+        valid_mask = ~nan_mask
+        has_valid = valid_mask.any(axis=0)
+        total_nan = nan_mask.sum(axis=0, dtype=np.int64)
+        first_valid = np.argmax(valid_mask, axis=0)
+        last_valid = array.shape[0] - 1 - np.argmax(valid_mask[::-1], axis=0)
+        leading = np.where(has_valid, first_valid, 0)
+        trailing = np.where(has_valid, array.shape[0] - 1 - last_valid, 0)
+        abnormal = np.where(has_valid, total_nan - leading - trailing, total_nan)
+        return int(np.maximum(abnormal, 0).sum())
+
+    @staticmethod
+    def _default_max_nan_ratio(symbol: str, timeframe: str) -> float:
+        """讀取 Task0.1 健康 run artifact；未知組合採已觀測最大值。"""
+        artifact_path = Path(__file__).parents[2] / "tests/_golden/failopen/max_nan_ratio.json"
+        try:
+            payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+            ratios = payload.get("ratios", {})
+            symbol_ratios = ratios.get(symbol, {}) if isinstance(ratios, dict) else {}
+            if timeframe in symbol_ratios:
+                return float(symbol_ratios[timeframe])
+            observed = [
+                float(value)
+                for timeframe_map in ratios.values()
+                if isinstance(timeframe_map, dict)
+                for value in timeframe_map.values()
+            ]
+            if observed:
+                return max(observed)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            logger.error("Failed to read max_nan_ratio artifact %s: %s", artifact_path, exc)
+            raise RuntimeError(f"max_nan_ratio artifact unavailable: {artifact_path}") from exc
+        raise RuntimeError(f"max_nan_ratio artifact has no observed ratios: {artifact_path}")
+
+    def _apply_runtime_quality_gate(
+        self,
+        metadata: Dict[str, Any],
+        config: "FactoryConfig",
+        symbol: str,
+        timeframe: str,
+        *,
+        nan_ratio: float,
+        inf_ratio: float,
+    ) -> None:
+        """超過 NaN/Inf 上限時將產物標為 partial，不改動數值。"""
+        max_inf_ratio = float(self._runtime_config_value(config, "max_inf_ratio", 0.0))
+        configured_nan = self._runtime_config_value(config, "max_nan_ratio", None)
+        max_nan_ratio = (
+            self._default_max_nan_ratio(symbol, timeframe)
+            if configured_nan is None
+            else float(configured_nan)
+        )
+        reasons: List[str] = []
+        if inf_ratio > max_inf_ratio:
+            reasons.append(f"inf_ratio={inf_ratio:.12g}>max_inf_ratio={max_inf_ratio:.12g}")
+        if nan_ratio > max_nan_ratio:
+            reasons.append(f"nan_ratio={nan_ratio:.12g}>max_nan_ratio={max_nan_ratio:.12g}")
+        if not reasons:
+            return
+        metadata["quality_status"] = "partial"
+        metadata["run_status"] = "partial"
+        metadata["failure_reasons"] = list(metadata.get("failure_reasons", [])) + reasons
+        metadata["quality_thresholds"] = {
+            "max_inf_ratio": max_inf_ratio,
+            "max_nan_ratio": max_nan_ratio,
+            "observed_inf_ratio": float(inf_ratio),
+            "observed_nan_ratio": float(nan_ratio),
+        }
+
+    def _apply_preprocessing_degradation_metadata(self, metadata: Dict[str, Any]) -> None:
+        """僅 L6.5 實際失敗時寫降級資訊，健康 run metadata 不變。"""
+        if getattr(self, "_preprocessing_applied", None) is not False:
+            return
+        metadata["preprocessing_applied"] = False
+        metadata["effective_preprocessing_config"] = copy.deepcopy(
+            getattr(self, "_effective_preprocessing_config", None) or {}
+        )
+        metadata["quality_status"] = "partial"
+        metadata["run_status"] = "partial"
+        metadata["failure_reasons"] = list(metadata.get("failure_reasons", [])) + [
+            "L6.5:preprocessing_failed"
+        ]
 
     def _persist_single_tf_l3_l6_to_cgsa(
         self,
@@ -2865,6 +3020,15 @@ class FeatureFactory:
             "failed_layers": list(completeness_meta.get("failed_layers", [])),
             "failure_reasons": list(completeness_meta.get("failure_reasons", [])),
         }
+        self._apply_preprocessing_degradation_metadata(metadata)
+        self._apply_runtime_quality_gate(
+            metadata,
+            config,
+            symbol,
+            timeframe,
+            nan_ratio=float(validation_summary.get("nan_ratio", 1.0 - float(validation_summary.get("coverage", 0.0)))),
+            inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
+        )
 
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=raw_data.index),
@@ -2890,7 +3054,10 @@ class FeatureFactory:
                 }
             )
         except Exception as exc:
-            logger.warning("Failed to update feature registry: %s", exc)
+            if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
+                logger.warning("Failed to update feature registry: %s", exc)
+            else:
+                raise RuntimeError(f"Failed to update feature registry: {exc}") from exc
 
         return result
 
@@ -2998,6 +3165,15 @@ class FeatureFactory:
                 "constant_features_removed": [],
             },
         }
+        self._apply_preprocessing_degradation_metadata(metadata)
+        self._apply_runtime_quality_gate(
+            metadata,
+            config,
+            symbol,
+            timeframe,
+            nan_ratio=float(validation_summary.get("nan_ratio", 1.0 - float(validation_summary["coverage"]))),
+            inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
+        )
 
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=raw_data.index),
@@ -3023,7 +3199,10 @@ class FeatureFactory:
                 }
             )
         except Exception as exc:
-            logger.warning("Failed to update feature registry: %s", exc)
+            if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
+                logger.warning("Failed to update feature registry: %s", exc)
+            else:
+                raise RuntimeError(f"Failed to update feature registry: {exc}") from exc
 
         return result
 
@@ -3112,6 +3291,19 @@ class FeatureFactory:
         metadata["validation"] = validation.__dict__
         metadata["feature_names"] = list(result.features_df.columns)
         metadata["feature_count"] = int(result.features_df.shape[1])
+        values = result.features_df.to_numpy(copy=False)
+        value_count = int(values.size)
+        nan_ratio = float(self._abnormal_nan_count(values) / value_count) if value_count else 0.0
+        inf_ratio = float(np.isinf(values).sum() / value_count) if value_count else 0.0
+        self._apply_preprocessing_degradation_metadata(metadata)
+        self._apply_runtime_quality_gate(
+            metadata,
+            config,
+            symbol,
+            timeframe,
+            nan_ratio=nan_ratio,
+            inf_ratio=inf_ratio,
+        )
         result.metadata = metadata
         result.feature_count = int(result.features_df.shape[1])
 
@@ -3132,7 +3324,10 @@ class FeatureFactory:
                 }
             )
         except Exception as exc:
-            logger.warning("Failed to update feature registry: %s", exc)
+            if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
+                logger.warning("Failed to update feature registry: %s", exc)
+            else:
+                raise RuntimeError(f"Failed to update feature registry: {exc}") from exc
 
         return result
 
@@ -3171,6 +3366,10 @@ class FeatureFactory:
         end_date: Optional[str] = None,
     ) -> str:
         config_payload = config.model_dump(by_alias=True)
+        # Runtime fail-open gates do not alter feature values and must not
+        # fragment the numerical cache key.
+        config_payload.pop("allow_partial_layers", None)
+        config_payload.pop("allow_partial_timeframes", None)
         preprocessing_payload = config_payload.get("preprocessing")
         if isinstance(preprocessing_payload, dict):
             preprocessing_payload.setdefault("causal_preprocessing", True)

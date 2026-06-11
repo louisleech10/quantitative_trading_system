@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
@@ -171,13 +172,18 @@ def test_ensure_primary_appends_and_deduplicates():
     assert result_no_primary == ["4h", "1h", "12h"]
 
 
-def test_lower_tf_missing_degrades_but_primary_succeeds():
+def test_lower_tf_missing_fails_closed_unless_partial_enabled():
     primary_ts = [0, 12 * 3600 * 1000]
     primary_data = pd.DataFrame({"timestamp": primary_ts, "value": [10, 11]})
     factory = StubFactory({"12h": primary_data})
 
     generator = MultiTFGenerator(factory, DummyConfig())
-    result = generator.generate_multi_tf("BTCUSDT")
+    with pytest.raises(RuntimeError, match="Timeframe 1h failed"):
+        generator.generate_multi_tf("BTCUSDT")
+
+    partial_config = DummyConfig()
+    partial_config.allow_partial_timeframes = True
+    result = MultiTFGenerator(factory, partial_config).generate_multi_tf("BTCUSDT")
 
     assert result.features_df.shape[0] == 2
     assert result.metadata["skipped_timeframes"] == ["1h"]

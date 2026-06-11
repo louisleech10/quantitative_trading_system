@@ -236,7 +236,12 @@ class FeatureFactoryService:
             with self._lock:
                 task_info = self._tasks.get(task_id)
                 if task_info:
-                    task_info["status"] = "completed"
+                    quality_status = str(
+                        (summary.get("metadata") or {}).get("quality_status", "complete")
+                    )
+                    task_info["status"] = (
+                        "completed" if quality_status == "complete" else "completed_degraded"
+                    )
                     task_info["progress"] = 1.0
                     task_info["result"] = summary
 
@@ -611,7 +616,11 @@ class FeatureFactoryService:
             if task_id not in self._tasks:
                 self._tasks[task_id] = {
                     "task_id": task_id,
-                    "status": "completed",
+                    "status": (
+                        "completed"
+                        if str((record.get("metadata") or {}).get("quality_status", "complete")) == "complete"
+                        else "completed_degraded"
+                    ),
                     "progress": 1.0,
                     "current_stage": None,
                     "completed_stages": [],
@@ -3857,7 +3866,11 @@ class FeatureFactoryService:
                     continue
                 self._tasks[stable_id] = {
                     "task_id": stable_id,
-                    "status": "completed",
+                    "status": (
+                        "completed"
+                        if str(manifest.get("quality_status", "complete")) == "complete"
+                        else "completed_degraded"
+                    ),
                     "progress": 1.0,
                     "current_stage": None,
                     "completed_stages": [],

@@ -15,3 +15,4 @@
 | `tests/feature_engineering/test_l7_raw_streaming.py` | `raw_v1` manifest/parquet/metadata 斷言 | `raw_v2` | Batch3 round2 schema_version 遷移 |
 | `tests/feature_engineering/test_failopen_manifest.py:test_persist_false_generate_features_metadata` | CGSA 路徑（`FFACT_USE_CGSA=1` 預設） | 顯式 `FFACT_USE_CGSA=0` 測非 CGSA `_layer7_validate_and_persist` completeness | Batch3 round3 |
 | `tests/feature_engineering/test_failopen_manifest.py` | 並行 RMW 無 barrier/負向 | `test_manifest_concurrent_*` 加 Barrier+鎖內 sleep；`test_manifest_concurrent_merge_fails_without_lock` 證偽 | Batch3 round3 |
+| `tests/test_multi_tf_generator.py::test_lower_tf_missing_degrades_but_primary_succeeds` | lower TF 缺資料預設 skip 並成功 | 改名 `test_lower_tf_missing_fails_closed_unless_partial_enabled`；預設 `pytest.raises`，僅 `allow_partial_timeframes=True` 保留 skip | Batch4 Task 4.1：TF 預設 fail-closed |

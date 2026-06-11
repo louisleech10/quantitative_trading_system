@@ -110,6 +110,7 @@ class MultiTFGenerator:
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
+        failed_layers: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         stage_seconds: Dict[str, float] = {
             "dual_tf_l1_l6": 0.0,
@@ -156,15 +157,18 @@ class MultiTFGenerator:
             except FileNotFoundError:
                 logger.warning("MultiTF: missing data for %s/%s, skipping timeframe", symbol, timeframe)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, "missing data")
                 continue
             except Exception as exc:
                 logger.error("MultiTF: load failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, str(exc))
                 continue
 
             if raw_data is None or raw_data.empty:
                 logger.warning("MultiTF: empty data for %s/%s, skipping timeframe", symbol, timeframe)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, "empty data")
                 continue
 
             # Record groups before this TF runs so we know which were added.
@@ -179,9 +183,12 @@ class MultiTFGenerator:
                 layer1, layer2, layer3, layer4, layer5, layer6 = [
                     self._factory.layer_data(item) for item in layer_results
                 ]
+                failed_layers.extend(self._collect_failed_layer_ids(layer_results, timeframe))
             except Exception as exc:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
+                registry.rollback_timeframe(timeframe)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, str(exc))
                 continue
 
             # Persist L3/L4/L5/L6 to CGSA registry (L1/L2 are persisted inside their layer methods).
@@ -317,6 +324,8 @@ class MultiTFGenerator:
         result.metadata["actual_timeframes"] = [
             tf for tf in self._training_tfs if tf not in skipped_tfs
         ]
+        self._apply_failed_timeframe_metadata(result, skipped_tfs)
+        self._apply_failed_layer_metadata(result, failed_layers)
 
         self._report_progress("complete", 1.0, f"[CGSA] MultiTF generation completed ({total_elapsed:.2f}s)")
         return result
@@ -357,6 +366,7 @@ class MultiTFGenerator:
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
+        failed_layers: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         # dual_tf_l1_l6: worker L1-L6 runs in child processes; parent cannot
         # measure it (future.result() wait ≈ 0). Leave None — not 0.
@@ -397,11 +407,14 @@ class MultiTFGenerator:
                 f"[CGSA-parallel] Processing primary TF {self._primary_tf}",
             )
             self._factory._current_timeframe = self._primary_tf
+            primary_groups_before = set(registry._groups.keys())
 
             try:
                 layer_results = self._run_tf_l1_l6_results(primary_raw)
             except Exception as exc:
                 logger.error("Primary TF pipeline failed: %s", exc, exc_info=True)
+                if set(registry._groups.keys()) != primary_groups_before:
+                    registry.rollback_timeframe(self._primary_tf)
                 raise
 
             for layer_result, layer_src, label in [
@@ -423,6 +436,7 @@ class MultiTFGenerator:
             tf_layer_counts[self._primary_tf] = self._collect_layer_counts_from_registry(
                 registry, self._primary_tf
             )
+            failed_layers.extend(self._collect_failed_layer_ids(layer_results, self._primary_tf))
             gc.collect()
 
             # Persist primary TF progress immediately so a crash before workers
@@ -512,25 +526,34 @@ class MultiTFGenerator:
                     except Exception as exc:
                         logger.error("TF worker %s failed: %s", tf, exc, exc_info=True)
                         skipped_tfs.append(tf)
+                        self._raise_for_failed_timeframe(tf, str(exc))
                         continue
 
                     if "error" in result:
                         logger.warning("TF worker %s returned error: %s", tf, result["error"])
                         skipped_tfs.append(tf)
+                        self._raise_for_failed_timeframe(tf, str(result["error"]))
                         continue
 
                     # Register groups from worker into main registry.
                     # OOM Fix: result now carries only metadata + npy paths,
                     # so the pickle payload is KB rather than GB.
                     tf_layer_counts[tf] = result.get("layer_counts", {})
+                    failed_layers.extend(result.get("failed_layers", []))
                     groups_data = result.get("groups", [])
                     source_ts_ms = result.get("source_timestamps_ms")
                     align_start = time.perf_counter()
-                    self._register_worker_groups(
-                        registry, groups_data, tf,
-                        primary_timestamps, self._config.timeframes.alignment_mode,
-                        source_timestamps_ms=source_ts_ms,
-                    )
+                    try:
+                        self._register_worker_groups(
+                            registry, groups_data, tf,
+                            primary_timestamps, self._config.timeframes.alignment_mode,
+                            source_timestamps_ms=source_ts_ms,
+                        )
+                    except Exception as exc:
+                        registry.rollback_timeframe(tf)
+                        skipped_tfs.append(tf)
+                        self._raise_for_failed_timeframe(tf, str(exc))
+                        continue
                     stage_seconds["alignment"] += time.perf_counter() - align_start
                     # Resume support: persist worker progress to manifest now,
                     # so a SIGKILL during the next worker / L6.5 leaves a
@@ -592,6 +615,8 @@ class MultiTFGenerator:
         result.metadata["actual_timeframes"] = [
             tf for tf in self._training_tfs if tf not in skipped_tfs
         ]
+        self._apply_failed_timeframe_metadata(result, skipped_tfs)
+        self._apply_failed_layer_metadata(result, failed_layers)
 
         self._report_progress("complete", 1.0, f"[CGSA-parallel] MultiTF completed ({total_elapsed:.2f}s)")
         return result
@@ -1173,8 +1198,8 @@ class MultiTFGenerator:
             group_layer = getattr(getattr(group, "layer", ""), "value", str(getattr(group, "layer", "")))
             if group_layer in layer_values:
                 stale_group_ids.append(gid)
-        for gid in stale_group_ids:
-            registry.unregister_group(gid)
+        if stale_group_ids:
+            registry._rollback_group_ids(stale_group_ids)
 
     # ------------------------------------------------------------------
     # Legacy path: wide DataFrame concat + alignment (non-CGSA)
@@ -1191,6 +1216,7 @@ class MultiTFGenerator:
         """Legacy multi-TF: combine layers into wide DF, align, then L6.5 + L7."""
         aligned_outputs: List[pd.DataFrame] = []
         skipped_tfs: List[str] = []
+        failed_layers: List[str] = []
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         total_tfs = len(self._training_tfs)
 
@@ -1213,15 +1239,18 @@ class MultiTFGenerator:
             except FileNotFoundError:
                 logger.warning("MultiTF: missing data for %s/%s, skipping timeframe", symbol, timeframe)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, "missing data")
                 continue
             except Exception as exc:
                 logger.error("MultiTF: load failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, str(exc))
                 continue
 
             if raw_data is None or raw_data.empty:
                 logger.warning("MultiTF: empty data for %s/%s, skipping timeframe", symbol, timeframe)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, "empty data")
                 continue
 
             try:
@@ -1229,9 +1258,11 @@ class MultiTFGenerator:
                 layer1, layer2, layer3, layer4, layer5, layer6 = [
                     self._factory.layer_data(item) for item in layer_results
                 ]
+                failed_layers.extend(self._collect_failed_layer_ids(layer_results, timeframe))
             except Exception as exc:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
+                self._raise_for_failed_timeframe(timeframe, str(exc))
                 continue
 
             tf_layer_counts[timeframe] = self._collect_layer_counts(layer_results)
@@ -1284,7 +1315,12 @@ class MultiTFGenerator:
 
         if self._config.preprocessing.enabled:
             self._report_progress("preprocessing", 0.75, "Running Layer 6.5 preprocessing")
-            merged_df = self._factory._layer6_5_preprocessing(merged_df, self._config)
+            merged_df = self._factory._execute_l65_with_degradation(
+                "Layer 6.5",
+                self._factory._layer6_5_preprocessing,
+                merged_df,
+                self._config,
+            )
 
         self._report_progress("persist", 0.9, "Running Layer 7 validate and persist")
         config_hash = self._factory._compute_config_hash(
@@ -1307,6 +1343,8 @@ class MultiTFGenerator:
         result.metadata["actual_timeframes"] = [
             tf for tf in self._training_tfs if tf not in skipped_tfs
         ]
+        self._apply_failed_timeframe_metadata(result, skipped_tfs)
+        self._apply_failed_layer_metadata(result, failed_layers)
 
         self._report_progress("complete", 1.0, f"MultiTF generation completed ({elapsed:.2f}s)")
         return result
@@ -1321,10 +1359,13 @@ class MultiTFGenerator:
         factory = self._factory
         config = self._config
         r1 = factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw_data, config)
+        self._raise_for_failed_layer(r1, "Layer 1")
         layer1 = r1.data
         r2 = factory._execute_layer1_6("Layer 2", factory._layer2_derived_features, layer1, raw_data, config)
+        self._raise_for_failed_layer(r2, "Layer 2")
         layer2 = factory._spill_to_memmap(r2.data, "layer2")
         r3 = factory._execute_layer1_6("Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config)
+        self._raise_for_failed_layer(r3, "Layer 3")
         r4 = factory._execute_layer1_6(
             "Layer 4",
             factory._layer4_lag_features,
@@ -1334,11 +1375,74 @@ class MultiTFGenerator:
             raw_data,
             config,
         )
+        self._raise_for_failed_layer(r4, "Layer 4")
         r5 = factory._execute_layer1_6("Layer 5", factory._layer5_cross_sectional, layer1, layer2, config)
+        self._raise_for_failed_layer(r5, "Layer 5")
         r6 = factory._execute_layer1_6(
             "Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config
         )
+        self._raise_for_failed_layer(r6, "Layer 6")
         return [r1, r2, r3, r4, r5, r6]
+
+    def _raise_for_failed_layer(
+        self,
+        result: LayerExecutionResult,
+        layer_name: str,
+    ) -> None:
+        if result.status != LayerStatus.layer_failed:
+            return
+        allow_partial = bool(getattr(self._config, "allow_partial_layers", False))
+        if not allow_partial:
+            raise RuntimeError(f"{layer_name} failed: {result.reason or 'unknown layer failure'}")
+
+    def _raise_for_failed_timeframe(self, timeframe: str, reason: str) -> None:
+        """預設 TF fail-closed；只在明示 allow_partial_timeframes 時續行。"""
+        allow_partial = bool(getattr(self._config, "allow_partial_timeframes", False))
+        if not allow_partial:
+            raise RuntimeError(f"Timeframe {timeframe} failed: {reason}")
+
+    def _apply_failed_timeframe_metadata(
+        self,
+        result: "FeatureGenerationResult",
+        failed_timeframes: List[str],
+    ) -> None:
+        if not failed_timeframes:
+            return
+        failed = list(dict.fromkeys(failed_timeframes))
+        result.metadata["expected_timeframes"] = list(self._training_tfs)
+        result.metadata["present_timeframes"] = [
+            tf for tf in self._training_tfs if tf not in failed
+        ]
+        result.metadata["failed_timeframes"] = failed
+        result.metadata["quality_status"] = "partial"
+        result.metadata["run_status"] = "partial"
+        result.metadata["failure_reasons"] = list(
+            result.metadata.get("failure_reasons", [])
+        ) + [f"timeframe:{tf}" for tf in failed]
+
+    @staticmethod
+    def _collect_failed_layer_ids(
+        layer_results: Iterable[LayerExecutionResult],
+        timeframe: str,
+    ) -> List[str]:
+        return [
+            f"L{index}:{timeframe}"
+            for index, layer_result in enumerate(layer_results, start=1)
+            if layer_result.status == LayerStatus.layer_failed
+        ]
+
+    @staticmethod
+    def _apply_failed_layer_metadata(
+        result: "FeatureGenerationResult",
+        failed_layers: List[str],
+    ) -> None:
+        if not failed_layers:
+            return
+        failed = list(dict.fromkeys(failed_layers))
+        existing = list(result.metadata.get("failed_layers", []))
+        result.metadata["failed_layers"] = list(dict.fromkeys(existing + failed))
+        result.metadata["quality_status"] = "partial"
+        result.metadata["run_status"] = "partial"
 
     @staticmethod
     def _collect_layer_counts(
@@ -1578,10 +1682,13 @@ def _tf_worker_entry(
         import gc as _gc
 
         r1 = factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw_data, config)
+        factory._raise_for_failed_layer(r1, "Layer 1", config)
         layer1 = r1.data
         r2 = factory._execute_layer1_6("Layer 2", factory._layer2_derived_features, layer1, raw_data, config)
+        factory._raise_for_failed_layer(r2, "Layer 2", config)
         layer2 = r2.data
         r3 = factory._execute_layer1_6("Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config)
+        factory._raise_for_failed_layer(r3, "Layer 3", config)
         layer3 = r3.data
         if r3.status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
             factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
@@ -1591,6 +1698,7 @@ def _tf_worker_entry(
         r4 = factory._execute_layer1_6(
             "Layer 4", factory._layer4_lag_features, layer1, layer2, None, raw_data, config
         )
+        factory._raise_for_failed_layer(r4, "Layer 4", config)
         layer4 = r4.data
         if layer4 is not None and not layer4.empty:
             factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
@@ -1598,6 +1706,7 @@ def _tf_worker_entry(
         _gc.collect()
 
         r5 = factory._execute_layer1_6("Layer 5", factory._layer5_cross_sectional, layer1, layer2, config)
+        factory._raise_for_failed_layer(r5, "Layer 5", config)
         layer5 = r5.data
         if layer5 is not None and not layer5.empty:
             factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
@@ -1605,6 +1714,7 @@ def _tf_worker_entry(
         _gc.collect()
 
         r6 = factory._execute_layer1_6("Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config)
+        factory._raise_for_failed_layer(r6, "Layer 6", config)
         layer6 = r6.data
         if layer6 is not None and not layer6.empty:
             factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
@@ -1686,6 +1796,9 @@ def _tf_worker_entry(
             "groups": groups_data,
             "source_timestamps_ms": source_timestamps_ms,
             "layer_counts": layer_counts,
+            "failed_layers": MultiTFGenerator._collect_failed_layer_ids(
+                [r1, r2, r3, r4, r5, r6], timeframe
+            ),
         }
     except Exception as exc:
         return {"timeframe": timeframe, "error": str(exc)}

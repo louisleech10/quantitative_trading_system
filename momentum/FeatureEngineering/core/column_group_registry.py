@@ -933,27 +933,85 @@ class ColumnGroupRegistry:
         Used by raw-sink to release manifest entries after a group's parts are
         all durably written. Manifest is rewritten atomically.
         """
-        with self._buffer_lock:
-            self._memory_buffer.pop(group_id, None)
-        group = self._groups.pop(group_id, None)
+        group = self._groups.get(group_id)
         if group is None:
             return
-        for shard in group.shards:
-            if shard.disk_path.exists():
+        self._rollback_group_ids([group_id])
+
+    def rollback_timeframe(self, timeframe: str) -> list[str]:
+        """以 group.timeframe 為準回滾整個 TF 的所有 registry groups。"""
+        group_ids = [
+            group_id
+            for group_id, group in self._groups.items()
+            if str(group.timeframe) == str(timeframe)
+        ]
+        self._rollback_group_ids(group_ids)
+        return group_ids
+
+    def _rollback_group_ids(self, group_ids: Iterable[str]) -> None:
+        """先 staging 檔案，再原子改 manifest；任何 I/O 失敗均向上拋出。"""
+        selected = [group_id for group_id in group_ids if group_id in self._groups]
+        if not selected:
+            return
+
+        staged_paths: list[tuple[Path, Path]] = []
+        seen_paths: set[Path] = set()
+        for group_id in selected:
+            group = self._groups[group_id]
+            paths = [shard.disk_path for shard in group.shards]
+            if group.disk_path is not None:
+                paths.append(group.disk_path)
+            parquet_path = self._group_parquet_paths.get(group_id)
+            if parquet_path:
+                paths.append(Path(parquet_path))
+            for path in paths:
+                source = Path(path)
+                if source in seen_paths or not source.exists():
+                    continue
+                seen_paths.add(source)
+                staged = source.with_name(f".{source.name}.rollback-{os.getpid()}-{len(staged_paths)}")
                 try:
-                    shard.disk_path.unlink()
-                except OSError:
-                    pass
-        if group.disk_path and group.disk_path.exists():
-            try:
-                group.disk_path.unlink()
-            except OSError:
-                pass
-        self._group_parquet_paths.pop(group_id, None)
+                    os.replace(source, staged)
+                except Exception:
+                    for original, staged_path in reversed(staged_paths):
+                        if staged_path.exists():
+                            os.replace(staged_path, original)
+                    raise
+                staged_paths.append((source, staged))
+
+        groups_snapshot = {group_id: self._groups[group_id] for group_id in selected}
+        parquet_snapshot = {
+            group_id: self._group_parquet_paths[group_id]
+            for group_id in selected
+            if group_id in self._group_parquet_paths
+        }
+        with self._buffer_lock:
+            buffer_snapshot = {
+                group_id: self._memory_buffer[group_id]
+                for group_id in selected
+                if group_id in self._memory_buffer
+            }
+            for group_id in selected:
+                self._memory_buffer.pop(group_id, None)
+        for group_id in selected:
+            self._groups.pop(group_id, None)
+            self._group_parquet_paths.pop(group_id, None)
+
         try:
             self._write_manifest_thread_safe()
-        except OSError:
-            pass
+        except Exception:
+            self._groups.update(groups_snapshot)
+            self._group_parquet_paths.update(parquet_snapshot)
+            with self._buffer_lock:
+                self._memory_buffer.update(buffer_snapshot)
+            for original, staged in reversed(staged_paths):
+                if staged.exists():
+                    os.replace(staged, original)
+            raise
+
+        for _original, staged in staged_paths:
+            if staged.exists():
+                staged.unlink()
 
     def release_storage(self, group_id: str) -> int:
         """Release on-disk storage for a group while keeping the registry entry.

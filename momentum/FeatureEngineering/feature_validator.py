@@ -14,9 +14,11 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
-import logging
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.preprocessing._numba_transforms import (
+    rolling_winsorize_array,
+)
 
 logger = get_logger(__name__)
 
@@ -51,6 +53,7 @@ class FeatureValidator:
         """
         self.correlation_threshold = correlation_threshold
         self.logger = logger
+        self._last_winsorization_count = 0
     
     def validate(
         self,
@@ -126,14 +129,6 @@ class FeatureValidator:
                 constant_features_removed=[],
             )
 
-        has_nan = self.validate_no_nan(features_df, feature_names)
-        if has_nan:
-            warnings.append("發現 NaN 值")
-
-        has_inf = self.validate_no_inf(features_df, feature_names)
-        if has_inf:
-            warnings.append("發現 Inf 值")
-
         constant_features = self._check_constant_features(features_df, feature_names)
         if constant_features:
             features_df = features_df.drop(columns=constant_features)
@@ -145,7 +140,22 @@ class FeatureValidator:
         if coverage < 1.0:
             warnings.append(f"覆蓋率: {coverage:.4f}")
 
-        result.features_df = self.winsorize(features_df)
+        self._last_winsorization_count = 0
+        if not self._l65_winsorization_applied(result):
+            features_df = self.winsorize(features_df)
+            self._last_winsorization_count = 1
+        result.features_df = features_df
+
+        # Winsorization must not hide newly-created invalid values.  The
+        # returned validation status always describes the final output frame.
+        feature_names = list(features_df.columns)
+        has_nan = self.validate_no_nan(features_df, feature_names)
+        if has_nan:
+            warnings.append("發現 NaN 值")
+
+        has_inf = self.validate_no_inf(features_df, feature_names)
+        if has_inf:
+            warnings.append("發現 Inf 值")
 
         return ValidationResult(
             has_nan=has_nan,
@@ -172,13 +182,31 @@ class FeatureValidator:
         lower: float = 0.01,
         upper: float = 0.99,
     ) -> pd.DataFrame:
-        """極端值截斷"""
+        """以只含當下與歷史資料的 rolling quantile 截斷極端值。"""
         if features_df.empty:
             return features_df
 
-        lower_bounds = features_df.quantile(lower)
-        upper_bounds = features_df.quantile(upper)
-        return features_df.clip(lower=lower_bounds, upper=upper_bounds, axis=1)
+        values = features_df.to_numpy(dtype=np.float32, copy=True)
+        clipped = rolling_winsorize_array(
+            values,
+            lower_q=lower,
+            upper_q=upper,
+            window=252,
+            min_periods=63,
+        )
+        return pd.DataFrame(clipped, index=features_df.index, columns=features_df.columns)
+
+    @staticmethod
+    def _l65_winsorization_applied(result) -> bool:
+        """判斷 L6.5 是否已套 winsor，避免 validator 重複處理。"""
+        config_used = getattr(result, "config_used", {}) or {}
+        if not isinstance(config_used, dict):
+            return False
+        preprocessing = config_used.get("preprocessing") or {}
+        if not isinstance(preprocessing, dict) or not preprocessing.get("enabled", False):
+            return False
+        winsor = preprocessing.get("winsorization") or {}
+        return isinstance(winsor, dict) and bool(winsor.get("enabled", False))
     
     def validate_no_nan(
         self,
