@@ -145,3 +145,8 @@ sessions/數據遷移總結.md
 # fail-closed gate runtime tokens/audit (transient)
 .claude/gate/*.token
 .claude/gate/audit.log
+
+# 測試執行副產物(2026-06-12:測試未隔離輸出目錄,根治屬測試隔離 backlog)
+optimization_results/
+data/
+test_data/
