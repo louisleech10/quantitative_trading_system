@@ -319,6 +319,33 @@ def test_runtime_partial_flags_do_not_change_config_hash() -> None:
     assert baseline_hash == partial_hash
 
 
+def test_quality_gate_max_ratios_do_not_change_config_hash() -> None:
+    """max_inf_ratio/max_nan_ratio 為 runtime gate，不得進 config_hash。"""
+    from tests.feature_engineering.test_failopen_correctness import (
+        KLINE_CACHE_DIR,
+        _freeze_baseline_module,
+    )
+
+    freeze = _freeze_baseline_module()
+    factory = create_feature_factory(cache_dir=KLINE_CACHE_DIR, validate_continuity=False)
+    payload = freeze._fixed_config_payload(["1h", "12h"], "1h")
+    start_date, end_date = freeze._window_dates()
+    config = factory._resolve_config(payload)
+
+    default_hash = factory._compute_config_hash(
+        config, "BTCUSDT", "1h", start_date=start_date, end_date=end_date
+    )
+    gated = factory._resolve_config(
+        {**payload, "max_inf_ratio": 0.0, "max_nan_ratio": 0.05}
+    )
+    gated_hash = factory._compute_config_hash(
+        gated, "BTCUSDT", "1h", start_date=start_date, end_date=end_date
+    )
+
+    assert default_hash == gated_hash
+    assert default_hash == "57c47c30d3396cd2454a8eb198a3b13e"
+
+
 def test_l65_failure_records_effective_config_and_continues() -> None:
     factory = create_feature_factory(validate_continuity=False)
     config = _config()

@@ -12,6 +12,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from momentum.Analysis.ic_engine import ICEngine, ICReadError
+from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.FeatureEngineering.feature_config import PreprocessingConfig
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from momentum.FeatureEngineering.feature_reader import FeatureReader
@@ -80,6 +81,24 @@ def _selection_metadata() -> Dict[str, Any]:
     }
 
 
+def _ok_layer(data: pd.DataFrame) -> LayerExecutionResult:
+    return LayerExecutionResult(
+        data=data,
+        status=LayerStatus.ok,
+        failed_engines=(),
+        reason=None,
+        configured_engines=1,
+        present_engines=1,
+        required_engines=0,
+        dependency_error=False,
+    )
+
+
+def _healthy_layer_results(row_index: pd.DatetimeIndex) -> Dict[str, LayerExecutionResult]:
+    frame = pd.DataFrame({"x": np.ones(len(row_index), dtype=np.float32)}, index=row_index)
+    return {f"Layer {idx}": _ok_layer(frame) for idx in range(1, 7)}
+
+
 def _ic_fixture(
     tmp_path,
     symbol: str = "SYNTHETIC",
@@ -88,20 +107,30 @@ def _ic_fixture(
 ) -> Dict[str, Any]:
     storage = FeatureStorage(str(tmp_path / "features"))
     reader = FeatureReader(str(tmp_path / "features"))
+    row_index = pd.date_range("2026-01-01", periods=6, freq="h")
     groups = {
         "group_alpha": pd.DataFrame(
             {
                 "alpha": np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
                 "beta": np.array([1.0, 3.0, 2.0, 5.0, 4.0, 6.0], dtype=np.float32),
-            }
+            },
+            index=row_index,
         ),
         "group_gamma": pd.DataFrame(
             {
                 "gamma": np.array([2.0, 1.0, 2.0, 1.0, 2.0, 1.0], dtype=np.float32),
-            }
+            },
+            index=row_index,
         ),
     }
-    raw_dir = storage.write_raw(symbol, tf, config_hash, groups)
+    raw_dir = storage.write_raw(
+        symbol,
+        tf,
+        config_hash,
+        groups,
+        row_index=row_index,
+        layer_results=_healthy_layer_results(row_index),
+    )
     label = pd.Series(
         np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
         name="forward_return",
@@ -561,9 +590,12 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
     config.tier_peak_budget_gb = 999.0
     storage = FeatureStorage(str(tmp_path / "features"))
     reader = FeatureReader(str(tmp_path / "features"))
+    row_index = pd.date_range("2026-01-01", periods=6, freq="h")
     raw_data = pd.DataFrame(
-        {"close": np.array([10.0, 11.0, 12.0, 13.0, 14.0, 15.0], dtype=np.float32)}
+        {"close": np.array([10.0, 11.0, 12.0, 13.0, 14.0, 15.0], dtype=np.float32)},
+        index=row_index,
     )
+    factory.layer_results = _healthy_layer_results(row_index)
     layers = [
         pd.DataFrame(
             {

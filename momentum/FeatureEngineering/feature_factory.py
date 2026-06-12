@@ -466,7 +466,19 @@ class FeatureFactory:
             dependency_error=dependency_error,
         )
 
-    def _execute_layer1_6(self, layer_name: str, func: Callable, *args) -> LayerExecutionResult:
+    def _execute_layer1_6_preserve_dtype(
+        self, layer_name: str, func: Callable, *args
+    ) -> LayerExecutionResult:
+        """Multi-TF L1-L6：保留層間原始 dtype；float32 壓縮留在 persistence/memmap 邊界。"""
+        return self._execute_layer1_6(layer_name, func, *args, preserve_dtype=True)
+
+    def _execute_layer1_6(
+        self,
+        layer_name: str,
+        func: Callable,
+        *args,
+        preserve_dtype: bool = False,
+    ) -> LayerExecutionResult:
         """執行 L1-L6：回傳 typed LayerExecutionResult（不再經 _safe_execute 吞錯）。"""
         self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
         logger.info("%s starting, rss=%dMB", layer_name, _PROC.memory_info().rss >> 20)
@@ -510,7 +522,7 @@ class FeatureFactory:
             data = pd.DataFrame(index=index)
         elif data.empty and len(data.index) == 0 and len(index) > 0:
             data = pd.DataFrame(index=index)
-        if not data.empty:
+        if not data.empty and not preserve_dtype:
             data = self._ensure_float32(data)
             if data.columns.has_duplicates:
                 duplicate_counts = data.columns[data.columns.duplicated(keep=False)].value_counts()
@@ -1015,6 +1027,7 @@ class FeatureFactory:
         if not self._current_timeframe:
             return
 
+        frame = self._coerce_persistence_frame(frame)
         grouped_columns: Dict[tuple[str, str], List[str]] = {}
         grouped_sources: Dict[tuple[str, str], set[str]] = {}
         for column_name in frame.columns:
@@ -1031,7 +1044,7 @@ class FeatureFactory:
             group_id = self._next_available_group_id(base_group_id)
             sources = grouped_sources.get((category, indicator), set())
             data_source = next(iter(sources)) if len(sources) == 1 else "mixed"
-            data = frame.loc[:, columns].to_numpy(dtype=np.float32, copy=False)
+            data = self._coerce_persistence_array(frame.loc[:, columns].to_numpy(copy=False))
             group = ColumnGroup(
                 group_id=group_id,
                 layer=LayerSource.L1,
@@ -1051,9 +1064,10 @@ class FeatureFactory:
         if not self._current_timeframe:
             return
 
+        frame = self._coerce_persistence_frame(frame)
         base_group_id = f"{self._current_timeframe}_L2_{category}"
         group_id = self._next_available_group_id(base_group_id)
-        data = frame.to_numpy(dtype=np.float32, copy=False)
+        data = self._coerce_persistence_array(frame.to_numpy(copy=False))
         group = ColumnGroup(
             group_id=group_id,
             layer=LayerSource.L2,
@@ -1084,6 +1098,7 @@ class FeatureFactory:
         if not self._current_timeframe:
             return
 
+        frame = self._coerce_persistence_frame(frame)
         columns = list(frame.columns)
         n_cols = len(columns)
         chunk_idx = 0
@@ -1094,8 +1109,8 @@ class FeatureFactory:
             suffix = f"_{chunk_idx}" if n_cols > chunk_cols else ""
             base_group_id = f"{self._current_timeframe}_{label}{suffix}"
             group_id = self._next_available_group_id(base_group_id)
-            data = frame.iloc[:, start : start + chunk_cols].to_numpy(
-                dtype=np.float32, copy=False,
+            data = self._coerce_persistence_array(
+                frame.iloc[:, start : start + chunk_cols].to_numpy(copy=False),
             )
             group = ColumnGroup(
                 group_id=group_id,
@@ -3407,6 +3422,9 @@ class FeatureFactory:
         config_payload.pop("allow_partial_timeframes", None)
         config_payload.pop("allow_partial_ic", None)
         config_payload.pop("allow_partial_training", None)
+        # Quality gate thresholds are runtime flags; they do not alter feature values.
+        config_payload.pop("max_inf_ratio", None)
+        config_payload.pop("max_nan_ratio", None)
         preprocessing_payload = config_payload.get("preprocessing")
         if isinstance(preprocessing_payload, dict):
             preprocessing_payload.setdefault("causal_preprocessing", True)
@@ -3599,6 +3617,21 @@ class FeatureFactory:
         # Batched conversion avoids costly per-column block fragmentation on very wide DataFrames.
         dtype_map = {column_name: "float32" for column_name in numeric_columns}
         return df.astype(dtype_map, copy=False)
+
+    @staticmethod
+    def _coerce_persistence_frame(df: pd.DataFrame) -> pd.DataFrame:
+        """層間 in-memory 可保留 float64；寫入 registry/memmap/parquet 前統一 float32。"""
+        return FeatureFactory._ensure_float32(df)
+
+    @staticmethod
+    def _coerce_persistence_array(data: np.ndarray) -> np.ndarray:
+        """Persistence 邊界：float64→float32 後再進 registry 或 parquet 編碼。
+
+        只 cast dtype、不改記憶體序:ascontiguousarray 會把 frame.to_numpy 的
+        F-order 視圖轉 C-order,np.save 的 npy bytes 與 Batch0 baseline 不一致
+        (Codex B 線實證:155/155 npy 恢復 F-order 即精確命中 baseline sha)。
+        """
+        return np.asarray(data, dtype=np.float32)
 
     @staticmethod
     def _data_range(raw_data: pd.DataFrame) -> List[str]:
@@ -3892,8 +3925,9 @@ class _StreamingL3Persister:
         timeframe = self.factory._current_timeframe or "unknown"
         base_id = f"{timeframe}_{self.label_prefix}_{step_label}_{chunk_idx}"
         group_id = self.factory._next_available_group_id(base_id)
+        merged = self.factory._coerce_persistence_frame(merged)
         columns_tuple = tuple(merged.columns)
-        data = merged.to_numpy(dtype=np.float32, copy=False)
+        data = self.factory._coerce_persistence_array(merged.to_numpy(copy=False))
         # ColumnGroup.save_data atomically writes .npy then registers metadata.
         group = ColumnGroup(
             group_id=group_id,

@@ -15,6 +15,7 @@ import pandas as pd
 
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.core.column_group_registry import normalize_npy_persistence_float32
 from momentum.FeatureEngineering.timeframe.tf_aligner import CURRENT_MTF_ALIGN_VERSION, TimeframeAligner
 
 
@@ -128,7 +129,9 @@ class MultiTFGenerator:
                 f"[CGSA] Processing timeframe {timeframe} ({index + 1}/{total_tfs})",
             )
 
-            if registry.has_layers_for_timeframe(timeframe, _RESUME_LAYERS):
+            if self._has_resume_checkpoint_for_timeframe(
+                registry, timeframe, _RESUME_LAYERS
+            ):
                 if timeframe != self._primary_tf and not self._tf_alignment_version_current(
                     registry, timeframe, _RESUME_LAYERS
                 ):
@@ -381,10 +384,11 @@ class MultiTFGenerator:
         # registry already contains some L1-L6 groups. Re-running the layer
         # methods would call `save_data` and raise "Duplicate group_id"
         # (or quietly create `_2`-suffixed siblings via `_next_available_group_id`).
-        # Skip any TF whose L1-L6 set is already present.
+        # Skip any TF with a completed L1-L6 checkpoint. Some healthy layers
+        # legitimately persist no groups, so full layer-set presence is invalid.
         _RESUME_LAYERS = (_LS.L1, _LS.L2, _LS.L3, _LS.L4, _LS.L5, _LS.L6)
-        primary_already_done = registry.has_layers_for_timeframe(
-            self._primary_tf, _RESUME_LAYERS
+        primary_already_done = self._has_resume_checkpoint_for_timeframe(
+            registry, self._primary_tf, _RESUME_LAYERS
         )
 
         # Step 1: Process primary TF in main process (needs registry + factory state)
@@ -449,11 +453,11 @@ class MultiTFGenerator:
         logger.info("[CGSA-parallel] Primary TF %s done, %d groups", self._primary_tf, len(list(registry.iter_all())))
 
         # Step 2: Process non-primary TFs in parallel via ProcessPoolExecutor + spawn
-        # Resume support: filter out TFs whose L1-L6 groups are already in the manifest.
+        # Resume support: filter out TFs with a completed L1-L6 checkpoint.
         all_non_primary = [tf for tf in self._training_tfs if tf != self._primary_tf]
         non_primary_tfs: List[str] = []
         for _tf in all_non_primary:
-            if registry.has_layers_for_timeframe(_tf, _RESUME_LAYERS):
+            if self._has_resume_checkpoint_for_timeframe(registry, _tf, _RESUME_LAYERS):
                 if not self._tf_alignment_version_current(registry, _tf, _RESUME_LAYERS):
                     logger.warning(
                         "[CGSA-parallel:resume] TF %s has stale/missing align_algo_version; rebuilding.",
@@ -866,6 +870,7 @@ class MultiTFGenerator:
                 freed_worker_bytes += moved_bytes
                 if moved_bytes > 0:
                     moved_dirs.add(source_path.parent)
+                normalize_npy_persistence_float32(target_path)
                 shard_metas.append(
                     ShardMeta(
                         shard_idx=shard_idx,
@@ -873,7 +878,7 @@ class MultiTFGenerator:
                         col_end=int(shard_payload.get("col_end", 0)),
                         n_rows=int(shard_payload.get("n_rows", n_source)),
                         disk_path=target_path,
-                        nbytes=int(shard_payload.get("nbytes", target_path.stat().st_size)),
+                        nbytes=int(target_path.stat().st_size),
                     )
                 )
         elif "npy_path" in group_data:
@@ -887,10 +892,12 @@ class MultiTFGenerator:
             freed_worker_bytes += moved_bytes
             if moved_bytes > 0:
                 moved_dirs.add(source_path.parent)
+            normalize_npy_persistence_float32(disk_path)
         elif "data" in group_data:
             source_array = np.asarray(group_data["data"], dtype=np.float32)
             disk_path = registry.work_dir / f"{group_id}.npy"
             np.save(disk_path, source_array, allow_pickle=False)
+            normalize_npy_persistence_float32(disk_path)
             n_source = int(source_array.shape[0])
         else:
             raise ValueError(f"Worker group {group_id} has no npy_path/shards/data payload")
@@ -1188,6 +1195,32 @@ class MultiTFGenerator:
         return matched > 0
 
     @staticmethod
+    def _has_resume_checkpoint_for_timeframe(
+        registry: object,
+        timeframe: str,
+        layers: Iterable[object],
+    ) -> bool:
+        """Return whether a completed TF left any resumable L1-L6 group.
+
+        A healthy layer may legitimately persist no group (disabled, short-data,
+        or all generated columns dropped). TF failures roll back the entire
+        timeframe, so requiring every layer to be represented makes valid
+        checkpoints look incomplete and causes duplicate ``_2`` groups.
+        """
+        layer_values = {getattr(layer, "value", str(layer)) for layer in layers}
+        for _gid, group in registry.iter_all():
+            if getattr(group, "timeframe", None) != timeframe:
+                continue
+            group_layer = getattr(
+                getattr(group, "layer", ""),
+                "value",
+                str(getattr(group, "layer", "")),
+            )
+            if group_layer in layer_values:
+                return True
+        return False
+
+    @staticmethod
     def _drop_timeframe_groups_from_registry(registry: object, timeframe: str, layers: Iterable[object]) -> None:
         """Remove stale groups for one timeframe so resume can rebuild without duplicate ids."""
         layer_values = {getattr(layer, "value", str(layer)) for layer in layers}
@@ -1358,15 +1391,21 @@ class MultiTFGenerator:
         """執行 L1-L6（typed executor + L2 spill），回傳六層 LayerExecutionResult。"""
         factory = self._factory
         config = self._config
-        r1 = factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw_data, config)
+        r1 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 1", factory._layer1_atomic_indicators, raw_data, config
+        )
         self._raise_for_failed_layer(r1, "Layer 1")
         layer1 = r1.data
-        r2 = factory._execute_layer1_6("Layer 2", factory._layer2_derived_features, layer1, raw_data, config)
+        r2 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 2", factory._layer2_derived_features, layer1, raw_data, config
+        )
         self._raise_for_failed_layer(r2, "Layer 2")
         layer2 = factory._spill_to_memmap(r2.data, "layer2")
-        r3 = factory._execute_layer1_6("Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config)
+        r3 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config
+        )
         self._raise_for_failed_layer(r3, "Layer 3")
-        r4 = factory._execute_layer1_6(
+        r4 = factory._execute_layer1_6_preserve_dtype(
             "Layer 4",
             factory._layer4_lag_features,
             layer1,
@@ -1376,9 +1415,11 @@ class MultiTFGenerator:
             config,
         )
         self._raise_for_failed_layer(r4, "Layer 4")
-        r5 = factory._execute_layer1_6("Layer 5", factory._layer5_cross_sectional, layer1, layer2, config)
+        r5 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 5", factory._layer5_cross_sectional, layer1, layer2, config
+        )
         self._raise_for_failed_layer(r5, "Layer 5")
-        r6 = factory._execute_layer1_6(
+        r6 = factory._execute_layer1_6_preserve_dtype(
             "Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config
         )
         self._raise_for_failed_layer(r6, "Layer 6")
@@ -1681,13 +1722,19 @@ def _tf_worker_entry(
         from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
         import gc as _gc
 
-        r1 = factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw_data, config)
+        r1 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 1", factory._layer1_atomic_indicators, raw_data, config
+        )
         factory._raise_for_failed_layer(r1, "Layer 1", config)
         layer1 = r1.data
-        r2 = factory._execute_layer1_6("Layer 2", factory._layer2_derived_features, layer1, raw_data, config)
+        r2 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 2", factory._layer2_derived_features, layer1, raw_data, config
+        )
         factory._raise_for_failed_layer(r2, "Layer 2", config)
         layer2 = r2.data
-        r3 = factory._execute_layer1_6("Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config)
+        r3 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config
+        )
         factory._raise_for_failed_layer(r3, "Layer 3", config)
         layer3 = r3.data
         if r3.status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
@@ -1695,7 +1742,7 @@ def _tf_worker_entry(
         del layer3
         _gc.collect()
 
-        r4 = factory._execute_layer1_6(
+        r4 = factory._execute_layer1_6_preserve_dtype(
             "Layer 4", factory._layer4_lag_features, layer1, layer2, None, raw_data, config
         )
         factory._raise_for_failed_layer(r4, "Layer 4", config)
@@ -1705,7 +1752,9 @@ def _tf_worker_entry(
         del layer4
         _gc.collect()
 
-        r5 = factory._execute_layer1_6("Layer 5", factory._layer5_cross_sectional, layer1, layer2, config)
+        r5 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 5", factory._layer5_cross_sectional, layer1, layer2, config
+        )
         factory._raise_for_failed_layer(r5, "Layer 5", config)
         layer5 = r5.data
         if layer5 is not None and not layer5.empty:
@@ -1713,7 +1762,9 @@ def _tf_worker_entry(
         del layer5
         _gc.collect()
 
-        r6 = factory._execute_layer1_6("Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config)
+        r6 = factory._execute_layer1_6_preserve_dtype(
+            "Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config
+        )
         factory._raise_for_failed_layer(r6, "Layer 6", config)
         layer6 = r6.data
         if layer6 is not None and not layer6.empty:

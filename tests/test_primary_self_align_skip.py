@@ -54,6 +54,10 @@ class _FactoryStub:
         del layer_name
         return stub_execute_layer1_6(func, *args)
 
+    def _execute_layer1_6_preserve_dtype(self, layer_name, func, *args):
+        del layer_name
+        return stub_execute_layer1_6(func, *args)
+
     _spill_to_memmap = staticmethod(stub_spill_to_memmap)
     layer_data = stub_layer_data
 

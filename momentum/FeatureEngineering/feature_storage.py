@@ -42,6 +42,13 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+
+def _coerce_persistence_array(data: np.ndarray) -> np.ndarray:
+    """Persistence 邊界：float64→float32 後再進 parquet/registry 編碼。"""
+    # 只 cast dtype,不改記憶體序(ascontiguousarray 會改 npy/編碼 bytes 佈局)。
+    return np.asarray(data, dtype=np.float32)
+
+
 L7_ENCODING_REGISTRY_METADATA_KEY = "l7_encoding_registry"
 RANK_UINT16_ENCODING = "rank_uint16"
 ZSCORE_INT16_ENCODING = "zscore_int16"
@@ -861,7 +868,7 @@ class FeatureStorage:
                         _tagged.append(_c)
                 columns_list = _tagged
 
-            array = np.asarray(data, dtype=np.float32)
+            array = _coerce_persistence_array(data)
             # registry 來源可能是 memmap / arrow 零拷貝（唯讀）；下方 Layer B 淨化與
             # dead-drop 需就地寫入 → 唯讀時複製成可寫副本（可寫來源維持零拷貝省記憶體）。
             if not array.flags.writeable:
@@ -936,6 +943,7 @@ class FeatureStorage:
             written_part_ids: List[str] = []
             for part_id, part_cols, part_data in parts:
                 safe_part_id = self._safe_path_segment(str(part_id), "part_id")
+                part_data = _coerce_persistence_array(part_data)
                 (
                     arrays,
                     storage_dtype,
@@ -2355,15 +2363,9 @@ class FeatureStorage:
                 pending_disk_paths = {}
 
             for idx, (group_id, group) in enumerate(groups_list, 1):
-                # P3.1 (2026-04-25): Skip the wasteful float32 materialization.
-                # ``registry.load_data`` returns a memory-mapped read-only
-                # array; the previous ``np.asarray(..., dtype=np.float32)``
-                # forced a full RAM copy as float32 (4 bytes/cell) only for
-                # the very next line to ``astype(np.float16)`` (2 bytes/cell)
-                # and discard the float32. We retain the validation contract
-                # by checking the mmap shape directly and let the f16 cast
-                # do the one-and-only allocation in the part loop below.
-                mmap_arr = registry.load_data(group_id)
+                # Persistence 邊界：層間 in-memory 可為 float64，編碼前統一 float32
+                # （與 Batch0 baseline 的 float32→float16 單次捨入一致）。
+                mmap_arr = _coerce_persistence_array(registry.load_data(group_id))
                 if mmap_arr.ndim != 2:
                     raise ValueError(f"Group {group_id} data must be 2D, got shape={mmap_arr.shape}")
                 if mmap_arr.shape[1] != len(group.columns):
@@ -2537,9 +2539,9 @@ class FeatureStorage:
         zero. A roundtrip gate catches both cases plus excessive quantization error.
         """
         if data.size == 0:
-            return data.astype(np.float16), "float16"
+            return _coerce_persistence_array(data).astype(np.float16), "float16"
 
-        source = np.asarray(data, dtype=np.float32)
+        source = _coerce_persistence_array(np.asarray(data))
         with np.errstate(all="ignore"):
             data_float16 = source.astype(np.float16)
 
@@ -2573,7 +2575,7 @@ class FeatureStorage:
         pa_module: Any,
     ) -> Tuple[List[Any], str, List[str], Dict[str, int], int]:
         """Build parquet arrays with per-column float16/float32 fallback."""
-        source = np.asarray(data, dtype=np.float32)
+        source = _coerce_persistence_array(data)
         arrays: List[Any] = []
         float32_cols: List[str] = []
         dtype_counts: Dict[str, int] = {}

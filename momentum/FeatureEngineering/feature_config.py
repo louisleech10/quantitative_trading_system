@@ -464,8 +464,8 @@ class FactoryConfig(BaseModel):
     """Feature Factory 主配置。
 
     Fail-open gate 預設矩陣（§C-2）：allow_partial_* 全 False；max_inf_ratio=0；
-    max_nan_ratio=None 時 producer 讀 Phase0 baseline 上界。allow_partial_* 不進
-    config_hash；max_* 進 config_hash（影響數值輸出）。
+    max_nan_ratio=None 時 producer 讀 Phase0 baseline 上界。allow_partial_* 與 max_*
+    皆不進 config_hash（runtime gate；門檻記錄於 manifest/quality policy）。
     """
 
     version: str = "2.2"

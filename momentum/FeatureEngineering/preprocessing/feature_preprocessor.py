@@ -392,6 +392,29 @@ class FeaturePreprocessor:
         if registry is None:
             return 0
 
+        raw_sink = sink
+
+        def persistence_sink(
+            group_id: str,
+            columns: List[str],
+            data: np.ndarray,
+            source_group_id: str,
+            source_disk_path: Optional[Path],
+            cleanup_source: bool,
+        ) -> None:
+            # 只 cast dtype,不改記憶體序(ascontiguousarray 會變 npy header/bytes)。
+            data_fp32 = np.asarray(data, dtype=np.float32)
+            raw_sink(
+                group_id,
+                columns,
+                data_fp32,
+                source_group_id,
+                source_disk_path,
+                cleanup_source,
+            )
+
+        sink = persistence_sink
+
         groups = [group for _, group in registry.iter_all() if group.n_cols > 0]
         if not groups:
             return 0

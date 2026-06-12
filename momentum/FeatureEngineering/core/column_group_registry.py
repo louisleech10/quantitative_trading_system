@@ -33,6 +33,21 @@ from momentum.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+def normalize_npy_persistence_float32(path: Path) -> None:
+    """Persistence 邊界:worker 落地的 npy 若非 float32 則重寫為 float32。
+
+    已是 float32 → 不重寫(np.save 重寫會改 header/記憶體序 bytes,與
+    Batch0 baseline npy 不一致);僅 dtype cast,不 ascontiguousarray。
+    """
+    arr = np.load(path, mmap_mode="r", allow_pickle=False)
+    if arr.dtype == np.float32:
+        return
+    fp32 = np.asarray(np.load(path, allow_pickle=False), dtype=np.float32)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.fp32.tmp")
+    np.save(tmp_path, fp32, allow_pickle=False)
+    os.replace(tmp_path, path)
+
+
 class FailureType(str, Enum):
     """Failure category for registry I/O and validation operations."""
 
@@ -726,6 +741,9 @@ class ColumnGroupRegistry:
         if group.group_id in self._groups:
             raise ValueError(f"Duplicate group_id: {group.group_id}")
 
+        # Persistence 邊界:只 cast dtype(float64→float32),不改記憶體序——
+        # ascontiguousarray 會把 F-order 轉 C-order,np.save header/bytes 與
+        # Batch0 baseline npy 不一致(值同 bytes 異,2026-06-12 親測)。
         data_fp32 = np.asarray(data, dtype=np.float32)
         n_rows, n_cols = int(data_fp32.shape[0]), int(data_fp32.shape[1])
 
