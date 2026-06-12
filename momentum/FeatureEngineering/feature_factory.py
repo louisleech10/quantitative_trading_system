@@ -60,10 +60,13 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
     compute_feature_schema_hash,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from momentum.FeatureEngineering.utils.nan_stats import abnormal_nan_count
+from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 
 
 logger = get_logger(__name__)
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
+_MAX_NAN_RATIO_ARTIFACT_PATH = Path(__file__).parent / "_resources/max_nan_ratio.json"
 
 
 def _derived_operator_engine_cls() -> type:
@@ -576,6 +579,17 @@ class FeatureFactory:
         if isinstance(config, dict):
             return config.get(name, default)
         return getattr(config, name, default)
+
+    @staticmethod
+    def _resolve_stream_nan_ratio(validation_summary: Dict[str, Any]) -> float:
+        """優先讀 warmup-aware nan_ratio；舊 summary 維持 coverage fallback。"""
+        if "nan_ratio" in validation_summary:
+            return float(validation_summary["nan_ratio"])
+        logger.warning(
+            "[L7] stream validation missing nan_ratio; using warmup-inclusive "
+            "1-coverage fallback"
+        )
+        return 1.0 - float(validation_summary.get("coverage", 0.0))
 
     def _raise_for_failed_layer(
         self,
@@ -2772,24 +2786,12 @@ class FeatureFactory:
     @staticmethod
     def _abnormal_nan_count(values: np.ndarray) -> int:
         """計算各欄首尾有效值之間的 NaN；合法前導/尾端 warmup 不計。"""
-        array = np.asarray(values)
-        if array.ndim != 2 or array.size == 0:
-            return 0
-        nan_mask = np.isnan(array)
-        valid_mask = ~nan_mask
-        has_valid = valid_mask.any(axis=0)
-        total_nan = nan_mask.sum(axis=0, dtype=np.int64)
-        first_valid = np.argmax(valid_mask, axis=0)
-        last_valid = array.shape[0] - 1 - np.argmax(valid_mask[::-1], axis=0)
-        leading = np.where(has_valid, first_valid, 0)
-        trailing = np.where(has_valid, array.shape[0] - 1 - last_valid, 0)
-        abnormal = np.where(has_valid, total_nan - leading - trailing, total_nan)
-        return int(np.maximum(abnormal, 0).sum())
+        return abnormal_nan_count(values)
 
     @staticmethod
     def _default_max_nan_ratio(symbol: str, timeframe: str) -> float:
         """讀取 Task0.1 健康 run artifact；未知組合採已觀測最大值。"""
-        artifact_path = Path(__file__).parents[2] / "tests/_golden/failopen/max_nan_ratio.json"
+        artifact_path = _MAX_NAN_RATIO_ARTIFACT_PATH
         try:
             payload = json.loads(artifact_path.read_text(encoding="utf-8"))
             ratios = payload.get("ratios", {})
@@ -3060,6 +3062,7 @@ class FeatureFactory:
                 "high_correlation_pairs": [],
                 "warnings": list(validation_summary.get("warnings", [])),
                 "coverage": float(validation_summary.get("coverage", 0.0)),
+                "nan_ratio": self._resolve_stream_nan_ratio(validation_summary),
                 "inf_count": int(validation_summary.get("inf_count", 0)),
                 "inf_ratio": float(validation_summary.get("inf_ratio", 0.0)),
                 "groups_with_inf": int(validation_summary.get("groups_with_inf", 0)),
@@ -3067,16 +3070,21 @@ class FeatureFactory:
             },
             "quality_status": str(completeness_meta["quality_status"]),
             "run_status": str(completeness_meta["quality_status"]),
-            "failed_layers": list(completeness_meta.get("failed_layers", [])),
-            "failure_reasons": list(completeness_meta.get("failure_reasons", [])),
+            "failed_layers": qualify_failed_layer_ids(
+                completeness_meta.get("failed_layers", []), timeframe
+            ),
+            "failure_reasons": qualify_failed_layer_ids(
+                completeness_meta.get("failure_reasons", []), timeframe
+            ),
         }
         self._apply_preprocessing_degradation_metadata(metadata)
+        stream_nan_ratio = float(metadata["validation"]["nan_ratio"])
         self._apply_runtime_quality_gate(
             metadata,
             config,
             symbol,
             timeframe,
-            nan_ratio=float(validation_summary.get("nan_ratio", 1.0 - float(validation_summary.get("coverage", 0.0)))),
+            nan_ratio=stream_nan_ratio,
             inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
         )
 
@@ -3322,8 +3330,12 @@ class FeatureFactory:
             "config_used": config.model_dump(by_alias=True),
             "quality_status": str(completeness_meta["quality_status"]),
             "run_status": str(completeness_meta["quality_status"]),
-            "failed_layers": list(completeness_meta.get("failed_layers", [])),
-            "failure_reasons": list(completeness_meta.get("failure_reasons", [])),
+            "failed_layers": qualify_failed_layer_ids(
+                completeness_meta.get("failed_layers", []), timeframe
+            ),
+            "failure_reasons": qualify_failed_layer_ids(
+                completeness_meta.get("failure_reasons", []), timeframe
+            ),
         }
 
         result = FeatureGenerationResult(
@@ -3337,7 +3349,10 @@ class FeatureFactory:
             compute_warnings=compute_warnings or [],
         )
 
-        validation = self._validator.validate_factory_output(result)
+        validation = self._validator.validate_factory_output(
+            result,
+            winsor_window=config.preprocessing.winsorization.window,
+        )
         metadata["validation"] = validation.__dict__
         metadata["feature_names"] = list(result.features_df.columns)
         metadata["feature_count"] = int(result.features_df.shape[1])

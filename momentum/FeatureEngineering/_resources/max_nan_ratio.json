@@ -1,0 +1,14 @@
+{
+  "definition": "observed healthy-run final_L7 nan_ratio upper bound",
+  "ratios": {
+    "BTCUSDT": {
+      "12h": 0.16346106471952185,
+      "1h": 0.015799165570665605
+    },
+    "ETHUSDT": {
+      "12h": 0.16339980371515053,
+      "1h": 0.01574373766355243
+    }
+  },
+  "schema_version": 1
+}
