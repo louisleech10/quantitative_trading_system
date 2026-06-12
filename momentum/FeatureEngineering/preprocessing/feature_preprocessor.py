@@ -41,6 +41,7 @@ from momentum.FeatureEngineering.preprocessing._numba_transforms import (
 )
 from momentum.FeatureEngineering.utils.adf_safe_skip import filter_safe_skip
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
+from momentum.FeatureEngineering.utils.winsor_params import resolve_winsor_min_periods
 from momentum.FeatureEngineering.operators.derived_operators import (
     RATIO_UNSAFE_CATEGORIES,
 )
@@ -122,7 +123,6 @@ except Exception:
     adfuller = None
     logger.warning("statsmodels not available, ADF/Fractional Differencing disabled")
 
-
 class FeaturePreprocessor:
     """Layer 6.5: 特徵前處理與正規化。"""
 
@@ -154,8 +154,7 @@ class FeaturePreprocessor:
 
     @staticmethod
     def _rolling_min_periods(window: int) -> int:
-        w = max(1, int(window))
-        return min(w, max(20, w // 4))
+        return resolve_winsor_min_periods(int(window))
 
     def _calibration_bars(self) -> int:
         adf_sample = int(self.adf_config.get("sample_size", self.fracdiff_config.get("sample_size", 500)))

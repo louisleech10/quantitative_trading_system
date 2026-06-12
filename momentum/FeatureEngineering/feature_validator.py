@@ -19,6 +19,7 @@ from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.preprocessing._numba_transforms import (
     rolling_winsorize_array,
 )
+from momentum.FeatureEngineering.utils.winsor_params import resolve_winsor_min_periods
 
 logger = get_logger(__name__)
 
@@ -111,7 +112,12 @@ class FeatureValidator:
         
         return result
 
-    def validate_factory_output(self, result) -> ValidationResult:
+    def validate_factory_output(
+        self,
+        result,
+        *,
+        winsor_window: Optional[int] = None,
+    ) -> ValidationResult:
         """工廠專用驗證：NaN/Inf + 常數移除 + 覆蓋率 + Winsorize"""
         features_df = result.features_df
         feature_names = list(features_df.columns)
@@ -142,7 +148,11 @@ class FeatureValidator:
 
         self._last_winsorization_count = 0
         if not self._l65_winsorization_applied(result):
-            features_df = self.winsorize(features_df)
+            features_df = (
+                self.winsorize(features_df)
+                if winsor_window is None
+                else self.winsorize(features_df, window=winsor_window)
+            )
             self._last_winsorization_count = 1
         result.features_df = features_df
 
@@ -181,8 +191,15 @@ class FeatureValidator:
         features_df: pd.DataFrame,
         lower: float = 0.01,
         upper: float = 0.99,
+        *,
+        window: Optional[int] = None,
     ) -> pd.DataFrame:
         """以只含當下與歷史資料的 rolling quantile 截斷極端值。"""
+        if window is None:
+            window = 252
+        if window <= 0:
+            raise ValueError(f"winsor window must be positive, got {window}")
+        min_periods = resolve_winsor_min_periods(window)
         if features_df.empty:
             return features_df
 
@@ -191,8 +208,8 @@ class FeatureValidator:
             values,
             lower_q=lower,
             upper_q=upper,
-            window=252,
-            min_periods=63,
+            window=window,
+            min_periods=min_periods,
         )
         return pd.DataFrame(clipped, index=features_df.index, columns=features_df.columns)
 
