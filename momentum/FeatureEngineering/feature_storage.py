@@ -830,6 +830,10 @@ class FeatureStorage:
         except Exception:
             _stream_zstd_level = 1
 
+        from momentum.FeatureEngineering.utils.nan_stats import ColumnNanAccumulator
+
+        nan_accumulators: Dict[str, ColumnNanAccumulator] = {}
+
         def _write_group(
             group_id: str,
             columns: List[str],
@@ -916,6 +920,11 @@ class FeatureStorage:
             if array.size:
                 nan_mask = np.isnan(array)
                 non_nan_values += int(array.size - nan_mask.sum())
+                for column_index, column in enumerate(columns_list):
+                    accumulator = nan_accumulators.setdefault(
+                        column, ColumnNanAccumulator()
+                    )
+                    accumulator.update(nan_mask[:, column_index])
                 inf_count = int(np.isinf(array).sum())
                 total_inf += inf_count
                 if inf_count > 0:
@@ -1124,12 +1133,17 @@ class FeatureStorage:
             resolved_time_range = time_range or {"start": None, "end": None}
             coverage = float(non_nan_values / total_values) if total_values else 0.0
             inf_ratio = float(total_inf / total_values) if total_values else 0.0
+            abnormal_nan = sum(
+                accumulator.abnormal() for accumulator in nan_accumulators.values()
+            )
+            nan_ratio = float(abnormal_nan / total_values) if total_values else 0.0
             validation_summary = {
                 "has_nan": bool(non_nan_values < total_values),
                 "has_inf": bool(total_inf > 0),
                 "coverage": coverage,
                 "inf_count": int(total_inf),
                 "inf_ratio": inf_ratio,
+                "nan_ratio": nan_ratio,
                 "groups_with_inf": int(groups_with_inf),
                 "warnings": [],
             }
