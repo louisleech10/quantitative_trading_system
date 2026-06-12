@@ -107,7 +107,7 @@ class _FactoryStub:
         return SimpleNamespace(
             features_df=features_df,
             labels_df=pd.DataFrame(index=features_df.index),
-            metadata={"layer_counts": {}, "skipped_timeframes": [], "actual_timeframes": []},
+            metadata={"layer_counts": {}, "skipped_timeframes": [], "present_timeframes": []},
             feature_count=features_df.shape[1],
             generation_time=0.0,
             layer_counts={},

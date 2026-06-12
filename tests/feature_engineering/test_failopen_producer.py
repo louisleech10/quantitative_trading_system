@@ -260,7 +260,7 @@ def test_four_generator_paths_fail_closed_integration(
 
     result = generator.generate_multi_tf("BTCUSDT")
     assert result.metadata["skipped_timeframes"] == ["1h"]
-    assert result.metadata["actual_timeframes"] == ["12h"]
+    assert result.metadata["present_timeframes"] == ["12h"]
     assert "1h" in result.metadata["failed_timeframes"]
 
 

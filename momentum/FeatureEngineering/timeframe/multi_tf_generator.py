@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
+
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.core.column_group_registry import normalize_npy_persistence_float32
@@ -324,9 +326,7 @@ class MultiTFGenerator:
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
-        result.metadata["actual_timeframes"] = [
-            tf for tf in self._training_tfs if tf not in skipped_tfs
-        ]
+        result.metadata["present_timeframes"] = self._present_timeframes(skipped_tfs)
         self._apply_failed_timeframe_metadata(result, skipped_tfs)
         self._apply_failed_layer_metadata(result, failed_layers)
 
@@ -543,7 +543,9 @@ class MultiTFGenerator:
                     # OOM Fix: result now carries only metadata + npy paths,
                     # so the pickle payload is KB rather than GB.
                     tf_layer_counts[tf] = result.get("layer_counts", {})
-                    failed_layers.extend(result.get("failed_layers", []))
+                    failed_layers.extend(
+                        qualify_failed_layer_ids(result.get("failed_layers", []), tf)
+                    )
                     groups_data = result.get("groups", [])
                     source_ts_ms = result.get("source_timestamps_ms")
                     align_start = time.perf_counter()
@@ -616,9 +618,7 @@ class MultiTFGenerator:
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
-        result.metadata["actual_timeframes"] = [
-            tf for tf in self._training_tfs if tf not in skipped_tfs
-        ]
+        result.metadata["present_timeframes"] = self._present_timeframes(skipped_tfs)
         self._apply_failed_timeframe_metadata(result, skipped_tfs)
         self._apply_failed_layer_metadata(result, failed_layers)
 
@@ -1373,9 +1373,7 @@ class MultiTFGenerator:
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
         result.metadata["skipped_timeframes"] = skipped_tfs
-        result.metadata["actual_timeframes"] = [
-            tf for tf in self._training_tfs if tf not in skipped_tfs
-        ]
+        result.metadata["present_timeframes"] = self._present_timeframes(skipped_tfs)
         self._apply_failed_timeframe_metadata(result, skipped_tfs)
         self._apply_failed_layer_metadata(result, failed_layers)
 
@@ -1386,6 +1384,11 @@ class MultiTFGenerator:
         if self._progress_callback:
             self._progress_callback({"stage": stage, "progress": progress, "message": message})
         logger.info("[multi_tf:%s] %0.0f%% - %s", stage, progress * 100, message)
+
+    def _present_timeframes(self, skipped: List[str]) -> List[str]:
+        """依 training 順序回傳實際存在的 timeframes。"""
+        skipped_set = set(skipped)
+        return [tf for tf in self._training_tfs if tf not in skipped_set]
 
     def _run_tf_l1_l6_results(self, raw_data: pd.DataFrame) -> List[LayerExecutionResult]:
         """執行 L1-L6（typed executor + L2 spill），回傳六層 LayerExecutionResult。"""

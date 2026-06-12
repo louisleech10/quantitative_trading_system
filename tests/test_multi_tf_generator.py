@@ -191,7 +191,7 @@ def test_lower_tf_missing_fails_closed_unless_partial_enabled():
 
     assert result.features_df.shape[0] == 2
     assert result.metadata["skipped_timeframes"] == ["1h"]
-    assert result.metadata["actual_timeframes"] == ["12h"]
+    assert result.metadata["present_timeframes"] == ["12h"]
 
 
 def test_short_primary_data_still_generates():

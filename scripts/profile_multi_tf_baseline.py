@@ -411,7 +411,7 @@ def main() -> None:
         },
         "metadata": {
             "skipped_timeframes": result.metadata.get("skipped_timeframes", []),
-            "actual_timeframes": result.metadata.get("actual_timeframes", []),
+            "present_timeframes": result.metadata.get("present_timeframes", []),
             "config_hash": str(result.metadata.get("config_hash", "")),
         },
     }
