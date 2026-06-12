@@ -1,25 +1,27 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-11 | **Branch**: main
+**Agent**: Claude (remote) | **Time**: 2026-06-12 | **Branch**: claude/hopeful-dijkstra-p40yu0
 
-## 結案:L1-L4 因果化 L6.5 perf 回歸 = winsor(已修),非 fracdiff
-我的因果化(fff522b/f1714e4)把 L6.5 的 winsor 從全樣本改成 rolling,舊 `_rolling_quantile_numba` 每窗 full-sort → 在 45 萬欄全量上炸開。**fracdiff 不是主因(只 ~2%)**;先前「fracdiff 543x」是我讀 log 時間位置誤判,繞了一大圈 P1(已作廢)。
+## 狀態:FF fail-open Batch0-5 完成+已推;Batch6 在使用者 Local PC 執行中
+- Batch0-5 commit 至 e9c5459(=origin/main),Batch5 驗收 273 passed。
+- Batch6(test_failopen_matrix + test_failopen_correctness + 三方簽核 V-9)由使用者 Local 跑,**未進 repo**。
 
-## 修法 P0(已 commit + push:d1440c3 kernel/oracle、81e475b flip 預設、e941c33/92aa963 housekeeping)
-- `_rolling_quantile_numba` 旁加 `_rolling_quantile_sliding_numba`(per-column sliding sorted window,二分插入保等值時序+移除最舊等值,buffer window+1 防 numba OOB)。保 `(lower,upper)` API、4 caller、簽名不動。
-- flag `FFACT_ROLLING_QUANTILE_KERNEL=sliding|legacy`(**預設 sliding**,call-time;legacy 一鍵回退)。
-- **byte-identical 三方簽核**:Claude byte gate 16/16(array_equal+uint8-view,含 ties/inf/±0.0/NaN fuzz)+ Codex 實作 + Composer review「可合併」。e2e 雙路徑(Polars 19.2x/pandas 19.8x)byte-identical。
-- 測試:`tests/feature_engineering/preprocessing/test_perf_winsor_identical.py`(reference `tests/_fixtures/rolling_quantile_legacy.py` + 真實 ETH fixture sha256)。
+## 本次:FF 靜態複掃(remote 無依賴跑不了測試,僅靜態;動態正確性由 Batch6 兜底)
+三方深稽(FF_FAILOPEN_AUDIT.md)11 病灶逐一對 HEAD 實碼核對 → **全部已修**:
+typed LayerExecutionResult/layer_failed、NaN-inf gate(Phase0 baseline)、TF fail-closed+CGSA
+rollback_timeframe、producer completeness 由 layer_results 衍生、legacy adapter 映 legacy、
+cache/resume 驗 run_status(缺→unknown→拒)、xgboost 交集 gate(xgboost_batch_service:495)、
+validator winsor 改 rolling 因果+≤1次、API restart completed_degraded、frozen list 對帳、
+錯標 complete 無證據→unknown。Decoupling Rule1=0 違規;無殘留吞錯;labels shift(-n) 合法。
 
-## 全量驗證(使用者真實 UI run,鐵證)
-- 修正前 `case_search_api_20260610-before fix.log`:L6.5 跑 47 分到 **1.2%**、ETA 爆表 → **沒跑完**。
-- 修正後 `case_search_api_20260611.log`:L6.5 = **36 分,100% 完成**。
-- **兩 run d* cache 命中序列完全相同**(193/870…)→ 唯一變數=winsor kernel → 鐵證 winsor 是回歸主因、P0 已解。
-- 殘差(36 分 vs 非因果 baseline 22 分):**因果正確性的合理成本**(因果把更多欄判為非平穩→更多 d* 搜尋:870 vs baseline 511),非 bug、非 winsor。
+## 殘留(非 blocker,backlog)
+1. `api/services/feature_factory_service.py:242,618,3888` `.get("quality_status","complete")`
+   缺欄預設 complete — 僅顯示層;硬 gate 走 effective_run_status 不受影響。
+2. `_safe_execute` 仍吞錯,僅剩 IC-first L6.5 pre_ic 一 caller;write_raw allow_empty=False
+   兜底 abort(fail-closed),但錯誤訊息不指向 L6.5 真因(可觀測性小瑕疵)。
+3. `_default_max_nan_ratio` production 讀 `tests/_golden/failopen/max_nan_ratio.json`,
+   缺檔 RuntimeError(fail-closed)但部署不含 tests/ 會炸。
 
-## 結論
-- **P0 winsor 修復完成並全量驗證:L6.5 從「跑不完」→ 36 分完成,值 byte-identical(因果正確性不變)。**
-- **P1(fracdiff 優化)結案=不需做**(只佔 ~2%)。
-- 比較分析:見對話(可比照 docs/L65_20260514_VS_20260521_COMPARISON.md 格式存檔,使用者未要求存)。
-
-## 鐵律(本任務血淚)
-實測>假設:**用合成資料外推誤判多輪**(8GB死路/ADF硬底/fracdiff 543x 全錯),真相靠使用者真實 log + COMPARISON.md。2 輪 solo 失敗早該停。byte-identical 不可 atol。不偽造 adversarial。
+## 結論/下一步
+- 靜態面 FF 完整、無重大瑕疵。**唯一 gate = Batch6 全綠 + 三方數據正確性簽核**。
+- Batch6 過後 → 開 IC Gatekeeper:命中 (b)(d) → 大任務管線(簡述→manifest→SPEC→
+  雙家族 adversarial→TODO→Codex 實作+Composer review),不得跳步。
