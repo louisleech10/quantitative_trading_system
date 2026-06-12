@@ -1,0 +1,26 @@
+{
+  "max_nan_ratio_btc_12h": 0.16346106471952185,
+  "nan_stats_reference": {
+    "all_nan": 50,
+    "cross_chunk": 0,
+    "empty": 0,
+    "leading_only": 0,
+    "mid_hole": 7,
+    "trailing_only": 0
+  },
+  "perf_parameters": {
+    "columns": 2000,
+    "measured_runs": 3,
+    "rows": 20000,
+    "shard_rows": 4096,
+    "warmup_runs": 1,
+    "workers": 1
+  },
+  "perf_peak_bytes": 252030018,
+  "perf_wall_seconds": 1.2597598750000003,
+  "winsor_default_mask_hash": "9436130cb8e18231acebd864df78644ef5d53cc4cf0df5df71e28a073c7759ba",
+  "winsor_default_value_hash": "0aa586bf37c85fceec973f17a65ef5e59529ab8fd42ec7b1e6bb4c9cbec228b5",
+  "winsor_w100_mask_hash": "9436130cb8e18231acebd864df78644ef5d53cc4cf0df5df71e28a073c7759ba",
+  "winsor_w100_min_periods": 25,
+  "winsor_w100_value_hash": "53878ca7577195dae0c3f53ba3b356cbcc4641d1e5492db3fd937597e7dbaa8e"
+}
