@@ -35,6 +35,7 @@ from api.utils.feature_name_parser import infer_category, infer_layer, infer_lev
 from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
 from momentum.factories import create_feature_factory, create_feature_factory_mcp, create_run_lifecycle_manager
 from momentum.FeatureEngineering.run_locks import is_run_active
+from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
 
 
 logger = get_logger("api.feature_factory_service")
@@ -281,7 +282,16 @@ class FeatureFactoryService:
             else:
                 self._start_stats_cache_warmup(task_id, reason="generation_completed")
                 if lease_sink:
-                    lease_sink.pop().release()
+                    lease = lease_sink.pop()
+                    identity = self._run_identity(summary)
+                    lease.release()
+                    if identity:
+                        try:
+                            self._lifecycle().auto_cleanup(
+                                identity["symbol"], identity["timeframe"], 5
+                            )
+                        except Exception as exc:
+                            logger.warning("Run auto-cleanup failed: %s", exc)
 
             self._notify_callbacks(task_id, {
                 "stage": "completed",
@@ -661,9 +671,18 @@ class FeatureFactoryService:
 
     def delete_run(self, symbol: str, timeframe: str, config_hash: str) -> Dict[str, Any]:
         manager = self._lifecycle()
-        if manager.registry.get(symbol, timeframe, config_hash) is None:
-            raise KeyError((symbol, timeframe, config_hash))
+        registry_exists = manager.registry.get(symbol, timeframe, config_hash) is not None
+        feature_leaf = features_run_dir(manager.features_root, symbol, timeframe, config_hash)
+        cgsa_leaf = cgsa_work_dir(manager.cgsa_root, symbol, timeframe, config_hash)
+        artifact_exists = (
+            feature_leaf.exists()
+            or feature_leaf.is_symlink()
+            or cgsa_leaf.exists()
+            or cgsa_leaf.is_symlink()
+        )
         result = manager.delete_run(symbol, timeframe, config_hash)
+        if not registry_exists and not artifact_exists:
+            raise KeyError((symbol, timeframe, config_hash))
         if not result.errors:
             prefix = f"browse_{symbol}_{timeframe}_{config_hash}"
             with self._lock:
@@ -674,7 +693,8 @@ class FeatureFactoryService:
                         remove_ids.append(task_id)
                 for task_id in remove_ids:
                     self._tasks.pop(task_id, None)
-                    self._invalidate_task_cache(task_id)
+            for task_id in remove_ids:
+                self._invalidate_task_cache(task_id)
         return {**result.__dict__, "total_bytes": result.total_bytes}
 
     def _run_warmups_then_release(self, lease: Any, warmup_fns: List[Callable[[], Any]], identity: Optional[Dict[str, str]]) -> None:
@@ -4020,8 +4040,7 @@ class FeatureFactoryService:
                 continue  # Unexpected layout — skip
             symbol = parts[0]
             timeframe = parts[1]
-            # Stable ID — latest-overwrite by symbol+timeframe. Older
-            # browse_{symbol}_{timeframe}_{hash8} ids are ignored on restore.
+            # Stable ID includes the full config hash so concurrent pass2 runs coexist.
             config_hash = parts[2]
             stable_id = f"browse_{symbol}_{timeframe}_{config_hash}"
             with self._lock:

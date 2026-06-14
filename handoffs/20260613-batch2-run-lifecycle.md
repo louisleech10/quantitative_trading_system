@@ -79,3 +79,35 @@ grep -r 'from api\.' momentum/
 - 補充回歸：`test_feature_factory_batch_resume.py + test_failopen_producer.py` 34 passed；`test_failopen_api_flags.py + lifecycle API` 9 passed；最終 lifecycle+API flags 23 passed。
 - Golden inventory：工作樹與 HEAD SHA256 均 `94c08dda06f7aac81b434ef616e2d4b4ee56005e3d54aa2dd34c7c34336`。
 - 數值/schema：不改數值、特徵輸出、checkpoint 寫入格式；新增 API DTO/欄位與 full-hash browse ID，registry 新增 alias/size_bytes/deleting 欄位。
+
+## Code review 修復輪（2026-06-15）
+- MAJOR 1：DELETE 不再於 registry miss 提前 404；有 features/CGSA artifact 時仍走 manager 冪等刪除回 200，原先 registry+磁碟全無才 404。
+- MAJOR 2：`test_run_lifecycle_api.py` 新增真 ASGI async client，覆蓋 409 `run_busy`、404 `run_not_found`、422 `alias_conflict`、500 `delete_partial`、active DELETE 409→release→200、created_at 兩樣本 ISO regex、browse reconciliation。
+- MAJOR 3：新增 tmp checkpoint 的 resume 三分支整合測試；path hash / browse full-hash 缺 manifest 均 assert `execute_resume` called，legacy 保留 completed 且 warning。
+- MAJOR 4：新增真 `FeatureFactory.generate_features`+flock+barrier+HTTP DELETE 全鏈；同 hash 第二 generate busy、warmup 中 409、結束後 200；pass2 兩 full-hash browse task 並存。
+- MAJOR 5：legacy HDF5 完成路徑改為 release 後 `auto_cleanup(..., 5)`；新增事件順序單測。
+- MINOR 1：vitest 新增同 fixture 的 WS / polling completion queue 與 500 delete_partial errors 顯示。
+- MINOR 2：registry 私有 API 耦合未列為本輪必修，未修改。
+- MINOR 3：created_at numeric/ISO 兩樣本已由 HTTP list_runs 測試覆蓋。
+- MINOR 4：pass2 註解改為 full config hash 並明記雙 run 共存。
+- 額外修復：browse reconciliation 測試發現 `delete_run` 鎖內呼叫 `_invalidate_task_cache` 的非重入死鎖；改為鎖內移除 tasks、鎖外 invalidate。
+- Debug 第 1 輪：完整 backend suite 停於 reconciliation；假設=鎖重入，證據=`_invalidate_task_cache` 再取 `self._lock`；上述鎖範圍修正後聚焦 8 tests passed。
+
+### 修復輪最終驗收原文
+```text
+pytest tests/feature_engineering/test_run_lifecycle.py tests/api/test_run_lifecycle_api.py -q
+28 passed in 2.24s
+
+cd frontend && npm run test -- run_lifecycle
+Test Files  1 passed (1)
+Tests  5 passed (5)
+Duration  1.15s
+
+pytest <第1批 7-file bundle> -q
+78 passed in 198.50s (0:03:18)
+```
+- `git diff --check`：0 errors；`rg "from api\." momentum`：0 results。
+- Golden inventory：工作樹與 HEAD SHA256 均 `94c08dda06f7aac81b434ef616e2d4b4ee56005e3d54aa2dd34c7a43c7c34336`；未跑 collect-only，無 golden diff。
+- `git diff --name-only -- data_cache/`：0 results；本輪未寫真 `data_cache/`。
+- 防假綠：舊 warmup coordinator 與 resume resolver 斷言原樣保留；新增整合斷言，未降門檻。
+- 本輪未 commit；根 `HANDOFF.md` 的既有修改未觸碰。
