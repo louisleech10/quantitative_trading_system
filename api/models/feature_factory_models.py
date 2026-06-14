@@ -75,6 +75,35 @@ class FeatureTaskStatusResponse(BaseModel):
     current_stage: Optional[str] = None
     completed_stages: list[str]
     error: Optional[str] = None
+    result: Optional[Dict] = None
+    retention_prompt: Optional[bool] = None
+    run_identity: Optional[Dict[str, str]] = None
+
+
+class RunInfo(BaseModel):
+    symbol: str
+    timeframe: str
+    config_hash: str
+    alias: Optional[str] = None
+    created_at: Optional[str] = None
+    size_bytes: Optional[int] = None
+    active: bool
+
+
+class AliasRequest(BaseModel):
+    alias: Optional[str] = None
+
+
+class DeleteRunResponse(BaseModel):
+    symbol: str
+    timeframe: str
+    config_hash: str
+    features_deleted: bool
+    cgsa_deleted: bool
+    registry_removed: bool
+    skipped: list[str]
+    errors: list[str]
+    total_bytes: int
 
 
 class NL2ConfigRequest(BaseModel):

@@ -441,7 +441,7 @@ def test_api_restore_partial_manifest_maps_completed_degraded(
     service = _build_api_service_for_restore()
     service._restore_persisted_tasks()
 
-    task = service._tasks["browse_BTCUSDT_12h"]
+    task = service._tasks["browse_BTCUSDT_12h_deadbeef"]
     assert task["status"] == "completed_degraded"
 
 

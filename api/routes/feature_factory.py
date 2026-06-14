@@ -24,7 +24,11 @@ from api.models.feature_factory_models import (
     NL2ConfigResponse,
     RegisterPathRequest,
     RegisterPathResponse,
+    AliasRequest,
+    DeleteRunResponse,
+    RunInfo,
 )
+from momentum.FeatureEngineering.run_locks import RunBusyError
 from api.services.feature_factory_batch_service import (
     BatchBusyError,
     FeatureFactoryBatchService,
@@ -35,6 +39,37 @@ from api.services.feature_factory_service import feature_factory_service
 
 router = APIRouter(prefix="/api/v1/features", tags=["Feature Factory"])
 logger = get_logger("api.routes.feature_factory")
+
+
+@router.get("/runs", response_model=list[RunInfo])
+async def list_runs():
+    return feature_factory_service.list_runs()
+
+
+@router.patch("/runs/{symbol}/{timeframe}/{config_hash}/alias")
+async def set_run_alias(symbol: str, timeframe: str, config_hash: str, request: AliasRequest):
+    try:
+        feature_factory_service.set_run_alias(symbol, timeframe, config_hash, request.alias)
+        return {"status": "ok"}
+    except RunBusyError as exc:
+        raise HTTPException(status_code=409, detail={"code": "run_busy", "message": str(exc)})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "alias_conflict", "message": str(exc)})
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "run_not_found"})
+
+
+@router.delete("/runs/{symbol}/{timeframe}/{config_hash}", response_model=DeleteRunResponse)
+async def delete_run(symbol: str, timeframe: str, config_hash: str):
+    try:
+        result = feature_factory_service.delete_run(symbol, timeframe, config_hash)
+    except RunBusyError as exc:
+        raise HTTPException(status_code=409, detail={"code": "run_busy", "message": str(exc)})
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "run_not_found"})
+    if result["errors"]:
+        raise HTTPException(status_code=500, detail={"code": "delete_partial", "errors": result["errors"]})
+    return result
 
 
 def get_batch_service() -> FeatureFactoryBatchService:

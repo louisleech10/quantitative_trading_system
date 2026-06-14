@@ -8,13 +8,14 @@ import asyncio
 import contextlib
 import hashlib
 import io
+import inspect
 import json
 import os
 import threading
 import time
 import uuid
 from bisect import bisect_right
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 
@@ -32,7 +33,8 @@ from api.core.config import settings
 from api.core.logging import get_logger
 from api.utils.feature_name_parser import infer_category, infer_layer, infer_level
 from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
-from momentum.factories import create_feature_factory, create_feature_factory_mcp
+from momentum.factories import create_feature_factory, create_feature_factory_mcp, create_run_lifecycle_manager
+from momentum.FeatureEngineering.run_locks import is_run_active
 
 
 logger = get_logger("api.feature_factory_service")
@@ -203,6 +205,7 @@ class FeatureFactoryService:
             # thread so asyncio.create_task() calls inside WS callbacks remain safe.
             loop.call_soon_threadsafe(self._notify_callbacks, task_id, notify_payload)
 
+        lease_sink: List[Any] = []
         try:
             config_override = getattr(request, "config_override", None)
             fail_open = getattr(request, "fail_open", None)
@@ -222,7 +225,7 @@ class FeatureFactoryService:
             # Offload the blocking call to a thread pool worker.
             result = await loop.run_in_executor(
                 None,
-                lambda: self._generate_features_with_phase_d(
+                lambda: self._invoke_generation_with_lease_sink(
                     task_id=task_id,
                     symbol=symbol,
                     timeframe=timeframe,
@@ -231,6 +234,7 @@ class FeatureFactoryService:
                     progress_callback=progress_callback,
                     start_date=start_date,
                     end_date=end_date,
+                    lease_sink=lease_sink,
                 ),
             )
 
@@ -251,6 +255,7 @@ class FeatureFactoryService:
             # Persist task record to disk so the task can be restored after an
             # API restart without re-running feature generation.
             self._persist_task_record(task_id, summary)
+            self._write_run_size(summary)
 
             # Precompute Feature Table stats as soon as generation completes for
             # legacy HDF5 tasks. CGSA outputs can have 50k-200k columns; full
@@ -259,25 +264,38 @@ class FeatureFactoryService:
             if str(summary.get("hdf5_path", "")).lower().endswith(".json"):
                 try:
                     context = self._load_task_context(task_id)
-                    self._start_cgsa_catalog_warmup(task_id, context)
-                    # Bake data_quality.json in background so the dashboard
-                    # opens instantly after pipeline completes. Runs after the
-                    # "completed" event is dispatched, so it does not delay the
-                    # pipeline-finished signal users see.
-                    self._start_data_quality_warmup(task_id, context)
+                    if lease_sink:
+                        threading.Thread(
+                            target=self._run_warmups_then_release,
+                            args=(lease_sink.pop(), [
+                                lambda: self._start_cgsa_catalog_warmup(task_id, context),
+                                lambda: self._start_data_quality_warmup(task_id, context),
+                            ], self._run_identity(summary)),
+                            daemon=True,
+                        ).start()
+                    else:
+                        self._start_cgsa_catalog_warmup(task_id, context)
+                        self._start_data_quality_warmup(task_id, context)
                 except Exception as exc:
                     logger.debug("CGSA catalog warmup start skipped for %s: %s", task_id, exc)
             else:
                 self._start_stats_cache_warmup(task_id, reason="generation_completed")
+                if lease_sink:
+                    lease_sink.pop().release()
 
             self._notify_callbacks(task_id, {
                 "stage": "completed",
                 "progress": 1.0,
                 "message": "Feature generation completed",
                 "result": summary,
+                "retention_prompt": bool(self._run_identity(summary)),
+                "run_identity": self._run_identity(summary),
             })
 
         except Exception as exc:
+            for lease in lease_sink:
+                lease.release()
+            lease_sink.clear()
             error_type = classify_error(exc)
             logger.error(
                 "Feature generation failed (%s): %s",
@@ -307,6 +325,7 @@ class FeatureFactoryService:
         progress_callback: Optional[Callable],
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        lease_sink: Optional[list] = None,
     ) -> FeatureGenerationResult:
         """Phase D governance: old/new compute path toggle, shadow compare, and rollback fallback."""
         new_path_enabled = self._is_new_compute_path_enabled()
@@ -322,6 +341,7 @@ class FeatureFactoryService:
                 env_overrides=self._old_path_env_overrides(),
                 start_date=start_date,
                 end_date=end_date,
+                lease_sink=lease_sink,
             )
 
         new_result = self._factory.generate_features(
@@ -332,6 +352,7 @@ class FeatureFactoryService:
             progress_callback=progress_callback,
             start_date=start_date,
             end_date=end_date,
+            lease_sink=lease_sink,
         )
 
         if not self._should_run_dual_path_check(task_id):
@@ -344,7 +365,14 @@ class FeatureFactoryService:
                     "reason": "sampling_skipped",
                 },
             )
-            return new_result
+        return new_result
+
+    def _invoke_generation_with_lease_sink(self, *, lease_sink: list, **kwargs: Any) -> FeatureGenerationResult:
+        """Preserve compatibility with tests/callers that replace the helper using its old signature."""
+        target = self._generate_features_with_phase_d
+        if "lease_sink" in inspect.signature(target).parameters:
+            kwargs["lease_sink"] = lease_sink
+        return target(**kwargs)
 
         logger.info("Phase D: running dual-path shadow compare for task %s", task_id)
         old_shadow_result = self._run_shadow_old_path(
@@ -415,6 +443,7 @@ class FeatureFactoryService:
             start_date=start_date,
             end_date=end_date,
             persist=False,
+            acquire_lease=False,
         )
 
     def _run_with_env_overrides(
@@ -429,9 +458,12 @@ class FeatureFactoryService:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         persist: bool = True,
+        lease_sink: Optional[list] = None,
+        acquire_lease: bool = True,
     ) -> FeatureGenerationResult:
         with self._temporary_environ(env_overrides):
-            return factory.generate_features(
+            generate = factory.generate_features if acquire_lease else factory._generate_features_impl
+            kwargs = dict(
                 symbol=symbol,
                 timeframe=timeframe,
                 config_override=config_override,
@@ -441,6 +473,9 @@ class FeatureFactoryService:
                 end_date=end_date,
                 persist=persist,
             )
+            if acquire_lease:
+                kwargs["lease_sink"] = lease_sink
+            return generate(**kwargs)
 
     @staticmethod
     def _is_new_compute_path_enabled() -> bool:
@@ -557,6 +592,8 @@ class FeatureFactoryService:
             task_info = self._tasks.get(task_id)
             if not task_info:
                 return None
+            result = task_info.get("result")
+            identity = self._run_identity(result or {}) if result else None
             return {
                 "task_id": task_info["task_id"],
                 "status": task_info["status"],
@@ -564,7 +601,112 @@ class FeatureFactoryService:
                 "current_stage": task_info["current_stage"],
                 "completed_stages": list(task_info["completed_stages"]),
                 "error": task_info["error"],
+                "result": result,
+                "retention_prompt": bool(identity and task_info["status"] == "completed"),
+                "run_identity": identity,
             }
+
+    @staticmethod
+    def _run_identity(result: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        metadata = result.get("metadata") or {}
+        symbol = metadata.get("symbol")
+        timeframe = metadata.get("timeframe")
+        config_hash = metadata.get("config_hash")
+        if not all((symbol, timeframe, config_hash)):
+            path = result.get("hdf5_path")
+            if path:
+                parts = Path(path).parts
+                if len(parts) >= 4:
+                    symbol, timeframe, config_hash = parts[-4], parts[-3], parts[-2]
+        if not all((symbol, timeframe, config_hash)):
+            return None
+        return {"symbol": str(symbol), "timeframe": str(timeframe), "config_hash": str(config_hash)}
+
+    @staticmethod
+    def _config_hash_from_path(path: Path, symbol: str, timeframe: str) -> str:
+        if path.name.endswith("manifest.json"):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8")).get("config_hash")
+                if value:
+                    return str(value)
+            except (OSError, ValueError):
+                pass
+        parts = path.parts
+        for index in range(len(parts) - 2):
+            if parts[index] == symbol and parts[index + 1] == timeframe:
+                return parts[index + 2]
+        raise ValueError("Cannot resolve full config hash from browse path")
+
+    def _lifecycle(self):
+        root = settings.data_cache_path / "features"
+        return create_run_lifecycle_manager(features_root=root, cgsa_root=settings.data_cache_path / "cgsa_work")
+
+    def list_runs(self) -> List[Dict[str, Any]]:
+        manager = self._lifecycle()
+        rows = []
+        for entry in manager.registry.list_all():
+            created = entry.get("created_at")
+            if isinstance(created, (int, float)):
+                created_value = datetime.fromtimestamp(created, timezone.utc).isoformat()
+            elif isinstance(created, str) and "T" in created:
+                created_value = created
+            else:
+                created_value = None
+            rows.append({**entry, "created_at": created_value, "size_bytes": entry.get("size_bytes"),
+                         "active": is_run_active(manager.locks_dir, str(entry.get("symbol")), str(entry.get("timeframe")), str(entry.get("config_hash")))})
+        return rows
+
+    def set_run_alias(self, symbol: str, timeframe: str, config_hash: str, alias: Optional[str]) -> None:
+        self._lifecycle().set_run_alias(symbol, timeframe, config_hash, alias)
+
+    def delete_run(self, symbol: str, timeframe: str, config_hash: str) -> Dict[str, Any]:
+        manager = self._lifecycle()
+        if manager.registry.get(symbol, timeframe, config_hash) is None:
+            raise KeyError((symbol, timeframe, config_hash))
+        result = manager.delete_run(symbol, timeframe, config_hash)
+        if not result.errors:
+            prefix = f"browse_{symbol}_{timeframe}_{config_hash}"
+            with self._lock:
+                remove_ids = []
+                for task_id, info in self._tasks.items():
+                    identity = self._run_identity(info.get("result") or {})
+                    if task_id == prefix or identity == {"symbol": symbol, "timeframe": timeframe, "config_hash": config_hash}:
+                        remove_ids.append(task_id)
+                for task_id in remove_ids:
+                    self._tasks.pop(task_id, None)
+                    self._invalidate_task_cache(task_id)
+        return {**result.__dict__, "total_bytes": result.total_bytes}
+
+    def _run_warmups_then_release(self, lease: Any, warmup_fns: List[Callable[[], Any]], identity: Optional[Dict[str, str]]) -> None:
+        """Warmups finish before the generation lease is released; completed event timing is unchanged."""
+        try:
+            threads = [fn() for fn in warmup_fns]
+            for thread in threads:
+                if thread is not None:
+                    thread.join()
+        finally:
+            lease.release()
+        if identity:
+            try:
+                self._lifecycle().auto_cleanup(identity["symbol"], identity["timeframe"], 5)
+            except Exception as exc:
+                logger.warning("Run auto-cleanup failed: %s", exc)
+
+    def _write_run_size(self, summary: Dict[str, Any]) -> None:
+        """Scan persisted run trees once and transactionally store size_bytes."""
+        identity = self._run_identity(summary)
+        if identity is None:
+            return
+        manager = self._lifecycle()
+        feature_dir = manager.features_root / identity["symbol"] / identity["timeframe"] / identity["config_hash"]
+        cgsa_dir = manager.cgsa_root / f"{identity['symbol']}_{identity['timeframe']}_{identity['config_hash'][:8]}"
+        total = sum(path.stat().st_size for root in (feature_dir, cgsa_dir) if root.exists() for path in root.rglob("*") if path.is_file())
+
+        def mutate() -> None:
+            entry = manager.registry._find_entry(identity["symbol"], identity["timeframe"], identity["config_hash"])
+            if entry is not None:
+                entry["size_bytes"] = total
+        manager.registry._locked_mutate(mutate)
 
     def get_result(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Get task result if available."""
@@ -606,7 +748,8 @@ class FeatureFactoryService:
             raise FileNotFoundError(f"HDF5 file not found: {hdf5_path}")
 
         # 使用固定格式的 task_id，相同 symbol+timeframe 重複呼叫回傳同一個 id（冪等）
-        task_id = f"browse_{symbol}_{timeframe}"
+        config_hash = self._config_hash_from_path(file_path, symbol, timeframe)
+        task_id = f"browse_{symbol}_{timeframe}_{config_hash}"
         result = {
             "hdf5_path": str(hdf5_path),
             "metadata": {"symbol": symbol, "timeframe": timeframe},
@@ -1407,10 +1550,10 @@ class FeatureFactoryService:
                     except OSError:
                         pass
 
-    def _start_cgsa_catalog_warmup(self, task_id: str, context: Dict[str, Any]) -> None:
+    def _start_cgsa_catalog_warmup(self, task_id: str, context: Dict[str, Any]) -> Optional[threading.Thread]:
         with self._lock:
             if task_id in self._cgsa_catalog_cache or task_id in self._cgsa_catalog_warming_tasks:
-                return
+                return None
             self._cgsa_catalog_warming_tasks.add(task_id)
 
         def _worker() -> None:
@@ -1428,8 +1571,9 @@ class FeatureFactoryService:
             name=f"cgsa-catalog-warm-{task_id[:8]}",
         )
         thread.start()
+        return thread
 
-    def _start_data_quality_warmup(self, task_id: str, context: Dict[str, Any]) -> None:
+    def _start_data_quality_warmup(self, task_id: str, context: Dict[str, Any]) -> Optional[threading.Thread]:
         """Background-bake data_quality.json so the dashboard opens instantly.
 
         No-op when the cache already exists or a warmup is already running.
@@ -1439,13 +1583,13 @@ class FeatureFactoryService:
         falls back to the existing synchronous scan path.
         """
         if not context or not context.get("is_cgsa"):
-            return
+            return None
         cache_path = self._data_quality_cache_path(context)
         if cache_path is not None and cache_path.exists():
-            return
+            return None
         with self._lock:
             if task_id in self._data_quality_warming_tasks:
-                return
+                return None
             self._data_quality_warming_tasks.add(task_id)
 
         def _worker() -> None:
@@ -1472,6 +1616,7 @@ class FeatureFactoryService:
             name=f"dq-warm-{task_id[:8]}",
         )
         thread.start()
+        return thread
 
     # ------------------------------------------------------------------
     # CGSA feature stats disk-cache helpers
@@ -3877,7 +4022,8 @@ class FeatureFactoryService:
             timeframe = parts[1]
             # Stable ID — latest-overwrite by symbol+timeframe. Older
             # browse_{symbol}_{timeframe}_{hash8} ids are ignored on restore.
-            stable_id = f"browse_{symbol}_{timeframe}"
+            config_hash = parts[2]
+            stable_id = f"browse_{symbol}_{timeframe}_{config_hash}"
             with self._lock:
                 if stable_id in self._tasks:
                     continue

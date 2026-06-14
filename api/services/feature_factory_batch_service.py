@@ -7,6 +7,7 @@ import gc
 import hashlib
 import json
 import os
+import re
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor
@@ -171,6 +172,23 @@ class FeatureFactoryBatchService:
         if checkpoint is None:
             raise FileNotFoundError(f"batch checkpoint not found: {batch_id}")
 
+        completed_items = checkpoint.get("completed_items", [])
+        retained_completed = []
+        for item in completed_items:
+            run_hash = self._resolve_completed_run_hash(item)
+            if run_hash is None:
+                logger.warning("Legacy completed item has no resolvable run hash: %s", item)
+                retained_completed.append(item)
+                continue
+            if self._completed_manifest_exists(item, run_hash):
+                retained_completed.append(item)
+                continue
+            checkpoint.setdefault("queued_items", []).append({
+                "symbol": item.get("symbol"), "timeframe": item.get("timeframe")
+            })
+            logger.info("Requeued completed item with missing run manifest: %s", item)
+        checkpoint["completed_items"] = retained_completed
+
         skipped_items = len(checkpoint.get("completed_items", []))
         queued_items = len(checkpoint.get("queued_items", []))
         resumed_from = str(checkpoint.get("last_updated_at") or checkpoint.get("started_at") or "")
@@ -214,6 +232,40 @@ class FeatureFactoryBatchService:
             "queued_items": queued_items,
             "status": "running",
         }
+
+    @staticmethod
+    def _resolve_completed_run_hash(item: Dict[str, Any]) -> Optional[str]:
+        symbol = str(item.get("symbol") or "")
+        timeframe = str(item.get("timeframe") or "")
+        for raw_path in item.get("output_paths") or []:
+            path = raw_path.get("path") if isinstance(raw_path, dict) else raw_path
+            if not path:
+                continue
+            parts = Path(str(path)).parts
+            for index in range(len(parts) - 2):
+                if parts[index] == symbol and parts[index + 1] == timeframe:
+                    return parts[index + 2]
+        browse_id = str(item.get("browse_task_id") or "")
+        match = re.fullmatch(rf"browse_{re.escape(symbol)}_{re.escape(timeframe)}_([A-Za-z0-9_.-]{{1,64}})", browse_id)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _completed_manifest_exists(item: Dict[str, Any], run_hash: str) -> bool:
+        symbol = str(item.get("symbol") or "")
+        timeframe = str(item.get("timeframe") or "")
+        for raw_path in item.get("output_paths") or []:
+            path = raw_path.get("path") if isinstance(raw_path, dict) else raw_path
+            if not path:
+                continue
+            candidate = Path(str(path))
+            parts = candidate.parts
+            if symbol in parts and timeframe in parts and run_hash in parts:
+                run_dir = candidate if candidate.is_dir() else candidate.parent
+                while run_dir.name != run_hash and run_dir != run_dir.parent:
+                    run_dir = run_dir.parent
+                manifest = run_dir / "feature_manifest.json"
+                return manifest.is_file() and manifest.stat().st_size > 0
+        return False
 
     async def execute_resume(
         self,

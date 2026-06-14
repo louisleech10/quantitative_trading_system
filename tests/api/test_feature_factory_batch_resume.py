@@ -465,7 +465,7 @@ def test_compute_symbol_quality_uses_injected_manifest_computer(
     assert mock_quality_computer.calls == [str(manifest_path)]
 
 
-def test_restore_persisted_manifest_uses_browse_id_without_hash(monkeypatch, tmp_path):
+def test_restore_persisted_manifest_uses_full_hash_browse_id(monkeypatch, tmp_path):
     manifest_dir = tmp_path / "features" / "BTCUSDT" / "1h" / "abcdef1234567890"
     manifest_dir.mkdir(parents=True)
     manifest_path = manifest_dir / "feature_manifest.json"
@@ -483,11 +483,11 @@ def test_restore_persisted_manifest_uses_browse_id_without_hash(monkeypatch, tmp
 
     service = FeatureFactoryService()
 
-    task = service.get_task_status("browse_BTCUSDT_1h")
+    task = service.get_task_status("browse_BTCUSDT_1h_abcdef1234567890")
     assert task is not None
     assert task["status"] == "completed"
-    assert service.get_task_status("browse_BTCUSDT_1h_abcdef12") is None
-    result = service.get_result("browse_BTCUSDT_1h")
+    assert service.get_task_status("browse_BTCUSDT_1h") is None
+    result = service.get_result("browse_BTCUSDT_1h_abcdef1234567890")
     assert result is not None
     assert result["hdf5_path"] == str(manifest_path)
 
