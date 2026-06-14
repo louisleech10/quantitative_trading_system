@@ -17,6 +17,8 @@ import {
   FeatureSchema,
   BatchItemRss,
   BatchOutputPath,
+  RunInfo,
+  RunIdentity,
 } from '@/lib/types';
 
 type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
@@ -66,6 +68,13 @@ interface FeatureFactoryState {
   registryLoading: boolean;
   alignmentMode: 'open_minus' | 'close_time';
   trainingTimeframes: string[];
+  runs: RunInfo[];
+  runsLoading: boolean;
+  runsError: string | null;
+  completionQueue: RunIdentity[];
+  fetchRuns: () => Promise<void>;
+  enqueueCompletion: (run: RunIdentity) => void;
+  shiftCompletion: () => void;
   setConfig: (config: FeatureFactoryConfig) => void;
   updateConfigPartial: (partial: Record<string, unknown>) => void;
   setPresets: (presets: FeatureFactoryPreset[]) => void;
@@ -368,6 +377,25 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   registryLoading: false,
   alignmentMode: 'open_minus',
   trainingTimeframes: ['12h'],
+  runs: [],
+  runsLoading: false,
+  runsError: null,
+  completionQueue: [],
+  fetchRuns: async () => {
+    set({ runsLoading: true, runsError: null });
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/runs`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      set({ runs: await response.json() as RunInfo[], runsLoading: false });
+    } catch (error) {
+      set({ runsError: error instanceof Error ? error.message : '載入失敗', runsLoading: false });
+    }
+  },
+  enqueueCompletion: (run) => set((state) => ({
+    completionQueue: state.completionQueue.some((item) => item.symbol === run.symbol && item.timeframe === run.timeframe && item.config_hash === run.config_hash)
+      ? state.completionQueue : [...state.completionQueue, run],
+  })),
+  shiftCompletion: () => set((state) => ({ completionQueue: state.completionQueue.slice(1) })),
   setConfig: (config) =>
     set({
       config,

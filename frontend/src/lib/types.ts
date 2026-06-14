@@ -503,6 +503,18 @@ export interface FeatureTask {
   error: string | null;
   compute_warnings?: string[];
   validation_summary?: FeatureValidationSummary;
+  retention_prompt?: boolean;
+  run_identity?: RunIdentity;
+  result?: Record<string, unknown>;
+}
+
+export interface RunIdentity { symbol: string; timeframe: string; config_hash: string; }
+export interface RunInfo extends RunIdentity {
+  alias?: string | null; created_at?: string | null; size_bytes?: number | null; active: boolean;
+}
+export interface DeleteRunResponse extends RunIdentity {
+  features_deleted: boolean; cgsa_deleted: boolean; registry_removed: boolean;
+  skipped: string[]; errors: string[]; total_bytes: number;
 }
 
 export interface FeatureFactoryPreset {

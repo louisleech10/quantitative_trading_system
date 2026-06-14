@@ -23,7 +23,7 @@ export default function GenerationProgress({
   symbols = [],
   naked = false,
 }: GenerationProgressProps) {
-  const { progress, setProgress, setCurrentTask } = useFeatureFactoryStore();
+  const { progress, setProgress, setCurrentTask, enqueueCompletion } = useFeatureFactoryStore();
   const isBatchMode = Boolean(batchTask);
 
   // Stable refs so the useEffect closure always has the latest callbacks/task
@@ -51,6 +51,8 @@ export default function GenerationProgress({
       progress?: number;
       message?: string;
       status?: string;
+      retention_prompt?: boolean;
+      run_identity?: { symbol: string; timeframe: string; config_hash: string };
     }) => {
       const t = taskRef.current;
       if (!t) return;
@@ -71,7 +73,12 @@ export default function GenerationProgress({
         status: derivedStatus,
         progress: payload.progress ?? t.progress,
         current_stage: payload.stage ?? t.current_stage,
+        retention_prompt: payload.retention_prompt,
+        run_identity: payload.run_identity,
       });
+      if (derivedStatus === 'completed' && payload.retention_prompt && payload.run_identity) {
+        enqueueCompletion(payload.run_identity);
+      }
     };
 
     const stopPolling = () => {
@@ -101,8 +108,11 @@ export default function GenerationProgress({
             status: string;
             progress: number;
             current_stage: string | null;
+            retention_prompt?: boolean;
+            run_identity?: { symbol: string; timeframe: string; config_hash: string };
           };
-          applyPayload({ stage: s.current_stage ?? s.status, progress: s.progress, status: s.status });
+          applyPayload({ stage: s.current_stage ?? s.status, progress: s.progress, status: s.status,
+            retention_prompt: s.retention_prompt, run_identity: s.run_identity });
           if (s.status === 'completed' || s.status === 'failed') stopPolling();
         } catch {
           // Network error — keep retrying.

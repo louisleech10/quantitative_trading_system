@@ -9,6 +9,8 @@ import ConfigPanel from '@/components/feature-factory/ConfigPanel';
 import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKlineDownloadPanel';
 import PreviewPanel from '@/components/feature-factory/PreviewPanel';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
+import RunRetentionDialog from '@/components/feature-factory/RunRetentionDialog';
+import RunManagerPanel from '@/components/feature-factory/RunManagerPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
 import LayerPanel from '@/components/feature-factory/LayerPanel';
@@ -562,6 +564,8 @@ export default function FeatureFactoryPage() {
             </>
           )}
 
+        <RunRetentionDialog />
+        <RunManagerPanel />
         <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
           <div>
             <div className="text-sm font-medium text-slate-300">跨 Symbol Coverage Matrix</div>
