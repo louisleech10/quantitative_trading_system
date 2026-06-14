@@ -652,6 +652,27 @@ def create_feature_registry() -> "FeatureRegistry":
     return FeatureRegistry()
 
 
+def create_run_lifecycle_manager(
+    features_root: Optional[Path] = None,
+    cgsa_root: Optional[Path] = None,
+    locks_dir: Optional[Path] = None,
+    registry: Optional["FeatureRegistry"] = None,
+) -> Any:
+    """Create the persisted feature-run lifecycle manager."""
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+    from momentum.FeatureEngineering.run_lifecycle import RunLifecycleManager
+
+    resolved_features = Path(features_root or "data_cache/features")
+    resolved_cgsa = Path(cgsa_root or "data_cache/cgsa_work")
+    resolved_registry = registry or FeatureRegistry(resolved_features / "registry.json")
+    return RunLifecycleManager(
+        features_root=resolved_features,
+        cgsa_root=resolved_cgsa,
+        locks_dir=Path(locks_dir or resolved_features / ".locks"),
+        registry=resolved_registry,
+    )
+
+
 def create_prediction_analyzer() -> "PredictionAnalyzer":
     """Factory — Prediction analyzer for pattern analysis."""
     from momentum.Analysis.prediction_analyzer import PredictionAnalyzer

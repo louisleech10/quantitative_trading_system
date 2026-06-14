@@ -31,6 +31,8 @@ from momentum.FeatureEngineering.feature_storage import (
     build_completeness_meta_from_layer_results,
 )
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
+from momentum.FeatureEngineering.run_paths import cgsa_work_dir
+from momentum.FeatureEngineering.run_locks import RunLease
 from momentum.FeatureEngineering.labels.label_generator import LabelGenerator
 from momentum.FeatureEngineering.meta_features.consensus_features import ConsensusFeatureEngine
 from momentum.FeatureEngineering.meta_features.interaction_features import InteractionFeatureEngine
@@ -207,6 +209,33 @@ class FeatureFactory:
         self._effective_preprocessing_config: Optional[Dict[str, Any]] = None
 
     def generate_features(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_override: Optional[dict] = None,
+        force_regenerate: bool = False,
+        progress_callback: Optional[Callable] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        persist: bool = True,
+        lease_sink: Optional[list] = None,
+    ) -> FeatureGenerationResult:
+        """Run the pipeline while holding the per-run lease."""
+        config = self._resolve_config(config_override)
+        config_hash = self._compute_config_hash(config, symbol, timeframe, start_date=start_date, end_date=end_date)
+        lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, timeframe, config_hash, timeout=0)
+        retained = False
+        try:
+            result = self._generate_features_impl(symbol, timeframe, config_override, force_regenerate, progress_callback, start_date, end_date, persist)
+            if lease_sink is not None:
+                lease_sink.append(lease)
+                retained = True
+            return result
+        finally:
+            if not retained:
+                lease.release()
+
+    def _generate_features_impl(
         self,
         symbol: str,
         timeframe: str,
@@ -900,16 +929,23 @@ class FeatureFactory:
         if configured_work_dir:
             work_dir = Path(configured_work_dir).expanduser().resolve()
         else:
-            safe_symbol = re.sub(r"[^A-Za-z0-9_.-]+", "_", symbol)
-            safe_timeframe = re.sub(r"[^A-Za-z0-9_.-]+", "_", timeframe)
             normalized_config_hash = config_hash or ""
-            hash_prefix = normalized_config_hash[:8] if normalized_config_hash else "nohash"
-            work_dir = (
-                Path.cwd()
-                / "data_cache"
-                / "cgsa_work"
-                / f"{safe_symbol}_{safe_timeframe}_{hash_prefix}"
-            ).resolve()
+            if normalized_config_hash:
+                work_dir = cgsa_work_dir(
+                    Path.cwd() / "data_cache" / "cgsa_work",
+                    symbol,
+                    timeframe,
+                    normalized_config_hash,
+                )
+            else:
+                safe_symbol = re.sub(r"[^A-Za-z0-9_.-]+", "_", symbol)
+                safe_timeframe = re.sub(r"[^A-Za-z0-9_.-]+", "_", timeframe)
+                work_dir = (
+                    Path.cwd()
+                    / "data_cache"
+                    / "cgsa_work"
+                    / f"{safe_symbol}_{safe_timeframe}_nohash"
+                ).resolve()
 
         work_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1901,6 +1937,42 @@ class FeatureFactory:
         label_horizon: str = "1_bar_forward_return",
         selection_window: Optional[Dict[str, Any]] = None,
         split_id: Optional[str] = None,
+        cleanup_raw: bool = False,
+        lease_sink: Optional[list] = None,
+    ) -> FeatureGenerationResult:
+        """Run IC-first while holding a lease when invoked independently."""
+        resolved_hash = config_hash or self._current_config_hash or self._compute_config_hash(config, symbol, tf)
+        lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, tf, resolved_hash, timeout=0)
+        retained = False
+        try:
+            result = self._run_ic_first_pipeline_impl(
+                symbol, tf, config, raw_data=raw_data, layers=layers, config_hash=config_hash,
+                compute_warnings=compute_warnings, start_time=start_time, persist=persist,
+                label=label, ic_engine=ic_engine, feature_reader=feature_reader, storage=storage,
+                ic_threshold=ic_threshold, allow_partial_ic=allow_partial_ic,
+                label_horizon=label_horizon, selection_window=selection_window,
+                split_id=split_id, cleanup_raw=cleanup_raw,
+            )
+            if lease_sink is not None:
+                lease_sink.append(lease)
+                retained = True
+            return result
+        finally:
+            if not retained:
+                lease.release()
+
+    def _run_ic_first_pipeline_impl(
+        self,
+        symbol: str,
+        tf: str,
+        config: "FactoryConfig",
+        *, raw_data: Optional[pd.DataFrame] = None, layers: Optional[List[pd.DataFrame]] = None,
+        config_hash: Optional[str] = None, compute_warnings: Optional[List[str]] = None,
+        start_time: Optional[float] = None, persist: bool = True, label: Optional[pd.Series] = None,
+        ic_engine: Optional[Any] = None, feature_reader: Optional[Any] = None,
+        storage: Optional[FeatureStorage] = None, ic_threshold: Optional[float] = None,
+        allow_partial_ic: bool = False, label_horizon: str = "1_bar_forward_return",
+        selection_window: Optional[Dict[str, Any]] = None, split_id: Optional[str] = None,
         cleanup_raw: bool = False,
     ) -> FeatureGenerationResult:
         """Run the IC-First pipeline with raw persist, GC gate, IC, and processed persist.
