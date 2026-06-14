@@ -376,6 +376,7 @@ async def test_delete_idempotent_artifact_and_browse_reconciliation(
     after = await async_client.get("/api/v1/features/browse/available")
     assert after.json()["tasks"] == []
 
+    # SPEC [B2-6] 冪等語義：磁碟孤兒+registry 有→200；皆無（已完整刪除/從未存在）→404 run_not_found。
     missing = await async_client.delete("/api/v1/features/runs/BTCUSDT/12h/cfg_batch2d")
     assert missing.status_code == 404
     assert missing.json()["detail"]["code"] == "run_not_found"
@@ -461,3 +462,36 @@ async def test_resume_batch_keeps_legacy_completed_item(
     assert response["skipped_items"] == 1
     execute_mock.assert_not_called()
     assert "Legacy completed item has no resolvable run hash" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_resume_batch_retains_completed_item_with_present_manifest(
+    tmp_path: Path,
+    batch_service_factory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """manifest-exists 分支整合測：碟上 manifest 存在 → 不 requeue、status completed。"""
+    service = batch_service_factory(tmp_path / "checkpoints")
+    request = BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="12h")
+    checkpoint = service._build_initial_checkpoint("batch-present", request)
+    run_dir = tmp_path / "features" / "BTCUSDT" / "12h" / "cfg_batch2d"
+    run_dir.mkdir(parents=True)
+    manifest = run_dir / "feature_manifest.json"
+    manifest.write_text('{"ok": true}', encoding="utf-8")
+    checkpoint["completed_items"] = [{
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+        "output_paths": [str(manifest)],
+        "browse_task_id": "browse_BTCUSDT_12h_cfg_batch2d",
+    }]
+    checkpoint["queued_items"] = []
+    service._safe_persist_checkpoint(checkpoint)
+    execute_mock = AsyncMock()
+    monkeypatch.setattr(service, "execute_resume", execute_mock)
+
+    response = await service.resume_batch("batch-present")
+
+    assert response["status"] == "completed"
+    assert response["queued_items"] == 0
+    assert response["skipped_items"] == 1
+    execute_mock.assert_not_called()

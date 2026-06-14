@@ -92,7 +92,7 @@
 - SPEC ref：Task 2.2（契約全文見 SPEC [B2-6]）。
 - 實作要點：
   1. DTO：RunInfo（含 `active:bool`）/AliasRequest/DeleteRunResponse；**path=既有 `GET /task/{task_id}`（route :252）**擴充：`get_task_status`（service:554-567）填 `retention_prompt`+`run_identity`（completed+persist 成功）+ FeatureTaskStatusResponse.result 填值。
-  2. 新 3 端點 thin→service：list_runs（`active := is_run_active(triple)`；size 缺值 null；created_at：numeric epoch 秒→ISO UTC / ISO 字串 passthrough / 其他→null）；set_run_alias（經 manager lease 版本；RunBusyError→409、ValueError→422 `alias_conflict`、KeyError→404）；delete_run（RunBusyError→409 `run_busy`、404 `run_not_found`、errors 非空→500 `delete_partial` 禁 200、冪等→200）。
+  2. 新 3 端點 thin→service：list_runs（`active := is_run_active(triple)`；size 缺值 null；created_at：numeric epoch 秒→ISO UTC / ISO 字串 passthrough / 其他→null）；set_run_alias（經 manager lease 版本；RunBusyError→409、ValueError→422 `alias_conflict`、KeyError→404）；delete_run（RunBusyError→409 `run_busy`、404 `run_not_found`、errors 非空→500 `delete_partial` 禁 200、冪等語義對齊 SPEC [B2-6]：磁碟孤兒+registry 有→200 清 entry、**皆無→404 `run_not_found`**）。
   3. size 寫入：task 收尾執行緒 du features+cgsa 一次經 _locked_mutate 寫 entry。
   4. 刪除成功 reconciliation：清 in-memory tasks（result metadata 三元組 + browse full-hash ID 兩來源）+ `_invalidate_task_cache()`。
 - 不可做：route 業務邏輯；service 互 import；list 同步全掃；partial 回 200。
