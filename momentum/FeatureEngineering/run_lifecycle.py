@@ -144,7 +144,9 @@ class RunLifecycleManager:
                     for entry in self.registry.find(symbol, timeframe)
                     if not entry.get("alias")
                 ),
-                key=lambda entry: entry.get("created_at", 0),
+                key=lambda entry: entry.get(
+                    "last_generated_at", entry.get("created_at", 0)
+                ),
                 reverse=True,
             )
             for entry in entries[keep_latest:]:

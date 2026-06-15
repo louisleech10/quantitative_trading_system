@@ -53,7 +53,8 @@ def test_registry_upserts_same_symbol_timeframe_config_hash() -> None:
         assert len(entries) == 1
         assert entries[0]["feature_count"] == 12
         assert entries[0]["path"] == "/tmp/new.parquet"
-        assert entries[0]["created_at"] == 200
+        assert entries[0]["created_at"] == 100
+        assert entries[0]["last_generated_at"] == 200
 
 
 def test_registry_keeps_distinct_config_hash_versions() -> None:

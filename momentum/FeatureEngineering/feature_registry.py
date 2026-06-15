@@ -91,6 +91,7 @@ class FeatureRegistry:
             raise ValueError(f"Missing required keys: {missing}")
         incoming = dict(entry)
         incoming.setdefault("created_at", time.time())
+        incoming.setdefault("last_generated_at", incoming["created_at"])
 
         def mutate() -> None:
             key = self._key(incoming)
@@ -125,7 +126,10 @@ class FeatureRegistry:
         matches = self.find(symbol, timeframe)
         if not matches:
             return None
-        return max(matches, key=lambda item: item.get("created_at", 0))
+        return max(
+            matches,
+            key=lambda item: item.get("last_generated_at", item.get("created_at", 0)),
+        )
 
     def get(self, symbol: str, timeframe: str, config_hash: str) -> Optional[Dict[str, Any]]:
         """讀取單一 entry；mutation 安全由 lease/deleting 協定保證。"""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import signal
 import subprocess
 import sys
@@ -99,7 +100,13 @@ def test_locks_subprocess_kill_releases_kernel_lock(tmp_path: Path) -> None:
 
 
 def _entry(config_hash: str = "cfg_batch2d") -> dict[str, object]:
-    return {"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": config_hash, "created_at": 1.0}
+    return {
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+        "config_hash": config_hash,
+        "created_at": 1.0,
+        "last_generated_at": 1.0,
+    }
 
 
 def test_registry_transactions_preserve_fields_and_instances(tmp_path: Path) -> None:
@@ -162,7 +169,11 @@ def _create_run(manager: RunLifecycleManager, registry: FeatureRegistry, config_
     cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
     cgsa_leaf.mkdir(parents=True)
     (cgsa_leaf / "manifest.json").write_text('{"config_hash":"' + config_hash + '"}')
-    registry.add({**_entry(config_hash), "created_at": created_at})
+    registry.add({
+        **_entry(config_hash),
+        "created_at": created_at,
+        "last_generated_at": created_at,
+    })
 
 
 def test_delete_removes_owned_leaves_and_registry(tmp_path: Path) -> None:
@@ -229,6 +240,38 @@ def test_cleanup_keeps_latest_named_and_busy(tmp_path: Path) -> None:
     assert "cfg_1" in report.skipped_busy
     assert registry.get("BTCUSDT", "12h", "cfg_0") is not None
     assert len(registry.find("BTCUSDT", "12h")) == 7
+
+
+def test_cleanup_refreshes_regenerated_legacy_run_recency(tmp_path: Path) -> None:
+    """重跑 legacy 未命名 run 後，應依最後生成時間回到保留五筆內。"""
+    manager, registry = _manager(tmp_path)
+    for index in range(6):
+        _create_run(manager, registry, f"cfg_{index}", float(index + 1))
+
+    registry_path = manager.features_root / "registry.json"
+    entries = registry.list_all()
+    legacy = next(entry for entry in entries if entry["config_hash"] == "cfg_0")
+    legacy.pop("last_generated_at", None)
+    registry_path.write_text(json.dumps(entries), encoding="utf-8")
+    registry = FeatureRegistry(registry_path)
+    manager.registry = registry
+    registry.add({
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+        "config_hash": "cfg_0",
+        "created_at": 100.0,
+        "last_generated_at": 100.0,
+    })
+
+    refreshed = registry.get("BTCUSDT", "12h", "cfg_0")
+    assert refreshed is not None
+    assert refreshed["created_at"] == 1.0
+    assert refreshed["last_generated_at"] == 100.0
+
+    report = manager.auto_cleanup("BTCUSDT", "12h", keep_latest=5)
+
+    assert {item.config_hash for item in report.deleted} == {"cfg_1"}
+    assert registry.get("BTCUSDT", "12h", "cfg_0") is not None
 
 
 def test_cleanup_alias_race_is_blocked_after_mark(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

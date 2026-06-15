@@ -86,6 +86,7 @@ class RunInfo(BaseModel):
     config_hash: str
     alias: Optional[str] = None
     created_at: Optional[str] = None
+    last_generated_at: Optional[str] = None
     size_bytes: Optional[int] = None
     active: bool
 

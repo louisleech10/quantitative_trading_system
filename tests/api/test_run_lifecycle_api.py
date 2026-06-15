@@ -332,6 +332,8 @@ async def test_list_runs_created_at_iso_samples(
     iso_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:\+00:00|Z)$")
     assert iso_pattern.fullmatch(rows["cfg_batch2d"]["created_at"])
     assert iso_pattern.fullmatch(rows["cfg_batch2e"]["created_at"])
+    assert iso_pattern.fullmatch(rows["cfg_batch2d"]["last_generated_at"])
+    assert iso_pattern.fullmatch(rows["cfg_batch2e"]["last_generated_at"])
 
 
 @pytest.mark.asyncio

@@ -655,16 +655,32 @@ class FeatureFactoryService:
         manager = self._lifecycle()
         rows = []
         for entry in manager.registry.list_all():
-            created = entry.get("created_at")
-            if isinstance(created, (int, float)):
-                created_value = datetime.fromtimestamp(created, timezone.utc).isoformat()
-            elif isinstance(created, str) and "T" in created:
-                created_value = created
-            else:
-                created_value = None
-            rows.append({**entry, "created_at": created_value, "size_bytes": entry.get("size_bytes"),
-                         "active": is_run_active(manager.locks_dir, str(entry.get("symbol")), str(entry.get("timeframe")), str(entry.get("config_hash")))})
+            created_value = self._registry_timestamp_iso(entry.get("created_at"))
+            generated_value = self._registry_timestamp_iso(
+                entry.get("last_generated_at", entry.get("created_at"))
+            )
+            rows.append({
+                **entry,
+                "created_at": created_value,
+                "last_generated_at": generated_value,
+                "size_bytes": entry.get("size_bytes"),
+                "active": is_run_active(
+                    manager.locks_dir,
+                    str(entry.get("symbol")),
+                    str(entry.get("timeframe")),
+                    str(entry.get("config_hash")),
+                ),
+            })
         return rows
+
+    @staticmethod
+    def _registry_timestamp_iso(value: Any) -> Optional[str]:
+        """將 registry timestamp 正規化為 API ISO 字串。"""
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value, timezone.utc).isoformat()
+        if isinstance(value, str) and "T" in value:
+            return value
+        return None
 
     def set_run_alias(self, symbol: str, timeframe: str, config_hash: str, alias: Optional[str]) -> None:
         self._lifecycle().set_run_alias(symbol, timeframe, config_hash, alias)
