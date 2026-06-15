@@ -42,7 +42,7 @@ def _make_part_item(base_dir: Path, part_id: str, n_rows: int = 8, n_cols: int =
     table = pa.Table.from_arrays(arrays, names=[f"{part_id}_col_{idx}" for idx in range(n_cols)])
     final_path = base_dir / f"{part_id}.parquet"
     staging_path = base_dir / f".{part_id}.staging.parquet"
-    return (part_id, table, final_path, staging_path)
+    return (part_id, table, final_path, staging_path, [])
 
 
 @pytest.fixture
@@ -112,11 +112,16 @@ def test_tier_auto_selects_l7_workers(
         lambda tier: {"l65_workers": 4, "cgsa_memory_buffer": 0, "l7_workers": 4, "chunk_bars": 50_000},
     )
 
-    def fake_persist(parts_queue, n_workers, compactor=None):
+    def fake_persist(parts_queue, n_workers, compactor=None, compression_level=1):
         captured["n_workers"] = n_workers
         results = []
-        for _part_id, table, final_path, staging_path in parts_queue:
-            pq.write_table(table, str(staging_path), compression="zstd", compression_level=1)
+        for _part_id, table, final_path, staging_path, _float32_cols in parts_queue:
+            pq.write_table(
+                table,
+                str(staging_path),
+                compression="zstd",
+                compression_level=compression_level,
+            )
             if compactor is None:
                 final_path.parent.mkdir(parents=True, exist_ok=True)
                 Path(staging_path).replace(final_path)
@@ -146,7 +151,7 @@ def test_async_compactor_merges_small_files_into_large_parts(tmp_path: Path) -> 
         )
         staging_path = staging_dir / f"part_{index}.parquet"
         pq.write_table(table, str(staging_path), compression="zstd", compression_level=1)
-        compactor.enqueue((f"part_{index}", staging_path))
+        compactor.enqueue((f"part_{index}", staging_path, []))
 
     merged_paths = compactor.finalize()
 
@@ -246,7 +251,7 @@ def test_l7_workers_env_override(
         lambda tier: {"l65_workers": 4, "cgsa_memory_buffer": 0, "l7_workers": 8, "chunk_bars": 50_000},
     )
 
-    def fake_persist(parts_queue, n_workers, compactor=None):
+    def fake_persist(parts_queue, n_workers, compactor=None, compression_level=1):
         captured["n_workers"] = n_workers
         return []
 
@@ -296,7 +301,7 @@ def test_async_compactor_finalize_flushes_remaining_files(tmp_path: Path) -> Non
         )
         staging_path = staging_dir / f"flush_{index}.parquet"
         pq.write_table(table, str(staging_path), compression="zstd", compression_level=1)
-        compactor.enqueue((f"flush_{index}", staging_path))
+        compactor.enqueue((f"flush_{index}", staging_path, []))
 
     merged_paths = compactor.finalize()
 
@@ -320,7 +325,7 @@ def test_async_compactor_crash_preserves_staging_files(tmp_path: Path, monkeypat
         )
         staging_path = staging_dir / f"crash_{index}.parquet"
         pq.write_table(table, str(staging_path), compression="zstd", compression_level=1)
-        compactor.enqueue((f"crash_{index}", staging_path))
+        compactor.enqueue((f"crash_{index}", staging_path, []))
 
     monkeypatch.setattr(
         compactor,

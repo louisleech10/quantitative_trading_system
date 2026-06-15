@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from api.core.config import settings
 from api.routes import config as config_route
+from momentum.FeatureEngineering.utils.hardware_utils import get_tier_config as real_tier_config
 
 
 @pytest.fixture
@@ -35,6 +36,10 @@ class FakePsutil:
         return 23.0
 
 
+def _tier_config(tier: str, **overrides: object) -> dict:
+    return {**real_tier_config(tier), **overrides}
+
+
 def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     """測試硬體 endpoint 回傳正確 JSON 結構與建議設定。"""
     monkeypatch.setattr(config_route, "psutil", FakePsutil)
@@ -42,12 +47,13 @@ def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: p
     monkeypatch.setattr(
         config_route,
         "get_tier_config",
-        lambda tier: {
-            "l65_workers": 6,
-            "cgsa_memory_buffer": 0,
-            "l7_workers": 6,
-            "chunk_bars": 100_000,
-        },
+        lambda tier: _tier_config(
+            tier,
+            l65_workers=6,
+            cgsa_memory_buffer=0,
+            l7_workers=6,
+            chunk_bars=100_000,
+        ),
     )
     monkeypatch.setattr(settings, "data_cache_path", tmp_path)
 
@@ -55,7 +61,10 @@ def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: p
 
     assert response.status_code == 200
     payload = response.json()
-    assert set(payload.keys()) == {"memory_tier", "cpu", "memory", "disk", "recommended_settings"}
+    assert set(payload.keys()) == {
+        "memory_tier", "cpu", "memory", "disk", "recommended_settings",
+        "applied_settings", "tier_table", "tier_thresholds_gb",
+    }
     assert payload["memory_tier"] == "16gb"
     assert payload["cpu"] == {
         "logical_cores": 8,
@@ -73,7 +82,11 @@ def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: p
         "FFACT_CGSA_MEMORY_BUFFER": 0,
         "FFACT_L7_WORKERS": 6,
         "FFACT_L7_COMPACTOR_ENABLED": 1,
+        "FFACT_MULTI_TF_MAX_WORKERS": 2,
+        "FFACT_LAYER3_CHUNK_SIZE": 512,
     }
+    assert payload["applied_settings"]["l65_workers"]["value"] == 6
+    assert set(payload["tier_table"]) == {"8gb", "16gb", "24gb", "32gb"}
 
 
 def test_hardware_endpoint_tier_matches_util(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -83,12 +96,13 @@ def test_hardware_endpoint_tier_matches_util(client: TestClient, monkeypatch: py
     monkeypatch.setattr(
         config_route,
         "get_tier_config",
-        lambda tier: {
-            "l65_workers": 8,
-            "cgsa_memory_buffer": 32,
-            "l7_workers": 8,
-            "chunk_bars": 250_000,
-        },
+        lambda tier: _tier_config(
+            tier,
+            l65_workers=8,
+            cgsa_memory_buffer=32,
+            l7_workers=8,
+            chunk_bars=250_000,
+        ),
     )
     monkeypatch.setattr(settings, "data_cache_path", tmp_path)
 
@@ -106,12 +120,13 @@ def test_hardware_endpoint_missing_data_cache(client: TestClient, monkeypatch: p
     monkeypatch.setattr(
         config_route,
         "get_tier_config",
-        lambda tier: {
-            "l65_workers": 4,
-            "cgsa_memory_buffer": 0,
-            "l7_workers": 4,
-            "chunk_bars": 50_000,
-        },
+        lambda tier: _tier_config(
+            tier,
+            l65_workers=4,
+            cgsa_memory_buffer=0,
+            l7_workers=4,
+            chunk_bars=50_000,
+        ),
     )
     monkeypatch.setattr(settings, "data_cache_path", missing_path)
 

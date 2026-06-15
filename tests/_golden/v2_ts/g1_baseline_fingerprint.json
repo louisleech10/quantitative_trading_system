@@ -19,10 +19,11 @@
     }
   },
   "manifest_allowlist": {
+    "schema_version": "raw_v2",
     "dtype": {
       "g": "float32"
     },
-    "feature_schema_hash": "d04e1ae095cd22034a2a9f19147173f0298dba01934cdf0b69674bd55b86191d",
+    "feature_schema_hash": "93ef6756efafdba58023f6c09f9ac872c11f19ccf1c754952b7cfc4153016468",
     "groups": {
       "g": {
         "column_count": 2,

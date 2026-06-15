@@ -31,7 +31,13 @@ def test_get_memory_tier_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_get_tier_config_returns_valid_dict() -> None:
     """測試 get_tier_config：所有 tier 都應回傳完整設定鍵。"""
-    expected_keys = {"l65_workers", "cgsa_memory_buffer", "l7_workers", "chunk_bars"}
+    expected_keys = {
+        "l65_workers", "cgsa_memory_buffer", "l7_workers", "chunk_bars",
+        "multi_tf_max_workers", "layer3_chunk_size", "l3_persist_mode",
+        "l3_streaming_buffer_cols", "l65_split_threshold", "l2_category_workers",
+        "cgsa_shard_bytes", "concurrent_symbols", "l7_zstd_level",
+        "cgsa_stats_sync_cap", "cgsa_stats_q_sample", "cgsa_stats_warmup_workers",
+    }
 
     for tier in ("8gb", "16gb", "24gb", "32gb"):
         assert set(hardware_utils.get_tier_config(tier).keys()) == expected_keys
@@ -42,7 +48,7 @@ def test_get_tier_config_unknown_tier_fallback() -> None:
     config = hardware_utils.get_tier_config("64gb")
 
     assert config == hardware_utils.get_tier_config("8gb")
-    assert config["l65_workers"] == 4
+    assert config["l65_workers"] == 2
 
 
 def test_get_memory_tier_env_auto(monkeypatch: pytest.MonkeyPatch) -> None:

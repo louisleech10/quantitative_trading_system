@@ -68,6 +68,7 @@ def _manifest_allowlist(run_dir: Path) -> Dict[str, Any]:
     manifest = json.loads((run_dir / "feature_manifest.json").read_text(encoding="utf-8"))
     raw = manifest["artifacts"]["raw"]
     return {
+        "schema_version": raw["schema_version"],
         "groups": raw["groups"],
         "row_count": raw["row_count"],
         "feature_schema_hash": raw["feature_schema_hash"],

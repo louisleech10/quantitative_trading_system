@@ -7,24 +7,52 @@ import pytest
 
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 from momentum.FeatureEngineering.feature_factory import FeatureFactory
+from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
 
 @pytest.fixture
-def feature_factory() -> FeatureFactory:
+def feature_factory(tmp_path: Path) -> FeatureFactory:
     """建立最小 FeatureFactory 實例供 CGSA 測試使用。"""
     factory = FeatureFactory.__new__(FeatureFactory)
     factory._config_manager = Mock()
     factory._adapter_registry = Mock()
     factory._progress_callback = None
-    factory._storage = Mock()
-    factory._registry = Mock()
+    factory._storage = FeatureStorage(str(tmp_path / "features"))
+    factory._registry = FeatureRegistry(tmp_path / "registry.json")
     factory._validator = Mock()
     factory._current_symbol = None
     factory._current_timeframe = None
+    factory._current_config_hash = None
     factory._current_raw_data = None
     factory._reference_data_cache = {}
     factory._cgsa_registry = None
+    factory._cgsa_force_fresh = False
+    factory.layer_results = {}
     return factory
+
+
+def _write_complete_l7_manifest(
+    factory: FeatureFactory,
+    symbol: str,
+    timeframe: str,
+    config_hash: str,
+) -> None:
+    run_dir = factory._storage.feature_run_dir(symbol, timeframe, config_hash)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    completeness = {
+        "expected_layers": ["L1"],
+        "present_layers": ["L1"],
+        "failed_layers": [],
+        "expected_timeframes": [timeframe],
+        "present_timeframes": [timeframe],
+        "failed_timeframes": [],
+        "quality_status": "complete",
+    }
+    (run_dir / factory._storage.L7_V2_MANIFEST_NAME).write_text(
+        json.dumps({"artifacts": {"raw": {"schema_version": "raw_v2", **completeness}}}),
+        encoding="utf-8",
+    )
 
 
 def test_cgsa_deterministic_path(
@@ -60,6 +88,7 @@ def test_cgsa_resume_from_existing_manifest(
     expected_registry = ColumnGroupRegistry(work_dir=work_dir)
     resume_mock = Mock(return_value=expected_registry)
     monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", resume_mock)
+    _write_complete_l7_manifest(feature_factory, "ETHUSDT", "1h", "1234567890abcdef")
 
     registry = feature_factory._prepare_cgsa_registry("ETHUSDT", "1h", "1234567890abcdef")
 

@@ -22,17 +22,24 @@ import pytest
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     FeaturePreprocessor,
 )
+from tests._fixtures.rolling_quantile_legacy import rolling_quantile_2d_legacy
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_preprocessor(winsor_method: str = "quantile", quantile_range=None) -> FeaturePreprocessor:
+def _make_preprocessor(
+    winsor_method: str = "quantile",
+    quantile_range=None,
+    *,
+    causal_preprocessing: bool = True,
+) -> FeaturePreprocessor:
     """最小設定的 FeaturePreprocessor instance，足以呼叫 winsorize 相關方法。"""
     if quantile_range is None:
         quantile_range = [0.01, 0.99]
     cfg = {
+        "causal_preprocessing": causal_preprocessing,
         "winsorization": {
             "enabled": True,
             "method": winsor_method,
@@ -293,12 +300,7 @@ def test_legacy_equivalent_no_extra_copy_quantile():
 # ---------------------------------------------------------------------------
 
 def test_transform_single_optimized_df_end_to_end():
-    """完整 pipeline end-to-end：改動後 _transform_single_optimized_df 輸出不變。
-
-    用兩個 FeaturePreprocessor instance 分別處理同一份資料：
-    - pp_new: 使用改動後的程式碼（當前實作）
-    - 驗證：輸出 DataFrame 的數值與 _winsorize_2d_inplace 直接計算結果一致
-    """
+    """因果模式與 rolling PIT oracle 一致，且不受未來值擾動。"""
     pp = _make_preprocessor(winsor_method="quantile", quantile_range=[0.01, 0.99])
 
     rng = np.random.default_rng(314)
@@ -306,20 +308,60 @@ def test_transform_single_optimized_df_end_to_end():
     arr_f64 = rng.standard_normal((n_rows, n_cols)).astype(np.float64)
     arr_f64[:20, :] = np.nan  # warmup NaN
 
-    # 手動模擬 _winsorize_2d_inplace 路徑（new → partition）
     lower_q, upper_q = 0.01, 0.99
-    arr_ref = arr_f64.copy()
-    FeaturePreprocessor._winsorize_2d_inplace(arr_ref, lower_q, upper_q)
-
-    # 透過 _winsorize_2d_legacy_equivalent 路徑（quantile method）
+    window = pp._rolling_window()
+    min_periods = pp._rolling_min_periods(window)
+    lower, upper = rolling_quantile_2d_legacy(
+        arr_f64, lower_q, upper_q, window, min_periods
+    )
+    valid = np.isfinite(lower) & np.isfinite(upper)
+    expected = arr_f64.copy()
+    clipped = np.clip(arr_f64, lower, upper)
+    expected[valid] = clipped[valid]
+    expected[np.isnan(arr_f64)] = np.nan
+    original = arr_f64.copy()
     result = pp._winsorize_2d_legacy_equivalent(arr_f64)
 
-    # result 是 float32（quantile path 最終 .astype(np.float32, copy=False)）
-    # arr_ref 是 float64；比對時允許 float32 精度誤差
+    np.testing.assert_allclose(
+        result,
+        expected.astype(np.float32),
+        rtol=1e-5,
+        atol=1e-5,
+        equal_nan=True,
+        err_msg="causal winsorize 與 rolling PIT oracle 不一致",
+    )
+
+    perturbed = original.copy()
+    perturbed[-1, :] = 1_000_000.0
+    perturbed_result = pp._winsorize_2d_legacy_equivalent(perturbed)
+    np.testing.assert_allclose(
+        result[:-1],
+        perturbed_result[:-1],
+        rtol=1e-5,
+        atol=1e-5,
+        equal_nan=True,
+    )
+
+
+def test_transform_single_optimized_df_noncausal_matches_full_sample() -> None:
+    """非因果模式才與 full-sample partition/nanquantile 路徑比較。"""
+    pp = _make_preprocessor(
+        winsor_method="quantile",
+        quantile_range=[0.01, 0.99],
+        causal_preprocessing=False,
+    )
+    rng = np.random.default_rng(314)
+    arr_f64 = rng.standard_normal((150, 15)).astype(np.float64)
+    arr_f64[:20, :] = np.nan
+    arr_ref = arr_f64.copy()
+    FeaturePreprocessor._winsorize_2d_inplace(arr_ref, 0.01, 0.99)
+
+    result = pp._winsorize_2d_legacy_equivalent(arr_f64)
+
     np.testing.assert_allclose(
         result.astype(np.float64),
         arr_ref,
         rtol=1e-5,
         atol=1e-5,
-        err_msg="end-to-end: winsorize 輸出在 float32 精度下不一致",
+        equal_nan=True,
     )

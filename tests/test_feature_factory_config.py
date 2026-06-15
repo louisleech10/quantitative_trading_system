@@ -90,7 +90,7 @@ def test_factory_config_backward_compat_defaults():
         "labels": {},
     }
     config = FactoryConfig.model_validate(old_yaml_like)
-    assert config.preprocessing.enabled is False
+    assert config.preprocessing.enabled is True
     assert config.atomic_indicators.microstructure.enabled is False
     assert config.timeframes.alignment_mode == AlignmentMode.OPEN_MINUS
 
@@ -167,7 +167,7 @@ def test_yaml_with_new_sections_defaults():
     assert config.atomic_indicators.microstructure.enabled is False
     assert config.atomic_indicators.entropy.enabled is False
     assert config.atomic_indicators.tail_risk.enabled is False
-    assert config.preprocessing.enabled is False
+    assert config.preprocessing.enabled is True
 
 
 def test_yaml_enable_microstructure():

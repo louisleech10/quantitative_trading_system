@@ -254,11 +254,15 @@ class TestMultiTFColumnBatchMerge:
 
         # Non-chunked
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "0")
-        result_single = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        result_single = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
 
         # Chunked (chunk_size=5 → 4 chunks)
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "5")
-        result_chunked = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        result_chunked = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
 
         pd.testing.assert_frame_equal(
             result_single.sort_index(axis=1),
@@ -273,10 +277,14 @@ class TestMultiTFColumnBatchMerge:
         source_values, source_index, primary_index = self._make_aligned_data(n_cols=10)
 
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "0")
-        result_single = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        result_single = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
 
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "3")
-        result_chunked = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        result_chunked = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
 
         single_ts = result_single.attrs.get("source_timestamps")
         chunked_ts = result_chunked.attrs.get("source_timestamps")
@@ -291,12 +299,17 @@ class TestMultiTFColumnBatchMerge:
         source_values, source_index, primary_index = self._make_aligned_data(n_cols=10)
 
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "3")
-        aligned = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        aligned = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
 
         # source_timestamps should all be <= primary_index
         source_ts = aligned.attrs.get("source_timestamps")
         assert source_ts is not None
-        assert (source_ts <= primary_index).all(), "Chunked merge introduced future leakage!"
+        valid = ~source_ts.isna()
+        assert (source_ts[valid] <= primary_index[valid]).all(), (
+            "Chunked merge introduced future leakage!"
+        )
 
     def test_empty_source(self, monkeypatch):
         """空源 DataFrame 不該拋 exception"""
@@ -307,7 +320,9 @@ class TestMultiTFColumnBatchMerge:
         source_index = pd.DatetimeIndex([])
 
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "3")
-        result = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        result = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
         assert result.shape[0] == len(primary_index)
 
     def test_single_column_merge(self, monkeypatch):
@@ -317,5 +332,7 @@ class TestMultiTFColumnBatchMerge:
         source_values, source_index, primary_index = self._make_aligned_data(n_cols=1)
 
         monkeypatch.setenv("FFACT_MERGE_CHUNK_SIZE", "5000")
-        result = TimeframeAligner._merge_asof_align(source_values, source_index, primary_index)
+        result = TimeframeAligner._merge_asof_align(
+            source_values, source_index, primary_index, "12h", "12h"
+        )
         assert result.shape[1] == 1

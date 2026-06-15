@@ -2,12 +2,17 @@ from __future__ import annotations
 
 from copy import deepcopy
 from functools import lru_cache
+import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from momentum.factories import create_feature_factory, create_kline_storage_manager
 from momentum.FeatureEngineering.atomic.microstructure_indicators import MicrostructureIndicatorEngine
+from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from momentum.core.contracts import LayerStatus
 
 
 TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
@@ -65,56 +70,72 @@ def _resolve_test_target() -> tuple[str, str]:
     pytest.skip("No available kline dataset for feature factory E2E tests")
 
 
-def _generate(config_override: dict):
+def _generate(
+    config_override: dict,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    persist: bool = False,
+):
+    work_dir = tmp_path / "cgsa"
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
+    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(tmp_path / "registry.json"))
     factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR)
+    factory._storage = FeatureStorage(str(tmp_path / "features"))
+    factory._registry = FeatureRegistry(tmp_path / "registry.json")
     symbol, timeframe = _resolve_test_target()
-    return factory.generate_features(
+    result = factory.generate_features(
         symbol=symbol,
         timeframe=timeframe,
         config_override=config_override,
         force_regenerate=True,
-        persist=False,
+        persist=persist,
     )
+    manifest = json.loads(Path(result.metadata["manifest_path"]).read_text(encoding="utf-8"))
+    return result, factory, manifest
 
 
-def _result_columns(result) -> list[str]:
-    """Get feature column names — from features_df or CGSA metadata if df is empty."""
-    if not result.features_df.empty:
-        return list(result.features_df.columns)
-    return list(result.metadata.get("feature_names", []))
+def _manifest_columns(manifest: dict) -> list[str]:
+    """從 CGSA source manifest 或 L7 artifact manifest 讀取 schema 欄位。"""
+    groups = manifest.get("groups")
+    if groups is None:
+        groups = manifest["artifacts"]["raw"]["groups"]
+    group_values = groups.values() if isinstance(groups, dict) else groups
+    return [str(column) for group in group_values for column in group.get("columns", [])]
 
 
-def test_pipeline_with_microstructure() -> None:
+def test_pipeline_with_microstructure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["microstructure"]["enabled"] = True
 
-    result = _generate(config)
-    ms_columns = [col for col in _result_columns(result) if col.startswith("ms_")]
+    _result, _factory, manifest = _generate(config, tmp_path, monkeypatch)
+    ms_columns = [col for col in _manifest_columns(manifest) if col.startswith("ms_")]
 
+    assert manifest["schema_version"] == 2
     assert len(ms_columns) > 0
 
 
-def test_pipeline_with_entropy() -> None:
+def test_pipeline_with_entropy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["entropy"]["enabled"] = True
 
-    result = _generate(config)
-    ent_columns = [col for col in _result_columns(result) if col.startswith("ent_")]
+    _result, _factory, manifest = _generate(config, tmp_path, monkeypatch)
+    ent_columns = [col for col in _manifest_columns(manifest) if col.startswith("ent_")]
 
     assert len(ent_columns) > 0
 
 
-def test_pipeline_with_tail_risk() -> None:
+def test_pipeline_with_tail_risk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["tail_risk"]["enabled"] = True
 
-    result = _generate(config)
-    tr_columns = [col for col in _result_columns(result) if col.startswith("tr_")]
+    _result, _factory, manifest = _generate(config, tmp_path, monkeypatch)
+    tr_columns = [col for col in _manifest_columns(manifest) if col.startswith("tr_")]
 
     assert len(tr_columns) > 0
 
 
-def test_pipeline_with_preprocessing() -> None:
+def test_pipeline_with_preprocessing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["microstructure"]["enabled"] = True
     config["preprocessing"] = {
@@ -128,14 +149,16 @@ def test_pipeline_with_preprocessing() -> None:
         "adaptive_zscore": {"enabled": True, "windows": [55], "apply_to": "all", "epsilon": 1e-8},
     }
 
-    result = _generate(config)
-    columns = _result_columns(result)
+    _result, _factory, manifest = _generate(
+        config, tmp_path, monkeypatch, persist=True
+    )
+    columns = _manifest_columns(manifest)
 
     assert any(col.endswith("_rank") for col in columns)
     assert any("_zscore_" in col for col in columns)
 
 
-def test_pipeline_all_new_features() -> None:
+def test_pipeline_all_new_features(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["microstructure"]["enabled"] = True
     config["atomic_indicators"]["entropy"]["enabled"] = True
@@ -151,30 +174,35 @@ def test_pipeline_all_new_features() -> None:
         "adaptive_zscore": {"enabled": True, "windows": [55], "apply_to": "all", "epsilon": 1e-8},
     }
 
-    result = _generate(config)
-    columns = _result_columns(result)
+    result, _factory, manifest = _generate(
+        config, tmp_path, monkeypatch, persist=True
+    )
+    columns = _manifest_columns(manifest)
 
     assert result.feature_count > 0
     assert any(col.startswith("ms_") for col in columns)
     assert any(col.startswith("ent_") for col in columns)
     assert any(col.startswith("tr_") for col in columns)
-    assert not result.hdf5_path
+    assert result.hdf5_path
     assert "validation" in result.metadata
 
 
-def test_pipeline_backward_compatible() -> None:
+def test_pipeline_backward_compatible(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_a = _base_pipeline_override()
     config_b = deepcopy(_base_pipeline_override())
 
-    result_a = _generate(config_a)
-    result_b = _generate(config_b)
+    result_a, _factory_a, manifest_a = _generate(config_a, tmp_path / "a", monkeypatch)
+    result_b, _factory_b, manifest_b = _generate(config_b, tmp_path / "b", monkeypatch)
 
     assert result_a.features_df.shape == result_b.features_df.shape
     assert list(result_a.features_df.columns) == list(result_b.features_df.columns)
     pd.testing.assert_frame_equal(result_a.features_df, result_b.features_df)
+    assert _manifest_columns(manifest_a) == _manifest_columns(manifest_b)
 
 
-def test_pipeline_partial_engine_failure(monkeypatch) -> None:
+def test_pipeline_partial_engine_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config = _base_pipeline_override()
     config["atomic_indicators"]["microstructure"]["enabled"] = True
     config["atomic_indicators"]["tail_risk"]["enabled"] = True
@@ -184,8 +212,11 @@ def test_pipeline_partial_engine_failure(monkeypatch) -> None:
 
     monkeypatch.setattr(MicrostructureIndicatorEngine, "compute_all", _raise)
 
-    result = _generate(config)
-    columns = _result_columns(result)
+    _result, factory, manifest = _generate(config, tmp_path, monkeypatch)
+    columns = _manifest_columns(manifest)
 
     assert any(col.startswith("tr_") for col in columns)
     assert not any(col.startswith("ms_") for col in columns)
+    layer1 = factory.layer_results["Layer 1"]
+    assert layer1.failed_engines == ("microstructure",)
+    assert layer1.status == LayerStatus.engine_partial

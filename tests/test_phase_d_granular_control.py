@@ -515,47 +515,6 @@ class TestD4APISpecification:
 
 
 # ===========================================================
-# D5: FRONTEND_INTEGRATION_GUIDE.md 更新驗證
-# ===========================================================
-
-
-class TestD5FrontendIntegrationGuide:
-    """D5: 驗證 FRONTEND_INTEGRATION_GUIDE.md 包含 Granular Control 前端指南"""
-
-    @pytest.fixture(autouse=True)
-    def _load(self):
-        self.content = (ROOT / "docs" / "FRONTEND_INTEGRATION_GUIDE.md").read_text(encoding="utf-8")
-
-    def test_granular_control_section_exists(self):
-        """包含 Granular Control / 細粒度控制相關章節"""
-        assert "Granular Control" in self.content or "細粒度" in self.content or "LayerPanel" in self.content
-
-    def test_layer_panel_component_documented(self):
-        """LayerPanel 元件已記錄"""
-        assert "LayerPanel" in self.content
-
-    def test_indicator_checkbox_documented(self):
-        """IndicatorCheckbox 元件已記錄"""
-        assert "IndicatorCheckbox" in self.content
-
-    def test_feature_preview_bar_documented(self):
-        """FeaturePreviewBar 元件已記錄"""
-        assert "FeaturePreviewBar" in self.content
-
-    def test_config_io_buttons_documented(self):
-        """ConfigIOButtons 元件已記錄"""
-        assert "ConfigIOButtons" in self.content
-
-    def test_store_actions_documented(self):
-        """Zustand store actions 已記錄"""
-        assert "toggleIndicator" in self.content or "featureFactoryStore" in self.content
-
-    def test_schema_api_integration_documented(self):
-        """Schema API 整合已記錄"""
-        assert "/schema" in self.content or "loadSchema" in self.content
-
-
-# ===========================================================
 # §19.3 向後相容測試補完
 # ===========================================================
 

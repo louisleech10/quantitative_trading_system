@@ -38,7 +38,13 @@ def _make_part_item(base_dir: Path, part_id: str, n_rows: int = 64, n_cols: int 
     rng = np.random.default_rng(abs(hash(part_id)) % (2 ** 32))
     arrays = [pa.array(rng.normal(size=n_rows).astype(np.float16)) for _ in range(n_cols)]
     table = pa.Table.from_arrays(arrays, names=[f"{part_id}_col_{idx}" for idx in range(n_cols)])
-    return (part_id, table, base_dir / f"{part_id}.parquet", base_dir / f".{part_id}.staging.parquet")
+    return (
+        part_id,
+        table,
+        base_dir / f"{part_id}.parquet",
+        base_dir / f".{part_id}.staging.parquet",
+        [],
+    )
 
 
 @pytest.fixture

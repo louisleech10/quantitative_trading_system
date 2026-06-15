@@ -256,8 +256,8 @@ def test_cgsa_parquet_uses_float32_when_values_exceed_float16(tmp_path):
     assert str(df["btc_price_feature"].dtype) == "float32"
     assert np.isinf(df["btc_price_feature"].to_numpy()).sum() == 0
     assert df["btc_price_feature"].tolist() == [60000.0, 70000.0, 80000.0]
-    assert manifest["dtype"] == "float32"
-    assert manifest["groups"]["test_high_price"]["dtype"] == "float32"
+    assert manifest["dtype"] == "mixed"
+    assert manifest["groups"]["test_high_price"]["dtype"] == "mixed"
 
 
 def test_cgsa_parquet_uses_float32_when_float16_underflows_tiny_values(tmp_path):
