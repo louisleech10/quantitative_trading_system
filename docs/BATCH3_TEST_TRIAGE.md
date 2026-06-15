@@ -54,3 +54,16 @@ batch2 merge-preserve 保留 created_at。但 retention「per (s,tf) 留最近 5
 2. #2 d* fracdiff 大型管線（吸收 C）
 3. B 殭屍分簇修（委員會 Q2 定原則後派執行端）
 4. #3 tier profile（#2 後）
+
+## 委員會三方裁定（2026-06-15，Codex+Composer 獨立調查一致 + Claude reconcile）
+> 報告：handoffs/20260615-batch3-committee-{codex,composer}.md。資料正確性鐵律滿足（三方一致）。
+
+| Q | 裁定 | 修法 | 信心 |
+|---|---|---|---|
+| Q1 retention | **B** | 加 `last_generated_at`：每次同 key add 刷新之；auto_cleanup/「最近未命名」改依 `last_generated_at` 排序（legacy 無此欄 fallback `created_at`）；created_at 維持首次+merge-preserve；非破壞性遷移。修 phase2 + lifecycle 測試證明「重跑舊未命名 run 回到保留 5 內，alias/created_at 不變」 | 0.95 |
+| Q3 winsorize | **非 production bug，測試過時** | production causal rolling 正確（commit fff522b 因果化）；測試誤比 causal vs global。拆 `test_transform_single_optimized_df_end_to_end`：causal 模式比 rolling PIT oracle；`causal_preprocessing=False` 才比 `_winsorize_2d_inplace`/nanquantile。保留 future-perturbation 不變量。**禁改 production 回 full-sample、禁放寬容差** | 0.99 |
+| Q4 golden | **刻意 schema bump** | raw_v1→raw_v2（commit 7427c72）。更新 `tests/_golden/v2_ts/g1_baseline_fingerprint.json` 的 `manifest_allowlist.feature_schema_hash`→`93ef6756efafdba58023f6c09f9ac872c11f19ccf1c754952b7cfc4153016468`；加註綁 schema_version。不重生其他指紋 | 0.99 |
+| Q5 engine | **tail-risk 正常，CGSA metadata 缺口** | streaming CGSA 硬寫 metadata `feature_names=[]`（commit 816b3f8）。**採保守版（Codex 輸出大小警告）**：E2E 測試改查 CGSA registry/manifest schema 驗 `tr_` 在/`ms_` 缺 + 加 `failed_engines==("microstructure",)`/`engine_partial` 斷言；**不**把上千欄名灌進 production response（違反最小輸出原則） | 0.97 |
+
+## B 殭屍剩餘簇（執行端逐簇判：test-lag 更新 vs 真缺陷 BLOCKED）
+phase_d 缺 doc(7)/memory_chunking 簽名(5)/l7_parallel_persist(9)/hardware(5)/config defaults(2)/cgsa_resume(5)/feature_storage mixed dtype(1)。原則：對齊刻意 API 變更=更新測試（禁放寬斷言遮真 bug）；功能已移除=刪測試；疑真缺陷（尤其碰 merge 對齊/resume/dtype 溢位等資料正確性）=停手標 BLOCKED 回報委員會。
