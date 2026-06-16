@@ -68,6 +68,22 @@ def stable_json(payload: Any) -> str:
     )
 
 
+def read_d_star_json(path: Path) -> Dict[str, float]:
+    """讀取單一持久化 d-star JSON，回傳有效的欄位數值。"""
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    entries = payload.get("entries")
+    if not isinstance(entries, dict):
+        raise ValueError(f"d-star cache entries missing or invalid: {path}")
+    values: Dict[str, float] = {}
+    for column, entry in entries.items():
+        if not isinstance(entry, dict) or entry.get("d_star") is None:
+            continue
+        value = float(entry["d_star"])
+        if np.isfinite(value):
+            values[str(column)] = value
+    return values
+
+
 def _sha256_prefix(payload: Any, length: int = 32) -> str:
     digest = hashlib.sha256(stable_json(payload).encode("utf-8")).hexdigest()
     return digest[:length]
@@ -605,3 +621,15 @@ class DStarCache:
 
     def stats(self) -> Tuple[int, int]:
         return self._hits, self._misses
+
+    def export_d_star_values(self) -> Dict[str, float]:
+        """匯出目前 instance 內有效的 d-star 值，不暴露 cache entry 結構。"""
+        values: Dict[str, float] = {}
+        for column, entry in self._entries.items():
+            raw_value = entry.get("d_star")
+            if raw_value is None:
+                continue
+            value = float(raw_value)
+            if np.isfinite(value):
+                values[str(column)] = value
+        return values

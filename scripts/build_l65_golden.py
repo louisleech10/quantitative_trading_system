@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -20,6 +21,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor  # noqa: E402
+from momentum.FeatureEngineering.preprocessing._d_star_cache import (  # noqa: E402
+    PreprocessingContext,
+    compute_data_fingerprint,
+    compute_feature_schema_hash,
+    read_d_star_json,
+)
 from momentum.core.logging import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
@@ -234,11 +241,38 @@ def _l65_full_preprocessing_config() -> Dict[str, Any]:
 
 
 def _run_l65_full_preprocessing(frame: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, float]]:
-    preprocessor = FeaturePreprocessor(_l65_full_preprocessing_config())
-    preprocessor._d_star_cache = {}
-    processed = preprocessor.transform(frame)
-    d_star_cache = preprocessor._d_star_cache or {}
-    return processed, {str(column): float(value) for column, value in sorted(d_star_cache.items())}
+    with tempfile.TemporaryDirectory(prefix="l65_dstar_") as temp_dir:
+        original_cache_dir = FeaturePreprocessor.__dict__["_d_star_cache_dir"]
+        FeaturePreprocessor._d_star_cache_dir = staticmethod(lambda: Path(temp_dir))
+        try:
+            data_fingerprint, weak_fingerprint = compute_data_fingerprint(frame)
+            context = PreprocessingContext(
+                symbol="SYNTHETIC",
+                timeframe="1h",
+                config_hash="tier2a",
+                data_fingerprint=data_fingerprint,
+                feature_schema_hash=compute_feature_schema_hash(frame.columns),
+                time_range=(int(frame.index[0].value), int(frame.index[-1].value)),
+                row_count=len(frame),
+                source_data_version="tier2a-v1",
+                data_fingerprint_status=(
+                    "weak_fingerprint" if weak_fingerprint else "strong"
+                ),
+            )
+            preprocessor = FeaturePreprocessor(
+                _l65_full_preprocessing_config(),
+                context=context,
+            )
+            processed = preprocessor.transform(frame)
+        finally:
+            FeaturePreprocessor._d_star_cache_dir = original_cache_dir
+
+        cache_paths = sorted(Path(temp_dir).glob("d_star_*.json"))
+        if len(cache_paths) != 1:
+            raise GoldenBuildError(
+                f"Expected exactly one synthetic d-star cache, found {len(cache_paths)}"
+            )
+        return processed, read_d_star_json(cache_paths[0])
 
 
 def build_tier2_synthetic(out_dir: Path = TIER2_DIR) -> None:
@@ -251,6 +285,13 @@ def build_tier2_synthetic(out_dir: Path = TIER2_DIR) -> None:
         raise GoldenBuildError(f"Unexpected synthetic baseline shape: {processed.shape}")
     if not d_star:
         raise GoldenBuildError("Synthetic d_star output is empty")
+    invalid_layers = {
+        column: _extract_layer(column)
+        for column in d_star
+        if _extract_layer(column) not in {"L1", "L2"}
+    }
+    if invalid_layers:
+        raise GoldenBuildError(f"Synthetic d_star contains non-L1/L2 keys: {invalid_layers}")
 
     _atomic_write_parquet(out_dir / "synthetic_baseline.parquet", processed)
     _atomic_write_json(out_dir / "d_star_synthetic.json", d_star)
