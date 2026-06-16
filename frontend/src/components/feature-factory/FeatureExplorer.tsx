@@ -12,6 +12,9 @@ import FeatureTimeSeriesChart from '@/components/feature-factory/FeatureTimeSeri
 import FeatureCorrelationHeatmap from '@/components/feature-factory/FeatureCorrelationHeatmap';
 import FeatureDistributionChart from '@/components/feature-factory/FeatureDistributionChart';
 import DataQualityDashboard from '@/components/feature-factory/DataQualityDashboard';
+import CollapsibleSection from '@/components/feature-factory/CollapsibleSection';
+
+const FEATURE_EXPLORER_EXPANDED_KEY = 'ff-feature-explorer-expanded';
 
 interface FeatureExplorerProps {
   taskId?: string | null;
@@ -330,28 +333,26 @@ export default function FeatureExplorer({
     setSelectedRun(run);
   };
 
-  return (
-    <div className="glass-panel rounded-2xl border border-white/10">
-      <div className="flex items-stretch gap-4 px-5 py-4">
-        <div className="flex flex-col justify-between gap-3 flex-shrink-0 min-w-0 flex-1">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-violet-400/15 flex items-center justify-center flex-shrink-0">
-              <Table2 className="w-5 h-5 text-violet-200" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-base font-semibold text-slate-100">Feature Explorer</div>
-              {taskId ? (
-                <div className="text-sm text-slate-400 mt-0.5 truncate">
-                  {selectedRun ? formatRunLabel(selectedRun) : `Task: ${taskId}`}
-                </div>
-              ) : (
-                <div className="text-sm text-slate-500 mt-0.5">
-                  從 registry 選擇 run，或使用進階 Task ID 瀏覽歷史結果
-                </div>
-              )}
-            </div>
-          </div>
+  const explorerSubtitle = taskId
+    ? (selectedRun ? formatRunLabel(selectedRun) : `Task: ${taskId}`)
+    : '從 registry 選擇 run，或使用進階 Task ID 瀏覽歷史結果';
 
+  return (
+    <CollapsibleSection
+      storageKey={FEATURE_EXPLORER_EXPANDED_KEY}
+      title="Feature Explorer"
+      description={explorerSubtitle}
+      leading={(
+        <div className="h-10 w-10 rounded-xl bg-violet-400/15 flex items-center justify-center flex-shrink-0">
+          <Table2 className="w-5 h-5 text-violet-200" />
+        </div>
+      )}
+      expandedClassName="glass-panel rounded-2xl border border-white/10"
+      collapsedClassName="glass-panel rounded-xl border border-white/10 px-4 py-3"
+      headerClassName="px-5 py-4"
+    >
+      <div className="flex items-stretch gap-4 px-5 py-4 border-t border-white/5">
+        <div className="flex flex-col justify-between gap-3 flex-shrink-0 min-w-0 flex-1">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <input
@@ -642,6 +643,6 @@ export default function FeatureExplorer({
           </>
         )}
       </div>
-    </div>
+    </CollapsibleSection>
   );
 }

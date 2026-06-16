@@ -49,6 +49,8 @@ const task: FeatureTask = {
 
 describe('run lifecycle', () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem('ff-run-manager-expanded', 'true');
     MockWebSocket.instances = [];
     useFeatureFactoryStore.setState({
       runs: [], runsLoading: false, runsError: null, completionQueue: [],
@@ -89,6 +91,65 @@ describe('run lifecycle', () => {
     fireEvent.click(screen.getByText('命名並保留'));
     expect(await screen.findByRole('alert')).toHaveTextContent('名稱已被使用');
     expect(useFeatureFactoryStore.getState().completionQueue).toHaveLength(1);
+  });
+
+  it('lists runs newest-first by last_generated_at then created_at', async () => {
+    const runsFixture = [
+      {
+        ...run,
+        config_hash: 'hash_old',
+        alias: 'run-old',
+        created_at: '2026-01-01T00:00:00Z',
+        last_generated_at: null,
+        active: false,
+        size_bytes: 1,
+      },
+      {
+        ...run,
+        config_hash: 'hash_new',
+        alias: 'run-new',
+        created_at: '2026-05-01T00:00:00Z',
+        last_generated_at: '2026-06-15T00:00:00Z',
+        active: false,
+        size_bytes: 2,
+      },
+      {
+        ...run,
+        config_hash: 'hash_mid',
+        alias: 'run-mid',
+        created_at: '2026-03-01T00:00:00Z',
+        last_generated_at: '2026-04-01T00:00:00Z',
+        active: false,
+        size_bytes: 3,
+      },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => runsFixture }),
+    );
+    useFeatureFactoryStore.setState({
+      runsLoading: false,
+      runsError: null,
+      runs: runsFixture,
+    });
+    render(<RunManagerPanel />);
+    await waitFor(() => expect(screen.getByText('run-new')).toBeInTheDocument());
+    const dataRows = screen.getAllByRole('row').slice(1);
+    expect(dataRows[0]).toHaveTextContent('run-new');
+    expect(dataRows[1]).toHaveTextContent('run-mid');
+    expect(dataRows[2]).toHaveTextContent('run-old');
+  });
+
+  it('toggles collapsed state and persists preference', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+    useFeatureFactoryStore.setState({ runsLoading: false, runsError: null, runs: [] });
+    render(<RunManagerPanel />);
+    await waitFor(() => expect(screen.getByText('尚無 Runs')).toBeInTheDocument());
+    const toggle = screen.getByRole('button', { expanded: true });
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('尚無 Runs')).not.toBeInTheDocument();
+    expect(window.localStorage.getItem('ff-run-manager-expanded')).toBe('false');
   });
 
   it('renders loading, empty, error retry, and busy delete state', async () => {

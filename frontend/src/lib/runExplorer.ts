@@ -109,10 +109,15 @@ export function pickDefaultRun(
     }
   }
 
-  const sorted = [...browseReady].sort((a, b) => {
+  const sorted = sortRunsByRecency(browseReady);
+  return sorted[0] ?? browseReady[0] ?? null;
+}
+
+/** Run 列表依建立/最近生成時間降序（最新在上） */
+export function sortRunsByRecency(runs: RunInfo[]): RunInfo[] {
+  return [...runs].sort((a, b) => {
     const aTime = Date.parse(a.last_generated_at ?? a.created_at ?? '') || 0;
     const bTime = Date.parse(b.last_generated_at ?? b.created_at ?? '') || 0;
     return bTime - aTime;
   });
-  return sorted[0] ?? browseReady[0] ?? null;
 }

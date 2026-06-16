@@ -10,8 +10,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { ChevronUp, ChevronDown, RefreshCw, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react';
 import type { NanRatioQuantiles } from '@/lib/types';
+import CollapsibleSection from '@/components/feature-factory/CollapsibleSection';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const BATCH_QUALITY_EXPANDED_KEY = 'ff-batch-quality-expanded';
 
 /* ---------- Types ---------- */
 
@@ -339,24 +341,28 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
   );
 
   return (
-    <div className="glass-panel rounded-xl p-5 border border-white/10 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-100">批次品質彙整</h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            真問題數 + NaN 五數摘要 — 問題標的優先顯示
-          </p>
-        </div>
+    <CollapsibleSection
+      storageKey={BATCH_QUALITY_EXPANDED_KEY}
+      title="批次品質彙整"
+      description="真問題數 + NaN 五數摘要 — 問題標的優先顯示"
+      titleHeadingLevel="h3"
+      expandedClassName="glass-panel rounded-xl p-5 border border-white/10 space-y-4"
+      collapsedClassName="glass-panel rounded-xl border border-white/10 px-4 py-3"
+      contentClassName="space-y-4"
+      headerTrailing={(
         <button
-          onClick={fetchQuality}
+          type="button"
+          onClick={() => {
+            void fetchQuality();
+          }}
           disabled={isLoading}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/5 transition disabled:opacity-40"
           title="重新計算"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
-      </div>
-
+      )}
+    >
       {isLoading && (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
@@ -475,6 +481,6 @@ export default function BatchQualityOverview({ batchTaskId, onBatchExpired }: Ba
           </div>
         </>
       )}
-    </div>
+    </CollapsibleSection>
   );
 }

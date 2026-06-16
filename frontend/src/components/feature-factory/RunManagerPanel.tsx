@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 import type { RunInfo } from '@/lib/types';
+import { sortRunsByRecency } from '@/lib/runExplorer';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import CollapsibleSection from '@/components/feature-factory/CollapsibleSection';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+
+const RUN_MANAGER_EXPANDED_KEY = 'ff-run-manager-expanded';
 
 const thCls =
   'px-3 py-2.5 text-left text-xs text-slate-400 font-medium whitespace-nowrap';
@@ -77,20 +81,6 @@ function formatCreatedAt(createdAt: string | null | undefined): {
   return { label: formatRelativeTime(createdAt), title: absolute };
 }
 
-const RUN_MANAGER_EXPANDED_KEY = 'ff-run-manager-expanded';
-
-function readExpandedPreference(): boolean {
-  if (typeof window === 'undefined') return true;
-  try {
-    const stored = localStorage.getItem(RUN_MANAGER_EXPANDED_KEY);
-    if (stored === 'false') return false;
-    if (stored === 'true') return true;
-  } catch {
-    // ignore storage errors
-  }
-  return true;
-}
-
 function displayName(run: RunInfo): { visible: string; fullHash: string; truncated: boolean } {
   const alias = run.alias?.trim();
   if (alias) return { visible: alias, fullHash: run.config_hash, truncated: false };
@@ -104,27 +94,11 @@ function displayName(run: RunInfo): { visible: string; fullHash: string; truncat
 
 export default function RunManagerPanel() {
   const { runs, runsLoading, runsError, fetchRuns, updateRunAlias, deleteRun } = useFeatureFactoryStore();
-  // 初值固定 true 保持 SSR/CSR 一致(避免 Next hydration mismatch);持久化偏好於 mount 後載入。
-  const [expanded, setExpanded] = useState(true);
-  useEffect(() => {
-    setExpanded(readExpandedPreference());
-  }, []);
+  const sortedRuns = useMemo(() => sortRunsByRecency(runs), [runs]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [savingRename, setSavingRename] = useState(false);
-
-  const toggleExpanded = () => {
-    setExpanded((current) => {
-      const next = !current;
-      try {
-        localStorage.setItem(RUN_MANAGER_EXPANDED_KEY, String(next));
-      } catch {
-        // ignore storage errors
-      }
-      return next;
-    });
-  };
 
   useEffect(() => {
     void fetchRuns();
@@ -174,37 +148,16 @@ export default function RunManagerPanel() {
   const runCountLabel = runsLoading ? '載入中…' : `${runs.length} 個 Run`;
 
   return (
-    <section
-      className={
-        expanded
-          ? 'glass-panel rounded-2xl p-5 border border-white/10 space-y-4'
-          : 'glass-panel rounded-xl border border-white/10 px-4 py-3'
-      }
+    <CollapsibleSection
+      storageKey={RUN_MANAGER_EXPANDED_KEY}
+      title="Run 管理"
+      description={`命名、檢視與刪除已產生的 Feature Run · ${runCountLabel}`}
     >
-      <button
-        type="button"
-        onClick={toggleExpanded}
-        className="flex w-full items-center justify-between gap-3 text-left"
-        aria-expanded={expanded}
-      >
-        <div>
-          <h2 className="text-sm font-semibold text-slate-100">Run 管理</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            命名、檢視與刪除已產生的 Feature Run · {runCountLabel}
-          </p>
-        </div>
-        {expanded ? (
-          <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-        ) : (
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-        )}
-      </button>
-
-      {expanded && runsLoading && (
+      {runsLoading && (
         <p className="text-sm text-slate-400">載入 Runs…</p>
       )}
 
-      {expanded && !runsLoading && runsError && (
+      {!runsLoading && runsError && (
         <div className="space-y-3">
           <p role="alert" className="text-sm text-rose-300">
             {runsError}
@@ -219,15 +172,15 @@ export default function RunManagerPanel() {
         </div>
       )}
 
-      {expanded && !runsLoading && !runsError && actionError && (
+      {!runsLoading && !runsError && actionError && (
         <p role="alert" className="text-xs text-rose-300 border border-rose-400/30 bg-rose-400/10 rounded-lg px-3 py-2">
           {actionError}
         </p>
       )}
 
-      {expanded && !runsLoading && !runsError && runs.length === 0 ? (
+      {!runsLoading && !runsError && runs.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-8">尚無 Runs</p>
-      ) : expanded && !runsLoading && !runsError && runs.length > 0 ? (
+      ) : !runsLoading && !runsError && runs.length > 0 ? (
         <div className="overflow-auto rounded-xl border border-white/10 bg-white/[0.03]">
           <table className="w-full min-w-[760px]">
             <thead className="sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm border-b border-white/10">
@@ -241,10 +194,10 @@ export default function RunManagerPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {runs.map((run) => {
+              {sortedRuns.map((run) => {
                 const key = runKey(run);
                 const name = displayName(run);
-                const created = formatCreatedAt(run.created_at);
+                const created = formatCreatedAt(run.last_generated_at ?? run.created_at);
                 return (
                   <tr key={key} className="hover:bg-white/5 transition-colors">
                     <td className={`${tdCls} text-slate-200 font-medium max-w-[180px]`}>
@@ -350,6 +303,6 @@ export default function RunManagerPanel() {
           )}
         </DialogContent>
       </Dialog>
-    </section>
+    </CollapsibleSection>
   );
 }

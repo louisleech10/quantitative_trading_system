@@ -21,9 +21,11 @@ import BatchQualityOverview, {
 } from '@/components/feature-factory/BatchQualityOverview';
 import HardwareStatusPanel from '@/components/feature-factory/HardwareStatusPanel';
 import SymbolCoverageMatrix from '@/components/feature-factory/SymbolCoverageMatrix';
+import CollapsibleSection from '@/components/feature-factory/CollapsibleSection';
 
 const DEFAULT_SYMBOL = 'BTCUSDT';
 const DEFAULT_TIMEFRAME = '12h';
+const SYMBOL_COVERAGE_EXPANDED_KEY = 'ff-symbol-coverage-expanded';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -506,14 +508,15 @@ export default function FeatureFactoryPage() {
           )}
 
         <RunRetentionDialog />
-        <RunManagerPanel />
-        <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
-          <div>
-            <div className="text-sm font-medium text-slate-300">跨 Symbol Coverage Matrix</div>
-            <p className="text-xs text-slate-500 mt-1">
-              比對多個 Symbol 在同一 timeframe 下各 feature 的覆蓋率（= 非 NaN 比率 = 1 − NaN 比率，越高越好），找出跨標的不穩定的特徵。需先在 Feature Factory 生成至少 2 個 Symbol 的特徵。
-            </p>
-          </div>
+        <CollapsibleSection
+          storageKey={SYMBOL_COVERAGE_EXPANDED_KEY}
+          title="跨 Symbol Coverage Matrix"
+          description="比對多個 Symbol 在同一 timeframe 下各 feature 的覆蓋率（= 非 NaN 比率 = 1 − NaN 比率，越高越好），找出跨標的不穩定的特徵。需先在 Feature Factory 生成至少 2 個 Symbol 的特徵。"
+          titleHeadingLevel="h3"
+          expandedClassName="glass-panel rounded-xl p-4 border border-white/10 space-y-3"
+          collapsedClassName="glass-panel rounded-xl border border-white/10 px-4 py-3"
+          contentClassName="space-y-3"
+        >
           {distinctSymbolCount >= 2 ? (
             <SymbolCoverageMatrix entries={coverageEntries} />
           ) : (
@@ -521,7 +524,8 @@ export default function FeatureFactoryPage() {
               需至少 2 個 Symbol 的特徵資料，請先生成更多 Symbol 的特徵。
             </div>
           )}
-        </div>
+        </CollapsibleSection>
+        <RunManagerPanel />
 
       </div>
     </div>
