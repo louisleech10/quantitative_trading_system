@@ -9,7 +9,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import psutil
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -126,9 +126,15 @@ except Exception:
 class FeaturePreprocessor:
     """Layer 6.5: 特徵前處理與正規化。"""
 
-    def __init__(self, config: Dict, context: Optional[PreprocessingContext] = None) -> None:
+    def __init__(
+        self,
+        config: Dict,
+        context: Optional[PreprocessingContext] = None,
+        column_layer_map: Optional[Mapping[str, str]] = None,
+    ) -> None:
         self._config = config or {}
         self._preprocessing_context = context or PreprocessingContext()
+        self._column_layer_map = dict(column_layer_map) if column_layer_map is not None else None
         self.rank_config = self._config.get("rank_transform", {})
         self.gaussian_config = self._config.get("gaussian_normalize", {})
         self.adf_config = self._config.get("adf_differencing", {})
@@ -236,6 +242,7 @@ class FeaturePreprocessor:
         post_ic_preprocessor = FeaturePreprocessor(
             post_ic_config,
             context=self._preprocessing_context,
+            column_layer_map=self._column_layer_map,
         )
 
         processed_groups: Dict[str, pd.DataFrame] = {}
@@ -2901,6 +2908,24 @@ class FeaturePreprocessor:
                 len(columns),
             )
             return []
+
+        if self._column_layer_map is not None:
+            target_columns = [
+                column
+                for column in columns
+                if column in self._column_layer_map
+                and self._column_layer_map[column] in self._fracdiff_apply_to_layers
+            ]
+            unknown_columns = [column for column in columns if column not in self._column_layer_map]
+            if unknown_columns:
+                logger.warning(
+                    "[L6.5] FracDiff layer map missing %d/%d columns; "
+                    "treating unknown columns as non-target. examples=%s",
+                    len(unknown_columns),
+                    len(columns),
+                    [str(column) for column in unknown_columns[:5]],
+                )
+            return self._apply_adf_safe_skip(target_columns, context="fracdiff/layer_map")
 
         target_columns: List[str] = []
         parse_failed = 0

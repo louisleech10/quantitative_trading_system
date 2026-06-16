@@ -67,6 +67,20 @@ from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 
 
 logger = get_logger(__name__)
+
+_LAYER_LABELS = ("L1", "L2", "L3", "L4", "L5", "L6")
+
+
+def _build_column_layer_map(layers: List[pd.DataFrame]) -> Dict[str, str]:
+    """建立合併前欄位的來源層對照，重複欄位保留最先出現的層。"""
+    column_layer_map: Dict[str, str] = {}
+    for layer_label, layer in zip(_LAYER_LABELS, layers):
+        if layer is None or layer.empty:
+            continue
+        for column in layer.columns:
+            assert isinstance(column, str), f"non-str column: {column!r}"
+            column_layer_map.setdefault(column, layer_label)
+    return column_layer_map
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 _MAX_NAN_RATIO_ARTIFACT_PATH = Path(__file__).parent / "_resources/max_nan_ratio.json"
 
@@ -207,6 +221,7 @@ class FeatureFactory:
         self.layer_results: Dict[str, LayerExecutionResult] = {}
         self._preprocessing_applied: Optional[bool] = None
         self._effective_preprocessing_config: Optional[Dict[str, Any]] = None
+        self._column_layer_map: Optional[Dict[str, str]] = None
 
     def generate_features(
         self,
@@ -260,6 +275,7 @@ class FeatureFactory:
         self.layer_results = {}
         self._preprocessing_applied = None
         self._effective_preprocessing_config = None
+        self._column_layer_map = None
         start_time = time.time()
 
         config_hash = self._compute_config_hash(
@@ -361,6 +377,7 @@ class FeatureFactory:
 
         _ic_first_on = self._ic_first_enabled(config)
         if config.preprocessing.enabled:
+            self._column_layer_map = _build_column_layer_map(layers)
             all_features = self._combine_layers(layers, context="layer6_5_input")
             if _ic_first_on:
                 # IC-First: only run winsorization + fracdiff/ADF at generation time.
@@ -2485,7 +2502,11 @@ class FeatureFactory:
         # （legacy / ic_first_pre / post_ic 三 mode 都經由此函式 → 一處覆蓋全部）
         all_features = self._apply_cascade_blacklist(all_features, "L65_input", config)
         context = self._build_preprocessing_context(all_features, config)
-        preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
+        preprocessor = FeaturePreprocessor(
+            preprocessing_config,
+            context=context,
+            column_layer_map=self._column_layer_map,
+        )
 
         if self._cgsa_enabled() and self._cgsa_registry is not None:
             from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
