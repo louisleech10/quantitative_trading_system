@@ -65,10 +65,19 @@ export function runsToRegistryEntries(runs: RunInfo[]): FeatureRegistryEntry[] {
     }));
 }
 
+/** 格式化為本地 24 小時制 `YYYY-MM-DD HH:mm`；無法解析則退回前 10 字(日期)。 */
+export function formatRunTimestamp(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function formatRunLabel(run: RunInfo): string {
   const title = run.alias?.trim() || `${run.symbol} / ${run.timeframe} / ${run.config_hash}`;
   const count = run.feature_count != null ? ` · ${run.feature_count.toLocaleString()} 特徵` : '';
-  const when = run.created_at ? ` · ${run.created_at.slice(0, 10)}` : '';
+  const when = run.created_at ? ` · ${formatRunTimestamp(run.created_at)}` : '';
   return `${title}${count}${when}`;
 }
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ChevronDown, Table2 } from 'lucide-react';
 import { ExplorerTab, FeatureValidationSummary, RunInfo } from '@/lib/types';
-import { formatRunLabel, pickDefaultRun } from '@/lib/runExplorer';
+import { formatRunLabel, formatRunTimestamp, pickDefaultRun } from '@/lib/runExplorer';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import { runKey, useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import OverviewDashboard from '@/components/feature-factory/OverviewDashboard';
@@ -582,7 +582,7 @@ export default function FeatureExplorer({
                       </span>
                       <span className="text-slate-500 shrink-0 ml-3">
                         {t.feature_count != null ? `${t.feature_count.toLocaleString()} 特徵` : ''}
-                        {t.created_at ? ` · ${t.created_at.slice(0, 10)}` : ''}
+                        {t.created_at ? ` · ${formatRunTimestamp(t.created_at)}` : ''}
                       </span>
                     </button>
                   ))}
