@@ -23,7 +23,7 @@ batch2 merge-preserve 保留 created_at。但 retention「per (s,tf) 留最近 5
 
 | 測試 | 根因 |
 |---|---|
-| test_l65_golden tier2a「Synthetic d_star output is empty」(GoldenBuildError) | d* 因果化遺留；與 #2「非 CGSA path fracdiff 靜默失效」同源——#2 修復時一併處理 |
+| test_l65_golden tier2a「Synthetic d_star output is empty」(GoldenBuildError) | **同批不同根因**（委員會更正）：golden builder 讀過時 private `_d_star_cache` dict（非 frame no-op）——#2 同 PR 分開修（見 BATCH2D manifest [D2-6]） |
 
 ## B — 既有殭屍/滯後測試（batch-3 backlog 本體，~39，分簇處置）
 
