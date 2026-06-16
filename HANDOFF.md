@@ -16,10 +16,11 @@
 - 本機 8GB 無法實測高 tier(強制即 OOM);依「實測>假設」以程式+8gb log 定論。
 - 「才評估」→獨立 perf ticket(24/32GB 並行 raw-sink/計算寫盤解耦,需高 tier 硬體+SPEC),本批不動。文件 docs/BATCH3_TIER_PARALLELISM_PROFILE.md。
 
-## 待使用者 / 待辦 ticket(本批刻意不做,另開)
-- **float16 精度 ticket**:CGSA raw 將 L1/L2 存 float16(vs frame float32),調查意外撈到,值得評估是否該存 float32(與 #2 無關)。見 BATCH2D manifest 三方裁定節。
+## 待辦 ticket(本批刻意不做,另開)
+- **float16 儲存:委員會三方評估畢=維持 float16,本批不動**(全改 float32→L7 體積 2×/8GB OOM 風險,且不解全部 T4;精度風險消費端特定未證實)。可選後續:strict/training 讀升 float32(小改無體積)+ A/B 驗證。見 docs/FLOAT16_STORAGE_EVALUATION.md。
 - **CGSA raw-sink ADF/d* tier-gated 並行 ticket**(#3 才評估,需 24/32GB 硬體)。
-- 第 1 批殘留 MINOR:真 kline 測試 glob→rglob;SPEC :185 錨點勘誤。
+- 第 1 批殘留 MINOR:真 kline 測試 glob→rglob(低風險防呆,目前 flat 佈局無 bug,待使用者定);SPEC :185 錨點勘誤(歷史過程文件,無實益,不做)。
+- batch2d golden 139MB:使用者決維持現狀。docs 已清理(刪中間版 TODO/MANIFEST,留 SPEC+DECISION)。
 
 ## 執行端分工(2026-06-15 使用者改定,已入 memory)
 - **中、大型實作=Composer 2.5 實作 + Codex review**(先前大=Codex 實作對調);小=Claude 自己做;其餘流程不變。
