@@ -19,6 +19,7 @@ import {
   BatchOutputPath,
   RunInfo,
   RunIdentity,
+  EnsureBrowseResponse,
 } from '@/lib/types';
 
 type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
@@ -77,8 +78,15 @@ interface FeatureFactoryState {
   runs: RunInfo[];
   runsLoading: boolean;
   runsError: string | null;
+  selectedRunKey: string | null;
   completionQueue: RunIdentity[];
   fetchRuns: () => Promise<void>;
+  setSelectedRun: (run: RunInfo | null) => void;
+  ensureBrowseTaskForRun: (
+    symbol: string,
+    timeframe: string,
+    configHash: string,
+  ) => Promise<string | null>;
   updateRunAlias: (
     symbol: string,
     timeframe: string,
@@ -169,6 +177,10 @@ const mergeDeep = (
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const API_PREFIX = '/api/v1/features';
 export const LAST_BATCH_TASK_ID_KEY = 'ff:lastBatchTaskId';
+
+export function runKey(run: RunIdentity): string {
+  return `${run.symbol}|${run.timeframe}|${run.config_hash}`;
+}
 
 export function readLastBatchTaskId(): string | null {
   if (typeof window === 'undefined') return null;
@@ -417,6 +429,7 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
   runs: [],
   runsLoading: false,
   runsError: null,
+  selectedRunKey: null,
   completionQueue: [],
   fetchRuns: async () => {
     set({ runsLoading: true, runsError: null });
@@ -426,6 +439,20 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       set({ runs: await response.json() as RunInfo[], runsLoading: false });
     } catch (error) {
       set({ runsError: error instanceof Error ? error.message : '載入失敗', runsLoading: false });
+    }
+  },
+  setSelectedRun: (run) => set({ selectedRunKey: run ? runKey(run) : null }),
+  ensureBrowseTaskForRun: async (symbol, timeframe, configHash) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/runs/${encodeURIComponent(symbol)}/${encodeURIComponent(timeframe)}/${encodeURIComponent(configHash)}/browse`,
+        { method: 'POST' },
+      );
+      if (!response.ok) return null;
+      const payload = await response.json() as EnsureBrowseResponse;
+      return payload.browse_task_id;
+    } catch {
+      return null;
     }
   },
   updateRunAlias: async (symbol, timeframe, configHash, alias) => {

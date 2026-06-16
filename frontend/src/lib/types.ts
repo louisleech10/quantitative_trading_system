@@ -510,7 +510,21 @@ export interface FeatureTask {
 
 export interface RunIdentity { symbol: string; timeframe: string; config_hash: string; }
 export interface RunInfo extends RunIdentity {
-  alias?: string | null; created_at?: string | null; size_bytes?: number | null; active: boolean;
+  alias?: string | null;
+  created_at?: string | null;
+  last_generated_at?: string | null;
+  size_bytes?: number | null;
+  active: boolean;
+  browse_task_id: string;
+  browse_ready: boolean;
+  browse_path?: string | null;
+  feature_count?: number | null;
+  row_count?: number | null;
+  quality_status?: string | null;
+}
+export interface EnsureBrowseResponse extends RunIdentity {
+  browse_task_id: string;
+  browse_ready: boolean;
 }
 export interface DeleteRunResponse extends RunIdentity {
   features_deleted: boolean; cgsa_deleted: boolean; registry_removed: boolean;

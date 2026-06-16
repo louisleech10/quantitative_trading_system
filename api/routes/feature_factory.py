@@ -26,6 +26,7 @@ from api.models.feature_factory_models import (
     RegisterPathResponse,
     AliasRequest,
     DeleteRunResponse,
+    EnsureBrowseResponse,
     RunInfo,
 )
 from momentum.FeatureEngineering.run_locks import RunBusyError
@@ -44,6 +45,32 @@ logger = get_logger("api.routes.feature_factory")
 @router.get("/runs", response_model=list[RunInfo])
 async def list_runs():
     return feature_factory_service.list_runs()
+
+
+@router.post(
+    "/runs/{symbol}/{timeframe}/{config_hash}/browse",
+    response_model=EnsureBrowseResponse,
+)
+async def ensure_browse_task_for_run(symbol: str, timeframe: str, config_hash: str):
+    """Registry run 選取時 lazy 確保 browse 虛擬任務存在。"""
+    try:
+        browse_task_id = feature_factory_service.ensure_browse_task_for_run(
+            symbol, timeframe, config_hash
+        )
+        return EnsureBrowseResponse(
+            browse_task_id=browse_task_id,
+            browse_ready=True,
+            symbol=symbol,
+            timeframe=timeframe,
+            config_hash=config_hash,
+        )
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "run_not_found"})
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail={"code": "browse_not_ready", "message": str(exc)})
+    except Exception as exc:
+        logger.error("Failed to ensure browse task: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.patch("/runs/{symbol}/{timeframe}/{config_hash}/alias")

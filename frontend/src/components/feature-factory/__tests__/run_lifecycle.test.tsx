@@ -7,7 +7,14 @@ import GenerationProgress from '../GenerationProgress';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import type { FeatureTask } from '@/lib/types';
 
-const run = { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'cfg_batch2d' };
+const run = {
+  symbol: 'BTCUSDT',
+  timeframe: '12h',
+  config_hash: 'cfg_batch2d',
+  active: false,
+  browse_task_id: 'browse_BTCUSDT_12h_cfg_batch2d',
+  browse_ready: true,
+};
 const completionPayload = {
   status: 'completed',
   stage: 'completed',

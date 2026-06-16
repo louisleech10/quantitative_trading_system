@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Table2 } from 'lucide-react';
-import { ExplorerTab, FeatureValidationSummary } from '@/lib/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, ChevronDown, Table2 } from 'lucide-react';
+import { ExplorerTab, FeatureValidationSummary, RunInfo } from '@/lib/types';
+import { formatRunLabel, pickDefaultRun } from '@/lib/runExplorer';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
-import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import { runKey, useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import OverviewDashboard from '@/components/feature-factory/OverviewDashboard';
 import FeatureTable from '@/components/feature-factory/FeatureTable';
 import FeatureTimeSeriesChart from '@/components/feature-factory/FeatureTimeSeriesChart';
@@ -29,47 +30,169 @@ const TABS: Array<{ key: ExplorerTab; label: string }> = [
   { key: 'nan', label: '資料品質' },
 ];
 
-export default function FeatureExplorer({ taskId: propTaskId, taskStatus, validationSummary }: FeatureExplorerProps) {
+export default function FeatureExplorer({
+  taskId: propTaskId,
+  taskStatus,
+  validationSummary,
+}: FeatureExplorerProps) {
   const { browseSummary, browseFeatures, listAvailableTasks } = useFeatureFactory();
-  // Use individual selectors to return stable primitives/references.
-  // A combined object selector `(state) => ({ ... })` creates a new object every render,
-  // which triggers React 18 concurrent-mode's "getSnapshot should be cached" infinite loop.
   const explorerTaskId = useFeatureFactoryStore((state) => state.explorerTaskId);
   const explorerActiveTab = useFeatureFactoryStore((state) => state.explorerActiveTab);
   const explorerSummary = useFeatureFactoryStore((state) => state.explorerSummary);
   const explorerSummaryByTask = useFeatureFactoryStore((state) => state.explorerSummaryByTask);
   const explorerFeatureNamesByTask = useFeatureFactoryStore((state) => state.explorerFeatureNamesByTask);
   const explorerRecentTasks = useFeatureFactoryStore((state) => state.explorerRecentTasks);
+  const runs = useFeatureFactoryStore((state) => state.runs);
+  const runsLoading = useFeatureFactoryStore((state) => state.runsLoading);
+  const selectedRunKey = useFeatureFactoryStore((state) => state.selectedRunKey);
+  const currentTask = useFeatureFactoryStore((state) => state.currentTask);
+  const batchTask = useFeatureFactoryStore((state) => state.batchTask);
+  const fetchRuns = useFeatureFactoryStore((state) => state.fetchRuns);
+  const setSelectedRun = useFeatureFactoryStore((state) => state.setSelectedRun);
+  const ensureBrowseTaskForRun = useFeatureFactoryStore((state) => state.ensureBrowseTaskForRun);
   const setExplorerTaskId = useFeatureFactoryStore((state) => state.setExplorerTaskId);
   const setExplorerActiveTab = useFeatureFactoryStore((state) => state.setExplorerActiveTab);
   const setExplorerSelectedFeatures = useFeatureFactoryStore((state) => state.setExplorerSelectedFeatures);
   const setExplorerSummaryForTask = useFeatureFactoryStore((state) => state.setExplorerSummaryForTask);
   const setExplorerFeatureNamesForTask = useFeatureFactoryStore((state) => state.setExplorerFeatureNamesForTask);
   const pushExplorerRecentTask = useFeatureFactoryStore((state) => state.pushExplorerRecentTask);
-  const removeExplorerRecentTask = useFeatureFactoryStore((state) => state.removeExplorerRecentTask);
   const validationSummaryByTask = useFeatureFactoryStore((state) => state.validationSummaryByTask);
   const setValidationSummaryForTask = useFeatureFactoryStore((state) => state.setValidationSummaryForTask);
 
-  // 允許使用者在沒有進行中任務時手動輸入 task ID 瀏覽歷史結果
   const [manualTaskId, setManualTaskId] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const taskId: string = manualTaskId || propTaskId || '';
+  const [showAdvancedTaskInput, setShowAdvancedTaskInput] = useState(false);
+  const [symbolFilter, setSymbolFilter] = useState('');
+  const [timeframeFilter, setTimeframeFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [ensuringBrowse, setEnsuringBrowse] = useState(false);
+  const [resolvedBrowseTaskId, setResolvedBrowseTaskId] = useState<string | null>(null);
+  const ensureAttemptedRef = useRef<string | null>(null);
+  const selectionSourceRef = useRef<'auto' | 'manual'>('auto');
 
-  // prop 優先（當前 session 剛完成的任務），fallback 到 per-task localStorage 快取（refresh 後瀏覽歷史任務）
-  const effectiveValidationSummary = validationSummary ?? (taskId ? validationSummaryByTask[taskId] : undefined);
+  const selectedRun = useMemo(
+    () => runs.find((run) => runKey(run) === selectedRunKey) ?? null,
+    [runs, selectedRunKey],
+  );
+
+  const symbolOptions = useMemo(
+    () => Array.from(new Set(runs.map((run) => run.symbol))).sort(),
+    [runs],
+  );
+  const timeframeOptions = useMemo(
+    () => Array.from(new Set(runs.map((run) => run.timeframe))).sort(),
+    [runs],
+  );
+
+  const filteredRuns = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return runs.filter((run) => {
+      if (symbolFilter && run.symbol !== symbolFilter) return false;
+      if (timeframeFilter && run.timeframe !== timeframeFilter) return false;
+      if (!query) return true;
+      const haystack = [
+        run.alias,
+        run.symbol,
+        run.timeframe,
+        run.config_hash,
+        run.browse_task_id,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [runs, searchQuery, symbolFilter, timeframeFilter]);
+
+  const taskId: string = manualTaskId || resolvedBrowseTaskId || propTaskId || '';
+  const effectiveValidationSummary =
+    validationSummary ?? (taskId ? validationSummaryByTask[taskId] : undefined);
 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
-
-  // Available tasks for recovery when the current task_id is no longer in API memory
-  const [availableTasks, setAvailableTasks] = useState<Array<{ task_id: string; symbol: string; timeframe: string; feature_count: number | null; created_at: string }>>([]);
+  const [availableTasks, setAvailableTasks] = useState<
+    Array<{ task_id: string; symbol: string; timeframe: string; feature_count: number | null; created_at: string }>
+  >([]);
   const [isLoadingAvailable, setIsLoadingAvailable] = useState(false);
   const cachedSummary = taskId ? explorerSummaryByTask[taskId] : undefined;
   const hasCachedSummary = Boolean(cachedSummary);
   const cachedFeatureNames = taskId ? explorerFeatureNamesByTask[taskId] : undefined;
   const hasCachedFeatureNames = Array.isArray(cachedFeatureNames);
-  // Only auto-load when task is fully ready.
   const isTaskReady = !taskStatus || taskStatus === 'completed';
+
+  useEffect(() => {
+    void fetchRuns();
+  }, [fetchRuns]);
+
+  useEffect(() => {
+    if (manualTaskId || runs.length === 0) return;
+    if (selectionSourceRef.current === 'manual') return;
+
+    const defaultRun = pickDefaultRun(runs, currentTask, batchTask);
+    if (!defaultRun) return;
+
+    const defaultKey = runKey(defaultRun);
+    if (selectedRunKey !== defaultKey) {
+      setSelectedRun(defaultRun);
+      selectionSourceRef.current = 'auto';
+    }
+  }, [manualTaskId, selectedRunKey, runs, currentTask, batchTask, setSelectedRun]);
+
+  useEffect(() => {
+    if (manualTaskId) {
+      setResolvedBrowseTaskId(null);
+      return;
+    }
+    if (!selectedRun) {
+      setResolvedBrowseTaskId(null);
+      return;
+    }
+    setResolvedBrowseTaskId(selectedRun.browse_ready ? selectedRun.browse_task_id : null);
+    ensureAttemptedRef.current = null;
+  }, [manualTaskId, selectedRun]);
+
+  const loadSummary = useCallback(
+    async (activeTaskId: string, runForEnsure: RunInfo | null) => {
+      setSummaryLoading(true);
+      setSummaryError(null);
+      try {
+        const payload = await browseSummary(activeTaskId);
+        setExplorerSummaryForTask(activeTaskId, payload);
+        pushExplorerRecentTask(activeTaskId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : '載入 summary 失敗';
+        const shouldEnsure =
+          runForEnsure?.browse_ready &&
+          message.includes('Result not found') &&
+          ensureAttemptedRef.current !== runKey(runForEnsure);
+        if (shouldEnsure) {
+          ensureAttemptedRef.current = runKey(runForEnsure);
+          setEnsuringBrowse(true);
+          const ensuredId = await ensureBrowseTaskForRun(
+            runForEnsure.symbol,
+            runForEnsure.timeframe,
+            runForEnsure.config_hash,
+          );
+          setEnsuringBrowse(false);
+          if (ensuredId) {
+            setResolvedBrowseTaskId(ensuredId);
+            const payload = await browseSummary(ensuredId);
+            setExplorerSummaryForTask(ensuredId, payload);
+            pushExplorerRecentTask(ensuredId);
+            return;
+          }
+        }
+        setSummaryError(message);
+      } finally {
+        setSummaryLoading(false);
+      }
+    },
+    [
+      browseSummary,
+      ensureBrowseTaskForRun,
+      pushExplorerRecentTask,
+      setExplorerSummaryForTask,
+    ],
+  );
 
   useEffect(() => {
     if (!taskId) return;
@@ -81,47 +204,21 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
   }, [explorerTaskId, taskId, setExplorerTaskId, setExplorerSelectedFeatures, setExplorerActiveTab]);
 
   useEffect(() => {
-    let active = true;
     if (!taskId || !isTaskReady) {
       setSummaryLoading(false);
       if (!taskId) setSummaryError(null);
       return;
     }
-
     if (hasCachedSummary) {
       setSummaryLoading(false);
       setSummaryError(null);
       return;
     }
+    void loadSummary(taskId, manualTaskId ? null : selectedRun);
+  }, [taskId, isTaskReady, hasCachedSummary, loadSummary, manualTaskId, selectedRun]);
 
-    setSummaryLoading(true);
-    setSummaryError(null);
-
-    browseSummary(taskId)
-      .then((payload) => {
-        if (!active) return;
-        setExplorerSummaryForTask(taskId, payload);
-        pushExplorerRecentTask(taskId);
-      })
-      .catch((err) => {
-        if (!active) return;
-        setSummaryError(err instanceof Error ? err.message : '載入 summary 失敗');
-      })
-      .finally(() => {
-        if (!active) return;
-        setSummaryLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [browseSummary, taskId, hasCachedSummary, isTaskReady, setExplorerSummaryForTask, pushExplorerRecentTask]);
-
-  // 當 taskId 切換到歷史任務（或 refresh 後），且該任務的 validation_summary 尚未快取時，
-  // 主動呼叫 /result/{taskId} 取得 L7 品質摘要並寫入 per-task localStorage 快取。
   useEffect(() => {
     if (!taskId || !isTaskReady) return;
-    // prop 已有（當前 session 剛完成的任務）或快取命中 → 不需再 fetch
     if (validationSummary != null || validationSummaryByTask[taskId] != null) return;
 
     let active = true;
@@ -143,13 +240,13 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
           });
         }
       })
-      .catch(() => { /* silent — L7 卡片只是不顯示，不應影響主流程 */ });
+      .catch(() => {});
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [taskId, isTaskReady, validationSummary, validationSummaryByTask, setValidationSummaryForTask]);
 
-  // When task_id is not found in API memory (happens after restart), fetch the
-  // list of available browse tasks so the user can pick one to recover.
   useEffect(() => {
     if (!summaryError || !summaryError.includes('Result not found')) {
       setAvailableTasks([]);
@@ -158,10 +255,18 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
     let active = true;
     setIsLoadingAvailable(true);
     listAvailableTasks()
-      .then((tasks) => { if (active) setAvailableTasks(tasks); })
-      .catch(() => { if (active) setAvailableTasks([]); })
-      .finally(() => { if (active) setIsLoadingAvailable(false); });
-    return () => { active = false; };
+      .then((tasks) => {
+        if (active) setAvailableTasks(tasks);
+      })
+      .catch(() => {
+        if (active) setAvailableTasks([]);
+      })
+      .finally(() => {
+        if (active) setIsLoadingAvailable(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [summaryError, listAvailableTasks]);
 
   useEffect(() => {
@@ -169,8 +274,6 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
     if (!taskId || !isTaskReady || hasCachedFeatureNames) {
       return;
     }
-    // P0-A: Only fetch the 442k feature-name catalog when a tab that actually
-    // needs it is active. Overview/NaN-pattern can render purely from summary.
     const TABS_NEEDING_NAMES: ReadonlyArray<typeof explorerActiveTab> = [
       'table',
       'timeseries',
@@ -195,90 +298,176 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
           .filter((name): name is string => typeof name === 'string' && name.length > 0);
         setExplorerFeatureNamesForTask(taskId, names);
       })
-      .catch(() => {
-        // Summary carries the user-facing failure state. A missing names catalog
-        // should not block Overview/Table rendering.
-      });
+      .catch(() => {});
 
     return () => {
       active = false;
     };
-  }, [browseFeatures, taskId, isTaskReady, hasCachedFeatureNames, setExplorerFeatureNamesForTask, explorerActiveTab]);
+  }, [
+    browseFeatures,
+    taskId,
+    isTaskReady,
+    hasCachedFeatureNames,
+    setExplorerFeatureNamesForTask,
+    explorerActiveTab,
+  ]);
 
-  // When summary loads from cache (no fetch needed), still mark as recent.
   useEffect(() => {
     if (taskId && hasCachedSummary) {
       pushExplorerRecentTask(taskId);
     }
   }, [taskId, hasCachedSummary, pushExplorerRecentTask]);
 
-  const summary = useMemo(() => cachedSummary || (explorerTaskId === taskId ? explorerSummary : null), [cachedSummary, explorerSummary, explorerTaskId, taskId]);
+  const summary = useMemo(
+    () => cachedSummary || (explorerTaskId === taskId ? explorerSummary : null),
+    [cachedSummary, explorerSummary, explorerTaskId, taskId],
+  );
+
+  const handleRunSelect = (run: RunInfo) => {
+    setManualTaskId('');
+    setSummaryError(null);
+    selectionSourceRef.current = 'manual';
+    setSelectedRun(run);
+  };
 
   return (
     <div className="glass-panel rounded-2xl border border-white/10">
-      {/* 頂部區：左欄（標題 + task controls）與右欄（L7 卡片）stretch 同高 */}
       <div className="flex items-stretch gap-4 px-5 py-4">
-        {/* 左欄：Feature Explorer 標題堆疊在 task controls 上方 */}
-        <div className="flex flex-col justify-between gap-3 flex-shrink-0">
+        <div className="flex flex-col justify-between gap-3 flex-shrink-0 min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-violet-400/15 flex items-center justify-center flex-shrink-0">
               <Table2 className="w-5 h-5 text-violet-200" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-base font-semibold text-slate-100">Feature Explorer</div>
-              {taskId
-                ? <div className="text-sm text-slate-400 mt-0.5">Task: {taskId}</div>
-                : <div className="text-sm text-slate-500 mt-0.5">尚無進行中的任務，可貼入 Task ID 瀏覽歷史結果</div>
-              }
+              {taskId ? (
+                <div className="text-sm text-slate-400 mt-0.5 truncate">
+                  {selectedRun ? formatRunLabel(selectedRun) : `Task: ${taskId}`}
+                </div>
+              ) : (
+                <div className="text-sm text-slate-500 mt-0.5">
+                  從 registry 選擇 run，或使用進階 Task ID 瀏覽歷史結果
+                </div>
+              )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={manualTaskId}
-              onChange={(e) => setManualTaskId(e.target.value.trim())}
-              placeholder="貼入 Task ID…"
-              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
-            />
-            {manualTaskId && (
-              <button
-                type="button"
-                onClick={() => { setManualTaskId(''); setSummaryError(null); }}
-                className="text-slate-500 hover:text-slate-300 text-xs"
-                title={propTaskId ? '回到目前任務' : '清除手動 Task'}
-              >✕</button>
-            )}
-            {explorerRecentTasks.length > 0 && (
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜尋 alias / symbol / hash…"
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-52"
+              />
               <select
-                value=""
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v) setManualTaskId(v);
-                }}
-                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
-                title="切換最近瀏覽的 Task"
+                value={symbolFilter}
+                onChange={(e) => setSymbolFilter(e.target.value)}
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40"
               >
-                <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
-                {explorerRecentTasks.map((tid) => (
-                  <option key={tid} value={tid}>
-                    {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
+                <option value="">全部 Symbol</option>
+                {symbolOptions.map((symbol) => (
+                  <option key={symbol} value={symbol}>
+                    {symbol}
                   </option>
                 ))}
               </select>
-            )}
-            {manualTaskId && explorerRecentTasks.includes(manualTaskId) && (
+              <select
+                value={timeframeFilter}
+                onChange={(e) => setTimeframeFilter(e.target.value)}
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40"
+              >
+                <option value="">全部 Timeframe</option>
+                {timeframeOptions.map((tf) => (
+                  <option key={tf} value={tf}>
+                    {tf}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
-                onClick={() => { removeExplorerRecentTask(manualTaskId); setManualTaskId(''); }}
-                className="text-rose-400/70 hover:text-rose-300 text-xs"
-                title="從最近清單移除"
-              >移除</button>
+                onClick={() => setShowAdvancedTaskInput((value) => !value)}
+                className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-xs text-slate-400 hover:text-slate-200"
+              >
+                <ChevronDown className={`w-3 h-3 transition ${showAdvancedTaskInput ? 'rotate-180' : ''}`} />
+                進階 Task ID
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={selectedRunKey ?? ''}
+                onChange={(e) => {
+                  const run = runs.find((item) => runKey(item) === e.target.value);
+                  if (run) handleRunSelect(run);
+                }}
+                disabled={runsLoading || filteredRuns.length === 0}
+                className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 min-w-[280px] max-w-full"
+              >
+                <option value="">
+                  {runsLoading ? '載入 Runs…' : filteredRuns.length === 0 ? '尚無可用 Run' : '選擇 Run…'}
+                </option>
+                {filteredRuns.map((run) => (
+                  <option key={runKey(run)} value={runKey(run)}>
+                    {formatRunLabel(run)}
+                    {run.browse_ready ? '' : ' (未就緒)'}
+                    {run.active ? ' · 使用中' : ''}
+                  </option>
+                ))}
+              </select>
+              {ensuringBrowse && (
+                <span className="text-xs text-slate-400">確保 browse 任務中…</span>
+              )}
+            </div>
+
+            {showAdvancedTaskInput && (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={manualTaskId}
+                  onChange={(e) => {
+                    setManualTaskId(e.target.value.trim());
+                    setSummaryError(null);
+                  }}
+                  placeholder="貼入 Task ID…"
+                  className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 w-64"
+                />
+                {manualTaskId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualTaskId('');
+                      setSummaryError(null);
+                    }}
+                    className="text-slate-500 hover:text-slate-300 text-xs"
+                  >
+                    清除
+                  </button>
+                )}
+                {explorerRecentTasks.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v) setManualTaskId(v);
+                    }}
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-300/40 max-w-[200px]"
+                    title="切換最近瀏覽的 Task"
+                  >
+                    <option value="">最近瀏覽 ({explorerRecentTasks.length})…</option>
+                    {explorerRecentTasks.map((tid) => (
+                      <option key={tid} value={tid}>
+                        {tid.length > 20 ? `${tid.slice(0, 8)}…${tid.slice(-8)}` : tid}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             )}
           </div>
         </div>
 
-        {/* 右欄：L7 品質卡片，自動撐滿左欄高度（items-stretch） */}
         {taskId && isTaskReady && effectiveValidationSummary && (
           (() => {
             const v = effectiveValidationSummary;
@@ -331,7 +520,7 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
                 </div>
                 {v.has_inf && (
                   <div className="text-xs text-rose-200/80 mt-2">
-                    💡 Inf 通常源自比值類指標分母趨近 0 或回歸視窗常數。已套用 epsilon mask
+                    Inf 通常源自比值類指標分母趨近 0 或回歸視窗常數。已套用 epsilon mask
                     + 1e30 cap，並由 L6.5 winsorization 進一步處理。詳細位置見後端 log 的 Top-5 offending groups。
                   </div>
                 )}
@@ -342,113 +531,116 @@ export default function FeatureExplorer({ taskId: propTaskId, taskStatus, valida
       </div>
 
       <div className="px-6 pb-6 space-y-4 border-t border-white/5">
-
-      {/* ——— 生成中：顯示等待狀態 ——— */}
-      {!isTaskReady && (
-        <div className="flex items-center gap-3 text-slate-400 text-sm">
-          <span className="inline-block w-4 h-4 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin shrink-0" />
-          特徵生成中，完成後自動載入…
-        </div>
-      )}
-
-      {/* ——— 無任務且無手動輸入：空白提示 ——— */}
-      {!taskId && (
-        <div className="rounded-xl border border-white/5 bg-white/3 p-6 text-center text-xs text-slate-500">
-          生成特徵後結果將自動顯示，或貼入過去的 Task ID 直接瀏覽
-        </div>
-      )}
-
-      {/* ——— Task ID 不存在（API 重啟後記憶體清空）：提供可用任務清單供切換 ——— */}
-      {summaryError && summaryError.includes('Result not found') && (
-        <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 space-y-3">
-          <div className="flex items-center gap-2 text-amber-300 text-sm font-medium">
-            <span>⚠</span>
-            <span>Task 已失效（API 重啟後記憶體清空）</span>
+        {!isTaskReady && (
+          <div className="flex items-center gap-3 text-slate-400 text-sm">
+            <span className="inline-block w-4 h-4 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin shrink-0" />
+            特徵生成中，完成後自動載入…
           </div>
-          <div className="text-xs text-slate-400">Task ID: <code className="text-slate-300">{taskId}</code></div>
-          {isLoadingAvailable && (
-            <div className="text-xs text-slate-500">搜尋可用任務中…</div>
-          )}
-          {!isLoadingAvailable && availableTasks.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs text-slate-400">偵測到以下可用的歷史特徵任務，請選擇切換：</div>
-              <div className="flex flex-col gap-1.5">
-                {availableTasks.map((t) => (
-                  <button
-                    key={t.task_id}
-                    type="button"
-                    onClick={() => { setManualTaskId(t.task_id); setSummaryError(null); setAvailableTasks([]); }}
-                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-cyan-400/10 hover:border-cyan-400/30 text-left"
-                  >
-                    <span>
-                      {t.symbol && t.timeframe ? (
-                        <span className="text-cyan-300 font-medium">{t.symbol} / {t.timeframe}</span>
-                      ) : null}
-                      {' '}
-                      <span className="text-slate-400 font-mono">{t.task_id.length > 24 ? `${t.task_id.slice(0, 12)}…` : t.task_id}</span>
-                    </span>
-                    <span className="text-slate-500 shrink-0 ml-3">
-                      {t.feature_count != null ? `${t.feature_count.toLocaleString()} 特徵` : ''}
-                      {t.created_at ? ` · ${t.created_at.slice(0, 10)}` : ''}
-                    </span>
-                  </button>
-                ))}
+        )}
+
+        {!taskId && (
+          <div className="rounded-xl border border-white/5 bg-white/3 p-6 text-center text-xs text-slate-500">
+            從上方選擇 registry run，或展開進階 Task ID 瀏覽歷史結果
+          </div>
+        )}
+
+        {summaryError && summaryError.includes('Result not found') && (
+          <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-amber-300 text-sm font-medium">
+              <span>⚠</span>
+              <span>Task 已失效（API 重啟後記憶體清空）</span>
+            </div>
+            <div className="text-xs text-slate-400">
+              Task ID: <code className="text-slate-300">{taskId}</code>
+            </div>
+            {isLoadingAvailable && (
+              <div className="text-xs text-slate-500">搜尋可用任務中…</div>
+            )}
+            {!isLoadingAvailable && availableTasks.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs text-slate-400">偵測到以下可用的歷史特徵任務，請選擇切換：</div>
+                <div className="flex flex-col gap-1.5">
+                  {availableTasks.map((t) => (
+                    <button
+                      key={t.task_id}
+                      type="button"
+                      onClick={() => {
+                        setManualTaskId(t.task_id);
+                        setSummaryError(null);
+                        setAvailableTasks([]);
+                      }}
+                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 hover:bg-cyan-400/10 hover:border-cyan-400/30 text-left"
+                    >
+                      <span>
+                        {t.symbol && t.timeframe ? (
+                          <span className="text-cyan-300 font-medium">{t.symbol} / {t.timeframe}</span>
+                        ) : null}
+                        {' '}
+                        <span className="text-slate-400 font-mono">
+                          {t.task_id.length > 24 ? `${t.task_id.slice(0, 12)}…` : t.task_id}
+                        </span>
+                      </span>
+                      <span className="text-slate-500 shrink-0 ml-3">
+                        {t.feature_count != null ? `${t.feature_count.toLocaleString()} 特徵` : ''}
+                        {t.created_at ? ` · ${t.created_at.slice(0, 10)}` : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          {!isLoadingAvailable && availableTasks.length === 0 && (
-            <div className="text-xs text-slate-500">
-              目前無可用歷史任務。請重新執行特徵生成，或重啟 API 後再試（伺服器啟動時會自動還原磁碟上的特徵）。
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ——— 有 taskId 且任務已完成：顯示 Tabs 與內容 ——— */}
-      {taskId && isTaskReady && (
-        <>
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setExplorerActiveTab(tab.key)}
-            className={`rounded-full px-3 py-1 text-xs border ${
-              explorerActiveTab === tab.key
-                ? 'bg-cyan-400/20 border-cyan-300/40 text-cyan-200'
-                : 'border-white/10 text-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div>
-        {explorerActiveTab === 'overview' && (
-          <OverviewDashboard summary={summary || null} loading={summaryLoading} error={summaryError} taskId={taskId} />
+            )}
+            {!isLoadingAvailable && availableTasks.length === 0 && (
+              <div className="text-xs text-slate-500">
+                目前無可用歷史任務。請重新執行特徵生成，或重啟 API 後再試（伺服器啟動時會自動還原磁碟上的特徵）。
+              </div>
+            )}
+          </div>
         )}
 
-        {explorerActiveTab === 'table' && (
-          <FeatureTable
-            taskId={taskId}
-            totalCount={summary?.total_features}
-            onOpenDistribution={(feature) => {
-              setExplorerActiveTab('distribution', feature);
-            }}
-            onOpenCorrelation={(features) => {
-              setExplorerSelectedFeatures(features);
-              setExplorerActiveTab('correlation');
-            }}
-          />
-        )}
+        {taskId && isTaskReady && (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setExplorerActiveTab(tab.key)}
+                  className={`rounded-full px-3 py-1 text-xs border ${
+                    explorerActiveTab === tab.key
+                      ? 'bg-cyan-400/20 border-cyan-300/40 text-cyan-200'
+                      : 'border-white/10 text-slate-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-        {explorerActiveTab === 'timeseries' && <FeatureTimeSeriesChart taskId={taskId} />}
-        {explorerActiveTab === 'correlation' && <FeatureCorrelationHeatmap taskId={taskId} />}
-        {explorerActiveTab === 'distribution' && <FeatureDistributionChart taskId={taskId} />}
-        {explorerActiveTab === 'nan' && <DataQualityDashboard taskId={taskId} />}
-      </div>
-        </>
-      )}
+            <div>
+              {explorerActiveTab === 'overview' && (
+                <OverviewDashboard summary={summary || null} loading={summaryLoading} error={summaryError} taskId={taskId} />
+              )}
+
+              {explorerActiveTab === 'table' && (
+                <FeatureTable
+                  taskId={taskId}
+                  totalCount={summary?.total_features}
+                  onOpenDistribution={(feature) => {
+                    setExplorerActiveTab('distribution', feature);
+                  }}
+                  onOpenCorrelation={(features) => {
+                    setExplorerSelectedFeatures(features);
+                    setExplorerActiveTab('correlation');
+                  }}
+                />
+              )}
+
+              {explorerActiveTab === 'timeseries' && <FeatureTimeSeriesChart taskId={taskId} />}
+              {explorerActiveTab === 'correlation' && <FeatureCorrelationHeatmap taskId={taskId} />}
+              {explorerActiveTab === 'distribution' && <FeatureDistributionChart taskId={taskId} />}
+              {explorerActiveTab === 'nan' && <DataQualityDashboard taskId={taskId} />}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

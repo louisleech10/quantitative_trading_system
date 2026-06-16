@@ -651,6 +651,91 @@ class FeatureFactoryService:
         root = settings.data_cache_path / "features"
         return create_run_lifecycle_manager(features_root=root, cgsa_root=settings.data_cache_path / "cgsa_work")
 
+    @staticmethod
+    def _browse_task_id(symbol: str, timeframe: str, config_hash: str) -> str:
+        """Registry run 對應的穩定 browse 虛擬任務 id。"""
+        return f"browse_{symbol}_{timeframe}_{config_hash}"
+
+    def _canonical_manifest_path(
+        self,
+        manager: Any,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+    ) -> Path:
+        """標準 V2 manifest 路徑。"""
+        return features_run_dir(manager.features_root, symbol, timeframe, config_hash) / "feature_manifest.json"
+
+    def _resolve_registry_artifact_path(self, entry: Dict[str, Any], manager: Any) -> Optional[Path]:
+        """從 registry hdf5_relative_path 解析可瀏覽 artifact 路徑。"""
+        relative = str(entry.get("hdf5_relative_path") or "").strip()
+        if not relative:
+            return None
+        candidate = Path(relative)
+        if candidate.is_absolute():
+            return candidate if candidate.exists() else None
+        for root in (settings.data_cache_path, manager.features_root):
+            resolved = (root / relative).resolve()
+            if resolved.exists():
+                return resolved
+        return None
+
+    @staticmethod
+    def _manifest_metadata(manifest_path: Path) -> Dict[str, Any]:
+        """讀取 manifest 摘要欄位；失敗時回傳空 dict。"""
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError):
+            return {}
+        return payload if isinstance(payload, dict) else {}
+
+    def _browse_metadata_for_run(
+        self,
+        entry: Dict[str, Any],
+        manager: Any,
+    ) -> Dict[str, Any]:
+        """為 registry run 附加 browse 衍生欄位。"""
+        symbol = str(entry.get("symbol") or "")
+        timeframe = str(entry.get("timeframe") or "")
+        config_hash = str(entry.get("config_hash") or "")
+        browse_task_id = self._browse_task_id(symbol, timeframe, config_hash)
+        canonical_manifest = self._canonical_manifest_path(manager, symbol, timeframe, config_hash)
+        registry_artifact = self._resolve_registry_artifact_path(entry, manager)
+
+        browse_path: Optional[str] = None
+        browse_ready = False
+        if registry_artifact is not None and registry_artifact.exists():
+            browse_ready = True
+            browse_path = str(registry_artifact)
+        elif canonical_manifest.exists():
+            browse_ready = True
+            browse_path = str(canonical_manifest)
+
+        feature_count = entry.get("feature_count")
+        row_count = entry.get("row_count")
+        quality_status = entry.get("quality_status")
+        if browse_path and (
+            feature_count in (None, "")
+            or row_count in (None, "")
+            or quality_status in (None, "")
+        ):
+            manifest = self._manifest_metadata(Path(browse_path))
+            if feature_count in (None, ""):
+                feature_count = manifest.get("total_features", manifest.get("feature_count"))
+            if row_count in (None, ""):
+                row_count = manifest.get("row_count", manifest.get("total_rows"))
+            if quality_status in (None, ""):
+                quality_status = manifest.get("quality_status", manifest.get("run_status"))
+
+        return {
+            "browse_task_id": browse_task_id,
+            "browse_ready": browse_ready,
+            "browse_path": browse_path,
+            "feature_count": feature_count,
+            "row_count": row_count,
+            "quality_status": quality_status,
+        }
+
     def list_runs(self) -> List[Dict[str, Any]]:
         manager = self._lifecycle()
         rows = []
@@ -659,6 +744,7 @@ class FeatureFactoryService:
             generated_value = self._registry_timestamp_iso(
                 entry.get("last_generated_at", entry.get("created_at"))
             )
+            browse_meta = self._browse_metadata_for_run(entry, manager)
             rows.append({
                 **entry,
                 "created_at": created_value,
@@ -670,8 +756,29 @@ class FeatureFactoryService:
                     str(entry.get("timeframe")),
                     str(entry.get("config_hash")),
                 ),
+                **browse_meta,
             })
         return rows
+
+    def ensure_browse_task_for_run(self, symbol: str, timeframe: str, config_hash: str) -> str:
+        """確保 registry run 在 browse 記憶體中有對應虛擬任務；冪等。"""
+        manager = self._lifecycle()
+        entry = manager.registry.get(symbol, timeframe, config_hash)
+        if entry is None:
+            raise KeyError((symbol, timeframe, config_hash))
+
+        browse_meta = self._browse_metadata_for_run(entry, manager)
+        browse_task_id = str(browse_meta["browse_task_id"])
+        if not browse_meta["browse_ready"] or not browse_meta["browse_path"]:
+            raise FileNotFoundError(
+                f"No browse artifact for run {symbol}/{timeframe}/{config_hash}"
+            )
+
+        with self._lock:
+            if browse_task_id in self._tasks:
+                return browse_task_id
+
+        return self.register_hdf5_for_browse(symbol, timeframe, str(browse_meta["browse_path"]))
 
     @staticmethod
     def _registry_timestamp_iso(value: Any) -> Optional[str]:

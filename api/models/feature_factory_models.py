@@ -89,6 +89,22 @@ class RunInfo(BaseModel):
     last_generated_at: Optional[str] = None
     size_bytes: Optional[int] = None
     active: bool
+    browse_task_id: str
+    browse_ready: bool
+    browse_path: Optional[str] = None
+    feature_count: Optional[int] = None
+    row_count: Optional[int] = None
+    quality_status: Optional[str] = None
+
+
+class EnsureBrowseResponse(BaseModel):
+    """Registry run 對應的 browse 虛擬任務確保結果。"""
+
+    browse_task_id: str
+    browse_ready: bool
+    symbol: str
+    timeframe: str
+    config_hash: str
 
 
 class AliasRequest(BaseModel):

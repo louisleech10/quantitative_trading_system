@@ -337,6 +337,82 @@ async def test_list_runs_created_at_iso_samples(
 
 
 @pytest.mark.asyncio
+async def test_list_runs_includes_browse_metadata(
+    async_client: httpx.AsyncClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = _manager(tmp_path)
+    _add_run(manager, "cfg_batch2d")
+    monkeypatch.setattr(feature_factory_service, "_lifecycle", lambda: manager)
+    monkeypatch.setattr(
+        feature_service_module,
+        "settings",
+        SimpleNamespace(data_cache_path=tmp_path),
+    )
+    response = await async_client.get("/api/v1/features/runs")
+    assert response.status_code == 200
+    row = next(item for item in response.json() if item["config_hash"] == "cfg_batch2d")
+    assert row["browse_task_id"] == "browse_BTCUSDT_12h_cfg_batch2d"
+    assert row["browse_ready"] is True
+    assert str(row["browse_path"]).endswith("feature_manifest.json")
+
+
+@pytest.mark.asyncio
+async def test_ensure_browse_task_for_run_idempotent(
+    async_client: httpx.AsyncClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = _manager(tmp_path)
+    _add_run(manager, "cfg_batch2d")
+    monkeypatch.setattr(feature_factory_service, "_lifecycle", lambda: manager)
+    monkeypatch.setattr(
+        feature_service_module,
+        "settings",
+        SimpleNamespace(data_cache_path=tmp_path),
+    )
+    monkeypatch.setattr(feature_factory_service, "_lock", threading.Lock())
+    monkeypatch.setattr(feature_factory_service, "_tasks", {})
+
+    url = "/api/v1/features/runs/BTCUSDT/12h/cfg_batch2d/browse"
+    first = await async_client.post(url)
+    assert first.status_code == 200
+    payload = first.json()
+    assert payload["browse_task_id"] == "browse_BTCUSDT_12h_cfg_batch2d"
+    assert payload["browse_ready"] is True
+
+    second = await async_client.post(url)
+    assert second.status_code == 200
+    assert second.json()["browse_task_id"] == payload["browse_task_id"]
+    assert "browse_BTCUSDT_12h_cfg_batch2d" in feature_factory_service._tasks
+
+
+@pytest.mark.asyncio
+async def test_ensure_browse_task_not_ready_returns_404(
+    async_client: httpx.AsyncClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = _manager(tmp_path)
+    manager.registry.add({
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+        "config_hash": "cfg_missing",
+        "created_at": 1_700_000_000.0,
+    })
+    monkeypatch.setattr(feature_factory_service, "_lifecycle", lambda: manager)
+    monkeypatch.setattr(
+        feature_service_module,
+        "settings",
+        SimpleNamespace(data_cache_path=tmp_path),
+    )
+    response = await async_client.post("/api/v1/features/runs/BTCUSDT/12h/cfg_missing/browse")
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "browse_not_ready"
+
+
+@pytest.mark.asyncio
 async def test_delete_idempotent_artifact_and_browse_reconciliation(
     async_client: httpx.AsyncClient,
     tmp_path: Path,

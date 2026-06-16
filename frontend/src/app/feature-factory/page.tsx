@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Wand2, AlertCircle, PlayCircle, Database, Layers, ArrowDownUp, Eye, Download, Cpu } from 'lucide-react';
-import { getBackendBrowseTaskId } from '@/lib/batchBrowse';
 import { useFeatureFactoryStore, readLastBatchTaskId } from '@/store/featureFactoryStore';
+import { runsToRegistryEntries } from '@/lib/runExplorer';
 import { useFeatureFactory } from '@/hooks/useFeatureFactory';
 import ConfigPanel from '@/components/feature-factory/ConfigPanel';
 import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKlineDownloadPanel';
@@ -56,12 +56,12 @@ export default function FeatureFactoryPage() {
   } = useFeatureFactoryStore();
 
   const setValidationSummaryForTask = useFeatureFactoryStore((state) => state.setValidationSummaryForTask);
-  const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
-  const fetchRegistry = useFeatureFactoryStore((state) => state.fetchRegistry);
+  const runs = useFeatureFactoryStore((state) => state.runs);
   const fetchRuns = useFeatureFactoryStore((state) => state.fetchRuns);
+  const coverageEntries = useMemo(() => runsToRegistryEntries(runs), [runs]);
   const distinctSymbolCount = useMemo(
-    () => new Set(registryEntries.map((entry) => entry.symbol)).size,
-    [registryEntries],
+    () => new Set(coverageEntries.map((entry) => entry.symbol)).size,
+    [coverageEntries],
   );
 
   const {
@@ -77,9 +77,6 @@ export default function FeatureFactoryPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedBatchSymbol, setSelectedBatchSymbol] = useState<string | null>(null);
-  const [browseTaskIds, setBrowseTaskIds] = useState<Record<string, string>>({});
-  const [registeringSymbol, setRegisteringSymbol] = useState<string | null>(null);
   const loadedResultTaskRef = useRef<string | null>(null);
   const fetchedRunsForTaskRef = useRef<string | null>(null);
   const fetchedRunsForBatchRef = useRef<string | null>(null);
@@ -161,8 +158,6 @@ export default function FeatureFactoryPage() {
   // 頁面載入時抓一次；FeatureKlineDownloadPanel 下載完成後也會刷新
   useEffect(() => { refreshFeatureKlineSymbols(); }, [refreshFeatureKlineSymbols]);
 
-  const batchResults = batchTask?.results ?? {};
-  const batchSuccessSymbols = Object.keys(batchResults);
 
   const activeQualityBatchId =
     batchTask?.status === 'completed' || batchTask?.status === 'partial'
@@ -176,47 +171,6 @@ export default function FeatureFactoryPage() {
     (!batchTask && recoverableBatchesLoaded);
 
   const showBatchQualityOverview = Boolean(activeQualityBatchId);
-  const showBatchExplorer =
-    (batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
-    batchSuccessSymbols.length > 0;
-
-  // 批次完成後自動選擇第一個成功的 symbol
-  useEffect(() => {
-    if (
-      (batchTask?.status === 'completed' || batchTask?.status === 'partial') &&
-      batchSuccessSymbols.length > 0 &&
-      !selectedBatchSymbol
-    ) {
-      setSelectedBatchSymbol(batchSuccessSymbols[0]);
-    }
-  }, [batchTask?.status, batchSuccessSymbols, selectedBatchSymbol]);
-
-  const handleSelectBatchSymbol = async (sym: string) => {
-    setSelectedBatchSymbol(sym);
-    if (browseTaskIds[sym]) return; // 已登錄，無需重複呼叫
-    const backendBrowseTaskId = getBackendBrowseTaskId(batchTask, sym);
-    if (backendBrowseTaskId) {
-      setBrowseTaskIds((prev) => ({ ...prev, [sym]: backendBrowseTaskId }));
-      return;
-    }
-    const hdf5Path = batchResults[sym];
-    if (!hdf5Path) return;
-    setRegisteringSymbol(sym);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/features/browse/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: sym, timeframe, hdf5_path: hdf5Path }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { task_id: string };
-      setBrowseTaskIds((prev) => ({ ...prev, [sym]: data.task_id }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `登錄 ${sym} 失敗`);
-    } finally {
-      setRegisteringSymbol(null);
-    }
-  };
 
   const normalizedSymbols = useMemo(() => parseSymbols(symbol), [symbol]);
   const isBatchMode = normalizedSymbols.length > 1;
@@ -224,10 +178,6 @@ export default function FeatureFactoryPage() {
   useEffect(() => {
     loadInitial();
   }, [loadInitial]);
-
-  useEffect(() => {
-    fetchRegistry().catch(() => undefined);
-  }, [fetchRegistry]);
 
   useEffect(() => {
     if (!config) {
@@ -524,8 +474,8 @@ export default function FeatureFactoryPage() {
             </>
           )}
         </div>
-        <FeatureExplorer taskId={currentTask?.task_id} taskStatus={currentTask?.status} validationSummary={currentTask?.validation_summary} />
-        {(showBatchQualitySection || showBatchExplorer) && (
+        <FeatureExplorer />
+        {showBatchQualitySection && (
             <>
               {showBatchQualitySection && !batchTask && (
                 <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
@@ -552,44 +502,6 @@ export default function FeatureFactoryPage() {
                   onBatchExpired={handleBatchExpired}
                 />
               )}
-              {showBatchExplorer && (
-              <>
-              {/* 批次模式 Symbol 選擇器 */}
-              <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
-                <div className="text-sm font-medium text-slate-300">Feature Explorer — 選擇標的</div>
-                <div className="flex flex-wrap gap-2">
-                  {batchSuccessSymbols.map((sym) => (
-                    <button
-                      key={sym}
-                      onClick={() => handleSelectBatchSymbol(sym)}
-                      disabled={registeringSymbol === sym}
-                      className={`rounded-full px-3 py-1 text-xs border transition ${
-                        selectedBatchSymbol === sym
-                          ? 'bg-cyan-400/20 border-cyan-300/40 text-cyan-200'
-                          : 'border-white/10 text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                      } disabled:opacity-50`}
-                    >
-                      {registeringSymbol === sym ? (
-                        <span className="flex items-center gap-1">
-                          <span className="inline-block w-3 h-3 rounded-full border-2 border-cyan-400/60 border-t-cyan-300 animate-spin" />
-                          {sym}
-                        </span>
-                      ) : sym}
-                    </button>
-                  ))}
-                </div>
-                {selectedBatchSymbol && browseTaskIds[selectedBatchSymbol] && (
-                  <FeatureExplorer taskId={browseTaskIds[selectedBatchSymbol]} />
-                )}
-                {selectedBatchSymbol && !browseTaskIds[selectedBatchSymbol] && registeringSymbol === selectedBatchSymbol && (
-                  <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
-                    <span className="inline-block w-3 h-3 rounded-full border-2 border-amber-400/60 border-t-amber-300 animate-spin" />
-                    載入 {selectedBatchSymbol} 特徵資料中…
-                  </div>
-                )}
-              </div>
-              </>
-              )}
             </>
           )}
 
@@ -603,7 +515,7 @@ export default function FeatureFactoryPage() {
             </p>
           </div>
           {distinctSymbolCount >= 2 ? (
-            <SymbolCoverageMatrix entries={registryEntries} />
+            <SymbolCoverageMatrix entries={coverageEntries} />
           ) : (
             <div className="rounded-md border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-400">
               需至少 2 個 Symbol 的特徵資料，請先生成更多 Symbol 的特徵。
