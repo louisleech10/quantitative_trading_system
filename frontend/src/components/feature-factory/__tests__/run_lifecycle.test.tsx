@@ -25,6 +25,7 @@ class MockWebSocket {
   onclose: (() => void) | null = null;
 
   constructor(_url: string) {
+    void _url;
     MockWebSocket.instances.push(this);
   }
 

@@ -24,6 +24,12 @@ import {
 type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
 type BatchPayload = Partial<BatchTaskStatus> & Record<string, unknown>;
 
+/** Run alias PATCH / DELETE 操作結果 */
+export interface RunMutationResult {
+  ok: boolean;
+  error?: string;
+}
+
 interface FeatureFactoryState {
   config: FeatureFactoryConfig | null;
   presets: FeatureFactoryPreset[];
@@ -73,6 +79,17 @@ interface FeatureFactoryState {
   runsError: string | null;
   completionQueue: RunIdentity[];
   fetchRuns: () => Promise<void>;
+  updateRunAlias: (
+    symbol: string,
+    timeframe: string,
+    configHash: string,
+    alias: string,
+  ) => Promise<RunMutationResult>;
+  deleteRun: (
+    symbol: string,
+    timeframe: string,
+    configHash: string,
+  ) => Promise<RunMutationResult>;
   enqueueCompletion: (run: RunIdentity) => void;
   shiftCompletion: () => void;
   setConfig: (config: FeatureFactoryConfig) => void;
@@ -280,6 +297,26 @@ function normalizePerItemRss(payload: BatchPayload, previous?: BatchTaskStatus |
   return Array.from(existing.values());
 }
 
+async function parseAliasPatchError(response: Response): Promise<string> {
+  if (response.status === 409) return 'Run 使用中';
+  if (response.status === 422) return '名稱已被使用';
+  return '命名失敗';
+}
+
+async function parseDeleteRunError(response: Response): Promise<string> {
+  if (response.status === 409) return 'Run 正在使用中';
+  try {
+    const body = (await response.json()) as { detail?: { errors?: string[] } | string };
+    const detail = body.detail;
+    if (detail && typeof detail === 'object' && Array.isArray(detail.errors) && detail.errors.length > 0) {
+      return detail.errors.join(', ');
+    }
+  } catch {
+    // ignore JSON parse failure
+  }
+  return 'delete_partial';
+}
+
 function normalizeBatchTask(
   payload: BatchPayload,
   previous: BatchTaskStatus | null,
@@ -389,6 +426,40 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       set({ runs: await response.json() as RunInfo[], runsLoading: false });
     } catch (error) {
       set({ runsError: error instanceof Error ? error.message : '載入失敗', runsLoading: false });
+    }
+  },
+  updateRunAlias: async (symbol, timeframe, configHash, alias) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/runs/${encodeURIComponent(symbol)}/${encodeURIComponent(timeframe)}/${encodeURIComponent(configHash)}/alias`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alias }),
+        },
+      );
+      if (!response.ok) {
+        return { ok: false, error: await parseAliasPatchError(response) };
+      }
+      await get().fetchRuns();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: '命名失敗' };
+    }
+  },
+  deleteRun: async (symbol, timeframe, configHash) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/runs/${encodeURIComponent(symbol)}/${encodeURIComponent(timeframe)}/${encodeURIComponent(configHash)}`,
+        { method: 'DELETE' },
+      );
+      if (!response.ok) {
+        return { ok: false, error: await parseDeleteRunError(response) };
+      }
+      await get().fetchRuns();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: '刪除失敗' };
     }
   },
   enqueueCompletion: (run) => set((state) => ({
