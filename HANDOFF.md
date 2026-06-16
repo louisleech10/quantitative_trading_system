@@ -1,27 +1,32 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-15 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-06-16 | **Branch**: main
 
-## 結案:第 2 批 Run 生命週期 UX(大型,已 push 至 1d453c4)
-- 功能:未命名 run 自動清理(per symbol+tf 各留 5)、跑完彈窗保留/命名/丟棄、命名永不自動清、刪除=features+對應 cgsa_work(絕不碰 kline_cache/feature_klines/d* cache)。
-- 核心:`run_paths.py`(canonical resolver)/`run_locks.py`(**fcntl.flock** per-run lease:kernel 互斥+進程死亡自動釋放)/`run_lifecycle.py`(安全刪除 lstat 逐層拒 symlink+白名單雙根+cgsa ownership manifest 核對)/registry transaction(merge-preserve alias+corrupt fail-closed+deleting 標記)/runs API(409/404/422/500 寫死)/前端 RunRetentionDialog+RunManagerPanel。
-- 管線:V1→V5 **六輪 adversarial**(鎖機制 lockdir→rename→mutex 均被 Codex 證明有 race,最終 flock 終局,r5 實測 SIGKILL 0.0013s 自動釋放)→Codex 實作→Composer code review(REQUEST_CHANGES 5 MAJOR→Codex 修→r2 2 PARTIAL→Claude 補測試+文件澄清→r3 **APPROVE**)。
-- 驗收:lifecycle 29 passed(含跨進程 flock/kill-9/競態 barrier/HTTP 四碼/resume 三分支)+vitest 5+回歸 bundle 78+build+解耦 0+postflight ✅。
-- 文件:docs/BATCH2_RUN_LIFECYCLE_{SPEC,TODO,MANIFEST,DECISION}.md(V5);交接 handoffs/20260613-batch2-*。
-- 已知技債(下輪順手):`_write_run_size` 用 registry 私有 API(行為正確,維護耦合);symlink parent-swap TOCTOU(威脅模型外接受);batch _tasks 面板可見性不隨刪除即時更新(resume 正確性已保證)。
+## 結案:backlog #1/#2/#3 三批全完成(自主執行,本輪一次 push)
+### #1 既有測試紅 triage（完成）
+- 43 紅分類解決:3 我的回歸(frozen 守門+phase2)、委員會三方 Q1-Q5 裁定、~30 殭屍滯後對齊。Composer redfix code review **APPROVE**。
+- 文件 docs/BATCH3_TEST_TRIAGE.md;commit d1a6146/1cb31bd/935b24f。
+### #2 d* / FracDiff 非 CGSA 對齊（完成,選 A 修復）
+- 根因:非 CGSA frame path fracdiff 因 regex `^(L\d+)_` 對裸欄名全 unparsed→靜默 no-op。修法:factory `_build_column_layer_map`+preprocessor filter 優先序(ALL→map→regex fallback),CGSA source_layer 分支未動。
+- 管線:設計委員會雙家族三方一致→SPEC/TODO/MANIFEST V3(4 輪 adversarial,核心 reframe **d* parity 為主 oracle** 化解 CGSA/非 CGSA 不同儲存格式)→Composer 寫 P4+跨家族 review production APPROVE→Codex review P4+跑 slow gate APPROVE。
+- **三方資料正確性裁定:d* parity 達成**(T3 3458/3458 exact,0 mismatch);**T4 value 差異=既有結構差異 out-of-scope**(CGSA float16 vs frame float32+index dtype+L7 dead-drop,非 #2 bug,fracdiff-OFF baseline 同 delta 證 pre-existing)。
+- 驗收:P4 4 passed(774s,T3/control L3-L6 127744 exact/CGSA SHA exact)+回歸 bundle 78+解耦 0;tier2a 修(L1-L5→L1/L2 only)。commit ca87829/245bf6a/55a433f。
+- freeze 崩潰排障:根因 control phase Polars 路徑 OOM(非 CGSA),關 Polars+chunked+subprocess-per-phase 解;**使用者 UI 能跑線索關鍵**(證 production 健康、崩潰係 freeze script 特有)。
+### #3 tier ADF/d* 並行度 profile（完成,結論=單執行緒 by design,評估另立 ticket）
+- CGSA 主路徑(raw-sink L7_raw)L6.5 ADF/d* **所有 tier 強制 serial**(disk-safety,feature_preprocessor.py:428-435 effective_workers=1)。tier worker 表只作用 in-memory frame 路徑非 raw-sink。
+- 本機 8GB 無法實測高 tier(強制即 OOM);依「實測>假設」以程式+8gb log 定論。
+- 「才評估」→獨立 perf ticket(24/32GB 並行 raw-sink/計算寫盤解耦,需高 tier 硬體+SPEC),本批不動。文件 docs/BATCH3_TIER_PARALLELISM_PROFILE.md。
 
-## 結案:第 1 批 follow-up 小修包(7 commits,已 push)
-- N4/N6(all-NaN=total_nan)/N3 winsor/N7 canonicalizer/T5 present_timeframes。三輪雙家族 adversarial→Codex 實作→Composer APPROVE。新測試 20+回歸 78。
-- 文件 docs/BATCH1_FOLLOWUP_*。
+## 待使用者 / 待辦 ticket(本批刻意不做,另開)
+- **float16 精度 ticket**:CGSA raw 將 L1/L2 存 float16(vs frame float32),調查意外撈到,值得評估是否該存 float32(與 #2 無關)。見 BATCH2D manifest 三方裁定節。
+- **CGSA raw-sink ADF/d* tier-gated 並行 ticket**(#3 才評估,需 24/32GB 硬體)。
+- 第 1 批殘留 MINOR:真 kline 測試 glob→rglob;SPEC :185 錨點勘誤。
 
-## 待使用者 / 下一步 backlog(順序已拍板)
-- **第 3 批:既有測試紅 triage**(~44 紅,先分類半天再決定修哪些)。
-- **d* cache/fracdiff 選 A 修復對齊**(大型,使用者已決;見 docs/DSTAR_FRACDIFF_NONCGSA_FINDING.md;命中 a/b/d 走完整大型管線)。
-- 16/24/32GB tier ADF/d* 並行度 profile(以 CGSA 主路徑為準,因 d* 在非 CGSA 前提已變)。
-- templates/optimization_report.html 還原案(前輪遺留,仍待答)。
-- 第 1 批 MINOR:真 kline 測試 glob→rglob;SPEC :185 錨點勘誤。
+## 執行端分工(2026-06-15 使用者改定,已入 memory)
+- **中、大型實作=Composer 2.5 實作 + Codex review**(先前大=Codex 實作對調);小=Claude 自己做;其餘流程不變。
+- 技術決策委派委員會(非使用者);中途自主 commit;本輪全做完才一起 push。
 
-## 鐵律教訓(累積)
-- 鎖/併發設計勿自製 stale/接管協定(三版均有 successor-race)→優先 kernel 原語(flock);adversarial 連續多輪聚焦同一點時,換機制比補協定快。
-- codex sandbox 無 .git 寫權限→執行端只寫檔,commit 由 Claude 按 Phase 接手(已多次實證)。
-- tests/conftest.py 在 `--collect-only` 會重寫 tests/golden/l65/test_inventory.txt——跑 --co 後必查 git status 還原。
-- commit 後直接 push;派工進度 10 分鐘節奏(均已入 memory)。
+## 鐵律教訓(本輪新增)
+- 儲存層命名/格式現實連續打臉假設 3 次(不同格式→誤判 CGSA 裸名→實為兩路同 tag)→改數值對齊任務,§A 必先實測儲存層欄名/dtype 真相。
+- 大型數值對齊「exact value parity」常不可達(float16/storage/topology 差異);主 oracle 該選**格式無關的語義不變量**(此處 d* per-column),value 差異歸既有結構分案,不寬容差掩蓋。
+- 同進程連跑兩次全特徵生成→第二次 OOM-kill(faulthandler 抓不到=SIGKILL);profile/freeze 一律分 subprocess。
+- 委員會 cursor-agent 偶發斷線無報告→驗檔案落盤;斷線換手或自己決定性蒐證(CGSA-alone 測試)定位。
