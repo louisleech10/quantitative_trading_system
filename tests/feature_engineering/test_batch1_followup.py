@@ -457,7 +457,7 @@ def test_real_kline_stream_nan_ratio_matches_written_arrays(
     assert "nan_ratio" in validation
     abnormal = 0
     total = 0
-    parquet_paths = sorted(Path(result.metadata["raw_path"]).glob("*.parquet"))
+    parquet_paths = sorted(Path(result.metadata["raw_path"]).rglob("*.parquet"))
     assert parquet_paths
     for parquet_path in parquet_paths:
         values = pd.read_parquet(parquet_path).to_numpy()
