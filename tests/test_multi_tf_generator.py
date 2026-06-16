@@ -85,7 +85,7 @@ class StubFactory:
     def _compute_config_hash(self, config, symbol=None, timeframe=None, start_date=None, end_date=None):
         return "dummy_hash"
 
-    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash):
+    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None):
         features_df = self._combine_layers(layers).reindex(raw_data.index)
         return SimpleNamespace(
             features_df=features_df,

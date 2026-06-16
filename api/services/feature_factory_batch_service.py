@@ -455,6 +455,7 @@ class FeatureFactoryBatchService:
                             request.config_override,
                             request.force_regenerate,
                             batch_cache_dir,
+                            str(checkpoint.get("batch_id") or ""),
                         )
                         wrapped_futures.append(_wait_one(item, future))
                 finally:
@@ -1055,6 +1056,7 @@ class FeatureFactoryBatchService:
         config_override: Optional[Dict[str, Any]],
         force_regenerate: bool,
         cache_dir: Optional[str] = None,
+        batch_id: str = "",
     ) -> str:
         """在子進程中執行單一標的特徵計算。"""
         from momentum.factories import create_feature_factory
@@ -1072,12 +1074,14 @@ class FeatureFactoryBatchService:
                 pass  # 使用 create_feature_factory 預設值（data_cache/）
 
         factory = create_feature_factory(cache_dir=cache_dir)
+        resolved_batch_id = batch_id.strip() or None
         try:
             result = factory.generate_features(
                 symbol=symbol,
                 timeframe=timeframe,
                 config_override=config_override,
                 force_regenerate=force_regenerate,
+                batch_id=resolved_batch_id,
             )
             if metrics_path:
                 FeatureFactoryBatchService._append_child_metrics_jsonl(

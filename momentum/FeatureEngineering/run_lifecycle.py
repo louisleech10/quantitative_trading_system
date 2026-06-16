@@ -142,7 +142,7 @@ class RunLifecycleManager:
                 (
                     entry
                     for entry in self.registry.find(symbol, timeframe)
-                    if not entry.get("alias")
+                    if not (entry.get("alias") or entry.get("batch_alias"))
                 ),
                 key=lambda entry: entry.get(
                     "last_generated_at", entry.get("created_at", 0)

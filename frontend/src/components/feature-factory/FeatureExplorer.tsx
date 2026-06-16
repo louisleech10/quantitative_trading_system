@@ -94,6 +94,7 @@ export default function FeatureExplorer({
       if (!query) return true;
       const haystack = [
         run.alias,
+        run.batch_alias,
         run.symbol,
         run.timeframe,
         run.config_hash,

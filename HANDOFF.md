@@ -1,33 +1,21 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-16 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-06-17 | **Branch**: main
 
-## 結案:backlog #1/#2/#3 三批全完成(自主執行,本輪一次 push)
-### #1 既有測試紅 triage（完成）
-- 43 紅分類解決:3 我的回歸(frozen 守門+phase2)、委員會三方 Q1-Q5 裁定、~30 殭屍滯後對齊。Composer redfix code review **APPROVE**。
-- 文件 docs/BATCH3_TEST_TRIAGE.md;commit d1a6146/1cb31bd/935b24f。
-### #2 d* / FracDiff 非 CGSA 對齊（完成,選 A 修復）
-- 根因:非 CGSA frame path fracdiff 因 regex `^(L\d+)_` 對裸欄名全 unparsed→靜默 no-op。修法:factory `_build_column_layer_map`+preprocessor filter 優先序(ALL→map→regex fallback),CGSA source_layer 分支未動。
-- 管線:設計委員會雙家族三方一致→SPEC/TODO/MANIFEST V3(4 輪 adversarial,核心 reframe **d* parity 為主 oracle** 化解 CGSA/非 CGSA 不同儲存格式)→Composer 寫 P4+跨家族 review production APPROVE→Codex review P4+跑 slow gate APPROVE。
-- **三方資料正確性裁定:d* parity 達成**(T3 3458/3458 exact,0 mismatch);**T4 value 差異=既有結構差異 out-of-scope**(CGSA float16 vs frame float32+index dtype+L7 dead-drop,非 #2 bug,fracdiff-OFF baseline 同 delta 證 pre-existing)。
-- 驗收:P4 4 passed(774s,T3/control L3-L6 127744 exact/CGSA SHA exact)+回歸 bundle 78+解耦 0;tier2a 修(L1-L5→L1/L2 only)。commit ca87829/245bf6a/55a433f。
-- freeze 崩潰排障:根因 control phase Polars 路徑 OOM(非 CGSA),關 Polars+chunked+subprocess-per-phase 解;**使用者 UI 能跑線索關鍵**(證 production 健康、崩潰係 freeze script 特有)。
-### #3 tier ADF/d* 並行度 profile（完成,結論=單執行緒 by design,評估另立 ticket）
-- CGSA 主路徑(raw-sink L7_raw)L6.5 ADF/d* **所有 tier 強制 serial**(disk-safety,feature_preprocessor.py:428-435 effective_workers=1)。tier worker 表只作用 in-memory frame 路徑非 raw-sink。
-- 本機 8GB 無法實測高 tier(強制即 OOM);依「實測>假設」以程式+8gb log 定論。
-- 「才評估」→獨立 perf ticket(24/32GB 並行 raw-sink/計算寫盤解耦,需高 tier 硬體+SPEC),本批不動。文件 docs/BATCH3_TIER_PARALLELISM_PROFILE.md。
+## 本輪完成:#4 batch_alias Phase 1+2(批次一次命名,解 100 symbol 改名 100 次)
+完整中-大管線走完,**Codex code review APPROVE**,本 commit 收尾。
+- **規格**:SPEC/TODO/MANIFEST V4(docs/BATCH_ALIAS_*.md),經 **4 輪 Codex adversarial**(r1 FAIL 2B/4M/2m → r2 → r3 → r4 PASS),每輪抓真實缺口逐輪收斂:batch_id 跨進程鏈→禁 mutable self 顯式穿透→multi-TF 主路徑遺漏→6 個 _layer7 呼叫點全涵蓋。
+- **實作**:Composer 2.5 寫 P1(後端 registry/API/cleanup)+P2(前端 Explorer/Run 管理分組+整批 rename)。
+- **協調者驗收抓並修 3 bug(防假綠生效)**:① registry.add 新 entry 無條件 pop batch_alias→僅 batch_id is None 時 pop;② 前端新測試漏 import jest-dom;③ 6 個 test fake factory 的 _layer7 簽名缺 batch_id=None(Codex review 抓到的回歸,跨 8 檔 17 失敗)。
+- **驗收**:後端 100 passed(含 test_batch_alias 17+所有 _layer7 回歸+run_lifecycle)、前端 39 passed(新 16)、npm run build 過、解耦 0、Codex review r2 APPROVE。
+- **語義**:三態 overwrite(同 batch_id 保留 batch_alias/換 batch_id reset/None merge-preserve);batch_alias 不覆寫 per-run alias;set_batch_alias 對 deleting→409;auto-cleanup 候選+mark_deleting 都護 batch_alias。
 
-## 待辦 ticket(本批刻意不做,另開)
-- **float16 儲存:委員會三方評估畢=維持 float16,本批不動**(全改 float32→L7 體積 2×/8GB OOM 風險,且不解全部 T4;精度風險消費端特定未證實)。可選後續:strict/training 讀升 float32(小改無體積)+ A/B 驗證。見 docs/FLOAT16_STORAGE_EVALUATION.md。
-- **CGSA raw-sink ADF/d* tier-gated 並行 ticket**(#3 才評估,需 24/32GB 硬體)。
-- 第 1 批殘留 MINOR:真 kline 測試 glob→rglob(低風險防呆,目前 flat 佈局無 bug,待使用者定);SPEC :185 錨點勘誤(歷史過程文件,無實益,不做)。
-- batch2d golden 139MB:使用者決維持現狀。docs 已清理(刪中間版 TODO/MANIFEST,留 SPEC+DECISION)。
+## 已知無關問題(非本任務)
+- frontend `strategy-components.test.tsx` pre-existing 壞(缺 @/components/strategy/SignalTooltip,commit 6be0862,未碰 strategy)。
 
-## 執行端分工(2026-06-15 使用者改定,已入 memory)
-- **中、大型實作=Composer 2.5 實作 + Codex review**(先前大=Codex 實作對調);小=Claude 自己做;其餘流程不變。
-- 技術決策委派委員會(非使用者);中途自主 commit;本輪全做完才一起 push。
+## 待辦 ticket(另開)
+- float16 strict/training 讀升 float32 可選後續(docs/FLOAT16_STORAGE_EVALUATION.md)。
+- CGSA raw-sink ADF/d* tier-gated 並行(需 24/32GB 硬體)。
+- batch_alias Phase 3:一等 batch entity(batches.json),目前 batch_id/batch_alias 存 run registry([BA-9])。
 
-## 鐵律教訓(本輪新增)
-- 儲存層命名/格式現實連續打臉假設 3 次(不同格式→誤判 CGSA 裸名→實為兩路同 tag)→改數值對齊任務,§A 必先實測儲存層欄名/dtype 真相。
-- 大型數值對齊「exact value parity」常不可達(float16/storage/topology 差異);主 oracle 該選**格式無關的語義不變量**(此處 d* per-column),value 差異歸既有結構分案,不寬容差掩蓋。
-- 同進程連跑兩次全特徵生成→第二次 OOM-kill(faulthandler 抓不到=SIGKILL);profile/freeze 一律分 subprocess。
-- 委員會 cursor-agent 偶發斷線無報告→驗檔案落盤;斷線換手或自己決定性蒐證(CGSA-alone 測試)定位。
+## 執行端分工(2026-06-15 使用者定)
+- 中/大實作=Composer 2.5 + Codex review;小=Claude 自己做。技術決策走委員會;中途自主 commit。

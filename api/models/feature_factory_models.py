@@ -85,6 +85,8 @@ class RunInfo(BaseModel):
     timeframe: str
     config_hash: str
     alias: Optional[str] = None
+    batch_id: Optional[str] = None
+    batch_alias: Optional[str] = None
     created_at: Optional[str] = None
     last_generated_at: Optional[str] = None
     size_bytes: Optional[int] = None
@@ -109,6 +111,14 @@ class EnsureBrowseResponse(BaseModel):
 
 class AliasRequest(BaseModel):
     alias: Optional[str] = None
+
+
+class BatchAliasRequest(BaseModel):
+    batch_alias: Optional[str] = None
+
+
+class BatchAliasResponse(BaseModel):
+    affected: int
 
 
 class DeleteRunResponse(BaseModel):

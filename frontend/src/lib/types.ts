@@ -511,6 +511,8 @@ export interface FeatureTask {
 export interface RunIdentity { symbol: string; timeframe: string; config_hash: string; }
 export interface RunInfo extends RunIdentity {
   alias?: string | null;
+  batch_id?: string | null;
+  batch_alias?: string | null;
   created_at?: string | null;
   last_generated_at?: string | null;
   size_bytes?: number | null;

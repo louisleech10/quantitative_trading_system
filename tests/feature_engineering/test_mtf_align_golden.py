@@ -146,6 +146,7 @@ class _RealLayer0Factory:
         config_hash,
         compute_warnings=None,
         persist: bool = True,
+        batch_id=None,
     ):
         del symbol, timeframe, config, compute_warnings, persist
         if self._cgsa_registry is None:
@@ -165,7 +166,7 @@ class _RealLayer0Factory:
             config_used={},
         )
 
-    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash):
+    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None):
         features_df = self._combine_layers(layers).reindex(raw_data.index)
         return SimpleNamespace(
             features_df=features_df,

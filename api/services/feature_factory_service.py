@@ -792,6 +792,10 @@ class FeatureFactoryService:
     def set_run_alias(self, symbol: str, timeframe: str, config_hash: str, alias: Optional[str]) -> None:
         self._lifecycle().set_run_alias(symbol, timeframe, config_hash, alias)
 
+    def set_batch_alias(self, batch_id: str, batch_alias: Optional[str]) -> int:
+        """更新同 batch_id 所有 registry entry 的 batch_alias。"""
+        return self._lifecycle().registry.set_batch_alias(batch_id, batch_alias)
+
     def delete_run(self, symbol: str, timeframe: str, config_hash: str) -> Dict[str, Any]:
         manager = self._lifecycle()
         registry_exists = manager.registry.get(symbol, timeframe, config_hash) is not None

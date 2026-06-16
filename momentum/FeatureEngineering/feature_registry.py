@@ -92,6 +92,7 @@ class FeatureRegistry:
         incoming = dict(entry)
         incoming.setdefault("created_at", time.time())
         incoming.setdefault("last_generated_at", incoming["created_at"])
+        incoming_batch_id = incoming.get("batch_id")
 
         def mutate() -> None:
             key = self._key(incoming)
@@ -102,8 +103,12 @@ class FeatureRegistry:
                 for field in ("alias", "size_bytes", "created_at"):
                     if existing.get(field) not in (None, ""):
                         merged[field] = existing[field]
+                self._apply_batch_id_merge(existing, merged, incoming_batch_id)
                 self._entries[index] = merged
                 return
+            if incoming_batch_id is None:
+                incoming.pop("batch_id", None)
+                incoming.pop("batch_alias", None)
             self._entries.append(incoming)
 
         if self._corrupt:
@@ -166,6 +171,34 @@ class FeatureRegistry:
         self._require_healthy()
         self._locked_mutate(mutate)
 
+    def set_batch_alias(self, batch_id: str, batch_alias: Optional[str]) -> int:
+        """更新同 batch_id 所有 entry 的 batch_alias；空字串視為清除。"""
+        normalized = batch_alias.strip() if batch_alias is not None else ""
+        affected = 0
+
+        def mutate() -> None:
+            nonlocal affected
+            targets = [
+                item
+                for item in self._entries
+                if str(item.get("batch_id") or "") == batch_id
+            ]
+            if not targets:
+                raise KeyError(batch_id)
+            for target in targets:
+                if target.get("deleting"):
+                    raise RunBusyError("Run is being deleted")
+            for target in targets:
+                if normalized:
+                    target["batch_alias"] = normalized
+                else:
+                    target.pop("batch_alias", None)
+                affected += 1
+
+        self._require_healthy()
+        self._locked_mutate(mutate)
+        return affected
+
     def remove(self, symbol: str, timeframe: str, config_hash: str) -> bool:
         """移除單一 registry entry。"""
         removed = False
@@ -182,13 +215,13 @@ class FeatureRegistry:
         return removed
 
     def mark_deleting(self, symbol: str, timeframe: str, config_hash: str) -> bool:
-        """在 transaction 內重新確認 alias 並標記刪除。"""
+        """在 transaction 內重新確認 alias/batch_alias 並標記刪除。"""
         marked = False
 
         def mutate() -> None:
             nonlocal marked
             target = self._require_entry(symbol, timeframe, config_hash)
-            if target.get("alias"):
+            if target.get("alias") or target.get("batch_alias"):
                 return
             target["deleting"] = True
             marked = True
@@ -246,6 +279,38 @@ class FeatureRegistry:
             str(entry.get("timeframe")),
             str(entry.get("config_hash")),
         )
+
+    @staticmethod
+    def _apply_batch_id_merge(
+        existing: Dict[str, Any],
+        merged: Dict[str, Any],
+        incoming_batch_id: Any,
+    ) -> None:
+        """三態 batch_id overwrite：同批保留、換批 reset、None merge-preserve。"""
+        existing_batch_id = existing.get("batch_id")
+        incoming_has_concrete_batch_id = incoming_batch_id not in (None, "")
+
+        if not incoming_has_concrete_batch_id:
+            if existing_batch_id not in (None, ""):
+                merged["batch_id"] = existing_batch_id
+            else:
+                merged.pop("batch_id", None)
+            if existing.get("batch_alias") not in (None, ""):
+                merged["batch_alias"] = existing["batch_alias"]
+            else:
+                merged.pop("batch_alias", None)
+            return
+
+        if str(incoming_batch_id) == str(existing_batch_id or ""):
+            merged["batch_id"] = incoming_batch_id
+            if existing.get("batch_alias") not in (None, ""):
+                merged["batch_alias"] = existing["batch_alias"]
+            else:
+                merged.pop("batch_alias", None)
+            return
+
+        merged["batch_id"] = incoming_batch_id
+        merged.pop("batch_alias", None)
 
     def _find_entry(self, symbol: str, timeframe: str, config_hash: str) -> Optional[Dict[str, Any]]:
         key = (symbol, timeframe, config_hash)

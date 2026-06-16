@@ -93,6 +93,7 @@ interface FeatureFactoryState {
     configHash: string,
     alias: string,
   ) => Promise<RunMutationResult>;
+  setBatchAlias: (batchId: string, batchAlias: string) => Promise<RunMutationResult>;
   deleteRun: (
     symbol: string,
     timeframe: string,
@@ -472,6 +473,25 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       return { ok: true };
     } catch {
       return { ok: false, error: '命名失敗' };
+    }
+  },
+  setBatchAlias: async (batchId, batchAlias) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/alias`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batch_alias: batchAlias }),
+        },
+      );
+      if (!response.ok) {
+        return { ok: false, error: await parseAliasPatchError(response) };
+      }
+      await get().fetchRuns();
+      return { ok: true };
+    } catch {
+      return { ok: false, error: '批次命名失敗' };
     }
   },
   deleteRun: async (symbol, timeframe, configHash) => {

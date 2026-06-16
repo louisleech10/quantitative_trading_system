@@ -234,6 +234,7 @@ class FeatureFactory:
         end_date: Optional[str] = None,
         persist: bool = True,
         lease_sink: Optional[list] = None,
+        batch_id: Optional[str] = None,
     ) -> FeatureGenerationResult:
         """Run the pipeline while holding the per-run lease."""
         config = self._resolve_config(config_override)
@@ -241,7 +242,17 @@ class FeatureFactory:
         lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, timeframe, config_hash, timeout=0)
         retained = False
         try:
-            result = self._generate_features_impl(symbol, timeframe, config_override, force_regenerate, progress_callback, start_date, end_date, persist)
+            result = self._generate_features_impl(
+                symbol,
+                timeframe,
+                config_override,
+                force_regenerate,
+                progress_callback,
+                start_date,
+                end_date,
+                persist,
+                batch_id=batch_id,
+            )
             if lease_sink is not None:
                 lease_sink.append(lease)
                 retained = True
@@ -260,6 +271,7 @@ class FeatureFactory:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> FeatureGenerationResult:
         """Run the seven-layer pipeline.
 
@@ -308,6 +320,7 @@ class FeatureFactory:
                 start_date=start_date,
                 end_date=end_date,
                 persist=persist,
+                batch_id=batch_id,
             )
 
         try:
@@ -373,6 +386,7 @@ class FeatureFactory:
                 config_hash=config_hash,
                 compute_warnings=compute_warnings,
                 persist=persist,
+                batch_id=batch_id,
             )
 
         _ic_first_on = self._ic_first_enabled(config)
@@ -407,6 +421,7 @@ class FeatureFactory:
             config_hash,
             compute_warnings=compute_warnings,
             persist=persist,
+            batch_id=batch_id,
         )
         return result
 
@@ -3021,6 +3036,7 @@ class FeatureFactory:
         config_hash: str,
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> FeatureGenerationResult:
         """CGSA generation path: L1-L6 → L6.5 mode → canonical L7_raw."""
         if self._cgsa_registry is None:
@@ -3194,16 +3210,17 @@ class FeatureFactory:
         )
 
         try:
-            self._registry.add(
-                {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "config_hash": config_hash,
-                    "feature_count": result.feature_count,
-                    "row_count": len(raw_data.index),
-                    "hdf5_relative_path": result.hdf5_path,
-                }
-            )
+            registry_payload: Dict[str, Any] = {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "config_hash": config_hash,
+                "feature_count": result.feature_count,
+                "row_count": len(raw_data.index),
+                "hdf5_relative_path": result.hdf5_path,
+            }
+            if batch_id is not None:
+                registry_payload["batch_id"] = batch_id
+            self._registry.add(registry_payload)
         except Exception as exc:
             if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
                 logger.warning("Failed to update feature registry: %s", exc)
@@ -3250,6 +3267,7 @@ class FeatureFactory:
         config_hash: str,
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> FeatureGenerationResult:
         """CGSA Layer 7 path: per-group scan validation + per-group parquet persistence."""
         if self._cgsa_registry is None:
@@ -3339,16 +3357,17 @@ class FeatureFactory:
         )
 
         try:
-            self._registry.add(
-                {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "config_hash": config_hash,
-                    "feature_count": result.feature_count,
-                    "row_count": len(raw_data.index),
-                    "hdf5_relative_path": result.hdf5_path,
-                }
-            )
+            registry_payload: Dict[str, Any] = {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "config_hash": config_hash,
+                "feature_count": result.feature_count,
+                "row_count": len(raw_data.index),
+                "hdf5_relative_path": result.hdf5_path,
+            }
+            if batch_id is not None:
+                registry_payload["batch_id"] = batch_id
+            self._registry.add(registry_payload)
         except Exception as exc:
             if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
                 logger.warning("Failed to update feature registry: %s", exc)
@@ -3368,6 +3387,7 @@ class FeatureFactory:
         config_hash: str,
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> FeatureGenerationResult:
         if self._cgsa_enabled() and self._cgsa_registry is not None:
             return self._layer7_validate_and_persist_cgsa(
@@ -3379,6 +3399,7 @@ class FeatureFactory:
                 config_hash=config_hash,
                 compute_warnings=compute_warnings,
                 persist=persist,
+                batch_id=batch_id,
             )
 
         features_df = self._combine_layers(layers, context="layer7_final")
@@ -3471,16 +3492,17 @@ class FeatureFactory:
             result.hdf5_path = ""
 
         try:
-            self._registry.add(
-                {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "config_hash": config_hash,
-                    "feature_count": len(result.features_df.columns),
-                    "row_count": len(result.features_df.index),
-                    "hdf5_relative_path": result.hdf5_path,
-                }
-            )
+            registry_payload: Dict[str, Any] = {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "config_hash": config_hash,
+                "feature_count": len(result.features_df.columns),
+                "row_count": len(result.features_df.index),
+                "hdf5_relative_path": result.hdf5_path,
+            }
+            if batch_id is not None:
+                registry_payload["batch_id"] = batch_id
+            self._registry.add(registry_payload)
         except Exception as exc:
             if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
                 logger.warning("Failed to update feature registry: %s", exc)

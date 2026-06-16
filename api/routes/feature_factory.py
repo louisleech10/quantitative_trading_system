@@ -25,6 +25,8 @@ from api.models.feature_factory_models import (
     RegisterPathRequest,
     RegisterPathResponse,
     AliasRequest,
+    BatchAliasRequest,
+    BatchAliasResponse,
     DeleteRunResponse,
     EnsureBrowseResponse,
     RunInfo,
@@ -84,6 +86,18 @@ async def set_run_alias(symbol: str, timeframe: str, config_hash: str, request: 
         raise HTTPException(status_code=422, detail={"code": "alias_conflict", "message": str(exc)})
     except KeyError:
         raise HTTPException(status_code=404, detail={"code": "run_not_found"})
+
+
+@router.patch("/batch/{batch_id}/alias", response_model=BatchAliasResponse)
+async def set_batch_alias(batch_id: str, request: BatchAliasRequest):
+    """依 batch_id 整批更新 batch_alias。"""
+    try:
+        affected = feature_factory_service.set_batch_alias(batch_id, request.batch_alias)
+        return BatchAliasResponse(affected=affected)
+    except RunBusyError as exc:
+        raise HTTPException(status_code=409, detail={"code": "run_busy", "message": str(exc)})
+    except KeyError:
+        raise HTTPException(status_code=404, detail={"code": "batch_not_found"})
 
 
 @router.delete("/runs/{symbol}/{timeframe}/{config_hash}", response_model=DeleteRunResponse)

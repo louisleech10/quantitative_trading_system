@@ -75,7 +75,9 @@ export function formatRunTimestamp(iso: string | null | undefined): string {
 }
 
 export function formatRunLabel(run: RunInfo): string {
-  const title = run.alias?.trim() || `${run.symbol} / ${run.timeframe} / ${run.config_hash}`;
+  const trimmedAlias = run.alias?.trim();
+  const title = trimmedAlias
+    || (run.batch_alias ? `${run.batch_alias}:${run.symbol}` : `${run.symbol} / ${run.timeframe} / ${run.config_hash}`);
   const count = run.feature_count != null ? ` · ${run.feature_count.toLocaleString()} 特徵` : '';
   const when = run.created_at ? ` · ${formatRunTimestamp(run.created_at)}` : '';
   return `${title}${count}${when}`;

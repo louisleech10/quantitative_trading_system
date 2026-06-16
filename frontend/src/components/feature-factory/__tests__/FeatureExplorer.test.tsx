@@ -210,4 +210,25 @@ describe('FeatureExplorer unified run selector', () => {
       expect(useFeatureFactoryStore.getState().selectedRunKey).toBe('ETHUSDT|12h|cfg_eth');
     });
   });
+
+  it('filters runs by batch_alias in search haystack', async () => {
+    useFeatureFactoryStore.setState({
+      runs: [
+        mockRun({ batch_alias: 'wave-alpha', config_hash: 'cfg_wave' }),
+        mockRun({ symbol: 'ETHUSDT', config_hash: 'cfg_eth', browse_task_id: 'browse_ETHUSDT_12h_cfg_eth' }),
+      ],
+      selectedRunKey: null,
+    });
+
+    render(<FeatureExplorer />);
+
+    const searchInput = screen.getByPlaceholderText('搜尋 alias / symbol / hash…');
+    fireEvent.change(searchInput, { target: { value: 'wave-alpha' } });
+
+    const selects = screen.getAllByRole('combobox');
+    const runDropdown = selects[selects.length - 1] as HTMLSelectElement;
+    const optionLabels = Array.from(runDropdown.options).map((option) => option.textContent ?? '');
+    expect(optionLabels.some((label) => label.includes('wave-alpha:BTCUSDT'))).toBe(true);
+    expect(optionLabels.some((label) => label.includes('ETHUSDT'))).toBe(false);
+  });
 });

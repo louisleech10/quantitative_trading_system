@@ -38,6 +38,11 @@ describe('runExplorer', () => {
     expect(label).toContain('10');
   });
 
+  it('formatRunLabel uses batch_alias:symbol when alias missing', () => {
+    const label = formatRunLabel(baseRun({ batch_alias: 'wave-a' }));
+    expect(label.startsWith('wave-a:BTCUSDT')).toBe(true);
+  });
+
   it('pickDefaultRun prefers completed current task identity over same symbol/timeframe', () => {
     const runs = [
       baseRun({ config_hash: 'cfg_old', browse_task_id: 'browse_BTCUSDT_12h_cfg_old' }),

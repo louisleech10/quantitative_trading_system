@@ -45,6 +45,7 @@ class MultiTFGenerator:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> "FeatureGenerationResult":
         """Generate features across training timeframes and align to primary."""
         start_time = time.time()
@@ -81,11 +82,13 @@ class MultiTFGenerator:
             return self._generate_multi_tf_cgsa(
                 symbol, primary_raw, primary_timestamps, start_time,
                 start_date=start_date, end_date=end_date, persist=persist,
+                batch_id=batch_id,
             )
 
         return self._generate_multi_tf_legacy(
             symbol, primary_raw, primary_timestamps, start_time,
             start_date=start_date, end_date=end_date,
+            batch_id=batch_id,
         )
 
     # ------------------------------------------------------------------
@@ -100,6 +103,7 @@ class MultiTFGenerator:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> "FeatureGenerationResult":
         """CGSA multi-TF: compute layers per TF, align registry groups, then L6.5 + L7."""
         from momentum.FeatureEngineering.feature_config import AlignmentMode
@@ -109,6 +113,7 @@ class MultiTFGenerator:
             return self._generate_multi_tf_cgsa_parallel(
                 symbol, primary_raw, primary_timestamps, start_time,
                 start_date=start_date, end_date=end_date, persist=persist,
+                batch_id=batch_id,
             )
 
         registry = self._factory._cgsa_registry
@@ -314,6 +319,7 @@ class MultiTFGenerator:
             elapsed=pre_l7_elapsed,
             config_hash=config_hash,
             persist=persist,
+            batch_id=batch_id,
         )
         stage_seconds["l65_l7"] = time.perf_counter() - l65_l7_start
         total_elapsed = time.time() - start_time
@@ -359,6 +365,7 @@ class MultiTFGenerator:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         persist: bool = True,
+        batch_id: Optional[str] = None,
     ) -> "FeatureGenerationResult":
         """CGSA multi-TF with ProcessPoolExecutor + spawn for non-primary TFs."""
         import multiprocessing as mp
@@ -605,6 +612,7 @@ class MultiTFGenerator:
             elapsed=pre_l7_elapsed,
             config_hash=config_hash,
             persist=persist,
+            batch_id=batch_id,
         )
         stage_seconds["l65_l7"] = time.perf_counter() - l65_l7_start
         total_elapsed = time.time() - start_time
@@ -1245,6 +1253,7 @@ class MultiTFGenerator:
         start_time: float,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        batch_id: Optional[str] = None,
     ) -> "FeatureGenerationResult":
         """Legacy multi-TF: combine layers into wide DF, align, then L6.5 + L7."""
         aligned_outputs: List[pd.DataFrame] = []
@@ -1369,6 +1378,7 @@ class MultiTFGenerator:
             config=self._config,
             elapsed=elapsed,
             config_hash=config_hash,
+            batch_id=batch_id,
         )
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)

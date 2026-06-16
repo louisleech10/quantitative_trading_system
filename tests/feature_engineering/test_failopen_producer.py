@@ -150,6 +150,7 @@ class _CgsaStubFactory(StubFactory):
         config_hash,
         compute_warnings=None,
         persist: bool = True,
+        batch_id=None,
     ):
         del symbol, timeframe, config, compute_warnings, persist
         frames = []

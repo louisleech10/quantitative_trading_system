@@ -118,7 +118,7 @@ class _FactoryStub:
         del config, symbol, timeframe, start_date, end_date
         return "dummy_hash"
 
-    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash):
+    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None):
         del symbol, timeframe, config, elapsed, config_hash
         features_df = self._combine_layers(layers).reindex(raw_data.index)
         return SimpleNamespace(
