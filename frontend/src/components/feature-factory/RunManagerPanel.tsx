@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-react';
 import type { RunInfo } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import {
@@ -77,6 +77,20 @@ function formatCreatedAt(createdAt: string | null | undefined): {
   return { label: formatRelativeTime(createdAt), title: absolute };
 }
 
+const RUN_MANAGER_EXPANDED_KEY = 'ff-run-manager-expanded';
+
+function readExpandedPreference(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const stored = localStorage.getItem(RUN_MANAGER_EXPANDED_KEY);
+    if (stored === 'false') return false;
+    if (stored === 'true') return true;
+  } catch {
+    // ignore storage errors
+  }
+  return true;
+}
+
 function displayName(run: RunInfo): { visible: string; fullHash: string; truncated: boolean } {
   const alias = run.alias?.trim();
   if (alias) return { visible: alias, fullHash: run.config_hash, truncated: false };
@@ -90,10 +104,27 @@ function displayName(run: RunInfo): { visible: string; fullHash: string; truncat
 
 export default function RunManagerPanel() {
   const { runs, runsLoading, runsError, fetchRuns, updateRunAlias, deleteRun } = useFeatureFactoryStore();
+  // 初值固定 true 保持 SSR/CSR 一致(避免 Next hydration mismatch);持久化偏好於 mount 後載入。
+  const [expanded, setExpanded] = useState(true);
+  useEffect(() => {
+    setExpanded(readExpandedPreference());
+  }, []);
   const [actionError, setActionError] = useState<string | null>(null);
   const [renamingKey, setRenamingKey] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [savingRename, setSavingRename] = useState(false);
+
+  const toggleExpanded = () => {
+    setExpanded((current) => {
+      const next = !current;
+      try {
+        localStorage.setItem(RUN_MANAGER_EXPANDED_KEY, String(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     void fetchRuns();
@@ -139,49 +170,64 @@ export default function RunManagerPanel() {
     }
   };
 
-  if (runsLoading) {
-    return (
-      <div className="glass-panel rounded-2xl p-6 border border-white/10">
-        <p className="text-sm text-slate-400">載入 Runs…</p>
-      </div>
-    );
-  }
-
-  if (runsError) {
-    return (
-      <div className="glass-panel rounded-2xl p-6 border border-white/10 space-y-3">
-        <p role="alert" className="text-sm text-rose-300">
-          {runsError}
-        </p>
-        <button
-          type="button"
-          onClick={() => void fetchRuns()}
-          className={`${btnBase} border-white/15 text-slate-200 hover:border-cyan-300/40 hover:bg-white/5`}
-        >
-          重試
-        </button>
-      </div>
-    );
-  }
-
   const renamingRun = renamingKey ? runs.find((run) => runKey(run) === renamingKey) : undefined;
+  const runCountLabel = runsLoading ? '載入中…' : `${runs.length} 個 Run`;
 
   return (
-    <section className="glass-panel rounded-2xl p-5 border border-white/10 space-y-4">
-      <div>
-        <h2 className="text-sm font-semibold text-slate-100">Run 管理</h2>
-        <p className="text-xs text-slate-400 mt-0.5">命名、檢視與刪除已產生的 Feature Run</p>
-      </div>
+    <section
+      className={
+        expanded
+          ? 'glass-panel rounded-2xl p-5 border border-white/10 space-y-4'
+          : 'glass-panel rounded-xl border border-white/10 px-4 py-3'
+      }
+    >
+      <button
+        type="button"
+        onClick={toggleExpanded}
+        className="flex w-full items-center justify-between gap-3 text-left"
+        aria-expanded={expanded}
+      >
+        <div>
+          <h2 className="text-sm font-semibold text-slate-100">Run 管理</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            命名、檢視與刪除已產生的 Feature Run · {runCountLabel}
+          </p>
+        </div>
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+        )}
+      </button>
 
-      {actionError && (
+      {expanded && runsLoading && (
+        <p className="text-sm text-slate-400">載入 Runs…</p>
+      )}
+
+      {expanded && !runsLoading && runsError && (
+        <div className="space-y-3">
+          <p role="alert" className="text-sm text-rose-300">
+            {runsError}
+          </p>
+          <button
+            type="button"
+            onClick={() => void fetchRuns()}
+            className={`${btnBase} border-white/15 text-slate-200 hover:border-cyan-300/40 hover:bg-white/5`}
+          >
+            重試
+          </button>
+        </div>
+      )}
+
+      {expanded && !runsLoading && !runsError && actionError && (
         <p role="alert" className="text-xs text-rose-300 border border-rose-400/30 bg-rose-400/10 rounded-lg px-3 py-2">
           {actionError}
         </p>
       )}
 
-      {runs.length === 0 ? (
+      {expanded && !runsLoading && !runsError && runs.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-8">尚無 Runs</p>
-      ) : (
+      ) : expanded && !runsLoading && !runsError && runs.length > 0 ? (
         <div className="overflow-auto rounded-xl border border-white/10 bg-white/[0.03]">
           <table className="w-full min-w-[760px]">
             <thead className="sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm border-b border-white/10">
@@ -260,7 +306,7 @@ export default function RunManagerPanel() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       <Dialog open={renamingKey !== null} onOpenChange={(open) => { if (!open) closeRename(); }}>
         <DialogContent className="max-w-md gap-4 p-5" aria-label="重命名 Run">

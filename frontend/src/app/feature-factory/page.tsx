@@ -58,6 +58,7 @@ export default function FeatureFactoryPage() {
   const setValidationSummaryForTask = useFeatureFactoryStore((state) => state.setValidationSummaryForTask);
   const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
   const fetchRegistry = useFeatureFactoryStore((state) => state.fetchRegistry);
+  const fetchRuns = useFeatureFactoryStore((state) => state.fetchRuns);
   const distinctSymbolCount = useMemo(
     () => new Set(registryEntries.map((entry) => entry.symbol)).size,
     [registryEntries],
@@ -80,6 +81,8 @@ export default function FeatureFactoryPage() {
   const [browseTaskIds, setBrowseTaskIds] = useState<Record<string, string>>({});
   const [registeringSymbol, setRegisteringSymbol] = useState<string | null>(null);
   const loadedResultTaskRef = useRef<string | null>(null);
+  const fetchedRunsForTaskRef = useRef<string | null>(null);
+  const fetchedRunsForBatchRef = useRef<string | null>(null);
   // 已下載的 Feature K 線標的（來自 FeatureKlineDownloadPanel 下載的資料）
   const [featureKlineSymbols, setFeatureKlineSymbols] = useState<string[]>([]);
   const [featureKlineSymbolsLoading, setFeatureKlineSymbolsLoading] = useState(false);
@@ -258,6 +261,32 @@ export default function FeatureFactoryPage() {
       setValidationSummaryForTask(currentTask.task_id, currentTask.validation_summary);
     }
   }, [currentTask?.task_id, currentTask?.status, currentTask?.validation_summary, setValidationSummaryForTask]);
+
+  // 單次生成完成後自動重整 Run 列表
+  useEffect(() => {
+    if (currentTask?.status !== 'completed' || !currentTask.task_id) {
+      return;
+    }
+    if (fetchedRunsForTaskRef.current === currentTask.task_id) {
+      return;
+    }
+    fetchedRunsForTaskRef.current = currentTask.task_id;
+    void fetchRuns();
+  }, [currentTask?.status, currentTask?.task_id, fetchRuns]);
+
+  // 批次生成完成（或 partial）後自動重整 Run 列表
+  useEffect(() => {
+    const batchDone =
+      batchTask?.status === 'completed' || batchTask?.status === 'partial';
+    if (!batchDone || !batchTask.task_id) {
+      return;
+    }
+    if (fetchedRunsForBatchRef.current === batchTask.task_id) {
+      return;
+    }
+    fetchedRunsForBatchRef.current = batchTask.task_id;
+    void fetchRuns();
+  }, [batchTask?.status, batchTask?.task_id, fetchRuns]);
 
   const handleGenerate = async () => {
     if (!config) {

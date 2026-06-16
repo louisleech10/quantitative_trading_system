@@ -79,7 +79,7 @@ describe('run lifecycle', () => {
     useFeatureFactoryStore.setState({ completionQueue: [run] });
     render(<RunRetentionDialog />);
     fireEvent.change(screen.getByLabelText('Run alias'), { target: { value: 'alpha' } });
-    fireEvent.click(screen.getByText('命名保留'));
+    fireEvent.click(screen.getByText('命名並保留'));
     expect(await screen.findByRole('alert')).toHaveTextContent('名稱已被使用');
     expect(useFeatureFactoryStore.getState().completionQueue).toHaveLength(1);
   });
