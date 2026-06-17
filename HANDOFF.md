@@ -1,31 +1,32 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-17 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-06-17 | **Branch**: main | 最後 commit: c3c40a3
 
-## 本輪完成:#4 batch_alias Phase 1+2(批次一次命名,解 100 symbol 改名 100 次)
-完整中-大管線走完,**Codex code review APPROVE**,本 commit 收尾。
-- **規格**:SPEC/TODO/MANIFEST V4(docs/BATCH_ALIAS_*.md),經 **4 輪 Codex adversarial**(r1 FAIL 2B/4M/2m → r2 → r3 → r4 PASS),每輪抓真實缺口逐輪收斂:batch_id 跨進程鏈→禁 mutable self 顯式穿透→multi-TF 主路徑遺漏→6 個 _layer7 呼叫點全涵蓋。
-- **實作**:Composer 2.5 寫 P1(後端 registry/API/cleanup)+P2(前端 Explorer/Run 管理分組+整批 rename)。
-- **協調者驗收抓並修 3 bug(防假綠生效)**:① registry.add 新 entry 無條件 pop batch_alias→僅 batch_id is None 時 pop;② 前端新測試漏 import jest-dom;③ 6 個 test fake factory 的 _layer7 簽名缺 batch_id=None(Codex review 抓到的回歸,跨 8 檔 17 失敗)。
-- **驗收**:後端 100 passed(含 test_batch_alias 17+所有 _layer7 回歸+run_lifecycle)、前端 39 passed(新 16)、npm run build 過、解耦 0、Codex review r2 APPROVE。
-- **語義**:三態 overwrite(同 batch_id 保留 batch_alias/換 batch_id reset/None merge-preserve);batch_alias 不覆寫 per-run alias;set_batch_alias 對 deleting→409;auto-cleanup 候選+mark_deleting 都護 batch_alias。
+## 給下一個 session:接手就做這些(使用者已拍板,2026-06-17)
+研究路線:先把 **crypto 單一市場** 的 FF→IC→ML→回測 跑成完整版;**數據源擴充(Glassnode/CoinGecko/台股/美股)延後**,等四階段完整版再議(三方委員會共識,評估檔 handoffs/20260617-datasource-ff-assessment-{codex,composer}.md)。
 
-## 已知無關問題(非本任務)
-- frontend `strategy-components.test.tsx` pre-existing 壞(缺 @/components/strategy/SignalTooltip,commit 6be0862,未碰 strategy)。
+### 任務 A(先做,最獨立):修 :4109 ref-cache bug
+- **位置**:`feature_factory.py:4109` `factory._reference_data_cache[("BTCUSDT", tf)] = ref_df` —— 多 symbol 批次時 cache key 硬寫 "BTCUSDT",即使傳了別的 `ref_symbol`(:3894)也被覆蓋 → 跨截面特徵**靜默用錯參考標的**。命中高風險 (d)(回測/ML 正確性)。
+- 修法方向:cache key 用實際 `reference_symbol`(config 的 cross_sectional.reference_symbol),非硬編碼。
+- 流程:完整管線(SPEC→雙家族 adversarial→Composer 實作→Codex review)。**使用者已同意開工**。
 
-## 架構評估(2026-06-17 三方委員會:Claude+Codex+Composer 一致,評估檔 handoffs/20260617-datasource-ff-assessment-{codex,composer}.md)
-使用者問:① 串 Glassnode/CoinGecko/台股/美股 易嗎 ② FF 夠不夠、可否往 IC Gatekeeper。
-- **Q1 不能輕易達成**:adapter 抽象在但產線只 crypto 單通道。阻斷:fetch_aligned inner-join 跨頻率不相容(P0)、股票交易日曆全缺(P0)、雙 registry 假象、crypto taker 硬耦合、**:4109 ref-cache 硬寫 BTCUSDT=現有 bug**。前置:adapter metadata 合約+AsOf/PIT 對齊層+MarketCalendar+移除 BTC 硬編碼。
-- **Q2 crypto 域有條件 GO 往 IC Gatekeeper**:FF crypto 研究級已足;IC Gatekeeper 已大量建好(ICFilterOrchestrator 8 階段+20+ 分析器),接點=V2 manifest+L7 raw parquet。GO 條件:限 crypto kline_cache、走 IC-First、強制 selection_window/split、修 :4109、真實 kline 端到端三方簽核。
-- **PIT 稽核**:L3/L4/multi-TF/L6.5-winsor(預設 causal)安全;⚠️ 兩風險:(a) causal_preprocessing=False→全樣本 winsor 洩漏;(b) FracDiff d* 只前 500 bar 校準→regime drift。
-- **使用者待決(我已問,未答)**::4109 bug 現在修(全管線高風險(d)) vs 記待辦。新源另立 epic 與 IC 解耦(三方共識)。
+### 任務 B(接著做):L6.5 預處理正確性強化(打包成一個計畫)
+1. **刪 legacy + IC-First 設為唯一/預設**:現況 IC-First **預設關**(`feature_config.py:240` ic_first_pipeline=False;env FFACT_IC_FIRST_PIPELINE),預設路徑是 legacy(`feature_factory.py:392-409` 分支)。使用者手動在 UI(PreprocessingPanel.tsx)開 IC-First。決定:IC-First 設唯一/預設、移除 legacy 分支+UI 切換鈕+改測試。理由:legacy 的 rank/gaussian/zscore 全樣本→洩漏面較大;IC-First 省記憶體理由仍成立。
+2. **FracDiff d\* walk-forward 重估**:現只用前 500 bar 校準一次(`feature_preprocessor.py:170-172,3734`)→長樣本 regime drift。改分段重估提升數據品質。
+3. **causal_preprocessing 釘死 True + 警示註解**:`feature_config.py:233` 預設 True、`feature_factory.py:3560` setdefault True,**未上 UI/API**(使用者關不掉)。在定義/setdefault/讀取三處加醒目註解「⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會」防 AI 靜默改。
+- 流程:命中 (d),完整管線一個計畫。
 
-## 待辦 ticket(另開)
-- **[新-高] feature_factory.py:4109 ref-cache 硬寫 ("BTCUSDT",tf)**:多 symbol 批次跨截面靜默用錯 ref,影響現有 crypto 正確性;命中 (d),建議推 IC 前先修。
-- **[新] 多數據源 epic**(與 IC 解耦):adapter metadata 合約/AsOf PIT 對齊/MarketCalendar/企業行動;CoinGecko<Glassnode<台股美股 難度遞增。
-- **[新] L6.5 洩漏防護**:確認 UI 預設 causal_preprocessing=True+IC-First;d* walk-forward 重估評估。
-- float16 strict/training 讀升 float32 可選後續(docs/FLOAT16_STORAGE_EVALUATION.md)。
-- CGSA raw-sink ADF/d* tier-gated 並行(需 24/32GB 硬體)。
-- batch_alias Phase 3:一等 batch entity(batches.json),目前 batch_id/batch_alias 存 run registry([BA-9])。
+### 不用現在動
+- selection_window/split:IC 引擎已強制(`ic_engine.py:127,453` 沒給就報錯)。等逐一驗證 IC 篩選時再看。
+
+## IC Gatekeeper 真實狀態(使用者原以為「只有項目沒測試」,實際更正)
+- **已大量建好**:ICFilterOrchestrator 8 階段全真實作 + 10 個深度分析模組;**79 個 IC 單元測試會過**;前端 ic-analysis 元件齊。接點=V2 manifest + L7 raw parquet。
+- **但單元測試全用合成資料(np.random)**,從沒真實 kline 端到端驗證。
+- **「真實 kline 三方簽核」= 下一步驗證手段**(選真實 symbol→FF(IC-First)→IC 引擎→委員會查洩漏/算錯→修再跑),不是等完美才跑。是「邊跑真實簽核邊完善」。
+
+## 其他待辦(更後面)
+- 多數據源 epic(延後):adapter metadata 合約/AsOf PIT 對齊/MarketCalendar/企業行動。
+- float16 strict 讀升 float32;CGSA tier 並行(需 24/32GB);batch_alias Phase 3(batches.json)。
+- pre-existing 壞測試:frontend strategy-components.test.tsx 缺 SignalTooltip(與本線無關)。
 
 ## 執行端分工(2026-06-15 使用者定)
-- 中/大實作=Composer 2.5 + Codex review;小=Claude 自己做。技術決策走委員會;中途自主 commit。
+中/大實作=Composer 2.5 + Codex review;小=Claude 自己做。技術決策走委員會;中途自主 commit。
