@@ -1,0 +1,2882 @@
+{
+  "config": {
+    "adaptive_zscore": {
+      "apply_to": "all",
+      "enabled": true,
+      "epsilon": 1e-08,
+      "windows": [
+        100,
+        252
+      ]
+    },
+    "adf_differencing": {
+      "adf_threshold": 0.1,
+      "apply_to": "non_stationary",
+      "enabled": true,
+      "max_diff": 1,
+      "sample_size": 500
+    },
+    "calibration_bars": 500,
+    "causal_preprocessing": true,
+    "enabled": true,
+    "fractional_differencing": {
+      "adf_threshold": 0.1,
+      "apply_to": "non_stationary",
+      "cache_d_star": true,
+      "d_range": [
+        0.0,
+        1.0
+      ],
+      "enabled": true,
+      "precision": 0.01,
+      "weight_threshold": 1e-05
+    },
+    "gaussian_normalize": {
+      "apply_to": "all",
+      "clip_range": [
+        0.001,
+        0.999
+      ],
+      "enabled": true
+    },
+    "ic_first_pipeline": true,
+    "mode": "replace",
+    "rank_transform": {
+      "apply_to": "all",
+      "enabled": true,
+      "window": 252
+    },
+    "winsorization": {
+      "apply_to": "all",
+      "enabled": true,
+      "method": "quantile",
+      "quantile_range": [
+        0.01,
+        0.99
+      ],
+      "window": 252
+    }
+  },
+  "config_hash": "f2dc452e9b4bddc17f45af46591c39150159d073dae137bb8c4aa1ea1106d285",
+  "generated_at_utc": "2026-06-17T16:05:18.852447+00:00",
+  "git_sha": "e097cc7df939f311882cf0b1889e42bc434740ae",
+  "kline_path": "data_cache/feature_klines/kline_cache.h5",
+  "mode": "ic_first_l65",
+  "records": {
+    "ADAUSDT": {
+      "1h": {
+        "post_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32"
+          },
+          "feature_count": 20,
+          "feature_ids": [
+            "L1_binance_close",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_open",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L1_binance_volume",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_return_1",
+            "L2_derived_close_std_13",
+            "L2_derived_close_std_21",
+            "L2_derived_close_std_3",
+            "L2_derived_close_std_34"
+          ],
+          "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
+          "nan_mask_hash": "c7538329816ec0d37b308be984ba83195a1f874516a8521547ec69112b181e67",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": -0.05995285770186766,
+              "nan_ratio": 0.062,
+              "std": 1.2958559892670523
+            },
+            "L1_binance_high": {
+              "mean": -0.06944321280538684,
+              "nan_ratio": 0.062,
+              "std": 1.2926610071779605
+            },
+            "L1_binance_low": {
+              "mean": -0.05915027037335986,
+              "nan_ratio": 0.062,
+              "std": 1.2925644699563712
+            },
+            "L1_binance_open": {
+              "mean": -0.0643486199239125,
+              "nan_ratio": 0.062,
+              "std": 1.2895289276176713
+            },
+            "L1_binance_quote_volume": {
+              "mean": 0.020456317114131303,
+              "nan_ratio": 0.062,
+              "std": 1.0629114551484558
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.010971955057122618,
+              "nan_ratio": 0.062,
+              "std": 1.0026516693658307
+            },
+            "L1_binance_volume": {
+              "mean": 0.019402941041257428,
+              "nan_ratio": 0.062,
+              "std": 1.0599572930478398
+            },
+            "L2_derived_close_mean_13": {
+              "mean": -0.07254072986460645,
+              "nan_ratio": 0.062,
+              "std": 1.337585951632572
+            },
+            "L2_derived_close_mean_21": {
+              "mean": -0.07303114919272909,
+              "nan_ratio": 0.062,
+              "std": 1.3603697974667834
+            },
+            "L2_derived_close_mean_3": {
+              "mean": -0.06766196549028451,
+              "nan_ratio": 0.062,
+              "std": 1.3036509522798854
+            },
+            "L2_derived_close_mean_34": {
+              "mean": -0.10575698274700318,
+              "nan_ratio": 0.062,
+              "std": 1.3752621544197836
+            },
+            "L2_derived_close_mean_5": {
+              "mean": -0.0752075227587593,
+              "nan_ratio": 0.062,
+              "std": 1.3168737825330432
+            },
+            "L2_derived_close_mean_55": {
+              "mean": -0.12675701185037244,
+              "nan_ratio": 0.062,
+              "std": 1.4015810089073688
+            },
+            "L2_derived_close_mean_8": {
+              "mean": -0.07965319337035559,
+              "nan_ratio": 0.062,
+              "std": 1.335703585437292
+            },
+            "L2_derived_close_mean_89": {
+              "mean": -0.08864718707503506,
+              "nan_ratio": 0.062,
+              "std": 1.4401940624948883
+            },
+            "L2_derived_close_return_1": {
+              "mean": 0.010203548986914878,
+              "nan_ratio": 0.0625,
+              "std": 1.0061576776399257
+            },
+            "L2_derived_close_std_13": {
+              "mean": -0.008083172495919224,
+              "nan_ratio": 0.162,
+              "std": 1.0341018509794684
+            },
+            "L2_derived_close_std_21": {
+              "mean": 0.006763004541873349,
+              "nan_ratio": 0.162,
+              "std": 1.0482218343409353
+            },
+            "L2_derived_close_std_3": {
+              "mean": -0.004782877373447021,
+              "nan_ratio": 0.0625,
+              "std": 1.0250199099267026
+            },
+            "L2_derived_close_std_34": {
+              "mean": 0.038319528848088036,
+              "nan_ratio": 0.0625,
+              "std": 1.2043808828866325
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "501c9091909f25d1a9f14be52c73cbd23a51e9524cee4bb0615b741d283d8a46"
+        },
+        "pre_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float64",
+            "L2_derived_close_std_21": "float64",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32",
+            "L2_derived_close_std_5": "float32",
+            "L2_derived_close_std_55": "float32",
+            "L2_derived_close_std_8": "float32",
+            "L2_derived_close_std_89": "float32",
+            "L2_derived_log_close": "float32",
+            "L2_derived_volume_change_1": "float32",
+            "L2_derived_volume_mean_13": "float64",
+            "L2_derived_volume_mean_21": "float64",
+            "L2_derived_volume_mean_3": "float64",
+            "L2_derived_volume_mean_34": "float64",
+            "L2_derived_volume_mean_5": "float64",
+            "L2_derived_volume_mean_55": "float64",
+            "L2_derived_volume_mean_8": "float64",
+            "L2_derived_volume_mean_89": "float64"
+          },
+          "feature_count": 34,
+          "feature_ids": [
+            "L1_binance_open",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_close",
+            "L1_binance_volume",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L2_derived_close_return_1",
+            "L2_derived_log_close",
+            "L2_derived_volume_change_1",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_std_3",
+            "L2_derived_volume_mean_3",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_std_5",
+            "L2_derived_volume_mean_5",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_std_8",
+            "L2_derived_volume_mean_8",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_std_13",
+            "L2_derived_volume_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_std_21",
+            "L2_derived_volume_mean_21",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_std_34",
+            "L2_derived_volume_mean_34",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_std_55",
+            "L2_derived_volume_mean_55",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_std_89",
+            "L2_derived_volume_mean_89"
+          ],
+          "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
+          "nan_mask_hash": "b6f0d1e7da258675c081dc22c5f39afdcbfefb7e0eba3154ea8c941baa7155ea",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 0.2621571072563529,
+              "nan_ratio": 0.0,
+              "std": 0.01465557213865651
+            },
+            "L1_binance_high": {
+              "mean": 0.2636581504866481,
+              "nan_ratio": 0.0,
+              "std": 0.015026608970972806
+            },
+            "L1_binance_low": {
+              "mean": 0.26072159253060817,
+              "nan_ratio": 0.0,
+              "std": 0.01440479128547523
+            },
+            "L1_binance_open": {
+              "mean": 0.26218815534561873,
+              "nan_ratio": 0.0,
+              "std": 0.014685201227028738
+            },
+            "L1_binance_quote_volume": {
+              "mean": 1607746.024265625,
+              "nan_ratio": 0.0,
+              "std": 1893231.8902948056
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.4940428096950054,
+              "nan_ratio": 0.0,
+              "std": 0.07597458731400643
+            },
+            "L1_binance_volume": {
+              "mean": 6097856.499375,
+              "nan_ratio": 0.0,
+              "std": 7260960.502316378
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 0.26230515708774327,
+              "nan_ratio": 0.0,
+              "std": 0.0144301827901016
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 0.26240081641823054,
+              "nan_ratio": 0.0,
+              "std": 0.014275332783032625
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 0.2621834089457989,
+              "nan_ratio": 0.0,
+              "std": 0.014623004304537428
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 0.2625521450936794,
+              "nan_ratio": 0.0,
+              "std": 0.014068721631624325
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 0.262207485511899,
+              "nan_ratio": 0.0,
+              "std": 0.014590013185125277
+            },
+            "L2_derived_close_mean_55": {
+              "mean": 0.262776299290359,
+              "nan_ratio": 0.0,
+              "std": 0.01378560804517335
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 0.26224467570334675,
+              "nan_ratio": 0.0,
+              "std": 0.014534613567326427
+            },
+            "L2_derived_close_mean_89": {
+              "mean": 0.26308775959908964,
+              "nan_ratio": 0.0,
+              "std": 0.013391607039236805
+            },
+            "L2_derived_close_return_1": {
+              "mean": -5.7991142639202656e-05,
+              "nan_ratio": 0.0005,
+              "std": 0.0069819032626913975
+            },
+            "L2_derived_close_std_13": {
+              "mean": 0.0003387906321717443,
+              "nan_ratio": 0.1,
+              "std": 0.0008951631588692369
+            },
+            "L2_derived_close_std_21": {
+              "mean": 4.7764149508011066e-05,
+              "nan_ratio": 0.1,
+              "std": 0.000526254590951267
+            },
+            "L2_derived_close_std_3": {
+              "mean": 0.0012088413475784359,
+              "nan_ratio": 0.0005,
+              "std": 0.0010339126145369774
+            },
+            "L2_derived_close_std_34": {
+              "mean": 0.004346515308087669,
+              "nan_ratio": 0.0005,
+              "std": 0.0025106409133885295
+            },
+            "L2_derived_close_std_5": {
+              "mean": 0.0015701417604154055,
+              "nan_ratio": 0.0005,
+              "std": 0.001192481313654214
+            },
+            "L2_derived_close_std_55": {
+              "mean": 0.005401488391157443,
+              "nan_ratio": 0.0005,
+              "std": 0.00292603347136258
+            },
+            "L2_derived_close_std_8": {
+              "mean": 0.0020022871331462013,
+              "nan_ratio": 0.0005,
+              "std": 0.0014097233843302513
+            },
+            "L2_derived_close_std_89": {
+              "mean": 0.00660965848481632,
+              "nan_ratio": 0.0005,
+              "std": 0.003217688608480586
+            },
+            "L2_derived_log_close": {
+              "mean": -1.3403524237275124,
+              "nan_ratio": 0.0,
+              "std": 0.0553528295796563
+            },
+            "L2_derived_volume_change_1": {
+              "mean": 0.21827710405416692,
+              "nan_ratio": 0.0005,
+              "std": 0.9349071446447023
+            },
+            "L2_derived_volume_mean_13": {
+              "mean": 715423.6899697796,
+              "nan_ratio": 0.0995,
+              "std": 1665759.1676079412
+            },
+            "L2_derived_volume_mean_21": {
+              "mean": 1797165.4545650159,
+              "nan_ratio": 0.0995,
+              "std": 2002584.4814076382
+            },
+            "L2_derived_volume_mean_3": {
+              "mean": 3069757.4304548865,
+              "nan_ratio": 0.0995,
+              "std": 4623089.20802823
+            },
+            "L2_derived_volume_mean_34": {
+              "mean": 171186.16326424968,
+              "nan_ratio": 0.0995,
+              "std": 605461.3483021565
+            },
+            "L2_derived_volume_mean_5": {
+              "mean": 2350290.8011523313,
+              "nan_ratio": 0.0995,
+              "std": 3610282.880281022
+            },
+            "L2_derived_volume_mean_55": {
+              "mean": 71057.3006431873,
+              "nan_ratio": 0.0995,
+              "std": 341808.86825048167
+            },
+            "L2_derived_volume_mean_8": {
+              "mean": 777164.925966918,
+              "nan_ratio": 0.0995,
+              "std": 2160936.8218651493
+            },
+            "L2_derived_volume_mean_89": {
+              "mean": 77961.07136949002,
+              "nan_ratio": 0.0995,
+              "std": 275492.2231590815
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "72fbf4fd88332e35a2cc15af3926bdd66998d2b9d95ec35df63b243970dee747"
+        },
+        "selected_feature_count": 20,
+        "selected_feature_ids": [
+          "L1_binance_close",
+          "L1_binance_high",
+          "L1_binance_low",
+          "L1_binance_open",
+          "L1_binance_quote_volume",
+          "L1_binance_taker_ratio",
+          "L1_binance_volume",
+          "L2_derived_close_mean_13",
+          "L2_derived_close_mean_21",
+          "L2_derived_close_mean_3",
+          "L2_derived_close_mean_34",
+          "L2_derived_close_mean_5",
+          "L2_derived_close_mean_55",
+          "L2_derived_close_mean_8",
+          "L2_derived_close_mean_89",
+          "L2_derived_close_return_1",
+          "L2_derived_close_std_13",
+          "L2_derived_close_std_21",
+          "L2_derived_close_std_3",
+          "L2_derived_close_std_34"
+        ],
+        "source_cols": 34,
+        "source_rows": 2000,
+        "symbol": "ADAUSDT",
+        "timeframe": "1h"
+      },
+      "4h": {
+        "post_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32"
+          },
+          "feature_count": 20,
+          "feature_ids": [
+            "L1_binance_close",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_open",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L1_binance_volume",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_return_1",
+            "L2_derived_close_std_13",
+            "L2_derived_close_std_21",
+            "L2_derived_close_std_3",
+            "L2_derived_close_std_34"
+          ],
+          "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
+          "nan_mask_hash": "c638c2b0e8c3a28cfece9606884165351a65c353b8a98dcdad82fa2a72deb5be",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 0.012501261447354724,
+              "nan_ratio": 0.1615,
+              "std": 1.0527759050444943
+            },
+            "L1_binance_high": {
+              "mean": 0.020077834597782642,
+              "nan_ratio": 0.1615,
+              "std": 1.097898309072423
+            },
+            "L1_binance_low": {
+              "mean": 0.02248003297889706,
+              "nan_ratio": 0.1615,
+              "std": 1.068788556414286
+            },
+            "L1_binance_open": {
+              "mean": 0.018418110794029278,
+              "nan_ratio": 0.1615,
+              "std": 1.0672964072210849
+            },
+            "L1_binance_quote_volume": {
+              "mean": -0.0038400829054518523,
+              "nan_ratio": 0.1615,
+              "std": 1.0544689389256086
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.013138337207135004,
+              "nan_ratio": 0.062,
+              "std": 1.019496299455581
+            },
+            "L1_binance_volume": {
+              "mean": -0.010227759792813063,
+              "nan_ratio": 0.1615,
+              "std": 1.0318576623684312
+            },
+            "L2_derived_close_mean_13": {
+              "mean": -0.021136585472021033,
+              "nan_ratio": 0.114,
+              "std": 1.1196116331684298
+            },
+            "L2_derived_close_mean_21": {
+              "mean": -0.03665772373213725,
+              "nan_ratio": 0.1355,
+              "std": 1.1976290027925192
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 0.027536237056113858,
+              "nan_ratio": 0.1615,
+              "std": 1.1171412369482914
+            },
+            "L2_derived_close_mean_34": {
+              "mean": -0.03706266027626892,
+              "nan_ratio": 0.0625,
+              "std": 1.1933412061851794
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 0.03046045032969621,
+              "nan_ratio": 0.1615,
+              "std": 1.1317284592645096
+            },
+            "L2_derived_close_mean_55": {
+              "mean": -0.029885560190646598,
+              "nan_ratio": 0.0625,
+              "std": 1.2625629288204638
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 0.01388482267934838,
+              "nan_ratio": 0.1595,
+              "std": 1.1061682323221451
+            },
+            "L2_derived_close_mean_89": {
+              "mean": -0.004554158061812631,
+              "nan_ratio": 0.0625,
+              "std": 1.2911080791778917
+            },
+            "L2_derived_close_return_1": {
+              "mean": 0.002958822407507493,
+              "nan_ratio": 0.0625,
+              "std": 1.0015565747350539
+            },
+            "L2_derived_close_std_13": {
+              "mean": 0.0018985642531093617,
+              "nan_ratio": 0.0625,
+              "std": 1.1152866477902876
+            },
+            "L2_derived_close_std_21": {
+              "mean": -0.027759354430716483,
+              "nan_ratio": 0.0625,
+              "std": 1.1852428324124817
+            },
+            "L2_derived_close_std_3": {
+              "mean": 0.009651339254295453,
+              "nan_ratio": 0.0625,
+              "std": 1.0233829308719624
+            },
+            "L2_derived_close_std_34": {
+              "mean": -0.01953393061645329,
+              "nan_ratio": 0.0625,
+              "std": 1.250352177202027
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "bd4766d3aeeda2ce7d8638f88102f88f59881f54e8f58dda42ebad7621f675ea"
+        },
+        "pre_ic": {
+          "dtypes": {
+            "L1_binance_close": "float64",
+            "L1_binance_high": "float64",
+            "L1_binance_low": "float64",
+            "L1_binance_open": "float64",
+            "L1_binance_quote_volume": "float64",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float64",
+            "L2_derived_close_mean_13": "float64",
+            "L2_derived_close_mean_21": "float64",
+            "L2_derived_close_mean_3": "float64",
+            "L2_derived_close_mean_34": "float64",
+            "L2_derived_close_mean_5": "float64",
+            "L2_derived_close_mean_55": "float64",
+            "L2_derived_close_mean_8": "float64",
+            "L2_derived_close_mean_89": "float64",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32",
+            "L2_derived_close_std_5": "float32",
+            "L2_derived_close_std_55": "float64",
+            "L2_derived_close_std_8": "float32",
+            "L2_derived_close_std_89": "float64",
+            "L2_derived_log_close": "float64",
+            "L2_derived_volume_change_1": "float32",
+            "L2_derived_volume_mean_13": "float32",
+            "L2_derived_volume_mean_21": "float64",
+            "L2_derived_volume_mean_3": "float64",
+            "L2_derived_volume_mean_34": "float32",
+            "L2_derived_volume_mean_5": "float64",
+            "L2_derived_volume_mean_55": "float64",
+            "L2_derived_volume_mean_8": "float32",
+            "L2_derived_volume_mean_89": "float64"
+          },
+          "feature_count": 34,
+          "feature_ids": [
+            "L1_binance_open",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_close",
+            "L1_binance_volume",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L2_derived_close_return_1",
+            "L2_derived_log_close",
+            "L2_derived_volume_change_1",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_std_3",
+            "L2_derived_volume_mean_3",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_std_5",
+            "L2_derived_volume_mean_5",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_std_8",
+            "L2_derived_volume_mean_8",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_std_13",
+            "L2_derived_volume_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_std_21",
+            "L2_derived_volume_mean_21",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_std_34",
+            "L2_derived_volume_mean_34",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_std_55",
+            "L2_derived_volume_mean_55",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_std_89",
+            "L2_derived_volume_mean_89"
+          ],
+          "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
+          "nan_mask_hash": "39f9daf1b4dd3c0749970e67fb44a22f061ad1860b0fb757d608d251a5a24273",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 0.007076861816364998,
+              "nan_ratio": 0.0995,
+              "std": 0.010826878311684638
+            },
+            "L1_binance_high": {
+              "mean": 0.013942885833596206,
+              "nan_ratio": 0.0995,
+              "std": 0.012539704753401852
+            },
+            "L1_binance_low": {
+              "mean": 0.00883598770221946,
+              "nan_ratio": 0.0995,
+              "std": 0.011211944150011918
+            },
+            "L1_binance_open": {
+              "mean": 0.0100969566669576,
+              "nan_ratio": 0.0995,
+              "std": 0.01162367954977751
+            },
+            "L1_binance_quote_volume": {
+              "mean": 10221271.709503585,
+              "nan_ratio": 0.0995,
+              "std": 12835223.374034153
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.4893206992000341,
+              "nan_ratio": 0.0,
+              "std": 0.044151868016741744
+            },
+            "L1_binance_volume": {
+              "mean": 10544267.894976735,
+              "nan_ratio": 0.0995,
+              "std": 17115796.38383705
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 0.0009597607830431822,
+              "nan_ratio": 0.052,
+              "std": 0.003198165957049487
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 0.0013824476125258215,
+              "nan_ratio": 0.0735,
+              "std": 0.0028994223218804923
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 0.009903635082327264,
+              "nan_ratio": 0.0995,
+              "std": 0.0096556689132034
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 0.00023874290112318428,
+              "nan_ratio": 0.0005,
+              "std": 0.0015877441819011308
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 0.008248204527154145,
+              "nan_ratio": 0.0995,
+              "std": 0.008326296673807068
+            },
+            "L2_derived_close_mean_55": {
+              "mean": 0.0002391241069672524,
+              "nan_ratio": 0.0005,
+              "std": 0.0013005545199382604
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 0.0018825870096348667,
+              "nan_ratio": 0.0975,
+              "std": 0.004822073519319316
+            },
+            "L2_derived_close_mean_89": {
+              "mean": 0.00023924658869790578,
+              "nan_ratio": 0.0005,
+              "std": 0.001016654613119262
+            },
+            "L2_derived_close_return_1": {
+              "mean": -0.0004209239441966263,
+              "nan_ratio": 0.0005,
+              "std": 0.015269446617631901
+            },
+            "L2_derived_close_std_13": {
+              "mean": 0.011864908029378418,
+              "nan_ratio": 0.0005,
+              "std": 0.008786972154592837
+            },
+            "L2_derived_close_std_21": {
+              "mean": 0.01509343758991837,
+              "nan_ratio": 0.0005,
+              "std": 0.010636779007235213
+            },
+            "L2_derived_close_std_3": {
+              "mean": 0.005650573595490572,
+              "nan_ratio": 0.0005,
+              "std": 0.005304665794197939
+            },
+            "L2_derived_close_std_34": {
+              "mean": 0.01906388458502798,
+              "nan_ratio": 0.0005,
+              "std": 0.012858360450761696
+            },
+            "L2_derived_close_std_5": {
+              "mean": 0.00740315899995527,
+              "nan_ratio": 0.0005,
+              "std": 0.0061565738053570495
+            },
+            "L2_derived_close_std_55": {
+              "mean": 9.583817564499066e-05,
+              "nan_ratio": 0.1,
+              "std": 0.0014086152063391662
+            },
+            "L2_derived_close_std_8": {
+              "mean": 0.009337568733560014,
+              "nan_ratio": 0.0005,
+              "std": 0.007306333762729961
+            },
+            "L2_derived_close_std_89": {
+              "mean": 4.1733108197498766e-05,
+              "nan_ratio": 0.0595,
+              "std": 0.0009625308125673258
+            },
+            "L2_derived_log_close": {
+              "mean": -0.0047869699886487985,
+              "nan_ratio": 0.0995,
+              "std": 0.017847443844927792
+            },
+            "L2_derived_volume_change_1": {
+              "mean": 0.19132114149962137,
+              "nan_ratio": 0.0005,
+              "std": 0.8161060924740063
+            },
+            "L2_derived_volume_mean_13": {
+              "mean": 24909244.27725,
+              "nan_ratio": 0.0,
+              "std": 13304597.523152761
+            },
+            "L2_derived_volume_mean_21": {
+              "mean": 17982984.713014923,
+              "nan_ratio": 0.0995,
+              "std": 10376927.906580215
+            },
+            "L2_derived_volume_mean_3": {
+              "mean": 10734315.735619348,
+              "nan_ratio": 0.0995,
+              "std": 13286045.041013844
+            },
+            "L2_derived_volume_mean_34": {
+              "mean": 25075916.926,
+              "nan_ratio": 0.0,
+              "std": 10765562.108035404
+            },
+            "L2_derived_volume_mean_5": {
+              "mean": 9545117.085900815,
+              "nan_ratio": 0.0995,
+              "std": 11637444.8515185
+            },
+            "L2_derived_volume_mean_55": {
+              "mean": 3839313.453119561,
+              "nan_ratio": 0.0995,
+              "std": 3331653.5773508297
+            },
+            "L2_derived_volume_mean_8": {
+              "mean": 24806397.82375,
+              "nan_ratio": 0.0,
+              "std": 14534593.639861593
+            },
+            "L2_derived_volume_mean_89": {
+              "mean": 17886120.002654377,
+              "nan_ratio": 0.0995,
+              "std": 6451031.535159188
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "5bc10aa83e13772ae7095369e530ba2681732dad37a9acd226d0db6568650683"
+        },
+        "selected_feature_count": 20,
+        "selected_feature_ids": [
+          "L1_binance_close",
+          "L1_binance_high",
+          "L1_binance_low",
+          "L1_binance_open",
+          "L1_binance_quote_volume",
+          "L1_binance_taker_ratio",
+          "L1_binance_volume",
+          "L2_derived_close_mean_13",
+          "L2_derived_close_mean_21",
+          "L2_derived_close_mean_3",
+          "L2_derived_close_mean_34",
+          "L2_derived_close_mean_5",
+          "L2_derived_close_mean_55",
+          "L2_derived_close_mean_8",
+          "L2_derived_close_mean_89",
+          "L2_derived_close_return_1",
+          "L2_derived_close_std_13",
+          "L2_derived_close_std_21",
+          "L2_derived_close_std_3",
+          "L2_derived_close_std_34"
+        ],
+        "source_cols": 34,
+        "source_rows": 2000,
+        "symbol": "ADAUSDT",
+        "timeframe": "4h"
+      }
+    },
+    "BTCUSDT": {
+      "1h": {
+        "post_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32"
+          },
+          "feature_count": 20,
+          "feature_ids": [
+            "L1_binance_close",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_open",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L1_binance_volume",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_return_1",
+            "L2_derived_close_std_13",
+            "L2_derived_close_std_21",
+            "L2_derived_close_std_3",
+            "L2_derived_close_std_34"
+          ],
+          "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
+          "nan_mask_hash": "f3f6e51756225ca64eff1da2d23b893866713ac46137ece31ce931ea4ee2712a",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 0.000972107520403548,
+              "nan_ratio": 0.062,
+              "std": 1.2465516331743365
+            },
+            "L1_binance_high": {
+              "mean": -0.017861329045622362,
+              "nan_ratio": 0.1615,
+              "std": 1.1696240193736227
+            },
+            "L1_binance_low": {
+              "mean": 0.0015928296008868876,
+              "nan_ratio": 0.062,
+              "std": 1.2421244896390233
+            },
+            "L1_binance_open": {
+              "mean": -0.010656492438427792,
+              "nan_ratio": 0.1615,
+              "std": 1.1710774148029637
+            },
+            "L1_binance_quote_volume": {
+              "mean": -0.03474830744178415,
+              "nan_ratio": 0.1615,
+              "std": 1.0599782967959466
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.01217215819618052,
+              "nan_ratio": 0.062,
+              "std": 1.0167158774798797
+            },
+            "L1_binance_volume": {
+              "mean": -0.013885840355707335,
+              "nan_ratio": 0.1615,
+              "std": 1.003177142666137
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 0.003504780980113989,
+              "nan_ratio": 0.062,
+              "std": 1.2877441603924982
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 0.004233134485511129,
+              "nan_ratio": 0.062,
+              "std": 1.3092211839539103
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 0.00052706246307221,
+              "nan_ratio": 0.062,
+              "std": 1.260556475744193
+            },
+            "L2_derived_close_mean_34": {
+              "mean": -0.0226849899203293,
+              "nan_ratio": 0.1615,
+              "std": 1.3366047348715686
+            },
+            "L2_derived_close_mean_5": {
+              "mean": -0.0008675001920568251,
+              "nan_ratio": 0.062,
+              "std": 1.272414843670619
+            },
+            "L2_derived_close_mean_55": {
+              "mean": -0.05154474109376737,
+              "nan_ratio": 0.062,
+              "std": 1.3876668411844957
+            },
+            "L2_derived_close_mean_8": {
+              "mean": -0.003923296955593642,
+              "nan_ratio": 0.062,
+              "std": 1.2841278057348429
+            },
+            "L2_derived_close_mean_89": {
+              "mean": -0.16467378378180147,
+              "nan_ratio": 0.062,
+              "std": 1.4286997410276498
+            },
+            "L2_derived_close_return_1": {
+              "mean": 0.012663372483096706,
+              "nan_ratio": 0.0625,
+              "std": 1.0050695092466302
+            },
+            "L2_derived_close_std_13": {
+              "mean": -0.024598443855532625,
+              "nan_ratio": 0.162,
+              "std": 1.0665764297022615
+            },
+            "L2_derived_close_std_21": {
+              "mean": -0.012729391198630166,
+              "nan_ratio": 0.162,
+              "std": 1.0451614419324426
+            },
+            "L2_derived_close_std_3": {
+              "mean": -0.015114437640629088,
+              "nan_ratio": 0.0625,
+              "std": 1.0360314371232886
+            },
+            "L2_derived_close_std_34": {
+              "mean": 0.005060168731877308,
+              "nan_ratio": 0.162,
+              "std": 1.0804727077034098
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "ac42a956fec35cc22382461019ecaaa5546e1894009b479b04f340a88b3daa53"
+        },
+        "pre_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float64",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float64",
+            "L1_binance_quote_volume": "float64",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float64",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float64",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float64",
+            "L2_derived_close_std_21": "float64",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float64",
+            "L2_derived_close_std_5": "float64",
+            "L2_derived_close_std_55": "float64",
+            "L2_derived_close_std_8": "float64",
+            "L2_derived_close_std_89": "float64",
+            "L2_derived_log_close": "float32",
+            "L2_derived_volume_change_1": "float32",
+            "L2_derived_volume_mean_13": "float64",
+            "L2_derived_volume_mean_21": "float64",
+            "L2_derived_volume_mean_3": "float64",
+            "L2_derived_volume_mean_34": "float64",
+            "L2_derived_volume_mean_5": "float64",
+            "L2_derived_volume_mean_55": "float64",
+            "L2_derived_volume_mean_8": "float64",
+            "L2_derived_volume_mean_89": "float64"
+          },
+          "feature_count": 34,
+          "feature_ids": [
+            "L1_binance_open",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_close",
+            "L1_binance_volume",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L2_derived_close_return_1",
+            "L2_derived_log_close",
+            "L2_derived_volume_change_1",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_std_3",
+            "L2_derived_volume_mean_3",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_std_5",
+            "L2_derived_volume_mean_5",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_std_8",
+            "L2_derived_volume_mean_8",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_std_13",
+            "L2_derived_volume_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_std_21",
+            "L2_derived_volume_mean_21",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_std_34",
+            "L2_derived_volume_mean_34",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_std_55",
+            "L2_derived_volume_mean_55",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_std_89",
+            "L2_derived_volume_mean_89"
+          ],
+          "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
+          "nan_mask_hash": "04a76d5ed71c091fbe12aab430ae091a622fc2832fdc82c44273549c6a603a29",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 70305.06326171875,
+              "nan_ratio": 0.0,
+              "std": 3566.574504820883
+            },
+            "L1_binance_high": {
+              "mean": 15931.77144104193,
+              "nan_ratio": 0.0995,
+              "std": 1026.710913831992
+            },
+            "L1_binance_low": {
+              "mean": 70031.698125,
+              "nan_ratio": 0.0,
+              "std": 3586.4518278389573
+            },
+            "L1_binance_open": {
+              "mean": 16586.947573912163,
+              "nan_ratio": 0.0995,
+              "std": 1058.1380414290904
+            },
+            "L1_binance_quote_volume": {
+              "mean": 64108687.17182185,
+              "nan_ratio": 0.0995,
+              "std": 67381616.86703257
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.49429513423144816,
+              "nan_ratio": 0.0,
+              "std": 0.08197596067755307
+            },
+            "L1_binance_volume": {
+              "mean": 358.7204253072183,
+              "nan_ratio": 0.0995,
+              "std": 812.3022355707482
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 70301.66047851562,
+              "nan_ratio": 0.0,
+              "std": 3516.960570293686
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 70298.86069921876,
+              "nan_ratio": 0.0,
+              "std": 3482.2346225301994
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 70304.5508828125,
+              "nan_ratio": 0.0,
+              "std": 3557.3195344386204
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 11747.715715150076,
+              "nan_ratio": 0.0995,
+              "std": 705.8917421212021
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 70303.62676367187,
+              "nan_ratio": 0.0,
+              "std": 3549.4387735329574
+            },
+            "L2_derived_close_mean_55": {
+              "mean": 70277.08195117187,
+              "nan_ratio": 0.0,
+              "std": 3322.103063637763
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 70302.85951367188,
+              "nan_ratio": 0.0,
+              "std": 3537.536222661789
+            },
+            "L2_derived_close_mean_89": {
+              "mean": 70239.96690234375,
+              "nan_ratio": 0.0,
+              "std": 3172.539191423507
+            },
+            "L2_derived_close_return_1": {
+              "mean": 2.2863368811662692e-05,
+              "nan_ratio": 0.0005,
+              "std": 0.005222624574539216
+            },
+            "L2_derived_close_std_13": {
+              "mean": 129.07699440863362,
+              "nan_ratio": 0.1,
+              "std": 206.92610930965705
+            },
+            "L2_derived_close_std_21": {
+              "mean": 24.340138384858726,
+              "nan_ratio": 0.1,
+              "std": 121.41272205907364
+            },
+            "L2_derived_close_std_3": {
+              "mean": 233.09623886311633,
+              "nan_ratio": 0.0005,
+              "std": 199.8174601694589
+            },
+            "L2_derived_close_std_34": {
+              "mean": 27.94542373508674,
+              "nan_ratio": 0.1,
+              "std": 107.96884438344318
+            },
+            "L2_derived_close_std_5": {
+              "mean": 246.81010039125132,
+              "nan_ratio": 0.1,
+              "std": 221.27606134041565
+            },
+            "L2_derived_close_std_55": {
+              "mean": 102.60193001412773,
+              "nan_ratio": 0.1,
+              "std": 168.40692486118854
+            },
+            "L2_derived_close_std_8": {
+              "mean": 197.6273563862189,
+              "nan_ratio": 0.1,
+              "std": 225.33245539826382
+            },
+            "L2_derived_close_std_89": {
+              "mean": 7.919784525178331,
+              "nan_ratio": 0.1,
+              "std": 55.733348370972
+            },
+            "L2_derived_log_close": {
+              "mean": 11.159336470603943,
+              "nan_ratio": 0.0,
+              "std": 0.05003601461394018
+            },
+            "L2_derived_volume_change_1": {
+              "mean": 0.1767103045639305,
+              "nan_ratio": 0.0005,
+              "std": 0.7945360163417028
+            },
+            "L2_derived_volume_mean_13": {
+              "mean": 84.06418533134543,
+              "nan_ratio": 0.0995,
+              "std": 228.9624235973051
+            },
+            "L2_derived_volume_mean_21": {
+              "mean": 470.09473865261396,
+              "nan_ratio": 0.0995,
+              "std": 417.55308003068967
+            },
+            "L2_derived_volume_mean_3": {
+              "mean": 466.3799034383166,
+              "nan_ratio": 0.0995,
+              "std": 655.6339662084238
+            },
+            "L2_derived_volume_mean_34": {
+              "mean": 39.44755386120082,
+              "nan_ratio": 0.0995,
+              "std": 113.48226594134513
+            },
+            "L2_derived_volume_mean_5": {
+              "mean": 307.83899265549303,
+              "nan_ratio": 0.0995,
+              "std": 505.16052381749904
+            },
+            "L2_derived_volume_mean_55": {
+              "mean": 16.336521858400936,
+              "nan_ratio": 0.0995,
+              "std": 72.66949241717201
+            },
+            "L2_derived_volume_mean_8": {
+              "mean": 44.5627375397264,
+              "nan_ratio": 0.0995,
+              "std": 249.91662976305918
+            },
+            "L2_derived_volume_mean_89": {
+              "mean": 37.77908300848629,
+              "nan_ratio": 0.0995,
+              "std": 79.26110025630817
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "f3c45bc59118c4e004736194e7b931029638ab65deebc5e9f64b6229a1dd2a4a"
+        },
+        "selected_feature_count": 20,
+        "selected_feature_ids": [
+          "L1_binance_close",
+          "L1_binance_high",
+          "L1_binance_low",
+          "L1_binance_open",
+          "L1_binance_quote_volume",
+          "L1_binance_taker_ratio",
+          "L1_binance_volume",
+          "L2_derived_close_mean_13",
+          "L2_derived_close_mean_21",
+          "L2_derived_close_mean_3",
+          "L2_derived_close_mean_34",
+          "L2_derived_close_mean_5",
+          "L2_derived_close_mean_55",
+          "L2_derived_close_mean_8",
+          "L2_derived_close_mean_89",
+          "L2_derived_close_return_1",
+          "L2_derived_close_std_13",
+          "L2_derived_close_std_21",
+          "L2_derived_close_std_3",
+          "L2_derived_close_std_34"
+        ],
+        "source_cols": 34,
+        "source_rows": 2000,
+        "symbol": "BTCUSDT",
+        "timeframe": "1h"
+      },
+      "4h": {
+        "post_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32"
+          },
+          "feature_count": 20,
+          "feature_ids": [
+            "L1_binance_close",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_open",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L1_binance_volume",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_return_1",
+            "L2_derived_close_std_13",
+            "L2_derived_close_std_21",
+            "L2_derived_close_std_3",
+            "L2_derived_close_std_34"
+          ],
+          "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
+          "nan_mask_hash": "fe4a65d4b068605a2ac414045dd91007df1e8bba1b778e26903cc7ef3f078386",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 0.11599510722556504,
+              "nan_ratio": 0.1615,
+              "std": 1.2472791379037902
+            },
+            "L1_binance_high": {
+              "mean": 0.08546047250076726,
+              "nan_ratio": 0.1615,
+              "std": 1.2314838856118886
+            },
+            "L1_binance_low": {
+              "mean": 0.10985061648656094,
+              "nan_ratio": 0.1615,
+              "std": 1.2293179950255613
+            },
+            "L1_binance_open": {
+              "mean": 0.11500176801426769,
+              "nan_ratio": 0.1615,
+              "std": 1.2475098190337108
+            },
+            "L1_binance_quote_volume": {
+              "mean": -0.0006426102723797231,
+              "nan_ratio": 0.062,
+              "std": 1.0289045589326704
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.007777965246383084,
+              "nan_ratio": 0.062,
+              "std": 1.0045028011090114
+            },
+            "L1_binance_volume": {
+              "mean": -0.005968446148863862,
+              "nan_ratio": 0.062,
+              "std": 1.0281669770867707
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 0.08470089112142724,
+              "nan_ratio": 0.1615,
+              "std": 1.2727038781290136
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 0.03187182077661659,
+              "nan_ratio": 0.1615,
+              "std": 1.2945402169660598
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 0.09128954516088814,
+              "nan_ratio": 0.1615,
+              "std": 1.230387304133572
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 0.0049775665498555345,
+              "nan_ratio": 0.1555,
+              "std": 1.2534588448799207
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 0.07696141230133204,
+              "nan_ratio": 0.1615,
+              "std": 1.218263668916044
+            },
+            "L2_derived_close_mean_55": {
+              "mean": -0.03255638906185826,
+              "nan_ratio": 0.0625,
+              "std": 1.2449667771681545
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 0.0835350458498549,
+              "nan_ratio": 0.1615,
+              "std": 1.2382352013725355
+            },
+            "L2_derived_close_mean_89": {
+              "mean": -0.03602568737516801,
+              "nan_ratio": 0.0625,
+              "std": 1.3309455881796357
+            },
+            "L2_derived_close_return_1": {
+              "mean": -0.0065208228309328355,
+              "nan_ratio": 0.0625,
+              "std": 1.0052850013348311
+            },
+            "L2_derived_close_std_13": {
+              "mean": 0.0031650832679859984,
+              "nan_ratio": 0.0625,
+              "std": 1.1045967472503002
+            },
+            "L2_derived_close_std_21": {
+              "mean": -0.0006584948603995145,
+              "nan_ratio": 0.0625,
+              "std": 1.1597850130140515
+            },
+            "L2_derived_close_std_3": {
+              "mean": 0.00848299977319936,
+              "nan_ratio": 0.0625,
+              "std": 1.011861012389182
+            },
+            "L2_derived_close_std_34": {
+              "mean": 0.027679373979537437,
+              "nan_ratio": 0.0625,
+              "std": 1.2166662700960127
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "912165f6aa897e1a9bdb28f152552a64e3e70a28e193a5d726f82c8658e5300f"
+        },
+        "pre_ic": {
+          "dtypes": {
+            "L1_binance_close": "float64",
+            "L1_binance_high": "float64",
+            "L1_binance_low": "float64",
+            "L1_binance_open": "float64",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float64",
+            "L2_derived_close_mean_21": "float64",
+            "L2_derived_close_mean_3": "float64",
+            "L2_derived_close_mean_34": "float64",
+            "L2_derived_close_mean_5": "float64",
+            "L2_derived_close_mean_55": "float64",
+            "L2_derived_close_mean_8": "float64",
+            "L2_derived_close_mean_89": "float64",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32",
+            "L2_derived_close_std_5": "float32",
+            "L2_derived_close_std_55": "float32",
+            "L2_derived_close_std_8": "float32",
+            "L2_derived_close_std_89": "float32",
+            "L2_derived_log_close": "float64",
+            "L2_derived_volume_change_1": "float32",
+            "L2_derived_volume_mean_13": "float32",
+            "L2_derived_volume_mean_21": "float32",
+            "L2_derived_volume_mean_3": "float32",
+            "L2_derived_volume_mean_34": "float32",
+            "L2_derived_volume_mean_5": "float32",
+            "L2_derived_volume_mean_55": "float32",
+            "L2_derived_volume_mean_8": "float32",
+            "L2_derived_volume_mean_89": "float64"
+          },
+          "feature_count": 34,
+          "feature_ids": [
+            "L1_binance_open",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_close",
+            "L1_binance_volume",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L2_derived_close_return_1",
+            "L2_derived_log_close",
+            "L2_derived_volume_change_1",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_std_3",
+            "L2_derived_volume_mean_3",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_std_5",
+            "L2_derived_volume_mean_5",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_std_8",
+            "L2_derived_volume_mean_8",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_std_13",
+            "L2_derived_volume_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_std_21",
+            "L2_derived_volume_mean_21",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_std_34",
+            "L2_derived_volume_mean_34",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_std_55",
+            "L2_derived_volume_mean_55",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_std_89",
+            "L2_derived_volume_mean_89"
+          ],
+          "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
+          "nan_mask_hash": "acbefec88466f7d57d6fc76a467b37c353924e2040345e65b911cbe9d34010fb",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 33605.30973813437,
+              "nan_ratio": 0.0995,
+              "std": 5913.597800744642
+            },
+            "L1_binance_high": {
+              "mean": 23823.329899856326,
+              "nan_ratio": 0.0995,
+              "std": 4267.539610003836
+            },
+            "L1_binance_low": {
+              "mean": 25044.276525652844,
+              "nan_ratio": 0.0995,
+              "std": 4543.486604539081
+            },
+            "L1_binance_open": {
+              "mean": 32733.80504151623,
+              "nan_ratio": 0.0995,
+              "std": 5764.965105834219
+            },
+            "L1_binance_quote_volume": {
+              "mean": 288168848.586,
+              "nan_ratio": 0.0,
+              "std": 214193867.9208472
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.48387153132259847,
+              "nan_ratio": 0.0,
+              "std": 0.053268447264352405
+            },
+            "L1_binance_volume": {
+              "mean": 3072.6205831604,
+              "nan_ratio": 0.0,
+              "std": 2362.2210150570877
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 11398.009281009005,
+              "nan_ratio": 0.0995,
+              "std": 2171.53819599167
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 7087.982509070826,
+              "nan_ratio": 0.0995,
+              "std": 1431.0919112309314
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 16797.220592007376,
+              "nan_ratio": 0.0995,
+              "std": 3128.412921756037
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 262.9576630332907,
+              "nan_ratio": 0.0935,
+              "std": 225.1563523875857
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 8027.1088942977085,
+              "nan_ratio": 0.0995,
+              "std": 1705.7398481273328
+            },
+            "L2_derived_close_mean_55": {
+              "mean": 14.365592952726363,
+              "nan_ratio": 0.0005,
+              "std": 107.76613996078596
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 9683.510369830099,
+              "nan_ratio": 0.0995,
+              "std": 1935.6068267183412
+            },
+            "L2_derived_close_mean_89": {
+              "mean": 14.860531828414207,
+              "nan_ratio": 0.0005,
+              "std": 81.91943904851367
+            },
+            "L2_derived_close_return_1": {
+              "mean": -0.00011865521218100605,
+              "nan_ratio": 0.0005,
+              "std": 0.008307139739219847
+            },
+            "L2_derived_close_std_13": {
+              "mean": 1056.591040736738,
+              "nan_ratio": 0.0005,
+              "std": 615.1733204363383
+            },
+            "L2_derived_close_std_21": {
+              "mean": 1346.51545529845,
+              "nan_ratio": 0.0005,
+              "std": 714.8492334233738
+            },
+            "L2_derived_close_std_3": {
+              "mean": 505.2742424163895,
+              "nan_ratio": 0.0005,
+              "std": 415.081748643166
+            },
+            "L2_derived_close_std_34": {
+              "mean": 1695.4044224642228,
+              "nan_ratio": 0.0005,
+              "std": 866.2194384462072
+            },
+            "L2_derived_close_std_5": {
+              "mean": 658.5317659153826,
+              "nan_ratio": 0.0005,
+              "std": 458.9356111358714
+            },
+            "L2_derived_close_std_55": {
+              "mean": 2125.9020905182206,
+              "nan_ratio": 0.0005,
+              "std": 1102.4197312934136
+            },
+            "L2_derived_close_std_8": {
+              "mean": 830.4437741865928,
+              "nan_ratio": 0.0005,
+              "std": 525.4648302836695
+            },
+            "L2_derived_close_std_89": {
+              "mean": 2689.845193844786,
+              "nan_ratio": 0.0005,
+              "std": 1436.9883988524416
+            },
+            "L2_derived_log_close": {
+              "mean": 1.071773986788199,
+              "nan_ratio": 0.0995,
+              "std": 0.02168432261337552
+            },
+            "L2_derived_volume_change_1": {
+              "mean": 0.18966327184154208,
+              "nan_ratio": 0.0005,
+              "std": 0.8003103811097291
+            },
+            "L2_derived_volume_mean_13": {
+              "mean": 3116.249187927246,
+              "nan_ratio": 0.0,
+              "std": 1566.9116096388602
+            },
+            "L2_derived_volume_mean_21": {
+              "mean": 3125.8656377563475,
+              "nan_ratio": 0.0,
+              "std": 1417.276011931454
+            },
+            "L2_derived_volume_mean_3": {
+              "mean": 3087.9170360565186,
+              "nan_ratio": 0.0,
+              "std": 1976.775085113093
+            },
+            "L2_derived_volume_mean_34": {
+              "mean": 3131.609088806152,
+              "nan_ratio": 0.0,
+              "std": 1286.4356073170634
+            },
+            "L2_derived_volume_mean_5": {
+              "mean": 3097.2603183746337,
+              "nan_ratio": 0.0,
+              "std": 1820.52230637029
+            },
+            "L2_derived_volume_mean_55": {
+              "mean": 3134.836016723633,
+              "nan_ratio": 0.0,
+              "std": 1178.639597381274
+            },
+            "L2_derived_volume_mean_8": {
+              "mean": 3106.077678527832,
+              "nan_ratio": 0.0,
+              "std": 1706.4593780135685
+            },
+            "L2_derived_volume_mean_89": {
+              "mean": 545.2032898398031,
+              "nan_ratio": 0.0995,
+              "std": 321.60583663961535
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "549803e091788a17027de5cf29798c8a7924d3be4f8a50212ed52e8d313b6bae"
+        },
+        "selected_feature_count": 20,
+        "selected_feature_ids": [
+          "L1_binance_close",
+          "L1_binance_high",
+          "L1_binance_low",
+          "L1_binance_open",
+          "L1_binance_quote_volume",
+          "L1_binance_taker_ratio",
+          "L1_binance_volume",
+          "L2_derived_close_mean_13",
+          "L2_derived_close_mean_21",
+          "L2_derived_close_mean_3",
+          "L2_derived_close_mean_34",
+          "L2_derived_close_mean_5",
+          "L2_derived_close_mean_55",
+          "L2_derived_close_mean_8",
+          "L2_derived_close_mean_89",
+          "L2_derived_close_return_1",
+          "L2_derived_close_std_13",
+          "L2_derived_close_std_21",
+          "L2_derived_close_std_3",
+          "L2_derived_close_std_34"
+        ],
+        "source_cols": 34,
+        "source_rows": 2000,
+        "symbol": "BTCUSDT",
+        "timeframe": "4h"
+      }
+    },
+    "ETHUSDT": {
+      "1h": {
+        "post_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32"
+          },
+          "feature_count": 20,
+          "feature_ids": [
+            "L1_binance_close",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_open",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L1_binance_volume",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_return_1",
+            "L2_derived_close_std_13",
+            "L2_derived_close_std_21",
+            "L2_derived_close_std_3",
+            "L2_derived_close_std_34"
+          ],
+          "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
+          "nan_mask_hash": "4ab2e3e1edec51e43eb5d4703c1644e5df4d28fe7586ee687de8e2b3c8225aa9",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": -0.006600485195709603,
+              "nan_ratio": 0.062,
+              "std": 1.205494899978423
+            },
+            "L1_binance_high": {
+              "mean": -0.014078722716912802,
+              "nan_ratio": 0.062,
+              "std": 1.210157253087179
+            },
+            "L1_binance_low": {
+              "mean": 0.002815825007878232,
+              "nan_ratio": 0.062,
+              "std": 1.2033781021292018
+            },
+            "L1_binance_open": {
+              "mean": -0.00938033031773873,
+              "nan_ratio": 0.062,
+              "std": 1.2053012288260907
+            },
+            "L1_binance_quote_volume": {
+              "mean": -0.03351170076757056,
+              "nan_ratio": 0.1615,
+              "std": 1.0713938338771136
+            },
+            "L1_binance_taker_ratio": {
+              "mean": -0.0017140266438939922,
+              "nan_ratio": 0.062,
+              "std": 1.0203064433973767
+            },
+            "L1_binance_volume": {
+              "mean": -0.023384429373487954,
+              "nan_ratio": 0.1615,
+              "std": 1.0237208221021679
+            },
+            "L2_derived_close_mean_13": {
+              "mean": -0.01627080847237342,
+              "nan_ratio": 0.062,
+              "std": 1.2601790639735435
+            },
+            "L2_derived_close_mean_21": {
+              "mean": -0.021609140835741638,
+              "nan_ratio": 0.062,
+              "std": 1.2962440336086054
+            },
+            "L2_derived_close_mean_3": {
+              "mean": -0.007463830405676083,
+              "nan_ratio": 0.062,
+              "std": 1.2188117298301806
+            },
+            "L2_derived_close_mean_34": {
+              "mean": -0.04615447652551146,
+              "nan_ratio": 0.062,
+              "std": 1.3116877556210207
+            },
+            "L2_derived_close_mean_5": {
+              "mean": -0.012030360617127313,
+              "nan_ratio": 0.062,
+              "std": 1.2287901039902842
+            },
+            "L2_derived_close_mean_55": {
+              "mean": -0.06673673970866292,
+              "nan_ratio": 0.062,
+              "std": 1.379083106463585
+            },
+            "L2_derived_close_mean_8": {
+              "mean": -0.01695175508798253,
+              "nan_ratio": 0.062,
+              "std": 1.2465152979924337
+            },
+            "L2_derived_close_mean_89": {
+              "mean": -0.1519525689308716,
+              "nan_ratio": 0.062,
+              "std": 1.4179771235565695
+            },
+            "L2_derived_close_return_1": {
+              "mean": 0.017701962558366358,
+              "nan_ratio": 0.0625,
+              "std": 1.0036724543826547
+            },
+            "L2_derived_close_std_13": {
+              "mean": -0.015772724301346717,
+              "nan_ratio": 0.162,
+              "std": 1.064736810547254
+            },
+            "L2_derived_close_std_21": {
+              "mean": -0.003915337311846609,
+              "nan_ratio": 0.162,
+              "std": 1.0564038900194361
+            },
+            "L2_derived_close_std_3": {
+              "mean": -0.0249873462105256,
+              "nan_ratio": 0.162,
+              "std": 1.0305194866454304
+            },
+            "L2_derived_close_std_34": {
+              "mean": -0.011261650765726458,
+              "nan_ratio": 0.162,
+              "std": 1.1325123382905697
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "f7448aea607e686390c3209ffba3285f9157dbe9c2099ebfce37fd05e413b2ff"
+        },
+        "pre_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float64",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float64",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float64",
+            "L2_derived_close_std_21": "float64",
+            "L2_derived_close_std_3": "float64",
+            "L2_derived_close_std_34": "float64",
+            "L2_derived_close_std_5": "float32",
+            "L2_derived_close_std_55": "float64",
+            "L2_derived_close_std_8": "float64",
+            "L2_derived_close_std_89": "float64",
+            "L2_derived_log_close": "float32",
+            "L2_derived_volume_change_1": "float32",
+            "L2_derived_volume_mean_13": "float64",
+            "L2_derived_volume_mean_21": "float64",
+            "L2_derived_volume_mean_3": "float64",
+            "L2_derived_volume_mean_34": "float64",
+            "L2_derived_volume_mean_5": "float64",
+            "L2_derived_volume_mean_55": "float64",
+            "L2_derived_volume_mean_8": "float64",
+            "L2_derived_volume_mean_89": "float64"
+          },
+          "feature_count": 34,
+          "feature_ids": [
+            "L1_binance_open",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_close",
+            "L1_binance_volume",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L2_derived_close_return_1",
+            "L2_derived_log_close",
+            "L2_derived_volume_change_1",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_std_3",
+            "L2_derived_volume_mean_3",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_std_5",
+            "L2_derived_volume_mean_5",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_std_8",
+            "L2_derived_volume_mean_8",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_std_13",
+            "L2_derived_volume_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_std_21",
+            "L2_derived_volume_mean_21",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_std_34",
+            "L2_derived_volume_mean_34",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_std_55",
+            "L2_derived_volume_mean_55",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_std_89",
+            "L2_derived_volume_mean_89"
+          ],
+          "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
+          "nan_mask_hash": "4819991e2d4b1f0bbf93887257bb8a3f50545e5dc2397183cb671873bb9f06a5",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 2110.4035939941405,
+              "nan_ratio": 0.0,
+              "std": 139.91063395610723
+            },
+            "L1_binance_high": {
+              "mean": 2121.1590182495115,
+              "nan_ratio": 0.0,
+              "std": 139.40707195032752
+            },
+            "L1_binance_low": {
+              "mean": 2099.8403977661133,
+              "nan_ratio": 0.0,
+              "std": 140.60330918010192
+            },
+            "L1_binance_open": {
+              "mean": 2110.4037462158203,
+              "nan_ratio": 0.0,
+              "std": 139.9099119941525
+            },
+            "L1_binance_quote_volume": {
+              "mean": 38276212.65282788,
+              "nan_ratio": 0.0995,
+              "std": 44923777.94247245
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.4914779954999685,
+              "nan_ratio": 0.0,
+              "std": 0.072444914593366
+            },
+            "L1_binance_volume": {
+              "mean": 9363.1461676838,
+              "nan_ratio": 0.0995,
+              "std": 18591.85217488604
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 2110.1977135009765,
+              "nan_ratio": 0.0,
+              "std": 137.98453982289107
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 2110.055627746582,
+              "nan_ratio": 0.0,
+              "std": 136.6915476834976
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 2110.3773689575196,
+              "nan_ratio": 0.0,
+              "std": 139.54545306692978
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 2109.7513881225586,
+              "nan_ratio": 0.0,
+              "std": 134.45774690138157
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 2110.3330509643556,
+              "nan_ratio": 0.0,
+              "std": 139.22803026188558
+            },
+            "L2_derived_close_mean_55": {
+              "mean": 2109.1793392944337,
+              "nan_ratio": 0.0,
+              "std": 130.94790399154206
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 2110.2738846435545,
+              "nan_ratio": 0.0,
+              "std": 138.76356213562227
+            },
+            "L2_derived_close_mean_89": {
+              "mean": 2107.8539130859376,
+              "nan_ratio": 0.0,
+              "std": 126.25152201177944
+            },
+            "L2_derived_close_return_1": {
+              "mean": 3.2958328903014685e-05,
+              "nan_ratio": 0.0005,
+              "std": 0.00663483000251963
+            },
+            "L2_derived_close_std_13": {
+              "mean": 9.682224176278808,
+              "nan_ratio": 0.1,
+              "std": 10.490377499705797
+            },
+            "L2_derived_close_std_21": {
+              "mean": 3.2121698626866557,
+              "nan_ratio": 0.1,
+              "std": 7.238511459962071
+            },
+            "L2_derived_close_std_3": {
+              "mean": 7.985048095085352,
+              "nan_ratio": 0.1,
+              "std": 8.032728064355805
+            },
+            "L2_derived_close_std_34": {
+              "mean": 3.7374457435490487,
+              "nan_ratio": 0.1,
+              "std": 6.851996707398666
+            },
+            "L2_derived_close_std_5": {
+              "mean": 11.443744073217067,
+              "nan_ratio": 0.0005,
+              "std": 9.379092282911971
+            },
+            "L2_derived_close_std_55": {
+              "mean": 4.147459212761338,
+              "nan_ratio": 0.1,
+              "std": 6.619777488024183
+            },
+            "L2_derived_close_std_8": {
+              "mean": 10.812626047218615,
+              "nan_ratio": 0.1,
+              "std": 10.191682265105172
+            },
+            "L2_derived_close_std_89": {
+              "mean": 0.2802194832807409,
+              "nan_ratio": 0.1,
+              "std": 2.0948751999744357
+            },
+            "L2_derived_log_close": {
+              "mean": 7.652468634128571,
+              "nan_ratio": 0.0,
+              "std": 0.06560819071725345
+            },
+            "L2_derived_volume_change_1": {
+              "mean": 0.22415207389234035,
+              "nan_ratio": 0.0005,
+              "std": 0.9575464340794227
+            },
+            "L2_derived_volume_mean_13": {
+              "mean": 2719.272647328049,
+              "nan_ratio": 0.0995,
+              "std": 5679.891266407086
+            },
+            "L2_derived_volume_mean_21": {
+              "mean": 2824.460323390635,
+              "nan_ratio": 0.0995,
+              "std": 4592.507876451397
+            },
+            "L2_derived_volume_mean_3": {
+              "mean": 10090.364974441107,
+              "nan_ratio": 0.0995,
+              "std": 15053.783788919678
+            },
+            "L2_derived_volume_mean_34": {
+              "mean": 607.419024106193,
+              "nan_ratio": 0.0995,
+              "std": 2028.5494288313996
+            },
+            "L2_derived_volume_mean_5": {
+              "mean": 6452.088069284144,
+              "nan_ratio": 0.0995,
+              "std": 11296.027683998649
+            },
+            "L2_derived_volume_mean_55": {
+              "mean": 436.5466160255108,
+              "nan_ratio": 0.0995,
+              "std": 1499.6418593254255
+            },
+            "L2_derived_volume_mean_8": {
+              "mean": 1842.0958826527083,
+              "nan_ratio": 0.0995,
+              "std": 6326.895421823666
+            },
+            "L2_derived_volume_mean_89": {
+              "mean": 509.47283326028924,
+              "nan_ratio": 0.0995,
+              "std": 1416.1518923324063
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "6630504540489cf88f8a409202258528280a6633f756a6237287c5d246c5fe3b"
+        },
+        "selected_feature_count": 20,
+        "selected_feature_ids": [
+          "L1_binance_close",
+          "L1_binance_high",
+          "L1_binance_low",
+          "L1_binance_open",
+          "L1_binance_quote_volume",
+          "L1_binance_taker_ratio",
+          "L1_binance_volume",
+          "L2_derived_close_mean_13",
+          "L2_derived_close_mean_21",
+          "L2_derived_close_mean_3",
+          "L2_derived_close_mean_34",
+          "L2_derived_close_mean_5",
+          "L2_derived_close_mean_55",
+          "L2_derived_close_mean_8",
+          "L2_derived_close_mean_89",
+          "L2_derived_close_return_1",
+          "L2_derived_close_std_13",
+          "L2_derived_close_std_21",
+          "L2_derived_close_std_3",
+          "L2_derived_close_std_34"
+        ],
+        "source_cols": 34,
+        "source_rows": 2000,
+        "symbol": "ETHUSDT",
+        "timeframe": "1h"
+      },
+      "4h": {
+        "post_ic": {
+          "dtypes": {
+            "L1_binance_close": "float32",
+            "L1_binance_high": "float32",
+            "L1_binance_low": "float32",
+            "L1_binance_open": "float32",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float32",
+            "L2_derived_close_mean_21": "float32",
+            "L2_derived_close_mean_3": "float32",
+            "L2_derived_close_mean_34": "float32",
+            "L2_derived_close_mean_5": "float32",
+            "L2_derived_close_mean_55": "float32",
+            "L2_derived_close_mean_8": "float32",
+            "L2_derived_close_mean_89": "float32",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32"
+          },
+          "feature_count": 20,
+          "feature_ids": [
+            "L1_binance_close",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_open",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L1_binance_volume",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_return_1",
+            "L2_derived_close_std_13",
+            "L2_derived_close_std_21",
+            "L2_derived_close_std_3",
+            "L2_derived_close_std_34"
+          ],
+          "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
+          "nan_mask_hash": "893edc711ee0900fa79125e309007c8c9d95b7dea28ebf35c05768ac7a119252",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 0.024009766952879118,
+              "nan_ratio": 0.1615,
+              "std": 1.0565405174203097
+            },
+            "L1_binance_high": {
+              "mean": 0.04493397191489779,
+              "nan_ratio": 0.1615,
+              "std": 1.1135732326169538
+            },
+            "L1_binance_low": {
+              "mean": 0.05066428524715007,
+              "nan_ratio": 0.1615,
+              "std": 1.0940515386404537
+            },
+            "L1_binance_open": {
+              "mean": 0.02438335807514463,
+              "nan_ratio": 0.1615,
+              "std": 1.056788523594673
+            },
+            "L1_binance_quote_volume": {
+              "mean": 0.01821519459400912,
+              "nan_ratio": 0.062,
+              "std": 1.0567919303081108
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.010532023113637382,
+              "nan_ratio": 0.062,
+              "std": 0.9993290797947884
+            },
+            "L1_binance_volume": {
+              "mean": 0.004902781325150162,
+              "nan_ratio": 0.062,
+              "std": 1.0491313338128438
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 0.01113435693119611,
+              "nan_ratio": 0.151,
+              "std": 1.1610276904574366
+            },
+            "L2_derived_close_mean_21": {
+              "mean": -0.02682245283223948,
+              "nan_ratio": 0.151,
+              "std": 1.2085599052391396
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 0.0459867658944785,
+              "nan_ratio": 0.1615,
+              "std": 1.1344885242836653
+            },
+            "L2_derived_close_mean_34": {
+              "mean": -0.05987878084181227,
+              "nan_ratio": 0.076,
+              "std": 1.216563809555452
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 0.022121360650026175,
+              "nan_ratio": 0.1615,
+              "std": 1.1106625212287822
+            },
+            "L2_derived_close_mean_55": {
+              "mean": -0.03720003359603967,
+              "nan_ratio": 0.0625,
+              "std": 1.263999944830294
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 0.008104497552102406,
+              "nan_ratio": 0.1615,
+              "std": 1.1323958334192004
+            },
+            "L2_derived_close_mean_89": {
+              "mean": -0.011472425339145897,
+              "nan_ratio": 0.0625,
+              "std": 1.2940143004899882
+            },
+            "L2_derived_close_return_1": {
+              "mean": -0.0011123662711276362,
+              "nan_ratio": 0.0625,
+              "std": 1.003838578453706
+            },
+            "L2_derived_close_std_13": {
+              "mean": 0.015493094746395946,
+              "nan_ratio": 0.0625,
+              "std": 1.1003994815383815
+            },
+            "L2_derived_close_std_21": {
+              "mean": 0.009986783934632938,
+              "nan_ratio": 0.0625,
+              "std": 1.1583258537728855
+            },
+            "L2_derived_close_std_3": {
+              "mean": 0.009649726322789987,
+              "nan_ratio": 0.0625,
+              "std": 1.0205708445501604
+            },
+            "L2_derived_close_std_34": {
+              "mean": 0.013081146922684275,
+              "nan_ratio": 0.0625,
+              "std": 1.238688659395205
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "ebb709d5945a65ef6c4ca497e1c1b49a80adfa5d2460fecc83cfba3b1d738a62"
+        },
+        "pre_ic": {
+          "dtypes": {
+            "L1_binance_close": "float64",
+            "L1_binance_high": "float64",
+            "L1_binance_low": "float64",
+            "L1_binance_open": "float64",
+            "L1_binance_quote_volume": "float32",
+            "L1_binance_taker_ratio": "float32",
+            "L1_binance_volume": "float32",
+            "L2_derived_close_mean_13": "float64",
+            "L2_derived_close_mean_21": "float64",
+            "L2_derived_close_mean_3": "float64",
+            "L2_derived_close_mean_34": "float64",
+            "L2_derived_close_mean_5": "float64",
+            "L2_derived_close_mean_55": "float64",
+            "L2_derived_close_mean_8": "float64",
+            "L2_derived_close_mean_89": "float64",
+            "L2_derived_close_return_1": "float32",
+            "L2_derived_close_std_13": "float32",
+            "L2_derived_close_std_21": "float32",
+            "L2_derived_close_std_3": "float32",
+            "L2_derived_close_std_34": "float32",
+            "L2_derived_close_std_5": "float32",
+            "L2_derived_close_std_55": "float64",
+            "L2_derived_close_std_8": "float32",
+            "L2_derived_close_std_89": "float32",
+            "L2_derived_log_close": "float64",
+            "L2_derived_volume_change_1": "float32",
+            "L2_derived_volume_mean_13": "float32",
+            "L2_derived_volume_mean_21": "float32",
+            "L2_derived_volume_mean_3": "float32",
+            "L2_derived_volume_mean_34": "float32",
+            "L2_derived_volume_mean_5": "float32",
+            "L2_derived_volume_mean_55": "float64",
+            "L2_derived_volume_mean_8": "float32",
+            "L2_derived_volume_mean_89": "float64"
+          },
+          "feature_count": 34,
+          "feature_ids": [
+            "L1_binance_open",
+            "L1_binance_high",
+            "L1_binance_low",
+            "L1_binance_close",
+            "L1_binance_volume",
+            "L1_binance_quote_volume",
+            "L1_binance_taker_ratio",
+            "L2_derived_close_return_1",
+            "L2_derived_log_close",
+            "L2_derived_volume_change_1",
+            "L2_derived_close_mean_3",
+            "L2_derived_close_std_3",
+            "L2_derived_volume_mean_3",
+            "L2_derived_close_mean_5",
+            "L2_derived_close_std_5",
+            "L2_derived_volume_mean_5",
+            "L2_derived_close_mean_8",
+            "L2_derived_close_std_8",
+            "L2_derived_volume_mean_8",
+            "L2_derived_close_mean_13",
+            "L2_derived_close_std_13",
+            "L2_derived_volume_mean_13",
+            "L2_derived_close_mean_21",
+            "L2_derived_close_std_21",
+            "L2_derived_volume_mean_21",
+            "L2_derived_close_mean_34",
+            "L2_derived_close_std_34",
+            "L2_derived_volume_mean_34",
+            "L2_derived_close_mean_55",
+            "L2_derived_close_std_55",
+            "L2_derived_volume_mean_55",
+            "L2_derived_close_mean_89",
+            "L2_derived_close_std_89",
+            "L2_derived_volume_mean_89"
+          ],
+          "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
+          "nan_mask_hash": "5c5887634be64bb03dcc2183d02e8390564f3a0ca3cef15bf60b141717a3e578",
+          "per_feature_stats": {
+            "L1_binance_close": {
+              "mean": 28.557987032940343,
+              "nan_ratio": 0.0995,
+              "std": 48.381563425509846
+            },
+            "L1_binance_high": {
+              "mean": 105.01715747248879,
+              "nan_ratio": 0.0995,
+              "std": 65.94967483584524
+            },
+            "L1_binance_low": {
+              "mean": 74.6942118643365,
+              "nan_ratio": 0.0995,
+              "std": 59.818092447675795
+            },
+            "L1_binance_open": {
+              "mean": 28.551831605125468,
+              "nan_ratio": 0.0995,
+              "std": 48.379178619105936
+            },
+            "L1_binance_quote_volume": {
+              "mean": 261549481.631,
+              "nan_ratio": 0.0,
+              "std": 214563014.20302415
+            },
+            "L1_binance_taker_ratio": {
+              "mean": 0.4926210505962372,
+              "nan_ratio": 0.0,
+              "std": 0.04652397434241522
+            },
+            "L1_binance_volume": {
+              "mean": 82730.76898535156,
+              "nan_ratio": 0.0,
+              "std": 63422.98483919943
+            },
+            "L2_derived_close_mean_13": {
+              "mean": 7.437466283767603,
+              "nan_ratio": 0.089,
+              "std": 18.841739012042023
+            },
+            "L2_derived_close_mean_21": {
+              "mean": 7.424658714670575,
+              "nan_ratio": 0.089,
+              "std": 15.729394792607089
+            },
+            "L2_derived_close_mean_3": {
+              "mean": 73.47225740995727,
+              "nan_ratio": 0.0995,
+              "std": 51.88715120431383
+            },
+            "L2_derived_close_mean_34": {
+              "mean": 1.0579202755278545,
+              "nan_ratio": 0.014,
+              "std": 7.934808221287325
+            },
+            "L2_derived_close_mean_5": {
+              "mean": 18.861009531169966,
+              "nan_ratio": 0.0995,
+              "std": 31.48384988003655
+            },
+            "L2_derived_close_mean_55": {
+              "mean": 0.16110985180090046,
+              "nan_ratio": 0.0005,
+              "std": 6.10237879032517
+            },
+            "L2_derived_close_mean_8": {
+              "mean": 10.305424624659434,
+              "nan_ratio": 0.0995,
+              "std": 24.20768382834289
+            },
+            "L2_derived_close_mean_89": {
+              "mean": 0.1597464992261756,
+              "nan_ratio": 0.0005,
+              "std": 4.7431131970188956
+            },
+            "L2_derived_close_return_1": {
+              "mean": 2.3280370511009e-05,
+              "nan_ratio": 0.0005,
+              "std": 0.01304619813711814
+            },
+            "L2_derived_close_std_13": {
+              "mean": 57.611278762216266,
+              "nan_ratio": 0.0005,
+              "std": 36.87992229721867
+            },
+            "L2_derived_close_std_21": {
+              "mean": 74.6022678607103,
+              "nan_ratio": 0.0005,
+              "std": 44.46679000750296
+            },
+            "L2_derived_close_std_3": {
+              "mean": 26.448142437621197,
+              "nan_ratio": 0.0005,
+              "std": 23.36727195957669
+            },
+            "L2_derived_close_std_34": {
+              "mean": 95.13129094387664,
+              "nan_ratio": 0.0005,
+              "std": 54.10264968362472
+            },
+            "L2_derived_close_std_5": {
+              "mean": 34.820072291134714,
+              "nan_ratio": 0.0005,
+              "std": 26.127581096964608
+            },
+            "L2_derived_close_std_55": {
+              "mean": 4.208693874005053,
+              "nan_ratio": 0.1,
+              "std": 12.526063225459868
+            },
+            "L2_derived_close_std_8": {
+              "mean": 44.46738690957837,
+              "nan_ratio": 0.0005,
+              "std": 30.523472030932055
+            },
+            "L2_derived_close_std_89": {
+              "mean": 151.30377335379038,
+              "nan_ratio": 0.0005,
+              "std": 86.8133285117958
+            },
+            "L2_derived_log_close": {
+              "mean": 0.2936318193034171,
+              "nan_ratio": 0.0995,
+              "std": 0.021576471533374827
+            },
+            "L2_derived_volume_change_1": {
+              "mean": 0.21445308921631923,
+              "nan_ratio": 0.0005,
+              "std": 0.8639641477446209
+            },
+            "L2_derived_volume_mean_13": {
+              "mean": 83745.67721191407,
+              "nan_ratio": 0.0,
+              "std": 40838.54160408712
+            },
+            "L2_derived_volume_mean_21": {
+              "mean": 83996.89365332031,
+              "nan_ratio": 0.0,
+              "std": 37372.953974040865
+            },
+            "L2_derived_volume_mean_3": {
+              "mean": 83195.02287353516,
+              "nan_ratio": 0.0,
+              "std": 52448.89265856725
+            },
+            "L2_derived_volume_mean_34": {
+              "mean": 84273.84005273438,
+              "nan_ratio": 0.0,
+              "std": 34208.08027172181
+            },
+            "L2_derived_volume_mean_5": {
+              "mean": 83405.74429736329,
+              "nan_ratio": 0.0,
+              "std": 47617.46759339208
+            },
+            "L2_derived_volume_mean_55": {
+              "mean": 953.8515001179096,
+              "nan_ratio": 0.0995,
+              "std": 3264.4883159930164
+            },
+            "L2_derived_volume_mean_8": {
+              "mean": 83583.513015625,
+              "nan_ratio": 0.0,
+              "std": 44395.60457484582
+            },
+            "L2_derived_volume_mean_89": {
+              "mean": 777.2570022852082,
+              "nan_ratio": 0.0995,
+              "std": 2191.5013733810933
+            }
+          },
+          "rows": 2000,
+          "sample_row_indices": [
+            0,
+            1,
+            10,
+            50,
+            100,
+            250,
+            500,
+            750,
+            1000,
+            1250,
+            1500,
+            1750,
+            1999
+          ],
+          "sampled_value_hash": "bbdfaf59b01c9b373715361cd6863a55b75b5a071c90df74a4e9a9ab61097e87"
+        },
+        "selected_feature_count": 20,
+        "selected_feature_ids": [
+          "L1_binance_close",
+          "L1_binance_high",
+          "L1_binance_low",
+          "L1_binance_open",
+          "L1_binance_quote_volume",
+          "L1_binance_taker_ratio",
+          "L1_binance_volume",
+          "L2_derived_close_mean_13",
+          "L2_derived_close_mean_21",
+          "L2_derived_close_mean_3",
+          "L2_derived_close_mean_34",
+          "L2_derived_close_mean_5",
+          "L2_derived_close_mean_55",
+          "L2_derived_close_mean_8",
+          "L2_derived_close_mean_89",
+          "L2_derived_close_return_1",
+          "L2_derived_close_std_13",
+          "L2_derived_close_std_21",
+          "L2_derived_close_std_3",
+          "L2_derived_close_std_34"
+        ],
+        "source_cols": 34,
+        "source_rows": 2000,
+        "symbol": "ETHUSDT",
+        "timeframe": "4h"
+      }
+    }
+  },
+  "sampling": {
+    "feature_selection": "sorted_column_names_take_first_n",
+    "fixed_row_indices_rule": [
+      0,
+      1,
+      10,
+      50,
+      100,
+      250,
+      500,
+      750,
+      1000,
+      1250,
+      1500,
+      1750,
+      1999
+    ],
+    "ic_first_selected_feature_count": 20,
+    "max_cols": 500,
+    "max_rows": 2000
+  },
+  "schema_version": 1,
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "ADAUSDT"
+  ],
+  "timeframes": [
+    "1h",
+    "4h"
+  ]
+}
