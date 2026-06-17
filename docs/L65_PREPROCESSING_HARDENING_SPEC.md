@@ -15,7 +15,7 @@
 - → §G Golden 必填、adversarial review 必跑（雙家族）。
 
 ## §A 假設與待使用者確認（事故：拿推論代替問人）
-- **已驗證事實**（附驗證方式）：
+- **已驗證事實**（附驗證方式：grep/Read/type() 實測，附行號）：
   - `ic_first_pipeline: bool = False`（feature_config.py:240，Read 實測）→ 預設走 `_layer6_5_legacy`（feature_factory.py:2344）。
   - legacy gating：`_ic_first_enabled` = `config_enabled or get_ic_first_pipeline_enabled()`（feature_factory.py:2347-2350）。
   - d* 校準：`_calibration_series` = `series.iloc[:bars]`，bars=`max(adf_sample, configured, 500)`（feature_preprocessor.py:165-172，Read 實測）。
@@ -24,8 +24,9 @@
   - `causal_preprocessing: bool = True`（feature_config.py:233）；建構子 `self.causal_preprocessing = bool(_config.get("causal_preprocessing", True))`（feature_preprocessor.py:147）。
   - env 覆蓋：`get_ic_first_pipeline_enabled`（core/config.py:38）、`get_multi_symbol_ic_first_enabled`（core/config.py:66）。
   - d* disk cache：`DStarCache`，fingerprint per (symbol, tf, fracdiff-params)（preprocessing/_d_star_cache.py），含 `calibration_bars` 入 hash（206-227）。
-  - 前端：PreprocessingPanel.tsx / lib/types.ts / app/ic-analysis/page.tsx 引用 ic_first（grep 實測）。
-  - batch service 讀取：feature_factory_batch_service.py:660 `preprocessing.get("ic_first_pipeline", False)`。
+  - 前端（adversarial 修正）：**僅 2 檔** PreprocessingPanel.tsx + lib/types.ts:277 引用 ic_first；`app/ic-analysis/page.tsx` **grep 0（無引用）**，原 §A 誤列已更正。
+  - batch service 讀取：feature_factory_batch_service.py `_config_enables_ic_first`(:652) 讀 `ic_first_pipeline`，於 `_resolve_concurrent_symbols`(:635) **強制 concurrent_symbols=1（IC-First OOM 護欄）**。
+  - `get_multi_symbol_ic_first_enabled`(core/config.py:66)+`FFACT_MULTI_SYMBOL_IC_FIRST`(:67)：**孤兒碼,無 caller（adversarial 實測）**;原 §A「env 覆蓋」敘述誇大,刪除即可,無功能影響。
 - **待使用者確認**：無（下列已確認）。
 - **已確認結果**（使用者 2026-06-17）：
   1. 全移除 legacy + UI 切換鈕，IC-First 唯一路徑（接受預設輸出改變）。
@@ -36,14 +37,18 @@
 - 解耦 7 條：`grep "from api\." momentum/`→0；服務不互 import；config 單一真相。
 - 不可違反原則：不弱化 NaN/inf gate；多 symbol schema 一致（replace 模式，跨 symbol 欄名一致）；不擅改輸出大小（本任務輸出值改變已獲使用者授權，但**欄位集合/數量/schema 仍須跨 symbol 一致**）。
 - 本任務特別注意：
-  - L6.5 是 CGSA / batch / 單 symbol 全部消費的共用熱路徑。
-  - d_star_cache fingerprint 必須隨 walk-forward 參數變動，否則舊 cache 污染新邏輯。
-  - causal 釘死後，所有 `if self.causal_preprocessing else <whole series>` 的 else 分支變成死碼 → 一併清理或保留但不可達（委員會定）。
+  - L6.5 是 CGSA / batch / 單 symbol 全部消費的共用熱路徑 → B2 驗證須含 CGSA + 多 symbol batch 真 kline smoke（不只單 symbol grep/build）。
+  - **多 symbol OOM 護欄**（adversarial BLOCKING）：IC-First 成唯一路徑後，batch `_resolve_concurrent_symbols` 的 ic_first-條件式 OOM 護欄會失效 → 須改**無條件 concurrent_symbols=1**（保 OOM 保護；符合 Optimization Priority #2 多symbol穩定 > #4 runtime）。見 §P Task 2.2b。
+  - causal 釘死後 `if self.causal_preprocessing else <whole series>` else 已不可達 → Phase 3 清理（注意中間期假綠窗口，見 §V）。
+  - d* cache key 含 `causal_preprocessing`；外部 False canonicalize 為 True 後，舊 False-key cache 自然不命中 → 安全，但須加測。
+  - ~~d_star_cache walk-forward fingerprint~~：walk-forward 已否決，此約束作廢。
 
 ## §G Golden / Baseline（高風險必填）
-- **凍結時機 / reference 設定**：動工**前**，以真實 kline `data_cache/feature_klines/kline_cache.h5` 跑 baseline。
-  - symbol 集合：BTCUSDT, ETHUSDT, ADAUSDT（含參考標的 + 2 非參考）；tf：1h, 4h。
-  - 兩組 config：① IC-First（現況已可手動開）；② legacy（現況預設）。baseline 存 `tests/golden/l65_hardening/{symbol}_{tf}_{path}.json`（路徑寫死）。
+- **baseline builder（adversarial BLOCKING：先有可復現腳本，非實作者臨時產→自比假綠）**：
+  動工**前**先建 read-only 腳本 `scripts/build_l65_golden_baseline.py`（**Phase 0，先於 Phase 2**），輸出 baseline + manifest（記 git SHA、config hash、symbol/tf、固定 row-index 抽樣規則、feature-id 集合）。比對腳本同檔提供。baseline 由「移除前 commit」產，存 `tests/golden/l65_hardening/`（git 追蹤）。
+- **凍結時機 / reference 設定**：以真實 kline `data_cache/feature_klines/kline_cache.h5` 跑 baseline。
+  - symbol 集合：BTCUSDT, ETHUSDT, ADAUSDT（含參考標的 + 2 非參考）；tf：1h, 4h（快速 golden）。**三方資料正確性簽核用 10 symbol×3 tf（3×2 不足以代表資料正確）**。
+  - config：**IC-First**（現況可手動開）= 移除後的唯一路徑 baseline。legacy baseline 不需（legacy 刻意廢棄）。
 - **baseline 內容**（須抓值重排/局部錯位/同矩漂移，非只 aggregate）：
   feature 名稱集合 sha256 + 數量/schema dtype + 每 feature mean/std/nan_ratio + 抽樣 value hash（固定 row index 取樣）+ NaN mask hash。
 - **通過條件（可證偽，容差分尺度）**：
@@ -54,14 +59,22 @@
 
 ## §P Phase 與依賴（自檢：無 forward dependency）
 
+### Phase 0 — Golden baseline builder（依賴：無；必先於 Phase 2）
+**Task 0.1 — build_l65_golden_baseline.py**
+- 目標：read-only 腳本在「移除前 commit」產 IC-First baseline + manifest（git SHA/config hash/symbol/tf/row-index 抽樣/feature-id 集合），存 tests/golden/l65_hardening/。
+- 檔案：scripts/build_l65_golden_baseline.py（新建，無 caller）。
+- 驗證：腳本可重跑、輸出穩定（同 input → 同 hash）；manifest 欄位齊。`python scripts/build_l65_golden_baseline.py --check`。
+- 邊界：缺真實 kline → 明確報錯不產假 baseline。　不可做：不進生產路徑、不改 momentum/。
+
 ### Phase 1 — causal 釘死（依賴：無）
 **Task 1.1 — 讀取端強制 causal=True**
 - 目標：`FeaturePreprocessor.__init__` 的 `self.causal_preprocessing` 無視外部 False，恆 True 並於收到 False 時 warn 一次。
 - 檔案：feature_preprocessor.py:147（建構子）。既有 caller：所有建立 FeaturePreprocessor 之處（factory L6.5）。
 - 改法：`raw = bool(_config.get("causal_preprocessing", True)); if not raw: logger.warning("⚠️ causal_preprocessing=False 被忽略,強制 True(防 look-ahead 洩漏)"); self.causal_preprocessing = True`。
-- 驗證：傳 `causal_preprocessing=False` 的 config → `pp.causal_preprocessing is True` 且 log 含警示字串。`pytest tests/feature_engineering/ -k causal`。
-- 邊界：① config 缺 key → True（不 warn）；② 顯式 True → True（不 warn）；③ 顯式 False → True + warn。
-- 不可做：不得移除 else 分支邏輯本身於本 Phase（留 Phase 4 死碼清理，避免一次混太多）。
+- **傳播鏈（adversarial）**：transform_context 的 causal 值在 feature_preprocessor.py:685/716 由 `self.causal_preprocessing` 設 → 釘死 __init__ 會自動傳播到 7 處讀取（1759/1799/1811/1885/1894/2048/2057，且 default 已 True）。**前提：所有 FeaturePreprocessor 實例（含 native/shard 子實例）都經此 __init__**——須確認 native_pp 等子實例不繞過。
+- 驗證：① 傳 `causal_preprocessing=False` → `pp.causal_preprocessing is True` + log 警示；② **端到端傳播測試**：走 fast/registry 路徑、外部 False → 實際輸出 == causal=True（非建構子層級而已）。`pytest tests/feature_engineering/ -k causal`。
+- 邊界：① config 缺 key → True（不 warn）；② 顯式 True → True（不 warn）；③ 顯式 False → True + warn；④ native/shard 子實例外部 False → 仍 True。
+- 不可做：不得移除 else 分支邏輯本身於本 Phase（留 Phase 3 死碼清理）。
 
 **Task 1.2 — 三處釘死註解**
 - 目標：feature_config.py:233（定義）、feature_factory.py:3560（setdefault）、feature_preprocessor.py:147（讀取）加「⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會」。
@@ -72,23 +85,32 @@
 **Task 2.1 — feature_factory 移除 legacy 分支**
 - 目標：`_layer6_5_preprocessing` 不再分流，恆走 IC-First（pre_ic/post_ic）；刪 `_layer6_5_legacy`、`_ic_first_enabled` gating（或恆 True）。
 - 檔案：feature_factory.py:392-409, 2339-2344, 2347-2350, 2369, 2420, 2457。既有 caller：generate_features 主流程。
-- 改法：保留 `_layer6_5_pre_ic`/`_layer6_5_post_ic`；`_layer6_5_preprocessing` 直接依 `selected_features is None` 二選一。metadata `ic_first_pipeline` 欄保留為 True 常數（下游 batch_service 不爆）或委員會定移除策略。
+- 改法：保留 `_layer6_5_pre_ic`/`_layer6_5_post_ic`；`_layer6_5_preprocessing` 直接依 `selected_features is None` 二選一。
+- **metadata 矛盾解（adversarial BLOCKING）**：metadata `ic_first_pipeline`(:2167,2420) **保留輸出為 True 常數**（向後相容下游 batch/前端）；Task 2.2 的 grep 驗收**排除 metadata 輸出鍵**，只查 config 欄/env helper/legacy 分支（見 Task 2.2 grep 規格）。二者不再矛盾。
 - 驗證：grep `_layer6_5_legacy` → 0；IC-First baseline byte 一致（§G 子項1）。`pytest tests/ -k "layer6_5 or ic_first"`。
 - 邊界：① selected_features=None（pre-IC 階段）；② 有 selected_features（post-IC）；③ 空特徵 DF。
-- 不可做：不改 pre_ic/post_ic 內部演算法（僅移除分流）。
+- 不可做：不改 pre_ic/post_ic 內部演算法（僅移除分流）；不刪 metadata 鍵。
 
 **Task 2.2 — 移除 ic_first config 欄 + env helper**
-- 目標：刪 `ic_first_pipeline`（feature_config.py:240）、`get_ic_first_pipeline_enabled`、`get_multi_symbol_ic_first_enabled`（core/config.py:38,66）+ env 讀取。
-- 檔案：feature_config.py:238-240、core/config.py:38-66、feature_factory.py:24(import)、batch_service:660。既有 caller：上述。
-- 改法：移除欄位與 helper；batch_service:660 改為常數 True 或移除該分支。同步 import。
-- 驗證：grep `ic_first_pipeline|get_ic_first_pipeline_enabled|FFACT_IC_FIRST` → 僅剩註解/test fixture 清理後 0 個程式引用。`pytest tests/`。
-- 邊界：① 舊 config dict 仍帶 `ic_first_pipeline` key（extra="allow" 容許）→ 不報錯、被忽略；② env var 設了 → 無效（已移）。
+- 目標：刪 `ic_first_pipeline`（feature_config.py:240）、`get_ic_first_pipeline_enabled`、`get_multi_symbol_ic_first_enabled`（core/config.py:38,66）+ env 讀取（FFACT_IC_FIRST_PIPELINE, FFACT_MULTI_SYMBOL_IC_FIRST）。
+- 檔案：feature_config.py:238-240、core/config.py:38-74、feature_factory.py:24(import)。既有 caller：上述 + Task 2.1 已改 feature_factory。
+- 改法：移除欄位與 helper；同步 import。`get_multi_symbol_ic_first_enabled` 為孤兒（無 caller）直接刪。
+- 驗證（grep 規格，排除 metadata 輸出鍵）：`grep -rn "ic_first_pipeline" momentum/ api/ | grep -v "metadata\|:2167\|:2420"` → 0；`grep -rn "get_ic_first_pipeline_enabled\|get_multi_symbol_ic_first_enabled\|FFACT_IC_FIRST_PIPELINE\|FFACT_MULTI_SYMBOL_IC_FIRST" momentum/ api/` → 0。`pytest tests/`。
+- 邊界：① 舊 config dict 帶 `ic_first_pipeline` key → PreprocessingConfig extra="allow"(:266 實測) 容許,被忽略不報錯；② env var 設了 → 無效（已移）。
 - 不可做：不動其他 PreprocessingConfig 欄位。
 
+**Task 2.2b — batch 多 symbol OOM 護欄（adversarial BLOCKING：移欄位後護欄失效）**
+- 目標：IC-First 成唯一路徑後，batch `_resolve_concurrent_symbols` 不再靠 `_config_enables_ic_first` 條件 → 改**無條件 concurrent_symbols=1**（保 IC-First 高記憶體的 OOM 保護）。
+- 檔案：feature_factory_batch_service.py `_resolve_concurrent_symbols`(:628-649)、`_config_enables_ic_first`(:651-660)。
+- 改法：移除 `_config_enables_ic_first` 條件分支；`_resolve_concurrent_symbols` 直接回 1（保留 nested guard 等其他 =1 條件）；刪孤兒 `_config_enables_ic_first` 或保留但不再 gate。決策理由：Optimization Priority #2（多symbol穩定/OOM）> #4（runtime）。
+- 驗證：多 symbol batch 真 kline smoke（≥2 symbol）→ concurrent_symbols==1 且不 OOM；`pytest tests/ -k "batch and (ic_first or concurrent)"`。
+- 邊界：① 單 symbol → 1；② 多 symbol → 1（不再隨 tier 放大）；③ nested env → 1。
+- 不可做：不得讓多 symbol 回到 tier-based 並行（會 OOM）。
+
 **Task 2.3 — 前端移除 IC-First 切換鈕**
-- 目標：PreprocessingPanel.tsx 移除切換 UI；lib/types.ts 移欄位；ic-analysis/page.tsx 清引用。
-- 檔案：frontend 3 檔。
-- 驗證：`cd frontend && npm run build` 通過；grep `ic_first|icFirst` → 0（除無關字串）。
+- 目標：PreprocessingPanel.tsx 移除切換 UI + state/handler；lib/types.ts:277 移欄位。
+- 檔案：**僅 2 檔**（adversarial 修正：ic-analysis/page.tsx grep 0，不在範圍）。
+- 驗證：`cd frontend && npm run build` 通過；`grep -rn "ic_first\|icFirst" frontend/src` → 0（除無關字串）。
 - 邊界：① 舊 localStorage/store 殘留該欄 → 不 crash（忽略）。
 - 不可做：不改其他預處理 UI 控制項。
 
@@ -107,15 +129,29 @@
 
 **Task 3.2 — 真實 kline 三方資料正確性簽核**
 - 目標：Claude + Codex + Composer 三方獨立確認資料正確（生成→計算→merge→split→無洩漏）。
-- 驗證：§V 全套不變量在真實 kline 上通過；三方皆簽「資料正確」。
+- 驗證：§V 不變量表全綠（byte abs≤1e-6/rel≤1e-4、schema 跨 10 symbol 一致、PIT、NaN gate）+ `pytest tests/feature_engineering/ -k l65` 綠 + 三方各寫 handoffs/*.md 簽「資料正確」。
 - 邊界：見 §V。　不可做：不得用合成 fixture 代替真實 kline。
 
 ## §V 驗證策略與邊界測試目錄
-- 測試層級：單元（causal 強制 / config 移除）/ 整合（L6.5 端到端）/ Golden 對照（§G）/ 邊界。皆可獨立 `pytest tests/...`，不需 run_api.py。
-- **防假綠**：diff 既有測試斷言；移除 legacy/ic_first 的測試須**重寫為 IC-First 唯一路徑斷言**，不得只刪測試換綠燈。新斷言對應新行為（causal 強制）。
-- **值守恆**：causal 釘死預設 == 舊預設 byte 一致；移 legacy 後 IC-First 路徑 == 移除前 IC-First baseline byte 一致。
+- 測試層級：單元（causal 強制 / config 移除）/ 整合（L6.5 端到端 + CGSA + 多 symbol batch）/ Golden 對照（§G）/ 邊界。皆可獨立 `pytest tests/...`，不需 run_api.py。
+- **防假綠（既有 causal=False 測試重寫清單，adversarial BLOCKING——禁刪換綠）**：下列顯式設 `causal_preprocessing=False` 並斷言「與 True 不同」的測試，釘死後該語義已不可達 → **逐一重寫為「外部 False → 強制 True + warn」新斷言**，不得刪除或留著假綠：
+  - tests/feature_engineering/preprocessing/test_ff_causal_golden.py（:41）
+  - tests/feature_engineering/preprocessing/test_l65_v2_transforms.py（:32,44）
+  - tests/feature_engineering/preprocessing/test_causal_winsor.py
+  - tests/momentum/test_feature_preprocessor.py
+  - tests/test_winsorize_partition_opt.py
+  - ic_first/legacy 測試（≥13 檔含 test_ic_first_pipeline.py、test_multi_symbol_ic_first.py、test_failopen_matrix.py…）→ 重寫為 IC-First 唯一路徑斷言。執行端須附「每檔改了什麼斷言」清單供驗收 diff。
+- **中間期假綠窗口（adversarial）**：Phase 1 釘死 __init__ 但 Phase 3 才清死碼；中間 commit 須確認 causal=False 路徑已**實際不可達**（靠傳播鏈測試，非僅建構子）。
+- **值守恆**：causal 釘死預設 == 舊預設 byte 一致；移 legacy 後 IC-First 路徑 == 移除前 IC-First baseline byte 一致（§G builder）。
+- **三方簽核不變量表（Task 3.2，adversarial：禁口頭 PASS）**：每項附可執行命令 + 可證偽通過條件：
+  | 不變量 | 檢查 | 通過條件 |
+  |---|---|---|
+  | byte 一致 | IC-First 輸出 vs §G baseline | value abs≤1e-6/rel≤1e-4、nan_ratio exact |
+  | 跨 symbol 隔離 | 10 symbol 各自輸出 schema | 欄位集合/dtype 跨 symbol 一致；無跨 symbol 值污染 |
+  | causal PIT | 外部 False + 竄改尾端 | 仍 True、輸出不受未來資料影響 |
+  | NaN gate | 全 NaN/Inf 欄 | NaN 模式合理、不弱化 gate |
 - **跨 symbol/TF 隔離**：schema 跨 symbol 一致。
-- **邊界目錄**（打勾對應 Task）：空DF(2.1)/全NaN列/Inf/std=0/重複·亂序timestamp/causal 外部 False 強制 True(1.1)。
+- **邊界目錄**：空DF(2.1)/全NaN列/Inf/std=0/重複·亂序timestamp/causal 外部 False 強制 True(1.1)/fast+registry 路徑 False(1.1)/多 symbol batch concurrent=1(2.2b)/舊 False-key cache 不命中(2.2)。
 
 ## §R 回退
 - 每 Phase 獨立 commit，可單獨 revert（Phase 1/2/3 解耦）。

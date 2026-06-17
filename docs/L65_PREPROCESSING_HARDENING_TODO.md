@@ -9,13 +9,16 @@
 | Task | 1.2 | 三處釘死註解 | Phase1 |
 | Task | 2.1 | feature_factory 移除 legacy 分支 | Phase2 |
 | Task | 2.2 | 移除 ic_first config 欄+env helper | Phase2 |
-| Task | 2.3 | 前端移除 IC-First 切換鈕 | Phase2 |
+| Task | 0.1 | Golden baseline builder 腳本 | Phase0(adv新增) |
+| Task | 2.2b | batch 多symbol OOM 護欄(無條件 concurrent=1) | Phase2(adv新增) |
+| Task | 2.3 | 前端移除 IC-First 切換鈕(**僅2檔**) | Phase2 |
 | Task | 3.1 | 清理 causal=False 死碼 | Phase3 |
-| Task | 3.2 | 真實 kline 三方資料正確性簽核 | Phase3 |
+| Task | 3.2 | 真實 kline 三方資料正確性簽核(不變量表) | Phase3 |
 | Golden | G-1 | IC-First 移 legacy 前後 byte 一致 | §V/Task2.1 |
 | Golden | G-3 | causal 釘死預設 byte 不變 | §V/Task1.1 |
-| 風險 | (a)(b)(d) | 數值/共用路徑/洩漏守門 | §RISK |
-- 合計：Task=7、Golden=2、風險原則=3。
+| 風險 | (a)(b)(d) | 數值/共用路徑(含多symbol OOM)/洩漏守門 | §RISK |
+- 合計：Task=9(含 adv 新增 0.1, 2.2b)、Golden=2、風險原則=3。
+- **雙家族 adversarial 已 reconcile**(handoffs/20260617-l65-adv-{codex,composer}.md);詳細修補見 SPEC(權威來源)+本檔 §ADV。
 - **否決移除**（2026-06-17 三方實證）：原 Task 3.1 d* walk-forward、G-2 段數退化、PIT-1 不變量、recalibration_interval flag、P3←P1 依賴 —— 全部隨子項 2 否決而移除（非遺漏）。記憶 project-dstar-walkforward-rejected。
 
 ## §0 全域規則與約束（執行端讀完即可遵守）
@@ -31,16 +34,18 @@
 
 | Batch | 含 Task | 依賴 | 合併理由 | 規模 |
 |---|---|---|---|---|
-| B1 | 1.1, 1.2 | 無 | causal 釘死+註解,同檔同主題,最小 | 小 |
-| B2 | 2.1, 2.2, 2.3 | 無(與 B1 獨立) | 移除 legacy 全棧(後端+config+前端)一氣呵成,避免半移除狀態 | 中 |
-| B3 | 3.1, 3.2 | B1,B2 | 死碼清理需前批定案;三方簽核需全部到位 | 中 |
+| B0 | 0.1 | 無 | golden builder 須先於 B2 產 baseline | 小 |
+| B1 | 1.1, 1.2 | 無 | causal 釘死+註解+傳播鏈測試,同檔同主題 | 小 |
+| B2 | 2.1, 2.2, 2.2b, 2.3 | B0(baseline),B1 | 移除 legacy 全棧(後端+config+batch OOM+前端)一氣呵成,避免半移除 | 中 |
+| B3 | 3.1, 3.2 | B0,B1,B2 | 死碼清理需前批定案;三方簽核需全部到位 | 中 |
 
 > **B(原)中的 d* walk-forward 批已隨子項 2 否決移除**（2026-06-17 三方實證）。
 
 - **批次間 Gate**：
-  - B1 後：`pytest tests/feature_engineering/ -k causal` 綠 + G-3 byte 一致。
-  - B2 後：`grep -rn "ic_first_pipeline\|get_ic_first_pipeline_enabled\|FFACT_IC_FIRST\|_layer6_5_legacy" momentum/ api/` → 0 程式引用；`cd frontend && npm run build` 綠；G-1 byte 一致。
-  - B3 後：全 `pytest` 綠（扣除 pre-existing test_l65_parallel::test_tier_auto_selects_workers，見下）+ 三方簽核「資料正確」。
+  - B0 後：`python scripts/build_l65_golden_baseline.py --check` 綠 + baseline/manifest 存在於 tests/golden/l65_hardening/。
+  - B1 後：`pytest tests/feature_engineering/ -k causal` 綠（含 fast/registry 傳播鏈測試）+ G-3 byte 一致。
+  - B2 後：`grep -rn "ic_first_pipeline" momentum/ api/ | grep -v "metadata\|:2167\|:2420"` → 0；`grep -rn "get_ic_first_pipeline_enabled\|get_multi_symbol_ic_first_enabled\|FFACT_IC_FIRST_PIPELINE\|FFACT_MULTI_SYMBOL_IC_FIRST\|_layer6_5_legacy" momentum/ api/` → 0；多 symbol batch smoke concurrent==1 不 OOM；`cd frontend && npm run build` 綠；G-1 byte 一致。
+  - B3 後：全 `pytest` 綠（扣除 pre-existing test_l65_parallel::test_tier_auto_selects_workers，見下）+ §V 不變量表全綠 + 三方簽核「資料正確」。
 - **派工 prompt**（每批複製給 Composer 2.5，附前置狀態 + Task 列表 + 驗證命令）：見各 Phase 末。
 
 > **pre-existing 注意**：`tests/test_l65_parallel.py::test_tier_auto_selects_workers` 在 clean tree 已 FAIL（`_column_layer_map` 缺失，走 legacy 路徑）。移除 legacy 後此測試應改寫或移除（Task 2.1 連帶處理），不得視為本任務新增回歸。
@@ -157,7 +162,7 @@
 - 不可做：禁合成 fixture 代替真實 kline。
 - 邊界：見 §V。
 - 風險緩解：(a)(b)(d)
-- 驗證：§V 全綠 + 三方簽「資料正確」。
+- 驗證：§V 不變量表全綠（byte abs≤1e-6/rel≤1e-4、schema 跨 symbol 一致）+ `pytest tests/` 綠 + 三方各寫 handoffs 簽「資料正確」。
 
 ### Phase 3 測試 + Gate
 - 單元：causal 死碼簡化等價測試 + causal 外部 False 強制 True。邊界：見各 Task。
@@ -165,6 +170,17 @@
 
 ---
 
-## 階段 4：Frozen 前 handoff
-`SPEC=docs/L65_PREPROCESSING_HARDENING_SPEC.md TODO=docs/L65_PREPROCESSING_HARDENING_TODO.md FOCUS=移legacy行為不變(IC-First byte一致)/causal釘死/防假綠`
-→ 用 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` 雙家族（GPT-5.5 Codex + Composer 2.5）各一次獨立審查，Blocking finding reconcile 後才過 gate dispatch。未過外部 review 前僅 `Internal Frozen`。
+## §ADV 雙家族 adversarial reconcile（2026-06-17，已併入上方 Task；SPEC 為權威細節）
+兩家獨立稽核（handoffs/20260617-l65-adv-{codex,composer}.md），收斂 BLOCKING 已修補：
+1. **Golden baseline 無 builder**（兩家）→ 新增 Task 0.1 + Phase 0（先於 B2，可復現腳本+manifest）。
+2. **causal 釘死不完整**（Codex）→ 已驗：transform_context 經 :685/716 由 self.causal_preprocessing 設,釘死 __init__ 自動傳播 7 處;但須加 fast/registry 傳播鏈測試 + 確認 native/shard 子實例不繞過（Task 1.1 擴充）。
+3. **causal=False 既有測試假綠**（兩家）→ §V 列重寫清單(test_ff_causal_golden:41 / test_l65_v2_transforms:32,44 / test_causal_winsor / test_feature_preprocessor / test_winsorize_partition_opt + ≥13 ic_first 測試),禁刪換綠。
+4. **batch 移 ic_first 破多symbol OOM 護欄**（Composer BLOCKING/Codex）→ 新增 Task 2.2b：_resolve_concurrent_symbols 改無條件=1。
+5. **metadata vs grep 矛盾**（兩家）→ metadata 保留 True 常數,grep 排除 metadata 鍵(Task 2.1/2.2)。
+- 事實更正（adversarial 實測）：前端僅 2 檔(ic-analysis grep 0)；get_multi_symbol_ic_first_enabled 為孤兒；grep 補 FFACT_MULTI_SYMBOL_IC_FIRST；§C walk-forward cache 約束作廢。
+- 採納為 NON-BLOCKING：CGSA/shard smoke(納 B2 gate)、舊 False-key cache 不命中測試(Task 2.2 邊界)、三方簽核 10×3(§G)。
+
+## 階段 4：Frozen 狀態
+本 SPEC/TODO **已過雙家族 adversarial 並 reconcile**（→ 可過 gate dispatch 實作）。
+派工分工：**Composer 2.5 實作 + Codex code review**（2026-06-17 使用者重申）。
+驗收必 diff 既有斷言防假綠 + 真實 kline 三方資料正確性簽核。
