@@ -1,32 +1,23 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-17 | **Branch**: main | 最後 commit: c3c40a3
+**Agent**: Claude | **Time**: 2026-06-17 | **Branch**: main
 
-## 給下一個 session:接手就做這些(使用者已拍板,2026-06-17)
-研究路線:先把 **crypto 單一市場** 的 FF→IC→ML→回測 跑成完整版;**數據源擴充(Glassnode/CoinGecko/台股/美股)延後**,等四階段完整版再議(三方委員會共識,評估檔 handoffs/20260617-datasource-ff-assessment-{codex,composer}.md)。
+## 任務 A ✅ 完成並 push
+修 :4109 ref-cache key 硬編碼 BTCUSDT(孤兒碼潛伏 bug,降小任務自修)。讀寫兩端統一以 config.cross_sectional.reference_symbol 為單一真相 + 回歸測試(防假綠驗過)。
 
-### 任務 A(先做,最獨立):修 :4109 ref-cache bug
-- **位置**:`feature_factory.py:4109` `factory._reference_data_cache[("BTCUSDT", tf)] = ref_df` —— 多 symbol 批次時 cache key 硬寫 "BTCUSDT",即使傳了別的 `ref_symbol`(:3894)也被覆蓋 → 跨截面特徵**靜默用錯參考標的**。命中高風險 (d)(回測/ML 正確性)。
-- 修法方向:cache key 用實際 `reference_symbol`(config 的 cross_sectional.reference_symbol),非硬編碼。
-- 流程:完整管線(SPEC→雙家族 adversarial→Composer 實作→Codex review)。**使用者已同意開工**。
+## 任務 B — d* walk-forward 子項已三方否決,範圍縮為子項 1+3
+**子項 2 (walk-forward d*) ❌ 否決**(2026-06-17 三方真實 kline 實證):d* 會漂(rolling std≈0.25)但**無下游價值**(真實 L1 n=232 配對 dIC_mean=−0.002、WF較佳僅42%、|IC|不增反減),成本 16–50×。連帶否決 d_min floor。詳見記憶 project-dstar-walkforward-rejected + docs/DSTAR_WALKFORWARD_COMMITTEE_BRIEF.md + handoffs/20260617-dstar-{codex,composer}.md + scripts/diag_dstar_*.py。
 
-### 任務 B(接著做):L6.5 預處理正確性強化(打包成一個計畫)
-1. **刪 legacy + IC-First 設為唯一/預設**:現況 IC-First **預設關**(`feature_config.py:240` ic_first_pipeline=False;env FFACT_IC_FIRST_PIPELINE),預設路徑是 legacy(`feature_factory.py:392-409` 分支)。使用者手動在 UI(PreprocessingPanel.tsx)開 IC-First。決定:IC-First 設唯一/預設、移除 legacy 分支+UI 切換鈕+改測試。理由:legacy 的 rank/gaussian/zscore 全樣本→洩漏面較大;IC-First 省記憶體理由仍成立。
-2. **FracDiff d\* walk-forward 重估**:現只用前 500 bar 校準一次(`feature_preprocessor.py:170-172,3734`)→長樣本 regime drift。改分段重估提升數據品質。
-3. **causal_preprocessing 釘死 True + 警示註解**:`feature_config.py:233` 預設 True、`feature_factory.py:3560` setdefault True,**未上 UI/API**(使用者關不掉)。在定義/setdefault/讀取三處加醒目註解「⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會」防 AI 靜默改。
-- 流程:命中 (d),完整管線一個計畫。
+**剩餘施作 = 子項 1 + 3**(使用者拍板):
+1. 全移除 legacy L6.5 + UI 切換鈕 + env(FFACT_IC_FIRST_PIPELINE, get_multi_symbol_ic_first_enabled),IC-First 唯一路徑(接受輸出改變)。
+3. causal_preprocessing 程式釘死 True(讀取端強制+忽略外部False+warn)+三處註解。
+SPEC/TODO 已更新移除 Phase 3:docs/L65_PREPROCESSING_HARDENING_{SPEC,TODO,BRIEF}.md(範圍=子項1+3)。
 
-### 不用現在動
-- selection_window/split:IC 引擎已強制(`ic_engine.py:127,453` 沒給就報錯)。等逐一驗證 IC 篩選時再看。
+### 下一步(接手就做)
+- [ ] 雙家族 adversarial 稽核 SPEC/TODO(GPT-5.5+Composer 各一次,reconcile)— 範圍已縮小
+- [ ] 過 gate dispatch → **Composer 2.5 實作 + Codex review**(中/大分工,2026-06-17 使用者重申)
+- [ ] 接回:diff 防假綠 + 真實 kline 三方資料正確性簽核
+- 影響面(實測):後端 feature_factory(ic_first 分支 392-409/2339-2344/2369/2420/2457 + _layer6_5_legacy)、feature_config、core/config、feature_preprocessor(causal:147)、batch_service:660;前端 PreprocessingPanel/types/ic-analysis;~10 測試檔。
+- pre-existing 失敗(非本線):test_l65_parallel::test_tier_auto_selects_workers(_column_layer_map,走 legacy,移除時連帶處理)。
 
-## IC Gatekeeper 真實狀態(使用者原以為「只有項目沒測試」,實際更正)
-- **已大量建好**:ICFilterOrchestrator 8 階段全真實作 + 10 個深度分析模組;**79 個 IC 單元測試會過**;前端 ic-analysis 元件齊。接點=V2 manifest + L7 raw parquet。
-- **但單元測試全用合成資料(np.random)**,從沒真實 kline 端到端驗證。
-- **「真實 kline 三方簽核」= 下一步驗證手段**(選真實 symbol→FF(IC-First)→IC 引擎→委員會查洩漏/算錯→修再跑),不是等完美才跑。是「邊跑真實簽核邊完善」。
-
-## 其他待辦(更後面)
-- 多數據源 epic(延後):adapter metadata 合約/AsOf PIT 對齊/MarketCalendar/企業行動。
-- float16 strict 讀升 float32;CGSA tier 並行(需 24/32GB);batch_alias Phase 3(batches.json)。
-- pre-existing 壞測試:frontend strategy-components.test.tsx 缺 SignalTooltip(與本線無關)。
-
-## 執行端分工(2026-06-15 使用者定)
-中/大實作=Composer 2.5 + Codex review;小=Claude 自己做。技術決策走委員會;中途自主 commit。
+## 方法論(本 session 教訓)
+先量測再決定:Claude 自產實驗→三方審。我最初「d* 穩定不必做」直覺**理由錯**(d* 其實漂)但**結論對**(不該做 WF)——靠真實 L1 配對 IC 實證校正。委員會 proxy 有 bug 風險(我首版 n=4 是 NaN 卷積污染,修 ffill 後 n=232),壞 run 不可當證據。
