@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path
 
 import numpy as np
@@ -13,7 +12,6 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import HAS_S
 
 
 REAL_BASELINE = Path("tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet")
-CAUSAL_GOLDEN = Path("tests/_golden/ff_causal/legacy_preprocessing_fingerprint.json")
 
 
 def _real_numeric_frame() -> pd.DataFrame:
@@ -38,28 +36,21 @@ def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
         "adaptive_zscore": {"enabled": False},
         "gaussian_normalize": {"enabled": True, "clip_range": [0.001, 0.999], "apply_to": "all"},
     }
-    legacy = FeaturePreprocessor({**base, "causal_preprocessing": False}).transform(frame)
+    # causal 釘死後，外部 False 會被強制為 True；legacy(False) fingerprint 已不可達。
+    forced = FeaturePreprocessor({**base, "causal_preprocessing": False}).transform(frame)
     causal = FeaturePreprocessor({**base, "causal_preprocessing": True}).transform(frame)
 
-    if not CAUSAL_GOLDEN.exists():
-        pytest.fail("missing committed causal preprocessing legacy fingerprint")
-    golden = json.loads(CAUSAL_GOLDEN.read_text(encoding="utf-8"))
-    legacy_values = np.ascontiguousarray(legacy.to_numpy(np.float64))
-    legacy_value_sha256 = hashlib.sha256(legacy_values.tobytes()).hexdigest()
-    legacy_nan_sha256 = hashlib.sha256(
-        np.isnan(legacy_values).astype(np.uint8).tobytes()
+    assert list(forced.columns) == list(causal.columns)
+    assert list(forced.shape) == list(causal.shape)
+    diff = np.nanmax(np.abs(forced.to_numpy(np.float64) - causal.to_numpy(np.float64)))
+    assert diff < 1e-6
+    forced_value_sha256 = hashlib.sha256(
+        np.ascontiguousarray(forced.to_numpy(np.float64)).tobytes()
     ).hexdigest()
-    assert list(legacy.columns) == golden["columns"]
-    assert list(legacy.shape) == golden["shape"]
-    assert legacy_value_sha256 == golden["legacy_value_sha256"]
-    assert legacy_nan_sha256 == golden["legacy_nan_mask_sha256"]
-
-    diff = np.nanmax(np.abs(legacy.to_numpy(np.float64) - causal.to_numpy(np.float64)))
-    assert diff > 1e-6
     causal_value_sha256 = hashlib.sha256(
         np.ascontiguousarray(causal.to_numpy(np.float64)).tobytes()
     ).hexdigest()
-    assert causal_value_sha256 != legacy_value_sha256
+    assert forced_value_sha256 == causal_value_sha256
 
 
 def test_rolling_quantile_oracle_on_real_baseline() -> None:

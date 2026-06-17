@@ -344,23 +344,53 @@ def test_transform_single_optimized_df_end_to_end():
 
 
 def test_transform_single_optimized_df_noncausal_matches_full_sample() -> None:
-    """非因果模式才與 full-sample partition/nanquantile 路徑比較。"""
-    pp = _make_preprocessor(
+    """外部 noncausal 被強制 causal，optimized 輸出等於 causal rolling oracle。"""
+    forced_pp = _make_preprocessor(
         winsor_method="quantile",
         quantile_range=[0.01, 0.99],
         causal_preprocessing=False,
     )
+    causal_pp = _make_preprocessor(
+        winsor_method="quantile",
+        quantile_range=[0.01, 0.99],
+        causal_preprocessing=True,
+    )
+    assert forced_pp.causal_preprocessing is True
+
     rng = np.random.default_rng(314)
     arr_f64 = rng.standard_normal((150, 15)).astype(np.float64)
     arr_f64[:20, :] = np.nan
-    arr_ref = arr_f64.copy()
-    FeaturePreprocessor._winsorize_2d_inplace(arr_ref, 0.01, 0.99)
 
-    result = pp._winsorize_2d_legacy_equivalent(arr_f64)
+    # causal 釘死後，外部 False 不再代表 full-sample quantile 分支。
+    window = forced_pp._rolling_window()
+    min_periods = forced_pp._rolling_min_periods(window)
+    lower, upper = rolling_quantile_2d_legacy(
+        arr_f64,
+        0.01,
+        0.99,
+        window,
+        min_periods,
+    )
+    valid = np.isfinite(lower) & np.isfinite(upper)
+    expected = arr_f64.copy()
+    clipped = np.clip(arr_f64, lower, upper)
+    expected[valid] = clipped[valid]
+    expected[np.isnan(arr_f64)] = np.nan
+
+    forced_result = forced_pp._winsorize_2d_legacy_equivalent(arr_f64.copy())
+    causal_result = causal_pp._winsorize_2d_legacy_equivalent(arr_f64.copy())
 
     np.testing.assert_allclose(
-        result.astype(np.float64),
-        arr_ref,
+        forced_result,
+        causal_result,
+        rtol=1e-5,
+        atol=1e-5,
+        equal_nan=True,
+    )
+
+    np.testing.assert_allclose(
+        forced_result.astype(np.float64),
+        expected,
         rtol=1e-5,
         atol=1e-5,
         equal_nan=True,

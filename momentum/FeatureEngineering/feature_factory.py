@@ -3557,6 +3557,7 @@ class FeatureFactory:
         config_payload.pop("max_nan_ratio", None)
         preprocessing_payload = config_payload.get("preprocessing")
         if isinstance(preprocessing_payload, dict):
+            # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
             preprocessing_payload.setdefault("causal_preprocessing", True)
         timeframes = config_payload.get("timeframes")
         if isinstance(timeframes, dict) and isinstance(timeframes.get("training"), list):

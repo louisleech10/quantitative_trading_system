@@ -230,6 +230,7 @@ class AdaptiveZScoreConfig(BaseModel):
 
 class PreprocessingConfig(BaseModel):
     enabled: bool = True
+    # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
     causal_preprocessing: bool = True
     calibration_bars: int = 500
     # replace：原地覆蓋，確保跨標的欄位名稱一致（業界標準）

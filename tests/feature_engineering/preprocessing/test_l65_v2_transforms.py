@@ -26,10 +26,11 @@ def _rank_config(window: int = 3) -> dict:
     }
 
 
-def _gaussian_config() -> dict:
+def _gaussian_config(*, causal: bool = True) -> dict:
     return {
         "mode": "replace",
-        "causal_preprocessing": False,
+        "causal_preprocessing": causal,
+        "rank_transform": {"window": 1},
         "gaussian_normalize": {
             "enabled": True,
             "clip_range": [0.001, 0.999],
@@ -38,14 +39,20 @@ def _gaussian_config() -> dict:
     }
 
 
-def _winsor_quantile_config(lower: float = 0.25, upper: float = 0.75) -> dict:
+def _winsor_quantile_config(
+    lower: float = 0.25,
+    upper: float = 0.75,
+    *,
+    causal: bool = True,
+) -> dict:
     return {
         "mode": "replace",
-        "causal_preprocessing": False,
+        "causal_preprocessing": causal,
         "winsorization": {
             "enabled": True,
             "method": "quantile",
             "quantile_range": [lower, upper],
+            "window": 2,
             "apply_to": "all",
         },
     }
@@ -107,13 +114,26 @@ def _expected_gaussian(frame: pd.DataFrame, lower: float = 0.001, upper: float =
         pytest.skip("scipy is required for gaussian comparison")
 
     payload = {}
+    window = 1
+    min_periods = FeaturePreprocessor._rolling_min_periods(window)
     for column in frame.columns:
         series = frame[column].astype(float)
-        if series.nunique(dropna=True) <= 1:
-            ranked = pd.Series(np.nan, index=series.index, dtype=float)
-            ranked.loc[series.notna()] = 0.5
-        else:
-            ranked = series.rank(pct=True)
+        ranked = pd.Series(np.nan, index=series.index, dtype=float)
+        values = series.to_numpy(dtype=np.float64)
+        for row_idx, value in enumerate(values):
+            if np.isnan(value):
+                continue
+            start = max(0, row_idx - window + 1)
+            window_values = values[start : row_idx + 1]
+            window_values = window_values[np.isfinite(window_values)]
+            if len(window_values) < min_periods:
+                continue
+            less = np.sum(window_values < value)
+            equal = np.sum(window_values == value)
+            if less == 0 and equal == len(window_values):
+                ranked.iloc[row_idx] = 0.5
+            else:
+                ranked.iloc[row_idx] = (less + (equal + 1.0) / 2.0) / len(window_values)
         payload[column] = ndtri(ranked.clip(lower=lower, upper=upper).to_numpy(dtype=np.float64))
     return pd.DataFrame(payload, index=frame.index).astype(np.float32, copy=False)
 
@@ -124,9 +144,15 @@ def _expected_winsor_quantile(
     upper: float,
 ) -> pd.DataFrame:
     selected = frame.astype(float)
-    lowers = selected.quantile(lower)
-    uppers = selected.quantile(upper)
-    return selected.clip(lower=lowers, upper=uppers, axis=1).astype(np.float32, copy=False)
+    window = 2
+    min_periods = FeaturePreprocessor._rolling_min_periods(window)
+    rolling = selected.rolling(window, min_periods=min_periods)
+    lowers = rolling.quantile(lower)
+    uppers = rolling.quantile(upper)
+    expected = selected.copy()
+    valid = lowers.notna() & uppers.notna()
+    expected = expected.where(~valid, expected.clip(lower=lowers, upper=uppers, axis=1))
+    return expected.astype(np.float32, copy=False)
 
 
 def _expected_zscore(frame: pd.DataFrame, window: int, epsilon: float = 1e-8) -> pd.DataFrame:
@@ -324,7 +350,8 @@ def test_winsorize_numpy_equivalence() -> None:
             "constant": [7.0, 7.0, 7.0, 7.0, 7.0],
         }
     )
-    result = FeaturePreprocessor(_winsor_quantile_config())._apply_winsorization(frame)
+    # causal 釘死後，winsorize 等價性以 causal rolling oracle 為準。
+    result = FeaturePreprocessor(_winsor_quantile_config(causal=False))._apply_winsorization(frame)
     expected = _expected_winsor_quantile(frame, lower=0.25, upper=0.75)
 
     assert result.isna().equals(expected.isna())
@@ -344,7 +371,8 @@ def test_winsorize_all_nan_column() -> None:
             "mixed": [1.0, np.nan, 3.0, 100.0],
         }
     )
-    result = FeaturePreprocessor(_winsor_quantile_config())._apply_winsorization(frame)
+    # causal 釘死後，外部 False 不再走 full-sample quantile 分支。
+    result = FeaturePreprocessor(_winsor_quantile_config(causal=False))._apply_winsorization(frame)
 
     assert result["all_nan"].isna().all()
     assert result["mixed"].isna().to_list() == [False, True, False, False]
@@ -473,7 +501,8 @@ def test_gaussian_batch_equivalence() -> None:
             "negative": [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0],
         }
     )
-    result = FeaturePreprocessor(_gaussian_config())._apply_gaussian_normalize(frame)
+    # causal 釘死後，gaussian 等價性以 causal rolling rank oracle 為準。
+    result = FeaturePreprocessor(_gaussian_config(causal=False))._apply_gaussian_normalize(frame)
     expected = _expected_gaussian(frame)
 
     np.testing.assert_allclose(
@@ -496,7 +525,8 @@ def test_gaussian_nan_column() -> None:
             "mixed": [1.0, np.nan, 2.0, 3.0],
         }
     )
-    result = FeaturePreprocessor(_gaussian_config())._apply_gaussian_normalize(frame)
+    # causal 釘死後，外部 False 不再走 full-sample gaussian 分支。
+    result = FeaturePreprocessor(_gaussian_config(causal=False))._apply_gaussian_normalize(frame)
 
     assert result["all_nan"].isna().all()
     assert result["constant_with_nan"].isna().to_list() == [False, True, False, True]

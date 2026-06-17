@@ -144,7 +144,13 @@ class FeaturePreprocessor:
         self.adf_safe_skip_config = self._config.get("adf_safe_skip", {}) or {}
         # 預設 replace：確保跨標的欄位名稱一致
         self.mode = self._config.get("mode", "replace")
-        self.causal_preprocessing = bool(self._config.get("causal_preprocessing", True))
+        # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
+        raw_causal = bool(self._config.get("causal_preprocessing", True))
+        if not raw_causal:
+            logger.warning(
+                "⚠️ causal_preprocessing=False 被忽略,強制 True(防 look-ahead 洩漏,變更需委員會)"
+            )
+        self.causal_preprocessing = True
 
         self._fracdiff_processed_columns: set[str] = set()
         self._fracdiff_apply_to_layers = get_fracdiff_layers()
