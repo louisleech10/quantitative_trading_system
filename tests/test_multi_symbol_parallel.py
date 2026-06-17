@@ -428,6 +428,57 @@ class TestT52NoCrosstalk:
         from momentum.FeatureEngineering.feature_factory import _worker_entry
         assert callable(_worker_entry)
 
+    def test_worker_entry_ref_cache_key_matches_config(self, tmp_path, monkeypatch):
+        """Regression (:4109): worker 注入參考資料的 cache key 必須取自
+        config.cross_sectional.reference_symbol（讀取端用的同一來源），
+        而非硬編碼 "BTCUSDT"。否則參考標的非 BTC 時讀取端會靜默用錯標的。
+
+        真碰路徑：呼叫真實 _worker_entry、寫/讀真實 Arrow IPC；只 stub 下游
+        generate_features 以攔截 worker 內部 factory 的 _reference_data_cache。
+        """
+        from types import SimpleNamespace
+
+        from momentum.FeatureEngineering import feature_factory as ff_mod
+        from momentum.FeatureEngineering.arrow_ipc_utils import write_reference_data_ipc
+
+        # 真實 IPC：參考標的刻意設為非 BTC，才能抓出硬編碼 bug
+        ref_symbol = "ETHUSDT"
+        ref_df = pd.DataFrame(
+            {"close": np.random.randn(64), "volume": np.random.randn(64)}
+        )
+        ipc_path = write_reference_data_ipc(ref_df, tmp_path, ref_symbol)
+
+        captured: dict = {}
+
+        def _stub_generate_features(self, **kwargs):
+            # 攔截 worker 內部 factory 的參考 cache 狀態
+            captured["cache_keys"] = list(self._reference_data_cache.keys())
+            return SimpleNamespace(metadata={"ok": True})
+
+        monkeypatch.setattr(
+            ff_mod.FeatureFactory, "generate_features", _stub_generate_features
+        )
+
+        config_payload = {
+            "timeframes": {"training": ["1h"]},
+            "cross_sectional": {"reference_symbol": ref_symbol},
+        }
+
+        ff_mod._worker_entry(
+            symbol="ADAUSDT",
+            config_payload=config_payload,
+            cache_dir=None,
+            ref_ipc_path=str(ipc_path),
+        )
+
+        assert (ref_symbol, "1h") in captured["cache_keys"], (
+            f"參考資料應以 config 的 reference_symbol={ref_symbol} 為 cache key，"
+            f"實際: {captured['cache_keys']}"
+        )
+        assert ("BTCUSDT", "1h") not in captured["cache_keys"], (
+            "不得把參考資料寫進硬編碼的 BTCUSDT key（:4109 bug）"
+        )
+
 
 # ===========================================================================
 # T5.3d: FeatureReader cross-symbol

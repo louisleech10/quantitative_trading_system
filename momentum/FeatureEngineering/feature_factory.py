@@ -3914,15 +3914,20 @@ class FeatureFactory:
         config = self._resolve_config(config_override)
         config_payload = config.model_dump(by_alias=True)
 
-        # Step 3: Prepare reference data as Arrow IPC for zero-copy sharing
+        # Step 3: Prepare reference data as Arrow IPC for zero-copy sharing.
+        # 單一真相：跨截面參考標的一律取自 config.cross_sectional.reference_symbol，
+        # 與讀取端（_layer5 cross-sectional, cache_key = (reference_symbol, tf)）一致。
+        # 不得用硬編碼或與 config 分歧的 ref_symbol 參數，否則 worker 會把參考資料
+        # 寫進錯誤的 cache key → 讀取端靜默拿到錯誤標的的資料。
+        effective_ref_symbol = config.cross_sectional.reference_symbol or ref_symbol
         ref_ipc_path: Optional[str] = None
         try:
             from momentum.FeatureEngineering.arrow_ipc_utils import write_reference_data_ipc
-            ref_data = self._load_reference_if_available(ref_symbol, config)
+            ref_data = self._load_reference_if_available(effective_ref_symbol, config)
             if ref_data is not None:
                 import tempfile
                 work_dir = Path(tempfile.mkdtemp(prefix="ffact_multi_"))
-                ipc_path = write_reference_data_ipc(ref_data, work_dir, ref_symbol)
+                ipc_path = write_reference_data_ipc(ref_data, work_dir, effective_ref_symbol)
                 ref_ipc_path = str(ipc_path)
         except Exception as exc:
             logger.warning("Reference data IPC preparation failed: %s", exc)
@@ -4106,7 +4111,12 @@ def _worker_entry(
             ref_df = read_reference_data_ipc(Path(ref_ipc_path))
             config_tfs = config_payload.get("timeframes", {}).get("training", ["1h"])
             tf = config_tfs[0] if config_tfs else "1h"
-            factory._reference_data_cache[("BTCUSDT", tf)] = ref_df
+            # cache key 必須與讀取端（_layer5, config.cross_sectional.reference_symbol）
+            # 一致；硬編碼 "BTCUSDT" 會在參考標的非 BTC 時造成靜默用錯標的。
+            ref_symbol = config_payload.get("cross_sectional", {}).get(
+                "reference_symbol", "BTCUSDT"
+            )
+            factory._reference_data_cache[(ref_symbol, tf)] = ref_df
         except Exception:
             pass  # Proceed without reference data
 
