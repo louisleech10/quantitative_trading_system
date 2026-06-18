@@ -64,6 +64,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 _FRACDIFF_LAYER_RE = re.compile(r"^(L\d+)_")
+_WARNED_CAUSAL_OVERRIDE = False
 
 
 def _is_ratio_unsafe_column(col: str) -> bool:
@@ -147,9 +148,12 @@ class FeaturePreprocessor:
         # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
         raw_causal = bool(self._config.get("causal_preprocessing", True))
         if not raw_causal:
-            logger.warning(
-                "⚠️ causal_preprocessing=False 被忽略,強制 True(防 look-ahead 洩漏,變更需委員會)"
-            )
+            global _WARNED_CAUSAL_OVERRIDE
+            if not _WARNED_CAUSAL_OVERRIDE:
+                logger.warning(
+                    "⚠️ causal_preprocessing=False 被忽略,強制 True(防 look-ahead 洩漏,變更需委員會)"
+                )
+                _WARNED_CAUSAL_OVERRIDE = True
         self.causal_preprocessing = True
 
         self._fracdiff_processed_columns: set[str] = set()

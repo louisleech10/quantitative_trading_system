@@ -47,7 +47,7 @@ def test_preprocess_constant_column() -> None:
     df = pd.DataFrame({"f1": [5.0] * 120})
     pre = FeaturePreprocessor(
         {
-            "causal_preprocessing": False,
+            "causal_preprocessing": True,
             "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
             "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
@@ -67,7 +67,7 @@ def test_adf_nan_heavy() -> None:
     df.loc[df.index[:80], "f1"] = np.nan
     pre = FeaturePreprocessor(
         {
-            "causal_preprocessing": False,
+            "causal_preprocessing": True,
             "adf_differencing": {"enabled": True, "apply_to": ["f1"], "max_diff": 2},
             "mode": "append",
         }
@@ -81,7 +81,7 @@ def test_gaussian_boundary() -> None:
     df = pd.DataFrame({"f1": np.concatenate([np.zeros(50), np.ones(50)])})
     pre = FeaturePreprocessor(
         {
-            "causal_preprocessing": False,
+            "causal_preprocessing": True,
             "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
             "mode": "append",
         }
@@ -94,7 +94,7 @@ def test_winsor_then_zscore() -> None:
     df = pd.DataFrame({"f1": [1.0] * 100 + [1000.0]})
     pre = FeaturePreprocessor(
         {
-            "causal_preprocessing": False,
+            "causal_preprocessing": True,
             "winsorization": {"enabled": True, "method": "sigma", "sigma_k": 0.0, "apply_to": "all"},
             "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
             "mode": "append",
@@ -102,6 +102,32 @@ def test_winsor_then_zscore() -> None:
     )
     out = pre.transform(df)
     assert np.isfinite(out["f1_zscore_20"].fillna(0.0).to_numpy()).all()
+
+
+def test_external_false_matches_causal_true_core_transforms() -> None:
+    """外部 False 只能觸發釘死契約，不能恢復非 causal 路徑。"""
+    df = pd.DataFrame({"f1": np.r_[np.linspace(1.0, 40.0, 40), 1000.0, 41.0]})
+    config = {
+        "winsorization": {
+            "enabled": True,
+            "method": "quantile",
+            "quantile_range": [0.25, 0.75],
+            "window": 20,
+            "apply_to": "all",
+        },
+        "rank_transform": {"enabled": True, "window": 20, "apply_to": "all"},
+        "gaussian_normalize": {"enabled": True, "apply_to": "all", "clip_range": [0.001, 0.999]},
+        "adaptive_zscore": {"enabled": True, "windows": [20], "apply_to": "all", "epsilon": 1e-8},
+        "mode": "append",
+    }
+    causal = FeaturePreprocessor({**config, "causal_preprocessing": True}).transform(df)
+    forced = FeaturePreprocessor({**config, "causal_preprocessing": False}).transform(df)
+    np.testing.assert_allclose(
+        forced.to_numpy(np.float32),
+        causal.to_numpy(np.float32),
+        atol=1e-6,
+        equal_nan=True,
+    )
 
 
 def test_preprocess_replace_mode() -> None:
@@ -158,7 +184,7 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     df = df.rename(columns={"f2": "L1_f2"})
     pre = FeaturePreprocessor(
         {
-            "causal_preprocessing": False,
+            "causal_preprocessing": True,
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": ["L1_f2"],
@@ -193,7 +219,7 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
     df = df.rename(columns={"f2": "L1_f2"})
     pre = FeaturePreprocessor(
         {
-            "causal_preprocessing": False,
+            "causal_preprocessing": True,
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": ["L1_f2"],

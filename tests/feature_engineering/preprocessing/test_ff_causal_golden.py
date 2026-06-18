@@ -10,6 +10,11 @@ import pytest
 from momentum.factories import create_feature_factory, create_kline_storage_manager
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import HAS_SCIPY, FeaturePreprocessor
 
+try:
+    from scipy.special import ndtri
+except Exception:  # pragma: no cover
+    ndtri = None
+
 
 REAL_BASELINE = Path("tests/golden/l65/tier2_reduced/ETHUSDT_1h_2000rows.parquet")
 
@@ -27,6 +32,8 @@ def _real_numeric_frame() -> pd.DataFrame:
 def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
     if not HAS_SCIPY:
         pytest.skip("scipy required")
+    if ndtri is None:
+        pytest.skip("scipy ndtri required")
 
     frame = _real_numeric_frame()
     base = {
@@ -40,8 +47,35 @@ def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
     forced = FeaturePreprocessor({**base, "causal_preprocessing": False}).transform(frame)
     causal = FeaturePreprocessor({**base, "causal_preprocessing": True}).transform(frame)
 
+    window = 252
+    min_periods = max(20, window // 4)
+    lower = frame.rolling(window, min_periods=min_periods).quantile(0.05)
+    upper = frame.rolling(window, min_periods=min_periods).quantile(0.95)
+    clipped = frame.where(
+        lower.isna() | upper.isna(),
+        frame.clip(lower=lower, upper=upper, axis=1),
+    )
+    ranked = clipped.rolling(window, min_periods=min_periods).rank(method="average", pct=True)
+    expected = pd.DataFrame(
+        ndtri(ranked.clip(0.001, 0.999).to_numpy(float)),
+        index=frame.index,
+        columns=frame.columns,
+    )
+
     assert list(forced.columns) == list(causal.columns)
     assert list(forced.shape) == list(causal.shape)
+    np.testing.assert_allclose(
+        forced.to_numpy(np.float32),
+        expected.to_numpy(np.float32),
+        atol=1e-6,
+        equal_nan=True,
+    )
+    np.testing.assert_allclose(
+        causal.to_numpy(np.float32),
+        expected.to_numpy(np.float32),
+        atol=1e-6,
+        equal_nan=True,
+    )
     diff = np.nanmax(np.abs(forced.to_numpy(np.float64) - causal.to_numpy(np.float64)))
     assert diff < 1e-6
     forced_value_sha256 = hashlib.sha256(

@@ -163,9 +163,9 @@ def test_flag_busts_hash_and_both_caches(tmp_path) -> None:
     factory = FeatureFactory(config_manager=Mock(), adapter_registry=adapter)
     cm = ConfigManager()
     causal = cm.get_merged_config(api_override={"preprocessing": {"causal_preprocessing": True}})
-    legacy = cm.get_merged_config(api_override={"preprocessing": {"causal_preprocessing": False}})
+    external_false = cm.get_merged_config(api_override={"preprocessing": {"causal_preprocessing": False}})
 
-    assert factory._compute_config_hash(causal, "BTCUSDT", "1h") != factory._compute_config_hash(legacy, "BTCUSDT", "1h")
+    assert factory._compute_config_hash(causal, "BTCUSDT", "1h") != factory._compute_config_hash(external_false, "BTCUSDT", "1h")
 
     ctx = PreprocessingContext(symbol="BTCUSDT", timeframe="1h", row_count=10)
     old_cache = DStarCache(ctx, tmp_path, adf_threshold=0.1, precision=0.1, max_lag=20, weight_threshold=1e-5, sample_size=500, causal_preprocessing=False, calibration_bars=0)
@@ -198,6 +198,8 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
     monkeypatch.setenv("FFACT_L65_OPTIMIZATION_PROFILE", "legacy")
     legacy = FeaturePreprocessor(config).transform(frame)
+    forced = FeaturePreprocessor({**config, "causal_preprocessing": False}).transform(frame)
+    np.testing.assert_allclose(forced.to_numpy(np.float32), legacy.to_numpy(np.float32), atol=1e-6, equal_nan=True)
 
     monkeypatch.setenv("FFACT_L65_OPTIMIZATION_PROFILE", "optimized")
     optimized = FeaturePreprocessor(config).transform(frame)

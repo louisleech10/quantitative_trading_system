@@ -15,6 +15,7 @@ import pytest
 from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
     scale_preprocessing_config_for_native,
 )
+from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fp_mod
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     HAS_SCIPY,
     FeaturePreprocessor,
@@ -58,11 +59,17 @@ def test_external_false_forced_true_no_warn_when_explicit_true(
 
 def test_external_false_forced_true_with_warn(caplog: pytest.LogCaptureFixture) -> None:
     """顯式 False → 強制 True 並 warn 一次。"""
+    fp_mod._WARNED_CAUSAL_OVERRIDE = False
     caplog.set_level("WARNING")
     pp = FeaturePreprocessor(_winsor_config(causal=False))
     assert pp.causal_preprocessing is True
     assert "被忽略" in caplog.text
     assert "look-ahead" in caplog.text
+
+    caplog.clear()
+    again = FeaturePreprocessor(_winsor_config(causal=False))
+    assert again.causal_preprocessing is True
+    assert "被忽略" not in caplog.text
 
 
 def test_external_false_output_matches_causal_true_legacy_path(
@@ -154,6 +161,9 @@ def test_native_subinstance_external_false_still_causal() -> None:
     }
     parent = FeaturePreprocessor(parent_config)
     assert parent.causal_preprocessing is True
+    causal_parent_config = {**parent_config, "causal_preprocessing": True}
+    causal_parent = FeaturePreprocessor(causal_parent_config)
+    assert causal_parent.causal_preprocessing is True
 
     scaled = scale_preprocessing_config_for_native(parent_config, "12h", "1h")
     native_pp = FeaturePreprocessor(scaled)
@@ -173,7 +183,7 @@ def test_native_subinstance_external_false_still_causal() -> None:
         ),
     )
 
-    def _run_native(values: np.ndarray) -> np.ndarray:
+    def _run_native(pp: FeaturePreprocessor, values: np.ndarray) -> np.ndarray:
         registry = Mock()
         registry.load_data_native.return_value = values
         registry.get_alignment_idx_map.return_value = idx_map
@@ -181,11 +191,14 @@ def test_native_subinstance_external_false_still_causal() -> None:
         registry.overwrite_data.side_effect = lambda _gid, data: captured.setdefault(
             "data", data.copy()
         )
-        assert parent._maybe_run_native_l65_inplace(registry, group)
+        assert pp._maybe_run_native_l65_inplace(registry, group)
         return captured["data"]
 
-    native_out = _run_native(native_values)
+    causal_out = _run_native(causal_parent, native_values)
+    native_out = _run_native(parent, native_values)
+    np.testing.assert_allclose(causal_out, native_out, atol=1e-6, equal_nan=True)
+
     perturbed = native_values.copy()
     perturbed[-1, 0] = -9999.0
-    native_perturbed = _run_native(perturbed)
+    native_perturbed = _run_native(parent, perturbed)
     np.testing.assert_allclose(native_out[:-12], native_perturbed[:-12], atol=1e-6, equal_nan=True)
