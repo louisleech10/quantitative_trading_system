@@ -376,14 +376,14 @@ def test_matrix_l65_failure_degrades_metadata(
     def _boom(_frame, _config):  # noqa: ANN001
         raise RuntimeError("injected preprocessing failure")
 
-    monkeypatch.setattr(factory, "_layer6_5_legacy", _boom)
+    monkeypatch.setattr(factory, "_layer6_5_pre_ic", _boom)
 
     result = factory.generate_features(
         MATRIX_SYMBOL,
         MATRIX_TF,
         config_override={
             **_fast_config_payload(),
-            "preprocessing": {"enabled": True, "ic_first_pipeline": False},
+            "preprocessing": {"enabled": True},
         },
         force_regenerate=True,
         start_date=start,
