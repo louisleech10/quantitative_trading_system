@@ -3,23 +3,31 @@
 
 ## 任務 A ✅ 完成 push (:4109 ref-cache 修正 + 防假綠回歸測試)
 
-## 任務 B — L6.5 強化(子項1移legacy + 子項3釘死causal;子項2 walk-forward 已三方否決)
-**狀態:雙家族 adversarial 已過+reconcile;實作進行中(Codex 實作,Composer shell 被擋 role-swap)**
+## 任務 B ✅ 完成 — L6.5 預處理正確性強化
+子項1 移 legacy(IC-First 唯一) + 子項3 釘死 causal True;**子項2 walk-forward d* 三方實證否決**(無下游價值,記憶 project-dstar-walkforward-rejected)。
 
-- ✅ **B0**(Task 0.1):scripts/build_l65_golden_baseline.py + tests/golden/l65_hardening/(6 records,--check PASS)。commit 751067b。
-- ✅ **B1**(Task 1.1,1.2):causal 釘死 True+warn+傳播鏈測試+三處註解;6 個既有 causal=False 測試**忠實重寫**(對照獨立 causal oracle,防假綠,我 diff 驗過)。203 passed。commit e8b62c9。
-- ✅ **B2**(commits f6bf409 移legacy + 6d749ba F1-F4修補 + 4d8cae7 frozen-doc):IC-First 唯一路徑。golden --check PASS、grep0、npm build、targeted 132 passed。Codex 2 次 timeout(全suite慢)→我 targeted 驗+代commit。Composer review 跑中(b04g8hkik);全suite backstop 跑中(b9qx6u3qc)。
-- ✅ **B3a**(1cbcd25 causal死碼清理 byte不變 + d829754 B2review#1-6修補+config_hash golden重生):targeted 226 passed+golden check+多symbol smoke PASS。Composer review跑中(boxxeflr6);全suite backstop跑中(bvn9fmjr5)。
-  - backstop 抓到 config_hash golden stale(移ic_first_pipeline欄→hash 57c4→1dbe,正確後果,已重生)+perf flaky(忽略)。⚠️副作用:config_hash變→現有特徵快取失效需重生。
-- ⬜ **B3b**:真實 kline **三方資料正確性簽核**(Claude+Codex+Composer 各獨立驗 生成→計算→merge→split→無洩漏;§V 不變量表)。任務B最後一哩。
+全程:現況實測 → brief/SPEC/TODO → 雙家族 adversarial reconcile → Codex 實作/Composer review(分批 B0-B3b) → 三方資料正確性簽核。
 
-### 接回驗收要點(每批我必做)
-postflight(data_cache 防刪)+ diff 既有斷言**防假綠**+ 自跑驗證(不信執行端報告)+ golden --check byte 一致 + commit(Codex sandbox `.git/index.lock` 不可寫→commit 我代勞)。B2 完待 Composer read-only code review。
+| 批 | commit | 內容 |
+|---|---|---|
+| B0 | 751067b | golden baseline builder |
+| B1 | e8b62c9 | causal 釘死+傳播測試+6測試重寫 |
+| B2 | f6bf409/6d749ba/4d8cae7 | 移 legacy 全棧+F1-F4+frozen-doc |
+| B3a | 1cbcd25/d829754 | causal 死碼清理+B2review#1-6+config_hash golden重生 |
+| B3b | 7e9d083/9cdf78a | 剩餘死碼清理+三方資料正確性簽核 |
 
-### Pre-existing 失敗(非本線,勿誤判回歸)
-1. test_l65_parallel::test_tier_auto_selects_workers + test_ic_first_pipeline 4 個 = `_column_layer_map`/`_storage` AttributeError(走 legacy 路徑;B2 移 legacy 後應調整/消失)。
-2. test_failopen_matrix::test_v8_frozen_doc_covers_every_existing_assertion_change = frozen doc 過期(含我 Task A 測試 + 一堆無關 hardware/phase_d 測試→session 前就紅)。**治理 housekeeping,需重生 frozen doc,獨立於 L65**。
+**三方簽核「資料正確」**(真實 kline 10×3,各自獨立腳本):Claude(PIT+隔離)、Composer(byte parity/PIT雙切點/隔離30對/NaN·inf/multi-TF merge值守恆)、Codex(merge 2000值守恆/split無洩漏/30對隔離)。
 
-## 關鍵文件
-docs/L65_PREPROCESSING_HARDENING_{SPEC(權威),TODO,BRIEF}.md;記憶 project-dstar-walkforward-rejected;handoffs/20260617-l65-adv-* + 20260618-l65-impl-*。
-執行端:中/大實作 Composer,Codex review(但本機 Composer shell 被擋→暫由 Codex 實作 role-swap)。
+**驗證**:golden --check PASS(IC-First byte不變);全 feature_engineering suite 622 passed(B3a後);B3b後 my-env 188 passed。
+
+⚠️ **副作用(已知,正確)**:移除 ic_first_pipeline config 欄→default config_hash 變(57c4→1dbe)→現有 data_cache 特徵快取失效需重生。
+
+## Pre-existing(非本線)
+- perf smoke test_batch1_followup flaky(負載下偶發,單跑PASS,忽略)。
+- joblib/loky slow-path parallel 測試在受限 sandbox(Codex)缺 semaphore 權限 fail;非受限環境 PASS。
+
+## 下一步(任務 B 已完,新方向待使用者指示)
+原研究路線:crypto 單市場 FF→IC→ML→回測 完整版;IC Gatekeeper 真實 kline 端到端驗證(79 IC 單元測試全合成資料,從沒真實端到端)。數據源擴充延後。
+
+## 執行端分工
+中/大實作 Codex(gpt-5.5,`codex exec -m gpt-5.5`) + Composer(`cursor-agent -p --force --output-format text --model composer-2.5`)review。本任務因實作一致性全程 Codex 實作。派工被擋先查根因(記憶 feedback-dispatch-blocked-investigate-cause)。
