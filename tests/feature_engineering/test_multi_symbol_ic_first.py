@@ -14,7 +14,9 @@ Test IDs:
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List, Optional
+from concurrent.futures import Future
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -57,6 +59,45 @@ def _make_service(tmp_path: Any) -> Any:
     svc._active_tasks: Dict[str, Any] = {}
     svc._notification_callbacks: Dict[str, Any] = {}
     return svc
+
+
+def _real_kline_symbols(limit: int = 2) -> List[str]:
+    """讀取真實 kline cache 內可用 symbol，供 batch smoke 覆蓋 production 資料路徑。"""
+    import h5py
+
+    path = Path("data_cache/feature_klines/kline_cache.h5")
+    if not path.is_file():
+        pytest.skip(f"missing real kline cache: {path}")
+    with h5py.File(path, "r") as handle:
+        symbols = sorted(
+            symbol
+            for symbol in handle.keys()
+            if "1h" in handle[symbol] and "data" in handle[symbol]["1h"]
+        )
+    if len(symbols) < limit:
+        pytest.skip(f"need at least {limit} symbols in real kline cache, found {symbols}")
+    return symbols[:limit]
+
+
+class _InlineProcessPoolExecutor:
+    """測試用同步 executor：避開 sandbox 禁用的 process semaphore probe。"""
+
+    def __init__(self, max_workers: int = 1) -> None:
+        self.max_workers = max_workers
+
+    def __enter__(self) -> "_InlineProcessPoolExecutor":
+        return self
+
+    def __exit__(self, *_exc_info: object) -> None:
+        return None
+
+    def submit(self, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Future:
+        future: Future = Future()
+        try:
+            future.set_result(fn(*args, **kwargs))
+        except BaseException as exc:  # pragma: no cover - mirrors Executor contract
+            future.set_exception(exc)
+        return future
 
 
 # ---------------------------------------------------------------------------
@@ -598,3 +639,75 @@ class TestBenchmark10SymbolDryrun:
         assert concurrent == 1, (
             f"IC-First 唯一路徑下應忽略 tier-based 值 2，實際為 {concurrent}"
         )
+
+    @pytest.mark.slow
+    @pytest.mark.asyncio
+    async def test_real_kline_batch_service_smoke_serializes_two_symbols(
+        self, tmp_path, monkeypatch
+    ):
+        """
+        Given: 真實 kline cache 至少兩個 symbol
+        When:  FeatureFactoryBatchService 跑 minimal 多 symbol batch
+        Then:  concurrent_symbols 固定 1，任務完成且沒有 OOM/failed item
+        """
+        from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+        import api.services.feature_factory_batch_service as batch_service_module
+
+        symbols = _real_kline_symbols(2)
+        monkeypatch.setattr(
+            batch_service_module,
+            "ProcessPoolExecutor",
+            _InlineProcessPoolExecutor,
+        )
+        monkeypatch.setenv("FFACT_BATCH_NESTED", "0")
+        monkeypatch.setenv("FFACT_USE_CGSA", "1")
+        monkeypatch.setenv("FFACT_USE_POLARS", "1")
+        monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
+        monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
+
+        service = FeatureFactoryBatchService(
+            checkpoint_dir=tmp_path / "checkpoints",
+            browse_registrar=MagicMock(register=lambda symbol, _tf, _path: f"browse-{symbol}"),
+            quality_computer=MagicMock(),
+        )
+        request = _make_batch_request(
+            symbols,
+            "1h",
+            force_regenerate=True,
+            config_override={
+                "preset": "minimal",
+                "timeframes": {
+                    "primary": "1h",
+                    "training": ["1h"],
+                    "alignment": "point_in_time",
+                    "alignment_mode": "open_minus",
+                },
+                "data_sources": {"enabled_sources": ["close"], "synthetic_sources": []},
+                "preprocessing": {
+                    "enabled": True,
+                    "winsorization": {"enabled": False},
+                    "fractional_differencing": {"enabled": False},
+                    "adf_differencing": {"enabled": False},
+                    "rank_transform": {"enabled": False},
+                    "adaptive_zscore": {"enabled": False},
+                    "gaussian_normalize": {"enabled": False},
+                },
+            },
+        )
+        task_id = "real-kline-smoke"
+        checkpoint = service._build_initial_checkpoint(task_id, request)
+        service._tasks[task_id] = service._build_task_state(
+            task_id,
+            request,
+            checkpoint,
+            status="pending",
+        )
+
+        await service._run_batch(task_id, request, checkpoint)
+
+        status = service.get_status(task_id)
+        assert status is not None
+        assert status["concurrent_symbols"] == 1
+        assert status["status"] == "completed"
+        assert status["failed"] == 0
+        assert len(checkpoint["completed_items"]) == len(symbols)

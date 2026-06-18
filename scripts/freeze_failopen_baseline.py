@@ -96,7 +96,6 @@ def _fixed_config_payload(training: Sequence[str], primary: str) -> dict[str, An
         # 是未驗證的錯誤推論,實測坐實 fracdiff ON/OFF 同速(72.3 vs 72.9s)。fracdiff=OFF
         # 之所以可行,是「重構不碰 fracdiff 數學」,不是為省時。winsor+IC-First 保留。
         "preprocessing": {
-            "ic_first_pipeline": True,
             "winsorization": {"enabled": True},
             "fractional_differencing": {"enabled": False},
             "adf_differencing": {"enabled": False},

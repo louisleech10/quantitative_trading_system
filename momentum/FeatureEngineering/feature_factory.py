@@ -1986,6 +1986,8 @@ class FeatureFactory:
             if not retained:
                 lease.release()
 
+    run_ic_first_pipeline = run_ic_first
+
     def _run_ic_first_impl(
         self,
         symbol: str,

@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from momentum.factories import create_feature_factory, create_kline_storage_manager
+from momentum.FeatureEngineering.preprocessing._numba_transforms import _rolling_rank_numba
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import HAS_SCIPY, FeaturePreprocessor
 
 try:
@@ -55,7 +56,11 @@ def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
         lower.isna() | upper.isna(),
         frame.clip(lower=lower, upper=upper, axis=1),
     )
-    ranked = clipped.rolling(window, min_periods=min_periods).rank(method="average", pct=True)
+    ranked = pd.DataFrame(
+        _rolling_rank_numba(clipped.to_numpy(dtype=np.float64, copy=False), window, min_periods),
+        index=frame.index,
+        columns=frame.columns,
+    )
     expected = pd.DataFrame(
         ndtri(ranked.clip(0.001, 0.999).to_numpy(float)),
         index=frame.index,

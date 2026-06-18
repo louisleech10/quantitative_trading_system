@@ -460,7 +460,6 @@ atomic_indicators:
 preprocessing:
   enabled: true
   mode: replace
-  ic_first_pipeline: false  # true = IC-First 兩段式（IC 選特徵 → 只對選出特徵做 rank/zscore）；false = legacy（所有特徵全做 L6.5）
 
   winsorization:
     enabled: true

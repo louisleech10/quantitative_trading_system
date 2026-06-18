@@ -199,6 +199,8 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FFACT_L65_OPTIMIZATION_PROFILE", "legacy")
     legacy = FeaturePreprocessor(config).transform(frame)
     forced = FeaturePreprocessor({**config, "causal_preprocessing": False}).transform(frame)
+    expected = _rolling_quantile_oracle(frame.astype(float), window=20, lower_q=0.25, upper_q=0.75)
+    np.testing.assert_allclose(legacy.to_numpy(np.float32), expected.to_numpy(np.float32), atol=1e-6, equal_nan=True)
     np.testing.assert_allclose(forced.to_numpy(np.float32), legacy.to_numpy(np.float32), atol=1e-6, equal_nan=True)
 
     monkeypatch.setenv("FFACT_L65_OPTIMIZATION_PROFILE", "optimized")

@@ -216,29 +216,27 @@ def _assert_per_column_exact(
         )
 
 
-def _assert_per_column_mask_exact(
-    live_hashes: Dict[str, Dict[str, str]],
-    frozen_hashes: Dict[str, Dict[str, str]],
+def _assert_nan_mask_gate(
+    first_hashes: Dict[str, Dict[str, str]],
+    second_hashes: Dict[str, Dict[str, str]],
     columns: List[str],
     *,
     label: str,
 ) -> None:
-    """IC-First 唯一路徑後 value hash 允許改變；schema 與 NaN mask 仍 frozen。"""
+    """IC-First 值可變；NaN mask 必須在重跑時完全穩定。"""
     mismatches: List[str] = []
     for column in columns:
-        if column not in live_hashes:
-            mismatches.append(f"{column}: missing in live {label}")
+        if column not in first_hashes:
+            mismatches.append(f"{column}: missing in first {label}")
             continue
-        if column not in frozen_hashes:
-            mismatches.append(f"{column}: missing in frozen {label}")
+        if column not in second_hashes:
+            mismatches.append(f"{column}: missing in second {label}")
             continue
-        live = live_hashes[column]
-        frozen = frozen_hashes[column]
-        if live["nan_mask_sha256"] != frozen["nan_mask_sha256"]:
+        if first_hashes[column]["nan_mask_sha256"] != second_hashes[column]["nan_mask_sha256"]:
             mismatches.append(f"{column}: nan_mask_sha256")
     if mismatches:
         pytest.fail(
-            f"{label} per-column mask mismatch count={len(mismatches)} "
+            f"{label} NaN-mask mismatch count={len(mismatches)} "
             f"sample={mismatches[:5]}"
         )
 
@@ -419,13 +417,25 @@ class TestP4Parity:
         _apply_batch2d_env(monkeypatch, use_cgsa=False)
         with tempfile.TemporaryDirectory(prefix="batch2d_p4_control_") as temp_dir:
             payload, _ = _run_control(Path(temp_dir))
+        with tempfile.TemporaryDirectory(prefix="batch2d_p4_control_repeat_") as temp_dir:
+            repeat_payload, _ = _run_control(Path(temp_dir))
 
         assert payload["frame"]["rows"] > 0
         assert payload["frame"]["columns"] > 0
         assert payload["frame"]["canonical_sha256"] != frozen_control["frame"]["canonical_sha256"]
         live_per_column = payload["frame"]["per_column"]
+        repeat_per_column = repeat_payload["frame"]["per_column"]
         live_l36 = [column for column in l36_columns if column in live_per_column]
         assert live_l36, "control gate vacuous: no live L3-L6 columns under IC-First"
+        assert all(
+            column in repeat_per_column for column in live_l36
+        ), "control repeat gate vacuous: repeated run missing live L3-L6 columns"
+        _assert_nan_mask_gate(
+            live_per_column,
+            repeat_per_column,
+            live_l36,
+            label="control L3-L6",
+        )
 
     @pytest.mark.slow
     def test_cgsa_baseline_runs_ic_first_not_legacy_frozen(
@@ -439,11 +449,25 @@ class TestP4Parity:
         monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work"))
         with tempfile.TemporaryDirectory(prefix="batch2d_p4_cgsa_") as temp_dir:
             payload, _ = _run_cgsa(Path(temp_dir))
+        monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work_repeat"))
+        with tempfile.TemporaryDirectory(prefix="batch2d_p4_cgsa_repeat_") as temp_dir:
+            repeat_payload, _ = _run_cgsa(Path(temp_dir))
 
         assert payload["frame"]["rows"] > 0
         assert payload["frame"]["columns"] > 0
         assert payload["frame"]["canonical_sha256"] != frozen_cgsa["frame"]["canonical_sha256"]
         assert payload["manifest_columns"]
+        common_columns = sorted(
+            set(payload["frame"]["per_column"]) & set(repeat_payload["frame"]["per_column"])
+        )
+        if not common_columns:
+            pytest.fail("CGSA gate vacuous: no live columns overlap repeated run")
+        _assert_nan_mask_gate(
+            payload["frame"]["per_column"],
+            repeat_payload["frame"]["per_column"],
+            common_columns,
+            label="CGSA common columns",
+        )
 
 
 def test_t4_value_parity_inventory_record_only() -> None:

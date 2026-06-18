@@ -344,7 +344,7 @@ def test_quality_gate_max_ratios_do_not_change_config_hash() -> None:
     )
 
     assert default_hash == gated_hash
-    assert default_hash == "57c47c30d3396cd2454a8eb198a3b13e"
+    assert default_hash == "1dbe534ed08793b0ea2f80b3748fa1a0"
 
 
 def test_l65_failure_records_effective_config_and_continues() -> None:
