@@ -188,34 +188,6 @@ def _tagged_l36_columns(provenance: Dict[str, str]) -> List[str]:
     return sorted(column for column, layer in provenance.items() if layer in _L36_LAYERS)
 
 
-def _assert_per_column_exact(
-    live_hashes: Dict[str, Dict[str, str]],
-    frozen_hashes: Dict[str, Dict[str, str]],
-    columns: List[str],
-    *,
-    label: str,
-) -> None:
-    mismatches: List[str] = []
-    for column in columns:
-        if column not in live_hashes:
-            mismatches.append(f"{column}: missing in live {label}")
-            continue
-        if column not in frozen_hashes:
-            mismatches.append(f"{column}: missing in frozen {label}")
-            continue
-        live = live_hashes[column]
-        frozen = frozen_hashes[column]
-        if live["value_sha256"] != frozen["value_sha256"]:
-            mismatches.append(f"{column}: value_sha256")
-        if live["nan_mask_sha256"] != frozen["nan_mask_sha256"]:
-            mismatches.append(f"{column}: nan_mask_sha256")
-    if mismatches:
-        pytest.fail(
-            f"{label} per-column hash mismatch count={len(mismatches)} "
-            f"sample={mismatches[:5]}"
-        )
-
-
 def _assert_nan_mask_gate(
     first_hashes: Dict[str, Dict[str, str]],
     second_hashes: Dict[str, Dict[str, str]],

@@ -2311,66 +2311,42 @@ class FeaturePreprocessor:
         # Caller passes a fancy-indexed slice that NumPy has already materialised
         # as a separate float64 array, so .copy() here is always redundant.
         result_array = np.ascontiguousarray(arr, dtype=np.float64)
-        selected = pd.DataFrame(result_array)
         method = self.winsor_config.get("method", "sigma")
 
         if method == "sigma":
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            if self.causal_preprocessing:
-                window = self._rolling_window()
-                min_periods = self._rolling_min_periods(window)
-                means, stds = _rolling_mean_std(result_array, window, min_periods=min_periods)
-                lowers = means.astype(np.float64) - sigma_k * stds.astype(np.float64)
-                uppers = means.astype(np.float64) + sigma_k * stds.astype(np.float64)
-                nan_mask = np.isnan(result_array)
-                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
-                clipped = np.clip(result_array, lowers, uppers)
-                result_array[valid_bounds] = clipped[valid_bounds]
-                result_array[nan_mask] = np.nan
-            else:
-                means = selected.mean(skipna=True)
-                stds = selected.std(skipna=True)
-                valid_std = (~stds.isna()) & (stds != 0.0)
-                if not valid_std.any():
-                    return result_array
-
-                valid_positions = valid_std[valid_std].index.tolist()
-                lowers = means.loc[valid_positions] - sigma_k * stds.loc[valid_positions]
-                uppers = means.loc[valid_positions] + sigma_k * stds.loc[valid_positions]
-                clipped = selected.loc[:, valid_positions].clip(
-                    lower=lowers,
-                    upper=uppers,
-                    axis=1,
-                )
-                result_array[:, valid_positions] = clipped.to_numpy(dtype=np.float32, copy=False)
+            window = self._rolling_window()
+            min_periods = self._rolling_min_periods(window)
+            means, stds = _rolling_mean_std(result_array, window, min_periods=min_periods)
+            lowers = means.astype(np.float64) - sigma_k * stds.astype(np.float64)
+            uppers = means.astype(np.float64) + sigma_k * stds.astype(np.float64)
+            nan_mask = np.isnan(result_array)
+            valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+            clipped = np.clip(result_array, lowers, uppers)
+            result_array[valid_bounds] = clipped[valid_bounds]
+            result_array[nan_mask] = np.nan
             return result_array
 
         if method == "quantile":
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             lower_q = float(quantile_range[0])
             upper_q = float(quantile_range[1])
-            if self.causal_preprocessing:
-                window = self._rolling_window()
-                min_periods = self._rolling_min_periods(window)
-                lowers, uppers = rolling_quantile_2d(
-                    result_array,
-                    lower_q,
-                    upper_q,
-                    window,
-                    min_periods,
-                )
-                nan_mask = np.isnan(result_array)
-                # 暖機期 quantile bounds 無效 → pass-through 原值（非輸出 NaN）。
-                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
-                clipped = np.clip(result_array, lowers, uppers)
-                result_array[valid_bounds] = clipped[valid_bounds]
-                result_array[nan_mask] = np.nan
-                return result_array.astype(np.float32, copy=False)
-            return self._winsorize_2d_inplace(
+            window = self._rolling_window()
+            min_periods = self._rolling_min_periods(window)
+            lowers, uppers = rolling_quantile_2d(
                 result_array,
                 lower_q,
                 upper_q,
-            ).astype(np.float32, copy=False)
+                window,
+                min_periods,
+            )
+            nan_mask = np.isnan(result_array)
+            # 暖機期 quantile bounds 無效 → pass-through 原值（非輸出 NaN）。
+            valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+            clipped = np.clip(result_array, lowers, uppers)
+            result_array[valid_bounds] = clipped[valid_bounds]
+            result_array[nan_mask] = np.nan
+            return result_array.astype(np.float32, copy=False)
 
         raise ValueError(f"Unsupported winsorization method: {method}")
 
@@ -2709,63 +2685,42 @@ class FeaturePreprocessor:
 
         if method == "sigma":
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
-            if self.causal_preprocessing:
-                window = self._rolling_window()
-                min_periods = self._rolling_min_periods(window)
-                arr = selected.to_numpy(dtype=np.float64, copy=True)
-                means, stds = _rolling_mean_std(arr, window, min_periods=min_periods)
-                lowers = means.astype(np.float64) - sigma_k * stds.astype(np.float64)
-                uppers = means.astype(np.float64) + sigma_k * stds.astype(np.float64)
-                nan_mask = np.isnan(arr)
-                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
-                clipped = np.clip(arr, lowers, uppers)
-                arr[valid_bounds] = clipped[valid_bounds]
-                arr[nan_mask] = np.nan
-                result.loc[:, columns] = pd.DataFrame(
-                    arr.astype(np.float32, copy=False),
-                    index=selected.index,
-                    columns=columns,
-                )
-            else:
-                means = selected.mean(skipna=True)
-                stds = selected.std(skipna=True)
-                valid_std = (~stds.isna()) & (stds != 0.0)
-                if not valid_std.any():
-                    return result
-
-                valid_columns = valid_std[valid_std].index.tolist()
-                lowers = means.loc[valid_columns] - sigma_k * stds.loc[valid_columns]
-                uppers = means.loc[valid_columns] + sigma_k * stds.loc[valid_columns]
-                clipped = selected.loc[:, valid_columns].clip(lower=lowers, upper=uppers, axis=1)
-                clipped = clipped.astype(np.float32, copy=False)
-                result.loc[:, valid_columns] = clipped
+            window = self._rolling_window()
+            min_periods = self._rolling_min_periods(window)
+            arr = selected.to_numpy(dtype=np.float64, copy=True)
+            means, stds = _rolling_mean_std(arr, window, min_periods=min_periods)
+            lowers = means.astype(np.float64) - sigma_k * stds.astype(np.float64)
+            uppers = means.astype(np.float64) + sigma_k * stds.astype(np.float64)
+            nan_mask = np.isnan(arr)
+            valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+            clipped = np.clip(arr, lowers, uppers)
+            arr[valid_bounds] = clipped[valid_bounds]
+            arr[nan_mask] = np.nan
+            result.loc[:, columns] = pd.DataFrame(
+                arr.astype(np.float32, copy=False),
+                index=selected.index,
+                columns=columns,
+            )
         elif method == "quantile":
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
             lower_q = float(quantile_range[0])
             upper_q = float(quantile_range[1])
             selected_array = selected.to_numpy(dtype=np.float64, copy=True)
-            if self.causal_preprocessing:
-                window = self._rolling_window()
-                min_periods = self._rolling_min_periods(window)
-                lowers, uppers = rolling_quantile_2d(
-                    selected_array,
-                    lower_q,
-                    upper_q,
-                    window,
-                    min_periods,
-                )
-                nan_mask = np.isnan(selected_array)
-                valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
-                clipped = np.clip(selected_array, lowers, uppers)
-                selected_array[valid_bounds] = clipped[valid_bounds]
-                selected_array[nan_mask] = np.nan
-                clipped_array = selected_array
-            else:
-                clipped_array = self._winsorize_2d_inplace(
-                    selected_array,
-                    lower_q,
-                    upper_q,
-                )
+            window = self._rolling_window()
+            min_periods = self._rolling_min_periods(window)
+            lowers, uppers = rolling_quantile_2d(
+                selected_array,
+                lower_q,
+                upper_q,
+                window,
+                min_periods,
+            )
+            nan_mask = np.isnan(selected_array)
+            valid_bounds = np.isfinite(lowers) & np.isfinite(uppers)
+            clipped = np.clip(selected_array, lowers, uppers)
+            selected_array[valid_bounds] = clipped[valid_bounds]
+            selected_array[nan_mask] = np.nan
+            clipped_array = selected_array
             clipped = pd.DataFrame(
                 clipped_array.astype(np.float32, copy=False),
                 index=selected.index,
