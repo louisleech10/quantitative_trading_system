@@ -629,35 +629,18 @@ class FeatureFactoryBatchService:
         self,
         config_override: Optional[Dict[str, Any]] = None,
     ) -> int:
-        """Resolve concurrent symbol count from tier table, config, and nested guard."""
+        """Resolve concurrent symbol count for the IC-First-only L6.5 path."""
 
-        # IC-First pipeline 記憶體使用量顯著高於標準路徑；強制序列執行避免 OOM
-        if self._config_enables_ic_first(config_override):
-            logger.info(
-                "[L65] IC-First config detected; forcing concurrent_symbols=1 "
-                "to prevent OOM on IC-First pipeline"
-            )
-            return 1
-
-        tier_gb = get_current_tier_gb()
-        concurrent_symbols = max(1, get_tier_concurrent_symbols(tier_gb))
         if get_batch_nested_enabled():
             logger.warning(
                 "[L6.5] FFACT_BATCH_NESTED detected; forcing concurrent_symbols=1"
             )
             return 1
-        return concurrent_symbols
-
-    @staticmethod
-    def _config_enables_ic_first(config_override: Optional[Dict[str, Any]]) -> bool:
-        """Return True when request config enables generation-time IC-First routing."""
-
-        if not isinstance(config_override, dict):
-            return False
-        preprocessing = config_override.get("preprocessing")
-        if not isinstance(preprocessing, dict):
-            return False
-        return bool(preprocessing.get("ic_first_pipeline", False))
+        logger.info(
+            "[L65] IC-First is the only pipeline; forcing concurrent_symbols=1 "
+            "to prevent multi-symbol OOM"
+        )
+        return 1
 
     def _resolve_ram_gate_min_gb(self) -> float:
         """Resolve RAM gate GB threshold from env override or concurrent tier."""

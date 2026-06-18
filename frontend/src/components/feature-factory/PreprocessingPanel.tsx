@@ -21,7 +21,6 @@ interface PreprocessingPanelProps {
 const DEFAULT_PREPROCESSING: PreprocessingConfig = {
   enabled: true,
   mode: 'replace',
-  ic_first_pipeline: false,
   winsorization: {
     enabled: true,
     method: 'quantile',
@@ -199,7 +198,6 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
   const fracEnabled = Boolean(preprocessing.fractional_differencing?.enabled);
   const adfEnabled = Boolean(preprocessing.adf_differencing?.enabled);
   const showCoexistWarning = fracEnabled && adfEnabled;
-  const icFirstOn = Boolean(preprocessing.ic_first_pipeline);
 
   return (
     <div>
@@ -218,54 +216,6 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
         </button>
       </div>
       <div className="px-6 pb-6 space-y-4">
-
-      {/* 模式選擇 + 流程說明 */}
-      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 space-y-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400">管線模式</span>
-          <button
-            type="button"
-            onClick={() => update({ ic_first_pipeline: false })}
-            className={`rounded-md px-2 py-1 border text-xs ${
-              !preprocessing.ic_first_pipeline
-                ? 'bg-cyan-400/15 text-cyan-100 border-cyan-300/40'
-                : 'bg-white/5 text-slate-400 border-white/10'
-            }`}
-          >
-            Legacy（全特徵）
-          </button>
-          <button
-            type="button"
-            onClick={() => update({ ic_first_pipeline: true })}
-            className={`rounded-md px-2 py-1 border text-xs ${
-              preprocessing.ic_first_pipeline
-                ? 'bg-emerald-400/15 text-emerald-100 border-emerald-300/40'
-                : 'bg-white/5 text-slate-400 border-white/10'
-            }`}
-          >
-            IC-First（節省記憶體）
-          </button>
-          <InfoTooltip content={`【Legacy vs IC-First】
-Legacy：所有特徵完整跑 L6.5（Winsor → FracDiff/ADF → Rank → Z-Score → Gaussian）。最完整，耗時耗記憶體。
-
-IC-First（推薦多標的場景）：
-① 生成時只執行 Winsor + FracDiff/ADF（跳過 Rank / Z-Score / Gaussian）
-② 到 IC Analysis 頁面執行 IC Gatekeeper 篩選
-③ 在 IC Analysis 頁面用「套用 L6.5 後處理」按鈕，
-   只對通過 IC 篩選的特徵執行 Rank / Z-Score / Gaussian
-→ 計算量大幅減少，記憶體可控，多標的不 OOM。`} />
-        </div>
-        {preprocessing.ic_first_pipeline ? (
-          <div className="text-[11px] text-emerald-300/80 leading-relaxed">
-            <span className="text-emerald-300">IC-First 模式</span>：生成時只執行 Winsor + FracDiff/ADF，跳過 Rank / Z-Score / Gaussian。
-            完成 IC Analysis 後，在 IC Analysis 頁面用「套用 L6.5 後處理」對篩選後的特徵執行 Rank / Z-Score / Gaussian。
-          </div>
-        ) : (
-          <div className="text-[11px] text-slate-400 leading-relaxed">
-            <span className="text-cyan-300">Legacy 模式</span>：所有特徵都完整跑 L6.5，無特徵刪減，適合單標的研究。
-          </div>
-        )}
-      </div>
 
       {/* 輸出模式 */}
       <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 space-y-2">
@@ -388,7 +338,7 @@ IC-First（推薦多標的場景）：
         </div>
 
         {/* Rank Transform */}
-        <div className={`rounded-xl border border-emerald-300/30 bg-emerald-400/5 p-3 space-y-2 transition-opacity ${icFirstOn ? 'opacity-40 pointer-events-none' : ''}`}>
+        <div className="rounded-xl border border-emerald-300/30 bg-emerald-400/5 p-3 space-y-2 transition-opacity opacity-40 pointer-events-none">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-emerald-200 font-medium">Rank Transform</span>
@@ -414,13 +364,11 @@ IC-First（推薦多標的場景）：
               className="w-24 rounded-md border border-white/10 bg-slate-900/60 px-2 py-1 text-slate-200"
             />
           </div>
-          {icFirstOn && (
-            <div className="text-[10px] text-amber-300/70">IC-First 模式：請在 IC Analysis 頁面套用</div>
-          )}
+          <div className="text-[10px] text-amber-300/70">生成階段略過，請在 IC Analysis 頁面套用</div>
         </div>
 
         {/* Gaussian Normalize */}
-        <div className={`rounded-xl border border-amber-300/30 bg-amber-400/5 p-3 space-y-2 transition-opacity ${icFirstOn ? 'opacity-40 pointer-events-none' : ''}`}>
+        <div className="rounded-xl border border-amber-300/30 bg-amber-400/5 p-3 space-y-2 transition-opacity opacity-40 pointer-events-none">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-amber-200 font-medium">Gaussian Normalize</span>
@@ -434,13 +382,11 @@ IC-First（推薦多標的場景）：
               }
             />
           </div>
-          {icFirstOn && (
-            <div className="text-[10px] text-amber-300/70">IC-First 模式：請在 IC Analysis 頁面套用</div>
-          )}
+          <div className="text-[10px] text-amber-300/70">生成階段略過，請在 IC Analysis 頁面套用</div>
         </div>
 
         {/* Adaptive Z-Score */}
-        <div className={`rounded-xl border border-amber-300/30 bg-amber-400/5 p-3 space-y-2 transition-opacity ${icFirstOn ? 'opacity-40 pointer-events-none' : ''}`}>
+        <div className="rounded-xl border border-amber-300/30 bg-amber-400/5 p-3 space-y-2 transition-opacity opacity-40 pointer-events-none">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <span className="text-amber-200 font-medium">Adaptive Z-Score</span>
@@ -454,9 +400,7 @@ IC-First（推薦多標的場景）：
               }
             />
           </div>
-          {icFirstOn && (
-            <div className="text-[10px] text-amber-300/70">IC-First 模式：請在 IC Analysis 頁面套用</div>
-          )}
+          <div className="text-[10px] text-amber-300/70">生成階段略過，請在 IC Analysis 頁面套用</div>
         </div>
 
         {/* ADF Differencing */}

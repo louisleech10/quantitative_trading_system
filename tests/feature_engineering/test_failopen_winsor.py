@@ -11,11 +11,10 @@ import pytest
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
 
 
-def _result(frame: pd.DataFrame, *, preprocessing: bool, winsor: bool, ic_first: bool):
+def _result(frame: pd.DataFrame, *, preprocessing: bool, winsor: bool):
     config = {
         "preprocessing": {
             "enabled": preprocessing,
-            "ic_first_pipeline": ic_first,
             "winsorization": {"enabled": winsor},
         }
     }
@@ -48,11 +47,9 @@ def test_validator_winsor_is_point_in_time() -> None:
 
 
 @pytest.mark.parametrize("cgsa", [False, True])
-@pytest.mark.parametrize("ic_first", [False, True])
 @pytest.mark.parametrize("l65_winsor", [False, True])
 def test_each_config_path_applies_at_most_one_winsor(
     cgsa: bool,
-    ic_first: bool,
     l65_winsor: bool,
 ) -> None:
     del cgsa  # CGSA 不呼叫 frame validator；此矩陣仍驗證共同 config 決策。
@@ -61,7 +58,6 @@ def test_each_config_path_applies_at_most_one_winsor(
         frame,
         preprocessing=l65_winsor,
         winsor=l65_winsor,
-        ic_first=ic_first,
     )
     validator = FeatureValidator()
 
@@ -74,7 +70,7 @@ def test_each_config_path_applies_at_most_one_winsor(
 
 def test_winsor_rescans_nan_and_inf(monkeypatch: pytest.MonkeyPatch) -> None:
     frame = pd.DataFrame({"feature": np.arange(320, dtype=np.float32)})
-    result = _result(frame, preprocessing=False, winsor=False, ic_first=False)
+    result = _result(frame, preprocessing=False, winsor=False)
     validator = FeatureValidator()
 
     def _inject_invalid(_frame: pd.DataFrame) -> pd.DataFrame:

@@ -26,16 +26,16 @@ def _make_factory() -> FeatureFactory:
     factory._current_timeframe = "fixture"
     factory._current_config_hash = "ic-first-test"
     factory._current_raw_data = None
+    factory._column_layer_map = {}
     factory._cgsa_registry = None
     factory.layer_results = {}
     return factory
 
 
-def _make_config(*, ic_first_pipeline: bool = False) -> Any:
+def _make_config() -> Any:
     preprocessing = PreprocessingConfig(
         enabled=True,
         mode="replace",
-        ic_first_pipeline=ic_first_pipeline,
         winsorization={
             "enabled": True,
             "method": "quantile",
@@ -172,7 +172,6 @@ def _load_selected_payload(result) -> Dict[str, Any]:
 
 
 def test_routing(monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_IC_FIRST_PIPELINE", "1")
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
     config = _make_config()
@@ -188,13 +187,6 @@ def test_routing(monkeypatch) -> None:
     expected_pre_ic = _expected_pre_ic(frame, config)
     _assert_frame_allclose(pre_ic, expected_pre_ic)
 
-    legacy = factory._layer6_5_legacy(frame, config)
-    assert not np.allclose(
-        pre_ic.to_numpy(dtype=np.float32),
-        legacy.to_numpy(dtype=np.float32),
-        equal_nan=True,
-    )
-
     selected_features: List[str] = ["alpha", "gamma"]
     post_ic = factory._layer6_5_preprocessing(
         frame,
@@ -207,11 +199,10 @@ def test_routing(monkeypatch) -> None:
     assert "beta" not in post_ic.columns
 
 
-def test_config_flag_routes_to_pre_ic_without_env(monkeypatch) -> None:
-    monkeypatch.delenv("FFACT_IC_FIRST_PIPELINE", raising=False)
+def test_generation_routes_to_pre_ic_without_env(monkeypatch) -> None:
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
-    config = _make_config(ic_first_pipeline=True)
+    config = _make_config()
     frame = pd.DataFrame(
         {
             "alpha": [1.0, 2.0, 3.0, 100.0, 5.0],
@@ -224,16 +215,8 @@ def test_config_flag_routes_to_pre_ic_without_env(monkeypatch) -> None:
     expected_pre_ic = _expected_pre_ic(frame, config)
     _assert_frame_allclose(pre_ic, expected_pre_ic)
 
-    legacy = factory._layer6_5_legacy(frame, config)
-    assert not np.allclose(
-        pre_ic.to_numpy(dtype=np.float32),
-        legacy.to_numpy(dtype=np.float32),
-        equal_nan=True,
-    )
 
-
-def test_ic_first_legacy_fallback(monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_IC_FIRST_PIPELINE", "0")
+def test_selected_features_route_to_post_ic(monkeypatch) -> None:
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
     config = _make_config()
@@ -250,10 +233,8 @@ def test_ic_first_legacy_fallback(monkeypatch) -> None:
         config,
         selected_features=["alpha"],
     )
-    expected = factory._layer6_5_legacy(frame, config)
-
-    assert list(result.columns) == list(frame.columns)
-    _assert_frame_allclose(result, expected)
+    assert list(result.columns) == ["alpha"]
+    assert result.index.equals(frame.index)
 
 
 def test_transform_selected_only_processes_ic_features(monkeypatch) -> None:
@@ -609,7 +590,8 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
         name="forward_return",
     )
 
-    result = factory.run_ic_first_pipeline(
+    factory._storage = storage
+    result = factory.run_ic_first(
         "SYNTHETIC",
         "1h",
         config,

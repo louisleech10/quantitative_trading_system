@@ -35,20 +35,6 @@ def get_l65_optimization_profile() -> str:
     return "optimized"
 
 
-def get_ic_first_pipeline_enabled() -> bool:
-    raw = os.getenv("FFACT_IC_FIRST_PIPELINE", "0").strip().lower()
-    if raw in {"1", "true", "yes", "on"}:
-        return True
-    if raw in {"", "0", "false", "no", "off"}:
-        return False
-
-    logger.warning(
-        "Invalid FFACT_IC_FIRST_PIPELINE=%s, fallback to disabled legacy pipeline",
-        raw,
-    )
-    return False
-
-
 def get_l7_codec_upgrade_enabled() -> bool:
     raw = os.getenv("FFACT_L7_CODEC_UPGRADE", "0").strip().lower()
     if raw in {"1", "true", "yes", "on"}:
@@ -58,20 +44,6 @@ def get_l7_codec_upgrade_enabled() -> bool:
 
     logger.warning(
         "Invalid FFACT_L7_CODEC_UPGRADE=%s, fallback to disabled legacy codec",
-        raw,
-    )
-    return False
-
-
-def get_multi_symbol_ic_first_enabled() -> bool:
-    raw = os.getenv("FFACT_MULTI_SYMBOL_IC_FIRST", "0").strip().lower()
-    if raw in {"1", "true", "yes", "on"}:
-        return True
-    if raw in {"", "0", "false", "no", "off"}:
-        return False
-
-    logger.warning(
-        "Invalid FFACT_MULTI_SYMBOL_IC_FIRST=%s, fallback to disabled multi-symbol IC-First",
         raw,
     )
     return False

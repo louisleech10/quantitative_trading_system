@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
-from momentum.core.config import get_fracdiff_layers, get_ic_first_pipeline_enabled
+from momentum.core.config import get_fracdiff_layers
 from momentum.core.contracts import LayerExecutionResult, LayerStatus, derive_status
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
@@ -389,25 +389,18 @@ class FeatureFactory:
                 batch_id=batch_id,
             )
 
-        _ic_first_on = self._ic_first_enabled(config)
         if config.preprocessing.enabled:
             self._column_layer_map = _build_column_layer_map(layers)
             all_features = self._combine_layers(layers, context="layer6_5_input")
-            if _ic_first_on:
-                # IC-First: only run winsorization + fracdiff/ADF at generation time.
-                # Rank / Z-Score / Gaussian are intentionally skipped here; they will be
-                # optional downstream transforms after L7_raw is produced.
-                logger.info(
-                    "[IC-First] Generation mode: skipping rank/zscore/gaussian. "
-                    "IC Gatekeeper and selected transforms are downstream actions after L7_raw."
-                )
-                preprocessed = self._execute_l65_with_degradation(
-                    "Layer 6.5 (IC-First)", self._layer6_5_pre_ic, all_features, config
-                )
-            else:
-                preprocessed = self._execute_l65_with_degradation(
-                    "Layer 6.5", self._layer6_5_legacy, all_features, config
-                )
+            # IC-First is now the only generation path: run winsorization +
+            # fracdiff/ADF now; rank/zscore/gaussian remain downstream transforms.
+            logger.info(
+                "[IC-First] Generation mode: skipping rank/zscore/gaussian. "
+                "IC Gatekeeper and selected transforms are downstream actions after L7_raw."
+            )
+            preprocessed = self._execute_l65_with_degradation(
+                "Layer 6.5 (IC-First)", self._layer6_5_pre_ic, all_features, config
+            )
             if not preprocessed.empty:
                 layers = [preprocessed]
 
@@ -1948,7 +1941,7 @@ class FeatureFactory:
             failed_engines=tuple(failed_engines),
         )
 
-    def run_ic_first_pipeline(
+    def run_ic_first(
         self,
         symbol: str,
         tf: str,
@@ -1972,12 +1965,12 @@ class FeatureFactory:
         cleanup_raw: bool = False,
         lease_sink: Optional[list] = None,
     ) -> FeatureGenerationResult:
-        """Run IC-first while holding a lease when invoked independently."""
+        """Run IC-First while holding a lease when invoked independently."""
         resolved_hash = config_hash or self._current_config_hash or self._compute_config_hash(config, symbol, tf)
         lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, tf, resolved_hash, timeout=0)
         retained = False
         try:
-            result = self._run_ic_first_pipeline_impl(
+            result = self._run_ic_first_impl(
                 symbol, tf, config, raw_data=raw_data, layers=layers, config_hash=config_hash,
                 compute_warnings=compute_warnings, start_time=start_time, persist=persist,
                 label=label, ic_engine=ic_engine, feature_reader=feature_reader, storage=storage,
@@ -1993,7 +1986,7 @@ class FeatureFactory:
             if not retained:
                 lease.release()
 
-    def _run_ic_first_pipeline_impl(
+    def _run_ic_first_impl(
         self,
         symbol: str,
         tf: str,
@@ -2039,7 +2032,7 @@ class FeatureFactory:
         resolved_reader = feature_reader or self._build_feature_reader_for_storage(storage_manager)
         resolved_ic_engine = ic_engine or getattr(self, "_ic_engine", None)
         if resolved_ic_engine is None:
-            raise ValueError("run_ic_first_pipeline requires an injected ic_engine")
+            raise ValueError("run_ic_first requires an injected ic_engine")
 
         if raw_data is None or layers is None:
             raw_data, layers = self._run_l1_l6_for_ic_first(symbol, tf, config)
@@ -2164,7 +2157,7 @@ class FeatureFactory:
             "symbol": symbol,
             "timeframe": tf,
             "config_hash": resolved_config_hash,
-            "ic_first_pipeline": True,
+            "ic_first_pipeline": True,  # metadata backward compatibility
             "raw_path": str(raw_path),
             "processed_path": str(processed_path),
             "selected_features": selected_features,
@@ -2336,23 +2329,9 @@ class FeatureFactory:
         selected_features: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Layer 6.5: Feature preprocessing and normalization."""
-        if self._ic_first_enabled(config):
-            if selected_features is None:
-                return self._layer6_5_pre_ic(all_features, config)
-            return self._layer6_5_post_ic(all_features, config, selected_features)
-
-        return self._layer6_5_legacy(all_features, config)
-
-    @staticmethod
-    def _ic_first_enabled(config: "FactoryConfig") -> bool:
-        preprocessing = getattr(config, "preprocessing", None)
-        config_enabled = bool(getattr(preprocessing, "ic_first_pipeline", False))
-        return config_enabled or get_ic_first_pipeline_enabled()
-
-    def _layer6_5_legacy(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
-        """Legacy Layer 6.5 path: apply preprocessing config to all features."""
-        preprocessing_config = self._preprocessing_config_dict(config)
-        return self._run_layer6_5_preprocessor(all_features, config, preprocessing_config)
+        if selected_features is None:
+            return self._layer6_5_pre_ic(all_features, config)
+        return self._layer6_5_post_ic(all_features, config, selected_features)
 
     def _layer6_5_pre_ic(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
         """Pre-IC path: winsorization plus FracDiff/ADF only."""
@@ -2366,10 +2345,9 @@ class FeatureFactory:
     def _build_l7_raw_preprocessing_config(self, config: "FactoryConfig") -> Dict[str, Any]:
         """Return the L6.5 config used by generation before writing L7_raw."""
         preprocessing_config = self._preprocessing_config_dict(config)
-        if self._ic_first_enabled(config):
-            self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", False)
-            self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", False)
-            self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", False)
+        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
         return preprocessing_config
 
     def _build_l7_raw_preprocessing_metadata(
@@ -2417,7 +2395,7 @@ class FeatureFactory:
         return {
             "preprocessing_config_enabled": {
                 "enabled": config_enabled,
-                "ic_first_pipeline": self._ic_first_enabled(config),
+                "ic_first_pipeline": True,  # metadata backward compatibility
                 "steps": config_steps,
             },
             "raw_artifact_applied": raw_artifact_applied,
@@ -2436,7 +2414,7 @@ class FeatureFactory:
         # Modes:
         #   - "none"         (Mode C, L6.5 disabled passthrough)
         #   - "ic_first_pre" (Mode B, IC-First: Winsor + FracDiff/ADF only)
-        #   - "legacy"       (Mode A, full L6.5 incl. Rank/ZScore/Gaussian)
+        #   - "legacy"       (removed; retained in old artifacts only)
         # Any combination that cannot be unambiguously resolved must raise
         # rather than silently default. Callers downstream rely on this exact
         # set of three values for cache invalidation and routing decisions.
@@ -2454,9 +2432,7 @@ class FeatureFactory:
             )
         if not bool(enabled_attr):
             return "none"
-        if self._ic_first_enabled(config):
-            return "ic_first_pre"
-        return "legacy"
+        return "ic_first_pre"
 
     def _layer6_5_post_ic(
         self,

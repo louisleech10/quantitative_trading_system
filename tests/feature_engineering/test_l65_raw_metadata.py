@@ -15,7 +15,6 @@ def test_l7_raw_metadata_separates_config_enabled_from_raw_applied(monkeypatch) 
     config = SimpleNamespace(
         preprocessing=SimpleNamespace(
             enabled=True,
-            ic_first_pipeline=True,
             winsorization=_step(True),
             rank_transform=_step(True),
             adaptive_zscore=_step(True),
@@ -36,6 +35,7 @@ def test_l7_raw_metadata_separates_config_enabled_from_raw_applied(monkeypatch) 
     metadata = factory._build_l7_raw_preprocessing_metadata(config, raw_config, "ic_first_pre")
 
     assert metadata["preprocessing_config_enabled"]["steps"]["rank_transform"] is True
+    assert metadata["preprocessing_config_enabled"]["ic_first_pipeline"] is True
     assert metadata["preprocessing_config_enabled"]["steps"]["adaptive_zscore"] is True
     assert metadata["preprocessing_config_enabled"]["steps"]["gaussian_normalize"] is True
     assert metadata["raw_artifact_applied"]["mode"] == "ic_first_pre"

@@ -46,11 +46,10 @@ def _make_registry(tmp_path: Path, group_id: str = "group_1") -> ColumnGroupRegi
     return registry
 
 
-def _preprocessor_config(*, ic_first: bool = False) -> dict:
+def _preprocessor_config() -> dict:
     config = PreprocessingConfig(
         enabled=True,
         mode="replace",
-        ic_first_pipeline=ic_first,
         winsorization={
             "enabled": True,
             "method": "quantile",
@@ -433,7 +432,6 @@ def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> No
     preprocessing = PreprocessingConfig(
         enabled=True,
         mode="replace",
-        ic_first_pipeline=True,
         winsorization={"enabled": True},
         fractional_differencing={"enabled": True},
         adf_differencing={"enabled": True},

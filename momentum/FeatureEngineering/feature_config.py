@@ -236,9 +236,6 @@ class PreprocessingConfig(BaseModel):
     # replace：原地覆蓋，確保跨標的欄位名稱一致（業界標準）
     # append 會產生 _diff1/_diff2/_fracdiff，不同標的欄位名可能不同 → 多標的訓練 schema 錯誤
     mode: str = "replace"
-    # IC-First 兩段式路由：winsor 全特徵 → IC 選特徵 → rank/zscore 只做選出的特徵
-    # false = legacy（全部特徵跑完整 L6.5）；亦可由 FFACT_IC_FIRST_PIPELINE env var 覆蓋
-    ic_first_pipeline: bool = False
     winsorization: WinsorConfig = Field(default_factory=WinsorConfig)
     adf_differencing: ADFDifferencingConfig = Field(default_factory=ADFDifferencingConfig)
     fractional_differencing: FractionalDifferencingConfig = Field(default_factory=FractionalDifferencingConfig)

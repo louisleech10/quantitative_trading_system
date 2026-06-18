@@ -13,7 +13,6 @@ Test IDs:
 """
 from __future__ import annotations
 
-import os
 import uuid
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
@@ -67,11 +66,11 @@ def _make_service(tmp_path: Any) -> Any:
 class TestMultiSymbolIcIsolation:
     """T3.1: 每個標的的輸出路徑必須互相隔離，不能相互覆寫。"""
 
-    def test_ic_first_config_routes_l65_to_pre_ic(self, tmp_path):
+    def test_l65_always_routes_to_pre_ic(self, tmp_path):
         """
-        Given: preprocessing.ic_first_pipeline=true
+        Given: preprocessing enabled
         When:  FeatureFactory 執行 L6.5 preprocessing dispatch
-        Then:  走 _layer6_5_pre_ic，不走 legacy rank/zscore/gaussian 路徑
+        Then:  走 _layer6_5_pre_ic
         """
         import pandas as pd
 
@@ -81,24 +80,21 @@ class TestMultiSymbolIcIsolation:
         config = factory._resolve_config(
             {
                 "preset": "minimal",
-                "preprocessing": {"enabled": True, "ic_first_pipeline": True},
+                "preprocessing": {"enabled": True},
             }
         )
         frame = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
         expected = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
 
-        with patch.object(factory, "_layer6_5_pre_ic", return_value=expected) as pre_ic, patch.object(
-            factory, "_layer6_5_legacy", return_value=pd.DataFrame({"legacy": [1.0]})
-        ) as legacy:
+        with patch.object(factory, "_layer6_5_pre_ic", return_value=expected) as pre_ic:
             result = factory._layer6_5_preprocessing(frame, config)
 
         pre_ic.assert_called_once()
-        legacy.assert_not_called()
         assert result.equals(expected)
 
-    def test_compute_single_ic_first_config_returns_isolated_paths(self, tmp_path):
+    def test_compute_single_returns_isolated_paths(self, tmp_path):
         """
-        Given: 兩個不同標的分別用 ic_first_pipeline config 呼叫 _compute_single
+        Given: 兩個不同標的分別呼叫 _compute_single
         When:  generate_features 回傳不同的 hdf5_path
         Then:  兩條路徑互不相同（輸出隔離）
         """
@@ -131,7 +127,7 @@ class TestMultiSymbolIcIsolation:
             call_count[0] += 1
             return factory_btc if call_count[0] == 1 else factory_eth
 
-        config = {"preprocessing": {"ic_first_pipeline": True}}
+        config = {"preprocessing": {"enabled": True}}
         with patch(
             "momentum.factories.create_feature_factory",
             side_effect=mock_create_factory,
@@ -147,22 +143,19 @@ class TestMultiSymbolIcIsolation:
         assert result1 == path_btc
         assert result2 == path_eth
 
-    def test_compute_single_ic_first_config_does_not_set_env_flag_on_failure(self, tmp_path):
+    def test_compute_single_does_not_mutate_config_on_failure(self, tmp_path):
         """
-        Given: FFACT_IC_FIRST_PIPELINE 在執行前未設定
-        When:  _compute_single 以 ic_first_pipeline config 執行失敗
-        Then:  FFACT_IC_FIRST_PIPELINE 環境變數不被 batch service 設定
+        Given: 呼叫端傳入 config_override
+        When:  _compute_single 執行失敗
+        Then:  原 config_override 不被 batch service 修改
         """
         from api.services.feature_factory_batch_service import (
             FeatureFactoryBatchService,
         )
 
-        # 確認執行前未設定
-        os.environ.pop("FFACT_IC_FIRST_PIPELINE", None)
-        assert "FFACT_IC_FIRST_PIPELINE" not in os.environ
-
         factory_mock = MagicMock()
         factory_mock.generate_features.side_effect = RuntimeError("模擬計算失敗")
+        config = {"preprocessing": {"enabled": True}}
 
         with patch(
             "momentum.factories.create_feature_factory",
@@ -172,31 +165,28 @@ class TestMultiSymbolIcIsolation:
                 FeatureFactoryBatchService._compute_single(
                     "BTCUSDT",
                     "1h",
-                    {"preprocessing": {"ic_first_pipeline": True}},
+                    config,
                     False,
                     str(tmp_path),
                 )
 
-        assert "FFACT_IC_FIRST_PIPELINE" not in os.environ, (
-            "FFACT_IC_FIRST_PIPELINE 不應由 batch service 設定"
-        )
+        assert config == {"preprocessing": {"enabled": True}}
 
-    def test_compute_single_ic_first_config_preserves_existing_env_flag(self, tmp_path):
+    def test_compute_single_passes_config_override_to_factory(self, tmp_path):
         """
-        Given: FFACT_IC_FIRST_PIPELINE 在執行前已設為 "0"
-        When:  _compute_single 以 ic_first_pipeline config 執行完畢
-        Then:  FFACT_IC_FIRST_PIPELINE 仍為 "0"（batch service 不覆寫）
+        Given: 呼叫端傳入 config_override
+        When:  _compute_single 執行完畢
+        Then:  generate_features 收到同一份 config_override
         """
         from api.services.feature_factory_batch_service import (
             FeatureFactoryBatchService,
         )
 
-        os.environ["FFACT_IC_FIRST_PIPELINE"] = "0"
-
         factory_mock = MagicMock()
         result_mock = MagicMock()
         result_mock.hdf5_path = str(tmp_path / "out.parquet")
         factory_mock.generate_features.return_value = result_mock
+        config = {"preprocessing": {"enabled": True}}
 
         with patch(
             "momentum.factories.create_feature_factory",
@@ -205,16 +195,12 @@ class TestMultiSymbolIcIsolation:
             FeatureFactoryBatchService._compute_single(
                 "BTCUSDT",
                 "1h",
-                {"preprocessing": {"ic_first_pipeline": True}},
+                config,
                 False,
                 str(tmp_path),
             )
 
-        assert os.environ.get("FFACT_IC_FIRST_PIPELINE") == "0", (
-            "預設值 '0' 應在 finally 中被還原"
-        )
-        # Cleanup
-        del os.environ["FFACT_IC_FIRST_PIPELINE"]
+        assert factory_mock.generate_features.call_args.kwargs["config_override"] is config
 
 
 # ---------------------------------------------------------------------------
@@ -384,10 +370,10 @@ class TestSymbolFailureNoCheckpoint:
 
         assert failure_type != BatchFailureType.OOM
 
-    def test_compute_single_ic_first_memory_error_remains_classifiable(self, tmp_path):
+    def test_compute_single_memory_error_remains_classifiable(self, tmp_path):
         """
         Given: generate_features 內部拋出 MemoryError
-        When:  _compute_single 以 ic_first_pipeline config 執行
+        When:  _compute_single 執行
         Then:  包裝後的 RuntimeError 仍可被分類為 OOM
         """
         from api.services.feature_factory_batch_service import (
@@ -406,16 +392,16 @@ class TestSymbolFailureNoCheckpoint:
                 FeatureFactoryBatchService._compute_single(
                     "BTCUSDT",
                     "1h",
-                    {"preprocessing": {"ic_first_pipeline": True}},
+                    {"preprocessing": {"enabled": True}},
                     False,
                     str(tmp_path),
                 )
         assert FeatureFactoryBatchService._classify_failure(exc_info.value) == BatchFailureType.OOM
 
-    def test_compute_single_ic_first_config_runtime_error_wrapped(self, tmp_path):
+    def test_compute_single_runtime_error_wrapped(self, tmp_path):
         """
         Given: generate_features 拋出一般 Exception
-        When:  _compute_single 以 ic_first_pipeline config 執行
+        When:  _compute_single 執行
         Then:  回傳 RuntimeError（含 symbol + timeframe 資訊）
         """
         from api.services.feature_factory_batch_service import (
@@ -433,7 +419,7 @@ class TestSymbolFailureNoCheckpoint:
                 FeatureFactoryBatchService._compute_single(
                     "BTCUSDT",
                     "1h",
-                    {"preprocessing": {"ic_first_pipeline": True}},
+                    {"preprocessing": {"enabled": True}},
                     False,
                     str(tmp_path),
                 )
@@ -561,27 +547,27 @@ class TestBenchmark10SymbolDryrun:
         assert len(queued_symbols) == 5, f"queued_items 應有 5 個標的，實際為 {len(queued_symbols)}"
         assert len(completed_symbols) == 5, f"completed_items 應有 5 個標的，實際為 {len(completed_symbols)}"
 
-    def test_ic_first_config_controls_resolve_concurrent(self, tmp_path):
+    def test_resolve_concurrent_always_serializes_symbols(self, tmp_path):
         """
-        Given: config_override.preprocessing.ic_first_pipeline=true
+        Given: 任意 config_override
         When:  _resolve_concurrent_symbols() 被呼叫
-        Then:  回傳 1（強制序列）
+        Then:  回傳 1（IC-First 唯一路徑強制序列）
         """
 
         svc = _make_service(tmp_path)
         concurrent = svc._resolve_concurrent_symbols(
-            {"preprocessing": {"ic_first_pipeline": True}}
+            {"preprocessing": {"enabled": True}}
         )
 
         assert concurrent == 1, (
-            f"IC-First 模式下 concurrent_symbols 應為 1，實際為 {concurrent}"
+            f"IC-First 唯一路徑下 concurrent_symbols 應為 1，實際為 {concurrent}"
         )
 
-    def test_ic_first_config_disabled_uses_tier(self, tmp_path, monkeypatch):
+    def test_resolve_concurrent_ignores_tier_parallelism(self, tmp_path, monkeypatch):
         """
-        Given: config_override.preprocessing.ic_first_pipeline=false
+        Given: tier-based concurrency 會回傳 2
         When:  _resolve_concurrent_symbols() 被呼叫
-        Then:  回傳 tier-based 值（>= 1，不強制為 1 by IC-First）
+        Then:  仍回傳 1
         Boundary: FFACT_BATCH_NESTED=0 以排除 nested guard
         """
         monkeypatch.setenv("FFACT_BATCH_NESTED", "0")
@@ -603,12 +589,12 @@ class TestBenchmark10SymbolDryrun:
             return_value=2,
         ):
             concurrent = svc._resolve_concurrent_symbols(
-                {"preprocessing": {"ic_first_pipeline": False}}
+                {"preprocessing": {"enabled": True}}
             )
 
         monkeypatch.delenv("FFACT_BATCH_NESTED", raising=False)
         importlib.reload(cfg_mod)
 
-        assert concurrent == 2, (
-            f"非 IC-First 模式下應使用 tier-based 值 2，實際為 {concurrent}"
+        assert concurrent == 1, (
+            f"IC-First 唯一路徑下應忽略 tier-based 值 2，實際為 {concurrent}"
         )
