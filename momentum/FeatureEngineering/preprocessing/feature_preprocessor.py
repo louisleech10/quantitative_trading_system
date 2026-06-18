@@ -3020,7 +3020,7 @@ class FeaturePreprocessor:
             nan_policy="dropna",
             adf_engine_version=self._adf_engine_version(),
             causal_preprocessing=self.causal_preprocessing,
-            calibration_bars=self._calibration_bars() if self.causal_preprocessing else 0,
+            calibration_bars=self._calibration_bars(),
         )
 
     @staticmethod
@@ -3077,7 +3077,7 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
-            cache_arr = self._calibration_values(col_arr) if self.causal_preprocessing else col_arr
+            cache_arr = self._calibration_values(col_arr)
 
             try:
                 cached_d_star = cache.get(column, cache_arr) if cache is not None else None
@@ -3134,7 +3134,7 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
-            cache_arr = self._calibration_values(col_arr) if self.causal_preprocessing else col_arr
+            cache_arr = self._calibration_values(col_arr)
             col_input_arrays[column] = col_arr
             value_key = _strong_col_value_fingerprint(col_arr)
             cached_d_star = (
@@ -3162,7 +3162,7 @@ class FeaturePreprocessor:
                 "max_lag": max_lag,
                 "weight_threshold": weight_threshold,
                 "sample_size": sample_size,
-                "calibration_bars": self._calibration_bars() if self.causal_preprocessing else 0,
+                "calibration_bars": self._calibration_bars(),
             }
             items.append((col_arr, metadata))
 
@@ -3182,7 +3182,7 @@ class FeaturePreprocessor:
                     not bool(output.get("cache_hit", False)) or target_column != column
                 ):
                     target_values = col_input_arrays.get(target_column)
-                    if target_values is not None and self.causal_preprocessing:
+                    if target_values is not None:
                         target_values = self._calibration_values(target_values)
                     cache.set(target_column, d_star, target_values)
             if output.get("status") != "ok":
@@ -3376,7 +3376,7 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
 
-            decision_source = self._calibration_series(series) if self.causal_preprocessing else series
+            decision_source = self._calibration_series(series)
             decision_working = decision_source.copy()
             full_working = series.copy()
             chosen_diff = 0
@@ -3384,7 +3384,7 @@ class FeaturePreprocessor:
                 clean = decision_working.dropna()
                 if len(clean) < 20:
                     break
-                sample = clean.head(sample_size) if self.causal_preprocessing else clean.tail(sample_size)
+                sample = clean.head(sample_size)
                 pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
 
                 if pvalue <= threshold:
@@ -3636,7 +3636,7 @@ class FeaturePreprocessor:
 
         for column in df.columns:
             raw_series = df[column]
-            decision_series = self._calibration_series(raw_series) if self.causal_preprocessing else raw_series
+            decision_series = self._calibration_series(raw_series)
             cache_key = self._non_stationary_cache.make_key(
                 str(column),
                 threshold,
@@ -3644,7 +3644,7 @@ class FeaturePreprocessor:
                 nan_policy,
                 decision_series,
                 causal_preprocessing=self.causal_preprocessing,
-                calibration_bars=self._calibration_bars() if self.causal_preprocessing else 0,
+                calibration_bars=self._calibration_bars(),
             )
             cached = self._non_stationary_cache.get(cache_key)
             if cached is not None:
@@ -3664,7 +3664,7 @@ class FeaturePreprocessor:
                 continue
 
             pvalue = self._adf_pvalue_for_values(
-                (series.head(sample_size) if self.causal_preprocessing else series.tail(sample_size)).to_numpy(dtype=np.float64),
+                series.head(sample_size).to_numpy(dtype=np.float64),
                 sample_size=sample_size,
             )
 
@@ -3741,7 +3741,7 @@ class FeaturePreprocessor:
         if not HAS_STATSMODELS:
             return 1.0
 
-        decision_series = self._calibration_series(series) if self.causal_preprocessing else series
+        decision_series = self._calibration_series(series)
         clean = decision_series.dropna()
         if len(clean) < 20:
             return 1.0
