@@ -450,99 +450,100 @@ class FeatureFactoryBatchService:
                     pass
 
         layer_tick_task = asyncio.create_task(_layer_metrics_tick())
-        with batch_nested_environment(True):
-            previous_metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
-            previous_layer_metrics_path = os.environ.get("FFACT_LAYER_METRICS_PATH")
-            previous_symbol_concurrency = os.environ.get("FFACT_BATCH_SYMBOL_CONCURRENCY")
-            previous_thread_caps = self._snapshot_batch_thread_env()
-            os.environ["FFACT_CHILD_METRICS_PATH"] = str(child_metrics_path)
-            os.environ["FFACT_LAYER_METRICS_PATH"] = str(layer_metrics_path)
-            os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = str(wave_concurrency)
-            if get_parallel_budget_enabled():
-                self._apply_batch_thread_caps()
-            with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
-                try:
-                    for item in item_wave:
+        try:
+            with batch_nested_environment(True):
+                previous_metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
+                previous_layer_metrics_path = os.environ.get("FFACT_LAYER_METRICS_PATH")
+                previous_symbol_concurrency = os.environ.get("FFACT_BATCH_SYMBOL_CONCURRENCY")
+                previous_thread_caps = self._snapshot_batch_thread_env()
+                os.environ["FFACT_CHILD_METRICS_PATH"] = str(child_metrics_path)
+                os.environ["FFACT_LAYER_METRICS_PATH"] = str(layer_metrics_path)
+                os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = str(wave_concurrency)
+                if get_parallel_budget_enabled():
+                    self._apply_batch_thread_caps()
+                with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
+                    try:
+                        for item in item_wave:
+                            symbol = str(item["symbol"])
+                            timeframe = str(item["timeframe"])
+                            task["current_symbol"] = symbol
+                            task["current_timeframe"] = timeframe
+                            self._notify_progress(task_id)
+                            future = loop.run_in_executor(
+                                executor,
+                                compute_fn,
+                                symbol,
+                                timeframe,
+                                request.config_override,
+                                request.force_regenerate,
+                                batch_cache_dir,
+                                str(checkpoint.get("batch_id") or ""),
+                            )
+                            wrapped_futures.append(_wait_one(item, future))
+                    finally:
+                        if previous_metrics_path is None:
+                            os.environ.pop("FFACT_CHILD_METRICS_PATH", None)
+                        else:
+                            os.environ["FFACT_CHILD_METRICS_PATH"] = previous_metrics_path
+                        if previous_layer_metrics_path is None:
+                            os.environ.pop("FFACT_LAYER_METRICS_PATH", None)
+                        else:
+                            os.environ["FFACT_LAYER_METRICS_PATH"] = previous_layer_metrics_path
+                        if previous_symbol_concurrency is None:
+                            os.environ.pop("FFACT_BATCH_SYMBOL_CONCURRENCY", None)
+                        else:
+                            os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = (
+                                previous_symbol_concurrency
+                            )
+                        self._restore_batch_thread_env(previous_thread_caps)
+
+                    oom_seen = False
+                    for wrapped_future in asyncio.as_completed(wrapped_futures):
+                        item, hdf5_path, error = await wrapped_future
                         symbol = str(item["symbol"])
                         timeframe = str(item["timeframe"])
-                        task["current_symbol"] = symbol
-                        task["current_timeframe"] = timeframe
-                        self._notify_progress(task_id)
-                        future = loop.run_in_executor(
-                            executor,
-                            compute_fn,
+                        rss_before = rss_before_by_item[(symbol, timeframe)]
+                        rss_peak = max(rss_before, self._rss_mb())
+                        gc.collect()
+                        rss_after = self._rss_mb()
+                        wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
+                        wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
+                        failure_type = self._classify_failure(error) if error else None
+                        oom_seen = oom_seen or failure_type == BatchFailureType.OOM
+
+                        self._record_item_result(
+                            task,
+                            checkpoint,
                             symbol,
                             timeframe,
-                            request.config_override,
-                            request.force_regenerate,
-                            batch_cache_dir,
-                            str(checkpoint.get("batch_id") or ""),
+                            hdf5_path or "",
+                            error,
+                            failure_type,
+                            rss_before,
+                            rss_peak,
+                            rss_after,
                         )
-                        wrapped_futures.append(_wait_one(item, future))
-                finally:
-                    if previous_metrics_path is None:
-                        os.environ.pop("FFACT_CHILD_METRICS_PATH", None)
-                    else:
-                        os.environ["FFACT_CHILD_METRICS_PATH"] = previous_metrics_path
-                    if previous_layer_metrics_path is None:
-                        os.environ.pop("FFACT_LAYER_METRICS_PATH", None)
-                    else:
-                        os.environ["FFACT_LAYER_METRICS_PATH"] = previous_layer_metrics_path
-                    if previous_symbol_concurrency is None:
-                        os.environ.pop("FFACT_BATCH_SYMBOL_CONCURRENCY", None)
-                    else:
-                        os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = (
-                            previous_symbol_concurrency
+                        self._append_child_metrics_if_missing(
+                            child_metrics_path,
+                            symbol,
+                            timeframe,
+                            {
+                                "symbol": symbol,
+                                "timeframe": timeframe,
+                                "pid": os.getpid(),
+                                "peak_rss_mb": rss_peak,
+                                "duration_s": 0.0,
+                                "status": "failed" if error else "ok",
+                            },
                         )
-                    self._restore_batch_thread_env(previous_thread_caps)
-
-                oom_seen = False
-                for wrapped_future in asyncio.as_completed(wrapped_futures):
-                    item, hdf5_path, error = await wrapped_future
-                    symbol = str(item["symbol"])
-                    timeframe = str(item["timeframe"])
-                    rss_before = rss_before_by_item[(symbol, timeframe)]
-                    rss_peak = max(rss_before, self._rss_mb())
-                    gc.collect()
-                    rss_after = self._rss_mb()
-                    wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
-                    wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
-                    failure_type = self._classify_failure(error) if error else None
-                    oom_seen = oom_seen or failure_type == BatchFailureType.OOM
-
-                    self._record_item_result(
-                        task,
-                        checkpoint,
-                        symbol,
-                        timeframe,
-                        hdf5_path or "",
-                        error,
-                        failure_type,
-                        rss_before,
-                        rss_peak,
-                        rss_after,
-                    )
-                    self._append_child_metrics_if_missing(
-                        child_metrics_path,
-                        symbol,
-                        timeframe,
-                        {
-                            "symbol": symbol,
-                            "timeframe": timeframe,
-                            "pid": os.getpid(),
-                            "peak_rss_mb": rss_peak,
-                            "duration_s": 0.0,
-                            "status": "failed" if error else "ok",
-                        },
-                    )
-                    self._notify_progress(task_id)
-
-        stop_layer_tick.set()
-        layer_tick_task.cancel()
-        try:
-            await layer_tick_task
-        except asyncio.CancelledError:
-            pass
+                        self._notify_progress(task_id)
+        finally:
+            stop_layer_tick.set()
+            layer_tick_task.cancel()
+            try:
+                await layer_tick_task
+            except asyncio.CancelledError:
+                pass
 
         wave_total_peak_mb = max(wave_parent_peak_mb, wave_child_peak_mb)
         if wave_total_peak_mb > rss_soft_limit_mb:
@@ -800,16 +801,29 @@ class FeatureFactoryBatchService:
         except OSError:
             return []
 
+    @staticmethod
+    def _clear_layer_metrics_on_task(task: Dict[str, Any]) -> None:
+        """Remove per-symbol layer observability fields from task state."""
+
+        for key in ("current_stage", "stage_progress", "current_rss_mb"):
+            task.pop(key, None)
+
     def _apply_layer_metrics_to_task(self, task: Dict[str, Any], task_id: str) -> None:
         """Merge latest layer metrics row for the current symbol into task state."""
 
         if int(task.get("concurrent_symbols") or 1) != 1:
+            self._clear_layer_metrics_on_task(task)
             return
         symbol = task.get("current_symbol")
         timeframe = task.get("current_timeframe")
         if not symbol or not timeframe:
+            self._clear_layer_metrics_on_task(task)
             return
-        rows = self._tail_layer_metrics_jsonl(self._layer_metrics_path(task_id))
+        layer_path = self._layer_metrics_path(task_id)
+        if not layer_path.exists():
+            self._clear_layer_metrics_on_task(task)
+            return
+        rows = self._tail_layer_metrics_jsonl(layer_path)
         matching = [
             row
             for row in rows
@@ -817,6 +831,7 @@ class FeatureFactoryBatchService:
             and str(row.get("timeframe")) == str(timeframe)
         ]
         if not matching:
+            self._clear_layer_metrics_on_task(task)
             return
         latest = matching[-1]
         task["current_stage"] = latest.get("stage")
@@ -824,6 +839,8 @@ class FeatureFactoryBatchService:
         rss_mb = latest.get("rss_mb")
         if rss_mb is not None:
             task["current_rss_mb"] = int(rss_mb)
+        else:
+            task.pop("current_rss_mb", None)
 
     def _build_initial_checkpoint(
         self,
