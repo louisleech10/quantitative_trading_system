@@ -344,6 +344,28 @@ function normalizeBatchTask(
   const etaFromAverage = completed > 0 && total > completed + failed
     ? Math.round((total - completed - failed) * (elapsedSeconds / completed))
     : 0;
+  const currentSymbol = (payload.current_symbol as string | null | undefined) ?? previous?.current_symbol ?? null;
+  const currentTimeframe = (payload.current_timeframe as string | null | undefined) ?? previous?.current_timeframe ?? null;
+  const symbolChanged = previous != null && (
+    (payload.current_symbol !== undefined && payload.current_symbol !== previous.current_symbol)
+    || (payload.current_timeframe !== undefined && payload.current_timeframe !== previous.current_timeframe)
+  );
+  const blockLayerFields = status !== 'running' || symbolChanged;
+  const currentStage = blockLayerFields
+    ? null
+    : ('current_stage' in payload
+      ? (payload.current_stage == null ? null : String(payload.current_stage))
+      : null);
+  const stageProgress = blockLayerFields
+    ? null
+    : ('stage_progress' in payload
+      ? (payload.stage_progress == null ? null : toNumber(payload.stage_progress, 0))
+      : null);
+  const currentRssMb = blockLayerFields
+    ? null
+    : ('current_rss_mb' in payload
+      ? (payload.current_rss_mb == null ? null : toNumber(payload.current_rss_mb, 0))
+      : null);
 
   return {
     ...previous,
@@ -355,15 +377,11 @@ function normalizeBatchTask(
     completed,
     failed,
     progress,
-    current_symbol: (payload.current_symbol as string | null | undefined) ?? previous?.current_symbol ?? null,
-    current_timeframe: (payload.current_timeframe as string | null | undefined) ?? previous?.current_timeframe ?? null,
-    current_stage: (payload.current_stage as string | null | undefined) ?? previous?.current_stage ?? null,
-    stage_progress: payload.stage_progress != null
-      ? toNumber(payload.stage_progress, previous?.stage_progress ?? 0)
-      : previous?.stage_progress ?? null,
-    current_rss_mb: payload.current_rss_mb != null
-      ? toNumber(payload.current_rss_mb, previous?.current_rss_mb ?? 0)
-      : previous?.current_rss_mb ?? null,
+    current_symbol: currentSymbol,
+    current_timeframe: currentTimeframe,
+    current_stage: currentStage,
+    stage_progress: stageProgress,
+    current_rss_mb: currentRssMb,
     queued: toNumber(payload.queued, Math.max(total - completed - failed, 0)),
     concurrent_symbols: toNumber(payload.concurrent_symbols, previous?.concurrent_symbols ?? 1),
     memory_sanity_failed: Boolean(payload.memory_sanity_failed ?? previous?.memory_sanity_failed ?? false),
