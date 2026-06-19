@@ -250,6 +250,9 @@ class BatchTaskStatusResponse(BaseModel):
     progress: float
     current_symbol: Optional[str] = None
     current_timeframe: Optional[str] = None
+    current_stage: Optional[str] = None
+    stage_progress: Optional[float] = None
+    current_rss_mb: Optional[int] = None
     queued: Optional[int] = None
     concurrent_symbols: Optional[int] = None
     memory_sanity_failed: Optional[bool] = None
