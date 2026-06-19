@@ -119,6 +119,28 @@ class FeatureFactoryBatchConnectionManager:
 batch_manager = FeatureFactoryBatchConnectionManager()
 
 
+def map_batch_progress_ws_data(payload: Dict) -> Dict:
+    """Map batch task status dict to WebSocket batch_progress data payload."""
+
+    return {
+        "task_id": payload.get("task_id"),
+        "total": payload.get("total", 0),
+        "completed": payload.get("completed", 0),
+        "failed": payload.get("failed", 0),
+        "current_symbol": payload.get("current_symbol"),
+        "current_timeframe": payload.get("current_timeframe"),
+        "current_stage": payload.get("current_stage"),
+        "stage_progress": payload.get("stage_progress"),
+        "current_rss_mb": payload.get("current_rss_mb"),
+        "progress": payload.get("progress", 0.0),
+        "status": payload.get("status"),
+        "queued": payload.get("queued", 0),
+        "concurrent_symbols": payload.get("concurrent_symbols", 1),
+        "memory_sanity_failed": payload.get("memory_sanity_failed", False),
+        "last_item_metrics": payload.get("last_item_metrics"),
+    }
+
+
 @router.websocket("/features/{task_id}")
 async def feature_factory_websocket(
     websocket: WebSocket,
@@ -194,23 +216,7 @@ async def feature_factory_batch_websocket(websocket: WebSocket, task_id: str):
     async def send_payload(payload: Dict) -> None:
         await batch_manager.broadcast(task_id, {
             "event": "batch_progress",
-            "data": {
-                "task_id": payload.get("task_id"),
-                "total": payload.get("total", 0),
-                "completed": payload.get("completed", 0),
-                "failed": payload.get("failed", 0),
-                "current_symbol": payload.get("current_symbol"),
-                "current_timeframe": payload.get("current_timeframe"),
-                "current_stage": payload.get("current_stage"),
-                "stage_progress": payload.get("stage_progress"),
-                "current_rss_mb": payload.get("current_rss_mb"),
-                "progress": payload.get("progress", 0.0),
-                "status": payload.get("status"),
-                "queued": payload.get("queued", 0),
-                "concurrent_symbols": payload.get("concurrent_symbols", 1),
-                "memory_sanity_failed": payload.get("memory_sanity_failed", False),
-                "last_item_metrics": payload.get("last_item_metrics"),
-            },
+            "data": map_batch_progress_ws_data(payload),
             "timestamp": datetime.now().isoformat(),
         })
 
