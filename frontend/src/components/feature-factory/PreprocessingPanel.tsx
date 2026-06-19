@@ -202,7 +202,11 @@ export default function PreprocessingPanel({ config, onChange }: PreprocessingPa
   return (
     <div>
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <div className="text-xs text-slate-400">固定接力順序：Winsor → FracDiff/ADF → Rank → Gaussian → Z-Score</div>
+        <div className="text-xs text-slate-400">
+          <span className="text-slate-300">生成階段</span>：Winsor → FracDiff/ADF
+          <span className="mx-1.5 text-slate-600">｜</span>
+          <span className="text-amber-300/70">IC 篩選後（IC Analysis 頁）：Rank → Gaussian → Z-Score</span>
+        </div>
         <button
           type="button"
           onClick={() => update({ enabled: !preprocessing.enabled })}
