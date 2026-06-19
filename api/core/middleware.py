@@ -8,56 +8,64 @@ from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from .logging import get_logger, log_api_request
+from .logging import get_logger
 from .config import settings
+
+# 高頻輪詢端點(前端每 ~0.5s 打一次):成功且快速時靜音 access log,
+# 避免淹沒真正的 FF 執行 log(2026-06-19 三方定:刪雙記+刪Started+path-filter,
+# 不用 blanket DEBUG)。非 2xx / 慢請求 / 寫入 / 未知路徑一律照記。
+_QUIET_GET_PREFIXES = (
+    "/api/v1/features/batch/",
+    "/api/v1/features/browse/",
+    "/api/v1/features/result/",
+)
+_ACCESS_SLOW_MS = 1000.0  # 即使是靜音路徑,>=1s 仍記(輪詢退化訊號)
+
+
+def _is_quiet_access(method: str, path: str, status_code: int, duration_ms: float) -> bool:
+    """成功且快速的高頻輪詢 GET → 靜音。其餘(>=400/慢/非GET/未知路徑)照記。"""
+    if method != "GET" or status_code >= 400 or duration_ms >= _ACCESS_SLOW_MS:
+        return False
+    return path.startswith(_QUIET_GET_PREFIXES)
+
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """請求日誌中間件"""
-    
+
     def __init__(self, app: ASGIApp):
         super().__init__(app)
         self.logger = get_logger("api.middleware.request")
-    
+
     async def dispatch(self, request: Request, call_next: Callable):
         # 生成請求ID
         request_id = str(uuid.uuid4())[:8]
-        
+
         # 記錄開始時間
         start_time = time.time()
-        
+
         # 添加請求ID到請求對象
         request.state.request_id = request_id
-        
-        # 記錄請求開始
-        self.logger.info(
-            f"[{request_id}] Started {request.method} {request.url.path} "
-            f"from {request.client.host if request.client else 'unknown'}"
-        )
-        
+
         try:
             # 處理請求
             response = await call_next(request)
-            
+
             # 計算處理時間
             process_time = time.time() - start_time
-            
+
             # 添加響應頭
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Process-Time"] = str(process_time)
-            
-            # 記錄請求完成
-            log_api_request(
-                method=request.method,
-                path=str(request.url.path),
-                status_code=response.status_code,
-                duration=process_time
-            )
-            
-            self.logger.info(
-                f"[{request_id}] Completed {request.method} {request.url.path} "
-                f"- {response.status_code} - {process_time:.3f}s"
-            )
-            
+
+            # 單一 completion log(含 request-id);高頻輪詢成功快速 → 靜音
+            if not _is_quiet_access(
+                request.method, request.url.path, response.status_code, process_time * 1000.0
+            ):
+                self.logger.info(
+                    f"[{request_id}] {request.method} {request.url.path} "
+                    f"- {response.status_code} - {process_time:.3f}s"
+                )
+
             return response
             
         except Exception as e:
