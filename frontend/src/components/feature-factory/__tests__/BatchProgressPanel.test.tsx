@@ -180,4 +180,55 @@ describe('BatchProgressPanel', () => {
     });
     expect(MockWebSocket.instances).toHaveLength(2);
   });
+
+  it('renders layer stage and rss for running symbol with graceful fallback', () => {
+    render(
+      <BatchProgressPanel
+        batchTask={{
+          task_id: 'batch-layer',
+          batch_id: 'batch-layer',
+          status: 'running',
+          total: 2,
+          completed: 0,
+          failed: 0,
+          progress: 0,
+          current_symbol: 'ETHUSDT',
+          current_timeframe: '1h',
+          current_stage: 'layer_3',
+          stage_progress: 0.42,
+          current_rss_mb: 768,
+          results: {},
+          errors: {},
+        }}
+        symbols={['BTCUSDT', 'ETHUSDT']}
+      />
+    );
+
+    expect(screen.getByTestId('layer-status-ETHUSDT')).toHaveTextContent('layer_3 (42%) · RSS 768MB');
+    expect(screen.queryByTestId('layer-status-BTCUSDT')).not.toBeInTheDocument();
+  });
+
+  it('falls back gracefully when layer fields are absent', () => {
+    render(
+      <BatchProgressPanel
+        batchTask={{
+          task_id: 'batch-layer-fallback',
+          batch_id: 'batch-layer-fallback',
+          status: 'running',
+          total: 1,
+          completed: 0,
+          failed: 0,
+          progress: 0,
+          current_symbol: 'BTCUSDT',
+          current_timeframe: '4h',
+          results: {},
+          errors: {},
+        }}
+        symbols={['BTCUSDT']}
+      />
+    );
+
+    expect(screen.getAllByText('running').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('layer-status-BTCUSDT')).not.toBeInTheDocument();
+  });
 });

@@ -462,6 +462,9 @@ export interface BatchTaskStatus {
   progress: number;
   current_symbol?: string | null;
   current_timeframe?: string | null;
+  current_stage?: string | null;
+  stage_progress?: number | null;
+  current_rss_mb?: number | null;
   queued?: number;
   concurrent_symbols?: number;
   memory_sanity_failed?: boolean;

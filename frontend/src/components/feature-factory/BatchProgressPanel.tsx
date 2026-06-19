@@ -255,21 +255,36 @@ export default function BatchProgressPanel({ batchTask, symbols = [], naked = fa
         <div className="text-xs uppercase tracking-[0.2em] text-slate-400">逐標的狀態</div>
         <div className="max-h-52 overflow-auto rounded-xl border border-white/10 bg-white/5 p-3 grid grid-cols-1 md:grid-cols-2 gap-2">
           {statusBySymbol.map(([symbol, status]) => (
-            <div key={symbol} className="flex items-center justify-between text-xs rounded-md bg-white/5 px-2 py-1">
-              <span className="text-slate-200">{symbol}</span>
-              <span
-                className={
-                  status === 'completed'
-                    ? 'text-emerald-300'
-                    : status === 'failed'
-                    ? 'text-rose-300'
-                    : status === 'running'
-                    ? 'text-amber-300'
-                    : 'text-slate-400'
-                }
-              >
-                {getStatusLabel(status)}
-              </span>
+            <div key={symbol} className="rounded-md bg-white/5 px-2 py-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-200">{symbol}</span>
+                <span
+                  className={
+                    status === 'completed'
+                      ? 'text-emerald-300'
+                      : status === 'failed'
+                      ? 'text-rose-300'
+                      : status === 'running'
+                      ? 'text-amber-300'
+                      : 'text-slate-400'
+                  }
+                >
+                  {getStatusLabel(status)}
+                </span>
+              </div>
+              {status === 'running'
+                && symbol === effectiveBatchTask.current_symbol
+                && effectiveBatchTask.current_stage && (
+                <div className="mt-1 text-[11px] text-slate-400" data-testid={`layer-status-${symbol}`}>
+                  {effectiveBatchTask.current_stage}
+                  {effectiveBatchTask.stage_progress != null
+                    ? ` (${Math.round(effectiveBatchTask.stage_progress * 100)}%)`
+                    : ''}
+                  {effectiveBatchTask.current_rss_mb != null
+                    ? ` · RSS ${effectiveBatchTask.current_rss_mb}MB`
+                    : ''}
+                </div>
+              )}
             </div>
           ))}
           {statusBySymbol.length === 0 && (

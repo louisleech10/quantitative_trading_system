@@ -357,6 +357,13 @@ function normalizeBatchTask(
     progress,
     current_symbol: (payload.current_symbol as string | null | undefined) ?? previous?.current_symbol ?? null,
     current_timeframe: (payload.current_timeframe as string | null | undefined) ?? previous?.current_timeframe ?? null,
+    current_stage: (payload.current_stage as string | null | undefined) ?? previous?.current_stage ?? null,
+    stage_progress: payload.stage_progress != null
+      ? toNumber(payload.stage_progress, previous?.stage_progress ?? 0)
+      : previous?.stage_progress ?? null,
+    current_rss_mb: payload.current_rss_mb != null
+      ? toNumber(payload.current_rss_mb, previous?.current_rss_mb ?? 0)
+      : previous?.current_rss_mb ?? null,
     queued: toNumber(payload.queued, Math.max(total - completed - failed, 0)),
     concurrent_symbols: toNumber(payload.concurrent_symbols, previous?.concurrent_symbols ?? 1),
     memory_sanity_failed: Boolean(payload.memory_sanity_failed ?? previous?.memory_sanity_failed ?? false),
