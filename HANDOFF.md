@@ -31,3 +31,12 @@
 
 ## 執行端分工
 中/大實作 Codex(gpt-5.5,`codex exec -m gpt-5.5`) + Composer(`cursor-agent -p --force --output-format text --model composer-2.5`)review。本任務因實作一致性全程 Codex 實作。派工被擋先查根因(記憶 feedback-dispatch-blocked-investigate-cause)。
+
+## FF 收尾打磨(2026-06-19,T1/T2/T-C 完成)
+使用者手動跑 2×2 揭露的 3 點 + log 分析,三方委員會後:
+- **#1 UI 接力順序註釋** ✅ commit(header 分「生成階段 vs IC篩選後」)。
+- **T1 log 噪音** ✅ commit(消雙記+刪Started+path-filter;**需重啟後端生效**)。
+- **T2 批次 layer 觀測性** ✅ commit+Codex review(Composer 實作,5缺陷修畢):worker→layer_metrics.jsonl→父週期tick→WS→前端;補 #2(batch看不到layer)+F1(per-layer RSS落地)。
+- **T-C CGSA L3 累積磁碟預檢** ✅ commit+Codex review:L3 persist前估累積footprint,不夠提早abort(env FFACT_CGSA_DISK_PRECHECK/RESERVE_GIB可調)。修磁碟撐爆事故(437K×float32=35.6GB,L3-L6累積)。
+- **擱置**:T-A per-layer串流釋放(P1,scaffold已存,砍峰值根本解)、T-B float16暫存(P2需A/B簽核)、T-D 為何以前28GB夠(取證)、.claude/gstack 1GB清理(使用者決定)。
+- 重啟後端重跑 2×2:乾淨log(T1)+即時layer進度與RSS(T2)+磁碟不夠提早abort(T-C)。
