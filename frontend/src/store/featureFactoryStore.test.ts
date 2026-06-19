@@ -141,3 +141,92 @@ describe('featureFactoryStore lastBatchTaskId persistence', () => {
     expect(readLastBatchTaskId()).toBe('batch-reload-42');
   });
 });
+
+describe('featureFactoryStore batch layer field staleness', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  afterEach(() => {
+    resetStore();
+  });
+
+  function seedRunningBatch(overrides: Record<string, unknown> = {}): void {
+    useFeatureFactoryStore.setState({
+      batchTask: {
+        task_id: 'batch-layer',
+        batch_id: 'batch-layer',
+        status: 'running',
+        total: 2,
+        completed: 0,
+        failed: 0,
+        progress: 0,
+        queued: 2,
+        concurrent_symbols: 1,
+        memory_sanity_failed: false,
+        eta_seconds: 0,
+        resume_available: false,
+        current_symbol: 'BTCUSDT',
+        current_timeframe: '1h',
+        current_stage: 'layer_3',
+        stage_progress: 0.5,
+        current_rss_mb: 512,
+        output_paths: [],
+        per_item_rss: [],
+        last_item_metrics: null,
+        results: {},
+        browse_task_ids: {},
+        errors: {},
+        ...overrides,
+      },
+      batchStartedAtMs: Date.now(),
+    });
+  }
+
+  it('clears layer fields when symbol changes without fresh layer payload', () => {
+    seedRunningBatch();
+
+    useFeatureFactoryStore.getState().applyBatchEvent({
+      current_symbol: 'ETHUSDT',
+      current_timeframe: '1h',
+    });
+
+    const state = useFeatureFactoryStore.getState();
+    expect(state.batchTask?.current_symbol).toBe('ETHUSDT');
+    expect(state.batchTask?.current_stage).toBeNull();
+    expect(state.batchTask?.stage_progress).toBeNull();
+    expect(state.batchTask?.current_rss_mb).toBeNull();
+  });
+
+  it('clears layer fields when payload omits them on running updates', () => {
+    seedRunningBatch();
+
+    useFeatureFactoryStore.getState().applyBatchEvent({
+      progress: 0.1,
+    });
+
+    const state = useFeatureFactoryStore.getState();
+    expect(state.batchTask?.current_stage).toBeNull();
+    expect(state.batchTask?.stage_progress).toBeNull();
+    expect(state.batchTask?.current_rss_mb).toBeNull();
+  });
+
+  it('clears layer fields when status is not running', () => {
+    seedRunningBatch();
+
+    useFeatureFactoryStore.getState().applyBatchEvent({
+      status: 'completed',
+      completed: 2,
+      progress: 1,
+      current_stage: 'layer_7',
+      stage_progress: 1,
+      current_rss_mb: 999,
+    });
+
+    const state = useFeatureFactoryStore.getState();
+    expect(state.batchTask?.status).toBe('completed');
+    expect(state.batchTask?.current_stage).toBeNull();
+    expect(state.batchTask?.stage_progress).toBeNull();
+    expect(state.batchTask?.current_rss_mb).toBeNull();
+  });
+});
