@@ -30,19 +30,21 @@
 - SPEC ref：1.1　目標：估累積 cgsa_work footprint vs free,不足 raise。
 - 實作要點:
   1. 新 method(column_group_registry.py,mirror feature_storage.py:2726 模型):入參 即將 persist 的 layer DataFrame(s)/groups + 目標 cgsa_work 路徑 + symbol/tf/layer 標籤。
-  2. `needed = registry 現佔(total_shard_bytes 加總) + planned = Σ(n_rows×n_cols×4) + max_shard_bytes×2(.tmp) + reserve_floor`(reserve 沿用 L7 風格常數)。
-  3. `free = _disk_free_bytes(path)`;`if free is not None and free < needed: raise ColumnGroupRegistryError(f"...symbol/tf/layer, need X GiB, free Y GiB, 建議:清磁碟/減特徵/FFACT_CGSA_TEMP_DTYPE")`。
-  4. 估不到(空)→return None 不 raise。
+  2. **(adversarial #1 BLOCKING)** `needed = planned_new_bytes + max_inflight_tmp×2 + reserve_floor`——**不加 registry_occupied(free 已扣除既佔→重複計算會誤擋)**。
+  3. `planned_new_bytes`(adv#3):模擬 5000-col chunk(`range(0,n_cols,chunk)`,feature_factory.py:1159-1200)+ `_compute_shard_slices`(column_group_registry.py:772-827),Σ float32 bytes,**用實際 DataFrame.shape**(compact persist 後才標,adv#5);`max_inflight_tmp`=最大 planned shard。
+  4. `reserve_floor`(adv#2):env `FFACT_CGSA_DISK_RESERVE_GIB` 預設 2.0,或複用 L7 `_resolve_l7_min_free_bytes()`。
+  5. `free=_disk_free_bytes(path)`;`if free is not None and free < needed: raise ColumnGroupRegistryError(含 symbol/tf/layer/need GiB/free GiB/建議)`。
+  6. 非 DataFrame/缺 .columns/coerce 失敗(adv#6)→return None 退回 per-shard guard,不 raise。
 - 修改檔案:momentum/FeatureEngineering/core/column_group_registry.py。既有 caller:Phase2 接入。
 - 不可做:不改特徵值;不吞 OS 寫入錯誤;不用 naive 437K 上界(用實際 shape)。
 - 邊界:足夠→pass(None);不足→raise 含分量;空 layer→None;compact 非 primary→實際 n_rows 不高估。
 - 驗證:mock shutil.disk_usage 低 free→raise 且訊息含 needed/free GiB+symbol/tf;充足→None;`pytest tests/feature_engineering/ -k cgsa_disk_precheck`。
 
 ## Phase 2 — 接入 persist 前
-### Task 2.1 — multi_tf_generator persist 前呼叫
-- SPEC ref：2.1　目標:persist L3(及 L4-L6)前各呼叫預檢,最先擋 L3 事故點。
+### Task 2.1 — 三條 CGSA persist 路徑 persist 前呼叫 (adv#4)
+- SPEC ref：2.1　目標:persist L3(及 L4-L6)前各呼叫預檢,最先擋 L3 事故點。**三路徑都接**:serial multi-TF(multi_tf_generator.py:204-212)、parallel primary(:432-441)、single-TF(feature_factory.py:2949-2966)——建議抽共用 helper 各處呼叫避免漏。
 - 實作要點:
-  1. multi_tf_generator.py:204-212 各 `_persist_layer_output_groups(layerN,...)` 前呼叫 `_precheck_cgsa_cumulative_disk(layerN, _LS.LN, symbol, tf, ...)`。
+  1. 三處各 `_persist_layer_output_groups(layerN,...)` 前呼叫 `_precheck_cgsa_cumulative_disk(layerN, _LS.LN, symbol, tf, ...)`。
   2. env `FFACT_CGSA_DISK_PRECHECK`(預設 "1" 啟用;"0" 停用回舊行為)。
   3. 沿用既有 offloaded_to_registry skip 條件,不重複預檢。
 - 修改檔案:momentum/FeatureEngineering/timeframe/multi_tf_generator.py。
