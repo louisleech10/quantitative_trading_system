@@ -3492,7 +3492,10 @@ class FeatureFactory:
     def _report_progress(self, stage: str, progress: float, message: str) -> None:
         """Report progress for WebSocket or other observers."""
         if self._progress_callback:
-            self._progress_callback({"stage": stage, "progress": progress, "message": message})
+            try:
+                self._progress_callback({"stage": stage, "progress": progress, "message": message})
+            except Exception as exc:
+                logger.debug("progress_callback failed (fail-open): %s", exc)
         logger.info("[%s] %0.0f%% - %s", stage, progress * 100, message)
 
     @property

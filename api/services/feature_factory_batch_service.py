@@ -46,6 +46,8 @@ RAM_GATE_BASE_PER_SYMBOL_GB = 2.0
 RAM_GATE_SEQUENTIAL_GB = 1.0
 RSS_CUMULATIVE_WINDOW = 20
 RSS_CUMULATIVE_LIMIT_MB = 1536
+LAYER_METRICS_TAIL_BYTES = 64 * 1024
+LAYER_METRICS_TICK_SECONDS = 2.5
 
 
 class BatchBusyError(ValueError):
@@ -316,6 +318,7 @@ class FeatureFactoryBatchService:
             task["concurrent_symbols"] = concurrent_symbols
             checkpoint["concurrent_symbols"] = concurrent_symbols
             checkpoint["child_metrics_path"] = str(self._child_metrics_path(task_id))
+            checkpoint["layer_metrics_path"] = str(self._layer_metrics_path(task_id))
             checkpoint["last_updated_at"] = datetime.now().isoformat()
             self._safe_persist_checkpoint(checkpoint)
             self._notify_progress(task_id)
@@ -408,6 +411,7 @@ class FeatureFactoryBatchService:
         loop = asyncio.get_running_loop()
         task_id = str(task["task_id"])
         child_metrics_path = self._child_metrics_path(task_id)
+        layer_metrics_path = self._layer_metrics_path(task_id)
         rss_before_by_item: Dict[Tuple[str, str], int] = {}
         wave_concurrency = max(1, len(item_wave))
         rss_soft_limit_mb = self._rss_soft_limit_mb()
@@ -431,11 +435,28 @@ class FeatureFactoryBatchService:
 
         wrapped_futures = []
         compute_fn = self._compute_single
+        stop_layer_tick = asyncio.Event()
+
+        async def _layer_metrics_tick() -> None:
+            while not stop_layer_tick.is_set():
+                try:
+                    self._apply_layer_metrics_to_task(task, task_id)
+                    self._notify_progress(task_id)
+                except Exception as exc:
+                    logger.debug("Layer metrics tick failed (fail-open): %s", exc)
+                try:
+                    await asyncio.wait_for(stop_layer_tick.wait(), timeout=LAYER_METRICS_TICK_SECONDS)
+                except asyncio.TimeoutError:
+                    pass
+
+        layer_tick_task = asyncio.create_task(_layer_metrics_tick())
         with batch_nested_environment(True):
             previous_metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
+            previous_layer_metrics_path = os.environ.get("FFACT_LAYER_METRICS_PATH")
             previous_symbol_concurrency = os.environ.get("FFACT_BATCH_SYMBOL_CONCURRENCY")
             previous_thread_caps = self._snapshot_batch_thread_env()
             os.environ["FFACT_CHILD_METRICS_PATH"] = str(child_metrics_path)
+            os.environ["FFACT_LAYER_METRICS_PATH"] = str(layer_metrics_path)
             os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = str(wave_concurrency)
             if get_parallel_budget_enabled():
                 self._apply_batch_thread_caps()
@@ -463,6 +484,10 @@ class FeatureFactoryBatchService:
                         os.environ.pop("FFACT_CHILD_METRICS_PATH", None)
                     else:
                         os.environ["FFACT_CHILD_METRICS_PATH"] = previous_metrics_path
+                    if previous_layer_metrics_path is None:
+                        os.environ.pop("FFACT_LAYER_METRICS_PATH", None)
+                    else:
+                        os.environ["FFACT_LAYER_METRICS_PATH"] = previous_layer_metrics_path
                     if previous_symbol_concurrency is None:
                         os.environ.pop("FFACT_BATCH_SYMBOL_CONCURRENCY", None)
                     else:
@@ -511,6 +536,13 @@ class FeatureFactoryBatchService:
                         },
                     )
                     self._notify_progress(task_id)
+
+        stop_layer_tick.set()
+        layer_tick_task.cancel()
+        try:
+            await layer_tick_task
+        except asyncio.CancelledError:
+            pass
 
         wave_total_peak_mb = max(wave_parent_peak_mb, wave_child_peak_mb)
         if wave_total_peak_mb > rss_soft_limit_mb:
@@ -694,6 +726,11 @@ class FeatureFactoryBatchService:
 
         return self._task_artifact_dir(batch_id) / "child_metrics.jsonl"
 
+    def _layer_metrics_path(self, batch_id: str) -> Path:
+        """Return layer metrics JSONL path for a batch id."""
+
+        return self._task_artifact_dir(batch_id) / "layer_metrics.jsonl"
+
     @staticmethod
     def _append_child_metrics_jsonl(path: Path, row: Dict[str, Any]) -> None:
         """Append one child metrics row using a single O_APPEND write."""
@@ -731,6 +768,62 @@ class FeatureFactoryBatchService:
             except (OSError, json.JSONDecodeError):
                 pass
         cls._append_child_metrics_jsonl(path, row)
+
+    @staticmethod
+    def _tail_layer_metrics_jsonl(
+        path: Path,
+        tail_bytes: int = LAYER_METRICS_TAIL_BYTES,
+    ) -> List[Dict[str, Any]]:
+        """Read the trailing portion of layer_metrics.jsonl (fail-open)."""
+
+        if not path.exists():
+            return []
+        try:
+            size = path.stat().st_size
+            with path.open("rb") as handle:
+                if size > tail_bytes:
+                    handle.seek(size - tail_bytes)
+                chunk = handle.read()
+            text = chunk.decode("utf-8", errors="ignore")
+            if size > tail_bytes and "\n" in text:
+                text = text.split("\n", 1)[1]
+            rows: List[Dict[str, Any]] = []
+            for line in text.splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    rows.append(json.loads(stripped))
+                except json.JSONDecodeError:
+                    continue
+            return rows
+        except OSError:
+            return []
+
+    def _apply_layer_metrics_to_task(self, task: Dict[str, Any], task_id: str) -> None:
+        """Merge latest layer metrics row for the current symbol into task state."""
+
+        if int(task.get("concurrent_symbols") or 1) != 1:
+            return
+        symbol = task.get("current_symbol")
+        timeframe = task.get("current_timeframe")
+        if not symbol or not timeframe:
+            return
+        rows = self._tail_layer_metrics_jsonl(self._layer_metrics_path(task_id))
+        matching = [
+            row
+            for row in rows
+            if str(row.get("symbol")) == str(symbol)
+            and str(row.get("timeframe")) == str(timeframe)
+        ]
+        if not matching:
+            return
+        latest = matching[-1]
+        task["current_stage"] = latest.get("stage")
+        task["stage_progress"] = latest.get("progress")
+        rss_mb = latest.get("rss_mb")
+        if rss_mb is not None:
+            task["current_rss_mb"] = int(rss_mb)
 
     def _build_initial_checkpoint(
         self,
@@ -1047,6 +1140,29 @@ class FeatureFactoryBatchService:
         started_at = time.perf_counter()
         process = psutil.Process(os.getpid())
         metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
+        layer_metrics_path = os.environ.get("FFACT_LAYER_METRICS_PATH")
+
+        def _progress_callback(event: Dict[str, Any]) -> None:
+            try:
+                if not layer_metrics_path:
+                    return
+                row = {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "stage": event.get("stage"),
+                    "progress": event.get("progress"),
+                    "message": event.get("message"),
+                    "rss_mb": int(process.memory_info().rss // BYTES_PER_MB),
+                    "ts": time.time(),
+                    "elapsed": round(time.perf_counter() - started_at, 6),
+                    "schema_version": 1,
+                }
+                FeatureFactoryBatchService._append_child_metrics_jsonl(
+                    Path(layer_metrics_path),
+                    row,
+                )
+            except Exception as exc:
+                logger.debug("layer progress_callback failed (fail-open): %s", exc)
 
         # 子進程無法存取父進程的 module-level 單例，必須重新計算 cache_dir
         if cache_dir is None:
@@ -1064,6 +1180,7 @@ class FeatureFactoryBatchService:
                 timeframe=timeframe,
                 config_override=config_override,
                 force_regenerate=force_regenerate,
+                progress_callback=_progress_callback if layer_metrics_path else None,
                 batch_id=resolved_batch_id,
             )
             if metrics_path:
@@ -1226,6 +1343,8 @@ class FeatureFactoryBatchService:
         if not task:
             return None
 
+        self._apply_layer_metrics_to_task(task, task_id)
+
         done = task["completed"] + task["failed"]
         progress = done / max(task["total"], 1)
 
@@ -1237,6 +1356,9 @@ class FeatureFactoryBatchService:
             "failed": task["failed"],
             "current_symbol": task.get("current_symbol"),
             "current_timeframe": task.get("current_timeframe"),
+            "current_stage": task.get("current_stage"),
+            "stage_progress": task.get("stage_progress"),
+            "current_rss_mb": task.get("current_rss_mb"),
             "progress": progress,
             "queued": max(task["total"] - done, 0),
             "concurrent_symbols": task.get("concurrent_symbols", 1),
