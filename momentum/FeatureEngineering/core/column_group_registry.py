@@ -924,6 +924,117 @@ class ColumnGroupRegistry:
             start = end
         return slices
 
+    def _estimate_chunk_shard_planned_bytes(
+        self,
+        n_rows: int,
+        n_cols: int,
+        *,
+        chunk_cols: int = 5000,
+        dtype_size: int = 4,
+    ) -> tuple[int, int]:
+        """模擬 _persist_layer_output_groups 的 chunk + shard 切分。
+
+        回傳 (planned_new_bytes, max_shard_bytes)。
+        """
+        if n_rows <= 0 or n_cols <= 0:
+            return 0, 0
+
+        planned_new_bytes = 0
+        max_shard_bytes = 0
+        for start in range(0, n_cols, chunk_cols):
+            chunk_n_cols = min(chunk_cols, n_cols - start)
+            slices = self._compute_shard_slices(n_rows, chunk_n_cols, dtype_size=dtype_size)
+            for col_start, col_end in slices:
+                shard_cols = col_end - col_start
+                shard_bytes = int(n_rows) * int(shard_cols) * int(dtype_size)
+                planned_new_bytes += shard_bytes
+                if shard_bytes > max_shard_bytes:
+                    max_shard_bytes = shard_bytes
+        return planned_new_bytes, max_shard_bytes
+
+    @staticmethod
+    def _resolve_cgsa_disk_reserve_bytes() -> int:
+        """CGSA persist 預檢保留空間下限（GiB env → bytes）。"""
+        raw = os.getenv("FFACT_CGSA_DISK_RESERVE_GIB", "2.0").strip()
+        try:
+            value = float(raw)
+        except ValueError:
+            value = 2.0
+        if value < 0:
+            value = 2.0
+        return int(value * (1024 ** 3))
+
+    def _precheck_cgsa_cumulative_disk(
+        self,
+        frame: Any,
+        *,
+        layer_label: str,
+        symbol: str,
+        timeframe: str,
+        chunk_cols: int = 5000,
+    ) -> None:
+        """L3-L6 persist 前累積磁碟預檢（增量制；free 已扣 registry 既佔，不加 registry_occupied）。
+
+        非 DataFrame / 無法讀取 shape → return（退回既有 per-shard guard）。
+        """
+        if frame is None:
+            return
+        if not isinstance(frame, pd.DataFrame):
+            return
+        if not hasattr(frame, "columns"):
+            return
+        try:
+            if frame.empty:
+                return
+            n_rows = int(frame.shape[0])
+            n_cols = int(frame.shape[1])
+        except Exception:
+            return
+        if n_rows <= 0 or n_cols <= 0:
+            return
+
+        planned_new_bytes, max_shard_bytes = self._estimate_chunk_shard_planned_bytes(
+            n_rows,
+            n_cols,
+            chunk_cols=chunk_cols,
+        )
+        max_inflight_tmp_bytes = int(max_shard_bytes) * 2
+        reserve_floor = self._resolve_cgsa_disk_reserve_bytes()
+        needed = int(planned_new_bytes) + max_inflight_tmp_bytes + reserve_floor
+
+        free_bytes = self._disk_free_bytes(self._work_dir)
+        if free_bytes is None:
+            return
+
+        if free_bytes < needed:
+            raise ColumnGroupRegistryError(
+                f"Insufficient disk space for CGSA cumulative persist ({layer_label}, "
+                f"symbol={symbol}, timeframe={timeframe}): "
+                f"need {self._format_bytes(needed)} "
+                f"(planned_new={self._format_bytes(planned_new_bytes)}, "
+                f"max_inflight_tmp×2={self._format_bytes(max_inflight_tmp_bytes)}, "
+                f"reserve_floor={self._format_bytes(reserve_floor)}), "
+                f"available {self._format_bytes(free_bytes)} at {self._work_dir}; "
+                "clear disk space, reduce features, or set FFACT_CGSA_TEMP_DTYPE "
+                "to lower temp bytes.",
+                failure_type=FailureType.IO_ERROR,
+            )
+
+        logger.info(
+            "[CGSA] Disk pre-check OK: layer=%s symbol=%s tf=%s need=%.2f GiB "
+            "(planned_new=%.2f GiB, max_inflight_tmp×2=%.2f GiB, reserve=%.2f GiB) "
+            "free=%.2f GiB shape=%s",
+            layer_label,
+            symbol,
+            timeframe,
+            needed / (1024 ** 3),
+            planned_new_bytes / (1024 ** 3),
+            max_inflight_tmp_bytes / (1024 ** 3),
+            reserve_floor / (1024 ** 3),
+            free_bytes / (1024 ** 3),
+            (n_rows, n_cols),
+        )
+
     def unlink_shard(self, group_id: str, shard_idx: int) -> None:
         """Delete one persisted shard file. No-op if file already absent.
 

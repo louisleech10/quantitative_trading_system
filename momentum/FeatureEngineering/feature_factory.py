@@ -941,6 +941,30 @@ class FeatureFactory:
         raw = os.getenv("FFACT_USE_CGSA", "1").strip().lower()
         return raw not in {"0", "false", "no", "off"}
 
+    @staticmethod
+    def _cgsa_disk_precheck_enabled() -> bool:
+        raw = os.getenv("FFACT_CGSA_DISK_PRECHECK", "1").strip().lower()
+        return raw not in {"0", "false", "no", "off"}
+
+    def _maybe_precheck_cgsa_cumulative_disk(
+        self,
+        frame: pd.DataFrame,
+        layer_label: str,
+    ) -> None:
+        """三條 CGSA persist 路徑共用：L3-L6 chunk persist 前累積磁碟預檢。"""
+        if not self._cgsa_disk_precheck_enabled():
+            return
+        if self._cgsa_registry is None:
+            return
+        symbol = self._current_symbol or "unknown"
+        timeframe = self._current_timeframe or "unknown"
+        self._cgsa_registry._precheck_cgsa_cumulative_disk(
+            frame,
+            layer_label=layer_label,
+            symbol=symbol,
+            timeframe=timeframe,
+        )
+
     def _prepare_cgsa_registry(
         self,
         symbol: str,
@@ -1172,6 +1196,8 @@ class FeatureFactory:
             return
         if not self._current_timeframe:
             return
+
+        self._maybe_precheck_cgsa_cumulative_disk(frame, label)
 
         frame = self._coerce_persistence_frame(frame)
         columns = list(frame.columns)
