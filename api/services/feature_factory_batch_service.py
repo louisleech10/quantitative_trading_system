@@ -955,7 +955,7 @@ class FeatureFactoryBatchService:
             {"symbol": symbol, "timeframe": request.timeframe}
             for symbol in request.symbols
         ]
-        return {
+        checkpoint: Dict[str, Any] = {
             "schema_version": 1,
             "batch_id": task_id,
             "request_hash": self._hash_payload(request_payload),
@@ -969,8 +969,10 @@ class FeatureFactoryBatchService:
             "concurrent_symbols": self._resolve_concurrent_symbols(request.config_override),
             "memory_sanity_failed": False,
             "rss_after_gc_history_mb": [],
-            "retention_items": [],
         }
+        if self._is_batch_retention_enabled():
+            checkpoint["retention_items"] = []
+        return checkpoint
 
     def _build_task_state(
         self,
