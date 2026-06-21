@@ -15,13 +15,53 @@ import pandas as pd
 import numpy as np
 import pytest
 
+import api.services.feature_factory_service as feature_service_module
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
-from momentum.factories import create_feature_factory, create_kline_storage_manager
+from momentum import factories as momentum_factories
+from momentum.FeatureEngineering.feature_storage import FeatureStorage
+from momentum.factories import create_kline_storage_manager
 
 TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
 DATE_WINDOW_DAYS = 167
 ROW_COUNT_TOLERANCE = 8
+PRODUCTION_FEATURES_ROOT = Path("data_cache/features")
+
+
+def _snapshot_production_features() -> set[str]:
+    """Record production feature cache paths for pollution checks."""
+    if not PRODUCTION_FEATURES_ROOT.exists():
+        return set()
+    return {str(path) for path in PRODUCTION_FEATURES_ROOT.rglob("*") if path.is_file()}
+
+
+def _isolate_feature_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Redirect feature writes to tmp_path while keeping real kline reads."""
+    real_data_cache = Path(feature_service_module.settings.data_cache_path)
+    klines_link = tmp_path / "feature_klines"
+    if not klines_link.exists():
+        klines_link.symlink_to(real_data_cache / "feature_klines", target_is_directory=True)
+
+    monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
+
+    features_root = tmp_path / "features"
+    features_root.mkdir(parents=True, exist_ok=True)
+    original_create = momentum_factories.create_feature_factory
+
+    def _create_with_tmp_features(
+        cache_dir: Optional[str] = None,
+        validate_continuity: bool = True,
+    ):
+        resolved_cache_dir = cache_dir or str(tmp_path / "feature_klines")
+        factory = original_create(
+            cache_dir=resolved_cache_dir,
+            validate_continuity=validate_continuity,
+        )
+        factory._storage = FeatureStorage(str(features_root))
+        return factory
+
+    monkeypatch.setattr(momentum_factories, "create_feature_factory", _create_with_tmp_features)
+    return features_root
 
 
 @lru_cache(maxsize=1)
@@ -239,29 +279,6 @@ async def test_batch_date_threading_via_run_in_executor(
     assert captured == [("2025-01-01", "2025-06-21")]
 
 
-def test_batch_config_hash_matches_single_path() -> None:
-    _require_kline()
-    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR)
-    config = factory._resolve_config(_minimal_batch_config("12h"))
-    start_date, end_date = _date_range_last_n_days(_load_klines("BTCUSDT", "12h"), DATE_WINDOW_DAYS)
-
-    single_hash = factory._compute_config_hash(
-        config,
-        "BTCUSDT",
-        "12h",
-        start_date=start_date,
-        end_date=end_date,
-    )
-    batch_hash = factory._compute_config_hash(
-        config,
-        "BTCUSDT",
-        "12h",
-        start_date=start_date,
-        end_date=end_date,
-    )
-    assert batch_hash == single_hash
-
-
 @pytest.mark.asyncio
 async def test_batch_date_applied_row_count_primary_12h(
     monkeypatch,
@@ -270,6 +287,8 @@ async def test_batch_date_applied_row_count_primary_12h(
     mock_browse_registrar,
 ) -> None:
     _require_kline()
+    features_before = _snapshot_production_features()
+    _isolate_feature_output(monkeypatch, tmp_path)
     symbol = "BTCUSDT"
     timeframe = "12h"
     klines = _load_klines(symbol, timeframe)
@@ -301,6 +320,7 @@ async def test_batch_date_applied_row_count_primary_12h(
     actual_rows = _manifest_row_count(manifest_path)
     assert abs(actual_rows - expected_rows) <= ROW_COUNT_TOLERANCE
     assert actual_rows < len(klines) - 100, "date-selected batch must not run full history"
+    assert _snapshot_production_features() == features_before
 
 
 @pytest.mark.asyncio
@@ -311,6 +331,8 @@ async def test_batch_date_applied_row_count_primary_1h(
     mock_browse_registrar,
 ) -> None:
     _require_kline()
+    features_before = _snapshot_production_features()
+    _isolate_feature_output(monkeypatch, tmp_path)
     symbol = "BTCUSDT"
     timeframe = "1h"
     klines = _load_klines(symbol, timeframe)
@@ -341,6 +363,7 @@ async def test_batch_date_applied_row_count_primary_1h(
     actual_rows = _manifest_row_count(manifest_path)
     assert abs(actual_rows - expected_rows) <= ROW_COUNT_TOLERANCE
     assert actual_rows < len(klines) - 500, "date-selected 1h batch must not run full history"
+    assert _snapshot_production_features() == features_before
 
 
 @pytest.mark.asyncio
@@ -351,6 +374,8 @@ async def test_batch_vs_single_row_count_and_hash_consistency(
     mock_browse_registrar,
 ) -> None:
     _require_kline()
+    features_before = _snapshot_production_features()
+    features_root = _isolate_feature_output(monkeypatch, tmp_path)
     symbol = "BTCUSDT"
     timeframe = "12h"
     klines = _load_klines(symbol, timeframe)
@@ -360,7 +385,7 @@ async def test_batch_vs_single_row_count_and_hash_consistency(
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
 
-    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR)
+    factory = momentum_factories.create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR)
     single_result = factory.generate_features(
         symbol=symbol,
         timeframe=timeframe,
@@ -397,6 +422,9 @@ async def test_batch_vs_single_row_count_and_hash_consistency(
 
     assert batch_row_count == single_row_count
     assert batch_hash == single_hash
+    assert str(single_result.hdf5_path).startswith(str(features_root))
+    assert str(batch_manifest_path).startswith(str(features_root))
+    assert _snapshot_production_features() == features_before
 
 
 @pytest.mark.asyncio
