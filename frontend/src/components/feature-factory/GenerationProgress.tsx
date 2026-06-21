@@ -53,6 +53,10 @@ export default function GenerationProgress({
       status?: string;
       retention_prompt?: boolean;
       run_identity?: { symbol: string; timeframe: string; config_hash: string };
+      process_rss_mb?: number | null;
+      worker_rss_mb?: number | null;
+      current_rss_mb?: number | null;
+      schema_version?: number;
     }) => {
       const t = taskRef.current;
       if (!t) return;
@@ -62,17 +66,30 @@ export default function GenerationProgress({
         : payload.stage === 'failed' || payload.status === 'failed' ? 'failed'
         : payload.status ?? 'running';
 
+      const processRssMb =
+        'process_rss_mb' in payload
+          ? (payload.process_rss_mb == null ? null : payload.process_rss_mb)
+          : 'current_rss_mb' in payload
+            ? (payload.current_rss_mb == null ? null : payload.current_rss_mb)
+            : null;
+
       setProgressRef.current({
         status: derivedStatus,
         stage: payload.stage ?? undefined,
         progress: payload.progress,
         message: payload.message,
+        process_rss_mb: processRssMb,
+        current_rss_mb: processRssMb,
+        schema_version: payload.schema_version,
       });
       setCurrentTaskRef.current({
         ...t,
         status: derivedStatus,
         progress: payload.progress ?? t.progress,
         current_stage: payload.stage ?? t.current_stage,
+        process_rss_mb: processRssMb,
+        current_rss_mb: processRssMb,
+        schema_version: payload.schema_version ?? t.schema_version,
         retention_prompt: payload.retention_prompt,
         run_identity: payload.run_identity,
       });
@@ -108,11 +125,22 @@ export default function GenerationProgress({
             status: string;
             progress: number;
             current_stage: string | null;
+            process_rss_mb?: number | null;
+            current_rss_mb?: number | null;
+            schema_version?: number;
             retention_prompt?: boolean;
             run_identity?: { symbol: string; timeframe: string; config_hash: string };
           };
-          applyPayload({ stage: s.current_stage ?? s.status, progress: s.progress, status: s.status,
-            retention_prompt: s.retention_prompt, run_identity: s.run_identity });
+          applyPayload({
+            stage: s.current_stage ?? s.status,
+            progress: s.progress,
+            status: s.status,
+            process_rss_mb: s.process_rss_mb ?? s.current_rss_mb ?? null,
+            current_rss_mb: s.current_rss_mb ?? s.process_rss_mb ?? null,
+            schema_version: s.schema_version,
+            retention_prompt: s.retention_prompt,
+            run_identity: s.run_identity,
+          });
           if (s.status === 'completed' || s.status === 'failed') stopPolling();
         } catch {
           // Network error — keep retrying.
@@ -175,6 +203,7 @@ export default function GenerationProgress({
   const pct = Math.round((progress?.progress ?? task.progress ?? 0) * 100);
   const stageLabel = progress?.stage ?? task.current_stage ?? '等待啟動';
   const stageMessage = progress?.message;
+  const processRssMb = progress?.process_rss_mb ?? task.process_rss_mb ?? progress?.current_rss_mb ?? task.current_rss_mb;
   const isFailed = task.status === 'failed';
   const isCompleted = task.status === 'completed';
   const pctColor = isFailed ? 'text-rose-300' : isCompleted ? 'text-emerald-300' : 'text-amber-200';
@@ -207,6 +236,14 @@ export default function GenerationProgress({
 
       <div className="text-xs text-slate-400">
         {stageMessage ?? (isCompleted ? '生成完成' : isFailed ? '生成失敗' : '等待進度更新...')}
+        {processRssMb != null && (
+          <span
+            className="ml-2 text-slate-500"
+            title="API 行程整體 RSS（含 API/browse 等同進程噪音）；純觀測值，非該 symbol 獨佔記憶體。"
+          >
+            · (單)行程 RSS {processRssMb}MB
+          </span>
+        )}
       </div>
     </div>
   );

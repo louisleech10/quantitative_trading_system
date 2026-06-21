@@ -464,7 +464,10 @@ export interface BatchTaskStatus {
   current_timeframe?: string | null;
   current_stage?: string | null;
   stage_progress?: number | null;
+  process_rss_mb?: number | null;
+  worker_rss_mb?: number | null;
   current_rss_mb?: number | null;
+  schema_version?: number;
   queued?: number;
   concurrent_symbols?: number;
   memory_sanity_failed?: boolean;
@@ -502,6 +505,10 @@ export interface FeatureTask {
   current_stage: string | null;
   completed_stages: string[];
   error: string | null;
+  process_rss_mb?: number | null;
+  worker_rss_mb?: number | null;
+  current_rss_mb?: number | null;
+  schema_version?: number;
   compute_warnings?: string[];
   validation_summary?: FeatureValidationSummary;
   retention_prompt?: boolean;
@@ -553,6 +560,10 @@ export interface FeatureGenerationProgress {
   stage?: string;
   progress?: number;
   message?: string;
+  process_rss_mb?: number | null;
+  worker_rss_mb?: number | null;
+  current_rss_mb?: number | null;
+  schema_version?: number;
 }
 
 export interface FeatureNLResult {

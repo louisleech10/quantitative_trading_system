@@ -78,6 +78,19 @@ class FeatureTaskStatusResponse(BaseModel):
     result: Optional[Dict] = None
     retention_prompt: Optional[bool] = None
     run_identity: Optional[Dict[str, str]] = None
+    process_rss_mb: Optional[int] = Field(
+        default=None,
+        description=(
+            "單 symbol 路徑：API 行程整體 RSS（MB），含 API/browse 等同進程噪音；"
+            "純觀測值，非該 symbol 獨佔記憶體。"
+        ),
+    )
+    worker_rss_mb: Optional[int] = None
+    current_rss_mb: Optional[int] = Field(
+        default=None,
+        description="Legacy RSS 欄（與 process_rss_mb 或 worker_rss_mb 雙寫同值）。",
+    )
+    schema_version: int = 1
 
 
 class RunInfo(BaseModel):
@@ -252,7 +265,22 @@ class BatchTaskStatusResponse(BaseModel):
     current_timeframe: Optional[str] = None
     current_stage: Optional[str] = None
     stage_progress: Optional[float] = None
-    current_rss_mb: Optional[int] = None
+    process_rss_mb: Optional[int] = Field(
+        default=None,
+        description=(
+            "單 symbol 路徑：API 行程整體 RSS（MB），含 API/browse 等同進程噪音；"
+            "純觀測值，非該 symbol 獨佔記憶體。"
+        ),
+    )
+    worker_rss_mb: Optional[int] = Field(
+        default=None,
+        description="批次路徑：子進程 worker RSS（MB）。",
+    )
+    current_rss_mb: Optional[int] = Field(
+        default=None,
+        description="Legacy RSS 欄（與 process_rss_mb 或 worker_rss_mb 雙寫同值）。",
+    )
+    schema_version: int = 1
     queued: Optional[int] = None
     concurrent_symbols: Optional[int] = None
     memory_sanity_failed: Optional[bool] = None

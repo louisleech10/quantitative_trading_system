@@ -361,11 +361,28 @@ function normalizeBatchTask(
     : ('stage_progress' in payload
       ? (payload.stage_progress == null ? null : toNumber(payload.stage_progress, 0))
       : null);
+  const workerRssMb = blockLayerFields
+    ? null
+    : ('worker_rss_mb' in payload
+      ? (payload.worker_rss_mb == null ? null : toNumber(payload.worker_rss_mb, 0))
+      : null);
+  const processRssMb = blockLayerFields
+    ? null
+    : ('process_rss_mb' in payload
+      ? (payload.process_rss_mb == null ? null : toNumber(payload.process_rss_mb, 0))
+      : null);
   const currentRssMb = blockLayerFields
     ? null
-    : ('current_rss_mb' in payload
-      ? (payload.current_rss_mb == null ? null : toNumber(payload.current_rss_mb, 0))
-      : null);
+    : ('worker_rss_mb' in payload
+      ? workerRssMb
+      : 'process_rss_mb' in payload
+        ? processRssMb
+        : 'current_rss_mb' in payload
+          ? (payload.current_rss_mb == null ? null : toNumber(payload.current_rss_mb, 0))
+          : null);
+  const schemaVersion = 'schema_version' in payload
+    ? toNumber(payload.schema_version, previous?.schema_version ?? 1)
+    : (previous?.schema_version ?? 1);
 
   return {
     ...previous,
@@ -381,7 +398,10 @@ function normalizeBatchTask(
     current_timeframe: currentTimeframe,
     current_stage: currentStage,
     stage_progress: stageProgress,
+    process_rss_mb: processRssMb,
+    worker_rss_mb: workerRssMb,
     current_rss_mb: currentRssMb,
+    schema_version: schemaVersion,
     queued: toNumber(payload.queued, Math.max(total - completed - failed, 0)),
     concurrent_symbols: toNumber(payload.concurrent_symbols, previous?.concurrent_symbols ?? 1),
     memory_sanity_failed: Boolean(payload.memory_sanity_failed ?? previous?.memory_sanity_failed ?? false),

@@ -280,8 +280,8 @@ export default function BatchProgressPanel({ batchTask, symbols = [], naked = fa
                   {effectiveBatchTask.stage_progress != null
                     ? ` (${Math.round(effectiveBatchTask.stage_progress * 100)}%)`
                     : ''}
-                  {effectiveBatchTask.current_rss_mb != null
-                    ? ` · RSS ${effectiveBatchTask.current_rss_mb}MB`
+                  {(effectiveBatchTask.worker_rss_mb ?? effectiveBatchTask.current_rss_mb) != null
+                    ? ` · (批)worker RSS ${effectiveBatchTask.worker_rss_mb ?? effectiveBatchTask.current_rss_mb}MB`
                     : ''}
                 </div>
               )}
