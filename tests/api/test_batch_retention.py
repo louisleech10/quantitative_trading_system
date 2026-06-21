@@ -1292,3 +1292,78 @@ async def test_retention_crash_c_checkpoint_write_fail_retry_idempotent(
     assert second.status_code == 200
     assert second.json()["state"] == RetentionState.RETAINED.value
     assert attempts["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_retention_crash_c_discard_after_delete_write_fail_retry_idempotent(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """⑥ crash matrix (c) discard 變體：delete_run 已刪後 checkpoint 寫失敗→重試經 KeyError 收斂 discarded。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+    url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+
+    delete_calls: List[tuple[str, str, str]] = []
+    original_delete = batch_service._run_deleter
+
+    def _spy_delete(symbol: str, timeframe: str, cfg_hash: str) -> Dict[str, Any]:
+        delete_calls.append((symbol, timeframe, cfg_hash))
+        return original_delete(symbol, timeframe, cfg_hash)
+
+    batch_service._run_deleter = _spy_delete
+
+    attempts = {"count": 0}
+    original_write = batch_service._write_checkpoint_atomic
+
+    def _flaky_write(checkpoint: Dict[str, Any]) -> None:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise OSError("simulated checkpoint write failure")
+        original_write(checkpoint)
+
+    monkeypatch.setattr(batch_service, "_write_checkpoint_atomic", _flaky_write)
+
+    # 首次 discard：delete_run 真刪成功，但 checkpoint 寫失敗 → 5xx，未提交 discarded
+    first = await client.post(url, json={"decision": "discard"})
+    assert first.status_code == 500
+
+    # 重試：item 仍 pending（未提交），再 discard → delete_run 對已刪 raise KeyError 被包裝成 success → 收斂 discarded
+    second = await client.post(url, json={"decision": "discard"})
+    assert second.status_code == 200
+    assert second.json()["state"] == RetentionState.DISCARDED.value
+    assert len(delete_calls) == 2  # 兩次都呼 delete_run，第二次走 KeyError 冪等路徑
+
+
+@pytest.mark.asyncio
+async def test_read_disk_free_bytes_measures_features_root(monkeypatch, retention_client):
+    """#7 量測 path 直測：_read_disk_free_bytes 經 shutil.disk_usage(features_root)。"""
+    import api.services.feature_factory_batch_service as bsvc
+    from api.core.config import settings as _settings
+
+    _client, batch_service, _ff, _manager, tmp_path = retention_client
+    captured: Dict[str, Any] = {}
+
+    def _spy_disk_usage(path):
+        captured["path"] = Path(path)
+        return SimpleNamespace(total=0, used=0, free=4321)
+
+    monkeypatch.setattr(bsvc.shutil, "disk_usage", _spy_disk_usage)
+
+    free = batch_service._read_disk_free_bytes()
+    assert free == 4321
+    assert captured["path"] == Path(_settings.data_cache_path) / "features"
+    assert captured["path"] == tmp_path / "features"
