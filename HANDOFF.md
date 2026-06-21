@@ -46,8 +46,8 @@
 - **Q5**(P0a)✅ uvicorn access_log env 開關(terminal 噪音預設關,FFACT_UVICORN_ACCESS_LOG=1 恢復)。
 - **B1 #1**(P0b)✅ batch worker non-rotating FileHandler 進當日檔(FFACT_API_LOG_PATH)+[pid sym tf]+smoke。Codex review PASS(minor:idempotent T-A 再收緊)。
 - **B2 E-normalize+Q3**(P0c+P1)✅ 共用 FeatureProgressEvent+normalize 單一出口+RSS 互斥分欄(process_rss_mb/worker_rss_mb,current_rss_mb 雙寫過渡)+schema_version int+parity5。Codex review 攔3 BLOCKING+#4 全修。**教訓:前端驗收須跑 vitest。**
-留待(retention 層,大×2):
-- **B3 Q2-A**(P2,大)retention 對話:非阻塞+磁碟背壓+staging(register後移)+checkpoint 狀態機+resume+前端。走大管線(決策簡述+雙家族 adversarial+backend/frontend phase)。
-- **B4 Q2-B**(P2.5,大)交易式 bulk-delete endpoint(tombstone+失效 checkpoint/RunManager/quality/磁碟)。
+- **B3 Q2-A**(P2,大)✅ 批次保留對話。使用者選「discard 即刪」→ **post-hoc mark**(run 照常生成+register 不延後→多下游一致)+ discard 重用 `delete_run` 即刪(背壓自洽)+ 真實 `shutil.disk_usage` 背壓+wakeup+hard-pause observable + crash matrix abc + per-item lock + flag `FFACT_BATCH_RETENTION` 預設關 + 前端 BatchRetentionPanel(source 區分,非 N modal,不打 deleteRun)。**兩輪雙家族 adversarial**(4 BLOCKING→post-hoc 轉向)+Codex review 兩次抓假綠修真。後端 31 pytest + 前端 21 vitest + byte PASS。非阻塞 hardening note:RunRetentionDialog 未來可改 find(non-batch) 防 starve(現不可達)。
+留待:
+- **B4 Q2-B**(P2.5,大)交易式 bulk-delete endpoint(tombstone+失效 checkpoint/RunManager/quality/磁碟)。B3 已備單 run delete(delete_run);B4 做多選/原子/批量。
 - **E 執行模型維持現狀**(不整併 thread/subprocess,委員會兩輪定案);normalize 薄函式已落地防漂移。
-重啟後端:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度都帶 RSS(B2,單=process_rss 含API噪音/批=worker_rss)。
+重啟後端:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度都帶 RSS(B2)+批次跑完每個 run 可逐項 retain/discard(B3,需 FFACT_BATCH_RETENTION=1 啟用)。
