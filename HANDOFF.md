@@ -47,7 +47,10 @@
 - **B1 #1**(P0b)✅ batch worker non-rotating FileHandler 進當日檔(FFACT_API_LOG_PATH)+[pid sym tf]+smoke。Codex review PASS(minor:idempotent T-A 再收緊)。
 - **B2 E-normalize+Q3**(P0c+P1)✅ 共用 FeatureProgressEvent+normalize 單一出口+RSS 互斥分欄(process_rss_mb/worker_rss_mb,current_rss_mb 雙寫過渡)+schema_version int+parity5。Codex review 攔3 BLOCKING+#4 全修。**教訓:前端驗收須跑 vitest。**
 - **B3 Q2-A**(P2,大)✅ 批次保留對話。使用者選「discard 即刪」→ **post-hoc mark**(run 照常生成+register 不延後→多下游一致)+ discard 重用 `delete_run` 即刪(背壓自洽)+ 真實 `shutil.disk_usage` 背壓+wakeup+hard-pause observable + crash matrix abc + per-item lock + flag `FFACT_BATCH_RETENTION` 預設關 + 前端 BatchRetentionPanel(source 區分,非 N modal,不打 deleteRun)。**兩輪雙家族 adversarial**(4 BLOCKING→post-hoc 轉向)+Codex review 兩次抓假綠修真。後端 31 pytest + 前端 21 vitest + byte PASS。非阻塞 hardening note:RunRetentionDialog 未來可改 find(non-batch) 防 starve(現不可達)。
-留待:
-- **B4 Q2-B**(P2.5,大)交易式 bulk-delete endpoint(tombstone+失效 checkpoint/RunManager/quality/磁碟)。B3 已備單 run delete(delete_run);B4 做多選/原子/批量。
-- **E 執行模型維持現狀**(不整併 thread/subprocess,委員會兩輪定案);normalize 薄函式已落地防漂移。
+留待(優先序,使用者 2026-06-21 定):
+- **B5**(大,進行中)批次日期 bug:批次無視日期跑全史(5x);BatchGenerateRequest 無 date 欄→跨棧加(Pydantic+前端 batch 分支+threading _compute_single→generate_features+checkpoint resume+8 mock 檔)。strict-window=Option2(止血)。詳 [[project_batch_date_bug]]。
+- **B6**(大,B5 後)warmup-then-trim:接現有 per-indicator warmup 乘數(warmup_lookup.py,FF 生成路徑現未用)。選日期載入 start-max_warmup_bars→算→trim 輸出[start,end]→與全範圍同日期 byte 一致(Option1)。max_warmup=max(L1/L3/L6.5/fracdiff/native-tf 全部);warmup 不足→後端回報+前端提醒(不靜默)。§A 先查 expanding 指標。
+- **L6.5 並行研究**(B5/B6 後,記得提醒使用者)委員會方案 handoffs/20260622-l65-parallel-*:先 read-only profile 證 CPU vs I/O(winsor sliding 已 O(n),32x 疑為 per-group 開銷)→窄L3並行/寬L2序列+tier worker公式+RSS gate+ThreadPool+byte parity。native-tf gate 否決見 [[project_nativetf_gate_rejected]]。
+- **B4 Q2-B**(大,最後,記得提醒)交易式 bulk-delete(tombstone+失效 checkpoint/RunManager/quality/磁碟)。B3 已備單 run delete_run;B4 做多選/原子/批量。
+- **E 執行模型維持現狀**;normalize 薄函式已落地。
 重啟後端:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度都帶 RSS(B2)+批次跑完每個 run 可逐項 retain/discard(B3,需 FFACT_BATCH_RETENTION=1 啟用)。
