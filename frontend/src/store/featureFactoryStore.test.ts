@@ -230,3 +230,48 @@ describe('featureFactoryStore batch layer field staleness', () => {
     expect(state.batchTask?.current_rss_mb).toBeNull();
   });
 });
+
+describe('featureFactoryStore completionQueue source', () => {
+  afterEach(() => {
+    useFeatureFactoryStore.setState({ completionQueue: [], batchTask: null });
+  });
+
+  it('enqueueCompletion defaults source to single', () => {
+    useFeatureFactoryStore.getState().enqueueCompletion({
+      symbol: 'BTCUSDT',
+      timeframe: '12h',
+      config_hash: 'cfg_a',
+    });
+    expect(useFeatureFactoryStore.getState().completionQueue).toEqual([{
+      symbol: 'BTCUSDT',
+      timeframe: '12h',
+      config_hash: 'cfg_a',
+      source: 'single',
+    }]);
+  });
+
+  it('clears retention_pending when payload includes empty retention_pending key', () => {
+    useFeatureFactoryStore.setState({
+      batchTask: {
+        task_id: 'batch-r',
+        batch_id: 'batch-r',
+        status: 'running',
+        total: 1,
+        completed: 0,
+        failed: 0,
+        progress: 0,
+        retention_pending: [{
+          symbol: 'BTCUSDT',
+          timeframe: '12h',
+          config_hash: 'hash_old',
+          state: 'pending',
+        }],
+      },
+      batchStartedAtMs: Date.now(),
+    });
+
+    useFeatureFactoryStore.getState().applyBatchEvent({ retention_pending: [] });
+
+    expect(useFeatureFactoryStore.getState().batchTask?.retention_pending).toEqual([]);
+  });
+});

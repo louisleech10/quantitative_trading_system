@@ -67,7 +67,7 @@ describe('run lifecycle', () => {
     ws.onmessage?.({
       data: JSON.stringify({ event: 'progress', data: completionPayload }),
     } as MessageEvent);
-    expect(useFeatureFactoryStore.getState().completionQueue).toEqual([run]);
+    expect(useFeatureFactoryStore.getState().completionQueue).toEqual([{ ...run, source: 'single' }]);
     wsView.unmount();
 
     useFeatureFactoryStore.setState({ completionQueue: [], currentTask: null, progress: null });
@@ -80,7 +80,7 @@ describe('run lifecycle', () => {
     const pollingWs = MockWebSocket.instances[1];
     pollingWs.onerror?.();
     await vi.advanceTimersByTimeAsync(2000);
-    expect(useFeatureFactoryStore.getState().completionQueue).toEqual([run]);
+    expect(useFeatureFactoryStore.getState().completionQueue).toEqual([{ ...run, source: 'single' }]);
   });
 
   it('renders completion queue and retains item on 422', async () => {
