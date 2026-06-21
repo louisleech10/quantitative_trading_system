@@ -23,6 +23,8 @@ def _compute_success(
     _force_regenerate: bool,
     _cache_dir: Optional[str] = None,
     _batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     return f"/tmp/{symbol}_{timeframe}.h5"
 
@@ -34,6 +36,8 @@ def _compute_partial(
     _force_regenerate: bool,
     _cache_dir: Optional[str] = None,
     _batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     if symbol == "BAD":
         raise RuntimeError("simulated failure")
@@ -47,6 +51,8 @@ def _compute_fail(
     _force_regenerate: bool,
     _cache_dir: Optional[str] = None,
     _batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     raise RuntimeError(f"{symbol}-{timeframe}-failed")
 

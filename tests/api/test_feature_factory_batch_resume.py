@@ -66,6 +66,8 @@ def _compute_success(
     _force_regenerate: bool,
     _cache_dir: Optional[str] = None,
     _batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     return f"/tmp/{symbol}_{timeframe}.h5"
 
@@ -173,6 +175,8 @@ async def test_batch_resume_skips_completed_items(monkeypatch, tmp_path, batch_s
         _force_regenerate: bool,
         _cache_dir: Optional[str] = None,
         _batch_id: str = "",
+        _start_date: Optional[str] = None,
+        _end_date: Optional[str] = None,
     ) -> str:
         calls.append(symbol)
         return f"/tmp/{symbol}_{timeframe}.h5"
@@ -233,6 +237,8 @@ async def test_current_symbol_updates_on_submit_before_item_completes(monkeypatc
         _force_regenerate: bool,
         _cache_dir: Optional[str] = None,
         _batch_id: str = "",
+        _start_date: Optional[str] = None,
+        _end_date: Optional[str] = None,
     ) -> str:
         if symbol == "ETHUSDT":
             second_started.set()
@@ -333,6 +339,8 @@ async def test_parent_records_failed_child_metrics_when_compute_raises(monkeypat
         _force_regenerate: bool,
         _cache_dir: Optional[str] = None,
         _batch_id: str = "",
+        _start_date: Optional[str] = None,
+        _end_date: Optional[str] = None,
     ) -> str:
         raise RuntimeError(f"{symbol} failed")
 

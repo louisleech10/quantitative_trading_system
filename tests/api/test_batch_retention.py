@@ -141,6 +141,8 @@ def _compute_success(
     _force_regenerate: bool,
     cache_dir: Optional[str] = None,
     _batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     base = Path(cache_dir).parent if cache_dir else Path("/tmp")
     run_dir = base / "features" / symbol / timeframe / "cfg_batch_ret"
@@ -163,6 +165,8 @@ def _compute_tracked_nonblock(
     force_regenerate: bool,
     cache_dir: Optional[str] = None,
     batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     _NONBLOCK_COMPLETION_ORDER.append(symbol)
     if symbol == "BTCUSDT":

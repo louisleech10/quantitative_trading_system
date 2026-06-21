@@ -180,6 +180,8 @@ def _compute_capture_env(
     _force_regenerate: bool,
     _cache_dir: Optional[str] = None,
     _batch_id: str = "",
+    _start_date: Optional[str] = None,
+    _end_date: Optional[str] = None,
 ) -> str:
     return json.dumps(
         {
