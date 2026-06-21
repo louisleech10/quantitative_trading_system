@@ -19,6 +19,10 @@ import {
   BatchOutputPath,
   RunInfo,
   RunIdentity,
+  CompletionQueueItem,
+  CompletionSource,
+  BatchRetentionItem,
+  BatchRetentionPendingResponse,
   EnsureBrowseResponse,
 } from '@/lib/types';
 
@@ -79,7 +83,7 @@ interface FeatureFactoryState {
   runsLoading: boolean;
   runsError: string | null;
   selectedRunKey: string | null;
-  completionQueue: RunIdentity[];
+  completionQueue: CompletionQueueItem[];
   fetchRuns: () => Promise<void>;
   setSelectedRun: (run: RunInfo | null) => void;
   ensureBrowseTaskForRun: (
@@ -99,7 +103,15 @@ interface FeatureFactoryState {
     timeframe: string,
     configHash: string,
   ) => Promise<RunMutationResult>;
-  enqueueCompletion: (run: RunIdentity) => void;
+  enqueueCompletion: (run: RunIdentity, source?: CompletionSource) => void;
+  fetchBatchRetentionPending: (batchId: string) => Promise<void>;
+  applyBatchRetentionDecision: (
+    batchId: string,
+    symbol: string,
+    timeframe: string,
+    configHash: string,
+    decision: 'retain' | 'discard',
+  ) => Promise<RunMutationResult>;
   shiftCompletion: () => void;
   setConfig: (config: FeatureFactoryConfig) => void;
   updateConfigPartial: (partial: Record<string, unknown>) => void;
@@ -310,6 +322,34 @@ function normalizePerItemRss(payload: BatchPayload, previous?: BatchTaskStatus |
   return Array.from(existing.values());
 }
 
+function normalizeRetentionPending(
+  payload: BatchPayload,
+  previous?: BatchTaskStatus | null,
+): BatchRetentionItem[] | undefined {
+  if ('retention_pending' in payload) {
+    const raw = payload.retention_pending;
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return (raw as unknown[])
+      .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object')
+      .map((item) => ({
+        symbol: String(item.symbol ?? ''),
+        timeframe: String(item.timeframe ?? ''),
+        config_hash: String(item.config_hash ?? ''),
+        state: String(item.state ?? 'pending'),
+        hdf5_path: item.hdf5_path != null ? String(item.hdf5_path) : null,
+        error: item.error != null ? String(item.error) : null,
+      }))
+      .filter((item) => item.symbol && item.timeframe && item.config_hash);
+  }
+  return previous?.retention_pending;
+}
+
+function retentionItemKey(item: Pick<BatchRetentionItem, 'symbol' | 'timeframe' | 'config_hash'>): string {
+  return `${item.symbol}|${item.timeframe}|${item.config_hash}`;
+}
+
 async function parseAliasPatchError(response: Response): Promise<string> {
   if (response.status === 409) return 'Run 使用中';
   if (response.status === 422) return '名稱已被使用';
@@ -413,6 +453,7 @@ function normalizeBatchTask(
     results: (payload.results as Record<string, string> | undefined) ?? previous?.results ?? {},
     browse_task_ids: (payload.browse_task_ids as Record<string, string> | undefined) ?? previous?.browse_task_ids ?? {},
     errors: (payload.errors as Record<string, string> | undefined) ?? previous?.errors ?? {},
+    retention_pending: normalizeRetentionPending(payload, previous),
   };
 }
 
@@ -554,10 +595,73 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       return { ok: false, error: '刪除失敗' };
     }
   },
-  enqueueCompletion: (run) => set((state) => ({
-    completionQueue: state.completionQueue.some((item) => item.symbol === run.symbol && item.timeframe === run.timeframe && item.config_hash === run.config_hash)
-      ? state.completionQueue : [...state.completionQueue, run],
+  enqueueCompletion: (run, source = 'single') => set((state) => ({
+    completionQueue: state.completionQueue.some(
+      (item) => item.symbol === run.symbol
+        && item.timeframe === run.timeframe
+        && item.config_hash === run.config_hash,
+    )
+      ? state.completionQueue
+      : [...state.completionQueue, { ...run, source }],
   })),
+  fetchBatchRetentionPending: async (batchId) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/retention/pending`,
+      );
+      if (!response.ok) return;
+      const payload = await response.json() as BatchRetentionPendingResponse;
+      set((state) => {
+        const currentId = state.batchTask?.batch_id ?? state.batchTask?.task_id;
+        if (!state.batchTask || currentId !== batchId) return {};
+        return {
+          batchTask: {
+            ...state.batchTask,
+            retention_pending: payload.pending,
+          },
+        };
+      });
+    } catch {
+      /* 斷線補償失敗時保留既有 WS 狀態 */
+    }
+  },
+  applyBatchRetentionDecision: async (batchId, symbol, timeframe, configHash, decision) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/retention/${encodeURIComponent(symbol)}/${encodeURIComponent(timeframe)}/${encodeURIComponent(configHash)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        },
+      );
+      if (!response.ok) {
+        if (response.status === 409) {
+          return { ok: false, error: 'retention_conflict' };
+        }
+        if (response.status === 404) {
+          return { ok: false, error: 'retention_not_found' };
+        }
+        return { ok: false, error: 'retention_decision_failed' };
+      }
+      const identityKey = `${symbol}|${timeframe}|${configHash}`;
+      set((state) => {
+        if (!state.batchTask) return {};
+        const pending = (state.batchTask.retention_pending ?? []).filter(
+          (item) => retentionItemKey(item) !== identityKey,
+        );
+        return {
+          batchTask: {
+            ...state.batchTask,
+            retention_pending: pending,
+          },
+        };
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'retention_decision_failed' };
+    }
+  },
   shiftCompletion: () => set((state) => ({ completionQueue: state.completionQueue.slice(1) })),
   setConfig: (config) =>
     set({

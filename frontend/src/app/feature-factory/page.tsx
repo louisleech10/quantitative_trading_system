@@ -10,6 +10,7 @@ import FeatureKlineDownloadPanel from '@/components/feature-factory/FeatureKline
 import PreviewPanel from '@/components/feature-factory/PreviewPanel';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
 import RunRetentionDialog from '@/components/feature-factory/RunRetentionDialog';
+import BatchRetentionPanel from '@/components/feature-factory/BatchRetentionPanel';
 import RunManagerPanel from '@/components/feature-factory/RunManagerPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
@@ -508,6 +509,7 @@ export default function FeatureFactoryPage() {
           )}
 
         <RunRetentionDialog />
+        <BatchRetentionPanel />
         <CollapsibleSection
           storageKey={SYMBOL_COVERAGE_EXPANDED_KEY}
           title="跨 Symbol Coverage Matrix"

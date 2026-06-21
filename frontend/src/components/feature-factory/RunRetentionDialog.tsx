@@ -15,7 +15,8 @@ const btnBase =
   'inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm transition disabled:opacity-40 disabled:cursor-not-allowed';
 
 export default function RunRetentionDialog() {
-  const run = useFeatureFactoryStore((state) => state.completionQueue[0]);
+  const item = useFeatureFactoryStore((state) => state.completionQueue[0]);
+  const run = item && item.source !== 'batch' ? item : null;
   const shiftCompletion = useFeatureFactoryStore((state) => state.shiftCompletion);
   const updateRunAlias = useFeatureFactoryStore((state) => state.updateRunAlias);
   const deleteRun = useFeatureFactoryStore((state) => state.deleteRun);

@@ -546,6 +546,13 @@ export interface FeatureTask {
 }
 
 export interface RunIdentity { symbol: string; timeframe: string; config_hash: string; }
+
+/** completionQueue 項目來源：單 symbol modal vs batch 面板 */
+export type CompletionSource = 'single' | 'batch';
+
+export interface CompletionQueueItem extends RunIdentity {
+  source: CompletionSource;
+}
 export interface RunInfo extends RunIdentity {
   alias?: string | null;
   batch_id?: string | null;
