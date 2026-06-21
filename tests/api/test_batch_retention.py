@@ -19,6 +19,7 @@ from fastapi import FastAPI
 import api.services.feature_factory_service as feature_service_module
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service, router as feature_factory_router
+from api.services.feature_factory_batch_adapters import FeatureFactoryBrowseAdapter
 from api.services.feature_factory_batch_service import (
     FeatureFactoryBatchService,
     RetentionConflictError,
@@ -86,6 +87,52 @@ async def retention_client(monkeypatch, tmp_path, mock_browse_registrar, mock_qu
         yield client, batch_service, ff_service, manager, tmp_path
 
 
+@pytest_asyncio.fixture
+async def retention_client_real_browse(monkeypatch, tmp_path, mock_quality_computer):
+    """FastAPI client with real browse registrar wired to FeatureFactoryService."""
+
+    features_root = tmp_path / "features"
+    cgsa_root = tmp_path / "cgsa_work"
+    manager = RunLifecycleManager(
+        features_root=features_root,
+        cgsa_root=cgsa_root,
+        locks_dir=features_root / ".locks",
+        registry=FeatureRegistry(features_root / "registry.json"),
+    )
+    monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
+    ff_service = FeatureFactoryService()
+    monkeypatch.setattr(feature_service_module, "feature_factory_service", ff_service)
+    monkeypatch.setattr("api.routes.feature_factory.feature_factory_service", ff_service)
+    browse_registrar = FeatureFactoryBrowseAdapter(ff_service)
+
+    batch_service = FeatureFactoryBatchService(
+        checkpoint_dir=tmp_path / "batch_checkpoints",
+        browse_registrar=browse_registrar,
+        quality_computer=mock_quality_computer,
+        run_deleter=ff_service.delete_run,
+    )
+
+    app = FastAPI()
+    app.include_router(feature_factory_router)
+    app.dependency_overrides[get_batch_service] = lambda: batch_service
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client, batch_service, ff_service, manager, tmp_path
+
+
+_RETAIN_SYMBOL = "BTCUSDT"
+_RETAIN_TIMEFRAME = "1h"
+_RETAIN_CONFIG_HASH = "cfg_batch_ret"
+_REGISTRY_COMPARE_KEYS = (
+    "symbol",
+    "timeframe",
+    "config_hash",
+    "browse_task_id",
+    "browse_ready",
+)
+
+
 def _compute_success(
     symbol: str,
     timeframe: str,
@@ -145,6 +192,67 @@ def _seed_registry(
         "config_hash": config_hash,
         "created_at": 1_700_000_000.0,
     })
+
+
+def _find_registry_entry(
+    runs: List[Dict[str, Any]],
+    symbol: str,
+    timeframe: str,
+    config_hash: str,
+) -> Dict[str, Any]:
+    for entry in runs:
+        if (
+            entry.get("symbol") == symbol
+            and entry.get("timeframe") == timeframe
+            and entry.get("config_hash") == config_hash
+        ):
+            return entry
+    raise AssertionError(
+        f"registry entry not found for {symbol}/{timeframe}/{config_hash}: {runs}"
+    )
+
+
+def _registry_snapshot(
+    ff_service: FeatureFactoryService,
+    symbol: str,
+    timeframe: str,
+    config_hash: str,
+) -> Dict[str, Any]:
+    entry = _find_registry_entry(ff_service.list_runs(), symbol, timeframe, config_hash)
+    return {key: entry.get(key) for key in _REGISTRY_COMPARE_KEYS}
+
+
+def _browse_task_id(symbol: str, timeframe: str, config_hash: str) -> str:
+    return f"browse_{symbol}_{timeframe}_{config_hash}"
+
+
+async def _quality_summary_for_symbol(
+    batch_service: FeatureFactoryBatchService,
+    task_id: str,
+    symbol: str,
+) -> Dict[str, Any]:
+    summary = await batch_service.get_batch_quality_summary(task_id)
+    assert summary is not None
+    matches = [item for item in summary["summaries"] if item["symbol"] == symbol]
+    assert len(matches) == 1, f"expected one quality summary for {symbol}, got {summary}"
+    return matches[0]
+
+
+async def _identity_snapshot(
+    batch_service: FeatureFactoryBatchService,
+    ff_service: FeatureFactoryService,
+    task_id: str,
+    symbol: str,
+    timeframe: str,
+    config_hash: str,
+) -> Dict[str, Any]:
+    status = batch_service.get_status(task_id)
+    assert status is not None
+    return {
+        "registry_entry": _registry_snapshot(ff_service, symbol, timeframe, config_hash),
+        "browse_task_id": status["browse_task_ids"][symbol],
+        "quality_summary": await _quality_summary_for_symbol(batch_service, task_id, symbol),
+    }
 
 
 # --- retention_state ---
@@ -213,6 +321,20 @@ def test_retention_state_flag_off_skips_pending_mark(
     assert checkpoint.get("retention_items", []) == []
 
 
+def test_retention_state_flag_off_checkpoint_omits_retention_items(
+    monkeypatch,
+    tmp_path,
+    batch_service_factory,
+) -> None:
+    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    service = batch_service_factory(tmp_path)
+    checkpoint = service._build_initial_checkpoint(
+        "batch-flag-off-schema",
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h"),
+    )
+    assert "retention_items" not in checkpoint
+
+
 def test_retention_state_flag_on_marks_pending(
     monkeypatch,
     tmp_path,
@@ -278,7 +400,7 @@ async def test_retention_flag_off_spy_register_timing(
     await _wait_batch_done(service, task_id)
     checkpoint = service._load_checkpoint(task_id)
     assert checkpoint is not None
-    assert checkpoint.get("retention_items", []) == []
+    assert "retention_items" not in checkpoint
     assert len(mock_browse_registrar.calls) == 1
 
 
@@ -317,9 +439,9 @@ async def test_retention_decision_retain_clears_pending(
 @pytest.mark.asyncio
 async def test_retention_decision_discard_deletes_run_and_browse_gone(
     monkeypatch,
-    retention_client,
+    retention_client_real_browse,
 ) -> None:
-    client, batch_service, ff_service, manager, tmp_path = retention_client
+    client, batch_service, ff_service, manager, tmp_path = retention_client_real_browse
     monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
     monkeypatch.setattr(
         FeatureFactoryBatchService,
@@ -328,23 +450,40 @@ async def test_retention_decision_discard_deletes_run_and_browse_gone(
     )
 
     task_id = await batch_service.start_batch(
-        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+        BatchGenerateRequest(
+            symbols=[_RETAIN_SYMBOL],
+            timeframe=_RETAIN_TIMEFRAME,
+            force_regenerate=True,
+        )
     )
     await _wait_batch_done(batch_service, task_id)
-    config_hash = "cfg_batch_ret"
-    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
-    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+    config_hash = _RETAIN_CONFIG_HASH
+    manifest = (
+        tmp_path / "features" / _RETAIN_SYMBOL / _RETAIN_TIMEFRAME / config_hash
+        / "feature_manifest.json"
+    )
+    _seed_registry(manager, _RETAIN_SYMBOL, _RETAIN_TIMEFRAME, config_hash, manifest)
+    browse_task_id = _browse_task_id(_RETAIN_SYMBOL, _RETAIN_TIMEFRAME, config_hash)
+    assert browse_task_id in ff_service._tasks
+    before = await client.get("/api/v1/features/browse/available")
+    assert any(task["task_id"] == browse_task_id for task in before.json()["tasks"])
 
     resp = await client.post(
-        f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}",
+        f"/api/v1/features/batch/{task_id}/retention/"
+        f"{_RETAIN_SYMBOL}/{_RETAIN_TIMEFRAME}/{config_hash}",
         json={"decision": "discard"},
     )
     assert resp.status_code == 200
     assert resp.json()["state"] == RetentionState.DISCARDED.value
     assert not manifest.exists()
+    assert browse_task_id not in ff_service._tasks
+    after = await client.get("/api/v1/features/browse/available")
+    assert not any(task["task_id"] == browse_task_id for task in after.json()["tasks"])
     runs = ff_service.list_runs()
     assert not any(
-        r["symbol"] == "BTCUSDT" and r["timeframe"] == "1h" and r["config_hash"] == "cfg_batch_ret"
+        r["symbol"] == _RETAIN_SYMBOL
+        and r["timeframe"] == _RETAIN_TIMEFRAME
+        and r["config_hash"] == config_hash
         for r in runs
     )
 
@@ -421,11 +560,11 @@ async def test_retention_decision_not_found_404(retention_client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_retention_decision_concurrent_only_one_wins(
+async def test_retention_decision_concurrent_retain_discard_only_one_wins(
     monkeypatch,
     retention_client,
 ) -> None:
-    _client, batch_service, _ff, _manager, _tmp_path = retention_client
+    _client, batch_service, ff_service, _manager, _tmp_path = retention_client
     monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
     monkeypatch.setattr(
         FeatureFactoryBatchService,
@@ -438,10 +577,17 @@ async def test_retention_decision_concurrent_only_one_wins(
     )
     await _wait_batch_done(batch_service, task_id)
     config_hash = "cfg_batch_ret"
+    delete_calls: List[tuple[str, str, str]] = []
+    original_delete = ff_service.delete_run
 
+    def _spy_delete(symbol: str, timeframe: str, config_hash: str) -> Dict[str, Any]:
+        delete_calls.append((symbol, timeframe, config_hash))
+        return original_delete(symbol, timeframe, config_hash)
+
+    batch_service._run_deleter = _spy_delete
     barrier = threading.Barrier(2)
 
-    async def _decide(decision: str):
+    async def _decide(decision: str) -> Optional[Dict[str, Any]]:
         await asyncio.get_event_loop().run_in_executor(None, barrier.wait)
         try:
             return await batch_service.apply_retention_decision(
@@ -460,66 +606,173 @@ async def test_retention_decision_concurrent_only_one_wins(
         RetentionState.RETAINED.value,
         RetentionState.DISCARDED.value,
     }
+    assert len(delete_calls) <= 1
 
 
 @pytest.mark.asyncio
-async def test_retention_retain_equiv_registry_browse_quality(
+async def test_retention_concurrent_retain_retain_single_terminal(
     monkeypatch,
     retention_client,
-    mock_browse_registrar,
-    mock_quality_computer,
 ) -> None:
-    """Retain 後 registry/browse/quality 與 flag-off 基線一致。"""
-    client, batch_service, ff_service, manager, tmp_path = retention_client
+    _client, batch_service, ff_service, _manager, _tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",
         staticmethod(_compute_success),
     )
 
-    async def _baseline_flag_off() -> Dict[str, Any]:
-        monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
-        mock_browse_registrar.calls.clear()
-        mock_quality_computer.calls.clear()
-        task_id = await batch_service.start_batch(
-            BatchGenerateRequest(symbols=["ETHUSDT"], timeframe="1h", force_regenerate=True)
-        )
-        await _wait_batch_done(batch_service, task_id)
-        manifest = tmp_path / "features" / "ETHUSDT" / "1h" / "cfg_batch_ret" / "feature_manifest.json"
-        _seed_registry(manager, "ETHUSDT", "1h", "cfg_batch_ret", manifest)
-        quality = batch_service._quality_computer.compute(str(manifest))
-        return {
-            "browse_calls": list(mock_browse_registrar.calls),
-            "browse_task_id": batch_service.get_status(task_id)["browse_task_ids"]["ETHUSDT"],
-            "registry": ff_service.list_runs(),
-            "quality": quality,
-        }
-
-    baseline = await _baseline_flag_off()
-
-    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
-    mock_browse_registrar.calls.clear()
     task_id = await batch_service.start_batch(
-        BatchGenerateRequest(symbols=["SOLUSDT"], timeframe="1h", force_regenerate=True)
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
     )
     await _wait_batch_done(batch_service, task_id)
-    manifest = tmp_path / "features" / "SOLUSDT" / "1h" / "cfg_batch_ret" / "feature_manifest.json"
-    _seed_registry(manager, "SOLUSDT", "1h", "cfg_batch_ret", manifest)
     config_hash = "cfg_batch_ret"
+    delete_calls: List[tuple[str, str, str]] = []
+    original_delete = ff_service.delete_run
+
+    def _spy_delete(symbol: str, timeframe: str, config_hash: str) -> Dict[str, Any]:
+        delete_calls.append((symbol, timeframe, config_hash))
+        return original_delete(symbol, timeframe, config_hash)
+
+    batch_service._run_deleter = _spy_delete
+    barrier = threading.Barrier(2)
+
+    async def _decide_retain() -> Dict[str, Any]:
+        await asyncio.get_event_loop().run_in_executor(None, barrier.wait)
+        return await batch_service.apply_retention_decision(
+            task_id, "BTCUSDT", "1h", config_hash, "retain"
+        )
+
+    first, second = await asyncio.gather(_decide_retain(), _decide_retain())
+    assert first["state"] == RetentionState.RETAINED.value
+    assert second["state"] == RetentionState.RETAINED.value
+    assert len(delete_calls) == 0
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    terminal = [
+        item
+        for item in checkpoint.get("retention_items", [])
+        if item.get("state") in {
+            RetentionState.RETAINED.value,
+            RetentionState.DISCARDED.value,
+        }
+    ]
+    assert len(terminal) == 1
+    assert terminal[0]["state"] == RetentionState.RETAINED.value
+
+
+@pytest.mark.asyncio
+async def test_retention_concurrent_discard_discard_single_delete(
+    monkeypatch,
+    retention_client,
+) -> None:
+    _client, batch_service, ff_service, manager, tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+    delete_calls: List[tuple[str, str, str]] = []
+    original_delete = ff_service.delete_run
+
+    def _spy_delete(symbol: str, timeframe: str, config_hash: str) -> Dict[str, Any]:
+        delete_calls.append((symbol, timeframe, config_hash))
+        return original_delete(symbol, timeframe, config_hash)
+
+    batch_service._run_deleter = _spy_delete
+    barrier = threading.Barrier(2)
+
+    async def _decide_discard() -> Dict[str, Any]:
+        await asyncio.get_event_loop().run_in_executor(None, barrier.wait)
+        return await batch_service.apply_retention_decision(
+            task_id, "BTCUSDT", "1h", config_hash, "discard"
+        )
+
+    first, second = await asyncio.gather(_decide_discard(), _decide_discard())
+    assert first["state"] == RetentionState.DISCARDED.value
+    assert second["state"] == RetentionState.DISCARDED.value
+    assert len(delete_calls) == 1
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    terminal = [
+        item
+        for item in checkpoint.get("retention_items", [])
+        if item.get("state") in {
+            RetentionState.RETAINED.value,
+            RetentionState.DISCARDED.value,
+        }
+    ]
+    assert len(terminal) == 1
+    assert terminal[0]["state"] == RetentionState.DISCARDED.value
+
+
+@pytest.mark.asyncio
+async def test_retention_retain_equiv_registry_browse_quality(
+    monkeypatch,
+    retention_client_real_browse,
+) -> None:
+    """同一 symbol/identity：flag-off 基線 vs flag-on retain 後三項一致。"""
+    client, batch_service, ff_service, manager, tmp_path = retention_client_real_browse
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+    symbol = _RETAIN_SYMBOL
+    timeframe = _RETAIN_TIMEFRAME
+    config_hash = _RETAIN_CONFIG_HASH
+
+    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    baseline_task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=[symbol], timeframe=timeframe, force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, baseline_task_id)
+    manifest = (
+        tmp_path / "features" / symbol / timeframe / config_hash / "feature_manifest.json"
+    )
+    _seed_registry(manager, symbol, timeframe, config_hash, manifest)
+    baseline = await _identity_snapshot(
+        batch_service,
+        ff_service,
+        baseline_task_id,
+        symbol,
+        timeframe,
+        config_hash,
+    )
+
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    retain_task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=[symbol], timeframe=timeframe, force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, retain_task_id)
+    _seed_registry(manager, symbol, timeframe, config_hash, manifest)
 
     resp = await client.post(
-        f"/api/v1/features/batch/{task_id}/retention/SOLUSDT/1h/{config_hash}",
+        f"/api/v1/features/batch/{retain_task_id}/retention/{symbol}/{timeframe}/{config_hash}",
         json={"decision": "retain"},
     )
     assert resp.status_code == 200
+    retained = await _identity_snapshot(
+        batch_service,
+        ff_service,
+        retain_task_id,
+        symbol,
+        timeframe,
+        config_hash,
+    )
 
-    retained_quality = batch_service._quality_computer.compute(str(manifest))
-    retained_status = batch_service.get_status(task_id)
-    assert retained_status["browse_task_ids"]["SOLUSDT"] == retained_status["browse_task_ids"]["SOLUSDT"]
-    assert len(mock_browse_registrar.calls) == 1
-    assert mock_browse_registrar.calls[0]["symbol"] in {"ETHUSDT", "SOLUSDT"}
-    assert retained_quality["grade"] == baseline["quality"]["grade"]
-    assert ff_service.list_runs()  # run still visible after retain
+    assert retained["registry_entry"] == baseline["registry_entry"]
+    assert retained["browse_task_id"] == baseline["browse_task_id"]
+    assert retained["quality_summary"] == baseline["quality_summary"]
 
 
 # --- retention_list ---
