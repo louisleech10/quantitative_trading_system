@@ -69,10 +69,11 @@ def test_compute_single_writes_layer_metrics_jsonl(tmp_path, monkeypatch) -> Non
         assert "stage" in row
         assert "progress" in row
         assert "elapsed" in row
-        rss = row["rss_mb"]
+        rss = row.get("worker_rss_mb", row.get("rss_mb"))
         assert isinstance(rss, int)
         assert rss >= 0
         assert rss < 65536
+        assert row.get("current_rss_mb") == rss
         rss_values.append(rss)
     assert len(set(rss_values)) >= 1
 

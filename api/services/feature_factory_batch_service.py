@@ -22,6 +22,7 @@ from fastapi import HTTPException
 
 from api.core.logging import get_logger
 from api.models.feature_factory_models import BatchGenerateRequest
+from api.utils.ff_progress import normalize_progress_event
 from momentum.FeatureEngineering.utils.hardware_utils import (
     get_current_tier_gb,
     get_tier_concurrent_symbols,
@@ -827,7 +828,14 @@ class FeatureFactoryBatchService:
     def _clear_layer_metrics_on_task(task: Dict[str, Any]) -> None:
         """Remove per-symbol layer observability fields from task state."""
 
-        for key in ("current_stage", "stage_progress", "current_rss_mb"):
+        for key in (
+            "current_stage",
+            "stage_progress",
+            "current_rss_mb",
+            "process_rss_mb",
+            "worker_rss_mb",
+            "schema_version",
+        ):
             task.pop(key, None)
 
     def _apply_layer_metrics_to_task(self, task: Dict[str, Any], task_id: str) -> None:
@@ -856,13 +864,27 @@ class FeatureFactoryBatchService:
             self._clear_layer_metrics_on_task(task)
             return
         latest = matching[-1]
-        task["current_stage"] = latest.get("stage")
-        task["stage_progress"] = latest.get("progress")
-        rss_mb = latest.get("rss_mb")
-        if rss_mb is not None:
-            task["current_rss_mb"] = int(rss_mb)
+        normalized = normalize_progress_event(
+            stage=latest.get("stage"),
+            progress=latest.get("progress"),
+            message=latest.get("message", ""),
+            worker_rss_mb=latest.get("worker_rss_mb", latest.get("rss_mb")),
+            current_rss_mb=latest.get("current_rss_mb"),
+            symbol=symbol,
+            timeframe=timeframe,
+            schema_version=latest.get("schema_version"),
+        )
+        task["current_stage"] = normalized.get("stage")
+        task["stage_progress"] = normalized.get("progress")
+        if normalized.get("worker_rss_mb") is not None:
+            task["worker_rss_mb"] = normalized["worker_rss_mb"]
+        else:
+            task.pop("worker_rss_mb", None)
+        if normalized.get("current_rss_mb") is not None:
+            task["current_rss_mb"] = normalized["current_rss_mb"]
         else:
             task.pop("current_rss_mb", None)
+        task["schema_version"] = normalized.get("schema_version", 1)
 
     def _build_initial_checkpoint(
         self,
@@ -1191,16 +1213,18 @@ class FeatureFactoryBatchService:
             try:
                 if not layer_metrics_path:
                     return
+                normalized = normalize_progress_event(
+                    stage=event.get("stage"),
+                    progress=event.get("progress"),
+                    message=event.get("message"),
+                    worker_rss_mb=int(process.memory_info().rss // BYTES_PER_MB),
+                    symbol=symbol,
+                    timeframe=timeframe,
+                )
                 row = {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "stage": event.get("stage"),
-                    "progress": event.get("progress"),
-                    "message": event.get("message"),
-                    "rss_mb": int(process.memory_info().rss // BYTES_PER_MB),
+                    **normalized,
                     "ts": time.time(),
                     "elapsed": round(time.perf_counter() - started_at, 6),
-                    "schema_version": 1,
                 }
                 FeatureFactoryBatchService._append_child_metrics_jsonl(
                     Path(layer_metrics_path),
@@ -1403,7 +1427,10 @@ class FeatureFactoryBatchService:
             "current_timeframe": task.get("current_timeframe"),
             "current_stage": task.get("current_stage"),
             "stage_progress": task.get("stage_progress"),
+            "process_rss_mb": task.get("process_rss_mb"),
+            "worker_rss_mb": task.get("worker_rss_mb"),
             "current_rss_mb": task.get("current_rss_mb"),
+            "schema_version": task.get("schema_version", 1),
             "progress": progress,
             "queued": max(task["total"] - done, 0),
             "concurrent_symbols": task.get("concurrent_symbols", 1),

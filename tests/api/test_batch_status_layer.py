@@ -86,6 +86,7 @@ def test_apply_layer_metrics_to_task_concurrent_one(batch_service_factory, tmp_p
     service._apply_layer_metrics_to_task(task, task_id)
     assert task["current_stage"] == "layer_2"
     assert task["stage_progress"] == 0.75
+    assert task["worker_rss_mb"] == 256
     assert task["current_rss_mb"] == 256
 
 
@@ -138,6 +139,7 @@ def test_apply_layer_metrics_clears_on_symbol_handoff(batch_service_factory, tmp
     service._apply_layer_metrics_to_task(task, task_id)
     assert task["current_stage"] == "layer_3"
     assert task["stage_progress"] == 0.8
+    assert task["worker_rss_mb"] == 300
     assert task["current_rss_mb"] == 300
 
     task["current_symbol"] = "ETHUSDT"
@@ -182,6 +184,7 @@ def test_get_status_includes_layer_fields(batch_service_factory, tmp_path) -> No
     assert status is not None
     assert status["current_stage"] == "layer_6_5"
     assert status["stage_progress"] == 0.25
+    assert status["worker_rss_mb"] == 640
     assert status["current_rss_mb"] == 640
 
 
@@ -196,7 +199,9 @@ def test_ws_mapper_emits_layer_fields() -> None:
         "current_timeframe": "1h",
         "current_stage": "layer_4",
         "stage_progress": 0.42,
+        "worker_rss_mb": 768,
         "current_rss_mb": 768,
+        "schema_version": 1,
         "progress": 0.5,
         "status": "running",
         "queued": 1,
@@ -208,7 +213,9 @@ def test_ws_mapper_emits_layer_fields() -> None:
     mapped = map_batch_progress_ws_data(payload)
     assert mapped["current_stage"] == "layer_4"
     assert mapped["stage_progress"] == 0.42
+    assert mapped["worker_rss_mb"] == 768
     assert mapped["current_rss_mb"] == 768
+    assert mapped["schema_version"] == 1
     assert mapped["current_symbol"] == "BTCUSDT"
     assert mapped["current_timeframe"] == "1h"
 

@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
 import h5py
 import numpy as np
 import pandas as pd
+import psutil
 
 try:
     from statsmodels.tsa.stattools import adfuller
@@ -32,6 +33,7 @@ except Exception:
 from api.core.config import settings
 from api.core.logging import get_logger
 from api.utils.feature_name_parser import infer_category, infer_layer, infer_level
+from api.utils.ff_progress import normalize_progress_event
 from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
 from momentum.factories import create_feature_factory, create_feature_factory_mcp, create_run_lifecycle_manager
 from momentum.FeatureEngineering.run_locks import is_run_active
@@ -187,21 +189,52 @@ class FeatureFactoryService:
 
         def progress_callback(payload: Dict[str, Any]) -> None:
             """Called from the worker thread — must not touch asyncio directly."""
-            stage = payload.get("stage")
-            progress = payload.get("progress", 0.0)
-            message = payload.get("message", "")
+            try:
+                process_rss_mb: Optional[int] = None
+                try:
+                    process_rss_mb = int(psutil.Process().memory_info().rss // (1024 * 1024))
+                except Exception:
+                    pass
+                normalized = normalize_progress_event(
+                    stage=payload.get("stage"),
+                    progress=payload.get("progress", 0.0),
+                    message=payload.get("message", ""),
+                    process_rss_mb=process_rss_mb,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                )
+            except Exception:
+                normalized = normalize_progress_event(
+                    stage=payload.get("stage"),
+                    progress=payload.get("progress", 0.0),
+                    message=payload.get("message", ""),
+                    symbol=symbol,
+                    timeframe=timeframe,
+                )
+
+            stage = normalized.get("stage")
+            progress = float(normalized.get("progress", 0.0))
 
             with self._lock:
                 task_info = self._tasks.get(task_id)
                 if not task_info:
                     return
                 task_info["current_stage"] = stage
-                task_info["progress"] = float(progress)
+                task_info["progress"] = progress
+                if normalized.get("process_rss_mb") is not None:
+                    task_info["process_rss_mb"] = normalized["process_rss_mb"]
+                else:
+                    task_info.pop("process_rss_mb", None)
+                if normalized.get("current_rss_mb") is not None:
+                    task_info["current_rss_mb"] = normalized["current_rss_mb"]
+                else:
+                    task_info.pop("current_rss_mb", None)
+                task_info["schema_version"] = normalized.get("schema_version", 1)
                 if stage and progress >= 1.0:
                     if stage not in task_info["completed_stages"]:
                         task_info["completed_stages"].append(stage)
 
-            notify_payload = {"stage": stage, "progress": float(progress), "message": message}
+            notify_payload = dict(normalized)
             # call_soon_threadsafe schedules _notify_callbacks back on the event loop
             # thread so asyncio.create_task() calls inside WS callbacks remain safe.
             loop.call_soon_threadsafe(self._notify_callbacks, task_id, notify_payload)
@@ -614,6 +647,9 @@ class FeatureFactoryService:
                 "result": result,
                 "retention_prompt": bool(identity and task_info["status"] == "completed"),
                 "run_identity": identity,
+                "process_rss_mb": task_info.get("process_rss_mb"),
+                "current_rss_mb": task_info.get("current_rss_mb"),
+                "schema_version": task_info.get("schema_version", 1),
             }
 
     @staticmethod
