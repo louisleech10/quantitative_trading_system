@@ -392,13 +392,17 @@ app = create_app()
 
 def run_server():
     """運行服務器（用於開發）"""
+    # uvicorn 內建 access log 印到 stdout(terminal),與我們 middleware 的
+    # 過濾後請求 log(進檔)重複→預設關閉去除 terminal 噪音。需追 HTTP 層
+    # (404/500)時設 FFACT_UVICORN_ACCESS_LOG=1 恢復。預設安靜、可恢復(委員會定)。
+    _uvicorn_access_log = os.getenv("FFACT_UVICORN_ACCESS_LOG", "0").strip().lower() in ("1", "true", "yes")
     uvicorn.run(
         "api.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
         log_level=settings.log_level.lower(),
-        access_log=True
+        access_log=_uvicorn_access_log,
     )
 
 if __name__ == "__main__":
