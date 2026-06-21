@@ -15,7 +15,7 @@
 | 不變量 | RESUME | resume 保留 date | §V |
 | 風險 | (b)(d) | 批次共用+日期資料正確性 | §RISK |
 - 合計：Task=5、不變量=4、風險=1。
-- **Codex adversarial reconcile**:v1 §A 誤認 BatchGenerateRequest 有 date→實無(176-184)→跨棧加(Pydantic+前端+threading+resume+8mock);warmup 留 B6(strict-window)。
+- **雙家族 adversarial reconcile(v2.1)**:v1 §A 誤認 BatchGenerateRequest 有 date→實無(176-184)。修補:① mock **7 檔非 8**(剔 multi_window_rolling,含 multi_symbol_ic_first direct call;`-k batch` 跑不到 IC-first 須點名);② row-count **按 primary TF**(12h~335/1h~4009,讀 manifest,勿硬套 4009);③ config_hash **專屬 pytest**+單vs批一致;④ 前端活路徑 page.tsx:262→hook(store:875 死碼排除);⑤ warmup 留 B6。
 
 ## §0 全域規則
 - **無 date(None)=今日全史行為完全不變**(向後相容核心;golden+spy)。
@@ -62,12 +62,12 @@
 - 驗證:resume date 批次列數=strict 區間;`pytest tests/api/ -k batch_date_resume`。
 
 ## Phase 3 — mocks
-### Task 3.1 — 8 個 _compute_single mock 同步
-- SPEC ref：3.1　目標:全部 8 檔 mock 簽名加 date,免 TypeError。
-- 實作要點:rg 全掃確認;改 test_feature_factory_batch_step4/test_batch_retention/test_batch_layer_metrics/test_batch_progress_normalize/test_worker_logging/test_feature_factory_batch_resume/test_multi_symbol_ic_first/test_multi_window_rolling 的 _compute_single mock;加 1 spy 測證 date 參數順序。
-- 修改檔案:上述 8 檔。不可做:不放寬既有斷言。
+### Task 3.1 — 7 個 _compute_single mock/caller 同步
+- SPEC ref：3.1　目標:7 檔 _compute_single mock/spy/direct-call 簽名加 date,免 TypeError。
+- 實作要點:`rg "_compute_single" tests/` 確認;改 test_feature_factory_batch_step4/test_batch_retention/test_batch_layer_metrics/test_batch_progress_normalize/test_worker_logging/test_feature_factory_batch_resume/**test_multi_symbol_ic_first(direct call)**;**剔除 test_multi_window_rolling**(非 service mock);加 1 spy 測證 date 參數順序。
+- 修改檔案:上述 7 檔。不可做:不放寬既有斷言。
 - 邊界:mock 簽名與真實一致。
-- 驗證:`pytest tests/api/ -k batch -q` 全綠無 TypeError。
+- 驗證:`pytest tests/api/ -k batch -q` + **`pytest tests/feature_engineering/test_multi_symbol_ic_first.py -q`**(須額外點名)全綠無 TypeError。
 
 ### Phase 測試 + Gate
 - 無 date:`build_l65_golden_baseline.py --check` PASS + spy 驗 None。
