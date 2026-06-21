@@ -587,6 +587,8 @@ class FeatureFactoryBatchService:
                                     request.force_regenerate,
                                     batch_cache_dir,
                                     str(checkpoint.get("batch_id") or ""),
+                                    request.start_date,
+                                    request.end_date,
                                 )
                                 wrapped_futures.append(_wait_one(item, future))
                         finally:
@@ -1286,6 +1288,8 @@ class FeatureFactoryBatchService:
         force_regenerate: bool,
         cache_dir: Optional[str] = None,
         batch_id: str = "",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> str:
         """在子進程中執行單一標的特徵計算。"""
         api_log_path = os.environ.get("FFACT_API_LOG_PATH")
@@ -1343,6 +1347,8 @@ class FeatureFactoryBatchService:
                 config_override=config_override,
                 force_regenerate=force_regenerate,
                 progress_callback=_progress_callback if layer_metrics_path else None,
+                start_date=start_date,
+                end_date=end_date,
                 batch_id=resolved_batch_id,
             )
             if metrics_path:

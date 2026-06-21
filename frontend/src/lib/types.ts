@@ -405,6 +405,8 @@ export interface BatchToggleItem {
 export interface BatchGenerateRequest {
   symbols: string[];
   timeframe: string;
+  start_date?: string;
+  end_date?: string;
   config_override?: Record<string, unknown>;
   force_regenerate?: boolean;
   max_workers?: number;

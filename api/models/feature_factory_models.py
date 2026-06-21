@@ -178,6 +178,8 @@ class BatchGenerateRequest(BaseModel):
 
     symbols: List[str] = Field(..., min_length=1, max_length=200)
     timeframe: str = Field(default="12h", description="primary TF")
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
     config_override: Optional[Dict[str, Any]] = None
     force_regenerate: bool = False
     max_workers: int = Field(default=4, ge=1, le=8)

@@ -265,6 +265,8 @@ export default function FeatureFactoryPage() {
           config_override: config as unknown as Record<string, unknown>,
           force_regenerate: true,
           max_workers: 4,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
         });
       }
     } catch (err) {
