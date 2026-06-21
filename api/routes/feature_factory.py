@@ -27,6 +27,9 @@ from api.models.feature_factory_models import (
     AliasRequest,
     BatchAliasRequest,
     BatchAliasResponse,
+    BatchRetentionDecisionRequest,
+    BatchRetentionDecisionResponse,
+    BatchRetentionPendingResponse,
     DeleteRunResponse,
     EnsureBrowseResponse,
     RunInfo,
@@ -35,6 +38,9 @@ from momentum.FeatureEngineering.run_locks import RunBusyError
 from api.services.feature_factory_batch_service import (
     BatchBusyError,
     FeatureFactoryBatchService,
+    RetentionConflictError,
+    RetentionNotFoundError,
+    RetentionStateError,
     get_feature_factory_batch_service,
 )
 from api.services.feature_factory_service import feature_factory_service
@@ -323,6 +329,69 @@ async def get_batch_quality(
     except Exception as exc:
         logger.error("Failed to get batch quality summary: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get(
+    "/batch/{batch_id}/retention/pending",
+    response_model=BatchRetentionPendingResponse,
+)
+async def list_batch_retention_pending(
+    batch_id: str,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """列出批次中待決 retention 的 run。"""
+    try:
+        pending = await service.list_pending_retention(batch_id)
+        return BatchRetentionPendingResponse(batch_id=batch_id, pending=pending)
+    except RetentionNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "batch_not_found"})
+    except Exception as exc:
+        logger.error("Failed to list batch retention pending: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post(
+    "/batch/{batch_id}/retention/{symbol}/{timeframe}/{config_hash}",
+    response_model=BatchRetentionDecisionResponse,
+)
+async def apply_batch_retention_decision(
+    batch_id: str,
+    symbol: str,
+    timeframe: str,
+    config_hash: str,
+    request: BatchRetentionDecisionRequest,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """對單一 batch run 套用 retain/discard（非 DELETE /runs 單 flow）。"""
+    try:
+        return await service.apply_retention_decision(
+            batch_id,
+            symbol,
+            timeframe,
+            config_hash,
+            request.decision,
+        )
+    except RetentionNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "retention_not_found"})
+    except RetentionConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "retention_conflict", "message": str(exc)},
+        )
+    except RetentionStateError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "retention_state_error", "message": str(exc)},
+        )
+    except OSError as exc:
+        logger.error("Retention checkpoint persist failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail={"code": "checkpoint_persist_failed"})
+    except Exception as exc:
+        logger.error("Failed to apply batch retention decision: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "retention_error", "message": str(exc)},
+        )
 
 
 @router.get("/task/{task_id}", response_model=FeatureTaskStatusResponse)

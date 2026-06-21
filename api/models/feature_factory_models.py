@@ -4,7 +4,7 @@ Pydantic models for Feature Factory endpoints.
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -288,6 +288,43 @@ class BatchTaskStatusResponse(BaseModel):
     results: Optional[Dict[str, str]] = None
     browse_task_ids: Optional[Dict[str, str]] = None
     errors: Optional[Dict[str, str]] = None
+    retention_pending: Optional[List["BatchRetentionItem"]] = None
+
+
+class BatchRetentionItem(BaseModel):
+    """單一 batch run 的 retention 狀態（post-hoc mark）。"""
+
+    symbol: str
+    timeframe: str
+    config_hash: str
+    state: str
+    hdf5_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BatchRetentionDecisionRequest(BaseModel):
+    """批次 retention retain/discard 決策請求。"""
+
+    decision: Literal["retain", "discard"]
+
+
+class BatchRetentionDecisionResponse(BaseModel):
+    """批次 retention 決策結果。"""
+
+    batch_id: str
+    symbol: str
+    timeframe: str
+    config_hash: str
+    state: str
+    hdf5_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BatchRetentionPendingResponse(BaseModel):
+    """批次待決 retention 列表。"""
+
+    batch_id: str
+    pending: List[BatchRetentionItem]
 
 
 class BatchResumeResponse(BaseModel):

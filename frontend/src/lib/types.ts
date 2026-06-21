@@ -479,6 +479,35 @@ export interface BatchTaskStatus {
   results?: Record<string, string>;
   browse_task_ids?: Record<string, string>;
   errors?: Record<string, string>;
+  retention_pending?: BatchRetentionItem[];
+}
+
+export interface BatchRetentionItem {
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+  state: string;
+  hdf5_path?: string | null;
+  error?: string | null;
+}
+
+export interface BatchRetentionDecisionRequest {
+  decision: 'retain' | 'discard';
+}
+
+export interface BatchRetentionDecisionResponse {
+  batch_id: string;
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+  state: string;
+  hdf5_path?: string | null;
+  error?: string | null;
+}
+
+export interface BatchRetentionPendingResponse {
+  batch_id: string;
+  pending: BatchRetentionItem[];
 }
 
 export interface FeaturePreview {

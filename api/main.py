@@ -26,6 +26,7 @@ from api.services.feature_factory_batch_adapters import (
     FeatureFactoryBrowseAdapter,
     FeatureFactoryQualityAdapter,
 )
+from api.services.feature_factory_service import feature_factory_service
 
 
 batch_service: Optional[FeatureFactoryBatchService] = None
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
         batch_service = FeatureFactoryBatchService(
             browse_registrar=FeatureFactoryBrowseAdapter(),
             quality_computer=FeatureFactoryQualityAdapter(),
+            run_deleter=feature_factory_service.delete_run,
         )
         set_feature_factory_batch_service(batch_service)
     

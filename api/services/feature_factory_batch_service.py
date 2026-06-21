@@ -67,6 +67,44 @@ class BatchFailureType(str, Enum):
     COMPUTE_ERROR = "compute_error"
 
 
+class RetentionState(str, Enum):
+    """Batch run retention states (post-hoc mark, flag-gated)."""
+
+    PENDING = "pending"
+    DECIDING = "deciding"
+    RETAINED = "retained"
+    DISCARDED = "discarded"
+    RETENTION_ERROR = "retention_error"
+
+
+_RETENTION_TERMINAL_STATES = frozenset({
+    RetentionState.RETAINED,
+    RetentionState.DISCARDED,
+    RetentionState.RETENTION_ERROR,
+})
+
+_RETENTION_VALID_TRANSITIONS: Dict[RetentionState, frozenset[RetentionState]] = {
+    RetentionState.PENDING: frozenset({RetentionState.DECIDING}),
+    RetentionState.DECIDING: frozenset({
+        RetentionState.RETAINED,
+        RetentionState.DISCARDED,
+        RetentionState.RETENTION_ERROR,
+    }),
+}
+
+
+class RetentionNotFoundError(ValueError):
+    """Raised when batch or retention item is missing."""
+
+
+class RetentionConflictError(ValueError):
+    """Raised on concurrent or illegal retention decisions."""
+
+
+class RetentionStateError(ValueError):
+    """Raised on illegal retention state machine transitions."""
+
+
 class FeatureFactoryBatchService:
     """Batch service for multi-symbol feature generation."""
 
@@ -80,6 +118,7 @@ class FeatureFactoryBatchService:
         *,
         browse_registrar: Optional[IBrowseRegistrar] = None,
         quality_computer: Optional[IQualityComputer] = None,
+        run_deleter: Optional[Callable[[str, str, str], Dict[str, Any]]] = None,
     ) -> None:
         if browse_registrar is None or quality_computer is None:
             raise ValueError(
@@ -89,6 +128,8 @@ class FeatureFactoryBatchService:
         self._notification_callbacks: Dict[str, List[Callable[[Dict[str, Any]], None]]] = {}
         self._browse_registrar = browse_registrar
         self._quality_computer = quality_computer
+        self._run_deleter = run_deleter
+        self._retention_locks: Dict[Tuple[str, str, str, str], asyncio.Lock] = {}
         self._running_batch_count: int = 0
         self._max_concurrent_batches: int = 1
         self._task_ttl_seconds: int = 3600
@@ -633,6 +674,21 @@ class FeatureFactoryBatchService:
                 "rss_peak_item_mb": rss_peak_mb,
                 "rss_after_gc_mb": rss_after_gc_mb,
             })
+            if self._is_batch_retention_enabled():
+                run_hash = self._resolve_completed_run_hash({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "output_paths": output_paths,
+                    "browse_task_id": browse_task_id,
+                })
+                config_hash = run_hash or str(checkpoint.get("config_hash") or "")
+                self._mark_retention_pending(
+                    checkpoint,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    config_hash=config_hash,
+                    hdf5_path=hdf5_path,
+                )
         else:
             task["failed"] += 1
             task["errors"][symbol] = str(effective_error)
@@ -913,6 +969,7 @@ class FeatureFactoryBatchService:
             "concurrent_symbols": self._resolve_concurrent_symbols(request.config_override),
             "memory_sanity_failed": False,
             "rss_after_gc_history_mb": [],
+            "retention_items": [],
         }
 
     def _build_task_state(
@@ -1417,6 +1474,12 @@ class FeatureFactoryBatchService:
 
         done = task["completed"] + task["failed"]
         progress = done / max(task["total"], 1)
+        checkpoint = self._load_checkpoint(task_id)
+        retention_pending = (
+            self._list_pending_retention_items(checkpoint)
+            if checkpoint is not None
+            else []
+        )
 
         return {
             "task_id": task["task_id"],
@@ -1440,6 +1503,247 @@ class FeatureFactoryBatchService:
             "results": dict(task["results"]),
             "browse_task_ids": dict(task.get("browse_task_ids", {})),
             "errors": dict(task["errors"]),
+            "retention_pending": retention_pending,
+        }
+
+    @staticmethod
+    def _is_batch_retention_enabled() -> bool:
+        """Return True when batch retention post-hoc mark is enabled."""
+
+        return os.getenv("FFACT_BATCH_RETENTION", "0").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
+    @staticmethod
+    def _retention_item_identity(
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+    ) -> Tuple[str, str, str]:
+        return (str(symbol), str(timeframe), str(config_hash))
+
+    def _retention_lock(
+        self,
+        batch_id: str,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+    ) -> asyncio.Lock:
+        """Per-item retention decision lock."""
+
+        key = (batch_id, *self._retention_item_identity(symbol, timeframe, config_hash))
+        lock = self._retention_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._retention_locks[key] = lock
+        return lock
+
+    @staticmethod
+    def _find_retention_item(
+        checkpoint: Dict[str, Any],
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Find a retention item by identity in checkpoint."""
+
+        identity = FeatureFactoryBatchService._retention_item_identity(
+            symbol,
+            timeframe,
+            config_hash,
+        )
+        for item in checkpoint.get("retention_items", []):
+            item_identity = FeatureFactoryBatchService._retention_item_identity(
+                str(item.get("symbol", "")),
+                str(item.get("timeframe", "")),
+                str(item.get("config_hash", "")),
+            )
+            if item_identity == identity:
+                return item
+        return None
+
+    @staticmethod
+    def _validate_retention_transition(
+        current: RetentionState,
+        target: RetentionState,
+    ) -> None:
+        """Raise RetentionStateError on illegal state transitions."""
+
+        allowed = _RETENTION_VALID_TRANSITIONS.get(current, frozenset())
+        if target not in allowed:
+            raise RetentionStateError(
+                f"illegal retention transition: {current.value} -> {target.value}"
+            )
+
+    @staticmethod
+    def _mark_retention_pending(
+        checkpoint: Dict[str, Any],
+        *,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+        hdf5_path: str,
+    ) -> Dict[str, Any]:
+        """Append or refresh a pending retention item after successful register."""
+
+        items = checkpoint.setdefault("retention_items", [])
+        existing = FeatureFactoryBatchService._find_retention_item(
+            checkpoint,
+            symbol,
+            timeframe,
+            config_hash,
+        )
+        if existing is not None:
+            current = RetentionState(str(existing.get("state", "")))
+            if current in _RETENTION_TERMINAL_STATES:
+                return existing
+            existing.update({
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "config_hash": config_hash,
+                "state": RetentionState.PENDING.value,
+                "hdf5_path": hdf5_path,
+                "error": None,
+            })
+            return existing
+        item = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "config_hash": config_hash,
+            "state": RetentionState.PENDING.value,
+            "hdf5_path": hdf5_path,
+            "error": None,
+        }
+        items.append(item)
+        return item
+
+    @staticmethod
+    def _list_pending_retention_items(
+        checkpoint: Optional[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Return pending retention items from checkpoint."""
+
+        if not checkpoint:
+            return []
+        pending: List[Dict[str, Any]] = []
+        for item in checkpoint.get("retention_items", []):
+            if str(item.get("state")) == RetentionState.PENDING.value:
+                pending.append({
+                    "symbol": str(item.get("symbol", "")),
+                    "timeframe": str(item.get("timeframe", "")),
+                    "config_hash": str(item.get("config_hash", "")),
+                    "state": RetentionState.PENDING.value,
+                    "hdf5_path": item.get("hdf5_path"),
+                    "error": item.get("error"),
+                })
+        return pending
+
+    def _persist_checkpoint_required(self, checkpoint: Dict[str, Any]) -> None:
+        """Persist checkpoint for retention decisions; failure propagates as 5xx."""
+
+        checkpoint["last_updated_at"] = datetime.now().isoformat()
+        self._write_checkpoint_atomic(checkpoint)
+
+    async def list_pending_retention(self, batch_id: str) -> List[Dict[str, Any]]:
+        """List pending retention items for a batch."""
+
+        checkpoint = self._load_checkpoint(batch_id)
+        if checkpoint is None:
+            raise RetentionNotFoundError(f"batch not found: {batch_id}")
+        return self._list_pending_retention_items(checkpoint)
+
+    async def apply_retention_decision(
+        self,
+        batch_id: str,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+        decision: str,
+    ) -> Dict[str, Any]:
+        """Apply retain/discard for one batch item with per-item CAS + persistence."""
+
+        normalized = decision.strip().lower()
+        if normalized not in {"retain", "discard"}:
+            raise ValueError(f"unsupported retention decision: {decision}")
+
+        checkpoint = self._load_checkpoint(batch_id)
+        if checkpoint is None:
+            raise RetentionNotFoundError(f"batch not found: {batch_id}")
+
+        lock = self._retention_lock(batch_id, symbol, timeframe, config_hash)
+        async with lock:
+            item = self._find_retention_item(checkpoint, symbol, timeframe, config_hash)
+            if item is None:
+                raise RetentionNotFoundError(
+                    f"retention item not found: {batch_id}/{symbol}/{timeframe}/{config_hash}"
+                )
+
+            current = RetentionState(str(item.get("state", "")))
+            if normalized == "discard" and current == RetentionState.DISCARDED:
+                return self._retention_decision_payload(batch_id, item)
+            if normalized == "retain" and current == RetentionState.RETAINED:
+                return self._retention_decision_payload(batch_id, item)
+            if current in _RETENTION_TERMINAL_STATES:
+                raise RetentionConflictError(
+                    f"retention item already terminal: {current.value}"
+                )
+            if current == RetentionState.DECIDING:
+                raise RetentionConflictError("retention decision already in progress")
+            if current != RetentionState.PENDING:
+                raise RetentionStateError(f"unexpected retention state: {current.value}")
+
+            self._validate_retention_transition(current, RetentionState.DECIDING)
+            item["state"] = RetentionState.DECIDING.value
+            item["error"] = None
+
+            if normalized == "discard":
+                if self._run_deleter is None:
+                    raise RuntimeError("run_deleter is not configured")
+                try:
+                    self._run_deleter(symbol, timeframe, config_hash)
+                except KeyError:
+                    pass
+                except Exception as exc:
+                    self._validate_retention_transition(
+                        RetentionState.DECIDING,
+                        RetentionState.RETENTION_ERROR,
+                    )
+                    item["state"] = RetentionState.RETENTION_ERROR.value
+                    item["error"] = str(exc)
+                    self._persist_checkpoint_required(checkpoint)
+                    raise
+                self._validate_retention_transition(
+                    RetentionState.DECIDING,
+                    RetentionState.DISCARDED,
+                )
+                item["state"] = RetentionState.DISCARDED.value
+            else:
+                self._validate_retention_transition(
+                    RetentionState.DECIDING,
+                    RetentionState.RETAINED,
+                )
+                item["state"] = RetentionState.RETAINED.value
+
+            self._persist_checkpoint_required(checkpoint)
+            self._notify_progress(batch_id)
+            return self._retention_decision_payload(batch_id, item)
+
+    @staticmethod
+    def _retention_decision_payload(
+        batch_id: str,
+        item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "batch_id": batch_id,
+            "symbol": str(item.get("symbol", "")),
+            "timeframe": str(item.get("timeframe", "")),
+            "config_hash": str(item.get("config_hash", "")),
+            "state": str(item.get("state", "")),
+            "hdf5_path": item.get("hdf5_path"),
+            "error": item.get("error"),
         }
 
 
