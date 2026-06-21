@@ -102,3 +102,24 @@ async def test_single_progress_psutil_fail_open() -> None:
     notify = progress_notifies[0]
     assert "process_rss_mb" not in notify or notify.get("process_rss_mb") is None
     assert notify["stage"] == "layer_1"
+
+
+@pytest.mark.asyncio
+async def test_single_terminal_success_completed_not_invalid_stage() -> None:
+    """成功 terminal notify 經 normalize 後 error_class 非 invalid_stage。"""
+    captured: Dict[str, List[Any]] = {}
+    service = _build_single_service(captured)
+    request = FeatureGenerateRequest(symbol="BTCUSDT", timeframe="1h")
+
+    with patch("api.services.feature_factory_service.psutil.Process") as proc_mock:
+        proc_mock.return_value.memory_info.return_value.rss = 640 * 1024 * 1024
+        await service._run_task("task-single", request)
+
+    terminal_notifies = [n for n in captured["notify"] if n.get("stage") == "completed"]
+    assert terminal_notifies, captured["notify"]
+    terminal = terminal_notifies[0]
+    assert terminal["error_class"] != "invalid_stage"
+    assert terminal["error_class"] == "none"
+    assert terminal["schema_version"] == 1
+    assert terminal["process_rss_mb"] == 640
+    assert terminal["current_rss_mb"] == 640

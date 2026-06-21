@@ -94,3 +94,36 @@ def test_normalize_same_input_stable_output() -> None:
     first = normalize_progress_event(**fields)
     second = normalize_progress_event(**fields)
     assert first == second
+
+
+def test_normalize_terminal_success_completed_stage() -> None:
+    """成功 terminal 使用 stage=completed，不得誤標 invalid_stage。"""
+    event = normalize_progress_event(
+        stage="completed",
+        progress=1.0,
+        message="Feature generation completed",
+        process_rss_mb=512,
+        schema_version=1,
+    )
+    assert event["stage"] == "completed"
+    assert event["error_class"] != ProgressErrorClass.INVALID_STAGE.value
+    assert event["error_class"] == ProgressErrorClass.NONE.value
+    assert event["schema_version"] == 1
+    assert event["process_rss_mb"] == 512
+    assert event["current_rss_mb"] == 512
+
+
+def test_normalize_terminal_failed_stage_still_clean() -> None:
+    """失敗 terminal stage=failed 維持乾淨 error_class。"""
+    event = normalize_progress_event(
+        stage="failed",
+        progress=1.0,
+        message="generation error",
+        process_rss_mb=256,
+        schema_version=1,
+    )
+    assert event["stage"] == "failed"
+    assert event["error_class"] == ProgressErrorClass.NONE.value
+    assert event["schema_version"] == 1
+    assert event["process_rss_mb"] == 256
+    assert event["current_rss_mb"] == 256

@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any, Optional, TypedDict
 
 _STAGE_PATTERN = re.compile(
-    r"^(layer_\d+(?:_\d+)*(?:_\d+)?|complete|failed|persist|multi_tf|preprocessing)$"
+    r"^(layer_\d+(?:_\d+)*(?:_\d+)?|complete|completed|failed|persist|multi_tf|preprocessing)$"
 )
 
 
