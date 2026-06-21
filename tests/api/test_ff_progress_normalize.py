@@ -17,6 +17,7 @@ def test_normalize_single_process_rss_dual_writes_legacy() -> None:
         progress=0.5,
         message="half",
         process_rss_mb=420,
+        schema_version=1,
     )
     assert event["process_rss_mb"] == 420
     assert event.get("worker_rss_mb") is None
@@ -32,6 +33,7 @@ def test_normalize_batch_worker_rss_dual_writes_legacy() -> None:
         worker_rss_mb=512,
         symbol="BTCUSDT",
         timeframe="1h",
+        schema_version=1,
     )
     assert event["worker_rss_mb"] == 512
     assert event.get("process_rss_mb") is None
@@ -60,6 +62,7 @@ def test_normalize_legacy_jsonl_rss_mb_alias() -> None:
     )
     assert event["worker_rss_mb"] == 333
     assert event["current_rss_mb"] == 333
+    assert event["schema_version"] == 0
 
 
 def test_normalize_invalid_stage_fail_open() -> None:
@@ -69,10 +72,16 @@ def test_normalize_invalid_stage_fail_open() -> None:
 
 
 def test_normalize_missing_rss_fields_none() -> None:
-    event = normalize_progress_event(stage="complete", progress=1.0)
+    event = normalize_progress_event(stage="complete", progress=1.0, schema_version=1)
     assert "process_rss_mb" not in event
     assert "worker_rss_mb" not in event
     assert "current_rss_mb" not in event
+    assert event["schema_version"] == 1
+
+
+def test_normalize_legacy_absent_schema_version_defaults_zero() -> None:
+    event = normalize_progress_event(stage="layer_0", progress=0.1)
+    assert event["schema_version"] == 0
 
 
 def test_legacy_absent_schema_version_is_zero() -> None:

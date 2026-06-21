@@ -51,6 +51,7 @@ def test_parity_single_ws_process_rss_and_schema_version() -> None:
         progress=0.3,
         message="go",
         process_rss_mb=700,
+        schema_version=1,
     )
     assert ws_payload["process_rss_mb"] == 700
     assert ws_payload["schema_version"] == 1
@@ -122,8 +123,8 @@ def test_parity_legacy_current_rss_mb_dual_write_both_paths() -> None:
     """③ legacy current_rss_mb 兩路徑仍存在（雙寫）。"""
     from api.utils.ff_progress import normalize_progress_event
 
-    single = normalize_progress_event(stage="layer_0", progress=0.1, process_rss_mb=111)
-    batch = normalize_progress_event(stage="layer_0", progress=0.1, worker_rss_mb=222)
+    single = normalize_progress_event(stage="layer_0", progress=0.1, process_rss_mb=111, schema_version=1)
+    batch = normalize_progress_event(stage="layer_0", progress=0.1, worker_rss_mb=222, schema_version=1)
     assert single["current_rss_mb"] == 111
     assert batch["current_rss_mb"] == 222
 
@@ -132,8 +133,8 @@ def test_parity_process_xor_worker_exclusive() -> None:
     """④ process_rss_mb XOR worker_rss_mb（同 event 互斥）。"""
     from api.utils.ff_progress import normalize_progress_event
 
-    single = normalize_progress_event(stage="layer_1", progress=0.2, process_rss_mb=50)
-    batch = normalize_progress_event(stage="layer_1", progress=0.2, worker_rss_mb=60)
+    single = normalize_progress_event(stage="layer_1", progress=0.2, process_rss_mb=50, schema_version=1)
+    batch = normalize_progress_event(stage="layer_1", progress=0.2, worker_rss_mb=60, schema_version=1)
     assert "process_rss_mb" in single and "worker_rss_mb" not in single
     assert "worker_rss_mb" in batch and "process_rss_mb" not in batch
 

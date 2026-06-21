@@ -204,7 +204,9 @@ describe('BatchProgressPanel', () => {
       />
     );
 
-    expect(screen.getByTestId('layer-status-ETHUSDT')).toHaveTextContent('layer_3 (42%) · RSS 768MB');
+    expect(screen.getByTestId('layer-status-ETHUSDT')).toHaveTextContent(
+      'layer_3 (42%) · (批)worker RSS 768MB'
+    );
     expect(screen.queryByTestId('layer-status-BTCUSDT')).not.toBeInTheDocument();
   });
 

@@ -79,7 +79,7 @@ def test_apply_layer_metrics_reads_legacy_rss_mb_jsonl(batch_service_factory, tm
     service._apply_layer_metrics_to_task(task, task_id)
     assert task["worker_rss_mb"] == 199
     assert task["current_rss_mb"] == 199
-    assert task["schema_version"] == 1
+    assert task["schema_version"] == 0
 
 
 def test_apply_layer_metrics_concurrent_gt_one_coarse(batch_service_factory, tmp_path) -> None:
