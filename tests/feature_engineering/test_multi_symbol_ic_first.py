@@ -174,10 +174,10 @@ class TestMultiSymbolIcIsolation:
             side_effect=mock_create_factory,
         ):
             result1 = FeatureFactoryBatchService._compute_single(
-                "BTCUSDT", "1h", config, False, str(tmp_path)
+                "BTCUSDT", "1h", config, False, str(tmp_path), "", None, None
             )
             result2 = FeatureFactoryBatchService._compute_single(
-                "ETHUSDT", "1h", config, False, str(tmp_path)
+                "ETHUSDT", "1h", config, False, str(tmp_path), "", None, None
             )
 
         assert result1 != result2, "兩標的輸出路徑不應相同（output isolation 違反）"
@@ -209,6 +209,9 @@ class TestMultiSymbolIcIsolation:
                     config,
                     False,
                     str(tmp_path),
+                    "",
+                    None,
+                    None,
                 )
 
         assert config == {"preprocessing": {"enabled": True}}
@@ -239,6 +242,9 @@ class TestMultiSymbolIcIsolation:
                 config,
                 False,
                 str(tmp_path),
+                "",
+                None,
+                None,
             )
 
         assert factory_mock.generate_features.call_args.kwargs["config_override"] is config
@@ -436,6 +442,9 @@ class TestSymbolFailureNoCheckpoint:
                     {"preprocessing": {"enabled": True}},
                     False,
                     str(tmp_path),
+                    "",
+                    None,
+                    None,
                 )
         assert FeatureFactoryBatchService._classify_failure(exc_info.value) == BatchFailureType.OOM
 
@@ -463,6 +472,9 @@ class TestSymbolFailureNoCheckpoint:
                     {"preprocessing": {"enabled": True}},
                     False,
                     str(tmp_path),
+                    "",
+                    None,
+                    None,
                 )
 
         assert "BTCUSDT" in str(exc_info.value)

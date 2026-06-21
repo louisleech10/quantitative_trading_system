@@ -39,7 +39,9 @@ def test_compute_single_writes_normalized_layer_metrics_jsonl(tmp_path, monkeypa
     factory_mock.generate_features.side_effect = fake_generate
 
     with patch("momentum.factories.create_feature_factory", return_value=factory_mock):
-        FeatureFactoryBatchService._compute_single("BTCUSDT", "1h", None, True, str(tmp_path))
+        FeatureFactoryBatchService._compute_single(
+            "BTCUSDT", "1h", None, True, str(tmp_path), "", None, None
+        )
 
     rows = _read_jsonl(layer_metrics_path)
     assert len(rows) == 1

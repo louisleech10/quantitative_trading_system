@@ -55,6 +55,9 @@ def test_compute_single_writes_layer_metrics_jsonl(tmp_path, monkeypatch) -> Non
             None,
             True,
             str(tmp_path),
+            "",
+            None,
+            None,
         )
 
     assert path.endswith("BTCUSDT_1h.h5")
@@ -100,7 +103,9 @@ def test_compute_single_layer_metrics_failopen_on_write_error(tmp_path, monkeypa
             "_append_child_metrics_jsonl",
             side_effect=OSError("disk full"),
         ):
-            path = FeatureFactoryBatchService._compute_single("BTCUSDT", "1h", None, True, str(tmp_path))
+            path = FeatureFactoryBatchService._compute_single(
+                "BTCUSDT", "1h", None, True, str(tmp_path), "", None, None
+            )
 
     assert path.endswith("out.h5")
 
@@ -122,6 +127,9 @@ def test_compute_single_cache_hit_no_layer_events(tmp_path, monkeypatch) -> None
             None,
             False,
             str(tmp_path),
+            "",
+            None,
+            None,
         )
 
     assert path.endswith("cached.h5")
