@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor
@@ -103,6 +104,22 @@ class RetentionConflictError(ValueError):
 
 class RetentionStateError(ValueError):
     """Raised on illegal retention state machine transitions."""
+
+
+class DiskBackpressureAction(str, Enum):
+    """Real free-space gate outcomes for batch retention backpressure."""
+
+    OK = "ok"
+    PAUSE_PENDING = "pause_pending"
+    HARD_PAUSE = "hard_pause"
+
+
+_BATCH_DISK_RESERVE_GIB_BY_TIER: Dict[int, float] = {
+    8: 2.0,
+    16: 4.0,
+    24: 6.0,
+    32: 8.0,
+}
 
 
 class FeatureFactoryBatchService:
@@ -232,6 +249,10 @@ class FeatureFactoryBatchService:
             })
             logger.info("Requeued completed item with missing run manifest: %s", item)
         checkpoint["completed_items"] = retained_completed
+
+        if self._is_batch_retention_enabled():
+            self._reconcile_retention_on_resume(checkpoint)
+            self._safe_persist_checkpoint(checkpoint)
 
         skipped_items = len(checkpoint.get("completed_items", []))
         queued_items = len(checkpoint.get("queued_items", []))
@@ -387,6 +408,18 @@ class FeatureFactoryBatchService:
                     self._safe_persist_checkpoint(checkpoint)
                     self._notify_progress(task_id)
                     return
+
+                if self._is_batch_retention_enabled():
+                    disk_action = self._evaluate_disk_backpressure(checkpoint)
+                    if disk_action != DiskBackpressureAction.OK:
+                        self._apply_disk_backpressure_pause(
+                            task,
+                            checkpoint,
+                            disk_action,
+                        )
+                        self._safe_persist_checkpoint(checkpoint)
+                        self._notify_progress(task_id)
+                        return
 
                 queued_items = list(checkpoint.get("queued_items", []))
                 item_wave = queued_items[: max(1, concurrent_symbols)]
@@ -1731,6 +1764,7 @@ class FeatureFactoryBatchService:
 
             self._persist_checkpoint_required(checkpoint)
             self._notify_progress(batch_id)
+            await self._try_wakeup_from_disk_backpressure(batch_id)
             return self._retention_decision_payload(batch_id, item)
 
     @staticmethod
@@ -1747,6 +1781,269 @@ class FeatureFactoryBatchService:
             "hdf5_path": item.get("hdf5_path"),
             "error": item.get("error"),
         }
+
+    def _resolve_features_root(self) -> Path:
+        """Return features_root for real free-space measurement (RunLifecycle path)."""
+
+        try:
+            from api.core.config import settings
+
+            return Path(settings.data_cache_path) / "features"
+        except Exception:
+            return MomentumConfig.from_project_root().data_cache_path / "features"
+
+    @classmethod
+    def _resolve_batch_disk_reserve_bytes(cls) -> int:
+        """Resolve batch retention disk reserve floor (GiB env or tier default)."""
+
+        raw = os.getenv("FFACT_BATCH_DISK_RESERVE_GIB")
+        if raw is not None:
+            try:
+                value = float(raw.strip())
+                if value >= 0:
+                    return int(value * BYTES_PER_GB)
+            except ValueError:
+                pass
+        tier_gb = get_current_tier_gb()
+        reserve_gib = _BATCH_DISK_RESERVE_GIB_BY_TIER.get(int(tier_gb), 2.0)
+        return int(reserve_gib * BYTES_PER_GB)
+
+    @classmethod
+    def _disk_free_bytes(cls, path: Path) -> Optional[int]:
+        """Read real free bytes via shutil.disk_usage (not logical accounting)."""
+
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            return int(shutil.disk_usage(path).free)
+        except OSError:
+            return None
+
+    def _read_disk_free_bytes(self) -> Optional[int]:
+        """Measure free bytes at features_root."""
+
+        return self._disk_free_bytes(self._resolve_features_root())
+
+    def _evaluate_disk_backpressure(
+        self,
+        checkpoint: Dict[str, Any],
+    ) -> DiskBackpressureAction:
+        """Evaluate real free-space gate before dispatching a new wave."""
+
+        if not self._is_batch_retention_enabled():
+            return DiskBackpressureAction.OK
+
+        free_bytes = self._read_disk_free_bytes()
+        reserve_bytes = self._resolve_batch_disk_reserve_bytes()
+        if free_bytes is None:
+            return DiskBackpressureAction.OK
+
+        checkpoint["disk_backpressure"] = {
+            "free_bytes": free_bytes,
+            "reserve_bytes": reserve_bytes,
+            "features_root": str(self._resolve_features_root()),
+            "evaluated_at": datetime.now().isoformat(),
+        }
+
+        if free_bytes >= reserve_bytes:
+            return DiskBackpressureAction.OK
+
+        pending = self._list_pending_retention_items(checkpoint)
+        if pending:
+            return DiskBackpressureAction.PAUSE_PENDING
+        return DiskBackpressureAction.HARD_PAUSE
+
+    def _apply_disk_backpressure_pause(
+        self,
+        task: Dict[str, Any],
+        checkpoint: Dict[str, Any],
+        action: DiskBackpressureAction,
+    ) -> None:
+        """Set observable paused status for disk backpressure (not a deadlock)."""
+
+        free_bytes = self._read_disk_free_bytes()
+        reserve_bytes = self._resolve_batch_disk_reserve_bytes()
+        pending_count = len(self._list_pending_retention_items(checkpoint))
+        checkpoint["disk_backpressure"] = {
+            "free_bytes": free_bytes,
+            "reserve_bytes": reserve_bytes,
+            "features_root": str(self._resolve_features_root()),
+            "pending_count": pending_count,
+            "action": action.value,
+            "evaluated_at": datetime.now().isoformat(),
+        }
+        checkpoint["last_updated_at"] = datetime.now().isoformat()
+
+        if action == DiskBackpressureAction.HARD_PAUSE:
+            task["status"] = "paused_disk_hard"
+            logger.warning(
+                "[L6.5] Batch disk hard-pause batch_id=%s free_bytes=%s reserve_bytes=%s "
+                "pending_count=%s path=%s (no pending retention to discard; observable terminal)",
+                task.get("task_id"),
+                free_bytes,
+                reserve_bytes,
+                pending_count,
+                self._resolve_features_root(),
+            )
+            return
+
+        task["status"] = "paused_disk_backpressure"
+        logger.info(
+            "[L6.5] Batch disk backpressure pause batch_id=%s free_bytes=%s reserve_bytes=%s "
+            "pending_count=%s path=%s (awaiting retention decision)",
+            task.get("task_id"),
+            free_bytes,
+            reserve_bytes,
+            pending_count,
+            self._resolve_features_root(),
+        )
+
+    async def _try_wakeup_from_disk_backpressure(self, batch_id: str) -> None:
+        """After retention decision, re-read real free bytes and resume if allowed."""
+
+        if not self._is_batch_retention_enabled():
+            return
+
+        checkpoint = self._load_checkpoint(batch_id)
+        task = self._tasks.get(batch_id)
+        if checkpoint is None or task is None:
+            return
+        if task.get("status") not in {"paused_disk_backpressure", "paused_disk_hard"}:
+            return
+
+        disk_action = self._evaluate_disk_backpressure(checkpoint)
+        if disk_action == DiskBackpressureAction.HARD_PAUSE:
+            self._apply_disk_backpressure_pause(task, checkpoint, disk_action)
+            self._safe_persist_checkpoint(checkpoint)
+            self._notify_progress(batch_id)
+            return
+        if disk_action == DiskBackpressureAction.PAUSE_PENDING:
+            self._apply_disk_backpressure_pause(task, checkpoint, disk_action)
+            self._safe_persist_checkpoint(checkpoint)
+            self._notify_progress(batch_id)
+            return
+
+        if not checkpoint.get("queued_items"):
+            done = task["completed"] + task["failed"]
+            if task["failed"] == 0:
+                task["status"] = "completed"
+            elif task["failed"] < task["total"]:
+                task["status"] = "partial"
+            else:
+                task["status"] = "failed"
+            task["progress"] = done / max(task["total"], 1)
+            task["completed_at"] = time.time()
+            checkpoint["status"] = task["status"]
+            checkpoint["last_updated_at"] = datetime.now().isoformat()
+            checkpoint.pop("disk_backpressure", None)
+            self._safe_persist_checkpoint(checkpoint)
+            self._notify_progress(batch_id)
+            return
+
+        if not await self._reserve_heavy_batch_slot():
+            logger.info(
+                "[L6.5] Disk backpressure wakeup deferred batch_id=%s (heavy slot busy)",
+                batch_id,
+            )
+            return
+
+        request_payload = checkpoint.get("request_payload") or {}
+        request = BatchGenerateRequest(**request_payload)
+        task["status"] = "running"
+        checkpoint.pop("disk_backpressure", None)
+        checkpoint["last_updated_at"] = datetime.now().isoformat()
+        self._safe_persist_checkpoint(checkpoint)
+        self._notify_progress(batch_id)
+        asyncio.create_task(
+            self._run_batch(batch_id, request, checkpoint, lock_reserved=True)
+        )
+
+    def _reconcile_retention_on_resume(self, checkpoint: Dict[str, Any]) -> None:
+        """Crash matrix reconcile: pending mark + deleted→discarded convergence."""
+
+        if not self._is_batch_retention_enabled():
+            return
+
+        retention_items = checkpoint.setdefault("retention_items", [])
+        for item in retention_items:
+            state = RetentionState(str(item.get("state", "")))
+            if state not in {RetentionState.PENDING, RetentionState.DECIDING}:
+                continue
+            if not self._retention_artifact_exists(item):
+                item["state"] = RetentionState.DISCARDED.value
+                item["error"] = None
+                logger.info(
+                    "[L6.5] Retention reconcile discarded missing artifact: %s/%s/%s",
+                    item.get("symbol"),
+                    item.get("timeframe"),
+                    item.get("config_hash"),
+                )
+
+        covered_states = {
+            RetentionState.RETAINED.value,
+            RetentionState.DISCARDED.value,
+            RetentionState.PENDING.value,
+        }
+        for completed in checkpoint.get("completed_items", []):
+            symbol = str(completed.get("symbol") or "")
+            timeframe = str(completed.get("timeframe") or "")
+            if not symbol or not timeframe:
+                continue
+            run_hash = self._resolve_completed_run_hash(completed)
+            config_hash = run_hash or str(checkpoint.get("config_hash") or "")
+            if run_hash is None or not self._completed_manifest_exists(completed, run_hash):
+                continue
+            existing = self._find_retention_item(
+                checkpoint,
+                symbol,
+                timeframe,
+                config_hash,
+            )
+            if existing is not None and str(existing.get("state")) in covered_states:
+                continue
+
+            output_paths = completed.get("output_paths") or []
+            hdf5_path = ""
+            if output_paths:
+                first = output_paths[0]
+                hdf5_path = str(first.get("path") if isinstance(first, dict) else first)
+            self._mark_retention_pending(
+                checkpoint,
+                symbol=symbol,
+                timeframe=timeframe,
+                config_hash=config_hash,
+                hdf5_path=hdf5_path,
+            )
+            logger.info(
+                "[L6.5] Retention reconcile marked pending: %s/%s/%s",
+                symbol,
+                timeframe,
+                config_hash,
+            )
+
+    @staticmethod
+    def _retention_artifact_exists(item: Dict[str, Any]) -> bool:
+        """Return True when retention item artifact/manifest still exists on disk."""
+
+        hdf5_path = item.get("hdf5_path")
+        if hdf5_path and Path(str(hdf5_path)).exists():
+            return True
+        symbol = str(item.get("symbol", ""))
+        timeframe = str(item.get("timeframe", ""))
+        config_hash = str(item.get("config_hash", ""))
+        completed_stub = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "output_paths": [hdf5_path] if hdf5_path else [],
+            "browse_task_id": item.get("browse_task_id"),
+        }
+        run_hash = FeatureFactoryBatchService._resolve_completed_run_hash(completed_stub)
+        resolved_hash = run_hash or config_hash
+        if not resolved_hash:
+            return False
+        return FeatureFactoryBatchService._completed_manifest_exists(
+            completed_stub,
+            resolved_hash,
+        )
 
 
 _feature_factory_batch_service: Optional[FeatureFactoryBatchService] = None
