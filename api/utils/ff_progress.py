@@ -84,7 +84,7 @@ def normalize_progress_event(**fields: Any) -> FeatureProgressEvent:
 
     - ``process_rss_mb`` 與 ``worker_rss_mb`` 互斥；同時存在時保留 process、清 worker。
     - ``current_rss_mb`` legacy 雙寫 = 當前路徑 RSS（process 優先於 worker）。
-    - ``schema_version`` 為 int；normalize 後預設 1；未提供且無其他 normalized 欄時視為 0。
+    - ``schema_version`` 為 int；未提供時視為 0（legacy/pre-version）；新事件由呼叫端傳 ``schema_version=1``。
     - 非法 stage / progress 不拋錯，以 ``error_class`` 標記。
     """
     error = ProgressErrorClass.NONE
@@ -125,12 +125,12 @@ def normalize_progress_event(**fields: Any) -> FeatureProgressEvent:
 
     raw_version = fields.get("schema_version")
     if raw_version is None:
-        schema_version = 1
+        schema_version = 0
     else:
         try:
             schema_version = int(raw_version)
         except (TypeError, ValueError):
-            schema_version = 1
+            schema_version = 0
 
     event: FeatureProgressEvent = {
         "stage": stage,

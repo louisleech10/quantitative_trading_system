@@ -202,6 +202,7 @@ class FeatureFactoryService:
                     process_rss_mb=process_rss_mb,
                     symbol=symbol,
                     timeframe=timeframe,
+                    schema_version=1,
                 )
             except Exception:
                 normalized = normalize_progress_event(
@@ -210,6 +211,7 @@ class FeatureFactoryService:
                     message=payload.get("message", ""),
                     symbol=symbol,
                     timeframe=timeframe,
+                    schema_version=1,
                 )
 
             stage = normalized.get("stage")
@@ -326,14 +328,26 @@ class FeatureFactoryService:
                         except Exception as exc:
                             logger.warning("Run auto-cleanup failed: %s", exc)
 
-            self._notify_callbacks(task_id, {
-                "stage": "completed",
-                "progress": 1.0,
-                "message": "Feature generation completed",
-                "result": summary,
-                "retention_prompt": bool(self._run_identity(summary)),
-                "run_identity": self._run_identity(summary),
-            })
+            completed_rss_mb: Optional[int] = None
+            try:
+                completed_rss_mb = int(psutil.Process().memory_info().rss // (1024 * 1024))
+            except Exception:
+                pass
+            completed_notify = dict(
+                normalize_progress_event(
+                    stage="completed",
+                    progress=1.0,
+                    message="Feature generation completed",
+                    process_rss_mb=completed_rss_mb,
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    schema_version=1,
+                )
+            )
+            completed_notify["result"] = summary
+            completed_notify["retention_prompt"] = bool(self._run_identity(summary))
+            completed_notify["run_identity"] = self._run_identity(summary)
+            self._notify_callbacks(task_id, completed_notify)
 
         except Exception as exc:
             for lease in lease_sink:
@@ -352,11 +366,25 @@ class FeatureFactoryService:
                     task_info["status"] = "failed"
                     task_info["error"] = str(exc)
 
-            self._notify_callbacks(task_id, {
-                "stage": "failed",
-                "progress": 1.0,
-                "message": str(exc),
-            })
+            failed_rss_mb: Optional[int] = None
+            try:
+                failed_rss_mb = int(psutil.Process().memory_info().rss // (1024 * 1024))
+            except Exception:
+                pass
+            self._notify_callbacks(
+                task_id,
+                dict(
+                    normalize_progress_event(
+                        stage="failed",
+                        progress=1.0,
+                        message=str(exc),
+                        process_rss_mb=failed_rss_mb,
+                        symbol=getattr(request, "symbol", None),
+                        timeframe=getattr(request, "timeframe", "12h"),
+                        schema_version=1,
+                    )
+                ),
+            )
 
     def _generate_features_with_phase_d(
         self,

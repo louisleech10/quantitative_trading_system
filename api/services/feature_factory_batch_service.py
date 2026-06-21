@@ -884,7 +884,7 @@ class FeatureFactoryBatchService:
             task["current_rss_mb"] = normalized["current_rss_mb"]
         else:
             task.pop("current_rss_mb", None)
-        task["schema_version"] = normalized.get("schema_version", 1)
+        task["schema_version"] = normalized["schema_version"]
 
     def _build_initial_checkpoint(
         self,
@@ -1220,6 +1220,7 @@ class FeatureFactoryBatchService:
                     worker_rss_mb=int(process.memory_info().rss // BYTES_PER_MB),
                     symbol=symbol,
                     timeframe=timeframe,
+                    schema_version=1,
                 )
                 row = {
                     **normalized,
