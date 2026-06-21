@@ -44,6 +44,12 @@ def _isolate_feature_output(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
     monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
 
+    # CGSA workdir 用 cwd-based 預設(_prepare_cgsa_registry),不吃 settings.data_cache_path
+    # → 必須另以 env 重導到 tmp,否則整合測試會寫真實 data_cache/cgsa_work(Codex review BLOCKING)。
+    cgsa_root = tmp_path / "cgsa_work"
+    cgsa_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(cgsa_root))
+
     features_root = tmp_path / "features"
     features_root.mkdir(parents=True, exist_ok=True)
     original_create = momentum_factories.create_feature_factory
