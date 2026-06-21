@@ -40,3 +40,14 @@
 - **T-C CGSA L3 累積磁碟預檢** ✅ commit+Codex review:L3 persist前估累積footprint,不夠提早abort(env FFACT_CGSA_DISK_PRECHECK/RESERVE_GIB可調)。修磁碟撐爆事故(437K×float32=35.6GB,L3-L6累積)。
 - **擱置**:T-A per-layer串流釋放(P1,scaffold已存,砍峰值根本解)、T-B float16暫存(P2需A/B簽核)、T-D 為何以前28GB夠(取證)、.claude/gstack 1GB清理(使用者決定)。
 - 重啟後端重跑 2×2:乾淨log(T1)+即時layer進度與RSS(T2)+磁碟不夠提早abort(T-C)。
+
+## FF 一致性整併 — 實作中(兩輪三方委員會定案後)
+觀測性層完成:
+- **Q5**(P0a)✅ uvicorn access_log env 開關(terminal 噪音預設關,FFACT_UVICORN_ACCESS_LOG=1 恢復)。
+- **B1 #1**(P0b)✅ batch worker non-rotating FileHandler 進當日檔(FFACT_API_LOG_PATH)+[pid sym tf]+smoke。Codex review PASS(minor:idempotent T-A 再收緊)。
+- **B2 E-normalize+Q3**(P0c+P1)✅ 共用 FeatureProgressEvent+normalize 單一出口+RSS 互斥分欄(process_rss_mb/worker_rss_mb,current_rss_mb 雙寫過渡)+schema_version int+parity5。Codex review 攔3 BLOCKING+#4 全修。**教訓:前端驗收須跑 vitest。**
+留待(retention 層,大×2):
+- **B3 Q2-A**(P2,大)retention 對話:非阻塞+磁碟背壓+staging(register後移)+checkpoint 狀態機+resume+前端。走大管線(決策簡述+雙家族 adversarial+backend/frontend phase)。
+- **B4 Q2-B**(P2.5,大)交易式 bulk-delete endpoint(tombstone+失效 checkpoint/RunManager/quality/磁碟)。
+- **E 執行模型維持現狀**(不整併 thread/subprocess,委員會兩輪定案);normalize 薄函式已落地防漂移。
+重啟後端:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度都帶 RSS(B2,單=process_rss 含API噪音/批=worker_rss)。
