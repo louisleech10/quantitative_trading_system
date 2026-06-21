@@ -454,89 +454,111 @@ class FeatureFactoryBatchService:
             with batch_nested_environment(True):
                 previous_metrics_path = os.environ.get("FFACT_CHILD_METRICS_PATH")
                 previous_layer_metrics_path = os.environ.get("FFACT_LAYER_METRICS_PATH")
+                previous_api_log_path = os.environ.get("FFACT_API_LOG_PATH")
                 previous_symbol_concurrency = os.environ.get("FFACT_BATCH_SYMBOL_CONCURRENCY")
                 previous_thread_caps = self._snapshot_batch_thread_env()
+                from api.core.config import settings as api_settings
+
+                api_log_date = datetime.now().strftime("%Y%m%d")
+                api_log_path = api_settings.logs_path / f"case_search_api_{api_log_date}.log"
                 os.environ["FFACT_CHILD_METRICS_PATH"] = str(child_metrics_path)
                 os.environ["FFACT_LAYER_METRICS_PATH"] = str(layer_metrics_path)
+                os.environ["FFACT_API_LOG_PATH"] = str(api_log_path)
                 os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = str(wave_concurrency)
                 if get_parallel_budget_enabled():
                     self._apply_batch_thread_caps()
-                with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
-                    try:
-                        for item in item_wave:
+                wave_env_restored = False
+
+                def _restore_wave_env() -> None:
+                    nonlocal wave_env_restored
+                    if wave_env_restored:
+                        return
+                    if previous_metrics_path is None:
+                        os.environ.pop("FFACT_CHILD_METRICS_PATH", None)
+                    else:
+                        os.environ["FFACT_CHILD_METRICS_PATH"] = previous_metrics_path
+                    if previous_layer_metrics_path is None:
+                        os.environ.pop("FFACT_LAYER_METRICS_PATH", None)
+                    else:
+                        os.environ["FFACT_LAYER_METRICS_PATH"] = previous_layer_metrics_path
+                    if previous_api_log_path is None:
+                        os.environ.pop("FFACT_API_LOG_PATH", None)
+                    else:
+                        os.environ["FFACT_API_LOG_PATH"] = previous_api_log_path
+                    if previous_symbol_concurrency is None:
+                        os.environ.pop("FFACT_BATCH_SYMBOL_CONCURRENCY", None)
+                    else:
+                        os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = (
+                            previous_symbol_concurrency
+                        )
+                    self._restore_batch_thread_env(previous_thread_caps)
+                    wave_env_restored = True
+
+                try:
+                    with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
+                        try:
+                            for item in item_wave:
+                                symbol = str(item["symbol"])
+                                timeframe = str(item["timeframe"])
+                                task["current_symbol"] = symbol
+                                task["current_timeframe"] = timeframe
+                                self._notify_progress(task_id)
+                                future = loop.run_in_executor(
+                                    executor,
+                                    compute_fn,
+                                    symbol,
+                                    timeframe,
+                                    request.config_override,
+                                    request.force_regenerate,
+                                    batch_cache_dir,
+                                    str(checkpoint.get("batch_id") or ""),
+                                )
+                                wrapped_futures.append(_wait_one(item, future))
+                        finally:
+                            _restore_wave_env()
+
+                        oom_seen = False
+                        for wrapped_future in asyncio.as_completed(wrapped_futures):
+                            item, hdf5_path, error = await wrapped_future
                             symbol = str(item["symbol"])
                             timeframe = str(item["timeframe"])
-                            task["current_symbol"] = symbol
-                            task["current_timeframe"] = timeframe
-                            self._notify_progress(task_id)
-                            future = loop.run_in_executor(
-                                executor,
-                                compute_fn,
+                            rss_before = rss_before_by_item[(symbol, timeframe)]
+                            rss_peak = max(rss_before, self._rss_mb())
+                            gc.collect()
+                            rss_after = self._rss_mb()
+                            wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
+                            wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
+                            failure_type = self._classify_failure(error) if error else None
+                            oom_seen = oom_seen or failure_type == BatchFailureType.OOM
+
+                            self._record_item_result(
+                                task,
+                                checkpoint,
                                 symbol,
                                 timeframe,
-                                request.config_override,
-                                request.force_regenerate,
-                                batch_cache_dir,
-                                str(checkpoint.get("batch_id") or ""),
+                                hdf5_path or "",
+                                error,
+                                failure_type,
+                                rss_before,
+                                rss_peak,
+                                rss_after,
                             )
-                            wrapped_futures.append(_wait_one(item, future))
-                    finally:
-                        if previous_metrics_path is None:
-                            os.environ.pop("FFACT_CHILD_METRICS_PATH", None)
-                        else:
-                            os.environ["FFACT_CHILD_METRICS_PATH"] = previous_metrics_path
-                        if previous_layer_metrics_path is None:
-                            os.environ.pop("FFACT_LAYER_METRICS_PATH", None)
-                        else:
-                            os.environ["FFACT_LAYER_METRICS_PATH"] = previous_layer_metrics_path
-                        if previous_symbol_concurrency is None:
-                            os.environ.pop("FFACT_BATCH_SYMBOL_CONCURRENCY", None)
-                        else:
-                            os.environ["FFACT_BATCH_SYMBOL_CONCURRENCY"] = (
-                                previous_symbol_concurrency
+                            self._append_child_metrics_if_missing(
+                                child_metrics_path,
+                                symbol,
+                                timeframe,
+                                {
+                                    "symbol": symbol,
+                                    "timeframe": timeframe,
+                                    "pid": os.getpid(),
+                                    "peak_rss_mb": rss_peak,
+                                    "duration_s": 0.0,
+                                    "status": "failed" if error else "ok",
+                                },
                             )
-                        self._restore_batch_thread_env(previous_thread_caps)
-
-                    oom_seen = False
-                    for wrapped_future in asyncio.as_completed(wrapped_futures):
-                        item, hdf5_path, error = await wrapped_future
-                        symbol = str(item["symbol"])
-                        timeframe = str(item["timeframe"])
-                        rss_before = rss_before_by_item[(symbol, timeframe)]
-                        rss_peak = max(rss_before, self._rss_mb())
-                        gc.collect()
-                        rss_after = self._rss_mb()
-                        wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
-                        wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
-                        failure_type = self._classify_failure(error) if error else None
-                        oom_seen = oom_seen or failure_type == BatchFailureType.OOM
-
-                        self._record_item_result(
-                            task,
-                            checkpoint,
-                            symbol,
-                            timeframe,
-                            hdf5_path or "",
-                            error,
-                            failure_type,
-                            rss_before,
-                            rss_peak,
-                            rss_after,
-                        )
-                        self._append_child_metrics_if_missing(
-                            child_metrics_path,
-                            symbol,
-                            timeframe,
-                            {
-                                "symbol": symbol,
-                                "timeframe": timeframe,
-                                "pid": os.getpid(),
-                                "peak_rss_mb": rss_peak,
-                                "duration_s": 0.0,
-                                "status": "failed" if error else "ok",
-                            },
-                        )
-                        self._notify_progress(task_id)
+                            self._notify_progress(task_id)
+                finally:
+                    _restore_wave_env()
         finally:
             stop_layer_tick.set()
             layer_tick_task.cancel()
@@ -1152,6 +1174,12 @@ class FeatureFactoryBatchService:
         batch_id: str = "",
     ) -> str:
         """在子進程中執行單一標的特徵計算。"""
+        api_log_path = os.environ.get("FFACT_API_LOG_PATH")
+        if api_log_path:
+            from api.core.logging import init_worker_logging
+
+            init_worker_logging(api_log_path, symbol, timeframe)
+
         from momentum.factories import create_feature_factory
 
         started_at = time.perf_counter()

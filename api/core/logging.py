@@ -1,11 +1,14 @@
 import logging
 import logging.handlers
+import os
 from pathlib import Path
 from typing import Optional
 import sys
 from datetime import datetime
 
 from .config import settings
+
+_FFACT_WORKER_HANDLER_MARKER = "_ffact_worker_log_handler"
 
 class ColoredFormatter(logging.Formatter):
     """帶顏色的日誌格式化器（僅在控制台輸出時使用）"""
@@ -114,6 +117,67 @@ def setup_logging(
     
     return logger
 
+class _WorkerContextFilter(logging.Filter):
+    """在 log 訊息前注入 batch worker 上下文 [pid sym tf]。"""
+
+    def __init__(self, pid: int, symbol: str, timeframe: str) -> None:
+        super().__init__()
+        self._pid = pid
+        self._symbol = symbol
+        self._timeframe = timeframe
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        prefix = f"[pid={self._pid} sym={self._symbol} tf={self._timeframe}]"
+        record.msg = f"{prefix} {record.msg}"
+        return True
+
+
+def _has_worker_log_handler() -> bool:
+    """檢查 momentum/api 是否已掛 worker FileHandler（idempotent 用）。"""
+    for logger_name in ("momentum", "api"):
+        for handler in logging.getLogger(logger_name).handlers:
+            if getattr(handler, _FFACT_WORKER_HANDLER_MARKER, False):
+                return True
+    return False
+
+
+def init_worker_logging(path: str, symbol: str, tf: str) -> None:
+    """在 batch worker 子進程掛 non-rotating FileHandler（fail-open）。
+
+    子進程 root 預設 WARNING 且不得改 root level（adv#2），故掛在
+    momentum/api namespace logger（涵蓋 momentum.*/api.*），不清除既有 handler。
+    同進程重複呼叫時不重複掛載（adv#1 idempotent）。
+    """
+    try:
+        if _has_worker_log_handler():
+            return
+
+        log_path = Path(path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        handler = logging.FileHandler(log_path, encoding="utf-8")
+        setattr(handler, _FFACT_WORKER_HANDLER_MARKER, True)
+
+        level = getattr(logging, settings.log_level.upper(), logging.INFO)
+        handler.setLevel(level)
+
+        formatter = logging.Formatter(
+            fmt=settings.log_format,
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+        handler.addFilter(_WorkerContextFilter(os.getpid(), symbol, tf))
+
+        for logger_name in ("momentum", "api"):
+            target = logging.getLogger(logger_name)
+            target.setLevel(level)
+            target.addHandler(handler)
+    except Exception as exc:
+        logging.getLogger(__name__).debug(
+            "init_worker_logging failed (fail-open): %s", exc
+        )
+
+
 def get_logger(name: str) -> logging.Logger:
     """獲取指定名稱的logger
     
@@ -191,9 +255,10 @@ def init_logging():
 
 # 導出
 __all__ = [
-    "setup_logging", 
-    "get_logger", 
-    "log_function_call", 
-    "log_api_request", 
-    "init_logging"
+    "setup_logging",
+    "get_logger",
+    "log_function_call",
+    "log_api_request",
+    "init_logging",
+    "init_worker_logging",
 ]
