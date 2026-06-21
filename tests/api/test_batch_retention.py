@@ -550,6 +550,70 @@ async def test_retention_decision_repeat_discard_idempotent(
 
 
 @pytest.mark.asyncio
+async def test_retention_decision_discard_then_retain_conflict_409(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """確定性混合決定：先 discard(terminal) → 後 retain 同 item → 409 conflict。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+    discard = await client.post(url, json={"decision": "discard"})
+    assert discard.status_code == 200
+    assert discard.json()["state"] == RetentionState.DISCARDED.value
+
+    retain = await client.post(url, json={"decision": "retain"})
+    assert retain.status_code == 409
+    assert retain.json()["detail"]["code"] == "retention_conflict"
+
+
+@pytest.mark.asyncio
+async def test_retention_decision_retain_then_discard_conflict_409(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """確定性混合決定：先 retain(terminal) → 後 discard 同 item → 409 conflict。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+    retain = await client.post(url, json={"decision": "retain"})
+    assert retain.status_code == 200
+    assert retain.json()["state"] == RetentionState.RETAINED.value
+
+    discard = await client.post(url, json={"decision": "discard"})
+    assert discard.status_code == 409
+    assert discard.json()["detail"]["code"] == "retention_conflict"
+
+
+@pytest.mark.asyncio
 async def test_retention_decision_not_found_404(retention_client) -> None:
     client, _batch, _ff, _manager, _tmp = retention_client
     resp = await client.post(
