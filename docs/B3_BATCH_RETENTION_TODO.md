@@ -16,7 +16,8 @@
 | 風險 | (b)(c) | checkpoint/delete_run 多下游·crash 難回退 | §RISK |
 | flag | RETENTION 預設關=今日行為 | 護欄 | §R |
 - 合計：Task=5、不變量=4、風險=1、flag=1。
-- **雙家族 reconcile**:Codex 4 BLOCKING(完成語義/背壓矛盾/crash/並發)+Composer 事實修正(FeatureRegistry.add:3227/checkpoint:889-916/delete_run:103 可重用)→ **轉 post-hoc mark + discard 重用 delete_run**:多下游一致(不延後)、背壓自洽(真刪)、crash matrix、per-item lock。詳見 SPEC v2。
+- **雙家族 reconcile v1→v2**:Codex 4 BLOCKING+Composer 事實修正→ **轉 post-hoc mark + discard 重用 delete_run**。
+- **v2 確認雙家族 reconcile(v2.1,兩家判方向PASS只需小patch)**:① Codex#5/Composer F3 `delete_run` 雙不存在會 **raise KeyError 非冪等**→**冪等放 decision 層**(看 checkpoint terminal+catch KeyError,不改 route);② Composer F1 flag env=`FFACT_BATCH_RETENTION` 預設`"0"`;③ Composer F2 前端 `enqueueCompletion` 預設 source:'single'+`RunRetentionDialog` 僅 single 才開;④ Codex#3 reconcile 掃描差集;⑤ Codex#4 lock key=(batch_id,symbol,tf,config_hash)+critical section;⑥ Codex#7 retain==今日拆 registry/browse/quality 三項;⑦ Codex#2 wakeup 重讀真實 free bytes+hard-pause observable;⑧ F4 disk path=`features_root`。詳見 SPEC v2.1。
 
 ## §0 全域規則
 - **不延後任何副作用(核心)**:post-hoc mark——run 照常生成+register+寫盤(FeatureRegistry.add:3227/browse:606/artifact 都不動);retention 純疊加狀態。
@@ -24,8 +25,9 @@
 - **flag 預設關=今日完全行為**:flag-off spy 驗 register/quality 時機同今日(byte 不足)。
 - **非阻塞**:pending 待決不卡其他 symbol。
 - **真實 free-space 背壓**:`shutil.disk_usage` 非邏輯記帳;低+有 pending→暫停,decision wakeup;低+無 pending→hard-pause+log(非死鎖)。
-- **discard 冪等 + 重用 delete_run**:後端呼 `feature_factory_service.delete_run`(非前端 deleteRun action),對已刪 no-op。
-- **decision 原子**:per-item lock/CAS,pending→deciding→terminal;先持久化 checkpoint 再回 200。
+- **discard 冪等(decision 層)+ 重用 delete_run**:後端呼 `feature_factory_service.delete_run`(非前端 deleteRun action);**delete_run 雙不存在 raise KeyError 非 no-op**→decision 先看 checkpoint terminal(已 discarded→no-op success)+catch KeyError 當已刪=success,不改 route。
+- **decision 原子**:per-item lock key=(batch_id,symbol,tf,config_hash),CAS pending→deciding→terminal,checkpoint mutation 同 critical section;先持久化 checkpoint 再回 200。
+- **flag env**:`FFACT_BATCH_RETENTION` 預設 `"0"`(關=今日行為)。
 - **diff scope**:不碰 generate_features 生成參數/數值(碰=BLOCK)。
 - **防假綠**:逐條碰真實下游(browse/quality/delete_run/disk),非 smoke。
 - **B3 不做 bulk**:transactional 多選刪除留 B4;B3 discard 為 scoped 單 run。

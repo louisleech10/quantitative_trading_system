@@ -14,13 +14,13 @@
   - quality adapter side-effect:`feature_factory_batch_adapters.py:34 register_hdf5_for_browse`(compute 內自帶 register)。post-hoc mark 下不受影響(run 本就 registered)。
   - checkpoint schema:`_build_initial_checkpoint`(feature_factory_batch_service.py:**889-916**,有 schema_version/completed_items/failed_items/queued_items);v1 誤標 :178-209(實為 resume_batch)。
   - **單 run 刪除已存在可重用**:`DELETE /runs/{symbol}/{timeframe}/{config_hash}`(api/routes/feature_factory.py:103)→ `feature_factory_service.delete_run(symbol,tf,config_hash)`(刪 artifact+registry)。B3 discard **後端重用 delete_run**(非前端 deleteRun action)。
-  - 前端單 symbol 保留:`completionQueue`(store:82,單筆:479)+ `RunRetentionDialog.tsx`(deleteRun:546 打 DELETE /runs)。batch 需 `source` 區分,不可誤路由到單 flow。
+  - 前端單 symbol 保留:`completionQueue`(store:82,單筆:479)+ store `deleteRun:542`(打 DELETE /runs;Composer 修正:非 RunRetentionDialog:61)。batch 需 `source` 區分:`enqueueCompletion` 預設 `source:'single'`,`RunRetentionDialog` 僅 `source==='single'` 才開,batch 不入 completionQueue 改走面板(Composer F2)。
 - **待確認**：無。**已確認**(2026-06-21 使用者選「B3 含 discard 即刪該單一 run」;委員會兩輪 FINAL + 雙家族 adversarial 定 post-hoc mark)。
 
 ## §C 約束
 - 解耦:狀態在 batch service checkpoint;discard 重用 api delete_run;不新增跨域依賴。
-- **不可違反**:① 不改特徵值/生成/register 行為(post-hoc mark 純疊加);② **非阻塞**——pending 待決不卡其他 symbol;③ **背壓用真實 free-space**(`shutil.disk_usage`,非邏輯記帳),低於閾值且有 pending→暫停新生成,decision 後 wakeup 重評;低磁碟但無 pending 可 discard→誠實 hard-pause+log(非死鎖);④ **discard 冪等**(delete_run 對已刪 no-op success);⑤ **decision 原子**(per-item lock + deciding 占位,防 retain/discard race);⑥ **flag 預設關=今日完全行為**。
-- 注意:transactional **bulk** delete(多選/tombstone)留 B4;B3 discard 為 scoped 單 run。
+- **不可違反**:① 不改特徵值/生成/register 行為(post-hoc mark 純疊加);② **非阻塞**——pending 待決不卡其他 symbol;③ **背壓用真實 free-space**(`shutil.disk_usage(manager.features_root)` 量測 path,非邏輯記帳),低於閾值且有 pending→暫停新生成,**decision 後 wakeup 必重讀真實 free bytes 再決定續/停**;低磁碟但無 pending 可 discard→誠實 **hard-pause 為 observable terminal state**+log(非死鎖);④ **冪等放 decision 層**(Codex#5/Composer F3:`delete_run` 對 registry+artifact 雙不存在會 `raise KeyError`,**非 no-op**;故 decision 先看 checkpoint terminal:已 discarded→no-op success;只在 pending→deciding→discard 轉移呼 delete_run;**catch KeyError 當「已不在=success」**;**不改公共 delete_run/DELETE route 語意**);⑤ **decision 原子**(per-item lock,key=`(batch_id,symbol,tf,config_hash)`;CAS pending→deciding;checkpoint mutation 同一 critical section;並發另一方見非 pending→409/no-op,防 retain/discard race);⑥ **flag 預設關=今日完全行為**(env `FFACT_BATCH_RETENTION`,預設 `"0"`)。
+- 注意:transactional **bulk** delete(多選/tombstone)留 B4;B3 discard 為 scoped 單 run。pending 窗內 run 在 RunManager/browse/quality **仍可見可互動**(設計取捨);使用者經 RunManager 手刪後再 decide→404/terminal reconcile(見 §V)。batch `status=completed` 可與 item retention pending 並存(完成指生成,retention 另軸)。
 
 ## §G Golden / Baseline
 - N/A(移 §N)。行為不變:flag 關 → `python scripts/build_l65_golden_baseline.py --check` PASS **且 spy 驗 register/quality 時機與今日一致**(byte 不足以證時機)。
@@ -38,7 +38,7 @@
 **Task 2.1 — retain/discard endpoint(per-item,非阻塞,原子)**
 - 目標:POST 決定 endpoint:retain→pending 清除(run 已 registered,無他事);discard→`deciding` 占位→重用 `feature_factory_service.delete_run(symbol,tf,config_hash)` 刪該 run→標 discarded。per-item async lock/CAS 防並發。**待決不阻塞 wave**。
 - 檔案:api/routes/feature_factory.py(新 batch retention decision endpoint)+ feature_factory_batch_service.py(decision 方法+lock)+ api/models。
-- 改法:decision 先 CAS pending→deciding;discard 呼 delete_run(冪等);decision 結果**先持久化 checkpoint 再回 200**(寫失敗→回 5xx,decision 未提交,可重試)。
+- 改法:per-item lock(key=`(batch_id,symbol,tf,config_hash)`)內 CAS pending→deciding;**discard 包裝 delete_run**:已 discarded terminal→no-op success,只在轉移時呼 `delete_run`,**catch KeyError(雙不存在)當已刪=success**,不改 delete_run/route;decision 結果**先持久化 checkpoint 再回 200**(寫失敗→5xx 未提交,可重試);checkpoint mutation 同 critical section。
 - 驗證:retain 清 pending;discard 刪檔+browse 不見+標 discarded;並發 retain/discard 僅一勝(另 409/no-op);重複 discard 冪等;不存在 item→404;待決時他 symbol 續;`pytest tests/api/ -k retention_decision`。
 - 邊界:重複 decide 冪等;404;並發安全;delete_run 拋→retention_error 不靜默。　不可做:不阻塞 wave;不碰 B4 bulk。
 **Task 2.2 — REST 列 pending + WS 推 pending**
@@ -58,7 +58,7 @@
 **Task 4.1 — batch per-item 面板(source 區分,非 N modal,不打 deleteRun)**
 - 目標:completionQueue 加 `source:'batch'|'single'` 區分;batch 用**可展開面板**逐項 retain/discard,呼 Phase2 batch endpoint(**非單 flow deleteRun**);與 page.tsx:510 單 symbol modal 並存關係明定(batch 面板獨立元件,不互搶)。
 - 檔案:frontend featureFactoryStore.ts(completionQueue 加 source)、新 BatchRetentionPanel、types.ts、page.tsx。
-- 改法:WS pending→面板;按鈕呼 batch decision endpoint;狀態用 B2 normalize/`'key' in payload` 權威;斷線 REST list 補。
+- 改法:`enqueueCompletion` 預設 `source:'single'`;`RunRetentionDialog` 僅 `source==='single'` 才開(batch 不誤彈 modal,Composer F2);WS pending→面板;按鈕呼 batch decision endpoint;狀態用 B2 normalize/`'key' in payload` 權威;斷線 REST list 補。
 - 驗證:`cd frontend && npm run build` 綠 + **vitest 5 案例綠**(渲染/retain/discard/空佇列/**assert discard URL≠deleteRun URL**,多 item==1 面板非 N modal);對應 `*.test.tsx`。
 - 邊界:空佇列不顯示;deciding 中 disable 防重複;不破單 symbol 既有 flow。　不可做:batch 不呼 deleteRun(/runs DELETE 單flow)。
 
@@ -67,15 +67,15 @@
 - **防假綠**:不放寬既有 batch 測試;新斷言逐條碰真實下游(browse/quality/delete_run/disk),非 smoke。
 - **retention 5 不變量(逐條 fixtures/commands/assertions,可證偽)**:
   ① 狀態轉移僅合法(pending→deciding→retained/discarded/error;非法 raise)——`-k retention_state`,assert 非法轉移拋。
-  ② retain==今日:flag 開 retain 後 run 的 browse_task_id/quality 與 flag 關時相同(spy 比對)——`-k retention_retain_equiv`。
+  ② retain==今日(Codex#7 拆三項同 identity 比對):flag 開 retain 後該 run 的 **registry entry + browse_task_id + quality summary** 三者與 flag 關時相同——`-k retention_retain_equiv`。
   ③ discard:delete_run 被呼且該 run artifact 不存在(`Path.exists()==False`)+browse list 不含——`-k retention_discard_delete`。
   ④ 非阻塞:A pending 未決時 B symbol 跑完(整合,assert B 完成 timestamp)——`-k retention_nonblock`。
   ⑤ resume 守恆(crash matrix,見下)。
-- **crash matrix(injected-crash tests,可驗 crash points)**:(a)成功 register 後標 pending 前 crash→resume 對「已 registered 未標」reconcile 成 pending(不重算/不重 register);(b)discard delete_run 後標 discarded 前 crash→resume 見 artifact 已無→冪等收斂 discarded;(c)decision checkpoint 寫失敗→回 5xx 未提交→重試冪等。idempotency key=(symbol,tf,config_hash)。`-k retention_crash`。
+- **crash matrix(injected-crash tests,可驗 crash points)**:(a)成功 register 後標 pending 前 crash→resume 跑 **reconcile 掃描**:`completed_items/registered 集合 − (retained∪discarded∪pending)` 的差集標 pending(idempotent,不重算/不重 register);(b)discard delete_run 後標 discarded 前 crash→resume 見 artifact 已無→冪等收斂 discarded;(c)decision checkpoint 寫失敗→回 5xx 未提交→重試冪等。idempotency key=(symbol,tf,config_hash)。`-k retention_crash`。
 - **並發原子性**:同 item 並發 retain/retain、retain/discard、discard/discard→僅一 terminal,無重複 delete_run/register——`-k retention_concurrent`。
 - **flag-off spy(Codex#7/Composer#4)**:flag 關時 spy registrar/quality→`_record_item_result` 同步立即 register(call count/timing 同今日)、不寫 retention 欄、browse_task_ids 舊時機出現——`-k retention_flag_off`。
 - **行為不變 + diff scope**:flag 關 `build_l65_golden_baseline.py --check` PASS;**diff 不碰 generate_features 生成參數/數值路徑→BLOCK**。
-- **邊界目錄**:flag 關=今日行為/crash matrix abc/重複 decide 冪等/404/並發/背壓 hard-pause 不死鎖/wakeup 不漏/前端空佇列/discard URL≠deleteRun/WS 斷線 REST 補。
+- **邊界目錄**:flag 關=今日行為/crash matrix abc/重複 decide 冪等/404/並發/背壓 hard-pause observable 不死鎖/wakeup 重讀真實 free bytes 不漏/前端空佇列/discard URL≠deleteRun/RunManager 手刪 pending run 後 decide→404 terminal reconcile/WS 斷線 REST 補/batch completed 與 item pending 並存。
 
 ## §R 回退
 - **feature flag**(env,預設關=今日立即 register 行為)總護欄;關閉即完全回退。每 Phase 獨立 commit。discard 重用既有 delete_run(無新刪除邏輯)降風險。byte 變(flag 關)或 flag-off spy 失敗=立即 revert。
