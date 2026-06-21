@@ -31,7 +31,7 @@
 
 ### Phase 1 — max_warmup + OutputWindow(依賴:無)
 **Task 1.1 — max_warmup_bars 全來源 + OutputWindow**
-- 目標:generate 入口算一次 `OutputWindow(ingest_start, output_start=start, output_end=end)`;`max_warmup_bars(primary TF)=max(` **L1** get_max_warmup_bars(ind:period)+CDL get_pattern_default_bars;**L2** max(momentum lags,WQ windows,decay_linear);**L3** max(rolling windows);**L4** max(config lags|adaptive seq×ratio);**L6.5** max(winsor窗,rank窗,zscore windows,fracdiff max_lag,ADF max_lag,calibration_bars);**native-tf** 各次 TF scale_window_for_native 取 max;**validator** winsor fallback 窗(僅 L6.5 winsor off)`)`。**排除**:cumulative/fracdiff d*/ADF order/post-IC/labels。
+- 目標:generate 入口算一次 `OutputWindow(ingest_start, output_start=start, output_end=end)`;`max_warmup_bars(primary TF)=max(` **L1** get_max_warmup_bars(ind:period)+CDL get_pattern_default_bars+**L1 advanced atomic 獨立窗**(microstructure/entropy/tail_risk/hurst/perm/mdd 的 config windows,warmup_lookup 未必涵蓋→逐 config 列舉,Codex MAJOR2);**L2** max(momentum lags,WQ windows,decay_linear);**L3** max(rolling windows);**L4** max(config lags|adaptive seq×ratio);**L5 cross-sectional**(RelativeStrengthProcessor.compute_beta rolling window,feature_factory.py:1812;**reference symbol(BTC)也須同 warmup**,Codex MAJOR1);**L6/meta** 任何顯式 rolling 窗(cycle/entropy/tail-risk/microstructure);**L6.5** max(winsor窗,rank窗,zscore windows,fracdiff max_lag,ADF max_lag,calibration_bars);**native-tf** 各次 TF scale_window_for_native 取 max;**validator** winsor fallback 窗(僅 L6.5 winsor off)`)`。**排除**(位置相依不靠有限 warmup):cumulative/fracdiff d*/ADF order/post-IC/labels。
 - 檔案:新 helper(feature_factory.py/preprocessing 中性),重用 warmup_lookup。
 - 驗證:已知 config→max_warmup=各源最大(含 native-tf 放大);`pytest tests/ -k warmup_bars_estimate`(逐源單測)。
 - 邊界:無 fracdiff/native-tf 不計該源。不可做:不漏源、cumulative 不納。
@@ -56,7 +56,7 @@
 
 ### Phase 3 — API + 前端警示(依賴:Phase 2)
 **Task 3.1 — warmup_insufficient 穿 API + UI(不靜默)**
-- 目標:不足 metadata 穿 Pydantic(明定欄位名)+ WS/REST + batch checkpoint 保留 → 前端警示(needed/available/前 N 根降級)。
+- 目標:不足 metadata 穿 Pydantic **凍結欄位 `warmup_insufficient{needed:int, available:int, affected_bars:int}`** + WS/REST + batch checkpoint 保留 → 前端警示(needed/available/前 affected_bars 根降級);vitest selector 對應。
 - 檔案:api/models、feature_factory_ws/routes、frontend types/元件。
 - 驗證:`cd frontend && npm run build` + **vitest 2 案例**(不足顯/足夠不顯);`pytest tests/api/ -k warmup_warning`。
 - 邊界:足夠不顯;flag 關不顯。
@@ -65,7 +65,7 @@
 - 測試層級:單元(warmup 估算)/整合(品質增益+子集 allclose,**真實 kline_cache.h5**)/前端(vitest)/行為不變(flag 關 golden)。
 - **防假綠**:用真實 kline 非合成;品質增益測位置不變欄;不外露逐 persist 路徑驗;不放寬既有測試。
 - **核心驗收(可證偽,三方定)**:
-  ① **A 品質增益(主)**:同 symbol/TF/[start,end],flag-on vs flag-off,對 POSITION_INDEPENDENT 欄,start 後 K=min(50,max_warmup/4) 根 `valid_frac`(非 NaN 比例)assert on≥off+δ(δ=0.05 起,真實 kline 校);warmup 不足→可 on≈off+標 warmup_insufficient。
+  ① **A 品質增益(主)**:同 symbol/TF/[start,end],flag-on vs flag-off,對 **POSITION_INDEPENDENT 欄**,start 後 K=min(50,max_warmup/4) 根 `valid_frac`(非 NaN 比例)assert on≥off+δ(δ=0.05 起,真實 kline 校);warmup 不足→可 on≈off+標 warmup_insufficient。**POSITION_INDEPENDENT 判定式(兩家 MAJOR,防量錯欄假綠)**=`L7 pre-IC 持久化欄 − 排除表`(regex 排除:`OBV|AD|ADOSC|VWAP`、`fracdiff_*`、`adf_*`/`*diff_order`、`label_*`、`post_ic_*`);fixture 明列受測欄。**品質增益測限 non-IC-first 或 mock IC**(IC-first 選特結構差異不追,Composer non-blocking)。
   ② **B 子集 allclose(輔,非阻塞)**:排除表外欄,same window+available≥needed 時 date-windowed vs 全範圍同日期 `allclose≤1e-6`+NaN mask 一致;失敗僅 regression 記錄不擋。
   ③ **C 因果**:`max(ingest_index)<start`;features/IC 輸出 index∈[start,end];fracdiff/ADF 校準列取自 ingest 前 min(500,len) 非 start 後(assert calibration slice 上界<start 後段)。
   ④ **D 自洽**:同參數重跑 byte 一致;`row_count==|[start,end]|`;metadata 與列數一致。
@@ -75,7 +75,7 @@
 - **邊界目錄**:flag 關=strict/前史不足→載最早+回報/完全無前史/多TF per-TF warmup/native-tf 對齊後 trim/排除表欄不納 allclose/labels 尾 NaN 標記/PIT ingest<start/resume 不偽裝。
 
 ## §R 回退
-- **feature flag**(env,預設關=今日 strict-window B5)總護欄;關閉即回 B5。每 Phase 獨立 commit。byte 變(flag 關)=立即 revert。
+- **feature flag `FFACT_WARMUP_TRIM`**(env,預設 `"0"`=今日 strict-window B5)總護欄;關閉即回 B5。**flag 不納 config_hash**(strict 與 warmup 同 hash→cache 不分裂;但 strict checkpoint 不得偽裝 warmup-enabled,見 §C⑧)。每 Phase 獨立 commit。byte 變(flag 關)=立即 revert。
 
 ## §N N/A 登記
 - §G Golden 數值:**N/A — 改「載多少資料+輸出trim」,非特徵公式**;改以 flag 關 `build_l65_golden_baseline.py --check` PASS(abs≤1e-6) + 品質增益(flag-on valid_frac≥off+0.05) + 子集 allclose(輔) + 因果(ingest_index<start) + 自洽(row_count==|[start,end]|) + T2 不外露 驗證。

@@ -16,6 +16,7 @@
 | 風險 | (b)(d) | 共享 ingestion 多persist+warmup正確性 | §RISK |
 | flag | 預設關=B5 strict | 護欄 | §R |
 - 合計：Task=5、不變量=4、風險=1、flag=1。
+- **雙家族 v2 確認 reconcile(v2.1,兩家判 Option1 框架 sound 只需窄補)**:① max_warmup 補 **L5 cross-sectional**(compute_beta rolling+reference BTC,feature_factory.py:1812)+**L1 advanced atomic 獨立窗**(microstructure/entropy/tail_risk/hurst/perm/mdd);② **POSITION_INDEPENDENT 判定式**=L7 pre-IC 欄−排除 regex(OBV/AD/ADOSC/VWAP/fracdiff_*/adf_*/label_*/post_ic_*)+fixture,品質增益限 non-IC-first/mock IC;③ flag `FFACT_WARMUP_TRIM`=0 不納 hash;④ warmup_insufficient 凍結欄位 needed/available/affected_bars。詳 SPEC v2.1。
 
 ## §0 全域規則
 - **不承諾 byte parity**(明示);成功=品質增益+因果+不外露。
@@ -38,7 +39,7 @@
 ## Phase 1
 ### Task 1.1 — max_warmup + OutputWindow
 - SPEC ref：1.1　目標:generate 入口算 OutputWindow + max_warmup_bars(§SPEC 完整清單)。
-- 實作要點:新 helper 重用 warmup_lookup;native-tf 各次 TF scale_window_for_native 取 max;排除 cumulative/fracdiff d*/ADF/post-IC/labels。
+- 實作要點:新 helper 重用 warmup_lookup;**含 L5 cross-sectional(compute_beta rolling+reference BTC 同 warmup)+L1 advanced atomic 獨立窗(microstructure/entropy/tail_risk/hurst/perm/mdd config 逐列)+L6/meta 顯式窗**;native-tf 各次 TF scale_window_for_native 取 max;排除 cumulative/fracdiff d*/ADF/post-IC/labels。
 - 修改檔案:feature_factory.py/preprocessing helper。不可做:不漏源、cumulative 不納。
 - 邊界:無 fracdiff/native-tf 不計該源。
 - 驗證:max_warmup=各源最大(含 native-tf 放大);`pytest tests/ -k warmup_bars_estimate`。
