@@ -21,6 +21,7 @@ from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service, router as feature_factory_router
 from api.services.feature_factory_batch_adapters import FeatureFactoryBrowseAdapter
 from api.services.feature_factory_batch_service import (
+    DiskBackpressureAction,
     FeatureFactoryBatchService,
     RetentionConflictError,
     RetentionState,
@@ -169,14 +170,25 @@ def _compute_tracked_nonblock(
     return _compute_success(symbol, timeframe, config_override, force_regenerate, cache_dir, batch_id)
 
 
-async def _wait_batch_done(service: FeatureFactoryBatchService, task_id: str) -> Dict[str, Any]:
+async def _wait_batch_done(
+    service: FeatureFactoryBatchService,
+    task_id: str,
+    timeout: float = 5.0,
+) -> Dict[str, Any]:
     started = time.time()
-    while time.time() - started < 5.0:
+    terminal = {
+        "completed",
+        "partial",
+        "failed",
+        "paused_disk_backpressure",
+        "paused_disk_hard",
+    }
+    while time.time() - started < timeout:
         status = service.get_status(task_id)
-        if status and status["status"] in {"completed", "partial", "failed"}:
+        if status and status["status"] in terminal:
             return status
         await asyncio.sleep(0.02)
-    raise TimeoutError(f"batch did not finish: {task_id}")
+    raise TimeoutError(f"batch did not reach terminal state: {task_id}")
 
 
 def _seed_registry(
@@ -939,3 +951,344 @@ async def test_retention_nonblock_other_symbol_completes(
     assert len(checkpoint.get("retention_items", [])) == 2
     assert "ETHUSDT" in _NONBLOCK_COMPLETION_ORDER
     assert _NONBLOCK_COMPLETION_ORDER.index("ETHUSDT") <= _NONBLOCK_COMPLETION_ORDER.index("BTCUSDT") + 1
+
+
+# --- retention_backpressure ---
+
+
+def _install_disk_free_mock(
+    monkeypatch: pytest.MonkeyPatch,
+    free_bytes: int | List[int],
+) -> List[int]:
+    """Patch real disk_usage gate; returns call log of evaluated free bytes."""
+
+    if isinstance(free_bytes, int):
+        sequence = [free_bytes]
+    else:
+        sequence = list(free_bytes)
+    calls: List[int] = []
+
+    def _read_disk_free(_self: FeatureFactoryBatchService) -> int:
+        value = sequence[min(len(calls), len(sequence) - 1)]
+        calls.append(value)
+        return value
+
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_read_disk_free_bytes",
+        _read_disk_free,
+    )
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_resolve_batch_disk_reserve_bytes",
+        classmethod(lambda cls: 10 * 1024 ** 3),
+    )
+    return calls
+
+
+@pytest.mark.asyncio
+async def test_retention_backpressure_low_free_pending_pauses(
+    monkeypatch,
+    batch_service_factory,
+    tmp_path,
+) -> None:
+    """① 低 free-space + pending retention → 暫停派新生成。"""
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    _install_disk_free_mock(monkeypatch, [50 * 1024 ** 3, 1 * 1024 ** 3])
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_tracked_nonblock),
+    )
+    service = batch_service_factory(tmp_path)
+    task_id = await service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(service, task_id, timeout=8.0)
+
+    status = service.get_status(task_id)
+    assert status is not None
+    assert status["status"] == "paused_disk_backpressure"
+    checkpoint = service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    assert len(checkpoint.get("queued_items", [])) == 1
+    assert checkpoint["queued_items"][0]["symbol"] == "ETHUSDT"
+    assert len(service._list_pending_retention_items(checkpoint)) == 1
+
+
+@pytest.mark.asyncio
+async def test_retention_backpressure_discard_wakeup_continues(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """② discard 釋放後 wakeup 重讀真實 free bytes 續跑。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    disk_calls = _install_disk_free_mock(monkeypatch, [50 * 1024 ** 3, 1 * 1024 ** 3, 50 * 1024 ** 3])
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_tracked_nonblock),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    paused = await _wait_batch_done(batch_service, task_id)
+    assert paused["status"] == "paused_disk_backpressure"
+
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    resp = await client.post(
+        f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}",
+        json={"decision": "discard"},
+    )
+    assert resp.status_code == 200
+
+    final = await _wait_batch_done(batch_service, task_id, timeout=8.0)
+    assert final["status"] == "completed"
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    assert checkpoint.get("queued_items", []) == []
+    assert len(disk_calls) >= 3
+
+
+@pytest.mark.asyncio
+async def test_retention_backpressure_no_pending_hard_pause_observable(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """③ 無 pending 可 discard → hard-pause observable，不死鎖。"""
+    client, batch_service, _ff, _manager, _tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    _install_disk_free_mock(monkeypatch, [50 * 1024 ** 3, 1 * 1024 ** 3, 1 * 1024 ** 3])
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_tracked_nonblock),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    paused = await _wait_batch_done(batch_service, task_id)
+    assert paused["status"] == "paused_disk_backpressure"
+
+    config_hash = "cfg_batch_ret"
+    retain = await client.post(
+        f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}",
+        json={"decision": "retain"},
+    )
+    assert retain.status_code == 200
+
+    hard = await _wait_batch_done(batch_service, task_id, timeout=8.0)
+    assert hard["status"] == "paused_disk_hard"
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    assert checkpoint.get("disk_backpressure", {}).get("action") == DiskBackpressureAction.HARD_PAUSE.value
+    assert len(checkpoint.get("queued_items", [])) == 1
+
+
+# --- retention_crash ---
+
+
+@pytest.mark.asyncio
+async def test_retention_crash_a_completed_minus_retention_marks_pending_no_reregister(
+    monkeypatch,
+    batch_service_factory,
+    tmp_path,
+    mock_browse_registrar,
+) -> None:
+    """④ crash matrix (a): completed−retention 差集標 pending，不重 register。"""
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    service = batch_service_factory(tmp_path)
+    request = BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h")
+    checkpoint = service._build_initial_checkpoint("crash-a", request)
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / "cfg_batch_ret" / "feature_manifest.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text("{}", encoding="utf-8")
+    checkpoint["completed_items"] = [{
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "output_paths": [str(manifest)],
+        "browse_task_id": "browse_BTCUSDT_1h_cfg_batch_ret",
+    }]
+    checkpoint["retention_items"] = []
+    calls_before = len(mock_browse_registrar.calls)
+
+    service._reconcile_retention_on_resume(checkpoint)
+
+    assert len(mock_browse_registrar.calls) == calls_before
+    pending = service._list_pending_retention_items(checkpoint)
+    assert len(pending) == 1
+    assert pending[0]["config_hash"] == "cfg_batch_ret"
+    assert pending[0]["state"] == RetentionState.PENDING.value
+
+    service._reconcile_retention_on_resume(checkpoint)
+    assert len(service._list_pending_retention_items(checkpoint)) == 1
+
+
+@pytest.mark.asyncio
+async def test_retention_crash_b_deleted_converges_discarded(
+    monkeypatch,
+    batch_service_factory,
+    tmp_path,
+) -> None:
+    """⑤ crash matrix (b): delete_run 後 artifact 已無 → resume 收斂 discarded。"""
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    service = batch_service_factory(tmp_path)
+    checkpoint: Dict[str, Any] = {
+        "batch_id": "crash-b",
+        "config_hash": "cfg_batch_ret",
+        "completed_items": [{
+            "symbol": "BTCUSDT",
+            "timeframe": "1h",
+            "output_paths": ["/missing/manifest.json"],
+        }],
+        "retention_items": [{
+            "symbol": "BTCUSDT",
+            "timeframe": "1h",
+            "config_hash": "cfg_batch_ret",
+            "state": RetentionState.DECIDING.value,
+            "hdf5_path": "/missing/manifest.json",
+            "error": None,
+        }],
+    }
+
+    service._reconcile_retention_on_resume(checkpoint)
+    item = checkpoint["retention_items"][0]
+    assert item["state"] == RetentionState.DISCARDED.value
+
+    service._reconcile_retention_on_resume(checkpoint)
+    assert checkpoint["retention_items"][0]["state"] == RetentionState.DISCARDED.value
+
+
+@pytest.mark.asyncio
+async def test_retention_crash_a_resume_batch_path_marks_pending(
+    monkeypatch,
+    batch_service_factory,
+    tmp_path,
+    mock_browse_registrar,
+) -> None:
+    """crash matrix (a) via real resume_batch path."""
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    service = batch_service_factory(tmp_path)
+    batch_id = "crash-a-resume"
+    request = BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="1h")
+    checkpoint = service._build_initial_checkpoint(batch_id, request)
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / "cfg_batch_ret" / "feature_manifest.json"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text("{}", encoding="utf-8")
+    checkpoint["completed_items"] = [{
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "output_paths": [str(manifest)],
+        "browse_task_id": "browse_BTCUSDT_1h_cfg_batch_ret",
+    }]
+    checkpoint["retention_items"] = []
+    checkpoint["queued_items"] = []
+    service._write_checkpoint_atomic(checkpoint)
+    calls_before = len(mock_browse_registrar.calls)
+
+    result = await service.resume_batch(batch_id)
+
+    assert result["status"] == "completed"
+    loaded = service._load_checkpoint(batch_id)
+    assert loaded is not None
+    assert len(service._list_pending_retention_items(loaded)) == 1
+    assert len(mock_browse_registrar.calls) == calls_before
+
+
+@pytest.mark.asyncio
+async def test_retention_crash_b_resume_batch_path_converges_discarded(
+    monkeypatch,
+    batch_service_factory,
+    tmp_path,
+) -> None:
+    """crash matrix (b) via real resume_batch path."""
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    service = batch_service_factory(tmp_path)
+    batch_id = "crash-b-resume"
+    checkpoint: Dict[str, Any] = {
+        "schema_version": 1,
+        "batch_id": batch_id,
+        "config_hash": "cfg_batch_ret",
+        "request_payload": BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h").model_dump(),
+        "started_at": "2026-06-21T00:00:00",
+        "last_updated_at": "2026-06-21T00:00:00",
+        "completed_items": [{
+            "symbol": "BTCUSDT",
+            "timeframe": "1h",
+            "output_paths": ["/missing/manifest.json"],
+        }],
+        "failed_items": [],
+        "queued_items": [],
+        "retention_items": [{
+            "symbol": "BTCUSDT",
+            "timeframe": "1h",
+            "config_hash": "cfg_batch_ret",
+            "state": RetentionState.PENDING.value,
+            "hdf5_path": "/missing/manifest.json",
+            "error": None,
+        }],
+        "concurrent_symbols": 1,
+        "memory_sanity_failed": False,
+        "rss_after_gc_history_mb": [],
+    }
+    service._write_checkpoint_atomic(checkpoint)
+
+    result = await service.resume_batch(batch_id)
+
+    assert result["status"] == "completed"
+    loaded = service._load_checkpoint(batch_id)
+    assert loaded is not None
+    assert loaded["retention_items"][0]["state"] == RetentionState.DISCARDED.value
+
+
+@pytest.mark.asyncio
+async def test_retention_crash_c_checkpoint_write_fail_retry_idempotent(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """⑥ crash matrix (c): checkpoint 寫失敗 5xx，重試冪等。"""
+    client, batch_service, _ff, _manager, _tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    config_hash = "cfg_batch_ret"
+    url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+
+    attempts = {"count": 0}
+    original_write = batch_service._write_checkpoint_atomic
+
+    def _flaky_write(checkpoint: Dict[str, Any]) -> None:
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise OSError("simulated checkpoint write failure")
+        original_write(checkpoint)
+
+    monkeypatch.setattr(batch_service, "_write_checkpoint_atomic", _flaky_write)
+
+    first = await client.post(url, json={"decision": "retain"})
+    assert first.status_code == 500
+
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    item = batch_service._find_retention_item(checkpoint, "BTCUSDT", "1h", config_hash)
+    assert item is not None
+    assert item["state"] == RetentionState.PENDING.value
+
+    second = await client.post(url, json={"decision": "retain"})
+    assert second.status_code == 200
+    assert second.json()["state"] == RetentionState.RETAINED.value
+    assert attempts["count"] == 2
