@@ -1,68 +1,82 @@
-# B5 — 批次特徵生成日期範圍 bug 修復 — SPEC
+# B5 — 批次特徵生成日期 bug 修復（threading 止血）— SPEC v2
 
-> 來源：使用者 2026-06-21 實測（選 167 天但批次跑 848 天全史）。日期：2026-06-21｜對應 TODO：docs/B5_BATCH_DATE_TODO.md
+> 來源：使用者 2026-06-21 實測（選 167 天但批次跑 848 天全史）+ Codex adversarial(handoffs/20260621-b5-adv-codex.md 修正事實)。日期：2026-06-21｜對應 TODO：docs/B5_BATCH_DATE_TODO.md
 >
-> **問題**：批次（≥2 symbol）worker `_compute_single` 不接收/不傳 `start_date`/`end_date` → `generate_features` 在全史生成，無視使用者日期選擇。單 symbol path 正確。
+> **v2 修正**：v1 §A 誤認「BatchGenerateRequest 有 date」。實為**完全無 date 欄位** → 修法是跨棧大任務。**B5 只做 threading（strict-window=Option2 止血）；warmup(Option1)留 B6。**
 
 ## §RISK 風險分級
-- **大小**：中-大。
-- **命中**：**(b) 批次 worker 共用路徑**(`_compute_single` 是所有 batch symbol 入口,B1/B2/B3 動過、有 mock/測試) + **(d) 資料正確性**(日期→生成用哪段資料,錯範圍=錯特徵,下游 IC/回測受影響)。
-- → §G 數值 N/A(行為性);以「無 date 不變(`build_l65_golden_baseline.py --check`+spy)」+「date 生效(167天→~4009列 非20352)」+「config_hash 與單 path 一致」3 不變量驗證。
+- **大小**：**大**（跨棧:Pydantic + 前端 + worker threading + checkpoint + 8 mock 檔）。
+- **命中**：**(b) 批次共用路徑**(_compute_single 所有 batch 入口) + **(d) 資料正確性**(日期→生成用哪段資料;錯範圍=錯特徵,下游 IC/回測受影響)。
+- → §G 數值 N/A;以「無 date 不變(`build_l65_golden_baseline.py --check`+spy)」+「date 生效列數=strict 區間(167天→~4009列)」+「config_hash 與單 path 一致」+「resume 保留 date」4 不變量驗證。
 
-## §A 假設與待使用者確認
+## §A 假設與待使用者確認（v2 已修正 v1 事實錯誤）
 - **已驗證事實**(grep/Read/log 實測,附行號):
-  - 批次 worker `_compute_single`(api/services/feature_factory_batch_service.py:1282)簽名 `(symbol,timeframe,config_override,force_regenerate,cache_dir=None,batch_id="")`——**無 start_date/end_date**;其 `factory.generate_features(symbol=,timeframe=,...)`(:~1340)**未傳 date**。
-  - `run_in_executor` 呼 compute_fn(:581-590)只傳 symbol/timeframe/config_override/force_regenerate/batch_cache_dir/batch_id——**無 date**。
-  - `generate_features`(momentum/FeatureEngineering/feature_factory.py:226)**有** start_date/end_date(:8-9),且 **config_hash 含 date**(`_compute_config_hash(config,symbol,timeframe,start_date=,end_date=)`:241)→ 傳 date 後 cache key 與單 path 一致,**無 stale 風險**。
-  - 單 symbol path(api/services/feature_factory_service.py:251-272)正確讀 `getattr(request,"start_date")` 並傳 generate_features。
-  - `BatchGenerateRequest`(api/models/feature_factory_models.py:39-40)**有** start_date/end_date(已從前端收到,只是 worker 沒用)。
-  - **實測證據**:1 symbol primary 12h → native_rows=4009(=167 天,date 生效✓);2 symbol primary 12h → native_rows=20352(=848 天全史,date 失效✗)。
-- **待確認**：無。**已確認**(2026-06-21 使用者:「有設日期就該只跑那段」=預期 date 生效,批次失效是 bug)。
+  - **`BatchGenerateRequest`(api/models/feature_factory_models.py:176-184)無 start_date/end_date**(只 symbols/timeframe/config_override/force_regenerate/max_workers)。v1 誤把單 symbol 的 FeatureGenerateRequest(:225-226 有 date)當批次=事實錯誤。
+  - 前端有 startDate/endDate state(page.tsx:80-81),**單 symbol** path 有送(`startGeneration(...startDate||undefined,endDate||undefined)`:259);**batch 分支未送 date**。
+  - 批次 worker `_compute_single`(feature_factory_batch_service.py:1282)無 date 參數;`run_in_executor`(:581-590)不傳 date;`factory.generate_features`(:~1340)不傳 date。
+  - `generate_features`(momentum/.../feature_factory.py:226)**有** start_date/end_date,且 **config_hash 含 date**(:241)→ cache 與單 path 一致無 stale。
+  - 單 path 正確(feature_factory_service.py:251-272)。
+  - `_layer0_data_ingestion`(:738)對 date 是**嚴格 mask 切窗**(無 warmup)→ **B5 保留此 strict-window(=Option2),warmup 留 B6**。
+  - checkpoint 用 `request.model_dump()` 保存(resume 從 request_payload 重建)→ date 入 model 即自動 resume。
+  - **8 個 test 檔 patch `_compute_single`**:test_feature_factory_batch_step4 / test_batch_retention / test_batch_layer_metrics / test_batch_progress_normalize / test_worker_logging / test_feature_factory_batch_resume / test_multi_symbol_ic_first / test_multi_window_rolling。
+  - 實測:1sym primary 12h native_rows=4009(167天✓);2sym=20352(848天全史✗)。
+- **待確認**：無。**已確認**(2026-06-21 使用者:設日期該只跑該段=預期;批次失效是 bug;B5 strict-window 止血、B6 補 warmup)。
 
 ## §C 約束
-- 解耦:純 threading 既有參數,不新增跨域依賴。
-- **不可違反**:① **無 date(None)=今日全史行為完全不變**(向後相容,golden+spy 驗);② date 傳入後 config_hash 含 date(與單 path 一致,cache 連貫不 stale);③ **不改數值計算邏輯**(只改「用哪段資料」的入口,不碰特徵公式/NaN gate);④ **同步更新所有 patch `_compute_single` 的 test mocks**(B1/B2/B3 加 batch_id 的前例:漏更會 TypeError 假綠)。
-- 注意:date 改變生成輸出是**本修復的目的**(批次該尊重 date);非 date 路徑零變動。
+- 解耦:threading 既有參數 + Pydantic/前端欄位;不新增跨域依賴。
+- **不可違反**:① **無 date(None)=今日全史行為完全不變**(向後相容);② date→config_hash 含 date(與單 path 一致);③ **不改數值計算**(只改「用哪段資料」入口,不碰特徵公式/NaN gate);④ **同步更新全部 8 個 _compute_single mocks**(漏更=TypeError 假綠);⑤ checkpoint 存 date 供 resume;⑥ **B5 不做 warmup**(strict-window;warmup=B6,動工前明示此邊界)。
+- 注意:date 改變生成輸出是目的;非 date 路徑零變動。
 
 ## §G Golden / Baseline
-- 數值 N/A(移 §N)。行為不變:**無 date** 時 `python scripts/build_l65_golden_baseline.py --check` PASS(golden 用全史,不傳 date→與今日一致)。date 生效另以新測驗。
+- 數值 N/A(移 §N)。行為不變:**無 date** `python scripts/build_l65_golden_baseline.py --check` PASS。
 
 ## §P Phase 與依賴
 
-### Phase 1 — threading date 穿批次路徑(依賴:無)
-**Task 1.1 — _compute_single 接收 + 傳 date**
-- 目標:`_compute_single` 加 `start_date`/`end_date` 參數,傳入 `factory.generate_features(...,start_date=,end_date=)`,比照單 path。
-- 檔案:feature_factory_batch_service.py(`_compute_single`:1282 簽名 + generate_features 呼叫:~1340)。
-- 改法:簽名加 `start_date: Optional[str]=None, end_date: Optional[str]=None`(位置與 run_in_executor 對齊);generate_features 呼叫補 `start_date=start_date, end_date=end_date`。
-- 驗證:date 傳入時 generate_features 收到對的 date;`pytest tests/api/ -k batch_date_threading`。
-- 邊界:None→不傳(今日行為)。　不可做:不改特徵公式/數值。
+### Phase 1 — 契約層:Pydantic + 前端送 date(依賴:無)
+**Task 1.1 — BatchGenerateRequest 加 date 欄**
+- 目標:`BatchGenerateRequest` 加 `start_date: Optional[str]=None, end_date: Optional[str]=None`(比照 FeatureGenerateRequest:225-226)。
+- 檔案:api/models/feature_factory_models.py:176-184。
+- 驗證:request model 接受 date;`pytest tests/api/ -k batch_request_date`。
+- 邊界:None 預設(向後相容)。不可做:不改其他欄位語意。
+**Task 1.2 — 前端 batch 分支送 date**
+- 目標:batch 生成呼叫送 `startDate||undefined / endDate||undefined`(比照單 path:259);types.ts batch payload 型別加 date。
+- 檔案:frontend page.tsx(batch 分支)、lib/types.ts、相關 store/api。
+- 驗證:`cd frontend && npm run build` + **vitest 2 案例**(batch payload 帶 date / 空 date 送 undefined);`*.test.tsx`。
+- 邊界:空 date→undefined(不送)。
 
-**Task 1.2 — run_in_executor 傳 request 的 date**
-- 目標:`run_in_executor`(:581-590)補傳 `request.start_date, request.end_date` 到 compute_fn。
-- 檔案:feature_factory_batch_service.py:581-590。
-- 改法:args 加 request.start_date/request.end_date(與 _compute_single 簽名位置一致)。
-- 驗證:批次 worker 收到 request 的 date;整合測 date-selected 批次生成列數=選定範圍(非全史);`pytest tests/api/ -k batch_date_applied`。
-- 邊界:request 無 date(None)→全史(今日)。
+### Phase 2 — threading + resume(依賴:Phase 1)
+**Task 2.1 — threading _compute_single → generate_features**
+- 目標:date 從 request 經 run_in_executor → _compute_single → generate_features。
+- 檔案:feature_factory_batch_service.py(_compute_single:1282 簽名加 date;run_in_executor:581-590 傳 request.start_date/end_date;generate_features 呼叫:~1340 補 date)。
+- 驗證:date 傳入時 generate_features 收對 date(spy);整合 date-selected 批次列數=strict 區間(167天→~4009列 1h,**非 20352**);`pytest tests/api/ -k "batch_date_threading or batch_date_applied"`。
+- 邊界:None→全史(今日)。不可做:不改數值;不做 warmup(B6)。
+**Task 2.2 — checkpoint 存 date 供 resume**
+- 目標:確認 date 經 request.model_dump 入 checkpoint,resume 重建帶 date。
+- 檔案:feature_factory_batch_service.py(checkpoint/resume 路徑)。
+- 驗證:resume date-selected 批次仍用對 date(列數=strict 區間);`pytest tests/api/ -k batch_date_resume`。
+- 邊界:舊 checkpoint 無 date→None→全史(向後相容)。
 
-**Task 1.3 — 更新 test mocks(防假綠)**
-- 目標:所有 patch/mock `_compute_single` 的測試(B1/B2/B3 retention/logging/progress)簽名同步加 start_date/end_date,避免 TypeError 假綠。
-- 檔案:tests/api/test_batch_retention.py、test_worker_logging.py、test_batch_*.py 等所有 _compute_single mock。
-- 驗證:既有批次測試全綠(無 TypeError);`pytest tests/api/ -k batch -q`。
-- 邊界:mock 簽名須與真實一致。　不可做:不放寬既有斷言。
+### Phase 3 — 更新 mocks(依賴:Phase 2)
+**Task 3.1 — 8 個 _compute_single mock 同步簽名**
+- 目標:全部 8 檔的 _compute_single mock/spy 簽名加 date,免 TypeError 假綠。
+- 檔案:§A 列的 8 個 test 檔。
+- 驗證:`pytest tests/api/ -k batch -q` + 8 檔全綠無 TypeError;新增 1 個 spy 測證 date 參數順序正確傳達。
+- 邊界:mock 簽名與真實一致。不可做:不放寬既有斷言。
 
 ## §V 驗證策略與邊界測試目錄
-- 測試層級:單元(date threading)/整合(真實小 batch date-selected→列數=選定範圍)/行為不變(無 date golden+spy)/既有批次回歸。
-- **防假綠**:不放寬既有測試;新斷言碰真實 generate_features date 參數 + 真實列數,非 smoke;所有 _compute_single mock 同步更新。
+- 測試層級:單元(model/threading)/整合(date 批次列數=strict 區間)/前端(vitest batch 送 date)/行為不變(無 date golden+spy)/resume/8-mock 回歸。
+- **防假綠**:不放寬既有測試;新斷言碰真實 generate_features date 參數 + 真實列數;8 mock 同步。
 - **核心不變量(可證偽)**:
-  ① **無 date 不變**:start_date/end_date=None 時批次 generate_features 收到 None、輸出與今日一致(spy 比對 call 參數 + `build_l65_golden_baseline.py --check` PASS)。
-  ② **date 生效**:date-selected 批次的 generate_features 收到該 date,且生成列數=選定範圍(167 天→~4009 1h 列,**非 20352 全史**)——整合測 assert 列數/或 spy date 參數。
-  ③ **config_hash 一致**:同 (symbol,tf,date,config) 批次與單 path 算出相同 config_hash(date 已入 hash)。
-  ④ **既有批次測試綠**:mocks 更新後 `pytest tests/api/ -k batch` 全綠無 TypeError。
+  ① 無 date 不變:None→generate_features 收 None + `build_l65_golden_baseline.py --check` PASS。
+  ② date 生效:date-selected 批次列數=strict 區間(167天→~4009列,非20352全史)。
+  ③ config_hash 一致:同(symbol,tf,date,config)批次與單 path 同 hash。
+  ④ resume 保留 date:resume 後仍用對 date。
+  ⑤ 前端 batch 送 date(vitest);⑥ 8 mock 更新後既有 batch 測試綠。
 - **行為不變**:無 date `build_l65_golden_baseline.py --check` PASS(abs≤1e-6)。
-- **邊界目錄**:None=今日全史/date 生效列數/config_hash 與單 path 一致/mocks 同步/不改特徵數值。
+- **邊界目錄**:None=今日全史/date strict 列數/config_hash 一致/resume 帶 date/舊 checkpoint 無 date 向後相容/8 mock 同步/前端空 date→undefined/不做 warmup(B6)。
 
 ## §R 回退
-- 純 threading,單點可 revert。無 date(None)即今日行為=天然向後相容護欄。byte 變(無 date 情境)=立即 revert。
+- 無 date(None)=今日行為=天然向後相容護欄。每 Phase 獨立 commit。byte 變(無 date 情境)=立即 revert。
 
 ## §N N/A 登記
-- §G Golden 數值:**N/A — 改「用哪段資料」入口,非特徵數值公式**;改以無 date `build_l65_golden_baseline.py --check` PASS(abs≤1e-6,byte 不變)+ spy 驗 call 參數 + date 生效列數 + config_hash 一致 驗證。
+- §G Golden 數值:**N/A — 改「用哪段資料」入口,非特徵公式**;改以無 date `build_l65_golden_baseline.py --check` PASS(abs≤1e-6) + spy 驗 call 參數 + date 生效列數 + config_hash 一致 + resume 帶 date 驗證。
