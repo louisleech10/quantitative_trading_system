@@ -275,3 +275,192 @@ describe('featureFactoryStore completionQueue source', () => {
     expect(useFeatureFactoryStore.getState().batchTask?.retention_pending).toEqual([]);
   });
 });
+
+const API_BASE = 'http://localhost:8000';
+const API_PREFIX = '/api/v1/features';
+
+function bulkDeleteUrl(): string {
+  return `${API_BASE}${API_PREFIX}/runs/bulk-delete`;
+}
+
+function runsUrl(): string {
+  return `${API_BASE}${API_PREFIX}/runs`;
+}
+
+function orphansUrl(): string {
+  return `${API_BASE}${API_PREFIX}/runs/orphans`;
+}
+
+function orphansCleanUrl(): string {
+  return `${API_BASE}${API_PREFIX}/runs/orphans/clean`;
+}
+
+function retentionPendingUrl(batchId: string): string {
+  return `${API_BASE}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/retention/pending`;
+}
+
+describe('featureFactoryStore bulkDeleteRuns', () => {
+  beforeEach(() => {
+    resetStore();
+    useFeatureFactoryStore.setState({ runs: [], batchTask: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetStore();
+  });
+
+  it('POSTs deduped runs to bulk-delete, then refreshes runs and retention pending', async () => {
+    const bulkResponse = {
+      deleted: [{ symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a', bytes: 100 }],
+      failed: [],
+      skipped: [],
+    };
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      fetchCalls.push({ url, init });
+      if (url === bulkDeleteUrl() && init?.method === 'POST') {
+        return response(200, bulkResponse);
+      }
+      if (url === runsUrl()) {
+        return response(200, []);
+      }
+      if (url === retentionPendingUrl('batch-42')) {
+        return response(200, { pending: [] });
+      }
+      return response(404, {});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    useFeatureFactoryStore.setState({
+      batchTask: {
+        task_id: 'batch-42',
+        batch_id: 'batch-42',
+        status: 'completed',
+        total: 1,
+        completed: 1,
+        failed: 0,
+        progress: 1,
+        results: {},
+        errors: {},
+      },
+    });
+
+    const result = await useFeatureFactoryStore.getState().bulkDeleteRuns([
+      { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a' },
+      { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a' },
+      { symbol: 'ETHUSDT', timeframe: '4h', config_hash: 'hash_b' },
+    ]);
+
+    expect(result.ok).toBe(true);
+    const bulkCall = fetchCalls.find((call) => call.url === bulkDeleteUrl());
+    expect(bulkCall).toBeDefined();
+    expect(bulkCall?.init?.method).toBe('POST');
+    const body = JSON.parse(String(bulkCall?.init?.body)) as {
+      runs: Array<{ symbol: string; timeframe: string; config_hash: string }>;
+    };
+    expect(body.runs).toEqual([
+      { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a' },
+      { symbol: 'ETHUSDT', timeframe: '4h', config_hash: 'hash_b' },
+    ]);
+    expect(fetchCalls.some((call) => call.url === runsUrl())).toBe(true);
+    expect(fetchCalls.some((call) => call.url === retentionPendingUrl('batch-42'))).toBe(true);
+  });
+});
+
+describe('featureFactoryStore scanOrphans', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetStore();
+  });
+
+  it('GETs the orphans scan endpoint', async () => {
+    const scanPayload = {
+      orphans: [{
+        kind: 'registry_without_leaf',
+        symbol: 'ADAUSDT',
+        timeframe: '4h',
+        config_hash: 'orphan_cfg',
+        leaf_kind: 'features',
+      }],
+      count: 1,
+    };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === orphansUrl()) {
+        return response(200, scanPayload);
+      }
+      return response(404, {});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await useFeatureFactoryStore.getState().scanOrphans();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data).toEqual(scanPayload);
+    }
+    expect(fetchMock).toHaveBeenCalledWith(orphansUrl());
+  });
+});
+
+describe('featureFactoryStore cleanOrphans', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetStore();
+  });
+
+  it('POSTs dry_run flag to orphans clean endpoint', async () => {
+    const cleanPayload = {
+      orphans: [],
+      cleaned_registry: 0,
+      cleaned_leaves: 0,
+      errors: [],
+      dry_run: true,
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === orphansCleanUrl() && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as { dry_run: boolean };
+        return response(200, { ...cleanPayload, dry_run: body.dry_run });
+      }
+      if (url === runsUrl()) {
+        return response(200, []);
+      }
+      return response(404, {});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const dryResult = await useFeatureFactoryStore.getState().cleanOrphans(true);
+    expect(dryResult.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      orphansCleanUrl(),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ dry_run: true }),
+      }),
+    );
+
+    fetchMock.mockClear();
+
+    const liveResult = await useFeatureFactoryStore.getState().cleanOrphans(false);
+    expect(liveResult.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      orphansCleanUrl(),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ dry_run: false }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(runsUrl());
+  });
+});

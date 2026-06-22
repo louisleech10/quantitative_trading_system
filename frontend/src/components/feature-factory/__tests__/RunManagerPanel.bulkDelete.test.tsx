@@ -193,6 +193,58 @@ describe('RunManagerPanel bulk delete & orphan cleanup', () => {
     expect(within(dialog).queryByText('my-alias')).not.toBeInTheDocument();
   });
 
+  it('excludes runs that became active after selection from bulk delete payload', async () => {
+    const idleRun = baseRun({
+      symbol: 'SOLUSDT',
+      config_hash: 'was_idle_hash',
+      alias: 'was-idle',
+      browse_task_id: 'browse_SOLUSDT_12h_was_idle_hash',
+    });
+    storeState.runs = [
+      idleRun,
+      baseRun({
+        symbol: 'ETHUSDT',
+        config_hash: 'still_idle',
+        alias: 'eth-idle',
+        browse_task_id: 'browse_ETHUSDT_12h_still_idle',
+      }),
+    ];
+    storeState.bulkDeleteRuns.mockResolvedValue({
+      ok: true,
+      data: {
+        deleted: [{ symbol: 'ETHUSDT', timeframe: '12h', config_hash: 'still_idle', bytes: 1024 }],
+        failed: [],
+        skipped: [],
+      },
+    });
+
+    const { rerender } = render(<RunManagerPanel />);
+
+    fireEvent.click(screen.getByLabelText('選取 was-idle'));
+    fireEvent.click(screen.getByLabelText('選取 eth-idle'));
+
+    storeState.runs = [
+      { ...idleRun, active: true },
+      storeState.runs[1],
+    ];
+    rerender(<RunManagerPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /批次刪除 \(1\)/ }));
+    const dialog = await screen.findByRole('dialog', { name: /確認批次刪除/ });
+    expect(within(dialog).getByText(/已排除 1 筆使用中 Run/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/was-idle/)).toBeInTheDocument();
+    expect(within(dialog).getByText('eth-idle')).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '確認刪除' }));
+
+    await waitFor(() => {
+      expect(storeState.bulkDeleteRuns).toHaveBeenCalledTimes(1);
+    });
+    expect(storeState.bulkDeleteRuns).toHaveBeenCalledWith([
+      { symbol: 'ETHUSDT', timeframe: '12h', config_hash: 'still_idle' },
+    ]);
+  });
+
   it('orphan scan then clean calls correct endpoints', async () => {
     const orphans: OrphanEntry[] = [
       {
