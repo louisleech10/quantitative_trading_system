@@ -1,63 +1,68 @@
-# B4 交易式批次刪除 (Q2-B) TODO
-> 版本：DRAFT｜基於 SPEC：docs/B4_BULK_DELETE_SPEC.md｜日期：2026-06-22
+# B4 批次刪除 + 孤兒清理 (Q2-B) TODO v2
+> 版本：v2(選項1+防累積安全網,雙家族 adversarial reconcile)｜基於 SPEC：docs/B4_BULK_DELETE_SPEC.md｜日期：2026-06-22
 
 ## 階段 1：SPEC ID 覆蓋
 | 類別 | ID | 節錄 | 落點 |
 |---|---|---|---|
-| Task | 1.1 | bulk-delete endpoint + 逐 run + aggregate report | Phase1 |
-| Task | 1.2 | 下游失效(browse/checkpoint/quality) | Phase1 |
-| Task | 2.1 | RunManagerPanel 多選 + bulk-delete + 確認 | Phase2 |
+| Task | 1.1 | bulk-delete endpoint + mark-deleting + report | Phase1 |
+| Task | 2.1 | 孤兒掃描 + 清理 endpoint | Phase2 |
+| Task | 3.1 | RunManagerPanel 多選 + 確認 + 孤兒按鈕 | Phase3 |
 | 不變量 | EQUIV | bulk == 逐單 delete_run 等價 | §V |
-| 不變量 | PARTIAL | 部分失敗報告不靜默不中斷 | §V |
-| 不變量 | DOWNSTREAM | 下游(browse/checkpoint/quality)失效 | §V |
-| 風險 | (b)(c) | 多下游刪除+部分失敗並發 | §RISK |
-
-- 合計：Task=3、不變量=3、風險=1。
+| 不變量 | PARTIAL | partial 失敗報告不靜默不中斷 | §V |
+| 不變量 | ORPHAN | 孤兒掃出+清掉(防累積) | §V |
+| 不變量 | B3CONC | bulk vs B3 retention discard 並發安全 | §V |
+| 風險 | (b)(c) | 共用刪除+partial+並發 | §RISK |
+- 合計：Task=3、不變量=4、風險=1。
 
 ## §0 全域規則
-- **逐 run 原子**:reuse 既有 `delete_run`(per-run RunLease 鎖),不重寫刪除邏輯。
-- **完整 per-run report**:成功/失敗/bytes 逐筆;**部分失敗不靜默、不中斷整批**(filesystem 無法真 rollback→best-effort+報,非全-or-nothing)。
-- **失效下游**:成功刪的 run 移除 browse `_tasks`、標 checkpoint completed_items 參照失效、清 quality cache。
-- **並發安全**:registry RunBusyError(刪除中)保護;同 run 並發冪等。
-- **防誤刪**:前端刪除前確認對話(顯將刪清單+總 bytes);空選不可刪。
-- **不改特徵值/不碰生成**;hermetic 測試(B5 教訓)。
+- **逐 run 原子**:reuse 既有 `delete_run`(per-run RunLease),不重寫刪除邏輯。
+- **完整 per-run report**:deleted/failed/skipped+bytes;partial **不靜默不中斷**。HTTP **200+per-run status**(非 207,避免與單刪 500 分裂)。
+- **mark-deleting**:delete 路徑開始設 registry `deleting` flag(用既有欄),reader(list/get)期間隱藏/標,完成 remove 或失敗 clear。
+- **孤兒清理(安全網)**:掃 registry↔artifact 不一致(registry 有/dir 無、dir 有/registry 無)→ dry-run 報 → 清,防 partial-delete error 累積。
+- **B3 並發**:bulk 刪 B3 pending-retention run → 更新 retention FSM 或 RunBusyError 擋+報;同 run 冪等。
+- **防誤刪**:確認對話顯 symbol/tf/alias/full-hash/bytes/batch,active 禁選,payload 去重。
+- **不清 d_star**(共享 fingerprint);記憶體/前端 stale 非本批(重啟/重整清);正常刪除已清整 run 目錄(實證,不留磁碟垃圾)。
+- 不改特徵值;hermetic 測試(tmp+FFACT_CGSA_WORK_DIR)。
 
 ## §B 批次
 | Batch | Task | 依賴 | 規模 |
 |---|---|---|---|
-| B4a | 1.1 + 1.2 | 無 | 中-大(endpoint+逐run+report+下游失效) |
-| B4b | 2.1 | B4a | 中(前端多選+確認) |
-- Gate:B4a bulk==逐單等價+部分失敗報+下游失效+並發;B4b npm build+vitest+確認對話+不破單 deleteRun。
+| B4a | 1.1 | 無 | 中-大(bulk+mark-deleting+report+B3並發) |
+| B4b | 2.1 | 無 | 中(孤兒掃描+清理) |
+| B4c | 3.1 | B4a+B4b | 中(前端多選+確認+孤兒按鈕) |
+- Gate:B4a bulk==逐單+partial報+mark-deleting+B3並發;B4b 孤兒兩類掃清;B4c npm build+vitest+確認active禁選+不破單deleteRun。
 
-## Phase 1 — backend
-### Task 1.1 — bulk endpoint + 逐 run + report
-- SPEC ref：1.1　目標:POST bulk 收 runs[];逐 run reuse delete_run;aggregate {deleted,failed,total_bytes_freed};部分失敗 207/明報。
-- 實作要點:新 endpoint(api/routes/feature_factory.py)+service bulk 方法 loop delete_run;收 DeleteResult per run;一失敗續刪;RunBusyError→標 busy/skip 報。
-- 修改檔案:api/routes/feature_factory.py、feature_factory_service.py、api/models。
-- 不可做:不中斷整批;不靜默吞失敗;不重寫刪除邏輯。
-- 邊界:空清單 no-op;重複冪等;不存在→failed 非 500。
-- 驗證:多 run deleted/failed 正確;一失敗其餘照刪;`pytest tests/api/ -k bulk_delete`。
-### Task 1.2 — 下游失效
-- SPEC ref：1.2　目標:成功刪 run 移除 browse `_tasks`/標 checkpoint 參照失效/清 quality cache。
-- 實作要點:沿用 delete_run 既有 _tasks 清理延伸;checkpoint completed_items 對應 browse_task_id 標失效。
-- 修改檔案:feature_factory_service.py、batch_service.py。
-- 不可做:不破既有 _tasks 清理。
-- 邊界:無 checkpoint 參照跳過;quality cache 無項 no-op。
-- 驗證:刪後 browse 查不到+checkpoint 參照失效+quality 清;`pytest tests/api/ -k bulk_delete_downstream`。
+## Phase 1
+### Task 1.1 — bulk endpoint + mark-deleting + report
+- SPEC ref：1.1　目標:POST runs[];逐 run 設deleting→delete_run→remove/clear;aggregate report;200+per-run status。
+- 實作要點:loop reuse delete_run;mark_deleting(registry 既有欄,reader 隱藏);一失敗續刪;RunBusyError→skipped;active run→拒+報。
+- 修改檔案:api/routes/feature_factory.py、feature_factory_service.py、run_lifecycle.py/registry(mark_deleting+get/list filter)、api/models。
+- 不可做:不中斷整批;不靜默;不重寫刪除;不清 d_star。
+- 邊界:空 no-op;重複冪等;不存在→failed;active 拒。
+- 驗證:多 run deleted/failed;一失敗其餘照刪;mark-deleting 期間 list 隱藏;`pytest tests/api/ -k bulk_delete`。
 
-## Phase 2 — frontend
-### Task 2.1 — RunManagerPanel 多選+確認
-- SPEC ref：2.1　目標:per-run checkbox+全選+bulk 按鈕+確認對話(顯N個+總bytes)+per-run 結果。
-- 實作要點:selected Set<runKey>;確認 dialog;呼 bulk endpoint;deleted 移出/failed 顯錯;不破單 deleteRun。
-- 修改檔案:frontend RunManagerPanel.tsx、store(bulkDeleteRuns)、types.ts。
-- 不可做:無確認直接刪;不破單 deleteRun(B3 retention)。
-- 邊界:未選不可刪;刪除中 disable。
-- 驗證:`npm run build`+**vitest 3 案例**(多選刪呼對endpoint/部分失敗顯錯/確認對話顯清單);`pytest tests/api/ -k bulk` 全綠。
+## Phase 2
+### Task 2.1 — 孤兒掃描 + 清理
+- SPEC ref：2.1　目標:掃 list_all vs features_run_dir → 兩類孤兒;dry-run 報+清(a→registry.remove、b→刪dir);冪等。
+- 實作要點:feature_factory_service+run_lifecycle orphan scan/clean;清走 per-run lease;dry-run 預設。
+- 修改檔案:feature_factory_service.py、run_lifecycle.py、api/routes、api/models。
+- 不可做:active run 不算孤兒;清理失敗不靜默。
+- 邊界:無孤兒空報;清理失敗報。
+- 驗證:製造兩類孤兒(刪dir留registry/留dir刪registry)→掃出+清;`pytest tests/api/ -k orphan_cleanup`。
+
+## Phase 3
+### Task 3.1 — 前端多選+確認+孤兒按鈕
+- SPEC ref：3.1　目標:checkbox+全選+bulk按鈕+確認對話(alias/full-hash/bytes/batch,active禁選)+per-run結果+孤兒清理按鈕(掃→顯→清)。
+- 實作要點:selected Set;確認 dialog;呼 Phase1/2;deleted移出/failed顯錯;不破單deleteRun。
+- 修改檔案:frontend RunManagerPanel.tsx、store(bulkDeleteRuns/scanOrphans/cleanOrphans)、types.ts。
+- 不可做:無確認直接刪;不破單deleteRun(B3 retention)。
+- 邊界:未選不可刪;刪除中disable;active禁選。
+- 驗證:`npm run build`+**vitest 4案例**(多選刪呼對endpoint/部分失敗顯錯/確認顯清單+active禁選/孤兒掃清);`pytest tests/api/ -k "bulk or orphan"` 綠。
 
 ### Phase 測試 + Gate
-- bulk==逐單等價+部分失敗報+下游失效+並發 RunBusyError+前端確認。
-- 單 deleteRun(B3 retention discard)不破。hermetic(data_cache diff 空)。
+- bulk==逐單+partial報+mark-deleting+孤兒掃清+B3並發+防誤刪+HTTP per-run status。
+- 單 deleteRun(B3)不破;hermetic(data_cache diff空);不清 d_star。
 
 ## 階段 4：Frozen 前 handoff
-`SPEC=docs/B4_BULK_DELETE_SPEC.md TODO=docs/B4_BULK_DELETE_TODO.md FOCUS=逐run原子reuse delete_run/完整report不靜默/下游失效/並發RunBusyError/防誤刪確認/hermetic`
-→ **雙家族 adversarial(大,(b)(c),Codex+Composer)** reconcile → Composer 實作(Phase1→2) + Codex review。
+`SPEC=docs/B4_BULK_DELETE_SPEC.md TODO=docs/B4_BULK_DELETE_TODO.md FOCUS=bulk==逐單/partial報/mark-deleting/孤兒掃清/B3並發/防誤刪/不清d_star/hermetic`
+→ **雙家族確認 v2(大,Codex+Composer)** reconcile → Composer 實作(Phase1→3) + Codex review。
