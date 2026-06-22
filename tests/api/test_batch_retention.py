@@ -315,7 +315,7 @@ def test_retention_state_flag_off_skips_pending_mark(
     tmp_path,
     batch_service_factory,
 ) -> None:
-    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "0")
     service = batch_service_factory(tmp_path)
     checkpoint = service._build_initial_checkpoint(
         "batch-flag-off",
@@ -342,7 +342,7 @@ def test_retention_state_flag_off_checkpoint_omits_retention_items(
     tmp_path,
     batch_service_factory,
 ) -> None:
-    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "0")
     service = batch_service_factory(tmp_path)
     checkpoint = service._build_initial_checkpoint(
         "batch-flag-off-schema",
@@ -392,7 +392,7 @@ async def test_retention_flag_off_spy_register_timing(
     batch_service_factory,
     mock_browse_registrar,
 ) -> None:
-    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "0")
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",
@@ -811,7 +811,7 @@ async def test_retention_retain_equiv_registry_browse_quality(
     timeframe = _RETAIN_TIMEFRAME
     config_hash = _RETAIN_CONFIG_HASH
 
-    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "0")
     baseline_task_id = await batch_service.start_batch(
         BatchGenerateRequest(symbols=[symbol], timeframe=timeframe, force_regenerate=True)
     )
@@ -890,7 +890,7 @@ async def test_retention_list_empty_when_none(
     retention_client,
 ) -> None:
     client, batch_service, _ff, _manager, _tmp = retention_client
-    monkeypatch.delenv("FFACT_BATCH_RETENTION", raising=False)
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "0")
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",

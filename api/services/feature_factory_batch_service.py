@@ -1587,9 +1587,13 @@ class FeatureFactoryBatchService:
 
     @staticmethod
     def _is_batch_retention_enabled() -> bool:
-        """Return True when batch retention post-hoc mark is enabled."""
+        """Return True when batch retention post-hoc mark is enabled.
 
-        return os.getenv("FFACT_BATCH_RETENTION", "0").strip().lower() in {
+        預設開（2026-06-22 使用者定）：批次跑完逐項 retain/discard 與單 symbol 一致。
+        設 FFACT_BATCH_RETENTION=0 可關（回 B5 strict 行為,rollback 用）。
+        """
+
+        return os.getenv("FFACT_BATCH_RETENTION", "1").strip().lower() in {
             "1",
             "true",
             "yes",
