@@ -13,6 +13,7 @@
 | 不變量 | B3CONC | bulk vs B3 retention discard 並發安全 | §V |
 | 風險 | (b)(c) | 共用刪除+partial+並發 | §RISK |
 - 合計：Task=3、不變量=4、風險=1。
+- **雙家族 v2 確認 reconcile(v2.1,兩家判方向PASS+2 BLOCKING小補)**:① `mark_deleting`(:224)對 alias/batch run return False→**需 delete-path force helper 允許刪命名 run**(統一 lifecycle orchestration:lease→mark(force)→delete→remove/clear);② **孤兒掃描須涵蓋 CGSA leaf**(delete_run 刪獨立 cgsa_work_dir,只掃 features 漏 CGSA 孤兒累積大檔);③ B3 FSM reconcile 接線(route→batch_service 標 retention_items DISCARDED+前端刷新);④ best-effort 用詞(非「原子」)、errors→failed;⑤ checkpoint 邏輯失效 OUT OF SCOPE(孤兒網兜底磁碟)。詳 SPEC v2.1。
 
 ## §0 全域規則
 - **逐 run 原子**:reuse 既有 `delete_run`(per-run RunLease),不重寫刪除邏輯。
@@ -35,20 +36,20 @@
 ## Phase 1
 ### Task 1.1 — bulk endpoint + mark-deleting + report
 - SPEC ref：1.1　目標:POST runs[];逐 run 設deleting→delete_run→remove/clear;aggregate report;200+per-run status。
-- 實作要點:loop reuse delete_run;mark_deleting(registry 既有欄,reader 隱藏);一失敗續刪;RunBusyError→skipped;active run→拒+報。
-- 修改檔案:api/routes/feature_factory.py、feature_factory_service.py、run_lifecycle.py/registry(mark_deleting+get/list filter)、api/models。
-- 不可做:不中斷整批;不靜默;不重寫刪除;不清 d_star。
+- 實作要點:loop reuse delete_run;**delete-path mark helper(force,允許刪 alias/batch run)**;reader 隱藏 deleting;一失敗續刪;RunBusyError→skipped;active(lease)→拒;**命中 B3 pending→route 呼 batch_service 標 retention_items DISCARDED**。
+- 修改檔案:api/routes/feature_factory.py、feature_factory_service.py、run_lifecycle.py/registry(force mark_deleting+get/list filter)、batch_service.py(retention reconcile API)、api/models。
+- 不可做:不中斷整批;不靜默;不重寫刪除;不清 d_star;不漏 named run。
 - 邊界:空 no-op;重複冪等;不存在→failed;active 拒。
 - 驗證:多 run deleted/failed;一失敗其餘照刪;mark-deleting 期間 list 隱藏;`pytest tests/api/ -k bulk_delete`。
 
 ## Phase 2
 ### Task 2.1 — 孤兒掃描 + 清理
 - SPEC ref：2.1　目標:掃 list_all vs features_run_dir → 兩類孤兒;dry-run 報+清(a→registry.remove、b→刪dir);冪等。
-- 實作要點:feature_factory_service+run_lifecycle orphan scan/clean;清走 per-run lease;dry-run 預設。
-- 修改檔案:feature_factory_service.py、run_lifecycle.py、api/routes、api/models。
-- 不可做:active run 不算孤兒;清理失敗不靜默。
+- 實作要點:掃 list_all vs **features_run_dir + cgsa_work_dir**(manifest config_hash ownership 驗);清走 per-run lease;dry-run 預設;**active(lease)/deleting 不算孤兒**。
+- 修改檔案:feature_factory_service.py、run_lifecycle.py(features+CGSA orphan)、api/routes、api/models。
+- 不可做:active/deleting 不算孤兒;清理失敗不靜默。
 - 邊界:無孤兒空報;清理失敗報。
-- 驗證:製造兩類孤兒(刪dir留registry/留dir刪registry)→掃出+清;`pytest tests/api/ -k orphan_cleanup`。
+- 驗證:製造孤兒(刪features dir留registry/留dir刪registry/**CGSA-only**)→掃出+清;active 不誤清;`pytest tests/api/ -k orphan_cleanup`。
 
 ## Phase 3
 ### Task 3.1 — 前端多選+確認+孤兒按鈕

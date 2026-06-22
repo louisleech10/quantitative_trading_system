@@ -12,8 +12,9 @@
 - **已驗證事實**(grep/Read/實機,附行號):
   - **正常刪除不留磁碟垃圾**(實機確認):`data_quality.json`/`feature_stats_cache_parts`/`feature_catalog_cache`/`manifest`/`raw/` **全在 run 目錄內**(features_root/symbol/tf/config_hash/);`delete_run`→`_delete_run_locked` 刪**整個** feature_leaf(run_lifecycle.py:90 `_delete_leaf`)→ 連同清掉。委員會「漏清 quality/stats」誤判(那些在 run 目錄內)。
   - `delete_run`(run_lifecycle.py:70)per-run RunLease 鎖;**僅 `not result.errors` 才 `registry.remove`**(:114)→ **partial 失敗(如 cgsa error)會留 registry entry + 半缺 artifact = 孤兒**(這是真累積風險,罕見)。
-  - registry 有 `deleting` flag 但**只 alias 守衛/auto_cleanup 用**(set_alias:157/set_batch_alias:190);`delete_run` 不 mark_deleting;`get`(:139)不檢查 → 刪檔窗口內 reader 仍見 entry(委員會 BLOCKING,v2 修:delete 路徑 mark_deleting)。
-  - `registry.list_all`(:120)+ `features_run_dir`(run_paths.py:26)→ 可掃孤兒;`auto_cleanup(keep_latest=5)`(:132)既有。
+  - registry 有 `deleting` flag 但**只 alias 守衛/auto_cleanup 用**(set_alias:157/set_batch_alias:190);`delete_run` 不 mark_deleting;`get`(:139)不檢查 → 刪檔窗口內 reader 仍見 entry。**且 `mark_deleting`(:217-225)對有 alias/batch_alias 的 run `return False`**(auto-cleanup 保護命名 run 語義)→ **使用者明確 bulk 刪命名 run 會被拒**(v2.1 BLOCKING,需 delete-path force helper)。
+  - **delete_run 刪 features leaf + 獨立 `cgsa_work_dir`(run_paths.py:34)**;partial error 可留 features/registry/cgsa 任一不一致 → **孤兒掃描須涵蓋 features+CGSA 兩 leaf**(v2.1 BLOCKING,只掃 features 會漏 CGSA 孤兒累積大檔)。
+  - `registry.list_all`(:120)+ `features_run_dir`(run_paths.py:26)+ `cgsa_work_dir`(:34)→ 掃孤兒;`auto_cleanup(keep_latest=5)`(:132)既有。
   - B3 retention discard **也 reuse delete_run**(batch_service.py:1785)→ bulk 與 discard 同 run 並發需協調(RunBusyError + retention FSM)。
   - 前端 RunManagerPanel(deleteRun:293)無多選;有 batch 分組 + active 徽章。
   - **記憶體快取**(_df/_stats/_adf cache)+ 前端狀態(selectedRunKey/explorer*)= 重啟/重整即清,**非磁碟累積**(proportionate 處理,非全 matrix)。
@@ -22,7 +23,8 @@
 
 ## §C 約束
 - 解耦:reuse delete_run;新 endpoint api/routes;不重寫刪除邏輯;不新增跨域依賴。
-- **不可違反**:① **逐 run 原子**(reuse per-run RunLease delete_run);② **完整 per-run report**(deleted/failed/skipped+bytes,**partial 不靜默不中斷**);③ **mark-deleting**:delete 路徑開始設 registry `deleting` flag(用既有欄),reader(list/get)期間隱藏/標,完成 remove 或失敗 clear;④ **孤兒清理**:掃 registry↔artifact 不一致(registry 有/dir 無、dir 有/registry 無)→ report + 清,防累積;⑤ **B3 並發**:bulk 刪 B3 pending-retention run → 更新 retention FSM 或 RunBusyError 擋 + 報;同 run 冪等;⑥ **防誤刪**:確認對話顯 symbol/tf/alias/full-hash/bytes/batch,**active(生成中)run 禁選**,payload 去重;⑦ **HTTP**:200 + per-run status body(避免 207 與單刪 500 語意分裂);⑧ **不清 d_star**(共享);不改特徵值。
+- **不可違反**:① **per-run lease + best-effort**(reuse delete_run;非全-or-無,filesystem 無法真 rollback;`DeleteResult.errors`→report 的 `failed` 非 skipped);② **完整 per-run report**(deleted/failed/skipped+bytes,**partial 不靜默不中斷**);③ **delete-path mark-deleting(force named)**:統一 lifecycle delete orchestration `lease→mark_deleting(allow_named/force)→delete→remove or 失敗 clear`,**新 helper 允許刪 alias/batch_alias run**(既有 mark_deleting 拒命名,explicit delete 須 override);reader(public get/list)期間隱藏 deleting,**孤兒 scan(internal)看得到 deleting/partial**;單刪+bulk+retention discard **共用此 orchestration**;④ **孤兒清理(含 CGSA)**:掃 registry ↔ **features leaf + cgsa_work_dir** 不一致(registry 有/leaf 無、leaf 有/registry 無,以 manifest config_hash ownership 驗)→ report + 清;**active(lease held)run 不算孤兒**(dir 有 registry 無的生成中不可清);⑤ **B3 FSM reconcile**:bulk 刪 B3 pending-retention run → **route 編排呼 batch_service 標 retention_items DISCARDED**(或 RunBusyError 擋+報);bulk 後前端 `fetchBatchRetentionPending` 刷新;同 run 冪等;⑥ **防誤刪**:確認對話顯 symbol/tf/alias/full-hash/bytes/batch,**active run 禁選**,payload 去重;⑦ **HTTP 200 + per-run status**(避免 207);⑧ **不清 d_star**(共享);不改特徵值。
+- 注意:checkpoint completed_items 邏輯失效(resume/quality builders 過濾)= **明確 OUT OF SCOPE**(孤兒網兜底磁碟;完整 checkpoint schema 失效留未來);記憶體/前端 stale 重啟/重整清。
 - 注意:記憶體/前端 stale 為次要(重啟/重整清),不納本批 disk-garbage 範圍。
 
 ## §G Golden / Baseline
@@ -34,17 +36,17 @@
 **Task 1.1 — bulk-delete endpoint + mark-deleting + aggregate report**
 - 目標:POST 收 `runs:[{symbol,timeframe,config_hash}]`;逐 run:設 `deleting` flag→reuse delete_run→remove/clear flag;aggregate `{deleted:[{run,bytes}], failed:[{run,error}], skipped:[]}`;**HTTP 200 + per-run status**(全空→no-op)。
 - 檔案:api/routes/feature_factory.py(新 endpoint)+ feature_factory_service.py(bulk 方法)+ run_lifecycle/registry(mark_deleting)+ api/models。
-- 改法:loop;一失敗續刪;RunBusyError→skipped 報;reader(get/list)期間隱藏 deleting。
-- 驗證:多 run deleted/failed 正確;一失敗其餘照刪;mark-deleting 期間 list 隱藏;`pytest tests/api/ -k bulk_delete`。
-- 邊界:空清單 no-op;重複冪等;不存在→failed;active run→拒+報。不可做:不中斷整批;不靜默。
+- 改法:loop;**delete-path mark helper(force named,可刪 alias/batch run)**;一失敗續刪;RunBusyError→skipped 報;public reader 隱藏 deleting;**命中 B3 pending-retention → route 呼 batch_service 標 retention_items DISCARDED**(或 RunBusyError 擋)。
+- 驗證:多 run deleted/failed;一失敗其餘照刪;**alias/batch_alias run 能刪**;mark-deleting 期間 list 隱藏;**bulk 刪 B3 pending run→retention FSM 標 DISCARDED**;`pytest tests/api/ -k "bulk_delete or B3CONC"`。
+- 邊界:空 no-op;重複冪等;不存在→failed;active(lease held)→拒+報。不可做:不中斷整批;不靜默;不漏 named run。
 
 ### Phase 2 — 孤兒清理安全網(依賴:無)
 **Task 2.1 — 孤兒掃描 + 清理 endpoint**
-- 目標:掃 `registry.list_all` vs `features_run_dir` 實際目錄 → 兩類孤兒:(a)registry 有但 dir 無、(b)dir 有但 registry 無;report;清理動作(a→registry.remove、b→刪 dir);冪等。
-- 檔案:feature_factory_service.py + run_lifecycle.py(orphan scan/clean)+ api/routes + api/models。
-- 改法:dry-run(只報)+ confirm clean;清理走 per-run lease 安全。
-- 驗證:製造孤兒(刪 dir 留 registry / 留 dir 刪 registry)→掃出+清掉;`pytest tests/api/ -k orphan_cleanup`。
-- 邊界:無孤兒→空報;active run 不算孤兒;清理失敗報非靜默。
+- 目標:掃 `registry.list_all` vs **`features_run_dir` + `cgsa_work_dir`** → 孤兒:(a)registry 有但 leaf 無、(b)leaf(features 或 CGSA)有但 registry 無(以 manifest config_hash ownership 驗);report;清(a→registry.remove、b→刪 leaf);冪等。
+- 檔案:feature_factory_service.py + run_lifecycle.py(orphan scan/clean,**features+CGSA**)+ api/routes + api/models。
+- 改法:dry-run(只報)+ confirm clean;清走 per-run lease;**active(lease held)/deleting 中的 dir 不算孤兒**(內部 scan 看得到 deleting 但不誤清生成中)。
+- 驗證:製造孤兒(刪 features leaf 留 registry / 留 features dir 刪 registry / **CGSA-only 孤兒**)→掃出+清;active 不誤清;`pytest tests/api/ -k orphan_cleanup`。
+- 邊界:無孤兒→空報;active/deleting 不算孤兒;清理失敗報非靜默。
 
 ### Phase 3 — 前端多選 + 確認 + 孤兒按鈕(依賴:Phase 1/2)
 **Task 3.1 — RunManagerPanel 多選 + bulk + 確認 + 孤兒清理**
@@ -62,7 +64,9 @@
   ② **partial 報告**:N 中 1 失敗(mock delete_run raise)→其餘照刪 + failed 明列(不靜默/不中斷)。
   ③ **mark-deleting**:刪檔窗口內 list/get 隱藏該 run;完成 remove/失敗 clear flag。
   ④ **孤兒掃清**:製造兩類孤兒→掃出+清掉;無孤兒空報。
-  ⑤ **B3 並發**:bulk 刪 B3 pending-retention run→retention FSM 更新或 RunBusyError 擋;同 run bulk+single 並發冪等無雙刪 race。
+  ⑤ **B3 並發 + FSM reconcile**:bulk 刪 B3 pending-retention run→**retention_items 標 DISCARDED**(route→batch_service)或 RunBusyError 擋;bulk 後前端 fetchBatchRetentionPending 刷新;同 run bulk+single+discard 並發冪等無雙刪 race;`-k B3CONC`。
+  ⑥ **named run 可刪**:alias/batch_alias run 經 bulk(force mark)能刪(既有 mark_deleting 拒,delete-path 須 override)。
+  ⑦ **CGSA 孤兒**:CGSA-only 孤兒掃出+清(防大檔累積)。
   ⑥ **防誤刪**:確認對話顯 alias/full-hash/bytes;active 禁選;空選不可刪。
   ⑦ **HTTP 200+per-run status**(非 207)。
 - **行為不變**:單 deleteRun(B3 retention discard)正常;不清 d_star;golden 不受影響。
