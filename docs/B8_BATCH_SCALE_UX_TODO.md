@@ -12,6 +12,7 @@
 | 不變量 | NOBREAK | 不破單項/單刪/批次刪除/重命名整批 | §V |
 | 風險 | (b) | retention FSM+刪除(重用reviewed) | §RISK |
 - 合計：Task=3、不變量=3、風險=1。
+- **Codex adversarial reconcile**:#1 刪除整批用獨立 `bulkDeleteTarget`(mode selection|batch)不污染 selectedKeys(測先勾A再刪B只刪B);#2 bulk retention terminal 語意:same→succeeded/**opposite→failed+conflict(非skipped)**/無pending→skipped(+bulk×single並發測);#3 store **real store+mock fetch**(非mock store,B4c教訓);#4 凍結 `BatchRetentionBulkResponse{results:[{id,status,state,error?,code?}]}`+HTTP200 per-item。詳 SPEC。
 
 ## §0 全域規則
 - **A reuse `apply_retention_decision`**(per-item lock/FSM/冪等),loop 成 bulk,不重寫。
