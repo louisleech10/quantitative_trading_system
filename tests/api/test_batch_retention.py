@@ -1371,3 +1371,314 @@ async def test_read_disk_free_bytes_measures_features_root(monkeypatch, retentio
     assert free == 4321
     assert captured["path"] == Path(_settings.data_cache_path) / "features"
     assert captured["path"] == tmp_path / "features"
+
+
+# --- bulk_retention (B8) ---
+
+
+def _bulk_retention_url(batch_id: str) -> str:
+    return f"/api/v1/features/batch/{batch_id}/retention/bulk"
+
+
+async def _start_two_symbol_batch(
+    monkeypatch: pytest.MonkeyPatch,
+    batch_service: FeatureFactoryBatchService,
+) -> str:
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    return task_id
+
+
+def _assert_bulk_result_schema(item: Dict[str, Any]) -> None:
+    assert "symbol" in item
+    assert "timeframe" in item
+    assert "config_hash" in item
+    assert item["status"] in {"succeeded", "failed", "skipped"}
+    assert "state" in item
+    assert "error" in item or item.get("error") is None
+    assert "code" in item or item.get("code") is None
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_retain_equals_individual(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """bulk retain 所有 pending == 逐個 retain（FSM 同 RETAINED）。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    task_id = await _start_two_symbol_batch(monkeypatch, batch_service)
+    config_hash = "cfg_batch_ret"
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        manifest = tmp_path / "features" / symbol / "1h" / config_hash / "feature_manifest.json"
+        _seed_registry(manager, symbol, "1h", config_hash, manifest)
+
+    resp = await client.post(
+        _bulk_retention_url(task_id),
+        json={
+            "decision": "retain",
+            "runs": [
+                {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": config_hash},
+                {"symbol": "ETHUSDT", "timeframe": "1h", "config_hash": config_hash},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["results"]) == 2
+    for item in body["results"]:
+        _assert_bulk_result_schema(item)
+        assert item["status"] == "succeeded"
+        assert item["state"] == RetentionState.RETAINED.value
+
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    pending = batch_service._list_pending_retention_items(checkpoint)
+    assert pending == []
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_discard_deletes_runs(
+    monkeypatch,
+    retention_client_real_browse,
+) -> None:
+    """bulk discard 真刪 run 目錄。"""
+    client, batch_service, ff_service, manager, tmp_path = retention_client_real_browse
+    task_id = await _start_two_symbol_batch(monkeypatch, batch_service)
+    config_hash = "cfg_batch_ret"
+    manifests: Dict[str, Path] = {}
+    for symbol in ("BTCUSDT", "ETHUSDT"):
+        manifest = tmp_path / "features" / symbol / "1h" / config_hash / "feature_manifest.json"
+        manifests[symbol] = manifest
+        _seed_registry(manager, symbol, "1h", config_hash, manifest)
+
+    resp = await client.post(
+        _bulk_retention_url(task_id),
+        json={
+            "decision": "discard",
+            "runs": [
+                {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": config_hash},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json()["results"][0]["status"] == "succeeded"
+    assert resp.json()["results"][0]["state"] == RetentionState.DISCARDED.value
+    assert not manifests["BTCUSDT"].exists()
+    assert manifests["ETHUSDT"].exists()
+    runs = ff_service.list_runs()
+    assert _find_registry_entry(runs, "ETHUSDT", "1h", config_hash)
+    with pytest.raises(AssertionError):
+        _find_registry_entry(runs, "BTCUSDT", "1h", config_hash)
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_opposite_terminal_failed_not_skipped(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """opposite-decision terminal → failed+conflict，不可吞成 skipped。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    task_id = await _start_two_symbol_batch(monkeypatch, batch_service)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    retain_url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+    retain = await client.post(retain_url, json={"decision": "retain"})
+    assert retain.status_code == 200
+
+    resp = await client.post(
+        _bulk_retention_url(task_id),
+        json={
+            "decision": "discard",
+            "runs": [
+                {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": config_hash},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    item = resp.json()["results"][0]
+    _assert_bulk_result_schema(item)
+    assert item["status"] == "failed"
+    assert item["code"] == "retention_conflict"
+    assert item["state"] == RetentionState.RETAINED.value
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_same_decision_terminal_succeeded_idempotent(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """same-decision terminal → succeeded（冪等）。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    task_id = await _start_two_symbol_batch(monkeypatch, batch_service)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    retain_url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+    first = await client.post(retain_url, json={"decision": "retain"})
+    assert first.status_code == 200
+
+    resp = await client.post(
+        _bulk_retention_url(task_id),
+        json={
+            "decision": "retain",
+            "runs": [
+                {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": config_hash},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    item = resp.json()["results"][0]
+    assert item["status"] == "succeeded"
+    assert item["state"] == RetentionState.RETAINED.value
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_not_found_skipped(
+    retention_client,
+) -> None:
+    """無對應 retention item → skipped。"""
+    client, batch_service, _ff, _manager, _tmp = retention_client
+    checkpoint = {
+        "batch_id": "orphan-batch",
+        "status": "completed",
+        "retention_items": [],
+    }
+    batch_service._write_checkpoint_atomic(checkpoint)
+
+    resp = await client.post(
+        _bulk_retention_url("orphan-batch"),
+        json={
+            "decision": "retain",
+            "runs": [
+                {"symbol": "XRPUSDT", "timeframe": "1h", "config_hash": "missing_cfg"},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    item = resp.json()["results"][0]
+    assert item["status"] == "skipped"
+    assert item["code"] == "retention_not_found"
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_one_failure_continues_others(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """一筆失敗其餘照做。"""
+    client, batch_service, _ff, manager, tmp_path = retention_client
+    task_id = await _start_two_symbol_batch(monkeypatch, batch_service)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    retain_url = f"/api/v1/features/batch/{task_id}/retention/BTCUSDT/1h/{config_hash}"
+    await client.post(retain_url, json={"decision": "retain"})
+
+    resp = await client.post(
+        _bulk_retention_url(task_id),
+        json={
+            "decision": "retain",
+            "runs": [
+                {"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": config_hash},
+                {"symbol": "ETHUSDT", "timeframe": "1h", "config_hash": config_hash},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    results = {r["symbol"]: r for r in resp.json()["results"]}
+    assert results["BTCUSDT"]["status"] == "succeeded"
+    assert results["ETHUSDT"]["status"] == "succeeded"
+    assert results["ETHUSDT"]["state"] == RetentionState.RETAINED.value
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_concurrent_bulk_and_single_mixed_decision(
+    monkeypatch,
+    retention_client,
+) -> None:
+    """bulk×single 並發混合決定：僅一筆 terminal。"""
+    _client, batch_service, ff_service, manager, tmp_path = retention_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    monkeypatch.setattr(
+        FeatureFactoryBatchService,
+        "_compute_single",
+        staticmethod(_compute_success),
+    )
+
+    task_id = await batch_service.start_batch(
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="1h", force_regenerate=True)
+    )
+    await _wait_batch_done(batch_service, task_id)
+    config_hash = "cfg_batch_ret"
+    manifest = tmp_path / "features" / "BTCUSDT" / "1h" / config_hash / "feature_manifest.json"
+    _seed_registry(manager, "BTCUSDT", "1h", config_hash, manifest)
+
+    delete_calls: List[tuple[str, str, str]] = []
+    original_delete = ff_service.delete_run
+
+    def _spy_delete(symbol: str, timeframe: str, cfg_hash: str) -> Dict[str, Any]:
+        delete_calls.append((symbol, timeframe, cfg_hash))
+        return original_delete(symbol, timeframe, cfg_hash)
+
+    batch_service._run_deleter = _spy_delete
+    barrier = threading.Barrier(2)
+
+    async def _bulk_retain() -> Dict[str, Any]:
+        await asyncio.get_event_loop().run_in_executor(None, barrier.wait)
+        return await batch_service.apply_bulk_retention_decisions(
+            task_id,
+            "retain",
+            [{"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": config_hash}],
+        )
+
+    async def _single_discard() -> Optional[Dict[str, Any]]:
+        await asyncio.get_event_loop().run_in_executor(None, barrier.wait)
+        try:
+            return await batch_service.apply_retention_decision(
+                task_id, "BTCUSDT", "1h", config_hash, "discard"
+            )
+        except RetentionConflictError:
+            return None
+
+    bulk_results, single_result = await asyncio.gather(_bulk_retain(), _single_discard())
+    statuses = {item["status"] for item in bulk_results}
+    assert "succeeded" in statuses or "failed" in statuses
+    winners = [r for r in [single_result] if r is not None]
+    assert len(winners) <= 1
+    assert len(delete_calls) <= 1
+    checkpoint = batch_service._load_checkpoint(task_id)
+    assert checkpoint is not None
+    terminal = [
+        item
+        for item in checkpoint.get("retention_items", [])
+        if item.get("state") in {
+            RetentionState.RETAINED.value,
+            RetentionState.DISCARDED.value,
+        }
+    ]
+    assert len(terminal) == 1
+
+
+@pytest.mark.asyncio
+async def test_bulk_retention_batch_not_found_404(retention_client) -> None:
+    client, _batch, _ff, _manager, _tmp = retention_client
+    resp = await client.post(
+        _bulk_retention_url("missing-batch"),
+        json={
+            "decision": "retain",
+            "runs": [{"symbol": "BTCUSDT", "timeframe": "1h", "config_hash": "cfg1"}],
+        },
+    )
+    assert resp.status_code == 404
