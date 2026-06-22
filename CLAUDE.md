@@ -209,6 +209,7 @@ This applies to everything: naming conventions, NaN patterns, execution paths, t
 ## Key Documentation
 
 - `HANDOFF.md` — current task state, decisions, blockers (update before handoff)
+- `docs/ROADMAP.md` — 單一現役戰術 roadmap（中長期 epic 排序/範圍；完成項與新需求隨手增修）
 - `docs/ARCHITECTURE.md` — full system architecture (~1900 lines)
 - `docs/DEVELOPMENT_GUIDE.md` — coding standards
 - `docs/API_SPECIFICATION.md` — all API endpoints (v5.0)
