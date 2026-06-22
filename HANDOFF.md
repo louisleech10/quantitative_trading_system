@@ -41,7 +41,8 @@
 - **擱置**:T-A per-layer串流釋放(P1,scaffold已存,砍峰值根本解)、T-B float16暫存(P2需A/B簽核)、T-D 為何以前28GB夠(取證)、.claude/gstack 1GB清理(使用者決定)。
 - 重啟後端重跑 2×2:乾淨log(T1)+即時layer進度與RSS(T2)+磁碟不夠提早abort(T-C)。
 
-## FF 一致性整併 — 實作中(兩輪三方委員會定案後)
+## FF 一致性整併 — ✅ 全部完成(2026-06-22)
+Q5/B1/B2/B3/B5/B6/B4 全完成 push;B7(L6.5並行)三方定 P2 暫緩。每項走完整管線(SPEC/TODO+adversarial+Composer實作+Codex review)。
 觀測性層完成:
 - **Q5**(P0a)✅ uvicorn access_log env 開關(terminal 噪音預設關,FFACT_UVICORN_ACCESS_LOG=1 恢復)。
 - **B1 #1**(P0b)✅ batch worker non-rotating FileHandler 進當日檔(FFACT_API_LOG_PATH)+[pid sym tf]+smoke。Codex review PASS(minor:idempotent T-A 再收緊)。
@@ -51,7 +52,9 @@
 - **B6**(大)✅ warmup-then-trim(**選項1**:使用者定,不承諾全範圍 parity,目標前段可用+run自洽)。max_warmup全源(L1 advanced/L2/L3/L4/**L5 cross-sectional**/L6.5/native-tf/validator)+OutputWindow+per-TF載warmup+單trim choke 5路徑+warmup不足警示(needed/available/affected_bars)。**排除parity表**:cumulative(OBV/AD/ADOSC/VWAP burn_in未實作)/fracdiff d*(first-500,[[project_dstar_first500_optionA]])/ADF/post-IC/labels horizon。flag `FFACT_WARMUP_TRIM`=0(僅開時納hash)。後端16+前端 vitest+hermetic+golden PASS。多輪委員會(d* Option A三方+Option-1設計三方+v1/v2雙家族+後端review兩輪)。
 留待(優先序,使用者 2026-06-21 定):
 - **B7 L6.5 並行**(P2 暫緩,三方定)microbench:現況 ThreadPool ~1.0x(kernels @njit 無 nogil GIL-bound),nogil=True→4.3-4.5x@6。但 MTF 三方:細→粗罕見且應聚合,native-tf 慢路徑是預處理正確性 backstop 非 alpha 標準→**B7 除非反證否則不做**。SPEC docs/B7_L65_PARALLEL_* 留存。見 [[project_mtf_direction_b7_parked]]。使用者確認 roadmap(crypto+台指/美指+月季報/籌碼/法人/總經)幾乎全粗→細。未來基本面 epic 核心=PIT 對齊(公告時戳+vintage)非並行。
-- **B4 Q2-B**(大,**進行中**)交易式 bulk-delete:RunManagerPanel 加多選+bulk endpoint。reuse 既有 `delete_run`(per-run RunLease 鎖,DeleteResult)逐 run+aggregate report+失效下游(browse_task_id/checkpoint completed_items/quality/磁碟);registry 已有 RunBusyError(刪除中)近似 in-flight tombstone。前端 RunManagerPanel 現無多選。
+- **B4 Q2-B**(大)✅ 批次刪除+孤兒清理(**選項1+防累積安全網**,使用者定)。bulk-delete endpoint(統一 delete orchestration:lease→mark_deleting_for_delete force(可刪命名run)→delete_run→remove/clear,單刪/bulk/B3 discard 共用)+完整 per-run report(HTTP 200 deleted/failed/skipped)+B3 FSM reconcile(刪 pending→DISCARDED+前端刷新)+**孤兒掃清(含 CGSA leaf+manifest ownership+active 排除)**防 partial-delete 累積。前端 RunManagerPanel 多選+確認(active提交排除+alias/hash)+孤兒按鈕。後端 33 pytest+前端 vitest+hermetic。**實證:正常刪除清整 run 目錄不留磁碟垃圾**。note:FFACT_CGSA_WORK_DIR override 仍 skip CGSA delete(孤兒網兜底)。
+未來/留待:
+- **B7 L6.5 並行 P2 暫緩**(見上,[[project_mtf_direction_b7_parked]]);未來基本面/總經 epic 核心=PIT 對齊(公告時戳+vintage)。
 - 既有壞測試(非本批):`frontend/src/__tests__/strategy-components.test.tsx` import 缺 `strategy/SignalTooltip`(d250c83 起壞,可另開小修)。
 - **E 執行模型維持現狀**;normalize 薄函式已落地。
-重啟後端:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度帶 RSS(B2)+批次 retain/discard(B3,FFACT_BATCH_RETENTION=1)+批次尊重日期(B5)+選日期 warmup 前段可用(B6,FFACT_WARMUP_TRIM=1)。
+重啟後端可用:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度帶 RSS(B2)+批次 retain/discard(B3,FFACT_BATCH_RETENTION=1)+批次尊重日期(B5)+選日期 warmup 前段可用(B6,FFACT_WARMUP_TRIM=1)+RunManager 多選 bulk 刪除+孤兒清理(B4)。
