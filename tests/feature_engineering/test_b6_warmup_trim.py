@@ -22,6 +22,7 @@ from momentum.FeatureEngineering.warmup_window import (
     estimate_max_warmup_bars,
     is_warmup_trim_enabled,
     max_ingest_index_before_output_start,
+    output_row_count,
     resolve_output_window,
     trim_dataframe_to_output_window,
 )
@@ -129,6 +130,80 @@ def _date_window(days: int = 120) -> tuple[str, str]:
     return start_ts.strftime("%Y-%m-%d"), end_ts.strftime("%Y-%m-%d")
 
 
+def _multi_tf_config(timeframe: str = "12h") -> Dict[str, Any]:
+    cfg = _minimal_config(timeframe)
+    cfg["timeframes"] = {
+        "primary": "12h",
+        "training": ["1h", "12h"],
+        "alignment": "point_in_time",
+        "alignment_mode": "open_minus",
+    }
+    return cfg
+
+
+def _expected_output_row_count_from_ingest(
+    factory: Any,
+    symbol: str,
+    timeframe: str,
+    config: Any,
+    start: str,
+    end: str,
+    window: OutputWindow,
+) -> int:
+    """從 ingest/raw 軸計算預期公開列數（非 trim 後結果）。"""
+    ingest_start = window.ingest_start if window.warmup_enabled else start
+    raw = factory._layer0_data_ingestion(
+        symbol,
+        timeframe,
+        config,
+        start_date=ingest_start,
+        end_date=end,
+    )
+    return output_row_count(raw.index, window)
+
+
+def _assert_trimmed_first_row_is_start(
+    index: pd.Index,
+    start: str,
+    window: OutputWindow,
+) -> None:
+    ts = _timestamp_series(pd.DataFrame(index=index))
+    assert ts.min() >= pd.Timestamp(start)
+    if window.warmup_enabled:
+        start_idx, _ = compute_row_bounds(index, window)
+        assert start_idx == 0, "trimmed output must begin at output_start (index position 0)"
+
+
+def _read_manifest_row_count(manifest_path: Path) -> int:
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if "row_count" in payload:
+        return int(payload["row_count"])
+    artifacts = payload.get("artifacts") or {}
+    for kind in ("raw", "processed", "validated"):
+        entry = artifacts.get(kind) or {}
+        if "row_count" in entry:
+            return int(entry["row_count"])
+    raise AssertionError(f"manifest missing row_count: {manifest_path}")
+
+
+def _resolve_manifest_path(result: Any, features_root: Path) -> Optional[Path]:
+    meta = result.metadata or {}
+    manifest_raw = meta.get("manifest_path")
+    if manifest_raw:
+        path = Path(str(manifest_raw))
+        if path.name == FeatureStorage.L7_V2_MANIFEST_NAME and path.exists():
+            return path
+    config_hash = str(meta.get("config_hash", ""))
+    timeframe = str(meta.get("timeframe", "12h"))
+    symbol = str(meta.get("symbol", "BTCUSDT"))
+    candidate = (
+        features_root / symbol / timeframe / config_hash / FeatureStorage.L7_V2_MANIFEST_NAME
+    )
+    if candidate.exists():
+        return candidate
+    return None
+
+
 def _position_independent_columns(columns: List[str]) -> List[str]:
     return [c for c in columns if not POSITION_INDEPENDENT_EXCLUDE.search(c)]
 
@@ -210,6 +285,11 @@ def test_warmup_trim_no_leak_row_count_matches_window(
     start, end = _date_window(90)
     factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
     factory._storage = FeatureStorage(str(features_root))
+    config = factory._resolve_config(_minimal_config())
+    window = resolve_output_window(config, "12h", start, end)
+    expected_rows = _expected_output_row_count_from_ingest(
+        factory, "BTCUSDT", "12h", config, start, end, window,
+    )
     result = factory.generate_features(
         "BTCUSDT",
         "12h",
@@ -218,15 +298,15 @@ def test_warmup_trim_no_leak_row_count_matches_window(
         start_date=start,
         end_date=end,
     )
-    expected_rows = compute_row_bounds(
-        result.features_df.index,
-        factory._current_output_window,
-    )
-    assert len(result.features_df) == expected_rows[1] - expected_rows[0]
+    assert len(result.features_df) == expected_rows
+    _assert_trimmed_first_row_is_start(result.features_df.index, start, window)
     ts = _timestamp_series(result.features_df)
     assert ts.min() >= pd.Timestamp(start)
     if end:
         assert ts.max() <= pd.Timestamp(end) + pd.Timedelta(hours=12)
+    manifest_path = _resolve_manifest_path(result, features_root)
+    if manifest_path is not None:
+        assert _read_manifest_row_count(manifest_path) == expected_rows
     _assert_data_cache_unchanged(before)
 
 
@@ -345,3 +425,226 @@ def test_trim_dataframe_preserves_values() -> None:
     trimmed = trim_dataframe_to_output_window(df, window)
     assert len(trimmed) == 3
     np.testing.assert_array_equal(trimmed["a"].to_numpy(), np.array([6.0, 7.0, 8.0]))
+
+
+def test_warmup_flag_off_preserves_config_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    """flag 關時 config_hash 與 B6 strict 一致；flag 開才分裂 cache key。"""
+    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
+    config = factory._resolve_config(_minimal_config())
+    start, end = _date_window(60)
+
+    monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
+    hash_strict_a = factory._compute_config_hash(
+        config, "BTCUSDT", "12h", start_date=start, end_date=end,
+    )
+    hash_strict_b = factory._compute_config_hash(
+        config, "BTCUSDT", "12h", start_date=start, end_date=end,
+    )
+    assert hash_strict_a == hash_strict_b
+
+    monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
+    hash_warmup = factory._compute_config_hash(
+        config, "BTCUSDT", "12h", start_date=start, end_date=end,
+    )
+    assert hash_warmup != hash_strict_a
+
+    monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
+    hash_strict_c = factory._compute_config_hash(
+        config, "BTCUSDT", "12h", start_date=start, end_date=end,
+    )
+    assert hash_strict_c == hash_strict_a
+
+
+def _assert_warmup_trim_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    path_name: str,
+    env: Dict[str, str],
+    config_override: Dict[str, Any],
+    timeframe: str = "12h",
+    symbol: str = "BTCUSDT",
+    days: int = 90,
+    ic_first: bool = False,
+) -> None:
+    _require_kline()
+    before = _snapshot_production_features()
+    features_root = _isolate_feature_output(monkeypatch, tmp_path / path_name)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+
+    start, end = _date_window(days)
+    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
+    factory._storage = FeatureStorage(str(features_root))
+    config = factory._resolve_config(config_override)
+    window = resolve_output_window(config, timeframe, start, end)
+    expected_rows = _expected_output_row_count_from_ingest(
+        factory, symbol, timeframe, config, start, end, window,
+    )
+
+    if ic_first:
+        from momentum.Analysis.ic_engine import ICEngine
+        from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+        factory._current_output_window = window
+        raw_data = factory._layer0_data_ingestion(
+            symbol,
+            timeframe,
+            config,
+            start_date=window.ingest_start if window.warmup_enabled else start,
+            end_date=end,
+        )
+        _, layers = factory._run_l1_l6_for_ic_first(symbol, timeframe, config)
+        reader = FeatureReader(str(features_root))
+        result = factory.run_ic_first(
+            symbol,
+            timeframe,
+            config,
+            raw_data=raw_data,
+            layers=layers,
+            config_hash=factory._compute_config_hash(
+                config, symbol, timeframe, start_date=start, end_date=end,
+            ),
+            ic_engine=ICEngine({"methods": ["spearman"]}),
+            feature_reader=reader,
+            storage=factory._storage,
+            ic_threshold=0.0,
+            persist=True,
+        )
+    else:
+        result = factory.generate_features(
+            symbol,
+            timeframe,
+            config_override=config_override,
+            force_regenerate=True,
+            start_date=start,
+            end_date=end,
+        )
+
+    assert len(result.features_df) == expected_rows
+    _assert_trimmed_first_row_is_start(result.features_df.index, start, window)
+    manifest_path = _resolve_manifest_path(result, features_root)
+    if manifest_path is not None:
+        assert _read_manifest_row_count(manifest_path) == expected_rows
+    _assert_data_cache_unchanged(before)
+
+
+def test_warmup_trim_non_cgsa_l7_validate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    _assert_warmup_trim_artifact(
+        monkeypatch,
+        tmp_path,
+        path_name="non_cgsa",
+        env={"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "0"},
+        config_override=_minimal_config(),
+    )
+
+
+def test_warmup_trim_cgsa_raw(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    _assert_warmup_trim_artifact(
+        monkeypatch,
+        tmp_path,
+        path_name="cgsa_raw",
+        env={"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "1"},
+        config_override=_minimal_config(),
+    )
+
+
+def test_warmup_trim_cgsa_validate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """CGSA validate/V7：直接走 _layer7_validate_and_persist_cgsa 並驗 trim。"""
+    _require_kline()
+    before = _snapshot_production_features()
+    features_root = _isolate_feature_output(monkeypatch, tmp_path)
+    monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
+    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+
+    start, end = _date_window(60)
+    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
+    factory._storage = FeatureStorage(str(features_root))
+    config = factory._resolve_config(_minimal_config())
+    window = resolve_output_window(config, "12h", start, end)
+    factory._current_output_window = window
+
+    raw_data = factory._layer0_data_ingestion(
+        "BTCUSDT",
+        "12h",
+        config,
+        start_date=window.ingest_start,
+        end_date=end,
+    )
+    factory._current_raw_data = raw_data
+    layer1 = factory._execute_layer1_6(
+        "Layer 1", factory._layer1_atomic_indicators, raw_data, config,
+    ).data
+    factory._cgsa_registry = factory._prepare_cgsa_registry(
+        "BTCUSDT", "12h", "cfg_cgsa_validate",
+    )
+    factory._persist_single_tf_l3_l6_to_cgsa(
+        factory._execute_layer1_6(
+            "Layer 3", factory._layer3_rolling_aggregation, layer1, layer1, config,
+        ).data,
+        factory._execute_layer1_6(
+            "Layer 4", factory._layer4_lag_features, layer1, layer1, layer1, raw_data, config,
+        ).data,
+        factory._execute_layer1_6(
+            "Layer 5", factory._layer5_cross_sectional, layer1, layer1, config,
+        ).data,
+        factory._execute_layer1_6(
+            "Layer 6", factory._layer6_meta_features, layer1, layer1, raw_data, config,
+        ).data,
+    )
+
+    config_hash = factory._compute_config_hash(
+        config, "BTCUSDT", "12h", start_date=start, end_date=end,
+    )
+    result = factory._layer7_validate_and_persist(
+        symbol="BTCUSDT",
+        timeframe="12h",
+        raw_data=raw_data,
+        layers=[],
+        config=config,
+        elapsed=1.0,
+        config_hash=config_hash,
+        persist=True,
+    )
+    expected_rows = _expected_output_row_count_from_ingest(
+        factory, "BTCUSDT", "12h", config, start, end, window,
+    )
+    assert len(result.features_df) == expected_rows
+    _assert_trimmed_first_row_is_start(result.features_df.index, start, window)
+    _assert_data_cache_unchanged(before)
+
+
+def test_warmup_trim_multi_tf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    _assert_warmup_trim_artifact(
+        monkeypatch,
+        tmp_path,
+        path_name="multi_tf",
+        env={
+            "FFACT_WARMUP_TRIM": "1",
+            "FFACT_USE_CGSA": "0",
+            "FFACT_MULTI_TF_PARALLEL": "0",
+        },
+        config_override=_multi_tf_config(),
+        timeframe="12h",
+    )
+
+
+def test_warmup_trim_ic_first(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    _assert_warmup_trim_artifact(
+        monkeypatch,
+        tmp_path,
+        path_name="ic_first",
+        env={"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "0"},
+        config_override=_minimal_config(),
+        ic_first=True,
+    )
