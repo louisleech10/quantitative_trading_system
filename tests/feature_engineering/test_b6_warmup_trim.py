@@ -455,6 +455,62 @@ def test_warmup_flag_off_preserves_config_hash(monkeypatch: pytest.MonkeyPatch) 
     assert hash_strict_c == hash_strict_a
 
 
+def _run_cgsa_l1_l6_into_registry(
+    factory: Any,
+    symbol: str,
+    timeframe: str,
+    config: Any,
+    start: str,
+    end: str,
+    window: OutputWindow,
+) -> pd.DataFrame:
+    """執行與 generate_features 一致的 CGSA L1-L6，將非空 groups 寫入 registry。"""
+    factory._current_symbol = symbol
+    factory._current_timeframe = timeframe
+    factory._current_output_window = window
+
+    config_hash = factory._compute_config_hash(
+        config, symbol, timeframe, start_date=start, end_date=end,
+    )
+    factory._current_config_hash = config_hash
+    factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, config_hash)
+
+    raw_data = factory._layer0_data_ingestion(
+        symbol,
+        timeframe,
+        config,
+        start_date=factory._layer0_ingest_start_date_for_tf(
+            timeframe, config.timeframes.primary,
+        ),
+        end_date=end,
+    )
+    factory._current_raw_data = raw_data
+
+    layer1 = factory._execute_layer1_6(
+        "Layer 1", factory._layer1_atomic_indicators, raw_data, config,
+    ).data
+    layer2 = factory._spill_to_memmap(
+        factory._execute_layer1_6(
+            "Layer 2", factory._layer2_derived_features, layer1, raw_data, config,
+        ).data,
+        "layer2",
+    )
+    layer3 = factory._execute_layer1_6(
+        "Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config,
+    ).data
+    layer4 = factory._execute_layer1_6(
+        "Layer 4", factory._layer4_lag_features, layer1, layer2, layer3, raw_data, config,
+    ).data
+    layer5 = factory._execute_layer1_6(
+        "Layer 5", factory._layer5_cross_sectional, layer1, layer2, config,
+    ).data
+    layer6 = factory._execute_layer1_6(
+        "Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config,
+    ).data
+    factory._persist_single_tf_l3_l6_to_cgsa(layer3, layer4, layer5, layer6)
+    return raw_data
+
+
 def _assert_warmup_trim_artifact(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -556,48 +612,28 @@ def test_warmup_trim_cgsa_raw(
 def test_warmup_trim_cgsa_validate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
-    """CGSA validate/V7：直接走 _layer7_validate_and_persist_cgsa 並驗 trim。"""
+    """CGSA validate/V7：非空 registry groups + row_slice trim + manifest row_count。"""
     _require_kline()
     before = _snapshot_production_features()
     features_root = _isolate_feature_output(monkeypatch, tmp_path)
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
     monkeypatch.setenv("FFACT_USE_CGSA", "1")
 
-    start, end = _date_window(60)
+    start, end = _date_window(90)
     factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
     factory._storage = FeatureStorage(str(features_root))
     config = factory._resolve_config(_minimal_config())
     window = resolve_output_window(config, "12h", start, end)
-    factory._current_output_window = window
 
-    raw_data = factory._layer0_data_ingestion(
-        "BTCUSDT",
-        "12h",
-        config,
-        start_date=window.ingest_start,
-        end_date=end,
+    raw_data = _run_cgsa_l1_l6_into_registry(
+        factory, "BTCUSDT", "12h", config, start, end, window,
     )
-    factory._current_raw_data = raw_data
-    layer1 = factory._execute_layer1_6(
-        "Layer 1", factory._layer1_atomic_indicators, raw_data, config,
-    ).data
-    factory._cgsa_registry = factory._prepare_cgsa_registry(
-        "BTCUSDT", "12h", "cfg_cgsa_validate",
-    )
-    factory._persist_single_tf_l3_l6_to_cgsa(
-        factory._execute_layer1_6(
-            "Layer 3", factory._layer3_rolling_aggregation, layer1, layer1, config,
-        ).data,
-        factory._execute_layer1_6(
-            "Layer 4", factory._layer4_lag_features, layer1, layer1, layer1, raw_data, config,
-        ).data,
-        factory._execute_layer1_6(
-            "Layer 5", factory._layer5_cross_sectional, layer1, layer1, config,
-        ).data,
-        factory._execute_layer1_6(
-            "Layer 6", factory._layer6_meta_features, layer1, layer1, raw_data, config,
-        ).data,
-    )
+    registry = factory._cgsa_registry
+    assert registry is not None
+    group_count = len(list(registry.iter_all()))
+    total_features = int(registry.total_columns())
+    assert group_count > 0, "CGSA validate test requires non-empty registry groups"
+    assert total_features > 0, "CGSA validate test requires non-empty feature columns"
 
     config_hash = factory._compute_config_hash(
         config, "BTCUSDT", "12h", start_date=start, end_date=end,
@@ -615,8 +651,12 @@ def test_warmup_trim_cgsa_validate(
     expected_rows = _expected_output_row_count_from_ingest(
         factory, "BTCUSDT", "12h", config, start, end, window,
     )
+    assert result.feature_count == total_features
     assert len(result.features_df) == expected_rows
     _assert_trimmed_first_row_is_start(result.features_df.index, start, window)
+    manifest_path = _resolve_manifest_path(result, features_root)
+    if manifest_path is not None:
+        assert _read_manifest_row_count(manifest_path) == expected_rows
     _assert_data_cache_unchanged(before)
 
 
@@ -648,3 +688,53 @@ def test_warmup_trim_ic_first(
         config_override=_minimal_config(),
         ic_first=True,
     )
+
+
+def test_warmup_trim_ic_first_public_window_init(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """public generate_features 初始化 B6 window；run_ic_first 不手設 window 仍 trim。"""
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    _require_kline()
+    before = _snapshot_production_features()
+    features_root = _isolate_feature_output(monkeypatch, tmp_path / "ic_first_public")
+    monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
+    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+
+    start, end = _date_window(90)
+    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
+    factory._storage = FeatureStorage(str(features_root))
+    config = factory._resolve_config(_minimal_config())
+
+    gen_result = factory.generate_features(
+        "BTCUSDT",
+        "12h",
+        config_override=_minimal_config(),
+        force_regenerate=True,
+        start_date=start,
+        end_date=end,
+    )
+    window = factory._current_output_window
+    assert window is not None and window.warmup_enabled
+    expected_rows = _expected_output_row_count_from_ingest(
+        factory, "BTCUSDT", "12h", config, start, end, window,
+    )
+    assert len(gen_result.features_df) == expected_rows
+    _assert_trimmed_first_row_is_start(gen_result.features_df.index, start, window)
+
+    ic_result = factory.run_ic_first(
+        "BTCUSDT",
+        "12h",
+        config,
+        ic_engine=ICEngine({"methods": ["spearman"]}),
+        feature_reader=FeatureReader(str(features_root)),
+        storage=factory._storage,
+        ic_threshold=0.0,
+        persist=True,
+    )
+    assert factory._current_output_window is window
+    assert len(ic_result.features_df) == expected_rows
+    _assert_trimmed_first_row_is_start(ic_result.features_df.index, start, window)
+    _assert_data_cache_unchanged(before)
