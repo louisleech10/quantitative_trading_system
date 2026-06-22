@@ -57,4 +57,4 @@ Q5/B1/B2/B3/B5/B6/B4 全完成 push;B7(L6.5並行)三方定 P2 暫緩。每項�
 - **B7 L6.5 並行 P2 暫緩**(見上,[[project_mtf_direction_b7_parked]]);未來基本面/總經 epic 核心=PIT 對齊(公告時戳+vintage)。
 - 既有壞測試(非本批):`frontend/src/__tests__/strategy-components.test.tsx` import 缺 `strategy/SignalTooltip`(d250c83 起壞,可另開小修)。
 - **E 執行模型維持現狀**;normalize 薄函式已落地。
-重啟後端可用:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度帶 RSS(B2)+批次 retain/discard(B3,FFACT_BATCH_RETENTION=1)+批次尊重日期(B5)+選日期 warmup 前段可用(B6,FFACT_WARMUP_TRIM=1)+RunManager 多選 bulk 刪除+孤兒清理(B4)。
+重啟後端可用:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度帶 RSS(B2)+**批次跑完自動顯 BatchRetentionPanel 逐項 retain/discard(B3,FFACT_BATCH_RETENTION 預設開,設 0 關;面板非 modal)**+批次尊重日期(B5)+選日期 warmup 前段可用(B6,FFACT_WARMUP_TRIM=1)+RunManager 多選 bulk 刪除+孤兒清理(B4)。
