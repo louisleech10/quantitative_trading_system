@@ -267,8 +267,12 @@ export default function RunManagerPanel() {
 
   const selectedRuns = useMemo(
     () => dedupeSelectedRuns(
-      sortedRuns.filter((run) => selectedKeys.has(runKey(run))),
+      sortedRuns.filter((run) => selectedKeys.has(runKey(run)) && !run.active),
     ),
+    [sortedRuns, selectedKeys],
+  );
+  const excludedActiveRuns = useMemo(
+    () => sortedRuns.filter((run) => selectedKeys.has(runKey(run)) && run.active),
     [sortedRuns, selectedKeys],
   );
   const selectedTotalBytes = useMemo(
@@ -672,6 +676,26 @@ export default function RunManagerPanel() {
                 : `即將刪除 ${selectedRuns.length} 筆 Run，共 ${formatBytes(selectedTotalBytes)}（含 CGSA）`}
             </DialogDescription>
           </DialogHeader>
+          {!bulkResult && excludedActiveRuns.length > 0 && (
+            <div
+              role="note"
+              className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
+            >
+              <p className="mb-1 font-medium">
+                已排除 {excludedActiveRuns.length} 筆使用中 Run（不會送出刪除）：
+              </p>
+              <ul className="list-disc pl-4 text-amber-100/90">
+                {excludedActiveRuns.map((run) => {
+                  const name = displayName(run);
+                  return (
+                    <li key={runKey(run)}>
+                      {run.symbol}/{run.timeframe} · {name.visible} · {run.config_hash}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
           <div className="max-h-64 overflow-auto rounded-lg border border-white/10">
             <table className="w-full text-xs">
               <thead className="bg-white/[0.04] text-slate-400">
