@@ -57,6 +57,10 @@ function batchDecisionUrl(symbol: string, timeframe: string, configHash: string)
   return `${API_BASE}${API_PREFIX}/batch/${BATCH_ID}/retention/${symbol}/${timeframe}/${configHash}`;
 }
 
+function bulkRetentionUrl(): string {
+  return `${API_BASE}${API_PREFIX}/batch/${BATCH_ID}/retention/bulk`;
+}
+
 function deleteRunUrl(symbol: string, timeframe: string, configHash: string): string {
   return `${API_BASE}${API_PREFIX}/runs/${symbol}/${timeframe}/${configHash}`;
 }
@@ -216,5 +220,115 @@ describe('BatchRetentionPanel', () => {
     expect(screen.getAllByTestId(/batch-retention-item-/)).toHaveLength(2);
     expect(screen.queryAllByRole('dialog')).toHaveLength(0);
     expect(screen.queryByText('保留這次產生的 Run？')).not.toBeInTheDocument();
+  });
+
+  it('retain all calls bulk endpoint and clears pending on success', async () => {
+    let pendingState = [...pendingItems];
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/retention/pending')) {
+        return { ok: true, json: async () => ({ batch_id: BATCH_ID, pending: pendingState }) };
+      }
+      if (url === bulkRetentionUrl() && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as { decision: string; runs: unknown[] };
+        expect(body.decision).toBe('retain');
+        expect(body.runs).toHaveLength(2);
+        pendingState = [];
+        return {
+          ok: true,
+          json: async () => ({
+            results: pendingItems.map((item) => ({
+              symbol: item.symbol,
+              timeframe: item.timeframe,
+              config_hash: item.config_hash,
+              status: 'succeeded',
+              state: 'retained',
+            })),
+          }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    seedBatchPending();
+    render(<BatchRetentionPanel />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '全部保留' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        bulkRetentionUrl(),
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    await waitFor(() => {
+      expect(useFeatureFactoryStore.getState().batchTask?.retention_pending ?? []).toHaveLength(0);
+    });
+  });
+
+  it('multi-select discard shows confirm dialog and calls bulk discard', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/retention/pending')) {
+        return { ok: true, json: async () => ({ batch_id: BATCH_ID, pending: pendingItems }) };
+      }
+      if (url === bulkRetentionUrl() && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as {
+          decision: string;
+          runs: Array<{ symbol: string }>;
+        };
+        expect(body.decision).toBe('discard');
+        expect(body.runs).toEqual([
+          expect.objectContaining({ symbol: 'BTCUSDT' }),
+        ]);
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{
+              symbol: 'BTCUSDT',
+              timeframe: '12h',
+              config_hash: 'hash_btc',
+              status: 'succeeded',
+              state: 'discarded',
+            }],
+          }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    seedBatchPending();
+    render(<BatchRetentionPanel />);
+
+    fireEvent.click(await screen.findByLabelText('選取 BTCUSDT'));
+    fireEvent.click(screen.getByRole('button', { name: '丟棄選取' }));
+
+    const dialog = await screen.findByRole('dialog', { name: /確認丟棄/ });
+    expect(within(dialog).getByText(/BTCUSDT\/12h/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/ETHUSDT/)).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '確認丟棄' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        bulkRetentionUrl(),
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+  });
+
+  it('select all checks all pending items', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ batch_id: BATCH_ID, pending: pendingItems }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    seedBatchPending();
+    render(<BatchRetentionPanel />);
+
+    fireEvent.click(await screen.findByLabelText('全選待決項目'));
+    expect(screen.getByLabelText('選取 BTCUSDT')).toBeChecked();
+    expect(screen.getByLabelText('選取 ETHUSDT')).toBeChecked();
   });
 });

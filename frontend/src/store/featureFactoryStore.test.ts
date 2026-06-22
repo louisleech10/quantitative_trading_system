@@ -299,6 +299,108 @@ function retentionPendingUrl(batchId: string): string {
   return `${API_BASE}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/retention/pending`;
 }
 
+function bulkRetentionUrl(batchId: string): string {
+  return `${API_BASE}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/retention/bulk`;
+}
+
+describe('featureFactoryStore bulkRetentionDecision', () => {
+  beforeEach(() => {
+    resetStore();
+    useFeatureFactoryStore.setState({ batchTask: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetStore();
+  });
+
+  it('POSTs bulk retention endpoint with deduped runs and refreshes pending', async () => {
+    const bulkResponse = {
+      results: [
+        {
+          symbol: 'BTCUSDT',
+          timeframe: '12h',
+          config_hash: 'hash_a',
+          status: 'succeeded',
+          state: 'retained',
+        },
+      ],
+    };
+    const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      fetchCalls.push({ url, init });
+      if (url === bulkRetentionUrl('batch-99') && init?.method === 'POST') {
+        return response(200, bulkResponse);
+      }
+      if (url === retentionPendingUrl('batch-99')) {
+        return response(200, {
+          batch_id: 'batch-99',
+          pending: [{
+            symbol: 'ETHUSDT',
+            timeframe: '12h',
+            config_hash: 'hash_b',
+            state: 'pending',
+          }],
+        });
+      }
+      return response(404, {});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    useFeatureFactoryStore.setState({
+      batchTask: {
+        task_id: 'batch-99',
+        batch_id: 'batch-99',
+        status: 'completed',
+        total: 2,
+        completed: 2,
+        failed: 0,
+        progress: 1,
+        retention_pending: [
+          {
+            symbol: 'BTCUSDT',
+            timeframe: '12h',
+            config_hash: 'hash_a',
+            state: 'pending',
+          },
+          {
+            symbol: 'ETHUSDT',
+            timeframe: '12h',
+            config_hash: 'hash_b',
+            state: 'pending',
+          },
+        ],
+      },
+    });
+
+    const result = await useFeatureFactoryStore.getState().bulkRetentionDecision(
+      'batch-99',
+      'retain',
+      [
+        { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a' },
+        { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a' },
+      ],
+    );
+
+    expect(result.ok).toBe(true);
+    const bulkCall = fetchCalls.find((call) => call.url === bulkRetentionUrl('batch-99'));
+    expect(bulkCall).toBeDefined();
+    const body = JSON.parse(String(bulkCall?.init?.body)) as {
+      decision: string;
+      runs: Array<{ symbol: string; timeframe: string; config_hash: string }>;
+    };
+    expect(body.decision).toBe('retain');
+    expect(body.runs).toEqual([
+      { symbol: 'BTCUSDT', timeframe: '12h', config_hash: 'hash_a' },
+    ]);
+    expect(fetchCalls.some((call) => call.url === retentionPendingUrl('batch-99'))).toBe(true);
+    const pending = useFeatureFactoryStore.getState().batchTask?.retention_pending ?? [];
+    expect(pending.some((item) => item.symbol === 'BTCUSDT')).toBe(false);
+    expect(pending.some((item) => item.symbol === 'ETHUSDT')).toBe(true);
+  });
+});
+
 describe('featureFactoryStore bulkDeleteRuns', () => {
   beforeEach(() => {
     resetStore();
