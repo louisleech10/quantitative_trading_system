@@ -8,6 +8,9 @@ const mockFetchRuns = vi.fn();
 const mockUpdateRunAlias = vi.fn();
 const mockSetBatchAlias = vi.fn();
 const mockDeleteRun = vi.fn();
+const mockBulkDeleteRuns = vi.fn();
+const mockScanOrphans = vi.fn();
+const mockCleanOrphans = vi.fn();
 
 const storeState = vi.hoisted(() => ({
   runs: [] as RunInfo[],
@@ -22,6 +25,9 @@ vi.mock('@/store/featureFactoryStore', () => ({
     updateRunAlias: mockUpdateRunAlias,
     setBatchAlias: mockSetBatchAlias,
     deleteRun: mockDeleteRun,
+    bulkDeleteRuns: mockBulkDeleteRuns,
+    scanOrphans: mockScanOrphans,
+    cleanOrphans: mockCleanOrphans,
   }),
 }));
 
