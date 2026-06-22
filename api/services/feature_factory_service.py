@@ -931,23 +931,6 @@ class FeatureFactoryService:
             manager = self._lifecycle()
             entry = manager.registry.get(symbol, timeframe, config_hash)
             batch_id = str(entry.get("batch_id") or "") if entry else ""
-            if retention_reconcile is not None:
-                try:
-                    retention_reconcile(
-                        symbol,
-                        timeframe,
-                        config_hash,
-                        batch_id or None,
-                    )
-                except RunBusyError as exc:
-                    skipped.append({
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "config_hash": config_hash,
-                        "bytes": 0,
-                        "error": str(exc),
-                    })
-                    continue
 
             try:
                 result = self.delete_run(symbol, timeframe, config_hash)
@@ -1007,6 +990,13 @@ class FeatureFactoryService:
                     "bytes": int(result.get("total_bytes") or 0),
                     "error": None,
                 })
+                if retention_reconcile is not None:
+                    retention_reconcile(
+                        symbol,
+                        timeframe,
+                        config_hash,
+                        batch_id or None,
+                    )
 
         return {"deleted": deleted, "failed": failed, "skipped": skipped}
 

@@ -255,7 +255,7 @@ class RunLifecycleManager:
             identity = (symbol, timeframe, config_hash)
             if identity in registry_keys:
                 continue
-            entry = self.registry.get(symbol, timeframe, config_hash)
+            entry = self.registry.get_internal(symbol, timeframe, config_hash)
             if entry is not None and entry.get("deleting"):
                 continue
             if is_run_active(self.locks_dir, symbol, timeframe, config_hash):

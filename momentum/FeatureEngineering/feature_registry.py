@@ -137,7 +137,14 @@ class FeatureRegistry:
         )
 
     def get(self, symbol: str, timeframe: str, config_hash: str) -> Optional[Dict[str, Any]]:
-        """讀取單一 entry；mutation 安全由 lease/deleting 協定保證。"""
+        """讀取單一 entry（公開 API；deleting 中視為不存在）。"""
+        entry = self._find_entry(symbol, timeframe, config_hash)
+        if entry is None or entry.get("deleting"):
+            return None
+        return dict(entry)
+
+    def get_internal(self, symbol: str, timeframe: str, config_hash: str) -> Optional[Dict[str, Any]]:
+        """內部掃描用；含 deleting 標記的 entry。"""
         entry = self._find_entry(symbol, timeframe, config_hash)
         return dict(entry) if entry is not None else None
 
