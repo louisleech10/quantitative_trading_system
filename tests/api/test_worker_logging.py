@@ -121,7 +121,7 @@ def test_compute_single_worker_logging_momentum_to_file(tmp_path, monkeypatch) -
             None,
             True,
             str(tmp_path),
-        )
+        ).hdf5_path
 
     _flush_root_handlers()
     assert path.endswith("BTCUSDT_1h.h5")
@@ -148,7 +148,7 @@ def test_compute_single_failopen_when_logging_setup_raises(tmp_path, monkeypatch
                 None,
                 True,
                 str(tmp_path),
-            )
+            ).hdf5_path
 
     assert path.endswith("BTCUSDT_1h.h5")
     factory_mock.generate_features.assert_called_once()

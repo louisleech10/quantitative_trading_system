@@ -142,6 +142,7 @@ def map_batch_progress_ws_data(payload: Dict) -> Dict:
         "memory_sanity_failed": payload.get("memory_sanity_failed", False),
         "last_item_metrics": payload.get("last_item_metrics"),
         "retention_pending": payload.get("retention_pending") or [],
+        "warmup_insufficient_items": payload.get("warmup_insufficient_items") or [],
     }
 
 

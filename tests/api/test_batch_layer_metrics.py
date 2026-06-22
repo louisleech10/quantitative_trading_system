@@ -58,7 +58,7 @@ def test_compute_single_writes_layer_metrics_jsonl(tmp_path, monkeypatch) -> Non
             "",
             None,
             None,
-        )
+        ).hdf5_path
 
     assert path.endswith("BTCUSDT_1h.h5")
     rows = _read_jsonl(layer_metrics_path)
@@ -105,7 +105,7 @@ def test_compute_single_layer_metrics_failopen_on_write_error(tmp_path, monkeypa
         ):
             path = FeatureFactoryBatchService._compute_single(
                 "BTCUSDT", "1h", None, True, str(tmp_path), "", None, None
-            )
+            ).hdf5_path
 
     assert path.endswith("out.h5")
 
@@ -130,7 +130,7 @@ def test_compute_single_cache_hit_no_layer_events(tmp_path, monkeypatch) -> None
             "",
             None,
             None,
-        )
+        ).hdf5_path
 
     assert path.endswith("cached.h5")
     assert _read_jsonl(layer_metrics_path) == []

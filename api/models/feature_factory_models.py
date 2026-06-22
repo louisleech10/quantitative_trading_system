@@ -66,6 +66,22 @@ class FeaturePreviewResponse(BaseModel):
     breakdown: Dict[str, int]
 
 
+class WarmupInsufficientInfo(BaseModel):
+    """B6 warmup 不足 metadata（凍結欄位）。"""
+
+    needed: int = Field(..., description="所需 warmup bar 數")
+    available: int = Field(..., description="起點前實得 bar 數")
+    affected_bars: int = Field(..., description="受影響前段 bar 數")
+
+
+class BatchWarmupInsufficientItem(BaseModel):
+    """批次單標的 warmup 不足警示。"""
+
+    symbol: str
+    timeframe: str
+    warmup_insufficient: WarmupInsufficientInfo
+
+
 class FeatureTaskStatusResponse(BaseModel):
     """Feature Factory task status response."""
 
@@ -76,6 +92,10 @@ class FeatureTaskStatusResponse(BaseModel):
     completed_stages: list[str]
     error: Optional[str] = None
     result: Optional[Dict] = None
+    warmup_insufficient: Optional[WarmupInsufficientInfo] = Field(
+        default=None,
+        description="B6：起點前歷史不足時由 result.metadata 提升至此",
+    )
     retention_prompt: Optional[bool] = None
     run_identity: Optional[Dict[str, str]] = None
     process_rss_mb: Optional[int] = Field(
@@ -291,6 +311,10 @@ class BatchTaskStatusResponse(BaseModel):
     browse_task_ids: Optional[Dict[str, str]] = None
     errors: Optional[Dict[str, str]] = None
     retention_pending: Optional[List["BatchRetentionItem"]] = None
+    warmup_insufficient_items: Optional[List[BatchWarmupInsufficientItem]] = Field(
+        default=None,
+        description="B6：已完成標的中 warmup 不足者（由 checkpoint 彙整）",
+    )
 
 
 class BatchRetentionItem(BaseModel):

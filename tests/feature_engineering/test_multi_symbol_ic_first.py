@@ -180,9 +180,9 @@ class TestMultiSymbolIcIsolation:
                 "ETHUSDT", "1h", config, False, str(tmp_path), "", None, None
             )
 
-        assert result1 != result2, "兩標的輸出路徑不應相同（output isolation 違反）"
-        assert result1 == path_btc
-        assert result2 == path_eth
+        assert result1.hdf5_path != result2.hdf5_path, "兩標的輸出路徑不應相同（output isolation 違反）"
+        assert result1.hdf5_path == path_btc
+        assert result2.hdf5_path == path_eth
 
     def test_compute_single_does_not_mutate_config_on_failure(self, tmp_path):
         """

@@ -16,7 +16,7 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 import threading
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple
 
 import psutil
 from fastapi import HTTPException
@@ -24,6 +24,10 @@ from fastapi import HTTPException
 from api.core.logging import get_logger
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.utils.ff_progress import normalize_progress_event
+from api.utils.warmup_contract import (
+    coerce_warmup_insufficient,
+    warmup_insufficient_items_from_completed,
+)
 from momentum.FeatureEngineering.utils.hardware_utils import (
     get_current_tier_gb,
     get_tier_concurrent_symbols,
@@ -66,6 +70,22 @@ class BatchFailureType(str, Enum):
     OOM = "oom"
     RAM_GATE = "ram_gate"
     COMPUTE_ERROR = "compute_error"
+
+
+class ComputeSingleResult(NamedTuple):
+    """子進程單標的計算結果（含 B6 warmup metadata）。"""
+
+    hdf5_path: str
+    warmup_insufficient: Optional[Dict[str, int]]
+
+
+def _normalize_compute_single_result(raw: Any) -> ComputeSingleResult:
+    """相容 mock 回傳 str 或 ComputeSingleResult。"""
+    if isinstance(raw, ComputeSingleResult):
+        return raw
+    if isinstance(raw, str):
+        return ComputeSingleResult(raw, None)
+    raise TypeError(f"unexpected _compute_single result type: {type(raw)!r}")
 
 
 class RetentionState(str, Enum):
@@ -501,12 +521,12 @@ class FeatureFactoryBatchService:
         async def _wait_one(
             item: Dict[str, str],
             future: asyncio.Future,
-        ) -> Tuple[Dict[str, str], Optional[str], Optional[BaseException]]:
+        ) -> Tuple[Dict[str, str], ComputeSingleResult, Optional[BaseException]]:
             try:
                 result = await future
-                return item, result, None
+                return item, _normalize_compute_single_result(result), None
             except Exception as exc:  # pragma: no cover - exercised through callers
-                return item, None, exc
+                return item, ComputeSingleResult("", None), exc
 
         wrapped_futures = []
         compute_fn = self._compute_single
@@ -596,9 +616,10 @@ class FeatureFactoryBatchService:
 
                         oom_seen = False
                         for wrapped_future in asyncio.as_completed(wrapped_futures):
-                            item, hdf5_path, error = await wrapped_future
+                            item, compute_result, error = await wrapped_future
                             symbol = str(item["symbol"])
                             timeframe = str(item["timeframe"])
+                            hdf5_path = compute_result.hdf5_path
                             rss_before = rss_before_by_item[(symbol, timeframe)]
                             rss_peak = max(rss_before, self._rss_mb())
                             gc.collect()
@@ -619,6 +640,7 @@ class FeatureFactoryBatchService:
                                 rss_before,
                                 rss_peak,
                                 rss_after,
+                                warmup_insufficient=compute_result.warmup_insufficient,
                             )
                             self._append_child_metrics_if_missing(
                                 child_metrics_path,
@@ -671,6 +693,7 @@ class FeatureFactoryBatchService:
         rss_before_mb: int,
         rss_peak_mb: int,
         rss_after_gc_mb: int,
+        warmup_insufficient: Optional[Dict[str, int]] = None,
     ) -> None:
         """Record one completed or failed item in memory and checkpoint state."""
 
@@ -708,6 +731,11 @@ class FeatureFactoryBatchService:
                 "browse_task_id": browse_task_id,
                 "rss_peak_item_mb": rss_peak_mb,
                 "rss_after_gc_mb": rss_after_gc_mb,
+                **(
+                    {"warmup_insufficient": warmup_insufficient}
+                    if warmup_insufficient is not None
+                    else {}
+                ),
             })
             if self._is_batch_retention_enabled():
                 run_hash = self._resolve_completed_run_hash({
@@ -1032,6 +1060,9 @@ class FeatureFactoryBatchService:
                 checkpoint.get("completed_items", [])
             ),
             "errors": self._errors_from_failed(checkpoint.get("failed_items", [])),
+            "warmup_insufficient_items": warmup_insufficient_items_from_completed(
+                checkpoint.get("completed_items", [])
+            ),
             "created_at": time.time(),
             "concurrent_symbols": checkpoint.get("concurrent_symbols", 1),
             "memory_sanity_failed": bool(checkpoint.get("memory_sanity_failed", False)),
@@ -1290,7 +1321,7 @@ class FeatureFactoryBatchService:
         batch_id: str = "",
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-    ) -> str:
+    ) -> ComputeSingleResult:
         """在子進程中執行單一標的特徵計算。"""
         api_log_path = os.environ.get("FFACT_API_LOG_PATH")
         if api_log_path:
@@ -1363,7 +1394,11 @@ class FeatureFactoryBatchService:
                         "status": "ok",
                     },
                 )
-            return result.hdf5_path or ""
+            warmup_insufficient = None
+            metadata = getattr(result, "metadata", None)
+            if isinstance(metadata, dict):
+                warmup_insufficient = coerce_warmup_insufficient(metadata.get("warmup_insufficient"))
+            return ComputeSingleResult(result.hdf5_path or "", warmup_insufficient)
         except FileNotFoundError as exc:
             if metrics_path:
                 FeatureFactoryBatchService._append_child_metrics_jsonl(
@@ -1545,6 +1580,9 @@ class FeatureFactoryBatchService:
             "browse_task_ids": dict(task.get("browse_task_ids", {})),
             "errors": dict(task["errors"]),
             "retention_pending": retention_pending,
+            "warmup_insufficient_items": warmup_insufficient_items_from_completed(
+                checkpoint.get("completed_items", []) if checkpoint is not None else []
+            ),
         }
 
     @staticmethod

@@ -34,6 +34,11 @@ from api.core.config import settings
 from api.core.logging import get_logger
 from api.utils.feature_name_parser import infer_category, infer_layer, infer_level
 from api.utils.ff_progress import normalize_progress_event
+from api.utils.warmup_contract import (
+    coerce_warmup_insufficient,
+    extract_warmup_insufficient_from_result,
+    warmup_insufficient_items_from_completed,
+)
 from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
 from momentum.factories import create_feature_factory, create_feature_factory_mcp, create_run_lifecycle_manager
 from momentum.FeatureEngineering.run_locks import is_run_active
@@ -345,6 +350,7 @@ class FeatureFactoryService:
                 )
             )
             completed_notify["result"] = summary
+            completed_notify["warmup_insufficient"] = extract_warmup_insufficient_from_result(summary)
             completed_notify["retention_prompt"] = bool(self._run_identity(summary))
             completed_notify["run_identity"] = self._run_identity(summary)
             self._notify_callbacks(task_id, completed_notify)
@@ -665,6 +671,7 @@ class FeatureFactoryService:
                 return None
             result = task_info.get("result")
             identity = self._run_identity(result or {}) if result else None
+            warmup_insufficient = extract_warmup_insufficient_from_result(result)
             return {
                 "task_id": task_info["task_id"],
                 "status": task_info["status"],
@@ -673,6 +680,7 @@ class FeatureFactoryService:
                 "completed_stages": list(task_info["completed_stages"]),
                 "error": task_info["error"],
                 "result": result,
+                "warmup_insufficient": warmup_insufficient,
                 "retention_prompt": bool(identity and task_info["status"] == "completed"),
                 "run_identity": identity,
                 "process_rss_mb": task_info.get("process_rss_mb"),
