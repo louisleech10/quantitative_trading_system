@@ -20,6 +20,7 @@ import {
   BatchGenerateRequest,
   BatchTaskStatus,
 } from '@/lib/types';
+import { normalizeWarmupInsufficient } from '@/lib/warmupInsufficient';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -236,6 +237,14 @@ export function useFeatureFactory() {
               ? (validationRaw.warnings as string[])
               : undefined,
           };
+        }
+        if (result.metadata && typeof result.metadata === 'object') {
+          const warmupInsufficient = normalizeWarmupInsufficient(
+            result.metadata as Record<string, unknown>,
+          );
+          if (warmupInsufficient !== undefined) {
+            patch.warmup_insufficient = warmupInsufficient;
+          }
         }
         if (Object.keys(patch).length > 0) {
           updateCurrentTaskPartial(patch);

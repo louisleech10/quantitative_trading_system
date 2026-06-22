@@ -11,6 +11,7 @@ import PreviewPanel from '@/components/feature-factory/PreviewPanel';
 import GenerationProgress from '@/components/feature-factory/GenerationProgress';
 import RunRetentionDialog from '@/components/feature-factory/RunRetentionDialog';
 import BatchRetentionPanel from '@/components/feature-factory/BatchRetentionPanel';
+import WarmupInsufficientAlert from '@/components/feature-factory/WarmupInsufficientAlert';
 import RunManagerPanel from '@/components/feature-factory/RunManagerPanel';
 import ExportButtons from '@/components/feature-factory/ExportButtons';
 import PreprocessingPanel from '@/components/feature-factory/PreprocessingPanel';
@@ -359,6 +360,9 @@ export default function FeatureFactoryPage() {
               </ul>
             </div>
           )}
+
+        <WarmupInsufficientAlert warmup={currentTask?.warmup_insufficient} />
+        <WarmupInsufficientAlert items={batchTask?.warmup_insufficient_items} />
 
         <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
           {/* Tab 導航列 */}

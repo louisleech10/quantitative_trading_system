@@ -23,8 +23,10 @@ import {
   CompletionSource,
   BatchRetentionItem,
   BatchRetentionPendingResponse,
+  BatchWarmupInsufficientItem,
   EnsureBrowseResponse,
 } from '@/lib/types';
+import { normalizeWarmupInsufficient } from '@/lib/warmupInsufficient';
 
 type BatchConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'lost';
 type BatchPayload = Partial<BatchTaskStatus> & Record<string, unknown>;
@@ -350,6 +352,30 @@ function retentionItemKey(item: Pick<BatchRetentionItem, 'symbol' | 'timeframe' 
   return `${item.symbol}|${item.timeframe}|${item.config_hash}`;
 }
 
+function normalizeWarmupInsufficientItems(
+  payload: BatchPayload,
+  previous?: BatchTaskStatus | null,
+): BatchWarmupInsufficientItem[] | undefined {
+  if ('warmup_insufficient_items' in payload) {
+    const raw = payload.warmup_insufficient_items;
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    return (raw as unknown[])
+      .filter((item): item is Record<string, unknown> => item != null && typeof item === 'object')
+      .map((item) => {
+        const wi = normalizeWarmupInsufficient(item);
+        if (!wi) return null;
+        const symbol = String(item.symbol ?? '');
+        const timeframe = String(item.timeframe ?? '');
+        if (!symbol || !timeframe) return null;
+        return { symbol, timeframe, warmup_insufficient: wi };
+      })
+      .filter((item): item is BatchWarmupInsufficientItem => item != null);
+  }
+  return previous?.warmup_insufficient_items;
+}
+
 async function parseAliasPatchError(response: Response): Promise<string> {
   if (response.status === 409) return 'Run 使用中';
   if (response.status === 422) return '名稱已被使用';
@@ -454,6 +480,7 @@ function normalizeBatchTask(
     browse_task_ids: (payload.browse_task_ids as Record<string, string> | undefined) ?? previous?.browse_task_ids ?? {},
     errors: (payload.errors as Record<string, string> | undefined) ?? previous?.errors ?? {},
     retention_pending: normalizeRetentionPending(payload, previous),
+    warmup_insufficient_items: normalizeWarmupInsufficientItems(payload, previous),
   };
 }
 

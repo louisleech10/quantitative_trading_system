@@ -482,6 +482,7 @@ export interface BatchTaskStatus {
   browse_task_ids?: Record<string, string>;
   errors?: Record<string, string>;
   retention_pending?: BatchRetentionItem[];
+  warmup_insufficient_items?: BatchWarmupInsufficientItem[];
 }
 
 export interface BatchRetentionItem {
@@ -510,6 +511,18 @@ export interface BatchRetentionDecisionResponse {
 export interface BatchRetentionPendingResponse {
   batch_id: string;
   pending: BatchRetentionItem[];
+}
+
+export interface WarmupInsufficient {
+  needed: number;
+  available: number;
+  affected_bars: number;
+}
+
+export interface BatchWarmupInsufficientItem {
+  symbol: string;
+  timeframe: string;
+  warmup_insufficient: WarmupInsufficient;
 }
 
 export interface FeaturePreview {
@@ -544,6 +557,7 @@ export interface FeatureTask {
   validation_summary?: FeatureValidationSummary;
   retention_prompt?: boolean;
   run_identity?: RunIdentity;
+  warmup_insufficient?: WarmupInsufficient | null;
   result?: Record<string, unknown>;
 }
 

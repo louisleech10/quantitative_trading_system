@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { BatchTaskStatus, FeatureTask } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import { extractWarmupInsufficientFromPayload } from '@/lib/warmupInsufficient';
 import BatchProgressPanel from './BatchProgressPanel';
 
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
@@ -57,6 +58,8 @@ export default function GenerationProgress({
       worker_rss_mb?: number | null;
       current_rss_mb?: number | null;
       schema_version?: number;
+      warmup_insufficient?: FeatureTask['warmup_insufficient'];
+      result?: Record<string, unknown>;
     }) => {
       const t = taskRef.current;
       if (!t) return;
@@ -82,6 +85,10 @@ export default function GenerationProgress({
         current_rss_mb: processRssMb,
         schema_version: payload.schema_version,
       });
+      const warmupInsufficient = extractWarmupInsufficientFromPayload(
+        payload as Record<string, unknown>,
+      );
+
       setCurrentTaskRef.current({
         ...t,
         status: derivedStatus,
@@ -92,6 +99,9 @@ export default function GenerationProgress({
         schema_version: payload.schema_version ?? t.schema_version,
         retention_prompt: payload.retention_prompt,
         run_identity: payload.run_identity,
+        ...(warmupInsufficient !== undefined
+          ? { warmup_insufficient: warmupInsufficient }
+          : {}),
       });
       if (derivedStatus === 'completed' && payload.retention_prompt && payload.run_identity) {
         enqueueCompletion(payload.run_identity);
@@ -130,6 +140,8 @@ export default function GenerationProgress({
             schema_version?: number;
             retention_prompt?: boolean;
             run_identity?: { symbol: string; timeframe: string; config_hash: string };
+            warmup_insufficient?: FeatureTask['warmup_insufficient'];
+            result?: Record<string, unknown>;
           };
           applyPayload({
             stage: s.current_stage ?? s.status,
@@ -140,6 +152,8 @@ export default function GenerationProgress({
             schema_version: s.schema_version,
             retention_prompt: s.retention_prompt,
             run_identity: s.run_identity,
+            warmup_insufficient: s.warmup_insufficient,
+            result: s.result,
           });
           if (s.status === 'completed' || s.status === 'failed') stopPolling();
         } catch {
