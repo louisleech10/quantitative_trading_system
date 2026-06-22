@@ -69,6 +69,7 @@ from momentum.FeatureEngineering.warmup_window import (
     build_warmup_metadata,
     compute_row_bounds,
     ingest_layer0_start_date,
+    is_warmup_trim_enabled,
     output_row_count,
     resolve_output_window,
     trim_dataframe_to_output_window,
@@ -735,13 +736,13 @@ class FeatureFactory:
     _BASE_OHLCV = ["open", "high", "low", "close", "volume"]
 
     def _layer0_ingest_start_date_for_tf(self, timeframe: str, primary_tf: str) -> Optional[str]:
-        window = self._current_output_window
+        window = getattr(self, "_current_output_window", None)
         if window is None:
             return None
         return ingest_layer0_start_date(window, timeframe, primary_tf)
 
     def _output_row_slice(self, index: pd.Index) -> Optional[slice]:
-        window = self._current_output_window
+        window = getattr(self, "_current_output_window", None)
         if window is None or not window.warmup_enabled:
             return None
         start_idx, end_idx = compute_row_bounds(index, window)
@@ -754,7 +755,7 @@ class FeatureFactory:
         labels_df: pd.DataFrame,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """單一 trim choke：公開輸出前裁到 [output_start, output_end]。"""
-        window = self._current_output_window
+        window = getattr(self, "_current_output_window", None)
         if window is None or not window.warmup_enabled:
             return raw_data, features_df, labels_df
         return (
@@ -769,7 +770,7 @@ class FeatureFactory:
         config: "FactoryConfig",
         raw_data: pd.DataFrame,
     ) -> None:
-        window = self._current_output_window
+        window = getattr(self, "_current_output_window", None)
         if window is None or not window.warmup_enabled:
             return
         metadata.update(build_warmup_metadata(config, raw_data, window))
@@ -2136,10 +2137,20 @@ class FeatureFactory:
 
         if raw_data is None or layers is None:
             raw_data, layers = self._run_l1_l6_for_ic_first(symbol, tf, config)
-        self._current_raw_data = raw_data
+        ingest_raw = raw_data
+        self._current_raw_data = ingest_raw
 
         if label is None:
-            label = self._build_default_ic_label(raw_data)
+            label = self._build_default_ic_label(ingest_raw)
+
+        labels_df = label.to_frame(name=label.name or "label")
+        trimmed_raw, _, labels_df = self._trim_for_public_output(
+            ingest_raw,
+            pd.DataFrame(index=ingest_raw.index),
+            labels_df,
+        )
+        label = labels_df.iloc[:, 0] if not labels_df.empty else label
+        raw_data_trimmed = trimmed_raw
 
         if selection_window is None and split_id is None:
             selection_window = {"start_pos": 0, "end_pos": int(len(label))}
@@ -2147,13 +2158,7 @@ class FeatureFactory:
 
         all_features = self._combine_layers(layers, context="ic_first_l65_pre_input")
         pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
-        row_slice = self._output_row_slice(raw_data.index)
-        if row_slice is not None:
-            pre_ic_frame = pre_ic_frame.iloc[row_slice]
-            label = trim_series_to_output_window(label, self._current_output_window)
-            raw_data_trimmed = raw_data.iloc[row_slice]
-        else:
-            raw_data_trimmed = raw_data
+        _, pre_ic_frame, _ = self._trim_for_public_output(ingest_raw, pre_ic_frame, labels_df)
         pre_ic_groups = self._frame_to_l7_groups(pre_ic_frame, "pre_ic")
         raw_feature_count = sum(len(frame.columns) for frame in pre_ic_groups.values())
         raw_path = storage_manager.write_raw(
@@ -2259,11 +2264,11 @@ class FeatureFactory:
         del processed_groups
         gc.collect()
 
-        labels_df = label.to_frame(name=label.name or "label")
         metadata = {
             "symbol": symbol,
             "timeframe": tf,
             "config_hash": resolved_config_hash,
+            "data_range": self._data_range(trimmed_raw),
             "ic_first_pipeline": True,  # metadata backward compatibility
             "raw_path": str(raw_path),
             "processed_path": str(processed_path),
@@ -2278,6 +2283,7 @@ class FeatureFactory:
             "raw_cleaned_up": cleanup_raw and not raw_path.exists(),
             "raw_freed_gb": raw_freed_gb,
         }
+        self._apply_warmup_metadata(metadata, config, ingest_raw)
         logger.info(
             "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d peak_rss_gb=%.2f",
             symbol,
@@ -2287,7 +2293,7 @@ class FeatureFactory:
             float(ic_memory.peak_rss_gb),
         )
         return FeatureGenerationResult(
-            features_df=pd.DataFrame(index=raw_data.index if raw_data is not None else None),
+            features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
             metadata=metadata,
             feature_count=processed_feature_count,
@@ -2307,7 +2313,18 @@ class FeatureFactory:
         tf: str,
         config: "FactoryConfig",
     ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
-        raw_data = self._layer0_data_ingestion(symbol, tf, config)
+        window = getattr(self, "_current_output_window", None)
+        end_date = window.output_end if window is not None else None
+        ingest_start = self._layer0_ingest_start_date_for_tf(tf, config.timeframes.primary)
+        if ingest_start is None and window is not None:
+            ingest_start = window.output_start
+        raw_data = self._layer0_data_ingestion(
+            symbol,
+            tf,
+            config,
+            start_date=ingest_start,
+            end_date=end_date,
+        )
         self._current_raw_data = raw_data
         layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config).data
         layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config).data
@@ -3686,6 +3703,9 @@ class FeatureFactory:
         # Explicitly include timeframe kwarg in hash to ensure 12h/1h results never share cache.
         config_payload["_timeframe"] = timeframe
         config_payload["_mtf_align_version"] = CURRENT_MTF_ALIGN_VERSION
+        # Warmup flag off must preserve pre-B6 strict cache keys; flag on splits cache.
+        if is_warmup_trim_enabled():
+            config_payload["_warmup_trim_enabled"] = True
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
