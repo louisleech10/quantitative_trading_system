@@ -50,8 +50,8 @@
 - **B5**(大)✅ 批次日期 bug 修復:跨棧加 date(Pydantic+前端 hook+threading+checkpoint resume+7 mock)。strict-window(止血)。hermetic 測試(B5 教訓:整合測須重導 tmp data_cache_path+FFACT_CGSA_WORK_DIR)。詳 [[project_batch_date_bug]]。
 - **B6**(大)✅ warmup-then-trim(**選項1**:使用者定,不承諾全範圍 parity,目標前段可用+run自洽)。max_warmup全源(L1 advanced/L2/L3/L4/**L5 cross-sectional**/L6.5/native-tf/validator)+OutputWindow+per-TF載warmup+單trim choke 5路徑+warmup不足警示(needed/available/affected_bars)。**排除parity表**:cumulative(OBV/AD/ADOSC/VWAP burn_in未實作)/fracdiff d*(first-500,[[project_dstar_first500_optionA]])/ADF/post-IC/labels horizon。flag `FFACT_WARMUP_TRIM`=0(僅開時納hash)。後端16+前端 vitest+hermetic+golden PASS。多輪委員會(d* Option A三方+Option-1設計三方+v1/v2雙家族+後端review兩輪)。
 留待(優先序,使用者 2026-06-21 定):
-- **L6.5 並行研究**(B5/B6 已完→**下一個**)委員會方案 handoffs/20260622-l65-parallel-*:先 read-only profile 證 CPU vs I/O(winsor sliding 已 O(n),native-tf 32x 疑為 per-group 開銷)→窄L3並行/寬L2序列+tier worker公式+RSS gate+ThreadPool+byte parity。native-tf gate 否決見 [[project_nativetf_gate_rejected]]。
-- **B4 Q2-B**(大,最後)交易式 bulk-delete(tombstone+失效 checkpoint/RunManager/quality/磁碟)。B3 已備單 run delete_run;B4 做多選/原子/批量。
+- **B7 L6.5 並行**(P2 暫緩,三方定)microbench:現況 ThreadPool ~1.0x(kernels @njit 無 nogil GIL-bound),nogil=True→4.3-4.5x@6。但 MTF 三方:細→粗罕見且應聚合,native-tf 慢路徑是預處理正確性 backstop 非 alpha 標準→**B7 除非反證否則不做**。SPEC docs/B7_L65_PARALLEL_* 留存。見 [[project_mtf_direction_b7_parked]]。使用者確認 roadmap(crypto+台指/美指+月季報/籌碼/法人/總經)幾乎全粗→細。未來基本面 epic 核心=PIT 對齊(公告時戳+vintage)非並行。
+- **B4 Q2-B**(大,**進行中**)交易式 bulk-delete:RunManagerPanel 加多選+bulk endpoint。reuse 既有 `delete_run`(per-run RunLease 鎖,DeleteResult)逐 run+aggregate report+失效下游(browse_task_id/checkpoint completed_items/quality/磁碟);registry 已有 RunBusyError(刪除中)近似 in-flight tombstone。前端 RunManagerPanel 現無多選。
 - 既有壞測試(非本批):`frontend/src/__tests__/strategy-components.test.tsx` import 缺 `strategy/SignalTooltip`(d250c83 起壞,可另開小修)。
 - **E 執行模型維持現狀**;normalize 薄函式已落地。
 重啟後端:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度帶 RSS(B2)+批次 retain/discard(B3,FFACT_BATCH_RETENTION=1)+批次尊重日期(B5)+選日期 warmup 前段可用(B6,FFACT_WARMUP_TRIM=1)。
