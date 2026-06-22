@@ -135,6 +135,14 @@ def test_registry_deleting_alias_and_remove(tmp_path: Path) -> None:
     assert not registry.remove("BTCUSDT", "12h", "cfg_batch2d")
 
 
+def test_registry_mark_deleting_for_delete_allows_named(tmp_path: Path) -> None:
+    registry = FeatureRegistry(tmp_path / "registry.json")
+    registry.add({**_entry(), "alias": "alpha"})
+    assert not registry.mark_deleting("BTCUSDT", "12h", "cfg_batch2d")
+    assert registry.mark_deleting_for_delete("BTCUSDT", "12h", "cfg_batch2d")
+    assert registry.get("BTCUSDT", "12h", "cfg_batch2d")["deleting"] is True
+
+
 def test_registry_corrupt_fails_closed(tmp_path: Path) -> None:
     path = tmp_path / "registry.json"
     original = b"{broken"
