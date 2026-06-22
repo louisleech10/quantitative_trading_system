@@ -39,6 +39,15 @@ class MultiTFGenerator:
         self._training_tfs = self._ensure_primary(list(dict.fromkeys(config.timeframes.training)))
         self._progress_callback = progress_callback
 
+    def _multi_tf_layer0_start(self, timeframe: str, strict_start: Optional[str] = None) -> Optional[str]:
+        """B6：warmup 開用 primary ingest_start；關用 strict start_date。"""
+        from momentum.FeatureEngineering.warmup_window import ingest_layer0_start_date
+
+        window = getattr(self._factory, "_current_output_window", None)
+        if window is None or not window.warmup_enabled:
+            return strict_start
+        return ingest_layer0_start_date(window, timeframe, self._primary_tf)
+
     def generate_multi_tf(
         self,
         symbol: str,
@@ -55,7 +64,7 @@ class MultiTFGenerator:
                 symbol,
                 self._primary_tf,
                 self._config,
-                start_date=start_date,
+                start_date=self._multi_tf_layer0_start(self._primary_tf, start_date),
                 end_date=end_date,
             )
         except FileNotFoundError as exc:
@@ -161,7 +170,8 @@ class MultiTFGenerator:
                     if timeframe == self._primary_tf
                     else self._factory._layer0_data_ingestion(
                         symbol, timeframe, self._config,
-                        start_date=start_date, end_date=end_date,
+                        start_date=self._multi_tf_layer0_start(timeframe, start_date),
+                        end_date=end_date,
                     )
                 )
             except FileNotFoundError:
@@ -1275,7 +1285,8 @@ class MultiTFGenerator:
                     if timeframe == self._primary_tf
                     else self._factory._layer0_data_ingestion(
                         symbol, timeframe, self._config,
-                        start_date=start_date, end_date=end_date,
+                        start_date=self._multi_tf_layer0_start(timeframe, start_date),
+                        end_date=end_date,
                     )
                 )
             except FileNotFoundError:
@@ -1714,9 +1725,27 @@ def _tf_worker_entry(
         factory._cgsa_force_fresh = True
         factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, "worker")
 
+        from momentum.FeatureEngineering.warmup_window import (
+            ingest_layer0_start_date,
+            resolve_output_window,
+        )
+
+        primary_tf = config.timeframes.primary
+        factory._current_output_window = resolve_output_window(
+            config,
+            primary_tf,
+            start_date,
+            end_date,
+        )
+        load_start = (
+            ingest_layer0_start_date(factory._current_output_window, timeframe, primary_tf)
+            if factory._current_output_window.warmup_enabled
+            else start_date
+        )
         raw_data = factory._layer0_data_ingestion(
             symbol, timeframe, config,
-            start_date=start_date, end_date=end_date,
+            start_date=load_start,
+            end_date=end_date,
         )
         if raw_data is None or raw_data.empty:
             return {"timeframe": timeframe, "error": f"Empty data for {symbol}/{timeframe}"}

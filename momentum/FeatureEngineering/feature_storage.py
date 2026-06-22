@@ -746,6 +746,7 @@ class FeatureStorage:
         dead_drop_min_valid: Optional[int] = None,
         sanitize_finite_cap: Optional[float] = None,
         row_index: Optional[pd.DatetimeIndex] = None,
+        row_slice: Optional[slice] = None,
         layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
     ) -> Tuple[Path, Dict[str, Any]]:
         """Stream CGSA registry groups into the canonical L7_raw artifact.
@@ -873,6 +874,8 @@ class FeatureStorage:
                 columns_list = _tagged
 
             array = _coerce_persistence_array(data)
+            if row_slice is not None:
+                array = array[row_slice]
             # registry 來源可能是 memmap / arrow 零拷貝（唯讀）；下方 Layer B 淨化與
             # dead-drop 需就地寫入 → 唯讀時複製成可寫副本（可寫來源維持零拷貝省記憶體）。
             if not array.flags.writeable:
@@ -2241,6 +2244,7 @@ class FeatureStorage:
         config_hash: str,
         registry: "ColumnGroupRegistry",
         cleanup_intermediate: bool = False,
+        row_slice: Optional[slice] = None,
     ) -> List[str]:
         """Persist CGSA registry groups to per-group parquet files.
 
@@ -2380,6 +2384,8 @@ class FeatureStorage:
                 # Persistence 邊界：層間 in-memory 可為 float64，編碼前統一 float32
                 # （與 Batch0 baseline 的 float32→float16 單次捨入一致）。
                 mmap_arr = _coerce_persistence_array(registry.load_data(group_id))
+                if row_slice is not None:
+                    mmap_arr = mmap_arr[row_slice]
                 if mmap_arr.ndim != 2:
                     raise ValueError(f"Group {group_id} data must be 2D, got shape={mmap_arr.shape}")
                 if mmap_arr.shape[1] != len(group.columns):

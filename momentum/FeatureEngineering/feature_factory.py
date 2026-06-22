@@ -64,7 +64,16 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from momentum.FeatureEngineering.utils.nan_stats import abnormal_nan_count
 from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
-
+from momentum.FeatureEngineering.warmup_window import (
+    OutputWindow,
+    build_warmup_metadata,
+    compute_row_bounds,
+    ingest_layer0_start_date,
+    output_row_count,
+    resolve_output_window,
+    trim_dataframe_to_output_window,
+    trim_series_to_output_window,
+)
 
 logger = get_logger(__name__)
 
@@ -222,6 +231,7 @@ class FeatureFactory:
         self._preprocessing_applied: Optional[bool] = None
         self._effective_preprocessing_config: Optional[Dict[str, Any]] = None
         self._column_layer_map: Optional[Dict[str, str]] = None
+        self._current_output_window: Optional[OutputWindow] = None
 
     def generate_features(
         self,
@@ -288,6 +298,12 @@ class FeatureFactory:
         self._preprocessing_applied = None
         self._effective_preprocessing_config = None
         self._column_layer_map = None
+        self._current_output_window = resolve_output_window(
+            config,
+            timeframe,
+            start_date,
+            end_date,
+        )
         start_time = time.time()
 
         config_hash = self._compute_config_hash(
@@ -328,7 +344,10 @@ class FeatureFactory:
                 symbol,
                 timeframe,
                 config,
-                start_date=start_date,
+                start_date=self._layer0_ingest_start_date_for_tf(
+                    timeframe,
+                    config.timeframes.primary,
+                ),
                 end_date=end_date,
             )
         except Exception as exc:
@@ -714,6 +733,46 @@ class FeatureFactory:
             return pd.DataFrame()
 
     _BASE_OHLCV = ["open", "high", "low", "close", "volume"]
+
+    def _layer0_ingest_start_date_for_tf(self, timeframe: str, primary_tf: str) -> Optional[str]:
+        window = self._current_output_window
+        if window is None:
+            return None
+        return ingest_layer0_start_date(window, timeframe, primary_tf)
+
+    def _output_row_slice(self, index: pd.Index) -> Optional[slice]:
+        window = self._current_output_window
+        if window is None or not window.warmup_enabled:
+            return None
+        start_idx, end_idx = compute_row_bounds(index, window)
+        return slice(start_idx, end_idx)
+
+    def _trim_for_public_output(
+        self,
+        raw_data: pd.DataFrame,
+        features_df: pd.DataFrame,
+        labels_df: pd.DataFrame,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """單一 trim choke：公開輸出前裁到 [output_start, output_end]。"""
+        window = self._current_output_window
+        if window is None or not window.warmup_enabled:
+            return raw_data, features_df, labels_df
+        return (
+            trim_dataframe_to_output_window(raw_data, window),
+            trim_dataframe_to_output_window(features_df, window),
+            trim_dataframe_to_output_window(labels_df, window),
+        )
+
+    def _apply_warmup_metadata(
+        self,
+        metadata: Dict[str, Any],
+        config: "FactoryConfig",
+        raw_data: pd.DataFrame,
+    ) -> None:
+        window = self._current_output_window
+        if window is None or not window.warmup_enabled:
+            return
+        metadata.update(build_warmup_metadata(config, raw_data, window))
 
     def _layer0_data_ingestion(
         self,
@@ -1749,7 +1808,20 @@ class FeatureFactory:
                         reason="reference fetch cached failure",
                     )
             else:
-                ref_data = self._layer0_data_ingestion(reference_symbol, timeframe, config)
+                ref_data = self._layer0_data_ingestion(
+                    reference_symbol,
+                    timeframe,
+                    config,
+                    start_date=self._layer0_ingest_start_date_for_tf(
+                        timeframe,
+                        config.timeframes.primary,
+                    ),
+                    end_date=(
+                        self._current_output_window.output_end
+                        if self._current_output_window is not None
+                        else None
+                    ),
+                )
                 self._reference_data_cache[cache_key] = ref_data
         except Exception as exc:
             self._reference_data_cache[cache_key] = None
@@ -2075,6 +2147,13 @@ class FeatureFactory:
 
         all_features = self._combine_layers(layers, context="ic_first_l65_pre_input")
         pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
+        row_slice = self._output_row_slice(raw_data.index)
+        if row_slice is not None:
+            pre_ic_frame = pre_ic_frame.iloc[row_slice]
+            label = trim_series_to_output_window(label, self._current_output_window)
+            raw_data_trimmed = raw_data.iloc[row_slice]
+        else:
+            raw_data_trimmed = raw_data
         pre_ic_groups = self._frame_to_l7_groups(pre_ic_frame, "pre_ic")
         raw_feature_count = sum(len(frame.columns) for frame in pre_ic_groups.values())
         raw_path = storage_manager.write_raw(
@@ -2082,7 +2161,7 @@ class FeatureFactory:
             tf,
             resolved_config_hash,
             pre_ic_groups,
-            row_index=self._derive_row_index_for_artifact(raw_data),
+            row_index=self._derive_row_index_for_artifact(raw_data_trimmed),
             layer_results=self.layer_results,
         )
 
@@ -3047,10 +3126,19 @@ class FeatureFactory:
             raise ValueError("CGSA L7_raw requested without initialized registry")
 
         self._cgsa_registry.finalize()
+        ingest_raw = raw_data
         labels_df = pd.DataFrame(index=raw_data.index)
         if "close" in raw_data.columns:
             label_generator = LabelGenerator(config.labels.model_dump())
             labels_df = label_generator.generate_all(raw_data["close"])
+
+        trimmed_raw, _, labels_df = self._trim_for_public_output(
+            raw_data,
+            pd.DataFrame(index=raw_data.index),
+            labels_df,
+        )
+        row_slice = self._output_row_slice(ingest_raw.index)
+        public_time_range = self._manifest_time_range_from_raw_data(trimmed_raw)
 
         config_payload = config.model_dump(by_alias=True)
         training_tfs = config_payload.get("timeframes", {}).get("training", [])
@@ -3063,7 +3151,9 @@ class FeatureFactory:
             "raw_path": "",
             "manifest_path": str(self._cgsa_registry.manifest_path),
             "feature_count": int(self._cgsa_registry.total_columns()),
-            "row_count": int(len(raw_data.index)),
+            "row_count": int(output_row_count(ingest_raw.index, self._current_output_window))
+            if self._current_output_window is not None
+            else int(len(trimmed_raw.index)),
             "group_count": len(list(self._cgsa_registry.iter_all())),
             "validation": self._scan_cgsa_registry_validation(self._cgsa_registry),
             "l65_mode": l65_mode,
@@ -3112,8 +3202,9 @@ class FeatureFactory:
                 l65_mode=l65_mode,
                 dead_drop_min_valid=_dead_min_valid,
                 sanitize_finite_cap=_sanitize_cap,
-                row_index=self._derive_row_index_for_artifact(raw_data),
-                time_range=self._manifest_time_range_from_raw_data(raw_data),
+                row_index=self._derive_row_index_for_artifact(trimmed_raw),
+                time_range=public_time_range,
+                row_slice=row_slice,
                 layer_results=self.layer_results,
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
@@ -3158,7 +3249,7 @@ class FeatureFactory:
             "compute_warnings": merged_warnings,
             "symbol": symbol,
             "timeframe": timeframe,
-            "data_range": self._data_range(raw_data),
+            "data_range": self._data_range(trimmed_raw),
             "config_used": config_payload,
             "artifact_kind": "raw",
             "schema_version": FeatureStorage.L7_RAW_SCHEMA_VERSION,
@@ -3190,6 +3281,7 @@ class FeatureFactory:
                 completeness_meta.get("failure_reasons", []), timeframe
             ),
         }
+        self._apply_warmup_metadata(metadata, config, ingest_raw)
         self._apply_preprocessing_degradation_metadata(metadata)
         stream_nan_ratio = float(metadata["validation"]["nan_ratio"])
         self._apply_runtime_quality_gate(
@@ -3202,7 +3294,7 @@ class FeatureFactory:
         )
 
         result = FeatureGenerationResult(
-            features_df=pd.DataFrame(index=raw_data.index),
+            features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
             metadata=metadata,
             feature_count=feature_count,
@@ -3219,7 +3311,7 @@ class FeatureFactory:
                 "timeframe": timeframe,
                 "config_hash": config_hash,
                 "feature_count": result.feature_count,
-                "row_count": len(raw_data.index),
+                "row_count": len(trimmed_raw.index),
                 "hdf5_relative_path": result.hdf5_path,
             }
             if batch_id is not None:
@@ -3282,6 +3374,13 @@ class FeatureFactory:
             label_generator = LabelGenerator(config.labels.model_dump())
             labels_df = label_generator.generate_all(raw_data["close"])
 
+        trimmed_raw, _, labels_df = self._trim_for_public_output(
+            raw_data,
+            pd.DataFrame(index=raw_data.index),
+            labels_df,
+        )
+        row_slice = self._output_row_slice(raw_data.index)
+
         validation_summary = self._scan_cgsa_registry_validation(self._cgsa_registry)
         layer_counts = self._collect_cgsa_layer_counts(self._cgsa_registry)
         feature_names = self._cgsa_registry.all_column_names()
@@ -3299,6 +3398,7 @@ class FeatureFactory:
                 config_hash=config_hash,
                 registry=self._cgsa_registry,
                 cleanup_intermediate=False,
+                row_slice=row_slice,
             )
 
         self._cgsa_registry.save_state(
@@ -3321,7 +3421,7 @@ class FeatureFactory:
             "compute_warnings": merged_warnings,
             "symbol": symbol,
             "timeframe": timeframe,
-            "data_range": self._data_range(raw_data),
+            "data_range": self._data_range(trimmed_raw),
             "config_used": config_payload,
             "manifest_path": manifest_path,
             "persisted_group_paths": persisted_group_paths,
@@ -3338,6 +3438,7 @@ class FeatureFactory:
                 "constant_features_removed": [],
             },
         }
+        self._apply_warmup_metadata(metadata, config, raw_data)
         self._apply_preprocessing_degradation_metadata(metadata)
         self._apply_runtime_quality_gate(
             metadata,
@@ -3349,7 +3450,7 @@ class FeatureFactory:
         )
 
         result = FeatureGenerationResult(
-            features_df=pd.DataFrame(index=raw_data.index),
+            features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
             metadata=metadata,
             feature_count=feature_count,
@@ -3366,7 +3467,7 @@ class FeatureFactory:
                 "timeframe": timeframe,
                 "config_hash": config_hash,
                 "feature_count": result.feature_count,
-                "row_count": len(raw_data.index),
+                "row_count": len(trimmed_raw.index),
                 "hdf5_relative_path": result.hdf5_path,
             }
             if batch_id is not None:
@@ -3421,6 +3522,12 @@ class FeatureFactory:
             label_generator = LabelGenerator(config.labels.model_dump())
             labels_df = label_generator.generate_all(raw_data["close"])
 
+        raw_data, features_df, labels_df = self._trim_for_public_output(
+            raw_data,
+            features_df,
+            labels_df,
+        )
+
         layer_counts = {
             "layer1": layers[0].shape[1] if len(layers) > 0 else 0,
             "layer2": layers[1].shape[1] if len(layers) > 1 else 0,
@@ -3455,6 +3562,8 @@ class FeatureFactory:
                 completeness_meta.get("failure_reasons", []), timeframe
             ),
         }
+        ingest_raw = self._current_raw_data if self._current_raw_data is not None else raw_data
+        self._apply_warmup_metadata(metadata, config, ingest_raw)
 
         result = FeatureGenerationResult(
             features_df=features_df,
