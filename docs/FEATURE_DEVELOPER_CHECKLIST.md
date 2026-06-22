@@ -125,6 +125,20 @@
 
 ## Cross-cutting
 
+### 上線可重算性（Serving Parity）— 必做 ⚠️
+> 新增 L1/L2/L3/L6.5 任何組件,先問:**這個計算在上線對新資料時,能不能用「最近 N 根歷史」因果重算出與訓練時同分布的值?**
+> 三方三輪盤點全清單見 `docs/FEATURE_STATEFUL_PARAM_AUDIT_FINAL.md`。
+
+判斷樹（對你的新組件逐一過）：
+- [ ] **固定窗 rolling / 純函數**（如 EMA/RSI/rolling winsor/zscore/rank/lag）→ **安全(D)**,上線自算,無須留存。
+- [ ] **因果遞推但會收斂**（EMA 族,warmup 後收斂）→ **D′**,只須在上線 pin「足夠 burn-in 根數」,無須帶 state。
+- [ ] **在校準樣本上搜/擬一次後固定**（fracdiff d* / ADF 差分階 / 任何 `.fit()` / optimal 搜尋 / 用**全樣本** `.median()/.mean()/.std()/.quantile()` 算 threshold）→ **A 類:上線無法重算,必須持久化綁 run/model**。**禁止用全樣本統計**——改 causal/expanding/rolling,或註冊到須留存清單。
+- [ ] **從序列起點累積且不收斂**（OBV/AD/cumsum/SAR pivot）→ **B 類**:上線須一致 reset/burn-in 規則 + 帶 running state。
+- [ ] **改變「哪些欄位存在」**（用全 run nunique/std/nan_rate 丟欄/跳過生成）→ **A-schema**:上線特徵清單須與訓練 pin 一致(缺欄/多欄會壞)。
+- [ ] **依賴同期參考集**（cross-sectional vs reference_symbol）→ **C 類**:上線須同 reference 即時資料。
+
+規則:**任何落入 A / A-schema / B / C 的新組件,PR 必須(a)在 doc 註明屬哪類 + 上線如何留存/重算,(b)優先改成 causal 避免留存,(c)無法 causal 則註冊到 `FEATURE_STATEFUL_PARAM_AUDIT_FINAL.md` 清單。** 已知未決:fracdiff d*(A1,最高優先,持久化屬 productionization epic)。
+
 ### Test data
 - [ ] Use real kline from `data_cache/feature_klines/kline_cache.h5`
 - [ ] Minimum sample size: 4000 bars (covers L3 window=720 cleanly)

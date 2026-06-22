@@ -334,8 +334,13 @@ export default function FeatureFactoryPage() {
                 <code className="mx-1 px-1 rounded bg-white/10 text-sky-100 font-mono text-xs">RATIO_UNSAFE_CATEGORIES</code>
                 黑名單；否則 ratio / momentum / WorldQuant 會在 L2/L3 階段產生大量 NaN（見 2026-05-21 事故）。
               </div>
+              <div className="text-sky-100/70">
+                此外，若新組件引入<strong className="text-sky-200">擬合/搜尋參數（如 fracdiff d*、ADF）、全樣本統計、累積狀態（OBV/SAR）或會改變欄位集合</strong>，
+                則該參數<strong className="text-sky-200">上線推論時必須持久化綁 run/model</strong>（否則 train/serve 分布偏移、模型靜默失效）；優先改 causal/rolling 避免留存。判斷樹見開發守則「上線可重算性」。
+              </div>
               <div className="flex flex-wrap gap-3 pt-1 text-xs text-sky-300/80">
                 <span>📄 docs/FEATURE_DEVELOPER_CHECKLIST.md</span>
+                <span>📄 docs/FEATURE_STATEFUL_PARAM_AUDIT_FINAL.md</span>
                 <span>📄 docs/NAN_POISONING_INVESTIGATION.md</span>
               </div>
             </div>
