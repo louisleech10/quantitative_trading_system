@@ -27,6 +27,13 @@ function runKey(run: RunInfo): string {
   return `${run.symbol}-${run.timeframe}-${run.config_hash}`;
 }
 
+type BulkDeleteTarget = {
+  mode: 'selection' | 'batch';
+  batchId?: string;
+  runs: RunInfo[];
+  excludedActive: RunInfo[];
+};
+
 /** 將 bytes 轉為 B / KB / MB / GB */
 function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null || Number.isNaN(bytes)) return '—';
@@ -255,6 +262,7 @@ export default function RunManagerPanel() {
   const [batchRenameValue, setBatchRenameValue] = useState('');
   const [savingBatchRename, setSavingBatchRename] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [bulkDeleteTarget, setBulkDeleteTarget] = useState<BulkDeleteTarget | null>(null);
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkResult, setBulkResult] = useState<BulkDeleteResponse | null>(null);
@@ -275,9 +283,17 @@ export default function RunManagerPanel() {
     () => sortedRuns.filter((run) => selectedKeys.has(runKey(run)) && run.active),
     [sortedRuns, selectedKeys],
   );
-  const selectedTotalBytes = useMemo(
-    () => selectedRuns.reduce((sum, run) => sum + (run.size_bytes ?? 0), 0),
-    [selectedRuns],
+  const targetRuns = useMemo(
+    () => bulkDeleteTarget?.runs ?? [],
+    [bulkDeleteTarget],
+  );
+  const targetExcludedActive = useMemo(
+    () => bulkDeleteTarget?.excludedActive ?? [],
+    [bulkDeleteTarget],
+  );
+  const targetTotalBytes = useMemo(
+    () => targetRuns.reduce((sum, run) => sum + (run.size_bytes ?? 0), 0),
+    [targetRuns],
   );
   const allSelectableSelected = selectableRuns.length > 0
     && selectableRuns.every((run) => selectedKeys.has(runKey(run)));
@@ -317,27 +333,51 @@ export default function RunManagerPanel() {
   const openBulkConfirm = () => {
     if (selectedRuns.length === 0) return;
     setBulkResult(null);
+    setBulkDeleteTarget({
+      mode: 'selection',
+      runs: selectedRuns,
+      excludedActive: excludedActiveRuns,
+    });
+    setBulkConfirmOpen(true);
+  };
+
+  const openBatchDeleteConfirm = (group: { batchId: string; runs: RunInfo[] }) => {
+    const deletable = dedupeSelectedRuns(group.runs.filter((run) => !run.active));
+    const excluded = group.runs.filter((run) => run.active);
+    if (deletable.length === 0) {
+      setActionError('此批次無可刪除的 Run（全部使用中）');
+      return;
+    }
+    setActionError(null);
+    setBulkResult(null);
+    setBulkDeleteTarget({
+      mode: 'batch',
+      batchId: group.batchId,
+      runs: deletable,
+      excludedActive: excluded,
+    });
     setBulkConfirmOpen(true);
   };
 
   const closeBulkConfirm = () => {
     if (bulkDeleting) return;
     setBulkConfirmOpen(false);
-    setBulkResult(null);
-    if (bulkResult) {
+    if (bulkResult && bulkDeleteTarget?.mode === 'selection') {
       const deletedKeys = new Set(
         bulkResult.deleted.map((item) => `${item.symbol}-${item.timeframe}-${item.config_hash}`),
       );
       setSelectedKeys((prev) => new Set([...prev].filter((key) => !deletedKeys.has(key))));
     }
+    setBulkDeleteTarget(null);
+    setBulkResult(null);
   };
 
   const executeBulkDelete = async () => {
-    if (selectedRuns.length === 0) return;
+    if (targetRuns.length === 0) return;
     setBulkDeleting(true);
     setActionError(null);
     const result = await bulkDeleteRuns(
-      selectedRuns.map((run) => ({
+      targetRuns.map((run) => ({
         symbol: run.symbol,
         timeframe: run.timeframe,
         config_hash: run.config_hash,
@@ -642,15 +682,27 @@ export default function RunManagerPanel() {
                         </span>
                       </td>
                       <td className={`${tdCls} text-right`}>
-                        <button
-                          type="button"
-                          aria-label={`重命名整批 ${headerLabel}`}
-                          onClick={() => openBatchRename(group)}
-                          className={`${btnBase} border-cyan-400/30 text-cyan-100 hover:border-cyan-300/50 hover:bg-cyan-400/10`}
-                        >
-                          <Pencil className="h-3 w-3" aria-hidden />
-                          重命名整批
-                        </button>
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <button
+                            type="button"
+                            aria-label={`重命名整批 ${headerLabel}`}
+                            onClick={() => openBatchRename(group)}
+                            className={`${btnBase} border-cyan-400/30 text-cyan-100 hover:border-cyan-300/50 hover:bg-cyan-400/10`}
+                          >
+                            <Pencil className="h-3 w-3" aria-hidden />
+                            重命名整批
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`刪除整批 ${headerLabel}`}
+                            disabled={bulkDeleting}
+                            onClick={() => openBatchDeleteConfirm(group)}
+                            className={`${btnBase} border-rose-400/30 text-rose-200 hover:border-rose-300/50 hover:bg-rose-400/10`}
+                          >
+                            <Trash2 className="h-3 w-3" aria-hidden />
+                            刪除整批
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {sortRunsByRecency(group.runs).map((run) => renderRunRow(run, true))}
@@ -673,19 +725,21 @@ export default function RunManagerPanel() {
             <DialogDescription className="text-xs text-slate-400">
               {bulkResult
                 ? `已刪除 ${bulkResult.deleted.length} 筆，失敗 ${bulkResult.failed.length} 筆，略過 ${bulkResult.skipped.length} 筆`
-                : `即將刪除 ${selectedRuns.length} 筆 Run，共 ${formatBytes(selectedTotalBytes)}（含 CGSA）`}
+                : bulkDeleteTarget?.mode === 'batch'
+                  ? `即將刪除整批 ${targetRuns.length} 筆 Run，共 ${formatBytes(targetTotalBytes)}（含 CGSA）`
+                  : `即將刪除 ${targetRuns.length} 筆 Run，共 ${formatBytes(targetTotalBytes)}（含 CGSA）`}
             </DialogDescription>
           </DialogHeader>
-          {!bulkResult && excludedActiveRuns.length > 0 && (
+          {!bulkResult && targetExcludedActive.length > 0 && (
             <div
               role="note"
               className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
             >
               <p className="mb-1 font-medium">
-                已排除 {excludedActiveRuns.length} 筆使用中 Run（不會送出刪除）：
+                已排除 {targetExcludedActive.length} 筆使用中 Run（不會送出刪除）：
               </p>
               <ul className="list-disc pl-4 text-amber-100/90">
-                {excludedActiveRuns.map((run) => {
+                {targetExcludedActive.map((run) => {
                   const name = displayName(run);
                   return (
                     <li key={runKey(run)}>
@@ -711,11 +765,11 @@ export default function RunManagerPanel() {
               <tbody className="divide-y divide-white/5 text-slate-300">
                 {(bulkResult
                   ? [
-                    ...bulkResult.deleted.map((item) => ({ item, status: 'deleted' as const, run: selectedRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
-                    ...bulkResult.failed.map((item) => ({ item, status: 'failed' as const, run: selectedRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
-                    ...bulkResult.skipped.map((item) => ({ item, status: 'skipped' as const, run: selectedRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
+                    ...bulkResult.deleted.map((item) => ({ item, status: 'deleted' as const, run: targetRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
+                    ...bulkResult.failed.map((item) => ({ item, status: 'failed' as const, run: targetRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
+                    ...bulkResult.skipped.map((item) => ({ item, status: 'skipped' as const, run: targetRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
                   ]
-                  : selectedRuns.map((run) => ({
+                  : targetRuns.map((run) => ({
                     item: {
                       symbol: run.symbol,
                       timeframe: run.timeframe,
@@ -757,7 +811,7 @@ export default function RunManagerPanel() {
           </div>
           {!bulkResult && (
             <p className="text-xs text-slate-500">
-              總計：{selectedRuns.length} 筆 · {formatBytes(selectedTotalBytes)}
+              總計：{targetRuns.length} 筆 · {formatBytes(targetTotalBytes)}
             </p>
           )}
           <DialogFooter className="gap-2 sm:justify-end">
@@ -772,7 +826,7 @@ export default function RunManagerPanel() {
             {!bulkResult && (
               <button
                 type="button"
-                disabled={bulkDeleting || selectedRuns.length === 0}
+                disabled={bulkDeleting || targetRuns.length === 0}
                 onClick={() => void executeBulkDelete()}
                 className={`${btnBase} border-rose-400/30 bg-rose-400/10 text-rose-100 hover:border-rose-300/50`}
               >
