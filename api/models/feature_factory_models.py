@@ -418,6 +418,39 @@ class BatchRetentionPendingResponse(BaseModel):
     pending: List[BatchRetentionItem]
 
 
+class BatchRetentionRunRef(BaseModel):
+    """bulk retention 請求中的單一 run 識別。"""
+
+    symbol: str
+    timeframe: str
+    config_hash: str
+
+
+class BatchRetentionBulkRequest(BaseModel):
+    """批次 retention 批量決策請求。"""
+
+    decision: Literal["retain", "discard"]
+    runs: List[BatchRetentionRunRef]
+
+
+class BatchRetentionBulkResultItem(BaseModel):
+    """bulk retention 單筆結果（HTTP 200 per-item）。"""
+
+    symbol: str
+    timeframe: str
+    config_hash: str
+    status: Literal["succeeded", "failed", "skipped"]
+    state: str
+    error: Optional[str] = None
+    code: Optional[str] = None
+
+
+class BatchRetentionBulkResponse(BaseModel):
+    """bulk retention 聚合回應。"""
+
+    results: List[BatchRetentionBulkResultItem]
+
+
 class BatchResumeResponse(BaseModel):
     """批次 resume 回應。"""
 

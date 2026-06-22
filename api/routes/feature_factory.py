@@ -27,6 +27,8 @@ from api.models.feature_factory_models import (
     AliasRequest,
     BatchAliasRequest,
     BatchAliasResponse,
+    BatchRetentionBulkRequest,
+    BatchRetentionBulkResponse,
     BatchRetentionDecisionRequest,
     BatchRetentionDecisionResponse,
     BatchRetentionPendingResponse,
@@ -399,6 +401,38 @@ async def list_batch_retention_pending(
     except Exception as exc:
         logger.error("Failed to list batch retention pending: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post(
+    "/batch/{batch_id}/retention/bulk",
+    response_model=BatchRetentionBulkResponse,
+)
+async def apply_batch_retention_bulk(
+    batch_id: str,
+    request: BatchRetentionBulkRequest,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """對多筆 batch run 批量套用 retain/discard（逐項 reuse per-item decision）。"""
+    try:
+        results = await service.apply_bulk_retention_decisions(
+            batch_id,
+            request.decision,
+            [run.model_dump() for run in request.runs],
+        )
+        return BatchRetentionBulkResponse(results=results)
+    except RetentionNotFoundError:
+        raise HTTPException(status_code=404, detail={"code": "batch_not_found"})
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_retention_decision", "message": str(exc)},
+        )
+    except Exception as exc:
+        logger.error("Failed to apply bulk batch retention: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "retention_error", "message": str(exc)},
+        )
 
 
 @router.post(

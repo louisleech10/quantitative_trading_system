@@ -1815,6 +1815,100 @@ class FeatureFactoryBatchService:
             await self._try_wakeup_from_disk_backpressure(batch_id)
             return self._retention_decision_payload(batch_id, item)
 
+    async def apply_bulk_retention_decisions(
+        self,
+        batch_id: str,
+        decision: str,
+        runs: List[Dict[str, str]],
+    ) -> List[Dict[str, Any]]:
+        """對多筆 batch run 套用 retain/discard；逐項 reuse apply_retention_decision。"""
+
+        normalized = decision.strip().lower()
+        if normalized not in {"retain", "discard"}:
+            raise ValueError(f"unsupported retention decision: {decision}")
+
+        checkpoint = self._load_checkpoint(batch_id)
+        if checkpoint is None:
+            raise RetentionNotFoundError(f"batch not found: {batch_id}")
+
+        results: List[Dict[str, Any]] = []
+        for run in runs:
+            symbol = str(run.get("symbol", ""))
+            timeframe = str(run.get("timeframe", ""))
+            config_hash = str(run.get("config_hash", ""))
+            try:
+                payload = await self.apply_retention_decision(
+                    batch_id,
+                    symbol,
+                    timeframe,
+                    config_hash,
+                    normalized,
+                )
+                results.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "status": "succeeded",
+                    "state": str(payload.get("state", "")),
+                    "error": payload.get("error"),
+                    "code": None,
+                })
+            except RetentionNotFoundError as exc:
+                results.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "status": "skipped",
+                    "state": "",
+                    "error": str(exc),
+                    "code": "retention_not_found",
+                })
+            except RetentionConflictError as exc:
+                item = self._find_retention_item(
+                    self._load_checkpoint(batch_id) or checkpoint,
+                    symbol,
+                    timeframe,
+                    config_hash,
+                )
+                state = str(item.get("state", "")) if item is not None else ""
+                results.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "status": "failed",
+                    "state": state,
+                    "error": str(exc),
+                    "code": "retention_conflict",
+                })
+            except RetentionStateError as exc:
+                item = self._find_retention_item(
+                    self._load_checkpoint(batch_id) or checkpoint,
+                    symbol,
+                    timeframe,
+                    config_hash,
+                )
+                state = str(item.get("state", "")) if item is not None else ""
+                results.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "status": "failed",
+                    "state": state,
+                    "error": str(exc),
+                    "code": "retention_state_error",
+                })
+            except Exception as exc:
+                results.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "status": "failed",
+                    "state": "",
+                    "error": str(exc),
+                    "code": "retention_error",
+                })
+        return results
+
     def mark_retention_discarded_for_run(
         self,
         symbol: str,
