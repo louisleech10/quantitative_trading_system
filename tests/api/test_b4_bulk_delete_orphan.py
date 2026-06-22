@@ -109,7 +109,6 @@ async def b4_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     features_root = tmp_path / "features"
     cgsa_root = tmp_path / "cgsa_work"
     cgsa_root.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(cgsa_root))
     monkeypatch.setattr(feature_service_module.settings, "data_cache_path", tmp_path)
 
     manager = RunLifecycleManager(
@@ -174,6 +173,112 @@ async def test_bulk_delete_equiv_matches_sequential_delete_run(b4_client) -> Non
     for config_hash in hashes:
         leaf = features_run_dir(manager.features_root, "BTCUSDT", "12h", config_hash)
         assert not leaf.exists()
+        cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
+        assert not cgsa_leaf.exists()
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_removes_cgsa_leaf(b4_client) -> None:
+    """bulk delete 真刪 CGSA leaf（不靠 FFACT_CGSA_WORK_DIR skip）。"""
+    client, _ff, manager, *_ = b4_client
+    config_hash = "cfg_b4_cgsa"
+    _create_run(manager, config_hash)
+    cgsa_leaf = cgsa_work_dir(manager.cgsa_root, "BTCUSDT", "12h", config_hash)
+    assert cgsa_leaf.exists()
+
+    resp = await client.post(
+        "/api/v1/features/runs/bulk-delete",
+        json={
+            "runs": [{"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": config_hash}],
+        },
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["deleted"]) == 1
+    assert not cgsa_leaf.exists()
+
+
+@pytest.mark.asyncio
+async def test_bulk_delete_failed_retention_stays_pending_B3CONC(
+    b4_client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """delete 失敗時 retention 不誤標 DISCARDED。"""
+    client, _ff, manager, batch_service, _tmp_path = b4_client
+    monkeypatch.setenv("FFACT_BATCH_RETENTION", "1")
+    batch_id = "batch-b4-fail-ret"
+    config_hash = "cfg_b4_fail_ret"
+    manifest = _create_run(manager, config_hash, batch_id=batch_id)
+    checkpoint = batch_service._build_initial_checkpoint(
+        batch_id,
+        BatchGenerateRequest(symbols=["BTCUSDT"], timeframe="12h"),
+    )
+    checkpoint["retention_items"] = [{
+        "symbol": "BTCUSDT",
+        "timeframe": "12h",
+        "config_hash": config_hash,
+        "state": RetentionState.PENDING.value,
+        "hdf5_path": str(manifest / "feature_manifest.json"),
+        "error": None,
+    }]
+    batch_service._safe_persist_checkpoint(checkpoint)
+    original = shutil.rmtree
+
+    def fail_delete(path: Path) -> None:
+        if config_hash in str(path):
+            raise OSError("simulated delete failure")
+        original(path)
+
+    monkeypatch.setattr("momentum.FeatureEngineering.run_lifecycle.shutil.rmtree", fail_delete)
+
+    resp = await client.post(
+        "/api/v1/features/runs/bulk-delete",
+        json={
+            "runs": [{"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": config_hash}],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["failed"]) == 1
+    assert body["failed"][0]["config_hash"] == config_hash
+    updated = batch_service._load_checkpoint(batch_id)
+    assert updated is not None
+    item = batch_service._find_retention_item(updated, "BTCUSDT", "12h", config_hash)
+    assert item is not None
+    assert item["state"] == RetentionState.PENDING.value
+
+
+@pytest.mark.asyncio
+async def test_ensure_browse_hidden_during_deleting(
+    b4_client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """deleting 期間 ensure_browse 視為不可用（404）。"""
+    client, ff_service, manager, *_ = b4_client
+    _create_run(manager, "cfg_browse_hide")
+    marked = threading.Barrier(2)
+    proceed = threading.Barrier(2)
+    original = manager._delete_run_locked
+
+    def slow_delete(*args: object, **kwargs: object):
+        marked.wait()
+        proceed.wait()
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(manager, "_delete_run_locked", slow_delete)
+
+    def bulk_worker() -> None:
+        ff_service.bulk_delete_runs([
+            {"symbol": "BTCUSDT", "timeframe": "12h", "config_hash": "cfg_browse_hide"},
+        ])
+
+    thread = threading.Thread(target=bulk_worker)
+    thread.start()
+    marked.wait()
+    browse = await client.post("/api/v1/features/runs/BTCUSDT/12h/cfg_browse_hide/browse")
+    assert browse.status_code == 404
+    assert browse.json()["detail"]["code"] == "run_not_found"
+    proceed.wait()
+    thread.join()
 
 
 @pytest.mark.asyncio

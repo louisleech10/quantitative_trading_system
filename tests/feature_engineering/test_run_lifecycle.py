@@ -140,7 +140,7 @@ def test_registry_mark_deleting_for_delete_allows_named(tmp_path: Path) -> None:
     registry.add({**_entry(), "alias": "alpha"})
     assert not registry.mark_deleting("BTCUSDT", "12h", "cfg_batch2d")
     assert registry.mark_deleting_for_delete("BTCUSDT", "12h", "cfg_batch2d")
-    assert registry.get("BTCUSDT", "12h", "cfg_batch2d")["deleting"] is True
+    assert registry.get_internal("BTCUSDT", "12h", "cfg_batch2d")["deleting"] is True
 
 
 def test_registry_corrupt_fails_closed(tmp_path: Path) -> None:
