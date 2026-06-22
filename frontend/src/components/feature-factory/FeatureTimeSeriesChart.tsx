@@ -76,6 +76,8 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
   const dragRef = useRef<{ x: number; y: number; range: { start: number; end: number }; yPanLeft: number; yPanRight: number } | null>(null);
   // Y 軸平移比率（正 = 往上看更高的值，負 = 往下看更低的值）
   const [yPanRatio, setYPanRatio] = useState({ left: 0, right: 0 });
+  // Y 軸縮放倍率（Shift+滾輪）：<1 收緊（線填滿）、>1 拉開（看 band/更大範圍）。預設 1=貼合線。
+  const [yZoom, setYZoom] = useState({ left: 1, right: 1 });
   // chart div ref：掛載 non-passive wheel listener，阻止頁面捲動
   const chartDivRef = useRef<HTMLDivElement>(null);
 
@@ -195,18 +197,16 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     const slice = visibleData;
 
     // left axis：第一條特徵 + rolling band
+    // Y domain 只貼合「線本身」（selected[0]），不納入 rolling band 的 ±σ 下/上界——
+    // band 對 ROC/momentum 等高波動特徵 mean-σ 可能掉到近 0,會把 Y 撐爆讓線擠在頂端。
+    // band 仍渲染,但以 allowDataOverflow 超出時裁切;Shift+滾輪 Y 縮放可拉開看 band。
+    // Number.isFinite 排除 NaN(typeof NaN==='number' 會毒化 Math.min/max)。
     let lMin = Infinity, lMax = -Infinity;
     const leftFeat = selected[0];
     slice.forEach((row) => {
       if (leftFeat) {
         const v = row[leftFeat];
-        if (typeof v === 'number') { lMin = Math.min(lMin, v); lMax = Math.max(lMax, v); }
-      }
-      if (showRollingBand) {
-        const lower = row['_roll_lower'];
-        const upper = row['_roll_upper'];
-        if (typeof lower === 'number') lMin = Math.min(lMin, lower);
-        if (typeof upper === 'number') lMax = Math.max(lMax, upper);
+        if (Number.isFinite(v as number)) { lMin = Math.min(lMin, v as number); lMax = Math.max(lMax, v as number); }
       }
     });
 
@@ -215,13 +215,13 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     selected.slice(1).forEach((feat) => {
       slice.forEach((row) => {
         const v = row[feat];
-        if (typeof v === 'number') { rMin = Math.min(rMin, v); rMax = Math.max(rMax, v); }
+        if (Number.isFinite(v as number)) { rMin = Math.min(rMin, v as number); rMax = Math.max(rMax, v as number); }
       });
     });
     if (showCloseOverlay) {
       slice.forEach((row) => {
         const v = row['close'];
-        if (typeof v === 'number') { rMin = Math.min(rMin, v); rMax = Math.max(rMax, v); }
+        if (Number.isFinite(v as number)) { rMin = Math.min(rMin, v as number); rMax = Math.max(rMax, v as number); }
       });
     }
 
@@ -231,27 +231,31 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     const rRange = rMax !== -Infinity ? rMax - rMin : 0;
     const lPad = lRange * 0.05;
     const rPad = rRange * 0.05;
-    const lShift = yPanRatio.left * (lRange + 2 * lPad);
-    const rShift = yPanRatio.right * (rRange + 2 * rPad);
+    // domain = 中心 ± (半高×yZoom) + 平移。yZoom<1 收緊填滿、>1 拉開看 band。
+    const lCenter = (lMin + lMax) / 2 + yPanRatio.left * (lRange + 2 * lPad);
+    const lHalf = (lRange / 2 + lPad) * yZoom.left;
+    const rCenter = (rMin + rMax) / 2 + yPanRatio.right * (rRange + 2 * rPad);
+    const rHalf = (rRange / 2 + rPad) * yZoom.right;
 
     return {
       yLeftDomain:
         lMax !== -Infinity
-          ? ([lMin - lPad + lShift, lMax + lPad + lShift] as [number, number])
+          ? ([lCenter - lHalf, lCenter + lHalf] as [number, number])
           : undefined,
       yRightDomain:
         rMax !== -Infinity
-          ? ([rMin - rPad + rShift, rMax + rPad + rShift] as [number, number])
+          ? ([rCenter - rHalf, rCenter + rHalf] as [number, number])
           : undefined,
     };
-  }, [visibleData, selected, showRollingBand, showCloseOverlay, yPanRatio]);
+  }, [visibleData, selected, showCloseOverlay, yPanRatio, yZoom]);
 
   const handleDoubleClick = () => {
     setBrushRange(null);
     setYPanRatio({ left: 0, right: 0 });
+    setYZoom({ left: 1, right: 1 });
   };
 
-  /** 滾輪縮放：以當前可見中心點為基準，向內/向外縮放 */
+  /** 滾輪：X 軸時間縮放；Shift+滾輪：Y 軸數值縮放（收緊填滿 / 拉開看 band） */
   /* 掛載 { passive: false } 原生 wheel 監聽器，確保 preventDefault() 生效 */
   useEffect(() => {
     const el = chartDivRef.current;
@@ -259,6 +263,15 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (chartData.length === 0) return;
+      // Shift+滾輪 = Y 軸縮放（下滾拉開、上滾收緊;clamp 0.1~10）
+      if (e.shiftKey) {
+        const yFactor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+        setYZoom((z) => ({
+          left: Math.max(0.1, Math.min(10, z.left * yFactor)),
+          right: Math.max(0.1, Math.min(10, z.right * yFactor)),
+        }));
+        return;
+      }
       const total = chartData.length;
       const cur = brushRange ?? { start: 0, end: total - 1 };
       const span = cur.end - cur.start;
@@ -518,10 +531,10 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              title="滾輪縮放 · 拖曳平移 · 雙擊重置"
+              title="滾輪=時間縮放 · Shift+滾輪=Y縮放 · 拖曳平移 · 雙擊重置"
             >
           <span className="absolute top-1 right-2 text-[10px] text-slate-600 select-none pointer-events-none">
-            滾輪縮放 · 拖曳平移 · 雙擊重置
+            滾輪=時間縮放 · Shift+滾輪=Y縮放 · 拖曳平移 · 雙擊重置
           </span>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={visibleData}>
@@ -535,6 +548,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
               <YAxis
                 yAxisId="left"
                 domain={yLeftDomain ?? ['auto', 'auto']}
+                allowDataOverflow
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 tickFormatter={formatYAxis}
                 tickCount={8}
@@ -543,6 +557,7 @@ export default function FeatureTimeSeriesChart({ taskId }: FeatureTimeSeriesChar
                 yAxisId="right"
                 orientation="right"
                 domain={yRightDomain ?? ['auto', 'auto']}
+                allowDataOverflow
                 tick={{ fontSize: 11, fill: '#94a3b8' }}
                 tickFormatter={formatYAxis}
                 tickCount={8}
