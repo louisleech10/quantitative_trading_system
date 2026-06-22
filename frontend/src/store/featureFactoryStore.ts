@@ -24,7 +24,10 @@ import {
   BatchRetentionItem,
   BatchRetentionPendingResponse,
   BatchWarmupInsufficientItem,
+  BulkDeleteResponse,
   EnsureBrowseResponse,
+  OrphanCleanResponse,
+  OrphanScanResponse,
 } from '@/lib/types';
 import { normalizeWarmupInsufficient } from '@/lib/warmupInsufficient';
 
@@ -105,6 +108,13 @@ interface FeatureFactoryState {
     timeframe: string,
     configHash: string,
   ) => Promise<RunMutationResult>;
+  bulkDeleteRuns: (
+    runs: RunIdentity[],
+  ) => Promise<{ ok: true; data: BulkDeleteResponse } | { ok: false; error: string }>;
+  scanOrphans: () => Promise<{ ok: true; data: OrphanScanResponse } | { ok: false; error: string }>;
+  cleanOrphans: (
+    dryRun: boolean,
+  ) => Promise<{ ok: true; data: OrphanCleanResponse } | { ok: false; error: string }>;
   enqueueCompletion: (run: RunIdentity, source?: CompletionSource) => void;
   fetchBatchRetentionPending: (batchId: string) => Promise<void>;
   applyBatchRetentionDecision: (
@@ -620,6 +630,71 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       return { ok: true };
     } catch {
       return { ok: false, error: '刪除失敗' };
+    }
+  },
+  bulkDeleteRuns: async (runs) => {
+    try {
+      const seen = new Set<string>();
+      const payload = runs.filter((run) => {
+        const key = `${run.symbol}|${run.timeframe}|${run.config_hash}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/runs/bulk-delete`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ runs: payload }),
+        },
+      );
+      if (!response.ok) {
+        return { ok: false, error: 'bulk_delete_failed' };
+      }
+      const data = await response.json() as BulkDeleteResponse;
+      await get().fetchRuns();
+      const batchId = get().batchTask?.batch_id ?? get().batchTask?.task_id;
+      if (batchId) {
+        await get().fetchBatchRetentionPending(batchId);
+      }
+      return { ok: true, data };
+    } catch {
+      return { ok: false, error: 'bulk_delete_failed' };
+    }
+  },
+  scanOrphans: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/runs/orphans`);
+      if (!response.ok) {
+        return { ok: false, error: 'orphan_scan_failed' };
+      }
+      const data = await response.json() as OrphanScanResponse;
+      return { ok: true, data };
+    } catch {
+      return { ok: false, error: 'orphan_scan_failed' };
+    }
+  },
+  cleanOrphans: async (dryRun) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/runs/orphans/clean`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dry_run: dryRun }),
+        },
+      );
+      if (!response.ok) {
+        return { ok: false, error: 'orphan_clean_failed' };
+      }
+      const data = await response.json() as OrphanCleanResponse;
+      if (!dryRun) {
+        await get().fetchRuns();
+      }
+      return { ok: true, data };
+    } catch {
+      return { ok: false, error: 'orphan_clean_failed' };
     }
   },
   enqueueCompletion: (run, source = 'single') => set((state) => ({

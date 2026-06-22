@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-import type { RunInfo } from '@/lib/types';
+import type { BulkDeleteResponse, OrphanEntry, RunInfo } from '@/lib/types';
 import { sortRunsByRecency } from '@/lib/runExplorer';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 import CollapsibleSection from '@/components/feature-factory/CollapsibleSection';
@@ -135,6 +135,14 @@ function batchGroupLabel(batchId: string, batchAlias: string | null | undefined)
   return shortBatchId(batchId);
 }
 
+function batchLabelForRun(run: RunInfo): string {
+  const alias = run.batch_alias?.trim();
+  if (alias) return alias;
+  const batchId = run.batch_id?.trim();
+  if (batchId) return shortBatchId(batchId);
+  return '—';
+}
+
 type BatchGroup = {
   batchId: string;
   batchAlias: string | null;
@@ -187,6 +195,18 @@ function displayName(run: RunInfo): { visible: string; fullHash: string; truncat
   };
 }
 
+function dedupeSelectedRuns(runs: RunInfo[]): RunInfo[] {
+  const seen = new Set<string>();
+  const result: RunInfo[] = [];
+  for (const run of runs) {
+    const key = runKey(run);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(run);
+  }
+  return result;
+}
+
 export default function RunManagerPanel() {
   const {
     runs,
@@ -196,9 +216,16 @@ export default function RunManagerPanel() {
     updateRunAlias,
     setBatchAlias,
     deleteRun,
+    bulkDeleteRuns,
+    scanOrphans,
+    cleanOrphans,
   } = useFeatureFactoryStore();
   const sortedRuns = useMemo(() => sortRunsByRecency(runs), [runs]);
   const { groups, singles } = useMemo(() => groupRunsByBatch(sortedRuns), [sortedRuns]);
+  const selectableRuns = useMemo(
+    () => sortedRuns.filter((run) => !run.active),
+    [sortedRuns],
+  );
   const batchIdPreviewById = useMemo(() => {
     const aliasToIds = new Map<string, string[]>();
     for (const group of groups) {
@@ -227,10 +254,146 @@ export default function RunManagerPanel() {
   const [batchRenamingId, setBatchRenamingId] = useState<string | null>(null);
   const [batchRenameValue, setBatchRenameValue] = useState('');
   const [savingBatchRename, setSavingBatchRename] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkDeleteResponse | null>(null);
+  const [orphanDialogOpen, setOrphanDialogOpen] = useState(false);
+  const [orphanScanning, setOrphanScanning] = useState(false);
+  const [orphanCleaning, setOrphanCleaning] = useState(false);
+  const [orphanList, setOrphanList] = useState<OrphanEntry[]>([]);
+  const [orphanConfirmClean, setOrphanConfirmClean] = useState(false);
+  const [orphanCleanResult, setOrphanCleanResult] = useState<string | null>(null);
+
+  const selectedRuns = useMemo(
+    () => dedupeSelectedRuns(
+      sortedRuns.filter((run) => selectedKeys.has(runKey(run))),
+    ),
+    [sortedRuns, selectedKeys],
+  );
+  const selectedTotalBytes = useMemo(
+    () => selectedRuns.reduce((sum, run) => sum + (run.size_bytes ?? 0), 0),
+    [selectedRuns],
+  );
+  const allSelectableSelected = selectableRuns.length > 0
+    && selectableRuns.every((run) => selectedKeys.has(runKey(run)));
+  const someSelectableSelected = selectableRuns.some((run) => selectedKeys.has(runKey(run)));
 
   useEffect(() => {
     void fetchRuns();
   }, [fetchRuns]);
+
+  useEffect(() => {
+    setSelectedKeys((prev) => {
+      const valid = new Set(sortedRuns.map(runKey));
+      const next = new Set([...prev].filter((key) => valid.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [sortedRuns]);
+
+  const toggleRunSelection = (run: RunInfo) => {
+    if (run.active) return;
+    const key = runKey(run);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelectableSelected) {
+      setSelectedKeys(new Set());
+      return;
+    }
+    setSelectedKeys(new Set(selectableRuns.map(runKey)));
+  };
+
+  const openBulkConfirm = () => {
+    if (selectedRuns.length === 0) return;
+    setBulkResult(null);
+    setBulkConfirmOpen(true);
+  };
+
+  const closeBulkConfirm = () => {
+    if (bulkDeleting) return;
+    setBulkConfirmOpen(false);
+    setBulkResult(null);
+    if (bulkResult) {
+      const deletedKeys = new Set(
+        bulkResult.deleted.map((item) => `${item.symbol}-${item.timeframe}-${item.config_hash}`),
+      );
+      setSelectedKeys((prev) => new Set([...prev].filter((key) => !deletedKeys.has(key))));
+    }
+  };
+
+  const executeBulkDelete = async () => {
+    if (selectedRuns.length === 0) return;
+    setBulkDeleting(true);
+    setActionError(null);
+    const result = await bulkDeleteRuns(
+      selectedRuns.map((run) => ({
+        symbol: run.symbol,
+        timeframe: run.timeframe,
+        config_hash: run.config_hash,
+      })),
+    );
+    setBulkDeleting(false);
+    if (!result.ok) {
+      setActionError(result.error ?? '批次刪除失敗');
+      return;
+    }
+    setBulkResult(result.data);
+    if (result.data.failed.length > 0) {
+      const summary = result.data.failed
+        .map((item) => `${item.symbol}/${item.timeframe}: ${item.error ?? 'failed'}`)
+        .join('; ');
+      setActionError(`部分刪除失敗：${summary}`);
+    }
+  };
+
+  const openOrphanDialog = async () => {
+    setOrphanDialogOpen(true);
+    setOrphanConfirmClean(false);
+    setOrphanCleanResult(null);
+    setOrphanScanning(true);
+    setActionError(null);
+    const result = await scanOrphans();
+    setOrphanScanning(false);
+    if (!result.ok) {
+      setActionError(result.error ?? '孤兒掃描失敗');
+      setOrphanList([]);
+      return;
+    }
+    setOrphanList(result.data.orphans);
+  };
+
+  const closeOrphanDialog = () => {
+    if (orphanCleaning) return;
+    setOrphanDialogOpen(false);
+    setOrphanConfirmClean(false);
+    setOrphanList([]);
+    setOrphanCleanResult(null);
+  };
+
+  const executeOrphanClean = async () => {
+    setOrphanCleaning(true);
+    setActionError(null);
+    const result = await cleanOrphans(false);
+    setOrphanCleaning(false);
+    if (!result.ok) {
+      setActionError(result.error ?? '孤兒清理失敗');
+      return;
+    }
+    const { cleaned_registry: reg, cleaned_leaves: leaves, errors } = result.data;
+    if (errors.length > 0) {
+      setActionError(`孤兒清理部分失敗：${errors.join('; ')}`);
+    }
+    setOrphanCleanResult(`已清理 registry ${reg} 筆、leaf ${leaves} 筆`);
+    setOrphanList(result.data.orphans);
+    setOrphanConfirmClean(false);
+  };
 
   const openRename = (run: RunInfo) => {
     const key = runKey(run);
@@ -306,8 +469,20 @@ export default function RunManagerPanel() {
     const key = runKey(run);
     const name = displayName(run);
     const created = formatCreatedAt(run.last_generated_at ?? run.created_at);
+    const isSelected = selectedKeys.has(key);
     return (
       <tr key={key} className="hover:bg-white/5 transition-colors">
+        <td className={`${tdCls} w-10`}>
+          <input
+            type="checkbox"
+            aria-label={`選取 ${name.visible}`}
+            checked={isSelected}
+            disabled={run.active || bulkDeleting}
+            title={run.active ? '使用中無法選取' : undefined}
+            onChange={() => toggleRunSelection(run)}
+            className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 disabled:opacity-40"
+          />
+        </td>
         <td className={`${tdCls} text-slate-200 font-medium max-w-[180px] ${indent ? 'pl-6' : ''}`}>
           <span title={name.fullHash} className="truncate block">
             {name.visible}
@@ -396,13 +571,48 @@ export default function RunManagerPanel() {
         </p>
       )}
 
+      {!runsLoading && !runsError && runs.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={selectedRuns.length === 0 || bulkDeleting}
+            onClick={openBulkConfirm}
+            className={`${btnBase} border-rose-400/30 text-rose-200 hover:border-rose-300/50 hover:bg-rose-400/10`}
+          >
+            <Trash2 className="h-3 w-3" aria-hidden />
+            批次刪除{selectedRuns.length > 0 ? ` (${selectedRuns.length})` : ''}
+          </button>
+          <button
+            type="button"
+            disabled={orphanScanning || orphanCleaning}
+            onClick={() => void openOrphanDialog()}
+            className={`${btnBase} border-amber-400/30 text-amber-100 hover:border-amber-300/50 hover:bg-amber-400/10`}
+          >
+            孤兒清理
+          </button>
+        </div>
+      )}
+
       {!runsLoading && !runsError && runs.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-8">尚無 Runs</p>
       ) : !runsLoading && !runsError && runs.length > 0 ? (
         <div className="overflow-auto rounded-xl border border-white/10 bg-white/[0.03]">
-          <table className="w-full min-w-[760px]">
+          <table className="w-full min-w-[800px]">
             <thead className="sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm border-b border-white/10">
               <tr>
+                <th className={`${thCls} w-10`}>
+                  <input
+                    type="checkbox"
+                    aria-label="全選可刪除的 Run"
+                    checked={allSelectableSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelectableSelected && !allSelectableSelected;
+                    }}
+                    disabled={selectableRuns.length === 0 || bulkDeleting}
+                    onChange={toggleSelectAll}
+                    className="h-3.5 w-3.5 rounded border-white/20 bg-white/5 disabled:opacity-40"
+                  />
+                </th>
                 <th className={thCls}>名稱</th>
                 <th className={thCls}>Symbol / TF</th>
                 <th className={`${thCls} text-right`}>大小</th>
@@ -418,6 +628,7 @@ export default function RunManagerPanel() {
                 return (
                   <Fragment key={`batch-${group.batchId}`}>
                     <tr className="bg-white/[0.04]">
+                      <td className={tdCls} />
                       <td colSpan={5} className={`${tdCls} text-slate-200 font-medium`}>
                         <span title={group.batchId}>
                           批次：{headerLabel}
@@ -447,6 +658,194 @@ export default function RunManagerPanel() {
           </table>
         </div>
       ) : null}
+
+      {bulkConfirmOpen && (
+      <Dialog open onOpenChange={(open) => { if (!open) closeBulkConfirm(); }}>
+        <DialogContent className="max-w-2xl gap-4 p-5" aria-label="確認批次刪除">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold text-slate-100">
+              {bulkResult ? '批次刪除結果' : '確認批次刪除'}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              {bulkResult
+                ? `已刪除 ${bulkResult.deleted.length} 筆，失敗 ${bulkResult.failed.length} 筆，略過 ${bulkResult.skipped.length} 筆`
+                : `即將刪除 ${selectedRuns.length} 筆 Run，共 ${formatBytes(selectedTotalBytes)}（含 CGSA）`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-64 overflow-auto rounded-lg border border-white/10">
+            <table className="w-full text-xs">
+              <thead className="bg-white/[0.04] text-slate-400">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium">Symbol/TF</th>
+                  <th className="px-2 py-1.5 text-left font-medium">別名</th>
+                  <th className="px-2 py-1.5 text-left font-medium">Hash</th>
+                  <th className="px-2 py-1.5 text-right font-medium">大小</th>
+                  <th className="px-2 py-1.5 text-left font-medium">批次</th>
+                  {bulkResult && <th className="px-2 py-1.5 text-left font-medium">結果</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 text-slate-300">
+                {(bulkResult
+                  ? [
+                    ...bulkResult.deleted.map((item) => ({ item, status: 'deleted' as const, run: selectedRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
+                    ...bulkResult.failed.map((item) => ({ item, status: 'failed' as const, run: selectedRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
+                    ...bulkResult.skipped.map((item) => ({ item, status: 'skipped' as const, run: selectedRuns.find((r) => runKey(r) === `${item.symbol}-${item.timeframe}-${item.config_hash}`) })),
+                  ]
+                  : selectedRuns.map((run) => ({
+                    item: {
+                      symbol: run.symbol,
+                      timeframe: run.timeframe,
+                      config_hash: run.config_hash,
+                      bytes: run.size_bytes ?? 0,
+                    },
+                    status: undefined,
+                    run,
+                  }))
+                ).map(({ item, status, run }) => {
+                  const name = run ? displayName(run) : { visible: shortHash(item.config_hash), fullHash: item.config_hash };
+                  return (
+                    <tr key={`${item.symbol}-${item.timeframe}-${item.config_hash}-${status ?? 'confirm'}`}>
+                      <td className="px-2 py-1.5 font-mono">{item.symbol}/{item.timeframe}</td>
+                      <td className="px-2 py-1.5">{name.visible}</td>
+                      <td className="px-2 py-1.5 font-mono text-slate-500" title={item.config_hash}>{item.config_hash}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{formatBytes(item.bytes ?? run?.size_bytes)}</td>
+                      <td className="px-2 py-1.5">{run ? batchLabelForRun(run) : '—'}</td>
+                      {bulkResult && (
+                        <td className="px-2 py-1.5">
+                          {status === 'deleted' && <span className="text-emerald-300">已刪除</span>}
+                          {status === 'failed' && (
+                            <span className="text-rose-300" title={item.error ?? undefined}>
+                              失敗{item.error ? `: ${item.error}` : ''}
+                            </span>
+                          )}
+                          {status === 'skipped' && (
+                            <span className="text-amber-200" title={item.error ?? undefined}>
+                              略過{item.error ? `: ${item.error}` : ''}
+                            </span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {!bulkResult && (
+            <p className="text-xs text-slate-500">
+              總計：{selectedRuns.length} 筆 · {formatBytes(selectedTotalBytes)}
+            </p>
+          )}
+          <DialogFooter className="gap-2 sm:justify-end">
+            <button
+              type="button"
+              disabled={bulkDeleting}
+              onClick={closeBulkConfirm}
+              className={`${btnBase} border-white/15 text-slate-300 hover:bg-white/5`}
+            >
+              {bulkResult ? '關閉' : '取消'}
+            </button>
+            {!bulkResult && (
+              <button
+                type="button"
+                disabled={bulkDeleting || selectedRuns.length === 0}
+                onClick={() => void executeBulkDelete()}
+                className={`${btnBase} border-rose-400/30 bg-rose-400/10 text-rose-100 hover:border-rose-300/50`}
+              >
+                {bulkDeleting ? '刪除中…' : '確認刪除'}
+              </button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      )}
+
+      {orphanDialogOpen && (
+      <Dialog open onOpenChange={(open) => { if (!open) closeOrphanDialog(); }}>
+        <DialogContent className="max-w-2xl gap-4 p-5" aria-label="孤兒清理">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold text-slate-100">孤兒清理</DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              {orphanScanning
+                ? '掃描中…'
+                : orphanCleanResult
+                  ? orphanCleanResult
+                  : `掃描到 ${orphanList.length} 筆孤兒（registry 與 features/CGSA leaf 不一致）`}
+            </DialogDescription>
+          </DialogHeader>
+          {!orphanScanning && orphanList.length > 0 && (
+            <div className="max-h-64 overflow-auto rounded-lg border border-white/10">
+              <table className="w-full text-xs">
+                <thead className="bg-white/[0.04] text-slate-400">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left font-medium">類型</th>
+                    <th className="px-2 py-1.5 text-left font-medium">Symbol/TF</th>
+                    <th className="px-2 py-1.5 text-left font-medium">Hash</th>
+                    <th className="px-2 py-1.5 text-left font-medium">Leaf</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-slate-300">
+                  {orphanList.map((orphan) => (
+                    <tr key={`${orphan.kind}-${orphan.symbol}-${orphan.timeframe}-${orphan.config_hash}`}>
+                      <td className="px-2 py-1.5">{orphan.kind}</td>
+                      <td className="px-2 py-1.5 font-mono">{orphan.symbol}/{orphan.timeframe}</td>
+                      <td className="px-2 py-1.5 font-mono text-slate-500">{orphan.config_hash}</td>
+                      <td className="px-2 py-1.5">{orphan.leaf_kind ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {!orphanScanning && orphanList.length === 0 && !orphanCleanResult && (
+            <p className="text-sm text-slate-500 text-center py-4">未發現孤兒</p>
+          )}
+          <DialogFooter className="gap-2 sm:justify-end">
+            <button
+              type="button"
+              disabled={orphanCleaning}
+              onClick={closeOrphanDialog}
+              className={`${btnBase} border-white/15 text-slate-300 hover:bg-white/5`}
+            >
+              關閉
+            </button>
+            {!orphanScanning && orphanList.length > 0 && !orphanCleanResult && (
+              <button
+                type="button"
+                disabled={orphanCleaning}
+                onClick={() => setOrphanConfirmClean(true)}
+                className={`${btnBase} border-amber-400/30 bg-amber-400/10 text-amber-100 hover:border-amber-300/50`}
+              >
+                清理孤兒
+              </button>
+            )}
+          </DialogFooter>
+          {orphanConfirmClean && (
+            <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+              <p className="mb-2">確認清理 {orphanList.length} 筆孤兒？此操作無法復原。</p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={orphanCleaning}
+                  onClick={() => setOrphanConfirmClean(false)}
+                  className={`${btnBase} border-white/15 text-slate-300 hover:bg-white/5`}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={orphanCleaning}
+                  onClick={() => void executeOrphanClean()}
+                  className={`${btnBase} border-amber-400/30 bg-amber-400/10 text-amber-100 hover:border-amber-300/50`}
+                >
+                  {orphanCleaning ? '清理中…' : '確認清理'}
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      )}
 
       {renamingKey !== null && (
       <Dialog open onOpenChange={(open) => { if (!open) closeRename(); }}>

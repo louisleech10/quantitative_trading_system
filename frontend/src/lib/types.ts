@@ -593,6 +593,46 @@ export interface DeleteRunResponse extends RunIdentity {
   skipped: string[]; errors: string[]; total_bytes: number;
 }
 
+/** B4 bulk-delete 單筆目標 */
+export type BulkDeleteRunItem = RunIdentity;
+
+/** B4 bulk-delete 單筆結果 */
+export interface BulkDeleteRunOutcome extends RunIdentity {
+  bytes: number;
+  error?: string | null;
+}
+
+/** B4 bulk-delete 彙整報告（HTTP 200 + per-run status） */
+export interface BulkDeleteResponse {
+  deleted: BulkDeleteRunOutcome[];
+  failed: BulkDeleteRunOutcome[];
+  skipped: BulkDeleteRunOutcome[];
+}
+
+/** B4 孤兒掃描條目 */
+export interface OrphanEntry {
+  kind: string;
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+  leaf_kind?: string | null;
+}
+
+/** B4 孤兒掃描報告 */
+export interface OrphanScanResponse {
+  orphans: OrphanEntry[];
+  count: number;
+}
+
+/** B4 孤兒清理報告 */
+export interface OrphanCleanResponse {
+  orphans: OrphanEntry[];
+  cleaned_registry: number;
+  cleaned_leaves: number;
+  errors: string[];
+  dry_run: boolean;
+}
+
 export interface FeatureFactoryPreset {
   name: string;
   description?: string;
