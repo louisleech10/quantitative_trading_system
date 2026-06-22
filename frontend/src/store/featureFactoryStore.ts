@@ -22,6 +22,7 @@ import {
   CompletionQueueItem,
   CompletionSource,
   BatchRetentionItem,
+  BatchRetentionBulkResponse,
   BatchRetentionPendingResponse,
   BatchWarmupInsufficientItem,
   BulkDeleteResponse,
@@ -124,6 +125,11 @@ interface FeatureFactoryState {
     configHash: string,
     decision: 'retain' | 'discard',
   ) => Promise<RunMutationResult>;
+  bulkRetentionDecision: (
+    batchId: string,
+    decision: 'retain' | 'discard',
+    runs: RunIdentity[],
+  ) => Promise<{ ok: true; data: BatchRetentionBulkResponse } | { ok: false; error: string }>;
   shiftCompletion: () => void;
   setConfig: (config: FeatureFactoryConfig) => void;
   updateConfigPartial: (partial: Record<string, unknown>) => void;
@@ -762,6 +768,55 @@ export const useFeatureFactoryStore = create<FeatureFactoryState>((set, get) => 
       return { ok: true };
     } catch {
       return { ok: false, error: 'retention_decision_failed' };
+    }
+  },
+  bulkRetentionDecision: async (batchId, decision, runs) => {
+    try {
+      const seen = new Set<string>();
+      const payload = runs.filter((run) => {
+        const key = retentionItemKey(run);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      const response = await fetch(
+        `${API_BASE_URL}${API_PREFIX}/batch/${encodeURIComponent(batchId)}/retention/bulk`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, runs: payload }),
+        },
+      );
+      if (!response.ok) {
+        if (response.status === 404) {
+          return { ok: false, error: 'batch_not_found' };
+        }
+        return { ok: false, error: 'bulk_retention_failed' };
+      }
+      const data = await response.json() as BatchRetentionBulkResponse;
+      const succeededKeys = new Set(
+        data.results
+          .filter((item) => item.status === 'succeeded')
+          .map((item) => retentionItemKey(item)),
+      );
+      if (succeededKeys.size > 0) {
+        set((state) => {
+          if (!state.batchTask) return {};
+          const pending = (state.batchTask.retention_pending ?? []).filter(
+            (item) => !succeededKeys.has(retentionItemKey(item)),
+          );
+          return {
+            batchTask: {
+              ...state.batchTask,
+              retention_pending: pending,
+            },
+          };
+        });
+      }
+      await get().fetchBatchRetentionPending(batchId);
+      return { ok: true, data };
+    } catch {
+      return { ok: false, error: 'bulk_retention_failed' };
     }
   },
   shiftCompletion: () => set((state) => ({ completionQueue: state.completionQueue.slice(1) })),

@@ -513,6 +513,31 @@ export interface BatchRetentionPendingResponse {
   pending: BatchRetentionItem[];
 }
 
+export interface BatchRetentionRunRef {
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+}
+
+export interface BatchRetentionBulkRequest {
+  decision: 'retain' | 'discard';
+  runs: BatchRetentionRunRef[];
+}
+
+export interface BatchRetentionBulkResultItem {
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+  status: 'succeeded' | 'failed' | 'skipped';
+  state: string;
+  error?: string | null;
+  code?: string | null;
+}
+
+export interface BatchRetentionBulkResponse {
+  results: BatchRetentionBulkResultItem[];
+}
+
 export interface WarmupInsufficient {
   needed: number;
   available: number;
