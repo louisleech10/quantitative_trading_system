@@ -1811,6 +1811,47 @@ class FeatureFactoryBatchService:
             await self._try_wakeup_from_disk_backpressure(batch_id)
             return self._retention_decision_payload(batch_id, item)
 
+    def mark_retention_discarded_for_run(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+        batch_id: Optional[str] = None,
+    ) -> bool:
+        """Bulk-delete 路徑：將 B3 pending/deciding retention item 標為 DISCARDED（冪等）。"""
+
+        if not self._is_batch_retention_enabled():
+            return False
+
+        updated = False
+        batch_ids: List[str]
+        if batch_id:
+            batch_ids = [batch_id]
+        else:
+            batch_ids = [
+                path.name.removeprefix("batch_state_").removesuffix(".json")
+                for path in sorted(self._checkpoint_dir.glob("batch_state_*.json"))
+            ]
+
+        for current_batch_id in batch_ids:
+            checkpoint = self._load_checkpoint(current_batch_id)
+            if checkpoint is None:
+                continue
+            item = self._find_retention_item(checkpoint, symbol, timeframe, config_hash)
+            if item is None:
+                continue
+            state = RetentionState(str(item.get("state", "")))
+            if state == RetentionState.DISCARDED:
+                updated = True
+                continue
+            if state not in {RetentionState.PENDING, RetentionState.DECIDING}:
+                continue
+            item["state"] = RetentionState.DISCARDED.value
+            item["error"] = None
+            self._persist_checkpoint_required(checkpoint)
+            updated = True
+        return updated
+
     @staticmethod
     def _retention_decision_payload(
         batch_id: str,

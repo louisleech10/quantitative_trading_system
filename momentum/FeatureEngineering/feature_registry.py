@@ -230,6 +230,22 @@ class FeatureRegistry:
         self._locked_mutate(mutate)
         return marked
 
+    def mark_deleting_for_delete(self, symbol: str, timeframe: str, config_hash: str) -> bool:
+        """明確刪除路徑標記 deleting；允許 alias/batch_alias run（override auto-cleanup 保護）。"""
+        marked = False
+
+        def mutate() -> None:
+            nonlocal marked
+            target = self._find_entry(symbol, timeframe, config_hash)
+            if target is None:
+                return
+            target["deleting"] = True
+            marked = True
+
+        self._require_healthy()
+        self._locked_mutate(mutate)
+        return marked
+
     def clear_deleting(self, symbol: str, timeframe: str, config_hash: str) -> bool:
         """清除失敗 cleanup 留下的 deleting 標記。"""
         cleared = False

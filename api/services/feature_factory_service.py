@@ -41,7 +41,7 @@ from api.utils.warmup_contract import (
 )
 from momentum.core.contracts import FailureType, classify_error, FeatureGenerationResult
 from momentum.factories import create_feature_factory, create_feature_factory_mcp, create_run_lifecycle_manager
-from momentum.FeatureEngineering.run_locks import is_run_active
+from momentum.FeatureEngineering.run_locks import RunBusyError, is_run_active
 from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
 
 
@@ -812,6 +812,8 @@ class FeatureFactoryService:
         manager = self._lifecycle()
         rows = []
         for entry in manager.registry.list_all():
+            if entry.get("deleting"):
+                continue
             created_value = self._registry_timestamp_iso(entry.get("created_at"))
             generated_value = self._registry_timestamp_iso(
                 entry.get("last_generated_at", entry.get("created_at"))
@@ -895,6 +897,154 @@ class FeatureFactoryService:
             for task_id in remove_ids:
                 self._invalidate_task_cache(task_id)
         return {**result.__dict__, "total_bytes": result.total_bytes}
+
+    def bulk_delete_runs(
+        self,
+        runs: List[Dict[str, str]],
+        *,
+        retention_reconcile: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """逐 run 重用 delete_run；一失敗續刪，彙整 deleted/failed/skipped。"""
+        deleted: List[Dict[str, Any]] = []
+        failed: List[Dict[str, Any]] = []
+        skipped: List[Dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        for run in runs:
+            symbol = str(run.get("symbol", "")).strip()
+            timeframe = str(run.get("timeframe", "")).strip()
+            config_hash = str(run.get("config_hash", "")).strip()
+            if not symbol or not timeframe or not config_hash:
+                failed.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": 0,
+                    "error": "invalid_run_identity",
+                })
+                continue
+            key = (symbol, timeframe, config_hash)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            manager = self._lifecycle()
+            entry = manager.registry.get(symbol, timeframe, config_hash)
+            batch_id = str(entry.get("batch_id") or "") if entry else ""
+            if retention_reconcile is not None:
+                try:
+                    retention_reconcile(
+                        symbol,
+                        timeframe,
+                        config_hash,
+                        batch_id or None,
+                    )
+                except RunBusyError as exc:
+                    skipped.append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "config_hash": config_hash,
+                        "bytes": 0,
+                        "error": str(exc),
+                    })
+                    continue
+
+            try:
+                result = self.delete_run(symbol, timeframe, config_hash)
+            except RunBusyError as exc:
+                skipped.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": 0,
+                    "error": str(exc),
+                })
+                continue
+            except KeyError:
+                failed.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": 0,
+                    "error": "run_not_found",
+                })
+                continue
+            except Exception as exc:
+                failed.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": 0,
+                    "error": str(exc),
+                })
+                continue
+
+            if result.get("errors"):
+                failed.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": int(result.get("total_bytes") or 0),
+                    "error": "; ".join(str(item) for item in result["errors"]),
+                })
+            elif not any((
+                result.get("registry_removed"),
+                result.get("features_deleted"),
+                result.get("cgsa_deleted"),
+            )) and manager.registry.get(symbol, timeframe, config_hash) is None:
+                failed.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": 0,
+                    "error": "run_not_found",
+                })
+            else:
+                deleted.append({
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "config_hash": config_hash,
+                    "bytes": int(result.get("total_bytes") or 0),
+                    "error": None,
+                })
+
+        return {"deleted": deleted, "failed": failed, "skipped": skipped}
+
+    def scan_orphans(self) -> Dict[str, Any]:
+        """掃描 registry↔features/CGSA leaf 不一致的孤兒。"""
+        report = self._lifecycle().scan_orphans()
+        orphans = [
+            {
+                "kind": item.kind,
+                "symbol": item.symbol,
+                "timeframe": item.timeframe,
+                "config_hash": item.config_hash,
+                "leaf_kind": item.leaf_kind,
+            }
+            for item in report.orphans
+        ]
+        return {"orphans": orphans, "count": len(orphans)}
+
+    def clean_orphans(self, *, dry_run: bool = True) -> Dict[str, Any]:
+        """清理孤兒；dry_run 預設只報告。"""
+        report = self._lifecycle().clean_orphans(dry_run=dry_run)
+        orphans = [
+            {
+                "kind": item.kind,
+                "symbol": item.symbol,
+                "timeframe": item.timeframe,
+                "config_hash": item.config_hash,
+                "leaf_kind": item.leaf_kind,
+            }
+            for item in report.orphans
+        ]
+        return {
+            "orphans": orphans,
+            "cleaned_registry": report.cleaned_registry,
+            "cleaned_leaves": report.cleaned_leaves,
+            "errors": list(report.errors),
+            "dry_run": report.dry_run,
+        }
 
     def _run_warmups_then_release(self, lease: Any, warmup_fns: List[Callable[[], Any]], identity: Optional[Dict[str, str]]) -> None:
         """Warmups finish before the generation lease is released; completed event timing is unchanged."""

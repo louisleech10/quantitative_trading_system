@@ -166,6 +166,71 @@ class DeleteRunResponse(BaseModel):
     total_bytes: int
 
 
+class BulkDeleteRunItem(BaseModel):
+    """單一 bulk-delete 目標 run。"""
+
+    symbol: str
+    timeframe: str
+    config_hash: str
+
+
+class BulkDeleteRequest(BaseModel):
+    """批次刪除請求。"""
+
+    runs: List[BulkDeleteRunItem] = Field(default_factory=list)
+
+
+class BulkDeleteRunOutcome(BaseModel):
+    """單一 run 的 bulk-delete 結果。"""
+
+    symbol: str
+    timeframe: str
+    config_hash: str
+    bytes: int = 0
+    error: Optional[str] = None
+
+
+class BulkDeleteResponse(BaseModel):
+    """批次刪除彙整報告（HTTP 200 + per-run status）。"""
+
+    deleted: List[BulkDeleteRunOutcome] = Field(default_factory=list)
+    failed: List[BulkDeleteRunOutcome] = Field(default_factory=list)
+    skipped: List[BulkDeleteRunOutcome] = Field(default_factory=list)
+
+
+class OrphanEntryModel(BaseModel):
+    """孤兒掃描條目。"""
+
+    kind: str
+    symbol: str
+    timeframe: str
+    config_hash: str
+    leaf_kind: Optional[str] = None
+
+
+class OrphanScanResponse(BaseModel):
+    """孤兒掃描報告。"""
+
+    orphans: List[OrphanEntryModel] = Field(default_factory=list)
+    count: int = 0
+
+
+class OrphanCleanRequest(BaseModel):
+    """孤兒清理請求；預設 dry-run 只報告。"""
+
+    dry_run: bool = True
+
+
+class OrphanCleanResponse(BaseModel):
+    """孤兒清理報告。"""
+
+    orphans: List[OrphanEntryModel] = Field(default_factory=list)
+    cleaned_registry: int = 0
+    cleaned_leaves: int = 0
+    errors: List[str] = Field(default_factory=list)
+    dry_run: bool = True
+
+
 class NL2ConfigRequest(BaseModel):
     """Natural language to config request."""
 

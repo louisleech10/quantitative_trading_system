@@ -30,8 +30,13 @@ from api.models.feature_factory_models import (
     BatchRetentionDecisionRequest,
     BatchRetentionDecisionResponse,
     BatchRetentionPendingResponse,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
     DeleteRunResponse,
     EnsureBrowseResponse,
+    OrphanCleanRequest,
+    OrphanCleanResponse,
+    OrphanScanResponse,
     RunInfo,
 )
 from momentum.FeatureEngineering.run_locks import RunBusyError
@@ -119,6 +124,27 @@ async def delete_run(symbol: str, timeframe: str, config_hash: str):
     return result
 
 
+@router.get("/runs/orphans", response_model=OrphanScanResponse)
+async def scan_orphan_runs():
+    """掃描 registry 與 features/CGSA leaf 不一致的孤兒。"""
+    try:
+        result = feature_factory_service.scan_orphans()
+        return OrphanScanResponse(**result)
+    except Exception as exc:
+        logger.error("Failed to scan orphan runs: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/runs/orphans/clean", response_model=OrphanCleanResponse)
+async def clean_orphan_runs(request: OrphanCleanRequest = Body(default=OrphanCleanRequest())):
+    """清理孤兒；預設 dry_run 只報告。"""
+    try:
+        return feature_factory_service.clean_orphans(dry_run=request.dry_run)
+    except Exception as exc:
+        logger.error("Failed to clean orphan runs: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 def get_batch_service() -> FeatureFactoryBatchService:
     """DI provider for FeatureFactoryBatchService singleton.
 
@@ -126,6 +152,31 @@ def get_batch_service() -> FeatureFactoryBatchService:
     which can cause circular imports during test collection.
     """
     return get_feature_factory_batch_service()
+
+
+@router.post("/runs/bulk-delete", response_model=BulkDeleteResponse)
+async def bulk_delete_runs(
+    request: BulkDeleteRequest,
+    service: FeatureFactoryBatchService = Depends(get_batch_service),
+):
+    """批次刪除多個 run；逐 run reuse delete_run，HTTP 200 + per-run status。"""
+    try:
+        reconcile = service.mark_retention_discarded_for_run
+        payload = [
+            {
+                "symbol": item.symbol,
+                "timeframe": item.timeframe,
+                "config_hash": item.config_hash,
+            }
+            for item in request.runs
+        ]
+        return feature_factory_service.bulk_delete_runs(
+            payload,
+            retention_reconcile=reconcile,
+        )
+    except Exception as exc:
+        logger.error("Failed to bulk delete runs: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/presets")
