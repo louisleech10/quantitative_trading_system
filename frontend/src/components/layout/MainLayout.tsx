@@ -14,7 +14,6 @@ import {
   Home,
   LineChart,
   Target,
-  TrendingUp,
   Brain,
   Star,
   ChevronLeft,
@@ -55,40 +54,28 @@ const navigationItems: NavItem[] = [
     description: '上傳案例CSV並批量下載K線'
   },
   {
-    name: '特徵工廠',
-    href: '/feature-factory',
-    icon: Database,
-    description: '建立特徵組合與產生設定'
-  },
-  {
     name: '圖表查看',
     href: '/charts',
     icon: LineChart,
     description: '查看案例K線圖表和技術指標'
   },
   {
-    name: '策略測試',
-    href: '/strategy-test',
-    icon: Target,
-    description: '配置策略參數並進行回測（Phase 3.3）'
-  },
-  {
-    name: '優化結果',
-    href: '/optimization-result',
-    icon: TrendingUp,
-    description: '查看參數優化結果（Phase 3.6）'
-  },
-  {
-    name: '模式發現',
-    href: '/patterns',
-    icon: Target,
-    description: 'LightGBM/XGBoost 雙引擎 ML 分析（Phase 3+4）'
+    name: '特徵工廠',
+    href: '/feature-factory',
+    icon: Database,
+    description: '建立特徵組合與產生設定'
   },
   {
     name: 'IC 分析',
     href: '/ic-analysis',
     icon: BarChart3,
     description: 'IC Gatekeeper 分析與篩選'
+  },
+  {
+    name: '模式發現',
+    href: '/patterns',
+    icon: Target,
+    description: 'LightGBM/XGBoost 雙引擎 ML 分析（Phase 3+4）'
   },
   {
     name: '序列模型',
