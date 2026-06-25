@@ -1,6 +1,0 @@
-field,value
-task_id,hyper_98ef85777d45420997425e3d45991df9
-task_type,hyperparameter
-status,completed
-best_trial_number,1
-best_value,0.9
