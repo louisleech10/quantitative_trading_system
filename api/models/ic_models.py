@@ -41,11 +41,21 @@ class FeatureTierRequest(BaseModel):
     custom_overrides: Optional[Dict[str, Dict[str, bool]]] = None
 
 
+class CrossRunRef(BaseModel):
+    symbol: str
+    config_hash: str
+
+
 class ICAnalyzeRequest(BaseModel):
     features_path: Optional[str] = Field(None, description="Path to features HDF5 (deprecated, optional)")
     symbol: Optional[str] = Field(None, description="Feature Library symbol")
     symbols: Optional[List[str]] = Field(None, description="Feature Library symbols for cross-sectional mode")
     timeframe: Optional[str] = Field(None, description="Feature Library timeframe")
+    config_hash: Optional[str] = Field(None, description="精確指定 run，None 則回退最新")
+    cross_sectional_runs: Optional[List[CrossRunRef]] = Field(
+        None,
+        description="橫截面 per-symbol config_hash",
+    )
     mode: Literal["longitudinal", "cross_sectional"] = Field(
         "longitudinal",
         description="IC analysis mode",

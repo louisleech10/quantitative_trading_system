@@ -136,6 +136,31 @@ class FeatureRegistry:
             key=lambda item: item.get("last_generated_at", item.get("created_at", 0)),
         )
 
+    @staticmethod
+    def is_materialized(entry: Dict[str, Any]) -> bool:
+        """Registry entry 是否具備可讀 V2 manifest（跳過 deleting / 空路徑 / 缺檔）。"""
+        if entry.get("deleting"):
+            return False
+        rel_path = str(entry.get("hdf5_relative_path") or "").strip()
+        if not rel_path:
+            return False
+        manifest_path = Path(rel_path)
+        if not manifest_path.is_absolute():
+            manifest_path = Path.cwd() / manifest_path
+        return manifest_path.is_file()
+
+    def find_latest_materialized(self, symbol: str, timeframe: str) -> Optional[Dict[str, Any]]:
+        """回傳最新且磁碟上 manifest 存在的 entry；跳過 deleting 與 orphan 登記。"""
+        matches = [
+            item for item in self.find(symbol, timeframe) if self.is_materialized(item)
+        ]
+        if not matches:
+            return None
+        return max(
+            matches,
+            key=lambda item: item.get("last_generated_at", item.get("created_at", 0)),
+        )
+
     def get(self, symbol: str, timeframe: str, config_hash: str) -> Optional[Dict[str, Any]]:
         """讀取單一 entry（公開 API；deleting 中視為不存在）。"""
         entry = self._find_entry(symbol, timeframe, config_hash)

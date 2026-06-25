@@ -824,6 +824,7 @@ class FeatureFactoryService:
                 "created_at": created_value,
                 "last_generated_at": generated_value,
                 "size_bytes": entry.get("size_bytes"),
+                "training_timeframes": self._read_training_timeframes(entry),
                 "active": is_run_active(
                     manager.locks_dir,
                     str(entry.get("symbol")),
@@ -833,6 +834,40 @@ class FeatureFactoryService:
                 **browse_meta,
             })
         return rows
+
+    @staticmethod
+    def _read_training_timeframes(entry: Dict[str, Any]) -> Optional[List[str]]:
+        """從 run manifest 或 task_record 讀取 training timeframes。"""
+        rel_path = entry.get("hdf5_relative_path")
+        if not rel_path:
+            return None
+        run_dir = Path(str(rel_path)).parent
+        candidates = [
+            run_dir / "feature_manifest.json",
+            run_dir / "task_record.json",
+        ]
+        for candidate in candidates:
+            if not candidate.exists():
+                continue
+            try:
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            timeframes = payload.get("timeframes")
+            if isinstance(timeframes, dict):
+                training = timeframes.get("training")
+                if isinstance(training, list):
+                    return [str(item) for item in training]
+            metadata = payload.get("metadata", {})
+            if isinstance(metadata, dict):
+                config_used = metadata.get("config_used", {})
+                if isinstance(config_used, dict):
+                    tf_block = config_used.get("timeframes", {})
+                    if isinstance(tf_block, dict):
+                        training = tf_block.get("training")
+                        if isinstance(training, list):
+                            return [str(item) for item in training]
+        return None
 
     def ensure_browse_task_for_run(self, symbol: str, timeframe: str, config_hash: str) -> str:
         """確保 registry run 在 browse 記憶體中有對應虛擬任務；冪等。"""

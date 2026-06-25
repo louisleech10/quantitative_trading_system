@@ -154,6 +154,8 @@ const defaultConfig: ICAnalysisConfig = {
   features_path: '',
   labels_path: '',
   meta_path: '',
+  config_hash: undefined,
+  cross_sectional_runs: [],
   mode: 'global',
   cross_sectional_symbols: [],
   event_query: '',
@@ -195,16 +197,28 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   featureToggles: { ...PRESET_TOGGLES.intermediate },
   setConfig: (config) => set({ config }),
   updateConfig: (patch) =>
-    set((state) => ({
-      config: {
-        ...state.config,
-        ...patch,
-        thresholds: {
-          ...state.config.thresholds,
-          ...(patch.thresholds || {}),
+    set((state) => {
+      const modeChanged = patch.mode !== undefined && patch.mode !== state.config.mode;
+      return {
+        config: {
+          ...state.config,
+          ...patch,
+          ...(modeChanged
+            ? {
+                cross_sectional_symbols: [],
+                cross_sectional_runs: [],
+                config_hash: undefined,
+                symbol: undefined,
+                timeframe: undefined,
+              }
+            : {}),
+          thresholds: {
+            ...state.config.thresholds,
+            ...(patch.thresholds || {}),
+          },
         },
-      },
-    })),
+      };
+    }),
   setTask: (taskId, status) =>
     set({
       taskId,

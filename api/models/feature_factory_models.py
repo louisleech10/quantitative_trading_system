@@ -130,6 +130,7 @@ class RunInfo(BaseModel):
     feature_count: Optional[int] = None
     row_count: Optional[int] = None
     quality_status: Optional[str] = None
+    training_timeframes: Optional[List[str]] = None
 
 
 class EnsureBrowseResponse(BaseModel):

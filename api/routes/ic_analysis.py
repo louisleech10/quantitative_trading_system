@@ -76,12 +76,21 @@ async def get_result(task_id: str):
 
 @router.get("/features/list", response_model=FeatureListResponse)
 async def list_available_features(
-    features_path: str,
+    features_path: Optional[str] = Query(None, description="Legacy features path or parquet key"),
     meta_path: Optional[str] = None,
+    symbol: Optional[str] = Query(None, description="Feature Library symbol"),
+    timeframe: Optional[str] = Query(None, description="Feature Library timeframe"),
+    config_hash: Optional[str] = Query(None, description="Feature Library config_hash"),
 ):
     """List available features from HDF5 + optional metadata."""
     try:
-        features = ic_analysis_service.list_features(features_path, meta_path)
+        features = ic_analysis_service.list_features(
+            features_path=features_path,
+            meta_path=meta_path,
+            symbol=symbol,
+            timeframe=timeframe,
+            config_hash=config_hash,
+        )
         return {
             "total": len(features),
             "features": [FeatureListItem(**item) for item in features],

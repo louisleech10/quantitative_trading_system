@@ -598,6 +598,7 @@ export interface RunInfo extends RunIdentity {
   alias?: string | null;
   batch_id?: string | null;
   batch_alias?: string | null;
+  training_timeframes?: string[] | null;
   created_at?: string | null;
   last_generated_at?: string | null;
   size_bytes?: number | null;
@@ -1951,6 +1952,8 @@ export interface ICAnalysisConfig {
   features_path: string;
   symbol?: string;
   timeframe?: string;
+  config_hash?: string;
+  cross_sectional_runs?: { symbol: string; config_hash: string }[];
   labels_path?: string;
   meta_path?: string;
   mode: 'global' | 'event' | 'cross_sectional';

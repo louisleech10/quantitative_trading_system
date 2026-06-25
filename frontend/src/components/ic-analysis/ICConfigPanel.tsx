@@ -1,26 +1,29 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ICAnalysisConfig } from '@/lib/types';
+import { ICAnalysisConfig, RunInfo } from '@/lib/types';
 import { FeatureTierLevel } from '@/lib/types';
-import { FeatureRegistryEntry } from '@/lib/types';
 import FeatureTierPanel from '@/components/ic-analysis/FeatureTierPanel';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { NumberInput } from '@/components/ui/NumberInput';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatRunLabel } from '@/lib/runExplorer';
 
 interface ICConfigPanelProps {
   config: ICAnalysisConfig;
-  registryEntries?: FeatureRegistryEntry[];
+  runs?: RunInfo[];
+  runsLoading?: boolean;
+  runsError?: string | null;
   crossSectionalFeatureCount?: number;
   featureTier: FeatureTierLevel;
   featureToggles: Record<string, boolean>;
@@ -40,9 +43,47 @@ const horizonOptions = [1, 2, 3, 5, 8, 13, 21].map((value) => ({
   label: `${value} 根`,
 }));
 
+function formatRunLeafLabel(run: RunInfo): string {
+  const base = formatRunLabel(run);
+  const primary = run.timeframe;
+  const training = (run.training_timeframes || []).filter((tf) => tf && tf !== primary);
+  if (training.length === 0) {
+    return base;
+  }
+  return `${base} · ${primary}(+${training.join(',')})`;
+}
+
+function groupRunsByBatch(runs: RunInfo[]): { key: string; label: string; items: RunInfo[] }[] {
+  const buckets = new Map<string, RunInfo[]>();
+  for (const run of runs) {
+    const batchId = run.batch_id || '__ungrouped__';
+    const key = `${batchId}::${run.timeframe}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, []);
+    }
+    buckets.get(key)!.push(run);
+  }
+  return Array.from(buckets.entries())
+    .map(([key, items]) => {
+      const batchId = key.split('::')[0] ?? '__ungrouped__';
+      const timeframe = items[0]?.timeframe ?? '';
+      return {
+        key,
+        label:
+          batchId === '__ungrouped__'
+            ? `未分組 · ${timeframe}`
+            : `${items[0]?.batch_alias || batchId} · ${timeframe}`,
+        items,
+      };
+    })
+    .filter((group) => group.items.length >= 2);
+}
+
 export default function ICConfigPanel({
   config,
-  registryEntries = [],
+  runs = [],
+  runsLoading = false,
+  runsError = null,
   crossSectionalFeatureCount = 0,
   featureTier,
   featureToggles,
@@ -53,72 +94,47 @@ export default function ICConfigPanel({
   isRunning,
 }: ICConfigPanelProps) {
   const horizonValues = useMemo(() => config.horizons.map((value) => String(value)), [config.horizons]);
-  const symbolOptions = useMemo(
-    () => Array.from(new Set(registryEntries.map((entry) => entry.symbol))).sort(),
-    [registryEntries]
+  const browseReadyRuns = useMemo(() => runs.filter((run) => run.browse_ready), [runs]);
+  const batchGroups = useMemo(() => groupRunsByBatch(browseReadyRuns), [browseReadyRuns]);
+  const batchOptions = useMemo(
+    () =>
+      batchGroups.map((group) => ({
+        value: group.key,
+        label: group.label,
+        symbolCount: group.items.length,
+      })),
+    [batchGroups],
   );
-  const timeframeOptions = useMemo(() => {
-    if (config.mode === 'cross_sectional') {
-      const selectedSymbols = config.cross_sectional_symbols || [];
-      if (selectedSymbols.length === 0) {
-        return Array.from(new Set(registryEntries.map((entry) => entry.timeframe))).sort();
-      }
 
-      const timeframeSets = selectedSymbols.map(
-        (symbol) =>
-          new Set(
-            registryEntries
-              .filter((entry) => entry.symbol === symbol)
-              .map((entry) => entry.timeframe)
-          )
-      );
+  const selectedRunKey = config.config_hash
+    ? `${config.symbol}:${config.timeframe}:${config.config_hash}`
+    : undefined;
 
-      const [firstSet, ...restSets] = timeframeSets;
-      if (!firstSet) {
-        return [];
-      }
-
-      return Array.from(firstSet)
-        .filter((timeframe) => restSets.every((set) => set.has(timeframe)))
-        .sort();
+  const selectedBatchId = useMemo(() => {
+    if (!config.cross_sectional_runs?.length) {
+      return undefined;
     }
-
-    if (!config.symbol) {
-      return Array.from(new Set(registryEntries.map((entry) => entry.timeframe))).sort();
-    }
-    return Array.from(
-      new Set(
-        registryEntries
-          .filter((entry) => entry.symbol === config.symbol)
-          .map((entry) => entry.timeframe)
-      )
-    ).sort();
-  }, [config.mode, config.symbol, config.cross_sectional_symbols, registryEntries]);
-
-  const crossSymbolOptions = useMemo(
-    () => symbolOptions.map((symbol) => ({ value: symbol, label: symbol })),
-    [symbolOptions]
-  );
+    const anchor = config.cross_sectional_runs[0];
+    const match = browseReadyRuns.find(
+      (run) => run.symbol === anchor.symbol && run.config_hash === anchor.config_hash,
+    );
+    return match?.batch_id
+      ? `${match.batch_id}::${match.timeframe}`
+      : `__ungrouped__::${match?.timeframe ?? ''}`;
+  }, [browseReadyRuns, config.cross_sectional_runs]);
 
   const isCrossSectionalMode = config.mode === 'cross_sectional';
-  const selectedCrossSymbols = config.cross_sectional_symbols || [];
-  const crossSymbolInsufficient = isCrossSectionalMode && selectedCrossSymbols.length < 2;
+  const crossRuns = config.cross_sectional_runs || [];
+  const crossSymbolInsufficient = isCrossSectionalMode && crossRuns.length < 2;
   const crossFeatureOverflow = isCrossSectionalMode && crossSectionalFeatureCount > 50;
-  const noAvailableSymbols = isCrossSectionalMode && symbolOptions.length === 0;
-  const crossTimeframeInvalid =
-    isCrossSectionalMode &&
-    Boolean(config.timeframe) &&
-    !timeframeOptions.includes(config.timeframe as string);
+  const noAvailableRuns = browseReadyRuns.length === 0;
+  const crossBatchInsufficient = isCrossSectionalMode && batchOptions.length === 0;
 
   const runDisabled =
     isRunning ||
-    (isCrossSectionalMode && (
-      crossSymbolInsufficient ||
-      !config.timeframe ||
-      crossTimeframeInvalid ||
-      crossFeatureOverflow ||
-      noAvailableSymbols
-    ));
+    (isCrossSectionalMode
+      ? crossSymbolInsufficient || crossFeatureOverflow || crossBatchInsufficient || noAvailableRuns
+      : !config.config_hash || !config.symbol || !config.timeframe);
 
   const updateConfig = (patch: ICConfigPatch) => {
     onConfigChange({
@@ -128,6 +144,36 @@ export default function ICConfigPanel({
         ...config.thresholds,
         ...(patch.thresholds || {}),
       },
+    });
+  };
+
+  const handleSelectRun = (runKey: string) => {
+    const run = browseReadyRuns.find(
+      (item) => `${item.symbol}:${item.timeframe}:${item.config_hash}` === runKey,
+    );
+    if (!run) {
+      return;
+    }
+    updateConfig({
+      symbol: run.symbol,
+      timeframe: run.timeframe,
+      config_hash: run.config_hash,
+    });
+  };
+
+  const handleSelectBatch = (batchKey: string) => {
+    const group = batchGroups.find((item) => item.key === batchKey);
+    if (!group || group.items.length === 0) {
+      return;
+    }
+    const primaryTf = group.items[0]?.timeframe;
+    updateConfig({
+      timeframe: primaryTf,
+      cross_sectional_runs: group.items.map((run) => ({
+        symbol: run.symbol,
+        config_hash: run.config_hash,
+      })),
+      cross_sectional_symbols: group.items.map((run) => run.symbol),
     });
   };
 
@@ -147,82 +193,50 @@ export default function ICConfigPanel({
       />
 
       <div className="space-y-4">
-        <Input
-          placeholder="data_cache/features/{symbol}_{tf}_factory.h5"
-          value={config.features_path}
-          onChange={(event) => updateConfig({ features_path: event.target.value })}
-        />
-        <Input
-          placeholder="data_cache/features/{symbol}_{tf}_labels.h5"
-          value={config.labels_path}
-          onChange={(event) => updateConfig({ labels_path: event.target.value })}
-        />
-        <Input
-          placeholder="data_cache/features/{symbol}_{tf}_meta.json"
-          value={config.meta_path}
-          onChange={(event) => updateConfig({ meta_path: event.target.value })}
-        />
-
         <div className="rounded-lg border border-white/10 p-3 space-y-3">
-          <p className="text-xs text-slate-400">或從 Feature Library 選擇</p>
-          {!isCrossSectionalMode ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Select
-                value={config.symbol}
-                onValueChange={(value) => updateConfig({ symbol: value, timeframe: undefined })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇 Symbol" />
-                </SelectTrigger>
-                <SelectContent>
-                  {symbolOptions.map((symbol) => (
-                    <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <p className="text-xs text-slate-400">從 Feature Library 選擇 Run</p>
+          {runsLoading && <p className="text-xs text-slate-400">載入 runs...</p>}
+          {runsError && <p className="text-xs text-rose-300">{runsError}</p>}
+          {!runsLoading && !runsError && noAvailableRuns && (
+            <p className="text-xs text-amber-300">無可選 run，請先去 Feature Factory 生成</p>
+          )}
 
-              <Select
-                value={config.timeframe}
-                onValueChange={(value) => updateConfig({ timeframe: value })}
-                disabled={!config.symbol}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇 Timeframe" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeframeOptions.map((timeframe) => (
-                    <SelectItem key={timeframe} value={timeframe}>{timeframe}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {!isCrossSectionalMode ? (
+            <Select value={selectedRunKey} onValueChange={handleSelectRun} disabled={noAvailableRuns}>
+              <SelectTrigger>
+                <SelectValue placeholder="選擇 Run（依批次分組）" />
+              </SelectTrigger>
+              <SelectContent>
+                {batchGroups.map((group) => (
+                  <SelectGroup key={group.key}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.items.map((run) => {
+                      const key = `${run.symbol}:${run.timeframe}:${run.config_hash}`;
+                      return (
+                        <SelectItem key={key} value={key}>
+                          {formatRunLeafLabel(run)}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <div className="space-y-3">
-              <MultiSelect
-                label="截面 Symbol 多選"
-                options={crossSymbolOptions}
-                value={selectedCrossSymbols}
-                onChange={(values) =>
-                  updateConfig({
-                    cross_sectional_symbols: values,
-                    timeframe: undefined,
-                  })
-                }
-                placeholder={noAvailableSymbols ? '無可用標的' : '請選擇至少 2 個 Symbol'}
-                description="資料來源：Feature Library registry"
-                disabled={noAvailableSymbols}
-              />
               <Select
-                value={config.timeframe}
-                onValueChange={(value) => updateConfig({ timeframe: value })}
-                disabled={timeframeOptions.length === 0}
+                value={selectedBatchId}
+                onValueChange={handleSelectBatch}
+                disabled={batchOptions.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={timeframeOptions.length === 0 ? '無可用 Timeframe' : '選擇共同 Timeframe'} />
+                  <SelectValue placeholder={batchOptions.length === 0 ? '無可用批次' : '選擇批次'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {timeframeOptions.map((timeframe) => (
-                    <SelectItem key={timeframe} value={timeframe}>{timeframe}</SelectItem>
+                  {batchOptions.map((batch) => (
+                    <SelectItem key={batch.value} value={batch.value}>
+                      {batch.label} · {batch.symbolCount} symbols
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -259,15 +273,15 @@ export default function ICConfigPanel({
         {isCrossSectionalMode && (
           <div className="space-y-2 text-xs">
             {crossSymbolInsufficient && (
-              <p className="text-amber-300">請至少選擇 2 個 Symbol</p>
+              <p className="text-amber-300">請選擇至少含 2 個 Symbol 的批次</p>
             )}
             {crossFeatureOverflow && (
               <p className="text-amber-300">截面 IC 最多支援 50 個因子，請先在 Feature Browser 篩選</p>
             )}
-            {crossTimeframeInvalid && (
-              <p className="text-amber-300">目前 Timeframe 與已選 Symbol 不相容，請重新選擇共同 Timeframe</p>
+            {crossBatchInsufficient && (
+              <p className="text-amber-300">無可用批次</p>
             )}
-            {noAvailableSymbols && (
+            {noAvailableRuns && (
               <p className="text-amber-300">無可用標的</p>
             )}
             <p className="text-slate-400">目前預估分析因子數：{crossSectionalFeatureCount}</p>

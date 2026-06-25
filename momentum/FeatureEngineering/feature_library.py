@@ -56,6 +56,7 @@ class FeatureLibrary:
         symbol: str,
         timeframe: str,
         *,
+        config_hash: Optional[str] = None,
         for_training: bool = False,
         allow_partial_training: bool = False,
     ) -> pd.DataFrame:
@@ -66,6 +67,7 @@ class FeatureLibrary:
         return self._load_internal(
             symbol,
             timeframe,
+            config_hash=config_hash,
             for_training=for_training,
             allow_partial_training=allow_partial_training,
         )
@@ -90,31 +92,53 @@ class FeatureLibrary:
         symbol: str,
         timeframe: str,
         *,
+        config_hash: Optional[str] = None,
         for_training: bool,
         allow_partial_training: bool,
     ) -> pd.DataFrame:
-        entry = self._registry.find_latest(symbol, timeframe)
-        if entry is None:
-            raise FeatureNotFoundError(symbol, timeframe, "No registry entry")
-
-        config_hash = entry.get("config_hash", "")
-
         if config_hash:
+            entry = self._registry.get(symbol, timeframe, config_hash)
+            if entry is None:
+                raise FeatureNotFoundError(
+                    symbol,
+                    timeframe,
+                    f"config_hash not found: {config_hash}",
+                )
+        else:
+            entry = self._registry.find_latest_materialized(symbol, timeframe)
+            if entry is None:
+                raise FeatureNotFoundError(
+                    symbol,
+                    timeframe,
+                    "No materialized registry entry",
+                )
+
+        resolved_hash = entry.get("config_hash", "")
+        explicit_hash = bool(config_hash)
+
+        if resolved_hash:
             try:
                 manifest = self._reader.load_manifest_v2(
                     symbol,
                     timeframe,
-                    config_hash,
+                    resolved_hash,
                     artifact_kind="raw",
                     consumer="strict" if for_training else "browse",
                     allow_partial=allow_partial_training,
                 )
-                columns = self._reader.list_features(symbol, config_hash)
+                columns = self._reader.list_features_v2(
+                    symbol,
+                    timeframe,
+                    resolved_hash,
+                    artifact_kind="raw",
+                    consumer="strict" if for_training else "browse",
+                    allow_partial=allow_partial_training,
+                )
                 if columns:
                     features_df = self._reader.load_columns_v2(
                         symbol,
                         timeframe,
-                        config_hash,
+                        resolved_hash,
                         columns,
                         artifact_kind="raw",
                         consumer="strict" if for_training else "browse",
@@ -139,7 +163,19 @@ class FeatureLibrary:
                         )
                         return features_df
             except FileNotFoundError:
-                pass
+                if explicit_hash:
+                    raise FeatureNotFoundError(
+                        symbol,
+                        timeframe,
+                        f"V2 artifacts missing for config_hash: {resolved_hash}",
+                    ) from None
+
+        if explicit_hash:
+            raise FeatureNotFoundError(
+                symbol,
+                timeframe,
+                f"artifacts missing for config_hash: {resolved_hash}",
+            )
 
         result = self._storage.load_factory_output(symbol, timeframe)
         features_df = getattr(result, "features_df", None) if result is not None else None
@@ -171,6 +207,7 @@ class FeatureLibrary:
         symbols: List[str],
         timeframe: str,
         *,
+        config_hashes: Optional[Dict[str, str]] = None,
         for_training: bool = False,
         allow_partial_training: bool = False,
         feature_columns: Optional[List[str]] = None,
@@ -178,9 +215,17 @@ class FeatureLibrary:
         """Load features for multiple symbols. Raises if any symbol is missing."""
         loaded: Dict[str, pd.DataFrame] = {}
         for symbol in symbols:
+            symbol_hash = (config_hashes or {}).get(symbol)
+            if config_hashes is not None and symbol not in config_hashes:
+                logger.warning(
+                    "config_hashes missing symbol %s/%s; falling back to find_latest",
+                    symbol,
+                    timeframe,
+                )
             loaded[symbol] = self.load(
                 symbol,
                 timeframe,
+                config_hash=symbol_hash,
                 for_training=for_training,
                 allow_partial_training=allow_partial_training,
             )
@@ -190,7 +235,7 @@ class FeatureLibrary:
 
     def ensure_fresh(self, symbol: str, timeframe: str, current_config_hash: str) -> bool:
         """Return whether latest cached entry matches given config hash."""
-        entry = self._registry.find_latest(symbol, timeframe)
+        entry = self._registry.find_latest_materialized(symbol, timeframe)
         if entry is None:
             return False
         return entry.get("config_hash") == current_config_hash

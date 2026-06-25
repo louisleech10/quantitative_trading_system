@@ -1,0 +1,114 @@
+{
+  "backward_compat_no_config_hash": {
+    "selected_config_hash": "90f586663db18ba594b21ce909ad83e0",
+    "run_identity": {
+      "symbol": "BTCUSDT",
+      "timeframe": "12h",
+      "config_hash": "90f586663db18ba594b21ce909ad83e0",
+      "path": "data_cache/features/BTCUSDT/12h/90f586663db18ba594b21ce909ad83e0/feature_manifest.json"
+    },
+    "feature_sha256": "7e3b8bf866c2a233dc4ffc976405efefcfb0fe180439e861f8aba7d8be5afb11",
+    "row_count": 1696,
+    "ic_summary_top": [
+      {
+        "feature_name": "close_12h_trend_EMA_200_fracdiff",
+        "ic_mean": 0.2730040763577908,
+        "icir": 1.460352648785533
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_144_fracdiff",
+        "ic_mean": 0.2592833119013652,
+        "icir": 1.3958862929957034
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_233_fracdiff",
+        "ic_mean": 0.26875089717737605,
+        "icir": 1.2982528076334663
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_13_fracdiff",
+        "ic_mean": 0.06974948312120795,
+        "icir": 0.4160313936773534
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_10_fracdiff",
+        "ic_mean": 0.06445453904141804,
+        "icir": 0.37540051792804224
+      }
+    ]
+  },
+  "disambig_1c4b825498449860a639b0ac37f66d73": {
+    "selected_config_hash": "1c4b825498449860a639b0ac37f66d73",
+    "run_identity": {
+      "symbol": "BTCUSDT",
+      "timeframe": "12h",
+      "config_hash": "1c4b825498449860a639b0ac37f66d73",
+      "path": "data_cache/features/BTCUSDT/12h/1c4b825498449860a639b0ac37f66d73/feature_manifest.json"
+    },
+    "feature_sha256": "012913b36ea3972372dd7012abbe0b53f886955e7a1cb30685d998852839a536",
+    "row_count": 1696,
+    "ic_summary_top": [
+      {
+        "feature_name": "close_12h_trend_EMA_200_fracdiff",
+        "ic_mean": 0.2730040763577908,
+        "icir": 1.460352648785533
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_144_fracdiff",
+        "ic_mean": 0.2592833119013652,
+        "icir": 1.3958862929957034
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_233_fracdiff",
+        "ic_mean": 0.26875089717737605,
+        "icir": 1.2982528076334663
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_13_fracdiff",
+        "ic_mean": 0.06974948312120795,
+        "icir": 0.4160313936773534
+      },
+      {
+        "feature_name": "close_12h_trend_EMA_10_fracdiff",
+        "ic_mean": 0.06445453904141804,
+        "icir": 0.37540051792804224
+      }
+    ]
+  },
+  "disambig_90f586663db18ba594b21ce909ad83e0": {
+    "selected_config_hash": "90f586663db18ba594b21ce909ad83e0",
+    "run_identity": {
+      "symbol": "BTCUSDT",
+      "timeframe": "12h",
+      "config_hash": "90f586663db18ba594b21ce909ad83e0",
+      "path": "data_cache/features/BTCUSDT/12h/90f586663db18ba594b21ce909ad83e0/feature_manifest.json"
+    },
+    "feature_sha256": "7e3b8bf866c2a233dc4ffc976405efefcfb0fe180439e861f8aba7d8be5afb11",
+    "row_count": 1696
+  },
+  "ml_caller_load_multi": {
+    "load_multi_kwargs": {
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ],
+      "timeframe": "12h",
+      "kwargs": {
+        "for_training": true,
+        "allow_partial_training": true
+      }
+    },
+    "per_symbol_row_count": {
+      "BTCUSDT": 1696,
+      "ETHUSDT": 1696
+    },
+    "per_symbol_feature_sha256": {
+      "BTCUSDT": "7e3b8bf866c2a233dc4ffc976405efefcfb0fe180439e861f8aba7d8be5afb11",
+      "ETHUSDT": "92ec9892aaaab5fba74c28c247ccea702ba461805aaad058575b03aac4b56c05"
+    },
+    "service_summary": {
+      "n_symbols": 2,
+      "result_count": 0
+    }
+  }
+}

@@ -89,10 +89,13 @@ function ICAnalysisPageContent() {
     applyTransforms,
     connectProgress,
   } = useICAnalysis();
-  const registryEntries = useFeatureFactoryStore((state) => state.registryEntries);
-  const fetchRegistry = useFeatureFactoryStore((state) => state.fetchRegistry);
+  const runs = useFeatureFactoryStore((state) => state.runs);
+  const fetchRuns = useFeatureFactoryStore((state) => state.fetchRuns);
+  const runsLoading = useFeatureFactoryStore((state) => state.runsLoading);
+  const runsError = useFeatureFactoryStore((state) => state.runsError);
 
   const [summaryText, setSummaryText] = useState<string>('');
+  const [featuresError, setFeaturesError] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [isRefiltering, setIsRefiltering] = useState(false);
   const [isDeepRunning, setIsDeepRunning] = useState(false);
@@ -229,19 +232,40 @@ function ICAnalysisPageContent() {
   }, [selectedFeature, setSelectedFeature, summaryTable]);
 
   useEffect(() => {
-    fetchRegistry().catch(() => undefined);
-  }, [fetchRegistry]);
+    fetchRuns().catch(() => undefined);
+  }, [fetchRuns]);
 
   useEffect(() => {
-    if (!config.features_path?.trim()) {
+    const anchor = config.cross_sectional_runs?.[0];
+    const symbol = anchor?.symbol || config.symbol;
+    const timeframe = config.timeframe;
+    const configHash = anchor?.config_hash || config.config_hash;
+
+    if (!symbol?.trim() || !timeframe?.trim() || !configHash?.trim()) {
       setAvailableFeatures([]);
+      setFeaturesError(null);
       return;
     }
 
-    fetchAvailableFeatures(config.features_path.trim(), config.meta_path?.trim() || undefined)
-      .then((features) => setAvailableFeatures(features))
-      .catch(() => setAvailableFeatures([]));
-  }, [config.features_path, config.meta_path, fetchAvailableFeatures, setAvailableFeatures]);
+    setFeaturesError(null);
+    fetchAvailableFeatures(symbol.trim(), timeframe.trim(), configHash.trim())
+      .then((features) => {
+        setAvailableFeatures(features);
+        setFeaturesError(null);
+      })
+      .catch((err) => {
+        setAvailableFeatures([]);
+        const message = err instanceof Error ? err.message : '載入特徵清單失敗';
+        setFeaturesError(message);
+      });
+  }, [
+    config.symbol,
+    config.timeframe,
+    config.config_hash,
+    config.cross_sectional_runs,
+    fetchAvailableFeatures,
+    setAvailableFeatures,
+  ]);
 
   useEffect(() => {
     if (summaryTable.length === 0) return;
@@ -359,8 +383,8 @@ function ICAnalysisPageContent() {
 
     try {
       if (config.mode === 'cross_sectional') {
-        if ((config.cross_sectional_symbols?.length || 0) < 2) {
-          throw new Error('請至少選擇 2 個 Symbol');
+        if ((config.cross_sectional_runs?.length || 0) < 2) {
+          throw new Error('請選擇至少含 2 個 Symbol 的批次');
         }
         if (crossSectionalFeatureCount > 50) {
           throw new Error('截面 IC 最多支援 50 個因子，請先在 Feature Browser 篩選');
@@ -487,10 +511,19 @@ function ICAnalysisPageContent() {
           </div>
         )}
 
+        {featuresError && (
+          <div className="glass-panel rounded-xl p-4 border border-amber-400/30 text-amber-200 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            <span>{featuresError}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
           <ICConfigPanel
             config={config}
-            registryEntries={registryEntries}
+            runs={runs}
+            runsLoading={runsLoading}
+            runsError={runsError}
             crossSectionalFeatureCount={crossSectionalFeatureCount}
             featureTier={featureTier}
             featureToggles={featureToggles}

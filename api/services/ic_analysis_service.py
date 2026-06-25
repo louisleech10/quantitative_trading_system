@@ -19,10 +19,18 @@ import pandas as pd
 
 from api.core.logging import get_logger
 from api.models.ic_models import DeepAnalysisRequest, ICAnalyzeRequest, ICFullAnalysisRequest
-from momentum.factories import create_feature_library, create_feature_reader, create_ic_analyzer, create_ic_reporter
+from momentum.factories import (
+    create_feature_library,
+    create_feature_reader,
+    create_ic_analyzer,
+    create_ic_reporter,
+    create_kline_storage_manager,
+)
 
 
 logger = get_logger("api.ic_analysis_service")
+
+FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
 
 class ICAnalysisService:
@@ -57,6 +65,7 @@ class ICAnalysisService:
             "req_features_path": request.features_path,
             "req_symbol": request.symbol,
             "req_timeframe": request.timeframe,
+            "req_config_hash": (request.config_hash or "").strip() or None,
         }
 
         with self._lock:
@@ -105,10 +114,24 @@ class ICAnalysisService:
             if request.mode == "cross_sectional":
                 if not request.timeframe:
                     raise ValueError("timeframe is required for cross_sectional mode")
-                if not request.symbols or len(request.symbols) < 2:
+
+                if request.cross_sectional_runs:
+                    symbols_resolved = [item.symbol for item in request.cross_sectional_runs]
+                    config_hashes = {item.symbol: item.config_hash for item in request.cross_sectional_runs}
+                elif request.symbols:
+                    symbols_resolved = list(request.symbols)
+                    config_hashes = None
+                else:
+                    raise ValueError("cross_sectional mode requires cross_sectional_runs or symbols")
+
+                if len(symbols_resolved) < 2:
                     raise ValueError("cross_sectional mode requires at least 2 symbols")
 
-                multi_features = self._feature_library.load_multi(request.symbols, request.timeframe)
+                multi_features = self._feature_library.load_multi(
+                    symbols_resolved,
+                    request.timeframe,
+                    config_hashes=config_hashes,
+                )
                 frames: List[pd.DataFrame] = []
                 for symbol, frame in multi_features.items():
                     if frame is None or frame.empty:
@@ -120,37 +143,76 @@ class ICAnalysisService:
                 cross_df = pd.concat(frames, axis=0)
                 cross_df = cross_df.set_index("_symbol", append=True)
 
+                labels_path = request.labels_path
+                if not labels_path:
+                    cross_df = self._append_cross_sectional_labels(
+                        cross_df,
+                        symbols_resolved,
+                        request.timeframe,
+                    )
+
                 report = analyzer.analyze_cross_sectional(
                     features=cross_df,
-                    labels_path=request.labels_path,
+                    labels_path=labels_path,
                     config_override=config_override,
                     progress_callback=progress_callback,
                 )
             else:
+                symbol = request.symbol
+                timeframe = request.timeframe
+                config_hash = (request.config_hash or "").strip() or None
                 features_path = request.features_path
-                if not features_path and request.symbol and request.timeframe:
-                    try:
-                        entry = self._feature_library._registry.find_latest(request.symbol, request.timeframe)
-                    except Exception as exc:
-                        logger.warning("FeatureLibrary lookup failed: %s", exc)
-                        entry = None
+                meta_path = request.meta_path
+                resolved_config_hash: Optional[str] = config_hash
 
-                    if entry:
-                        resolved_path = str(entry.get("hdf5_relative_path") or "")
-                        if resolved_path and not Path(resolved_path).is_absolute():
-                            resolved_path = str((Path.cwd() / resolved_path).resolve())
-                        features_path = resolved_path
+                if symbol and timeframe:
+                    if config_hash:
+                        entry = self._feature_library._registry.get(symbol, timeframe, config_hash)
+                        if entry is None:
+                            raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+                    else:
+                        entry = self._feature_library._registry.find_latest_materialized(
+                            symbol,
+                            timeframe,
+                        )
+                        if entry is None:
+                            entry = None
+                        else:
+                            logger.warning(
+                                "未指定 config_hash，回退最新 run %s/%s",
+                                symbol,
+                                timeframe,
+                            )
+                            resolved_config_hash = str(entry.get("config_hash") or "")
+
+                    if entry and not features_path:
+                        features_path, meta_path = self._materialize_features_for_ic(
+                            symbol,
+                            timeframe,
+                            resolved_config_hash,
+                        )
+                    elif entry and not meta_path:
+                        meta_path = self._write_ic_meta_json(
+                            symbol,
+                            timeframe,
+                            resolved_config_hash,
+                        )
 
                 if not features_path:
                     raise ValueError("features_path is required when FeatureLibrary symbol/timeframe is unavailable")
 
+                labels_path = request.labels_path
+                kline_reader = None
+                if not labels_path:
+                    kline_reader = create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR)
+
                 report = analyzer.analyze(
                     features_path=features_path,
-                    labels_path=request.labels_path,
-                    meta_path=request.meta_path,
+                    labels_path=labels_path or "",
+                    meta_path=meta_path,
                     config_override=config_override,
                     progress_callback=progress_callback,
-                    kline_reader=None,
+                    kline_reader=kline_reader,
                 )
 
             with self._lock:
@@ -302,13 +364,30 @@ class ICAnalysisService:
             "media_type": "text/markdown; charset=utf-8",
         }
 
-    def list_features(self, features_path: str, meta_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_features(
+        self,
+        features_path: Optional[str] = None,
+        meta_path: Optional[str] = None,
+        *,
+        symbol: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        config_hash: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Read available feature list from V7 Parquet or legacy HDF5.
 
+        V2 query: (symbol, timeframe, config_hash) → FeatureReader.list_features_v2.
         V7 path: features_path = 'parquet:{symbol}:{config_hash}' → FeatureReader.
         Legacy: features_path = '/path/to/file.h5' → h5py.
         """
         metadata = self._load_meta(meta_path)
+
+        if symbol and timeframe and config_hash:
+            reader = create_feature_reader()
+            names = reader.list_features_v2(symbol, timeframe, config_hash)
+            return self._build_feature_items(names, metadata)
+
+        if not features_path:
+            raise ValueError("features_path or (symbol, timeframe, config_hash) is required")
 
         # V7 Parquet path via FeatureReader
         if features_path.startswith("parquet:"):
@@ -1033,6 +1112,177 @@ class ICAnalysisService:
                 pass
 
         return str(value)
+
+    def _materialize_features_for_ic(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: Optional[str],
+    ) -> tuple[str, str]:
+        """透過 FeatureLibrary 載入特徵並 materialize 成 orchestrator 可讀的 HDF5。"""
+        features_df = self._feature_library.load(
+            symbol,
+            timeframe,
+            config_hash=config_hash,
+        )
+        cache_dir = Path("data_cache/reports/ic_ingest_cache")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        hash_key = config_hash or "latest"
+        safe_key = f"{symbol}_{timeframe}_{hash_key}".replace("/", "_")
+        h5_path = cache_dir / f"{safe_key}.h5"
+        meta_path = cache_dir / f"{safe_key}_meta.json"
+
+        if not h5_path.exists():
+            self._write_features_h5(h5_path, symbol, timeframe, features_df)
+        if not meta_path.exists():
+            meta_payload = self._build_ic_metadata_from_run(
+                symbol,
+                timeframe,
+                config_hash,
+                list(features_df.columns),
+            )
+            meta_path.write_text(
+                json.dumps(meta_payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+        return str(h5_path.resolve()), str(meta_path.resolve())
+
+    @staticmethod
+    def _write_features_h5(
+        path: Path,
+        symbol: str,
+        timeframe: str,
+        features_df: pd.DataFrame,
+    ) -> None:
+        """將 DataFrame 寫入 IC orchestrator 可讀的 HDF5 格式。"""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        group_key = f"{symbol}/{timeframe}"
+        index_values = features_df.index
+        if isinstance(index_values, pd.DatetimeIndex):
+            timestamps = index_values.view("int64") // 10**9
+        else:
+            timestamps = np.arange(len(features_df), dtype=np.int64)
+
+        with h5py.File(path, "w") as file:
+            group = file.create_group(group_key)
+            group.create_dataset(
+                "features",
+                data=features_df.to_numpy(dtype=np.float32),
+                compression="gzip",
+            )
+            group.create_dataset("timestamps", data=timestamps, compression="gzip")
+            str_dtype = h5py.string_dtype(encoding="utf-8")
+            group.create_dataset(
+                "feature_names",
+                data=np.array(features_df.columns.tolist(), dtype=object),
+                dtype=str_dtype,
+            )
+
+    def _write_ic_meta_json(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: Optional[str],
+        feature_names: Optional[List[str]] = None,
+    ) -> str:
+        """寫入 IC 分析用的 metadata JSON（symbol/timeframe 供 label 生成）。"""
+        cache_dir = Path("data_cache/reports/ic_ingest_cache")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        hash_key = config_hash or "latest"
+        safe_key = f"{symbol}_{timeframe}_{hash_key}".replace("/", "_")
+        meta_path = cache_dir / f"{safe_key}_meta.json"
+        meta_payload = self._build_ic_metadata_from_run(
+            symbol,
+            timeframe,
+            config_hash,
+            feature_names or [],
+        )
+        meta_path.write_text(
+            json.dumps(meta_payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return str(meta_path.resolve())
+
+    def _build_ic_metadata_from_run(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: Optional[str],
+        feature_names: List[str],
+    ) -> Dict[str, Any]:
+        """從 run catalog 建立 IC orchestrator 需要的 per-feature metadata。"""
+        metadata: Dict[str, Any] = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "config_hash": config_hash,
+        }
+        catalog_path: Optional[Path] = None
+        if config_hash:
+            catalog_path = (
+                Path("data_cache/features")
+                / symbol
+                / timeframe
+                / config_hash
+                / "feature_catalog_cache.parquet"
+            )
+        if catalog_path and catalog_path.exists():
+            catalog_df = pd.read_parquet(catalog_path)
+            for _, row in catalog_df.iterrows():
+                name = str(row.get("name"))
+                if not name:
+                    continue
+                metadata[name] = {
+                    "name": name,
+                    "category": row.get("category") or "unknown",
+                    "layer": row.get("layer") or 1,
+                }
+        for feature_name in feature_names:
+            if feature_name not in metadata:
+                metadata[feature_name] = {
+                    "name": feature_name,
+                    "category": "unknown",
+                    "layer": 1,
+                }
+        return metadata
+
+    def _append_cross_sectional_labels(
+        self,
+        cross_df: pd.DataFrame,
+        symbols: List[str],
+        timeframe: str,
+    ) -> pd.DataFrame:
+        """從 kline 為橫截面特徵附加 return_1 標籤欄。"""
+        from momentum.factories import create_label_generator
+
+        kline_reader = create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR)
+        label_generator = create_label_generator()
+        working_df = cross_df.copy()
+
+        if not isinstance(working_df.index, pd.MultiIndex):
+            raise ValueError("cross-sectional features must use MultiIndex")
+
+        index_names = list(working_df.index.names)
+        symbol_level_idx = working_df.index.nlevels - 1
+        if "_symbol" in index_names:
+            symbol_level_idx = index_names.index("_symbol")
+
+        for symbol in symbols:
+            raw_data = kline_reader.read_klines(symbol, timeframe)
+            if raw_data is None or raw_data.empty or "close" not in raw_data.columns:
+                raise ValueError(f"kline data unavailable for {symbol}/{timeframe}")
+            label_series = label_generator.generate_returns_by_type(
+                raw_data["close"],
+                1,
+                "log",
+            )
+            symbol_mask = working_df.index.get_level_values(symbol_level_idx) == symbol
+            if not symbol_mask.any():
+                continue
+            symbol_index = working_df.index[symbol_mask].droplevel(symbol_level_idx)
+            aligned = label_series.reindex(symbol_index)
+            working_df.loc[symbol_mask, "return_1"] = aligned.to_numpy()
+
+        return working_df
 
     def _load_meta(self, meta_path: Optional[str]) -> Dict[str, Any]:
         if not meta_path:

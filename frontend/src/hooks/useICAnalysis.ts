@@ -122,16 +122,17 @@ export function useICAnalysis() {
 
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {
-      const featuresPath = config.features_path.trim();
-      const hasLibrarySelection = Boolean(config.symbol && config.timeframe);
+      const hasLibrarySelection = Boolean(
+        config.symbol && config.timeframe && config.config_hash
+      );
       const hasCrossSectionSelection = Boolean(
         config.mode === 'cross_sectional' &&
         config.timeframe &&
-        (config.cross_sectional_symbols?.length || 0) >= 2
+        (config.cross_sectional_runs?.length || 0) >= 2
       );
 
-      if (!featuresPath && !hasLibrarySelection && !hasCrossSectionSelection) {
-        throw new Error('請提供特徵檔案路徑，或選擇 Symbol/Timeframe');
+      if (!hasLibrarySelection && !hasCrossSectionSelection) {
+        throw new Error('請選擇 Run 或橫截面批次');
       }
 
       const effectiveConfig = useICAnalysisStore.getState().getEffectiveConfig();
@@ -162,12 +163,11 @@ export function useICAnalysis() {
 
       const payload = {
         mode: isCrossSectionalMode ? 'cross_sectional' : 'longitudinal',
-        features_path: featuresPath || undefined,
         symbol: isCrossSectionalMode ? undefined : config.symbol || undefined,
         symbols: isCrossSectionalMode ? config.cross_sectional_symbols || [] : undefined,
+        cross_sectional_runs: isCrossSectionalMode ? config.cross_sectional_runs || [] : undefined,
         timeframe: config.timeframe || undefined,
-        labels_path: config.labels_path?.trim() || undefined,
-        meta_path: config.meta_path?.trim() || undefined,
+        config_hash: isCrossSectionalMode ? undefined : config.config_hash || undefined,
         config_override: {
           ...buildConfigOverride(config),
           ...(effectiveConfig.feature_tiers ? { feature_tiers: effectiveConfig.feature_tiers } : {}),
@@ -217,14 +217,20 @@ export function useICAnalysis() {
     return data.summary;
   }, []);
 
-  const fetchAvailableFeatures = useCallback(async (featuresPath: string, metaPath?: string) => {
-    const params = new URLSearchParams({ features_path: featuresPath });
-    if (metaPath) {
-      params.set('meta_path', metaPath);
-    }
-    const data = await requestJson<{ total: number; features: FeatureListItem[] }>(`/features/list?${params.toString()}`);
-    return data.features;
-  }, []);
+  const fetchAvailableFeatures = useCallback(
+    async (symbol: string, timeframe: string, configHash: string) => {
+      const params = new URLSearchParams({
+        symbol,
+        timeframe,
+        config_hash: configHash,
+      });
+      const data = await requestJson<{ total: number; features: FeatureListItem[] }>(
+        `/features/list?${params.toString()}`
+      );
+      return data.features;
+    },
+    []
+  );
 
   const startDeepAnalysis = useCallback(
     async (taskId: string, config: DeepAnalysisConfig) => {

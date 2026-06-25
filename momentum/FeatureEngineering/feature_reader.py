@@ -227,6 +227,35 @@ class FeatureReader:
                 return json.load(f)
         return self._list_features_from_parquet(symbol, config_hash)
 
+    def list_features_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+        *,
+        consumer: ConsumerPolicy = "browse",
+        allow_partial: bool = False,
+    ) -> List[str]:
+        """List feature names for a V2 run (symbol/timeframe/config_hash)."""
+        manifest, _base_dir, is_legacy = self._resolve_manifest_v2(
+            symbol=symbol,
+            tf=tf,
+            config_hash=config_hash,
+            artifact_kind=artifact_kind,
+            consumer=consumer,
+            allow_partial=allow_partial,
+        )
+        if is_legacy:
+            return self.list_features(symbol, config_hash)
+
+        artifact = self._get_v2_artifact(manifest, artifact_kind)
+        columns: List[str] = []
+        for group_info in artifact.get("groups", {}).values():
+            if isinstance(group_info, dict):
+                columns.extend(group_info.get("columns", []))
+        return columns
+
     # ------------------------------------------------------------------
     # Mode 2: Column-Projected
     # ------------------------------------------------------------------

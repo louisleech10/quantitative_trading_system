@@ -1,0 +1,38 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "timeframe": "12h",
+    "config_hash": "1c4b825498449860a639b0ac37f66d73",
+    "feature_count": 73,
+    "row_count": 1696,
+    "hdf5_relative_path": "data_cache/features/BTCUSDT/12h/1c4b825498449860a639b0ac37f66d73/feature_manifest.json",
+    "created_at": 1782147282.886011,
+    "last_generated_at": 1782147282.886011,
+    "size_bytes": 392417,
+    "alias": "IC Test 1symbol 1tf"
+  },
+  {
+    "symbol": "BTCUSDT",
+    "timeframe": "12h",
+    "config_hash": "90f586663db18ba594b21ce909ad83e0",
+    "feature_count": 45419,
+    "row_count": 1696,
+    "hdf5_relative_path": "data_cache/features/BTCUSDT/12h/90f586663db18ba594b21ce909ad83e0/feature_manifest.json",
+    "batch_id": "a08a292c-1503-4228-9e5d-c3a2f4224846",
+    "created_at": 1782216094.497776,
+    "last_generated_at": 1782216094.497776,
+    "batch_alias": "IC Test-3symbol 1tf"
+  },
+  {
+    "symbol": "ETHUSDT",
+    "timeframe": "12h",
+    "config_hash": "90f586663db18ba594b21ce909ad83e0",
+    "feature_count": 45421,
+    "row_count": 1696,
+    "hdf5_relative_path": "data_cache/features/ETHUSDT/12h/90f586663db18ba594b21ce909ad83e0/feature_manifest.json",
+    "batch_id": "a08a292c-1503-4228-9e5d-c3a2f4224846",
+    "created_at": 1782216167.2112992,
+    "last_generated_at": 1782216167.2112992,
+    "batch_alias": "IC Test-3symbol 1tf"
+  }
+]
