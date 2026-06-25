@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from api.models.ic_models import ICAnalyzeRequest
@@ -12,6 +15,23 @@ from api.services.ic_analysis_service import ICAnalysisService
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
 HASH_A = "1c4b825498449860a639b0ac37f66d73"
+
+
+class _SleepingAnalyzer:
+    def analyze(self, **_kwargs):
+        time.sleep(0.2)
+        return {"summary_table": []}
+
+    def analyze_cross_sectional(self, **_kwargs):
+        time.sleep(0.2)
+        return {"summary_table": []}
+
+
+class _ProgressAnalyzer:
+    def analyze(self, **kwargs):
+        progress_callback = kwargs["progress_callback"]
+        progress_callback({"stage": "ic_calculation", "progress": 0.5, "message": "worker tick"})
+        return {"summary_table": []}
 
 
 def _require_run() -> None:
@@ -65,3 +85,96 @@ def test_resolve_run_path_contains_config_hash() -> None:
     features_path, _meta_path = service._materialize_features_for_ic(SYMBOL, TIMEFRAME, HASH_A)
     assert HASH_A in entry["hdf5_relative_path"]
     assert features_path.endswith(".h5")
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_does_not_block_event_loop(monkeypatch) -> None:
+    service = ICAnalysisService()
+    analyzer = _SleepingAnalyzer()
+
+    async def run_and_probe(task_id: str, request: ICAnalyzeRequest) -> None:
+        service._tasks[task_id] = {
+            "task_id": task_id,
+            "status": "running",
+            "progress": 0.0,
+            "error": None,
+            "result": None,
+        }
+        started = time.perf_counter()
+        task = asyncio.create_task(service._run_analysis(task_id, analyzer, request, {}))
+        await asyncio.sleep(0.02)
+        elapsed = time.perf_counter() - started
+        await task
+
+        assert elapsed < 0.1
+        assert service.get_task_status(task_id)["status"] == "completed"
+
+    await run_and_probe(
+        "longitudinal-task",
+        ICAnalyzeRequest(features_path="features.h5", labels_path="labels.h5"),
+    )
+
+    frame = pd.DataFrame(
+        {
+            "alpha": [1.0, 2.0],
+            "label": [0.1, 0.2],
+        },
+        index=pd.Index([1, 2], name="timestamp"),
+    )
+    monkeypatch.setattr(
+        service,
+        "_feature_library",
+        SimpleNamespace(load_multi=lambda *_args, **_kwargs: {"BTC": frame, "ETH": frame}),
+    )
+
+    await run_and_probe(
+        "cross-sectional-task",
+        ICAnalyzeRequest(
+            mode="cross_sectional",
+            symbols=["BTC", "ETH"],
+            timeframe="12h",
+            labels_path="labels.h5",
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_progress_callback_from_to_thread_schedules_on_event_loop() -> None:
+    service = ICAnalysisService()
+    task_id = "progress-task"
+    scheduled: list[asyncio.Task] = []
+    callback_errors: list[str] = []
+
+    async def noop() -> None:
+        return None
+
+    def notification_callback(payload):
+        if payload.get("status") != "running":
+            return
+        try:
+            scheduled.append(asyncio.create_task(noop()))
+        except RuntimeError as exc:
+            callback_errors.append(str(exc))
+            raise
+
+    service._tasks[task_id] = {
+        "task_id": task_id,
+        "status": "running",
+        "progress": 0.0,
+        "error": None,
+        "result": None,
+    }
+    service.register_notification_callback(task_id, notification_callback)
+
+    await service._run_analysis(
+        task_id,
+        _ProgressAnalyzer(),
+        ICAnalyzeRequest(features_path="features.h5", labels_path="labels.h5"),
+        {},
+    )
+    await asyncio.sleep(0)
+
+    assert callback_errors == []
+    assert len(scheduled) == 1
+    await scheduled[0]
+    assert service.get_task_status(task_id)["status"] == "completed"

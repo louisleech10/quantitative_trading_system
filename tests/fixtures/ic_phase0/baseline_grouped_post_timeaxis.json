@@ -1,0 +1,14 @@
+{
+  "groups": {
+    "2024": {
+      "group_size": 3,
+      "ic_mean": 0.0,
+      "row_mask_hash": "c0be322c1ad6af50f418b96232d98fe25a36d5d0a557291833f8248f2084b8ef"
+    },
+    "2025": {
+      "group_size": 3,
+      "ic_mean": 0.0,
+      "row_mask_hash": "a752d8ffaabe4c4d8a7a10cbdb2ee1525130a56a8290eef5d8a695434c49928f"
+    }
+  }
+}

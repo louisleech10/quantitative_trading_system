@@ -86,6 +86,8 @@ class ICAnalysisService:
     ) -> None:
         """Run IC analysis in background."""
 
+        loop = asyncio.get_running_loop()
+
         def progress_callback(payload: Dict[str, Any]) -> None:
             stage_name = payload.get("stage_name") or payload.get("stage")
             progress = float(payload.get("progress", 0.0))
@@ -101,14 +103,15 @@ class ICAnalysisService:
                 task_info["progress"] = progress
                 task_info["status"] = "running"
 
-            self._notify_callbacks(task_id, {
+            notify_payload = {
                 "task_id": task_id,
                 "stage": stage_name,
                 "current_step": current_step,
                 "progress": progress,
                 "message": message,
                 "status": "running",
-            })
+            }
+            loop.call_soon_threadsafe(self._notify_callbacks, task_id, notify_payload)
 
         try:
             if request.mode == "cross_sectional":
@@ -151,7 +154,8 @@ class ICAnalysisService:
                         request.timeframe,
                     )
 
-                report = analyzer.analyze_cross_sectional(
+                report = await asyncio.to_thread(
+                    analyzer.analyze_cross_sectional,
                     features=cross_df,
                     labels_path=labels_path,
                     config_override=config_override,
@@ -206,7 +210,8 @@ class ICAnalysisService:
                 if not labels_path:
                     kline_reader = create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR)
 
-                report = analyzer.analyze(
+                report = await asyncio.to_thread(
+                    analyzer.analyze,
                     features_path=features_path,
                     labels_path=labels_path or "",
                     meta_path=meta_path,

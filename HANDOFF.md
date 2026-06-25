@@ -1,35 +1,46 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-24 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-06-25 | **Branch**: main
 
-## ★下一個任務(使用者 2026-06-24 定案,待新 session 開工)：IC 修法 Phase 0 止血+正確性硬閘
-- **直接讀**:`handoffs/20260624-ic-PHASE0-DEFINITION.md`(完整範圍 + 決策 baked in + 起手式)。照那份走完整 SPEC 管線。
-- **範圍**:IC-CRASH(GroupedConfig 崩潰)+ IC-FEATURE-GUARD(feature_filter 幽靈落地,是 Phase 2 前置)+ IC-UX-ERR(to_thread/WS)+ IC-TIMEAXIS(秒當毫秒)+ IC-BYVOL + decay log 聚合。級別:大(b)(d),走完整管線。
-- **已定決策**:起點=Phase 0;walk-forward/CPCV **复用 ML 孤島**(非重寫);不碰串流/train-test/case-control(留後 Phase)。
-- **狀態**:已定義,**實作未啟動**(使用者另開新 session 做)。
+## ★進行中：IC 修法 Phase 0（大任務 (b)(d)，完整管線施工中）
+**狀態**：**IC Phase 0 全完成 + 實機 smoke 通過 + WS regression 修好**。準備 commit。
+**實機 smoke（真瀏覽器選 45k run→analyze）**：① 不崩潰（跑過 preprocessing→ic_calculation，以前會崩的路徑）；② 抓到第 3 bug=to_thread 讓 WS 進度回呼從 worker thread 觸發 `create_task` no-running-loop → UI 顯「連線失敗」→ codex 修 `run_coroutine_threadsafe`；③ Claude 自修前端 stale-error（onerror no-op + onmessage 清 error），重跑 smoke「連線失敗」消失、後端 RuntimeError=0、+2 vitest。
+**Claude 最終驗收**：全套 IC `97 passed`；前端 vitest 4 passed；diff 防假綠 OK（測試全強化/新增無弱化）；golden 3 baseline 過。
+**Composer code review 抓到 BLOCKING（我+adversarial 都漏）**：`config/ic_config.yaml` by_volatility 未同步→預設 grouped 必崩 → codex 已修 yaml→false + 加 guard 測試（load_ic_config 原樣不 raise）。
+**postflight**：報 data_cache 縮 6.4MB → **調查為誤報**：真實 kline_cache.h5 未動（mtime Apr 28、ts 1704067200 正確）；縮減全在 gitignored `cgsa_work` FF 測試 scratch，與 IC 無關。
+**驗收共抓 2 真 bug 已修**：① _stage5 誤加必填參數（regression）；② yaml by_volatility 未同步（Composer 揪）。
+**實作摘要**：6 epic 全落地——crash model_dump / timeaxis 回 DatetimeIndex+單位實測+fail-closed / byvol fail-closed+預設 False / feature_filter `_apply_feature_filter` 預設不截斷+sorted+truncation_mode / decay 移 4 warning+summary(數值不變) / to_thread 兩路徑 + 前端 failed message+poll 狀態機。
+**驗收抓到 1 真 bug 已修**：_stage5_statistical_validation 誤加必填 feature_filter_info → analyze:139 漏傳崩 3 測試 → codex 移除誤加參數修好。
+**過程留痕**：BRIEF/MANIFEST/SPEC/TODO/ADVERSARIAL-{,TODO-}{CODEX,CURSOR,RECONCILE}/IMPL-*/CODEREVIEW-*。
+**preflight/postflight**：`/tmp/agent_dc_snapshot.txt`。
 
-## 背景：IC-Analysis 全覆蓋地圖（四家委員會,2026-06-24,已交付）
-- **入口**:`handoffs/20260624-ic-map-00-INDEX.md` → `WHOLEMAP.md`(+ STAGE{1-5}-FINAL;過程留痕在 `ic-map-trail/`)。
-- **核心結論**:IC 主流程**幾乎無防偽護網** + 多幽靈/算錯(系統性發現 A-H)。記憶 [[project_ic_analysis_map]]。
-- **分階段計畫**:`handoffs/20260624-ic-roadmap-phasing-CONVERGED.md`(七 Phase,contract-first+雙軌)。大尺度架構 `ic-optimization-CONVERGED.md`;Agent 顧問層=ROADMAP P2。
+### 已產出（這個 session）
+- 白話 brief：`handoffs/20260625-ic-PHASE0-BRIEF.md`（門外漢版）
+- manifest（30 ID）：`handoffs/20260625-ic-PHASE0-MANIFEST.md`
+- **SPEC v2**：`docs/IC_PHASE0_SPEC.md`（reconcile 後修補；三道機檢 PASS）
+- **TODO**：`docs/IC_PHASE0_TODO.md`（4 批；三道機檢 PASS；含派工 prompt B1-B4）
+- SPEC adversarial：`...ADVERSARIAL-{CODEX,CURSOR}.md` + `...ADVERSARIAL-RECONCILE.md`（12 項 R-1~R-12 已入 SPEC）
+- TODO adversarial（跑中）：`...TODO-ADVERSARIAL-{CODEX,CURSOR}.md`
 
-## 前一任務：IC Gatekeeper Run 選擇器重做 — 實作完成待使用者驗收
+### SPEC adversarial 收斂重點（已入 SPEC v2）
+- IC-TIMEAXIS 真 bug=`_iter_time_groups` AttributeError(回 Series 非 DatetimeIndex)，非靜默 1970
+- **IC-BYVOL 收斂=(b) fail-closed + schema 預設 by_volatility 改 False**（兩家獨立一致）
+- feature_filter 預設不截斷（前端 max_features 改 undefined）；去 config_override 被 ICConfig 丟棄
+- max_features 用 sorted() 穩定序非欄位序；Golden 改結構化 float + per-group row mask
 
-**目標**：ic-analysis 從 Feature Library 選擇無法辨識批次 + 後端 find_latest 靜默挑最新 run（無法選舊批次）。改為「批次分組 Run 選擇器」+ config_hash 端到端精確命中。
+### 親驗事實（鐵律親跑，不信報告）
+- IC-CRASH：compute_grouped_ic 單一 caller(orchestrator:1139) 傳 pydantic 給 dict-API → A1 model_dump
+- IC-TIMEAXIS：read_klines 回 RangeIndex+timestamp int64 秒(1704067200=2024)；_get_time_index:1025 寫死 unit="ms"→1970，真實路徑必觸發
+- IC-BYVOL：schema:80 預設 True，engine 無分支 → 委員會收斂 (a 實作/b fail-closed)，Claude 傾向 b
+- IC-FEATURE-GUARD：service:967 寫 metadata、momentum 零消費 → 幽靈全量 45k
 
-**完成範圍（大任務，命中 (b)(d)）**
-- 後端：ICAnalyzeRequest 加 config_hash/cross_sectional_runs；ic_analysis_service 用 registry.get + find_latest_materialized；feature_library load/load_multi optional config_hash **fail-closed**（明確 hash 缺失→raise，不靜默 fallback legacy）；list_features_v2 帶 tf；list_runs 補 training_timeframes。
-- 前端：ICConfigPanel 批次分組 Run 下拉（global/event 單選、cross_sectional 選同質 batch+tf）；移除貼路徑欄；啟動 gate；page fetchRuns 三態 + 清 stale features。
+### 待辦（接回 adversarial 後）
+1. 收 codex(`...ADVERSARIAL-CODEX.md`)+cursor(`...ADVERSARIAL-CURSOR.md`)兩家 findings → reconcile（含 IC-BYVOL 拍板）
+2. 改 SPEC（若有 BLOCKING）→ 生 TODO → gate → 派 codex 實作 + composer code review
+3. 接回 diff 防假綠 + 自跑 pytest + preflight/postflight
 
-**流程留痕（可稽核）**：handoffs/20260623-ic-run-selector-{DESIGN,MANIFEST,ADVERSARIAL-RECONCILE,CODEX-REVIEW,IMPL}.md；docs/IC_RUN_SELECTOR_{SPEC,TODO}.md。
-規劃委員會(codex+cursor) → 雙家族 adversarial(12 BLOCKING) → Composer 實作 → Codex review(5 BLOCKING 含 fail-closed) → Composer 修補 → Claude 獨立驗收。
+### 使用者新定規則（已存記憶）
+- brief 必白話門外漢版（[[feedback_brief_layman]]）
+- 任何 agent bug/test/疑問 2 輪解不了 → 一律交委員會（[[feedback_two_round_breaker_all_agents]]）
+- IC-BYVOL 照委員會收斂結果執行，不再問使用者
 
-**驗收結果（Claude 自驗，非信報告）**
-- pytest 全套 **1215 passed**；4 failed 全 pre-existing（batch_alias/worker_logging/optimization e2e·perf，stash 乾淨亦 fail，無關）。
-- golden marker gate **11 passed**（同 sym+tf 不同 hash 消歧 + 向後相容 + 真 ML caller）。
-- fail-closed 邏輯讀碼確認（feature_library.py:99-183）。前端 vitest 5 passed、build PASS、postflight data_cache 無縮減。
-
-**未做 / 待辦**
-- 尚未 commit（待使用者決定）。
-- 使用者宜在跑起來的 UI 實際操作驗收（原始需求是 UX）。
-- registry 有 orphan 無資料 run（4d26a4/5218729）；materialized resolver 已跳過，未清理。
-- Codex 對 fail-closed #1 回審未跑（Claude 已讀碼驗證，視需要可補）。
+## 背景：IC-Analysis 全覆蓋地圖入口 `handoffs/20260624-ic-map-00-INDEX.md`；定義 `20260624-ic-PHASE0-DEFINITION.md`

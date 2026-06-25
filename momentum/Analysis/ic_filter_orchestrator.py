@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 import time
 from collections import OrderedDict
 from copy import deepcopy
@@ -23,7 +24,7 @@ from momentum.Analysis.monotonicity_tester import MonotonicityTester
 from momentum.Analysis.redundancy_filter import RedundancyFilter
 from momentum.Analysis.statistical_validator import StatisticalValidator
 from momentum.Analysis.turnover_analyzer import TurnoverAnalyzer
-from momentum.Analysis.ic_config_schema import ICConfig
+from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig
 from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
 from momentum.core.logging import get_logger
@@ -123,6 +124,10 @@ class ICFilterOrchestrator:
             features_df, label_series, metadata, config, kline_reader
         )
 
+        features_df, metadata, feature_filter_info = self._apply_feature_filter(
+            features_df, metadata, config.feature_filter
+        )
+
         self._report_progress(4, "ic_calculation", 0.55, "computing IC metrics")
         ic_results = self._stage4_ic_calculation(
             features_df, label_series, metadata, config, kline_reader
@@ -153,6 +158,7 @@ class ICFilterOrchestrator:
             stage0_log,
             preproc_log,
             event_info,
+            feature_filter_info,
         )
 
         self._report_progress(7, "report", 1.0, "completed")
@@ -514,6 +520,7 @@ class ICFilterOrchestrator:
             self._ic_cache.get("stage0_log", {}),
             self._ic_cache.get("preproc_log", {}),
             self._ic_cache.get("event_info", {}),
+            self._ic_cache.get("feature_filter_info", {}),
         )
 
         self._report = report
@@ -1089,6 +1096,110 @@ class ICFilterOrchestrator:
         idx = filtered_df.index
         return features_df.loc[idx], label_series.loc[idx], info
 
+    def _apply_feature_filter(
+        self,
+        features_df: pd.DataFrame,
+        metadata: dict,
+        feature_filter: Optional[FeatureFilterSchema],
+    ) -> tuple[pd.DataFrame, dict, dict]:
+        original_columns = list(features_df.columns)
+        selected = set(original_columns)
+        info = {
+            "feature_count_original": int(len(original_columns)),
+            "feature_count_filtered": int(len(original_columns)),
+            "feature_filter_applied": False,
+            "truncation_mode": "none",
+            "truncation_order": None,
+        }
+
+        if len(original_columns) > 5000:
+            logger.warning(
+                "feature_filter received %d features; no implicit truncation applied",
+                len(original_columns),
+            )
+
+        if feature_filter is None:
+            return features_df, metadata, info
+
+        filter_data = feature_filter.model_dump(exclude_none=True)
+        if not filter_data:
+            return features_df, metadata, info
+
+        info["feature_filter_applied"] = True
+
+        include_features = set(feature_filter.include_features or [])
+        if include_features:
+            selected &= include_features
+
+        if feature_filter.include_pattern:
+            pattern = re.compile(feature_filter.include_pattern)
+            selected &= {name for name in original_columns if pattern.search(str(name))}
+
+        selected = self._apply_metadata_dimension_filter(
+            selected,
+            metadata,
+            "category",
+            feature_filter.include_categories,
+        )
+        selected = self._apply_metadata_dimension_filter(
+            selected,
+            metadata,
+            "data_source",
+            feature_filter.include_data_sources,
+        )
+        selected = self._apply_metadata_dimension_filter(
+            selected,
+            metadata,
+            "family",
+            feature_filter.include_families,
+        )
+
+        exclude_features = set(feature_filter.exclude_features or [])
+        if exclude_features:
+            selected -= exclude_features
+
+        ordered = [name for name in original_columns if name in selected]
+        if feature_filter.max_features is not None and len(ordered) > feature_filter.max_features:
+            ordered = sorted(ordered)[: feature_filter.max_features]
+            info["truncation_mode"] = "preview"
+            info["truncation_order"] = "sorted_column_name"
+
+        if not ordered:
+            raise InvalidInputError("feature_filter selected zero features")
+
+        filtered_metadata = self._filter_metadata_for_columns(metadata, set(ordered))
+        info["feature_count_filtered"] = int(len(ordered))
+        return features_df.loc[:, ordered], filtered_metadata, info
+
+    @staticmethod
+    def _apply_metadata_dimension_filter(
+        selected: set[str],
+        metadata: dict,
+        dimension: str,
+        allowed_values: Optional[list[str]],
+    ) -> set[str]:
+        if not allowed_values:
+            return selected
+        allowed = set(allowed_values)
+        return {
+            name
+            for name in selected
+            if isinstance(metadata.get(name), dict)
+            and metadata.get(name, {}).get(dimension) in allowed
+        }
+
+    @staticmethod
+    def _filter_metadata_for_columns(metadata: dict, selected_columns: set[str]) -> dict:
+        if not metadata:
+            return metadata
+        filtered: dict[str, Any] = {}
+        for key, value in metadata.items():
+            if key in selected_columns:
+                filtered[key] = value
+            elif not isinstance(value, dict):
+                filtered[key] = value
+        return filtered
+
     def _stage4_ic_calculation(
         self,
         features_df: pd.DataFrame,
@@ -1136,7 +1247,7 @@ class ICFilterOrchestrator:
                 label_series,
                 raw_data,
                 metadata,
-                config.ic_calculation.grouped_analysis,
+                config.ic_calculation.grouped_analysis.model_dump(),
             )
 
         ic_results = {
@@ -1249,12 +1360,14 @@ class ICFilterOrchestrator:
         stage0_log: dict,
         preproc_log: dict,
         event_info: dict,
+        feature_filter_info: dict,
     ) -> dict:
         filter_log = self._reporter.generate_filter_log(
             {
                 "stage0_ingestion": stage0_log,
                 "stage1_preprocessing": preproc_log,
                 "stage3_event_filter": event_info,
+                "feature_filter": feature_filter_info,
                 "stage5_thresholds": stage5_results.get("threshold_log", {}),
                 "stage6_redundancy": stage6_results.get("redundancy_log", {}),
             }
@@ -1284,6 +1397,7 @@ class ICFilterOrchestrator:
             metadata,
             event_info,
             ic_results.get("ic_decay", {}),
+            feature_filter_info,
         )
         report = self._reporter.generate_json_report(analysis_results, report_meta)
 
@@ -1306,6 +1420,7 @@ class ICFilterOrchestrator:
             "ic_decay": ic_results.get("ic_decay", {}),
             "grouped_ic": ic_results.get("grouped_ic", {}),
             "event_info": event_info,
+            "feature_filter_info": feature_filter_info,
             "stage0_log": stage0_log,
             "preproc_log": preproc_log,
         }
@@ -1490,6 +1605,7 @@ class ICFilterOrchestrator:
         metadata: dict,
         event_info: dict,
         ic_decay: dict,
+        feature_filter_info: Optional[dict] = None,
     ) -> dict:
         meta = dict(metadata) if metadata else {}
         warnings = []
@@ -1506,6 +1622,7 @@ class ICFilterOrchestrator:
                 else 0,
                 "n_samples": int(len(features_df)),
                 "event_filter": event_info,
+                **(feature_filter_info or {}),
                 "warnings": warnings,
             }
         )

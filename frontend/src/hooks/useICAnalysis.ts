@@ -70,13 +70,81 @@ export function useICAnalysis() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef(0);
+  const terminalRef = useRef(false);
+
+  const clearTimers = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  const fetchResult = useCallback(
+    async (taskId: string) => {
+      const result = await requestJson<ICReport>(`/result/${taskId}`);
+      setReport(result);
+      return result;
+    },
+    [setReport]
+  );
+
+  const fetchTaskStatus = useCallback(
+    async (taskId: string) => {
+      const status = await requestJson<{
+        task_id: string;
+        status: string;
+        progress: number;
+        current_stage?: string | null;
+        error?: string | null;
+      }>(`/task/${taskId}`);
+      setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
+      setProgress(status.progress ?? 0, status.current_stage ?? null);
+
+      if (status.status === 'failed') {
+        terminalRef.current = true;
+        clearTimers();
+        setError(status.error || 'IC analysis failed');
+      } else if (status.status === 'completed') {
+        terminalRef.current = true;
+        clearTimers();
+        await fetchResult(taskId);
+      }
+
+      return status;
+    },
+    [clearTimers, fetchResult, setError, setProgress, setStatus]
+  );
+
+  const startPolling = useCallback(
+    (taskId: string) => {
+      if (pollIntervalRef.current || terminalRef.current) {
+        return;
+      }
+      setError(null);
+      pollIntervalRef.current = setInterval(() => {
+        void fetchTaskStatus(taskId).catch((err) => {
+          setError(err instanceof Error ? err.message : 'IC analysis polling failed');
+        });
+      }, 2000);
+    },
+    [fetchTaskStatus, setError]
+  );
 
   const connectProgress = useCallback((taskId: string) => {
     if (!taskId) {
       return;
     }
 
+    terminalRef.current = false;
+
     if (wsRef.current) {
+      wsRef.current.onclose = null;
       wsRef.current.close();
     }
 
@@ -87,9 +155,27 @@ export function useICAnalysis() {
         const message = JSON.parse(event.data);
         if (message?.event === 'progress' && message?.data) {
           const payload = message.data;
+          // 收到有效進度 = 連線健康，清掉先前的 transient「連線失敗」誤報
+          if (payload.status !== 'failed') {
+            setError(null);
+          }
           setProgress(payload.progress ?? 0, payload.stage ?? payload.current_stage ?? null);
           if (payload.status) {
             setStatus(payload.status);
+          }
+          if (payload.status === 'failed') {
+            terminalRef.current = true;
+            clearTimers();
+            setError(payload.message || payload.error || 'IC analysis failed');
+            ws.close();
+            return;
+          }
+          if (payload.status === 'completed') {
+            terminalRef.current = true;
+            clearTimers();
+            void fetchResult(taskId);
+            ws.close();
+            return;
           }
           return;
         }
@@ -104,21 +190,32 @@ export function useICAnalysis() {
     };
 
     ws.onerror = () => {
-      setError('WebSocket 連線失敗');
+      // 不在 transient onerror 喊通用「連線失敗」(會誤報且不清除)。
+      // 交給 onclose retry(≤3)→ poll fallback;真失敗由 poll/status.error 顯真錯誤(U-2)。
     };
 
     ws.onclose = () => {
+      if (terminalRef.current) {
+        return;
+      }
+
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
 
+      if (retryCountRef.current >= 3) {
+        startPolling(taskId);
+        return;
+      }
+
+      retryCountRef.current += 1;
       reconnectTimerRef.current = setTimeout(() => {
         connectProgress(taskId);
       }, 3000);
     };
 
     wsRef.current = ws;
-  }, [setError, setProgress, setStatus]);
+  }, [clearTimers, fetchResult, setError, setProgress, setStatus, startPolling]);
 
   const startAnalysis = useCallback(
     async (config: ICAnalysisConfig) => {
@@ -140,6 +237,14 @@ export function useICAnalysis() {
       const isCrossSectionalMode = config.mode === 'cross_sectional';
 
       const normalizedFeatureFilter = {
+        include_features:
+          featureFilter.include_features && featureFilter.include_features.length > 0
+            ? featureFilter.include_features
+            : undefined,
+        exclude_features:
+          featureFilter.exclude_features && featureFilter.exclude_features.length > 0
+            ? featureFilter.exclude_features
+            : undefined,
         include_pattern: featureFilter.include_pattern?.trim() || undefined,
         include_categories:
           featureFilter.include_categories && featureFilter.include_categories.length > 0
@@ -184,32 +289,12 @@ export function useICAnalysis() {
 
       setTask(result.task_id, result.status === 'running' ? 'running' : 'pending');
       setStatus(result.status === 'running' ? 'running' : 'pending');
+      retryCountRef.current = 0;
       connectProgress(result.task_id);
 
       return result.task_id;
     },
     [connectProgress, setStatus, setTask]
-  );
-
-  const fetchTaskStatus = useCallback(
-    async (taskId: string) => {
-      const status = await requestJson<{ task_id: string; status: string; progress: number; current_stage?: string }>(
-        `/task/${taskId}`
-      );
-      setStatus(status.status as 'pending' | 'running' | 'completed' | 'failed');
-      setProgress(status.progress ?? 0, status.current_stage ?? null);
-      return status;
-    },
-    [setProgress, setStatus]
-  );
-
-  const fetchResult = useCallback(
-    async (taskId: string) => {
-      const result = await requestJson<ICReport>(`/result/${taskId}`);
-      setReport(result);
-      return result;
-    },
-    [setReport]
   );
 
   const fetchSummary = useCallback(async (taskId: string) => {
@@ -247,6 +332,7 @@ export function useICAnalysis() {
 
       setTask(result.task_id, result.status === 'running' ? 'running' : 'pending');
       setStatus(result.status === 'running' ? 'running' : 'pending');
+      retryCountRef.current = 0;
       connectProgress(result.task_id);
 
       return result.task_id;
@@ -302,7 +388,11 @@ export function useICAnalysis() {
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
       if (wsRef.current) {
+        wsRef.current.onclose = null;
         wsRef.current.close();
       }
     };

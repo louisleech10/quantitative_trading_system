@@ -184,7 +184,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
     include_categories: [],
     include_data_sources: [],
     include_families: [],
-    max_features: 30,
+    max_features: undefined,
   },
   selectedFeatures: [],
   deepAnalysisModules: defaultDeepAnalysisModules,

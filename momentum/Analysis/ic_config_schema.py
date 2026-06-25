@@ -77,7 +77,8 @@ class ICCalculationConfig(BaseModel):
         by_year: bool = True
         by_quarter: bool = False
         by_regime: bool = True
-        by_volatility: bool = True
+        # Phase 0 fail-closed: explicit True raises until volatility grouping is implemented.
+        by_volatility: bool = False
         by_category: bool = True
         by_data_source: bool = True
         by_layer: bool = True
@@ -155,6 +156,16 @@ class PerformanceConfig(BaseModel):
     max_features_for_correlation: int = 200
     parallel_ic_calculation: bool = True
     n_jobs: int = -1
+
+
+class FeatureFilterSchema(BaseModel):
+    include_features: Optional[list[str]] = None
+    exclude_features: Optional[list[str]] = None
+    include_pattern: Optional[str] = None
+    include_categories: Optional[list[str]] = None
+    include_data_sources: Optional[list[str]] = None
+    include_families: Optional[list[str]] = None
+    max_features: Optional[int] = Field(default=None, ge=1)
 
 
 class FactorReturnConfig(BaseModel):
@@ -351,6 +362,7 @@ class ICConfig(BaseModel):
     deep_analysis_global: DeepAnalysisGlobalConfig = Field(default_factory=DeepAnalysisGlobalConfig)
     shapley: ShapleyConfig = Field(default_factory=ShapleyConfig)
     feature_tiers: FeatureTierConfig = Field(default_factory=FeatureTierConfig)
+    feature_filter: Optional[FeatureFilterSchema] = None
 
 
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

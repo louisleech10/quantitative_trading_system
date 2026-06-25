@@ -523,8 +523,6 @@ def test_stage3_event_filter_uses_raw_data():
 
 def test_stage4_ic_calculation_with_kline_reader():
     """IC 計算含 decay/regime 分支。"""
-    from types import SimpleNamespace
-
     class _DummyReader:
         def read_klines(self, _symbol, _timeframe):
             return pd.DataFrame(
@@ -532,26 +530,22 @@ def test_stage4_ic_calculation_with_kline_reader():
                 index=pd.date_range("2024-01-01", periods=120, freq="D"),
             )
 
-    config = SimpleNamespace(
-        global_settings=SimpleNamespace(default_method="spearman"),
-        ic_calculation=SimpleNamespace(
-            rolling_windows=[5],
-            rolling_stride=1,
-            ic_decay_horizons=[1, 2],
-            grouped_analysis={
-                "by_year": False,
-                "by_quarter": False,
-                "by_regime": False,
-                "by_category": False,
-                "by_data_source": False,
-                "by_layer": False,
-                "method": "spearman",
-            },
-        ),
-        report=SimpleNamespace(include_decay_analysis=True, include_regime_analysis=True),
-        labels=SimpleNamespace(return_type="simple"),
+    config_data = load_ic_config().model_dump(by_alias=True)
+    config_data["ic_calculation"]["rolling_windows"] = [5]
+    config_data["ic_calculation"]["ic_decay_horizons"] = [1, 2]
+    config_data["ic_calculation"]["grouped_analysis"].update(
+        {
+            "by_year": False,
+            "by_quarter": False,
+            "by_regime": False,
+            "by_category": False,
+            "by_data_source": False,
+            "by_layer": False,
+            "by_volatility": False,
+        }
     )
-    orchestrator = ICFilterOrchestrator(load_ic_config())
+    config = ICConfig.model_validate(config_data)
+    orchestrator = ICFilterOrchestrator(config)
     features_df = pd.DataFrame(
         np.random.randn(120, 2).astype(np.float32),
         columns=["f1", "f2"],

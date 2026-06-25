@@ -1,0 +1,40 @@
+{
+  "decay_bad": {
+    "decay_rate": 0.12827379507443984,
+    "decay_type": "exponential",
+    "fit_r2": 1.0,
+    "fit_warning": false,
+    "fit_warning_reason": null,
+    "half_life": 5.403653802849585,
+    "horizons": [
+      1,
+      2,
+      3
+    ],
+    "ic_values": [
+      -0.13404067693534696,
+      -0.29860356107606373,
+      -0.44335513307557556
+    ],
+    "peak_horizon": 3
+  },
+  "decay_good": {
+    "decay_rate": null,
+    "decay_type": "fit_failed",
+    "fit_r2": null,
+    "fit_warning": true,
+    "fit_warning_reason": "low_variance",
+    "half_life": null,
+    "horizons": [
+      1,
+      2,
+      3
+    ],
+    "ic_values": [
+      -1.0,
+      -1.0,
+      -1.0
+    ],
+    "peak_horizon": 1
+  }
+}

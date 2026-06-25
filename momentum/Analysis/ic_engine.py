@@ -344,9 +344,13 @@ class ICEngine:
             horizon_results[horizon] = self.compute_ic(features_df, label, method)
 
         results: dict[str, dict] = {}
+        warning_counts: dict[str, int] = {}
         for feature in features_df.columns:
             ic_values = [horizon_results[h][feature] for h in horizons]
             decay_fit = self._fit_exponential_decay(horizons, ic_values)
+            if decay_fit.get("fit_warning"):
+                reason = str(decay_fit.get("fit_warning_reason") or "unknown")
+                warning_counts[reason] = warning_counts.get(reason, 0) + 1
             peak_horizon = self._select_peak_horizon(horizons, ic_values)
             results[feature] = {
                 "horizons": horizons,
@@ -359,6 +363,17 @@ class ICEngine:
                 "fit_warning": decay_fit.get("fit_warning"),
                 "fit_warning_reason": decay_fit.get("fit_warning_reason"),
             }
+
+        warning_total = sum(warning_counts.values())
+        details = ", ".join(
+            f"{reason}={count}" for reason, count in sorted(warning_counts.items())
+        ) or "none"
+        logger.info(
+            "Decay: %d/%d fit warnings summarized (%s)",
+            warning_total,
+            len(features_df.columns),
+            details,
+        )
 
         return results
 
@@ -375,6 +390,11 @@ class ICEngine:
         grouped_results: dict[str, dict] = {}
         config = config or self._grouped_config
         method = config.get("method", self._methods[0])
+
+        if config.get("by_volatility"):
+            raise NotImplementedError(
+                "by_volatility grouped is not supported in Phase 0; reserved for a later phase"
+            )
 
         features_df, label, raw_data = self._align_with_raw_data(
             features_df, label, raw_data
@@ -901,10 +921,6 @@ class ICEngine:
         y = y[mask]
 
         if x.size < 3:
-            logger.warning(
-                "Decay fit skipped: insufficient points (n=%d). Results may be unreliable.",
-                x.size,
-            )
             return {
                 "decay_rate": np.nan,
                 "half_life": np.nan,
@@ -915,9 +931,6 @@ class ICEngine:
             }
 
         if np.nanstd(y) < 1e-8:
-            logger.warning(
-                "Decay fit skipped: IC variance too small. Results may be unreliable."
-            )
             return {
                 "decay_rate": np.nan,
                 "half_life": np.nan,
@@ -940,11 +953,6 @@ class ICEngine:
             decay_type = "exponential" if r2 >= 0.5 else "non_exponential"
             fit_warning = decay_type != "exponential"
             fit_warning_reason = "low_r2" if fit_warning else None
-            if decay_type != "exponential":
-                logger.warning(
-                    "Decay fit quality low (R2=%.3f). Results may be unreliable.",
-                    r2,
-                )
             half_life = float(np.log(2) / lam) if lam > 0 else np.nan
             return {
                 "decay_rate": float(lam),
@@ -954,8 +962,7 @@ class ICEngine:
                 "fit_warning": fit_warning,
                 "fit_warning_reason": fit_warning_reason,
             }
-        except Exception as exc:
-            logger.warning("Decay fit failed: %s", exc)
+        except Exception:
             return {
                 "decay_rate": np.nan,
                 "half_life": np.nan,
@@ -1007,12 +1014,11 @@ class ICEngine:
         time_index = self._get_time_index(raw_data)
         if time_index is None:
             return []
+        time_series = pd.Series(time_index, index=raw_data.index)
         if mode == "year":
-            groups = time_index.to_series().groupby(time_index.year).groups
+            groups = time_series.groupby(time_series.dt.year).groups
             return [(key, idx) for key, idx in groups.items()]
-        groups = time_index.to_series().groupby(
-            [time_index.year, time_index.quarter]
-        ).groups
+        groups = time_series.groupby([time_series.dt.year, time_series.dt.quarter]).groups
         return [(f"{key[0]}Q{key[1]}", idx) for key, idx in groups.items()]
 
     def _get_time_index(self, raw_data: pd.DataFrame) -> Optional[pd.DatetimeIndex]:
@@ -1022,8 +1028,27 @@ class ICEngine:
             if col in raw_data.columns:
                 values = raw_data[col]
                 if np.issubdtype(values.dtype, np.number):
-                    return pd.to_datetime(values, unit="ms")
-                return pd.to_datetime(values)
+                    if values.isna().any():
+                        raise ValueError(f"timestamp column {col} contains NaN values")
+                    max_abs = float(np.nanmax(np.abs(values.to_numpy(dtype=float))))
+                    if max_abs >= 1e15:
+                        raise ValueError(
+                            f"timestamp column {col} has unsupported magnitude: {max_abs:g}"
+                        )
+                    unit = "ms" if max_abs >= 1e12 else "s"
+                    parsed = pd.DatetimeIndex(
+                        pd.to_datetime(values.to_numpy(), unit=unit, errors="raise")
+                    )
+                else:
+                    parsed = pd.DatetimeIndex(pd.to_datetime(values, errors="raise"))
+                years = parsed.year
+                current_year = pd.Timestamp.utcnow().year
+                if len(years) and (int(years.min()) < 1990 or int(years.max()) > current_year + 1):
+                    raise ValueError(
+                        f"timestamp column {col} produced implausible years: "
+                        f"{int(years.min())}-{int(years.max())}"
+                    )
+                return parsed
         return None
 
     def _compute_regime_groups(

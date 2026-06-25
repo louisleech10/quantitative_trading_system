@@ -1,0 +1,11 @@
+{
+  "filtered_columns": [
+    "alpha",
+    "beta"
+  ],
+  "filtered_sha256": "bbfb79e82216bd2db1ad2c507d44ddf80aeb12f64f9562056afe93aad43154d9",
+  "feature_count_filtered": 2,
+  "feature_count_original": 4,
+  "truncation_mode": "preview",
+  "truncation_order": "sorted_column_name"
+}

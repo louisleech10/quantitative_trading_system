@@ -89,6 +89,7 @@ async def ic_analysis_websocket(
         return
 
     await connection_manager.connect(websocket, task_id, client_id)
+    loop = asyncio.get_running_loop()
 
     async def send_payload(payload: Dict) -> None:
         current_step = payload.get("current_step") or payload.get("module_name") or payload.get("stage")
@@ -102,7 +103,7 @@ async def ic_analysis_websocket(
         })
 
     def notification_callback(payload: Dict) -> None:
-        asyncio.create_task(send_payload(payload))
+        asyncio.run_coroutine_threadsafe(send_payload(payload), loop)
 
     ic_analysis_service.register_notification_callback(task_id, notification_callback)
 

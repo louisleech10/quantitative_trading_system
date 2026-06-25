@@ -257,10 +257,11 @@ def test_select_icir_series_fallbacks():
 def test_time_index_parsing_and_alignment():
     """時間索引解析與對齊分支。"""
     engine = ICEngine({})
-    raw_data = pd.DataFrame({"open_time": [0, 1000, 2000]})
+    raw_data = pd.DataFrame({"open_time": [1704067200, 1704153600, 1704240000]})
 
     index = engine._get_time_index(raw_data)
     assert index is not None
+    assert index.year.tolist() == [2024, 2024, 2024]
 
     features = pd.DataFrame({"f1": [1.0, 2.0, 3.0]})
     label = pd.Series([1.0, 2.0, 3.0])

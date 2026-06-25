@@ -151,3 +151,4 @@ optimization_results/
 data/
 test_data/
 .codex/
+.gstack/

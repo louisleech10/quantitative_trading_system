@@ -48,7 +48,7 @@ ic_calculation:
     by_year: true  # 依年份
     by_quarter: false  # 依季度
     by_regime: true  # 依市場狀態
-    by_volatility: true  # 依波動度
+    by_volatility: false  # Phase 0 migration: volatility grouped is fail-closed until implemented
     by_category: true  # 依指標類別
     by_data_source: true  # 依資料來源
     by_layer: true  # 依 pipeline layer
