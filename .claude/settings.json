@@ -16,6 +16,7 @@
       "Bash(git log*)",
       "Bash(git add *)",
       "Bash(git commit *)",
+      "Bash(git push*)",
       "Bash(git branch*)",
       "Bash(git stash*)",
       "Bash(git fetch*)",
@@ -40,11 +41,12 @@
       "Bash(bash scripts/agent_preflight.sh:*)",
       "Bash(bash scripts/agent_postflight.sh:*)",
       "Bash(which *)",
-      "Bash(open *)"
+      "Bash(open *)",
+      "Bash(agy *)",
+      "Bash(timeout * agy *)"
     ],
     "ask": [
       "Bash(rm *)",
-      "Bash(git push*)",
       "Bash(git reset*)",
       "Bash(git rebase*)",
       "Bash(git checkout -- *)",
