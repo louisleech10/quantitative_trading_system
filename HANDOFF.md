@@ -1,61 +1,35 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-18 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-06-24 | **Branch**: main
 
-## 任務 A ✅ 完成 push (:4109 ref-cache 修正 + 防假綠回歸測試)
+## ★下一個任務(使用者 2026-06-24 定案,待新 session 開工)：IC 修法 Phase 0 止血+正確性硬閘
+- **直接讀**:`handoffs/20260624-ic-PHASE0-DEFINITION.md`(完整範圍 + 決策 baked in + 起手式)。照那份走完整 SPEC 管線。
+- **範圍**:IC-CRASH(GroupedConfig 崩潰)+ IC-FEATURE-GUARD(feature_filter 幽靈落地,是 Phase 2 前置)+ IC-UX-ERR(to_thread/WS)+ IC-TIMEAXIS(秒當毫秒)+ IC-BYVOL + decay log 聚合。級別:大(b)(d),走完整管線。
+- **已定決策**:起點=Phase 0;walk-forward/CPCV **复用 ML 孤島**(非重寫);不碰串流/train-test/case-control(留後 Phase)。
+- **狀態**:已定義,**實作未啟動**(使用者另開新 session 做)。
 
-## 任務 B ✅ 完成 — L6.5 預處理正確性強化
-子項1 移 legacy(IC-First 唯一) + 子項3 釘死 causal True;**子項2 walk-forward d* 三方實證否決**(無下游價值,記憶 project-dstar-walkforward-rejected)。
+## 背景：IC-Analysis 全覆蓋地圖（四家委員會,2026-06-24,已交付）
+- **入口**:`handoffs/20260624-ic-map-00-INDEX.md` → `WHOLEMAP.md`(+ STAGE{1-5}-FINAL;過程留痕在 `ic-map-trail/`)。
+- **核心結論**:IC 主流程**幾乎無防偽護網** + 多幽靈/算錯(系統性發現 A-H)。記憶 [[project_ic_analysis_map]]。
+- **分階段計畫**:`handoffs/20260624-ic-roadmap-phasing-CONVERGED.md`(七 Phase,contract-first+雙軌)。大尺度架構 `ic-optimization-CONVERGED.md`;Agent 顧問層=ROADMAP P2。
 
-全程:現況實測 → brief/SPEC/TODO → 雙家族 adversarial reconcile → Codex 實作/Composer review(分批 B0-B3b) → 三方資料正確性簽核。
+## 前一任務：IC Gatekeeper Run 選擇器重做 — 實作完成待使用者驗收
 
-| 批 | commit | 內容 |
-|---|---|---|
-| B0 | 751067b | golden baseline builder |
-| B1 | e8b62c9 | causal 釘死+傳播測試+6測試重寫 |
-| B2 | f6bf409/6d749ba/4d8cae7 | 移 legacy 全棧+F1-F4+frozen-doc |
-| B3a | 1cbcd25/d829754 | causal 死碼清理+B2review#1-6+config_hash golden重生 |
-| B3b | 7e9d083/9cdf78a | 剩餘死碼清理+三方資料正確性簽核 |
+**目標**：ic-analysis 從 Feature Library 選擇無法辨識批次 + 後端 find_latest 靜默挑最新 run（無法選舊批次）。改為「批次分組 Run 選擇器」+ config_hash 端到端精確命中。
 
-**三方簽核「資料正確」**(真實 kline 10×3,各自獨立腳本):Claude(PIT+隔離)、Composer(byte parity/PIT雙切點/隔離30對/NaN·inf/multi-TF merge值守恆)、Codex(merge 2000值守恆/split無洩漏/30對隔離)。
+**完成範圍（大任務，命中 (b)(d)）**
+- 後端：ICAnalyzeRequest 加 config_hash/cross_sectional_runs；ic_analysis_service 用 registry.get + find_latest_materialized；feature_library load/load_multi optional config_hash **fail-closed**（明確 hash 缺失→raise，不靜默 fallback legacy）；list_features_v2 帶 tf；list_runs 補 training_timeframes。
+- 前端：ICConfigPanel 批次分組 Run 下拉（global/event 單選、cross_sectional 選同質 batch+tf）；移除貼路徑欄；啟動 gate；page fetchRuns 三態 + 清 stale features。
 
-**驗證**:golden --check PASS(IC-First byte不變);全 feature_engineering suite 622 passed(B3a後);B3b後 my-env 188 passed。
+**流程留痕（可稽核）**：handoffs/20260623-ic-run-selector-{DESIGN,MANIFEST,ADVERSARIAL-RECONCILE,CODEX-REVIEW,IMPL}.md；docs/IC_RUN_SELECTOR_{SPEC,TODO}.md。
+規劃委員會(codex+cursor) → 雙家族 adversarial(12 BLOCKING) → Composer 實作 → Codex review(5 BLOCKING 含 fail-closed) → Composer 修補 → Claude 獨立驗收。
 
-⚠️ **副作用(已知,正確)**:移除 ic_first_pipeline config 欄→default config_hash 變(57c4→1dbe)→現有 data_cache 特徵快取失效需重生。
+**驗收結果（Claude 自驗，非信報告）**
+- pytest 全套 **1215 passed**；4 failed 全 pre-existing（batch_alias/worker_logging/optimization e2e·perf，stash 乾淨亦 fail，無關）。
+- golden marker gate **11 passed**（同 sym+tf 不同 hash 消歧 + 向後相容 + 真 ML caller）。
+- fail-closed 邏輯讀碼確認（feature_library.py:99-183）。前端 vitest 5 passed、build PASS、postflight data_cache 無縮減。
 
-## Pre-existing(非本線)
-- perf smoke test_batch1_followup flaky(負載下偶發,單跑PASS,忽略)。
-- joblib/loky slow-path parallel 測試在受限 sandbox(Codex)缺 semaphore 權限 fail;非受限環境 PASS。
-
-## 下一步(任務 B 已完,新方向待使用者指示)
-原研究路線:crypto 單市場 FF→IC→ML→回測 完整版;IC Gatekeeper 真實 kline 端到端驗證(79 IC 單元測試全合成資料,從沒真實端到端)。數據源擴充延後。
-
-## 執行端分工
-中/大實作 Codex(gpt-5.5,`codex exec -m gpt-5.5`) + Composer(`cursor-agent -p --force --output-format text --model composer-2.5`)review。本任務因實作一致性全程 Codex 實作。派工被擋先查根因(記憶 feedback-dispatch-blocked-investigate-cause)。
-
-## FF 收尾打磨(2026-06-19,T1/T2/T-C 完成)
-使用者手動跑 2×2 揭露的 3 點 + log 分析,三方委員會後:
-- **#1 UI 接力順序註釋** ✅ commit(header 分「生成階段 vs IC篩選後」)。
-- **T1 log 噪音** ✅ commit(消雙記+刪Started+path-filter;**需重啟後端生效**)。
-- **T2 批次 layer 觀測性** ✅ commit+Codex review(Composer 實作,5缺陷修畢):worker→layer_metrics.jsonl→父週期tick→WS→前端;補 #2(batch看不到layer)+F1(per-layer RSS落地)。
-- **T-C CGSA L3 累積磁碟預檢** ✅ commit+Codex review:L3 persist前估累積footprint,不夠提早abort(env FFACT_CGSA_DISK_PRECHECK/RESERVE_GIB可調)。修磁碟撐爆事故(437K×float32=35.6GB,L3-L6累積)。
-- **擱置**:T-A per-layer串流釋放(P1,scaffold已存,砍峰值根本解)、T-B float16暫存(P2需A/B簽核)、T-D 為何以前28GB夠(取證)、.claude/gstack 1GB清理(使用者決定)。
-- 重啟後端重跑 2×2:乾淨log(T1)+即時layer進度與RSS(T2)+磁碟不夠提早abort(T-C)。
-
-## FF 一致性整併 — ✅ 全部完成(2026-06-22)
-Q5/B1/B2/B3/B5/B6/B4 全完成 push;B7(L6.5並行)三方定 P2 暫緩。每項走完整管線(SPEC/TODO+adversarial+Composer實作+Codex review)。
-觀測性層完成:
-- **Q5**(P0a)✅ uvicorn access_log env 開關(terminal 噪音預設關,FFACT_UVICORN_ACCESS_LOG=1 恢復)。
-- **B1 #1**(P0b)✅ batch worker non-rotating FileHandler 進當日檔(FFACT_API_LOG_PATH)+[pid sym tf]+smoke。Codex review PASS(minor:idempotent T-A 再收緊)。
-- **B2 E-normalize+Q3**(P0c+P1)✅ 共用 FeatureProgressEvent+normalize 單一出口+RSS 互斥分欄(process_rss_mb/worker_rss_mb,current_rss_mb 雙寫過渡)+schema_version int+parity5。Codex review 攔3 BLOCKING+#4 全修。**教訓:前端驗收須跑 vitest。**
-- **B3 Q2-A**(P2,大)✅ 批次保留對話。使用者選「discard 即刪」→ **post-hoc mark**(run 照常生成+register 不延後→多下游一致)+ discard 重用 `delete_run` 即刪(背壓自洽)+ 真實 `shutil.disk_usage` 背壓+wakeup+hard-pause observable + crash matrix abc + per-item lock + flag `FFACT_BATCH_RETENTION` 預設關 + 前端 BatchRetentionPanel(source 區分,非 N modal,不打 deleteRun)。**兩輪雙家族 adversarial**(4 BLOCKING→post-hoc 轉向)+Codex review 兩次抓假綠修真。後端 31 pytest + 前端 21 vitest + byte PASS。非阻塞 hardening note:RunRetentionDialog 未來可改 find(non-batch) 防 starve(現不可達)。
-- **B5**(大)✅ 批次日期 bug 修復:跨棧加 date(Pydantic+前端 hook+threading+checkpoint resume+7 mock)。strict-window(止血)。hermetic 測試(B5 教訓:整合測須重導 tmp data_cache_path+FFACT_CGSA_WORK_DIR)。詳 [[project_batch_date_bug]]。
-- **B6**(大)✅ warmup-then-trim(**選項1**:使用者定,不承諾全範圍 parity,目標前段可用+run自洽)。max_warmup全源(L1 advanced/L2/L3/L4/**L5 cross-sectional**/L6.5/native-tf/validator)+OutputWindow+per-TF載warmup+單trim choke 5路徑+warmup不足警示(needed/available/affected_bars)。**排除parity表**:cumulative(OBV/AD/ADOSC/VWAP burn_in未實作)/fracdiff d*(first-500,[[project_dstar_first500_optionA]])/ADF/post-IC/labels horizon。flag `FFACT_WARMUP_TRIM`=0(僅開時納hash)。後端16+前端 vitest+hermetic+golden PASS。多輪委員會(d* Option A三方+Option-1設計三方+v1/v2雙家族+後端review兩輪)。
-留待(優先序,使用者 2026-06-21 定):
-- **B7 L6.5 並行**(P2 暫緩,三方定)microbench:現況 ThreadPool ~1.0x(kernels @njit 無 nogil GIL-bound),nogil=True→4.3-4.5x@6。但 MTF 三方:細→粗罕見且應聚合,native-tf 慢路徑是預處理正確性 backstop 非 alpha 標準→**B7 除非反證否則不做**。SPEC docs/B7_L65_PARALLEL_* 留存。見 [[project_mtf_direction_b7_parked]]。使用者確認 roadmap(crypto+台指/美指+月季報/籌碼/法人/總經)幾乎全粗→細。未來基本面 epic 核心=PIT 對齊(公告時戳+vintage)非並行。
-- **B4 Q2-B**(大)✅ 批次刪除+孤兒清理(**選項1+防累積安全網**,使用者定)。bulk-delete endpoint(統一 delete orchestration:lease→mark_deleting_for_delete force(可刪命名run)→delete_run→remove/clear,單刪/bulk/B3 discard 共用)+完整 per-run report(HTTP 200 deleted/failed/skipped)+B3 FSM reconcile(刪 pending→DISCARDED+前端刷新)+**孤兒掃清(含 CGSA leaf+manifest ownership+active 排除)**防 partial-delete 累積。前端 RunManagerPanel 多選+確認(active提交排除+alias/hash)+孤兒按鈕。後端 33 pytest+前端 vitest+hermetic。**實證:正常刪除清整 run 目錄不留磁碟垃圾**。note:FFACT_CGSA_WORK_DIR override 仍 skip CGSA delete(孤兒網兜底)。
-- **B8 批次規模化 UX**(中)✅ 解「100 symbol 按 N 次」。A:BatchRetentionPanel「全部保留」一鍵+多選/全部丟棄(確認)+checkbox全選(bulk retention endpoint `POST /batch/{id}/retention/bulk` loop reuse apply_retention_decision,**opposite-terminal→failed不吞**,凍結 BatchRetentionBulkResponse per-item);B:RunManager「刪除整批」(獨立 bulkDeleteTarget mode selection|batch,**不污染既有 selectedKeys**,reuse bulkDeleteRuns+確認active排除)。Codex adversarial 4 findings+review PASS。後端8 pytest+前端 vitest(real store+mock fetch)+hermetic。**B3 retention 已預設開**(FFACT_BATCH_RETENTION 預設1,設0關)。
-未來/留待:
-- **B7 L6.5 並行 P2 暫緩**(見上,[[project_mtf_direction_b7_parked]]);未來基本面/總經 epic 核心=PIT 對齊(公告時戳+vintage)。
-- 既有壞測試(非本批):`frontend/src/__tests__/strategy-components.test.tsx` import 缺 `strategy/SignalTooltip`(d250c83 起壞,可另開小修)。
-- **E 執行模型維持現狀**;normalize 薄函式已落地。
-重啟後端可用:terminal 乾淨(Q5)+batch worker log 進檔(B1)+單/批進度帶 RSS(B2)+**批次跑完自動顯 BatchRetentionPanel 逐項 retain/discard(B3,FFACT_BATCH_RETENTION 預設開,設 0 關;面板非 modal)**+批次尊重日期(B5)+選日期 warmup 前段可用(B6,FFACT_WARMUP_TRIM=1)+RunManager 多選 bulk 刪除+孤兒清理(B4)。
+**未做 / 待辦**
+- 尚未 commit（待使用者決定）。
+- 使用者宜在跑起來的 UI 實際操作驗收（原始需求是 UX）。
+- registry 有 orphan 無資料 run（4d26a4/5218729）；materialized resolver 已跳過，未清理。
+- Codex 對 fail-closed #1 回審未跑（Claude 已讀碼驗證，視需要可補）。

@@ -11,7 +11,21 @@
 ### P0 — IC Gatekeeper 開發 + 真實端到端測試
 - **為何**:FF 已收尾,pipeline 下一站。現況 79 IC 單元測試**全合成資料**,從未真實 kline 端到端驗證。
 - **範圍**:限 crypto(三方 2026-06-17 定,見 [[project-datasource-ff-ic-assessment]]);真實 kline 跑 IC Gatekeeper(12+10 模組) 端到端 + 驗證。
-- **狀態**:未啟動。
+- **★施工藍圖(2026-06-24 四家委員會地圖)**:`handoffs/20260624-ic-map-WHOLEMAP.md`(5 階段 28 種分析全棧盤點 + 系統性發現 A-H)。盤出主流程**幾乎無防偽護網**:
+  - **🎯 絕對優先(正確性紅線/生死)**:事件 case-control 套件(主戰場全缺)、train/test 切分(主路徑無)、FDR 接線(幽靈,43萬≈21,500假陽性)、Net IC 量綱錯誤、factor_attribution NaN 繞過。
+  - **🚨 P0 止血**:grouped/decay 崩潰、幽靈開關群(feature_filter/turnover/slippage)、靜默空圖、大尺度 cap。
+  - **大尺度(430K)架構**:見 `handoffs/20260624-ic-optimization-CONVERGED.md`(串流分塊不物化全矩陣)。每優先項走完整 SPEC 管線。
+- **分階段執行計畫(四家收斂)**:`handoffs/20260624-ic-roadmap-phasing-CONVERGED.md`(七 Phase,contract-first+雙軌)。
+- **★當前起點(使用者 2026-06-24 定)**:**Phase 0 止血+正確性硬閘**=`handoffs/20260624-ic-PHASE0-DEFINITION.md`(IC-CRASH/FEATURE-GUARD/UX-ERR/TIMEAXIS/BYVOL)。決策:walk-forward/CPCV **复用 ML 孤島**非重寫;不碰串流/train-test/case-control(留後 Phase)。
+- **狀態**:地圖+分階段完成;Phase 0 已定義,**實作未啟動(使用者另開新 session 做)**。
+
+### P0.5 — IC 效能 + grouped_ic 崩潰止血(已盤點,可立即動)
+- **為何**:使用者實測選 run 跑 analyze 卡死+崩潰;三方 reconcile 完成。
+- **Epic**:`handoffs/20260624-ic-grouped-crash-perf-ANALYSIS.md`(IC-CRASH/IC-FEATURE-GUARD/IC-UX-ERR=P0;IC-PERF=P1)。**狀態**:reconcile 完成,實作未啟動。
+
+### P2 — IC 輸出 Agent-readable + 顧問層(V2 願景地基)
+- **為何**:使用者要 AI Agent 直接讀 IC 輸出、像委員會討論、回饋「哪些特徵/參數真的較好」+ 點破盲點。**前提=先修上面正確性**(否則 Agent 讀到污染數字會自信推薦過擬合假因子)。
+- **範圍**:① IC 輸出結構化可機讀(穩定 schema);② 輸出含 FDR/OOS/DSR 嚴謹度指標(讓 Agent 分辨真好 vs 過擬合);③ Agent 解讀/委員會式討論層。**依賴**:P0 正確性紅線。**狀態**:概念,未規劃。
 
 ### P1 — Productionization Epic（全棧參數持久化）★上線前置
 - **為何**:任一特徵/模型要上線推論前必做,否則 train/serve 分布偏移、模型靜默失效。三方三輪盤點 CONVERGED。
