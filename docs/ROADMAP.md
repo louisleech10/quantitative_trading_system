@@ -1,6 +1,6 @@
 # ROADMAP — 量化交易系統戰術路線圖
 > 單一現役戰術 roadmap。**即時任務狀態**看 `HANDOFF.md`；**決策理由**看 memory；本檔=中長期 epic 排序與範圍。
-> 維護:完成項移到「已完成」、新需求加到對應優先級、範圍/決策變更標日期。最後更新 2026-06-23。
+> 維護:完成項移到「已完成」、新需求加到對應優先級、範圍/決策變更標日期。**每次 commit 一併更新本檔**(2026-06-26 使用者定)。最後更新 2026-06-26。
 
 當前階段:**V1.0 工具階段** — crypto 單市場研究管線(探索 → 發現 Pattern → ML 優化 → 回測)。願景 V1→V2→V3 見 `PRODUCT_VISION.md`。
 
@@ -16,8 +16,13 @@
   - **🚨 P0 止血**:grouped/decay 崩潰、幽靈開關群(feature_filter/turnover/slippage)、靜默空圖、大尺度 cap。
   - **大尺度(430K)架構**:見 `handoffs/20260624-ic-optimization-CONVERGED.md`(串流分塊不物化全矩陣)。每優先項走完整 SPEC 管線。
 - **分階段執行計畫(四家收斂)**:`handoffs/20260624-ic-roadmap-phasing-CONVERGED.md`(七 Phase,contract-first+雙軌)。
-- **★當前起點(使用者 2026-06-24 定)**:**Phase 0 止血+正確性硬閘**=`handoffs/20260624-ic-PHASE0-DEFINITION.md`(IC-CRASH/FEATURE-GUARD/UX-ERR/TIMEAXIS/BYVOL)。決策:walk-forward/CPCV **复用 ML 孤島**非重寫;不碰串流/train-test/case-control(留後 Phase)。
-- **狀態**:地圖+分階段完成;Phase 0 已定義,**實作未啟動(使用者另開新 session 做)**。
+- **決策**:walk-forward/CPCV **复用 ML 孤島**非重寫;contract-first 不硬接舊全 DataFrame 路徑。
+- **狀態(2026-06-26)**:
+  - **Phase 0 止血+正確性硬閘 ✅ 完成**(commit `11507f5`):CRASH/TIMEAXIS/BYVOL/FEATURE-GUARD/DECAY-LOG/UX-ERR 六 epic + 實機 45k smoke。
+  - **Phase 1 正確性 kernel + contract 🔵 進行中**:
+    - **1-contract ✅ 完成**(commit `e857834`):契約 DTO + 洩漏紅線(三方簽核,8 LEAK 全閉)+ Parquet artifact + API 版本化。**opt-in 未接線**。
+    - **下一段 = 1a train/test split 接線**(接契約進主流程 + allowed_symbols/expected_freq 落實);續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖。
+  - Phase 2A(事件 case-control 主戰場)/Phase 3(430K 串流)/2B/4/5 未啟動。詳 phasing-CONVERGED 七 Phase。
 
 ### P0.5 — IC 效能 + grouped_ic 崩潰止血(已盤點,可立即動)
 - **為何**:使用者實測選 run 跑 analyze 卡死+崩潰;三方 reconcile 完成。
