@@ -10,8 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from collections.abc import Callable, Iterable
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -279,6 +281,15 @@ StrategyCalculator = callable
 StrategyValidator = callable
 
 
+class EvaluationStatus(str, Enum):
+    """IC 特徵評估狀態，避免 legacy/未評估特徵混入排序或 FDR。"""
+
+    EVALUATED = "evaluated"
+    NOT_EVALUATED = "not_evaluated"
+    SKIPPED = "skipped"
+    UNKNOWN_LEGACY = "unknown_legacy"
+
+
 @dataclass
 class ICResult:
     """IC 分析單一特徵的結果 — momentum 內部 DTO."""
@@ -295,6 +306,32 @@ class ICResult:
     turnover_rate: Optional[float] = None
     ic_half_life: Optional[float] = None
     regime_robust: Optional[bool] = None
+    eval_status: EvaluationStatus = EvaluationStatus.UNKNOWN_LEGACY
+
+
+def filter_evaluated(results: List[ICResult]) -> List[ICResult]:
+    """只回傳明確完成評估的 ICResult，legacy/跳過/未評估皆不列入。"""
+    return [
+        result
+        for result in results
+        if result.eval_status == EvaluationStatus.EVALUATED
+    ]
+
+
+@dataclass(frozen=True)
+class ICArtifactSchema:
+    """IC artifact long-layout 單列契約。"""
+
+    feature_name: str
+    horizon: int
+    ic_mean: float
+    ic_std: float
+    icir: float
+    p_value: float
+    ic_hit_rate: float
+    eval_status: str
+    selection_scope_id: str
+    schema_version: int
 
 
 @dataclass
@@ -317,6 +354,416 @@ class SkippedResult:
     details: Optional[Dict] = None
     retryable: bool = False
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+
+
+@dataclass(frozen=True)
+class SplitPlan:
+    """IC 切分列歸屬契約，記錄單一 split 的 canonical row identity。"""
+
+    split_label: Literal["train", "val", "test"]
+    index_kind: Literal["timestamp", "positional", "row_id"]
+    row_index: np.ndarray
+    time_bounds: tuple
+    purge_gap: int
+    embargo: int
+    purge_semantic: Literal["rows", "timedelta"] = "rows"
+    expected_freq: Optional[str] = None
+    base_universe_hash: str = ""
+    symbol: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """驗證切分契約的必要 discriminator 與 purge 邊界。"""
+        if self.split_label not in {"train", "val", "test"}:
+            raise ValueError("split_label must be one of train, val, test")
+        if self.index_kind not in {"timestamp", "positional", "row_id"}:
+            raise ValueError("index_kind must be one of timestamp, positional, row_id")
+        if self.purge_semantic not in {"rows", "timedelta"}:
+            raise ValueError("purge_semantic must be one of rows, timedelta")
+        if not self.base_universe_hash:
+            raise ValueError("base_universe_hash is required")
+        if len(self.row_index) > 0 and self.purge_gap >= len(self.row_index):
+            raise ValueError("purge_gap must be smaller than non-empty row_index length")
+
+
+class CrossSymbolLeakageError(ValueError):
+    """切分列跨越 symbol 邊界時使用的 fail-closed 例外。"""
+
+
+class TimestampDiscontinuityError(ValueError):
+    """單一 symbol 內 timestamp 非嚴格連續時使用的 fail-closed 例外。"""
+
+
+class SplitPairLeakageError(ValueError):
+    """train/test pair 的 purge 或 embargo 禁止區間被 train row 踩入。"""
+
+
+def _coerce_timestamp_array(values: Any) -> np.ndarray:
+    """將 timestamp array 正規化成 pandas datetime64[ns] 陣列。"""
+    arr = np.asarray(values)
+    if arr.size == 0:
+        return pd.to_datetime(arr).to_numpy()
+    if np.issubdtype(arr.dtype, np.datetime64):
+        return pd.to_datetime(arr).to_numpy()
+    if np.issubdtype(arr.dtype, np.number):
+        return pd.to_datetime(arr, unit="s").to_numpy()
+    return pd.to_datetime(arr).to_numpy()
+
+
+def _normalize_symbol_value(value: Any) -> str:
+    """將 symbol 正規化為非空 str；缺值或不可解碼值 fail-closed。
+
+    missing_sentinels 是 best-effort heuristic；權威防線是
+    validate_* / split_per_symbol 的 allowed_symbols allowlist，接線端應傳入真實 universe。
+    """
+    missing_sentinels = {"", "nan", "null", "none", "na", "n/a", "<na>"}
+    if value is None:
+        raise CrossSymbolLeakageError("symbol contains missing value")
+    if isinstance(value, bytes):
+        try:
+            value = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise CrossSymbolLeakageError("symbol bytes must decode as utf-8") from exc
+    try:
+        if pd.isna(value):
+            raise CrossSymbolLeakageError("symbol contains missing value")
+    except TypeError:
+        pass
+    if not isinstance(value, str):
+        raise CrossSymbolLeakageError("symbol must normalize to non-empty str")
+    normalized = value.strip()
+    if normalized.lower() in missing_sentinels:
+        raise CrossSymbolLeakageError("symbol contains missing sentinel")
+    return normalized
+
+
+def _normalize_symbol_array(values: Any) -> np.ndarray:
+    """正規化整條 symbol array，避免 bytes/NaN 靜默通過或被 groupby 丟棄。"""
+    arr = np.asarray(values, dtype=object)
+    return np.asarray([_normalize_symbol_value(value) for value in arr], dtype=object)
+
+
+def _normalize_allowed_symbols(allowed_symbols: Optional[set[str]]) -> Optional[set[str]]:
+    """正規化 allowed symbol universe，供 contract 層做權威 allowlist 檢查。"""
+    if allowed_symbols is None:
+        return None
+    return {_normalize_symbol_value(symbol) for symbol in allowed_symbols}
+
+
+def _validate_allowed_symbols(
+    plan_symbol: str,
+    symbol_arr: np.ndarray,
+    allowed_symbols: Optional[set[str]],
+) -> None:
+    """確認 plan 與資料 symbol 都屬於指定 universe。"""
+    normalized_allowed = _normalize_allowed_symbols(allowed_symbols)
+    if normalized_allowed is None:
+        return
+    if plan_symbol not in normalized_allowed:
+        raise CrossSymbolLeakageError("SplitPlan.symbol is outside allowed_symbols")
+    unknown_symbols = set(np.unique(symbol_arr)) - normalized_allowed
+    if unknown_symbols:
+        raise CrossSymbolLeakageError("symbols contain values outside allowed_symbols")
+
+
+def _contiguous_index_ranges(indices: np.ndarray) -> List[Tuple[int, int]]:
+    """將 sorted row positions 壓成半開區間 [start, end)。"""
+    if indices.size == 0:
+        return []
+    sorted_idx = np.sort(indices.astype(int))
+    ranges: List[Tuple[int, int]] = []
+    start = int(sorted_idx[0])
+    prev = start
+    for value in sorted_idx[1:]:
+        current = int(value)
+        if current != prev + 1:
+            ranges.append((start, prev + 1))
+            start = current
+        prev = current
+    ranges.append((start, prev + 1))
+    return ranges
+
+
+def _local_ordinals_for_symbol(
+    row_index: np.ndarray,
+    symbol_arr: np.ndarray,
+    symbol: str,
+) -> np.ndarray:
+    """將全域 row position 映射成同 symbol 內的 local ordinal。"""
+    symbol_positions = np.flatnonzero(symbol_arr == symbol)
+    if symbol_positions.size == 0:
+        raise CrossSymbolLeakageError("symbol has no rows in base universe")
+    local_ordinals = np.searchsorted(symbol_positions, row_index.astype(int))
+    if (
+        np.any(local_ordinals >= symbol_positions.size)
+        or not np.array_equal(symbol_positions[local_ordinals], row_index.astype(int))
+    ):
+        raise CrossSymbolLeakageError("row_index contains rows outside declared symbol")
+    return local_ordinals.astype(int)
+
+
+def validate_split_integrity(
+    plan: SplitPlan,
+    ts: Any,
+    symbols: Any,
+    allowed_symbols: Optional[set[str]] = None,
+) -> None:
+    """驗證 SplitPlan 未跨 symbol 且單一 symbol 時間軸可安全套用 rows purge。"""
+    row_index = np.asarray(plan.row_index, dtype=int)
+
+    if plan.symbol is None:
+        raise CrossSymbolLeakageError("SplitPlan.symbol is required for split integrity")
+    plan_symbol = _normalize_symbol_value(plan.symbol)
+    if plan.purge_semantic == "rows" and plan.expected_freq is None:
+        raise TimestampDiscontinuityError(
+            "rows purge requires expected_freq; use timedelta purge to allow gaps"
+        )
+
+    symbol_arr = _normalize_symbol_array(symbols)
+    _validate_allowed_symbols(plan_symbol, symbol_arr, allowed_symbols)
+    ts_arr = _coerce_timestamp_array(ts)
+    if symbol_arr.shape[0] != ts_arr.shape[0]:
+        raise ValueError("symbols and ts must have the same length")
+    if row_index.size == 0:
+        return
+    if np.any(row_index < 0) or np.any(row_index >= symbol_arr.shape[0]):
+        raise IndexError("plan.row_index contains positions outside base universe")
+
+    selected_symbols = np.unique(symbol_arr[row_index])
+    if selected_symbols.size != 1 or selected_symbols[0] != plan_symbol:
+        raise CrossSymbolLeakageError(
+            "SplitPlan row_index must contain exactly its declared symbol"
+        )
+
+    selected_ts = ts_arr[row_index]
+    if selected_ts.size > 1:
+        diffs = np.diff(selected_ts)
+        if np.any(diffs <= np.timedelta64(0, "ns")):
+            raise TimestampDiscontinuityError(
+                "SplitPlan timestamps must be strictly increasing without duplicates"
+            )
+        if plan.purge_semantic == "rows":
+            base_ts = ts_arr[symbol_arr == plan_symbol]
+            base_diffs = np.diff(base_ts)
+            if np.any(base_diffs <= np.timedelta64(0, "ns")):
+                raise TimestampDiscontinuityError(
+                    "base symbol timestamps must be strictly increasing without duplicates"
+                )
+            expected_delta = pd.Timedelta(plan.expected_freq)
+            max_gap = pd.Timedelta(np.max(base_diffs))
+            if max_gap > expected_delta * 1.05:
+                raise TimestampDiscontinuityError(
+                    "rows purge requires continuous timestamps at expected_freq"
+                )
+
+
+def validate_split_pair_integrity(
+    train_plan: SplitPlan,
+    test_plan: SplitPlan,
+    ts: Any,
+    symbols: Any,
+    allowed_symbols: Optional[set[str]] = None,
+) -> None:
+    """驗證 train rows 沒踩進 test 的 purge/embargo 禁止區間。"""
+    validate_split_integrity(train_plan, ts, symbols, allowed_symbols)
+    validate_split_integrity(test_plan, ts, symbols, allowed_symbols)
+
+    train_rows = np.asarray(train_plan.row_index, dtype=int)
+    test_rows = np.asarray(test_plan.row_index, dtype=int)
+    if train_rows.size == 0 or test_rows.size == 0:
+        raise SplitPairLeakageError("train/test row_index must be non-empty")
+    train_symbol = _normalize_symbol_value(train_plan.symbol)
+    test_symbol = _normalize_symbol_value(test_plan.symbol)
+    if train_symbol != test_symbol:
+        raise CrossSymbolLeakageError("train/test SplitPlan symbols must match")
+    if train_plan.base_universe_hash != test_plan.base_universe_hash:
+        raise ValueError("train/test SplitPlan base_universe_hash must match")
+
+    symbol_arr = _normalize_symbol_array(symbols)
+    train_local = _local_ordinals_for_symbol(train_rows, symbol_arr, train_symbol)
+    test_local = _local_ordinals_for_symbol(test_rows, symbol_arr, test_symbol)
+    purge_gap = max(int(test_plan.purge_gap), int(train_plan.purge_gap), 0)
+    embargo = max(int(test_plan.embargo), 0)
+    for start, end in _contiguous_index_ranges(test_local):
+        forbidden_start = max(0, start - purge_gap)
+        forbidden_end = end + purge_gap + embargo
+        leaking = train_rows[
+            (train_local >= forbidden_start) & (train_local < forbidden_end)
+        ]
+        if leaking.size > 0:
+            raise SplitPairLeakageError(
+                "train rows overlap test purge/embargo forbidden interval"
+            )
+
+
+def _time_bounds_for_indices(ts: Any, row_index: np.ndarray) -> tuple:
+    """依 row_index 建立 SplitPlan time_bounds。"""
+    if row_index.size == 0:
+        return (None, None)
+    ts_arr = _coerce_timestamp_array(ts)
+    selected = ts_arr[row_index]
+    return (pd.Timestamp(selected[0]), pd.Timestamp(selected[-1]))
+
+
+def split_per_symbol(
+    data: pd.DataFrame,
+    splitter: Callable[[pd.DataFrame], Iterable[Tuple[np.ndarray, np.ndarray]]],
+    symbol_col: str,
+    ts_col: str,
+    *,
+    purge_gap: int = 0,
+    embargo: int = 0,
+    purge_semantic: Literal["rows", "timedelta"] = "rows",
+    expected_freq: Optional[str] = None,
+    base_universe_hash: str = "",
+    allowed_symbols: Optional[set[str]] = None,
+) -> List[Tuple[SplitPlan, SplitPlan]]:
+    """逐 symbol 呼叫 splitter，將 local index 轉回全 frame row position。"""
+    if symbol_col not in data.columns or ts_col not in data.columns:
+        raise ValueError("data must contain symbol_col and ts_col")
+    if not base_universe_hash:
+        raise ValueError("base_universe_hash is required")
+
+    frame = data.copy()
+    frame["_split_row_pos"] = np.arange(len(frame), dtype=int)
+    frame[symbol_col] = _normalize_symbol_array(frame[symbol_col].to_numpy())
+    ts = frame[ts_col].to_numpy()
+    symbols = frame[symbol_col].to_numpy()
+    normalized_allowed = _normalize_allowed_symbols(allowed_symbols)
+    plans: List[Tuple[SplitPlan, SplitPlan]] = []
+
+    for symbol, group in frame.groupby(symbol_col, sort=False, dropna=False):
+        symbol = _normalize_symbol_value(symbol)
+        if normalized_allowed is not None and symbol not in normalized_allowed:
+            raise CrossSymbolLeakageError("symbols contain values outside allowed_symbols")
+        group_sorted = group.sort_values(ts_col, kind="mergesort")
+        positions = group_sorted["_split_row_pos"].to_numpy(dtype=int)
+        group_for_splitter = group_sorted.drop(columns=["_split_row_pos"])
+        for train_local, test_local in splitter(group_for_splitter):
+            train_rows = positions[np.asarray(train_local, dtype=int)]
+            test_rows = positions[np.asarray(test_local, dtype=int)]
+            train_plan = SplitPlan(
+                split_label="train",
+                index_kind="positional",
+                row_index=train_rows,
+                time_bounds=_time_bounds_for_indices(ts, train_rows),
+                purge_gap=purge_gap,
+                embargo=embargo,
+                purge_semantic=purge_semantic,
+                expected_freq=expected_freq,
+                base_universe_hash=base_universe_hash,
+                symbol=symbol,
+            )
+            test_plan = SplitPlan(
+                split_label="test",
+                index_kind="positional",
+                row_index=test_rows,
+                time_bounds=_time_bounds_for_indices(ts, test_rows),
+                purge_gap=purge_gap,
+                embargo=embargo,
+                purge_semantic=purge_semantic,
+                expected_freq=expected_freq,
+                base_universe_hash=base_universe_hash,
+                symbol=symbol,
+            )
+            validate_split_pair_integrity(
+                train_plan,
+                test_plan,
+                ts,
+                symbols,
+                allowed_symbols=normalized_allowed,
+            )
+            plans.append((train_plan, test_plan))
+    return plans
+
+
+@dataclass(frozen=True)
+class RowMaskPlan:
+    """IC 列遮罩契約，使用 canonical row identity 表達入選列。"""
+
+    row_index: np.ndarray
+    index_kind: Literal["timestamp", "positional", "row_id"]
+    source: Literal["split", "event", "feature_filter", "full"]
+    base_universe_hash: str
+    length: int
+    symbol: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        """驗證遮罩契約 discriminator 與 universe identity。"""
+        if self.index_kind not in {"timestamp", "positional", "row_id"}:
+            raise ValueError("index_kind must be one of timestamp, positional, row_id")
+        if self.source not in {"split", "event", "feature_filter", "full"}:
+            raise ValueError("source must be one of split, event, feature_filter, full")
+        if not self.base_universe_hash:
+            raise ValueError("base_universe_hash is required")
+        if self.length < 0:
+            raise ValueError("length must be non-negative")
+
+    @property
+    def n_selected(self) -> int:
+        """回傳遮罩選中的列數。"""
+        return int(len(self.row_index))
+
+    def to_mask(self, base_len: int) -> np.ndarray:
+        """依 base universe 長度轉回 boolean mask。"""
+        if self.length != base_len:
+            raise ValueError("length must match base_len")
+        mask = np.zeros(base_len, dtype=bool)
+        mask[self.row_index] = True
+        return mask
+
+    @classmethod
+    def from_mask(cls, mask: np.ndarray, **meta: Any) -> "RowMaskPlan":
+        """由 boolean mask 建立 RowMaskPlan，metadata 必須帶 discriminator。"""
+        if "index_kind" not in meta:
+            raise ValueError("index_kind is required")
+        row_index = np.flatnonzero(mask)
+        return cls(row_index=row_index, length=len(mask), **meta)
+
+
+@dataclass(frozen=True)
+class SelectionScope:
+    """IC FDR/顯著性範圍契約，鎖定 universe、split 與 evaluated 集合。"""
+
+    scope_id: str
+    universe_features: List[str]
+    split_label: Literal["train", "val", "test"]
+    evaluated_features: List[str]
+    n_tests: int
+    method: str
+    base_universe_hash: str
+
+    def __post_init__(self) -> None:
+        """驗證 evaluated_features 必須屬於 universe 且 n_tests 一致。"""
+        if self.split_label not in {"train", "val", "test"}:
+            raise ValueError("split_label must be one of train, val, test")
+        if not set(self.evaluated_features).issubset(set(self.universe_features)):
+            raise ValueError("evaluated_features must be a subset of universe_features")
+        if self.n_tests != len(self.evaluated_features):
+            raise ValueError("n_tests must match len(evaluated_features)")
+
+
+@dataclass(frozen=True)
+class AlignmentSpec:
+    """IC Feature_t 與 Target_t+lag 的對齊契約簽名。"""
+
+    feature_ts_col: str
+    target_ts_col: str
+    lag: int
+    freq: str
+
+    def __post_init__(self) -> None:
+        """驗證 lag 與 pandas frequency 字串。"""
+        if self.lag < 0:
+            raise ValueError("lag must be non-negative")
+        try:
+            pd.tseries.frequencies.to_offset(self.freq)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("freq must be a valid pandas frequency") from exc
+
+
+def validate_alignment(feature_data: Any, target_data: Any, spec: AlignmentSpec) -> None:
+    """驗證 Feature_t 與 Target_t+lag 對齊；實作留待 1-align。"""
+    raise NotImplementedError("1-align 落地")
 
 
 @dataclass(frozen=True)

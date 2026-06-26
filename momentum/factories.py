@@ -38,7 +38,9 @@ if TYPE_CHECKING:
     from momentum.Analysis.feature_quality_diagnostics import FeatureQualityDiagnostics
     from momentum.Analysis.feature_toggle_registry import FeatureToggleRegistry
     from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+    from momentum.Analysis.ic_artifact_writer import ICArtifactWriter
     from momentum.Analysis.ic_reporter import ICReporter
+    from momentum.Analysis.ic_split_adapter import ICSplitAdapter
     from momentum.Analysis.indicator_cache import IndicatorCache
     from momentum.Analysis.kline_cache import KlineCache
     from momentum.Analysis.learning_curve_analyzer import LearningCurveAnalyzer
@@ -567,6 +569,23 @@ def create_combinatorial_purged_cv(
     from momentum.Analysis.model_validation.combinatorial_purged_cv import CombinatorialPurgedCV
 
     return CombinatorialPurgedCV(config=config)
+
+
+def create_ic_split_adapter(
+    expected_freq: Optional[str] = None,
+    strict_embargo: bool = True,
+) -> "ICSplitAdapter":
+    """Factory — IC SplitPlan adapter。"""
+    from momentum.Analysis.ic_split_adapter import ICSplitAdapter
+
+    return ICSplitAdapter(expected_freq=expected_freq, strict_embargo=strict_embargo)
+
+
+def create_ic_artifact_writer() -> "ICArtifactWriter":
+    """Factory — IC artifact Parquet writer。"""
+    from momentum.Analysis.ic_artifact_writer import ICArtifactWriter
+
+    return ICArtifactWriter()
 
 
 def create_learning_curve_analyzer(

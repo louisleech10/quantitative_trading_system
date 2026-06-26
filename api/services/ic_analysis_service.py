@@ -17,15 +17,23 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from api.core.config import settings
 from api.core.logging import get_logger
-from api.models.ic_models import DeepAnalysisRequest, ICAnalyzeRequest, ICFullAnalysisRequest
+from api.models.ic_models import (
+    DeepAnalysisRequest,
+    ICAnalyzeRequest,
+    ICFullAnalysisRequest,
+    ICResultV2Response,
+)
 from momentum.factories import (
     create_feature_library,
     create_feature_reader,
     create_ic_analyzer,
+    create_ic_artifact_writer,
     create_ic_reporter,
     create_kline_storage_manager,
 )
+from momentum.core.contracts import ICResult
 
 
 logger = get_logger("api.ic_analysis_service")
@@ -272,7 +280,7 @@ class ICAnalysisService:
                 "error": task_info.get("error"),
             }
 
-    def get_result(self, task_id: str) -> Optional[Dict[str, Any]]:
+    def get_result(self, task_id: str, schema_version: Optional[int] = None) -> Optional[Any]:
         """Get task result."""
         with self._lock:
             task_info = self._tasks.get(task_id)
@@ -285,8 +293,105 @@ class ICAnalysisService:
 
         normalized = self._to_json_compatible(result)
         if isinstance(normalized, dict):
-            return normalized
-        return {"raw": normalized}
+            if not settings.ic_response_v2 or schema_version != 2:
+                return normalized
+            return self._build_v2_result(task_id, task_info, normalized)
+        if not settings.ic_response_v2 or schema_version != 2:
+            return {"raw": normalized}
+        return self._build_v2_result(task_id, task_info, {})
+
+    def _build_v2_result(
+        self,
+        task_id: str,
+        task_info: Dict[str, Any],
+        normalized_result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Build schema_version=2 response from the artifact as the single source of truth."""
+        artifact_path = self._resolve_ic_v2_artifact_path(task_id, task_info, normalized_result)
+        if artifact_path is None or not artifact_path.exists():
+            response = ICResultV2Response(schema_version=2, artifact_uri=None, total_features=0)
+            return response.model_dump()
+
+        rows = create_ic_artifact_writer().read(artifact_path)
+        sorted_rows = self._sort_artifact_rows(rows, "icir")
+        top_n = self._resolve_v2_top_n(task_info)
+        response = ICResultV2Response(
+            schema_version=2,
+            top_n_summary=sorted_rows[:top_n],
+            artifact_uri=str(artifact_path),
+            total_features=len(rows),
+        )
+        return response.model_dump()
+
+    def _resolve_ic_v2_artifact_path(
+        self,
+        task_id: str,
+        task_info: Dict[str, Any],
+        normalized_result: Dict[str, Any],
+    ) -> Optional[Path]:
+        """Resolve the idempotent v2 artifact path for a task."""
+        explicit = task_info.get("ic_response_v2_artifact_path")
+        if explicit:
+            return Path(str(explicit))
+
+        config_hash = self._resolve_result_config_hash(task_info, normalized_result)
+        if not config_hash:
+            return None
+
+        artifact_dir = Path(
+            str(task_info.get("ic_artifact_dir") or settings.results_output_path / "ic_artifacts")
+        )
+        return artifact_dir / f"{task_id}_{config_hash}_v2.parquet"
+
+    @staticmethod
+    def _resolve_result_config_hash(
+        task_info: Dict[str, Any],
+        normalized_result: Dict[str, Any],
+    ) -> Optional[str]:
+        """Read config_hash from task metadata without guessing a replacement."""
+        direct = task_info.get("req_config_hash")
+        if direct:
+            return str(direct)
+
+        metadata = normalized_result.get("metadata")
+        if isinstance(metadata, dict):
+            config_hash = metadata.get("config_hash")
+            if config_hash:
+                return str(config_hash)
+        return None
+
+    @staticmethod
+    def _sort_artifact_rows(rows: List[Dict[str, Any]], sort_by: str) -> List[Dict[str, Any]]:
+        """Sort artifact rows for top-N derivation using artifact values only."""
+        descending = sort_by != "p_value"
+
+        def key(row: Dict[str, Any]) -> tuple[int, float]:
+            value = row.get(sort_by)
+            if value is None:
+                return (1, 0.0)
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                return (1, 0.0)
+            if math.isnan(numeric):
+                return (1, 0.0)
+            return (0, -numeric if descending else numeric)
+
+        return sorted(rows, key=key)
+
+    @staticmethod
+    def _resolve_v2_top_n(task_info: Dict[str, Any]) -> int:
+        """Resolve top-N from stored deep-analysis request metadata, defaulting to API contract."""
+        raw_top_n = task_info.get("deep_analysis_top_n")
+        if raw_top_n is None:
+            request = task_info.get("deep_analysis_request")
+            if isinstance(request, DeepAnalysisRequest):
+                raw_top_n = request.top_n
+            elif isinstance(request, dict):
+                raw_top_n = request.get("top_n")
+        if raw_top_n is None:
+            return DeepAnalysisRequest().top_n
+        return int(raw_top_n)
 
     def export_analysis(self, task_id: str, format_type: str, module_name: Optional[str] = None) -> Dict[str, Any]:
         """Export IC analysis result into requested format."""
@@ -1074,7 +1179,7 @@ class ICAnalysisService:
 
         return deep_payload
 
-    def _to_json_compatible(self, value: Any) -> Any:
+    def _to_json_compatible(self, value: Any, ic_response_v2: bool = False) -> Any:
         """Recursively normalize nested values for FastAPI/Pydantic serialization."""
 
         if value is None:
@@ -1093,22 +1198,37 @@ class ICAnalysisService:
             return scalar
 
         if isinstance(value, np.ndarray):
-            return [self._to_json_compatible(item) for item in value.tolist()]
+            return [
+                self._to_json_compatible(item, ic_response_v2=ic_response_v2)
+                for item in value.tolist()
+            ]
 
         if is_dataclass(value):
-            return self._to_json_compatible(asdict(value))
+            payload = asdict(value)
+            if isinstance(value, ICResult) and not ic_response_v2:
+                payload.pop("eval_status", None)
+            return self._to_json_compatible(payload, ic_response_v2=ic_response_v2)
 
         if hasattr(value, "model_dump"):
-            return self._to_json_compatible(value.model_dump())
+            return self._to_json_compatible(
+                value.model_dump(),
+                ic_response_v2=ic_response_v2,
+            )
 
         if isinstance(value, dict):
             return {
-                str(key): self._to_json_compatible(item)
+                str(key): self._to_json_compatible(
+                    item,
+                    ic_response_v2=ic_response_v2,
+                )
                 for key, item in value.items()
             }
 
         if isinstance(value, (list, tuple, set)):
-            return [self._to_json_compatible(item) for item in value]
+            return [
+                self._to_json_compatible(item, ic_response_v2=ic_response_v2)
+                for item in value
+            ]
 
         if hasattr(value, "isoformat"):
             try:

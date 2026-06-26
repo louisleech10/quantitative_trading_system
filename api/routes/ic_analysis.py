@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from api.core.logging import get_logger
 from api.models.ic_models import (
@@ -60,10 +60,10 @@ async def get_task_status(task_id: str):
 
 
 @router.get("/result/{task_id}")
-async def get_result(task_id: str):
+async def get_result(task_id: str, schema_version: Optional[int] = Query(None)):
     """Get IC analysis result."""
     try:
-        result = ic_analysis_service.get_result(task_id)
+        result = ic_analysis_service.get_result(task_id, schema_version)
         if result is None:
             raise HTTPException(status_code=404, detail=f"Result not found: {task_id}")
         return result
@@ -360,6 +360,15 @@ async def export_analysis(
         headers = {
             "Content-Disposition": f"attachment; filename=\"{export_result['filename']}\"",
         }
+        if export_result["type"] == "bytes":
+            content = export_result["content"]
+            if hasattr(content, "getvalue"):
+                content = content.getvalue()
+            return Response(
+                content=content,
+                media_type=export_result["media_type"],
+                headers=headers,
+            )
         return StreamingResponse(
             export_result["content"],
             media_type=export_result["media_type"],

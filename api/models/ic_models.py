@@ -2,7 +2,7 @@
 
 from typing import Optional, List, Dict, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FeatureFilterConfig(BaseModel):
@@ -33,6 +33,35 @@ class DeepAnalysisRequest(BaseModel):
     top_n: int = Field(default=30, ge=1, le=200)
     modules: DeepAnalysisModules = Field(default_factory=DeepAnalysisModules)
     config_override: Optional[Dict[str, Any]] = None
+
+
+class ICResultV2Response(BaseModel):
+    """Versioned IC result response with artifact-backed top-N summary."""
+
+    schema_version: Literal[2] = 2
+    top_n_summary: List[Dict[str, Any]] = Field(default_factory=list)
+    artifact_uri: Optional[str] = None
+    total_features: int = 0
+
+
+class ICArtifactFilter(BaseModel):
+    """Whitelist-only artifact filter model for the future HTTP query endpoint."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    feature_name: Optional[str] = None
+    horizon: Optional[int] = None
+    eval_status: Optional[str] = None
+    selection_scope_id: Optional[str] = None
+
+
+class ICArtifactQueryParams(BaseModel):
+    """Artifact query contract; HTTP filtering endpoint lands in a later phase."""
+
+    sort_by: Literal["icir", "ic_mean", "p_value"] = "icir"
+    filter: Optional[ICArtifactFilter] = None
+    page_size: int = Field(default=5000, ge=1, le=50000)
+    cursor: Optional[str] = None
 
 
 class FeatureTierRequest(BaseModel):

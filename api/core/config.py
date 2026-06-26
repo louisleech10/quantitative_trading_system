@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     enable_cache: bool = Field(default=True, validation_alias="ENABLE_CACHE")
     cache_ttl_seconds: int = Field(default=3600, validation_alias="CACHE_TTL")  # 1小時
 
+    # IC response schema negotiation
+    ic_response_v2: bool = Field(default=False, validation_alias="IC_RESPONSE_V2")
+
     # Phase 0: HDF5緩存配置
     enable_hdf5_cache: bool = Field(default=True, validation_alias="ENABLE_HDF5_CACHE")
     hdf5_cache_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent / "data_cache" / "hdf5_cache")
