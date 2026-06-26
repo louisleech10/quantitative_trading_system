@@ -7,7 +7,10 @@ from pathlib import Path
 import h5py
 import numpy as np
 import pytest
+from binance.client import Client
 from fastapi.testclient import TestClient
+
+Client.ping = lambda self: {}
 
 from api.main import app
 
@@ -87,6 +90,7 @@ def ic_analysis_task(tmp_path_factory: pytest.TempPathFactory) -> dict:
         "labels_path": str(labels_path),
         "meta_path": str(meta_path),
         "config_override": {
+            "ic_train_test_split": False,
             "thresholds": {
                 "ic_mean_min": -1.0,
                 "icir_min": -1.0,

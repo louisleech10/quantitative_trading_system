@@ -23,6 +23,7 @@ class DataPreprocessor:
         self,
         features_df: pd.DataFrame,
         metadata: Optional[dict] = None,
+        fit_mask: Optional[np.ndarray] = None,
     ) -> tuple[pd.DataFrame, dict]:
         if features_df is None or features_df.empty:
             raise ValueError("features_df is empty")
@@ -46,6 +47,7 @@ class DataPreprocessor:
                 lower=lower,
                 upper=upper,
                 metadata=metadata,
+                fit_mask=fit_mask,
             )
             log["winsorized_features"] = winsor_log["winsorized"]
             log["skipped_winsorization"] = winsor_log["skipped"]
@@ -57,17 +59,18 @@ class DataPreprocessor:
             df,
             max_fill_forward=max_fill_forward,
             min_coverage=min_coverage,
+            fit_mask=fit_mask,
         )
         if removed_low_coverage:
             log["removed_features"]["low_coverage"] = removed_low_coverage
 
-        df, removed_constants = self.remove_constant_features(df)
+        df, removed_constants = self.remove_constant_features(df, fit_mask=fit_mask)
         if removed_constants:
             log["removed_features"]["constant"] = removed_constants
 
         standardize_cfg = self._config.get("standardize", {})
         method = standardize_cfg.get("method", "none")
-        df = self.standardize(df, method=method)
+        df = self.standardize(df, method=method, fit_mask=fit_mask)
 
         logger.info(
             "Data preprocessing complete: columns=%s",
@@ -82,6 +85,7 @@ class DataPreprocessor:
         lower: float,
         upper: float,
         metadata: Optional[dict] = None,
+        fit_mask: Optional[np.ndarray] = None,
     ) -> tuple[pd.DataFrame, dict]:
         del metadata
 
@@ -95,11 +99,18 @@ class DataPreprocessor:
 
         for column in clipped.columns:
             series = clipped[column]
-            if self._is_type_feature(series):
+            fit_series = self._select_fit_series(series, fit_mask)
+            if self._is_type_feature(fit_series):
                 skipped.append(column)
                 continue
 
-            clipped[column] = self._clip_series(series, method, lower, upper)
+            clipped[column] = self._clip_series(
+                series,
+                method,
+                lower,
+                upper,
+                fit_mask=fit_mask,
+            )
             winsorized.append(column)
 
         return clipped, {"winsorized": winsorized, "skipped": skipped}
@@ -109,22 +120,34 @@ class DataPreprocessor:
         df: pd.DataFrame,
         max_fill_forward: int,
         min_coverage: float,
+        fit_mask: Optional[np.ndarray] = None,
     ) -> tuple[pd.DataFrame, list[str]]:
         filled = df.ffill(limit=max_fill_forward)
-        coverage = filled.notna().mean()
+        fit_df = self._select_fit_frame(filled, fit_mask)
+        coverage = fit_df.notna().mean()
         removed = coverage[coverage < min_coverage].index.tolist()
         if removed:
             filled = filled.drop(columns=removed)
         return filled, removed
 
-    def remove_constant_features(self, df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-        nunique = df.nunique(dropna=True)
+    def remove_constant_features(
+        self,
+        df: pd.DataFrame,
+        fit_mask: Optional[np.ndarray] = None,
+    ) -> tuple[pd.DataFrame, list[str]]:
+        fit_df = self._select_fit_frame(df, fit_mask)
+        nunique = fit_df.nunique(dropna=True)
         removed = nunique[nunique <= 1].index.tolist()
         if removed:
             df = df.drop(columns=removed)
         return df, removed
 
-    def standardize(self, df: pd.DataFrame, method: str = "none") -> pd.DataFrame:
+    def standardize(
+        self,
+        df: pd.DataFrame,
+        method: str = "none",
+        fit_mask: Optional[np.ndarray] = None,
+    ) -> pd.DataFrame:
         method = method.lower()
         if method == "none":
             return df
@@ -133,8 +156,9 @@ class DataPreprocessor:
             std = df.std(axis=1).replace(0, np.nan)
             return df.sub(mean, axis=0).div(std, axis=0).fillna(0.0)
         if method == "time_series_zscore":
-            mean = df.mean(axis=0)
-            std = df.std(axis=0).replace(0, np.nan)
+            fit_df = self._select_fit_frame(df, fit_mask)
+            mean = fit_df.mean(axis=0)
+            std = fit_df.std(axis=0).replace(0, np.nan)
             return df.sub(mean, axis=1).div(std, axis=1).fillna(0.0)
         if method == "rank_transform":
             return df.rank(axis=1, pct=True)
@@ -147,25 +171,29 @@ class DataPreprocessor:
         method: str,
         lower: float,
         upper: float,
+        fit_mask: Optional[np.ndarray] = None,
     ) -> pd.Series:
+        fit_series = self._select_fit_series(series, fit_mask)
+        if fit_series.dropna().empty:
+            return series
         if method == "percentile":
             lower_q = lower / 100.0
             upper_q = upper / 100.0
-            lo = series.quantile(lower_q)
-            hi = series.quantile(upper_q)
+            lo = fit_series.quantile(lower_q)
+            hi = fit_series.quantile(upper_q)
             return series.clip(lo, hi)
 
         if method == "mad":
-            median = np.nanmedian(series)
-            mad = np.nanmedian(np.abs(series - median))
+            median = np.nanmedian(fit_series)
+            mad = np.nanmedian(np.abs(fit_series - median))
             if mad == 0 or np.isnan(mad):
                 return series
             bound = 3.5 * mad
             return series.clip(median - bound, median + bound)
 
         if method == "zscore":
-            mean = series.mean()
-            std = series.std()
+            mean = fit_series.mean()
+            std = fit_series.std()
             if std == 0 or np.isnan(std):
                 return series
             bound = 3.0 * std
@@ -179,3 +207,32 @@ class DataPreprocessor:
         if not values:
             return False
         return values.issubset({-100, 0, 100})
+
+    @staticmethod
+    def _coerce_fit_mask(length: int, fit_mask: Optional[np.ndarray]) -> Optional[np.ndarray]:
+        if fit_mask is None:
+            return None
+        mask = np.asarray(fit_mask, dtype=bool)
+        if mask.shape[0] != length:
+            raise ValueError("fit_mask length must match data length")
+        if not bool(mask.any()):
+            raise ValueError("fit_mask must select at least one row")
+        return mask
+
+    @classmethod
+    def _select_fit_frame(
+        cls,
+        df: pd.DataFrame,
+        fit_mask: Optional[np.ndarray],
+    ) -> pd.DataFrame:
+        mask = cls._coerce_fit_mask(len(df), fit_mask)
+        return df if mask is None else df.loc[mask]
+
+    @classmethod
+    def _select_fit_series(
+        cls,
+        series: pd.Series,
+        fit_mask: Optional[np.ndarray],
+    ) -> pd.Series:
+        mask = cls._coerce_fit_mask(len(series), fit_mask)
+        return series if mask is None else series.loc[mask]

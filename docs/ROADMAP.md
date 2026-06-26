@@ -20,8 +20,9 @@
 - **狀態(2026-06-26)**:
   - **Phase 0 止血+正確性硬閘 ✅ 完成**(commit `11507f5`):CRASH/TIMEAXIS/BYVOL/FEATURE-GUARD/DECAY-LOG/UX-ERR 六 epic + 實機 45k smoke。
   - **Phase 1 正確性 kernel + contract 🔵 進行中**:
-    - **1-contract ✅ 完成**(commit `e857834`):契約 DTO + 洩漏紅線(三方簽核,8 LEAK 全閉)+ Parquet artifact + API 版本化。**opt-in 未接線**。
-    - **下一段 = 1a train/test split 接線**(接契約進主流程 + allowed_symbols/expected_freq 落實);續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖。
+    - **1-contract ✅ 完成**(commit `e857834`):契約 DTO + 洩漏紅線(三方簽核,8 LEAK 全閉)+ Parquet artifact + API 版本化。
+    - **1a 第一刀(單幣縱向接線)✅ 完成**:契約紅線接進 IC 主流程 `analyze()`——holdout 切分 + train-only fit(winsor/std/coverage/constant)+ OOS 報告 + purge≥horizon 防前瞻 + allowed_symbols/expected_freq 落實。**兩輪雙家族 adversarial(9 BLOCKING)+ 三方數據簽核 PASS(R1 抓 2 LEAK→修→R2)+ G-NEW 真實全 run 抓 2 整合 bug→修。default ON,OOS 不可行時分因回退(資料不足→full-sample 標記;時間軸壞→fail-closed)**。docs/IC_PHASE1_1a_CUT1_{SPEC,TODO}。
+    - **下一段 = 1a 第二刀(cross_sectional `analyze_cross_sectional` 防洩漏)**;續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖。
   - Phase 2A(事件 case-control 主戰場)/Phase 3(430K 串流)/2B/4/5 未啟動。詳 phasing-CONVERGED 七 Phase。
 
 ### P0.5 — IC 效能 + grouped_ic 崩潰止血(已盤點,可立即動)

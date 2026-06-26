@@ -574,11 +574,16 @@ def create_combinatorial_purged_cv(
 def create_ic_split_adapter(
     expected_freq: Optional[str] = None,
     strict_embargo: bool = True,
+    allowed_symbols: Optional[set[str]] = None,
 ) -> "ICSplitAdapter":
     """Factory — IC SplitPlan adapter。"""
     from momentum.Analysis.ic_split_adapter import ICSplitAdapter
 
-    return ICSplitAdapter(expected_freq=expected_freq, strict_embargo=strict_embargo)
+    return ICSplitAdapter(
+        expected_freq=expected_freq,
+        strict_embargo=strict_embargo,
+        allowed_symbols=allowed_symbols,
+    )
 
 
 def create_ic_artifact_writer() -> "ICArtifactWriter":

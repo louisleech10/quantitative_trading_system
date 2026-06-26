@@ -1,19 +1,25 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-06-26 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-06-27 | **Branch**: main
 
-## ✅ 上一任務:IC Phase 1 第一刀 = 1-contract(契約層)— 完成、已 commit+push (`e857834`)
-- **6 批次全落地**:契約 DTO(SplitPlan/RowMaskPlan/SelectionScope/AlignmentSpec/ICArtifactSchema/eval_status)+ 洩漏紅線(validate_split_integrity/pair/split_per_symbol/ic_split_adapter)+ Parquet artifact(ic_artifact_writer)+ API 版本化(ic_response_v2 flag/?schema_version=2/ICResultV2Response,flag-off byte 不變)+ export route 根治。
-- **三方數據簽核 PASS**:adversarial 自挑戰抓 8 真 LEAK(confirm-review 全漏),4 輪修補全閉;L4 allowlist 權威防線。SPEC+TODO 過雙家族 adversarial。61 測試過,解耦 0+腳本 PASS,真實 kline。
-- **文件**:docs/IC_PHASE1_CONTRACT_{SPEC,TODO}.md;留痕 handoffs/20260626-ic-phase1-*;b3-FINAL-SIGNOFF 記三方。
-- **教訓**:[[feedback_adversarial_beats_signoff]](簽核式 review 會漏洩漏洞,adversarial 才現形)。
+## ✅ 完成:IC Phase 1 — 1a 第一刀(單幣縱向 train/test 切分接線)
+讓 1-contract 防洩漏紅線真正生效於 IC 主流程 `analyze()`:holdout 切分 + winsor/standardize/coverage/constant **train-only fit** + IC/統計在 test(OOS) 報告 + **purge_gap≥label horizon**(防前瞻)。**三方數據簽核 PASS,default ON。**
 
-## ★下一個任務:IC Phase 1 — 1a train/test split（接線+其餘正確性 kernel）
-- **1a 必落實 1-contract 殘留(否則紅線不生效)**:① ICSplitAdapter 接線傳真實 symbol universe(allowed_symbols);② expected_freq 從 timeframe 推導(gap fail-closed 生效);③ 契約接進 IC 主 pipeline(目前 opt-in 未接,正確性僅保護經 adapter 路徑)。
-- **後續 Phase 1 kernel**(CONVERGED §Phase1):1-align 前瞻偏誤硬閘 → 1b FDR 接線 → 1c Net IC 量綱 → 1d factor_attribution → 1e HAC/block bootstrap → 1f 靜默空圖。
-- **G1 baseline**:`tests/golden/ic_phase1_contract/` 用 `freeze_baseline.py` 本地再生(52MB v1 payload 不進 git,config_hash a384e6d2);baseline 依賴測試 clean checkout 會缺檔→ 1a 宜改 skip-if-absent 或縮小 golden。
-- **MINOR(Composer)**:contracts private helper 暴露(1a 收斂 public);export_analysis 對 dataclass 預存 TypeError 風險。
-- **★1a 起手式(新 session)**:級別判斷=**大**(命中 (b) 跨模組 + (d) ML 正確性/防洩漏,接線會動 IC 主流程 caller)→ 走完整管線(短文件→manifest→SPEC→雙家族 adversarial→TODO→gate→派工→接回三方簽核)。先讀 `docs/IC_PHASE1_CONTRACT_{SPEC,TODO}.md`(契約介面)+ `handoffs/20260626-ic-phase1-b3-FINAL-SIGNOFF.md`(殘留清單)+ phasing-CONVERGED §Phase1(1a 範圍)。**接線=讓既有正確性紅線真的保護主流程,不是新功能**。三方數據簽核(split/leakage,真實 kline)鐵律仍適用。
+### 全程(完整管線,留痕 handoffs/20260626-1a-cut1-*)
+- 規劃:BRIEF→manifest(26 ID)→SPEC/TODO v2(docs/IC_PHASE1_1a_CUT1_*)→**兩輪雙家族 adversarial**(共 9 BLOCKING 全納)→Frozen,四機檢 PASS。
+- 實作:Codex B1-B5;**三方簽核 R1 抓 2 真 LEAK**(rolling 含 purge / winsor type 分支用全段)→修→R2 三方齊 PASS。
+- **凍 G-NEW(真實全 run)抓到 _slice_by_mask index 整合 bug + grouped raw 對齊** → FIX2 → 真實 run 成功。
+- **切 default ON 量爆炸半徑** → default-ON 語義委員會定案**分因回退**(insufficient→full-sample+標記;irregular_ts→維持 raise) → FIX3。
+- 驗收:34 測試 PASS、3 洩漏不變量、G-OLD flag-off deep-equal、G-NEW(scope=test)、解耦 0;tests/api 既有 timeout 經 clean-HEAD 確認**非 1a 回歸**(env/網路 flaky)。
 
-## 背景/維運
-- IC 地圖入口 `handoffs/20260624-ic-map-00-INDEX.md`;記憶 [[project_ic_analysis_map]] [[project_ic_phase1_decisions]]。
-- 執行端派工須寫 `handoffs/<date>-<task>.md`,勿覆寫根 HANDOFF(本次發生 2 次)。
+### 教訓/紀錄
+- [[feedback_adversarial_beats_signoff]]:Claude+Composer confirm PASS 漏的洩漏,Codex 作者自挑戰反例現形。
+- 驗證面逐層擴大(單元→簽核→真實全 run→default-ON 爆炸半徑)各抓不同層 bug。
+- G-OLD/G-NEW baseline 大檔已 gitignore(skip-if-absent,本地用 freeze 腳本再生)。
+
+## ★殘留/follow-up(§N,非阻塞)
+- fallback 的 `applied:false`/`reason` 僅內部,輸出層只 surface `metadata.scope`(test vs full);安全(fallback≠test 不誤判 OOS)但 reason 透明度可補。
+- 次路徑 reanalyze_with_thresholds/deep analysis 未帶 split_context → cut2。
+- stage4 回傳全段 label_series(主鏈已 slice,介面 rename)。
+- tests/api IC task 既有 timeout(env 網路 flaky)+ skipped 標 completed 語義 → 獨立修。
+
+## ★下一個:1a 第二刀 = cross_sectional 防洩漏(analyze_cross_sectional),再 1-align→1b FDR→...(見 ROADMAP / phasing-CONVERGED §Phase1)

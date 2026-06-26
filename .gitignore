@@ -156,3 +156,6 @@ test_data/
 # IC Phase1 G1 baseline: 大型可再生資料（52MB v1 IC payload），用 freeze_baseline.py 本地再生，不進 git
 tests/golden/ic_phase1_contract/baseline_btc_1h.json
 tests/golden/ic_phase1_contract/inputs/
+tests/golden/ic_phase1_1a_cut1/baseline_old_btc_1h_a384e6d2.json
+tests/golden/ic_phase1_1a_cut1/baseline_new_btc_1h_a384e6d2.json
+tests/golden/ic_phase1_1a_cut1/inputs/

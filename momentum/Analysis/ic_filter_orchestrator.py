@@ -28,6 +28,13 @@ from momentum.Analysis.ic_config_schema import FeatureFilterSchema, ICConfig
 from momentum.Analysis.deep_analysis_types import DeepAnalysisReport, SkippedResult
 from momentum.core.exceptions import InsufficientDataError, InvalidInputError
 from momentum.core.logging import get_logger
+from momentum.core.contracts import (
+    SplitPlan,
+    TimestampDiscontinuityError,
+    _coerce_timestamp_array,
+    _normalize_symbol_value,
+    validate_split_pair_integrity,
+)
 from momentum.core.protocols import IKlineReader
 from momentum.factories import create_label_generator
 
@@ -64,6 +71,236 @@ STAGE_OVERRIDE_PATHS: dict[str, tuple[str, str]] = {
     "turnover_analysis": ("turnover", "enabled"),
     "ai_summary": ("report", "ai_summary"),
 }
+
+EXPECTED_FREQ_BY_TIMEFRAME: dict[str, pd.Timedelta] = {
+    "1h": pd.Timedelta("1h"),
+    "4h": pd.Timedelta("4h"),
+    "12h": pd.Timedelta("12h"),
+}
+
+
+def _resolve_expected_freq(metadata: Optional[dict]) -> pd.Timedelta:
+    """由 metadata 的 timeframe 推導 rows purge 需要的固定頻率。"""
+    timeframe = (metadata or {}).get("timeframe")
+    if timeframe not in EXPECTED_FREQ_BY_TIMEFRAME:
+        raise ValueError(f"Unsupported or missing timeframe for IC split: {timeframe!r}")
+    return EXPECTED_FREQ_BY_TIMEFRAME[timeframe]
+
+
+def _resolve_metadata_symbol_allowlist(
+    metadata: Optional[dict],
+    allowed_symbols: Optional[set[str]] = None,
+) -> set[str]:
+    """由單幣 metadata 建立並驗證 split symbol allowlist。"""
+    if metadata is None or "symbol" not in metadata:
+        raise ValueError("metadata.symbol is required for IC train/test split")
+    symbol = _normalize_symbol_value(metadata["symbol"])
+    normalized_allowed = (
+        {_normalize_symbol_value(value) for value in allowed_symbols}
+        if allowed_symbols is not None
+        else {symbol}
+    )
+    if symbol not in normalized_allowed:
+        raise ValueError("metadata.symbol is outside allowed_symbols")
+    return {symbol}
+
+
+def _resolve_effective_label_horizon(
+    config: ICConfig,
+    labels_df: Optional[pd.DataFrame],
+) -> int:
+    """沿用 label stage 的 default_horizon fallback 規則提前解 horizon。"""
+    del labels_df
+    horizons = list(config.labels.horizons or [])
+    if not horizons:
+        raise ValueError("labels.horizons must contain at least one horizon")
+    default_horizon = int(config.global_settings.default_horizon)
+    return default_horizon if default_horizon in horizons else int(horizons[0])
+
+
+def _base_universe_hash(index: pd.Index, symbol: str) -> str:
+    """用 symbol/timestamp/row_pos 建立 split base universe hash。"""
+    ts_arr = _coerce_timestamp_array(index.to_numpy())
+    identity = pd.util.hash_pandas_object(
+        pd.DataFrame(
+            {
+                "symbol": [_normalize_symbol_value(symbol)] * len(index),
+                "timestamp": ts_arr,
+                "_split_row_pos": np.arange(len(index), dtype=int),
+            }
+        ),
+        index=True,
+    ).values
+    return hashlib.sha256(identity.tobytes()).hexdigest()
+
+
+def _validate_expected_frequency(index: pd.Index, expected_freq: pd.Timedelta) -> None:
+    """確認 rows purge 的 base universe 是固定頻率時間軸。"""
+    ts_arr = _coerce_timestamp_array(index.to_numpy())
+    if ts_arr.size <= 1:
+        return
+    diffs = np.diff(ts_arr)
+    if np.any(diffs <= np.timedelta64(0, "ns")):
+        raise TimestampDiscontinuityError(
+            "base timestamps must be strictly increasing without duplicates"
+        )
+    expected_delta = expected_freq.to_timedelta64()
+    tolerance = max(
+        pd.Timedelta(expected_freq).value * 0.05,
+        pd.Timedelta("1ns").value,
+    )
+    diff_ns = diffs.astype("timedelta64[ns]").astype(np.int64)
+    expected_ns = np.timedelta64(expected_delta, "ns").astype(np.int64)
+    if np.any(np.abs(diff_ns - expected_ns) > tolerance):
+        raise TimestampDiscontinuityError(
+            "rows purge requires continuous timestamps at expected_freq"
+        )
+
+
+def _time_bounds_for_rows(index: pd.Index, row_index: np.ndarray) -> tuple:
+    if row_index.size == 0:
+        return (None, None)
+    ts_arr = _coerce_timestamp_array(index.to_numpy())
+    selected = ts_arr[row_index]
+    return (pd.Timestamp(selected[0]), pd.Timestamp(selected[-1]))
+
+
+def _build_holdout_split_plan(
+    features_df: pd.DataFrame,
+    config: ICConfig,
+    symbol: str,
+    expected_freq: pd.Timedelta,
+    purge_gap: int,
+) -> tuple[SplitPlan, SplitPlan] | SkippedResult:
+    """建立單幣 chronological holdout train/test SplitPlan。"""
+    effective_horizon = _resolve_effective_label_horizon(config, None)
+    if int(purge_gap) < effective_horizon:
+        raise ValueError("purge_gap must be >= effective label horizon")
+    n_rows = len(features_df)
+    _validate_expected_frequency(features_df.index, expected_freq)
+    split_point = int(np.floor((1.0 - float(config.oos_test_size)) * n_rows))
+    effective_purge = max(int(purge_gap), effective_horizon, 0)
+    effective_embargo = int(config.embargo)
+    train_rows = np.arange(0, split_point, dtype=int)
+    test_rows = np.arange(split_point + effective_purge + effective_embargo, n_rows, dtype=int)
+    min_rows = int(config.min_test_rows)
+    if train_rows.size < min_rows or test_rows.size < min_rows:
+        return SkippedResult(
+            "ic_train_test_split",
+            "train/test rows below min_test_rows",
+            "INSUFFICIENT_DATA",
+            {
+                "train_rows": int(train_rows.size),
+                "test_rows": int(test_rows.size),
+                "min_test_rows": min_rows,
+            },
+        )
+
+    normalized_symbol = _normalize_symbol_value(symbol)
+    universe_hash = _base_universe_hash(features_df.index, normalized_symbol)
+    plan_kwargs = {
+        "index_kind": "positional",
+        "purge_gap": effective_purge,
+        "embargo": effective_embargo,
+        "purge_semantic": "rows",
+        "expected_freq": str(expected_freq),
+        "base_universe_hash": universe_hash,
+        "symbol": normalized_symbol,
+    }
+    train_plan = SplitPlan(
+        split_label="train",
+        row_index=train_rows,
+        time_bounds=_time_bounds_for_rows(features_df.index, train_rows),
+        **plan_kwargs,
+    )
+    test_plan = SplitPlan(
+        split_label="test",
+        row_index=test_rows,
+        time_bounds=_time_bounds_for_rows(features_df.index, test_rows),
+        **plan_kwargs,
+    )
+    symbols = np.asarray([normalized_symbol] * n_rows, dtype=object)
+    validate_split_pair_integrity(
+        train_plan,
+        test_plan,
+        features_df.index.to_numpy(),
+        symbols,
+        allowed_symbols={normalized_symbol},
+    )
+    return train_plan, test_plan
+
+
+def _derive_stage_masks(
+    train_plan: SplitPlan,
+    test_plan: SplitPlan,
+    current_index: pd.Index,
+) -> tuple[np.ndarray, np.ndarray]:
+    """用 split time_bounds 在目前 stage index 上重導 train/test 布林遮罩。"""
+    current_ts = pd.to_datetime(_coerce_timestamp_array(current_index.to_numpy()))
+    train_lo, train_hi = train_plan.time_bounds
+    test_lo, test_hi = test_plan.time_bounds
+    train_mask = (current_ts >= train_lo) & (current_ts <= train_hi)
+    test_mask = (current_ts >= test_lo) & (current_ts <= test_hi)
+    if bool(np.any(train_mask & test_mask)):
+        raise ValueError("train/test stage masks overlap")
+    return np.asarray(train_mask, dtype=bool), np.asarray(test_mask, dtype=bool)
+
+
+def _slice_by_mask(
+    features_df: pd.DataFrame,
+    label_series: pd.Series,
+    mask: Optional[np.ndarray],
+) -> tuple[pd.DataFrame, pd.Series]:
+    if mask is None:
+        return features_df, label_series
+    mask_arr = np.asarray(mask, dtype=bool)
+    if mask_arr.shape[0] != len(features_df):
+        raise ValueError("split mask length must match features length")
+    if not bool(mask_arr.any()):
+        raise ValueError("split mask must select at least one row")
+    selected_positions = np.flatnonzero(mask_arr)
+    sliced_features = features_df.iloc[selected_positions]
+    if len(label_series) == len(features_df):
+        sliced_label = label_series.iloc[selected_positions]
+    else:
+        sliced_label = label_series.reindex(sliced_features.index)
+    return sliced_features, sliced_label
+
+
+def _slice_raw_data_by_mask(
+    raw_data: pd.DataFrame,
+    features_df: pd.DataFrame,
+    sliced_features: pd.DataFrame,
+    mask: Optional[np.ndarray],
+) -> pd.DataFrame:
+    """用 feature row 位置切 raw kline，避免 RangeIndex 與 timestamp index 錯配。"""
+    if mask is None:
+        return raw_data
+    mask_arr = np.asarray(mask, dtype=bool)
+    if mask_arr.shape[0] != len(features_df):
+        raise ValueError("split mask length must match features length")
+    selected_positions = np.flatnonzero(mask_arr)
+    if len(raw_data) == len(features_df):
+        sliced_raw = raw_data.iloc[selected_positions].copy()
+        sliced_raw.index = sliced_features.index
+        return sliced_raw
+    return raw_data.reindex(sliced_features.index)
+
+
+def _split_fallback_metadata(reason: str, details: dict[str, Any]) -> dict[str, Any]:
+    """建立 default-ON 回退 metadata，避免 legacy 結果被誤標為 OOS。"""
+    return {
+        "requested": True,
+        "applied": False,
+        "scope": "full_sample_legacy",
+        "oos_guarantees": False,
+        "reason": reason,
+        "details": {
+            "train_rows": int(details.get("train_rows", 0)),
+            "test_rows": int(details.get("test_rows", 0)),
+            "min_test_rows": int(details.get("min_test_rows", 0)),
+        },
+    }
 
 
 class ICFilterOrchestrator:
@@ -111,8 +348,66 @@ class ICFilterOrchestrator:
             features_path, labels_path, meta_path
         )
 
+        split_context: Optional[dict] = None
+        if config.ic_train_test_split:
+            expected_freq = _resolve_expected_freq(metadata)
+            allowed_symbols = _resolve_metadata_symbol_allowlist(metadata)
+            symbol = next(iter(allowed_symbols))
+            effective_horizon = _resolve_effective_label_horizon(config, labels_df)
+            split_result = _build_holdout_split_plan(
+                features_df,
+                config,
+                symbol,
+                expected_freq,
+                purge_gap=effective_horizon,
+            )
+            if isinstance(split_result, SkippedResult):
+                return self._run_full_sample_fallback(
+                    features_path,
+                    labels_path,
+                    meta_path,
+                    config_override,
+                    progress_callback,
+                    kline_reader,
+                    reason="insufficient_data",
+                    details=split_result.details or {},
+                )
+            train_plan, test_plan = split_result
+            train_mask, test_mask = _derive_stage_masks(
+                train_plan, test_plan, features_df.index
+            )
+            split_context = {
+                "train_plan": train_plan,
+                "test_plan": test_plan,
+                "train_mask": train_mask,
+                "test_mask": test_mask,
+                "effective_horizon": effective_horizon,
+                "expected_freq": str(expected_freq),
+                "allowed_symbols": sorted(allowed_symbols),
+            }
+            metadata = dict(metadata)
+            metadata["ic_train_test_split"] = {
+                "requested": True,
+                "applied": True,
+                "scope": "train_test_holdout",
+                "oos_guarantees": True,
+                "effective_horizon": effective_horizon,
+                "purge_gap": train_plan.purge_gap,
+                "embargo": train_plan.embargo,
+                "expected_freq": str(expected_freq),
+                "train_rows": int(len(train_plan.row_index)),
+                "test_rows": int(len(test_plan.row_index)),
+                "train_time_bounds": [str(value) for value in train_plan.time_bounds],
+                "test_time_bounds": [str(value) for value in test_plan.time_bounds],
+                "index_kind": train_plan.index_kind,
+            }
+
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
-        features_df, preproc_log = self._stage1_preprocessing(features_df, metadata)
+        features_df, preproc_log = self._stage1_preprocessing(
+            features_df,
+            metadata,
+            fit_mask=split_context.get("train_mask") if split_context else None,
+        )
 
         self._report_progress(2, "label_generation", 0.25, "aligning labels")
         label_series, labels_df = self._stage2_label_generation(
@@ -123,6 +418,19 @@ class ICFilterOrchestrator:
         features_df, label_series, event_info = self._stage3_event_filter(
             features_df, label_series, metadata, config, kline_reader
         )
+        if split_context is not None:
+            train_mask, test_mask = _derive_stage_masks(
+                split_context["train_plan"],
+                split_context["test_plan"],
+                features_df.index,
+            )
+            split_context["train_mask"] = train_mask
+            split_context["test_mask"] = test_mask
+            event_info = dict(event_info)
+            event_info["split_mask"] = {
+                "train_rows": int(train_mask.sum()),
+                "test_rows": int(test_mask.sum()),
+            }
 
         features_df, metadata, feature_filter_info = self._apply_feature_filter(
             features_df, metadata, config.feature_filter
@@ -130,14 +438,35 @@ class ICFilterOrchestrator:
 
         self._report_progress(4, "ic_calculation", 0.55, "computing IC metrics")
         ic_results = self._stage4_ic_calculation(
-            features_df, label_series, metadata, config, kline_reader
+            features_df,
+            label_series,
+            metadata,
+            config,
+            kline_reader,
+            split_context=split_context,
         )
+        if ic_results.get("status") == "skipped":
+            return self._run_full_sample_fallback(
+                features_path,
+                labels_path,
+                meta_path,
+                config_override,
+                progress_callback,
+                kline_reader,
+                reason="rolling_warmup_insufficient",
+                details=ic_results.get("details") or {},
+            )
 
         self._report_progress(
             5, "stat_validation", 0.70, "validating statistics"
         )
         stage5_results = self._stage5_statistical_validation(
-            features_df, label_series, ic_results, config, event_info
+            features_df,
+            label_series,
+            ic_results,
+            config,
+            event_info,
+            split_context=split_context,
         )
 
         self._report_progress(6, "redundancy", 0.82, "removing redundancy")
@@ -146,6 +475,7 @@ class ICFilterOrchestrator:
             stage5_results["passed_features"],
             ic_results["icir"],
             metadata,
+            split_context=split_context,
         )
 
         self._report_progress(7, "report", 0.95, "generating report")
@@ -159,9 +489,39 @@ class ICFilterOrchestrator:
             preproc_log,
             event_info,
             feature_filter_info,
+            split_context=split_context,
         )
 
         self._report_progress(7, "report", 1.0, "completed")
+        self._report = report
+        return report
+
+    def _run_full_sample_fallback(
+        self,
+        features_path: str,
+        labels_path: str,
+        meta_path: Optional[str],
+        config_override: Optional[dict],
+        progress_callback: Optional[Callable],
+        kline_reader: Optional[IKlineReader],
+        reason: str,
+        details: dict[str, Any],
+    ) -> dict:
+        """以 flag-off 重跑 full-sample，並只追加 fallback metadata。"""
+        fallback_override = deepcopy(config_override) if config_override else {}
+        fallback_override["ic_train_test_split"] = False
+        report = self.analyze(
+            features_path,
+            labels_path,
+            meta_path,
+            config_override=fallback_override,
+            progress_callback=progress_callback,
+            kline_reader=kline_reader,
+        )
+        report_meta = dict(report.get("metadata") or {})
+        report_meta.pop("scope", None)
+        report_meta["ic_train_test_split"] = _split_fallback_metadata(reason, details)
+        report["metadata"] = report_meta
         self._report = report
         return report
 
@@ -1021,9 +1381,12 @@ class ICFilterOrchestrator:
         return features_df, labels_df, meta, stage0_log
 
     def _stage1_preprocessing(
-        self, features_df: pd.DataFrame, metadata: dict
+        self,
+        features_df: pd.DataFrame,
+        metadata: dict,
+        fit_mask: Optional[np.ndarray] = None,
     ) -> tuple[pd.DataFrame, dict]:
-        return self._preprocessor.preprocess(features_df, metadata)
+        return self._preprocessor.preprocess(features_df, metadata, fit_mask=fit_mask)
 
     def _stage2_label_generation(
         self,
@@ -1207,15 +1570,67 @@ class ICFilterOrchestrator:
         metadata: dict,
         config: ICConfig,
         kline_reader: Optional[IKlineReader],
+        split_context: Optional[dict] = None,
     ) -> dict:
         method = config.global_settings.default_method
         rolling_windows = config.ic_calculation.rolling_windows
         rolling_stride = config.ic_calculation.rolling_stride
         ic_decay_horizons = config.ic_calculation.ic_decay_horizons
+        test_mask = split_context.get("test_mask") if split_context else None
+        features_for_ic, label_for_ic = _slice_by_mask(
+            features_df,
+            label_series,
+            test_mask,
+        )
 
-        ic_values = self._ic_engine.compute_ic(features_df, label_series, method)
-        rolling_ic = self._ic_engine.compute_rolling_ic(
-            features_df, label_series, rolling_windows, rolling_stride, method
+        if split_context is not None:
+            adjusted_windows = self._ic_engine._adjust_rolling_windows(rolling_windows)
+            min_required = max(adjusted_windows) + int(
+                split_context.get("effective_horizon", 0)
+            )
+            if len(features_for_ic) < min_required:
+                return {
+                    "status": "skipped",
+                    "module_name": "ic_train_test_split",
+                    "reason": "test rows below rolling warmup minimum",
+                    "error_type": "INSUFFICIENT_DATA",
+                    "details": {
+                        "train_rows": int(np.asarray(split_context.get("train_mask"), dtype=bool).sum()),
+                        "test_rows": int(len(features_for_ic)),
+                        "min_test_rows": int(min_required),
+                    },
+                }
+
+        ic_values = self._ic_engine.compute_ic(features_for_ic, label_for_ic, method)
+        rolling_features = features_df
+        rolling_label = label_series
+        rolling_test_mask = test_mask
+        if split_context is not None:
+            train_mask = np.asarray(split_context.get("train_mask"), dtype=bool)
+            test_mask_arr = np.asarray(test_mask, dtype=bool)
+            if train_mask.shape[0] != len(features_df) or test_mask_arr.shape[0] != len(features_df):
+                raise ValueError("split mask length must match features length")
+            allowed_mask = train_mask | test_mask_arr
+            rolling_features, rolling_label = _slice_by_mask(
+                features_df,
+                label_series,
+                allowed_mask,
+            )
+            rolling_test_mask = test_mask_arr[allowed_mask]
+        rolling_ic_full = self._ic_engine.compute_rolling_ic(
+            rolling_features, rolling_label, rolling_windows, rolling_stride, method
+        )
+        rolling_ic = (
+            self._slice_rolling_ic_to_test(
+                rolling_ic_full,
+                rolling_features,
+                rolling_label,
+                rolling_windows,
+                rolling_stride,
+                rolling_test_mask,
+            )
+            if split_context is not None
+            else rolling_ic_full
         )
         icir = self._ic_engine.compute_icir(rolling_ic)
         ic_autocorr = self._ic_engine.compute_ic_autocorrelation(rolling_ic)
@@ -1223,29 +1638,37 @@ class ICFilterOrchestrator:
         ic_decay = {}
         grouped_ic = {}
         raw_data = None
+        raw_data_for_ic = None
 
         if kline_reader is not None and metadata:
             symbol = metadata.get("symbol")
             timeframe = metadata.get("timeframe")
             if symbol and timeframe:
                 raw_data = kline_reader.read_klines(symbol, timeframe)
+                if raw_data is not None:
+                    raw_data_for_ic = _slice_raw_data_by_mask(
+                        raw_data,
+                        features_df,
+                        features_for_ic,
+                        test_mask,
+                    )
 
-        if config.report.include_decay_analysis and raw_data is not None:
-            close = raw_data.get("close")
+        if config.report.include_decay_analysis and raw_data_for_ic is not None:
+            close = raw_data_for_ic.get("close")
             if close is not None:
                 ic_decay = self._ic_engine.compute_ic_decay(
-                    features_df,
+                    features_for_ic,
                     close,
                     ic_decay_horizons,
                     method,
                     config.labels.return_type,
                 )
 
-        if raw_data is not None and config.report.include_regime_analysis:
+        if raw_data_for_ic is not None and config.report.include_regime_analysis:
             grouped_ic = self._ic_engine.compute_grouped_ic(
-                features_df,
-                label_series,
-                raw_data,
+                features_for_ic,
+                label_for_ic,
+                raw_data_for_ic,
                 metadata,
                 config.ic_calculation.grouped_analysis.model_dump(),
             )
@@ -1258,6 +1681,7 @@ class ICFilterOrchestrator:
             "ic_autocorr": ic_autocorr,
             "ic_decay": ic_decay,
             "grouped_ic": grouped_ic,
+            "scope": "test" if split_context is not None else "full",
         }
 
         return ic_results
@@ -1269,9 +1693,16 @@ class ICFilterOrchestrator:
         ic_results: dict,
         config: ICConfig,
         event_info: dict,
+        split_context: Optional[dict] = None,
     ) -> dict:
         rolling_ic = ic_results.get("rolling_ic", {})
         icir = ic_results.get("icir", {})
+        test_mask = split_context.get("test_mask") if split_context else None
+        features_for_stats, label_for_stats = _slice_by_mask(
+            features_df,
+            label_series,
+            test_mask,
+        )
 
         ic_stats = self._stat_validator.compute_ic_statistics(rolling_ic)
         tier = event_info.get("tier", "sufficient")
@@ -1281,9 +1712,11 @@ class ICFilterOrchestrator:
         ):
             p_value_max = event_info.get("adjusted_p_threshold")
 
-        quantile_results = self._monotonicity.compute_all(features_df, label_series)
-        coverage_results = self._coverage.compute_all(features_df)
-        turnover_results = self._turnover.compute_all(features_df)
+        quantile_results = self._monotonicity.compute_all(
+            features_for_stats, label_for_stats
+        )
+        coverage_results = self._coverage.compute_all(features_for_stats)
+        turnover_results = self._turnover.compute_all(features_for_stats)
 
         summary_table = self._build_summary_table(
             features_df.columns,
@@ -1309,7 +1742,8 @@ class ICFilterOrchestrator:
             "turnover": turnover_results,
             "passed_features": passed_features,
             "threshold_log": threshold_log,
-            "label_series": label_series,
+            "label_series": label_for_stats,
+            "scope": "test" if split_context is not None else "full",
         }
 
     def _stage6_redundancy(
@@ -1318,22 +1752,35 @@ class ICFilterOrchestrator:
         passed_features: list[str],
         ic_scores: dict,
         metadata: dict,
+        split_context: Optional[dict] = None,
     ) -> dict:
+        test_mask = split_context.get("test_mask") if split_context else None
+        features_for_redundancy = features_df
+        if test_mask is not None:
+            mask_arr = np.asarray(test_mask, dtype=bool)
+            if mask_arr.shape[0] != len(features_df):
+                raise ValueError("split mask length must match features length")
+            features_for_redundancy = features_df.loc[features_df.index[mask_arr]]
+
         if not passed_features:
+            redundancy_log = {
+                "method": "none",
+                "input_features": 0,
+                "output_features": 0,
+                "removed_features": [],
+            }
+            if split_context is not None:
+                redundancy_log["scope"] = "test"
             return {
-                "filtered_df": pd.DataFrame(index=features_df.index),
-                "redundancy_log": {
-                    "method": "none",
-                    "input_features": 0,
-                    "output_features": 0,
-                    "removed_features": [],
-                },
+                "filtered_df": pd.DataFrame(index=features_for_redundancy.index),
+                "redundancy_log": redundancy_log,
                 "correlation_matrix": pd.DataFrame(),
                 "diversification_metrics": {},
+                **({"scope": "test"} if split_context is not None else {}),
             }
 
         filtered_df, redundancy_log = self._redundancy.filter(
-            features_df[passed_features],
+            features_for_redundancy[passed_features],
             ic_scores,
             method=self._config.redundancy.method,
         )
@@ -1343,11 +1790,15 @@ class ICFilterOrchestrator:
             list(filtered_df.columns), corr_matrix, feature_metadata
         )
 
+        if split_context is not None:
+            redundancy_log = {**redundancy_log, "scope": "test"}
+
         return {
             "filtered_df": filtered_df,
             "redundancy_log": redundancy_log,
             "correlation_matrix": corr_matrix,
             "diversification_metrics": diversification,
+            **({"scope": "test"} if split_context is not None else {}),
         }
 
     def _stage7_report(
@@ -1361,6 +1812,7 @@ class ICFilterOrchestrator:
         preproc_log: dict,
         event_info: dict,
         feature_filter_info: dict,
+        split_context: Optional[dict] = None,
     ) -> dict:
         filter_log = self._reporter.generate_filter_log(
             {
@@ -1398,6 +1850,7 @@ class ICFilterOrchestrator:
             event_info,
             ic_results.get("ic_decay", {}),
             feature_filter_info,
+            scope="test" if split_context is not None else None,
         )
         report = self._reporter.generate_json_report(analysis_results, report_meta)
 
@@ -1479,6 +1932,44 @@ class ICFilterOrchestrator:
             if str(default_horizon) in name:
                 return labels_df[name]
         return labels_df.iloc[:, 0]
+
+    def _slice_rolling_ic_to_test(
+        self,
+        rolling_ic: dict,
+        features_df: pd.DataFrame,
+        label_series: pd.Series,
+        windows: list[int],
+        stride: int,
+        test_mask: Optional[np.ndarray],
+    ) -> dict:
+        if test_mask is None:
+            return rolling_ic
+
+        label_name = label_series.name or "label"
+        aligned = pd.concat(
+            [features_df, label_series.rename(label_name)], axis=1
+        ).dropna()
+        if aligned.empty:
+            return {name: {} for name in features_df.columns}
+
+        test_index = set(features_df.index[np.asarray(test_mask, dtype=bool)])
+        adjusted_windows = self._ic_engine._adjust_rolling_windows(windows)
+        sliced: dict[str, dict] = {name: {} for name in features_df.columns}
+
+        for window in adjusted_windows:
+            key = f"window_{window}"
+            end_positions = np.arange(window, len(aligned) + 1, stride)
+            end_index = aligned.index[end_positions - 1]
+            keep_positions = [
+                idx for idx, timestamp in enumerate(end_index) if timestamp in test_index
+            ]
+            for feature in features_df.columns:
+                values = list((rolling_ic.get(feature, {}) or {}).get(key, []))
+                sliced[feature][key] = [
+                    values[idx] for idx in keep_positions if idx < len(values)
+                ]
+
+        return sliced
 
     def _build_summary_table(
         self,
@@ -1606,6 +2097,7 @@ class ICFilterOrchestrator:
         event_info: dict,
         ic_decay: dict,
         feature_filter_info: Optional[dict] = None,
+        scope: Optional[str] = None,
     ) -> dict:
         meta = dict(metadata) if metadata else {}
         warnings = []
@@ -1626,6 +2118,8 @@ class ICFilterOrchestrator:
                 "warnings": warnings,
             }
         )
+        if scope is not None:
+            meta["scope"] = scope
         return meta
 
     @staticmethod
