@@ -81,6 +81,7 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 **機制**：被 reconcile 的委員審完該 reconcile 後在檔內 append `RECONCILE-STAMP: <family> APPROVED <date>`（或 `REJECTED — 理由`）。`scripts/gate.sh dispatch` 對**對 SPEC 派實作**（`--spec` 存在）時，跑 `scripts/reconcile_stamps_check.sh` 驗 `--adversarial` 指向的 reconcile 已獲 codex+composer 全數 APPROVED，否則**拒發 token**。adversarial-review 派工本身（`--template n/a:`）不受限；邊角 `--adversarial stamped-waived:理由`。
 **實作端合約（defense-in-depth）**：看到 reconcile 未全數 APPROVED → `STATUS: BLOCKED` 不執行。
 **同理**：reconcile 後的最終章程/SPEC 本身須回送委員驗證（章程 §B5）。
+**Claude 自身不享特權（2026-06-27）**：Claude「又產獨立腿又做 reconcile」是特權位置 → **Claude 的獨立版/reconcile/SPEC/章程同須委員審+戳記,不可自我認證**。委員 `APPROVED` 語義＝「已審 **Claude 的腿** + reconcile,無錯/漏」;stamp-review 派工須明示「特別盯 Claude 的腿」（實證:FF 稽核 Composer 當場抓到 Claude 草稿誤用 test_cross_symbol_features）。
 
 **範本（V13 緊湊+錨點版，compliance-first）**：`templates/SPEC_TEMPLATE.md`（§RISK/§A/§C/§G/§P/§V/§R/§N 必填錨點）、
 `TODO_GENERATION_PROMPT.md`（蒸餾 1030→緊湊；產出 §0/§B/Task 驗證·邊界·不可做）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」）。
