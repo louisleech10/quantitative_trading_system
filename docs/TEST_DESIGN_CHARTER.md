@@ -54,6 +54,7 @@
 - **B5 測試章程 adversarial**:雙家族**專攻測試本身**(弱 oracle/合成掩蓋/缺 MR/無 manifest),與實作 review 分開出 finding。**reconcile 後的最終章程/測試套件本身也須回送驗證**(本 v2 即補此步)。
 - **B6 統計檢定設計審查**:每 STATISTICAL 預註 H0/H1/α/n_min/多重比較;禁 data snooping;區分公式正確 vs 有 alpha。
 - **B7 Fixture 審計**:每 fixture **在檔旁標** `FAITHFUL|SYNTHETIC|MOCK` + 覆蓋的真實契約欄位 + 已知不覆蓋項(如 ms vs s)。
+- **B8 Finding 閉合再驗證(退回修改後必做,2026-06-27)**:任一 review/adversarial/實作 抓到的 Block/Bug,① 給 finding 一個 ID;② 修補須註明「關閉哪個 finding ID」;③ **由原提出方(非修補者)重跑該 finding 的完全相同反例/重查該點**,確認從紅→綠 **且** 該測試可證偽(mutation:把修補還原仍 FAIL);④ 閉合留證(原話/數值前後對比)。**不可只憑「已修」字樣信任**(執行端可能放寬門檻交差)。模型:IC 2 LEAK→修→R2 Codex 重跑原反例證 ROLLING_EQUAL True + OLD_WOULD_EQUAL False。
 
 ## §C 流程接入點
 SPEC:§A 勾選+填 §G 章程(Oracle 矩陣 B4+§F 統計項) → Adversarial:專審測試章程(B5)+統計設計(B6) → 實作:先寫 P0/P1(洩漏/數值 TDD) → 接回:Claude 抽 mutation(B1,留證據)+diff assert(B3)+核 G-NEW 真跑 → 資料三方簽核:A1+A2+A8 真實 kline → Release:tier-matrix+full slow+manifest 對齊。
