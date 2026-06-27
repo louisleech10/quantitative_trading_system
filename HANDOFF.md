@@ -16,7 +16,12 @@
 - **R1 雙家族 adversarial 完成**(`...-ADV-codex.md`/`...-ADV-composer.md`,皆真run):兩家收斂揪出 **2 真 BUG**——BUG-1 BETA/CORREL 餵 (close,volume) 但 talib canonical 是 (high,low)(錯特徵/誤導命名);BUG-2 手刻 Klinger 非 canonical(corr 0.59)、ForceIndex/EOM 未標變體。另兩家共同 BLOCK:C1-2「⊆input_names」不可實作、C2-1 warmup 掩蓋假綠、C1-3 自指 oracle、mutation 須 TDD-first。我誤判更正:B1 降 RISK(fail-open 非錯值)、A5 過度宣稱(V-5 已有 end-date 截短 MR)、B4 撤回。
 - **Reconcile 已採納全部**:`handoffs/20260627-FF-DEEPAUDIT-RECONCILE.md`(修正設計=SPEC 種子)。
 - **R2/R2b 戳記齊全(過機檢)**:`reconcile_stamps_check.sh` PASS,codex+composer 皆 `APPROVED ... sha256:fa597372... task:ff-deepaudit-r2b`(R2b 為補 v2 雜湊綁定格式;R2 真核可 task=b147mxx9h/b7lzyi2vl)。reconcile gate-ready 可派實作。
-- **下一步**:寫正式 SPEC(P0-FF-1/2/4 + BUG-1/BUG-2 修;附測試章程§G+Oracle 分級;mutation TDD-first)+TODO → 過 gate(--spec 指向已戳記 reconcile)派實作(Codex)+另一方 code review。
+- **SPEC+TODO 已寫並過機檢**:`docs/FF_DEEPAUDIT_P0_SPEC.md`(§RISK/§A/§C/§G/§P/§V/§R/§N)+`docs/FF_DEEPAUDIT_P0_TODO.md`(§0/§B/9 Task 全覆蓋)。template_check PASS。
+- **SPEC+TODO 雙家族 adversarial 完成**(`...-SPECADV-{codex,composer}.md`):兩家收斂抓 SPEC 真缺口——BUG-1 消費者清單空殼(grep 出 adf_safe_skip/golden/UI/IC 真實同步點)、§G 受影響範圍無定義、correctness mode 機制未定義、price_transform 掉項、§B4 矩陣缺、C2 metadata 自相矛盾、logging 違解耦。**已 reconcile 採納全 18 點**(`...-SPECADV-RECONCILE.md`)並**修正 SPEC+TODO**(新增 Task 1.0 correctness mode、Consumer Sync Checklist、Affected Column Closure、§B4 矩陣、C2 四段斷言、§G v0/v1...),仍過 template_check。
+- **SPECADV-R2 完成,雙戳記過機檢**:codex 先 REJECTED(§B8 抓我漏改裸路徑)→ 修 → codex+composer 皆 `APPROVED sha256:6b75220 task:ff-specadv-r2(b)`,`reconcile_stamps_check` PASS。SPEC+TODO 歷兩輪雙家族 adversarial,dispatch-ready。
+- **⚠️ 環境阻礙(實作 B0 前須修)**:venv `pytables` 的 hdf5 dylib 壞(`libhdf5.310.dylib` 版本不符);`data_cache_manager.py` 用 `pd.HDFStore` 需 pytables → P0-FF-2 全鏈 MR(`generate_features()` 讀 kline)本機跑不起來。h5py 路徑正常。kline 已驗:`data_cache/feature_klines/kline_cache.h5` = 10 symbols(ADA/BCH/BNB/BTC/DOGE/ETH/LINK/SOL/TRX/XRP)+_metadata,符 §A。
+- **下一步**:R2 戳記齊 → 過 gate(--spec/--todo/--adversarial 指向已戳記 SPECADV-reconcile)派 **Composer 2.5 實作**(B0→B1/B2 並行→B3)+ **Codex code review**。BUG-1/2 落地後三方數據簽核。
+- **執行者新規(使用者 2026-06-27)**:中大型一律 Composer 實作 + Codex review(覆蓋原「大=Codex實作」),見記憶 feedback_executor_override_composer_impl。
 - **BUG-1 決策(使用者定)= 兩者都要**:補真正標準 BETA/CORREL(high,low)+ 保留改名(BetaCloseVolume 等)的價量相關版+metadata 標非標準。改特徵集→須三方數據簽核。已存記憶 project_ff_deepaudit_bugs。
 
 ## 維運
