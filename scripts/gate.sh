@@ -53,6 +53,14 @@ if [ "${kind}" = "dispatch" ]; then
       ""|waived:*) : ;;
       *) [ -f "${adversarial}" ] || { echo "ERROR: --adversarial 檔不存在:${adversarial}（真實檢查失敗）"; exit 1; } ;;
     esac
+    # reconcile 核可閘:對 SPEC 派「實作」(--spec 存在)時,--adversarial 指向的 reconcile 須獲委員戳記
+    #   防「Claude 自產 reconcile 無人複核就派實作」。adversarial-review 派工本身(--template n/a:)不受此限。
+    if [ -n "${spec}" ]; then
+      case "${adversarial}" in
+        ""|waived:*|stamped-waived:*) : ;;
+        *) bash scripts/reconcile_stamps_check.sh "${adversarial}" || { echo "ERROR: reconcile 未獲委員核可（見上），拒發實作 token。委員須在 reconcile append RECONCILE-STAMP APPROVED。"; exit 1; } ;;
+      esac
+    fi
     # 高風險「對 SPEC 派工」必須附 --spec 且機檢合規（template 漏結構=擋）
     case "${template}" in
       n/a:*|N/A:*) : ;;  # 明確非 spec 派工（如 adversarial review 本身）才可豁免

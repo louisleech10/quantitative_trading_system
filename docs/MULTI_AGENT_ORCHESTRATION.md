@@ -76,6 +76,12 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 - `Write` 到新 `docs/*{SPEC,TODO,PLAN}*.md` = 創建治理文件。
 - 無對應 fresh token（TTL 900s）→ **exit 2 擋下**，Claude 無法靜默跳過。
 
+### reconcile 委員核可閘（防「Claude 自產 reconcile 無人複核就派實作」）
+**為何**：Claude 產 reconcile，實作者直接信 → Claude 誤寫/誤併無人擋（charter v1 即發生:外置 §E/§F、A5 誤標，回送驗證才抓到）。
+**機制**：被 reconcile 的委員審完該 reconcile 後在檔內 append `RECONCILE-STAMP: <family> APPROVED <date>`（或 `REJECTED — 理由`）。`scripts/gate.sh dispatch` 對**對 SPEC 派實作**（`--spec` 存在）時，跑 `scripts/reconcile_stamps_check.sh` 驗 `--adversarial` 指向的 reconcile 已獲 codex+composer 全數 APPROVED，否則**拒發 token**。adversarial-review 派工本身（`--template n/a:`）不受限；邊角 `--adversarial stamped-waived:理由`。
+**實作端合約（defense-in-depth）**：看到 reconcile 未全數 APPROVED → `STATUS: BLOCKED` 不執行。
+**同理**：reconcile 後的最終章程/SPEC 本身須回送委員驗證（章程 §B5）。
+
 **範本（V13 緊湊+錨點版，compliance-first）**：`templates/SPEC_TEMPLATE.md`（§RISK/§A/§C/§G/§P/§V/§R/§N 必填錨點）、
 `TODO_GENERATION_PROMPT.md`（蒸餾 1030→緊湊；產出 §0/§B/Task 驗證·邊界·不可做）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」）。
 為何重寫：舊版過長 → 被 grep 一下就改寫成扁平 checklist（compliance 失敗）。新版緊湊到「讀的成本 < 改寫的成本」+ 錨點綁 gate 機檢。
