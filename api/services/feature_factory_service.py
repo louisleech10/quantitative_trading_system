@@ -3801,7 +3801,9 @@ class FeatureFactoryService:
         "LINEARREG": "線性回歸", "LINEARREG_SLOPE": "回歸斜率",
         "LINEARREG_ANGLE": "回歸角度", "LINEARREG_INTERCEPT": "回歸截距",
         "STDDEV": "標準差", "VAR": "方差", "TSF": "時間序列預測",
-        "BETA": "Beta 係數", "CORREL": "相關性",
+        "BETA": "Beta 係數 (high/low)", "CORREL": "相關性 (high/low)",
+        "Beta_CloseVolume": "Beta 係數 (close/volume，非標準)",
+        "Correl_CloseVolume": "相關性 (close/volume，非標準)",
         # Microstructure
         "amihud": "Amihud 非流動性", "kyle_lambda": "Kyle's Lambda",
         "roll_spread": "Roll 隱含價差", "cs_spread": "Corwin-Schultz 價差",

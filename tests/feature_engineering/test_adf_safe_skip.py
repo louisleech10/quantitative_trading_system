@@ -45,7 +45,8 @@ class TestIsSafeSkipBoundedOscillator:
             "close_12h_momentum_STOCHRSI-fastk_14-3-3-0",
             "close_12h_momentum_STOCHRSI-fastd_14-3-3-0",
             "ohlc_12h_momentum_BOP",
-            "close-volume_12h_statistics_CORREL_5",
+            "hl_12h_statistics_CORREL_5",
+            "close-volume_12h_statistics_Correl-CloseVolume_5",
             "close_12h_momentum_CMO_5",
             "close_12h_statistics_LINEARREG-ANGLE_5",
             "hlc_12h_momentum_PLUS-DI_8",
@@ -161,7 +162,8 @@ class TestIsSafeSkipNotInWhitelist:
             "close_12h_momentum_CCI_5",
             "close_12h_statistics_STDDEV_5_1",
             "close_12h_statistics_VAR_5_1",
-            "close-volume_12h_statistics_BETA_5",
+            "hl_12h_statistics_BETA_5",
+            "close-volume_12h_statistics_Beta-CloseVolume_5",
             "close_12h_statistics_LINEARREG-SLOPE_5",     # hyphen，但非 whitelist
             "close_12h_statistics_LINEARREG_5",           # LINEARREG 本體（I(1)）
             "close_12h_statistics_LINEARREG-INTERCEPT_5",

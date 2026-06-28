@@ -473,6 +473,7 @@ class FactoryConfig(BaseModel):
     allow_partial_training: bool = False
     max_inf_ratio: float = 0.0
     max_nan_ratio: Optional[float] = None
+    fail_open_indicators: bool = True
     global_settings: GlobalSettings = Field(alias="global")
     data_sources: DataSourceConfig
     timeframes: TimeframeConfig

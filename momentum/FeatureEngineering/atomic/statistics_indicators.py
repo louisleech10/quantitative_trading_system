@@ -5,6 +5,7 @@ from typing import Dict, List
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
 
@@ -18,6 +19,9 @@ class StatisticsIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            config.get("fail_open_indicators") if config else None
+        )
 
     def compute_all(self, data: pd.DataFrame) -> pd.DataFrame:
         indicators = self._config.get("indicators", []) if self._config else []
@@ -32,7 +36,7 @@ class StatisticsIndicatorEngine:
             try:
                 frames.append(TALibWrapper.compute_batch(name, data, params_list, self._data_sources))
             except Exception as exc:
-                logger.warning("Statistics indicator %s failed: %s", name, exc)
+                guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
         if not frames:
             return pd.DataFrame(index=data.index)
@@ -90,6 +94,15 @@ class StatisticsIndicatorEngine:
                         "params": params,
                         "description": f"{indicator_name} computed from {source_label}",
                     }
+                    if name in ("Beta_CloseVolume", "Correl_CloseVolume"):
+                        metadata[col_name]["variant"] = "non_standard_close_volume"
+                        metadata[col_name]["standard_talib"] = (
+                            "BETA" if name == "Beta_CloseVolume" else "CORREL"
+                        )
+                        metadata[col_name]["description"] = (
+                            f"Non-standard close-volume {metadata[col_name]['standard_talib']} "
+                            f"(not TA-Lib canonical high/low)"
+                        )
         return metadata
 
     def _resolve_params(self, name: str, indicator_def: Dict) -> List[Dict]:

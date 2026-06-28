@@ -173,6 +173,8 @@ class TALibWrapper:
         "statistics": [
             "BETA",
             "CORREL",
+            "Beta_CloseVolume",
+            "Correl_CloseVolume",
             "LINEARREG",
             "LINEARREG_ANGLE",
             "LINEARREG_INTERCEPT",
@@ -184,8 +186,23 @@ class TALibWrapper:
         "price_transform": ["AVGPRICE", "MEDPRICE", "TYPPRICE", "WCLPRICE"],
     }
 
+    _ALIAS_TALIB_FUNC: Dict[str, str] = {
+        "Beta_CloseVolume": "BETA",
+        "Correl_CloseVolume": "CORREL",
+    }
+
     _INPUT_TYPE_MAP = {
-        "hl": {"AROON", "AROONOSC", "MIDPRICE", "SAR", "SAREXT", "PLUS_DM", "MINUS_DM"},
+        "hl": {
+            "AROON",
+            "AROONOSC",
+            "MIDPRICE",
+            "SAR",
+            "SAREXT",
+            "PLUS_DM",
+            "MINUS_DM",
+            "BETA",
+            "CORREL",
+        },
         "hlc": {
             "ADX",
             "ADXR",
@@ -203,7 +220,7 @@ class TALibWrapper:
         },
         "hlcv": {"MFI", "AD", "ADOSC"},
         "ohlc": {"BOP"},
-        "close_volume": {"OBV", "BETA", "CORREL"},
+        "close_volume": {"OBV", "Beta_CloseVolume", "Correl_CloseVolume"},
     }
 
     _OUTPUT_NAME_OVERRIDES = {
@@ -254,6 +271,26 @@ class TALibWrapper:
 
         for category, names in cls._CATEGORY_MAP.items():
             for name in names:
+                talib_func = cls._ALIAS_TALIB_FUNC.get(name, name)
+                if name in cls._ALIAS_TALIB_FUNC:
+                    func = abstract.Function(talib_func)
+                    output_names = cls._OUTPUT_NAME_OVERRIDES.get(talib_func, func.output_names)
+                    input_type = cls._resolve_input_type(name)
+                    default_params = dict(func.parameters)
+                    param_strategy = "fibonacci" if "timeperiod" in default_params else "fixed"
+                    cls.INDICATOR_REGISTRY[name] = IndicatorSpec(
+                        name=name,
+                        talib_func=talib_func,
+                        category=category,
+                        input_type=input_type,
+                        output_count=len(output_names),
+                        output_names=output_names,
+                        default_params=default_params,
+                        param_strategy=param_strategy,
+                        computed_in_adapter=False,
+                    )
+                    continue
+
                 func = abstract.Function(name)
                 output_names = cls._OUTPUT_NAME_OVERRIDES.get(name, func.output_names)
                 input_type = cls._resolve_input_type(name)

@@ -7,6 +7,7 @@ import pandas as pd
 from scipy.stats import norm
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 
 
 logger = get_logger(__name__)
@@ -53,6 +54,9 @@ class MicrostructureIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config or {}
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            self._config.get("fail_open_indicators")
+        )
         self.windows = self._config.get("windows", [5, 13, 21, 55])
         self.epsilon = float(self._config.get("epsilon", 1e-10))
         self.min_trades = int(self._config.get("min_trades", 1))
@@ -79,7 +83,7 @@ class MicrostructureIndicatorEngine:
                 try:
                     frames.append(method(data))
                 except Exception as exc:
-                    logger.warning("Microstructure indicator %s failed: %s", name, exc)
+                    guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:

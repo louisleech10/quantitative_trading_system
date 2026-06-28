@@ -159,3 +159,6 @@ tests/golden/ic_phase1_contract/inputs/
 tests/golden/ic_phase1_1a_cut1/baseline_old_btc_1h_a384e6d2.json
 tests/golden/ic_phase1_1a_cut1/baseline_new_btc_1h_a384e6d2.json
 tests/golden/ic_phase1_1a_cut1/inputs/
+
+# FF 深稽 diff 表(測試生成,非追蹤;簽核記錄在 handoffs)
+tests/_golden/ff_deepaudit/

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 
 
 logger = get_logger(__name__)
@@ -17,6 +18,9 @@ class TailRiskIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config or {}
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            self._config.get("fail_open_indicators")
+        )
         self.windows = self._config.get("windows", [21, 55, 100])
         self.cvar_alphas = self._config.get("cvar_alphas", [0.01, 0.05])
         self.rv_windows = self._config.get("rv_windows", [13, 21, 55])
@@ -51,7 +55,7 @@ class TailRiskIndicatorEngine:
             try:
                 frames.append(method(returns))
             except Exception as exc:
-                logger.warning("Tail risk indicator failed: %s", exc)
+                guard_indicator_compute("tail_risk", exc, fail_open=self._fail_open)
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:

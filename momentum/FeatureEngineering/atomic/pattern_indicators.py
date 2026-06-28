@@ -5,7 +5,12 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
+from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+
+
+logger = get_logger(__name__)
 
 
 class PatternIndicatorEngine:
@@ -14,6 +19,9 @@ class PatternIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            config.get("fail_open_indicators") if config else None
+        )
 
     def compute_all(self, data: pd.DataFrame) -> pd.DataFrame:
         required = {"open", "high", "low", "close"}
@@ -26,7 +34,10 @@ class PatternIndicatorEngine:
         frames = []
         for indicator in indicators:
             name = indicator["name"] if isinstance(indicator, dict) else indicator
-            frames.append(TALibWrapper.compute_batch(name, data, [{}], self._data_sources))
+            try:
+                frames.append(TALibWrapper.compute_batch(name, data, [{}], self._data_sources))
+            except Exception as exc:
+                guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
         pattern_df = pd.concat(frames, axis=1) if frames else pd.DataFrame(index=data.index)
         if pattern_df.empty:

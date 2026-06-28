@@ -7,6 +7,7 @@ import pandas as pd
 import talib
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
 
@@ -20,6 +21,9 @@ class VolumeIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            config.get("fail_open_indicators") if config else None
+        )
 
     def compute_all(self, data: pd.DataFrame) -> pd.DataFrame:
         indicators = self._config.get("indicators", []) if self._config else []
@@ -39,7 +43,7 @@ class VolumeIndicatorEngine:
             try:
                 frames.append(TALibWrapper.compute_batch(name, data, params_list, self._data_sources))
             except Exception as exc:
-                logger.warning("Volume indicator %s failed: %s", name, exc)
+                guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
         frames.append(self._compute_vwap(data))
         frames.append(self._compute_volume_ma_ratio(data))
@@ -139,8 +143,8 @@ class VolumeIndicatorEngine:
             "category": "volume",
             "indicator": "ForceIndex",
             "source": "hlcv",
-            "params": {},
-            "description": "Force index based on price change and volume",
+            "params": {"timeperiod": 13},
+            "description": "Elder Force Index canonical (EMA13 of close change × volume)",
         }
 
         fast = 34
@@ -151,7 +155,7 @@ class VolumeIndicatorEngine:
             "indicator": "Klinger",
             "source": "hlcv",
             "params": {"fast": fast, "slow": slow},
-            "description": "Klinger volume oscillator",
+            "description": "Klinger Volume Oscillator canonical (trend-aware VF, EMA34−EMA55)",
         }
 
         eom_window = 14
@@ -161,7 +165,8 @@ class VolumeIndicatorEngine:
             "indicator": "EOM",
             "source": "hlcv",
             "params": {"timeperiod": eom_window},
-            "description": "Ease of movement",
+            "variant": "simplified",
+            "description": "Simplified ease of movement (no 1e8 scale factor)",
         }
         return metadata
 
@@ -218,24 +223,50 @@ class VolumeIndicatorEngine:
             index=data.index,
         )
 
-    def _compute_force_index(self, data: pd.DataFrame) -> pd.DataFrame:
+    def _compute_force_index(self, data: pd.DataFrame, ema_period: int = 13) -> pd.DataFrame:
         required = {"close", "volume"}
         if not required.issubset(data.columns):
             return pd.DataFrame(index=data.index)
-        force = data["close"].diff() * data["volume"]
+        close = data["close"].astype(float)
+        volume = data["volume"].astype(float)
+        raw = close.diff() * volume
+        smoothed = talib.EMA(raw.values, timeperiod=ema_period)
         return pd.DataFrame(
-            {"hlcv_volume_ForceIndex": force},
+            {"hlcv_volume_ForceIndex": pd.Series(smoothed, index=data.index)},
             index=data.index,
         )
+
+    @staticmethod
+    def _klinger_cumulative_measurement(dm: np.ndarray, trend: np.ndarray) -> np.ndarray:
+        """Klinger cumulative measurement：trend 不變時累加 dm，反轉時重置。"""
+        n = len(dm)
+        cm = np.empty(n, dtype=float)
+        cm[0] = dm[0]
+        for idx in range(1, n):
+            if trend[idx] == trend[idx - 1]:
+                cm[idx] = cm[idx - 1] + dm[idx]
+            else:
+                cm[idx] = dm[idx - 1] + dm[idx]
+        return cm
 
     def _compute_klinger(self, data: pd.DataFrame, fast: int = 34, slow: int = 55) -> pd.DataFrame:
         required = {"high", "low", "close", "volume"}
         if not required.issubset(data.columns):
             return pd.DataFrame(index=data.index)
-        hl_range = (data["high"] - data["low"]).replace(0, np.nan)
-        vf = data["volume"] * (2 * data["close"] - data["high"] - data["low"]) / hl_range
-        ema_fast = talib.EMA(vf.values.astype(float), timeperiod=fast)
-        ema_slow = talib.EMA(vf.values.astype(float), timeperiod=slow)
+        high = data["high"].astype(float)
+        low = data["low"].astype(float)
+        close = data["close"].astype(float)
+        volume = data["volume"].astype(float)
+        hlc = (high + low + close).values
+        trend = np.where(hlc > np.roll(hlc, 1), 1.0, -1.0)
+        trend[0] = 1.0
+        dm = (high - low).values
+        cm = self._klinger_cumulative_measurement(dm, trend)
+        cm = np.where(cm == 0, np.nan, cm)
+        vf = volume.values * np.abs(2.0 * (dm / cm - 1.0)) * trend * 100.0
+        vf = np.nan_to_num(vf, nan=0.0, posinf=0.0, neginf=0.0)
+        ema_fast = talib.EMA(vf.astype(float), timeperiod=fast)
+        ema_slow = talib.EMA(vf.astype(float), timeperiod=slow)
         kvo = ema_fast - ema_slow
         return pd.DataFrame(
             {f"hlcv_volume_Klinger_{fast}_{slow}": pd.Series(kvo, index=data.index)},

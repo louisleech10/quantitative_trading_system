@@ -13,7 +13,7 @@
 
 不加入 whitelist 的指標（保留 ADF 測試）：
     - CCI: 公式中 0.015 是 normalize const 非 bound，實測偶超 ±400
-    - STDDEV / VAR / BETA: 統計估計，regime change 時可 spike
+    - STDDEV / VAR / BETA / Beta-CloseVolume: 統計估計，regime change 時可 spike
     - LINEARREG_SLOPE / LINEARREG / LINEARREG_INTERCEPT / TSF: I(1) 或 borderline
     - TRANGE / ATR / Parkinson_Vol / GarmanKlass_Vol: I(1) 量級，**該執行 fracdiff**
     - HT_DCPERIOD / HT_PHASOR: 實務有界但無數學硬限
@@ -53,6 +53,7 @@ ADF_SAFE_SKIP_PATTERNS: frozenset[str] = frozenset({
     "STOCHRSI-fastd",      # hyphen
     "_BOP",
     "_CORREL_",
+    "Correl-CloseVolume",
     "_CMO_",
     "LINEARREG-ANGLE",     # hyphen
     "PLUS-DI",             # hyphen

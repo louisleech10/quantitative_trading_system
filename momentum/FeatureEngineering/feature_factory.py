@@ -869,7 +869,7 @@ class FeatureFactory:
             cat_cfg = getattr(config.atomic_indicators, cat_name)
             if not cat_cfg.enabled:
                 continue
-            filtered = self._filter_category_config(cat_cfg)
+            filtered = self._inject_fail_open(self._filter_category_config(cat_cfg), config)
             if filtered is None:
                 continue
             tasks.append(
@@ -878,19 +878,25 @@ class FeatureFactory:
 
         # --- 3 Advanced categories: Microstructure / Entropy / TailRisk ---
         if config.atomic_indicators.microstructure.enabled:
-            ms_cfg = self._filter_advanced_config(config.atomic_indicators.microstructure)
+            ms_cfg = self._inject_fail_open(
+                self._filter_advanced_config(config.atomic_indicators.microstructure), config
+            )
             tasks.append(
                 ("microstructure", False, lambda c=ms_cfg: MicrostructureIndicatorEngine(c, sources).compute_all(data))
             )
 
         if config.atomic_indicators.entropy.enabled:
-            ent_cfg = self._filter_advanced_config(config.atomic_indicators.entropy)
+            ent_cfg = self._inject_fail_open(
+                self._filter_advanced_config(config.atomic_indicators.entropy), config
+            )
             tasks.append(
                 ("entropy", False, lambda c=ent_cfg: EntropyIndicatorEngine(c, sources).compute_all(data))
             )
 
         if config.atomic_indicators.tail_risk.enabled:
-            tr_cfg = self._filter_advanced_config(config.atomic_indicators.tail_risk)
+            tr_cfg = self._inject_fail_open(
+                self._filter_advanced_config(config.atomic_indicators.tail_risk), config
+            )
             tasks.append(
                 ("tail_risk", False, lambda c=tr_cfg: TailRiskIndicatorEngine(c, sources).compute_all(data))
             )
@@ -1382,6 +1388,15 @@ class FeatureFactory:
             warnings.extend(engine.get_data_warnings(data))
 
         return warnings
+
+    @staticmethod
+    def _inject_fail_open(cfg: Optional[dict], factory_config: "FactoryConfig") -> Optional[dict]:
+        """將 FactoryConfig.fail_open_indicators 注入 atomic engine config。"""
+        if cfg is None:
+            return None
+        out = dict(cfg)
+        out["fail_open_indicators"] = factory_config.fail_open_indicators
+        return out
 
     @staticmethod
     def _filter_category_config(cat_cfg: Any) -> Optional[dict]:

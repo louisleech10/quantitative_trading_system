@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
 
@@ -19,6 +20,9 @@ class VolatilityIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            config.get("fail_open_indicators") if config else None
+        )
 
     def compute_all(self, data: pd.DataFrame) -> pd.DataFrame:
         indicators = self._config.get("indicators", []) if self._config else []
@@ -38,7 +42,7 @@ class VolatilityIndicatorEngine:
             try:
                 frames.append(TALibWrapper.compute_batch(name, data, params_list, self._data_sources))
             except Exception as exc:
-                logger.warning("Volatility indicator %s failed: %s", name, exc)
+                guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
         frames.append(self._compute_keltner(data))
         frames.append(self._compute_donchian(data))

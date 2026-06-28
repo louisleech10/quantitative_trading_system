@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
+from momentum.FeatureEngineering.atomic.compute_guard import resolve_fail_open
 
 
 logger = get_logger(__name__)
@@ -26,6 +28,9 @@ class EntropyIndicatorEngine:
     def __init__(self, config: Dict, data_sources: List[str]):
         self._config = config or {}
         self._data_sources = data_sources
+        self._fail_open = resolve_fail_open(
+            self._config.get("fail_open_indicators")
+        )
         self.windows = self._config.get("windows", [55, 100])
         self.n_bins = int(self._config.get("n_bins", 10))
         self.apen_m = int(self._config.get("apen_m", 2))
@@ -54,14 +59,25 @@ class EntropyIndicatorEngine:
             if series.isna().mean() > 0.5:
                 logger.warning("Entropy source %s has >50%% NaN", source)
 
-            frames.append(self._compute_shannon_entropy(series, source))
-
+            methods = [
+                ("shannon", lambda: self._compute_shannon_entropy(series, source)),
+            ]
             if source == "close_return":
-                frames.append(self._compute_approximate_entropy(series))
-                frames.append(self._compute_sample_entropy(series))
-                frames.append(self._compute_hurst(series))
-                frames.append(self._compute_fractal_dimension(series))
-                frames.append(self._compute_permutation_entropy(series))
+                methods.extend(
+                    [
+                        ("apen", lambda: self._compute_approximate_entropy(series)),
+                        ("sampen", lambda: self._compute_sample_entropy(series)),
+                        ("hurst", lambda: self._compute_hurst(series)),
+                        ("fractal_dim", lambda: self._compute_fractal_dimension(series)),
+                        ("perm_entropy", lambda: self._compute_permutation_entropy(series)),
+                    ]
+                )
+
+            for name, method in methods:
+                try:
+                    frames.append(method())
+                except Exception as exc:
+                    guard_indicator_compute(f"entropy_{name}", exc, fail_open=self._fail_open)
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:
