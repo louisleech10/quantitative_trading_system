@@ -48,6 +48,10 @@
 
 ## §B 測試設計審查紀律（Meta-QA）
 - **B1 可證偽硬門檻(mutation)**:聲稱 P0 的測試**必須有 mutation probe**——注入已知 bug 必 FAIL。**最低 probe 集(改相關模組抽 1)**:① 移除 purge → 必紅;② train/test 顛倒 fit(fit_mask=test_mask)→ 必紅;③ cache key 少 symbol → 隔離測試必紅。**須留證據**:patch 摘要 + 哪個測試紅 + 錯誤摘要。做不到→降 P3,禁寫「已驗證」。不全庫 mutmut(成本),用人工 probe。
+  - **B1.1 可執行、自證的 in-file 探針(2026-06-28,FF C1-2 事故後定)**:每個正確性測試**必附同檔 `test_mutation_*`**,該探針自證「基線綠 → 注入壞改 → 原斷言 `pytest.raises`(真紅)→ 還原」。探針會被收集會跑;**缺探針 = BLOCKING(等同缺 §B4 矩陣列)**。`scripts/mutation_probe_check.sh` 機械驗:受審測試模組每個有 ≥1 `test_mutation_*` 且全跑過(探針綠 = 它證明 mutation 真能讓底層測試紅)。
+  - **B1.2 oracle 獨立性(防自指假綠)**:oracle **不得從待測自身衍生**(不得用 `list_indicators()`/被測同一張 map/import 被測函式當期望值);須獨立來源(TA-Lib/scipy 直呼、硬編表、文獻手算、byte golden)。adversarial **標準必問**:「oracle 是否從待測自身衍生?」是→假綠 BLOCK。(C1-2:semantics 表從 `_INPUT_TYPE_MAP` 衍生→改 source 同時改 oracle→永遠相等。)
+  - **B1.3 注入須真生效(防無效 mutation 假紅)**:探針注入後須**重置一切快取狀態**(registry/singleton/lru_cache/cache key)讓壞改傳到執行路徑;用「基線綠+變異紅」雙斷言自證注入生效——mutated 仍綠則探針自己失敗。(C1-2:`INDICATOR_REGISTRY` 快取 input_type,改 map 後未 `clear()+initialize()`→mutation 沒生效、假裝通過。)
+- **B1-驗收紀律(驗收方必做,2026-06-28)**:接回任何聲稱正確性的批次,**親自跑 `scripts/mutation_probe_check.sh <測試路徑>` 看探針真紅/真綠**,**禁止只憑「pytest 全綠」+「git diff grep 沒放寬斷言」放行**(全綠 grep 抓不到自指/空測)。如煙霧偵測器要「拿火測會叫」,非「看燈亮」。
 - **B2 測真實路徑**:主正確性用 `kline_cache.h5` 或 byte-faithful 錄製(含 index dtype+單位);sanitized fixture 僅 A6 邊界或 A15 慢 oracle 輸入;symlink kline+hermetic tmp data_cache 算真實。
 - **B3 防假綠**:diff 既有 assert;放寬 tolerance 須 SPEC 明列+adversarial;禁 `pytest.skip` 把 fail 變 skipped。
 - **B4 覆蓋追溯矩陣**:SPEC 附 `|性質ID|類別|Oracle|測試檔:函式|Mutation probe|`;缺口=BLOCKING。
