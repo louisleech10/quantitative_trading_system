@@ -87,7 +87,7 @@ def _multi_tf_config_payload(**overrides: object) -> dict:
 
 def _make_factory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, feature_root: Path | None = None):
     if not KLINE_PATH.is_file():
-        pytest.skip(f"missing real kline cache: {KLINE_PATH}")
+        pytest.fail(f"missing real kline cache: {KLINE_PATH}")
     _apply_baseline_env(monkeypatch)
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
     factory = create_feature_factory(cache_dir=KLINE_CACHE_DIR, validate_continuity=False)
@@ -197,9 +197,10 @@ def test_v8_frozen_doc_covers_every_existing_assertion_change() -> None:
 @pytest.fixture
 def _require_kline() -> None:
     if not KLINE_PATH.is_file():
-        pytest.skip(f"missing real kline cache: {KLINE_PATH}")
+        pytest.fail(f"missing real kline cache: {KLINE_PATH}")
 
 
+@pytest.mark.requires_kline
 def test_matrix_whole_layer_failure_fail_closed(
     _require_kline: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -227,6 +228,7 @@ def test_matrix_whole_layer_failure_fail_closed(
         )
 
 
+@pytest.mark.requires_kline
 def test_matrix_whole_layer_failure_partial_status(
     _require_kline: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -257,6 +259,7 @@ def test_matrix_whole_layer_failure_partial_status(
     assert any("L1" in layer for layer in result.metadata.get("failed_layers", []))
 
 
+@pytest.mark.requires_kline
 def test_matrix_nan_ratio_exceeds_marks_partial(
     _require_kline: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -281,6 +284,7 @@ def test_matrix_nan_ratio_exceeds_marks_partial(
     assert result.metadata.get("quality_thresholds")
 
 
+@pytest.mark.requires_kline
 def test_matrix_partial_tf_failure_fail_closed_and_partial(
     _require_kline: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -326,6 +330,7 @@ def test_matrix_partial_tf_failure_fail_closed_and_partial(
     assert "1h" in result.metadata.get("failed_timeframes", [])
 
 
+@pytest.mark.requires_kline
 def test_matrix_cgsa_tf_failure_rollback_state(
     _require_kline: None,
     monkeypatch: pytest.MonkeyPatch,
@@ -363,6 +368,7 @@ def test_matrix_cgsa_tf_failure_rollback_state(
     assert not list(work_dir.glob("*1h*"))
 
 
+@pytest.mark.requires_kline
 def test_matrix_l65_failure_degrades_metadata(
     _require_kline: None,
     monkeypatch: pytest.MonkeyPatch,

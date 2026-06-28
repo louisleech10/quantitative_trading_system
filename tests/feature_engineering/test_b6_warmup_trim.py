@@ -84,7 +84,7 @@ def _kline_available() -> bool:
 
 def _require_kline() -> None:
     if not _kline_available():
-        pytest.skip("missing kline cache for B6 warmup tests")
+        pytest.fail("missing kline cache for B6 warmup tests")
 
 
 def _minimal_config(timeframe: str = "12h") -> Dict[str, Any]:
@@ -246,6 +246,7 @@ def test_resolve_output_window_flag_off_is_strict() -> None:
 # ── B6b: ingest / trim / insufficient ─────────────────────────────────────
 
 
+@pytest.mark.requires_kline
 def test_warmup_ingest_range_multitf_primary_ingest_before_start(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -273,6 +274,7 @@ def test_warmup_ingest_range_multitf_primary_ingest_before_start(
     _assert_data_cache_unchanged(before)
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_no_leak_row_count_matches_window(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -310,6 +312,7 @@ def test_warmup_trim_no_leak_row_count_matches_window(
     _assert_data_cache_unchanged(before)
 
 
+@pytest.mark.requires_kline
 def test_warmup_insufficient_report_near_dataset_start(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -345,6 +348,7 @@ def test_warmup_insufficient_report_near_dataset_start(
     _assert_data_cache_unchanged(before)
 
 
+@pytest.mark.requires_kline
 def test_warmup_quality_gain_position_independent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -395,9 +399,10 @@ def test_warmup_quality_gain_position_independent(
     _assert_data_cache_unchanged(before)
 
 
+@pytest.mark.requires_kline
 def test_warmup_flag_off_golden_baseline_check() -> None:
     if not _kline_available():
-        pytest.skip("missing kline cache")
+        pytest.fail("missing kline cache")
     env = os.environ.copy()
     env.pop("FFACT_WARMUP_TRIM", None)
     env["FFACT_WARMUP_TRIM"] = "0"
@@ -585,6 +590,7 @@ def _assert_warmup_trim_artifact(
     _assert_data_cache_unchanged(before)
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_non_cgsa_l7_validate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -597,6 +603,7 @@ def test_warmup_trim_non_cgsa_l7_validate(
     )
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_cgsa_raw(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -609,6 +616,7 @@ def test_warmup_trim_cgsa_raw(
     )
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_cgsa_validate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -660,6 +668,7 @@ def test_warmup_trim_cgsa_validate(
     _assert_data_cache_unchanged(before)
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_multi_tf(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -677,6 +686,7 @@ def test_warmup_trim_multi_tf(
     )
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_ic_first(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -690,6 +700,7 @@ def test_warmup_trim_ic_first(
     )
 
 
+@pytest.mark.requires_kline
 def test_warmup_trim_ic_first_public_window_init(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:

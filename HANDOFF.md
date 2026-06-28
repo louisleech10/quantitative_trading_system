@@ -19,8 +19,13 @@
 - **SPEC+TODO 已寫並過機檢**:`docs/FF_DEEPAUDIT_P0_SPEC.md`(§RISK/§A/§C/§G/§P/§V/§R/§N)+`docs/FF_DEEPAUDIT_P0_TODO.md`(§0/§B/9 Task 全覆蓋)。template_check PASS。
 - **SPEC+TODO 雙家族 adversarial 完成**(`...-SPECADV-{codex,composer}.md`):兩家收斂抓 SPEC 真缺口——BUG-1 消費者清單空殼(grep 出 adf_safe_skip/golden/UI/IC 真實同步點)、§G 受影響範圍無定義、correctness mode 機制未定義、price_transform 掉項、§B4 矩陣缺、C2 metadata 自相矛盾、logging 違解耦。**已 reconcile 採納全 18 點**(`...-SPECADV-RECONCILE.md`)並**修正 SPEC+TODO**(新增 Task 1.0 correctness mode、Consumer Sync Checklist、Affected Column Closure、§B4 矩陣、C2 四段斷言、§G v0/v1...),仍過 template_check。
 - **SPECADV-R2 完成,雙戳記過機檢**:codex 先 REJECTED(§B8 抓我漏改裸路徑)→ 修 → codex+composer 皆 `APPROVED sha256:6b75220 task:ff-specadv-r2(b)`,`reconcile_stamps_check` PASS。SPEC+TODO 歷兩輪雙家族 adversarial,dispatch-ready。
-- **⚠️ 環境阻礙(實作 B0 前須修)**:venv `pytables` 的 hdf5 dylib 壞(`libhdf5.310.dylib` 版本不符);`data_cache_manager.py` 用 `pd.HDFStore` 需 pytables → P0-FF-2 全鏈 MR(`generate_features()` 讀 kline)本機跑不起來。h5py 路徑正常。kline 已驗:`data_cache/feature_klines/kline_cache.h5` = 10 symbols(ADA/BCH/BNB/BTC/DOGE/ETH/LINK/SOL/TRX/XRP)+_metadata,符 §A。
-- **下一步**:R2 戳記齊 → 過 gate(--spec/--todo/--adversarial 指向已戳記 SPECADV-reconcile)派 **Composer 2.5 實作**(B0→B1/B2 並行→B3)+ **Codex code review**。BUG-1/2 落地後三方數據簽核。
+- **✅ 環境已修(2026-06-27)**:brew hdf5 升 320 → pytables 3.9.2 連舊 310 斷鏈。修法:numpy 還原 1.26.4(專案 pin;曾被誤升 2.0.2)+ tables 3.9.2 `--no-binary` 重編連 hdf5 320(`HDF5_DIR=/opt/homebrew/opt/hdf5`)+ packaging 還原 25.0。`tests/test_atomic_indicators.py` 5 passed。
+- **kline 實測 facts(補 §A)**:`data_cache/feature_klines/kline_cache.h5` = 10 symbols(ADA/BCH/BNB/BTC/DOGE/ETH/LINK/SOL/TRX/XRP)+_metadata;storage manager(h5py)讀:BTCUSDT/12h=1696列、ETHUSDT/1h=20352列、10 欄(timestamp,open,high,low,close,volume,+taker/quote/trades);**index=RangeIndex、timestamp 是欄位非 index**(實作 §A 注意)。pd.HDFStore 不適用(非 pandas 格式)。
+- **B0 實作派工中**(Composer 2.5,bg by6gk09xh;gate token 已驗戳記+preflight 快照):Task 0.1 requires_kline marker + 0.2 DATA_MANIFEST,prompt=`handoffs/...-B0-DISPATCH.md`,結果寫 `...-B0-RESULT.md`。
+- **B0 完成+Claude 初驗通過**:postflight 乾淨;**無斷言放寬**(git diff grep assert=空);skip→`pytest.fail`+marker 遷移 16 檔;DATA_MANIFEST entries=30(10×3),3 mutation 真可證偽(sha256/缺項/row_count raises);requires_kline marker 註冊生效(87 collected)。`test_v8_frozen_doc` 失敗=pre-existing IC(`test_ic_engine.py`,非 B0)。`test_inventory.txt` 成長=弱 smoke 非假綠。
+- **Codex B0 code review 回**(`...-B0-CODEREVIEW-codex.md`):抓 2 P0 — P0-1 manifest 測試漏 requires_kline marker(smoke 逃生口失效);P0-2 golden/parquet scope 外變動(經查=Claude 驗收跑 test_l65_golden 的副作用,已 git checkout 還原)。解耦 PASS、manifest 核心可證偽 PASS。
+- **Composer B0-fix 派工中**(bg bja6edxdl):補 manifest marker + conftest KeyError 收斂。
+- **下一步**:fix 回 → Claude 復驗(`-m "not requires_kline"` 排除正確)→ commit B0 → B1/B2 並行 → B3。pre-existing v8 失敗(test_ic_engine)另處理。golden 副作用提醒:跑 test_l65_golden 會寫 tests/golden/l65/ artifacts,驗收後須 git checkout 還原勿入 commit。
 - **執行者新規(使用者 2026-06-27)**:中大型一律 Composer 實作 + Codex review(覆蓋原「大=Codex實作」),見記憶 feedback_executor_override_composer_impl。
 - **BUG-1 決策(使用者定)= 兩者都要**:補真正標準 BETA/CORREL(high,low)+ 保留改名(BetaCloseVolume 等)的價量相關版+metadata 標非標準。改特徵集→須三方數據簽核。已存記憶 project_ff_deepaudit_bugs。
 

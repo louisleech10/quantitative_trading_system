@@ -72,7 +72,7 @@ def _apply_baseline_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _require_kline() -> None:
     if not KLINE_PATH.is_file():
-        pytest.skip(f"missing real kline cache: {KLINE_PATH}")
+        pytest.fail(f"missing real kline cache: {KLINE_PATH}")
 
 
 def _short_window_dates(
@@ -316,6 +316,7 @@ def _run_gate_a_subprocess(test_name: str, worker_env: str) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+@pytest.mark.requires_kline
 def test_v3_healthy_full_run_matches_frozen_baseline() -> None:
     """[V-3] BTCUSDT/12h 健康全量 hash == 凍結 baseline。"""
     if not BASELINE_PATH.is_file():
@@ -327,6 +328,7 @@ def test_v3_healthy_full_run_matches_frozen_baseline() -> None:
     _run_gate_a_subprocess("test_v3_healthy_full_run_matches_frozen_baseline", GATE_A_WORKER_ENV)
 
 
+@pytest.mark.requires_kline
 def test_v3_ethusdt_1h_matches_frozen_baseline() -> None:
     """[V-3] ETHUSDT/1h 健康全量 hash == 凍結 baseline。"""
     if not BASELINE_PATH.is_file():
@@ -342,6 +344,7 @@ def test_v3_ethusdt_1h_matches_frozen_baseline() -> None:
     _run_gate_a_subprocess("test_v3_ethusdt_1h_matches_frozen_baseline", GATE_A_ETH_WORKER_ENV)
 
 
+@pytest.mark.requires_kline
 def test_v3_multi_tf_btc_matches_frozen_baseline() -> None:
     """[V-3] BTCUSDT multi-TF merged_L7/artifact hash == 凍結 baseline。"""
     if not BASELINE_PATH.is_file():
@@ -353,6 +356,7 @@ def test_v3_multi_tf_btc_matches_frozen_baseline() -> None:
     _run_gate_a_subprocess("test_v3_multi_tf_btc_matches_frozen_baseline", GATE_A_MULTI_TF_WORKER_ENV)
 
 
+@pytest.mark.requires_kline
 def test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -412,6 +416,7 @@ def test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor(
     assert "close_trend_MIDPOINT_233_ZScore_W3" in direct_l3.columns
 
 
+@pytest.mark.requires_kline
 def test_v5_prefix_no_leakage_after_warmup(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -456,6 +461,7 @@ def test_v5_prefix_no_leakage_after_warmup(
     _assert_columns_byte_equal(full_slice.loc[comparable], trunc_slice.loc[comparable])
 
 
+@pytest.mark.requires_kline
 def test_v5_l5_cross_sectional_prefix_no_leakage(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -631,6 +637,7 @@ def _run_multi_tf_features(
     return result.features_df
 
 
+@pytest.mark.requires_kline
 def test_v6_independent_asof_oracle_matches_multi_tf_columns(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -921,6 +928,7 @@ def _capture_multi_tf_alignment(
 
 
 @pytest.mark.parametrize("use_searchsorted", [False, True])
+@pytest.mark.requires_kline
 def test_v6_backend_output_matches_independent_oracle(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -938,6 +946,7 @@ def test_v6_backend_output_matches_independent_oracle(
 
 
 @pytest.mark.parametrize("use_searchsorted", [False, True])
+@pytest.mark.requires_kline
 def test_v6_close_time_oracle_matches_pipeline(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -975,6 +984,7 @@ def _run_symbol_hash(
     return _hash_dataframe_canonical(result.features_df)
 
 
+@pytest.mark.requires_kline
 def test_v7_cross_symbol_isolation(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -987,6 +997,7 @@ def test_v7_cross_symbol_isolation(
     assert btc_alone == btc_after
 
 
+@pytest.mark.requires_kline
 def test_v7_cross_symbol_same_factory_no_cache_pollution(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1030,6 +1041,7 @@ def test_v7_cross_symbol_same_factory_no_cache_pollution(
     assert btc_hash_first == btc_hash_second
 
 
+@pytest.mark.requires_kline
 def test_v7_symbol_order_permutation_invariant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1049,6 +1061,7 @@ def test_v7_symbol_order_permutation_invariant(
     assert hashes_a["ETHUSDT"] == hashes_b["ETHUSDT"]
 
 
+@pytest.mark.requires_kline
 def test_v7_cache_cold_hot_identical(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1078,6 +1091,7 @@ def test_v7_cache_cold_hot_identical(
     assert _hash_dataframe_canonical(cold.features_df) == _hash_dataframe_canonical(hot.features_df)
 
 
+@pytest.mark.requires_kline
 def test_v7_cgsa_resume_matches_fresh(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

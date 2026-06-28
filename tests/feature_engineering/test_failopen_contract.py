@@ -109,7 +109,7 @@ def _resolve_test_target() -> tuple[str, str]:
             continue
         if df is not None and len(df) >= 100:
             return symbol, timeframe
-    pytest.skip("missing market data for fail-open contract tests")
+    pytest.fail("missing market data for fail-open contract tests")
 
 
 def _load_ohlcv() -> pd.DataFrame:
@@ -272,6 +272,7 @@ def _assert_l1_baseline_hash(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+@pytest.mark.requires_kline
 def test_l1_baseline_hash_matches_frozen(monkeypatch: pytest.MonkeyPatch) -> None:
     """CI 預設路徑必跑 L1 oracle：非 PYTHONHASHSEED=0 時 subprocess 重入。"""
     if os.environ.get(L1_ORACLE_WORKER_ENV) == "1":
@@ -300,6 +301,7 @@ def test_l1_baseline_hash_matches_frozen(monkeypatch: pytest.MonkeyPatch) -> Non
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+@pytest.mark.requires_kline
 def test_required_fail_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
     """required engine 例外 → layer_failed LayerExecutionResult，健康路徑數值不變。"""
     factory = create_feature_factory(
@@ -353,6 +355,7 @@ def test_required_fail_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
     assert factory.layer_results["Layer 1"].failed_engines == ("trend",)
 
 
+@pytest.mark.requires_kline
 def test_layer2_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
     """L2 未分類例外 → layer_failed + 保留 index，不中斷 pipeline。"""
     factory = create_feature_factory(
@@ -389,6 +392,7 @@ def test_layer2_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Layer 2" in factory.layer_results
 
 
+@pytest.mark.requires_kline
 def test_layer3_exception_fail_open(monkeypatch: pytest.MonkeyPatch) -> None:
     """L3 未分類例外 → layer_failed + 保留 index，不中斷 pipeline。"""
     factory = create_feature_factory(

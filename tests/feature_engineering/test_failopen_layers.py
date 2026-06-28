@@ -31,6 +31,8 @@ BASELINE_SYMBOL = "BTCUSDT"
 BASELINE_TIMEFRAME = "12h"
 GATE_A_WORKER_ENV = "_FAILOPEN_GATE_A_WORKER"
 
+pytestmark = pytest.mark.requires_kline
+
 
 @lru_cache(maxsize=1)
 def _freeze_baseline_module():
@@ -60,7 +62,7 @@ def _resolve_test_target() -> tuple[str, str]:
             continue
         if df is not None and len(df) >= 100:
             return symbol, timeframe
-    pytest.skip("missing market data for fail-open layer tests")
+    pytest.fail("missing market data for fail-open layer tests")
 
 
 def _load_ohlcv() -> pd.DataFrame:

@@ -38,6 +38,8 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
 
 REAL_KLINE_PATH = Path("data_cache/feature_klines/kline_cache.h5")
 
+pytestmark = pytest.mark.requires_kline
+
 
 # ---------------------------------------------------------------------------
 # Real-data fixtures
@@ -45,7 +47,7 @@ REAL_KLINE_PATH = Path("data_cache/feature_klines/kline_cache.h5")
 def _load_eth_close(timeframe: str, max_rows: int = 0) -> Tuple[np.ndarray, np.ndarray]:
     """Return (timestamp_ns, close_float32) arrays from the real kline cache."""
     if not REAL_KLINE_PATH.exists():
-        pytest.skip(f"real kline cache not present: {REAL_KLINE_PATH}")
+        pytest.fail(f"real kline cache not present: {REAL_KLINE_PATH}")
     with h5py.File(REAL_KLINE_PATH, "r") as f:
         ds = f[f"/ETHUSDT/{timeframe}/data"][:]
     ts = np.asarray(ds["timestamp"], dtype=np.int64)

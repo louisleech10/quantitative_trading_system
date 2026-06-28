@@ -121,6 +121,7 @@ def test_rolling_quantile_oracle_on_real_baseline() -> None:
     )
 
 
+@pytest.mark.requires_kline
 def test_real_generate_e2e_causal_preprocessing_no_persist(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     storage = create_kline_storage_manager()
     try:
@@ -128,7 +129,7 @@ def test_real_generate_e2e_causal_preprocessing_no_persist(tmp_path, monkeypatch
     except Exception:
         klines = None
     if klines is None or klines.empty:
-        pytest.skip("missing real ETHUSDT/1h klines")
+        pytest.fail("missing real ETHUSDT/1h klines")
 
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work"))
     factory = create_feature_factory(validate_continuity=False)

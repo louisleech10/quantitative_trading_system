@@ -9,6 +9,8 @@ from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistr
 
 TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
+pytestmark = pytest.mark.requires_kline
+
 
 @lru_cache(maxsize=1)
 def _resolve_test_target() -> tuple[str, str]:
@@ -25,7 +27,7 @@ def _resolve_test_target() -> tuple[str, str]:
             continue
         if df is not None and len(df) >= 100:
             return symbol, timeframe
-    pytest.skip("missing market data for adapter tests")
+    pytest.fail("missing market data for adapter tests")
 
 
 def test_crypto_spot_fetch():

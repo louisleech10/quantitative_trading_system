@@ -9,6 +9,8 @@ from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
 
 TEST_KLINE_CACHE_DIR = "data_cache/feature_klines"
 
+pytestmark = pytest.mark.requires_kline
+
 
 @lru_cache(maxsize=1)
 def _resolve_test_target() -> tuple[str, str]:
@@ -25,7 +27,7 @@ def _resolve_test_target() -> tuple[str, str]:
             continue
         if df is not None and len(df) >= 100:
             return symbol, timeframe
-    pytest.skip("missing market data for TA-Lib wrapper tests")
+    pytest.fail("missing market data for TA-Lib wrapper tests")
 
 
 def load_test_data() -> pd.DataFrame:

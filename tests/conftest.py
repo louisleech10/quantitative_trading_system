@@ -1,16 +1,24 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 import pytest
 
+from momentum.factories import create_kline_storage_manager
 from scripts.build_l65_golden import (
     TEST_INVENTORY_PATH,
     make_synthetic_l65_dataset,
     write_test_inventory_from_nodeids,
 )
+from tests.fixtures.data_manifest import (
+    ManifestValidationError,
+    verify_kline_entry,
+)
+
+FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
+FEATURE_KLINE_H5_PATH = Path(FEATURE_KLINE_CACHE_DIR) / "kline_cache.h5"
 
 
 @pytest.fixture(scope="session")
@@ -38,6 +46,57 @@ def ic_first_factory(tmp_path: Path) -> Callable[[str, str], Dict[str, Path]]:
         }
 
     return _factory
+
+
+@pytest.fixture
+def requires_kline_data() -> Callable[..., pd.DataFrame]:
+    """Factory fixture：要求真實 kline；缺檔或列數不足時 pytest.fail（非 skip）。"""
+
+    def _require(
+        symbol: str,
+        timeframe: str,
+        *,
+        min_rows: Optional[int] = None,
+        verify_manifest: bool = True,
+    ) -> pd.DataFrame:
+        if not FEATURE_KLINE_H5_PATH.is_file():
+            pytest.fail(
+                f"requires_kline: missing kline cache file: {FEATURE_KLINE_H5_PATH}"
+            )
+
+        if verify_manifest:
+            try:
+                verify_kline_entry(
+                    symbol,
+                    timeframe,
+                    cache_dir=FEATURE_KLINE_CACHE_DIR,
+                    min_rows=min_rows,
+                )
+            except (ManifestValidationError, KeyError) as exc:
+                pytest.fail(f"requires_kline manifest mismatch: {exc}")
+
+        storage = create_kline_storage_manager(cache_dir=FEATURE_KLINE_CACHE_DIR)
+        try:
+            df = storage.read_klines(symbol, timeframe, validate_continuity=False)
+        except Exception as exc:
+            pytest.fail(
+                f"requires_kline: failed reading {symbol}/{timeframe}: {exc}"
+            )
+
+        if df is None or df.empty:
+            pytest.fail(
+                f"requires_kline: no data for {symbol}/{timeframe} in {FEATURE_KLINE_H5_PATH}"
+            )
+
+        effective_min = min_rows if min_rows is not None else 1
+        if len(df) < effective_min:
+            pytest.fail(
+                f"requires_kline: {symbol}/{timeframe} has {len(df)} rows, "
+                f"need >= {effective_min}"
+            )
+        return df
+
+    return _require
 
 
 def pytest_collection_modifyitems(config: Any, items: List[Any]) -> None:

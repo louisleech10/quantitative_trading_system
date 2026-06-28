@@ -417,6 +417,7 @@ def test_perf_smoke_nan_stats_within_frozen_budget() -> None:
 
 
 @pytest.mark.slow
+@pytest.mark.requires_kline
 def test_real_kline_stream_nan_ratio_matches_written_arrays(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

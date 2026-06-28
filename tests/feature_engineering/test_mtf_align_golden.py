@@ -185,9 +185,11 @@ def test_before_baseline_shows_lookahead() -> None:
 
 
 @pytest.fixture(autouse=True)
-def _require_real_kline_cache() -> None:
+def _require_real_kline_cache(request: pytest.FixtureRequest) -> None:
+    if request.node.get_closest_marker("requires_kline") is None:
+        return
     if not KLINE_CACHE.exists():
-        pytest.skip(f"golden kline cache missing: {KLINE_CACHE}")
+        pytest.fail(f"golden kline cache missing: {KLINE_CACHE}")
 
 
 def _run_real_generate(
@@ -254,6 +256,7 @@ def _assert_down_close_after_exact(df: pd.DataFrame) -> None:
     assert _value_at(df, "2026-01-01 23:00:00", "close_12h_raw") == OPEN_12H_1200_CLOSE
 
 
+@pytest.mark.requires_kline
 def test_real_generate_down_open_close_and_invariant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -290,6 +293,7 @@ def test_real_generate_down_open_close_and_invariant(
     _assert_down_close_after_exact(close_df)
 
 
+@pytest.mark.requires_kline
 def test_real_generate_up_and_path_matrix(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     outputs = []
     for use_cgsa in (False, True):
@@ -313,6 +317,7 @@ def test_real_generate_up_and_path_matrix(monkeypatch: pytest.MonkeyPatch, tmp_p
     pd.testing.assert_frame_equal(outputs[2], outputs[3], check_dtype=False)
 
 
+@pytest.mark.requires_kline
 def test_real_generate_down_cgsa_path_matrix(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     outputs = []
     for use_searchsorted in (False, True):

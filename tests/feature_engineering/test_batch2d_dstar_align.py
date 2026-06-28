@@ -334,6 +334,7 @@ def test_batch2d_read_d_star_json_exports_values(tmp_path: Path) -> None:
 
 class TestP4Parity:
     @pytest.mark.slow
+    @pytest.mark.requires_kline
     def test_t3_d_star_parity_exact_on_l12_intersection(self) -> None:
         """T3 主 gate：非 CGSA vs CGSA L1/L2 交集 d* exact，0 mismatch。"""
         _require_real_kline()
@@ -370,6 +371,7 @@ class TestP4Parity:
         assert len(intersection) >= 3000
 
     @pytest.mark.slow
+    @pytest.mark.requires_kline
     def test_control_l3_l6_runs_ic_first_not_legacy_frozen(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
@@ -410,6 +412,7 @@ class TestP4Parity:
         )
 
     @pytest.mark.slow
+    @pytest.mark.requires_kline
     def test_cgsa_baseline_runs_ic_first_not_legacy_frozen(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
