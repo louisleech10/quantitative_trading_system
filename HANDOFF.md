@@ -26,5 +26,5 @@ P1-FF-5(跨 symbol 值隔離 MR)、P1-FF-6(d-star/fracdiff probe;B2 已部分)�
 
 ## 鐵律(慢測試/執行)
 - generate_features 全開 ~20分/次,warmup≈2051 需窗>暖機;驗證用內層 `timeout 14400`(4h)一次跑完別賭邊界(使用者 2026-06-30);**改完即交別硬撐自驗到 timeout**;**別巢狀 `&` 孤兒**;跑後 `git checkout -- tests/golden/l65/test_inventory.txt`+tier2 還原(測試副作用)。
-- 中大一律 **Composer 實作 + Codex review**(使用者 2026-06-27,記憶 feedator_override)。資料正確性/測試設計決策走三方委員會非 solo。慢測試委員勿跑全鏈,讀碼推理。
+- 中大一律 **Composer 實作 + Codex review**(使用者 2026-06-27,記憶 feedback_executor_override_composer_impl)。資料正確性/測試設計決策走三方委員會非 solo。慢測試委員勿跑全鏈,讀碼推理。
 - 記憶索引見 MEMORY.md。pre-existing v8 失敗=test_ic_engine(非深稽)。
