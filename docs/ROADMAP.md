@@ -56,6 +56,7 @@
 ---
 
 ## 🔭 未來 Epic（更遠,待 V1 穩固）
+- **FF preset 盤點/移除**（2026-06-29 使用者提,B2 後啟）：未用/未測 preset(professional_full / ml_optimized / trend_focused / intermediate_research / fibonacci_full / basic_essential…)= 死碼/可能 config bug 的未測路徑。使用者從沒用過 professional_full、想移除但未討論。**範圍**:盤點每 preset 有無真 caller、前端真送哪些、哪些從沒被測 → 給清單再決定移除。命中跨模組共用路徑(config_manager/前端 toggle)→ 走完整管線。B2 因果測試已改 base/full 全特徵(不綁 preset)。
 - **多資產擴充**:台指期 / 美指期 + 基本面/總經/月季報/籌碼/三大法人。核心=**PIT 對齊**(公告時戳 + vintage),幾乎全「粗→細」(見 [[project-mtf-direction-b7-parked]])。新數據源另立 epic。
 - **V2.0 對話式研究** / **V3.0 自主研究員**(見 PRODUCT_VISION)。
 
