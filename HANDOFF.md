@@ -14,12 +14,12 @@
 ### P0-FF-3(多 TF,進行中)— 設計三方戳記✅、實作✅、驗證收尾中
 - 設計 reconcile 雙戳記:`handoffs/20260630-FF-P0FF3-RECONCILE.md`(sha256:5da75188)。
 - 檔:**新** `tests/feature_engineering/ff_truncation_mr_helpers.py`(B2 共用 helper)+ `test_ff_multitf_truncation_mr.py`(primary=1h, training=[1h,4h,12h]);B2 檔改 import helper。
-- **已驗(babu8o07p)**:對齊 look-ahead mutation `test_mutation_align_lookahead_fails` **真紅✅**;c3 主 MR 曾因 metadata schema_hash 過嚴失敗→**已修**(`_assert_metadata_gate` 移 schema_hash exact,改由 columns gate 把關+保留 present_timeframes;columns/values/NaN gate 全過=多 TF 因果健全無 look-ahead)。
-- **下一步(接手做)**:
-  1. 確認 c3 主 MR 修後過:`bash 跑 pytest test_ff_multitf_truncation_mr.py::test_c3_multitf_truncation_invariant + ::*tail_perturbation* -p no:cacheprovider`(背景 bwx3t2jqq 在跑,結果 /tmp/p0ff3_main.txt)。
-  2. 全 mutation 真紅:`bash scripts/mutation_probe_check.sh tests/feature_engineering/test_ff_multitf_truncation_mr.py`(5 探針:align×2+center/winsor/lag)。
-  3. **B2 回歸**(抽 helper 後 P0-FF-2 行為不變):`pytest test_ff_fullchain_truncation_mr.py -m requires_kline`(c2_1/c2_2/fracdiff/5 mutation)。
-  4. 派 Codex code review P0-FF-3 diff → commit P0-FF-3。
+- **已驗 ✅**:① 對齊 look-ahead mutation `test_mutation_align_lookahead_fails` **真紅**(babu8o07p);② **c3 主 MR + perturbation 2 passed**(bwx3t2jqq,64分,metadata 修後)= 多 TF 對齊因果健全無 look-ahead。程式碼在 WIP commit `9f9839d`。
+- **下一步(接手 session 收尾 P0-FF-3,再做 P1)**:
+  1. 全 mutation 真紅(內層 `timeout 14400` 4h):`bash scripts/mutation_probe_check.sh tests/feature_engineering/test_ff_multitf_truncation_mr.py`(5 探針:align×2+center/winsor/lag,~2-3h)。
+  2. **B2 回歸**(抽 helper 後 P0-FF-2 行為不變,4h timeout):`pytest tests/feature_engineering/test_ff_fullchain_truncation_mr.py -m requires_kline`(c2_1/c2_2/fracdiff/5 mutation)。
+  3. 兩者過 → 派 Codex code review P0-FF-3 diff → 正式 commit P0-FF-3(收 WIP)。
+  4. 然後做 **P1-FF-5/6/7**。
 
 ### 剩餘
 P1-FF-5(跨 symbol 值隔離 MR)、P1-FF-6(d-star/fracdiff probe;B2 已部分)、P1-FF-7(wrapper 多路徑+polars/numba+float16;B1 已部分 wrapper source)。**FF preset 盤點**另 epic(記憶 project_ff_preset_audit)。
