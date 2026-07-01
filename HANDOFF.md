@@ -6,9 +6,14 @@
 - **文件鏈**:`docs/VERIFY_GATE_BRIEF.md`(白話)→ `docs/VERIFY_GATE_SPEC.md`(過範本機檢,4 Phase)→ 雙家族 adversarial **CHANGES-REQUESTED**(`...-SPEC-ADV-{CODEX,COMPOSER,RECONCILE}.md`,6 收斂BLOCK)→ Claude 平衡版+全流程漏洞掃描 W1-W9(`...-BALANCE-AND-WORKFLOW-CLAUDE.md`)。
 - **議事完成✅(四方收斂)**:`handoffs/20260701-VERIFYGATE-DELIB-RECONCILE.md`。全硬化=可執行的「約束式硬化」。定案:claim-object 偵測(router)+provenance(judge);誠實邊界 careless-proof+tamper-evident非防惡意偽造;W2/W3/W4=P0(同型);硬性順序:claim-object 測試誤報=0 才接 PreToolUse 否則退 commit-hook+CI。
 - **SPEC v2.1✅**`docs/VERIFY_GATE_SPEC.md`(claim-object偵測+三層enforcement+W1-W13+硬性順序)。v1雙家族adversarial CHANGES-REQUESTED→v2→closure再驗(BLOCK-1..5全CLOSED,剩W12/audit-schema/operational-block/fingerprint/EXEMPT表/W4/V17)→已補為v2.1。
-- **SPEC v2.1 gate-ready✅**:兩家最終確認 APPROVED;`reconcile_stamps_check` PASS(body sha256:86fe39f...,codex task b1eicjnuo/composer bwhprlh0j)。
-- **接手下一步**:① **TODO 生成**(TODO_GENERATION_PROMPT,依 SPEC v2.1 五 Phase)→ ② gate dispatch(--spec docs/VERIFY_GATE_SPEC.md --todo <檔> --adversarial handoffs/20260701-VERIFYGATE-DELIB-RECONCILE.md,機檢雙戳記)→ ③ **Composer 實作 5 Phase + Codex review**。實作硬性前提:claim-object 測試誤報=0 才接 PreToolUse,否則降 commit-hook+CI。
-- **⏸️ 等使用者拍板**:是否現在啟動多小時實作,或先回 P0-FF-3。
+- **SPEC v2.1 + TODO gate-ready✅**:`docs/VERIFY_GATE_TODO.md`(5 Phase/B1-B5 批次,過三道機檢);reconcile 雙戳記 PASS。
+- **B1 完成✅**(`scripts/run_with_receipt.py`+`tests/governance/test_verify_gate.py`+gitignore W12+audit log):
+  實作→Codex review 抓 3 BLOCKING(node-id分類/不存在命令無receipt/audit契約)→Composer 修→Codex 閉合 APPROVED→
+  Claude 再抓測試隔離缺陷(污染真實路徑)→Composer 修(env 覆蓋+tmp)→Claude 親驗跑測試前後零污染+7 passed+postflight淨。
+  教訓:Codex 抓我漏的正確性、我抓 Codex 漏的測試衛生 → 印證「無單一驗收者完備」。
+- **接手下一步**:② **序列 B2**(claim-object checker + pending ledger,依 B1 的 selected_node_ids+audit 契約)→ ③ B3/B4/B5 並行。
+  **硬性順序**:B2 的 V7 誤報=0 達標才接 B3 Task3.1 PreToolUse,否則降級 commit-hook+CI。
+- 批次派工模板/驗收命令見 `docs/VERIFY_GATE_TODO.md` §B;派工用「指令寫 repo 檔、cursor-agent 讀檔」(避免 prompt 反引號 shell 誤觸)。
 - **reconcile 戳記**:`20260701-FF-FORENSICS-RECONCILE.md` Composer 已 CHANGES-REQUESTED(SPEC補規後重戳)。
 
 ## ★FF 深稽 P0(暫停,驗收防偽閘後回來)— 冷啟動接手指南

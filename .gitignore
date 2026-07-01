@@ -122,6 +122,8 @@ temp/
 logs/
 backend.log
 *.log
+!handoffs/run_receipts/*.log
+!.claude/gate/verify_audit.log
 sessions/PHASE_3.3+3.4_COMPLETION_REPORT.md
 sessions/Phase3.1.md
 sessions/PHASE3.5_COMPLETE_SUMMARY.md
