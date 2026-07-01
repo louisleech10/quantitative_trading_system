@@ -1,12 +1,17 @@
 # ROADMAP — 量化交易系統戰術路線圖
 > 單一現役戰術 roadmap。**即時任務狀態**看 `HANDOFF.md`；**決策理由**看 memory；本檔=中長期 epic 排序與範圍。
-> 維護:完成項移到「已完成」、新需求加到對應優先級、範圍/決策變更標日期。**每次 commit 一併更新本檔**(2026-06-26 使用者定)。最後更新 2026-06-26。
+> 維護:完成項移到「已完成」、新需求加到對應優先級、範圍/決策變更標日期。**每次 commit 一併更新本檔**(2026-06-26 使用者定)。最後更新 2026-07-02。
 
 當前階段:**V1.0 工具階段** — crypto 單市場研究管線(探索 → 發現 Pattern → ML 優化 → 回測)。願景 V1→V2→V3 見 `PRODUCT_VISION.md`。
 
 ---
 
 ## 🔥 進行中 / 下一步（優先序）
+
+### P0 — 驗收防偽閘 verify-gate（2026-07-01 FF 驗收捏造事故後立,擋「宣稱已驗≠真驗」）
+- **範圍**:`docs/VERIFY_GATE_SPEC.md` v2.1(P0-FF-3「align mutation真紅」不實事故 → run receipt + claim checker + enforcement 三層)。
+- **狀態(2026-07-02)**:B1 receipt ✅(`d3870c4`)、B2 claim checker+ledger ✅(`a1d3638`,V7誤報=0)、**B4 provenance+B5 RESULT硬欄位 ✅**(Composer 實作+Codex adversarial 6 BLOCKING 全閉合,55 governance tests)。**剩 B3(PreToolUse/git hook/CI/health)=最後 enforcement 層**,V7 已達標可全量上;hook 生效需 session 重啟。
+- **B3 完成後**:FF P0-FF-3 用帶 receipt 管線重驗(mutation run 已在跑,receipt 自動落 `handoffs/run_receipts/`)。
 
 ### P0 — IC Gatekeeper 開發 + 真實端到端測試
 - **為何**:FF 已收尾,pipeline 下一站。現況 79 IC 單元測試**全合成資料**,從未真實 kline 端到端驗證。

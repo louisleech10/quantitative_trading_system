@@ -85,6 +85,19 @@ RUNTIME_CLASS_RANK = {
     "mutation_runtime": 3,
 }
 
+RESULT_FIELD_RE = re.compile(
+    r"^(STATIC_CHECK|RUNTIME_CHECK|MUTATION_CHECK|RECEIPTS|OPEN_PENDING)\s*=\s*(.+)$",
+    re.MULTILINE,
+)
+CHECK_ENUM_RE = re.compile(r"^(NOT_RUN|PASS|FAIL|N/A:.+)$")
+REQUIRED_RESULT_FIELDS = (
+    "STATIC_CHECK",
+    "RUNTIME_CHECK",
+    "MUTATION_CHECK",
+    "RECEIPTS",
+    "OPEN_PENDING",
+)
+
 
 @dataclass
 class Unit:
@@ -449,12 +462,214 @@ def extract_claim(unit: Unit) -> ClaimObject:
 
 
 def claim_fingerprint(claim: ClaimObject) -> str:
-    """計算 claim_fingerprint（供 ledger / 衝突檢查）。"""
+    """計算 claim_fingerprint（供 ledger / 衝突檢查）。
+
+    使用 canonical 主題項（scope + runtime_expectation + task_id），
+    剝除 VERIFY/SUPERSEDED/極性詞/收據 id 等狀態文字差異。
+    """
     scope_blob = ",".join(claim.scope)
-    payload = normalize(
-        f"{scope_blob}|{claim.runtime_expectation}|{claim.task_id}|{claim.source_line_text}"
-    )
+    payload = normalize(f"{scope_blob}|{claim.runtime_expectation}|{claim.task_id}")
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _is_result_file(path: str) -> bool:
+    """是否為 RESULT handoff 檔。"""
+    name = Path(path).name
+    return name.endswith("-RESULT.md") or "RESULT" in name.upper()
+
+
+def parse_result_fields(content: str) -> dict[str, str]:
+    """解析 RESULT 結構欄位（枚舉值）。"""
+    fields: dict[str, str] = {}
+    for match in RESULT_FIELD_RE.finditer(content):
+        key = match.group(1)
+        value = match.group(2).strip()
+        fields[key] = value
+    return fields
+
+
+def _parse_receipts_list(value: str) -> list[str]:
+    """解析 RECEIPTS=[...] 為 id 清單。"""
+    cleaned = value.strip()
+    if cleaned in ("[]", ""):
+        return []
+    inner = cleaned.strip("[]").strip()
+    if not inner:
+        return []
+    items: list[str] = []
+    for part in inner.split(","):
+        token = part.strip().strip('"').strip("'")
+        if token:
+            items.append(token)
+    return items
+
+
+def _line_of_result_field(content: str, field_name: str) -> int:
+    """找 RESULT 結構欄位所在行號。"""
+    for idx, line in enumerate(content.splitlines(), start=1):
+        if line.strip().startswith(f"{field_name}="):
+            return idx
+    return 1
+
+
+def _validate_check_enum(field_name: str, value: str) -> str | None:
+    """驗證 RESULT 檢查欄位枚舉值；不合規回傳錯誤訊息。"""
+    if CHECK_ENUM_RE.match(value):
+        return None
+    return (
+        f"RESULT {field_name} 枚舉外值: {value}"
+        f"（允許 NOT_RUN|PASS|FAIL|N/A:reason）"
+    )
+
+
+def _validate_receipts_format(value: str) -> str | None:
+    """驗證 RECEIPTS 為 [...] 陣列格式。"""
+    cleaned = value.strip()
+    if not cleaned.startswith("[") or not cleaned.endswith("]"):
+        return "RESULT RECEIPTS 格式須為 [...] 陣列"
+    inner = cleaned[1:-1].strip()
+    if not inner:
+        return None
+    try:
+        parsed = json.loads(cleaned.replace("'", '"'))
+    except json.JSONDecodeError:
+        _parse_receipts_list(cleaned)
+        return None
+    if not isinstance(parsed, list):
+        return "RESULT RECEIPTS 須為字串 id 陣列"
+    if not all(isinstance(item, str) for item in parsed):
+        return "RESULT RECEIPTS 陣列元素須為字串 receipt id"
+    return None
+
+
+def check_result_structured_fields(source_file: str, content: str) -> list[Violation]:
+    """RESULT 硬欄位交叉驗證（P5-1）。"""
+    violations: list[Violation] = []
+    if not _is_result_file(source_file):
+        return violations
+
+    fields = parse_result_fields(content)
+
+    for field_name in REQUIRED_RESULT_FIELDS:
+        if field_name not in fields:
+            violations.append(
+                Violation(
+                    file=source_file,
+                    line=_line_of_result_field(content, field_name),
+                    message=f"RESULT 缺必填欄位 {field_name}",
+                    unit_text=content[:200],
+                )
+            )
+
+    for field_name in ("STATIC_CHECK", "RUNTIME_CHECK", "MUTATION_CHECK"):
+        if field_name not in fields:
+            continue
+        enum_error = _validate_check_enum(field_name, fields[field_name])
+        if enum_error:
+            violations.append(
+                Violation(
+                    file=source_file,
+                    line=_line_of_result_field(content, field_name),
+                    message=enum_error,
+                    unit_text=f"{field_name}={fields[field_name]}",
+                )
+            )
+
+    if "RECEIPTS" in fields:
+        receipts_error = _validate_receipts_format(fields["RECEIPTS"])
+        if receipts_error:
+            violations.append(
+                Violation(
+                    file=source_file,
+                    line=_line_of_result_field(content, "RECEIPTS"),
+                    message=receipts_error,
+                    unit_text=f"RECEIPTS={fields['RECEIPTS']}",
+                )
+            )
+
+    if violations:
+        return violations
+
+    runtime_check = fields.get("RUNTIME_CHECK", "")
+    receipts = _parse_receipts_list(fields.get("RECEIPTS", "[]"))
+    if runtime_check == "PASS" and not receipts:
+        violations.append(
+            Violation(
+                file=source_file,
+                line=_line_of_result_field(content, "RUNTIME_CHECK"),
+                message="RESULT RUNTIME_CHECK=PASS 但 RECEIPTS=[]",
+                unit_text=(
+                    f"RUNTIME_CHECK={runtime_check}\n"
+                    f"RECEIPTS={fields.get('RECEIPTS', '[]')}"
+                ),
+            )
+        )
+
+    mutation_check = fields.get("MUTATION_CHECK", "")
+    if mutation_check == "NOT_RUN":
+        for unit in split_units(content, source_file):
+            claim = extract_claim(unit)
+            if claim.has_strong_polarity and claim.is_operational:
+                violations.append(
+                    Violation(
+                        file=source_file,
+                        line=unit.source_line,
+                        message="RESULT MUTATION_CHECK=NOT_RUN 但同 task 含已驗/極性宣稱",
+                        unit_text=unit.text,
+                    )
+                )
+                break
+    return violations
+
+
+def _is_failure_record(unit: Unit, claim: ClaimObject) -> bool:
+    """是否為 FAIL/紅燈紀錄（供 #6 衝突檢查）。"""
+    if claim.polarity == "failure":
+        return True
+    if re.search(r"紅燈", unit.text, re.IGNORECASE):
+        return True
+    if re.search(r"\bFAIL\b", unit.text):
+        return True
+    fields = parse_result_fields(unit.text)
+    for key in ("STATIC_CHECK", "RUNTIME_CHECK", "MUTATION_CHECK"):
+        if fields.get(key, "").startswith("FAIL"):
+            return True
+    return False
+
+
+def _is_green_verify(unit: Unit, claim: ClaimObject) -> bool:
+    """是否為 VERIFY 支撐的綠 claim。"""
+    return bool(VERIFY_RE.search(unit.text)) and claim.polarity == "success"
+
+
+def check_fingerprint_conflicts(
+    units_with_claims: list[tuple[Unit, ClaimObject]],
+) -> list[Violation]:
+    """#6 衝突檢查：同 fingerprint 有 FAIL/紅燈後，舊 VERIFY 綠未標 SUPERSEDED → FAIL。"""
+    violations: list[Violation] = []
+    by_fp: dict[str, list[tuple[Unit, ClaimObject]]] = {}
+    for unit, claim in units_with_claims:
+        fp = claim_fingerprint(claim)
+        by_fp.setdefault(fp, []).append((unit, claim))
+
+    for records in by_fp.values():
+        has_failure = any(_is_failure_record(u, c) for u, c in records)
+        if not has_failure:
+            continue
+        for unit, claim in records:
+            if _is_green_verify(unit, claim) and not SUPERSEDED_RE.search(unit.text):
+                violations.append(
+                    Violation(
+                        file=unit.source_file,
+                        line=unit.source_line,
+                        message=(
+                            "claim_fingerprint 衝突：曾有 FAIL/紅燈紀錄，"
+                            "舊 VERIFY 綠 claim 未標 SUPERSEDED"
+                        ),
+                        unit_text=unit.text,
+                    )
+                )
+    return violations
 
 
 def _is_citation(unit: Unit) -> bool:
@@ -885,6 +1100,7 @@ def check_files(paths: list[Path]) -> list[Violation]:
     """掃描多檔，回傳全部違規。"""
     violations: list[Violation] = []
     open_pending = load_open_pending()
+    all_units_claims: list[tuple[Unit, ClaimObject]] = []
     for path in paths:
         if not path.is_file():
             continue
@@ -892,7 +1108,12 @@ def check_files(paths: list[Path]) -> list[Violation]:
         content = path.read_text(encoding="utf-8")
         for unit in split_units(content, rel):
             _unknown_polarity_warn(unit)
+            claim = extract_claim(unit)
+            all_units_claims.append((unit, claim))
             violations.extend(check_unit(unit, open_pending))
+        if _is_result_file(rel):
+            violations.extend(check_result_structured_fields(rel, content))
+    violations.extend(check_fingerprint_conflicts(all_units_claims))
     return violations
 
 

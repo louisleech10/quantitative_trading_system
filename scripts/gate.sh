@@ -13,7 +13,12 @@
 # 缺任一必填 → 拒發 token(exit 1)。無聲跳過此 gate 會被 gate_check.sh 擋死。
 
 set -u
-GATE_DIR=".claude/gate"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
+SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+VENV_PY="${REPO_ROOT}/venv/bin/python"
+[ -x "${VENV_PY}" ] || VENV_PY="python"
+# GATE_DIR_OVERRIDE:governance 測試隔離用(token/audit 寫進 tmp,不汙染真實信任工件)
+GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
 kind="${1:-}"; shift || true
 [ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || { echo "ERROR: kind 必須是 dispatch|artifact"; exit 1; }
@@ -51,7 +56,20 @@ if [ "${kind}" = "dispatch" ]; then
     [ -n "${adversarial}" ] || miss adversarial "高風險必填 adversarial review 輸出路徑（或 waived:理由）"
     case "${adversarial}" in
       ""|waived:*) : ;;
-      *) [ -f "${adversarial}" ] || { echo "ERROR: --adversarial 檔不存在:${adversarial}（真實檢查失敗）"; exit 1; } ;;
+      *)
+        [ -f "${adversarial}" ] || { echo "ERROR: --adversarial 檔不存在:${adversarial}（真實檢查失敗）"; exit 1; }
+        # W3 fail-closed：須為 ADV 命名+provenance，或 reconcile 戳記核可；其他路徑一律拒發 token
+        case "${adversarial}" in
+          handoffs/*-ADV-CODEX.md|handoffs/*-ADV-COMPOSER.md|handoffs/*-adv-codex.md|handoffs/*-adv-composer.md)
+            "${VENV_PY}" "${SCRIPT_DIR}/verify_task_provenance.py" check-adversarial "${adversarial}" \
+              || { echo "ERROR: adversarial provenance 檢查失敗（見上），拒發 token。"; exit 1; }
+            ;;
+          *)
+            bash "${SCRIPT_DIR}/reconcile_stamps_check.sh" "${adversarial}" \
+              || { echo "ERROR: --adversarial 既非 ADV 命名亦未獲 reconcile 戳記核可（見上），拒發 token。"; exit 1; }
+            ;;
+        esac
+        ;;
     esac
     # reconcile 核可閘:對 SPEC 派「實作」(--spec 存在)時,--adversarial 指向的 reconcile 須獲委員戳記
     #   防「Claude 自產 reconcile 無人複核就派實作」。adversarial-review 派工本身(--template n/a:)不受此限。

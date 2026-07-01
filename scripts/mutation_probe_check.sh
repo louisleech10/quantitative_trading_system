@@ -70,11 +70,25 @@ if [ -n "${probe_files}" ]; then
   fi
 fi
 
-# ---- 規則 3:探針真跑過(精準 -k test_mutation_) ----
+# ---- 規則 3:探針真跑過(精準 -k test_mutation_,經 receipt 包裝) ----
 echo "→ 跑 mutation 探針: pytest -k test_mutation_ $*"
-probe_out="$(${VENV_PY} -W ignore -m pytest -q -p no:cacheprovider -k "test_mutation_" "$@" 2>&1)"
+# claim-id:單檔用 mutation-<stem>;多檔用 mutation-multi
+CLAIM_ID="mutation-multi"
+if [ $# -eq 1 ] && [ -f "$1" ]; then
+  CLAIM_ID="mutation-$(basename "$1" .py)"
+fi
+RECEIPTS_DIR="${VERIFY_GATE_RECEIPTS_DIR:-${REPO_ROOT}/handoffs/run_receipts}"
+GATE_AUDIT="${VERIFY_GATE_COMMITTEE_AUDIT_LOG:-${REPO_ROOT}/.claude/gate/audit.log}"
+probe_out="$(${VENV_PY} "${SCRIPT_DIR}/run_with_receipt.py" --claim-id "${CLAIM_ID}" -- \
+  "${VENV_PY}" -W ignore -m pytest -q -p no:cacheprovider -k "test_mutation_" "$@" 2>&1)"
 probe_rc=$?
 echo "${probe_out}" | tail -3
+# receipt 副作用:append 路徑到 gate audit(失敗不影響原 exit code)
+receipt_json="$(ls -t "${RECEIPTS_DIR}"/*-"${CLAIM_ID}".json 2>/dev/null | head -1 || true)"
+if [ -n "${receipt_json}" ]; then
+  mkdir -p "$(dirname "${GATE_AUDIT}")" 2>/dev/null || true
+  echo "ts=$(date '+%Y-%m-%d %H:%M:%S') mutation_receipt=${receipt_json}" >> "${GATE_AUDIT}" 2>/dev/null || true
+fi
 # 取最終 summary 行的 passed 數(tail -1,避免多 'N passed' 取錯)
 passed_count="$(echo "${probe_out}" | grep -oE '[0-9]+ passed' | tail -1 | grep -oE '[0-9]+' || echo 0)"
 if [ "${probe_rc}" -ne 0 ]; then

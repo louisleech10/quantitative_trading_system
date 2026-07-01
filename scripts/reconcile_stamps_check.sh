@@ -30,6 +30,9 @@ required="${2:-codex,composer}"
 
 # 本體雜湊用共用 canonical 腳本(委員 stamp 時與此處同法,避免換行慣例不一致致假失敗)。
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+VENV_PY="${REPO_ROOT}/venv/bin/python"
+[ -x "${VENV_PY}" ] || VENV_PY="python"
 if ! grep -qE '^##[[:space:]]*戳記' "${file}"; then
   echo "RECONCILE-STAMP FAIL: ${file} 缺『## 戳記』區段標題(無法界定本體雜湊範圍)"; exit 1
 fi
@@ -52,6 +55,13 @@ for fam in "${fams[@]}"; do
   elif ! printf '%s' "${stamp_line}" | grep -qE "sha256:${body_hash}"; then
     claimed="$(printf '%s' "${stamp_line}" | grep -oE 'sha256:[0-9a-f]+' | head -1)"
     fail="${fail}  · ${fam_trim}: 雜湊不符(本體已變動或戳記跨版重用)。戳記=${claimed:-無} 實際 body=sha256:${body_hash}\n"
+  else
+    # W2:戳記 task:<id> 須有 committee_dispatch 審計 + 輸出 hash(2026-07-01 前 grandfather)
+    prov_msg="$("${VENV_PY}" "${SCRIPT_DIR}/verify_task_provenance.py" check-stamp "${stamp_line}" --file "${file}" 2>&1)"
+    prov_rc=$?
+    if [ "${prov_rc}" -ne 0 ]; then
+      fail="${fail}  · ${fam_trim}: provenance 不符 — ${prov_msg}\n"
+    fi
   fi
 done
 

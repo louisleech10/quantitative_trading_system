@@ -548,7 +548,17 @@ def test_v11_pending_open_blocks_done_claim(tmp_path: Path) -> None:
     )
     fixture = _write_fixture(
         tmp_path / "handoffs" / "20260701-P0-FF-3-RESULT.md",
-        "STATUS: DONE — P0-FF-3\n",
+        "\n".join(
+            [
+                "STATIC_CHECK=NOT_RUN",
+                "RUNTIME_CHECK=NOT_RUN",
+                "MUTATION_CHECK=NOT_RUN",
+                "RECEIPTS=[]",
+                "OPEN_PENDING=[]",
+                "STATUS: DONE — P0-FF-3",
+            ]
+        )
+        + "\n",
     )
     blocked = _run_checker("--files", str(fixture))
     assert blocked.returncode == 1
