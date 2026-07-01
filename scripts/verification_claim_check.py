@@ -1,0 +1,1000 @@
+#!/usr/bin/env python3
+"""verification_claim_check.py — claim-object 偵測與 provenance 判定（router，非 judge）。
+
+誠實邊界：careless-proof + tamper-evident，非防惡意偽造；分類器只路由語境與
+provenance，不判斷「人對結果的詮釋是否正確」。法官是 receipt / audit / ledger 對不對得上。
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import unicodedata
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Iterable
+
+DEFAULT_RECEIPTS_DIR = Path("handoffs/run_receipts")
+DEFAULT_AUDIT_LOG_PATH = Path(".claude/gate/verify_audit.log")
+DEFAULT_PENDING_LEDGER = Path("handoffs/pending_verifications.jsonl")
+RECEIPTS_DIR_ENV = "VERIFY_GATE_RECEIPTS_DIR"
+AUDIT_LOG_ENV = "VERIFY_GATE_AUDIT_LOG"
+PENDING_LEDGER_ENV = "VERIFY_GATE_PENDING_LEDGER"
+
+ZWSP_CHARS = "\u200b\u200c\u200d\ufeff"
+HYPHEN_CHARS = "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
+
+STRONG_POLARITY_RE = re.compile(
+    r"(?:"
+    r"已驗|驗收.{0,12}通過|全綠|綠燈|真紅|真跑|也正確紅|正確紅|探針紅|搞定|"
+    r"無\s*look[- ]?ahead|runtime\s+PASS|signoff|"
+    r"已完成.{0,20}(?:mutation|慢測|回歸|adversarial|code\s*review)"
+    r")",
+    re.IGNORECASE,
+)
+WEAK_POLARITY_RE = re.compile(r"(?:\bpassed\b|通過)", re.IGNORECASE)
+DONE_READY_RE = re.compile(r"(?:\bDONE\b|(?<!-)\bready\b)", re.IGNORECASE)
+
+VERIFY_RE = re.compile(r"(?:VERIFY|REF):([A-Za-z0-9_.\-:]+)")
+SIGNOFF_RE = re.compile(r"SIGNOFF:([A-Za-z0-9_.\-:]+(?::[A-Za-z0-9_.\-:]+)*)")
+SUPERSEDED_RE = re.compile(
+    r"SUPERSEDED[:\s\]]|取代.{0,20}VERIFY:",
+    re.IGNORECASE,
+)
+DISCUSSION_MARKER_RE = re.compile(
+    r"<\!\-\-\s*claim-context:\s*discussion\s*\-\->",
+    re.IGNORECASE,
+)
+ATTRIBUTION_RE = re.compile(
+    r"把.{0,60}寫成|宣稱|不實|捏造|誤讀|事故|SUPERSEDED|假綠|無牙齒",
+    re.IGNORECASE,
+)
+EXEMPT_RE = re.compile(
+    r"VERIFY-EXEMPT:(typo|doc-example|migration-note|template-drift|tooling-blocked|spec-ambiguity):([A-Za-z0-9_.\-]+)",
+    re.IGNORECASE,
+)
+
+EXCLUSION_PATTERNS = [
+    re.compile(r"`[^`]*passed[^`]*`", re.IGNORECASE),
+    re.compile(r"passed\s+through", re.IGNORECASE),
+    re.compile(r"通過層\s*6\.5"),
+]
+
+RUNTIME_CLAIM_RE = re.compile(
+    r"(?:mutation|慢測|真跑|requires_kline|runtime|test_mutation_|真紅)",
+    re.IGNORECASE,
+)
+MUTATION_CLAIM_RE = re.compile(r"(?:mutation|test_mutation_|真紅|也正確紅)", re.IGNORECASE)
+NODE_ID_RE = re.compile(r"[\w./-]+::test_[\w]+")
+MARKER_RE = re.compile(r"\brequires_kline\b")
+TASK_ID_RE = re.compile(r"\b([A-Z]{1,3}\d+-[A-Za-z0-9_.\-]+|[A-Za-z0-9]{6,12})\b")
+
+OPERATIONAL_SECTION_RE = re.compile(
+    r"^#{1,3}\s*(?:正在做|待辦|已完成|現役任務|STATUS)|^(?:STATUS|RESULT)\s*:",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+RUNTIME_CLASS_RANK = {
+    "static_only": 0,
+    "helper_smoke": 1,
+    "requires_kline_runtime": 2,
+    "mutation_runtime": 3,
+}
+
+
+@dataclass
+class Unit:
+    """可掃描的文字單位。"""
+
+    text: str
+    source_file: str
+    source_line: int
+    in_fenced: bool = False
+    in_quote: bool = False
+    in_backtick: bool = False
+    section_operational: bool = False
+
+
+@dataclass
+class ClaimObject:
+    """從單位抽取的 claim-object。"""
+
+    polarity: str  # success|failure|supersede|pending|discussion|none
+    scope: list[str] = field(default_factory=list)
+    runtime_expectation: str = "none"
+    source_context: str = "discussion_quote"
+    backing_ids: list[str] = field(default_factory=list)
+    source_line_text: str = ""
+    task_id: str = ""
+    is_operational: bool = False
+    has_strong_polarity: bool = False
+    has_done_ready: bool = False
+
+
+@dataclass
+class Violation:
+    """違規記錄。"""
+
+    file: str
+    line: int
+    message: str
+    unit_text: str
+
+
+def _receipts_dir() -> Path:
+    override = os.environ.get(RECEIPTS_DIR_ENV)
+    return Path(override) if override else DEFAULT_RECEIPTS_DIR
+
+
+def _audit_log_path() -> Path:
+    override = os.environ.get(AUDIT_LOG_ENV)
+    return Path(override) if override else DEFAULT_AUDIT_LOG_PATH
+
+
+def _pending_ledger_path() -> Path:
+    override = os.environ.get(PENDING_LEDGER_ENV)
+    return Path(override) if override else DEFAULT_PENDING_LEDGER
+
+
+def _is_test_isolation() -> bool:
+    return bool(os.environ.get(RECEIPTS_DIR_ENV) or os.environ.get(AUDIT_LOG_ENV))
+
+
+def normalize(text: str) -> str:
+    """NFKC + 去零寬 + 統一 hyphen/空白。"""
+    normalized = unicodedata.normalize("NFKC", text)
+    for ch in ZWSP_CHARS:
+        normalized = normalized.replace(ch, "")
+    for ch in HYPHEN_CHARS:
+        normalized = normalized.replace(ch, "-")
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def _strip_exclusions(text: str) -> str:
+    """扣除白名單片段後再掃極性。"""
+    cleaned = text
+    for pattern in EXCLUSION_PATTERNS:
+        cleaned = pattern.sub(" ", cleaned)
+    return cleaned
+
+
+def _strip_inline_backticks(text: str) -> str:
+    """移除反引號內容（引用 pytest 輸出等）。"""
+    return re.sub(r"`[^`]*`", " ", text)
+
+
+def _strip_chinese_quotes(text: str) -> str:
+    """移除中文引號內容（規格示例/討論引用）。"""
+    return re.sub(r"「[^」]*」", " ", text)
+
+
+def _strip_all_quotes(text: str) -> str:
+    """移除各類引號與反引號內容（citation 判定用）。"""
+    cleaned = text
+    for pattern in (
+        r"「[^」]*」",
+        r"『[^』]*』",
+        r'"[^"]*"',
+        r"'[^']*'",
+        r"`[^`]*`",
+    ):
+        cleaned = re.sub(pattern, " ", cleaned)
+    return cleaned
+
+
+def _has_polarity_outside_quotes(text: str) -> bool:
+    """極性詞是否出現在引號外（作者新宣稱）。"""
+    outside = _strip_all_quotes(text)
+    scan = _claim_polarity_text(outside)
+    norm = normalize(scan)
+    return bool(STRONG_POLARITY_RE.search(norm) or STRONG_POLARITY_RE.search(norm.casefold()))
+
+
+def _polarity_scan_text(text: str) -> str:
+    """極性掃描用淨化文字。"""
+    cleaned = _strip_inline_backticks(text)
+    cleaned = _strip_chinese_quotes(cleaned)
+    cleaned = _strip_exclusions(cleaned)
+    return cleaned
+
+
+def split_units(content: str, source_file: str) -> list[Unit]:
+    """段切分：markdown block、列表項、表格列各自為單位。"""
+    units: list[Unit] = []
+    lines = content.splitlines()
+    in_fenced = False
+    in_blockquote = False
+    block_lines: list[str] = []
+    block_start = 1
+    block_fenced = False
+    block_quote = False
+
+    def flush_block(end_line: int) -> None:
+        nonlocal block_lines, block_start, block_fenced, block_quote
+        if not block_lines:
+            return
+        text = "\n".join(block_lines).strip()
+        if text:
+            units.append(
+                Unit(
+                    text=text,
+                    source_file=source_file,
+                    source_line=block_start,
+                    in_fenced=block_fenced,
+                    in_quote=block_quote,
+                    section_operational=_line_in_operational_section(content, block_start),
+                )
+            )
+        block_lines = []
+
+    for idx, raw_line in enumerate(lines, start=1):
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            flush_block(idx)
+            in_fenced = not in_fenced
+            block_start = idx + 1
+            block_fenced = in_fenced
+            block_quote = False
+            continue
+
+        is_quote = stripped.startswith(">") or in_blockquote
+        if stripped.startswith(">"):
+            in_blockquote = True
+        elif stripped == "":
+            in_blockquote = False
+        elif not stripped.startswith("|") and not stripped.startswith(("-", "*", "+")):
+            in_blockquote = False
+
+        if stripped == "" and not in_fenced:
+            flush_block(idx)
+            block_start = idx + 1
+            block_fenced = False
+            block_quote = False
+            continue
+
+        if stripped.startswith("|") and "|" in stripped[1:]:
+            flush_block(idx)
+            units.append(
+                Unit(
+                    text=stripped,
+                    source_file=source_file,
+                    source_line=idx,
+                    in_fenced=False,
+                    in_quote=False,
+                    section_operational=_line_in_operational_section(content, idx),
+                )
+            )
+            block_start = idx + 1
+            continue
+
+        if re.match(r"^[-*+]\s+", stripped) and not in_fenced:
+            flush_block(idx)
+            units.append(
+                Unit(
+                    text=stripped,
+                    source_file=source_file,
+                    source_line=idx,
+                    in_fenced=False,
+                    in_quote=is_quote,
+                    section_operational=_line_in_operational_section(content, idx),
+                )
+            )
+            block_start = idx + 1
+            continue
+
+        if not block_lines:
+            block_start = idx
+            block_fenced = in_fenced
+            block_quote = is_quote or in_fenced
+        block_lines.append(line)
+
+    flush_block(len(lines))
+    return units
+
+
+def _line_in_operational_section(content: str, line_no: int) -> bool:
+    """判斷行是否落在 operational 標題段內。"""
+    current_operational = False
+    for idx, line in enumerate(content.splitlines(), start=1):
+        if OPERATIONAL_SECTION_RE.search(line):
+            current_operational = True
+        elif re.match(r"^#{1,2}\s+", line) and not OPERATIONAL_SECTION_RE.search(line):
+            current_operational = False
+        if idx == line_no:
+            return current_operational
+    return False
+
+
+def _detect_source_context(unit: Unit) -> str:
+    """依檔案路徑與段落決定 source_context。"""
+    path = unit.source_file.replace("\\", "/")
+    name = Path(path).name
+
+    if path.endswith("COMMIT_MSG") or "commit" in path.lower():
+        return "commit_msg"
+
+    if name == "HANDOFF.md":
+        return "root_handoff_status"
+
+    if name.endswith("-RESULT.md") or "RESULT" in name:
+        return "operational_result"
+
+    if path.startswith("docs/") or "/docs/" in path:
+        return "docs_spec"
+
+    if unit.section_operational:
+        return "operational_result"
+
+    return "discussion_quote"
+
+
+def _extract_scope(text: str) -> list[str]:
+    """從文字抽取 scope 線索。"""
+    scope: list[str] = []
+    for match in NODE_ID_RE.finditer(text):
+        scope.append(match.group(0))
+    for match in MARKER_RE.finditer(text):
+        scope.append(match.group(0))
+    for match in re.finditer(r"test_[A-Za-z0-9_]+", text):
+        scope.append(match.group(0))
+    for match in re.finditer(r"tests/[\w./\-]+\.py", text):
+        scope.append(match.group(0))
+    return list(dict.fromkeys(scope))
+
+
+def _extract_task_id(text: str, source_file: str) -> str:
+    """抽取 task_id（優先 P0-FF-3 樣式、檔名、括號內 id）。"""
+    stem = Path(source_file).stem
+    stem = re.sub(r"-RESULT$", "", stem, flags=re.IGNORECASE)
+    blob = f"{stem} {text}"
+    for pattern in (
+        r"\b(P\d+-FF-\d+)\b",
+        r"\b(P\d+-[A-Z]+-\d+)\b",
+        r"\b([A-Z]{1,3}\d+-[A-Za-z0-9_.\-]+)\b",
+        r"(\d{8}-[A-Z0-9][A-Z0-9\-]+)",
+    ):
+        match = re.search(pattern, blob)
+        if match:
+            return match.group(1)
+    paren_match = re.search(r"\(([a-z0-9]{6,12})\)", text)
+    if paren_match:
+        return paren_match.group(1)
+    return ""
+
+
+def _runtime_expectation_from_text(text: str) -> str:
+    """由 claim 文字推導 runtime_expectation。"""
+    if MUTATION_CLAIM_RE.search(text):
+        return "mutation"
+    if re.search(r"慢測|真跑|requires_kline", text, re.IGNORECASE):
+        return "requires_kline"
+    if re.search(r"smoke|helper", text, re.IGNORECASE):
+        return "smoke"
+    if re.search(r"static|讀碼", text, re.IGNORECASE):
+        return "static"
+    if RUNTIME_CLAIM_RE.search(text):
+        return "requires_kline"
+    return "none"
+
+
+def _claim_polarity_text(text: str) -> str:
+    """極性掃描用文字（排除 VERIFY id、node-id 避免誤判）。"""
+    cleaned = VERIFY_RE.sub(" ", text)
+    cleaned = SIGNOFF_RE.sub(" ", cleaned)
+    cleaned = NODE_ID_RE.sub(" ", cleaned)
+    return _polarity_scan_text(cleaned)
+
+
+def extract_claim(unit: Unit) -> ClaimObject:
+    """從單位抽取 claim-object。"""
+    scan_text = _claim_polarity_text(unit.text)
+    norm_text = normalize(scan_text)
+    casefold_text = norm_text.casefold()
+
+    backing_ids = [m.group(1) for m in VERIFY_RE.finditer(unit.text)]
+    signoff_ids = [m.group(1) for m in SIGNOFF_RE.finditer(unit.text)]
+
+    has_strong = bool(STRONG_POLARITY_RE.search(norm_text) or STRONG_POLARITY_RE.search(casefold_text))
+    source_context = _detect_source_context(unit)
+    weak_allowed = source_context in {
+        "operational_result",
+        "commit_msg",
+        "root_handoff_status",
+    }
+    has_weak = weak_allowed and bool(
+        WEAK_POLARITY_RE.search(norm_text) or WEAK_POLARITY_RE.search(casefold_text)
+    )
+    has_done_ready = bool(DONE_READY_RE.search(norm_text))
+
+    polarity = "none"
+    if SUPERSEDED_RE.search(unit.text):
+        polarity = "supersede"
+    elif has_strong or has_weak:
+        if re.search(r"紅燈", scan_text, re.IGNORECASE) or re.search(
+            r"\bfailed\b", scan_text, re.IGNORECASE
+        ):
+            polarity = "failure"
+        else:
+            polarity = "success"
+
+    runtime_expectation = _runtime_expectation_from_text(unit.text)
+    scope = _extract_scope(unit.text)
+    task_id = _extract_task_id(unit.text, unit.source_file)
+
+    is_operational = source_context in {
+        "operational_result",
+        "commit_msg",
+        "root_handoff_status",
+    }
+
+    return ClaimObject(
+        polarity=polarity,
+        scope=scope,
+        runtime_expectation=runtime_expectation,
+        source_context=source_context,
+        backing_ids=backing_ids + [f"SIGNOFF:{sid}" for sid in signoff_ids],
+        source_line_text=unit.text.strip(),
+        task_id=task_id,
+        is_operational=is_operational,
+        has_strong_polarity=has_strong or has_weak,
+        has_done_ready=has_done_ready,
+    )
+
+
+def claim_fingerprint(claim: ClaimObject) -> str:
+    """計算 claim_fingerprint（供 ledger / 衝突檢查）。"""
+    scope_blob = ",".join(claim.scope)
+    payload = normalize(
+        f"{scope_blob}|{claim.runtime_expectation}|{claim.task_id}|{claim.source_line_text}"
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _is_citation(unit: Unit) -> bool:
+    """引用/討論原文（非作者 operational 新宣稱）。"""
+    if unit.in_fenced or unit.in_quote:
+        return True
+    if DISCUSSION_MARKER_RE.search(unit.text) and (unit.in_fenced or unit.in_quote):
+        return True
+    if not _has_polarity_outside_quotes(unit.text):
+        if STRONG_POLARITY_RE.search(normalize(_claim_polarity_text(unit.text))):
+            return True
+    if ATTRIBUTION_RE.search(unit.text):
+        return True
+    return False
+
+
+def classify_mode(unit: Unit, claim: ClaimObject) -> str:
+    """模式判定：citation|supersede|discussion|operational|neutral。"""
+    if SUPERSEDED_RE.search(unit.text):
+        return "supersede"
+    if _is_citation(unit):
+        return "discussion"
+    if claim.source_context == "docs_spec":
+        return "discussion"
+    if VERIFY_RE.search(unit.text) or SIGNOFF_RE.search(unit.text):
+        return "citation"
+    if claim.is_operational and claim.has_strong_polarity:
+        return "operational"
+    if claim.is_operational and claim.has_done_ready:
+        return "operational"
+    return "neutral"
+
+
+def _run_git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _is_tracked_or_staged(path: Path) -> bool:
+    """W12：receipt 須已 tracked 或 staged；測試隔離模式跳過。"""
+    if _is_test_isolation():
+        return path.is_file()
+    if not path.is_file():
+        return False
+    rel = path.as_posix()
+    staged = _run_git(["diff", "--cached", "--name-only", "--", rel])
+    if staged.returncode == 0 and rel in staged.stdout.splitlines():
+        return True
+    tracked = _run_git(["ls-files", "--error-unmatch", rel])
+    return tracked.returncode == 0
+
+
+def _load_audit_events() -> list[dict[str, Any]]:
+    audit_path = _audit_log_path()
+    if not audit_path.is_file():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in audit_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return events
+
+
+def _find_receipt_path(receipt_id: str) -> Path | None:
+    """依 receipt_id 或 claim_id 後綴找 receipt JSON。"""
+    receipts_dir = _receipts_dir()
+    direct = receipts_dir / f"{receipt_id}.json"
+    if direct.is_file():
+        return direct
+    matches = sorted(receipts_dir.glob(f"*-{receipt_id}.json"))
+    if matches:
+        return matches[-1]
+    for path in sorted(receipts_dir.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("receipt_id") == receipt_id or data.get("claim_id") == receipt_id:
+            return path
+    return None
+
+
+def _load_receipt(receipt_id: str) -> tuple[Path | None, dict[str, Any] | None]:
+    path = _find_receipt_path(receipt_id)
+    if path is None:
+        return None, None
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
+def _node_id_matches(claim_node: str, receipt_nodes: Iterable[str]) -> bool:
+    """node-id 須全等或 test 函式名後綴一致；共用檔路徑不足。"""
+    nodes = list(receipt_nodes)
+    if claim_node in nodes:
+        return True
+    claim_suffix = claim_node.split("::", 1)[-1]
+    return any(rn.split("::", 1)[-1] == claim_suffix for rn in nodes)
+
+
+def _scope_intersects(claim: ClaimObject, receipt: dict[str, Any]) -> bool:
+    """claim scope 與 receipt node/markers 須有非空交集；無 scope 線索時放行。"""
+    if not claim.scope:
+        return True
+    receipt_nodes = list(receipt.get("selected_node_ids") or [])
+    receipt_markers = set(receipt.get("markers") or [])
+    claim_nodes = [item for item in claim.scope if "::" in item]
+    claim_other = [item for item in claim.scope if "::" not in item]
+
+    if claim_nodes:
+        if not receipt_nodes:
+            return False
+        if not all(_node_id_matches(node, receipt_nodes) for node in claim_nodes):
+            return False
+        if not claim_other:
+            return True
+
+    if not claim_other:
+        return True
+
+    receipt_scope: set[str] = set(receipt_nodes)
+    receipt_scope.update(receipt_markers)
+    receipt_scope.add(str(receipt.get("claim_id", "")))
+    for item in claim_other:
+        matched = False
+        for candidate in receipt_scope:
+            if item == candidate or item in candidate or candidate in item:
+                matched = True
+                break
+        if not matched:
+            return False
+    return True
+
+
+def _runtime_class_sufficient(claim: ClaimObject, runtime_class: str) -> bool:
+    """runtime_class 是否足以支撐 claim 語意。"""
+    if claim.runtime_expectation == "none" and not MUTATION_CLAIM_RE.search(claim.source_line_text):
+        if not re.search(r"慢測|真跑|requires_kline", claim.source_line_text, re.IGNORECASE):
+            return True
+    if claim.runtime_expectation == "static":
+        return runtime_class == "static_only"
+    if claim.runtime_expectation == "smoke":
+        return runtime_class in {"helper_smoke", "requires_kline_runtime", "mutation_runtime"}
+    if claim.runtime_expectation == "requires_kline":
+        return runtime_class in {"requires_kline_runtime", "mutation_runtime"}
+    if claim.runtime_expectation == "mutation" or MUTATION_CLAIM_RE.search(claim.source_line_text):
+        return runtime_class == "mutation_runtime"
+    if RUNTIME_CLAIM_RE.search(claim.source_line_text):
+        return RUNTIME_CLASS_RANK.get(runtime_class, 0) >= RUNTIME_CLASS_RANK["requires_kline_runtime"]
+    return True
+
+
+def _polarity_matches(claim: ClaimObject, receipt: dict[str, Any]) -> bool:
+    """極性與 receipt exit/summary 須一致。"""
+    exit_code = int(receipt.get("exit_code", 1))
+    failed = int(receipt.get("failed", 0))
+    if claim.polarity == "failure":
+        return exit_code != 0 or failed > 0
+    if claim.polarity == "success":
+        return exit_code == 0 and failed == 0
+    return True
+
+
+def check_backing(claim: ClaimObject, backing_id: str) -> tuple[bool, str]:
+    """驗證 VERIFY/REF backing；回傳 (ok, reason)。"""
+    if backing_id.startswith("SIGNOFF:"):
+        if claim.runtime_expectation in {"mutation", "requires_kline"}:
+            return False, "SIGNOFF 不得支撐 runtime/mutation claim"
+        if MUTATION_CLAIM_RE.search(claim.source_line_text) and re.search(
+            r"慢測|真跑|mutation", claim.source_line_text, re.IGNORECASE
+        ):
+            return False, "SIGNOFF 不得支撐慢測/mutation claim"
+        return True, ""
+
+    receipt_path, receipt = _load_receipt(backing_id)
+    if receipt_path is None or receipt is None:
+        return False, f"receipt 不存在: {backing_id}"
+
+    log_path = Path(str(receipt.get("log_path", "")))
+    if not log_path.is_file():
+        alt_log = receipt_path.with_suffix(".log")
+        if alt_log.is_file():
+            log_path = alt_log
+        else:
+            return False, f"receipt log 不存在: {backing_id}"
+
+    if not _is_tracked_or_staged(receipt_path) or not _is_tracked_or_staged(log_path):
+        return False, f"receipt/log 未 tracked 或 staged: {backing_id}"
+
+    events = _load_audit_events()
+    receipt_id = str(receipt.get("receipt_id", receipt_path.stem))
+    audit = next((ev for ev in events if ev.get("receipt_id") == receipt_id), None)
+    if audit is None:
+        return False, f"審計事件缺失: {receipt_id}"
+
+    receipt_digest = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+    log_digest = hashlib.sha256(log_path.read_bytes()).hexdigest()
+    if audit.get("receipt_sha256") != receipt_digest:
+        return False, f"receipt_sha256 不符: {receipt_id}"
+    if audit.get("log_sha256") != log_digest:
+        return False, f"log_sha256 不符: {receipt_id}"
+
+    runtime_class = str(receipt.get("runtime_class", "static_only"))
+    if not _runtime_class_sufficient(claim, runtime_class):
+        return False, f"runtime_class 不足: {runtime_class} vs {claim.runtime_expectation}"
+
+    if not _polarity_matches(claim, receipt):
+        return False, f"極性與 receipt 不符: exit={receipt.get('exit_code')}"
+
+    if not _scope_intersects(claim, receipt):
+        return False, f"scope 無交集: {claim.scope}"
+
+    return True, ""
+
+
+def _close_event_valid(open_event: dict[str, Any], close_event: dict[str, Any]) -> bool:
+    """close 須與 open 指紋/scope/runtime 一致，且 receipt 有審計事件。"""
+    if close_event.get("claim_fingerprint") != open_event.get("claim_fingerprint"):
+        return False
+    if close_event.get("required_runtime_class") != open_event.get("required_runtime_class"):
+        return False
+    if list(close_event.get("required_node_ids") or []) != list(
+        open_event.get("required_node_ids") or []
+    ):
+        return False
+    if list(close_event.get("required_markers") or []) != list(
+        open_event.get("required_markers") or []
+    ):
+        return False
+
+    receipt_id = str(close_event.get("receipt_id", ""))
+    if not receipt_id:
+        return False
+    receipt_path, receipt = _load_receipt(receipt_id)
+    if receipt_path is None or receipt is None:
+        return False
+
+    audit_rid = str(receipt.get("receipt_id", receipt_path.stem))
+    audit = next((ev for ev in _load_audit_events() if ev.get("receipt_id") == audit_rid), None)
+    if audit is None:
+        return False
+
+    required_class = str(open_event.get("required_runtime_class", ""))
+    runtime_class = str(receipt.get("runtime_class", ""))
+    if required_class and runtime_class != required_class:
+        return False
+
+    required_nodes = list(open_event.get("required_node_ids") or [])
+    if required_nodes:
+        receipt_nodes = list(receipt.get("selected_node_ids") or [])
+        if not all(_node_id_matches(node, receipt_nodes) for node in required_nodes):
+            return False
+
+    return True
+
+
+def reduce_events(events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """reducer：求有 open 無有效 close 的未結 pending。"""
+    open_map: dict[str, dict[str, Any]] = {}
+    closed: set[str] = set()
+    for event in events:
+        pending_id = str(event.get("pending_id", ""))
+        if not pending_id:
+            continue
+        if event.get("event") == "open":
+            open_map[pending_id] = event
+        elif event.get("event") == "close":
+            open_event = open_map.get(pending_id)
+            if open_event and _close_event_valid(open_event, event):
+                closed.add(pending_id)
+    return [ev for pid, ev in open_map.items() if pid not in closed]
+
+
+def load_open_pending() -> list[dict[str, Any]]:
+    """讀取 ledger 未結 pending。"""
+    ledger_path = _pending_ledger_path()
+    if not ledger_path.is_file():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in ledger_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return reduce_events(events)
+
+
+def _open_pending_blocks(claim: ClaimObject, open_pending: list[dict[str, Any]]) -> str | None:
+    """同 task 有未結 pending 時擋 DONE/已驗/ready claim。"""
+    if not claim.task_id:
+        return None
+    if not (claim.has_strong_polarity or claim.has_done_ready):
+        return None
+    if not claim.is_operational:
+        return None
+    for pending in open_pending:
+        if pending.get("task_id") == claim.task_id:
+            return str(pending.get("pending_id", ""))
+    return None
+
+
+def _pending_closed_allows(claim: ClaimObject, open_pending: list[dict[str, Any]]) -> bool:
+    """pending 已關閉後，DONE/ready 狀態宣稱可放行。"""
+    if open_pending:
+        return False
+    if claim.has_done_ready and not claim.has_strong_polarity:
+        return True
+    return False
+
+
+def _exempt_allowed(unit: Unit, claim: ClaimObject) -> bool:
+    """VERIFY-EXEMPT 窄類別；HANDOFF/commit/RESULT 零豁免。"""
+    if claim.source_context in {"root_handoff_status", "commit_msg", "operational_result"}:
+        return False
+    return bool(EXEMPT_RE.search(unit.text))
+
+
+def _split_subclaims(text: str) -> list[str]:
+    """同段多 claim 以分號切分。"""
+    parts = [part.strip() for part in text.split(";")]
+    return [part for part in parts if part]
+
+
+def check_unit(unit: Unit, open_pending: list[dict[str, Any]]) -> list[Violation]:
+    """檢查單一文字單位，回傳違規清單。"""
+    violations: list[Violation] = []
+    claim = extract_claim(unit)
+    mode = classify_mode(unit, claim)
+
+    pending_id = _open_pending_blocks(claim, open_pending)
+    if pending_id:
+        violations.append(
+            Violation(
+                file=unit.source_file,
+                line=unit.source_line,
+                message=f"task {claim.task_id} 有未結 pending {pending_id}",
+                unit_text=unit.text,
+            )
+        )
+        return violations
+
+    if _pending_closed_allows(claim, open_pending):
+        return violations
+
+    if mode == "supersede" or mode == "discussion":
+        return violations
+
+    if _exempt_allowed(unit, claim):
+        return violations
+
+    subclaims = _split_subclaims(unit.text) if ";" in unit.text else [unit.text]
+    if len(subclaims) > 1:
+        for sub in subclaims:
+            sub_unit = Unit(
+                text=sub,
+                source_file=unit.source_file,
+                source_line=unit.source_line,
+                in_fenced=unit.in_fenced,
+                in_quote=unit.in_quote,
+                section_operational=unit.section_operational,
+            )
+            violations.extend(check_unit(sub_unit, open_pending))
+        return violations
+
+    if mode == "neutral":
+        return violations
+
+    sub_claim = extract_claim(unit)
+    sub_mode = classify_mode(unit, sub_claim)
+
+    if sub_mode == "citation":
+        if not sub_claim.backing_ids:
+            violations.append(
+                Violation(
+                    file=unit.source_file,
+                    line=unit.source_line,
+                    message="citation 模式但無 backing id",
+                    unit_text=unit.text,
+                )
+            )
+            return violations
+        for backing_id in sub_claim.backing_ids:
+            ok, reason = check_backing(sub_claim, backing_id)
+            if not ok:
+                violations.append(
+                    Violation(
+                        file=unit.source_file,
+                        line=unit.source_line,
+                        message=reason or f"backing 無效: {backing_id}",
+                        unit_text=unit.text,
+                    )
+                )
+        return violations
+
+    if sub_mode == "operational" or (sub_claim.is_operational and sub_claim.has_strong_polarity):
+        violations.append(
+            Violation(
+                file=unit.source_file,
+                line=unit.source_line,
+                message="operational claim 缺少 VERIFY/REF/SIGNOFF backing",
+                unit_text=unit.text,
+            )
+        )
+    return violations
+
+
+def _unknown_polarity_warn(unit: Unit) -> None:
+    """未知近似詞 WARN（不 exit 1）。"""
+    suspects = ["驗證通過", "測試綠", "runtime綠"]
+    text = unit.text
+    for word in suspects:
+        if word in text and not STRONG_POLARITY_RE.search(_polarity_scan_text(text)):
+            print(
+                f"WARN: 疑似極性詞 '{word}' 未收錄 — {unit.source_file}:{unit.source_line}",
+                file=sys.stderr,
+            )
+
+
+def check_files(paths: list[Path]) -> list[Violation]:
+    """掃描多檔，回傳全部違規。"""
+    violations: list[Violation] = []
+    open_pending = load_open_pending()
+    for path in paths:
+        if not path.is_file():
+            continue
+        rel = path.as_posix()
+        content = path.read_text(encoding="utf-8")
+        for unit in split_units(content, rel):
+            _unknown_polarity_warn(unit)
+            violations.extend(check_unit(unit, open_pending))
+    return violations
+
+
+def _git_staged_markdown_files() -> list[Path]:
+    proc = _run_git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+    if proc.returncode != 0:
+        return []
+    paths: list[Path] = []
+    for line in proc.stdout.splitlines():
+        if _is_scannable_path(line):
+            paths.append(Path(line))
+    return paths
+
+
+def _git_range_files(range_spec: str) -> list[Path]:
+    proc = _run_git(["diff", "--name-only", range_spec])
+    if proc.returncode != 0:
+        return []
+    return [Path(line) for line in proc.stdout.splitlines() if _is_scannable_path(line)]
+
+
+def _is_scannable_path(path_str: str) -> bool:
+    norm = path_str.replace("\\", "/")
+    if norm == "HANDOFF.md":
+        return True
+    if norm.startswith("handoffs/") and norm.endswith(".md"):
+        return True
+    if norm.startswith("docs/") and norm.endswith(".md"):
+        return True
+    return False
+
+
+def list_open_pending() -> int:
+    """印出未結 pending；供 list-open 子指令。"""
+    open_events = load_open_pending()
+    for event in open_events:
+        print(json.dumps(event, ensure_ascii=False, sort_keys=True))
+    return 0 if open_events else 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI 進入點。"""
+    parser = argparse.ArgumentParser(description="Verification claim checker (router, not judge).")
+    parser.add_argument("--staged", action="store_true", help="Scan git staged markdown files")
+    parser.add_argument("--files", nargs="*", default=[], help="Explicit files to scan")
+    parser.add_argument("--range", dest="range_spec", default="", help="Git diff range A...B")
+    parser.add_argument("--commit-msg", dest="commit_msg", default="", help="Commit message file")
+    parser.add_argument("command", nargs="?", default="", help="Subcommand: list-open")
+    args = parser.parse_args(argv)
+
+    if args.command == "list-open":
+        return list_open_pending()
+
+    paths: list[Path] = []
+    if args.staged:
+        paths.extend(_git_staged_markdown_files())
+    if args.range_spec:
+        paths.extend(_git_range_files(args.range_spec))
+    for file_arg in args.files:
+        paths.append(Path(file_arg))
+    if args.commit_msg:
+        msg_path = Path(args.commit_msg)
+        if msg_path.is_file():
+            paths.append(msg_path)
+            # commit-msg 以單一 operational 單位掃描
+            content = msg_path.read_text(encoding="utf-8")
+            unit = Unit(
+                text=content,
+                source_file="COMMIT_MSG",
+                source_line=1,
+                section_operational=True,
+            )
+            open_pending = load_open_pending()
+            violations = check_unit(unit, open_pending)
+            if violations:
+                for v in violations:
+                    print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
+                    print(v.unit_text, file=sys.stderr)
+                return 1
+            return 0
+
+    if not paths:
+        print("verification_claim_check.py: no input files", file=sys.stderr)
+        return 2
+
+    # 去重保序
+    seen: set[str] = set()
+    unique_paths: list[Path] = []
+    for path in paths:
+        key = str(path)
+        if key not in seen:
+            seen.add(key)
+            unique_paths.append(path)
+
+    violations = check_files(unique_paths)
+    if violations:
+        for v in violations:
+            print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
+            print(v.unit_text, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

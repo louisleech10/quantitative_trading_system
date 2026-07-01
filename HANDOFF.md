@@ -11,9 +11,11 @@
   實作→Codex review 抓 3 BLOCKING(node-id分類/不存在命令無receipt/audit契約)→Composer 修→Codex 閉合 APPROVED→
   Claude 再抓測試隔離缺陷(污染真實路徑)→Composer 修(env 覆蓋+tmp)→Claude 親驗跑測試前後零污染+7 passed+postflight淨。
   教訓:Codex 抓我漏的正確性、我抓 Codex 漏的測試衛生 → 印證「無單一驗收者完備」。
-- **接手下一步**:② **序列 B2**(claim-object checker + pending ledger,依 B1 的 selected_node_ids+audit 契約)→ ③ B3/B4/B5 並行。
-  **硬性順序**:B2 的 V7 誤報=0 達標才接 B3 Task3.1 PreToolUse,否則降級 commit-hook+CI。
-- 批次派工模板/驗收命令見 `docs/VERIFY_GATE_TODO.md` §B;派工用「指令寫 repo 檔、cursor-agent 讀檔」(避免 prompt 反引號 shell 誤觸)。
+- **B2 完成✅**(`scripts/verification_claim_check.py` claim-object checker + `handoffs/pending_verifications.jsonl` ledger):
+  實作→Codex adversarial 抓 **5 BLOCKING**(同義詞/inline-discussion/檔名免責/scope交集寬/偽close)→Composer 修(含 citation 判定:引號+歸屬放行、裸 operational 擋,解 V7 vs V17 張力)→Codex 閉合 APPROVED→Claude 親驗 27 passed/**V7 誤報=0**/V17事故裸原文擋/citation放行/隔離淨。
+  **V7 誤報=0 達標 → B3 PreToolUse 可上全攔**(非降級)。
+- **接手下一步**:③ **B3**(Task3.1 PreToolUse Edit/Write HANDOFF + 3.2 git hook + 3.3 CI + 3.4 health;誤報=0 已達可上 PreToolUse)→ **B4**(mutation接receipt+W2/W3 provenance+audit_chain)、**B5**(RESULT硬欄位+#6衝突+W1 FACT-RECEIPT)可並行。
+- 批次派工:「指令寫 repo 檔、cursor-agent 讀檔」(避免 prompt 反引號 shell 誤觸);每批 preflight→實作→Codex adversarial review→修→閉合再驗→Claude親驗→commit。
 - **reconcile 戳記**:`20260701-FF-FORENSICS-RECONCILE.md` Composer 已 CHANGES-REQUESTED(SPEC補規後重戳)。
 
 ## ★FF 深稽 P0(暫停,驗收防偽閘後回來)— 冷啟動接手指南
