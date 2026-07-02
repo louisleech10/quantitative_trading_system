@@ -21,7 +21,7 @@
 - 2026-07-02 曾派實作旋即依使用者指示停止,僅 helper 殘檔已刪,測試檔未開寫。
 - **P1-FF-6 不在此**:已併 fracdiff max_lag 修復 epic(ROADMAP;FF 深稽全完成後修,修完重生成 FF 給 IC——使用者定序)。
 
-## verify-gate 待修小項(新 session 順手或另批)
+## verify-gate 待修小項(**不擋 P1-FF-5/7,P1 優先;趁 P1 慢測空檔處理**——使用者 2026-07-02 認可此序)
 - **6 個 FF 委員會過程檔未 commit**(checker 擋其 prose 事實句;committee 親筆檔不宜為過閘改原文=竄改 audit trail):ALIGN-ORACLE-{FACTS,DESIGN-CODEX}、DSTAR-GATE-{CLAUDE,CODEX}、ALIGN-PROBE-FIX-PROMPT、PROBE-FIX2-composer。**檔在本機 handoffs/ 勿刪**;O3-extension(委員會過程檔 prose 類豁免設計)後補 commit。
 - **R7-emitter 缺口**:stamp-review 派工(risk low 無 adversarial)不發 committee_dispatch→新 reconcile 戳記 provenance FAIL 只能 waived(修向見 P1-57-RECONCILE 尾節)。
 - **`pytest -k` receipt 空 node_ids**:selected_node_ids=[]→具體 scope 聲稱綁不上,配 R3 反模糊成 catch-22;引用暫用「檔載『…』(出處:log)」格式。修向:run_with_receipt 對 -k 跑補記 collected node ids。
