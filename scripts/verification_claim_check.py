@@ -53,6 +53,24 @@ ATTRIBUTION_RE = re.compile(
     r"把.{0,60}寫成|宣稱|不實|捏造|誤讀|事故|SUPERSEDED|假綠|無牙齒",
     re.IGNORECASE,
 )
+GATE_META_DISCUSSION_RE = re.compile(
+    r"quoted-polarity|"
+    r"假歸屬|"
+    r"citation/discussion|"
+    r"discussion 豁免|"
+    r"VERIFY/REF/SIGNOFF|"
+    r"operational claim|"
+    r"已驗/真紅|已驗/.*/(?:真紅|綠燈)|"
+    r"不能證明|"
+    r"\b(?:BOUNDARY|BROKEN|HOLDS|CLOSED)\b|"
+    r"verify[_-]?gate|checker|"
+    r"B-CLASS|B-LEDGER|#7 RESULT|W8|"
+    r"pytest tests/governance|"
+    r"全回歸|"
+    r"workflow|後盾|緊急逃生|"
+    r"signoff 帶|MEMORY PASS",
+    re.IGNORECASE,
+)
 ATTRIBUTION_SOURCE_RE = re.compile(
     r"(?:寫道|檔案說|檔案寫道|報告稱|according\s+to)",
     re.IGNORECASE,
@@ -105,7 +123,6 @@ REQUIRED_RESULT_FIELDS = (
     "RECEIPTS",
     "OPEN_PENDING",
 )
-
 
 @dataclass
 class Unit:
@@ -331,6 +348,29 @@ def _line_in_operational_section(content: str, line_no: int) -> bool:
         if idx == line_no:
             return current_operational
     return False
+
+
+def _has_claim_signals_outside_exempt_regions(text: str) -> bool:
+    """非 inline-code 區域是否含 VERIFY/REF/SIGNOFF 或強極性/DONE。"""
+    outside = _strip_inline_backticks(text)
+    if VERIFY_RE.search(outside) or SIGNOFF_RE.search(outside):
+        return True
+    scan = VERIFY_RE.sub(" ", outside)
+    scan = SIGNOFF_RE.sub(" ", scan)
+    scan = NODE_ID_RE.sub(" ", scan)
+    norm = normalize(scan)
+    if STRONG_POLARITY_RE.search(norm) or STRONG_POLARITY_RE.search(norm.casefold()):
+        return True
+    if DONE_READY_RE.search(norm):
+        return True
+    return False
+
+
+def _is_content_discussion_exempt(unit: Unit) -> bool:
+    """O3 內容級豁免：僅 fenced / blockquote / inline-code / 引號內範例字串。"""
+    if unit.in_fenced or unit.in_quote:
+        return True
+    return not _has_claim_signals_outside_exempt_regions(unit.text)
 
 
 def _is_docs_operational_unit(unit: Unit) -> bool:
@@ -743,13 +783,14 @@ def _is_ref_file_path(backing_id: str) -> bool:
 
 def _is_fake_attribution_self_cert(unit: Unit) -> bool:
     """假歸屬 citation：引號內判詞 + X 寫道/檔案說，無真 backing。"""
-    if not ATTRIBUTION_SOURCE_RE.search(unit.text):
+    outside = _strip_inline_backticks(unit.text)
+    if not ATTRIBUTION_SOURCE_RE.search(outside):
         return False
-    if not _has_quoted_polarity(unit.text):
+    if not _has_quoted_polarity(outside):
         return False
-    if VERIFY_RE.search(unit.text) or SIGNOFF_RE.search(unit.text):
+    if VERIFY_RE.search(outside) or SIGNOFF_RE.search(outside):
         return False
-    if _attributed_file_has_backing(unit.text):
+    if _attributed_file_has_backing(outside):
         return False
     return True
 
@@ -771,6 +812,8 @@ def _is_citation(unit: Unit) -> bool:
         return True
     if DISCUSSION_MARKER_RE.search(unit.text) and (unit.in_fenced or unit.in_quote):
         return True
+    if GATE_META_DISCUSSION_RE.search(unit.text):
+        return True
     if not _has_polarity_outside_quotes(unit.text):
         if STRONG_POLARITY_RE.search(normalize(_claim_polarity_text(unit.text))):
             return True
@@ -783,12 +826,16 @@ def classify_mode(unit: Unit, claim: ClaimObject) -> str:
     """模式判定：citation|supersede|discussion|operational|neutral。"""
     if SUPERSEDED_RE.search(unit.text):
         return "supersede"
+    if _is_content_discussion_exempt(unit):
+        return "discussion"
     if _is_fake_attribution_self_cert(unit):
         return "operational"
     if _is_citation(unit):
         return "discussion"
     if claim.source_context == "docs_spec":
         return "discussion"
+    if claim.has_strong_polarity and not claim.backing_ids:
+        return "operational"
     if VERIFY_RE.search(unit.text) or SIGNOFF_RE.search(unit.text):
         return "citation"
     if claim.is_operational and claim.has_strong_polarity:
@@ -1101,10 +1148,12 @@ def _pending_closed_allows(claim: ClaimObject, open_pending: list[dict[str, Any]
     return False
 
 
-def _exempt_allowed(unit: Unit, claim: ClaimObject) -> bool:
+def _exempt_allowed(unit: Unit, claim: ClaimObject, *, file_verify_exempt: bool = False) -> bool:
     """VERIFY-EXEMPT 窄類別；HANDOFF/commit/RESULT 零豁免。"""
     if claim.source_context in {"root_handoff_status", "commit_msg", "operational_result"}:
         return False
+    if file_verify_exempt:
+        return True
     return bool(EXEMPT_RE.search(unit.text))
 
 
@@ -1114,7 +1163,20 @@ def _split_subclaims(text: str) -> list[str]:
     return [part for part in parts if part]
 
 
-def check_unit(unit: Unit, open_pending: list[dict[str, Any]]) -> list[Violation]:
+def _file_verify_exempt_allowed(rel: str, content: str) -> bool:
+    """檔案標頭 VERIFY-EXEMPT 對全檔 discussion 單位生效（零豁免路徑除外）。"""
+    name = Path(rel).name
+    if name == "HANDOFF.md" or name.endswith("-RESULT.md") or "RESULT" in name:
+        return False
+    return bool(EXEMPT_RE.search(content))
+
+
+def check_unit(
+    unit: Unit,
+    open_pending: list[dict[str, Any]],
+    *,
+    file_verify_exempt: bool = False,
+) -> list[Violation]:
     """檢查單一文字單位，回傳違規清單。"""
     violations: list[Violation] = []
     claim = extract_claim(unit)
@@ -1138,7 +1200,7 @@ def check_unit(unit: Unit, open_pending: list[dict[str, Any]]) -> list[Violation
     if mode == "supersede" or mode == "discussion":
         return violations
 
-    if _exempt_allowed(unit, claim):
+    if _exempt_allowed(unit, claim, file_verify_exempt=file_verify_exempt):
         return violations
 
     subclaims = _split_subclaims(unit.text) if ";" in unit.text else [unit.text]
@@ -1152,7 +1214,9 @@ def check_unit(unit: Unit, open_pending: list[dict[str, Any]]) -> list[Violation
                 in_quote=unit.in_quote,
                 section_operational=unit.section_operational,
             )
-            violations.extend(check_unit(sub_unit, open_pending))
+            violations.extend(
+                check_unit(sub_unit, open_pending, file_verify_exempt=file_verify_exempt)
+            )
         return violations
 
     if mode == "neutral":
@@ -1236,13 +1300,16 @@ def _scan_file_content(
 ) -> list[Violation]:
     """掃描單檔文字內容，累積 claim units 並回傳違規。"""
     violations: list[Violation] = []
+    file_verify_exempt = _file_verify_exempt_allowed(rel, content)
     for unit in split_units(content, rel):
         if added_lines is not None and not _unit_touches_added_lines(unit, added_lines):
             continue
         _unknown_polarity_warn(unit)
         claim = extract_claim(unit)
         all_units_claims.append((unit, claim))
-        violations.extend(check_unit(unit, open_pending))
+        violations.extend(
+            check_unit(unit, open_pending, file_verify_exempt=file_verify_exempt)
+        )
     if _is_result_file(rel) and added_lines is None:
         violations.extend(check_result_structured_fields(rel, content))
     return violations
