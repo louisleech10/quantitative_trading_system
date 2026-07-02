@@ -12,7 +12,7 @@
 - **範圍**:`docs/VERIFY_GATE_SPEC.md` v2.1(P0-FF-3「align mutation真紅」不實事故 → run receipt + claim checker + enforcement 三層)。
 - **狀態(2026-07-02)= epic B1-B5 全落地**:B1 receipt(`d3870c4`)、B2 claim checker(`a1d3638`,V7誤報=0)、B4+B5 provenance/RESULT硬欄位(`6c0a6b0`,Codex 6 BLOCKING 閉合)、B3 enforcement 三層+health(本次 commit;Codex 4 BLOCKING 閉合檔載「FINAL VERDICT: APPROVED」;governance 75 tests VERIFY:20260701T235954Z-governance-b3-final)。PreToolUse hook 已生效;git hooks 用 `bash scripts/install_verify_hooks.sh` 安裝。殘餘=誠實邊界(careless-proof+tamper-evident,非防惡意)。
 - **全系統紅隊 ✅(本次 commit)**:三方(Claude+Codex+Composer)紅隊抓 7 洞(env-prefix繞閘/docs走私/模糊洗白/假歸屬自我認證/路徑正規化/無逃生程序/provenance未接線),全修+Codex閉合R1-R7 CLOSED;淨判斷「仍有洞需緊>過嚴」。88 governance tests。
-- **接續**:FF P0-FF-3 用帶 receipt 管線重驗(5 mutation 探針已真跑通過 VERIFY:20260702T020806Z-mutation-test_ff_multitf_truncation_mr;B2 回歸進行中)。
+- **接續**:FF P0-FF-3 收尾完成(mutation 全探針輪 receipt log 檔載「5 passed」,出處:handoffs/run_receipts/20260702T125150Z-mutation-test_ff_multitf_truncation_mr.log;⚠️舊 receipt 020806Z 那輪的 align 為假綠 shape 已作廢;B2 回歸出處:20260702T042627Z-ff-b2-regression.log;Codex final review 檔載「APPROVED」出處:20260702-FF-P0FF3-FINAL-REVIEW-CODEX.md)。**次站=P1-FF-5/7 實作**(設計三方定案+IMPL-PROMPT 已備,見 HANDOFF)。
 
 ### P0 — IC Gatekeeper 開發 + 真實端到端測試
 - **為何**:FF 已收尾,pipeline 下一站。現況 79 IC 單元測試**全合成資料**,從未真實 kline 端到端驗證。

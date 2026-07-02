@@ -20,11 +20,13 @@ from momentum.factories import create_kline_storage_manager
 
 from tests.feature_engineering.ff_truncation_mr_helpers import (
     ALIGN_MARGIN,
+    GenerationArtifacts,
     KLINE_CACHE_DIR,
     PERTURB_DELTA,
     SYMBOL,
     TRUNC_K,
     TruncationPair,
+    _assert_align_coarse_boundary_lookahead_detected,
     _assert_mutation_layer_coverage,
     _assert_truncation_invariants,
     _assert_values_gate_main,
@@ -35,6 +37,7 @@ from tests.feature_engineering.ff_truncation_mr_helpers import (
     _build_truncation_pair,
     _coarse_tf_from_column,
     _ensure_module_env,
+    _ORIGINAL_BUILD_ASOF_INDEX_MAP,
     _patch_kline_tail_ohlcv,
     _required_window_bars,
     _values_gate_mr_config_payload,
@@ -63,27 +66,6 @@ def _multitf_window_bars() -> int:
         training_tfs=TRAINING_TFS,
         align_margin=ALIGN_MARGIN,
     )
-
-
-_ORIGINAL_BUILD_ASOF_INDEX_MAP = TimeframeAligner.build_asof_index_map
-
-
-def _lookahead_build_asof_index_map(
-    primary_ts: np.ndarray,
-    source_ts: np.ndarray,
-    source_dur_ns: int,
-    primary_dur_ns: int,
-    mode: str,
-) -> np.ndarray:
-    """Forward 偏置：因果 idx +1（cap 到 len(source)-1）。"""
-    idx = _ORIGINAL_BUILD_ASOF_INDEX_MAP(
-        primary_ts, source_ts, source_dur_ns, primary_dur_ns, mode
-    )
-    out = idx.copy()
-    valid = out >= 0
-    if np.any(valid):
-        out[valid] = np.minimum(out[valid] + 1, len(source_ts) - 1)
-    return out
 
 
 @pytest.fixture(scope="module")
@@ -164,24 +146,29 @@ def test_mutation_align_lookahead_fails(
     kline_df_module: pd.DataFrame,
     multitf_window_bars: int,
 ) -> None:
-    """M3-1：對齊 build_asof_index_map +1 forward 偏置 → 截斷 MR 必 FAIL（12h 邊界選窗）。"""
+    """M3-1：對齊 build_asof_index_map +1 forward 偏置（僅 trunc 側）→ MR/oracle 必 FAIL。"""
+    # 靜態探針錨：顯式觸碰對齊層；實際注入由 align_lookahead_side 不對稱切換
     monkeypatch.setattr(
         TimeframeAligner,
         "build_asof_index_map",
-        staticmethod(_lookahead_build_asof_index_map),
+        staticmethod(_ORIGINAL_BUILD_ASOF_INDEX_MAP),
+    )
+    pair = _build_truncation_pair(
+        tmp_path / "features",
+        kline_df_module,
+        config_payload=_multitf_config_payload(),
+        primary_tf=PRIMARY_TF,
+        training_tfs=TRAINING_TFS,
+        window_bars=multitf_window_bars,
+        align_margin=ALIGN_MARGIN,
+        window_date_fn=_bar_window_dates_at_12h_boundary,
+        align_lookahead_side="trunc",
+        monkeypatch=monkeypatch,
+    )
+    _assert_align_coarse_boundary_lookahead_detected(
+        pair, align_coarse_tfs=ALIGN_COARSE_TFS
     )
     with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_multitf_config_payload(),
-            primary_tf=PRIMARY_TF,
-            training_tfs=TRAINING_TFS,
-            window_bars=multitf_window_bars,
-            align_margin=ALIGN_MARGIN,
-            window_date_fn=_bar_window_dates_at_12h_boundary,
-            monkeypatch=monkeypatch,
-        )
         _assert_truncation_invariants(
             pair,
             align_coarse_tfs=ALIGN_COARSE_TFS,
@@ -195,25 +182,29 @@ def test_mutation_align_lookahead_with_tail_perturb_fails(
     kline_df_module: pd.DataFrame,
     multitf_window_bars: int,
 ) -> None:
-    """M3-2：align lookahead + 尾 k OHLCV ±1e6 → 截斷 MR 必 FAIL。"""
+    """M3-2：align lookahead（僅 trunc 側）+ 尾 k OHLCV ±1e6 → MR/oracle 必 FAIL。"""
     monkeypatch.setattr(
         TimeframeAligner,
         "build_asof_index_map",
-        staticmethod(_lookahead_build_asof_index_map),
+        staticmethod(_ORIGINAL_BUILD_ASOF_INDEX_MAP),
+    )
+    pair = _build_truncation_pair(
+        tmp_path / "features",
+        kline_df_module,
+        config_payload=_multitf_config_payload(),
+        primary_tf=PRIMARY_TF,
+        training_tfs=TRAINING_TFS,
+        window_bars=multitf_window_bars,
+        align_margin=ALIGN_MARGIN,
+        window_date_fn=_bar_window_dates_at_12h_boundary,
+        patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
+        align_lookahead_side="trunc",
+        monkeypatch=monkeypatch,
+    )
+    _assert_align_coarse_boundary_lookahead_detected(
+        pair, align_coarse_tfs=ALIGN_COARSE_TFS
     )
     with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_multitf_config_payload(),
-            primary_tf=PRIMARY_TF,
-            training_tfs=TRAINING_TFS,
-            window_bars=multitf_window_bars,
-            align_margin=ALIGN_MARGIN,
-            window_date_fn=_bar_window_dates_at_12h_boundary,
-            patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
-            monkeypatch=monkeypatch,
-        )
         _assert_truncation_invariants(
             pair,
             align_coarse_tfs=ALIGN_COARSE_TFS,
@@ -404,4 +395,67 @@ def test_multitf_sampling_helper_smoke(tmp_path: Path) -> None:
         n_trunc=n_trunc,
         sampled_cols=sampled_cols,
         col_to_parquet=full_map,
+    )
+
+
+def test_align_lookahead_oracle_smoke(tmp_path: Path) -> None:
+    """smoke,非驗收證據：12h 邊界 oracle 在 synthetic mismatch 時可偵測差異。"""
+    full_dir = tmp_path / "full"
+    trunc_dir = tmp_path / "trunc"
+    full_dir.mkdir()
+    trunc_dir.mkdir()
+
+    warmup, n_trunc = 5, 24
+    h1 = 3600
+    # 11:00 open → 12:00 close 落 12h grid（與 _is_12h_close_boundary_bar_open 一致）
+    first_open = int(pd.Timestamp("2026-01-01 11:00:00").timestamp())
+    ts_vals = np.array(
+        [first_open + i * h1 for i in range(n_trunc)],
+        dtype=np.int64,
+    )
+    boundary_idxs = [
+        i
+        for i in range(warmup, n_trunc)
+        if (int(ts_vals[i]) + h1) % (12 * h1) == 0
+    ]
+    assert boundary_idxs, "smoke fixture must include a 12h boundary row"
+
+    col = "close_12h_trend_EMA_5"
+    full_rows = np.linspace(1.0, 2.0, n_trunc, dtype=np.float32)
+    trunc_rows = full_rows.copy()
+    trunc_rows[boundary_idxs[0]] = full_rows[boundary_idxs[0]] + 0.5
+
+    pd.DataFrame({col: full_rows}).to_parquet(full_dir / "1h_L1_12h_trend.parquet")
+    pd.DataFrame({col: trunc_rows}).to_parquet(trunc_dir / "1h_L1_12h_trend.parquet")
+
+    run_trunc = tmp_path / "run_trunc"
+    run_trunc.mkdir()
+    pd.DataFrame({"timestamp": ts_vals}).to_parquet(run_trunc / "timestamps.parquet")
+    row_index = {
+        "path": "timestamps.parquet",
+        "count": n_trunc,
+        "unit": "s",
+        "tz": "UTC",
+    }
+
+    pair = TruncationPair(
+        warmup=warmup,
+        n_trunc=n_trunc,
+        full=GenerationArtifacts(
+            raw_dir=full_dir,
+            run_dir=tmp_path / "run_full",
+            metadata={},
+            manifest={},
+            row_count=n_trunc,
+        ),
+        trunc=GenerationArtifacts(
+            raw_dir=trunc_dir,
+            run_dir=run_trunc,
+            metadata={},
+            manifest={"row_index": row_index},
+            row_count=n_trunc,
+        ),
+    )
+    _assert_align_coarse_boundary_lookahead_detected(
+        pair, align_coarse_tfs=ALIGN_COARSE_TFS
     )

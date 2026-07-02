@@ -10,7 +10,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Literal, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -21,8 +21,12 @@ from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
 from momentum.FeatureEngineering.preprocessing._d_star_cache import read_d_star_json
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from momentum.core.constants import TIMEFRAME_SECONDS
+from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 from momentum.FeatureEngineering.warmup_window import estimate_max_warmup_bars
 from momentum.factories import create_feature_factory, create_kline_storage_manager
+
+_ORIGINAL_BUILD_ASOF_INDEX_MAP = TimeframeAligner.build_asof_index_map
+AlignLookaheadSide = Literal["full", "trunc"]
 
 ROOT = Path(__file__).resolve().parents[2]
 KLINE_CACHE_DIR = "data_cache/feature_klines"
@@ -1144,6 +1148,153 @@ def _assert_fracdiff_truncation_invariants(pair: TruncationPair) -> None:
     _assert_metadata_gate(pair.full, pair.trunc)
 
 
+def _lookahead_build_asof_index_map(
+    primary_ts: np.ndarray,
+    source_ts: np.ndarray,
+    source_dur_ns: int,
+    primary_dur_ns: int,
+    mode: str,
+) -> np.ndarray:
+    """Forward 偏置：因果 idx +1（cap 到 len(source)-1）。"""
+    idx = _ORIGINAL_BUILD_ASOF_INDEX_MAP(
+        primary_ts, source_ts, source_dur_ns, primary_dur_ns, mode
+    )
+    out = idx.copy()
+    valid = out >= 0
+    if np.any(valid):
+        out[valid] = np.minimum(out[valid] + 1, len(source_ts) - 1)
+    return out
+
+
+def _set_align_lookahead_patch(
+    monkeypatch: Optional[pytest.MonkeyPatch],
+    *,
+    enabled: bool,
+) -> None:
+    """切換 build_asof_index_map 是否帶 +1 forward 偏置（供不對稱 mutation 探針）。"""
+    if monkeypatch is None:
+        return
+    if enabled:
+        monkeypatch.setattr(
+            TimeframeAligner,
+            "build_asof_index_map",
+            staticmethod(_lookahead_build_asof_index_map),
+        )
+    else:
+        monkeypatch.setattr(
+            TimeframeAligner,
+            "build_asof_index_map",
+            staticmethod(_ORIGINAL_BUILD_ASOF_INDEX_MAP),
+        )
+
+
+def _primary_indices_at_12h_boundaries(
+    ts_vals: np.ndarray,
+    *,
+    warmup: int,
+    n_trunc: int,
+) -> List[int]:
+    """可比較窗 [warmup, n_trunc) 內 12h 收盤邊界 primary row index。"""
+    return [
+        i
+        for i in range(warmup, n_trunc)
+        if i < len(ts_vals) and _is_12h_close_boundary_bar_open(int(ts_vals[i]))
+    ]
+
+
+def _read_artifact_timestamps(artifact: GenerationArtifacts) -> np.ndarray:
+    """讀 feature_manifest row_index 指向的 primary timestamp sidecar（epoch seconds）。"""
+    row_index = artifact.manifest.get("row_index") or {}
+    path_key = row_index.get("path")
+    count = row_index.get("count")
+    unit = row_index.get("unit")
+    if not path_key or count is None or not unit:
+        raise AssertionError(
+            "align oracle: missing row_index "
+            f"(path/count/unit) in manifest for {artifact.run_dir}"
+        )
+
+    ts_path = artifact.run_dir / str(path_key)
+    if not ts_path.is_file():
+        raise AssertionError(
+            f"align oracle: missing timestamp sidecar {ts_path} "
+            f"(count={count}, unit={unit})"
+        )
+
+    ts_vals = pd.read_parquet(ts_path).iloc[:, 0].astype(np.int64).to_numpy()
+    count_i = int(count)
+    unit_s = str(unit)
+    if unit_s != "s":
+        raise AssertionError(
+            f"align oracle: row_index unit must be 's', got {unit_s!r} at {ts_path}"
+        )
+    if len(ts_vals) != count_i or len(ts_vals) != artifact.row_count:
+        raise AssertionError(
+            f"align oracle: timestamp count mismatch at {ts_path}: "
+            f"len={len(ts_vals)} row_index.count={count_i} "
+            f"artifact.row_count={artifact.row_count}"
+        )
+    return ts_vals
+
+
+def _assert_align_coarse_boundary_lookahead_detected(
+    pair: TruncationPair,
+    *,
+    align_coarse_tfs: List[str],
+) -> None:
+    """Oracle：粗 TF 欄在 12h 邊界 index 上 full vs trunc 必須可見差異（可讀 fail 訊息）。"""
+    ts_vals = _read_artifact_timestamps(pair.trunc)
+    boundary_idxs = _primary_indices_at_12h_boundaries(
+        ts_vals, warmup=pair.warmup, n_trunc=pair.n_trunc
+    )
+    if not boundary_idxs:
+        raise AssertionError(
+            "align oracle: no 12h boundary rows in "
+            f"[warmup={pair.warmup}, n_trunc={pair.n_trunc})"
+        )
+
+    full_map = _build_column_frame_map(pair.full.raw_dir)
+    trunc_map = _build_column_frame_map(pair.trunc.raw_dir)
+    common_cols = sorted(set(full_map) & set(trunc_map))
+    probe_cols = _select_required_probe_columns(
+        common_cols, full_map, align_coarse_tfs=align_coarse_tfs
+    )
+    align_probes = [c for c in probe_cols if _coarse_tf_from_column(c) in align_coarse_tfs]
+    if not align_probes:
+        raise AssertionError(
+            f"align oracle: no coarse probe columns for {align_coarse_tfs!r}"
+        )
+
+    mismatches: List[str] = []
+    for col in align_probes:
+        fname, _ = full_map[col]
+        trunc_path = pair.trunc.raw_dir / fname
+        if not trunc_path.is_file():
+            continue
+        full_vals = _read_parquet_columns(pair.full.raw_dir / fname, [col])[col].to_numpy()[
+            : pair.n_trunc
+        ]
+        trunc_vals = _read_parquet_columns(trunc_path, [col])[col].to_numpy()
+        for idx in boundary_idxs:
+            full_v = full_vals[idx]
+            trunc_v = trunc_vals[idx]
+            if np.isnan(full_v) and np.isnan(trunc_v):
+                continue
+            if not np.isclose(
+                full_v, trunc_v, rtol=FLOAT16_RTOL, atol=FLOAT16_ATOL, equal_nan=True
+            ):
+                mismatches.append(
+                    f"{fname}::{col} idx={idx} ts={int(ts_vals[idx])} "
+                    f"full={full_v!r} trunc={trunc_v!r}"
+                )
+
+    if not mismatches:
+        raise AssertionError(
+            "align lookahead oracle: no coarse column mismatch at 12h boundaries "
+            f"(probes={align_probes!r}, boundary_idxs={boundary_idxs[:8]})"
+        )
+
+
 def _build_truncation_pair(
     features_root: Path,
     kline_df: pd.DataFrame,
@@ -1158,6 +1309,7 @@ def _build_truncation_pair(
     patch_fetch: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     d_star_parent: Optional[Path] = None,
     monkeypatch: Optional[pytest.MonkeyPatch] = None,
+    align_lookahead_side: Optional[AlignLookaheadSide] = None,
 ) -> TruncationPair:
     if training_tfs is None:
         training_tfs = [primary_tf]
@@ -1200,6 +1352,9 @@ def _build_truncation_pair(
     full_d_dir = d_star_parent / "full" if d_star_parent else None
     trunc_d_dir = d_star_parent / "trunc" if d_star_parent else None
 
+    _set_align_lookahead_patch(
+        monkeypatch, enabled=(align_lookahead_side == "full")
+    )
     full = _run_generation(
         factory,
         features_root=features_root,
@@ -1209,6 +1364,9 @@ def _build_truncation_pair(
         symbol=symbol,
         primary_tf=primary_tf,
         d_star_dir=full_d_dir,
+    )
+    _set_align_lookahead_patch(
+        monkeypatch, enabled=(align_lookahead_side == "trunc")
     )
     trunc = _run_generation(
         factory,
@@ -1220,6 +1378,7 @@ def _build_truncation_pair(
         primary_tf=primary_tf,
         d_star_dir=trunc_d_dir,
     )
+    _set_align_lookahead_patch(monkeypatch, enabled=False)
     return TruncationPair(warmup=warmup, n_trunc=trunc.row_count, full=full, trunc=trunc)
 
 
