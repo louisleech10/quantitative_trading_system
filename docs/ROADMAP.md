@@ -39,6 +39,11 @@
 - **為何**:使用者要 AI Agent 直接讀 IC 輸出、像委員會討論、回饋「哪些特徵/參數真的較好」+ 點破盲點。**前提=先修上面正確性**(否則 Agent 讀到污染數字會自信推薦過擬合假因子)。
 - **範圍**:① IC 輸出結構化可機讀(穩定 schema);② 輸出含 FDR/OOS/DSR 嚴謹度指標(讓 Agent 分辨真好 vs 過擬合);③ Agent 解讀/委員會式討論層。**依賴**:P0 正確性紅線。**狀態**:概念,未規劃。
 
+### P1 — fracdiff max_lag 截斷不變修復（2026-07-02 三方委員會立案,使用者定序）
+- **根因**:`max_lag = min(max(2, len(df)//10), 252)` 以整段長度推導,把總長度洩進 d* 計算(600→60,590→59)→ 截斷不變性破壞。**非 look-ahead**(d* 校準只吃 first-500 prefix),量化因果安全,但屬真實作缺陷。三腿檔 `handoffs/20260702-FF-DSTAR-GATE-{CLAUDE,CODEX,COMPOSER}.md`;B2 回歸 receipt 20260702T042627Z(8 passed/2 fracdiff failed 揭露)。
+- **順序(使用者 2026-07-02 定)**:FF 深稽全完成(護網完工)→ 本 epic 修 max_lag(改由 calibration/固定推導;**會改全部 fracdiff 特徵值**,命中 (a)(d) 走完整管線+三方值守恆)→ 修完 2 個 strict-xfail 截斷測試應轉綠 → **重新生成 FF 定版給 IC**。併 P1-FF-6(d*/fracdiff probe)避免重工。
+- **現況**:2 測試 strict-xfail 附根因(test_ff_fullchain_truncation_mr.py);IC 程式開發不受阻(不依賴特徵精確值),特徵定版等本 epic。
+
 ### P1 — Productionization Epic（全棧參數持久化）★上線前置
 - **為何**:任一特徵/模型要上線推論前必做,否則 train/serve 分布偏移、模型靜默失效。三方三輪盤點 CONVERGED。
 - **權威範圍清單**:`docs/FEATURE_STATEFUL_PARAM_AUDIT_FINAL.md`(全棧三層)。

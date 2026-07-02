@@ -107,6 +107,16 @@ def test_c2_2_tail_perturbation_prefix_invariant(
     _assert_truncation_invariants(pair)
 
 
+# 2026-07-02 三方委員會定案(20260702-FF-DSTAR-GATE-{CLAUDE,CODEX,COMPOSER}):
+# fracdiff max_lag = min(max(2, len(df)//10), 252) 以「整段長度」推導,把總長度洩進
+# d* 計算(full 600→60, trunc 590→59)→ d* 差一格網格 → 截斷不變性破壞。
+# 非 look-ahead(d* 校準只吃 first-500 prefix,不用未來值),量化因果安全,但屬真實作缺陷。
+# 修法=max_lag 改由 calibration/固定推導,會改變全部 fracdiff 特徵值 → 獨立 epic
+# (ROADMAP「fracdiff max_lag 截斷不變修復」,併 P1-FF-6,FF 深稽完成後執行,修完本 xfail 應轉綠)。
+@pytest.mark.xfail(
+    strict=True,
+    reason="fracdiff max_lag 長度依賴(len(df)//10)破壞截斷不變;非 look-ahead;修法在 d*/max_lag epic",
+)
 def test_fracdiff_truncation_invariant(
     tmp_path: Path,
     kline_df_module: pd.DataFrame,
@@ -122,6 +132,11 @@ def test_fracdiff_truncation_invariant(
     _assert_fracdiff_truncation_invariants(pair)
 
 
+# 同上:max_lag 長度依賴,見 test_fracdiff_truncation_invariant 註解與委員會三腿檔。
+@pytest.mark.xfail(
+    strict=True,
+    reason="fracdiff max_lag 長度依賴(len(df)//10)破壞截斷不變;非 look-ahead;修法在 d*/max_lag epic",
+)
 def test_fracdiff_tail_perturbation_invariant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
