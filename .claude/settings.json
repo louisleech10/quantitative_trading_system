@@ -104,6 +104,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/ci_check_after_push.sh"
+          }
+        ]
+      }
     ]
   }
 }
