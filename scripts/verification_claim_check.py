@@ -39,7 +39,7 @@ STRONG_POLARITY_RE = re.compile(
 WEAK_POLARITY_RE = re.compile(r"(?:\bpassed\b|通過)", re.IGNORECASE)
 DONE_READY_RE = re.compile(r"(?:\bDONE\b|(?<!-)\bready\b)", re.IGNORECASE)
 
-VERIFY_RE = re.compile(r"(?:VERIFY|REF):([A-Za-z0-9_.\-:]+)")
+VERIFY_RE = re.compile(r"(?:VERIFY|REF):([A-Za-z0-9_.\-:]+(?:/[\w./\-]+)?)")
 SIGNOFF_RE = re.compile(r"SIGNOFF:([A-Za-z0-9_.\-:]+(?::[A-Za-z0-9_.\-:]+)*)")
 SUPERSEDED_RE = re.compile(
     r"SUPERSEDED[:\s\]]|取代.{0,20}VERIFY:",
@@ -51,6 +51,14 @@ DISCUSSION_MARKER_RE = re.compile(
 )
 ATTRIBUTION_RE = re.compile(
     r"把.{0,60}寫成|宣稱|不實|捏造|誤讀|事故|SUPERSEDED|假綠|無牙齒",
+    re.IGNORECASE,
+)
+ATTRIBUTION_SOURCE_RE = re.compile(
+    r"(?:寫道|檔案說|檔案寫道|報告稱|according\s+to)",
+    re.IGNORECASE,
+)
+QUOTED_VERDICT_RE = re.compile(
+    r"(?:已驗|真紅|APPROVED|綠燈|全綠|\bPASS\b|\bDONE\b)",
     re.IGNORECASE,
 )
 EXEMPT_RE = re.compile(
@@ -325,6 +333,19 @@ def _line_in_operational_section(content: str, line_no: int) -> bool:
     return False
 
 
+def _is_docs_operational_unit(unit: Unit) -> bool:
+    """docs/* 內 operational 段（## 已完成 / STATUS: / RESULT 硬欄位）。"""
+    path = unit.source_file.replace("\\", "/")
+    if not (path.startswith("docs/") or "/docs/" in path):
+        return False
+    if unit.section_operational:
+        return True
+    stripped = unit.text.strip()
+    if re.match(r"^(?:STATUS|RESULT)\s*:", stripped, re.IGNORECASE):
+        return True
+    return False
+
+
 def _detect_source_context(unit: Unit) -> str:
     """依檔案路徑與段落決定 source_context。"""
     path = unit.source_file.replace("\\", "/")
@@ -340,6 +361,8 @@ def _detect_source_context(unit: Unit) -> str:
         return "operational_result"
 
     if path.startswith("docs/") or "/docs/" in path:
+        if _is_docs_operational_unit(unit):
+            return "operational_result"
         return "docs_spec"
 
     if unit.section_operational:
@@ -672,8 +695,78 @@ def check_fingerprint_conflicts(
     return violations
 
 
+def _has_quoted_polarity(text: str) -> bool:
+    """中文引號內含驗收判詞（假歸屬自我認證偵測用）。"""
+    for pattern in (r"「([^」]+)」", r"『([^』]+)』"):
+        for match in re.finditer(pattern, text):
+            inner = match.group(1)
+            scan = normalize(_claim_polarity_text(inner))
+            if QUOTED_VERDICT_RE.search(scan) or STRONG_POLARITY_RE.search(scan):
+                return True
+    return False
+
+
+def _resolve_attributed_path(text: str) -> Path | None:
+    """從歸屬語句解析被引用檔案路徑（若存在）。"""
+    for match in re.finditer(r"(?:handoffs|docs)/[\w./\-]+\.md", text):
+        candidate = Path(match.group(0))
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _file_content_has_backing(content: str) -> bool:
+    """檔案內容是否含 receipt/戳記/委員閉合判詞（REF 檔案 backing 判定）。"""
+    if VERIFY_RE.search(content) or SIGNOFF_RE.search(content) or "RECONCILE-STAMP:" in content:
+        return True
+    if re.search(r"\b(?:CLOSED|APPROVED)\b", content):
+        return True
+    return False
+
+
+def _attributed_file_has_backing(text: str) -> bool:
+    """被歸屬檔案實含 VERIFY/REF/SIGNOFF、reconcile 戳記或委員閉合判詞。"""
+    path = _resolve_attributed_path(text)
+    if path is None:
+        return False
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return _file_content_has_backing(content)
+
+
+def _is_ref_file_path(backing_id: str) -> bool:
+    """REF token 是否為 handoffs/docs 檔案路徑（非 receipt id）。"""
+    return "/" in backing_id or backing_id.endswith(".md")
+
+
+def _is_fake_attribution_self_cert(unit: Unit) -> bool:
+    """假歸屬 citation：引號內判詞 + X 寫道/檔案說，無真 backing。"""
+    if not ATTRIBUTION_SOURCE_RE.search(unit.text):
+        return False
+    if not _has_quoted_polarity(unit.text):
+        return False
+    if VERIFY_RE.search(unit.text) or SIGNOFF_RE.search(unit.text):
+        return False
+    if _attributed_file_has_backing(unit.text):
+        return False
+    return True
+
+
+def _claim_has_parseable_scope(claim: ClaimObject) -> bool:
+    """claim 是否有可解析 scope（node-id/檔案）或 runtime 線索。"""
+    if claim.scope:
+        return True
+    if claim.runtime_expectation != "none":
+        return True
+    return False
+
+
 def _is_citation(unit: Unit) -> bool:
     """引用/討論原文（非作者 operational 新宣稱）。"""
+    if _is_fake_attribution_self_cert(unit):
+        return False
     if unit.in_fenced or unit.in_quote:
         return True
     if DISCUSSION_MARKER_RE.search(unit.text) and (unit.in_fenced or unit.in_quote):
@@ -690,6 +783,8 @@ def classify_mode(unit: Unit, claim: ClaimObject) -> str:
     """模式判定：citation|supersede|discussion|operational|neutral。"""
     if SUPERSEDED_RE.search(unit.text):
         return "supersede"
+    if _is_fake_attribution_self_cert(unit):
+        return "operational"
     if _is_citation(unit):
         return "discussion"
     if claim.source_context == "docs_spec":
@@ -849,6 +944,18 @@ def check_backing(claim: ClaimObject, backing_id: str) -> tuple[bool, str]:
             return False, "SIGNOFF 不得支撐慢測/mutation claim"
         return True, ""
 
+    if _is_ref_file_path(backing_id):
+        ref_path = Path(backing_id)
+        if not ref_path.is_file():
+            return False, f"REF 檔案不存在: {backing_id}"
+        try:
+            ref_content = ref_path.read_text(encoding="utf-8")
+        except OSError:
+            return False, f"REF 檔案無法讀取: {backing_id}"
+        if not _file_content_has_backing(ref_content):
+            return False, f"REF 檔案無 backing 內容: {backing_id}"
+        return True, ""
+
     receipt_path, receipt = _load_receipt(backing_id)
     if receipt_path is None or receipt is None:
         return False, f"receipt 不存在: {backing_id}"
@@ -883,6 +990,12 @@ def check_backing(claim: ClaimObject, backing_id: str) -> tuple[bool, str]:
 
     if not _polarity_matches(claim, receipt):
         return False, f"極性與 receipt 不符: exit={receipt.get('exit_code')}"
+
+    if claim.polarity == "success" and not _claim_has_parseable_scope(claim):
+        return (
+            False,
+            "模糊 scope：claim 無 node-id/檔案/runtime 線索，不得用任意 receipt 洗白",
+        )
 
     if not _scope_intersects(claim, receipt):
         return False, f"scope 無交集: {claim.scope}"
@@ -1105,20 +1218,32 @@ class FileReadError(Exception):
         super().__init__(f"{rel_path}: {detail}")
 
 
+def _unit_touches_added_lines(unit: Unit, added_lines: set[int]) -> bool:
+    """單位是否落在 staged 新增行範圍內。"""
+    if not added_lines:
+        return False
+    span_end = unit.source_line + unit.text.count("\n")
+    return any(line_no in added_lines for line_no in range(unit.source_line, span_end + 1))
+
+
 def _scan_file_content(
     rel: str,
     content: str,
     open_pending: list[dict[str, Any]],
     all_units_claims: list[tuple[Unit, ClaimObject]],
+    *,
+    added_lines: set[int] | None = None,
 ) -> list[Violation]:
     """掃描單檔文字內容，累積 claim units 並回傳違規。"""
     violations: list[Violation] = []
     for unit in split_units(content, rel):
+        if added_lines is not None and not _unit_touches_added_lines(unit, added_lines):
+            continue
         _unknown_polarity_warn(unit)
         claim = extract_claim(unit)
         all_units_claims.append((unit, claim))
         violations.extend(check_unit(unit, open_pending))
-    if _is_result_file(rel):
+    if _is_result_file(rel) and added_lines is None:
         violations.extend(check_result_structured_fields(rel, content))
     return violations
 
@@ -1127,10 +1252,12 @@ def check_files(
     paths: list[Path],
     *,
     content_map: dict[str, str] | None = None,
+    added_lines_map: dict[str, set[int]] | None = None,
 ) -> list[Violation]:
     """掃描多檔，回傳全部違規。
 
     content_map 若提供，以 map 內容取代 working tree read_text（供 --staged index blob）。
+    added_lines_map 若提供，僅掃描各檔 staged 相對 HEAD 的新增行（--staged 增量模式）。
     """
     violations: list[Violation] = []
     open_pending = load_open_pending()
@@ -1149,7 +1276,18 @@ def check_files(
                 raise FileReadError(rel, f"not valid UTF-8: {exc}") from exc
             except OSError as exc:
                 raise FileReadError(rel, str(exc)) from exc
-        violations.extend(_scan_file_content(rel, content, open_pending, all_units_claims))
+        added_lines = added_lines_map.get(rel) if added_lines_map is not None else None
+        if added_lines_map is not None and not added_lines:
+            continue
+        violations.extend(
+            _scan_file_content(
+                rel,
+                content,
+                open_pending,
+                all_units_claims,
+                added_lines=added_lines,
+            )
+        )
     violations.extend(check_fingerprint_conflicts(all_units_claims))
     return violations
 
@@ -1174,18 +1312,45 @@ def _git_staged_blob(rel_path: str) -> str | None:
     return proc.stdout
 
 
-def _git_staged_markdown_files() -> tuple[list[Path], dict[str, str]]:
-    """回傳 staged scannable paths 與 index blob 內容 map。"""
+def _git_staged_added_line_numbers(rel_path: str) -> set[int]:
+    """從 git diff --cached -U0 取 staged 相對 HEAD 的新增行行號（1-based）。"""
+    proc = _run_git(["diff", "--cached", "-U0", "--", rel_path])
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return set()
+    added: set[int] = set()
+    new_line = 0
+    for line in proc.stdout.splitlines():
+        if line.startswith("@@"):
+            match = re.match(r"@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            if match:
+                new_line = int(match.group(1))
+            continue
+        if line.startswith(("diff ", "---", "+++")):
+            continue
+        if line.startswith("+"):
+            added.add(new_line)
+            new_line += 1
+        elif line.startswith("-"):
+            continue
+        else:
+            new_line += 1
+    return added
+
+
+def _git_staged_markdown_files() -> tuple[list[Path], dict[str, str], dict[str, set[int]]]:
+    """回傳 staged scannable paths、index blob 內容 map 與新增行行號 map。"""
     rel_paths = _git_staged_scannable_paths()
     paths: list[Path] = []
     content_map: dict[str, str] = {}
+    added_lines_map: dict[str, set[int]] = {}
     for rel in rel_paths:
         blob = _git_staged_blob(rel)
         if blob is None:
             continue
         paths.append(Path(rel))
         content_map[rel] = blob
-    return paths, content_map
+        added_lines_map[rel] = _git_staged_added_line_numbers(rel)
+    return paths, content_map, added_lines_map
 
 
 def _git_range_files(range_spec: str) -> list[Path]:
@@ -1231,6 +1396,8 @@ def list_open_pending() -> int:
 def _stdin_operational_unit(unit: Unit, norm_path: str) -> bool:
     """PreToolUse 增量掃描：判斷單位是否落在 operational 區段。"""
     if norm_path == "HANDOFF.md":
+        return True
+    if norm_path.startswith("docs/") and _is_docs_operational_unit(unit):
         return True
     if unit.section_operational:
         return True
@@ -1294,8 +1461,9 @@ def main(argv: list[str] | None = None) -> int:
 
     paths: list[Path] = []
     staged_content_map: dict[str, str] | None = None
+    staged_added_lines_map: dict[str, set[int]] | None = None
     if args.staged:
-        staged_paths, staged_content_map = _git_staged_markdown_files()
+        staged_paths, staged_content_map, staged_added_lines_map = _git_staged_markdown_files()
         paths.extend(staged_paths)
     if args.range_spec:
         paths.extend(_git_range_files(args.range_spec))
@@ -1340,8 +1508,13 @@ def main(argv: list[str] | None = None) -> int:
             unique_paths.append(path)
 
     content_map = staged_content_map if args.staged else None
+    added_lines_map = staged_added_lines_map if args.staged else None
     try:
-        violations = check_files(unique_paths, content_map=content_map)
+        violations = check_files(
+            unique_paths,
+            content_map=content_map,
+            added_lines_map=added_lines_map,
+        )
     except FileReadError as exc:
         print(
             f"verification_claim_check.py: cannot read {exc.rel_path}: {exc.detail}",

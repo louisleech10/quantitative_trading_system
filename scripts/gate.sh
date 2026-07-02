@@ -24,6 +24,7 @@ kind="${1:-}"; shift || true
 [ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || { echo "ERROR: kind 必須是 dispatch|artifact"; exit 1; }
 
 intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
+task_id=""
 file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -33,6 +34,7 @@ while [ $# -gt 0 ]; do
     --review-role)     review_role="${2:-}"; shift 2 ;;
     --template)        template="${2:-}"; shift 2 ;;
     --adversarial)     adversarial="${2:-}"; shift 2 ;;
+    --task-id)         task_id="${2:-}"; shift 2 ;;
     --file)            file="${2:-}"; shift 2 ;;
     --template-opened) template_opened="${2:-}"; shift 2 ;;
     --sections)        sections="${2:-}"; shift 2 ;;
@@ -46,6 +48,43 @@ done
 missing=""
 miss() { missing="${missing}  · --$1: $2\n"; }
 
+# R7：委員派工 provenance emitter（只記錄派工+輸出指紋，不聲稱內容為真）
+_append_committee_dispatch() {
+  local adv_path="$1"
+  local tid="$2"
+  [ -n "${tid}" ] || return 0
+  [ -f "${adv_path}" ] || return 0
+  local dispatch_ts out_rel family output_sha256
+  dispatch_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%SZ')"
+  out_rel="${adv_path}"
+  case "${out_rel}" in
+    /*)
+      case "${out_rel}" in
+        *handoffs/*) out_rel="handoffs/${out_rel#*handoffs/}" ;;
+        *docs/*) out_rel="docs/${out_rel#*docs/}" ;;
+      esac
+      ;;
+  esac
+  family="composer"
+  case "${out_rel}" in
+    *-ADV-CODEX*|*-adv-codex*) family="codex" ;;
+    *-ADV-COMPOSER*|*-adv-composer*) family="composer" ;;
+    *)
+      case "${review_role}" in
+        *codex*|*CODEX*) family="codex" ;;
+        *composer*|*COMPOSER*) family="composer" ;;
+      esac
+      ;;
+  esac
+  output_sha256="$(
+    "${VENV_PY}" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' \
+      "${adv_path}"
+  )"
+  printf '%s\n' \
+    "{\"event\":\"committee_dispatch\",\"task_id\":\"${tid}\",\"family\":\"${family}\",\"output_path\":\"${out_rel}\",\"output_sha256\":\"${output_sha256}\",\"ts\":\"${dispatch_ts}\"}" \
+    >> "${AUDIT}"
+}
+
 if [ "${kind}" = "dispatch" ]; then
   [ -n "${intent}" ]      || miss intent      "派什麼給誰（一句）"
   [ -n "${risk}" ]        || miss risk        "low|high（命中 a/b/c/d 任一即 high）"
@@ -58,6 +97,16 @@ if [ "${kind}" = "dispatch" ]; then
       ""|waived:*) : ;;
       *)
         [ -f "${adversarial}" ] || { echo "ERROR: --adversarial 檔不存在:${adversarial}（真實檢查失敗）"; exit 1; }
+        # R7：先記錄 committee_dispatch，供後續 reconcile/adversarial provenance 機檢
+        case "${adversarial}" in
+          waived:*|n/a:*|N/A:*|stamped-waived:*) : ;;
+          *)
+            if [ -n "${task_id}" ]; then
+              _append_committee_dispatch "${adversarial}" "${task_id}"
+              export VERIFY_GATE_COMMITTEE_AUDIT_LOG="${AUDIT}"
+            fi
+            ;;
+        esac
         # W3 fail-closed：須為 ADV 命名+provenance，或 reconcile 戳記核可；其他路徑一律拒發 token
         case "${adversarial}" in
           handoffs/*-ADV-CODEX.md|handoffs/*-ADV-COMPOSER.md|handoffs/*-adv-codex.md|handoffs/*-adv-composer.md)

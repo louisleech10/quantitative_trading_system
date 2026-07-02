@@ -27,8 +27,11 @@ case "$tool_name" in
     ;;
   Bash)
     cmd="$(jq -r '.tool_input.command // empty' <<<"$INPUT" 2>/dev/null)"
+    # R1：剝除行首 env 前綴（VAR=value 可多個）再比對 executor，防 GATE_DIR_OVERRIDE=… codex exec 繞過。
+    while printf '%s' "$cmd" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*='; do
+      cmd="$(printf '%s' "$cmd" | sed -E 's/^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+//')"
+    done
     # executor 通道：只比對「命令位置」（行首 / 分隔符後）的 binary，避免誤擋 cat sp_codex.txt 這種檔名子字串。
-    # 殘量：env 前綴（VAR=x codex）或未列入的全新 CLI 會漏 Bash，但 Task 工具全涵蓋。
     if printf '%s' "$cmd" | grep -Eq '(^|[;&|][[:space:]]*)(codex|cursor-agent|agy)[[:space:]]|claude[^|]*(-p|--print)'; then
       # 排除 gate 自身與唯讀勘查
       if printf '%s' "$cmd" | grep -Eq 'scripts/gate(_check)?\.sh'; then exit 0; fi

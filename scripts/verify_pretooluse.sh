@@ -22,16 +22,37 @@ esac
 file_path="$(jq -r '.tool_input.file_path // empty' <<<"$INPUT" 2>/dev/null)" || exit 2
 [ -z "$file_path" ] && exit 0
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+ROOT_RAW="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "[VERIFY-PRETOOLUSE] 不在 git repo，fail-closed" >&2
   exit 2
 }
-cd "$ROOT" || exit 2
+cd "$ROOT_RAW" || exit 2
 
-rel_path="${file_path#"$ROOT"/}"
-rel_path="${rel_path#./}"
+py_early="venv/bin/python"
+[ -x "$py_early" ] || py_early="python3"
+_realpath() {
+  "$py_early" -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1" 2>/dev/null \
+    || realpath "$1" 2>/dev/null \
+    || readlink -f "$1" 2>/dev/null \
+    || printf '%s' "$1"
+}
+ROOT="$(_realpath "$ROOT_RAW")"
+abs_file="$(_realpath "$file_path")"
 
-if ! printf '%s' "$rel_path" | grep -Eq '^(HANDOFF\.md|handoffs/.+)$'; then
+case "$abs_file" in
+  "$ROOT"/*) ;;
+  *)
+    if printf '%s' "$file_path" | grep -Eq '(HANDOFF\.md|handoffs/|docs/)'; then
+      echo "[VERIFY-PRETOOLUSE] 無法正規化 repo 內目標路徑（fail-closed）: ${file_path}" >&2
+      exit 2
+    fi
+    exit 0
+    ;;
+esac
+
+rel_path="${abs_file#"$ROOT"/}"
+
+if ! printf '%s' "$rel_path" | grep -Eq '^(HANDOFF\.md|handoffs/.+|docs/.+)$'; then
   exit 0
 fi
 
