@@ -11,7 +11,7 @@
 
 ## verify-gate 待修項
 - ✅ `pytest -k` receipt 空 node_ids(本次 commit):run_with_receipt.py 加 --collect-only fallback(剝 verbosity 旗標防 -qq 退化)+回歸測試(修前紅/修後綠)。governance 檔載「106 passed」(本 session pytest 輸出)。
-- 未動:①6 委員會過程檔 prose 豁免(O3-extension;檔在本機 handoffs/ 勿刪:ALIGN-ORACLE-{FACTS,DESIGN-CODEX}、DSTAR-GATE-{CLAUDE,CODEX}、ALIGN-PROBE-FIX-PROMPT、PROBE-FIX2-composer)②R7-emitter(修向見 P1-57-RECONCILE 尾節)。
+- 未動:①委員會過程檔 prose 豁免(O3-extension;檔在本機 handoffs/ 勿刪,現 **8 份**:ALIGN-ORACLE-{FACTS,DESIGN-CODEX}、DSTAR-GATE-{CLAUDE,CODEX}、ALIGN-PROBE-FIX-PROMPT、PROBE-FIX2-composer+**新增 P1-57-IMPL-codex、P1-57-REVIEW-composer**(commit 41c2df7 時被 checker 擋,已 unstage 留本機))②R7-emitter(修向見 P1-57-RECONCILE 尾節)。
 - 新 `scripts/restore_golden_inventory.sh`(golden inventory 例行還原,免 ask 彈窗;`git checkout -- *` 在 ask 清單是刻意的)。
 
 ## 下一步(使用者定奪)
