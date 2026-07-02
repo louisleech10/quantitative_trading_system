@@ -124,6 +124,7 @@ backend.log
 *.log
 !handoffs/run_receipts/*.log
 !.claude/gate/verify_audit.log
+!.claude/gate/audit.log
 sessions/PHASE_3.3+3.4_COMPLETION_REPORT.md
 sessions/Phase3.1.md
 sessions/PHASE3.5_COMPLETE_SUMMARY.md
@@ -144,9 +145,10 @@ sessions/數據遷移總結.md
 # Antigravity CLI 本地設定（agy）
 .antigravitycli/
 
-# fail-closed gate runtime tokens/audit (transient)
+# fail-closed gate runtime tokens (transient)
 .claude/gate/*.token
-.claude/gate/audit.log
+# audit.log 自 GOV-O3EXT-R7 起入版控:committee_dispatch/committee_output 事件是
+# checker 檔案類豁免與 reconcile 戳記 provenance 的依據,CI checkout 需要;入 git=竄改可見
 
 # 測試執行副產物(2026-06-12:測試未隔離輸出目錄,根治屬測試隔離 backlog)
 optimization_results/
