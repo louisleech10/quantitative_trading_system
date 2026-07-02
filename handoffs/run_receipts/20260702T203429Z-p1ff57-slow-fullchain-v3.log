@@ -1,0 +1,799 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_slow_solo_a_equals_batch_b_then_a_artifacts 
+-------------------------------- live log call ---------------------------------
+04:17:56 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+04:17:56 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+04:17:56 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+04:17:56 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+04:17:56 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+04:17:56 [INFO] Registered adapter: crypto_spot
+04:17:57 [INFO] Fetching spot data: BTCUSDT/12h
+04:17:57 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+04:17:57 [INFO] Aligned data for BTCUSDT/12h: 1696 rows, 8 columns
+04:17:57 [INFO] [Layer 1] 0% - Starting Layer 1...
+04:17:57 [INFO] Layer 1 starting, rss=274MB
+04:17:57 [INFO] Loaded 134 TA-Lib indicators
+04:17:57 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:17:57 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:17:57 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:17:57 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:17:57 [WARNING] trades missing, large trade ratio set to NaN
+04:18:03 [INFO] [Layer 1] 100% - Layer 1 completed: 3427 features
+04:18:03 [INFO] Layer 1 done: 3427 cols, status=ok, rss=474MB
+04:18:03 [INFO] [Layer 2] 0% - Starting Layer 2...
+04:18:03 [INFO] Layer 2 starting, rss=469MB
+04:18:03 [INFO] [L2] Starting derived features: 3427 L1 cols
+04:18:03 [INFO] [NaN Blacklist][L2_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:18:03 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:18:03 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:18:03 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:18:03 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:18:14 [INFO] [L2] Completed: 30180 cols in 11.02s
+04:18:16 [INFO] [Layer 2] 100% - Layer 2 completed: 30180 features
+04:18:16 [INFO] Layer 2 done: 30180 cols, status=ok, rss=1356MB
+04:18:16 [INFO] [Layer 3] 0% - Starting Layer 3...
+04:18:16 [INFO] Layer 3 starting, rss=1356MB
+04:18:16 [INFO] [NaN Blacklist][L3_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:18:29 [INFO] [L3 streaming][numba][multi] step 10/16 (W55_std): 3352→3349 cols (-3 dead)
+04:18:29 [INFO] [L3 streaming][numba][multi] step 16/16 (W55_slope): 3352→3349 cols (-3 dead)
+04:18:29 [INFO] [L3 streaming][numba][multi] complete: 53632 total generated, 224 dead dropped, 53408 survivors
+04:18:31 [INFO] [Layer 3] 100% - Layer 3 completed: 53408 features
+04:18:31 [INFO] Layer 3 done: 53408 cols, status=ok, rss=1430MB
+04:18:31 [INFO] [Layer 4] 0% - Starting Layer 4...
+04:18:31 [INFO] Layer 4 starting, rss=1430MB
+04:18:31 [INFO] [NaN Blacklist][L4_input[layer1_and_raw]] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:18:32 [INFO] [Layer 4] 100% - Layer 4 completed: 6720 features
+04:18:32 [INFO] Layer 4 done: 6720 cols, status=ok, rss=1516MB
+04:18:32 [INFO] [Layer 5] 0% - Starting Layer 5...
+04:18:32 [INFO] Layer 5 starting, rss=1516MB
+04:18:32 [INFO] Fetching spot data: ETHUSDT/12h
+04:18:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+04:18:32 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 8 columns
+04:18:32 [INFO] [Layer 5] 100% - Layer 5 completed: 3 features
+04:18:32 [INFO] Layer 5 done: 3 cols, status=ok, rss=1518MB
+04:18:32 [INFO] [Layer 6] 0% - Starting Layer 6...
+04:18:32 [INFO] Layer 6 starting, rss=1518MB
+04:18:32 [INFO] [Layer 6] 100% - Layer 6 completed: 11 features
+04:18:32 [INFO] Layer 6 done: 11 cols, status=ok, rss=1519MB
+04:18:32 [INFO] [memmap concat] 6 DFs → 93749 cols × 1695 rows ≈ 0.64 GB → disk-backed
+04:18:32 [INFO] [memmap] created: shape=(1695, 93749), dtype=<class 'numpy.float32'>, est=0.64 GB  (file auto-unlinked)
+04:18:32 [INFO] [memmap concat] copying DF 1/6 (3427 cols)
+04:18:32 [INFO] [memmap concat] copying DF 2/6 (30180 cols)
+04:18:33 [INFO] [memmap concat] copying DF 3/6 (53408 cols)
+04:18:34 [INFO] [memmap concat] copying DF 4/6 (6720 cols)
+04:18:34 [INFO] [memmap concat] copying DF 5/6 (3 cols)
+04:18:34 [INFO] [memmap concat] copying DF 6/6 (11 cols)
+04:18:35 [INFO] [IC-First] Generation mode: skipping rank/zscore/gaussian. IC Gatekeeper and selected transforms are downstream actions after L7_raw.
+04:18:35 [INFO] [Layer 6.5 (IC-First)] 0% - Starting Layer 6.5 (IC-First)...
+04:18:35 [INFO] [IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only
+04:18:35 [INFO] [NaN Blacklist][L65_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:18:35 [INFO] [L6.5] dropping 9 ratio-unsafe columns (categories=['pattern']) at preprocessor entry
+04:18:35 [INFO] [L6.5] Column chunking activated: 93672 cols → 47 chunks of ≤2000
+04:18:35 [INFO] [memmap] created: shape=(1695, 93672), dtype=<class 'numpy.float32'>, est=0.64 GB  (file auto-unlinked)
+04:18:35 [INFO] [L6.5] Processing chunk 1/47 (2000 cols)
+04:18:36 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1008/2000 cols (50.4%); examples: ['close_momentum_RSI_5', 'close_momentum_RSI_6', 'close_momentum_RSI_7']
+04:18:47 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=117/734 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:18:50 [INFO] [ADF Safe-Skip][adf_diff] bypassed 480/480 cols (100.0%); examples: ['close_momentum_RSI_13', 'close_momentum_RSI_14', 'close_momentum_RSI_21']
+04:18:50 [INFO] [L6.5] Processing chunk 2/47 (2000 cols)
+04:18:50 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 792/2000 cols (39.6%); examples: ['low_momentum_ROC_21', 'low_momentum_ROC_34', 'low_momentum_ROC_55']
+04:18:59 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=117/1412 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:01 [INFO] [ADF Safe-Skip][adf_diff] bypassed 344/344 cols (100.0%); examples: ['low_momentum_ROC_34', 'low_momentum_ROC_55', 'low_momentum_ROC_89']
+04:19:01 [INFO] [L6.5] Processing chunk 3/47 (2000 cols)
+04:19:02 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 729/2000 cols (36.4%); examples: ['close_momentum_RSI_5_21_Ratio', 'close_momentum_RSI_5_25_Ratio', 'close_momentum_RSI_5_55_Ratio']
+04:19:06 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=304/2114 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:08 [INFO] [ADF Safe-Skip][adf_diff] bypassed 66/66 cols (100.0%); examples: ['close_momentum_RSI_13_55_Ratio', 'close_momentum_RSI_13_89_Ratio', 'close_momentum_RSI_14_55_Ratio']
+04:19:08 [INFO] [L6.5] Processing chunk 4/47 (2000 cols)
+04:19:08 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 845/2000 cols (42.2%); examples: ['quote_volume_momentum_ROC_12_55_Ratio', 'quote_volume_momentum_ROC_12_89_Ratio', 'quote_volume_momentum_ROC_12_144_Ratio']
+04:19:11 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=304/2446 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:12 [INFO] [ADF Safe-Skip][adf_diff] bypassed 331/331 cols (100.0%); examples: ['volume_momentum_ROCP_8_233_Ratio', 'volume_momentum_ROCP_9_233_Ratio', 'volume_momentum_ROCP_55_233_Ratio']
+04:19:12 [INFO] [L6.5] Processing chunk 5/47 (2000 cols)
+04:19:13 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['open_trend_EMA_10_200_Cross', 'open_trend_EMA_13_50_Cross', 'open_trend_EMA_13_89_Cross']
+04:19:16 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1078/1078 cols (100.0%); examples: ['open_trend_EMA_10_200_Cross', 'open_trend_EMA_13_50_Cross', 'open_trend_EMA_13_89_Cross']
+04:19:16 [INFO] [L6.5] Processing chunk 6/47 (2000 cols)
+04:19:16 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['hlc_momentum_ADX_34_233_Cross', 'hlc_momentum_ADX_55_233_Cross', 'hlc_momentum_ADXR_8_34_Cross']
+04:19:19 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1047/1047 cols (100.0%); examples: ['hlc_momentum_ADXR_8_34_Cross', 'hlc_momentum_ADXR_8_55_Cross', 'hlc_momentum_ADXR_13_55_Cross']
+04:19:19 [INFO] [L6.5] Processing chunk 7/47 (2000 cols)
+04:19:19 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 468/2000 cols (23.4%); examples: ['taker_ratio_statistics_STDDEV_5_144_Cross', 'taker_ratio_statistics_STDDEV_5_233_Cross', 'taker_ratio_statistics_STDDEV_8_34_Cross']
+04:19:23 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=333/2885 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:25 [INFO] [ADF Safe-Skip][adf_diff] bypassed 230/230 cols (100.0%); examples: ['taker_ratio_statistics_STDDEV_13_89_Cross', 'taker_ratio_statistics_STDDEV_14_55_Cross', 'taker_ratio_statistics_STDDEV_14_89_Cross']
+04:19:25 [INFO] [L6.5] Processing chunk 8/47 (2000 cols)
+04:19:25 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1606/2000 cols (80.3%); examples: ['close_momentum_RSI_5_Momentum_L1', 'close_momentum_RSI_5_Momentum_L3', 'close_momentum_RSI_6_Momentum_L1']
+04:19:26 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=465/3060 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:28 [INFO] [ADF Safe-Skip][adf_diff] bypassed 32/32 cols (100.0%); examples: ['volume_momentum_MACD-Hist_5-13-3_Momentum_L1', 'volume_momentum_MACD-Hist_34-89-13_Momentum_L1', 'taker-ratio_momentum_MACD-Line_5-21-5_Momentum_L3']
+04:19:28 [INFO] [L6.5] Processing chunk 9/47 (2000 cols)
+04:19:29 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1850/2000 cols (92.5%); examples: ['hlc_momentum_PLUS-DI_89_Momentum_L1', 'hlc_momentum_PLUS-DI_89_Momentum_L3', 'hlc_momentum_PLUS-DI_144_Momentum_L1']
+04:19:29 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=465/3071 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:31 [INFO] [ADF Safe-Skip][adf_diff] bypassed 48/48 cols (100.0%); examples: ['low_momentum_CMO_13_Momentum_L3', 'low_momentum_CMO_89_Momentum_L1', 'low_momentum_CMO_89_Momentum_L3']
+04:19:31 [INFO] [L6.5] Processing chunk 10/47 (2000 cols)
+04:19:32 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 144/2000 cols (7.2%); examples: ['close_statistics_LINEARREG-ANGLE_5_Momentum_L1', 'close_statistics_LINEARREG-ANGLE_5_Momentum_L3', 'close_statistics_LINEARREG-ANGLE_8_Momentum_L1']
+04:19:36 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=486/3453 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:37 [INFO] [ADF Safe-Skip][adf_diff] bypassed 3/3 cols (100.0%); examples: ['volume_statistics_LINEARREG-ANGLE_144_Momentum_L1', 'taker-ratio_statistics_LINEARREG-ANGLE_89_Momentum_L1', 'quote-volume_statistics_LINEARREG-ANGLE_233_Momentum_L3']
+04:19:37 [INFO] [L6.5] Processing chunk 11/47 (2000 cols)
+04:19:37 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 469/2000 cols (23.4%); examples: ['close_trend_EMA_5_TsRank_W13', 'close_trend_EMA_8_TsRank_W13', 'close_trend_EMA_10_TsRank_W13']
+04:19:47 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=1249/4589 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:49 [INFO] [ADF Safe-Skip][adf_diff] bypassed 150/150 cols (100.0%); examples: ['close_trend_EMA_20_TsRank_W13', 'close_trend_EMA_21_TsRank_W13', 'close_trend_EMA_34_TsRank_W13']
+04:19:49 [INFO] [L6.5] Processing chunk 12/47 (2000 cols)
+04:19:49 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 518/2000 cols (25.9%); examples: ['taker-ratio_trend_KAMA_21_TsRank_W13', 'taker-ratio_trend_KAMA_34_TsRank_W13', 'taker-ratio_trend_KAMA_55_TsRank_W13']
+04:19:57 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2175/5791 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:19:59 [INFO] [ADF Safe-Skip][adf_diff] bypassed 163/163 cols (100.0%); examples: ['open_trend_KAMA_34_TsRank_W13', 'open_trend_KAMA_55_TsRank_W13', 'open_trend_KAMA_89_TsRank_W13']
+04:19:59 [INFO] [L6.5] Processing chunk 13/47 (2000 cols)
+04:20:00 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['close_momentum_RSI_14_TsRank_W13', 'close_momentum_RSI_14_DecayLinear_W13', 'close_momentum_RSI_14_Sign']
+04:20:02 [INFO] [ADF Safe-Skip][adf_diff] bypassed 714/714 cols (100.0%); examples: ['close_momentum_RSI_14_DecayLinear_W13', 'close_momentum_RSI_14_Sign', 'close_momentum_RSI_14_Abs']
+04:20:02 [INFO] [L6.5] Processing chunk 14/47 (2000 cols)
+04:20:03 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1913/2000 cols (95.7%); examples: ['open_momentum_MACDEXT-Line_13-55-13_TsRank_W13', 'open_momentum_MACDEXT-Line_13-55-13_DecayLinear_W13', 'open_momentum_MACDEXT-Line_13-55-13_Sign']
+04:20:03 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2207/5852 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:20:06 [INFO] [ADF Safe-Skip][adf_diff] bypassed 688/688 cols (100.0%); examples: ['open_momentum_MACDEXT-Line_13-55-13_DecayLinear_W13', 'open_momentum_MACDEXT-Line_13-55-13_Sign', 'open_momentum_MACDEXT-Line_13-55-13_Abs']
+04:20:06 [INFO] [L6.5] Processing chunk 15/47 (2000 cols)
+04:20:06 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['taker-ratio_momentum_ROC_55_TsRank_W13', 'taker-ratio_momentum_ROC_55_DecayLinear_W13', 'taker-ratio_momentum_ROC_55_Sign']
+04:20:08 [INFO] [ADF Safe-Skip][adf_diff] bypassed 861/861 cols (100.0%); examples: ['taker-ratio_momentum_ROC_55_DecayLinear_W13', 'open_momentum_ROC_5_DecayLinear_W13', 'open_momentum_ROC_8_DecayLinear_W13']
+04:20:08 [INFO] [L6.5] Processing chunk 16/47 (2000 cols)
+04:20:09 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1403/2000 cols (70.2%); examples: ['volume_momentum_TRIX_13_TsRank_W13', 'volume_momentum_TRIX_13_DecayLinear_W13', 'volume_momentum_TRIX_13_Sign']
+04:20:12 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2378/6214 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:20:14 [INFO] [ADF Safe-Skip][adf_diff] bypassed 392/392 cols (100.0%); examples: ['volume_momentum_TRIX_13_DecayLinear_W13', 'volume_momentum_TRIX_21_DecayLinear_W13', 'volume_momentum_TRIX_34_DecayLinear_W13']
+04:20:14 [INFO] [L6.5] Processing chunk 17/47 (2000 cols)
+04:20:15 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 449/1532 cols (29.3%); examples: ['low_statistics_LINEARREG-ANGLE_55_TsRank_W13', 'low_statistics_LINEARREG-ANGLE_55_DecayLinear_W13', 'low_statistics_LINEARREG-ANGLE_55_Sign']
+04:20:20 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2881/6970 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:20:23 [INFO] [ADF Safe-Skip][adf_diff] bypassed 96/411 cols (23.4%); examples: ['low_statistics_LINEARREG-ANGLE_55_DecayLinear_W13', 'low_statistics_LINEARREG-ANGLE_55_Sign', 'low_statistics_LINEARREG-ANGLE_89_TsRank_W13']
+04:20:24 [INFO] [L6.5] Processing chunk 18/47 (2000 cols)
+04:20:28 [INFO] [ADF Safe-Skip][adf_diff] bypassed 782/1153 cols (67.8%); examples: ['close_momentum_RSI_5_Mean_W13', 'close_momentum_RSI_6_Mean_W13', 'close_momentum_RSI_7_Mean_W13']
+04:20:30 [INFO] [L6.5] Processing chunk 19/47 (2000 cols)
+04:20:33 [INFO] [ADF Safe-Skip][adf_diff] bypassed 184/888 cols (20.7%); examples: ['volume_momentum_TRIX_21_Mean_W13', 'volume_momentum_TRIX_34_Mean_W13', 'volume_momentum_TRIX_55_Mean_W13']
+04:20:36 [INFO] [L6.5] Processing chunk 20/47 (2000 cols)
+04:20:39 [INFO] [ADF Safe-Skip][adf_diff] bypassed 486/641 cols (75.8%); examples: ['volume_momentum_MACD-Hist_13-55-13_Std_W13', 'volume_momentum_MACD-Line_21-55-9_Std_W13', 'volume_momentum_MACD-Hist_21-55-9_Std_W13']
+04:20:40 [INFO] [L6.5] Processing chunk 21/47 (2000 cols)
+04:20:43 [INFO] [ADF Safe-Skip][adf_diff] bypassed 85/468 cols (18.2%); examples: ['hl_statistics_CORREL_89_Std_W13', 'hl_statistics_CORREL_144_Std_W13', 'hl_statistics_CORREL_233_Std_W13']
+04:20:43 [INFO] [L6.5] Processing chunk 22/47 (2000 cols)
+04:20:46 [INFO] [ADF Safe-Skip][adf_diff] bypassed 78/305 cols (25.6%); examples: ['high_momentum_MOM_55_Rank_W13', 'high_momentum_ROC_55_Rank_W13', 'high_momentum_ROCP_55_Rank_W13']
+04:20:47 [INFO] [L6.5] Processing chunk 23/47 (2000 cols)
+04:20:49 [INFO] [ADF Safe-Skip][adf_diff] bypassed 127/283 cols (44.9%); examples: ['close_momentum_MACD-Signal_21-55-9_ZScore_W13', 'close_momentum_MACD-Signal_21-89-13_ZScore_W13', 'close_momentum_MACD-Line_34-89-13_ZScore_W13']
+04:20:50 [INFO] [L6.5] Processing chunk 24/47 (2000 cols)
+04:20:54 [INFO] [ADF Safe-Skip][adf_diff] bypassed 115/947 cols (12.1%); examples: ['quote-volume_momentum_PPO_55-144-0_ZScore_W13', 'quote-volume_momentum_PPO_55-233-0_ZScore_W13', 'hl_momentum_AROON-aroondown_89_ZScore_W13']
+04:20:57 [INFO] [L6.5] Processing chunk 25/47 (2000 cols)
+04:21:01 [INFO] [ADF Safe-Skip][adf_diff] bypassed 878/1106 cols (79.4%); examples: ['close_momentum_MACD-Line_12-26-9_Min_W13', 'close_momentum_MACD-Signal_12-26-9_Min_W13', 'close_momentum_MACD-Line_13-34-9_Min_W13']
+04:21:01 [INFO] [L6.5] Processing chunk 26/47 (2000 cols)
+04:21:06 [INFO] [ADF Safe-Skip][adf_diff] bypassed 384/1204 cols (31.9%); examples: ['hl_statistics_CORREL_34_Min_W13', 'hl_statistics_CORREL_55_Min_W13', 'hl_statistics_CORREL_89_Min_W13']
+04:21:10 [INFO] [L6.5] Processing chunk 27/47 (2000 cols)
+04:21:13 [INFO] [ADF Safe-Skip][adf_diff] bypassed 554/1069 cols (51.8%); examples: ['quote-volume_momentum_MACDFIX-Signal_21_Max_W13', 'hlc_momentum_ADX_8_Max_W13', 'hlc_momentum_ADX_13_Max_W13']
+04:21:15 [INFO] [L6.5] Processing chunk 28/47 (2000 cols)
+04:21:19 [INFO] [ADF Safe-Skip][adf_diff] bypassed 444/624 cols (71.2%); examples: ['volume_momentum_RSI_21_Range_W13', 'volume_momentum_RSI_25_Range_W13', 'low_momentum_RSI_34_Range_W13']
+04:21:19 [INFO] [L6.5] Processing chunk 29/47 (2000 cols)
+04:21:23 [INFO] [ADF Safe-Skip][adf_diff] bypassed 63/873 cols (7.2%); examples: ['open_momentum_PPO_34-89-0_Range_W13', 'open_momentum_PPO_34-144-0_Range_W13', 'open_momentum_PPO_55-144-0_Range_W13']
+04:21:25 [INFO] [L6.5] Processing chunk 30/47 (2000 cols)
+04:21:28 [INFO] [ADF Safe-Skip][adf_diff] bypassed 367/502 cols (73.1%); examples: ['low_momentum_RSI_144_Slope_W13', 'close_momentum_MACD-Line_8-21-5_Slope_W13', 'close_momentum_MACD-Line_8-34-9_Slope_W13']
+04:21:28 [INFO] [L6.5] Processing chunk 31/47 (2000 cols)
+04:21:33 [INFO] [ADF Safe-Skip][adf_diff] bypassed 526/957 cols (55.0%); examples: ['hl_statistics_CORREL_144_Slope_W13', 'hl_statistics_CORREL_233_Slope_W13', 'close_momentum_RSI_5_Mean_W55']
+04:21:35 [INFO] [L6.5] Processing chunk 32/47 (2000 cols)
+04:21:38 [INFO] [ADF Safe-Skip][adf_diff] bypassed 754/1349 cols (55.9%); examples: ['high_momentum_MACDFIX-Hist_9_Mean_W55', 'high_momentum_MACDFIX-Line_13_Mean_W55', 'high_momentum_MACDFIX-Signal_13_Mean_W55']
+04:21:40 [INFO] [L6.5] Processing chunk 33/47 (2000 cols)
+04:21:43 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1095/1567 cols (69.9%); examples: ['close_momentum_RSI_5_Std_W55', 'close_momentum_RSI_6_Std_W55', 'close_momentum_RSI_7_Std_W55']
+04:21:45 [INFO] [L6.5] Processing chunk 34/47 (2000 cols)
+04:21:48 [INFO] [ADF Safe-Skip][adf_diff] bypassed 317/1337 cols (23.7%); examples: ['close_momentum_PPO_8-21-0_Std_W55', 'close_momentum_PPO_8-34-0_Std_W55', 'close_momentum_PPO_12-26-0_Std_W55']
+04:21:50 [INFO] [L6.5] Processing chunk 35/47 (2000 cols)
+04:21:53 [INFO] [ADF Safe-Skip][adf_diff] bypassed 484/580 cols (83.4%); examples: ['open_momentum_RSI_21_Rank_W55', 'open_momentum_RSI_25_Rank_W55', 'open_momentum_RSI_34_Rank_W55']
+04:21:53 [INFO] [L6.5] Processing chunk 36/47 (2000 cols)
+04:21:56 [INFO] [ADF Safe-Skip][adf_diff] bypassed 222/968 cols (22.9%); examples: ['hl_statistics_CORREL_55_Rank_W55', 'hl_statistics_CORREL_144_Rank_W55', 'close_momentum_RSI_25_ZScore_W55']
+04:21:57 [INFO] [L6.5] Processing chunk 37/47 (2000 cols)
+04:22:01 [INFO] [ADF Safe-Skip][adf_diff] bypassed 294/742 cols (39.6%); examples: ['open_momentum_MACDFIX-Line_3_ZScore_W55', 'open_momentum_MACDFIX-Signal_3_ZScore_W55', 'open_momentum_MACDFIX-Line_5_ZScore_W55']
+04:22:02 [INFO] [L6.5] Processing chunk 38/47 (2000 cols)
+04:22:06 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1112/1602 cols (69.4%); examples: ['close_momentum_RSI_5_Min_W55', 'close_momentum_RSI_6_Min_W55', 'close_momentum_RSI_7_Min_W55']
+04:22:08 [INFO] [L6.5] Processing chunk 39/47 (2000 cols)
+04:22:12 [INFO] [ADF Safe-Skip][adf_diff] bypassed 379/1315 cols (28.8%); examples: ['open_momentum_APO_21-55-0_Min_W55', 'open_momentum_APO_21-89-0_Min_W55', 'open_momentum_APO_34-89-0_Min_W55']
+04:22:16 [INFO] [L6.5] Processing chunk 40/47 (2000 cols)
+04:22:19 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1407/1648 cols (85.4%); examples: ['taker-ratio_momentum_RSI_89_Max_W55', 'taker-ratio_momentum_RSI_144_Max_W55', 'open_momentum_RSI_5_Max_W55']
+04:22:20 [INFO] [L6.5] Processing chunk 41/47 (2000 cols)
+04:22:23 [INFO] [ADF Safe-Skip][adf_diff] bypassed 625/1574 cols (39.7%); examples: ['hl_statistics_CORREL_5_Max_W55', 'hl_statistics_CORREL_8_Max_W55', 'hl_statistics_CORREL_13_Max_W55']
+04:22:26 [INFO] [L6.5] Processing chunk 42/47 (2000 cols)
+04:22:29 [INFO] [ADF Safe-Skip][adf_diff] bypassed 789/1504 cols (52.5%); examples: ['low_momentum_MACDFIX-Hist_8_Range_W55', 'low_momentum_MACDFIX-Line_9_Range_W55', 'low_momentum_MACDFIX-Signal_9_Range_W55']
+04:22:32 [INFO] [L6.5] Processing chunk 43/47 (2000 cols)
+04:22:35 [INFO] [ADF Safe-Skip][adf_diff] bypassed 433/776 cols (55.8%); examples: ['close_momentum_RSI_5_Slope_W55', 'close_momentum_RSI_6_Slope_W55', 'close_momentum_RSI_7_Slope_W55']
+04:22:36 [INFO] [L6.5] Processing chunk 44/47 (2000 cols)
+04:22:41 [INFO] [ADF Safe-Skip][adf_diff] bypassed 144/1120 cols (12.9%); examples: ['low_momentum_PPO_21-55-0_Slope_W55', 'low_momentum_PPO_55-144-0_Slope_W55', 'quote-volume_momentum_PPO_34-89-0_Slope_W55']
+04:22:45 [INFO] [L6.5] Processing chunk 45/47 (2000 cols)
+04:22:48 [INFO] [ADF Safe-Skip][adf_diff] bypassed 778/955 cols (81.5%); examples: ['quote-volume_momentum_RSI_25_Lag_1', 'quote-volume_momentum_RSI_34_Lag_1', 'quote-volume_momentum_RSI_55_Lag_1']
+04:22:49 [INFO] [L6.5] Processing chunk 46/47 (2000 cols)
+04:22:54 [INFO] [ADF Safe-Skip][adf_diff] bypassed 342/1219 cols (28.1%); examples: ['hl_statistics_CORREL_34_Lag_1', 'hl_statistics_CORREL_55_Lag_1', 'hl_statistics_CORREL_89_Lag_1']
+04:22:57 [INFO] [L6.5] Processing chunk 47/47 (1672 cols)
+04:23:00 [INFO] [ADF Safe-Skip][adf_diff] bypassed 487/824 cols (59.1%); examples: ['high_momentum_MACDFIX-Line_21_Lag_3', 'high_momentum_MACDFIX-Signal_21_Lag_3', 'low_momentum_MACDFIX-Line_3_Lag_3']
+04:23:02 [INFO] [Layer 6.5 (IC-First)] 100% - Layer 6.5 (IC-First) completed: 93672 features
+04:23:10 [WARNING] 發現 NaN 值: 91739 個特徵
+04:23:10 [WARNING]   close_12h_trend_EMA_5: 105 (6.19%)
+04:23:10 [WARNING]   close_12h_trend_EMA_8: 85 (5.01%)
+04:23:10 [WARNING]   close_12h_trend_EMA_10: 87 (5.13%)
+04:23:10 [WARNING]   close_12h_trend_EMA_13: 72 (4.25%)
+04:23:10 [WARNING]   close_12h_trend_EMA_20: 62 (3.66%)
+04:23:10 [WARNING]   close_12h_trend_EMA_21: 63 (3.72%)
+04:23:10 [WARNING]   close_12h_trend_EMA_34: 60 (3.54%)
+04:23:10 [WARNING]   close_12h_trend_EMA_50: 50 (2.95%)
+04:23:10 [WARNING]   close_12h_trend_EMA_55: 55 (3.24%)
+04:23:10 [WARNING]   close_12h_trend_EMA_89: 88 (5.19%)
+04:23:10 [WARNING]   close_12h_trend_EMA_100: 99 (5.84%)
+04:23:10 [WARNING]   close_12h_trend_EMA_144: 144 (8.50%)
+04:23:10 [WARNING]   close_12h_trend_EMA_200: 200 (11.80%)
+04:23:10 [WARNING]   close_12h_trend_EMA_233: 233 (13.75%)
+04:23:10 [WARNING]   volume_12h_trend_EMA_5: 4 (0.24%)
+04:23:10 [WARNING]   volume_12h_trend_EMA_8: 7 (0.41%)
+04:23:10 [WARNING]   volume_12h_trend_EMA_10: 9 (0.53%)
+04:23:10 [WARNING]   volume_12h_trend_EMA_13: 12 (0.71%)
+04:23:10 [WARNING]   volume_12h_trend_EMA_20: 187 (11.03%)
+04:23:10 [WARNING]   volume_12h_trend_EMA_21: 188 (11.09%)
+04:23:10 [WARNING]   ... 其餘 91719 個特徵略
+04:23:10 [INFO] 開始儲存工廠輸出 - BTCUSDT/12h
+04:23:24 [INFO] 工廠輸出儲存完成 - 特徵數: 91794, 標籤數: 7
+04:23:25 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+04:23:25 [INFO] Registered adapter: crypto_spot
+04:23:25 [INFO] Loaded feature registry with 1 entries
+04:23:25 [INFO] Fetching spot data: ETHUSDT/12h
+04:23:25 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+04:23:25 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 8 columns
+04:23:25 [INFO] [Layer 1] 0% - Starting Layer 1...
+04:23:25 [INFO] Layer 1 starting, rss=773MB
+04:23:25 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:25 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:23:25 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:23:25 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:23:25 [WARNING] trades missing, large trade ratio set to NaN
+04:23:31 [INFO] [Layer 1] 100% - Layer 1 completed: 3427 features
+04:23:31 [INFO] Layer 1 done: 3427 cols, status=ok, rss=505MB
+04:23:31 [INFO] [Layer 2] 0% - Starting Layer 2...
+04:23:31 [INFO] Layer 2 starting, rss=504MB
+04:23:31 [INFO] [L2] Starting derived features: 3427 L1 cols
+04:23:31 [INFO] [NaN Blacklist][L2_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:23:31 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:23:31 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:23:31 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:23:31 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:23:42 [INFO] [L2] Completed: 30180 cols in 10.76s
+04:23:45 [INFO] [Layer 2] 100% - Layer 2 completed: 30180 features
+04:23:45 [INFO] Layer 2 done: 30180 cols, status=ok, rss=2076MB
+04:23:45 [INFO] [Layer 3] 0% - Starting Layer 3...
+04:23:45 [INFO] Layer 3 starting, rss=2076MB
+04:23:45 [INFO] [NaN Blacklist][L3_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:23:57 [INFO] [L3 streaming][numba][multi] step 10/16 (W55_std): 3352→3349 cols (-3 dead)
+04:23:57 [INFO] [L3 streaming][numba][multi] step 16/16 (W55_slope): 3352→3349 cols (-3 dead)
+04:23:57 [INFO] [L3 streaming][numba][multi] complete: 53632 total generated, 207 dead dropped, 53425 survivors
+04:24:00 [INFO] [Layer 3] 100% - Layer 3 completed: 53425 features
+04:24:00 [INFO] Layer 3 done: 53425 cols, status=ok, rss=1267MB
+04:24:00 [INFO] [Layer 4] 0% - Starting Layer 4...
+04:24:00 [INFO] Layer 4 starting, rss=1267MB
+04:24:00 [INFO] [NaN Blacklist][L4_input[layer1_and_raw]] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:24:00 [INFO] [Layer 4] 100% - Layer 4 completed: 6720 features
+04:24:00 [INFO] Layer 4 done: 6720 cols, status=ok, rss=1461MB
+04:24:00 [INFO] [Layer 5] 0% - Starting Layer 5...
+04:24:00 [INFO] Layer 5 starting, rss=1461MB
+04:24:00 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+04:24:00 [INFO] Layer 5 done: 0 cols, status=empty_not_applicable, rss=1461MB
+04:24:00 [INFO] [Layer 6] 0% - Starting Layer 6...
+04:24:00 [INFO] Layer 6 starting, rss=1461MB
+04:24:00 [INFO] [Layer 6] 100% - Layer 6 completed: 11 features
+04:24:00 [INFO] Layer 6 done: 11 cols, status=ok, rss=1462MB
+04:24:00 [INFO] [memmap concat] 5 DFs → 93763 cols × 1695 rows ≈ 0.64 GB → disk-backed
+04:24:00 [INFO] [memmap] created: shape=(1695, 93763), dtype=<class 'numpy.float32'>, est=0.64 GB  (file auto-unlinked)
+04:24:00 [INFO] [memmap concat] copying DF 1/5 (3427 cols)
+04:24:01 [INFO] [memmap concat] copying DF 2/5 (30180 cols)
+04:24:03 [INFO] [memmap concat] copying DF 3/5 (53425 cols)
+04:24:04 [INFO] [memmap concat] copying DF 4/5 (6720 cols)
+04:24:06 [INFO] [memmap concat] copying DF 5/5 (11 cols)
+04:24:07 [INFO] [IC-First] Generation mode: skipping rank/zscore/gaussian. IC Gatekeeper and selected transforms are downstream actions after L7_raw.
+04:24:07 [INFO] [Layer 6.5 (IC-First)] 0% - Starting Layer 6.5 (IC-First)...
+04:24:07 [INFO] [IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only
+04:24:07 [INFO] [NaN Blacklist][L65_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:24:07 [INFO] [L6.5] dropping 9 ratio-unsafe columns (categories=['pattern']) at preprocessor entry
+04:24:08 [INFO] [L6.5] Column chunking activated: 93686 cols → 47 chunks of ≤2000
+04:24:08 [INFO] [memmap] created: shape=(1695, 93686), dtype=<class 'numpy.float32'>, est=0.64 GB  (file auto-unlinked)
+04:24:08 [INFO] [L6.5] Processing chunk 1/47 (2000 cols)
+04:24:08 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1008/2000 cols (50.4%); examples: ['close_momentum_RSI_5', 'close_momentum_RSI_6', 'close_momentum_RSI_7']
+04:24:17 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=122/753 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:24:20 [INFO] [ADF Safe-Skip][adf_diff] bypassed 491/491 cols (100.0%); examples: ['close_momentum_RSI_6', 'close_momentum_RSI_7', 'close_momentum_RSI_8']
+04:24:20 [INFO] [L6.5] Processing chunk 2/47 (2000 cols)
+04:24:20 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 792/2000 cols (39.6%); examples: ['low_momentum_ROC_21', 'low_momentum_ROC_34', 'low_momentum_ROC_55']
+04:24:28 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=122/1431 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:24:30 [INFO] [ADF Safe-Skip][adf_diff] bypassed 375/375 cols (100.0%); examples: ['low_momentum_ROC_21', 'low_momentum_ROC_34', 'low_momentum_ROC_55']
+04:24:30 [INFO] [L6.5] Processing chunk 3/47 (2000 cols)
+04:24:30 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 729/2000 cols (36.4%); examples: ['close_momentum_RSI_5_21_Ratio', 'close_momentum_RSI_5_25_Ratio', 'close_momentum_RSI_5_55_Ratio']
+04:24:34 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=292/2078 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:24:36 [INFO] [ADF Safe-Skip][adf_diff] bypassed 58/58 cols (100.0%); examples: ['close_momentum_RSI_21_89_Ratio', 'close_momentum_RSI_25_89_Ratio', 'close_momentum_RSI_34_144_Ratio']
+04:24:36 [INFO] [L6.5] Processing chunk 4/47 (2000 cols)
+04:24:37 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 845/2000 cols (42.2%); examples: ['quote_volume_momentum_ROC_12_55_Ratio', 'quote_volume_momentum_ROC_12_89_Ratio', 'quote_volume_momentum_ROC_12_144_Ratio']
+04:24:39 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=292/2328 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:24:40 [INFO] [ADF Safe-Skip][adf_diff] bypassed 349/349 cols (100.0%); examples: ['open_momentum_ROCP_9_55_Ratio', 'quote_volume_momentum_ROCP_8_89_Ratio', 'close_momentum_ROCR_5_34_Ratio']
+04:24:41 [INFO] [L6.5] Processing chunk 5/47 (2000 cols)
+04:24:42 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['open_trend_EMA_10_200_Cross', 'open_trend_EMA_13_50_Cross', 'open_trend_EMA_13_89_Cross']
+04:24:44 [INFO] [ADF Safe-Skip][adf_diff] bypassed 973/973 cols (100.0%); examples: ['open_trend_EMA_10_200_Cross', 'open_trend_EMA_13_50_Cross', 'open_trend_EMA_13_89_Cross']
+04:24:44 [INFO] [L6.5] Processing chunk 6/47 (2000 cols)
+04:24:45 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['hlc_momentum_ADX_34_233_Cross', 'hlc_momentum_ADX_55_233_Cross', 'hlc_momentum_ADXR_8_34_Cross']
+04:24:48 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1066/1066 cols (100.0%); examples: ['hlc_momentum_ADXR_8_55_Cross', 'hlc_momentum_ADXR_13_55_Cross', 'hlc_momentum_ADXR_14_55_Cross']
+04:24:48 [INFO] [L6.5] Processing chunk 7/47 (2000 cols)
+04:24:48 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 468/2000 cols (23.4%); examples: ['taker_ratio_statistics_STDDEV_5_144_Cross', 'taker_ratio_statistics_STDDEV_5_233_Cross', 'taker_ratio_statistics_STDDEV_8_34_Cross']
+04:24:52 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=328/2818 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:24:54 [INFO] [ADF Safe-Skip][adf_diff] bypassed 234/234 cols (100.0%); examples: ['taker_ratio_statistics_STDDEV_13_55_Cross', 'taker_ratio_statistics_STDDEV_13_89_Cross', 'taker_ratio_statistics_STDDEV_14_55_Cross']
+04:24:54 [INFO] [L6.5] Processing chunk 8/47 (2000 cols)
+04:24:54 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1606/2000 cols (80.3%); examples: ['close_momentum_RSI_5_Momentum_L1', 'close_momentum_RSI_5_Momentum_L3', 'close_momentum_RSI_6_Momentum_L1']
+04:24:55 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=477/3038 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:24:57 [INFO] [ADF Safe-Skip][adf_diff] bypassed 34/34 cols (100.0%); examples: ['close_momentum_MACD-Signal_8-21-5_Momentum_L1', 'close_momentum_MACD-Signal_8-21-5_Momentum_L3', 'close_momentum_MACD-Signal_12-26-9_Momentum_L1']
+04:24:57 [INFO] [L6.5] Processing chunk 9/47 (2000 cols)
+04:24:57 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1850/2000 cols (92.5%); examples: ['hlc_momentum_PLUS-DI_89_Momentum_L1', 'hlc_momentum_PLUS-DI_89_Momentum_L3', 'hlc_momentum_PLUS-DI_144_Momentum_L1']
+04:24:58 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=477/3051 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:00 [INFO] [ADF Safe-Skip][adf_diff] bypassed 34/34 cols (100.0%); examples: ['close_momentum_CMO_21_Momentum_L1', 'taker-ratio_momentum_CMO_21_Momentum_L3', 'open_momentum_CMO_34_Momentum_L3']
+04:25:00 [INFO] [L6.5] Processing chunk 10/47 (2000 cols)
+04:25:00 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 144/2000 cols (7.2%); examples: ['close_statistics_LINEARREG-ANGLE_5_Momentum_L1', 'close_statistics_LINEARREG-ANGLE_5_Momentum_L3', 'close_statistics_LINEARREG-ANGLE_8_Momentum_L1']
+04:25:05 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=502/3470 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:06 [INFO] [ADF Safe-Skip][adf_diff] bypassed 2/2 cols (100.0%); examples: ['hl_statistics_CORREL_233_Momentum_L1', 'hl_statistics_CORREL_233_Momentum_L3']
+04:25:06 [INFO] [L6.5] Processing chunk 11/47 (2000 cols)
+04:25:06 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 469/2000 cols (23.4%); examples: ['close_trend_EMA_5_TsRank_W13', 'close_trend_EMA_8_TsRank_W13', 'close_trend_EMA_10_TsRank_W13']
+04:25:14 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=1297/4620 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:16 [INFO] [ADF Safe-Skip][adf_diff] bypassed 149/149 cols (100.0%); examples: ['close_trend_EMA_34_TsRank_W13', 'close_trend_EMA_50_TsRank_W13', 'close_trend_EMA_55_TsRank_W13']
+04:25:16 [INFO] [L6.5] Processing chunk 12/47 (2000 cols)
+04:25:16 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 518/2000 cols (25.9%); examples: ['taker-ratio_trend_KAMA_21_TsRank_W13', 'taker-ratio_trend_KAMA_34_TsRank_W13', 'taker-ratio_trend_KAMA_55_TsRank_W13']
+04:25:22 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=2228/5801 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:24 [INFO] [ADF Safe-Skip][adf_diff] bypassed 195/195 cols (100.0%); examples: ['taker-ratio_trend_KAMA_21_TsRank_W13', 'taker-ratio_trend_KAMA_34_TsRank_W13', 'taker-ratio_trend_KAMA_55_TsRank_W13']
+04:25:24 [INFO] [L6.5] Processing chunk 13/47 (2000 cols)
+04:25:25 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['close_momentum_RSI_14_TsRank_W13', 'close_momentum_RSI_14_DecayLinear_W13', 'close_momentum_RSI_14_Sign']
+04:25:27 [INFO] [ADF Safe-Skip][adf_diff] bypassed 702/702 cols (100.0%); examples: ['close_momentum_RSI_14_DecayLinear_W13', 'close_momentum_RSI_14_Sign', 'close_momentum_RSI_14_Abs']
+04:25:27 [INFO] [L6.5] Processing chunk 14/47 (2000 cols)
+04:25:28 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1913/2000 cols (95.7%); examples: ['open_momentum_MACDEXT-Line_13-55-13_TsRank_W13', 'open_momentum_MACDEXT-Line_13-55-13_DecayLinear_W13', 'open_momentum_MACDEXT-Line_13-55-13_Sign']
+04:25:28 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=2260/5867 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:31 [INFO] [ADF Safe-Skip][adf_diff] bypassed 699/699 cols (100.0%); examples: ['open_momentum_MACDEXT-Line_13-55-13_Sign', 'open_momentum_MACDEXT-Line_13-55-13_Abs', 'open_momentum_MACDEXT-Signal_13-55-13_TsRank_W13']
+04:25:31 [INFO] [L6.5] Processing chunk 15/47 (2000 cols)
+04:25:32 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['taker-ratio_momentum_ROC_55_TsRank_W13', 'taker-ratio_momentum_ROC_55_DecayLinear_W13', 'taker-ratio_momentum_ROC_55_Sign']
+04:25:34 [INFO] [ADF Safe-Skip][adf_diff] bypassed 902/902 cols (100.0%); examples: ['taker-ratio_momentum_ROC_55_DecayLinear_W13', 'taker-ratio_momentum_ROC_233_DecayLinear_W13', 'open_momentum_ROC_5_DecayLinear_W13']
+04:25:34 [INFO] [L6.5] Processing chunk 16/47 (2000 cols)
+04:25:35 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1403/2000 cols (70.2%); examples: ['volume_momentum_TRIX_13_TsRank_W13', 'volume_momentum_TRIX_13_DecayLinear_W13', 'volume_momentum_TRIX_13_Sign']
+04:25:37 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=2422/6229 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:39 [INFO] [ADF Safe-Skip][adf_diff] bypassed 441/441 cols (100.0%); examples: ['volume_momentum_TRIX_13_DecayLinear_W13', 'volume_momentum_TRIX_21_DecayLinear_W13', 'volume_momentum_TRIX_34_DecayLinear_W13']
+04:25:39 [INFO] [L6.5] Processing chunk 17/47 (2000 cols)
+04:25:40 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 449/1532 cols (29.3%); examples: ['low_statistics_LINEARREG-ANGLE_55_TsRank_W13', 'low_statistics_LINEARREG-ANGLE_55_DecayLinear_W13', 'low_statistics_LINEARREG-ANGLE_55_Sign']
+04:25:44 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=2962/7057 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_4be28fca16ee.json
+04:25:47 [INFO] [ADF Safe-Skip][adf_diff] bypassed 92/388 cols (23.7%); examples: ['low_statistics_LINEARREG-ANGLE_55_TsRank_W13', 'low_statistics_LINEARREG-ANGLE_55_DecayLinear_W13', 'low_statistics_LINEARREG-ANGLE_55_Sign']
+04:25:48 [INFO] [L6.5] Processing chunk 18/47 (2000 cols)
+04:25:52 [INFO] [ADF Safe-Skip][adf_diff] bypassed 753/1080 cols (69.7%); examples: ['close_momentum_RSI_5_Mean_W13', 'close_momentum_RSI_6_Mean_W13', 'close_momentum_RSI_7_Mean_W13']
+04:25:53 [INFO] [L6.5] Processing chunk 19/47 (2000 cols)
+04:25:56 [INFO] [ADF Safe-Skip][adf_diff] bypassed 172/967 cols (17.8%); examples: ['volume_momentum_TRIX_21_Mean_W13', 'volume_momentum_TRIX_34_Mean_W13', 'taker-ratio_momentum_TRIX_34_Mean_W13']
+04:25:59 [INFO] [L6.5] Processing chunk 20/47 (2000 cols)
+04:26:02 [INFO] [ADF Safe-Skip][adf_diff] bypassed 514/664 cols (77.4%); examples: ['volume_momentum_MACD-Signal_34-89-13_Std_W13', 'volume_momentum_MACD-Signal_34-144-21_Std_W13', 'volume_momentum_MACD-Line_55-144-21_Std_W13']
+04:26:02 [INFO] [L6.5] Processing chunk 21/47 (2000 cols)
+04:26:06 [INFO] [ADF Safe-Skip][adf_diff] bypassed 72/497 cols (14.5%); examples: ['hl_statistics_CORREL_55_Std_W13', 'hl_statistics_CORREL_144_Std_W13', 'close_momentum_MACD-Signal_13-55-13_Rank_W13']
+04:26:07 [INFO] [L6.5] Processing chunk 22/47 (2000 cols)
+04:26:10 [INFO] [ADF Safe-Skip][adf_diff] bypassed 96/307 cols (31.3%); examples: ['close_momentum_MOM_55_Rank_W13', 'high_momentum_MOM_55_Rank_W13', 'low_momentum_MOM_55_Rank_W13']
+04:26:10 [INFO] [L6.5] Processing chunk 23/47 (2000 cols)
+04:26:13 [INFO] [ADF Safe-Skip][adf_diff] bypassed 110/296 cols (37.2%); examples: ['close_momentum_MACD-Signal_13-55-13_ZScore_W13', 'close_momentum_MACD-Signal_21-55-9_ZScore_W13', 'close_momentum_MACD-Signal_34-89-13_ZScore_W13']
+04:26:13 [INFO] [L6.5] Processing chunk 24/47 (2000 cols)
+04:26:17 [INFO] [ADF Safe-Skip][adf_diff] bypassed 113/925 cols (12.2%); examples: ['hl_momentum_AROONOSC_144_ZScore_W13', 'hl_momentum_AROONOSC_233_ZScore_W13', 'close_momentum_TRIX_21_ZScore_W13']
+04:26:19 [INFO] [L6.5] Processing chunk 25/47 (2000 cols)
+04:26:23 [INFO] [ADF Safe-Skip][adf_diff] bypassed 998/1234 cols (80.9%); examples: ['close_momentum_MACD-Line_12-26-9_Min_W13', 'close_momentum_MACD-Signal_12-26-9_Min_W13', 'close_momentum_MACD-Line_13-34-9_Min_W13']
+04:26:23 [INFO] [L6.5] Processing chunk 26/47 (2000 cols)
+04:26:27 [INFO] [ADF Safe-Skip][adf_diff] bypassed 426/1293 cols (32.9%); examples: ['hl_statistics_CORREL_34_Min_W13', 'hl_statistics_CORREL_55_Min_W13', 'hl_statistics_CORREL_89_Min_W13']
+04:26:30 [INFO] [L6.5] Processing chunk 27/47 (2000 cols)
+04:26:34 [INFO] [ADF Safe-Skip][adf_diff] bypassed 553/1134 cols (48.8%); examples: ['hlc_momentum_ADX_8_Max_W13', 'hlc_momentum_ADX_13_Max_W13', 'hlc_momentum_ADX_14_Max_W13']
+04:26:35 [INFO] [L6.5] Processing chunk 28/47 (2000 cols)
+04:26:40 [INFO] [ADF Safe-Skip][adf_diff] bypassed 449/679 cols (66.1%); examples: ['volume_momentum_RSI_8_Range_W13', 'volume_momentum_RSI_13_Range_W13', 'volume_momentum_RSI_14_Range_W13']
+04:26:40 [INFO] [L6.5] Processing chunk 29/47 (2000 cols)
+04:26:44 [INFO] [ADF Safe-Skip][adf_diff] bypassed 119/965 cols (12.3%); examples: ['open_momentum_PPO_12-26-0_Range_W13', 'high_momentum_PPO_8-21-0_Range_W13', 'high_momentum_PPO_12-26-0_Range_W13']
+04:26:46 [INFO] [L6.5] Processing chunk 30/47 (2000 cols)
+04:26:49 [INFO] [ADF Safe-Skip][adf_diff] bypassed 307/436 cols (70.4%); examples: ['low_momentum_RSI_21_Slope_W13', 'low_momentum_RSI_25_Slope_W13', 'low_momentum_RSI_34_Slope_W13']
+04:26:50 [INFO] [L6.5] Processing chunk 31/47 (2000 cols)
+04:26:53 [INFO] [ADF Safe-Skip][adf_diff] bypassed 394/749 cols (52.6%); examples: ['hl_statistics_CORREL_144_Slope_W13', 'hl_statistics_CORREL_233_Slope_W13', 'close_momentum_RSI_89_Mean_W55']
+04:26:55 [INFO] [L6.5] Processing chunk 32/47 (2000 cols)
+04:26:58 [INFO] [ADF Safe-Skip][adf_diff] bypassed 661/1106 cols (59.8%); examples: ['high_momentum_MACDFIX-Line_9_Mean_W55', 'high_momentum_MACDFIX-Signal_9_Mean_W55', 'high_momentum_MACDFIX-Hist_9_Mean_W55']
+04:27:00 [INFO] [L6.5] Processing chunk 33/47 (2000 cols)
+04:27:03 [INFO] [ADF Safe-Skip][adf_diff] bypassed 894/1212 cols (73.8%); examples: ['close_momentum_RSI_5_Std_W55', 'volume_momentum_RSI_5_Std_W55', 'volume_momentum_RSI_6_Std_W55']
+04:27:04 [INFO] [L6.5] Processing chunk 34/47 (2000 cols)
+04:27:07 [INFO] [ADF Safe-Skip][adf_diff] bypassed 273/1257 cols (21.7%); examples: ['close_momentum_PPO_5-13-0_Std_W55', 'close_momentum_PPO_5-21-0_Std_W55', 'close_momentum_PPO_8-21-0_Std_W55']
+04:27:10 [INFO] [L6.5] Processing chunk 35/47 (2000 cols)
+04:27:13 [INFO] [ADF Safe-Skip][adf_diff] bypassed 411/502 cols (81.9%); examples: ['open_momentum_RSI_21_Rank_W55', 'open_momentum_RSI_25_Rank_W55', 'open_momentum_RSI_34_Rank_W55']
+04:27:13 [INFO] [L6.5] Processing chunk 36/47 (2000 cols)
+04:27:16 [INFO] [ADF Safe-Skip][adf_diff] bypassed 182/893 cols (20.4%); examples: ['hl_statistics_CORREL_144_Rank_W55', 'low_momentum_RSI_13_ZScore_W55', 'low_momentum_RSI_14_ZScore_W55']
+04:27:18 [INFO] [L6.5] Processing chunk 37/47 (2000 cols)
+04:27:21 [INFO] [ADF Safe-Skip][adf_diff] bypassed 245/678 cols (36.1%); examples: ['open_momentum_MACDFIX-Signal_3_ZScore_W55', 'open_momentum_MACDFIX-Signal_5_ZScore_W55', 'open_momentum_MACDFIX-Signal_8_ZScore_W55']
+04:27:22 [INFO] [L6.5] Processing chunk 38/47 (2000 cols)
+04:27:25 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1056/1565 cols (67.5%); examples: ['close_momentum_RSI_5_Min_W55', 'close_momentum_RSI_6_Min_W55', 'close_momentum_RSI_25_Min_W55']
+04:27:27 [INFO] [L6.5] Processing chunk 39/47 (2000 cols)
+04:27:31 [INFO] [ADF Safe-Skip][adf_diff] bypassed 308/1275 cols (24.2%); examples: ['open_momentum_APO_13-34-0_Min_W55', 'open_momentum_APO_13-55-0_Min_W55', 'open_momentum_APO_21-55-0_Min_W55']
+04:27:34 [INFO] [L6.5] Processing chunk 40/47 (2000 cols)
+04:27:37 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1400/1633 cols (85.7%); examples: ['taker-ratio_momentum_RSI_6_Max_W55', 'taker-ratio_momentum_RSI_7_Max_W55', 'taker-ratio_momentum_RSI_8_Max_W55']
+04:27:38 [INFO] [L6.5] Processing chunk 41/47 (2000 cols)
+04:27:42 [INFO] [ADF Safe-Skip][adf_diff] bypassed 539/1364 cols (39.5%); examples: ['hl_statistics_CORREL_5_Max_W55', 'hl_statistics_CORREL_8_Max_W55', 'hl_statistics_CORREL_13_Max_W55']
+04:27:45 [INFO] [L6.5] Processing chunk 42/47 (2000 cols)
+04:27:48 [INFO] [ADF Safe-Skip][adf_diff] bypassed 696/1350 cols (51.6%); examples: ['high_momentum_MACDFIX-Signal_21_Range_W55', 'high_momentum_MACDFIX-Hist_21_Range_W55', 'low_momentum_MACDFIX-Line_3_Range_W55']
+04:27:50 [INFO] [L6.5] Processing chunk 43/47 (2000 cols)
+04:27:54 [INFO] [ADF Safe-Skip][adf_diff] bypassed 427/726 cols (58.8%); examples: ['close_momentum_RSI_5_Slope_W55', 'close_momentum_RSI_6_Slope_W55', 'close_momentum_RSI_34_Slope_W55']
+04:27:55 [INFO] [L6.5] Processing chunk 44/47 (2000 cols)
+04:27:59 [INFO] [ADF Safe-Skip][adf_diff] bypassed 168/1089 cols (15.4%); examples: ['high_momentum_PPO_5-21-0_Slope_W55', 'high_momentum_PPO_8-21-0_Slope_W55', 'high_momentum_PPO_21-55-0_Slope_W55']
+04:28:02 [INFO] [L6.5] Processing chunk 45/47 (2000 cols)
+04:28:05 [INFO] [ADF Safe-Skip][adf_diff] bypassed 818/984 cols (83.1%); examples: ['low_momentum_RSI_7_Lag_1', 'low_momentum_RSI_8_Lag_1', 'low_momentum_RSI_9_Lag_1']
+04:28:05 [INFO] [L6.5] Processing chunk 46/47 (2000 cols)
+04:28:09 [INFO] [ADF Safe-Skip][adf_diff] bypassed 321/1262 cols (25.4%); examples: ['hl_statistics_CORREL_34_Lag_1', 'hl_statistics_CORREL_55_Lag_1', 'hl_statistics_CORREL_89_Lag_1']
+04:28:12 [INFO] [L6.5] Processing chunk 47/47 (1686 cols)
+04:28:15 [INFO] [ADF Safe-Skip][adf_diff] bypassed 550/920 cols (59.8%); examples: ['open_momentum_MACDFIX-Line_21_Lag_3', 'open_momentum_MACDFIX-Signal_21_Lag_3', 'high_momentum_MACDFIX-Line_3_Lag_3']
+04:28:16 [INFO] [Layer 6.5 (IC-First)] 100% - Layer 6.5 (IC-First) completed: 93686 features
+04:28:25 [WARNING] 發現 NaN 值: 91750 個特徵
+04:28:25 [WARNING]   close_12h_trend_EMA_5: 164 (9.68%)
+04:28:25 [WARNING]   close_12h_trend_EMA_8: 108 (6.37%)
+04:28:25 [WARNING]   close_12h_trend_EMA_10: 110 (6.49%)
+04:28:25 [WARNING]   close_12h_trend_EMA_13: 113 (6.67%)
+04:28:25 [WARNING]   close_12h_trend_EMA_20: 97 (5.72%)
+04:28:25 [WARNING]   close_12h_trend_EMA_21: 98 (5.78%)
+04:28:25 [WARNING]   close_12h_trend_EMA_34: 76 (4.48%)
+04:28:25 [WARNING]   close_12h_trend_EMA_50: 76 (4.48%)
+04:28:25 [WARNING]   close_12h_trend_EMA_55: 55 (3.24%)
+04:28:25 [WARNING]   close_12h_trend_EMA_89: 88 (5.19%)
+04:28:25 [WARNING]   close_12h_trend_EMA_100: 99 (5.84%)
+04:28:25 [WARNING]   close_12h_trend_EMA_144: 144 (8.50%)
+04:28:25 [WARNING]   close_12h_trend_EMA_200: 200 (11.80%)
+04:28:25 [WARNING]   close_12h_trend_EMA_233: 233 (13.75%)
+04:28:25 [WARNING]   volume_12h_trend_EMA_5: 4 (0.24%)
+04:28:25 [WARNING]   volume_12h_trend_EMA_8: 7 (0.41%)
+04:28:25 [WARNING]   volume_12h_trend_EMA_10: 9 (0.53%)
+04:28:25 [WARNING]   volume_12h_trend_EMA_13: 12 (0.71%)
+04:28:25 [WARNING]   volume_12h_trend_EMA_20: 19 (1.12%)
+04:28:25 [WARNING]   volume_12h_trend_EMA_21: 20 (1.18%)
+04:28:25 [WARNING]   ... 其餘 91730 個特徵略
+04:28:26 [INFO] 開始儲存工廠輸出 - ETHUSDT/12h
+04:28:40 [INFO] 工廠輸出儲存完成 - 特徵數: 91812, 標籤數: 7
+04:28:40 [INFO] Loaded feature registry with 1 entries
+04:28:41 [INFO] Fetching spot data: BTCUSDT/12h
+04:28:41 [INFO] Read 1696 klines from BTCUSDT/12h in 0.005s
+04:28:41 [INFO] Aligned data for BTCUSDT/12h: 1696 rows, 8 columns
+04:28:41 [INFO] [Layer 1] 0% - Starting Layer 1...
+04:28:41 [INFO] Layer 1 starting, rss=315MB
+04:28:41 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:41 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:28:41 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:28:41 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:28:41 [WARNING] trades missing, large trade ratio set to NaN
+04:28:47 [INFO] [Layer 1] 100% - Layer 1 completed: 3427 features
+04:28:47 [INFO] Layer 1 done: 3427 cols, status=ok, rss=736MB
+04:28:47 [INFO] [Layer 2] 0% - Starting Layer 2...
+04:28:47 [INFO] Layer 2 starting, rss=736MB
+04:28:47 [INFO] [L2] Starting derived features: 3427 L1 cols
+04:28:47 [INFO] [NaN Blacklist][L2_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:28:47 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+04:28:47 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+04:28:47 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:28:47 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+04:28:58 [INFO] [L2] Completed: 30180 cols in 10.86s
+04:29:01 [INFO] [Layer 2] 100% - Layer 2 completed: 30180 features
+04:29:01 [INFO] Layer 2 done: 30180 cols, status=ok, rss=1932MB
+04:29:01 [INFO] [Layer 3] 0% - Starting Layer 3...
+04:29:01 [INFO] Layer 3 starting, rss=1932MB
+04:29:01 [INFO] [NaN Blacklist][L3_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:29:14 [INFO] [L3 streaming][numba][multi] step 10/16 (W55_std): 3352→3349 cols (-3 dead)
+04:29:14 [INFO] [L3 streaming][numba][multi] step 16/16 (W55_slope): 3352→3349 cols (-3 dead)
+04:29:14 [INFO] [L3 streaming][numba][multi] complete: 53632 total generated, 224 dead dropped, 53408 survivors
+04:29:16 [INFO] [Layer 3] 100% - Layer 3 completed: 53408 features
+04:29:16 [INFO] Layer 3 done: 53408 cols, status=ok, rss=2824MB
+04:29:16 [INFO] [Layer 4] 0% - Starting Layer 4...
+04:29:16 [INFO] Layer 4 starting, rss=2824MB
+04:29:16 [INFO] [NaN Blacklist][L4_input[layer1_and_raw]] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:29:16 [INFO] [Layer 4] 100% - Layer 4 completed: 6720 features
+04:29:16 [INFO] Layer 4 done: 6720 cols, status=ok, rss=2825MB
+04:29:16 [INFO] [Layer 5] 0% - Starting Layer 5...
+04:29:16 [INFO] Layer 5 starting, rss=2825MB
+04:29:16 [INFO] Fetching spot data: ETHUSDT/12h
+04:29:16 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+04:29:16 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 8 columns
+04:29:16 [INFO] [Layer 5] 100% - Layer 5 completed: 3 features
+04:29:16 [INFO] Layer 5 done: 3 cols, status=ok, rss=2825MB
+04:29:16 [INFO] [Layer 6] 0% - Starting Layer 6...
+04:29:16 [INFO] Layer 6 starting, rss=2825MB
+04:29:16 [INFO] [Layer 6] 100% - Layer 6 completed: 11 features
+04:29:16 [INFO] Layer 6 done: 11 cols, status=ok, rss=2826MB
+04:29:16 [INFO] [memmap concat] 6 DFs → 93749 cols × 1695 rows ≈ 0.64 GB → disk-backed
+04:29:17 [INFO] [memmap] created: shape=(1695, 93749), dtype=<class 'numpy.float32'>, est=0.64 GB  (file auto-unlinked)
+04:29:17 [INFO] [memmap concat] copying DF 1/6 (3427 cols)
+04:29:18 [INFO] [memmap concat] copying DF 2/6 (30180 cols)
+04:29:19 [INFO] [memmap concat] copying DF 3/6 (53408 cols)
+04:29:21 [INFO] [memmap concat] copying DF 4/6 (6720 cols)
+04:29:22 [INFO] [memmap concat] copying DF 5/6 (3 cols)
+04:29:23 [INFO] [memmap concat] copying DF 6/6 (11 cols)
+04:29:24 [INFO] [IC-First] Generation mode: skipping rank/zscore/gaussian. IC Gatekeeper and selected transforms are downstream actions after L7_raw.
+04:29:24 [INFO] [Layer 6.5 (IC-First)] 0% - Starting Layer 6.5 (IC-First)...
+04:29:24 [INFO] [IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only
+04:29:25 [INFO] [NaN Blacklist][L65_input] stripped 68 cols (e.g. ['ohlc_pattern_CDLSHOOTINGSTAR', 'ohlc_pattern_CDLENGULFING', 'ohlc_pattern_CDLHARAMI'])
+04:29:25 [INFO] [L6.5] dropping 9 ratio-unsafe columns (categories=['pattern']) at preprocessor entry
+04:29:25 [INFO] [L6.5] Column chunking activated: 93672 cols → 47 chunks of ≤2000
+04:29:25 [INFO] [memmap] created: shape=(1695, 93672), dtype=<class 'numpy.float32'>, est=0.64 GB  (file auto-unlinked)
+04:29:25 [INFO] [L6.5] Processing chunk 1/47 (2000 cols)
+04:29:26 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1008/2000 cols (50.4%); examples: ['close_momentum_RSI_5', 'close_momentum_RSI_6', 'close_momentum_RSI_7']
+04:29:36 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=117/734 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:29:39 [INFO] [ADF Safe-Skip][adf_diff] bypassed 480/480 cols (100.0%); examples: ['close_momentum_RSI_13', 'close_momentum_RSI_14', 'close_momentum_RSI_21']
+04:29:39 [INFO] [L6.5] Processing chunk 2/47 (2000 cols)
+04:29:40 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 792/2000 cols (39.6%); examples: ['low_momentum_ROC_21', 'low_momentum_ROC_34', 'low_momentum_ROC_55']
+04:29:48 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=117/1412 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:29:50 [INFO] [ADF Safe-Skip][adf_diff] bypassed 344/344 cols (100.0%); examples: ['low_momentum_ROC_34', 'low_momentum_ROC_55', 'low_momentum_ROC_89']
+04:29:50 [INFO] [L6.5] Processing chunk 3/47 (2000 cols)
+04:29:51 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 729/2000 cols (36.4%); examples: ['close_momentum_RSI_5_21_Ratio', 'close_momentum_RSI_5_25_Ratio', 'close_momentum_RSI_5_55_Ratio']
+04:29:55 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=304/2114 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:29:57 [INFO] [ADF Safe-Skip][adf_diff] bypassed 66/66 cols (100.0%); examples: ['close_momentum_RSI_13_55_Ratio', 'close_momentum_RSI_13_89_Ratio', 'close_momentum_RSI_14_55_Ratio']
+04:29:57 [INFO] [L6.5] Processing chunk 4/47 (2000 cols)
+04:29:57 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 845/2000 cols (42.2%); examples: ['quote_volume_momentum_ROC_12_55_Ratio', 'quote_volume_momentum_ROC_12_89_Ratio', 'quote_volume_momentum_ROC_12_144_Ratio']
+04:30:00 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=304/2446 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:01 [INFO] [ADF Safe-Skip][adf_diff] bypassed 331/331 cols (100.0%); examples: ['volume_momentum_ROCP_8_233_Ratio', 'volume_momentum_ROCP_9_233_Ratio', 'volume_momentum_ROCP_55_233_Ratio']
+04:30:01 [INFO] [L6.5] Processing chunk 5/47 (2000 cols)
+04:30:03 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['open_trend_EMA_10_200_Cross', 'open_trend_EMA_13_50_Cross', 'open_trend_EMA_13_89_Cross']
+04:30:05 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1078/1078 cols (100.0%); examples: ['open_trend_EMA_10_200_Cross', 'open_trend_EMA_13_50_Cross', 'open_trend_EMA_13_89_Cross']
+04:30:05 [INFO] [L6.5] Processing chunk 6/47 (2000 cols)
+04:30:06 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['hlc_momentum_ADX_34_233_Cross', 'hlc_momentum_ADX_55_233_Cross', 'hlc_momentum_ADXR_8_34_Cross']
+04:30:08 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1047/1047 cols (100.0%); examples: ['hlc_momentum_ADXR_8_34_Cross', 'hlc_momentum_ADXR_8_55_Cross', 'hlc_momentum_ADXR_13_55_Cross']
+04:30:08 [INFO] [L6.5] Processing chunk 7/47 (2000 cols)
+04:30:09 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 468/2000 cols (23.4%); examples: ['taker_ratio_statistics_STDDEV_5_144_Cross', 'taker_ratio_statistics_STDDEV_5_233_Cross', 'taker_ratio_statistics_STDDEV_8_34_Cross']
+04:30:13 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=333/2885 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:15 [INFO] [ADF Safe-Skip][adf_diff] bypassed 230/230 cols (100.0%); examples: ['taker_ratio_statistics_STDDEV_13_89_Cross', 'taker_ratio_statistics_STDDEV_14_55_Cross', 'taker_ratio_statistics_STDDEV_14_89_Cross']
+04:30:15 [INFO] [L6.5] Processing chunk 8/47 (2000 cols)
+04:30:15 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1606/2000 cols (80.3%); examples: ['close_momentum_RSI_5_Momentum_L1', 'close_momentum_RSI_5_Momentum_L3', 'close_momentum_RSI_6_Momentum_L1']
+04:30:16 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=465/3060 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:18 [INFO] [ADF Safe-Skip][adf_diff] bypassed 32/32 cols (100.0%); examples: ['volume_momentum_MACD-Hist_5-13-3_Momentum_L1', 'volume_momentum_MACD-Hist_34-89-13_Momentum_L1', 'taker-ratio_momentum_MACD-Line_5-21-5_Momentum_L3']
+04:30:18 [INFO] [L6.5] Processing chunk 9/47 (2000 cols)
+04:30:18 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1850/2000 cols (92.5%); examples: ['hlc_momentum_PLUS-DI_89_Momentum_L1', 'hlc_momentum_PLUS-DI_89_Momentum_L3', 'hlc_momentum_PLUS-DI_144_Momentum_L1']
+04:30:18 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=465/3071 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:21 [INFO] [ADF Safe-Skip][adf_diff] bypassed 48/48 cols (100.0%); examples: ['low_momentum_CMO_13_Momentum_L3', 'low_momentum_CMO_89_Momentum_L1', 'low_momentum_CMO_89_Momentum_L3']
+04:30:21 [INFO] [L6.5] Processing chunk 10/47 (2000 cols)
+04:30:21 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 144/2000 cols (7.2%); examples: ['close_statistics_LINEARREG-ANGLE_5_Momentum_L1', 'close_statistics_LINEARREG-ANGLE_5_Momentum_L3', 'close_statistics_LINEARREG-ANGLE_8_Momentum_L1']
+04:30:26 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=486/3453 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:27 [INFO] [ADF Safe-Skip][adf_diff] bypassed 3/3 cols (100.0%); examples: ['volume_statistics_LINEARREG-ANGLE_144_Momentum_L1', 'taker-ratio_statistics_LINEARREG-ANGLE_89_Momentum_L1', 'quote-volume_statistics_LINEARREG-ANGLE_233_Momentum_L3']
+04:30:27 [INFO] [L6.5] Processing chunk 11/47 (2000 cols)
+04:30:27 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 469/2000 cols (23.4%); examples: ['close_trend_EMA_5_TsRank_W13', 'close_trend_EMA_8_TsRank_W13', 'close_trend_EMA_10_TsRank_W13']
+04:30:36 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=1249/4589 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:39 [INFO] [ADF Safe-Skip][adf_diff] bypassed 150/150 cols (100.0%); examples: ['close_trend_EMA_20_TsRank_W13', 'close_trend_EMA_21_TsRank_W13', 'close_trend_EMA_34_TsRank_W13']
+04:30:39 [INFO] [L6.5] Processing chunk 12/47 (2000 cols)
+04:30:39 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 518/2000 cols (25.9%); examples: ['taker-ratio_trend_KAMA_21_TsRank_W13', 'taker-ratio_trend_KAMA_34_TsRank_W13', 'taker-ratio_trend_KAMA_55_TsRank_W13']
+04:30:47 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2175/5791 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:49 [INFO] [ADF Safe-Skip][adf_diff] bypassed 163/163 cols (100.0%); examples: ['open_trend_KAMA_34_TsRank_W13', 'open_trend_KAMA_55_TsRank_W13', 'open_trend_KAMA_89_TsRank_W13']
+04:30:49 [INFO] [L6.5] Processing chunk 13/47 (2000 cols)
+04:30:50 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['close_momentum_RSI_14_TsRank_W13', 'close_momentum_RSI_14_DecayLinear_W13', 'close_momentum_RSI_14_Sign']
+04:30:52 [INFO] [ADF Safe-Skip][adf_diff] bypassed 714/714 cols (100.0%); examples: ['close_momentum_RSI_14_DecayLinear_W13', 'close_momentum_RSI_14_Sign', 'close_momentum_RSI_14_Abs']
+04:30:52 [INFO] [L6.5] Processing chunk 14/47 (2000 cols)
+04:30:52 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1913/2000 cols (95.7%); examples: ['open_momentum_MACDEXT-Line_13-55-13_TsRank_W13', 'open_momentum_MACDEXT-Line_13-55-13_DecayLinear_W13', 'open_momentum_MACDEXT-Line_13-55-13_Sign']
+04:30:53 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2207/5852 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:30:55 [INFO] [ADF Safe-Skip][adf_diff] bypassed 688/688 cols (100.0%); examples: ['open_momentum_MACDEXT-Line_13-55-13_DecayLinear_W13', 'open_momentum_MACDEXT-Line_13-55-13_Sign', 'open_momentum_MACDEXT-Line_13-55-13_Abs']
+04:30:55 [INFO] [L6.5] Processing chunk 15/47 (2000 cols)
+04:30:57 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 2000/2000 cols (100.0%); examples: ['taker-ratio_momentum_ROC_55_TsRank_W13', 'taker-ratio_momentum_ROC_55_DecayLinear_W13', 'taker-ratio_momentum_ROC_55_Sign']
+04:30:59 [INFO] [ADF Safe-Skip][adf_diff] bypassed 861/861 cols (100.0%); examples: ['taker-ratio_momentum_ROC_55_DecayLinear_W13', 'open_momentum_ROC_5_DecayLinear_W13', 'open_momentum_ROC_8_DecayLinear_W13']
+04:30:59 [INFO] [L6.5] Processing chunk 16/47 (2000 cols)
+04:30:59 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 1403/2000 cols (70.2%); examples: ['volume_momentum_TRIX_13_TsRank_W13', 'volume_momentum_TRIX_13_DecayLinear_W13', 'volume_momentum_TRIX_13_Sign']
+04:31:02 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2378/6214 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:31:04 [INFO] [ADF Safe-Skip][adf_diff] bypassed 392/392 cols (100.0%); examples: ['volume_momentum_TRIX_13_DecayLinear_W13', 'volume_momentum_TRIX_21_DecayLinear_W13', 'volume_momentum_TRIX_34_DecayLinear_W13']
+04:31:04 [INFO] [L6.5] Processing chunk 17/47 (2000 cols)
+04:31:05 [INFO] [ADF Safe-Skip][fracdiff/layer_map] bypassed 449/1532 cols (29.3%); examples: ['low_statistics_LINEARREG-ANGLE_55_TsRank_W13', 'low_statistics_LINEARREG-ANGLE_55_DecayLinear_W13', 'low_statistics_LINEARREG-ANGLE_55_Sign']
+04:31:10 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=2881/6970 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-37/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_4be28fca16ee.json
+04:31:13 [INFO] [ADF Safe-Skip][adf_diff] bypassed 96/411 cols (23.4%); examples: ['low_statistics_LINEARREG-ANGLE_55_DecayLinear_W13', 'low_statistics_LINEARREG-ANGLE_55_Sign', 'low_statistics_LINEARREG-ANGLE_89_TsRank_W13']
+04:31:14 [INFO] [L6.5] Processing chunk 18/47 (2000 cols)
+04:31:18 [INFO] [ADF Safe-Skip][adf_diff] bypassed 782/1153 cols (67.8%); examples: ['close_momentum_RSI_5_Mean_W13', 'close_momentum_RSI_6_Mean_W13', 'close_momentum_RSI_7_Mean_W13']
+04:31:20 [INFO] [L6.5] Processing chunk 19/47 (2000 cols)
+04:31:24 [INFO] [ADF Safe-Skip][adf_diff] bypassed 184/888 cols (20.7%); examples: ['volume_momentum_TRIX_21_Mean_W13', 'volume_momentum_TRIX_34_Mean_W13', 'volume_momentum_TRIX_55_Mean_W13']
+04:31:26 [INFO] [L6.5] Processing chunk 20/47 (2000 cols)
+04:31:29 [INFO] [ADF Safe-Skip][adf_diff] bypassed 486/641 cols (75.8%); examples: ['volume_momentum_MACD-Hist_13-55-13_Std_W13', 'volume_momentum_MACD-Line_21-55-9_Std_W13', 'volume_momentum_MACD-Hist_21-55-9_Std_W13']
+04:31:30 [INFO] [L6.5] Processing chunk 21/47 (2000 cols)
+04:31:33 [INFO] [ADF Safe-Skip][adf_diff] bypassed 85/468 cols (18.2%); examples: ['hl_statistics_CORREL_89_Std_W13', 'hl_statistics_CORREL_144_Std_W13', 'hl_statistics_CORREL_233_Std_W13']
+04:31:34 [INFO] [L6.5] Processing chunk 22/47 (2000 cols)
+04:31:37 [INFO] [ADF Safe-Skip][adf_diff] bypassed 78/305 cols (25.6%); examples: ['high_momentum_MOM_55_Rank_W13', 'high_momentum_ROC_55_Rank_W13', 'high_momentum_ROCP_55_Rank_W13']
+04:31:37 [INFO] [L6.5] Processing chunk 23/47 (2000 cols)
+04:31:40 [INFO] [ADF Safe-Skip][adf_diff] bypassed 127/283 cols (44.9%); examples: ['close_momentum_MACD-Signal_21-55-9_ZScore_W13', 'close_momentum_MACD-Signal_21-89-13_ZScore_W13', 'close_momentum_MACD-Line_34-89-13_ZScore_W13']
+04:31:40 [INFO] [L6.5] Processing chunk 24/47 (2000 cols)
+04:31:44 [INFO] [ADF Safe-Skip][adf_diff] bypassed 115/947 cols (12.1%); examples: ['quote-volume_momentum_PPO_55-144-0_ZScore_W13', 'quote-volume_momentum_PPO_55-233-0_ZScore_W13', 'hl_momentum_AROON-aroondown_89_ZScore_W13']
+04:31:48 [INFO] [L6.5] Processing chunk 25/47 (2000 cols)
+04:31:51 [INFO] [ADF Safe-Skip][adf_diff] bypassed 878/1106 cols (79.4%); examples: ['close_momentum_MACD-Line_12-26-9_Min_W13', 'close_momentum_MACD-Signal_12-26-9_Min_W13', 'close_momentum_MACD-Line_13-34-9_Min_W13']
+04:31:52 [INFO] [L6.5] Processing chunk 26/47 (2000 cols)
+04:31:57 [INFO] [ADF Safe-Skip][adf_diff] bypassed 384/1204 cols (31.9%); examples: ['hl_statistics_CORREL_34_Min_W13', 'hl_statistics_CORREL_55_Min_W13', 'hl_statistics_CORREL_89_Min_W13']
+04:32:00 [INFO] [L6.5] Processing chunk 27/47 (2000 cols)
+04:32:04 [INFO] [ADF Safe-Skip][adf_diff] bypassed 554/1069 cols (51.8%); examples: ['quote-volume_momentum_MACDFIX-Signal_21_Max_W13', 'hlc_momentum_ADX_8_Max_W13', 'hlc_momentum_ADX_13_Max_W13']
+04:32:05 [INFO] [L6.5] Processing chunk 28/47 (2000 cols)
+04:32:09 [INFO] [ADF Safe-Skip][adf_diff] bypassed 444/624 cols (71.2%); examples: ['volume_momentum_RSI_21_Range_W13', 'volume_momentum_RSI_25_Range_W13', 'low_momentum_RSI_34_Range_W13']
+04:32:09 [INFO] [L6.5] Processing chunk 29/47 (2000 cols)
+04:32:14 [INFO] [ADF Safe-Skip][adf_diff] bypassed 63/873 cols (7.2%); examples: ['open_momentum_PPO_34-89-0_Range_W13', 'open_momentum_PPO_34-144-0_Range_W13', 'open_momentum_PPO_55-144-0_Range_W13']
+04:32:16 [INFO] [L6.5] Processing chunk 30/47 (2000 cols)
+04:32:19 [INFO] [ADF Safe-Skip][adf_diff] bypassed 367/502 cols (73.1%); examples: ['low_momentum_RSI_144_Slope_W13', 'close_momentum_MACD-Line_8-21-5_Slope_W13', 'close_momentum_MACD-Line_8-34-9_Slope_W13']
+04:32:19 [INFO] [L6.5] Processing chunk 31/47 (2000 cols)
+04:32:24 [INFO] [ADF Safe-Skip][adf_diff] bypassed 526/957 cols (55.0%); examples: ['hl_statistics_CORREL_144_Slope_W13', 'hl_statistics_CORREL_233_Slope_W13', 'close_momentum_RSI_5_Mean_W55']
+04:32:26 [INFO] [L6.5] Processing chunk 32/47 (2000 cols)
+04:32:29 [INFO] [ADF Safe-Skip][adf_diff] bypassed 754/1349 cols (55.9%); examples: ['high_momentum_MACDFIX-Hist_9_Mean_W55', 'high_momentum_MACDFIX-Line_13_Mean_W55', 'high_momentum_MACDFIX-Signal_13_Mean_W55']
+04:32:31 [INFO] [L6.5] Processing chunk 33/47 (2000 cols)
+04:32:34 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1095/1567 cols (69.9%); examples: ['close_momentum_RSI_5_Std_W55', 'close_momentum_RSI_6_Std_W55', 'close_momentum_RSI_7_Std_W55']
+04:32:35 [INFO] [L6.5] Processing chunk 34/47 (2000 cols)
+04:32:38 [INFO] [ADF Safe-Skip][adf_diff] bypassed 317/1337 cols (23.7%); examples: ['close_momentum_PPO_8-21-0_Std_W55', 'close_momentum_PPO_8-34-0_Std_W55', 'close_momentum_PPO_12-26-0_Std_W55']
+04:32:41 [INFO] [L6.5] Processing chunk 35/47 (2000 cols)
+04:32:44 [INFO] [ADF Safe-Skip][adf_diff] bypassed 484/580 cols (83.4%); examples: ['open_momentum_RSI_21_Rank_W55', 'open_momentum_RSI_25_Rank_W55', 'open_momentum_RSI_34_Rank_W55']
+04:32:44 [INFO] [L6.5] Processing chunk 36/47 (2000 cols)
+04:32:47 [INFO] [ADF Safe-Skip][adf_diff] bypassed 222/968 cols (22.9%); examples: ['hl_statistics_CORREL_55_Rank_W55', 'hl_statistics_CORREL_144_Rank_W55', 'close_momentum_RSI_25_ZScore_W55']
+04:32:49 [INFO] [L6.5] Processing chunk 37/47 (2000 cols)
+04:32:52 [INFO] [ADF Safe-Skip][adf_diff] bypassed 294/742 cols (39.6%); examples: ['open_momentum_MACDFIX-Line_3_ZScore_W55', 'open_momentum_MACDFIX-Signal_3_ZScore_W55', 'open_momentum_MACDFIX-Line_5_ZScore_W55']
+04:32:53 [INFO] [L6.5] Processing chunk 38/47 (2000 cols)
+04:32:57 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1112/1602 cols (69.4%); examples: ['close_momentum_RSI_5_Min_W55', 'close_momentum_RSI_6_Min_W55', 'close_momentum_RSI_7_Min_W55']
+04:32:59 [INFO] [L6.5] Processing chunk 39/47 (2000 cols)
+04:33:03 [INFO] [ADF Safe-Skip][adf_diff] bypassed 379/1315 cols (28.8%); examples: ['open_momentum_APO_21-55-0_Min_W55', 'open_momentum_APO_21-89-0_Min_W55', 'open_momentum_APO_34-89-0_Min_W55']
+04:33:07 [INFO] [L6.5] Processing chunk 40/47 (2000 cols)
+04:33:10 [INFO] [ADF Safe-Skip][adf_diff] bypassed 1407/1648 cols (85.4%); examples: ['taker-ratio_momentum_RSI_89_Max_W55', 'taker-ratio_momentum_RSI_144_Max_W55', 'open_momentum_RSI_5_Max_W55']
+04:33:11 [INFO] [L6.5] Processing chunk 41/47 (2000 cols)
+04:33:14 [INFO] [ADF Safe-Skip][adf_diff] bypassed 625/1574 cols (39.7%); examples: ['hl_statistics_CORREL_5_Max_W55', 'hl_statistics_CORREL_8_Max_W55', 'hl_statistics_CORREL_13_Max_W55']
+04:33:17 [INFO] [L6.5] Processing chunk 42/47 (2000 cols)
+04:33:20 [INFO] [ADF Safe-Skip][adf_diff] bypassed 789/1504 cols (52.5%); examples: ['low_momentum_MACDFIX-Hist_8_Range_W55', 'low_momentum_MACDFIX-Line_9_Range_W55', 'low_momentum_MACDFIX-Signal_9_Range_W55']
+04:33:23 [INFO] [L6.5] Processing chunk 43/47 (2000 cols)
+04:33:26 [INFO] [ADF Safe-Skip][adf_diff] bypassed 433/776 cols (55.8%); examples: ['close_momentum_RSI_5_Slope_W55', 'close_momentum_RSI_6_Slope_W55', 'close_momentum_RSI_7_Slope_W55']
+04:33:27 [INFO] [L6.5] Processing chunk 44/47 (2000 cols)
+04:33:33 [INFO] [ADF Safe-Skip][adf_diff] bypassed 144/1120 cols (12.9%); examples: ['low_momentum_PPO_21-55-0_Slope_W55', 'low_momentum_PPO_55-144-0_Slope_W55', 'quote-volume_momentum_PPO_34-89-0_Slope_W55']
+04:33:36 [INFO] [L6.5] Processing chunk 45/47 (2000 cols)
+04:33:40 [INFO] [ADF Safe-Skip][adf_diff] bypassed 778/955 cols (81.5%); examples: ['quote-volume_momentum_RSI_25_Lag_1', 'quote-volume_momentum_RSI_34_Lag_1', 'quote-volume_momentum_RSI_55_Lag_1']
+04:33:40 [INFO] [L6.5] Processing chunk 46/47 (2000 cols)
+04:33:45 [INFO] [ADF Safe-Skip][adf_diff] bypassed 342/1219 cols (28.1%); examples: ['hl_statistics_CORREL_34_Lag_1', 'hl_statistics_CORREL_55_Lag_1', 'hl_statistics_CORREL_89_Lag_1']
+04:33:49 [INFO] [L6.5] Processing chunk 47/47 (1672 cols)
+04:33:52 [INFO] [ADF Safe-Skip][adf_diff] bypassed 487/824 cols (59.1%); examples: ['high_momentum_MACDFIX-Line_21_Lag_3', 'high_momentum_MACDFIX-Signal_21_Lag_3', 'low_momentum_MACDFIX-Line_3_Lag_3']
+04:33:53 [INFO] [Layer 6.5 (IC-First)] 100% - Layer 6.5 (IC-First) completed: 93672 features
+04:34:02 [WARNING] 發現 NaN 值: 91739 個特徵
+04:34:02 [WARNING]   close_12h_trend_EMA_5: 105 (6.19%)
+04:34:02 [WARNING]   close_12h_trend_EMA_8: 85 (5.01%)
+04:34:02 [WARNING]   close_12h_trend_EMA_10: 87 (5.13%)
+04:34:02 [WARNING]   close_12h_trend_EMA_13: 72 (4.25%)
+04:34:02 [WARNING]   close_12h_trend_EMA_20: 62 (3.66%)
+04:34:02 [WARNING]   close_12h_trend_EMA_21: 63 (3.72%)
+04:34:02 [WARNING]   close_12h_trend_EMA_34: 60 (3.54%)
+04:34:02 [WARNING]   close_12h_trend_EMA_50: 50 (2.95%)
+04:34:02 [WARNING]   close_12h_trend_EMA_55: 55 (3.24%)
+04:34:02 [WARNING]   close_12h_trend_EMA_89: 88 (5.19%)
+04:34:02 [WARNING]   close_12h_trend_EMA_100: 99 (5.84%)
+04:34:02 [WARNING]   close_12h_trend_EMA_144: 144 (8.50%)
+04:34:02 [WARNING]   close_12h_trend_EMA_200: 200 (11.80%)
+04:34:02 [WARNING]   close_12h_trend_EMA_233: 233 (13.75%)
+04:34:02 [WARNING]   volume_12h_trend_EMA_5: 4 (0.24%)
+04:34:02 [WARNING]   volume_12h_trend_EMA_8: 7 (0.41%)
+04:34:02 [WARNING]   volume_12h_trend_EMA_10: 9 (0.53%)
+04:34:02 [WARNING]   volume_12h_trend_EMA_13: 12 (0.71%)
+04:34:02 [WARNING]   volume_12h_trend_EMA_20: 187 (11.03%)
+04:34:02 [WARNING]   volume_12h_trend_EMA_21: 188 (11.09%)
+04:34:02 [WARNING]   ... 其餘 91719 個特徵略
+04:34:02 [INFO] 開始儲存工廠輸出 - BTCUSDT/12h
+04:34:17 [INFO] 工廠輸出儲存完成 - 特徵數: 91794, 標籤數: 7
+04:34:17 [INFO] Loaded feature registry with 2 entries
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py: 63 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/statsmodels/regression/linear_model.py:955: RuntimeWarning: divide by zero encountered in log
+    llf = -nobs2*np.log(2*np.pi) - nobs2*np.log(ssr / nobs) - nobs2
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 1 passed, 63 warnings in 992.47s (0:16:32) ==================

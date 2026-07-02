@@ -200,6 +200,30 @@ def collect_selected_node_ids(cmd: list[str], output: str) -> list[str]:
     return selected
 
 
+def _collect_node_ids_fallback(cmd: list[str]) -> list[str]:
+    """argv/輸出都拿不到 node id 時（如 -k + -q），跑 --collect-only 補記。
+
+    只讀不執行測試；collect 失敗回空清單（fail-open 僅影響 receipt 豐富度，
+    不影響 receipt 本身的 pass/fail 記錄）。
+    """
+    # 剝掉原有 verbosity 旗標：殘留 -q 會疊成 -qq，collect 輸出縮成「檔名: 數量」而非 node id
+    verbosity_flags = {"-q", "-qq", "--quiet", "-v", "-vv", "--verbose"}
+    collect_cmd = [arg for arg in cmd if arg not in verbosity_flags]
+    collect_cmd += ["--collect-only", "-q"]
+    try:
+        proc = subprocess.run(
+            collect_cmd, capture_output=True, timeout=300, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    node_ids: list[str] = []
+    for line in proc.stdout.decode("utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if "::" in line and not line.startswith(("=", "-", "<")) and " " not in line:
+            node_ids.append(line)
+    return node_ids
+
+
 def _argv_indicates_mutation(cmd: list[str]) -> bool:
     """判斷 argv 是否指向 mutation 測試（-k 或 node-id）。"""
     k_value = _extract_flag_value(cmd, "-k")
@@ -410,6 +434,8 @@ def main(argv: list[str] | None = None) -> int:
     pytest_counts, pytest_summary_line = parse_pytest_summary(combined_text)
     markers = _extract_markers(cmd) if _is_pytest_cmd(cmd) else []
     selected_node_ids = collect_selected_node_ids(cmd, combined_text) if _is_pytest_cmd(cmd) else []
+    if _is_pytest_cmd(cmd) and not selected_node_ids:
+        selected_node_ids = _collect_node_ids_fallback(cmd)
     runtime_class = derive_runtime_class(
         cmd, duration_seconds, pytest_counts, markers, combined_text
     )

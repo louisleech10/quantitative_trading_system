@@ -781,3 +781,28 @@ def test_b2_fake_pending_close_still_blocks_done(tmp_path: Path) -> None:
     assert proc.returncode == 1
     assert pending_id in proc.stderr
 
+
+
+def test_k_filter_quiet_run_backfills_selected_node_ids(tmp_path: Path) -> None:
+    """-k + -q 跑（argv 無 node id、輸出無 PASSED 行）→ fallback 以 --collect-only 補記。
+
+    修復前 selected_node_ids=[]，scope 聲稱綁不上（HANDOFF 待修項）；
+    改壞 fallback（回空）本測試會 FAIL。
+    """
+    test_file = tmp_path / "test_sample_nodeids.py"
+    test_file.write_text(
+        "def test_alpha_case():\n    assert True\n\n"
+        "def test_beta_case():\n    assert True\n",
+        encoding="utf-8",
+    )
+    claim_id = "test-k-nodeids-backfill"
+    proc = _run_wrapper(
+        claim_id,
+        [str(PYTHON), "-m", "pytest", str(test_file), "-k", "alpha", "-q"],
+    )
+    assert proc.returncode == 0
+    _, receipt = _latest_receipt_for_claim(claim_id)
+    assert receipt["passed"] == 1
+    node_ids = receipt["selected_node_ids"]
+    assert len(node_ids) == 1, node_ids
+    assert node_ids[0].endswith("test_sample_nodeids.py::test_alpha_case")

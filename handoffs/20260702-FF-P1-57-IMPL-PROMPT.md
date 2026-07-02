@@ -1,4 +1,4 @@
-# P1-FF-5/7 實作指派（Composer 2.5 讀此檔執行）
+# P1-FF-5/7 實作指派（Codex GPT-5.5 讀此檔執行；2026-07-02 使用者改派：Codex 實作、Composer review）
 
 依三方定案 reconcile v2(codex+composer 內容 APPROVED):`handoffs/20260702-FF-P1-57-RECONCILE.md`。逐字讀該檔 §1-§4 + 三腿設計檔(DESIGN-CLAUDE/CODEX/COMPOSER)。真實 kline `data_cache/feature_klines/kline_cache.h5`,禁合成 fixture 當驗收。
 
@@ -19,4 +19,4 @@ V7.1 全 registry input semantics + direct-call differential + price_transform/M
 - 不動 production;不放寬既有斷言;測試副作用還原(golden inventory)。
 
 ## 收尾
-寫 `handoffs/20260702-FF-P1-57-IMPL-composer.md`(逐 V/M 實作+新測試名;TESTS_RUN 明標 fast/skipped-slow;FAILURES/SCOPE)。禁「已驗/真紅」字樣。最後 STATUS: DONE 或 BLOCKED。
+寫 `handoffs/20260702-FF-P1-57-IMPL-codex.md`(逐 V/M 實作+新測試名;TESTS_RUN 明標 fast/skipped-slow;FAILURES/SCOPE)。禁「已驗/真紅」字樣。最後 STATUS: DONE 或 BLOCKED。
