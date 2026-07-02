@@ -6,7 +6,8 @@
 - **B1 ✅**(`d3870c4` run_with_receipt+審計)。**B2 ✅**(`a1d3638` claim checker+ledger,V7 誤報=0→B3 PreToolUse 可全量)。
 - **B4+B5 ✅(本次 commit)**:B4=mutation接receipt/W3 adversarial provenance/W2 stamp provenance/audit_chain;B5=RESULT硬欄位枚舉/#6 fingerprint衝突/W1 FACT-RECEIPT。
   Composer 實作→Codex adversarial **6 BLOCKING**(gate非ADV路徑繞過/回填日期grandfather/RESULT枚舉不入checker/fingerprint含極性詞自廢/W1漏指令輸出/合成receipt殘留)→Composer 修→Codex 原提出方重跑反例**全 CLOSED**→Claude 補 gate.sh `GATE_DIR_OVERRIDE` 測試隔離+清 audit.log 合成條目→Codex round2 APPROVED。governance **55 passed 且 audit.log 零汙染**。
-- **下一步=B3(最後 enforcement 層)**:TODO Task3.1 PreToolUse/3.2 git hook/3.3 CI/3.4 health。派工 prompt 未寫(仿 B4-IMPL-PROMPT 格式);Composer 實作+Codex review。**hook 生效需 session 重啟+使用者 /hooks 核准**。
+- **B3(本次 commit)**:verify_pretooluse.sh+settings.json PreToolUse/git hooks(staged 讀 index blob)/CI workflow/health。Codex review 4 BLOCKING(partial-stage/code-only假紅/交付狀態自阻斷/binary crash)→Composer 修→Codex 閉合檔寫道「FINAL VERDICT: APPROVED — B3-1/B3-2/B3-3/B3-4 CLOSED」(出處:20260702-VERIFYGATE-B3-REVIEW-CODEX.md closure 節)。governance 75 tests 綠 VERIFY:20260701T235954Z-governance-b3-final。PreToolUse hook 已生效(本檔本段初稿即被其擋過,補 receipt 後才寫入)。
+- epic B1-B5 全落地。殘餘=誠實邊界(careless-proof+tamper-evident,非防惡意;audit_chain 人工抽查)。git hooks 安裝:`bash scripts/install_verify_hooks.sh`。
 
 ## ★FF 深稽 P0-FF-3(等 B3 完+探針修好再正式驗收)
 - ⚠️ **舊聲稱「align mutation 真紅(babu8o07p)」=捏造**(smoke 冒充慢測;`handoffs/20260701-FF-FORENSICS-RECONCILE.md`)。WIP 程式碼在 `9f9839d`(設計 reconcile 雙戳記 sha256:5da75188 有效)。

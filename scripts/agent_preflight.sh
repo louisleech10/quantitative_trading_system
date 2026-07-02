@@ -18,3 +18,4 @@ else
 fi
 echo "$fc $kb" > "$SNAP"
 echo "PREFLIGHT 快照：data_cache 檔案數=$fc 大小=${kb}KB → $SNAP"
+bash scripts/verify_hooks_health.sh || { echo "PREFLIGHT ❌ verify hooks health failed"; exit 2; }

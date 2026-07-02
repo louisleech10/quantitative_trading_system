@@ -1096,36 +1096,96 @@ def _unknown_polarity_warn(unit: Unit) -> None:
             )
 
 
-def check_files(paths: list[Path]) -> list[Violation]:
-    """掃描多檔，回傳全部違規。"""
+class FileReadError(Exception):
+    """無法讀取待掃描檔（非 UTF-8 或 I/O 錯誤）。"""
+
+    def __init__(self, rel_path: str, detail: str) -> None:
+        self.rel_path = rel_path
+        self.detail = detail
+        super().__init__(f"{rel_path}: {detail}")
+
+
+def _scan_file_content(
+    rel: str,
+    content: str,
+    open_pending: list[dict[str, Any]],
+    all_units_claims: list[tuple[Unit, ClaimObject]],
+) -> list[Violation]:
+    """掃描單檔文字內容，累積 claim units 並回傳違規。"""
+    violations: list[Violation] = []
+    for unit in split_units(content, rel):
+        _unknown_polarity_warn(unit)
+        claim = extract_claim(unit)
+        all_units_claims.append((unit, claim))
+        violations.extend(check_unit(unit, open_pending))
+    if _is_result_file(rel):
+        violations.extend(check_result_structured_fields(rel, content))
+    return violations
+
+
+def check_files(
+    paths: list[Path],
+    *,
+    content_map: dict[str, str] | None = None,
+) -> list[Violation]:
+    """掃描多檔，回傳全部違規。
+
+    content_map 若提供，以 map 內容取代 working tree read_text（供 --staged index blob）。
+    """
     violations: list[Violation] = []
     open_pending = load_open_pending()
     all_units_claims: list[tuple[Unit, ClaimObject]] = []
     for path in paths:
-        if not path.is_file():
-            continue
-        rel = path.as_posix()
-        content = path.read_text(encoding="utf-8")
-        for unit in split_units(content, rel):
-            _unknown_polarity_warn(unit)
-            claim = extract_claim(unit)
-            all_units_claims.append((unit, claim))
-            violations.extend(check_unit(unit, open_pending))
-        if _is_result_file(rel):
-            violations.extend(check_result_structured_fields(rel, content))
+        raw = path.as_posix()
+        rel = _scannable_rel_path(raw) if _is_scannable_path(raw) else raw
+        if content_map is not None and rel in content_map:
+            content = content_map[rel]
+        else:
+            if not path.is_file():
+                continue
+            try:
+                content = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError as exc:
+                raise FileReadError(rel, f"not valid UTF-8: {exc}") from exc
+            except OSError as exc:
+                raise FileReadError(rel, str(exc)) from exc
+        violations.extend(_scan_file_content(rel, content, open_pending, all_units_claims))
     violations.extend(check_fingerprint_conflicts(all_units_claims))
     return violations
 
 
-def _git_staged_markdown_files() -> list[Path]:
-    proc = _run_git(["diff", "--cached", "--name-only", "--diff-filter=ACMR"])
+def _git_staged_scannable_paths() -> list[str]:
+    """回傳 staged index 內可掃描 markdown 路徑（ACMR，跳過 delete）。"""
+    proc = _run_git(["diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"])
     if proc.returncode != 0:
         return []
-    paths: list[Path] = []
-    for line in proc.stdout.splitlines():
-        if _is_scannable_path(line):
-            paths.append(Path(line))
+    paths: list[str] = []
+    for entry in proc.stdout.split("\0"):
+        if entry and _is_scannable_path(entry):
+            paths.append(entry)
     return paths
+
+
+def _git_staged_blob(rel_path: str) -> str | None:
+    """從 index blob 讀 staged 內容（非 working tree）。"""
+    proc = _run_git(["show", f":{rel_path}"])
+    if proc.returncode != 0:
+        return None
+    return proc.stdout
+
+
+def _git_staged_markdown_files() -> tuple[list[Path], dict[str, str]]:
+    """回傳 staged scannable paths 與 index blob 內容 map。"""
+    rel_paths = _git_staged_scannable_paths()
+    paths: list[Path] = []
+    content_map: dict[str, str] = {}
+    for rel in rel_paths:
+        blob = _git_staged_blob(rel)
+        if blob is None:
+            continue
+        paths.append(Path(rel))
+        content_map[rel] = blob
+    return paths, content_map
 
 
 def _git_range_files(range_spec: str) -> list[Path]:
@@ -1137,13 +1197,27 @@ def _git_range_files(range_spec: str) -> list[Path]:
 
 def _is_scannable_path(path_str: str) -> bool:
     norm = path_str.replace("\\", "/")
-    if norm == "HANDOFF.md":
+    if norm == "HANDOFF.md" or norm.endswith("/HANDOFF.md"):
         return True
-    if norm.startswith("handoffs/") and norm.endswith(".md"):
-        return True
-    if norm.startswith("docs/") and norm.endswith(".md"):
-        return True
+    for marker in ("handoffs/", "docs/"):
+        idx = norm.find(marker)
+        if idx >= 0:
+            suffix = norm[idx:]
+            if suffix.endswith(".md"):
+                return True
     return False
+
+
+def _scannable_rel_path(path_str: str) -> str:
+    """正規化為 checker 使用的相對路徑（支援絕對路徑）。"""
+    norm = path_str.replace("\\", "/")
+    if norm == "HANDOFF.md" or norm.endswith("/HANDOFF.md"):
+        return "HANDOFF.md"
+    for marker in ("handoffs/", "docs/"):
+        idx = norm.find(marker)
+        if idx >= 0:
+            return norm[idx:]
+    return norm
 
 
 def list_open_pending() -> int:
@@ -1154,6 +1228,37 @@ def list_open_pending() -> int:
     return 0 if open_events else 0
 
 
+def _stdin_operational_unit(unit: Unit, norm_path: str) -> bool:
+    """PreToolUse 增量掃描：判斷單位是否落在 operational 區段。"""
+    if norm_path == "HANDOFF.md":
+        return True
+    if unit.section_operational:
+        return True
+    stripped = unit.text.strip()
+    return bool(re.match(r"^(?:STATUS|RESULT)\s*:", stripped))
+
+
+def check_stdin_operational(source_file: str, content: str) -> list[Violation]:
+    """掃描 PreToolUse 增量 operational 文字（僅本次新增/修改行）。"""
+    if not content.strip():
+        return []
+    norm_path = source_file.replace("\\", "/").lstrip("./")
+    violations: list[Violation] = []
+    open_pending = load_open_pending()
+    all_units_claims: list[tuple[Unit, ClaimObject]] = []
+    for unit in split_units(content, norm_path):
+        if unit.in_fenced or unit.in_quote:
+            continue
+        if not _stdin_operational_unit(unit, norm_path):
+            continue
+        _unknown_polarity_warn(unit)
+        claim = extract_claim(unit)
+        all_units_claims.append((unit, claim))
+        violations.extend(check_unit(unit, open_pending))
+    violations.extend(check_fingerprint_conflicts(all_units_claims))
+    return violations
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI 進入點。"""
     parser = argparse.ArgumentParser(description="Verification claim checker (router, not judge).")
@@ -1161,19 +1266,43 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--files", nargs="*", default=[], help="Explicit files to scan")
     parser.add_argument("--range", dest="range_spec", default="", help="Git diff range A...B")
     parser.add_argument("--commit-msg", dest="commit_msg", default="", help="Commit message file")
+    parser.add_argument(
+        "--stdin-operational",
+        dest="stdin_operational_file",
+        default="",
+        help="Scan incremental operational text from stdin for PreToolUse hook",
+    )
     parser.add_argument("command", nargs="?", default="", help="Subcommand: list-open")
     args = parser.parse_args(argv)
 
     if args.command == "list-open":
         return list_open_pending()
 
+    if args.stdin_operational_file:
+        try:
+            stdin_content = sys.stdin.read()
+        except OSError as exc:
+            print(f"verification_claim_check.py: stdin read failed: {exc}", file=sys.stderr)
+            return 2
+        violations = check_stdin_operational(args.stdin_operational_file, stdin_content)
+        if violations:
+            for v in violations:
+                print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
+                print(v.unit_text, file=sys.stderr)
+            return 1
+        return 0
+
     paths: list[Path] = []
+    staged_content_map: dict[str, str] | None = None
     if args.staged:
-        paths.extend(_git_staged_markdown_files())
+        staged_paths, staged_content_map = _git_staged_markdown_files()
+        paths.extend(staged_paths)
     if args.range_spec:
         paths.extend(_git_range_files(args.range_spec))
     for file_arg in args.files:
-        paths.append(Path(file_arg))
+        norm = file_arg.replace("\\", "/")
+        if _is_scannable_path(norm):
+            paths.append(Path(file_arg))
     if args.commit_msg:
         msg_path = Path(args.commit_msg)
         if msg_path.is_file():
@@ -1196,6 +1325,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
     if not paths:
+        if args.staged and not args.range_spec and not args.files:
+            return 0
         print("verification_claim_check.py: no input files", file=sys.stderr)
         return 2
 
@@ -1203,12 +1334,20 @@ def main(argv: list[str] | None = None) -> int:
     seen: set[str] = set()
     unique_paths: list[Path] = []
     for path in paths:
-        key = str(path)
+        key = path.as_posix()
         if key not in seen:
             seen.add(key)
             unique_paths.append(path)
 
-    violations = check_files(unique_paths)
+    content_map = staged_content_map if args.staged else None
+    try:
+        violations = check_files(unique_paths, content_map=content_map)
+    except FileReadError as exc:
+        print(
+            f"verification_claim_check.py: cannot read {exc.rel_path}: {exc.detail}",
+            file=sys.stderr,
+        )
+        return 2
     if violations:
         for v in violations:
             print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)

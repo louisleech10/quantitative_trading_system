@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# verify_pretooluse.sh — PreToolUse coarse-guard for HANDOFF/handoffs operational claims.
+#
+# 誠實邊界：careless-proof + tamper-evident，非防惡意偽造；只掃本次 Edit/Write 新增文字。
+# 退出碼：0=放行；2=擋下（fail-closed）；工具缺失=2。
+set -u
+
+INPUT="$(cat)"
+command -v jq >/dev/null 2>&1 || {
+  echo "[VERIFY-PRETOOLUSE] jq 缺失，fail-closed" >&2
+  exit 2
+}
+
+tool_name="$(jq -r '.tool_name // empty' <<<"$INPUT" 2>/dev/null)" || exit 2
+[ -z "$tool_name" ] && exit 0
+
+case "$tool_name" in
+  Edit|Write) ;;
+  *) exit 0 ;;
+esac
+
+file_path="$(jq -r '.tool_input.file_path // empty' <<<"$INPUT" 2>/dev/null)" || exit 2
+[ -z "$file_path" ] && exit 0
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "[VERIFY-PRETOOLUSE] 不在 git repo，fail-closed" >&2
+  exit 2
+}
+cd "$ROOT" || exit 2
+
+rel_path="${file_path#"$ROOT"/}"
+rel_path="${rel_path#./}"
+
+if ! printf '%s' "$rel_path" | grep -Eq '^(HANDOFF\.md|handoffs/.+)$'; then
+  exit 0
+fi
+
+new_text=""
+if [ "$tool_name" = "Edit" ]; then
+  new_text="$(jq -r '.tool_input.new_string // empty' <<<"$INPUT" 2>/dev/null)" || exit 2
+else
+  content="$(jq -r '.tool_input.content // empty' <<<"$INPUT" 2>/dev/null)" || exit 2
+  if [ -f "$rel_path" ]; then
+    tmp_new="$(mktemp)"
+    trap 'rm -f "$tmp_new"' EXIT
+    printf '%s' "$content" >"$tmp_new"
+    new_text="$(
+      diff -u "$rel_path" "$tmp_new" 2>/dev/null \
+        | grep '^+' \
+        | grep -v '^+++' \
+        | sed 's/^+//' \
+        || true
+    )"
+    rm -f "$tmp_new"
+    trap - EXIT
+  else
+    new_text="$content"
+  fi
+fi
+
+[ -z "$new_text" ] && exit 0
+
+py="venv/bin/python"
+checker="scripts/verification_claim_check.py"
+if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
+  echo "[VERIFY-PRETOOLUSE] python/checker 缺失，fail-closed" >&2
+  exit 2
+fi
+
+printf '%s' "$new_text" | "$py" "$checker" --stdin-operational "$rel_path"
+rc=$?
+if [ "$rc" -eq 1 ]; then
+  echo "[VERIFY-PRETOOLUSE] operational claim 無 backing，擋下 Edit/Write" >&2
+  exit 2
+fi
+exit "$rc"

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# commit-msg — 掃描 commit subject+body 的 operational claim。
+set -u
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+cd "$ROOT" || exit 1
+msg_file="${1:-}"
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+  echo "commit-msg: 缺少 commit message 檔" >&2
+  exit 1
+fi
+py="venv/bin/python"
+checker="scripts/verification_claim_check.py"
+if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
+  echo "commit-msg: venv/bin/python 或 verification_claim_check.py 缺失" >&2
+  exit 1
+fi
+exec "$py" "$checker" --commit-msg "$msg_file"

@@ -1,0 +1,59 @@
+name: Verify Claim
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify-claim:
+    name: Verification claim check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Verify jq available
+        run: command -v jq
+
+      - name: Create venv and install dependencies
+        run: |
+          python -m venv venv
+          venv/bin/pip install -q -r requirements.txt
+
+      - name: Determine diff range
+        id: range
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "before=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "before=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+            echo "head=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run verification claim check
+        env:
+          BEFORE_SHA: ${{ steps.range.outputs.before }}
+          HEAD_SHA: ${{ steps.range.outputs.head }}
+        run: |
+          CHANGED="$(git diff --name-only "${BEFORE_SHA}...${HEAD_SHA}" -- HANDOFF.md 'handoffs/*.md' 'docs/*.md' | tr '\n' ' ')"
+          if [ -n "$CHANGED" ]; then
+            venv/bin/python scripts/verification_claim_check.py \
+              --range "${BEFORE_SHA}...${HEAD_SHA}" \
+              --files ${CHANGED}
+          else
+            venv/bin/python scripts/verification_claim_check.py \
+              --range "${BEFORE_SHA}...${HEAD_SHA}"
+          fi

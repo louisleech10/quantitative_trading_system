@@ -19,7 +19,8 @@ COMMITTEE_AUDIT_ENV = "VERIFY_GATE_COMMITTEE_AUDIT_LOG"
 DEFAULT_COMMITTEE_AUDIT = Path(".claude/gate/audit.log")
 
 ADV_PATH_RE = re.compile(r"^handoffs/.*-ADV-(CODEX|COMPOSER)\.md$", re.IGNORECASE)
-STAMP_TASK_RE = re.compile(r"task:([a-z0-9]+)", re.IGNORECASE)
+# task id 允許連字號(如 p0ff3-r2);不含連字號會靜默截斷導致 allowlist/審計事件永不匹配
+STAMP_TASK_RE = re.compile(r"task:([a-z0-9][a-z0-9-]*)", re.IGNORECASE)
 STAMP_FAMILY_RE = re.compile(
     r"^RECONCILE-STAMP:\s*([a-z]+)\s+APPROVED",
     re.IGNORECASE,
@@ -40,6 +41,20 @@ LEGACY_STAMP_ALLOWLIST: frozenset[tuple[str, str, str, str]] = frozenset(
             "codex",
             "b1eicjnuo",
             "86fe39f51ea28fadde135b0c0fd2f75feeb09b4adffaba8bbcde4fd590140044",
+        ),
+        # P0-FF-3 設計 reconcile:B4 provenance 制度(2026-07-02)前的真戳記;
+        # 07-01 forensics 三方裁定設計 reconcile 有效(捏造的是驗證聲稱,非設計)
+        (
+            "handoffs/20260630-FF-P0FF3-RECONCILE.md",
+            "codex",
+            "p0ff3-r2",
+            "5da75188a4eebde3ef41a054462273e2c9958af27b5ad2b24dd7b1c3f72d93cd",
+        ),
+        (
+            "handoffs/20260630-FF-P0FF3-RECONCILE.md",
+            "composer",
+            "p0ff3-r2",
+            "5da75188a4eebde3ef41a054462273e2c9958af27b5ad2b24dd7b1c3f72d93cd",
         ),
     }
 )

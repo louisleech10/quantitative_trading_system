@@ -64,6 +64,15 @@
             "command": "bash scripts/gate_check.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/verify_pretooluse.sh"
+          }
+        ]
       }
     ],
     "SessionStart": [

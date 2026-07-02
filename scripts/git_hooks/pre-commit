@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# pre-commit — 掃描 staged HANDOFF/handoffs/docs markdown 的 claim-object。
+set -u
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+cd "$ROOT" || exit 1
+py="venv/bin/python"
+checker="scripts/verification_claim_check.py"
+if [ ! -x "$py" ] || [ ! -f "$checker" ]; then
+  echo "pre-commit: venv/bin/python 或 verification_claim_check.py 缺失" >&2
+  exit 1
+fi
+exec "$py" "$checker" --staged

@@ -42,4 +42,6 @@ porcelain="$(git status --porcelain)"
 echo "--- 工作樹改動 (git status --porcelain) ---"
 if [ -n "$porcelain" ]; then echo "$porcelain"; else echo "（無）"; fi
 
+bash scripts/verify_hooks_health.sh || { echo "POSTFLIGHT ❌ verify hooks health failed"; fail=1; }
+
 exit "$fail"
