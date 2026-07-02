@@ -51,6 +51,6 @@ jobs:
               --range "${BEFORE_SHA}...${HEAD_SHA}" \
               --files ${CHANGED}
           else
-            python scripts/verification_claim_check.py \
-              --range "${BEFORE_SHA}...${HEAD_SHA}"
+            # 範圍內無可掃 md(code-only push)=無事可驗,通過;與 pre-commit 同語義,非 fail-open
+            echo "no scannable markdown changed in range; nothing to check"
           fi
