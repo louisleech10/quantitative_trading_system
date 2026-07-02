@@ -20,9 +20,11 @@ from typing import Any, Iterable
 
 DEFAULT_RECEIPTS_DIR = Path("handoffs/run_receipts")
 DEFAULT_AUDIT_LOG_PATH = Path(".claude/gate/verify_audit.log")
+DEFAULT_COMMITTEE_AUDIT_LOG_PATH = Path(".claude/gate/audit.log")
 DEFAULT_PENDING_LEDGER = Path("handoffs/pending_verifications.jsonl")
 RECEIPTS_DIR_ENV = "VERIFY_GATE_RECEIPTS_DIR"
 AUDIT_LOG_ENV = "VERIFY_GATE_AUDIT_LOG"
+COMMITTEE_AUDIT_ENV = "VERIFY_GATE_COMMITTEE_AUDIT_LOG"
 PENDING_LEDGER_ENV = "VERIFY_GATE_PENDING_LEDGER"
 
 ZWSP_CHARS = "\u200b\u200c\u200d\ufeff"
@@ -371,6 +373,64 @@ def _is_content_discussion_exempt(unit: Unit) -> bool:
     if unit.in_fenced or unit.in_quote:
         return True
     return not _has_claim_signals_outside_exempt_regions(unit.text)
+
+
+def _committee_audit_path() -> Path:
+    """回傳 committee dispatch/output 審計 log 路徑。"""
+    override = os.environ.get(COMMITTEE_AUDIT_ENV)
+    return Path(override) if override else DEFAULT_COMMITTEE_AUDIT_LOG_PATH
+
+
+def _committee_output_rel(path: str) -> str:
+    """正規化 committee output path 到 handoffs/ 相對段。"""
+    norm = path.replace("\\", "/")
+    marker = "handoffs/"
+    idx = norm.find(marker)
+    if idx >= 0:
+        return norm[idx:]
+    return norm
+
+
+def _committee_registered_files() -> dict[str, set[str]]:
+    """讀 committee audit log，回傳 {output_path: raw_sha256集合}。"""
+    audit_log = _committee_audit_path()
+    if not audit_log.is_file():
+        return {}
+    registered: dict[str, set[str]] = {}
+    for raw in audit_log.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("event") not in {"committee_dispatch", "committee_output"}:
+            continue
+        output_path = _committee_output_rel(str(event.get("output_path", "")))
+        output_sha256 = str(event.get("output_sha256", ""))
+        if not output_path.startswith("handoffs/"):
+            continue
+        if not output_sha256 or output_sha256 == "pending":
+            continue
+        registered.setdefault(output_path, set()).add(output_sha256)
+    return registered
+
+
+def _is_committee_process_exempt(rel: str, source_path: Path) -> bool:
+    """已註冊且 raw bytes hash 相符的 handoffs 委員會過程檔可豁免 prose claim。"""
+    if os.environ.get("VERIFY_GATE_O3_FILECLASS", "1") == "0":
+        return False
+    norm = _committee_output_rel(rel)
+    if not norm.startswith("handoffs/"):
+        return False
+    if Path(norm).name == "HANDOFF.md":
+        return False
+    hashes = _committee_registered_files().get(norm, set())
+    if not hashes or not source_path.is_file():
+        return False
+    actual = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    return actual in hashes
 
 
 def _is_docs_operational_unit(unit: Unit) -> bool:
@@ -1176,6 +1236,7 @@ def check_unit(
     open_pending: list[dict[str, Any]],
     *,
     file_verify_exempt: bool = False,
+    committee_process_exempt: bool = False,
 ) -> list[Violation]:
     """檢查單一文字單位，回傳違規清單。"""
     violations: list[Violation] = []
@@ -1200,6 +1261,12 @@ def check_unit(
     if mode == "supersede" or mode == "discussion":
         return violations
 
+    if committee_process_exempt and claim.source_context not in {
+        "root_handoff_status",
+        "commit_msg",
+    }:
+        return violations
+
     if _exempt_allowed(unit, claim, file_verify_exempt=file_verify_exempt):
         return violations
 
@@ -1215,7 +1282,12 @@ def check_unit(
                 section_operational=unit.section_operational,
             )
             violations.extend(
-                check_unit(sub_unit, open_pending, file_verify_exempt=file_verify_exempt)
+                check_unit(
+                    sub_unit,
+                    open_pending,
+                    file_verify_exempt=file_verify_exempt,
+                    committee_process_exempt=committee_process_exempt,
+                )
             )
         return violations
 
@@ -1293,6 +1365,7 @@ def _unit_touches_added_lines(unit: Unit, added_lines: set[int]) -> bool:
 def _scan_file_content(
     rel: str,
     content: str,
+    source_path: Path,
     open_pending: list[dict[str, Any]],
     all_units_claims: list[tuple[Unit, ClaimObject]],
     *,
@@ -1301,6 +1374,7 @@ def _scan_file_content(
     """掃描單檔文字內容，累積 claim units 並回傳違規。"""
     violations: list[Violation] = []
     file_verify_exempt = _file_verify_exempt_allowed(rel, content)
+    committee_process_exempt = _is_committee_process_exempt(rel, source_path)
     for unit in split_units(content, rel):
         if added_lines is not None and not _unit_touches_added_lines(unit, added_lines):
             continue
@@ -1308,7 +1382,12 @@ def _scan_file_content(
         claim = extract_claim(unit)
         all_units_claims.append((unit, claim))
         violations.extend(
-            check_unit(unit, open_pending, file_verify_exempt=file_verify_exempt)
+            check_unit(
+                unit,
+                open_pending,
+                file_verify_exempt=file_verify_exempt,
+                committee_process_exempt=committee_process_exempt,
+            )
         )
     if _is_result_file(rel) and added_lines is None:
         violations.extend(check_result_structured_fields(rel, content))
@@ -1350,6 +1429,7 @@ def check_files(
             _scan_file_content(
                 rel,
                 content,
+                path,
                 open_pending,
                 all_units_claims,
                 added_lines=added_lines,

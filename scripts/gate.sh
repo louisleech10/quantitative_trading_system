@@ -7,6 +7,7 @@
 #        --facts-asked "..." --review-role "..." --template "..." [--adversarial PATH|waived:reason]
 #   bash scripts/gate.sh artifact --file docs/X_SPEC.md \
 #        --template-opened templates/SPEC_TEMPLATE.md --sections "§1.4 Golden=filled; §0.A=N/A:..."
+#   bash scripts/gate.sh register-output <task-id> <handoffs/path.md>
 #
 # 誠實邊界：不驗證填入內容為真，只強制「必填有內容」+ 對可機檢項做真實檢查
 #   （高風險派工的 --adversarial 檔須存在；artifact 的 --template-opened 檔須存在），其餘記入審計供稽核。
@@ -21,11 +22,115 @@ VENV_PY="${REPO_ROOT}/venv/bin/python"
 GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
 kind="${1:-}"; shift || true
-[ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || { echo "ERROR: kind 必須是 dispatch|artifact"; exit 1; }
+[ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || [ "${kind}" = "register-output" ] || { echo "ERROR: kind 必須是 dispatch|artifact|register-output"; exit 1; }
 
 intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
-task_id=""
+task_id=""; output_path=""
 file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
+
+_norm_output_path() {
+  "${VENV_PY}" - "$1" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+raw = sys.argv[1]
+norm = raw.replace("\\", "/")
+if norm.startswith("/"):
+    root = Path.cwd().resolve()
+    try:
+        rel = Path(raw).resolve().relative_to(root).as_posix()
+        norm = rel
+    except ValueError:
+        marker = "handoffs/"
+        idx = norm.find(marker)
+        if idx >= 0:
+            norm = norm[idx:]
+print(os.path.normpath(norm).replace("\\", "/"))
+PY
+}
+
+_sha256_file() {
+  "${VENV_PY}" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$1"
+}
+
+_append_committee_json_event() {
+  local event="$1"
+  local tid="$2"
+  local family="$3"
+  local out_rel="$4"
+  local output_sha256="$5"
+  local dispatch_ts
+  dispatch_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%SZ')"
+  "${VENV_PY}" - "$event" "$tid" "$family" "$out_rel" "$output_sha256" "$dispatch_ts" <<'PY' >> "${AUDIT}"
+import json
+import sys
+
+event, task_id, family, output_path, output_sha256, ts = sys.argv[1:7]
+print(json.dumps(
+    {
+        "event": event,
+        "task_id": task_id,
+        "family": family,
+        "output_path": output_path,
+        "output_sha256": output_sha256,
+        "ts": ts,
+    },
+    ensure_ascii=False,
+    sort_keys=True,
+))
+PY
+}
+
+_task_has_dispatch() {
+  local tid="$1"
+  "${VENV_PY}" - "${AUDIT}" "${tid}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+audit = Path(sys.argv[1])
+task_id = sys.argv[2]
+if not audit.is_file():
+    sys.exit(1)
+for raw in audit.read_text(encoding="utf-8").splitlines():
+    line = raw.strip()
+    if not line.startswith("{"):
+        continue
+    try:
+        event = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    if event.get("event") == "committee_dispatch" and event.get("task_id") == task_id:
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+if [ "${kind}" = "register-output" ]; then
+  task_id="${1:-}"
+  output_path="${2:-}"
+  [ -n "${task_id}" ] || { echo "ERROR: register-output 缺 task-id"; exit 1; }
+  [ -n "${output_path}" ] || { echo "ERROR: register-output 缺 path"; exit 1; }
+  case "${task_id}" in
+    legacy-*) echo "ERROR: register-output 拒絕 legacy-* task-id（請用 legacy 白名單腳本）"; exit 1 ;;
+  esac
+  [ -f "${output_path}" ] || { echo "ERROR: register-output 檔不存在:${output_path}"; exit 1; }
+  out_rel="$(_norm_output_path "${output_path}")"
+  case "${out_rel}" in
+    handoffs/*) : ;;
+    *) echo "ERROR: register-output 只接受 handoffs/ 內檔案:${output_path}"; exit 1 ;;
+  esac
+  case "${out_rel}" in
+    *"/../"*|"../"*|*".."*) echo "ERROR: register-output 路徑不可含 ..:${output_path}"; exit 1 ;;
+  esac
+  _task_has_dispatch "${task_id}" || { echo "ERROR: register-output 找不到先行 committee_dispatch task:${task_id}"; exit 1; }
+  output_sha256="$(_sha256_file "${output_path}")"
+  _append_committee_json_event "committee_output" "${task_id}" "unknown" "${out_rel}" "${output_sha256}"
+  echo "GATE PASS：已註冊 committee output task:${task_id} path:${out_rel} sha256:${output_sha256}。審計 → ${AUDIT}"
+  exit 0
+fi
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --intent)          intent="${2:-}"; shift 2 ;;
@@ -35,6 +140,7 @@ while [ $# -gt 0 ]; do
     --template)        template="${2:-}"; shift 2 ;;
     --adversarial)     adversarial="${2:-}"; shift 2 ;;
     --task-id)         task_id="${2:-}"; shift 2 ;;
+    --output)          output_path="${2:-}"; shift 2 ;;
     --file)            file="${2:-}"; shift 2 ;;
     --template-opened) template_opened="${2:-}"; shift 2 ;;
     --sections)        sections="${2:-}"; shift 2 ;;
@@ -49,22 +155,13 @@ missing=""
 miss() { missing="${missing}  · --$1: $2\n"; }
 
 # R7：委員派工 provenance emitter（只記錄派工+輸出指紋，不聲稱內容為真）
-_append_committee_dispatch() {
+_append_committee_dispatch_any() {
   local adv_path="$1"
   local tid="$2"
   [ -n "${tid}" ] || return 0
-  [ -f "${adv_path}" ] || return 0
-  local dispatch_ts out_rel family output_sha256
-  dispatch_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date '+%Y-%m-%dT%H:%M:%SZ')"
-  out_rel="${adv_path}"
-  case "${out_rel}" in
-    /*)
-      case "${out_rel}" in
-        *handoffs/*) out_rel="handoffs/${out_rel#*handoffs/}" ;;
-        *docs/*) out_rel="docs/${out_rel#*docs/}" ;;
-      esac
-      ;;
-  esac
+  local out_rel family output_sha256
+  out_rel=""
+  [ -n "${adv_path}" ] && out_rel="$(_norm_output_path "${adv_path}")"
   family="composer"
   case "${out_rel}" in
     *-ADV-CODEX*|*-adv-codex*) family="codex" ;;
@@ -76,13 +173,12 @@ _append_committee_dispatch() {
       esac
       ;;
   esac
-  output_sha256="$(
-    "${VENV_PY}" -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' \
-      "${adv_path}"
-  )"
-  printf '%s\n' \
-    "{\"event\":\"committee_dispatch\",\"task_id\":\"${tid}\",\"family\":\"${family}\",\"output_path\":\"${out_rel}\",\"output_sha256\":\"${output_sha256}\",\"ts\":\"${dispatch_ts}\"}" \
-    >> "${AUDIT}"
+  if [ -n "${adv_path}" ] && [ -f "${adv_path}" ]; then
+    output_sha256="$(_sha256_file "${adv_path}")"
+  else
+    output_sha256="pending"
+  fi
+  _append_committee_json_event "committee_dispatch" "${tid}" "${family}" "${out_rel}" "${output_sha256}"
 }
 
 if [ "${kind}" = "dispatch" ]; then
@@ -102,7 +198,7 @@ if [ "${kind}" = "dispatch" ]; then
           waived:*|n/a:*|N/A:*|stamped-waived:*) : ;;
           *)
             if [ -n "${task_id}" ]; then
-              _append_committee_dispatch "${adversarial}" "${task_id}"
+              _append_committee_dispatch_any "${adversarial}" "${task_id}"
               export VERIFY_GATE_COMMITTEE_AUDIT_LOG="${AUDIT}"
             fi
             ;;
@@ -142,6 +238,15 @@ if [ "${kind}" = "dispatch" ]; then
   if [ -n "${todo}" ]; then
     bash scripts/template_check.sh todo "${todo}" || { echo "ERROR: TODO 未過範本機檢（見上），拒發 token。"; exit 1; }
     [ -n "${manifest}" ] && { bash scripts/coverage_check.sh "${manifest}" "${todo}" || { echo "ERROR: TODO 漏 manifest 項（見上），拒發 token。"; exit 1; }; }
+  fi
+  if [ -z "${missing}" ] && [ -n "${task_id}" ]; then
+    if [ "${risk}" != "high" ] || [ -z "${adversarial}" ] || [ ! -f "${adversarial}" ]; then
+      _append_committee_dispatch_any "${output_path}" "${task_id}"
+      export VERIFY_GATE_COMMITTEE_AUDIT_LOG="${AUDIT}"
+    elif [ -n "${output_path}" ] && [ "${output_path}" != "${adversarial}" ]; then
+      _append_committee_dispatch_any "${output_path}" "${task_id}"
+      export VERIFY_GATE_COMMITTEE_AUDIT_LOG="${AUDIT}"
+    fi
   fi
 elif [ "${kind}" = "artifact" ]; then
   [ -n "${file}" ]            || miss file            "目標治理文件路徑"

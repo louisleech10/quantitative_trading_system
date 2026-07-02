@@ -72,7 +72,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def parse_committee_events(audit_log: Path) -> list[dict]:
-    """從審計 log 解析 committee_dispatch JSON 行。"""
+    """從審計 log 解析 committee_dispatch / committee_output JSON 行。"""
     if not audit_log.is_file():
         return []
     events: list[dict] = []
@@ -84,7 +84,7 @@ def parse_committee_events(audit_log: Path) -> list[dict]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if obj.get("event") == "committee_dispatch":
+        if obj.get("event") in {"committee_dispatch", "committee_output"}:
             events.append(obj)
     return events
 
@@ -97,22 +97,29 @@ def _norm_path(path: str) -> str:
 def find_dispatch_by_task(task_id: str, events: list[dict]) -> dict | None:
     """依 task_id 找 committee_dispatch 事件。"""
     for event in events:
-        if event.get("task_id") == task_id:
+        if event.get("event") == "committee_dispatch" and event.get("task_id") == task_id:
             return event
     return None
+
+
+def find_events_by_task(task_id: str, events: list[dict]) -> list[dict]:
+    """依 task_id 找所有 committee provenance 事件。"""
+    return [event for event in events if event.get("task_id") == task_id]
 
 
 def find_dispatch_by_output(output_path: str, events: list[dict]) -> dict | None:
     """依 output_path 找 committee_dispatch 事件。"""
     norm = _norm_path(output_path)
     for event in events:
-        if _norm_path(str(event.get("output_path", ""))) == norm:
+        if event.get("event") == "committee_dispatch" and _norm_path(str(event.get("output_path", ""))) == norm:
             return event
     return None
 
 
 def _verify_output_hash(output_path: Path, expected_sha256: str) -> tuple[bool, str]:
     """驗證輸出檔存在且 hash 與審計事件一致。"""
+    if expected_sha256 == "pending":
+        return False, "輸出 hash 仍為 pending（須 register-output 補記）"
     if not output_path.is_file():
         return False, f"輸出檔不存在: {output_path}"
     if not expected_sha256:
@@ -146,6 +153,33 @@ def _parse_stamp_fields(stamp_line: str) -> tuple[str, str, str]:
     hash_match = STAMP_HASH_RE.search(stamp_line)
     body_hash = hash_match.group(1).lower() if hash_match else ""
     return family, task_id, body_hash
+
+
+def _event_output_rel(event: dict) -> str:
+    """取事件 output_path 的 handoffs 相對路徑。"""
+    return _handoffs_relative(str(event.get("output_path", "")))
+
+
+def _stamp_event_satisfies(
+    event: dict,
+    *,
+    reconcile_file: str,
+    body_hash: str,
+) -> bool:
+    """判斷單一 provenance 事件是否可支撐 reconcile stamp。"""
+    output_sha256 = str(event.get("output_sha256", ""))
+    if not output_sha256 or output_sha256 == "pending":
+        return False
+    output_path = str(event.get("output_path", ""))
+    rel_file = _handoffs_relative(reconcile_file) if reconcile_file else ""
+    if rel_file and _event_output_rel(event) == rel_file:
+        return True
+    if body_hash and output_sha256.lower() == body_hash.lower():
+        return True
+    if event.get("event") == "committee_dispatch" and output_path:
+        ok, _ = _verify_output_hash(Path(output_path), output_sha256)
+        return ok
+    return False
 
 
 def _is_legacy_allowlisted_stamp(reconcile_file: str, stamp_line: str) -> bool:
@@ -200,19 +234,29 @@ def check_stamp_provenance(stamp_line: str, reconcile_file: str = "") -> tuple[i
         return 0, ""
 
     events = parse_committee_events(_committee_audit_path())
-    dispatch = find_dispatch_by_task(task_id, events)
-    if dispatch is None:
+    task_events = find_events_by_task(task_id, events)
+    if not task_events:
         return (
             1,
             f"ERROR: 戳記 task:{task_id} 無 committee_dispatch 審計事件"
             f"（非 legacy allowlist 須有派工留痕）",
         )
 
+    if any(
+        _stamp_event_satisfies(event, reconcile_file=reconcile_file, body_hash=_parse_stamp_fields(stamp_line)[2])
+        for event in task_events
+    ):
+        return 0, ""
+
+    dispatch = find_dispatch_by_task(task_id, task_events)
+    if dispatch is None:
+        return 1, f"ERROR: task:{task_id} 無可用 committee_dispatch/committee_output 輸出事件"
+
     output_path = Path(str(dispatch.get("output_path", "")))
     ok, detail = _verify_output_hash(output_path, str(dispatch.get("output_sha256", "")))
     if not ok:
         return 1, f"ERROR: task:{task_id} {detail}"
-    return 0, ""
+    return 1, f"ERROR: task:{task_id} provenance 未指向 reconcile 檔或戳記 hash"
 
 
 def main(argv: list[str] | None = None) -> int:

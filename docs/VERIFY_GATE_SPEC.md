@@ -109,3 +109,8 @@ N/A — 見 §N。改以「假 claim 擋 / 真 claim 放行 / 快測冒充慢測
 - **完整 HANDOFF render 索引**：N/A(v1) — churn 過高改全員習慣;v1 僅 #6 衝突檢查,完整 render 列 phase 2 後續 blocker（殘餘風險:過期 claim 靠衝突檢查+人工 supersede 漸進清理）。
 - **防惡意密碼學偽造**：N/A — 使用者威脅模型=編排者疏忽過度宣稱;做到 careless-proof+tamper-evident;密碼學簽章/repo 外密鑰列殘餘風險（§C 誠實邊界）。
 - **殘餘風險(明列,不阻 v1)**：① 未知同義詞先 WARN 後週期升 FAIL(非 v1 即封死,防撞牆);② ledger append 無 file lock 的 TOCTOU(單機低風險,phase 2 加鎖);③ `run_receipts/` 完整索引與自動 render phase 2。以上經四方 reconcile 接受為 v1 殘餘。
+
+## 增補（GOV-O3EXT-R7，2026-07-03）
+- **R7-emitter 泛化**：`committee_dispatch` 事件改為任何帶 `--task-id` 的 dispatch 皆 emit（原僅高風險+adversarial 實檔分支）；新增 `gate.sh register-output`（raw bytes sha256、須先行 dispatch 事件、拒 `legacy-*`/handoffs/ 外路徑、json.dumps 防注入）。stamp-review 派工必帶 `--output`，reconcile 戳記 provenance 由全鏈（dispatch → register-output → 戳記）閉合，去除 waived 常態。
+- **O3 檔案類豁免**：checker 讀委員會審計 log（`.claude/gate/audit.log`，`VERIFY_GATE_COMMITTEE_AUDIT_LOG` 可覆蓋；與 receipt 的 verify_audit.log 為不同 log 不可混讀）建 {output_path→sha256}；`handoffs/` 下命中且當前 raw bytes sha256 相符者，prose claim 豁免 backing。HANDOFF/commit-msg/docs 不豁免；改一字即失效；逃生口 `VERIFY_GATE_O3_FILECLASS=0`。設計/攻防詳見 `docs/GOV_O3EXT_R7_SPEC.md` 與 `handoffs/20260703-GOV-O3EXT-R7-ADV-COMPOSER.md`（F1-F7 全 CLOSED）。
+- **NON-BLOCKING 跟進（review B1-B5）**：register-output 與 dispatch 預告 output_path 綁定硬化、stamps_check 註解過期字樣、後續 epic 酌辦。

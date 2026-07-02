@@ -83,6 +83,10 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 **同理**：reconcile 後的最終章程/SPEC 本身須回送委員驗證（章程 §B5）。
 **Claude 自身不享特權（2026-06-27）**：Claude「又產獨立腿又做 reconcile」是特權位置 → **Claude 的獨立版/reconcile/SPEC/章程同須委員審+戳記,不可自我認證**。委員 `APPROVED` 語義＝「已審 **Claude 的腿** + reconcile,無錯/漏」;stamp-review 派工須明示「特別盯 Claude 的腿」（實證:FF 稽核 Composer 當場抓到 Claude 草稿誤用 test_cross_symbol_features）。
 
+### 委員派工留痕 + 委員會過程檔豁免（GOV-O3EXT-R7,2026-07-03）
+**R7-emitter**：任何帶 `--task-id` 的 dispatch（不分 risk/有無 adversarial）都 emit `committee_dispatch` 審計事件（`.claude/gate/audit.log`，json.dumps 防注入）；**stamp-review 派工必帶 `--output <reconcile路徑>`**。委員產出落地後 `bash scripts/gate.sh register-output <task-id> <path>` 補記 `committee_output`（raw bytes sha256；**須有同 task-id 先行 dispatch 事件**，拒 `legacy-*`、拒 handoffs/ 外路徑）→ 未來 reconcile 戳記 provenance 不再靠 waived。
+**O3 檔案類豁免**：`handoffs/` 下有事件且**當前內容 sha256 相符**的委員會過程檔，prose operational claim 免 VERIFY backing（改一字即失效；HANDOFF/commit-msg/docs 不在豁免內）。逃生口 `VERIFY_GATE_O3_FILECLASS=0`。legacy 8 檔走一次性 `scripts/register_legacy_committee_files.sh`（白名單+sha 寫死）。SPEC=`docs/GOV_O3EXT_R7_SPEC.md`。
+
 **範本（V13 緊湊+錨點版，compliance-first）**：`templates/SPEC_TEMPLATE.md`（§RISK/§A/§C/§G/§P/§V/§R/§N 必填錨點）、
 `TODO_GENERATION_PROMPT.md`（蒸餾 1030→緊湊；產出 §0/§B/Task 驗證·邊界·不可做）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」）。
 為何重寫：舊版過長 → 被 grep 一下就改寫成扁平 checklist（compliance 失敗）。新版緊湊到「讀的成本 < 改寫的成本」+ 錨點綁 gate 機檢。

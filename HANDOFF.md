@@ -1,23 +1,19 @@
 # Handoff
 **Agent**: Claude | **Time**: 2026-07-03 | **Branch**: main
 
-## ★P1-FF-5/7 ✅ 完成(本次 commit)
-- **路由變更(2026-07-02 使用者定)**:中大型改回 **Codex 實作 + Composer review**(解除 06-27 Composer 實作覆蓋,memory 已更新)。
-- 交付:`tests/feature_engineering/test_ff_cross_symbol_value_isolation.py`+`test_ff_wrapper_path_correctness.py`+`ff_artifact_compare_helpers.py`(零 production 改動,無既有斷言放寬)。
-- **adversarial 迴圈全紀錄**(出處:handoffs/20260702-FF-P1-57-REVIEW-composer.md):Composer 7 BLOCKING REJECTED→Codex FIX1→閉合輪 5 CLOSED/2 REOPEN→FIX2→CLOSURE ROUND 2 檔載「APPROVED」→Claude 驗收抓 2 spec 差距(slow 0.84s smoke 非全鏈;全開配置爆炸 L3 416k 欄 4h timeout)→FIX3+FIX4(縮至 L3 53k 欄+逐層 status=ok/cols>0 執行閘)→INCREMENTAL REVIEW 檔載「APPROVED」(6/6 inline 反例如預期 FAIL=閘可證偽)。
-- **slow 全鏈實跑**:receipt log 檔載「1 passed in 992.47s (0:16:32)」+「Layer 6.5 completed: 93672 features」(出處:run_receipts/20260702T203429Z-p1ff57-slow-fullchain-v3.log)。fast tier 檔載「28 passed, 1 deselected」(本 session pytest 輸出)。
-- Claude 自修:slow config 拆綁 professional_full preset(preset 待盤點移除)改明確全開;config probe 實跑 PASS;增量 review 評「優於 R3 宣稱」。
-- **殘餘待辦**:B-5 兩污染面 Codex 明標 defer(batch checkpoint/RunLease、L7 path-map deep),入 ROADMAP 不擋本批。
+## ★新 session 從這開始：fracdiff max_lag 大 epic（P1-FF-6 已併入）
+- **為何**:`max_lag = min(max(2, len(df)//10), 252)` 把總長度洩進 d* 計算 → 截斷不變性破壞(非 look-ahead,量化因果安全,但真缺陷)。詳見 docs/ROADMAP.md「P1 — fracdiff max_lag」節+三腿檔 `handoffs/20260702-FF-DSTAR-GATE-{CLAUDE,CODEX,COMPOSER}.md`。
+- **定序(使用者 2026-07-02)**:本 epic 修 max_lag(改 calibration/固定推導;**會改全部 fracdiff 特徵值**,命中 (a)(d))→ 2 個 strict-xfail 截斷測試轉綠 → **重生成 FF 定版給 IC**。
+- **管線要求(大任務)**:給使用者的白話簡述/決策文件 → manifest → SPEC/TODO → **雙家族 adversarial(Codex+Composer 各一次)** → Codex 實作+Composer review(2026-07-02 使用者定路由) → 三方值守恆簽核(真實 kline,禁合成 fixture)。
+- 相關 memory:project_dstar_first500_optionA(d* 前500校準;固定參考 d* 是未來修法)、project_stateful_param_audit。
 
-## verify-gate 待修項
-- ✅ `pytest -k` receipt 空 node_ids(本次 commit):run_with_receipt.py 加 --collect-only fallback(剝 verbosity 旗標防 -qq 退化)+回歸測試(修前紅/修後綠)。governance 檔載「106 passed」(本 session pytest 輸出)。
-- 未動:①委員會過程檔 prose 豁免(O3-extension;檔在本機 handoffs/ 勿刪,現 **8 份**:ALIGN-ORACLE-{FACTS,DESIGN-CODEX}、DSTAR-GATE-{CLAUDE,CODEX}、ALIGN-PROBE-FIX-PROMPT、PROBE-FIX2-composer+**新增 P1-57-IMPL-codex、P1-57-REVIEW-composer**(commit 41c2df7 時被 checker 擋,已 unstage 留本機))②R7-emitter(修向見 P1-57-RECONCILE 尾節)。
-- 新 `scripts/restore_golden_inventory.sh`(golden inventory 例行還原,免 ask 彈窗;`git checkout -- *` 在 ask 清單是刻意的)。
-
-## 下一步(使用者定奪)
-- FF 深稽剩餘 P1 項 / fracdiff max_lag epic(修完重生成 FF 給 IC) / IC Gatekeeper Phase 1 續。見 docs/ROADMAP.md。
+## 前一 session 完成(2026-07-03,兩批皆已 commit+push)
+- **P1-FF-5/7 ✅**(`41c2df7`):跨symbol值隔離+wrapper路徑測試;4輪 adversarial 閉合;slow 全鏈 receipt 檔載「1 passed in 992.47s」(出處:run_receipts/20260702T203429Z-p1ff57-slow-fullchain-v3.log)。殘餘:B-5 兩污染面 defer(入 ROADMAP)。
+- **GOV-O3EXT-R7 ✅**(本次 commit):verify-gate 待修項清零——①R7-emitter:任何帶 --task-id 派工留痕+`gate.sh register-output`(先行 dispatch 強制/拒 legacy-*/json.dumps 防注入);②O3 檔案類豁免:committee audit log+raw bytes sha256 綁定,改一字失效,HANDOFF/docs 不豁免,逃生口 VERIFY_GATE_O3_FILECLASS=0;③11 份委員會過程檔已註冊、checker exit 0、隨本批補 commit。SPEC/TODO adversarial F1-F7 全 CLOSED+code review 檔載「FINAL VERDICT: APPROVED」(出處:20260703-GOV-O3EXT-R7-REVIEW-composer.md)。governance 檔載「124 passed」(本 session pytest;基線106+18新)。
+- **路由變更(使用者定)**:中大型=Codex 實作+Composer review(memory 已更新)。
+- 跟進(不擋事):code review B1-B5 NON-BLOCKING(register-output 綁 dispatch output_path 硬化等,見 REVIEW-composer.md)。
 
 ## 鐵律(慢測試/執行)
 - generate_features ~20分/次;slow 跑後 `./scripts/restore_golden_inventory.sh`;長測試後清 pytest 舊輪次(留 pytest-current)。
-- HANDOFF/commit 寫「已驗/passed」須帶 VERIFY:<receipt-id>(receipt 先 git add)或引用格式「檔載『…』(出處:檔名)」。
-- pre-existing 失敗=test_ic_engine(非深稽)。派工執行端可能誤還原根 HANDOFF(本 session Codex 曾把我的更新當意外副作用還原)——commit 前重驗 HANDOFF 內容。
+- HANDOFF/commit 寫「已驗/passed」須帶 VERIFY:<receipt-id> 或引用格式「檔載『…』(出處:檔名)」。委員會過程檔今後派工帶 --task-id+--output,產出後 register-output 即可 commit(不再累積)。
+- pre-existing 失敗=test_ic_engine(非深稽)。派工執行端可能誤還原根 HANDOFF——commit 前重驗內容。
