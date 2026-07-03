@@ -7936,3 +7936,4 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-REVIEWCLOSE-composer.md", "output_sha256": "d05b2a240f8aa4d2a5b8135f6ac62a3feed83bdcbc5d2447ae6e83c3b62d95df", "task_id": "fracdiff-maxlag-reviewclose-composer-20260703", "ts": "2026-07-03T13:51:17Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-COMPOSER.md", "output_sha256": "da69a877f09d7e56f8e25a88c01b7011933f3bef197c090ba58650aca04918be", "task_id": "fracdiff-maxlag-mrfail-composer-20260703", "ts": "2026-07-03T13:53:37Z"}
