@@ -35,6 +35,11 @@
 - **為何**:使用者實測選 run 跑 analyze 卡死+崩潰;三方 reconcile 完成。
 - **Epic**:`handoffs/20260624-ic-grouped-crash-perf-ANALYSIS.md`(IC-CRASH/IC-FEATURE-GUARD/IC-UX-ERR=P0;IC-PERF=P1)。**狀態**:reconcile 完成,實作未啟動。
 
+### P2 — FF preset 移除盤點（2026-07-03 使用者排入,IC 正確性紅線之後做）
+- **為何**:使用者從未用過/測過 professional_full 等 preset（2026-06-29 明示想移除）;現行測試/生成一律 base/full 全特徵不綁 preset,preset 定義成死碼+誤用風險。
+- **範圍**:盤點所有 preset 定義與引用點（config/前端/文件）→ 確認零真實使用者 → 移除或明確 deprecate;涉 config schema 下游,走「中」型管線。
+- **狀態**:已排程未啟動;不擋 IC。
+
 ### P2 — IC 輸出 Agent-readable + 顧問層(V2 願景地基)
 - **為何**:使用者要 AI Agent 直接讀 IC 輸出、像委員會討論、回饋「哪些特徵/參數真的較好」+ 點破盲點。**前提=先修上面正確性**(否則 Agent 讀到污染數字會自信推薦過擬合假因子)。
 - **範圍**:① IC 輸出結構化可機讀(穩定 schema);② 輸出含 FDR/OOS/DSR 嚴謹度指標(讓 Agent 分辨真好 vs 過擬合);③ Agent 解讀/委員會式討論層。**依賴**:P0 正確性紅線。**狀態**:概念,未規劃。
