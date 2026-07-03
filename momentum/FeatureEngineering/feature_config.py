@@ -187,6 +187,8 @@ class FractionalDifferencingConfig(BaseModel):
     adf_threshold: float = 0.10
     weight_threshold: float = 1e-5
     precision: float = 0.01
+    # 0=auto（由 calibration_bars 推導）；>0 顯式覆蓋 fracdiff 權重寬度。
+    max_lag: int = Field(default=0, ge=0)
     apply_to: str = "non_stationary"
     cache_d_star: bool = True
 

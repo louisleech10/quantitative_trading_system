@@ -1,0 +1,138 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_slow_solo_a_equals_batch_b_then_a_artifacts 
+-------------------------------- live log call ---------------------------------
+23:51:12 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+23:51:12 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+23:51:12 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+23:51:12 [INFO] Registered adapter: crypto_spot
+23:51:12 [INFO] Fetching spot data: BTCUSDT/12h
+23:51:12 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+23:51:12 [INFO] Aligned data for BTCUSDT/12h: 1696 rows, 5 columns
+23:51:12 [INFO] [Layer 1] 0% - Starting Layer 1...
+23:51:12 [INFO] Layer 1 starting, rss=267MB
+23:51:12 [INFO] Loaded 134 TA-Lib indicators
+23:51:12 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+23:51:12 [INFO] Layer 1 done: 2 cols, status=ok, rss=267MB
+23:51:12 [INFO] [Layer 2] 0% - Starting Layer 2...
+23:51:12 [INFO] Layer 2 starting, rss=267MB
+23:51:12 [INFO] [L2] Starting derived features: 2 L1 cols
+23:51:12 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+23:51:12 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=267MB
+23:51:12 [INFO] [Layer 3] 0% - Starting Layer 3...
+23:51:12 [INFO] Layer 3 starting, rss=267MB
+23:51:12 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+23:51:12 [INFO] Layer 3 done: 0 cols, status=empty_not_applicable, rss=267MB
+23:51:12 [INFO] [Layer 4] 0% - Starting Layer 4...
+23:51:12 [INFO] Layer 4 starting, rss=267MB
+23:51:12 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+23:51:12 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=267MB
+23:51:12 [INFO] [Layer 5] 0% - Starting Layer 5...
+23:51:12 [INFO] Layer 5 starting, rss=267MB
+23:51:12 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+23:51:12 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=267MB
+23:51:12 [INFO] [Layer 6] 0% - Starting Layer 6...
+23:51:12 [INFO] Layer 6 starting, rss=267MB
+23:51:12 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+23:51:12 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=267MB
+23:51:12 [INFO] [IC-First] Generation mode: skipping rank/zscore/gaussian. IC Gatekeeper and selected transforms are downstream actions after L7_raw.
+23:51:12 [INFO] [Layer 6.5 (IC-First)] 0% - Starting Layer 6.5 (IC-First)...
+23:51:12 [INFO] [IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only
+23:51:13 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=0/2 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-22/test_v5_slow_solo_a_equals_bat0/dstar/solo/d_star_BTCUSDT_12h_02e8bfa1dd42.json
+23:51:13 [INFO] [Layer 6.5 (IC-First)] 100% - Layer 6.5 (IC-First) completed: 2 features
+23:51:13 [WARNING] 發現 NaN 值: 2 個特徵
+23:51:13 [WARNING]   close_12h_trend_EMA_8: 8 (3.32%)
+23:51:13 [WARNING]   close_12h_trend_SMA_13: 13 (5.39%)
+23:51:13 [INFO] 開始儲存工廠輸出 - BTCUSDT/12h
+23:51:13 [INFO] 工廠輸出儲存完成 - 特徵數: 2, 標籤數: 7
+23:51:13 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+23:51:13 [INFO] Registered adapter: crypto_spot
+23:51:13 [INFO] Loaded feature registry with 1 entries
+23:51:13 [INFO] Fetching spot data: ETHUSDT/12h
+23:51:13 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+23:51:13 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 5 columns
+23:51:13 [INFO] [Layer 1] 0% - Starting Layer 1...
+23:51:13 [INFO] Layer 1 starting, rss=294MB
+23:51:13 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+23:51:13 [INFO] Layer 1 done: 2 cols, status=ok, rss=294MB
+23:51:13 [INFO] [Layer 2] 0% - Starting Layer 2...
+23:51:13 [INFO] Layer 2 starting, rss=294MB
+23:51:13 [INFO] [L2] Starting derived features: 2 L1 cols
+23:51:13 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+23:51:13 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=294MB
+23:51:13 [INFO] [Layer 3] 0% - Starting Layer 3...
+23:51:13 [INFO] Layer 3 starting, rss=294MB
+23:51:13 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+23:51:13 [INFO] Layer 3 done: 0 cols, status=empty_not_applicable, rss=294MB
+23:51:13 [INFO] [Layer 4] 0% - Starting Layer 4...
+23:51:13 [INFO] Layer 4 starting, rss=294MB
+23:51:13 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+23:51:13 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=294MB
+23:51:13 [INFO] [Layer 5] 0% - Starting Layer 5...
+23:51:13 [INFO] Layer 5 starting, rss=294MB
+23:51:13 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+23:51:13 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=294MB
+23:51:13 [INFO] [Layer 6] 0% - Starting Layer 6...
+23:51:13 [INFO] Layer 6 starting, rss=294MB
+23:51:13 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+23:51:13 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=294MB
+23:51:13 [INFO] [IC-First] Generation mode: skipping rank/zscore/gaussian. IC Gatekeeper and selected transforms are downstream actions after L7_raw.
+23:51:13 [INFO] [Layer 6.5 (IC-First)] 0% - Starting Layer 6.5 (IC-First)...
+23:51:13 [INFO] [IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only
+23:51:13 [INFO] [L6.5] symbol=ETHUSDT tf=12h d_star_cache_hit=0/2 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-22/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_ETHUSDT_12h_02e8bfa1dd42.json
+23:51:13 [INFO] [Layer 6.5 (IC-First)] 100% - Layer 6.5 (IC-First) completed: 2 features
+23:51:13 [WARNING] 發現 NaN 值: 2 個特徵
+23:51:13 [WARNING]   close_12h_trend_EMA_8: 30 (12.45%)
+23:51:13 [WARNING]   close_12h_trend_SMA_13: 13 (5.39%)
+23:51:13 [INFO] 開始儲存工廠輸出 - ETHUSDT/12h
+23:51:13 [INFO] 工廠輸出儲存完成 - 特徵數: 2, 標籤數: 7
+23:51:13 [INFO] Loaded feature registry with 1 entries
+23:51:13 [INFO] Fetching spot data: BTCUSDT/12h
+23:51:13 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+23:51:13 [INFO] Aligned data for BTCUSDT/12h: 1696 rows, 5 columns
+23:51:13 [INFO] [Layer 1] 0% - Starting Layer 1...
+23:51:13 [INFO] Layer 1 starting, rss=281MB
+23:51:13 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+23:51:13 [INFO] Layer 1 done: 2 cols, status=ok, rss=281MB
+23:51:13 [INFO] [Layer 2] 0% - Starting Layer 2...
+23:51:13 [INFO] Layer 2 starting, rss=281MB
+23:51:13 [INFO] [L2] Starting derived features: 2 L1 cols
+23:51:13 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+23:51:13 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=281MB
+23:51:13 [INFO] [Layer 3] 0% - Starting Layer 3...
+23:51:13 [INFO] Layer 3 starting, rss=281MB
+23:51:13 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+23:51:13 [INFO] Layer 3 done: 0 cols, status=empty_not_applicable, rss=281MB
+23:51:13 [INFO] [Layer 4] 0% - Starting Layer 4...
+23:51:13 [INFO] Layer 4 starting, rss=281MB
+23:51:13 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+23:51:13 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=281MB
+23:51:13 [INFO] [Layer 5] 0% - Starting Layer 5...
+23:51:13 [INFO] Layer 5 starting, rss=281MB
+23:51:13 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+23:51:13 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=281MB
+23:51:13 [INFO] [Layer 6] 0% - Starting Layer 6...
+23:51:13 [INFO] Layer 6 starting, rss=281MB
+23:51:13 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+23:51:13 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=281MB
+23:51:13 [INFO] [IC-First] Generation mode: skipping rank/zscore/gaussian. IC Gatekeeper and selected transforms are downstream actions after L7_raw.
+23:51:13 [INFO] [Layer 6.5 (IC-First)] 0% - Starting Layer 6.5 (IC-First)...
+23:51:13 [INFO] [IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only
+23:51:13 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=0/2 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-22/test_v5_slow_solo_a_equals_bat0/dstar/batch/d_star_BTCUSDT_12h_02e8bfa1dd42.json
+23:51:13 [INFO] [Layer 6.5 (IC-First)] 100% - Layer 6.5 (IC-First) completed: 2 features
+23:51:13 [WARNING] 發現 NaN 值: 2 個特徵
+23:51:13 [WARNING]   close_12h_trend_EMA_8: 8 (3.32%)
+23:51:13 [WARNING]   close_12h_trend_SMA_13: 13 (5.39%)
+23:51:13 [INFO] 開始儲存工廠輸出 - BTCUSDT/12h
+23:51:13 [INFO] 工廠輸出儲存完成 - 特徵數: 2, 標籤數: 7
+23:51:13 [INFO] Loaded feature registry with 2 entries
+PASSED                                                                   [100%]
+
+============================== 1 passed in 0.84s ===============================

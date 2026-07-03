@@ -166,3 +166,9 @@ tests/golden/ic_phase1_1a_cut1/inputs/
 
 # FF 深稽 diff 表(測試生成,非追蹤;簽核記錄在 handoffs)
 tests/_golden/ff_deepaudit/
+
+# fracdiff max_lag golden 大型 artifacts(7.5GB parquet/cache)與全欄 digest json(397/199MB)
+# 留本地供稽核;入庫證據=同名 *-SUMMARY.json + compare receipt(8KB)
+handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/
+handoffs/run_receipts/20260703T042407Z-fracdiff-maxlag-golden-G1.json
+handoffs/run_receipts/20260703T042407Z-fracdiff-maxlag-golden-G2.json

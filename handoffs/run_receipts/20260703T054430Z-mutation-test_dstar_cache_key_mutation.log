@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 7 items
+
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_path_symbol_collision_is_rejected_by_payload_symbol PASSED [ 14%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_path_timeframe_collision_is_rejected_by_payload_timeframe PASSED [ 28%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_fracdiff_hash_without_max_lag_is_rejected PASSED [ 42%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_fracdiff_hash_without_calibration_bars_is_rejected PASSED [ 57%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_payload_row_count_mismatch_is_rejected 
+-------------------------------- live log call ---------------------------------
+13:44:29 [WARNING] [d_star_cache] stale cache field=row_count path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-84/test_mutation_payload_row_coun0/d_star_BTCUSDT_1h_a75b067e20c1.json
+PASSED                                                                   [ 71%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_payload_time_range_mismatch_is_rejected 
+-------------------------------- live log call ---------------------------------
+13:44:29 [WARNING] [d_star_cache] stale cache field=time_range path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-84/test_mutation_payload_time_ran0/d_star_BTCUSDT_1h_a75b067e20c1.json
+PASSED                                                                   [ 85%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_strong_value_fingerprint_mismatch_is_rejected PASSED [100%]
+
+============================== 7 passed in 0.05s ===============================

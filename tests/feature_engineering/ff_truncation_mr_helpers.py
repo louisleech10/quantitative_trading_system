@@ -1307,6 +1307,7 @@ def _build_truncation_pair(
     align_margin: int = 0,
     window_date_fn: Callable[..., Tuple[str, str, str]] = _bar_window_dates,
     patch_fetch: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
+    patch_fetch_full_only: Optional[Callable[[pd.DataFrame], pd.DataFrame]] = None,
     d_star_parent: Optional[Path] = None,
     monkeypatch: Optional[pytest.MonkeyPatch] = None,
     align_lookahead_side: Optional[AlignLookaheadSide] = None,
@@ -1330,7 +1331,8 @@ def _build_truncation_pair(
     features_root.mkdir(parents=True, exist_ok=True)
     factory = _make_factory(features_root)
 
-    if patch_fetch is not None:
+    patch_fetch_side: Optional[Literal["full", "trunc"]] = None
+    if patch_fetch is not None or patch_fetch_full_only is not None:
         from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 
         original_fetch = AdapterRegistry.fetch_aligned
@@ -1338,7 +1340,10 @@ def _build_truncation_pair(
         def _patched_fetch(self, sym: str, timeframe: str, sources: List[str]) -> pd.DataFrame:
             data = original_fetch(self, sym, timeframe, sources)
             if sym == symbol and timeframe == primary_tf:
-                data = patch_fetch(data.copy())
+                if patch_fetch is not None:
+                    data = patch_fetch(data.copy())
+                elif patch_fetch_full_only is not None and patch_fetch_side == "full":
+                    data = patch_fetch_full_only(data.copy())
             return data
 
         if monkeypatch is not None:
@@ -1355,6 +1360,7 @@ def _build_truncation_pair(
     _set_align_lookahead_patch(
         monkeypatch, enabled=(align_lookahead_side == "full")
     )
+    patch_fetch_side = "full"
     full = _run_generation(
         factory,
         features_root=features_root,
@@ -1368,6 +1374,7 @@ def _build_truncation_pair(
     _set_align_lookahead_patch(
         monkeypatch, enabled=(align_lookahead_side == "trunc")
     )
+    patch_fetch_side = "trunc"
     trunc = _run_generation(
         factory,
         features_root=features_root,
@@ -1378,6 +1385,7 @@ def _build_truncation_pair(
         primary_tf=primary_tf,
         d_star_dir=trunc_d_dir,
     )
+    patch_fetch_side = None
     _set_align_lookahead_patch(monkeypatch, enabled=False)
     return TruncationPair(warmup=warmup, n_trunc=trunc.row_count, full=full, trunc=trunc)
 
@@ -1409,5 +1417,4 @@ def _patch_kline_calibration_ohlcv(
                 out.iloc[window_start:cal_end][col].astype(float).to_numpy() + delta
             )
     return out
-
 

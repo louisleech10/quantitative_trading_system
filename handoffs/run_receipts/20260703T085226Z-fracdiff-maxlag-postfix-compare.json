@@ -1,0 +1,201 @@
+{
+  "created_at_utc": "20260703T085226Z",
+  "failures": [],
+  "golden_stamp": "20260703T042407Z",
+  "passed": true,
+  "symbols": {
+    "BTCUSDT": {
+      "G2P": {
+        "cache_stats": {
+          "hits": 1,
+          "misses": 0
+        },
+        "d_star_cache": {
+          "entry_count": 3792,
+          "fracdiff_hash": "dcc154ced6b642083138ca516f09aab7",
+          "path": "handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/20260703T085226Z-fracdiff-maxlag-postfix-G2P/BTCUSDT/d_star_cache/d_star_BTCUSDT_1h_dcc154ced6b6.json",
+          "resolved_max_lag": 50,
+          "row_count": 2081,
+          "time_range": [
+            1769842800,
+            1777330800
+          ]
+        },
+        "frame_digest_sha256": "d90f9ee6e953ca2347cb16e3b66a25866ece428a53e7207eefc11465d171e1a9"
+      },
+      "R": {
+        "cache_stats": {
+          "hits": 1,
+          "misses": 0
+        },
+        "d_star_cache": {
+          "entry_count": 3792,
+          "fracdiff_hash": "dcc154ced6b642083138ca516f09aab7",
+          "path": "handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/20260703T085226Z-fracdiff-maxlag-postfix-R/BTCUSDT/d_star_cache/d_star_BTCUSDT_1h_dcc154ced6b6.json",
+          "resolved_max_lag": 50,
+          "row_count": 2081,
+          "time_range": [
+            1769842800,
+            1777330800
+          ]
+        },
+        "frame_digest_sha256": "d90f9ee6e953ca2347cb16e3b66a25866ece428a53e7207eefc11465d171e1a9"
+      },
+      "cond1_R_vs_G2": {
+        "common": 225784,
+        "fracdiff_diff_count": 0,
+        "fracdiff_diff_examples": [],
+        "index_hash_equal": true,
+        "non_fracdiff_diff_count": 0,
+        "non_fracdiff_diff_examples": [],
+        "only_a": [],
+        "only_b": [],
+        "only_count": 0,
+        "row_count_equal": true
+      },
+      "cond2_R_vs_G1": {
+        "common": 225784,
+        "fracdiff_diff_count": 4546,
+        "fracdiff_diff_examples": [
+          "close-volume_1h_volume_OBV_Momentum_L55_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L89_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W13_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Abs_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Log1p_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L144_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L233_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L55_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L89_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L34_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L3_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L8_fracdiff"
+        ],
+        "index_hash_equal": true,
+        "non_fracdiff_diff_count": 0,
+        "non_fracdiff_diff_examples": [],
+        "only_a": [],
+        "only_b": [],
+        "only_count": 0,
+        "row_count_equal": true
+      },
+      "cond3_G2P_vs_R": {
+        "common": 225784,
+        "fracdiff_diff_count": 0,
+        "fracdiff_diff_examples": [],
+        "index_hash_equal": true,
+        "non_fracdiff_diff_count": 0,
+        "non_fracdiff_diff_examples": [],
+        "only_a": [],
+        "only_b": [],
+        "only_count": 0,
+        "row_count_equal": true
+      },
+      "g1_actual_max_lag": 208
+    },
+    "ETHUSDT": {
+      "G2P": {
+        "cache_stats": {
+          "hits": 1,
+          "misses": 0
+        },
+        "d_star_cache": {
+          "entry_count": 2837,
+          "fracdiff_hash": "dcc154ced6b642083138ca516f09aab7",
+          "path": "handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/20260703T085226Z-fracdiff-maxlag-postfix-G2P/ETHUSDT/d_star_cache/d_star_ETHUSDT_1h_dcc154ced6b6.json",
+          "resolved_max_lag": 50,
+          "row_count": 2081,
+          "time_range": [
+            1769842800,
+            1777330800
+          ]
+        },
+        "frame_digest_sha256": "ec266a81f6466d46f972755b9dec5ad1b10dd4a6a56c6624f02d533c93fc26e6"
+      },
+      "R": {
+        "cache_stats": {
+          "hits": 1,
+          "misses": 0
+        },
+        "d_star_cache": {
+          "entry_count": 2837,
+          "fracdiff_hash": "dcc154ced6b642083138ca516f09aab7",
+          "path": "handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/20260703T085226Z-fracdiff-maxlag-postfix-R/ETHUSDT/d_star_cache/d_star_ETHUSDT_1h_dcc154ced6b6.json",
+          "resolved_max_lag": 50,
+          "row_count": 2081,
+          "time_range": [
+            1769842800,
+            1777330800
+          ]
+        },
+        "frame_digest_sha256": "ec266a81f6466d46f972755b9dec5ad1b10dd4a6a56c6624f02d533c93fc26e6"
+      },
+      "cond1_R_vs_G2": {
+        "common": 224625,
+        "fracdiff_diff_count": 0,
+        "fracdiff_diff_examples": [],
+        "index_hash_equal": true,
+        "non_fracdiff_diff_count": 0,
+        "non_fracdiff_diff_examples": [],
+        "only_a": [],
+        "only_b": [],
+        "only_count": 0,
+        "row_count_equal": true
+      },
+      "cond2_R_vs_G1": {
+        "common": 224625,
+        "fracdiff_diff_count": 3435,
+        "fracdiff_diff_examples": [
+          "close-volume_1h_volume_OBV_DecayLinear_W13_fracdiff",
+          "close-volume_1h_volume_OBV_DecayLinear_W21_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L144_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L233_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L34_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L55_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L89_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W13_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W21_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_Log1p_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_Momentum_L89_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L233_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L55_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L89_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L3_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L5_fracdiff"
+        ],
+        "index_hash_equal": true,
+        "non_fracdiff_diff_count": 0,
+        "non_fracdiff_diff_examples": [],
+        "only_a": [],
+        "only_b": [],
+        "only_count": 0,
+        "row_count_equal": true
+      },
+      "cond3_G2P_vs_R": {
+        "common": 224625,
+        "fracdiff_diff_count": 0,
+        "fracdiff_diff_examples": [],
+        "index_hash_equal": true,
+        "non_fracdiff_diff_count": 0,
+        "non_fracdiff_diff_examples": [],
+        "only_a": [],
+        "only_b": [],
+        "only_count": 0,
+        "row_count_equal": true
+      },
+      "g1_actual_max_lag": 208
+    }
+  },
+  "window_bars": 2081
+}

@@ -42,7 +42,15 @@
 ### P1 — fracdiff max_lag 截斷不變修復（2026-07-02 三方委員會立案,使用者定序）
 - **根因**:`max_lag = min(max(2, len(df)//10), 252)` 以整段長度推導,把總長度洩進 d* 計算(600→60,590→59)→ 截斷不變性破壞。**非 look-ahead**(d* 校準只吃 first-500 prefix),量化因果安全,但屬真實作缺陷。三腿檔 `handoffs/20260702-FF-DSTAR-GATE-{CLAUDE,CODEX,COMPOSER}.md`;B2 回歸 receipt 20260702T042627Z(8 passed/2 fracdiff failed 揭露)。
 - **順序(使用者 2026-07-02 定)**:FF 深稽全完成(護網完工)→ 本 epic 修 max_lag(改由 calibration/固定推導;**會改全部 fracdiff 特徵值**,命中 (a)(d) 走完整管線+三方值守恆)→ 修完 2 個 strict-xfail 截斷測試應轉綠 → **重新生成 FF 定版給 IC**。併 P1-FF-6(d*/fracdiff probe)避免重工。
-- **現況**:2 測試 strict-xfail 附根因(test_ff_fullchain_truncation_mr.py);IC 程式開發不受阻(不依賴特徵精確值),特徵定版等本 epic。
+- **現況（2026-07-03 epic 主體完成,詳見 handoffs/20260703-FRACDIFF-MAXLAG-*）**:
+  ①max_lag 缺陷已修（`_resolve_fracdiff_max_lag` calibration-derived=50+config 顯式欄位）並經 golden 等價鏈證明（receipt 085226Z:修後 auto ≡ 修前 pin50 全欄 digest 0 差異、非 fracdiff 欄 0 差異、G2' config 路徑 ≡ R）;
+  ②附帶修復:fracdiff FFT 卷積尾擾捨入洩前綴（`_hurst_prior._convolve_1d`+孿生 `_frac_diff_convolve` 改 direct）;發現並修復 pydantic 靜默丟棄 config max_lag（逃生口本是幽靈）;
+  ③**兩 MR 維持誠實 xfail（reason 已換）**:卡在 pre-existing storage codec bug（見下一節）,轉綠時點=storage epic 完成後;max_lag 面護網=d\* gate+3 mutation 探針+full_fit/calibration(單邊重設計)控制;
+  ④P1-FF-6 cache key mutation 探針落地（7 mutant 對準 v3 guard）。
+
+### P1 — FF storage codec 截斷變異（2026-07-03 R3 委員會確認根因立案）
+- **根因（已確認,非假說）**:L7 raw per-column parquet codec（float16/32）依**全窗值域**選型（feature_storage.py:2554-2588）→ 窗長/尾值變化使同欄跨 run 選型翻面 → 儲存精度不可比。症狀:①近零分母大值 float16 溢出→inf→sanitize NaN（截斷 MR idx508 artifact）;②ULP 級 2^-7 值差（尾擾 MR dtype dump）。證據鏈:`handoffs/20260703-FRACDIFF-MAXLAG-{MRFAIL,R3}-*.md`+receipts 054245Z/094044Z 差分。
+- **修向**:codec 選型決定論化（不依全窗 stats,如固定 dtype 或依 calibration 段選型）;修完兩 fracdiff MR xfail 應轉綠。命中 (a)(b),走完整管線。
 
 ### P1 — Productionization Epic（全棧參數持久化）★上線前置
 - **為何**:任一特徵/模型要上線推論前必做,否則 train/serve 分布偏移、模型靜默失效。三方三輪盤點 CONVERGED。

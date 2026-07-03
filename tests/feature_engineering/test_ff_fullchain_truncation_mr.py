@@ -107,15 +107,13 @@ def test_c2_2_tail_perturbation_prefix_invariant(
     _assert_truncation_invariants(pair)
 
 
-# 2026-07-02 三方委員會定案(20260702-FF-DSTAR-GATE-{CLAUDE,CODEX,COMPOSER}):
-# fracdiff max_lag = min(max(2, len(df)//10), 252) 以「整段長度」推導,把總長度洩進
-# d* 計算(full 600→60, trunc 590→59)→ d* 差一格網格 → 截斷不變性破壞。
-# 非 look-ahead(d* 校準只吃 first-500 prefix,不用未來值),量化因果安全,但屬真實作缺陷。
-# 修法=max_lag 改由 calibration/固定推導,會改變全部 fracdiff 特徵值 → 獨立 epic
-# (ROADMAP「fracdiff max_lag 截斷不變修復」,併 P1-FF-6,FF 深稽完成後執行,修完本 xfail 應轉綠)。
 @pytest.mark.xfail(
     strict=True,
-    reason="fracdiff max_lag 長度依賴(len(df)//10)破壞截斷不變;非 look-ahead;修法在 d*/max_lag epic",
+    reason=(
+        "pre-existing materialization 精度路徑截斷變異(B1,非 max_lag;"
+        "證據=handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md idx508 artifact);"
+        "修法=storage codec/精度 epic"
+    ),
 )
 def test_fracdiff_truncation_invariant(
     tmp_path: Path,
@@ -132,10 +130,13 @@ def test_fracdiff_truncation_invariant(
     _assert_fracdiff_truncation_invariants(pair)
 
 
-# 同上:max_lag 長度依賴,見 test_fracdiff_truncation_invariant 註解與委員會三腿檔。
 @pytest.mark.xfail(
     strict=True,
-    reason="fracdiff max_lag 長度依賴(len(df)//10)破壞截斷不變;非 look-ahead;修法在 d*/max_lag epic",
+    reason=(
+        "真實護面（尾擾值級因果比對）暫停——pre-existing storage codec（per-column float16/32 "
+        "依全窗值域選型）使跨 run 儲存精度不可比（證據=094044Z dtype dump 2^-7 量化差）；"
+        "非 max_lag/conv 問題；storage epic 修 codec 決定論後轉綠"
+    ),
 )
 def test_fracdiff_tail_perturbation_invariant(
     monkeypatch: pytest.MonkeyPatch,
@@ -153,6 +154,135 @@ def test_fracdiff_tail_perturbation_invariant(
         monkeypatch=monkeypatch,
     )
     _assert_fracdiff_truncation_invariants(pair)
+
+
+def test_mutation_fracdiff_maxlag_len_coupling_truncation_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    kline_df_module: pd.DataFrame,
+) -> None:
+    """fracdiff mutant：max_lag 回到 len(df)//10 → 截斷 MR 必 FAIL。"""
+    original_apply = FeaturePreprocessor._apply_fractional_differencing
+    lengths_seen: List[int] = []
+
+    def _mutant_apply(
+        self: FeaturePreprocessor,
+        df: pd.DataFrame,
+        source_layer: str | None = None,
+    ) -> pd.DataFrame:
+        lengths_seen.append(len(df))
+        monkeypatch.setattr(
+            self,
+            "_resolve_fracdiff_max_lag",
+            lambda: min(max(2, len(df) // 10), 252),
+        )
+        return original_apply(self, df, source_layer=source_layer)
+
+    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
+    with pytest.raises(AssertionError):
+        pair = _build_truncation_pair(
+            tmp_path / "features",
+            kline_df_module,
+            config_payload=_fracdiff_mr_config_payload(),
+            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
+            d_star_parent=tmp_path / "dstar_mut_len",
+            monkeypatch=monkeypatch,
+        )
+        _assert_fracdiff_truncation_invariants(pair)
+    window_bars = _fracdiff_window_bars(_fracdiff_mr_config_payload())
+    assert {window_bars - TRUNC_K, window_bars}.issubset(set(lengths_seen))
+
+
+def test_mutation_fracdiff_maxlag_len_coupling_tail_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    kline_df_module: pd.DataFrame,
+) -> None:
+    """fracdiff mutant：max_lag 回到 len(df)//10 → 尾端擾動 MR 必 FAIL。"""
+    original_apply = FeaturePreprocessor._apply_fractional_differencing
+    lengths_seen: List[int] = []
+
+    def _mutant_apply(
+        self: FeaturePreprocessor,
+        df: pd.DataFrame,
+        source_layer: str | None = None,
+    ) -> pd.DataFrame:
+        lengths_seen.append(len(df))
+        monkeypatch.setattr(
+            self,
+            "_resolve_fracdiff_max_lag",
+            lambda: min(max(2, len(df) // 10), 252),
+        )
+        return original_apply(self, df, source_layer=source_layer)
+
+    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
+    with pytest.raises(AssertionError):
+        pair = _build_truncation_pair(
+            tmp_path / "features",
+            kline_df_module,
+            config_payload=_fracdiff_mr_config_payload(),
+            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
+            d_star_parent=tmp_path / "dstar_mut_len_tail",
+            patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
+            monkeypatch=monkeypatch,
+        )
+        _assert_fracdiff_truncation_invariants(pair)
+    window_bars = _fracdiff_window_bars(_fracdiff_mr_config_payload())
+    assert {window_bars - TRUNC_K, window_bars}.issubset(set(lengths_seen))
+
+
+def test_mutation_fracdiff_maxlag_len_coupling_parallel_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    kline_df_module: pd.DataFrame,
+) -> None:
+    """fracdiff mutant：parallel slow path 也必須吃到 resolver seam。"""
+    original_apply = FeaturePreprocessor._apply_fractional_differencing
+    parallel_calls: List[int] = []
+    lengths_seen: List[int] = []
+
+    def _mutant_apply(
+        self: FeaturePreprocessor,
+        df: pd.DataFrame,
+        source_layer: str | None = None,
+    ) -> pd.DataFrame:
+        lengths_seen.append(len(df))
+        monkeypatch.setattr(
+            self,
+            "_resolve_fracdiff_max_lag",
+            lambda: min(max(2, len(df) // 10), 252),
+        )
+        return original_apply(self, df, source_layer=source_layer)
+
+    def _force_parallel(self: FeaturePreprocessor) -> int:
+        return 2
+
+    original_parallel = FeaturePreprocessor._apply_fractional_differencing_parallel
+
+    def _parallel_spy(self: FeaturePreprocessor, *args: Any, **kwargs: Any) -> pd.DataFrame:
+        parallel_calls.append(int(kwargs.get("n_jobs", 0)))
+        return original_parallel(self, *args, **kwargs)
+
+    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
+    monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", _force_parallel)
+    monkeypatch.setattr(
+        FeaturePreprocessor,
+        "_apply_fractional_differencing_parallel",
+        _parallel_spy,
+    )
+    with pytest.raises(AssertionError):
+        pair = _build_truncation_pair(
+            tmp_path / "features",
+            kline_df_module,
+            config_payload=_fracdiff_mr_config_payload(),
+            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
+            d_star_parent=tmp_path / "dstar_mut_len_parallel",
+            monkeypatch=monkeypatch,
+        )
+        _assert_fracdiff_truncation_invariants(pair)
+    window_bars = _fracdiff_window_bars(_fracdiff_mr_config_payload())
+    assert {window_bars - TRUNC_K, window_bars}.issubset(set(lengths_seen))
+    assert parallel_calls and max(parallel_calls) > 1
 
 
 def test_mutation_numba_rolling_center_true_fails(
@@ -272,7 +402,12 @@ def test_mutation_fracdiff_calibration_perturb_fails(
     tmp_path: Path,
     kline_df_module: pd.DataFrame,
 ) -> None:
-    """fracdiff negative control：擾動 calibration 窗內 → fracdiff MR 必 FAIL。"""
+    """fracdiff negative control：擾動 calibration 窗內 → fracdiff MR 必 FAIL。
+
+    合法觸發路徑有兩種：
+    1. columns gate failed (strict)：校準擾動改變 ADF/d* 搜尋，進而改變 fracdiff 適格欄集合。
+    2. d_star mismatch：欄集合尚相同時，直接由 d* 值 gate 攔截。
+    """
     original_calibration = FeaturePreprocessor._calibration_series
     calibration_calls: List[int] = [0]
 
@@ -281,14 +416,14 @@ def test_mutation_fracdiff_calibration_perturb_fails(
         return original_calibration(self, series)
 
     monkeypatch.setattr(FeaturePreprocessor, "_calibration_series", _calibration_spy)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match=r"columns gate failed \(strict\)|d_star"):
         pair = _build_truncation_pair(
             tmp_path / "features",
             kline_df_module,
             config_payload=_fracdiff_mr_config_payload(),
             window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
             d_star_parent=tmp_path / "dstar_mut_cal",
-            patch_fetch=lambda df: _patch_kline_calibration_ohlcv(
+            patch_fetch_full_only=lambda df: _patch_kline_calibration_ohlcv(
                 df,
                 window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
                 calibration_bars=500,

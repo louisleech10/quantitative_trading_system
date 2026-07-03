@@ -6,25 +6,13 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-try:
-    from scipy.signal import fftconvolve as _scipy_fftconvolve
-    _HAS_FFTCONV = True
-except Exception:
-    _HAS_FFTCONV = False
-
-# FFT crossover: use FFT when n_signal * n_weights exceeds this threshold.
-# For fracdiff: n=20352, w≈252 → n×w≈5.1M >> 4096, always uses FFT.
-_FFT_OPS_THRESHOLD = 4096
-
 
 def _convolve_1d(signal: np.ndarray, weights: np.ndarray) -> np.ndarray:
-    """1-D convolution (mode='valid') with automatic FFT dispatch.
+    """1-D fracdiff convolution (mode='valid') with prefix-stable direct math.
 
-    Falls back to ``np.convolve`` when scipy is unavailable or the
-    operation count is below the crossover threshold.
+    MRFAIL-RECONCILE: FFT tail roundoff leaks into prefix bins, so fracdiff
+    must stay on direct convolution.
     """
-    if _HAS_FFTCONV and signal.size * weights.size > _FFT_OPS_THRESHOLD:
-        return np.asarray(_scipy_fftconvolve(signal, weights, mode="valid"), dtype=np.float64)
     return np.convolve(signal, weights, mode="valid")
 
 

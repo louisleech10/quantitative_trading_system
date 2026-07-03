@@ -1,0 +1,238 @@
+{
+  "created_at_utc": "20260703T042407Z",
+  "g1_vs_g2_validation": {
+    "passed": true,
+    "symbols": {
+      "BTCUSDT": {
+        "common_column_count": 225784,
+        "fracdiff_column_count": 5626,
+        "fracdiff_different_count": 4546,
+        "fracdiff_different_examples": [
+          "close-volume_1h_volume_OBV_Momentum_L55_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L89_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W13_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Abs_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Log1p_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L144_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L233_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L55_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L89_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L34_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L3_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L8_fracdiff"
+        ],
+        "fracdiff_equal_count": 1080,
+        "fracdiff_equal_examples": [
+          "close_1h_cycle_HT-DCPERIOD_Clip_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_Sign_fracdiff",
+          "close_1h_momentum_MACDFIX_Line_3_21_Ratio_fracdiff",
+          "close_1h_momentum_MACDFIX_Line_3_9_Ratio_fracdiff",
+          "close_1h_momentum_MACDFIX_Line_5_21_Ratio_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Abs_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_DecayLinear_W5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_21_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_21_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_Log1p_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_34_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_55_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_55_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_5_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_89_DecayLinear_W21_fracdiff"
+        ],
+        "index_hash_equal": true,
+        "non_fracdiff_different_count": 0,
+        "non_fracdiff_different_examples": [],
+        "only_g1": [],
+        "only_g2": [],
+        "passed": true,
+        "row_count_equal": true,
+        "schema_hash_equal": false
+      },
+      "ETHUSDT": {
+        "common_column_count": 224625,
+        "fracdiff_column_count": 4456,
+        "fracdiff_different_count": 3435,
+        "fracdiff_different_examples": [
+          "close-volume_1h_volume_OBV_DecayLinear_W13_fracdiff",
+          "close-volume_1h_volume_OBV_DecayLinear_W21_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L144_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L233_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L34_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L55_fracdiff",
+          "close-volume_1h_volume_OBV_Momentum_L89_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W13_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_DecayLinear_W21_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_Log1p_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_Momentum_L89_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_DecayLinear_W21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L233_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L55_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Momentum_L89_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L21_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L3_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Momentum_L5_fracdiff"
+        ],
+        "fracdiff_equal_count": 1021,
+        "fracdiff_equal_examples": [
+          "close_1h_cycle_HT-DCPERIOD_Clip_fracdiff",
+          "close_1h_cycle_HT-DCPERIOD_Sign_fracdiff",
+          "close_1h_momentum_MACDFIX_Line_3_21_Ratio_fracdiff",
+          "close_1h_momentum_MACDFIX_Line_3_9_Ratio_fracdiff",
+          "close_1h_momentum_MACDFIX_Line_5_21_Ratio_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_13_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_DecayLinear_W5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Log1p_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_144_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_21_Clip_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_21_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_Abs_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_DecayLinear_W13_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_DecayLinear_W5_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_Log1p_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_233_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_34_Sign_fracdiff",
+          "close_1h_statistics_LINEARREG-INTERCEPT_55_Clip_fracdiff"
+        ],
+        "index_hash_equal": true,
+        "non_fracdiff_different_count": 0,
+        "non_fracdiff_different_examples": [],
+        "only_g1": [],
+        "only_g2": [],
+        "passed": true,
+        "row_count_equal": true,
+        "schema_hash_equal": false
+      }
+    }
+  },
+  "golden": "G2",
+  "kline_cache": "data_cache/feature_klines/kline_cache.h5",
+  "runs_summary": [
+    {
+      "label": "G2",
+      "pin_method": "preprocessor_instance_fracdiff_config_injection",
+      "run_id": "20260703T042407Z-fracdiff-maxlag-golden-G2-run1",
+      "symbols": {
+        "BTCUSDT": {
+          "cache_stats": {
+            "hits": 1,
+            "misses": 0
+          },
+          "column_count": 225784,
+          "d_star_cache": {
+            "entry_count": 3792,
+            "fracdiff_hash": "dcc154ced6b642083138ca516f09aab7",
+            "path": "handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/20260703T042407Z-fracdiff-maxlag-golden-G2-run1/BTCUSDT/d_star_cache/d_star_BTCUSDT_1h_dcc154ced6b6.json",
+            "resolved_max_lag": 50,
+            "row_count": 2081,
+            "time_range": [
+              1769842800,
+              1777330800
+            ]
+          },
+          "fracdiff_column_count": 5626,
+          "frame_digest_sha256": "d90f9ee6e953ca2347cb16e3b66a25866ece428a53e7207eefc11465d171e1a9",
+          "index_hash": "7a2ef03c1d636641",
+          "row_count": 2081,
+          "sample_columns": {
+            "None_1h_microstructure_amihud_13_55_Cross": {
+              "dtype": "float32",
+              "nan_mask_sha256": "efa1b87c23b32998",
+              "value_sha256": "ef26ca7fc1e88015"
+            },
+            "taker-ratio_1h_momentum_MACDEXT-Signal_12-26-9_Range_W144": {
+              "dtype": "float16",
+              "nan_mask_sha256": "683a845798b3d3be",
+              "value_sha256": "cf16d6843bfe1122"
+            },
+            "wcl-price_1h_Lag_8": {
+              "dtype": "float32",
+              "nan_mask_sha256": "462b1b999f6ba836",
+              "value_sha256": "24f5e54fcafc9c4b"
+            }
+          },
+          "schema_hash": "0ff86795058bb254"
+        },
+        "ETHUSDT": {
+          "cache_stats": {
+            "hits": 1,
+            "misses": 0
+          },
+          "column_count": 224625,
+          "d_star_cache": {
+            "entry_count": 2837,
+            "fracdiff_hash": "dcc154ced6b642083138ca516f09aab7",
+            "path": "handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/20260703T042407Z-fracdiff-maxlag-golden-G2-run1/ETHUSDT/d_star_cache/d_star_ETHUSDT_1h_dcc154ced6b6.json",
+            "resolved_max_lag": 50,
+            "row_count": 2081,
+            "time_range": [
+              1769842800,
+              1777330800
+            ]
+          },
+          "fracdiff_column_count": 4456,
+          "frame_digest_sha256": "ec266a81f6466d46f972755b9dec5ad1b10dd4a6a56c6624f02d533c93fc26e6",
+          "index_hash": "7a2ef03c1d636641",
+          "row_count": 2081,
+          "sample_columns": {
+            "None_1h_microstructure_amihud_13_55_Cross": {
+              "dtype": "float32",
+              "nan_mask_sha256": "efa1b87c23b32998",
+              "value_sha256": "0624b775372ea67a"
+            },
+            "taker-ratio_1h_momentum_MACDEXT-Signal_12-26-9_Lag_3": {
+              "dtype": "float32",
+              "nan_mask_sha256": "baed3c44fadfbdb8",
+              "value_sha256": "5a167d8e9750b139"
+            },
+            "wcl-price_1h_Lag_8": {
+              "dtype": "float16",
+              "nan_mask_sha256": "462b1b999f6ba836",
+              "value_sha256": "b3caecf8d84970a2"
+            }
+          },
+          "schema_hash": "ea86b82fe1e642e6"
+        }
+      },
+      "window_bars": 2081
+    }
+  ],
+  "stability_precheck": {
+    "passed": true,
+    "symbols": {
+      "BTCUSDT": {
+        "first": "ae9f16c3418becd77d69f945f6df7d4dc75a604ae14fe62f971a1c96dd055868",
+        "second": "ae9f16c3418becd77d69f945f6df7d4dc75a604ae14fe62f971a1c96dd055868",
+        "stable": true
+      },
+      "ETHUSDT": {
+        "first": "7ea5e0b6b39fe2efbae4d57ed08e1f5159dc086f77a0e683b06f9dd8aaf0b9c4",
+        "second": "7ea5e0b6b39fe2efbae4d57ed08e1f5159dc086f77a0e683b06f9dd8aaf0b9c4",
+        "stable": true
+      }
+    }
+  },
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT"
+  ],
+  "task_id": "fracdiff-maxlag-b0-codex-20260703",
+  "timeframe": "1h",
+  "window_contract": "_fracdiff_window_bars(_fracdiff_mr_config_payload())"
+}

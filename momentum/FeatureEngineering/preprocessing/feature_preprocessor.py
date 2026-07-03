@@ -90,29 +90,20 @@ def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bo
 
 try:
     from scipy.special import ndtri
-    from scipy.signal import fftconvolve as _scipy_fftconvolve_pp
 
     HAS_SCIPY = True
-    _HAS_FFTCONV_PP = True
 except Exception:
     HAS_SCIPY = False
-    _HAS_FFTCONV_PP = False
     ndtri = None
     logger.warning("scipy not available, gaussian normalization disabled")
 
-# FFT crossover: use FFT when n_signal * n_weights exceeds this threshold.
-# For fracdiff at 20k rows with w≈252: n×w≈5.1M >> 4096, always uses FFT.
-_FRACDIFF_FFT_OPS_THRESHOLD = 4096
-
 
 def _frac_diff_convolve(signal: np.ndarray, weights: np.ndarray) -> np.ndarray:
-    """1-D convolution (mode='valid') with automatic FFT dispatch for fracdiff.
+    """1-D fracdiff convolution (mode='valid')，一律 direct、禁 FFT。
 
-    Uses ``scipy.signal.fftconvolve`` when available and operation count
-    exceeds the crossover threshold; falls back to ``np.convolve`` otherwise.
+    MRFAIL-RECONCILE 裁決：FFT 會把尾端擾動的捨入洩進前綴 bins，破壞
+    fracdiff 前綴因果不變（與 _hurst_prior._convolve_1d 同款修復）。
     """
-    if _HAS_FFTCONV_PP and signal.size * weights.size > _FRACDIFF_FFT_OPS_THRESHOLD:
-        return np.asarray(_scipy_fftconvolve_pp(signal, weights, mode="valid"), dtype=np.float64)
     return np.convolve(signal, weights, mode="valid")
 
 try:
@@ -3017,6 +3008,13 @@ class FeaturePreprocessor:
         concurrent_symbols = get_batch_symbol_concurrency()
         return get_slowpath_n_jobs(tier_gb, concurrent_symbols=concurrent_symbols)
 
+    def _resolve_fracdiff_max_lag(self) -> int:
+        """解析 fracdiff 權重寬度；auto 模式只依校準窗推導。"""
+        configured = int(self.fracdiff_config.get("max_lag", 0))
+        if configured > 0:
+            return configured
+        return min(max(2, self._calibration_bars() // 10), 252)
+
     def _apply_fractional_differencing_serial(
         self,
         result: pd.DataFrame,
@@ -3194,10 +3192,8 @@ class FeaturePreprocessor:
         adf_threshold = float(self.fracdiff_config.get("adf_threshold", 0.05))
         weight_threshold = float(self.fracdiff_config.get("weight_threshold", 1e-5))
         precision = self._resolve_fracdiff_precision()
-        # 限制 weight 寬度：最多序列長度的 10%（上限 252），避免 d≈0.5 時產生大量 NaN
-        max_lag = int(self.fracdiff_config.get("max_lag", 0))
-        if max_lag <= 0:
-            max_lag = min(max(2, len(df) // 10), 252)
+        # 限制 weight 寬度：auto 由校準窗推導，禁止依 len(df) 變動破壞截斷不變性。
+        max_lag = self._resolve_fracdiff_max_lag()
 
         cache_enabled = bool(self.fracdiff_config.get("cache_d_star", True))
         cache: Optional[DStarCache] = None

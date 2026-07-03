@@ -291,6 +291,9 @@ def _collect_l65_warmup_bars(
         if pp.fractional_differencing.enabled:
             max_lag = int(pp.fractional_differencing.model_dump().get("max_lag", 0) or 0)
             if max_lag <= 0:
+                # docs/FRACDIFF_MAXLAG_SPEC.md: value path auto max_lag is
+                # calibration-derived; warmup keeps the conservative 252
+                # fallback because it only extends preheat, not feature values.
                 max_lag = 252
             base_windows.append(max_lag)
         if pp.adf_differencing.enabled:

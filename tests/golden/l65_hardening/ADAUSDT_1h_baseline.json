@@ -46,7 +46,7 @@
       "L2_derived_close_std_34"
     ],
     "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-    "nan_mask_hash": "c7538329816ec0d37b308be984ba83195a1f874516a8521547ec69112b181e67",
+    "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
     "per_feature_stats": {
       "L1_binance_close": {
         "mean": -0.05995285770186766,
@@ -129,14 +129,14 @@
         "std": 1.0061576776399257
       },
       "L2_derived_close_std_13": {
-        "mean": -0.008083172495919224,
-        "nan_ratio": 0.162,
-        "std": 1.0341018509794684
+        "mean": -0.01066329389599408,
+        "nan_ratio": 0.087,
+        "std": 1.0500235756734388
       },
       "L2_derived_close_std_21": {
-        "mean": 0.006763004541873349,
-        "nan_ratio": 0.162,
-        "std": 1.0482218343409353
+        "mean": -0.01808192597605303,
+        "nan_ratio": 0.087,
+        "std": 1.0654088809759164
       },
       "L2_derived_close_std_3": {
         "mean": -0.004782877373447021,
@@ -165,7 +165,7 @@
       1750,
       1999
     ],
-    "sampled_value_hash": "501c9091909f25d1a9f14be52c73cbd23a51e9524cee4bb0615b741d283d8a46"
+    "sampled_value_hash": "9b4012f6af2830b811291651d8ece7cfe124144d71740263aa18051670c4a6c9"
   },
   "pre_ic": {
     "dtypes": {
@@ -242,7 +242,7 @@
       "L2_derived_volume_mean_89"
     ],
     "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-    "nan_mask_hash": "b6f0d1e7da258675c081dc22c5f39afdcbfefb7e0eba3154ea8c941baa7155ea",
+    "nan_mask_hash": "1466b4d40980d64b6d5ec7276741beef6c603ab9932a7f60319401ea988c3f4a",
     "per_feature_stats": {
       "L1_binance_close": {
         "mean": 0.2621571072563529,
@@ -325,14 +325,14 @@
         "std": 0.0069819032626913975
       },
       "L2_derived_close_std_13": {
-        "mean": 0.0003387906321717443,
-        "nan_ratio": 0.1,
-        "std": 0.0008951631588692369
+        "mean": 0.001449853080573844,
+        "nan_ratio": 0.025,
+        "std": 0.0012781555090483326
       },
       "L2_derived_close_std_21": {
-        "mean": 4.7764149508011066e-05,
-        "nan_ratio": 0.1,
-        "std": 0.000526254590951267
+        "mean": 0.0009880117459668107,
+        "nan_ratio": 0.025,
+        "std": 0.0010599262557716498
       },
       "L2_derived_close_std_3": {
         "mean": 0.0012088413475784359,
@@ -375,44 +375,44 @@
         "std": 0.9349071446447023
       },
       "L2_derived_volume_mean_13": {
-        "mean": 715423.6899697796,
-        "nan_ratio": 0.0995,
-        "std": 1665759.1676079412
+        "mean": 1603915.817678099,
+        "nan_ratio": 0.0245,
+        "std": 1903145.7795025534
       },
       "L2_derived_volume_mean_21": {
-        "mean": 1797165.4545650159,
-        "nan_ratio": 0.0995,
-        "std": 2002584.4814076382
+        "mean": 3713948.3003957886,
+        "nan_ratio": 0.0245,
+        "std": 2719889.654317428
       },
       "L2_derived_volume_mean_3": {
-        "mean": 3069757.4304548865,
-        "nan_ratio": 0.0995,
-        "std": 4623089.20802823
+        "mean": 5025909.526145338,
+        "nan_ratio": 0.0245,
+        "std": 5165077.851936399
       },
       "L2_derived_volume_mean_34": {
-        "mean": 171186.16326424968,
-        "nan_ratio": 0.0995,
-        "std": 605461.3483021565
+        "mean": 1021902.1879061648,
+        "nan_ratio": 0.0245,
+        "std": 985843.3504439163
       },
       "L2_derived_volume_mean_5": {
-        "mean": 2350290.8011523313,
-        "nan_ratio": 0.0995,
-        "std": 3610282.880281022
+        "mean": 3014050.026818162,
+        "nan_ratio": 0.0245,
+        "std": 3579021.1964395316
       },
       "L2_derived_volume_mean_55": {
-        "mean": 71057.3006431873,
-        "nan_ratio": 0.0995,
-        "std": 341808.86825048167
+        "mean": 643949.4593373175,
+        "nan_ratio": 0.0245,
+        "std": 594148.2345717229
       },
       "L2_derived_volume_mean_8": {
-        "mean": 777164.925966918,
-        "nan_ratio": 0.0995,
-        "std": 2160936.8218651493
+        "mean": 1763248.4142991411,
+        "nan_ratio": 0.0245,
+        "std": 2419528.2961543873
       },
       "L2_derived_volume_mean_89": {
-        "mean": 77961.07136949002,
-        "nan_ratio": 0.0995,
-        "std": 275492.2231590815
+        "mean": 508844.0981055648,
+        "nan_ratio": 0.0245,
+        "std": 421007.7405920501
       }
     },
     "rows": 2000,
@@ -431,7 +431,7 @@
       1750,
       1999
     ],
-    "sampled_value_hash": "72fbf4fd88332e35a2cc15af3926bdd66998d2b9d95ec35df63b243970dee747"
+    "sampled_value_hash": "574fe9272b7e9e9d9dd619ac4f180146e40f2c46cb8d2644d92e8785d7d6321e"
   },
   "selected_feature_count": 20,
   "selected_feature_ids": [

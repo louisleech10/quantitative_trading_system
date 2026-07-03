@@ -7451,3 +7451,488 @@ ts=2026-07-02 20:51:50 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-GOV-O3EXT-R7-REVIEW-composer.md", "output_sha256": "0968999bad3362b052d0848fb0c1b032415b8722c2c6b897cd10815fe26dd3d3", "task_id": "gov-o3ext-r7-review", "ts": "2026-07-02T23:22:49Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-GOV-O3EXT-R7-ADV-COMPOSER.md", "output_sha256": "8b0257661895dd29f463b9268f757e555217bf76e8a13526084d93f2f5b1adad", "task_id": "gov-o3ext-r7-adv", "ts": "2026-07-02T23:23:02Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-GOV-O3EXT-R7-IMPL-codex.md", "output_sha256": "f7c8c293c13194daebcf1f6ac2c6e6a320dd956869254dc3e67c89c3b7687928", "task_id": "gov-o3ext-r7-impl", "ts": "2026-07-02T23:23:02Z"}
+=== 2026-07-03 09:13:40 | artifact ===
+  ts=2026-07-03 09:13:40
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  file=docs/FRACDIFF_MAXLAG_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=大命中(a)(d); §A=facts-resolved已驗證(code行號+receipt 20260702T042627Z+20260629 pin50實測),待確認:無(使用者已定序2026-07-02,技術決策委員會收斂); §C=filled; §G=真實kline改前後對照+pin50等價證明; §P=filled(A-1..A-5,B-1..B-4,C-1..C-3,D-1..D-2); §V=mutation探針B-2/B-3防假綠; §R=獨立commit可revert; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-07-03 09:15:30 | artifact ===
+  ts=2026-07-03 09:15:30
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  file=docs/FRACDIFF_MAXLAG_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=全域規則(解耦/不可違反/防假綠); §B=批次策略(依SPEC Phase1-3拓撲); 每Task=驗證·邊界·不可做齊備; 追溯=manifest A-1..A-5,B-1..B-4,C-1..C-3,D-1..D-2 全覆蓋; 基於docs/FRACDIFF_MAXLAG_SPEC.md
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-adv-codex-20260703", "ts": "2026-07-03T01:20:47Z"}
+=== 2026-07-03 09:20:47 | dispatch ===
+  ts=2026-07-03 09:20:47
+  kind=dispatch
+  intent=雙家族adversarial之一:Codex(gpt-5.5)對FRACDIFF_MAXLAG SPEC/TODO做adversarial review(挑戰前提+獵漏),輸出findings檔
+  risk=high
+  facts_asked=使用者2026-07-02已定序+2026-07-03指定路由Codex實作/Composer review;修向屬技術決策委員會已收斂(三腿檔);無其他待問事實
+  review_role=Codex=adversary,挑戰Claude寫的SPEC前提(§G pin50等價假設/A-3保留252決議/mutation探針設計),特別盯Claude的腿
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=waived:本次派工即為adversarial review本身(對SPEC派實作時才須附已完成的adversarial檔)
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRACDIFF_MAXLAG_SPEC.md
+  todo=docs/FRACDIFF_MAXLAG_TODO.md
+  manifest=docs/FRACDIFF_MAXLAG_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-composer.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-adv-composer-20260703", "ts": "2026-07-03T01:21:18Z"}
+=== 2026-07-03 09:21:18 | dispatch ===
+  ts=2026-07-03 09:21:18
+  kind=dispatch
+  intent=雙家族adversarial之二:Composer2.5對FRACDIFF_MAXLAG SPEC/TODO做adversarial review(挑戰前提+獵漏),輸出findings檔
+  risk=high
+  facts_asked=使用者2026-07-02已定序+2026-07-03指定路由;修向屬技術決策委員會已收斂;無其他待問事實
+  review_role=Composer=adversary,挑戰Claude寫的SPEC前提(§G golden設計/B-3 cache mutation探針範圍/值守恆通過條件),特別盯Claude的腿
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=waived:本次派工即為adversarial review本身
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRACDIFF_MAXLAG_SPEC.md
+  todo=docs/FRACDIFF_MAXLAG_TODO.md
+  manifest=docs/FRACDIFF_MAXLAG_MANIFEST.md
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-codex.md", "output_sha256": "f7bcf968ab37409807ba73b893cd368dcbfcce037c07c303d6f2d8263f2545b4", "task_id": "fracdiff-maxlag-adv-codex-20260703", "ts": "2026-07-03T01:32:31Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-composer.md", "output_sha256": "db3a05b2880ce2f0dfecc4c6c01f03903ec66822fe9b3ad1dba0b52e7cfdea67", "task_id": "fracdiff-maxlag-adv-composer-20260703", "ts": "2026-07-03T01:32:31Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-codex.md", "output_sha256": "f7bcf968ab37409807ba73b893cd368dcbfcce037c07c303d6f2d8263f2545b4", "task_id": "fracdiff-maxlag-stamp-codex-20260703", "ts": "2026-07-03T01:32:40Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-CODEX.md", "output_sha256": "f7bcf968ab37409807ba73b893cd368dcbfcce037c07c303d6f2d8263f2545b4", "task_id": "fracdiff-maxlag-adv-codex-20260703", "ts": "2026-07-03T01:33:57Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-COMPOSER.md", "output_sha256": "db3a05b2880ce2f0dfecc4c6c01f03903ec66822fe9b3ad1dba0b52e7cfdea67", "task_id": "fracdiff-maxlag-adv-composer-20260703", "ts": "2026-07-03T01:33:57Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-CODEX.md", "output_sha256": "f7bcf968ab37409807ba73b893cd368dcbfcce037c07c303d6f2d8263f2545b4", "task_id": "fracdiff-maxlag-stamp-codex-20260703", "ts": "2026-07-03T01:34:11Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "d76dea68c54db2451f1c9b2c7115fbcb7cec323825410fde8cc91d46db228943", "task_id": "fracdiff-maxlag-stamp-codex-20260703", "ts": "2026-07-03T01:34:11Z"}
+=== 2026-07-03 09:34:11 | dispatch ===
+  ts=2026-07-03 09:34:11
+  kind=dispatch
+  intent=stamp-review之一:Codex re-review修訂後SPEC/TODO+reconcile,確認自己6條BLOCKING真閉合,append RECONCILE-STAMP
+  risk=high
+  facts_asked=無新增待問;修訂全依兩腿findings
+  review_role=Codex=stamp reviewer,驗自己finding閉合+特別盯Claude的reconcile歸類
+  template=n/a:stamp-review非SPEC實作派工
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-ADV-CODEX.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "170e66b16fca954e5c950113bb3a71aab4cc10455df197e9aa0bdeb129cb321b", "task_id": "fracdiff-maxlag-stamp-codex-20260703", "ts": "2026-07-03T01:36:04Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-ADV-COMPOSER.md", "output_sha256": "db3a05b2880ce2f0dfecc4c6c01f03903ec66822fe9b3ad1dba0b52e7cfdea67", "task_id": "fracdiff-maxlag-stamp-composer-20260703", "ts": "2026-07-03T01:36:04Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "170e66b16fca954e5c950113bb3a71aab4cc10455df197e9aa0bdeb129cb321b", "task_id": "fracdiff-maxlag-stamp-composer-20260703", "ts": "2026-07-03T01:36:04Z"}
+=== 2026-07-03 09:36:04 | dispatch ===
+  ts=2026-07-03 09:36:04
+  kind=dispatch
+  intent=stamp-review之二:Composer re-review修訂後SPEC/TODO+reconcile,確認自己4條BLOCKING+MAJOR真閉合,append RECONCILE-STAMP
+  risk=high
+  facts_asked=無新增待問;修訂全依兩腿findings
+  review_role=Composer=stamp reviewer,驗自己finding閉合+特別盯Claude的reconcile歸類
+  template=n/a:stamp-review非SPEC實作派工
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-ADV-COMPOSER.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "1bd500b8cf4da4558dc8c484614d524277ebea647d4cd1ed2b53bc23664499b2", "task_id": "fracdiff-maxlag-stamp-composer-20260703", "ts": "2026-07-03T01:38:22Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "1bd500b8cf4da4558dc8c484614d524277ebea647d4cd1ed2b53bc23664499b2", "task_id": "fracdiff-maxlag-b0-codex-20260703", "ts": "2026-07-03T01:39:21Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-B0-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-b0-codex-20260703", "ts": "2026-07-03T01:39:22Z"}
+=== 2026-07-03 09:39:22 | dispatch ===
+  ts=2026-07-03 09:39:22
+  kind=dispatch
+  intent=派Codex實作Batch B0:Task 0.1 Golden G1/G2凍結(全欄digest helper+真實kline兩baseline+receipt,不改production)
+  risk=high
+  facts_asked=使用者定序2026-07-02+路由2026-07-03(Codex實作/Composer review);技術決策經雙家族adversarial+雙戳記reconcile
+  review_role=Composer將於實作後做code review(實作者不自審)
+  template=templates/SPEC_TEMPLATE.md
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRACDIFF_MAXLAG_SPEC.md
+  todo=docs/FRACDIFF_MAXLAG_TODO.md
+  manifest=docs/FRACDIFF_MAXLAG_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-G2PIN-CODEX.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-g2pin-codex-20260703", "ts": "2026-07-03T03:45:02Z"}
+=== 2026-07-03 11:45:02 | dispatch ===
+  ts=2026-07-03 11:45:02
+  kind=dispatch
+  intent=斷路器委員會:G2 pin失效裁決,Codex腿(驗pydantic丟棄假設+選A/B/C/D+挑戰Claude腿)
+  risk=high
+  facts_asked=事實檔handoffs/20260703-FRACDIFF-MAXLAG-G2PIN-FACTS.md全實測;無需問使用者(技術決策委員會裁)
+  review_role=Codex=獨立裁決腿,挑戰Claude選A的等價論證
+  template=n/a:委員會裁決非SPEC派工
+  adversarial=waived:本派工即委員會裁決腿本身
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-G2PIN-COMPOSER.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-g2pin-composer-20260703", "ts": "2026-07-03T03:45:18Z"}
+=== 2026-07-03 11:45:18 | dispatch ===
+  ts=2026-07-03 11:45:18
+  kind=dispatch
+  intent=斷路器委員會:G2 pin失效裁決,Composer腿(驗pydantic丟棄假設+選A/B/C/D+挑戰Claude腿)
+  risk=high
+  facts_asked=事實檔全實測;技術決策委員會裁
+  review_role=Composer=獨立裁決腿,挑戰Claude選A的等價論證
+  template=n/a:委員會裁決非SPEC派工
+  adversarial=waived:本派工即委員會裁決腿本身
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-G2PIN-CODEX.md", "output_sha256": "f0797eb1365876d7fbfcd1d73ca0a7dbc861d02cfeb4ba999936a342a386f0b5", "task_id": "fracdiff-maxlag-g2pin-codex-20260703", "ts": "2026-07-03T03:48:50Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-G2PIN-COMPOSER.md", "output_sha256": "d03b1ec0d30be68281ca7892dc5cf1d7b225432bff7b82fafbfcd81dbd271836", "task_id": "fracdiff-maxlag-g2pin-composer-20260703", "ts": "2026-07-03T03:48:50Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "1bd500b8cf4da4558dc8c484614d524277ebea647d4cd1ed2b53bc23664499b2", "task_id": "fracdiff-maxlag-b1b2-codex-20260703", "ts": "2026-07-03T05:28:25Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-B1B2-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-b1b2-codex-20260703", "ts": "2026-07-03T05:28:25Z"}
+=== 2026-07-03 13:28:25 | dispatch ===
+  ts=2026-07-03 13:28:25
+  kind=dispatch
+  intent=派Codex實作Batch B1+B2:Phase1 max_lag解耦(resolver seam+schema+warmup註解+cache兩案)+Phase2 測試探針(xfail移除+B2/B3 mutation+unit),slow MR由Claude接跑
+  risk=high
+  facts_asked=B0 golden receipt 20260703T042407Z 全過(G1穩定/G2 pin生效/非fracdiff零差異);G2 pin法委員會裁定A;無新增待問
+  review_role=Composer將做code review(實作者不自審);B0後G2'交叉驗證落Task1.2
+  template=templates/SPEC_TEMPLATE.md
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRACDIFF_MAXLAG_SPEC.md
+  todo=docs/FRACDIFF_MAXLAG_TODO.md
+  manifest=docs/FRACDIFF_MAXLAG_MANIFEST.md
+ts=2026-07-03 13:33:51 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260703T053351Z-mutation-test_dstar_cache_key_mutation.json
+ts=2026-07-03 13:34:19 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260703T053419Z-mutation-test_dstar_cache_key_mutation.json
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "1bd500b8cf4da4558dc8c484614d524277ebea647d4cd1ed2b53bc23664499b2", "task_id": "fracdiff-maxlag-review-composer-20260703", "ts": "2026-07-03T05:42:03Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-REVIEW-composer.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-review-composer-20260703", "ts": "2026-07-03T05:42:03Z"}
+=== 2026-07-03 13:42:03 | dispatch ===
+  ts=2026-07-03 13:42:03
+  kind=dispatch
+  intent=派Composer對B1+B2實作做code review(實作者Codex不自審)
+  risk=high
+  facts_asked=B0 golden過;B1B2快測15 passed+mutation probe 7過;b6 golden失敗已定性為預期變更(nan_ratio 0.0245=(50-1)/2000精確吻合)
+  review_role=Composer=code reviewer,盯:斷言零放寬/mutation探針真可證偽/resolver seam無旁路/schema下游
+  template=n/a:code review非SPEC實作派工
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20260703T054430Z-mutation-test_dstar_cache_key_mutation.json
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-REVIEW-composer.md", "output_sha256": "6bea073f93317e238b340e693341092b636f16357905f6cbbd9977779c3f2177", "task_id": "fracdiff-maxlag-review-composer-20260703", "ts": "2026-07-03T05:48:12Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md", "output_sha256": "1bd500b8cf4da4558dc8c484614d524277ebea647d4cd1ed2b53bc23664499b2", "task_id": "fracdiff-maxlag-mrfail-codex-20260703", "ts": "2026-07-03T08:33:38Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-CODEX.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-mrfail-codex-20260703", "ts": "2026-07-03T08:33:38Z"}
+=== 2026-07-03 16:33:38 | dispatch ===
+  ts=2026-07-03 16:33:38
+  kind=dispatch
+  intent=MR 5F2P診斷委員會Codex腿:診斷B1 warmup NaN mask/B2 4.77e-7漂移根因(Q1-Q3)+修類A三個mutation測試窗長斷言(Q4)
+  risk=high
+  facts_asked=事實檔MRFAIL-FACTS全實測附receipt;技術診斷委員會裁
+  review_role=Composer將獨立診斷同題互審
+  template=n/a:診斷+測試bug修非SPEC新派工
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-COMPOSER.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-mrfail-composer-20260703", "ts": "2026-07-03T08:34:39Z"}
+=== 2026-07-03 16:34:39 | dispatch ===
+  ts=2026-07-03 16:34:39
+  kind=dispatch
+  intent=MR 5F2P診斷委員會Composer腿:獨立診斷Q1-Q3(B1 warmup NaN mask/B2 4.77e-7)與Codex互審
+  risk=high
+  facts_asked=事實檔MRFAIL-FACTS全實測;技術診斷委員會裁
+  review_role=Composer=獨立診斷腿,與Codex結論互審
+  template=n/a:read-only診斷
+  adversarial=waived:本派工即委員會診斷腿本身
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-CODEX.md", "output_sha256": "c304a22703403e02d1f2023dfc1962a2aace564f83af45aead1a63764cdeb4dd", "task_id": "fracdiff-maxlag-mrfail-codex-20260703", "ts": "2026-07-03T08:40:00Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-COMPOSER.md", "output_sha256": "565f34ea643a630175f54bae2d1f798767b24e2df0e9b0d67e4e16332cc7ef3f", "task_id": "fracdiff-maxlag-mrfail-composer-20260703", "ts": "2026-07-03T08:52:15Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md", "output_sha256": "046e10e691663f60605c3861a35495d7ddc037f86950fcc7d1b0f86da3f02a35", "task_id": "fracdiff-maxlag-mrfail-stamp-codex-20260703", "ts": "2026-07-03T08:53:33Z"}
+=== 2026-07-03 16:53:33 | dispatch ===
+  ts=2026-07-03 16:53:33
+  kind=dispatch
+  intent=MRFAIL reconcile stamp-review:Codex驗三方診斷收斂+裁決案(B2 conv修/B1定性xfail+另立案/定序防衝突),append RECONCILE-STAMP
+  risk=high
+  facts_asked=idx508 artifact實測補齊兩腿未完成步;無新增待問
+  review_role=Codex=stamp reviewer,盯Claude的裁決案歸類與定序邏輯
+  template=n/a:stamp-review非SPEC實作派工
+  adversarial=waived:本派工為診斷reconcile戳記審;兩診斷腿(MRFAIL-*)已register留痕(非ADV命名類)
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md", "output_sha256": "2e197b5a5741a1f36798e91098177475388b19c3dca4cf8d51069c76c56d2736", "task_id": "fracdiff-maxlag-mrfail-stamp2-codex-20260703", "ts": "2026-07-03T09:33:08Z"}
+=== 2026-07-03 17:33:08 | dispatch ===
+  ts=2026-07-03 17:33:08
+  kind=dispatch
+  intent=MRFAIL reconcile v2 stamp-review:Codex重審(v1被其REJECTED,v2補receipt實據),append RECONCILE-STAMP
+  risk=high
+  facts_asked=postfix compare receipt 20260703T085226Z PASSED=True全條件;v1 REJECT理由已補正
+  review_role=Codex=stamp reviewer,驗v2引據與receipt相符
+  template=n/a:stamp-review
+  adversarial=waived:診斷reconcile戳記審v2;兩診斷腿已register留痕
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md", "output_sha256": "3f9be314ca844d12c7176e98719312c2ead35d154734f126bc12dd92c987b038", "task_id": "fracdiff-maxlag-mrfail-stamp2-codex-20260703", "ts": "2026-07-03T09:34:41Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md", "output_sha256": "3f9be314ca844d12c7176e98719312c2ead35d154734f126bc12dd92c987b038", "task_id": "fracdiff-maxlag-mrfail-stamp2-composer-20260703", "ts": "2026-07-03T09:34:41Z"}
+=== 2026-07-03 17:34:41 | dispatch ===
+  ts=2026-07-03 17:34:41
+  kind=dispatch
+  intent=MRFAIL reconcile v2 stamp-review:Composer審(驗自己診斷歸類+裁決案+receipt引據),append RECONCILE-STAMP
+  risk=high
+  facts_asked=receipt 20260703T085226Z PASSED全條件;Codex已v2 APPROVED
+  review_role=Composer=stamp reviewer,盯Claude歸類與B1 xfail誠實性
+  template=n/a:stamp-review
+  adversarial=waived:診斷reconcile戳記審;兩診斷腿已register留痕
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md", "output_sha256": "f81aa24e599fb5c622d689128b1fbfdda34876895e863a1c5cc95302959df7ce", "task_id": "fracdiff-maxlag-mrfail-stamp2-composer-20260703", "ts": "2026-07-03T09:35:59Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md", "output_sha256": "f81aa24e599fb5c622d689128b1fbfdda34876895e863a1c5cc95302959df7ce", "task_id": "fracdiff-maxlag-convfix-codex-20260703", "ts": "2026-07-03T09:36:24Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONVFIX-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-convfix-codex-20260703", "ts": "2026-07-03T09:36:25Z"}
+=== 2026-07-03 17:36:25 | dispatch ===
+  ts=2026-07-03 17:36:25
+  kind=dispatch
+  intent=派Codex實作裁決案:B2 conv修復(_convolve_1d fracdiff路徑一律direct convolution)+B1截斷MR掛誠實xfail(strict)新reason
+  risk=high
+  facts_asked=裁決案經三方診斷+雙戳記(MRFAIL-RECONCILE v2);§G已以FFT基礎閉合(receipt 085226Z)
+  review_role=Composer已審診斷reconcile;conv修後slow oracle由編排端跑
+  template=templates/SPEC_TEMPLATE.md
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRACDIFF_MAXLAG_SPEC.md
+  todo=docs/FRACDIFF_MAXLAG_TODO.md
+  manifest=docs/FRACDIFF_MAXLAG_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-CODEX.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-r3-codex-20260703", "ts": "2026-07-03T12:28:02Z"}
+=== 2026-07-03 20:28:02 | dispatch ===
+  ts=2026-07-03 20:28:02
+  kind=dispatch
+  intent=R3委員會Codex腿:裁D1-D4(尾擾MR codec處置/控制探針重設計/簽核聲明)+驗證差分證據推理
+  risk=high
+  facts_asked=R3-FACTS全實測(兩receipt差分);技術裁決委員會
+  review_role=Codex=裁決腿,挑戰Claude的D1=(a)票與控制探針無效推理
+  template=n/a:委員會裁決
+  adversarial=waived:本派工即委員會裁決腿
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-COMPOSER.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-r3-composer-20260703", "ts": "2026-07-03T12:28:05Z"}
+=== 2026-07-03 20:28:05 | dispatch ===
+  ts=2026-07-03 20:28:05
+  kind=dispatch
+  intent=R3委員會Composer腿:同題獨立裁D1-D4+驗差分證據
+  risk=high
+  facts_asked=R3-FACTS全實測;技術裁決委員會
+  review_role=Composer=獨立裁決腿,挑戰Claude票與Codex(互審)
+  template=n/a:委員會裁決
+  adversarial=waived:本派工即委員會裁決腿
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-CODEX.md", "output_sha256": "00dcdacd2907d3db0ceebb6d40d812007e77837056418230766b560affbbd652", "task_id": "fracdiff-maxlag-r3-codex-20260703", "ts": "2026-07-03T12:33:12Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-COMPOSER.md", "output_sha256": "e2c9af866e8b00ef88ac8a86102de5304fcc66f796c4bc128c0f7e4866ca0e72", "task_id": "fracdiff-maxlag-r3-composer-20260703", "ts": "2026-07-03T12:33:12Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "6897aa5cfdeb869e78fb14bd5b168f157555aeb42f67b0747c52e1151e07200b", "task_id": "fracdiff-maxlag-r3-stamp-codex-20260703", "ts": "2026-07-03T12:33:52Z"}
+=== 2026-07-03 20:33:52 | dispatch ===
+  ts=2026-07-03 20:33:52
+  kind=dispatch
+  intent=R3 reconcile stamp-review:Codex驗裁決歸類+約束落文,append RECONCILE-STAMP
+  risk=high
+  facts_asked=兩腿R3已register;裁決全收斂
+  review_role=Codex=stamp reviewer,驗自己的約束(xfail措辭/D2 d*gate鎖定)有無被忠實載入
+  template=n/a:stamp-review
+  adversarial=waived:R3裁決reconcile戳記審;兩腿已register留痕
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "e537b89db339d4f2d05db03721df061312f4f7d07bb4675bf5cdb25d67b18154", "task_id": "fracdiff-maxlag-r3-stamp-codex-20260703", "ts": "2026-07-03T12:35:04Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "e537b89db339d4f2d05db03721df061312f4f7d07bb4675bf5cdb25d67b18154", "task_id": "fracdiff-maxlag-r3-stamp-composer-20260703", "ts": "2026-07-03T12:35:04Z"}
+=== 2026-07-03 20:35:04 | dispatch ===
+  ts=2026-07-03 20:35:04
+  kind=dispatch
+  intent=R3 reconcile stamp-review:Composer驗裁決歸類(含自己的三約束/雙層設計缺陷判讀),append RECONCILE-STAMP
+  risk=high
+  facts_asked=Codex已APPROVED;兩腿R3已register
+  review_role=Composer=stamp reviewer
+  template=n/a:stamp-review
+  adversarial=waived:R3裁決reconcile戳記審
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-r3-stamp-composer-20260703", "ts": "2026-07-03T12:37:54Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-d1d2-codex-20260703", "ts": "2026-07-03T12:38:21Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-D1D2-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-d1d2-codex-20260703", "ts": "2026-07-03T12:38:22Z"}
+=== 2026-07-03 20:38:22 | dispatch ===
+  ts=2026-07-03 20:38:22
+  kind=dispatch
+  intent=派Codex實作R3裁決D1+D2:尾擾MR誠實xfail(codec reason)+calibration控制單邊擾動重設計(d*gate鎖定)
+  risk=high
+  facts_asked=R3-RECONCILE雙戳記PASS;約束=xfail措辭禁噪音/D2驗收鎖d*gate訊息
+  review_role=驗收由編排端slow receipt+d*gate訊息鎖定
+  template=templates/SPEC_TEMPLATE.md
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRACDIFF_MAXLAG_SPEC.md
+  todo=docs/FRACDIFF_MAXLAG_TODO.md
+  manifest=docs/FRACDIFF_MAXLAG_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-d2match-codex-20260703", "ts": "2026-07-03T13:19:09Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-D2MATCH-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-d2match-codex-20260703", "ts": "2026-07-03T13:19:09Z"}
+=== 2026-07-03 21:19:09 | dispatch ===
+  ts=2026-07-03 21:19:09
+  kind=dispatch
+  intent=D2 match約束裁定+修:控制經columns gate(校準→適格集合)觸發,是否符合你的d*不變量鎖定意圖
+  risk=high
+  facts_asked=receipt 124142Z:XFAIL✓+控制raise但match不符(columns gate failed only_full=428/only_trunc=437)
+  review_role=Codex=原約束作者裁定
+  template=n/a:約束裁定+單行測試修
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-D2MATCH-codex.md", "output_sha256": "a394baf949af28c5cc3550f6587221b52d31b756cc593c4df757d29070819b17", "task_id": "fracdiff-maxlag-d2match-codex-20260703", "ts": "2026-07-03T13:20:55Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-signoff-codex-20260703", "ts": "2026-07-03T13:39:38Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONSERVATION-codex.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-signoff-codex-20260703", "ts": "2026-07-03T13:39:39Z"}
+=== 2026-07-03 21:39:39 | dispatch ===
+  ts=2026-07-03 21:39:39
+  kind=dispatch
+  intent=三方值守恆簽核Codex腿:獨立審全證據鏈+adversarial式獵漏(主動試打破守恆),出PASS/FAIL
+  risk=high
+  facts_asked=全receipt齊(042407Z/085226Z/094044Z/054245Z/132059Z);Claude腿已自產(CONSERVATION-claude.md);R3 D3聲明已載
+  review_role=Codex=adversarial簽核腿(主動構造反例,非確認式)
+  template=n/a:簽核審查
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-signoff-composer-20260703", "ts": "2026-07-03T13:40:23Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONSERVATION-composer.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-signoff-composer-20260703", "ts": "2026-07-03T13:40:23Z"}
+=== 2026-07-03 21:40:23 | dispatch ===
+  ts=2026-07-03 21:40:23
+  kind=dispatch
+  intent=三方值守恆簽核Composer腿:獨立審全證據鏈,出PASS/FAIL
+  risk=high
+  facts_asked=全receipt齊;Claude腿已出;Codex adversarial腿並行中
+  review_role=Composer=獨立簽核腿,盯Claude腿+方法論
+  template=n/a:簽核審查
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-signoff-composer2-20260703", "ts": "2026-07-03T13:41:41Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONSERVATION-composer.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-signoff-composer2-20260703", "ts": "2026-07-03T13:41:41Z"}
+=== 2026-07-03 21:41:41 | dispatch ===
+  ts=2026-07-03 21:41:41
+  kind=dispatch
+  intent=三方值守恆簽核Composer腿(重派,前次cursor-agent node crash SIGABRT)
+  risk=high
+  facts_asked=同前;crash非調用錯誤(node stack trace)
+  review_role=Composer=獨立簽核腿
+  template=n/a:簽核審查
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONSERVATION-codex.md", "output_sha256": "18a0a947ae1b2ed8d662d90ea24ce0e2d5f0d447abb0ae439e7e0875e83f7380", "task_id": "fracdiff-maxlag-signoff-codex-20260703", "ts": "2026-07-03T13:44:01Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-signoff-composer3-20260703", "ts": "2026-07-03T13:44:01Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONSERVATION-composer.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-signoff-composer3-20260703", "ts": "2026-07-03T13:44:01Z"}
+=== 2026-07-03 21:44:01 | dispatch ===
+  ts=2026-07-03 21:44:01
+  kind=dispatch
+  intent=三方值守恆簽核Composer腿(第3次派;前兩次cursor node OOM crash,根因=直讀397MB golden json;已備SUMMARY摘要檔)
+  risk=high
+  facts_asked=OOM根因已查明非agent能力問題;摘要檔已生成
+  review_role=Composer=獨立簽核腿
+  template=n/a:簽核審查
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-CONSERVATION-composer.md", "output_sha256": "4331c406e535a836ee3d6f8ccfb78e815bcf9499283c18ac51debebe7bd4a4d9", "task_id": "fracdiff-maxlag-signoff-composer3-20260703", "ts": "2026-07-03T13:48:12Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md", "output_sha256": "bc711ec6329dc6db53363c7368ed3c5bd85b76ffbeef0757e0aac204de9f03e1", "task_id": "fracdiff-maxlag-reviewclose-composer-20260703", "ts": "2026-07-03T13:48:12Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-REVIEWCLOSE-composer.md", "output_sha256": "pending", "task_id": "fracdiff-maxlag-reviewclose-composer-20260703", "ts": "2026-07-03T13:48:12Z"}
+=== 2026-07-03 21:48:12 | dispatch ===
+  ts=2026-07-03 21:48:12
+  kind=dispatch
+  intent=Composer閉合自己code review的3條BLOCKING(3.5 slow mutation receipt/6.5 B-1 receipt/5.7 G2')對照現有證據+雙戳記裁決,更新verdict
+  risk=high
+  facts_asked=全receipt齊;B-1結果依R3裁決=誠實xfail非轉綠(戳記檔載)
+  review_role=Composer=原finding提出者re-verify(閉合再驗證鐵律)
+  template=n/a:review閉合
+  adversarial=handoffs/20260703-FRACDIFF-MAXLAG-R3-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-REVIEWCLOSE-composer.md", "output_sha256": "d05b2a240f8aa4d2a5b8135f6ac62a3feed83bdcbc5d2447ae6e83c3b62d95df", "task_id": "fracdiff-maxlag-reviewclose-composer-20260703", "ts": "2026-07-03T13:51:17Z"}

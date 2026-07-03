@@ -58,8 +58,8 @@
     }
   },
   "config_hash": "f2dc452e9b4bddc17f45af46591c39150159d073dae137bb8c4aa1ea1106d285",
-  "generated_at_utc": "2026-06-17T16:05:18.852447+00:00",
-  "git_sha": "e097cc7df939f311882cf0b1889e42bc434740ae",
+  "generated_at_utc": "2026-07-03T13:48:24.952261+00:00",
+  "git_sha": "8e3ae0dbafce36eacdc08bc9e8a30be799ed0a05",
   "kline_path": "data_cache/feature_klines/kline_cache.h5",
   "mode": "ic_first_l65",
   "records": {
@@ -112,7 +112,7 @@
             "L2_derived_close_std_34"
           ],
           "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-          "nan_mask_hash": "c7538329816ec0d37b308be984ba83195a1f874516a8521547ec69112b181e67",
+          "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
           "per_feature_stats": {
             "L1_binance_close": {
               "mean": -0.05995285770186766,
@@ -195,14 +195,14 @@
               "std": 1.0061576776399257
             },
             "L2_derived_close_std_13": {
-              "mean": -0.008083172495919224,
-              "nan_ratio": 0.162,
-              "std": 1.0341018509794684
+              "mean": -0.01066329389599408,
+              "nan_ratio": 0.087,
+              "std": 1.0500235756734388
             },
             "L2_derived_close_std_21": {
-              "mean": 0.006763004541873349,
-              "nan_ratio": 0.162,
-              "std": 1.0482218343409353
+              "mean": -0.01808192597605303,
+              "nan_ratio": 0.087,
+              "std": 1.0654088809759164
             },
             "L2_derived_close_std_3": {
               "mean": -0.004782877373447021,
@@ -231,7 +231,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "501c9091909f25d1a9f14be52c73cbd23a51e9524cee4bb0615b741d283d8a46"
+          "sampled_value_hash": "9b4012f6af2830b811291651d8ece7cfe124144d71740263aa18051670c4a6c9"
         },
         "pre_ic": {
           "dtypes": {
@@ -308,7 +308,7 @@
             "L2_derived_volume_mean_89"
           ],
           "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-          "nan_mask_hash": "b6f0d1e7da258675c081dc22c5f39afdcbfefb7e0eba3154ea8c941baa7155ea",
+          "nan_mask_hash": "1466b4d40980d64b6d5ec7276741beef6c603ab9932a7f60319401ea988c3f4a",
           "per_feature_stats": {
             "L1_binance_close": {
               "mean": 0.2621571072563529,
@@ -391,14 +391,14 @@
               "std": 0.0069819032626913975
             },
             "L2_derived_close_std_13": {
-              "mean": 0.0003387906321717443,
-              "nan_ratio": 0.1,
-              "std": 0.0008951631588692369
+              "mean": 0.001449853080573844,
+              "nan_ratio": 0.025,
+              "std": 0.0012781555090483326
             },
             "L2_derived_close_std_21": {
-              "mean": 4.7764149508011066e-05,
-              "nan_ratio": 0.1,
-              "std": 0.000526254590951267
+              "mean": 0.0009880117459668107,
+              "nan_ratio": 0.025,
+              "std": 0.0010599262557716498
             },
             "L2_derived_close_std_3": {
               "mean": 0.0012088413475784359,
@@ -441,44 +441,44 @@
               "std": 0.9349071446447023
             },
             "L2_derived_volume_mean_13": {
-              "mean": 715423.6899697796,
-              "nan_ratio": 0.0995,
-              "std": 1665759.1676079412
+              "mean": 1603915.817678099,
+              "nan_ratio": 0.0245,
+              "std": 1903145.7795025534
             },
             "L2_derived_volume_mean_21": {
-              "mean": 1797165.4545650159,
-              "nan_ratio": 0.0995,
-              "std": 2002584.4814076382
+              "mean": 3713948.3003957886,
+              "nan_ratio": 0.0245,
+              "std": 2719889.654317428
             },
             "L2_derived_volume_mean_3": {
-              "mean": 3069757.4304548865,
-              "nan_ratio": 0.0995,
-              "std": 4623089.20802823
+              "mean": 5025909.526145338,
+              "nan_ratio": 0.0245,
+              "std": 5165077.851936399
             },
             "L2_derived_volume_mean_34": {
-              "mean": 171186.16326424968,
-              "nan_ratio": 0.0995,
-              "std": 605461.3483021565
+              "mean": 1021902.1879061648,
+              "nan_ratio": 0.0245,
+              "std": 985843.3504439163
             },
             "L2_derived_volume_mean_5": {
-              "mean": 2350290.8011523313,
-              "nan_ratio": 0.0995,
-              "std": 3610282.880281022
+              "mean": 3014050.026818162,
+              "nan_ratio": 0.0245,
+              "std": 3579021.1964395316
             },
             "L2_derived_volume_mean_55": {
-              "mean": 71057.3006431873,
-              "nan_ratio": 0.0995,
-              "std": 341808.86825048167
+              "mean": 643949.4593373175,
+              "nan_ratio": 0.0245,
+              "std": 594148.2345717229
             },
             "L2_derived_volume_mean_8": {
-              "mean": 777164.925966918,
-              "nan_ratio": 0.0995,
-              "std": 2160936.8218651493
+              "mean": 1763248.4142991411,
+              "nan_ratio": 0.0245,
+              "std": 2419528.2961543873
             },
             "L2_derived_volume_mean_89": {
-              "mean": 77961.07136949002,
-              "nan_ratio": 0.0995,
-              "std": 275492.2231590815
+              "mean": 508844.0981055648,
+              "nan_ratio": 0.0245,
+              "std": 421007.7405920501
             }
           },
           "rows": 2000,
@@ -497,7 +497,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "72fbf4fd88332e35a2cc15af3926bdd66998d2b9d95ec35df63b243970dee747"
+          "sampled_value_hash": "574fe9272b7e9e9d9dd619ac4f180146e40f2c46cb8d2644d92e8785d7d6321e"
         },
         "selected_feature_count": 20,
         "selected_feature_ids": [
@@ -575,32 +575,32 @@
             "L2_derived_close_std_34"
           ],
           "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-          "nan_mask_hash": "c638c2b0e8c3a28cfece9606884165351a65c353b8a98dcdad82fa2a72deb5be",
+          "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
           "per_feature_stats": {
             "L1_binance_close": {
-              "mean": 0.012501261447354724,
-              "nan_ratio": 0.1615,
-              "std": 1.0527759050444943
+              "mean": 0.011581667734538911,
+              "nan_ratio": 0.0865,
+              "std": 1.1284534323982351
             },
             "L1_binance_high": {
-              "mean": 0.020077834597782642,
-              "nan_ratio": 0.1615,
-              "std": 1.097898309072423
+              "mean": 0.004317935156987289,
+              "nan_ratio": 0.0865,
+              "std": 1.1298350435870623
             },
             "L1_binance_low": {
-              "mean": 0.02248003297889706,
-              "nan_ratio": 0.1615,
-              "std": 1.068788556414286
+              "mean": 0.02064479892691378,
+              "nan_ratio": 0.0865,
+              "std": 1.1205498066631103
             },
             "L1_binance_open": {
-              "mean": 0.018418110794029278,
-              "nan_ratio": 0.1615,
-              "std": 1.0672964072210849
+              "mean": 0.010882119716051557,
+              "nan_ratio": 0.0865,
+              "std": 1.122022052699913
             },
             "L1_binance_quote_volume": {
-              "mean": -0.0038400829054518523,
-              "nan_ratio": 0.1615,
-              "std": 1.0544689389256086
+              "mean": -0.0008290727574316571,
+              "nan_ratio": 0.0865,
+              "std": 1.0385349961420947
             },
             "L1_binance_taker_ratio": {
               "mean": 0.013138337207135004,
@@ -608,24 +608,24 @@
               "std": 1.019496299455581
             },
             "L1_binance_volume": {
-              "mean": -0.010227759792813063,
-              "nan_ratio": 0.1615,
-              "std": 1.0318576623684312
+              "mean": 0.0031621225494401404,
+              "nan_ratio": 0.0865,
+              "std": 1.047005414172369
             },
             "L2_derived_close_mean_13": {
-              "mean": -0.021136585472021033,
-              "nan_ratio": 0.114,
-              "std": 1.1196116331684298
+              "mean": -0.014658236012206713,
+              "nan_ratio": 0.0865,
+              "std": 1.1646619109959129
             },
             "L2_derived_close_mean_21": {
-              "mean": -0.03665772373213725,
-              "nan_ratio": 0.1355,
-              "std": 1.1976290027925192
+              "mean": -0.02962126116185127,
+              "nan_ratio": 0.0865,
+              "std": 1.2264829716722532
             },
             "L2_derived_close_mean_3": {
-              "mean": 0.027536237056113858,
-              "nan_ratio": 0.1615,
-              "std": 1.1171412369482914
+              "mean": 0.008813007999469996,
+              "nan_ratio": 0.0865,
+              "std": 1.1340605145657172
             },
             "L2_derived_close_mean_34": {
               "mean": -0.03706266027626892,
@@ -633,9 +633,9 @@
               "std": 1.1933412061851794
             },
             "L2_derived_close_mean_5": {
-              "mean": 0.03046045032969621,
-              "nan_ratio": 0.1615,
-              "std": 1.1317284592645096
+              "mean": 0.010572743909909468,
+              "nan_ratio": 0.0865,
+              "std": 1.1413049687085537
             },
             "L2_derived_close_mean_55": {
               "mean": -0.029885560190646598,
@@ -643,9 +643,9 @@
               "std": 1.2625629288204638
             },
             "L2_derived_close_mean_8": {
-              "mean": 0.01388482267934838,
-              "nan_ratio": 0.1595,
-              "std": 1.1061682323221451
+              "mean": -0.0028500710470179074,
+              "nan_ratio": 0.0865,
+              "std": 1.173529866021522
             },
             "L2_derived_close_mean_89": {
               "mean": -0.004554158061812631,
@@ -694,7 +694,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "bd4766d3aeeda2ce7d8638f88102f88f59881f54e8f58dda42ebad7621f675ea"
+          "sampled_value_hash": "785dbab1d3ce39e5af50928ca60f598b3fd42db23701473f0c30f604e40b4236"
         },
         "pre_ic": {
           "dtypes": {
@@ -771,32 +771,32 @@
             "L2_derived_volume_mean_89"
           ],
           "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-          "nan_mask_hash": "39f9daf1b4dd3c0749970e67fb44a22f061ad1860b0fb757d608d251a5a24273",
+          "nan_mask_hash": "32a331a27a24ee6f665df53b0486b7d2e5e990d7c278e75eab0d33bba38cf5c9",
           "per_feature_stats": {
             "L1_binance_close": {
-              "mean": 0.007076861816364998,
-              "nan_ratio": 0.0995,
-              "std": 0.010826878311684638
+              "mean": 0.05867671130764857,
+              "nan_ratio": 0.0245,
+              "std": 0.026710997735484163
             },
             "L1_binance_high": {
-              "mean": 0.013942885833596206,
-              "nan_ratio": 0.0995,
-              "std": 0.012539704753401852
+              "mean": 0.05378405980179505,
+              "nan_ratio": 0.0245,
+              "std": 0.02482102037826525
             },
             "L1_binance_low": {
-              "mean": 0.00883598770221946,
-              "nan_ratio": 0.0995,
-              "std": 0.011211944150011918
+              "mean": 0.051962860047865524,
+              "nan_ratio": 0.0245,
+              "std": 0.02411711316122098
             },
             "L1_binance_open": {
-              "mean": 0.0100969566669576,
-              "nan_ratio": 0.0995,
-              "std": 0.01162367954977751
+              "mean": 0.0536272115792075,
+              "nan_ratio": 0.0245,
+              "std": 0.02476966421498157
             },
             "L1_binance_quote_volume": {
-              "mean": 10221271.709503585,
-              "nan_ratio": 0.0995,
-              "std": 12835223.374034153
+              "mean": 7912077.042402171,
+              "nan_ratio": 0.0245,
+              "std": 11475285.564766211
             },
             "L1_binance_taker_ratio": {
               "mean": 0.4893206992000341,
@@ -804,24 +804,24 @@
               "std": 0.044151868016741744
             },
             "L1_binance_volume": {
-              "mean": 10544267.894976735,
-              "nan_ratio": 0.0995,
-              "std": 17115796.38383705
+              "mean": 20425167.412884604,
+              "nan_ratio": 0.0245,
+              "std": 18354258.059473664
             },
             "L2_derived_close_mean_13": {
-              "mean": 0.0009597607830431822,
-              "nan_ratio": 0.052,
-              "std": 0.003198165957049487
+              "mean": 0.007124960857347858,
+              "nan_ratio": 0.0245,
+              "std": 0.0050286898739474
             },
             "L2_derived_close_mean_21": {
-              "mean": 0.0013824476125258215,
-              "nan_ratio": 0.0735,
-              "std": 0.0028994223218804923
+              "mean": 0.010887565900789292,
+              "nan_ratio": 0.0245,
+              "std": 0.005784188213002004
             },
             "L2_derived_close_mean_3": {
-              "mean": 0.009903635082327264,
-              "nan_ratio": 0.0995,
-              "std": 0.0096556689132034
+              "mean": 0.03295375989173344,
+              "nan_ratio": 0.0245,
+              "std": 0.016070480056740388
             },
             "L2_derived_close_mean_34": {
               "mean": 0.00023874290112318428,
@@ -829,9 +829,9 @@
               "std": 0.0015877441819011308
             },
             "L2_derived_close_mean_5": {
-              "mean": 0.008248204527154145,
-              "nan_ratio": 0.0995,
-              "std": 0.008326296673807068
+              "mean": 0.025328339321802517,
+              "nan_ratio": 0.0245,
+              "std": 0.012743130741945951
             },
             "L2_derived_close_mean_55": {
               "mean": 0.0002391241069672524,
@@ -839,9 +839,9 @@
               "std": 0.0013005545199382604
             },
             "L2_derived_close_mean_8": {
-              "mean": 0.0018825870096348667,
-              "nan_ratio": 0.0975,
-              "std": 0.004822073519319316
+              "mean": 0.023081619316823093,
+              "nan_ratio": 0.0245,
+              "std": 0.011423511853177668
             },
             "L2_derived_close_mean_89": {
               "mean": 0.00023924658869790578,
@@ -879,9 +879,9 @@
               "std": 0.0061565738053570495
             },
             "L2_derived_close_std_55": {
-              "mean": 9.583817564499066e-05,
-              "nan_ratio": 0.1,
-              "std": 0.0014086152063391662
+              "mean": 0.005308100860505007,
+              "nan_ratio": 0.025,
+              "std": 0.00487646533592219
             },
             "L2_derived_close_std_8": {
               "mean": 0.009337568733560014,
@@ -889,14 +889,14 @@
               "std": 0.007306333762729961
             },
             "L2_derived_close_std_89": {
-              "mean": 4.1733108197498766e-05,
-              "nan_ratio": 0.0595,
-              "std": 0.0009625308125673258
+              "mean": 0.0006018718655355819,
+              "nan_ratio": 0.025,
+              "std": 0.0015203437011958728
             },
             "L2_derived_log_close": {
-              "mean": -0.0047869699886487985,
-              "nan_ratio": 0.0995,
-              "std": 0.017847443844927792
+              "mean": -0.07233007222186824,
+              "nan_ratio": 0.0245,
+              "std": 0.05048931540434863
             },
             "L2_derived_volume_change_1": {
               "mean": 0.19132114149962137,
@@ -909,14 +909,14 @@
               "std": 13304597.523152761
             },
             "L2_derived_volume_mean_21": {
-              "mean": 17982984.713014923,
-              "nan_ratio": 0.0995,
-              "std": 10376927.906580215
+              "mean": 24239669.389247242,
+              "nan_ratio": 0.0245,
+              "std": 11779503.716545511
             },
             "L2_derived_volume_mean_3": {
-              "mean": 10734315.735619348,
-              "nan_ratio": 0.0995,
-              "std": 13286045.041013844
+              "mean": 22198155.977735437,
+              "nan_ratio": 0.0245,
+              "std": 15737741.759287871
             },
             "L2_derived_volume_mean_34": {
               "mean": 25075916.926,
@@ -924,14 +924,14 @@
               "std": 10765562.108035404
             },
             "L2_derived_volume_mean_5": {
-              "mean": 9545117.085900815,
-              "nan_ratio": 0.0995,
-              "std": 11637444.8515185
+              "mean": 19481797.69792098,
+              "nan_ratio": 0.0245,
+              "std": 13820378.453188628
             },
             "L2_derived_volume_mean_55": {
-              "mean": 3839313.453119561,
-              "nan_ratio": 0.0995,
-              "std": 3331653.5773508297
+              "mean": 6400245.1327828085,
+              "nan_ratio": 0.0245,
+              "std": 3309086.698629442
             },
             "L2_derived_volume_mean_8": {
               "mean": 24806397.82375,
@@ -939,9 +939,9 @@
               "std": 14534593.639861593
             },
             "L2_derived_volume_mean_89": {
-              "mean": 17886120.002654377,
-              "nan_ratio": 0.0995,
-              "std": 6451031.535159188
+              "mean": 1761722.5685388066,
+              "nan_ratio": 0.0245,
+              "std": 1169424.3771853745
             }
           },
           "rows": 2000,
@@ -960,7 +960,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "5bc10aa83e13772ae7095369e530ba2681732dad37a9acd226d0db6568650683"
+          "sampled_value_hash": "63c10ed4e7a5c8d9170e30e87d87741276a02b0a2b650e9aa6256402f8b951e8"
         },
         "selected_feature_count": 20,
         "selected_feature_ids": [
@@ -1040,7 +1040,7 @@
             "L2_derived_close_std_34"
           ],
           "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-          "nan_mask_hash": "f3f6e51756225ca64eff1da2d23b893866713ac46137ece31ce931ea4ee2712a",
+          "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
           "per_feature_stats": {
             "L1_binance_close": {
               "mean": 0.000972107520403548,
@@ -1048,9 +1048,9 @@
               "std": 1.2465516331743365
             },
             "L1_binance_high": {
-              "mean": -0.017861329045622362,
-              "nan_ratio": 0.1615,
-              "std": 1.1696240193736227
+              "mean": -0.0037404084401972365,
+              "nan_ratio": 0.0865,
+              "std": 1.243204626554825
             },
             "L1_binance_low": {
               "mean": 0.0015928296008868876,
@@ -1058,14 +1058,14 @@
               "std": 1.2421244896390233
             },
             "L1_binance_open": {
-              "mean": -0.010656492438427792,
-              "nan_ratio": 0.1615,
-              "std": 1.1710774148029637
+              "mean": 0.0043528958386242576,
+              "nan_ratio": 0.0865,
+              "std": 1.2406227298225916
             },
             "L1_binance_quote_volume": {
-              "mean": -0.03474830744178415,
-              "nan_ratio": 0.1615,
-              "std": 1.0599782967959466
+              "mean": -0.02574270256542915,
+              "nan_ratio": 0.0865,
+              "std": 1.027555252744364
             },
             "L1_binance_taker_ratio": {
               "mean": 0.01217215819618052,
@@ -1073,9 +1073,9 @@
               "std": 1.0167158774798797
             },
             "L1_binance_volume": {
-              "mean": -0.013885840355707335,
-              "nan_ratio": 0.1615,
-              "std": 1.003177142666137
+              "mean": -0.031584012653612006,
+              "nan_ratio": 0.0865,
+              "std": 1.0446424170659088
             },
             "L2_derived_close_mean_13": {
               "mean": 0.003504780980113989,
@@ -1093,9 +1093,9 @@
               "std": 1.260556475744193
             },
             "L2_derived_close_mean_34": {
-              "mean": -0.0226849899203293,
-              "nan_ratio": 0.1615,
-              "std": 1.3366047348715686
+              "mean": -0.018600693984277297,
+              "nan_ratio": 0.0865,
+              "std": 1.35811654984057
             },
             "L2_derived_close_mean_5": {
               "mean": -0.0008675001920568251,
@@ -1123,14 +1123,14 @@
               "std": 1.0050695092466302
             },
             "L2_derived_close_std_13": {
-              "mean": -0.024598443855532625,
-              "nan_ratio": 0.162,
-              "std": 1.0665764297022615
+              "mean": -0.030435655765688845,
+              "nan_ratio": 0.087,
+              "std": 1.0562298432404624
             },
             "L2_derived_close_std_21": {
-              "mean": -0.012729391198630166,
-              "nan_ratio": 0.162,
-              "std": 1.0451614419324426
+              "mean": -0.011811087724802707,
+              "nan_ratio": 0.087,
+              "std": 1.0405884107802972
             },
             "L2_derived_close_std_3": {
               "mean": -0.015114437640629088,
@@ -1138,9 +1138,9 @@
               "std": 1.0360314371232886
             },
             "L2_derived_close_std_34": {
-              "mean": 0.005060168731877308,
-              "nan_ratio": 0.162,
-              "std": 1.0804727077034098
+              "mean": -0.01068705136977049,
+              "nan_ratio": 0.087,
+              "std": 1.0965585340959325
             }
           },
           "rows": 2000,
@@ -1159,7 +1159,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "ac42a956fec35cc22382461019ecaaa5546e1894009b479b04f340a88b3daa53"
+          "sampled_value_hash": "781e2f50f09ff2331689aaf9e44e745e0593dbea626bf3e059ef677efd249d31"
         },
         "pre_ic": {
           "dtypes": {
@@ -1236,7 +1236,7 @@
             "L2_derived_volume_mean_89"
           ],
           "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-          "nan_mask_hash": "04a76d5ed71c091fbe12aab430ae091a622fc2832fdc82c44273549c6a603a29",
+          "nan_mask_hash": "0e4616ec897ee36edb41abf7026e711b8b258662a617d46bcf91002c6de3b1b6",
           "per_feature_stats": {
             "L1_binance_close": {
               "mean": 70305.06326171875,
@@ -1244,9 +1244,9 @@
               "std": 3566.574504820883
             },
             "L1_binance_high": {
-              "mean": 15931.77144104193,
-              "nan_ratio": 0.0995,
-              "std": 1026.710913831992
+              "mean": 67516.52719188467,
+              "nan_ratio": 0.0245,
+              "std": 3256.029434524627
             },
             "L1_binance_low": {
               "mean": 70031.698125,
@@ -1254,14 +1254,14 @@
               "std": 3586.4518278389573
             },
             "L1_binance_open": {
-              "mean": 16586.947573912163,
-              "nan_ratio": 0.0995,
-              "std": 1058.1380414290904
+              "mean": 67401.11731382356,
+              "nan_ratio": 0.0245,
+              "std": 3277.6329561694815
             },
             "L1_binance_quote_volume": {
-              "mean": 64108687.17182185,
-              "nan_ratio": 0.0995,
-              "std": 67381616.86703257
+              "mean": 46635380.463878,
+              "nan_ratio": 0.0245,
+              "std": 59133803.94303312
             },
             "L1_binance_taker_ratio": {
               "mean": 0.49429513423144816,
@@ -1269,9 +1269,9 @@
               "std": 0.08197596067755307
             },
             "L1_binance_volume": {
-              "mean": 358.7204253072183,
-              "nan_ratio": 0.0995,
-              "std": 812.3022355707482
+              "mean": 797.5536530920026,
+              "nan_ratio": 0.0245,
+              "std": 921.2576995733913
             },
             "L2_derived_close_mean_13": {
               "mean": 70301.66047851562,
@@ -1289,9 +1289,9 @@
               "std": 3557.3195344386204
             },
             "L2_derived_close_mean_34": {
-              "mean": 11747.715715150076,
-              "nan_ratio": 0.0995,
-              "std": 705.8917421212021
+              "mean": 57102.19687550589,
+              "nan_ratio": 0.0245,
+              "std": 2660.257633101044
             },
             "L2_derived_close_mean_5": {
               "mean": 70303.62676367187,
@@ -1319,14 +1319,14 @@
               "std": 0.005222624574539216
             },
             "L2_derived_close_std_13": {
-              "mean": 129.07699440863362,
-              "nan_ratio": 0.1,
-              "std": 206.92610930965705
+              "mean": 164.2957810536378,
+              "nan_ratio": 0.025,
+              "std": 200.40377004180243
             },
             "L2_derived_close_std_21": {
-              "mean": 24.340138384858726,
-              "nan_ratio": 0.1,
-              "std": 121.41272205907364
+              "mean": 70.89355270093272,
+              "nan_ratio": 0.025,
+              "std": 136.9775733702379
             },
             "L2_derived_close_std_3": {
               "mean": 233.09623886311633,
@@ -1334,29 +1334,29 @@
               "std": 199.8174601694589
             },
             "L2_derived_close_std_34": {
-              "mean": 27.94542373508674,
-              "nan_ratio": 0.1,
-              "std": 107.96884438344318
+              "mean": 103.0859066253062,
+              "nan_ratio": 0.025,
+              "std": 139.62942584559943
             },
             "L2_derived_close_std_5": {
-              "mean": 246.81010039125132,
-              "nan_ratio": 0.1,
-              "std": 221.27606134041565
+              "mean": 236.64705095821859,
+              "nan_ratio": 0.025,
+              "std": 211.02159724210154
             },
             "L2_derived_close_std_55": {
-              "mean": 102.60193001412773,
-              "nan_ratio": 0.1,
-              "std": 168.40692486118854
+              "mean": 199.0424630239204,
+              "nan_ratio": 0.025,
+              "std": 182.01943187746824
             },
             "L2_derived_close_std_8": {
-              "mean": 197.6273563862189,
-              "nan_ratio": 0.1,
-              "std": 225.33245539826382
+              "mean": 200.84445583341972,
+              "nan_ratio": 0.025,
+              "std": 211.65901570708758
             },
             "L2_derived_close_std_89": {
-              "mean": 7.919784525178331,
-              "nan_ratio": 0.1,
-              "std": 55.733348370972
+              "mean": 232.09237645914305,
+              "nan_ratio": 0.025,
+              "std": 168.59768446724325
             },
             "L2_derived_log_close": {
               "mean": 11.159336470603943,
@@ -1369,44 +1369,44 @@
               "std": 0.7945360163417028
             },
             "L2_derived_volume_mean_13": {
-              "mean": 84.06418533134543,
-              "nan_ratio": 0.0995,
-              "std": 228.9624235973051
+              "mean": 378.1060276005926,
+              "nan_ratio": 0.0245,
+              "std": 374.7353522989852
             },
             "L2_derived_volume_mean_21": {
-              "mean": 470.09473865261396,
-              "nan_ratio": 0.0995,
-              "std": 417.55308003068967
+              "mean": 853.0501193968323,
+              "nan_ratio": 0.0245,
+              "std": 592.5607865142822
             },
             "L2_derived_volume_mean_3": {
-              "mean": 466.3799034383166,
-              "nan_ratio": 0.0995,
-              "std": 655.6339662084238
+              "mean": 723.5442044473089,
+              "nan_ratio": 0.0245,
+              "std": 735.3844029622124
             },
             "L2_derived_volume_mean_34": {
-              "mean": 39.44755386120082,
-              "nan_ratio": 0.0995,
-              "std": 113.48226594134513
+              "mean": 181.4931820618462,
+              "nan_ratio": 0.0245,
+              "std": 180.21732574659993
             },
             "L2_derived_volume_mean_5": {
-              "mean": 307.83899265549303,
-              "nan_ratio": 0.0995,
-              "std": 505.16052381749904
+              "mean": 358.0272097606137,
+              "nan_ratio": 0.0245,
+              "std": 480.4524076435447
             },
             "L2_derived_volume_mean_55": {
-              "mean": 16.336521858400936,
-              "nan_ratio": 0.0995,
-              "std": 72.66949241717201
+              "mean": 78.2791400941678,
+              "nan_ratio": 0.0245,
+              "std": 96.57043410723954
             },
             "L2_derived_volume_mean_8": {
-              "mean": 44.5627375397264,
-              "nan_ratio": 0.0995,
-              "std": 249.91662976305918
+              "mean": 298.87556881959256,
+              "nan_ratio": 0.0245,
+              "std": 386.9194797216811
             },
             "L2_derived_volume_mean_89": {
-              "mean": 37.77908300848629,
-              "nan_ratio": 0.0995,
-              "std": 79.26110025630817
+              "mean": 68.47389292210674,
+              "nan_ratio": 0.0245,
+              "std": 80.35284311010149
             }
           },
           "rows": 2000,
@@ -1425,7 +1425,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "f3c45bc59118c4e004736194e7b931029638ab65deebc5e9f64b6229a1dd2a4a"
+          "sampled_value_hash": "7d1aa36560fbc6c8c0135be97ca9a001f0abfac22237230165184fb65ceb4965"
         },
         "selected_feature_count": 20,
         "selected_feature_ids": [
@@ -1503,27 +1503,27 @@
             "L2_derived_close_std_34"
           ],
           "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-          "nan_mask_hash": "fe4a65d4b068605a2ac414045dd91007df1e8bba1b778e26903cc7ef3f078386",
+          "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
           "per_feature_stats": {
             "L1_binance_close": {
-              "mean": 0.11599510722556504,
-              "nan_ratio": 0.1615,
-              "std": 1.2472791379037902
+              "mean": 0.0755655347592884,
+              "nan_ratio": 0.0865,
+              "std": 1.1588252218255524
             },
             "L1_binance_high": {
-              "mean": 0.08546047250076726,
-              "nan_ratio": 0.1615,
-              "std": 1.2314838856118886
+              "mean": 0.06381687998446411,
+              "nan_ratio": 0.0865,
+              "std": 1.1686110666051375
             },
             "L1_binance_low": {
-              "mean": 0.10985061648656094,
-              "nan_ratio": 0.1615,
-              "std": 1.2293179950255613
+              "mean": 0.08952626211016393,
+              "nan_ratio": 0.0865,
+              "std": 1.170761931125329
             },
             "L1_binance_open": {
-              "mean": 0.11500176801426769,
-              "nan_ratio": 0.1615,
-              "std": 1.2475098190337108
+              "mean": 0.07496166066591566,
+              "nan_ratio": 0.0865,
+              "std": 1.1618344877103453
             },
             "L1_binance_quote_volume": {
               "mean": -0.0006426102723797231,
@@ -1541,29 +1541,29 @@
               "std": 1.0281669770867707
             },
             "L2_derived_close_mean_13": {
-              "mean": 0.08470089112142724,
-              "nan_ratio": 0.1615,
-              "std": 1.2727038781290136
+              "mean": 0.04843088536261778,
+              "nan_ratio": 0.0865,
+              "std": 1.2172704086458508
             },
             "L2_derived_close_mean_21": {
-              "mean": 0.03187182077661659,
-              "nan_ratio": 0.1615,
-              "std": 1.2945402169660598
+              "mean": 0.030638533367772322,
+              "nan_ratio": 0.0865,
+              "std": 1.2547515851904423
             },
             "L2_derived_close_mean_3": {
-              "mean": 0.09128954516088814,
-              "nan_ratio": 0.1615,
-              "std": 1.230387304133572
+              "mean": 0.09358860719316274,
+              "nan_ratio": 0.0865,
+              "std": 1.1985817965871695
             },
             "L2_derived_close_mean_34": {
-              "mean": 0.0049775665498555345,
-              "nan_ratio": 0.1555,
-              "std": 1.2534588448799207
+              "mean": 0.0017261487859596353,
+              "nan_ratio": 0.0865,
+              "std": 1.2648323585478132
             },
             "L2_derived_close_mean_5": {
-              "mean": 0.07696141230133204,
-              "nan_ratio": 0.1615,
-              "std": 1.218263668916044
+              "mean": 0.05017265080449212,
+              "nan_ratio": 0.0865,
+              "std": 1.1617608894530813
             },
             "L2_derived_close_mean_55": {
               "mean": -0.03255638906185826,
@@ -1571,9 +1571,9 @@
               "std": 1.2449667771681545
             },
             "L2_derived_close_mean_8": {
-              "mean": 0.0835350458498549,
-              "nan_ratio": 0.1615,
-              "std": 1.2382352013725355
+              "mean": 0.0714065215949119,
+              "nan_ratio": 0.0865,
+              "std": 1.2032100147959977
             },
             "L2_derived_close_mean_89": {
               "mean": -0.03602568737516801,
@@ -1622,7 +1622,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "912165f6aa897e1a9bdb28f152552a64e3e70a28e193a5d726f82c8658e5300f"
+          "sampled_value_hash": "ec520ecff4d5a829e7c9f20a5a03be874a5f07e8a95f9e39e827791330e95f01"
         },
         "pre_ic": {
           "dtypes": {
@@ -1699,27 +1699,27 @@
             "L2_derived_volume_mean_89"
           ],
           "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-          "nan_mask_hash": "acbefec88466f7d57d6fc76a467b37c353924e2040345e65b911cbe9d34010fb",
+          "nan_mask_hash": "e3195336e90bf4289bfab4fb88c99c0807d45a6dc1ed8c46dc1a1e572b697ad8",
           "per_feature_stats": {
             "L1_binance_close": {
-              "mean": 33605.30973813437,
-              "nan_ratio": 0.0995,
-              "std": 5913.597800744642
+              "mean": 17998.813803442063,
+              "nan_ratio": 0.0245,
+              "std": 3505.7879001602387
             },
             "L1_binance_high": {
-              "mean": 23823.329899856326,
-              "nan_ratio": 0.0995,
-              "std": 4267.539610003836
+              "mean": 18713.44906449466,
+              "nan_ratio": 0.0245,
+              "std": 3609.3756578334696
             },
             "L1_binance_low": {
-              "mean": 25044.276525652844,
-              "nan_ratio": 0.0995,
-              "std": 4543.486604539081
+              "mean": 22132.93906051443,
+              "nan_ratio": 0.0245,
+              "std": 4282.869308842753
             },
             "L1_binance_open": {
-              "mean": 32733.80504151623,
-              "nan_ratio": 0.0995,
-              "std": 5764.965105834219
+              "mean": 18192.223822668722,
+              "nan_ratio": 0.0245,
+              "std": 3539.391188779399
             },
             "L1_binance_quote_volume": {
               "mean": 288168848.586,
@@ -1737,29 +1737,29 @@
               "std": 2362.2210150570877
             },
             "L2_derived_close_mean_13": {
-              "mean": 11398.009281009005,
-              "nan_ratio": 0.0995,
-              "std": 2171.53819599167
+              "mean": 8959.514464861388,
+              "nan_ratio": 0.0245,
+              "std": 1766.9778884834693
             },
             "L2_derived_close_mean_21": {
-              "mean": 7087.982509070826,
-              "nan_ratio": 0.0995,
-              "std": 1431.0919112309314
+              "mean": 10241.428895044723,
+              "nan_ratio": 0.0245,
+              "std": 1967.2421716473837
             },
             "L2_derived_close_mean_3": {
-              "mean": 16797.220592007376,
-              "nan_ratio": 0.0995,
-              "std": 3128.412921756037
+              "mean": 22103.572027446022,
+              "nan_ratio": 0.0245,
+              "std": 4217.982409208853
             },
             "L2_derived_close_mean_34": {
-              "mean": 262.9576630332907,
-              "nan_ratio": 0.0935,
-              "std": 225.1563523875857
+              "mean": 3813.8770930237956,
+              "nan_ratio": 0.0245,
+              "std": 775.9885573759085
             },
             "L2_derived_close_mean_5": {
-              "mean": 8027.1088942977085,
-              "nan_ratio": 0.0995,
-              "std": 1705.7398481273328
+              "mean": 7474.43379406569,
+              "nan_ratio": 0.0245,
+              "std": 1561.1474293218582
             },
             "L2_derived_close_mean_55": {
               "mean": 14.365592952726363,
@@ -1767,9 +1767,9 @@
               "std": 107.76613996078596
             },
             "L2_derived_close_mean_8": {
-              "mean": 9683.510369830099,
-              "nan_ratio": 0.0995,
-              "std": 1935.6068267183412
+              "mean": 12207.64978733086,
+              "nan_ratio": 0.0245,
+              "std": 2382.4278212916565
             },
             "L2_derived_close_mean_89": {
               "mean": 14.860531828414207,
@@ -1822,9 +1822,9 @@
               "std": 1436.9883988524416
             },
             "L2_derived_log_close": {
-              "mean": 1.071773986788199,
-              "nan_ratio": 0.0995,
-              "std": 0.02168432261337552
+              "mean": 1.2000764113526239,
+              "nan_ratio": 0.0245,
+              "std": 0.023306549762588752
             },
             "L2_derived_volume_change_1": {
               "mean": 0.18966327184154208,
@@ -1867,9 +1867,9 @@
               "std": 1706.4593780135685
             },
             "L2_derived_volume_mean_89": {
-              "mean": 545.2032898398031,
-              "nan_ratio": 0.0995,
-              "std": 321.60583663961535
+              "mean": 1693.845046695867,
+              "nan_ratio": 0.0245,
+              "std": 596.357962518
             }
           },
           "rows": 2000,
@@ -1888,7 +1888,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "549803e091788a17027de5cf29798c8a7924d3be4f8a50212ed52e8d313b6bae"
+          "sampled_value_hash": "e897547dd9bd9c1ff0de185711677a5ae5de2e9ec64aa352cd88813130162b6a"
         },
         "selected_feature_count": 20,
         "selected_feature_ids": [
@@ -1968,7 +1968,7 @@
             "L2_derived_close_std_34"
           ],
           "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-          "nan_mask_hash": "4ab2e3e1edec51e43eb5d4703c1644e5df4d28fe7586ee687de8e2b3c8225aa9",
+          "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
           "per_feature_stats": {
             "L1_binance_close": {
               "mean": -0.006600485195709603,
@@ -1991,9 +1991,9 @@
               "std": 1.2053012288260907
             },
             "L1_binance_quote_volume": {
-              "mean": -0.03351170076757056,
-              "nan_ratio": 0.1615,
-              "std": 1.0713938338771136
+              "mean": -0.03239901730634964,
+              "nan_ratio": 0.0865,
+              "std": 1.022726435924816
             },
             "L1_binance_taker_ratio": {
               "mean": -0.0017140266438939922,
@@ -2001,9 +2001,9 @@
               "std": 1.0203064433973767
             },
             "L1_binance_volume": {
-              "mean": -0.023384429373487954,
-              "nan_ratio": 0.1615,
-              "std": 1.0237208221021679
+              "mean": -0.030617045735741796,
+              "nan_ratio": 0.0865,
+              "std": 1.0224088836485121
             },
             "L2_derived_close_mean_13": {
               "mean": -0.01627080847237342,
@@ -2051,24 +2051,24 @@
               "std": 1.0036724543826547
             },
             "L2_derived_close_std_13": {
-              "mean": -0.015772724301346717,
-              "nan_ratio": 0.162,
-              "std": 1.064736810547254
+              "mean": -0.02317901450668478,
+              "nan_ratio": 0.087,
+              "std": 1.0563006289702115
             },
             "L2_derived_close_std_21": {
-              "mean": -0.003915337311846609,
-              "nan_ratio": 0.162,
-              "std": 1.0564038900194361
+              "mean": -0.009607818879837783,
+              "nan_ratio": 0.087,
+              "std": 1.065103014384589
             },
             "L2_derived_close_std_3": {
-              "mean": -0.0249873462105256,
-              "nan_ratio": 0.162,
-              "std": 1.0305194866454304
+              "mean": -0.03052499401190245,
+              "nan_ratio": 0.087,
+              "std": 1.0225079430268837
             },
             "L2_derived_close_std_34": {
-              "mean": -0.011261650765726458,
-              "nan_ratio": 0.162,
-              "std": 1.1325123382905697
+              "mean": -0.02003887239941151,
+              "nan_ratio": 0.087,
+              "std": 1.138792818719219
             }
           },
           "rows": 2000,
@@ -2087,7 +2087,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "f7448aea607e686390c3209ffba3285f9157dbe9c2099ebfce37fd05e413b2ff"
+          "sampled_value_hash": "64738777664ba76a1c96d86aa3ac9344407990c37cc3c5a404fe5fde4aeb6f4c"
         },
         "pre_ic": {
           "dtypes": {
@@ -2164,7 +2164,7 @@
             "L2_derived_volume_mean_89"
           ],
           "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-          "nan_mask_hash": "4819991e2d4b1f0bbf93887257bb8a3f50545e5dc2397183cb671873bb9f06a5",
+          "nan_mask_hash": "d7fe561b858a5cd78dc6f01ee2871af14eb2f22fd538c4be51feddd640aeca52",
           "per_feature_stats": {
             "L1_binance_close": {
               "mean": 2110.4035939941405,
@@ -2187,9 +2187,9 @@
               "std": 139.9099119941525
             },
             "L1_binance_quote_volume": {
-              "mean": 38276212.65282788,
-              "nan_ratio": 0.0995,
-              "std": 44923777.94247245
+              "mean": 24674860.353612445,
+              "nan_ratio": 0.0245,
+              "std": 38067678.78262592
             },
             "L1_binance_taker_ratio": {
               "mean": 0.4914779954999685,
@@ -2197,9 +2197,9 @@
               "std": 0.072444914593366
             },
             "L1_binance_volume": {
-              "mean": 9363.1461676838,
-              "nan_ratio": 0.0995,
-              "std": 18591.85217488604
+              "mean": 12212.658566994396,
+              "nan_ratio": 0.0245,
+              "std": 18838.776692725147
             },
             "L2_derived_close_mean_13": {
               "mean": 2110.1977135009765,
@@ -2247,24 +2247,24 @@
               "std": 0.00663483000251963
             },
             "L2_derived_close_std_13": {
-              "mean": 9.682224176278808,
-              "nan_ratio": 0.1,
-              "std": 10.490377499705797
+              "mean": 9.14562220937656,
+              "nan_ratio": 0.025,
+              "std": 9.529900523958615
             },
             "L2_derived_close_std_21": {
-              "mean": 3.2121698626866557,
-              "nan_ratio": 0.1,
-              "std": 7.238511459962071
+              "mean": 5.469861667408161,
+              "nan_ratio": 0.025,
+              "std": 7.44009063263776
             },
             "L2_derived_close_std_3": {
-              "mean": 7.985048095085352,
-              "nan_ratio": 0.1,
-              "std": 8.032728064355805
+              "mean": 7.466938783925676,
+              "nan_ratio": 0.025,
+              "std": 7.733522643557657
             },
             "L2_derived_close_std_34": {
-              "mean": 3.7374457435490487,
-              "nan_ratio": 0.1,
-              "std": 6.851996707398666
+              "mean": 6.974595964599245,
+              "nan_ratio": 0.025,
+              "std": 7.326937281087924
             },
             "L2_derived_close_std_5": {
               "mean": 11.443744073217067,
@@ -2272,19 +2272,19 @@
               "std": 9.379092282911971
             },
             "L2_derived_close_std_55": {
-              "mean": 4.147459212761338,
-              "nan_ratio": 0.1,
-              "std": 6.619777488024183
+              "mean": 7.112358486452019,
+              "nan_ratio": 0.025,
+              "std": 6.572607815118783
             },
             "L2_derived_close_std_8": {
-              "mean": 10.812626047218615,
-              "nan_ratio": 0.1,
-              "std": 10.191682265105172
+              "mean": 9.941719015142995,
+              "nan_ratio": 0.025,
+              "std": 9.486917333113558
             },
             "L2_derived_close_std_89": {
-              "mean": 0.2802194832807409,
-              "nan_ratio": 0.1,
-              "std": 2.0948751999744357
+              "mean": 4.7887081962535065,
+              "nan_ratio": 0.025,
+              "std": 4.168022299779132
             },
             "L2_derived_log_close": {
               "mean": 7.652468634128571,
@@ -2297,44 +2297,44 @@
               "std": 0.9575464340794227
             },
             "L2_derived_volume_mean_13": {
-              "mean": 2719.272647328049,
-              "nan_ratio": 0.0995,
-              "std": 5679.891266407086
+              "mean": 5004.401498745071,
+              "nan_ratio": 0.0245,
+              "std": 6520.524695516769
             },
             "L2_derived_volume_mean_21": {
-              "mean": 2824.460323390635,
-              "nan_ratio": 0.0995,
-              "std": 4592.507876451397
+              "mean": 5489.93950874761,
+              "nan_ratio": 0.0245,
+              "std": 5818.142711045247
             },
             "L2_derived_volume_mean_3": {
-              "mean": 10090.364974441107,
-              "nan_ratio": 0.0995,
-              "std": 15053.783788919678
+              "mean": 9903.643217565539,
+              "nan_ratio": 0.0245,
+              "std": 14025.611566763599
             },
             "L2_derived_volume_mean_34": {
-              "mean": 607.419024106193,
-              "nan_ratio": 0.0995,
-              "std": 2028.5494288313996
+              "mean": 2072.042029774394,
+              "nan_ratio": 0.0245,
+              "std": 2885.4844439444564
             },
             "L2_derived_volume_mean_5": {
-              "mean": 6452.088069284144,
-              "nan_ratio": 0.0995,
-              "std": 11296.027683998649
+              "mean": 6908.195662105626,
+              "nan_ratio": 0.0245,
+              "std": 10547.504306383797
             },
             "L2_derived_volume_mean_55": {
-              "mean": 436.5466160255108,
-              "nan_ratio": 0.0995,
-              "std": 1499.6418593254255
+              "mean": 1151.2510688370553,
+              "nan_ratio": 0.0245,
+              "std": 1828.1433880749416
             },
             "L2_derived_volume_mean_8": {
-              "mean": 1842.0958826527083,
-              "nan_ratio": 0.0995,
-              "std": 6326.895421823666
+              "mean": 4364.185939188882,
+              "nan_ratio": 0.0245,
+              "std": 7373.594158560658
             },
             "L2_derived_volume_mean_89": {
-              "mean": 509.47283326028924,
-              "nan_ratio": 0.0995,
-              "std": 1416.1518923324063
+              "mean": 890.6026329043441,
+              "nan_ratio": 0.0245,
+              "std": 1470.7020465423573
             }
           },
           "rows": 2000,
@@ -2353,7 +2353,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "6630504540489cf88f8a409202258528280a6633f756a6237287c5d246c5fe3b"
+          "sampled_value_hash": "e4b3f4606c807dfbb199b10f17515dff8de92d57252873978a688acf9623fb92"
         },
         "selected_feature_count": 20,
         "selected_feature_ids": [
@@ -2431,27 +2431,27 @@
             "L2_derived_close_std_34"
           ],
           "feature_names_sha256": "4cdc42bde7e9f19537098b5d22c92f70ca254450efa46992150a479e1dde143b",
-          "nan_mask_hash": "893edc711ee0900fa79125e309007c8c9d95b7dea28ebf35c05768ac7a119252",
+          "nan_mask_hash": "3ad489bfc33a2a0fc0bf55d661b2adff1a11c9ff18d842f343b18b6f870ea008",
           "per_feature_stats": {
             "L1_binance_close": {
-              "mean": 0.024009766952879118,
-              "nan_ratio": 0.1615,
-              "std": 1.0565405174203097
+              "mean": 0.0348706506770619,
+              "nan_ratio": 0.0865,
+              "std": 1.0988945239840324
             },
             "L1_binance_high": {
-              "mean": 0.04493397191489779,
-              "nan_ratio": 0.1615,
-              "std": 1.1135732326169538
+              "mean": 0.02462249021461314,
+              "nan_ratio": 0.0865,
+              "std": 1.098504827930403
             },
             "L1_binance_low": {
-              "mean": 0.05066428524715007,
-              "nan_ratio": 0.1615,
-              "std": 1.0940515386404537
+              "mean": 0.03754677600208778,
+              "nan_ratio": 0.0865,
+              "std": 1.091618069410015
             },
             "L1_binance_open": {
-              "mean": 0.02438335807514463,
-              "nan_ratio": 0.1615,
-              "std": 1.056788523594673
+              "mean": 0.0330944300041897,
+              "nan_ratio": 0.0865,
+              "std": 1.0969415705129828
             },
             "L1_binance_quote_volume": {
               "mean": 0.01821519459400912,
@@ -2469,29 +2469,29 @@
               "std": 1.0491313338128438
             },
             "L2_derived_close_mean_13": {
-              "mean": 0.01113435693119611,
-              "nan_ratio": 0.151,
-              "std": 1.1610276904574366
+              "mean": 0.024311770160861425,
+              "nan_ratio": 0.0865,
+              "std": 1.1964090369347664
             },
             "L2_derived_close_mean_21": {
-              "mean": -0.02682245283223948,
-              "nan_ratio": 0.151,
-              "std": 1.2085599052391396
+              "mean": -0.022145499497920693,
+              "nan_ratio": 0.0865,
+              "std": 1.2184063068298894
             },
             "L2_derived_close_mean_3": {
-              "mean": 0.0459867658944785,
-              "nan_ratio": 0.1615,
-              "std": 1.1344885242836653
+              "mean": 0.027087278444917397,
+              "nan_ratio": 0.0865,
+              "std": 1.1253602412162933
             },
             "L2_derived_close_mean_34": {
-              "mean": -0.05987878084181227,
-              "nan_ratio": 0.076,
-              "std": 1.216563809555452
+              "mean": -0.02931254996969627,
+              "nan_ratio": 0.0865,
+              "std": 1.2528819211227449
             },
             "L2_derived_close_mean_5": {
-              "mean": 0.022121360650026175,
-              "nan_ratio": 0.1615,
-              "std": 1.1106625212287822
+              "mean": 0.02851652069749809,
+              "nan_ratio": 0.0865,
+              "std": 1.151618160858326
             },
             "L2_derived_close_mean_55": {
               "mean": -0.03720003359603967,
@@ -2499,9 +2499,9 @@
               "std": 1.263999944830294
             },
             "L2_derived_close_mean_8": {
-              "mean": 0.008104497552102406,
-              "nan_ratio": 0.1615,
-              "std": 1.1323958334192004
+              "mean": 0.02446470432647172,
+              "nan_ratio": 0.0865,
+              "std": 1.1736956688118285
             },
             "L2_derived_close_mean_89": {
               "mean": -0.011472425339145897,
@@ -2550,7 +2550,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "ebb709d5945a65ef6c4ca497e1c1b49a80adfa5d2460fecc83cfba3b1d738a62"
+          "sampled_value_hash": "e13648e877aa681dcdb42cdc1204cd3450e8a1ce8fc538d4c9821476d99fcda8"
         },
         "pre_ic": {
           "dtypes": {
@@ -2627,27 +2627,27 @@
             "L2_derived_volume_mean_89"
           ],
           "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-          "nan_mask_hash": "5c5887634be64bb03dcc2183d02e8390564f3a0ca3cef15bf60b141717a3e578",
+          "nan_mask_hash": "a10ec749121d08f334bd80fd6643f76d37d3c72c38266d275e7407da7b720d81",
           "per_feature_stats": {
             "L1_binance_close": {
-              "mean": 28.557987032940343,
-              "nan_ratio": 0.0995,
-              "std": 48.381563425509846
+              "mean": 241.93478864334375,
+              "nan_ratio": 0.0245,
+              "std": 84.42194751170908
             },
             "L1_binance_high": {
-              "mean": 105.01715747248879,
-              "nan_ratio": 0.0995,
-              "std": 65.94967483584524
+              "mean": 228.2477155720874,
+              "nan_ratio": 0.0245,
+              "std": 81.05156086953798
             },
             "L1_binance_low": {
-              "mean": 74.6942118643365,
-              "nan_ratio": 0.0995,
-              "std": 59.818092447675795
+              "mean": 208.58667747915058,
+              "nan_ratio": 0.0245,
+              "std": 77.28620809249347
             },
             "L1_binance_open": {
-              "mean": 28.551831605125468,
-              "nan_ratio": 0.0995,
-              "std": 48.379178619105936
+              "mean": 227.66616325421558,
+              "nan_ratio": 0.0245,
+              "std": 81.1006386860885
             },
             "L1_binance_quote_volume": {
               "mean": 261549481.631,
@@ -2665,29 +2665,29 @@
               "std": 63422.98483919943
             },
             "L2_derived_close_mean_13": {
-              "mean": 7.437466283767603,
-              "nan_ratio": 0.089,
-              "std": 18.841739012042023
+              "mean": 142.57968898485063,
+              "nan_ratio": 0.0245,
+              "std": 48.91351422818683
             },
             "L2_derived_close_mean_21": {
-              "mean": 7.424658714670575,
-              "nan_ratio": 0.089,
-              "std": 15.729394792607089
+              "mean": 131.0454796485384,
+              "nan_ratio": 0.0245,
+              "std": 43.535339856342055
             },
             "L2_derived_close_mean_3": {
-              "mean": 73.47225740995727,
-              "nan_ratio": 0.0995,
-              "std": 51.88715120431383
+              "mean": 198.70561106610194,
+              "nan_ratio": 0.0245,
+              "std": 69.48522697040211
             },
             "L2_derived_close_mean_34": {
-              "mean": 1.0579202755278545,
-              "nan_ratio": 0.014,
-              "std": 7.934808221287325
+              "mean": 67.40330167251243,
+              "nan_ratio": 0.0245,
+              "std": 24.941678161985614
             },
             "L2_derived_close_mean_5": {
-              "mean": 18.861009531169966,
-              "nan_ratio": 0.0995,
-              "std": 31.48384988003655
+              "mean": 196.68121003472208,
+              "nan_ratio": 0.0245,
+              "std": 66.8065421438703
             },
             "L2_derived_close_mean_55": {
               "mean": 0.16110985180090046,
@@ -2695,9 +2695,9 @@
               "std": 6.10237879032517
             },
             "L2_derived_close_mean_8": {
-              "mean": 10.305424624659434,
-              "nan_ratio": 0.0995,
-              "std": 24.20768382834289
+              "mean": 178.69825704096087,
+              "nan_ratio": 0.0245,
+              "std": 60.282727180764596
             },
             "L2_derived_close_mean_89": {
               "mean": 0.1597464992261756,
@@ -2735,9 +2735,9 @@
               "std": 26.127581096964608
             },
             "L2_derived_close_std_55": {
-              "mean": 4.208693874005053,
-              "nan_ratio": 0.1,
-              "std": 12.526063225459868
+              "mean": 42.11687767547861,
+              "nan_ratio": 0.025,
+              "std": 29.960039446732495
             },
             "L2_derived_close_std_8": {
               "mean": 44.46738690957837,
@@ -2750,9 +2750,9 @@
               "std": 86.8133285117958
             },
             "L2_derived_log_close": {
-              "mean": 0.2936318193034171,
-              "nan_ratio": 0.0995,
-              "std": 0.021576471533374827
+              "mean": 0.6433320932304739,
+              "nan_ratio": 0.0245,
+              "std": 0.02764303464109219
             },
             "L2_derived_volume_change_1": {
               "mean": 0.21445308921631923,
@@ -2785,9 +2785,9 @@
               "std": 47617.46759339208
             },
             "L2_derived_volume_mean_55": {
-              "mean": 953.8515001179096,
-              "nan_ratio": 0.0995,
-              "std": 3264.4883159930164
+              "mean": 2226.6453704455816,
+              "nan_ratio": 0.0245,
+              "std": 3068.0118673967804
             },
             "L2_derived_volume_mean_8": {
               "mean": 83583.513015625,
@@ -2795,9 +2795,9 @@
               "std": 44395.60457484582
             },
             "L2_derived_volume_mean_89": {
-              "mean": 777.2570022852082,
-              "nan_ratio": 0.0995,
-              "std": 2191.5013733810933
+              "mean": 1891.3043048718775,
+              "nan_ratio": 0.0245,
+              "std": 2028.3357390818146
             }
           },
           "rows": 2000,
@@ -2816,7 +2816,7 @@
             1750,
             1999
           ],
-          "sampled_value_hash": "bbdfaf59b01c9b373715361cd6863a55b75b5a071c90df74a4e9a9ab61097e87"
+          "sampled_value_hash": "1e577e2bb10f16949d47f4df1ef87849e1467b8fd57f755ad360e11d682ef681"
         },
         "selected_feature_count": 20,
         "selected_feature_ids": [
