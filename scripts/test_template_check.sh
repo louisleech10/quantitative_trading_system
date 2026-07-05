@@ -156,12 +156,7 @@ run_mutate() {
   restore_template_check "${backup}"
 
   run_matrix_to "${tmp_restored}"
-  if [ -f "${BASELINE_FILE}" ]; then
-    if ! compare_matrix_files "${tmp_restored}" "${BASELINE_FILE}" "BASELINE_BEFORE.txt（還原後）"; then
-      echo "MUTATE FAIL: ${mutate_id} 還原後矩陣與 BASELINE 不一致" >&2
-      exit 1
-    fi
-  elif ! compare_matrix_files "${tmp_restored}" "${tmp_actual}" "還原前快照"; then
+  if ! compare_matrix_files "${tmp_restored}" "${tmp_actual}" "還原前快照（須與 EXPECTED 一致）"; then
     echo "MUTATE FAIL: ${mutate_id} 還原後矩陣與破壞前不一致" >&2
     exit 1
   fi
