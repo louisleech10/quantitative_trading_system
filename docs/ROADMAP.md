@@ -13,6 +13,7 @@
 - **範圍三層**：①憲法內容/架構/儲存（CLAUDE.md 每 session 全載=最大固定 token 支出；四源重疊已實證分叉一次；copilot-instructions 739 行停在 2026-04-26；ARCHITECTURE/DEV_GUIDE 疑似漂移）②派工流程管線（本次實測摩擦：戳記輪×4、claim-check 擋 commit×5、provenance 流程中途才學會、同檔並發只能序列化）③小中大分類規則（多層補丁散在 CLAUDE.md＋記憶兩處）。
 - **方法**：每條規則四選一證據裁決——機械化（再犯且可寫成 gate/hook/checker）／留核心原則／合併去重／淘汰（已被機檢取代）；判準=出生事故＋violation 紀錄（audit.log/handoffs/git），不靠感覺。委員會三方裁決＋白話簡述給使用者否決權；「不可砍清單」先行＋雙家族 adversarial 防瘦身誤傷。
 - **時機（2026-07-05 使用者定案）**：P0 立即執行、完成後才回 IC 等其他任務；建議新 session 起跑（本立案 session context 已滿載 TGF 歷史）。流程=委員會 read-only 審查輪（三層各出 findings＋violation 證據考掘）→ 白話決策簡述給使用者否決 → 依裁決走完整管線實作。
+- **裁決（2026-07-05 使用者）**：D-1/2/3/5/6 同意預設；**D-4 否決固定制**→執行端選層動態、以使用者當下指示為準（usage 切換、未來或加 Grok），文件只留單一可變「現行分工」行。附帶：否決點以後須彈窗（AskUserQuestion）+推播；總審查頻率=事件觸發+每季保底。→ **下一步=依裁決走完整管線實作（Phase A 憲法重構起）**。
 - **狀態（2026-07-05）＝read-only 審查輪 ✅ 完成，等使用者否決 D-1~D-6**：四方獨立版（Claude+Codex+Composer+agy 諮詢，R1 不互看防定錨）→ reconcile 21 條統一裁決＋6 否決點（`handoffs/20260705-INSTREV-RECONCILE.md`），codex+composer 雙戳記 APPROVED、reconcile_stamps_check PASS（sha256:ee8c9fab…）。關鍵發現：選層三處三答案活分叉、中型管線兩文件相反、執行端合約停 05-31 缺 5 項制度＋HANDOFF 所有權同檔自相矛盾、gate DENY 不落 audit、claim-check 5 次全誤攔 chore。實作分期 Phase A（憲法重構＋合約補齊）/B（腳本）/C（觀察）見 reconcile §E；屬「大」走完整管線。
 
 ### P0 — 驗收防偽閘 verify-gate（2026-07-01 FF 驗收捏造事故後立,擋「宣稱已驗≠真驗」）
