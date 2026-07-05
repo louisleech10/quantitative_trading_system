@@ -107,6 +107,12 @@ validate_expected_coverage() {
   return 0
 }
 
+restore_template_check() {
+  local backup="$1"
+  cp "${backup}" "${TEMPLATE_CHECK}"
+  rm -f "${TEMPLATE_CHECK}.bak"
+}
+
 run_mutate() {
   local mutate_id="$1"
   local line sed_cmd
@@ -121,13 +127,21 @@ run_mutate() {
     exit 1
   fi
 
-  local tmp_actual tmp_broken tmp_restored
+  local tmp_actual tmp_broken tmp_restored backup
   tmp_actual="$(mktemp)"
   tmp_broken="$(mktemp)"
   tmp_restored="$(mktemp)"
-  trap 'rm -f "${tmp_actual}" "${tmp_broken}" "${tmp_restored}"' RETURN
+  backup="$(mktemp)"
+  trap 'rm -f "${tmp_actual}" "${tmp_broken}" "${tmp_restored}" "${backup}"' RETURN
 
+  # 前置：矩陣須先全綠，否則拒跑（Task 1.2 ⑦ runtime defect 修正）
   run_matrix_to "${tmp_actual}"
+  if ! compare_matrix_files "${tmp_actual}" "${EXPECTED_FILE}" "EXPECTED.txt（mutate 前須全綠）"; then
+    echo "ERROR: --mutate 拒跑：矩陣未全綠（須先通過 test_template_check.sh 並 commit 實作）" >&2
+    exit 2
+  fi
+
+  cp "${TEMPLATE_CHECK}" "${backup}"
 
   echo "MUTATE ${mutate_id}: 套用破壞 → ${sed_cmd}"
   (cd "${ROOT}" && eval "${sed_cmd}")
@@ -135,11 +149,11 @@ run_mutate() {
   run_matrix_to "${tmp_broken}"
   if compare_matrix_files "${tmp_broken}" "${EXPECTED_FILE}" "EXPECTED.txt（破壞後應轉紅）"; then
     echo "MUTATE FAIL: ${mutate_id} 破壞後矩陣仍與 EXPECTED 一致（未轉紅）" >&2
-    git -C "${ROOT}" checkout -- scripts/template_check.sh 2>/dev/null || true
+    restore_template_check "${backup}"
     exit 1
   fi
 
-  git -C "${ROOT}" checkout -- scripts/template_check.sh
+  restore_template_check "${backup}"
 
   run_matrix_to "${tmp_restored}"
   if [ -f "${BASELINE_FILE}" ]; then
@@ -152,8 +166,13 @@ run_mutate() {
     exit 1
   fi
 
+  if ! cmp -s "${backup}" "${TEMPLATE_CHECK}"; then
+    echo "MUTATE FAIL: ${mutate_id} template_check.sh 未淨還原（cp 備份比對失敗）" >&2
+    exit 1
+  fi
+
   if ! git -C "${ROOT}" diff --exit-code scripts/template_check.sh >/dev/null; then
-    echo "MUTATE FAIL: ${mutate_id} template_check.sh 未淨還原" >&2
+    echo "MUTATE FAIL: ${mutate_id} template_check.sh 工作區未淨（git diff 非空）" >&2
     git -C "${ROOT}" diff scripts/template_check.sh >&2 || true
     exit 1
   fi

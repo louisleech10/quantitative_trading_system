@@ -18,6 +18,64 @@ need() { grep -qF "$1" "${file}" || missing="${missing}  · 缺錨點: $1  （$2
 # 「A 或 B 擇一」：A 在就過；否則要求 B 出現（如 §G 缺則 §N 必須提到 §G）
 need_or() { grep -qF "$1" "${file}" || grep -qF "$2" "${file}" || missing="${missing}  · 缺: $1（或於 $2 標 N/A）  （$3）\n"; }
 
+# §A 段級 fact-scope 狀態機（Task 2.1 [A-1][A-2]）
+check_sec_a_fact_scope() {
+  local sec_a="$1"
+  [ -n "${sec_a}" ] || return 0
+
+  local fact_missing=""
+  local sec_a_lines=()
+  local sec_a_line_count=0
+  local idx fact_scope=0 line prev_line next_line
+  while IFS= read -r line; do
+    sec_a_lines[sec_a_line_count]="${line}"
+    sec_a_line_count=$((sec_a_line_count + 1))
+  done <<EOF
+${sec_a}
+EOF
+
+  idx=0
+  while [ "${idx}" -lt "${sec_a_line_count}" ]; do
+    line="${sec_a_lines[$idx]}"
+    if printf '%s' "${line}" | grep -qE '^###[[:space:]]' \
+       && printf '%s' "${line}" | grep -qE '已驗證事實|已確認'; then
+      fact_scope=1
+    elif printf '%s' "${line}" | grep -qE '^###[[:space:]]' \
+         && ! printf '%s' "${line}" | grep -qE '已驗證事實|已確認'; then
+      fact_scope=0
+    elif printf '%s' "${line}" | grep -qE '^-[[:space:]]+\*\*' \
+       && printf '%s' "${line}" | grep -qE '已驗證事實|已確認'; then
+      fact_scope=1
+    elif printf '%s' "${line}" | grep -qE '^-[[:space:]]+\*\*' \
+         && ! printf '%s' "${line}" | grep -qE '已驗證事實|已確認'; then
+      fact_scope=0
+    fi
+    if [ "${fact_scope}" -eq 1 ] \
+       && printf '%s' "${line}" | grep -qE 'handoffs/|\.md' \
+       && ! printf '%s' "${line}" | grep -qE 'DatetimeIndex|int64|float64|float16|dtype|ndarray|DataFrame|Series|raw_data|形狀|型別|單位|資料結構'; then
+      : # 純檔案引用無型別斷言，不觸發
+    elif [ "${fact_scope}" -eq 1 ] \
+       && printf '%s' "${line}" | grep -qE 'DatetimeIndex|int64|float64|float16|dtype|ndarray|DataFrame|Series|raw_data|形狀|型別|單位|資料結構|pytest|npm|bash|python|exit|rc=|stdout|stderr|輸出|印出|passed|failed|sha256'; then
+      prev_line=""
+      next_line=""
+      if [ "${idx}" -gt 0 ]; then
+        prev_line="${sec_a_lines[$((idx - 1))]}"
+      fi
+      if [ "${idx}" -lt $((sec_a_line_count - 1)) ]; then
+        next_line="${sec_a_lines[$((idx + 1))]}"
+      fi
+      if ! printf '%s\n%s\n%s' "${prev_line}" "${line}" "${next_line}" | grep -q 'FACT-RECEIPT:'; then
+        fact_missing="${fact_missing}  · §A fact-scope 缺 FACT-RECEIPT: ${line}\n"
+      fi
+    fi
+    idx=$((idx + 1))
+  done
+
+  if [ -n "${fact_missing}" ]; then
+    missing="${missing}${fact_missing}"
+  fi
+}
+
 case "${kind}" in
   spec)
     need "## §RISK" "風險分級"
@@ -27,50 +85,63 @@ case "${kind}" in
     need "## §V"    "驗證策略與邊界"
     need "## §R"    "回退"
     need "## §N"    "N/A 登記"
-    # §G Golden：有 §G 標題就過；否則 §N 區必須有一行同時含 §G 與 N/A
-    if ! grep -qF "## §G" "${file}" && ! grep -qE "§G.*N/A|N/A.*§G" "${file}"; then
-      missing="${missing}  · 缺: ## §G（高風險必填；不適用則於 §N 寫一行『§G：N/A — 理由』）\n"
+
+    # §RISK RISK-HIT 宣告制（Task 2.2 [A-3]）
+    sec_risk="$(awk '/^## §RISK/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
+    risk_hit_line="$(printf '%s\n' "${sec_risk}" | grep -E '^[[:space:]]*(-[[:space:]]+)?RISK-HIT:' | head -1 || true)"
+    risk_hit_dup="$(printf '%s\n' "${sec_risk}" | grep -cE '^[[:space:]]*(-[[:space:]]+)?RISK-HIT:' || true)"
+    if [ "${risk_hit_dup}" -gt 1 ]; then
+      echo "WARN: §RISK 內 RISK-HIT: 重複宣告，機檢取第一行" >&2
     fi
-    # §A facts-resolved（C3 反制）：§A 區必須「已確認」或明確宣告「待確認：無」，
-    # 不准留著未解的待確認項就過機檢 → 擋「沒問到答案就在錯前提上寫 SPEC」。
-    sec_a="$(awk '/^## §A/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
-    if [ -n "${sec_a}" ]; then
-      if ! printf '%s' "${sec_a}" | grep -q "已確認" \
-         && ! printf '%s' "${sec_a}" | grep -qE "待[^：:]*確認[：:][[:space:]]*無|無[^。]*待[^：:]*確認|無待確認"; then
-        missing="${missing}  · §A 未解事實：§A 須含『已確認…（使用者回覆+日期）』或明確『待確認：無』。C3 反制：缺只有使用者知道的事實時，不准在錯前提上把 SPEC 寫完就過機檢。\n"
+    if [ -z "${risk_hit_line}" ]; then
+      missing="${missing}  · §RISK 缺 RISK-HIT: 宣告行（格式 RISK-HIT: <a,b,c,d 子集|none>）\n"
+    else
+      risk_hit_val="${risk_hit_line#*RISK-HIT:}"
+      risk_hit_val="$(printf '%s' "${risk_hit_val}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+      risk_needs_g=0
+      if printf '%s' "${risk_hit_val}" | grep -qE '(^|[,[:space:]])a([,[:space:]]|$)|(^|[,[:space:]])d([,[:space:]]|$)'; then
+        risk_needs_g=1
       fi
-      # W1 FACT-RECEIPT：僅「已確認」+資料結構詞（非純設計/讀碼敘述）須同行/鄰行附 FACT-RECEIPT:
-      fact_missing=""
-      sec_a_lines=()
-      sec_a_line_count=0
-      while IFS= read -r sec_a_line; do
-        sec_a_lines[sec_a_line_count]="${sec_a_line}"
-        sec_a_line_count=$((sec_a_line_count + 1))
-      done <<EOF
-${sec_a}
-EOF
-      idx=0
-      while [ "${idx}" -lt "${sec_a_line_count}" ]; do
-        sec_a_line="${sec_a_lines[$idx]}"
-        if printf '%s' "${sec_a_line}" | grep -q "已確認" \
-           && printf '%s' "${sec_a_line}" | grep -qE 'DatetimeIndex|int64|float64|float16|dtype|ndarray|DataFrame|Series|raw_data|形狀|型別|單位|資料結構|pytest|npm|bash|python|exit|rc=|stdout|stderr|輸出|印出|passed|failed|sha256'; then
-          prev_line=""
-          next_line=""
-          if [ "${idx}" -gt 0 ]; then
-            prev_line="${sec_a_lines[$((idx - 1))]}"
-          fi
-          if [ "${idx}" -lt $((sec_a_line_count - 1)) ]; then
-            next_line="${sec_a_lines[$((idx + 1))]}"
-          fi
-          if ! printf '%s\n%s\n%s' "${prev_line}" "${sec_a_line}" "${next_line}" | grep -q 'FACT-RECEIPT:'; then
-            fact_missing="${fact_missing}  · §A 已確認+資料結構事實缺 FACT-RECEIPT: ${sec_a_line}\n"
+      if [ "${risk_needs_g}" -eq 1 ]; then
+        if ! grep -qF "## §G" "${file}"; then
+          missing="${missing}  · RISK-HIT 含 a/d 但缺 ## §G（高風險數值 golden 必填）\n"
+        else
+          sec_g="$(awk '/^## §G/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
+          if ! printf '%s' "${sec_g}" | grep -qE 'atol|rtol|sha256'; then
+            missing="${missing}  · §G 缺數值 golden token（atol|rtol|sha256 至少其一）\n"
           fi
         fi
-        idx=$((idx + 1))
-      done
-      if [ -n "${fact_missing}" ]; then
-        missing="${missing}${fact_missing}"
+        sec_n="$(awk '/^## §N/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
+        if printf '%s' "${sec_n}" | grep -qE '§G.*N/A|N/A.*§G'; then
+          missing="${missing}  · RISK-HIT 含 a/d 時 §N 不得標 §G N/A 豁免\n"
+        fi
+      else
+        need_or "## §G" "§G" "高風險必填；不適用則於 §N 標 N/A"
       fi
+    fi
+
+    # §A facts-resolved（C3 反制 + Task 2.4 [A-6] 待確認變體）
+    sec_a="$(awk '/^## §A/{f=1; print; next} f&&/^## /{f=0} f{print}' "${file}")"
+    if [ -n "${sec_a}" ]; then
+      facts_resolved=0
+      if printf '%s' "${sec_a}" | grep -qE '待[^：:]*確認[^：:]*[：:][[:space:]]*無|待[^：:]*確認[^：:]*[：:].*[本此]?任務?無|確認[：:][[:space:]]*本任務無|無[^。]*待[^：:]*確認|無待確認'; then
+        facts_resolved=1
+      fi
+      while IFS= read -r confirm_line; do
+        [ -n "${confirm_line}" ] || continue
+        if printf '%s' "${confirm_line}" | grep -q '待回覆\|未確認\|無法確認'; then
+          continue
+        fi
+        if printf '%s' "${confirm_line}" | grep -qE '[0-9]{4}-[0-9]{2}-[0-9]{2}|使用者'; then
+          facts_resolved=1
+        fi
+      done <<EOF
+$(printf '%s' "${sec_a}" | grep '已確認' || true)
+EOF
+      if [ "${facts_resolved}" -eq 0 ]; then
+        missing="${missing}  · §A 未解事實：§A 須含『已確認…（使用者回覆+日期）』或明確『待確認：無』／『待使用者確認：本任務無』。C3 反制：缺只有使用者知道的事實時，不准在錯前提上把 SPEC 寫完就過機檢。\n"
+      fi
+      check_sec_a_fact_scope "${sec_a}"
     fi
     ;;
   result)
@@ -97,15 +168,79 @@ EOF
     if [ -n "${enum_bad}" ]; then
       missing="${missing}${enum_bad}"
     fi
+
+    # Task 2.4 [A-5] RUNTIME PASS ⇒ RECEIPTS 非空
+    runtime_pass="$(grep -E '^RUNTIME_CHECK=' "${file}" | head -1 | cut -d= -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)"
+    receipts_line="$(grep -E '^RECEIPTS=' "${file}" | head -1 || true)"
+    receipts_val="${receipts_line#RECEIPTS=}"
+    receipts_val="$(printf '%s' "${receipts_val}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ "${runtime_pass}" = "PASS" ]; then
+      case "${receipts_val}" in
+        ""|'[]'|'[ ]'|'[" "]'|'[""]'|'[ ]')
+          missing="${missing}  · RUNTIME_CHECK=PASS 時 RECEIPTS 不得為空（${receipts_line}）\n"
+          ;;
+      esac
+      if printf '%s' "${receipts_val}" | grep -qE '^\[[[:space:]]*\]$|^\[[[:space:]]*"[[:space:]]*"\]$'; then
+        missing="${missing}  · RUNTIME_CHECK=PASS 時 RECEIPTS 不得為空陣列或空白元素（${receipts_line}）\n"
+      fi
+    fi
+
+    # Task 2.4 [A-5] MUTATION_CHECK=NOT_RUN ⇒ discussion 外禁 operational 極性
+    mutation_val="$(grep -E '^MUTATION_CHECK=' "${file}" | head -1 | cut -d= -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' || true)"
+    if [ "${mutation_val}" = "NOT_RUN" ]; then
+      in_discussion=0
+      operational_bad=""
+      while IFS= read -r res_line; do
+        if printf '%s' "${res_line}" | grep -q 'claim-context:[[:space:]]*discussion'; then
+          in_discussion=1
+          continue
+        fi
+        if [ "${in_discussion}" -eq 1 ]; then
+          continue
+        fi
+        if printf '%s' "${res_line}" | grep -qE '^[[:space:]]*#'; then
+          continue
+        fi
+        stripped="${res_line}"
+        stripped="$(printf '%s' "${stripped}" | sed 's/`[^`]*`//g')"
+        if printf '%s' "${stripped}" | grep -qE '已驗|DONE|全綠'; then
+          operational_bad="${operational_bad}  · MUTATION_CHECK=NOT_RUN 時 discussion 外禁 operational 極性: ${res_line}\n"
+        fi
+      done < "${file}"
+      if [ -n "${operational_bad}" ]; then
+        missing="${missing}${operational_bad}"
+      fi
+    fi
     ;;
   todo)
     need "## §0" "全域規則與約束"
     need "## §B" "批次執行策略"
     need "### Task" "至少一個 Task 區塊"
-    # per-Task 三必填欄（presence；逐 Task 完整性交 adversarial review）
-    need "驗證" "每 Task 可證偽驗證欄"
-    need "邊界" "每 Task 邊界(≥2)欄"
-    need "不可做" "每 Task 不可做欄"
+    # Task 2.3 [A-4] per-Task 三欄分段檢查
+    task_missing="$(awk '
+      BEGIN { in_task=0; title="" }
+      /^### Task/ {
+        if (in_task) check_block()
+        in_task=1
+        title=$0
+        has_v=0; has_b=0; has_x=0
+        next
+      }
+      in_task {
+        if ($0 ~ /驗證/) has_v=1
+        if ($0 ~ /邊界/) has_b=1
+        if ($0 ~ /不可做/) has_x=1
+      }
+      END { if (in_task) check_block() }
+      function check_block() {
+        if (!has_v) printf "  · Task 缺欄「驗證」: %s\\n", title
+        if (!has_b) printf "  · Task 缺欄「邊界」: %s\\n", title
+        if (!has_x) printf "  · Task 缺欄「不可做」: %s\\n", title
+      }
+    ' "${file}")"
+    if [ -n "${task_missing}" ]; then
+      missing="${missing}${task_missing}"
+    fi
     ;;
   *) echo "ERROR: kind 必須是 spec|todo|result"; exit 1 ;;
 esac
