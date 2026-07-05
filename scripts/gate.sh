@@ -305,13 +305,24 @@ if [ "${kind}" = "dispatch" ]; then
           || { echo "ERROR: adversarial 檢查失敗（見上），拒發 token。"; exit 1; }
         ;;
     esac
-    # reconcile 核可閘:對 SPEC 派「實作」(--spec 存在)時,--adversarial 指向的 reconcile 須獲委員戳記
+    # reconcile 核可閘:對 SPEC 派「實作」(--spec 存在)時,reconcile 須獲委員戳記
     #   防「Claude 自產 reconcile 無人複核就派實作」。adversarial-review 派工本身(--template n/a:)不受此限。
+    #   新語義:--reconcile 提供時檢 reconcile 單檔;未提供時對 --adversarial foreach(舊式 reconcile 內嵌戳記)。
     if [ -n "${spec}" ]; then
       case "${adversarial}" in
         ""|waived:*|stamped-waived:*) : ;;
-        *) _foreach_adversarial "${adversarial}" _run_reconcile_stamp_check_adv \
-             || { echo "ERROR: reconcile 未獲委員核可（見上），拒發實作 token。委員須在 reconcile append RECONCILE-STAMP APPROVED。"; exit 1; } ;;
+        *)
+          if [ -n "${reconcile}" ]; then
+            case "${reconcile}" in
+              waived:*|stamped-waived:*) : ;;
+              *) bash "${SCRIPT_DIR}/reconcile_stamps_check.sh" "${reconcile}" \
+                   || { echo "ERROR: reconcile 未獲委員核可（見上），拒發實作 token。委員須在 reconcile append RECONCILE-STAMP APPROVED。"; exit 1; } ;;
+            esac
+          else
+            _foreach_adversarial "${adversarial}" _run_reconcile_stamp_check_adv \
+              || { echo "ERROR: reconcile 未獲委員核可（見上），拒發實作 token。委員須在 reconcile append RECONCILE-STAMP APPROVED。"; exit 1; }
+          fi
+          ;;
       esac
     fi
     # 高風險「對 SPEC 派工」必須附 --spec 且機檢合規（template 漏結構=擋）
