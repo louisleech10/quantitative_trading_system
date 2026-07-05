@@ -8170,3 +8170,251 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=docs/TEMPLATE_GATE_FIX_SPEC.md
   todo=docs/TEMPLATE_GATE_FIX_TODO.md
   manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-b2-impl-r2", "ts": "2026-07-05T01:25:05Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-B2-RESULT.md", "output_sha256": "b3ee06cbc90d9d6ea2d3cb744e18d49db83717beb28cfe7266a2033154083f12", "task_id": "tgf-b2-impl-r2", "ts": "2026-07-05T01:25:06Z"}
+=== 2026-07-05 09:25:06 | dispatch ===
+  ts=2026-07-05 09:25:06
+  kind=dispatch
+  intent=TGF B2 重派(第一次因mutate還原自毀):Composer 改 template_check.sh 完成 Task 2.1-2.4;新程序=實作→矩陣綠→commit→才跑mutation;另修 --mutate 還原改 cp 備份+綠前置
+  risk=high
+  facts_asked=已問:事故根因=TODO Task1.2⑦的git checkout還原在未commit時自毀(Claude獨立驗收抓到,矩陣紅+diff空);B1已commit(b638d29)使git還原語義安全;--mutate改cp備份為防禦深化
+  review_role=實作=Composer;接回 Claude 逐項重跑+Codex 總 review;--mutate 契約修正已明列非靜默(TODO Task1.2⑦ runtime defect,RESULT 記錄)
+  template=跟過:TODO §B B2 prompt+RESULT_TEMPLATE;程序修正(commit-then-mutate)寫入派工 prompt
+  adversarial=handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-b3-impl", "ts": "2026-07-05T01:31:07Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-B3-RESULT.md", "output_sha256": "pending", "task_id": "tgf-b3-impl", "ts": "2026-07-05T01:31:07Z"}
+=== 2026-07-05 09:31:07 | dispatch ===
+  ts=2026-07-05 09:31:07
+  kind=dispatch
+  intent=TGF B3 派工:Composer 改三個 template 檔完成 Task 3.1/3.2/4.1/5.1(§A教學+RISK-HIT+頭注/三方簽核+章程掛鉤/adversarial實核義務+ID/RECHECK+E-3/TODO prompt憲法瘦身)
+  risk=high
+  facts_asked=已問:B2 已驗收(矩陣13/13綠+mutation×4+還原淨+真實SPEC IC_PHASE0轉FAIL)並push;B3 依賴 B2 定稿規則已滿足
+  review_role=實作=Composer;接回 Claude 跑全部 grep 斷言+Codex 總 review
+  template=跟過:TODO §B B3 prompt+RESULT_TEMPLATE
+  adversarial=handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-b4-impl", "ts": "2026-07-05T01:34:50Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-B4-RESULT.md", "output_sha256": "pending", "task_id": "tgf-b4-impl", "ts": "2026-07-05T01:34:51Z"}
+=== 2026-07-05 09:34:51 | dispatch ===
+  ts=2026-07-05 09:34:51
+  kind=dispatch
+  intent=TGF B4 派工:Composer 改 gate.sh(--reconcile CLI+Verdict/BLOCKING機檢)+治理文件7處舊錨點歸零+coverage改名+RESULT映射+GRANDFATHER盤點;5 gate fixture 拒×4/發×1
+  risk=high
+  facts_asked=已問:B3 已驗收 push(d53eeee);B4 依賴 B2 矩陣綠已滿足;gate.sh 鎖死風險=§C 明令改後立即真跑驗證
+  review_role=實作=Composer;接回 Claude 重跑 5 fixture+真 gate+舊錨點 grep;之後 Codex 總 code review
+  template=跟過:TODO §B B4 prompt+RESULT_TEMPLATE
+  adversarial=handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+=== 2026-07-05 09:40:45 | dispatch ===
+  ts=2026-07-05 09:40:45
+  kind=dispatch
+  intent=TGF-B4 post-change token regression
+  risk=low
+  facts_asked=none-needed:tgf-b4-impl
+  review_role=single-executor:n/a
+  template=n/a:tgf-b4-token-regression
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:42:28Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-codex.md,handoffs/2026-07-04-TGF-TODO-ADV-composer.md", "output_sha256": "pending", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:43:14Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "0eda9d1b2c8ff0b5aef782dccd8786810a298152f50837b6bffa0d6d11581271", "task_id": "tgf-todo-stamp-codex-r4", "ts": "2026-07-05T01:46:01Z"}
+=== 2026-07-05 09:46:01 | dispatch ===
+  ts=2026-07-05 09:46:01
+  kind=dispatch
+  intent=TGF reconcile 補機檢處置索引後 re-stamp(codex):D-2 逐ID同行處置為新gate要求,本體變更須重戳
+  risk=high
+  facts_asked=已問:索引僅機械彙整既有CLOSED結論,無新裁決;B4新D-2檢查在真實派工首擊命中本檔缺同行→處置
+  review_role=Codex 核對索引與其原結論一致後重戳新hash
+  template=n/a:re-stamp 輪
+  adversarial=waived:本派工即戳記步驟本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "0eda9d1b2c8ff0b5aef782dccd8786810a298152f50837b6bffa0d6d11581271", "task_id": "tgf-todo-stamp-composer-r4", "ts": "2026-07-05T01:46:01Z"}
+=== 2026-07-05 09:46:01 | dispatch ===
+  ts=2026-07-05 09:46:01
+  kind=dispatch
+  intent=TGF reconcile 補機檢處置索引後 re-stamp(composer):同上
+  risk=high
+  facts_asked=已問:同上
+  review_role=Composer 核對索引與其原結論一致後重戳新hash
+  template=n/a:re-stamp 輪
+  adversarial=waived:本派工即戳記步驟本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "489747e9cb3d4b5e2ca7f7f54147b67875c360c491d117b517518cd256f0a1da", "task_id": "tgf-todo-stamp-codex-r4", "ts": "2026-07-05T01:48:16Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "489747e9cb3d4b5e2ca7f7f54147b67875c360c491d117b517518cd256f0a1da", "task_id": "tgf-todo-stamp-composer-r4", "ts": "2026-07-05T01:48:16Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-codex.md,handoffs/2026-07-04-TGF-TODO-ADV-composer.md", "output_sha256": "pending", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:48:30Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md,handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:49:00Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md", "output_sha256": "55eca02a805e066c53eb5865073a1fc343f0ec3d66de1e39adb629e018783f44", "task_id": "tgf-todo-adv-codex-bf", "ts": "2026-07-05T01:49:27Z"}
+=== 2026-07-05 09:49:28 | dispatch ===
+  ts=2026-07-05 09:49:28
+  kind=dispatch
+  intent=provenance 回填:handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md 實產自 harness task bijd0lknv(tasks/bijd0lknv.output 可稽核),當時派工未帶 task-id/output,本事件補審計鏈
+  risk=low
+  facts_asked=none-needed:回填既有事實
+  review_role=single-executor:n/a
+  template=n/a:provenance 回填
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md", "output_sha256": "55eca02a805e066c53eb5865073a1fc343f0ec3d66de1e39adb629e018783f44", "task_id": "tgf-todo-adv-codex-bf", "ts": "2026-07-05T01:49:28Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md", "output_sha256": "7f92f459d8407f694dd63164d4ee599aee66c00471db1f9e5c6afdd6aa7ab309", "task_id": "tgf-todo-adv-composer-bf", "ts": "2026-07-05T01:49:28Z"}
+=== 2026-07-05 09:49:28 | dispatch ===
+  ts=2026-07-05 09:49:28
+  kind=dispatch
+  intent=provenance 回填:handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md 實產自 harness task ba8rglj8b(tasks/ba8rglj8b.output 可稽核),當時派工未帶 task-id/output,本事件補審計鏈
+  risk=low
+  facts_asked=none-needed:回填既有事實
+  review_role=single-executor:n/a
+  template=n/a:provenance 回填
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md", "output_sha256": "7f92f459d8407f694dd63164d4ee599aee66c00471db1f9e5c6afdd6aa7ab309", "task_id": "tgf-todo-adv-composer-bf", "ts": "2026-07-05T01:49:28Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md,handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:49:45Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-B4-HOTFIX-RESULT.md", "output_sha256": "pending", "task_id": "tgf-b4-hotfix", "ts": "2026-07-05T01:50:53Z"}
+=== 2026-07-05 09:50:53 | dispatch ===
+  ts=2026-07-05 09:50:53
+  kind=dispatch
+  intent=TGF B4 hotfix:gate.sh W3 戳記閘與新 --reconcile 語義整合 bug(--spec 在場時對 findings 檔跑 stamps check 必死鎖),Composer 修自家 B4 代碼
+  risk=high
+  facts_asked=已問:實跑證據=總review gate 以新語義(-adversarial=findings,--reconcile=stamped)被 W3 擋死;根因讀碼確認 gate.sh L311-316 未分流
+  review_role=實作=Composer(B4 原作者);Claude 以真實命令重跑驗證;隨後 Codex 總 review 涵蓋本 hotfix
+  template=n/a:gate.sh hotfix 非 SPEC/TODO 生成派工
+  adversarial=waived:hotfix 屬 B4 已戳記範圍的 defect 修正,總 review(Codex)即將全diff複查
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-05 09:52:58 | dispatch ===
+  ts=2026-07-05 09:52:58
+  kind=dispatch
+  intent=TGF-B4-hotfix smoke
+  risk=low
+  facts_asked=none-needed:tgf-b4-hotfix
+  review_role=single-executor:n/a
+  template=n/a:tgf-b4-hotfix-smoke
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md,handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md", "output_sha256": "pending", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:54:11Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-FINAL-REVIEW-codex.md", "output_sha256": "pending", "task_id": "tgf-final-review-codex", "ts": "2026-07-05T01:54:12Z"}
+=== 2026-07-05 09:54:12 | dispatch ===
+  ts=2026-07-05 09:54:12
+  kind=dispatch
+  intent=TGF 總 code review:Codex 審 B1-B4+hotfix 全 epic diff(2447c88..HEAD),重點=正確性/新繞過面/誤擋面/範圍外改動/shell 注入面
+  risk=high
+  facts_asked=已問:B1-B4+hotfix 全由 Claude 獨立重跑驗收;新 gate 五項檢查(D-1/D-2/檔名/provenance/W3分流)已在真實派工逐一驗證
+  review_role=review=Codex(實作者 Composer 不自審);BLOCKING 修後原提出方重驗
+  template=n/a:code review 派工非 SPEC/TODO 生成
+  adversarial=handoffs/2026-07-04-TGF-TODO-ADV-CODEX.md,handoffs/2026-07-04-TGF-TODO-ADV-COMPOSER.md
+  reconcile=handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-R1-FIX-RESULT.md", "output_sha256": "pending", "task_id": "tgf-r1-fix", "ts": "2026-07-05T02:01:18Z"}
+=== 2026-07-05 10:01:18 | dispatch ===
+  ts=2026-07-05 10:01:18
+  kind=dispatch
+  intent=TGF review-R1 修正派工:Composer 修 template_check.sh discussion 豁免有界化+新 fixture(EXPECTED 13→14)+R4 whitespace 清理
+  risk=high
+  facts_asked=已問:R1=Codex 實跑探針證實(discussion 後 operational DONE 仍 PASS);R2/R3 已附 repo 證據退回(8e3ae0d/d358028);處置檔=handoffs/TGF-FINAL-REVIEW-RECONCILE.md
+  review_role=實作=Composer;閉合=Codex(原提出方)重跑 R1/R4 RECHECK+審 R2/R3 退回後戳記
+  template=n/a:機檢 defect 修正非 SPEC/TODO 生成派工
+  adversarial=waived:findings=handoffs/TGF-FINAL-REVIEW-codex.md(ADV-CODEX-R1..R4),處置=handoffs/TGF-FINAL-REVIEW-RECONCILE.md,閉合由 Codex re-verify 輪戳記
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-FINAL-REVIEW-RECONCILE.md", "output_sha256": "b6af3e0997f514b6bc6460d336434f48d12943bd639c5f5865b66403a150b5d5", "task_id": "tgf-final-review-stamp", "ts": "2026-07-05T02:05:34Z"}
+=== 2026-07-05 10:05:34 | dispatch ===
+  ts=2026-07-05 10:05:34
+  kind=dispatch
+  intent=TGF 總review閉合輪:Codex 重跑 R1/R4 RECHECK+審 R2/R3 退回證據,戳記 handoffs/TGF-FINAL-REVIEW-RECONCILE.md
+  risk=high
+  facts_asked=已問:R1 探針已轉 RC:1(Claude 實跑)+矩陣14/14+whitespace check exit 0;R2/R3 退回附 commit 證據 8e3ae0d/d358028
+  review_role=閉合鐵律:原提出方 Codex 重驗;APPROVED 即 epic 驗收閉合
+  template=n/a:閉合戳記輪
+  adversarial=waived:本派工即閉合戳記步驟
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/TGF-FINAL-REVIEW-RECONCILE.md", "output_sha256": "7dee431a15f88c38fc087042546826fe81af1b6891d06ed3172da7741abe833c", "task_id": "tgf-final-review-stamp", "ts": "2026-07-05T02:07:58Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-FINAL-REVIEW-RECONCILE.md", "output_sha256": "0d0a0af0b05a2fabe1faa17f3cd70d995eb914b714db0e8907fa2f7e1d7ea4d2", "task_id": "tgf-final-review-stamp-r2", "ts": "2026-07-05T02:11:03Z"}
+=== 2026-07-05 10:11:03 | dispatch ===
+  ts=2026-07-05 10:11:03
+  kind=dispatch
+  intent=TGF 總review閉合輪r2:R4 退回點已修(三檔+b2-r2 whitespace 清除,range check exit 0,commit 43a22cf),Codex 重驗後戳記
+  risk=high
+  facts_asked=已問:git diff --check 2447c88..HEAD exit 0(Claude 實跑);R1 探針 RC:1+矩陣14/14 不變
+  review_role=閉合鐵律:原提出方 Codex 重驗;APPROVED=epic 驗收閉合
+  template=n/a:閉合戳記輪
+  adversarial=waived:本派工即閉合戳記步驟
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/TGF-FINAL-REVIEW-RECONCILE.md", "output_sha256": "2474e3924d68a8f3f328ce2846477393df29154e0e2fa3167dbaca07df0184c1", "task_id": "tgf-final-review-stamp-r2", "ts": "2026-07-05T02:12:20Z"}
