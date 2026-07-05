@@ -1,26 +1,24 @@
 # Handoff
 **Agent**: Claude | **Time**: 2026-07-05 | **Branch**: main
 
-## ★制度層總審查 epic — read-only 審查輪 ✅ 完成,**等使用者否決 D-1~D-6 後才實作**
+## ★制度層總審查 epic — Phase A(憲法重構+合約補齊)✅ 完成待 commit
 
-### 已完成(本 session)
-- 四方獨立版:`handoffs/20260705-INSTREV-{claude,codex,composer,agy}.md`(R1 不互看防定錨;全 register-output 留痕)。
-- reconcile:`handoffs/20260705-INSTREV-RECONCILE.md` — 21 條統一裁決(U-1~U-21)+3 事實爭議裁決+6 否決點;**codex+composer 雙戳記 APPROVED,reconcile_stamps_check PASS**(sha256:ee8c9fab…)。
-- 關鍵發現:①選層三處三答案活分叉(07-02「中大=Codex 實作」只在記憶,CLAUDE.md 反著寫);②中型管線 CLAUDE vs 手冊直接矛盾;③執行端合約停 05-31 缺 5 項現役制度+同檔 HANDOFF 所有權自相矛盾;④gate DENY 不落 audit;⑤claim-check 5 次全誤攔 chore。
+### 本 session 完成(走完整大任務管線,全程機檢+雙家族+code review)
+- **SPEC/TODO**:`docs/INSTREV_PHASEA_{SPEC,TODO}.md`(template+coverage 三道機檢過)+ 簡述/manifest `handoffs/20260705-INSTREV-PHASEA-BRIEF-MANIFEST.md`(16 個 [A-x])。
+- **雙家族 adversarial**:Codex 3 + Composer 12 findings(含 2 BLOCKING)→ reconcile `handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md`;R1 雙 REJECTED(抓 SPEC 落後 TODO 的選層對調)→ 修 → **R2 雙戳記 APPROVED**(sha256:6a14a0f6)。
+- **實作**(Composer 2.5)+ **Codex code review** 抓 2 BLOCKING(ORCH §6/§7 殘留 Codex 主力預設、CLAUDE 三方鐵律 token 在但義務被壓掉)→ Composer 修 → **Codex 閉合重驗雙 CLOSED**。
+- **成果**:copilot 739→8 行 pointer;CLAUDE.md 216→128 行(敘事移 `docs/SCAR_LEDGER.md`,規則零刪減 grep 驗);任務分派決策表單一化;選層 ORCH §1 單一「現行分工行」(動態,現行=**Composer 實作+Codex review**,07-05 額度切換);合約補 5 項制度;輪詢 10 分鐘、debug 2 輪(含 BOOTSTRAP);ARCH/DEV banner。
+- **記憶層(Phase 6,Claude 自做)**:feedback_task_routing 標 SUPERSEDED、dispatch_polling 改 pointer、executor_override 更新現行分工、MEMORY.md 索引同步。
 
-### 使用者裁決已收(2026-07-05,詳記憶 project-instrev-rulings)
-- **D-1/2/3/5/6 同意預設;D-4 否決固定制**→選層=動態,一律以使用者當下指示為準(看 usage 切換,未來或加 Grok);ORCHESTRATION §1 只留單一可變「現行分工」行,其他文件 pointer。
-- 附帶:①否決點以後須 AskUserQuestion 彈窗+PushNotification,不得只寫文字;②憲法給 AI 用,委員會共識即可,簡潔明確、品質優先但避免 token 浪費/冗餘;③總審查頻率=事件觸發(制度事故/誤攔或分叉訊號≥3/新增鐵律≥3)+每季保底,輕量 drift 盤點每完成一個大 epic 順手做。
+### 驗收(Claude 獨立跑,不採信執行端 STATUS)
+- postflight data_cache 完整未縮減;sync check ✅;CLAUDE 128/copilot 8 行;3輪·5分鐘 全 repo 清零;現行分工錨點=1;零刪減 12 token + 合約 A-12 token 全在;敘事負向核對乾淨。
 
-### 下一步(新 session 起點)
-1. ~~等使用者否決~~ ✅ 已裁決,直接進實作。
-2. 依裁決走完整管線實作:Phase A(憲法重構+合約補齊,U-1/2/4/5/6/7/8/10/11/19)→ Phase B(腳本:U-9/12/14/15)→ Phase C(觀察:U-13/20/21)。屬「大」:SPEC+manifest+雙家族 adversarial+TODO,不得跳步。
-3. 實作素材:`handoffs/instrev-evidence/`(R1 prompt+記憶匯出)。SCAR_LEDGER 為新產物(docs/)。
-
-### 之後才回:IC Analysis(前置=使用者手動生成 FF 測試資料,定案 config 見 ROADMAP)
-- 下一刀=1a 第二刀跨 symbol 防洩漏(SplitPlan per-symbol)→ 1-align → 1b FDR →…(ROADMAP P0 IC 節)。
+### 下一步
+1. **commit + push**(本次即將做)。
+2. **Phase B(腳本,中風險)**:U-9 sync 重構(加 A-12 token 到 CONTRACT_TOKENS)、U-12 gate DENY 落 audit、U-14 claim auto-fix、U-15 錯誤訊息模板。
+3. **Phase C(觀察)**:U-13 批次戳記慣例、U-20/21 證據累積。
+4. 之後才回 IC Analysis(前置=使用者手動生成 FF 測試資料;ROADMAP P0 IC 節)。
 
 ## 鐵律(慢測試/執行)
-- generate_features ~20分/次;slow 跑後 `./scripts/restore_golden_inventory.sh`;長測試後清 pytest 舊輪次。
-- 「已驗/passed」須帶 VERIFY:<receipt-id> 或「檔載『…』(出處:檔名)」;委員派工帶 --task-id+--output,產出後 register-output。
+- 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員派工帶 --task-id+--output,產出後 register-output。
 - pre-existing 失敗=test_ic_engine。執行端可能誤還原根 HANDOFF——commit 前重驗內容。

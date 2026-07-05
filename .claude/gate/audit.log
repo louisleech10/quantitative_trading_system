@@ -8525,3 +8525,217 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-RECONCILE.md", "output_sha256": "539d314f081f21140c11262c1528da115076219ad01e586239c457ace78ea9ac", "task_id": "instrev-stamp-composer-r2", "ts": "2026-07-05T06:45:43Z"}
+=== 2026-07-05 15:48:39 | artifact ===
+  ts=2026-07-05 15:48:39
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/INSTREV_PHASEA_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled(RISK-HIT: b,c);§A=4 FACT-RECEIPT 實跑+待確認:無+已確認 2026-07-05 使用者裁決;§C=filled;§G=N/A(純文件,§N 登記);§P=6 Phase 16 Task 對應 manifest A-1..A-16;§V=grep/wc/sync-check 可證偽驗收;§R=git revert;§N=§G+mutation N/A 附理由
+  spec=
+  todo=
+  manifest=
+=== 2026-07-05 20:04:40 | artifact ===
+  ts=2026-07-05 20:04:40
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/INSTREV_PHASEA_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=全域規則(解耦不適用聲明+token保留清單);§B=單批次(Batch 1=Task 1.1~5.1 派 Codex;Phase 6 Claude 自做);每 Task 含驗證/邊界/不可做;覆蓋 manifest A-1..A-16
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-codex.md", "output_sha256": "pending", "task_id": "instrev-phasea-adv-codex", "ts": "2026-07-05T12:08:50Z"}
+=== 2026-07-05 20:08:50 | dispatch ===
+  ts=2026-07-05 20:08:50
+  kind=dispatch
+  intent=INSTREV Phase A SPEC/TODO adversarial review — Codex 腿(雙家族之一)
+  risk=low
+  facts_asked=D-1~D-6 已於 2026-07-05 由使用者全數裁決(HANDOFF+memory project_instrev_rulings);本批無新的僅使用者知道的事實
+  review_role=Codex=adversarial,依 V13 prompt §0 挑戰前提,不採納 Claude 框架;作者(Claude)不自審
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-composer.md", "output_sha256": "pending", "task_id": "instrev-phasea-adv-composer", "ts": "2026-07-05T12:09:17Z"}
+=== 2026-07-05 20:09:17 | dispatch ===
+  ts=2026-07-05 20:09:17
+  kind=dispatch
+  intent=INSTREV Phase A SPEC/TODO adversarial review — Composer 腿(雙家族之二)
+  risk=low
+  facts_asked=D-1~D-6 已於 2026-07-05 由使用者全數裁決;本批無新的僅使用者知道的事實
+  review_role=Composer=adversarial,獨立於 Codex 腿(不互看),挑戰前提;作者(Claude)不自審
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-codex.md", "output_sha256": "24ae8776514be55e8c937adc7248f4d421e1e461a5e2ba1076f0d182d12bd6a0", "task_id": "instrev-phasea-adv-codex", "ts": "2026-07-05T12:12:22Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-composer.md", "output_sha256": "5bd56a62f620faee3de10f47369f54c8d4e2e10dc569b6d927806593ce48fa29", "task_id": "instrev-phasea-adv-composer", "ts": "2026-07-05T12:14:00Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "77b79ce16e2df8f77f6714f76be5bfff471bd06f17a09d2c6e1efdb8485a7209", "task_id": "instrev-phasea-recstamp-codex", "ts": "2026-07-05T12:24:55Z"}
+=== 2026-07-05 20:24:55 | dispatch ===
+  ts=2026-07-05 20:24:55
+  kind=dispatch
+  intent=戳記核可 Phase A adversarial reconcile(codex 腿確認其 findings 被忠實 reconcile)
+  risk=low
+  facts_asked=無新使用者事實;D-1~D-6 已裁決;本輪僅核 reconcile 忠實度
+  review_role=codex=stamp-review,特別盯 Claude 是否忠實收錄/裁決 ADV-CODEX-1/2/3,及是否誤降 Composer BLOCKING
+  template=n/a:stamp-review 非 SPEC 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "77b79ce16e2df8f77f6714f76be5bfff471bd06f17a09d2c6e1efdb8485a7209", "task_id": "instrev-phasea-recstamp-composer", "ts": "2026-07-05T12:24:55Z"}
+=== 2026-07-05 20:24:55 | dispatch ===
+  ts=2026-07-05 20:24:55
+  kind=dispatch
+  intent=戳記核可 Phase A adversarial reconcile(composer 腿確認其 findings 被忠實 reconcile)
+  risk=low
+  facts_asked=無新使用者事實;D-1~D-6 已裁決;本輪僅核 reconcile 忠實度
+  review_role=composer=stamp-review,特別盯 Claude 是否忠實收錄兩 BLOCKING(COMPOSER-3/4)且修法對應到 SPEC/TODO,不得口惠而已
+  template=n/a:stamp-review 非 SPEC 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "cc1c870321700a43f8ecca65b86610065afcb56488c1b619b5e559cd83adc845", "task_id": "instrev-phasea-recstamp-codex-r2", "ts": "2026-07-05T12:49:13Z"}
+=== 2026-07-05 20:49:13 | dispatch ===
+  ts=2026-07-05 20:49:13
+  kind=dispatch
+  intent=R2 戳記核可 Phase A adversarial reconcile(SPEC 已依 R1 rejection 修補)
+  risk=low
+  facts_asked=無新使用者事實;本輪核 R1 rejection 是否真修:SPEC 選層對調+錨點 grep+Task1.2 收窄
+  review_role=codex=stamp-review R2,重跑你 R1 指出的 SPEC L22/L62/L69 是否已改 Composer 實作+Codex review + 錨點 grep
+  template=n/a:stamp-review 非 SPEC 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "cc1c870321700a43f8ecca65b86610065afcb56488c1b619b5e559cd83adc845", "task_id": "instrev-phasea-recstamp-composer-r2", "ts": "2026-07-05T12:49:13Z"}
+=== 2026-07-05 20:49:13 | dispatch ===
+  ts=2026-07-05 20:49:13
+  kind=dispatch
+  intent=R2 戳記核可 Phase A adversarial reconcile(SPEC 已依 R1 rejection 修補)
+  risk=low
+  facts_asked=無新使用者事實;本輪核 R1 rejection 是否真修:SPEC L69 選層+Task1.2 邊界收窄
+  review_role=composer=stamp-review R2,重跑你 R1 指出的 SPEC L69 選層與 Task1.2 邊界是否已同 TODO/§A
+  template=n/a:stamp-review 非 SPEC 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "37699dcea9da2febf1060193de1793c1fb9287a3f6ccd34810859cd7482130a0", "task_id": "instrev-phasea-recstamp-codex-r2", "ts": "2026-07-05T13:13:08Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "37699dcea9da2febf1060193de1793c1fb9287a3f6ccd34810859cd7482130a0", "task_id": "instrev-phasea-recstamp-composer-r2", "ts": "2026-07-05T13:13:08Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "37699dcea9da2febf1060193de1793c1fb9287a3f6ccd34810859cd7482130a0", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T13:13:17Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-codex.md,handoffs/20260705-INSTREV-PHASEA-ADV-composer.md", "output_sha256": "pending", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T13:13:43Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-codex.md,handoffs/20260705-INSTREV-PHASEA-ADV-composer.md", "output_sha256": "pending", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T13:25:36Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "931fe3742f7a56c33ebb20e6bb2a0094ad0d390e6658276f0658a39a6a67cacb", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T13:26:40Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "5318b60a76eb655658036635ff7257e87fa9c6e66503043c7b9566b40b8bda6b", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T13:37:09Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-impl.md", "output_sha256": "pending", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T13:37:10Z"}
+=== 2026-07-05 21:37:10 | dispatch ===
+  ts=2026-07-05 21:37:10
+  kind=dispatch
+  intent=INSTREV Phase A 實作:憲法重構+合約補齊(純文件,派 Composer 2.5 實作)
+  risk=high
+  facts_asked=D-1~D-6 已裁決;執行端選層 07-05 切 Composer 實作/Codex review;無其他待決事實
+  review_role=雙家族 adversarial 已跑+reconcile 雙 R2 APPROVED;實作後派 Codex code review(實作者不自審)
+  template=templates/SPEC_TEMPLATE.md
+  adversarial=handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md
+  reconcile=handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/INSTREV_PHASEA_SPEC.md
+  todo=docs/INSTREV_PHASEA_TODO.md
+  manifest=handoffs/20260705-INSTREV-PHASEA-BRIEF-MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex.md", "output_sha256": "pending", "task_id": "instrev-phasea-codereview", "ts": "2026-07-05T13:53:44Z"}
+=== 2026-07-05 21:53:44 | dispatch ===
+  ts=2026-07-05 21:53:44
+  kind=dispatch
+  intent=INSTREV Phase A 實作 diff 的 code review(Composer 實作,派另一方 Codex 複查)
+  risk=low
+  facts_asked=無新使用者事實;驗收命令與零刪減清單見 SPEC §V/TODO §B Gate
+  review_role=Codex=code review,獨立複查 Composer 的文件重構 diff:規則有無被誤刪/語義弱化、選層對調是否徹底、有無越界改 scripts/程式/ARCH 正文
+  template=n/a:code review 非 SPEC 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md", "output_sha256": "5318b60a76eb655658036635ff7257e87fa9c6e66503043c7b9566b40b8bda6b", "task_id": "instrev-phasea-impl-fix1", "ts": "2026-07-05T14:08:30Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-impl.md", "output_sha256": "6cd738f8b18bfbff7cbd4cd094351fe7ebe07817294ccbf067ad776de29d13dd", "task_id": "instrev-phasea-impl-fix1", "ts": "2026-07-05T14:08:31Z"}
+=== 2026-07-05 22:08:31 | dispatch ===
+  ts=2026-07-05 22:08:31
+  kind=dispatch
+  intent=INSTREV Phase A code review 2 BLOCKING 修補(Composer 修自己實作)
+  risk=high
+  facts_asked=無新使用者事實;修補範圍=Codex code review 兩 BLOCKING 明列
+  review_role=Codex 已 code review 出 2 BLOCKING;修後由 Codex 原提出方閉合重驗
+  template=templates/SPEC_TEMPLATE.md
+  adversarial=handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md
+  reconcile=handoffs/20260705-INSTREV-PHASEA-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/INSTREV_PHASEA_SPEC.md
+  todo=docs/INSTREV_PHASEA_TODO.md
+  manifest=handoffs/20260705-INSTREV-PHASEA-BRIEF-MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex-r2.md", "output_sha256": "pending", "task_id": "instrev-phasea-codereview-r2", "ts": "2026-07-05T14:20:57Z"}
+=== 2026-07-05 22:20:57 | dispatch ===
+  ts=2026-07-05 22:20:57
+  kind=dispatch
+  intent=Codex 閉合重驗 2 BLOCKING 修補(原提出方確認真關閉)
+  risk=low
+  facts_asked=無新使用者事實;重驗範圍=先前 2 BLOCKING
+  review_role=Codex=原提出方閉合重驗(章程§B8),重跑同反例確認真關閉且無過度刪除/新弱化
+  template=n/a:closure re-verify 非 SPEC 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex.md", "output_sha256": "8c34e7fed828482ab6c24cfc8e97606ebbae21a15b6c6715e2f01fcb24da86d8", "task_id": "instrev-phasea-codereview", "ts": "2026-07-05T14:32:59Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex-r2.md", "output_sha256": "0de0c7c19276dbaccf9276e613ee49f4db9be5520aeb9b78b9a5585d8f54eb71", "task_id": "instrev-phasea-codereview-r2", "ts": "2026-07-05T14:32:59Z"}

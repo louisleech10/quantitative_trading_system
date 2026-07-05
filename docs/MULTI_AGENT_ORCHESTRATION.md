@@ -29,14 +29,14 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 
 | 層 | 角色 | 工具 | 何時用 |
 |----|------|------|--------|
-| 1 | 規劃 / SPEC / 驗收 + **小任務實作** | **Claude (Opus)** | 高價值思考;**小任務自己做+自驗(派工 ceremony 對小任務更貴 → 省 token)** |
-| 2 | **中任務主力執行** | **`cursor-agent --model composer-2.5`**（Composer 2.5） | 中型(單 module、不命中 a-d);A/B 實證正確性對等 + 派工省事 |
-| 3 | **大任務實作** | **`codex exec`**（GPT-5.5） | 大型/高風險(a-d);嚴謹 root-cause 紀錄佳 |
-| 3 | **大任務 code review** | **`cursor-agent`**（Composer 2.5） | 對 codex 大任務 diff 做跨家族複查 |
+| 1 | 規劃 / SPEC / 驗收 + **小任務實作** | **Claude (Opus)** | 依本節 §1 現行分工行 |
+| 2 | 執行端（實作） | **`cursor-agent`** / **`codex exec`** 等 | 依本節 §1 現行分工行 |
+| 3 | code review | 另一方執行端 | 中/大必派，實作者不自審 |
 | — | 規劃委員會 read-only | **`agy -p`**（Gemini） | 諮詢用,不得寫入 |
 
-**選層原則（2026-06-03 A/B 實證後定）**：**小=Claude 自己做、中=Composer 2.5、大=Codex 實作 + Composer code review**。對使用者透明,使用者只講需求。
-誠實邊界：A/B 顯示 codex≈cursor 正確性對等(標準題天花板),選層差異在**人體工學/成本與高風險嚴謹度紀錄**,非 coding 能力;cursor review codex 擋推理/結構盲點,**擋不了共享錯前提/缺使用者事實**(C3)→ facts-first 仍最優先。
+**現行分工(2026-07-05 使用者指示,因 Codex 額度 limit 切換):中/大=Composer 2.5(`cursor-agent`)實作+Codex(`codex`)code review;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依各 agent usage 切換,未來或加新執行端;新執行端須先過 §8 T-D 對等性測試才可寫入)。
+
+誠實邊界：A/B 顯示 codex≈cursor 正確性對等(標準題天花板),選層差異在**人體工學/成本與高風險嚴謹度紀錄**,非 coding 能力;cursor review codex 擋推理/結構盲點,**擋不了共享錯前提/缺使用者事實**(C3)→ facts-first 仍最優先。06-03 定層歷史見 `docs/SCAR_LEDGER.md`。
 
 > ⚠️ **能力閘門（council review #11）**：執行端**未通過 T-D（§8 對等性測試）前只能 read-only，不得寫入**。
 > 現況（2026-05-31）：**可寫入** = codex（GPT-5.5）、cursor（composer-2.5，過 T-D）；**僅 read-only** = agy（Gemini 3.5 Flash，coding 評測失敗 → 規劃委員會用）。
@@ -116,12 +116,12 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 > 深度只能 Opus（GPT-5.5 廣度深度不足，不可外包）→ 省 token 只能靠「**Opus 每單位只寫一次、不重生成整份**」。
 > 來源：CRISPY（短文件優先 / 指令預算 / 垂直切分）+ 本專案 gate 機檢。
 
-### 分層（依 §RISK，別對中型任務跑完整管線）
+### 分層（依 §RISK；分級判準見 CLAUDE.md 任務分派決策表）
 | 大小 | 流程 |
 |---|---|
 | 小 | 不寫 SPEC，直接派工指令 + 驗收命令 |
-| 中 | 寫 SPEC（含 per-Task 檔案/驗證/邊界欄）→ **直接從 SPEC 派工，跳獨立 TODO + 跳一次 adversarial** |
-| 大 / 高風險(a/b/c/d) | 完整管線（下方） |
+| 中 | 完整管線同大型（SPEC+TODO+至少一家不同模型 adversarial;2026-06-05 使用者定死不得跳步,D-1 維持）——判準與步驟見 CLAUDE.md **任務分派決策表** |
+| 大 / 高風險(a/b/c/d) | 完整管線（下方）；分級見 CLAUDE.md **任務分派決策表** |
 
 > **前置鐵律（反 C3，最高優先）**：開審前，SPEC §A 的「待使用者確認事實」必須**真的問過使用者並填入回覆**。
 > C3 事故證明 **Opus+GPT-5.5+Composer 2.5 三家族全沒抓到**——因為那是「缺一個只有使用者知道的事實 + 共享我框的錯前提」，不是推理盲點。**家族再多也救不了缺事實。** 故 facts-first 比加審查者更重要；gate `--facts-asked` 擋。
@@ -224,7 +224,7 @@ git log --oneline -5  # 執行端的 commit
 
 ## 5. 卡關 / 需決策（escalation & resume）
 
-headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `--force`）。執行端遇到「需要使用者決策」或「debug ≤ 3 輪未過」→ **停下並輸出 `STATUS: BLOCKED — <問題>`**，不卡在那等輸入。
+headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `--force`）。執行端遇到「需要使用者決策」或「debug ≤ 2 輪未過」→ **停下並輸出 `STATUS: BLOCKED — <問題>`**，不卡在那等輸入。(2026-06-10/06-25 使用者兩輪斷路器指示,出處見 `docs/SCAR_LEDGER.md`)
 
 **決策回填迴圈（使用者只跟 Claude 對話，不直接面對執行端）：**
 ```
@@ -238,7 +238,7 @@ headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `
 - 難 bug 的 debug 優先用便宜模型（Codex/Cursor），**不要動用 Opus 硬啃**。
 
 ### 宏觀斷路器（council Round 2 #Gemini1，防 Claude↔執行端無限拋接燒額度）
-執行端內部已有 `debug ≤3 輪`；**但「Claude 改 SPEC/指令 → 重派 → 又 BLOCKED」這層外迴圈也要上限**：
+執行端內部已有 `debug ≤2 輪`；**但「Claude 改 SPEC/指令 → 重派 → 又 BLOCKED」這層外迴圈也要上限**：
 - **同一任務的重派 ≤ 2 輪**。第 2 輪仍 BLOCKED → **停，升級使用者**：很可能 SPEC 有根本性缺陷，不是執行端能修的。**不得自動無限重派**。
 - 升級時給使用者：兩輪各自的 SPEC 調整、執行端 BLOCKED 原因、我的根因假設。
 - 背景任務一律帶 `timeout`（已實行），避免掛死燒額度。
@@ -257,10 +257,10 @@ headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `
 | 每任務概估 | ~$4.8 等級 | Fast ~$0.44 / 標準 ~$0.07（便宜 10–60×） |
 | 強項 | terminal-bench、長自主、root-cause | 多檔編輯、routine、速度快 |
 
-額度策略：Codex 主力，告警時切 Cursor 當溢出；或反轉用 Cursor 當日常主力、Codex 留給硬任務。實測手感後再定。
+額度策略：依各執行端成本與額度告警動態調整；**當前主力見 §1 現行分工行**（動態，以使用者當下指示為準）。
 
 ### 主力決策法（用數據，不靠感覺）
-預設 Codex 主力。累積數個**真實任務**後，Claude 追蹤四指標決定是否翻轉：
+**選層/主力歸屬見 §1 現行分工行**。累積數個**真實任務**後，Claude 追蹤四指標供翻轉參考：
 
 | 指標 | 含義 |
 |------|------|
@@ -270,8 +270,8 @@ headless 模式**不會互動提問**（codex sandbox 內自動執行 / cursor `
 | BLOCKED 頻率 | 多常卡住需 Claude 介入 |
 
 **記錄機制**：每次寫入派工**驗收當下** append 一列到 `docs/reviews/executor_scorecard.md`（數據驗收時已在手，near-zero 成本）。**不**每任務都對打——真實任務只派一個執行端，靠累積各自 track record；偶爾刻意 cross-assign 取對照。
-**偏差防範**：只記客觀指標、標任務類型只比同類、樣本夠（每類 ~5+）才下結論，否則維持預設 codex 主力。
-**翻轉規則**：某任務類型上 Cursor **品質（pass@1/scope）追平、成本低 10–60×** → Cursor 當該類主力，Codex 留 terminal-heavy / 難 root-cause。
+**偏差防範**：只記客觀指標、標任務類型只比同類、樣本夠（每類 ~5+）才下結論，否則維持 §1 現行分工行。
+**翻轉規則**：某任務類型上成本/品質指標顯示翻轉划算時，Claude 建議調整並更新 §1 現行分工行（須使用者確認）。
 工具：gstack **`/benchmark-models`**（同 prompt 跑 Claude/Codex/Gemini，量化比較，不含 Cursor）。
 
 ---
@@ -289,8 +289,8 @@ cursor-agent --list-models   # 或 cursor-agent models
 
 | 角色 | CLI | 釘選 model id | 重驗日期 |
 |------|-----|--------------|----------|
-| 主力執行 | codex | _(login 後填)_ | — |
-| 溢出執行 | cursor-agent | _(login 後填)_ | — |
+| 實作（依 §1 現行分工行） | cursor-agent / codex | _(login 後填)_ | — |
+| code review（依 §1） | 另一方執行端 | _(login 後填)_ | — |
 
 ---
 

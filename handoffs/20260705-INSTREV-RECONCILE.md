@@ -58,3 +58,6 @@
 (待 Codex/Composer append RECONCILE-STAMP)
 RECONCILE-STAMP: codex APPROVED 2026-07-05 sha256:ee8c9fab77885f1d4981141b5657e1d3c631db61804d2f4edff16b85c75d04ef task:instrev-stamp-codex-r2
 RECONCILE-STAMP: composer APPROVED 2026-07-05 sha256:ee8c9fab77885f1d4981141b5657e1d3c631db61804d2f4edff16b85c75d04ef task:instrev-stamp-composer-r2
+
+## Errata(戳記後補記,Claude 編排者,不動本體雜湊)
+- 2026-07-05:§E Phase A 分期表(L53)漏列 **U-3**(執行端合約補齊 5 項)。經 Phase A 雙家族 adversarial(Codex/Composer)獨立確認:Phase A 標題即「合約補齊」、U-3 裁決 3/3 收斂,判定為 §E 列表筆誤,U-3 歸屬 Phase A(對應 manifest [A-12])。**§E 分期表為建議非窮舉;權威=本 reconcile 全文 U 條裁決 + 使用者 D-1~D-6**。此 errata 位於「## 戳記」之後,不影響本體雜湊與既有 codex/composer APPROVED 戳記。
