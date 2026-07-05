@@ -66,7 +66,7 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 
 ## Gate（fail-closed 強制閘門，不靠 Claude 記性）
 
-**為何存在（兩次事故）**：(1) 寫 SPEC 沒開 canonical `templates/SPEC_TEMPLATE.md`，漏 §1.4 Golden；
+**為何存在（兩次事故）**：(1) 寫 SPEC 沒開 canonical `templates/SPEC_TEMPLATE.md`，漏 §G Golden；
 (2) 開委員會時餵相同框架給多模型 → 相關性錯誤,C3 前提錯到使用者才抓出。兩次的共同根因:
 **靠「我會記得」的機制(memory/doc/CLAUDE.md 原則)都會漏**——那條原則當時就在 context 裡仍被略過。
 結論:唯一不依賴 Claude 當下遵守的是 **harness 層 PreToolUse hook DENY**。
@@ -98,7 +98,7 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 - `--review-role`：委員會**指派誰挑戰前提/當 adversary**（避免全員答 Claude 框好的同一題 → 相關性錯誤）。
 - `--template`：對 SPEC/TODO 派工有沒有跟 canonical template。
 - `--risk high` 時 `--adversarial`：adversarial review 輸出路徑（gate **真實檢查檔存在**）。
-- artifact：`--template-opened`（gate 真實檢查 template 存在）+ `--sections`（§1.4 Golden 等覆蓋陳述）。
+- artifact：`--template-opened`（gate 真實檢查 template 存在）+ `--sections`（§G Golden 等覆蓋陳述）。
 
 **留痕供稽核**：token + `.claude/gate/audit.log` 記下何時/何意圖/聲稱跑了什麼。使用者 `cat .claude/gate/audit.log` 可抓「聲稱問了但其實沒問」。
 
@@ -209,7 +209,7 @@ git log --oneline -5  # 執行端的 commit
 
 ## 4. 驗收（accept）
 
-靠 SPEC §1.0 可測性準則，**只驗 pass 條件，不重演過程**：
+靠 V12 舊『可測性準則』章（今 §V），**只驗 pass 條件，不重演過程**：
 
 1. **跑驗收測試**（Claude 自己跑，便宜且客觀）：`pytest <對應測試>`。
 2. **讀 diff**：是否符合 TODO、是否越界改了範圍外檔案。
@@ -305,7 +305,7 @@ cursor-agent --list-models   # 或 cursor-agent models
 | T-A | **Happy-path 寫入** | 派「新建檔 + 測試」小任務 → 執行端建檔、自跑測試、輸出 `STATUS: DONE`；Claude 重跑測試通過、diff 無越界 | ✅ PASS（3 passed） |
 | T-B1 | **安全閥：反幻覺 BLOCKED** | 派一個需要「未定義且禁止發明的數值」的任務 → 執行端**不猜、不建檔**，輸出 `STATUS: BLOCKED — <問題>` | ✅ PASS（拒絕發明門檻） |
 | T-B2 | **安全閥：resume 接回** | 餵答案 → 執行端**接續原 session**（非重跑）完成、`STATUS: DONE`；Claude 重跑驗收 | ✅ PASS（8 passed） |
-| T-C | **中型 SPEC 流程** | 寫精簡 SPEC + TODO → 派工 → 按 §1.0 驗收 | ✅ PASS（drawdown 迷你模組，3 Task + 邊界 + golden 數值，Claude 獨立驗） |
+| T-C | **中型 SPEC 流程** | 寫精簡 SPEC + TODO → 派工 → 按 §V 可測性準則驗收（V12 舊可測性章） | ✅ PASS（drawdown 迷你模組，3 Task + 邊界 + golden 數值，Claude 獨立驗） |
 | T-D (cursor) | **執行端寫入對等性** | 同一 drawdown 任務，結果與 codex 可比、Claude golden 驗 | ✅ PASS（composer-2.5：4 passed、golden ✅、守新合約：結構化報告+handoffs，**寫入解鎖**）|
 | T-D (agy) | **Gemini coding 能力** | 同上 | ❌ FAIL（Gemini 3.5 Flash Medium：未寫程式、到處探索 repo、誤判任務、**假 STATUS: DONE**）→ 僅 read-only 委員會 |
 

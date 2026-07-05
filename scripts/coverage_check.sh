@@ -34,9 +34,9 @@ EOF
 
 miss_n="$(printf "%b" "${missing}" | grep -c '·' || true)"
 if [ -n "${missing}" ]; then
-  echo "COVERAGE FAIL: ${target} 漏掉 manifest 的 ${miss_n}/${total} 項："
+  echo "ID PRESENCE FAIL: ${target} 漏掉 manifest 的 ${miss_n}/${total} 項："
   printf "%b" "${missing}"
   echo "  → Opus 只補這幾項即可（不必重生成整份）。"
   exit 1
 fi
-echo "COVERAGE PASS: ${target} 涵蓋 manifest 全部 ${total} 項。"
+echo "ID PRESENCE PASS: ${target} 涵蓋 manifest 全部 ${total} 項。"

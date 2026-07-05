@@ -20,6 +20,7 @@ OPEN_PENDING=[]
 
 - `RUNTIME_CHECK=PASS` 時 `RECEIPTS` 不得為空
 - `MUTATION_CHECK=NOT_RUN` 時，同 task 不得宣稱「已驗 / DONE / 全綠」等 operational 極性
+- 執行端合約之 `TESTS_RUN` 項目應可對應 `RECEIPTS` 元素（全域統一列二期）
 - 自然語言摘要可寫在下方，但判定以結構欄位為準
 
 ## 摘要（可選）
