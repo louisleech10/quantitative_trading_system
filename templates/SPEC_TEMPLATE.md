@@ -8,6 +8,7 @@ SPEC 範本 V13 — Compliance-First / Gate-Anchored（取代 V12 重型版）
 用法：複製本檔，填 {{...}}；不適用的必填段「不可刪」，移到 §N 標 N/A+理由。
 必填錨點（gate 檢查 spec）：§RISK §A §C §P §V §R §N；§G 在高風險(a/d)時必填，否則於 §N 標 N/A。
 舊 V12 的重型機制（per-Task 偽碼/函式名、Golden、邊界測試、人工確認）全保留，只是重構成緊湊+分層+機檢。
+複製為 SPEC 後刪除本 HTML 註解。
 -->
 
 # {{專案/任務名稱}} — SPEC
@@ -17,13 +18,15 @@ SPEC 範本 V13 — Compliance-First / Gate-Anchored（取代 V12 重型版）
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：{{小 / 中 / 大}}（接 CLAUDE.md 任務分派規則）。
 - **命中高風險原則**：{{勾並說明 (a)數值/資料品質 (b)跨模組共用路徑 (c)多phase/難回退 (d)ML/回測正確性}}。
+- **RISK-HIT 宣告**（機檢依據，缺行 FAIL）：`RISK-HIT: <a,b,c,d 子集|none>`（例：`RISK-HIT: b,c` 或 `RISK-HIT: none`）。
 - 命中 (a) 或 (d) → **§G Golden 必填、adversarial review 必跑**（gate `--adversarial`）。
 
 ## §A 假設與待使用者確認（事故：拿推論代替問人）
 > 寫程式/開委員會前，列出「code/log 推不出、只有使用者或執行期知道」的事實，**先問再做**。
-- **已驗證事實**（附驗證方式）：{{例：tier=8GB（psutil 實測）；輸出格式=parquet（ls 實測）}}
-- **待使用者確認**（未確認前不得實作相關 Task）：{{例：UI 選了哪個模式；預期並行度；覆蓋語義 A/B}}
-- **已確認結果**：{{使用者回覆 + 日期}}
+- **FACT-RECEIPT 格式**（資料結構/型別/單位斷言必填）：`FACT-RECEIPT: <命令> → 印出 <stdout 摘要>（<who> 實跑 <date>）`
+- **已驗證事實**（附 receipt；缺 receipt 機檢 FAIL）：{{例：FACT-RECEIPT: `echo probe` → 印出 `probe`（作者 實跑 YYYY-MM-DD）}}
+- **待使用者確認**（未確認前不得實作）：{{例：UI 模式}}；無待決寫 **`待確認：無`**（精確字樣，勿寫「待回覆」）。
+- **已確認結果**：`YYYY-MM-DD 使用者<來源/摘要>`（須含日期+使用者；禁止混入待回覆/未確認）。
 
 ## §C 約束（不重抄，引用 + 只列本任務相關）
 - 解耦 7 條（`grep "from api\." momentum/`→0、服務不互 import 等）、不可違反原則（跨tier/多symbol/資料品質/不弱化 NaN·inf gate/不擅改輸出大小）。
@@ -31,6 +34,7 @@ SPEC 範本 V13 — Compliance-First / Gate-Anchored（取代 V12 重型版）
 
 ## §G Golden / Baseline（高風險(a/d)必填；否則移 §N 標 N/A+理由）
 > 凡改「數值正確性/特徵計算/ML 路徑」，必須有客觀 baseline 證明行為不變，否則驗收=口說。
+- **feature/kline 條件**：涉 feature/kline 生成/計算/merge/split/洩漏 → 須真實 `data_cache/feature_klines/kline_cache.h5`+三方簽核計畫；禁合成 fixture；**不適用即略過**。
 - **凍結時機 / reference 設定**：{{動工前用什麼 symbol+config 跑 baseline，存哪（路徑寫死）}}
 - **baseline 內容**（須能抓「值重排/局部錯位/同矩漂移」，非只 aggregate）：
   名稱集合 sha256 + 數量/schema + 每 feature mean/std/nan_ratio + **抽樣 value hash + NaN mask hash**。
@@ -49,6 +53,7 @@ SPEC 範本 V13 — Compliance-First / Gate-Anchored（取代 V12 重型版）
 - 不可做：{{防過度工程的明確禁止}}
 
 ## §V 驗證策略與邊界測試目錄
+- **mutation 條件**：RISK-HIT 含 a/d 或測試宣稱驗正確性 → 附可證偽/mutation 設計（引 `docs/TEST_DESIGN_CHARTER.md`）；否則 §N 標 mutation N/A+理由。
 - 測試層級：單元 / 整合 / Golden 對照 / 邊界。可獨立 `pytest tests/...` 跑，不需 run_api.py。
 - **防假綠**：diff 既有測試斷言，不得放寬/刪除換綠燈；新斷言對應新行為。
 - **邊界目錄**（本任務適用者打勾並對應 Task）：空DF / 全NaN列 / Inf / std=0 / 重複·亂序 timestamp / API重啟 / 並發寫 / OOM降載 / 大尺度浮點 reduction。

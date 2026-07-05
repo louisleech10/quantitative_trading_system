@@ -9,7 +9,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 
 > 用途：對 SPEC/TODO 做獨立 adversarial review，找矛盾、漏項、不可測需求、錯誤 quant 假設、過度工程、Agent 實作風險、**以及被當成事實的未驗證假設**。
 > 建議時機：SPEC→TODO 後、Frozen 前、大型 Phase 實作前。
-> 變數：`{{SPEC_FILE}}` `{{TODO_FILE}}` `{{PLAN_FILE|N/A}}` `{{REVIEW_FOCUS|完整審查}}` `{{STRICTNESS|MAXIMUM}}`
+> 變數：`{{SPEC_FILE}}` `{{TODO_FILE}}` `{{PLAN_FILE|N/A}}` `{{REVIEW_FOCUS|完整審查}}`
 
 ## Prompt 開始
 
@@ -22,6 +22,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 - **挑戰前提（不只答作者框好的題）**：SPEC 把哪些「假設」當「已驗證事實」陳述？逐一標出「這是 fact 還是 assumption？作者驗證過嗎？」
   特別查 §A「待使用者確認」是否其實沒問就當已知、§RISK 分級是否避重就輕。**被當成事實的未驗證假設 = 至少 MAJOR。**
 - 若你是多 reviewer 之一：別只附和作者框架（相同框架 → 相關性錯誤）。獨立重判前提是否成立。
+- **§A 實核義務**：可低成本核實的宣稱必實跑，附 `VERIFY:` 命令+stdout 摘要；finding 須含 `RECHECK:` 可重跑步驟。無 shell 者標「未經覆核」且相關 finding ≥MAJOR，不得 reconcile 降級為 NON-BLOCKING。
 
 ### §1 必查（10 類，每類無問題標「無」）
 1. **矛盾/互斥**：PLAN/SPEC/TODO 結論不一致；同功能不同 API/預設/Phase 順序；Task A 輸出 vs Task B 輸入。
@@ -38,8 +39,11 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 ### §2 範本錨點落實 + 獵空殼（本版新增，配合 gate；**作者模型不可自審此節**）
 - SPEC 有無 §RISK/§A/§C/§G/§P/§V/§R/§N？高風險(a/d)是否真有 §G Golden（可證偽通過條件 + 容差分尺度），還是只有口號？
 - §G 的 golden 是否只比 aggregate（mean/std）→ 提醒會被值重排/局部漂移繞過（要 value/NaN-mask hash）。
+- **FACT-RECEIPT 落實**：§A fact-scope 內資料結構斷言是否皆附 receipt？缺 → MAJOR。
+- **RISK-HIT↔§G**：RISK-HIT 含 a,d ⇒ §G 非 N/A 且含數值 golden token（atol/rtol/sha256）？§N 不得 N/A 豁免 §G。
+- **TODO §0 完整性**：含解耦 7 條+不可違反原則相關子集（純前端/文檔可聲明不適用；缺 → MAJOR）。
 - **獵空殼（機械 grep 抓不到，靠你逐段讀實際內容）**：對每個必填段與每個 Task，**引用其實際內容**；
-  若只有標題/表頭/欄位標籤（如 `驗證:`、表頭列）而**內容空泛或缺實質**（偽碼空、函式名沒寫、驗證是「確認正確」式空話、表格只有表頭）→ 列 **BLOCKING 空殼**，附該段原文證明。
+  若只有標題/表頭/欄位標籤（如 `驗證:`、表頭列）而**內容空泛或缺實質**（偽碼空、函式名沒寫、驗證是「確認正確」式空話、表格只有表頭；例：「確認有 1 個檔案」含數字仍空殼）→ 列 **BLOCKING 空殼**，附該段原文證明。
   機械 gate 只擋明顯空（空表/樣板/驗證無 token）；**「貌似有內容但邏輯空」只有你這層抓得到**。
 
 ### §3 不可違反原則（與其矛盾即 Blocking）
@@ -48,7 +52,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 ### 輸出格式
 ```
 ## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}
-## Findings（每條：[BLOCKING|MAJOR|MINOR] + 信心度 + 證據(章節/原文短句) + 會怎麼失敗 + 修法）
+## Findings（每條：ID: ADV-CODEX-<n> 或 ADV-COMPOSER-<n> + [BLOCKING|MAJOR|MINOR] + 信心度 + 證據(章節/原文短句) + RECHECK: + 會怎麼失敗 + 修法）
 （無問題的類別標「無」。挑戰前提的 finding 放最前。）
 ## 被當成事實的未驗證假設（§0，逐一列；無則「無」）
 STATUS: DONE
