@@ -8739,3 +8739,4 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex.md", "output_sha256": "8c34e7fed828482ab6c24cfc8e97606ebbae21a15b6c6715e2f01fcb24da86d8", "task_id": "instrev-phasea-codereview", "ts": "2026-07-05T14:32:59Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-CODEREVIEW-codex-r2.md", "output_sha256": "0de0c7c19276dbaccf9276e613ee49f4db9be5520aeb9b78b9a5585d8f54eb71", "task_id": "instrev-phasea-codereview-r2", "ts": "2026-07-05T14:32:59Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-PHASEA-impl.md", "output_sha256": "8c8a05ed019c1f7db087cf69e95302a29165cbfd8a88757694c740a4984a5c25", "task_id": "instrev-phasea-impl", "ts": "2026-07-05T14:35:00Z"}
