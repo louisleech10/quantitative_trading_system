@@ -1,9 +1,16 @@
 # Handoff
 **Agent**: Claude | **Time**: 2026-07-05 | **Branch**: main
 
-## ★新 session 從這開始：回 IC Analysis（使用者將先手動生成 FF 測試資料）
+## ★新 session 從這開始：制度層總審查 epic（使用者 2026-07-05 定 P0，完成後才回 IC）
 
-### 前置：FF 測試資料生成（使用者手動觸發，等資料好才動 IC 端到端）
+### 制度層總審查 — 起跑須知
+- **完整定義**：docs/ROADMAP.md P0「制度層總審查」節（三層範圍＋四選一證據裁決法＋緣起）。授權模式：委員會證據裁決、使用者只看白話簡述＋否決（memory feedback-rules-are-scar-tissue，**勿再把鐵律裁決推回使用者**）。
+- **三層範圍**：①憲法（CLAUDE.md 全載成本／AGENTS.md／.cursorrules／copilot-instructions 739行停在04-26／ARCHITECTURE+DEV_GUIDE 漂移）②派工流程管線（TGF 實測摩擦：戳記輪×4、claim-check×5、provenance 中途才學會、同檔並發序列化）③小中大分類（補丁散在 CLAUDE.md＋記憶兩處）。
+- **方法**：每條規則考掘出生事故＋violation 紀錄（audit.log/handoffs/git/記憶檔）→ 機械化／留核心原則／合併去重／淘汰。Claude 先自產一版再三方（Codex+Composer，agy 諮詢）；「不可砍清單」先行＋雙家族 adversarial。
+- **可用工具**：TGF 剛建好的 fixture 矩陣／--mutate／gate --reconcile 閉合鏈／canonical 戳記流程（見下節），機械化裁決直接沿用此基建。
+- **順序**：read-only 審查輪 → 白話決策簡述（否決點）→ 依裁決走完整管線實作。
+
+### 之後才回：IC Analysis（前置=使用者手動生成 FF 測試資料）
 - **定案 config（2026-07-03 使用者同意）**：BTC+ETH+ADA × 1h（測跨 TF 邊界再加 4h）；L1–L6.5 全開；base/full 全特徵**不綁 preset**；fracdiff/adf 開啟（吃修後 calibration-derived max_lag=50）。~20分/symbol-TF。全量 10×3 定版留到 IC 紅線完成。
 
 ### IC Analysis 現況
