@@ -1,3 +1,4 @@
+result_done_after_discussion.md,result,1
 result_notrun_done_in_discussion.md,result,0
 result_notrun_done_operational.md,result,1
 result_pass_empty_receipts.md,result,1

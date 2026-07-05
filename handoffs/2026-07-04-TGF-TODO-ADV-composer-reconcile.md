@@ -1,7 +1,7 @@
 # TGF TODO Adversarial — Composer 閉合輪收尾
 
-日期：2026-07-04  
-角色：Composer 2.5（原提出方）  
+日期：2026-07-04
+角色：Composer 2.5（原提出方）
 對象：handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
 
 ## 重驗摘要

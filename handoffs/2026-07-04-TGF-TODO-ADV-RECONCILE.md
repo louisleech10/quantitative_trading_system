@@ -64,7 +64,30 @@ REJECTED: ADV-CODEX-6 — 指定 RECHECK `grep -c "GATE_DIR_OVERRIDE" docs/TEMPL
 
 HISTORY | RECONCILE-STAMP: CODEX APPROVED 2026-07-05（缺 sha256/task 欄位，由文末 canonical 戳記取代）
 
+## 機檢處置索引（D-2 逐 ID 同行處置；語義詳見上方對映表與各輪 RECHECK 紀錄）
+- ADV-CODEX-5 → TODO Task 6.1 ③「或」語義與 SPEC 同句（CLOSED，Codex 重驗）
+- ADV-CODEX-6 → SPEC＋TODO Task 6.1 五 fixture＋GATE_DIR_OVERRIDE 主驗收（CLOSED，Codex 重驗）
+- ADV-CODEX-7 → TODO Task 3.2 delta 制基線 60（CLOSED，Codex 重驗）
+- ADV-CODEX-8 → TODO Task 1.2 ⑦ --mutate 契約＋§B 迴圈 gate（CLOSED，Codex 重驗）
+- ADV-CODEX-9 → TODO 頭註 WAIVER 行＋雙戳記核可（CLOSED，Codex 重驗）
+- ADV-COMPOSER-1 → SPEC 輪已閉合（見 handoffs/2026-07-04-TGF-SPEC-ADV-RECONCILE.md；本檔僅忠實度表引用）
+- ADV-COMPOSER-12 → SPEC §G 13 fixture 統一＋§A 計數字面移除（REOPEN 後 CLOSED，Composer 重驗）
+- ADV-COMPOSER-13 → manifest 檔名 typo 已修（CLOSED，Composer 確認）
+- ADV-COMPOSER-14 → TODO §0 解耦/紅線子集枚舉 4 條（CLOSED，Composer 重驗）
+- ADV-COMPOSER-15 → 同 ADV-CODEX-5（CLOSED）
+- ADV-COMPOSER-16 → manifest [C-3] 三條並點名 [E-3]（CLOSED，Composer 重驗）
+- ADV-COMPOSER-17 → 同 ADV-COMPOSER-12（CLOSED）
+- ADV-COMPOSER-18 → TODO 狀態頭尾一致（CLOSED，Composer 重驗）
+- ADV-COMPOSER-19 → SPEC 頭注「已生成」（CLOSED，Composer 重驗）
+- ADV-COMPOSER-20 → 同 ADV-CODEX-8（CLOSED）
+- ADV-COMPOSER-21 → 可先行僅限 [D-3]、[F-3] 必須 B2 後（CLOSED，Composer 重驗）
+- ADV-COMPOSER-22 → 同 ADV-CODEX-7（CLOSED）
+- ADV-COMPOSER-23 → SPEC Task 6.1 邊界 WARN 句回寫（CLOSED，Composer 重驗）
+- ADV-COMPOSER-24 → TODO 四處 gate fixture 計數改 5（CLOSED，Claude 修＋Composer 於 canonical 戳記輪確認）
+
 ## 戳記
 <!-- canonical 戳記區：委員 append '^RECONCILE-STAMP: <family> APPROVED <date> sha256:<body-hash> task:<task-id>'；本體雜湊=本標題之前全部內容 -->
 RECONCILE-STAMP: codex APPROVED 2026-07-05 sha256:9d9c51751557eb9fe6f730d7631bd6fca1b7e6988e9197dd28a63a5d34a3ce44 task:tgf-todo-stamp-codex-r3
 RECONCILE-STAMP: composer APPROVED 2026-07-05 sha256:9d9c51751557eb9fe6f730d7631bd6fca1b7e6988e9197dd28a63a5d34a3ce44 task:tgf-todo-stamp-composer-r3
+RECONCILE-STAMP: codex APPROVED 2026-07-05 sha256:88d3078f252eb4ea46a18a39f4ccd07f14a02b5dc8b17e708d9c630de27bc5b5 task:tgf-todo-stamp-codex-r4
+RECONCILE-STAMP: composer APPROVED 2026-07-05 sha256:88d3078f252eb4ea46a18a39f4ccd07f14a02b5dc8b17e708d9c630de27bc5b5 task:tgf-todo-stamp-composer-r4

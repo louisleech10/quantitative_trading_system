@@ -1,7 +1,7 @@
 # TEMPLATE_GATE_FIX — Grandfather 盤點（現役 docs/ SPEC/TODO）
 
-> 掃描時間：2026-07-05（TGF-B4 Task 6.2）  
-> 掃描器：`scripts/template_check.sh`（B2 硬化後版本）  
+> 掃描時間：2026-07-05（TGF-B4 Task 6.2）
+> 掃描器：`scripts/template_check.sh`（B2 硬化後版本）
 > 政策：**僅新文件適用新機檢；本表所列 FAIL 為 grandfather，不回頭追殺。**
 
 ## 政策聲明

@@ -1,9 +1,9 @@
 # TEMPLATE_GATE_FIX_SPEC adversarial review — Codex
 
-SPEC_FILE=docs/TEMPLATE_GATE_FIX_SPEC.md  
-TODO_FILE=N/A  
-PLAN_FILE=handoffs/2026-07-04-template-review-RECONCILE.md  
-REVIEW_FOCUS=完整審查  
+SPEC_FILE=docs/TEMPLATE_GATE_FIX_SPEC.md
+TODO_FILE=N/A
+PLAN_FILE=handoffs/2026-07-04-template-review-RECONCILE.md
+REVIEW_FOCUS=完整審查
 
 ## Verdict：需修補後派工
 

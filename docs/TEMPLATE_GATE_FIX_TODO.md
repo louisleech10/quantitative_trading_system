@@ -28,27 +28,27 @@
 - B3 派工 prompt：「讀 §0 與 Phase 3/4/5，改三個 template 檔完成 Task 3.1/3.2/4.1/5.1，驗收=各 Task grep 斷言，收尾寫 TGF-B3-RESULT.md」。
 - B4 派工 prompt：「讀 §0 與 Phase 6，改 gate.sh＋治理文件完成 Task 6.1/6.2，驗收=gate fixture 5 例（exit 1/1/1/1/0）＋舊錨點=0＋真 gate 實跑，收尾寫 TGF-B4-RESULT.md」。
 
-## Phase 1 — 探針固化與 baseline（目標：把繞過證據變永久 fixture；完成後系統有 13 fixture＋可證偽矩陣工具）
+## Phase 1 — 探針固化與 baseline（目標：把繞過證據變永久 fixture；完成後系統有 14 fixture＋可證偽矩陣工具，含 R1 修正輪新增）
 
 ### Task 1.1 — [F-1][F-2] fixture 重建與正負樣本庫
-- SPEC ref：Task 1.1　目標：13 個 fixture 入 repo 固化繞過/誤擋/合規證據
-- 輸入/輸出：兩份 adversarial 檔內嵌探針原文（handoffs/2026-07-04-TGF-SPEC-ADV-{codex,composer}.md）→ `tests/gate_fixtures/` 13 個 .md＋`POSITIVE_SAMPLES.txt`
+- SPEC ref：Task 1.1　目標：14 個 fixture 入 repo 固化繞過/誤擋/合規證據（含 R1 修正輪新增）
+- 輸入/輸出：兩份 adversarial 檔內嵌探針原文（handoffs/2026-07-04-TGF-SPEC-ADV-{codex,composer}.md）→ `tests/gate_fixtures/` 14 個 .md＋`POSITIVE_SAMPLES.txt`（R1 修正輪新增 result_done_after_discussion.md）
 - 實作要點：①負樣本 7：`spec_verified_bypass.md`、`spec_heading_verified_bypass.md`（標題含「已驗證」、事實在下層 bullet，照 ADV-CODEX-1 VERIFY 區塊原文）、`spec_ic_phase0_style.md`（`### 已驗證事實` 標題＋bullet 含 DatetimeIndex/int64 而行內無關鍵詞）、`spec_highrisk_no_g.md`（`RISK-HIT: a,d`＋§N 寫 §G N/A）、`todo_bad.md`（末 Task 缺三欄）、`result_pass_empty_receipts.md`（RUNTIME_CHECK=PASS＋RECEIPTS=[]）、`result_notrun_done_operational.md`（NOT_RUN＋discussion 外 DONE）；②維持 FAIL 1：`spec_pending_unresolved.md`；③正樣本 5：`spec_good_full.md`（FACT-RECEIPT＋RISK-HIT: b,c＋真 §G＋全錨點）、`todo_good_full.md`、`spec_pending_none_variant.md`（「待使用者確認：本任務無」）、`spec_risk_false_positive.md`（含「參見 (a) 原則」「| (a) | 否 |」干擾句＋RISK-HIT: none）、`result_notrun_done_in_discussion.md`（DONE 僅在 claim-context: discussion 內）；④統一 LF 無 BOM。
 - 修改檔案：全新建 `tests/gate_fixtures/*.md`＋`POSITIVE_SAMPLES.txt`（列 docs/TEMPLATE_GATE_FIX_SPEC.md 等現役合規文件路徑）。既有 caller：無（新建）。
 - 不可做：不得修改 scripts/template_check.sh（本 Phase 只固化現狀）；不得把探針寫成修後才 FAIL 的「預期版」——必須重現**現行**繞過。
 - 邊界：fixture 無 `## §A` 段時 W1 整段跳過不誤炸（spec_highrisk_no_g 即此型）；CRLF/BOM 混入會使 grep 錨點失效（存檔後 `file tests/gate_fixtures/*.md` 確認 ASCII/UTF-8 text）。
 - 風險緩解：[F-1][F-2]
-- 驗證：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_verified_bypass.md; echo $?` 印 0（重現繞過）；`ls tests/gate_fixtures/*.md | wc -l` == 13；`bash scripts/template_check.sh spec tests/gate_fixtures/spec_pending_unresolved.md; echo $?` 印 1。
+- 驗證：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_verified_bypass.md; echo $?` 印 0（重現繞過）；`ls tests/gate_fixtures/*.md | wc -l` == 14（含 R1 修正輪新增）；`bash scripts/template_check.sh spec tests/gate_fixtures/spec_pending_unresolved.md; echo $?` 印 1。
 
 ### Task 1.2 — [F-4] 一鍵驗證器＋§G baseline 凍結
 - SPEC ref：Task 1.2　目標：矩陣工具＋EXPECTED（先驗）＋BASELINE_BEFORE（實測）
-- 輸入/輸出：Task 1.1 的 13 fixture → `scripts/test_template_check.sh`＋`tests/gate_fixtures/{EXPECTED.txt,BASELINE_BEFORE.txt,MUTATION.txt}`
-- 實作要點：①kind 由檔名前綴判定（spec_*/todo_*/result_*）；②迴圈 `bash scripts/template_check.sh <kind> <f>`，輸出 CSV `<fixture>,<kind>,<exit>`；③`--freeze` 寫 BASELINE_BEFORE.txt，預設模式 `diff EXPECTED.txt <當次結果>`，diff 非空 → exit 1；④空 fixture 目錄 → exit 2＋ERROR 訊息；⑤EXPECTED.txt 依 SPEC §G 手填：7 繞過探針=1、pending=1、5 正樣本=0（13 行）；⑥MUTATION.txt 格式 `<id>|<sed 破壞命令（單字元級，作用於 scripts/template_check.sh）>`（4 條 A-* 各一列，破壞命令由 B2 填實）；⑦**`--mutate <id>` 模式（ADV-CODEX-8／ADV-COMPOSER-20 契約）**：套用該列 sed 破壞 → 跑矩陣，預期 exit 非 0（轉紅）→ `git checkout -- scripts/template_check.sh` 還原 → 重跑矩陣須綠 → `git diff --exit-code scripts/template_check.sh` 確認淨；全序列成立 → `--mutate` exit 0，任一步不成立 → exit 1＋點名步驟。
+- 輸入/輸出：Task 1.1 的 14 fixture → `scripts/test_template_check.sh`＋`tests/gate_fixtures/{EXPECTED.txt,BASELINE_BEFORE.txt,MUTATION.txt}`
+- 實作要點：①kind 由檔名前綴判定（spec_*/todo_*/result_*）；②迴圈 `bash scripts/template_check.sh <kind> <f>`，輸出 CSV `<fixture>,<kind>,<exit>`；③`--freeze` 寫 BASELINE_BEFORE.txt，預設模式 `diff EXPECTED.txt <當次結果>`，diff 非空 → exit 1；④空 fixture 目錄 → exit 2＋ERROR 訊息；⑤EXPECTED.txt 依 SPEC §G 手填：7 繞過探針=1、pending=1、5 正樣本=0（14 行，含 R1 修正輪新增）；⑥MUTATION.txt 格式 `<id>|<sed 破壞命令（單字元級，作用於 scripts/template_check.sh）>`（4 條 A-* 各一列，破壞命令由 B2 填實）；⑦**`--mutate <id>` 模式（ADV-CODEX-8／ADV-COMPOSER-20 契約）**：套用該列 sed 破壞 → 跑矩陣，預期 exit 非 0（轉紅）→ `git checkout -- scripts/template_check.sh` 還原 → 重跑矩陣須綠 → `git diff --exit-code scripts/template_check.sh` 確認淨；全序列成立 → `--mutate` exit 0，任一步不成立 → exit 1＋點名步驟。
 - 修改檔案：全新建。既有 caller：無。
 - 不可做：EXPECTED 不得由跑當下結果生成（恆真測試）；不得吞 template_check 的 stderr。
 - 邊界：fixture 檔名含空格（引號包覆變數）；EXPECTED 與 fixture 數不一致 → 明確 FAIL 訊息列缺漏檔名。
 - 風險緩解：[F-4]
-- 驗證：`bash scripts/test_template_check.sh --freeze && wc -l < tests/gate_fixtures/BASELINE_BEFORE.txt` 印 13；`bash scripts/test_template_check.sh; echo $?` 印 1（修前預期紅=Phase 2 可證偽起點）；`wc -l < tests/gate_fixtures/EXPECTED.txt` 印 13。
+- 驗證：`bash scripts/test_template_check.sh --freeze && wc -l < tests/gate_fixtures/BASELINE_BEFORE.txt` 印 14（含 R1 修正輪新增）；`bash scripts/test_template_check.sh; echo $?` 印 1（修前預期紅=Phase 2 可證偽起點）；`wc -l < tests/gate_fixtures/EXPECTED.txt` 印 14。
 
 ## Phase 2 — 機檢硬化（目標：template_check.sh 堵 U1/U2/U3/RESULT 洞；完成後矩陣全綠＋mutation 全轉紅）
 
@@ -161,7 +161,7 @@
 - 驗證：`grep -c "§1\.0\|§1\.4" CLAUDE.md scripts/gate.sh docs/MULTI_AGENT_ORCHESTRATION.md` 每檔印 0（修前基準 7 行）；`grep -rn "COVERAGE PASS" scripts/ --include="*.sh" | wc -l` 印 0；`grep -c "TESTS_RUN" templates/RESULT_TEMPLATE.md` ≥ 1；GRANDFATHER 檔存在且 `grep -c "IC_PHASE0_SPEC" docs/TEMPLATE_GATE_FIX_GRANDFATHER.md` ≥ 1。
 
 ## Phase 測試與 Gate 總表
-- 單元層：test_template_check.sh 矩陣（13 fixture，EXPECTED 先驗）。
+- 單元層：test_template_check.sh 矩陣（14 fixture，EXPECTED 先驗，含 R1 修正輪新增）。
 - 邊界層：各 Task 邊界欄（否定干擾句、discussion 豁免、特殊字元標題、空目錄 exit 2）。
 - Mutation 層：MUTATION.txt 4 case（A-1/A-3/A-4/A-5 各一），每 case 改壞轉紅、改回轉綠。
 - 端到端層：gate fixture 5 例拒/拒/拒/拒/發＋真 gate 實跑 exit 0＋本 SPEC/TODO 自檢 exit 0。
@@ -199,7 +199,7 @@
 | [F-3] | Task 6.2 | 「明列 docs/IC_PHASE0_SPEC.md…不回頭追殺」 |
 | [F-4] | Task 1.2 | 「支援 spec/todo/result 三 kind」 |
 
-合計數：Task 12（1.1/1.2/2.1/2.2/2.3/2.4/3.1/3.2/4.1/5.1/6.1/6.2）；manifest ID 29；探針 fixture 13（繞過 7＋維持 FAIL 1＋正樣本 5）；mutation case 4；gate fixture 5；批次 4。
+合計數：Task 12（1.1/1.2/2.1/2.2/2.3/2.4/3.1/3.2/4.1/5.1/6.1/6.2）；manifest ID 29；探針 fixture 14（繞過 7＋維持 FAIL 1＋正樣本 5＋R1 修正輪新增 1）；mutation case 4；gate fixture 5；批次 4。
 
 ## 階段 4 — Frozen 前 handoff
 SPEC=docs/TEMPLATE_GATE_FIX_SPEC.md TODO=docs/TEMPLATE_GATE_FIX_TODO.md FOCUS=完整審查（雙家族 adversarial 兩輪完成、31 條 finding 全閉合、雙戳記 APPROVED；現狀=**Frozen** 2026-07-05，與頭部狀態一致）

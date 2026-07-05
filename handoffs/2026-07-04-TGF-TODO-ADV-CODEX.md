@@ -1,9 +1,9 @@
 # TEMPLATE_GATE_FIX TODO adversarial review — Codex
 
-SPEC_FILE=docs/TEMPLATE_GATE_FIX_SPEC.md  
-TODO_FILE=docs/TEMPLATE_GATE_FIX_TODO.md  
-PLAN_FILE=handoffs/2026-07-04-template-review-RECONCILE.md  
-REVIEW_FOCUS=完整審查，重點=SPEC↔TODO 交叉一致性+TODO 可執行性  
+SPEC_FILE=docs/TEMPLATE_GATE_FIX_SPEC.md
+TODO_FILE=docs/TEMPLATE_GATE_FIX_TODO.md
+PLAN_FILE=handoffs/2026-07-04-template-review-RECONCILE.md
+REVIEW_FOCUS=完整審查，重點=SPEC↔TODO 交叉一致性+TODO 可執行性
 起始 ID：ADV-CODEX-5
 
 ## Verdict：需修補後派工
@@ -12,24 +12,24 @@ TODO 整體覆蓋 12 Task 與 29 manifest ID，但有 1 個 closure 契約走樣
 
 ## Low-cost VERIFY receipts
 
-VERIFY: `printf 'TODO Task count: '; grep -c '^### Task' docs/TEMPLATE_GATE_FIX_TODO.md; printf 'Appendix ID rows: '; sed -n '/^## 附錄 M/,$p' docs/TEMPLATE_GATE_FIX_TODO.md | grep -c '^| \\[[A-F]-[0-9]\\]'; printf 'Manifest ID rows: '; grep -c '^- \\[[A-F]-[0-9]\\]' docs/TEMPLATE_GATE_FIX_MANIFEST.md`  
+VERIFY: `printf 'TODO Task count: '; grep -c '^### Task' docs/TEMPLATE_GATE_FIX_TODO.md; printf 'Appendix ID rows: '; sed -n '/^## 附錄 M/,$p' docs/TEMPLATE_GATE_FIX_TODO.md | grep -c '^| \\[[A-F]-[0-9]\\]'; printf 'Manifest ID rows: '; grep -c '^- \\[[A-F]-[0-9]\\]' docs/TEMPLATE_GATE_FIX_MANIFEST.md`
 Output: `TODO Task count: 12` / `Appendix ID rows: 29` / `Manifest ID rows: 29`
 
-VERIFY: `sed -n '/^## 附錄 M/,$p' docs/TEMPLATE_GATE_FIX_TODO.md | grep -o '\\[[A-F]-[0-9]\\]' | sort | uniq -c`  
+VERIFY: `sed -n '/^## 附錄 M/,$p' docs/TEMPLATE_GATE_FIX_TODO.md | grep -o '\\[[A-F]-[0-9]\\]' | sort | uniq -c`
 Output: each `[A-1]`..`[F-4]` appears exactly `1`; duplicate check output was empty.
 
-VERIFY: `bash scripts/template_check.sh spec docs/TEMPLATE_GATE_FIX_SPEC.md; echo $?` and `bash scripts/template_check.sh todo docs/TEMPLATE_GATE_FIX_TODO.md; echo $?`  
+VERIFY: `bash scripts/template_check.sh spec docs/TEMPLATE_GATE_FIX_SPEC.md; echo $?` and `bash scripts/template_check.sh todo docs/TEMPLATE_GATE_FIX_TODO.md; echo $?`
 Output: both print `TEMPLATE PASS ...`; both exit `0`.
 
-VERIFY: `nl -ba templates/TODO_GENERATION_PROMPT.md | sed -n '20,24p'; nl -ba docs/TEMPLATE_GATE_FIX_TODO.md | sed -n '1,4p'`  
+VERIFY: `nl -ba templates/TODO_GENERATION_PROMPT.md | sed -n '20,24p'; nl -ba docs/TEMPLATE_GATE_FIX_TODO.md | sed -n '1,4p'`
 Output: current prompt line 23 says unconditional read of `.github/copilot-instructions.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT_GUIDE.md`; TODO line 3 states ARCHITECTURE/DEVELOPMENT_GUIDE were not fully read.
 
 ## Findings
 
 [MAJOR] High — ID: ADV-CODEX-5 — Task 6.1 narrows SPEC's reconcile trigger from `BLOCKING OR ID` to `BLOCKING AND ID`.
-Evidence: SPEC Task 6.1 says `--adversarial 檔含 [BLOCKING] 或 ID: 格式 finding 時，--reconcile 必填`; TODO Task 6.1 says `含 ID: 格式 finding 且含 [BLOCKING] → --reconcile 必填`.  
+Evidence: SPEC Task 6.1 says `--adversarial 檔含 [BLOCKING] 或 ID: 格式 finding 時，--reconcile 必填`; TODO Task 6.1 says `含 ID: 格式 finding 且含 [BLOCKING] → --reconcile 必填`.
 How it fails: an adversarial file with `ID: ADV-CODEX-9` and only MAJOR findings would satisfy the TODO implementation without a reconcile mapping, despite SPEC requiring ID-based closure. This directly weakens the finding closure mechanism from RECONCILE U9.
-VERIFY: `grep -n '含 .*BLOCKING.*ID\\|含 .*ID.*BLOCKING\\|--reconcile' docs/TEMPLATE_GATE_FIX_SPEC.md docs/TEMPLATE_GATE_FIX_TODO.md` shows SPEC line 116 uses `或`, TODO line 143 uses `且`.  
+VERIFY: `grep -n '含 .*BLOCKING.*ID\\|含 .*ID.*BLOCKING\\|--reconcile' docs/TEMPLATE_GATE_FIX_SPEC.md docs/TEMPLATE_GATE_FIX_TODO.md` shows SPEC line 116 uses `或`, TODO line 143 uses `且`.
 Fix: change TODO Task 6.1 implementation and verification to match SPEC: any new-format file containing `ID:` requires `--reconcile`; if `[BLOCKING]` is present, absence of reconcile is fail-closed. Define exact expected behavior for ID-only MAJOR/MINOR files.
 RECHECK: `grep -n '含 .*ID:.*或\\|含 .*BLOCKING.*或' docs/TEMPLATE_GATE_FIX_TODO.md` and run a gate fixture with `ID:` + `[MAJOR]` + no `--reconcile`; expected exit `1`.
 

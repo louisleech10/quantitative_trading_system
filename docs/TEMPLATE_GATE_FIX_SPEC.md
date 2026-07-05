@@ -27,24 +27,24 @@
 - 下游消費者：Claude（開 gate）、Codex/Composer（讀範本寫 SPEC/TODO、adversarial）、使用者（稽核 audit.log）。
 
 ## §G Golden / Baseline（本任務為行為 golden：fixture exit-code 矩陣）
-- **凍結時機 / reference 設定**：Phase 1 動工前，在 `tests/gate_fixtures/` 重建 Task 1.1 所列全部 13 fixture（7 繞過＋1 維持 FAIL＋5 正樣本）＋收集 ≥3 份現役已 PASS 文件（docs/IC_PHASE1_1a_CUT1_SPEC.md 等）入 POSITIVE_SAMPLES.txt；以**現行** template_check.sh 跑全矩陣，輸出存 `tests/gate_fixtures/BASELINE_BEFORE.txt`（路徑寫死）。
+- **凍結時機 / reference 設定**：Phase 1 動工前，在 `tests/gate_fixtures/` 重建 Task 1.1 所列全部 14 fixture（7 繞過＋1 維持 FAIL＋5 正樣本＋R1 修正輪新增 1；見 result_done_after_discussion.md）＋收集 ≥3 份現役已 PASS 文件（docs/IC_PHASE1_1a_CUT1_SPEC.md 等）入 POSITIVE_SAMPLES.txt；以**現行** template_check.sh 跑全矩陣，輸出存 `tests/gate_fixtures/BASELINE_BEFORE.txt`（路徑寫死）。
 - **baseline 內容**：每 fixture 一行 `<fixture>,<kind>,<exit_code_before>`；修後產 `AFTER` 同格式。
-- **通過條件（可證偽）**：修後矩陣必須逐行等於預期：**[F-1] 所列全部 7 個繞過探針** exit 0→**1**（不得漏列任一——EXPECTED.txt 行數須等於 Task 1.1 的 13 fixture 數）；facts-unresolved 探針維持 1；誤擋反例 exit 1→**0**；全部正樣本維持 0（任何正樣本翻 1 = 誤擋回歸 = FAIL，需修 A 組觸發條件而非放行）。比對命令：`diff tests/gate_fixtures/EXPECTED.txt tests/gate_fixtures/AFTER.txt` → exit 0。
+- **通過條件（可證偽）**：修後矩陣必須逐行等於預期：**[F-1] 所列全部 7 個繞過探針** exit 0→**1**（不得漏列任一——EXPECTED.txt 行數須等於 Task 1.1 的 14 fixture 數，含 R1 修正輪新增）；facts-unresolved 探針維持 1；誤擋反例 exit 1→**0**；全部正樣本維持 0（任何正樣本翻 1 = 誤擋回歸 = FAIL，需修 A 組觸發條件而非放行）。比對命令：`diff tests/gate_fixtures/EXPECTED.txt tests/gate_fixtures/AFTER.txt` → exit 0。
 
 ## §P Phase 與依賴（自檢：無 forward dependency；Phase 2-6 依賴 Phase 1 fixture；Phase 3 依賴 Phase 2 定稿的觸發規則；Phase 4 為 adversarial prompt 檔唯一改動點，Phase 5 僅改 TODO_GENERATION_PROMPT.md——同檔衝突已消解）
 
 ### Phase 1 — 探針固化與 baseline（依賴：無）
 **Task 1.1 — [F-1][F-2] fixture 重建與正負樣本庫**
-- 目標：把 Composer 探針、adversarial 新增探針、誤擋反例、合規正樣本固化為 repo 內永久 fixture。檔案：`tests/gate_fixtures/` 下 13 檔——負樣本 7：`spec_verified_bypass.md`、`spec_heading_verified_bypass.md`（ADV-C1：標題行含「已驗證」、事實在下層 bullet）、`spec_ic_phase0_style.md`（ADV-P2：`### 已驗證事實` 標題＋bullet 無關鍵詞字面，同構現役 IC_PHASE0 樣式）、`spec_highrisk_no_g.md`（改用 `RISK-HIT: a,d` 宣告＋§N 標 §G N/A）、`todo_bad.md`、`result_pass_empty_receipts.md`（ADV-P5：RUNTIME_CHECK=PASS＋RECEIPTS=[]）、`result_notrun_done_operational.md`（MUTATION_CHECK=NOT_RUN＋discussion 區塊外 DONE 極性）；維持 FAIL 探針 1：`spec_pending_unresolved.md`；正樣本 5：`spec_good_full.md`（含 FACT-RECEIPT 行、RISK-HIT 宣告、真 §G、全錨點）、`todo_good_full.md`、`spec_pending_none_variant.md`（「待使用者確認：本任務無」措辭）、`spec_risk_false_positive.md`（ADV-P4：§RISK 含「參見 (a) 原則」「| (a) | 否 |」等干擾句＋`RISK-HIT: none`）、`result_notrun_done_in_discussion.md`（DONE 字樣僅在 `claim-context: discussion` 區塊內）。另附現役文件引用清單 `POSITIVE_SAMPLES.txt`。新建無 caller。
+- 目標：把 Composer 探針、adversarial 新增探針、誤擋反例、合規正樣本固化為 repo 內永久 fixture。檔案：`tests/gate_fixtures/` 下 14 檔（R1 修正輪新增 result_done_after_discussion.md）——負樣本 7：`spec_verified_bypass.md`、`spec_heading_verified_bypass.md`（ADV-C1：標題行含「已驗證」、事實在下層 bullet）、`spec_ic_phase0_style.md`（ADV-P2：`### 已驗證事實` 標題＋bullet 無關鍵詞字面，同構現役 IC_PHASE0 樣式）、`spec_highrisk_no_g.md`（改用 `RISK-HIT: a,d` 宣告＋§N 標 §G N/A）、`todo_bad.md`、`result_pass_empty_receipts.md`（ADV-P5：RUNTIME_CHECK=PASS＋RECEIPTS=[]）、`result_notrun_done_operational.md`（MUTATION_CHECK=NOT_RUN＋discussion 區塊外 DONE 極性）；維持 FAIL 探針 1：`spec_pending_unresolved.md`；正樣本 5：`spec_good_full.md`（含 FACT-RECEIPT 行、RISK-HIT 宣告、真 §G、全錨點）、`todo_good_full.md`、`spec_pending_none_variant.md`（「待使用者確認：本任務無」措辭）、`spec_risk_false_positive.md`（ADV-P4：§RISK 含「參見 (a) 原則」「| (a) | 否 |」等干擾句＋`RISK-HIT: none`）、`result_notrun_done_in_discussion.md`（DONE 字樣僅在 `claim-context: discussion` 區塊內）。另附現役文件引用清單 `POSITIVE_SAMPLES.txt`。新建無 caller。
 - 改法：依 handoffs/2026-07-04-template-review-composer.md「機檢實跑摘要」與兩份 adversarial（TGF-SPEC-ADV-codex/composer）內嵌探針原文重建。
-- **驗證**：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_verified_bypass.md; echo $?` → 現行版印 0（重現繞過）；`ls tests/gate_fixtures/*.md | wc -l` == 13。
+- **驗證**：`bash scripts/template_check.sh spec tests/gate_fixtures/spec_verified_bypass.md; echo $?` → 現行版印 0（重現繞過）；`ls tests/gate_fixtures/*.md | wc -l` == 14（含 R1 修正輪新增）。
 - **邊界**：fixture 含 CRLF 或 BOM 時 grep 行為（統一 LF）；fixture 無「## §A」段時 W1 檢查整段跳過（sec_a 空）不誤炸。
 - 不可做：不得修改 template_check.sh（本 Phase 只固化現狀證據）。
 
 **Task 1.2 — [F-4] 一鍵驗證器 + [§G] baseline 凍結**
 - 目標：`scripts/test_template_check.sh` 跑全 fixture 矩陣（支援 spec/todo/result 三 kind，kind 由檔名前綴判定）、輸出三欄 CSV、與 EXPECTED 比對。檔案：新建 `scripts/test_template_check.sh`、`tests/gate_fixtures/{EXPECTED.txt,BASELINE_BEFORE.txt,MUTATION.txt}`。新建無 caller。
 - 改法：迴圈跑 `template_check.sh <kind> <fixture>` 收 exit code；`--freeze` 旗標寫 BASELINE_BEFORE.txt；預設模式 diff EXPECTED；MUTATION.txt 登記每條 A-* 規則的 mutation case（見 §V）。
-- **驗證**：`bash scripts/test_template_check.sh --freeze && wc -l tests/gate_fixtures/BASELINE_BEFORE.txt` == 13 行；EXPECTED.txt 依 §G 通過條件手填後 `bash scripts/test_template_check.sh; echo $?` 在修改前印 1（因繞過探針尚未被擋）——**此 1 是 Phase 2 的可證偽起點**。
+- **驗證**：`bash scripts/test_template_check.sh --freeze && wc -l tests/gate_fixtures/BASELINE_BEFORE.txt` == 14 行（含 R1 修正輪新增）；EXPECTED.txt 依 §G 通過條件手填後 `bash scripts/test_template_check.sh; echo $?` 在修改前印 1（因繞過探針尚未被擋）——**此 1 是 Phase 2 的可證偽起點**。
 - **邊界**：fixture 目錄空 → 明確 ERROR exit 2（非靜默 PASS）；單一 fixture 檔名含空格。
 - 不可做：不得把 EXPECTED 寫成「跑當下結果」（那是恆真測試）。
 

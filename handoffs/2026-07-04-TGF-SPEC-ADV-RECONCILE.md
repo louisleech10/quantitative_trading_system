@@ -51,13 +51,13 @@
 
 ### v2 新引入（不阻擋原 11 條閉合）
 
-**ID:ADV-COMPOSER-12 [MAJOR] 信心度:High** — §G 通過條件仍寫「3 繞過探針 exit 0→1」，§A FACT-RECEIPT 仍寫「三個繞過探針」，但 Task 1.1／manifest [F-1] 已擴至 **7** 個繞過探針；執行端手填 EXPECTED.txt 時可能漏列 4 探針 → 假綠。  
-證據：§G L32、§A L17 vs Task 1.1 L38／[F-1] L42。  
-修法：§G／§A 計數改 7，或改為「F-1 所列全部繞過探針」不寫死數字。  
+**ID:ADV-COMPOSER-12 [MAJOR] 信心度:High** — §G 通過條件仍寫「3 繞過探針 exit 0→1」，§A FACT-RECEIPT 仍寫「三個繞過探針」，但 Task 1.1／manifest [F-1] 已擴至 **7** 個繞過探針；執行端手填 EXPECTED.txt 時可能漏列 4 探針 → 假綠。
+證據：§G L32、§A L17 vs Task 1.1 L38／[F-1] L42。
+修法：§G／§A 計數改 7，或改為「F-1 所列全部繞過探針」不寫死數字。
 RECHECK: `grep -c "3 繞過\|三個繞過" docs/TEMPLATE_GATE_FIX_SPEC.md` = 0 且 §G 與 F-1 探針清單一致。
 
-**ID:ADV-COMPOSER-13 [MINOR] 信心度:High** — manifest [D-3] 檔名 typo `MULTI_AGent_ORCHESTRATION.md`（Agent 大小寫錯），SPEC Task 6.2 用正確路徑；copy-paste 風險。  
-修法：manifest L31 改為 `MULTI_AGENT_ORCHESTRATION.md`。  
+**ID:ADV-COMPOSER-13 [MINOR] 信心度:High** — manifest [D-3] 檔名 typo `MULTI_AGent_ORCHESTRATION.md`（Agent 大小寫錯），SPEC Task 6.2 用正確路徑；copy-paste 風險。
+修法：manifest L31 改為 `MULTI_AGENT_ORCHESTRATION.md`。
 RECHECK: `grep -c "MULTI_AGent" docs/TEMPLATE_GATE_FIX_MANIFEST.md` = 0。
 
 RECONCILE-STAMP: COMPOSER APPROVED 2026-07-04

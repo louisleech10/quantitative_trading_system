@@ -191,11 +191,21 @@ EOF
       in_discussion=0
       operational_bad=""
       while IFS= read -r res_line; do
+        if [ "${in_discussion}" -eq 1 ]; then
+          if printf '%s' "${res_line}" | grep -qE '^##[[:space:]]'; then
+            in_discussion=0
+          elif printf '%s' "${res_line}" | grep -q 'claim-context:'; then
+            in_discussion=0
+            continue
+          else
+            continue
+          fi
+        fi
         if printf '%s' "${res_line}" | grep -q 'claim-context:[[:space:]]*discussion'; then
           in_discussion=1
           continue
         fi
-        if [ "${in_discussion}" -eq 1 ]; then
+        if printf '%s' "${res_line}" | grep -q 'claim-context:'; then
           continue
         fi
         if printf '%s' "${res_line}" | grep -qE '^[[:space:]]*#'; then
