@@ -1,0 +1,13 @@
+result_notrun_done_in_discussion.md,result,0
+result_notrun_done_operational.md,result,1
+result_pass_empty_receipts.md,result,1
+spec_good_full.md,spec,0
+spec_heading_verified_bypass.md,spec,1
+spec_highrisk_no_g.md,spec,1
+spec_ic_phase0_style.md,spec,1
+spec_pending_none_variant.md,spec,0
+spec_pending_unresolved.md,spec,1
+spec_risk_false_positive.md,spec,0
+spec_verified_bypass.md,spec,1
+todo_bad.md,todo,1
+todo_good_full.md,todo,0

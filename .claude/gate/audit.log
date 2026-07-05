@@ -7937,3 +7937,236 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-REVIEWCLOSE-composer.md", "output_sha256": "d05b2a240f8aa4d2a5b8135f6ac62a3feed83bdcbc5d2447ae6e83c3b62d95df", "task_id": "fracdiff-maxlag-reviewclose-composer-20260703", "ts": "2026-07-03T13:51:17Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260703-FRACDIFF-MAXLAG-MRFAIL-COMPOSER.md", "output_sha256": "da69a877f09d7e56f8e25a88c01b7011933f3bef197c090ba58650aca04918be", "task_id": "fracdiff-maxlag-mrfail-composer-20260703", "ts": "2026-07-03T13:53:37Z"}
+=== 2026-07-04 18:14:22 | dispatch ===
+  ts=2026-07-04 18:14:22
+  kind=dispatch
+  intent=審查 templates/{SPEC,TODO,ADVERSARIAL,RESULT} 4範本+2機檢腳本:派 Codex(GPT-5.5)+Composer2.5 各做全面獨立審查並寫 handoffs/,agy(Gemini) read-only 諮詢;Claude 已先自產獨立版
+  risk=low
+  facts_asked=none-needed:使用者本 turn 明確指定審查對象與三個問題(合適性/冗長度/遺漏),為 read-only 文件審查,無 code/log 推不出且需使用者補的事實
+  review_role=Claude 已自產獨立版(handoffs/2026-07-04-template-review-claude.md,派工前完成不受污染);Codex 與 Composer 各自全面獨立審+挑戰前提(不分角度);agy read-only 第四視角;第二輪四方交叉詰問後 reconcile
+  template=n/a:本次非對 SPEC/TODO 派實作,是委員會對 template 本身的審查(read-only+各寫一份 handoff findings)
+  adversarial=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 18:22:25 | dispatch ===
+  ts=2026-07-04 18:22:25
+  kind=dispatch
+  intent=第二輪交叉詰問:Codex+Composer+agy 讀四方 review 後答 CROSSEXAM Q1-Q6(反駁/投票/優先序),各寫 handoffs/ crossexam 檔或 stdout
+  risk=low
+  facts_asked=none-needed:延續本 turn 委員會審查,無新增需使用者補的事實;已定案項附 Composer 探針+Claude grep 實證
+  review_role=四方互為 adversary:本輪明令解除獨立限制,每委員對其他三方 findings 逐條反駁或背書;Claude 同步自答 Q1-Q6 後 reconcile
+  template=n/a:非 SPEC/TODO 派工,是委員會交叉詰問輪(read-only+寫 findings 檔)
+  adversarial=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 18:39:17 | artifact ===
+  ts=2026-07-04 18:39:17
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  file=docs/TEMPLATE_GATE_FIX_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=大/命中(b)(c); §A=已確認(委員會reconcile四方定案+探針實證,FACT-RECEIPT附實跑輸出); §C=共用路徑gate/機檢; §G=filled(golden=探針fixture預期exit code矩陣,shell行為對照非數值golden); §P=6 Phase(A-F); §V=scripts/test_template_check.sh fixture矩陣; §R=逐Phase獨立commit可revert; §N=數值類golden N/A理由(本任務改shell/文檔,行為golden以fixture exit code代)
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 18:44:24 | dispatch ===
+  ts=2026-07-04 18:44:24
+  kind=dispatch
+  intent=TEMPLATE_GATE_FIX SPEC 雙家族 adversarial review:Codex+Composer 各依 templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 獨立獵漏,寫 handoffs/2026-07-04-TGF-SPEC-ADV-{codex,composer}.md
+  risk=high
+  facts_asked=已問:使用者2026-07-04核准epic+要求嚴謹;修法方向=四方reconcile定案無待決分歧;SPEC §A 四條事實均附FACT-RECEIPT實跑輸出
+  review_role=作者=Claude(不自審);Codex+Composer 雙家族各全面 adversarial(挑戰前提+獵空殼+實跑廉價反例);收齊 reconcile 後兩家戳記才進 TODO 生成
+  template=n/a:本次為 adversarial-review 派工本身(對 docs/TEMPLATE_GATE_FIX_SPEC.md);SPEC 已過 template_check(exit 0)+coverage_check(28/28)
+  adversarial=waived:本派工即 adversarial 步驟本身(產出=handoffs/2026-07-04-TGF-SPEC-ADV-{codex,composer}.md),不能以尚未存在的產出當前置
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 18:58:14 | dispatch ===
+  ts=2026-07-04 18:58:14
+  kind=dispatch
+  intent=TGF SPEC adversarial 閉合輪:Codex+Composer 各重跑自家 finding 的 RECHECK,確認 SPEC v2 真關閉後在 RECONCILE 檔 append 戳記
+  risk=high
+  facts_asked=已問:兩家 15 條 finding 全 ACCEPTED 修入 SPEC v2;v2 過 template_check exit 0+coverage 29/29
+  review_role=閉合鐵律:原提出方重驗自家反例(Codex 驗 ADV-CODEX-1..4,Composer 驗 ADV-COMPOSER-1..11);雙戳記 APPROVED 才進 TODO 生成
+  template=n/a:adversarial 閉合/戳記輪,非 SPEC/TODO 實作派工
+  adversarial=waived:本派工即 adversarial 閉合步驟(對 handoffs/2026-07-04-TGF-SPEC-ADV-RECONCILE.md 補戳記)
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 19:02:40 | artifact ===
+  ts=2026-07-04 19:02:40
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  file=docs/TEMPLATE_GATE_FIX_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=全域規則(不弱化防線/防假綠/audit.log不動); §B=4批次表(依賴拓撲+批間gate+派工prompt); 每Task=SPEC ref+輸入輸出+實作要點+修改檔案到函式+不可做+邊界+驗證(可證偽); 附錄=階段1 SPEC索引29 ID+合計數; 憲法讀取=copilot-instructions全文+ARCHITECTURE/DEV_GUIDE相關節(本SPEC僅觸shell/templates/docs,偏離『無條件全讀』已明列於TODO頭註供adversarial審)
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 19:07:19 | dispatch ===
+  ts=2026-07-04 19:07:19
+  kind=dispatch
+  intent=TGF TODO 雙家族 adversarial:Codex+Composer 對 SPEC v2+TODO 全對審查,寫 handoffs/2026-07-04-TGF-TODO-ADV-{codex,composer}.md;Composer 另重驗自家 ADV-COMPOSER-12/13 閉合
+  risk=high
+  facts_asked=已問:SPEC 已雙戳記 APPROVED;TODO 過 template_check exit 0+coverage 29/29;TODO 頭註明列憲法讀取偏離供審
+  review_role=作者=Claude(不自審);Codex+Composer 雙家族 adversarial(挑戰前提+實跑反例+SPEC↔TODO 交叉一致性);閉合後雙戳記才派實作
+  template=跟過:docs/TEMPLATE_GATE_FIX_TODO.md 依 templates/TODO_GENERATION_PROMPT.md 生成(§0/§B/12 Task 三欄/附錄M 索引29 ID/階段4 handoff 行);憲法讀取偏離已明列頭註
+  adversarial=waived:本派工即 TODO adversarial 步驟本身(產出=handoffs/2026-07-04-TGF-TODO-ADV-*.md);SPEC 輪 adversarial 已完成且雙戳記在 handoffs/2026-07-04-TGF-SPEC-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+=== 2026-07-04 19:09:27 | dispatch ===
+  ts=2026-07-04 19:09:27
+  kind=dispatch
+  intent=test
+  risk=low
+  facts_asked=none-needed:test
+  review_role=single-executor:n/a
+  template=n/a:test
+  adversarial=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-04 19:16:55 | dispatch ===
+  ts=2026-07-04 19:16:55
+  kind=dispatch
+  intent=TGF TODO adversarial 閉合輪:Codex 重驗 ADV-CODEX-5..9,Composer 重驗 ADV-COMPOSER-12(REOPEN)/14..23,確認 SPEC v3+TODO v2 真關閉後在 TODO-ADV-RECONCILE append 戳記
+  risk=high
+  facts_asked=已問:16 條 finding 全 ACCEPTED 修入;四道機檢 exit 0;REOPEN-12 RECHECK 已歸 0
+  review_role=閉合鐵律:原提出方重驗自家反例;雙戳記 APPROVED=SPEC/TODO 轉 Frozen+核可 WAIVER,即進實作派工
+  template=跟過:SPEC v3/TODO v2 均過 template_check+coverage(見 gate 自動機檢)
+  adversarial=waived:本派工即 TODO 輪 adversarial 閉合/戳記步驟(對 handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md 補戳記);SPEC 輪雙戳記已在 handoffs/2026-07-04-TGF-SPEC-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+=== 2026-07-04 19:21:38 | dispatch ===
+  ts=2026-07-04 19:21:38
+  kind=dispatch
+  intent=TGF TODO 閉合輪重派 Codex:RECHECK 命令已修正(粗體/同行計數問題)+ADV-COMPOSER-24 四處已修,Codex 重驗 5..9 後補戳記
+  risk=high
+  facts_asked=已問:Codex REJECTED 兩條為 RECHECK 命令精度問題非修法問題;修正版命令 Claude 已實跑 1/2/1/0 全達標
+  review_role=閉合鐵律:Codex 重驗自家 5..9(用修正版 RECHECK);Composer 已 APPROVED;Codex APPROVED 後即雙戳記轉 Frozen
+  template=跟過:SPEC v3/TODO v3 過 template_check+coverage(gate 自動重跑)
+  adversarial=waived:本派工即閉合戳記重驗輪(對 handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md)
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+=== 2026-07-05 09:01:44 | dispatch ===
+  ts=2026-07-05 09:01:44
+  kind=dispatch
+  intent=TGF TODO 閉合輪重派 Codex:RECHECK 命令已修正(粗體/同行計數問題)+ADV-COMPOSER-24 四處已修,Codex 重驗 5..9 後補戳記
+  risk=high
+  facts_asked=已問:Codex REJECTED 兩條為 RECHECK 命令精度問題非修法問題;修正版命令 Claude 已實跑 1/2/1/0 全達標
+  review_role=閉合鐵律:Codex 重驗自家 5..9(用修正版 RECHECK);Composer 已 APPROVED;Codex APPROVED 後即雙戳記轉 Frozen
+  template=跟過:SPEC v3/TODO v3 過 template_check+coverage(gate 自動重跑)
+  adversarial=waived:本派工即閉合戳記重驗輪(對 handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md)
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "64fe9a63860e5bec2e98ebcdc861bf733a332ee43824ae1c7bdf701f99c11784", "task_id": "tgf-todo-stamp-codex-r3", "ts": "2026-07-05T01:05:44Z"}
+=== 2026-07-05 09:05:45 | dispatch ===
+  ts=2026-07-05 09:05:45
+  kind=dispatch
+  intent=TGF TODO reconcile canonical 戳記輪(codex):重驗後 append 帶 sha256+task 的正式戳記
+  risk=high
+  facts_asked=已問:兩家實質重驗已完成(Composer 11/11 CLOSED+Codex 修正版 RECHECK 已由 Claude 實跑達標);本輪=canonical 戳記補正(sha256+task provenance)
+  review_role=Codex 依修正版 RECHECK 重驗自家 5..9 後蓋 canonical 戳記
+  template=跟過:SPEC/TODO 已 Frozen(雙家族兩輪 adversarial 完成)
+  adversarial=waived:本派工即戳記步驟本身
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "64fe9a63860e5bec2e98ebcdc861bf733a332ee43824ae1c7bdf701f99c11784", "task_id": "tgf-todo-stamp-composer-r3", "ts": "2026-07-05T01:05:45Z"}
+=== 2026-07-05 09:05:45 | dispatch ===
+  ts=2026-07-05 09:05:45
+  kind=dispatch
+  intent=TGF TODO reconcile canonical 戳記輪(composer):重驗後 append 帶 sha256+task 的正式戳記
+  risk=high
+  facts_asked=已問:同上;Composer 另需確認 ADV-COMPOSER-24 閉合(四處已改5)
+  review_role=Composer 重驗自家 12/14..24 後蓋 canonical 戳記
+  template=跟過:同上
+  adversarial=waived:本派工即戳記步驟本身
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-todo-stamp-codex-r3", "ts": "2026-07-05T01:08:37Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-todo-stamp-composer-r3", "ts": "2026-07-05T01:08:37Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-b1-impl", "ts": "2026-07-05T01:08:55Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-B1-RESULT.md", "output_sha256": "pending", "task_id": "tgf-b1-impl", "ts": "2026-07-05T01:08:56Z"}
+=== 2026-07-05 09:08:56 | dispatch ===
+  ts=2026-07-05 09:08:56
+  kind=dispatch
+  intent=TGF B1 實作派工:Composer 2.5 依 TODO Phase 1 完成 Task 1.1(13 fixture)+1.2(test_template_check.sh+EXPECTED先驗+BASELINE凍結),RESULT 寫 handoffs/TGF-B1-RESULT.md
+  risk=high
+  facts_asked=已問:SPEC/TODO Frozen(雙家族兩輪31條全閉+canonical雙戳記 PASS);執行者=Composer(2026-06-27使用者覆蓋)
+  review_role=實作=Composer 2.5;接回後 Codex code review(B4 全部完成後總審+逐批 diff 抽驗);作者不自審
+  template=跟過:TODO §B B1 派工 prompt+RESULT_TEMPLATE 收尾
+  adversarial=handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md", "output_sha256": "1dd1aeab90c1ecbf60681d5032b1908e435b1d08fbbeb35f16beb8717ecf0ab5", "task_id": "tgf-b2-impl", "ts": "2026-07-05T01:14:09Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/TGF-B2-RESULT.md", "output_sha256": "pending", "task_id": "tgf-b2-impl", "ts": "2026-07-05T01:14:09Z"}
+=== 2026-07-05 09:14:09 | dispatch ===
+  ts=2026-07-05 09:14:09
+  kind=dispatch
+  intent=TGF B2 實作派工:Composer 改 scripts/template_check.sh 完成 Task 2.1-2.4(§A段級狀態機/RISK-HIT宣告制/per-Task分段/RESULT交叉+regex),驗收=矩陣全綠+4 mutation 轉紅,RESULT 寫 handoffs/TGF-B2-RESULT.md
+  risk=high
+  facts_asked=已問:B1 已驗收(13 fixture+EXPECTED先驗+BASELINE 13行+預設紅);全部 spec fixture 已帶 RISK-HIT(誤擋邊界已防)
+  review_role=實作=Composer;B2 為機檢核心批次,接回後 Claude 逐項重跑驗收+Codex 總 review
+  template=跟過:TODO §B B2 派工 prompt+RESULT_TEMPLATE 收尾
+  adversarial=handoffs/2026-07-04-TGF-TODO-ADV-RECONCILE.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/TEMPLATE_GATE_FIX_SPEC.md
+  todo=docs/TEMPLATE_GATE_FIX_TODO.md
+  manifest=docs/TEMPLATE_GATE_FIX_MANIFEST.md

@@ -1,0 +1,4 @@
+A-1|sed -i.bak 's/FACT-RECEIPT:/FACT-RECEIPTX:/' scripts/template_check.sh
+A-3|sed -i.bak 's/RISK-HIT:/RISK-HITX:/' scripts/template_check.sh
+A-4|sed -i.bak 's/### Task/### TaskX/' scripts/template_check.sh
+A-5|sed -i.bak 's/RECEIPTS=/RECEIPTSX=/' scripts/template_check.sh
