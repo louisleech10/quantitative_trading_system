@@ -8418,3 +8418,110 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/TGF-FINAL-REVIEW-RECONCILE.md", "output_sha256": "2474e3924d68a8f3f328ce2846477393df29154e0e2fa3167dbaca07df0184c1", "task_id": "tgf-final-review-stamp-r2", "ts": "2026-07-05T02:12:20Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-codex.md", "output_sha256": "pending", "task_id": "instrev-codex-r1", "ts": "2026-07-05T06:35:36Z"}
+=== 2026-07-05 14:35:36 | dispatch ===
+  ts=2026-07-05 14:35:36
+  kind=dispatch
+  intent=制度層總審查R1:Codex獨立完整版(三層憲法/管線/分類,逐規則四選一證據裁決)
+  risk=high
+  facts_asked=使用者已委派委員會證據裁決(rules-are-scar-tissue);否決點白話簡述回使用者;無其他須先問事實
+  review_role=三委員各自獨立全面審+兼adversary挑戰前提;R1不互看防定錨,R2互審
+  template=n/a:委員會獨立審查輪,非SPEC/TODO派工
+  adversarial=waived:本派工即審查/adversarial腿本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-composer.md", "output_sha256": "pending", "task_id": "instrev-composer-r1", "ts": "2026-07-05T06:36:01Z"}
+=== 2026-07-05 14:36:01 | dispatch ===
+  ts=2026-07-05 14:36:01
+  kind=dispatch
+  intent=制度層總審查R1:Composer獨立完整版(三層憲法/管線/分類,逐規則四選一證據裁決)
+  risk=high
+  facts_asked=使用者已委派委員會證據裁決(rules-are-scar-tissue);否決點白話簡述回使用者;無其他須先問事實
+  review_role=三委員各自獨立全面審+兼adversary挑戰前提;R1不互看防定錨,R2互審
+  template=n/a:委員會獨立審查輪,非SPEC/TODO派工
+  adversarial=waived:本派工即審查/adversarial腿本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-agy.md", "output_sha256": "pending", "task_id": "instrev-agy-r1", "ts": "2026-07-05T06:36:25Z"}
+=== 2026-07-05 14:36:25 | dispatch ===
+  ts=2026-07-05 14:36:25
+  kind=dispatch
+  intent=制度層總審查R1:Gemini read-only諮詢(agy -p,輸出由Claude捕捉到handoffs,不寫檔)
+  risk=high
+  facts_asked=使用者已委派委員會證據裁決;無其他須先問事實
+  review_role=agy=read-only第四家族諮詢兼adversary;不得寫入(coding評測失敗)
+  template=n/a:委員會read-only諮詢輪
+  adversarial=waived:本派工即審查腿本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-agy.md", "output_sha256": "b3e0039d0e7bf132b6bcdd823a8c932ddb72040c0b8c254e2f9e4aa631cb119f", "task_id": "instrev-agy-r1b", "ts": "2026-07-05T06:37:22Z"}
+=== 2026-07-05 14:37:22 | dispatch ===
+  ts=2026-07-05 14:37:22
+  kind=dispatch
+  intent=制度層總審查R1:agy重派(flag順序修正,前次把flag當prompt)
+  risk=high
+  facts_asked=同前;無新事實
+  review_role=agy=read-only第四家族諮詢兼adversary
+  template=n/a:委員會read-only諮詢輪
+  adversarial=waived:本派工即審查腿本身
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-composer.md", "output_sha256": "59e0993b1be94242ea915b52e72fd59ec894e8a8bfd6d14b82ed43e33f77a7d6", "task_id": "instrev-composer-r1", "ts": "2026-07-05T06:38:40Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-agy.md", "output_sha256": "d469d04c04e5948641ad3c468fa4eb2759d4c39528fa7c17368576a7ff17ceab", "task_id": "instrev-agy-r1b", "ts": "2026-07-05T06:39:14Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-codex.md", "output_sha256": "dc9d6a5d007b6d47ecb80a162b5fa0e3f1a9f1bdd9b5248cc52347373b64efd9", "task_id": "instrev-codex-r1", "ts": "2026-07-05T06:39:25Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-RECONCILE.md", "output_sha256": "e2f579f8d80b6df2ddb9412e5421e3956cda8720f2433925090e30a1fbf1108c", "task_id": "instrev-stamp-codex-r2", "ts": "2026-07-05T06:41:57Z"}
+=== 2026-07-05 14:41:57 | dispatch ===
+  ts=2026-07-05 14:41:57
+  kind=dispatch
+  intent=制度層總審查R2:Codex戳記審(審reconcile+特別盯Claude腿,APPROVED/REJECTED戳記)
+  risk=high
+  facts_asked=同R1;copilot日期爭議已實測裁決(04-26)
+  review_role=Codex=戳記審查者,驗證reconcile忠實併入其findings+盯Claude腿事實與裁決;同檔戳記序列化,Codex先
+  template=n/a:閉合戳記輪
+  adversarial=waived:本派工即閉合戳記步驟
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-RECONCILE.md", "output_sha256": "2953b08fe49c7f00f3a5c7a5c5d6d98924f6b12e515e57c0477ec1b7878f8775", "task_id": "instrev-stamp-codex-r2", "ts": "2026-07-05T06:43:50Z"}
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/20260705-INSTREV-RECONCILE.md", "output_sha256": "2953b08fe49c7f00f3a5c7a5c5d6d98924f6b12e515e57c0477ec1b7878f8775", "task_id": "instrev-stamp-composer-r2", "ts": "2026-07-05T06:43:59Z"}
+=== 2026-07-05 14:43:59 | dispatch ===
+  ts=2026-07-05 14:43:59
+  kind=dispatch
+  intent=制度層總審查R2:Composer戳記審(審reconcile+特別盯Claude腿,APPROVED/REJECTED戳記;序列在Codex後)
+  risk=high
+  facts_asked=同R1;copilot日期爭議已實測裁決(04-26)
+  review_role=Composer=戳記審查者,驗證reconcile忠實併入其findings+盯Claude腿事實與裁決
+  template=n/a:閉合戳記輪
+  adversarial=waived:本派工即閉合戳記步驟
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260705-INSTREV-RECONCILE.md", "output_sha256": "539d314f081f21140c11262c1528da115076219ad01e586239c457ace78ea9ac", "task_id": "instrev-stamp-composer-r2", "ts": "2026-07-05T06:45:43Z"}

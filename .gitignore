@@ -172,3 +172,4 @@ tests/_golden/ff_deepaudit/
 handoffs/run_receipts/fracdiff_maxlag_golden_artifacts/
 handoffs/run_receipts/20260703T042407Z-fracdiff-maxlag-golden-G1.json
 handoffs/run_receipts/20260703T042407Z-fracdiff-maxlag-golden-G2.json
+handoffs/instrev-evidence/memory/
