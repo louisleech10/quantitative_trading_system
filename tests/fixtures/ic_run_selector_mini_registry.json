@@ -1,38 +1,71 @@
 [
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "12h",
-    "config_hash": "1c4b825498449860a639b0ac37f66d73",
-    "feature_count": 73,
-    "row_count": 1696,
-    "hdf5_relative_path": "data_cache/features/BTCUSDT/12h/1c4b825498449860a639b0ac37f66d73/feature_manifest.json",
-    "created_at": 1782147282.886011,
-    "last_generated_at": 1782147282.886011,
-    "size_bytes": 392417,
-    "alias": "IC Test 1symbol 1tf"
-  },
-  {
-    "symbol": "BTCUSDT",
-    "timeframe": "12h",
-    "config_hash": "90f586663db18ba594b21ce909ad83e0",
-    "feature_count": 45419,
-    "row_count": 1696,
-    "hdf5_relative_path": "data_cache/features/BTCUSDT/12h/90f586663db18ba594b21ce909ad83e0/feature_manifest.json",
-    "batch_id": "a08a292c-1503-4228-9e5d-c3a2f4224846",
-    "created_at": 1782216094.497776,
-    "last_generated_at": 1782216094.497776,
-    "batch_alias": "IC Test-3symbol 1tf"
-  },
-  {
-    "symbol": "ETHUSDT",
-    "timeframe": "12h",
-    "config_hash": "90f586663db18ba594b21ce909ad83e0",
-    "feature_count": 45421,
-    "row_count": 1696,
-    "hdf5_relative_path": "data_cache/features/ETHUSDT/12h/90f586663db18ba594b21ce909ad83e0/feature_manifest.json",
-    "batch_id": "a08a292c-1503-4228-9e5d-c3a2f4224846",
-    "created_at": 1782216167.2112992,
-    "last_generated_at": 1782216167.2112992,
-    "batch_alias": "IC Test-3symbol 1tf"
-  }
+ {
+  "symbol": "BCHUSDT",
+  "timeframe": "12h",
+  "config_hash": "e53e22906c35363757f4cd49d27f973e",
+  "feature_count": 218444,
+  "row_count": 1696,
+  "hdf5_relative_path": "data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json",
+  "batch_id": "3bc1050c-e3fa-4a42-9165-eba41960046f",
+  "created_at": 1783335386.724586,
+  "last_generated_at": 1783335386.724586,
+  "batch_alias": "For IC Analysis Test - 12h"
+ },
+ {
+  "symbol": "BCHUSDT",
+  "timeframe": "12h",
+  "config_hash": "f754aad4cc8fe5ccc1532296d6e279ec",
+  "feature_count": 161092,
+  "row_count": 1696,
+  "hdf5_relative_path": "data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json",
+  "batch_id": "6e9ad7fb-94a7-470b-a92e-17c71c936fb3",
+  "created_at": 1783340269.239279,
+  "last_generated_at": 1783340269.239279
+ },
+ {
+  "symbol": "BTCUSDT",
+  "timeframe": "12h",
+  "config_hash": "e53e22906c35363757f4cd49d27f973e",
+  "feature_count": 218369,
+  "row_count": 1696,
+  "hdf5_relative_path": "data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json",
+  "batch_id": "3bc1050c-e3fa-4a42-9165-eba41960046f",
+  "created_at": 1783334476.979124,
+  "last_generated_at": 1783334476.979124,
+  "batch_alias": "For IC Analysis Test - 12h"
+ },
+ {
+  "symbol": "BTCUSDT",
+  "timeframe": "12h",
+  "config_hash": "f754aad4cc8fe5ccc1532296d6e279ec",
+  "feature_count": 161031,
+  "row_count": 1696,
+  "hdf5_relative_path": "data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json",
+  "batch_id": "6e9ad7fb-94a7-470b-a92e-17c71c936fb3",
+  "created_at": 1783339752.359381,
+  "last_generated_at": 1783339752.359381
+ },
+ {
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "config_hash": "e53e22906c35363757f4cd49d27f973e",
+  "feature_count": 218410,
+  "row_count": 1696,
+  "hdf5_relative_path": "data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json",
+  "batch_id": "3bc1050c-e3fa-4a42-9165-eba41960046f",
+  "created_at": 1783334914.7774458,
+  "last_generated_at": 1783334914.7774458,
+  "batch_alias": "For IC Analysis Test - 12h"
+ },
+ {
+  "symbol": "ETHUSDT",
+  "timeframe": "12h",
+  "config_hash": "f754aad4cc8fe5ccc1532296d6e279ec",
+  "feature_count": 161055,
+  "row_count": 1696,
+  "hdf5_relative_path": "data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json",
+  "batch_id": "6e9ad7fb-94a7-470b-a92e-17c71c936fb3",
+  "created_at": 1783340011.340967,
+  "last_generated_at": 1783340011.340967
+ }
 ]

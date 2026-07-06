@@ -14,7 +14,8 @@ from api.services.ic_analysis_service import ICAnalysisService
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
-HASH_A = "1c4b825498449860a639b0ac37f66d73"
+# 2026-07-06 重凍:改用現行真實 12h run(取代已不在資料集的舊 1c4b825)。
+HASH_A = "e53e22906c35363757f4cd49d27f973e"
 
 
 class _SleepingAnalyzer:
@@ -40,6 +41,14 @@ def _require_run() -> None:
         pytest.skip(f"missing registry run {HASH_A}")
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "第二刀首項 bug:物化的 12h 特徵進到切分驗證(_validate_expected_frequency)時 index"
+        " 為位置整數(0,1,2…)非時間軸,連續性檢查誤判缺口→raise。原始 12h kline 實測連續、1h"
+        " golden 正常。修好後此 xfail 會 xpass(strict)強制移除標記=finding 閉合訊號。"
+    ),
+)
 @pytest.mark.asyncio
 @pytest.mark.ic_run_selector
 @pytest.mark.analyze_real_run

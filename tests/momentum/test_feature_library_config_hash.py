@@ -11,8 +11,8 @@ from momentum.factories import create_feature_library
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
-HASH_A = "1c4b825498449860a639b0ac37f66d73"
-HASH_B = "90f586663db18ba594b21ce909ad83e0"
+HASH_A = "e53e22906c35363757f4cd49d27f973e"
+HASH_B = "f754aad4cc8fe5ccc1532296d6e279ec"
 MINI_REGISTRY_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "ic_run_selector_mini_registry.json"
 )

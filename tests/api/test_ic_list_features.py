@@ -9,7 +9,7 @@ from momentum.factories import create_feature_library
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
-HASH_A = "1c4b825498449860a639b0ac37f66d73"
+HASH_A = "e53e22906c35363757f4cd49d27f973e"
 
 
 @pytest.mark.ic_run_selector

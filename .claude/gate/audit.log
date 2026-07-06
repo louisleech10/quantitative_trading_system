@@ -8917,3 +8917,19 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+=== 2026-07-06 21:20:20 | dispatch ===
+  ts=2026-07-06 21:20:20
+  kind=dispatch
+  intent=codex adversarial review run_selector 重凍 diff(test constants + generator + baseline/mini_registry fixtures)
+  risk=high
+  facts_asked=none-needed: 兩競爭 12h run 由使用者生成+實測確認(row同/feature異);重凍由既有 generator 產出
+  review_role=adversary:codex 挑戰;實作者Claude不自審
+  template=n/a: 既有 diff code review 非 SPEC 派工
+  adversarial=waived:本 dispatch 即 adversarial review,無前置文件
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=

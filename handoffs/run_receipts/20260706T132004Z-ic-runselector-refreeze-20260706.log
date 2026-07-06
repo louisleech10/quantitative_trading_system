@@ -1,0 +1,119 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+21:19:06 [INFO] Loaded feature registry with 9 entries
+collected 24 items
+
+tests/momentum/test_ic_phase0_golden.py::test_grouped_baseline PASSED    [  4%]
+tests/momentum/test_ic_phase0_golden.py::test_feature_filter_baseline 
+-------------------------------- live log call ---------------------------------
+21:19:06 [INFO] IC config loaded
+PASSED                                                                   [  8%]
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline 
+-------------------------------- live log call ---------------------------------
+21:19:06 [INFO] Decay: 1/2 fit warnings summarized (low_variance=1)
+PASSED                                                                   [ 12%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_parses_second_epoch_as_datetime_index PASSED [ 16%]
+tests/momentum/test_ic_timeaxis.py::test_iter_time_groups_handles_second_epoch_kline_shape PASSED [ 20%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_implausible_numeric_timestamps PASSED [ 25%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_parses_millisecond_epoch PASSED [ 29%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_nan_timestamp PASSED [ 33%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_exact_unsupported_magnitude PASSED [ 37%]
+tests/momentum/test_ic_timeaxis.py::test_compute_grouped_ic_rejects_explicit_by_volatility PASSED [ 41%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log call ---------------------------------
+21:19:06 [INFO] Loaded feature registry with 9 entries
+21:19:06 [INFO] IC config loaded
+21:19:06 [INFO] IC analysis task started: 3cc6b62e-00b5-4b5e-a235-427796dbd96c
+21:19:06 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:19:07 [INFO] Data preprocessing complete: columns=50
+21:19:07 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+21:19:07 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+21:19:07 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+21:19:10 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+21:19:10 [INFO] IC analysis task completed: 3cc6b62e-00b5-4b5e-a235-427796dbd96c
+PASSED                                                                   [ 45%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+21:19:13 [INFO] Loaded feature registry with 9 entries
+21:19:13 [INFO] IC config loaded
+21:19:13 [INFO] IC analysis task started: 76fe1caa-2194-420b-8964-da58bdf39b2d
+21:19:13 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:19:13 [INFO] Data preprocessing complete: columns=50
+21:19:13 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+21:19:13 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+21:19:14 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+21:19:15 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+21:19:15 [INFO] IC analysis task completed: 76fe1caa-2194-420b-8964-da58bdf39b2d
+PASSED                                                                   [ 50%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_wraps_cpcv PASSED [ 54%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_wraps_wf PASSED [ 58%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_l5_wf_cross_fold_embargo_violation_raises PASSED [ 62%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_detects_embargo_relaxation 
+-------------------------------- live log call ---------------------------------
+21:19:15 [WARNING] CombinatorialPurgedCV: embargo 清空訓練集，自動降低 embargo
+21:19:15 [ERROR] CPCV embargo mismatch for BTCUSDT fold 0: returned=2 expected=0 extra=[58, 59]
+PASSED                                                                   [ 66%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_l6_cpcv_test_boundaries_rebuilt_independently PASSED [ 70%]
+tests/api/test_ic_run_selector.py::test_disambig_same_tf_different_hash 
+-------------------------------- live log call ---------------------------------
+21:19:15 [INFO] Loaded feature registry with 6 entries
+21:19:15 [INFO] Loaded feature registry with 6 entries
+21:19:24 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+21:19:25 [INFO] Loaded feature registry with 6 entries
+21:19:31 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+PASSED                                                                   [ 75%]
+tests/api/test_ic_run_selector.py::test_backward_compat_matches_baseline 
+-------------------------------- live log call ---------------------------------
+21:19:31 [INFO] Loaded feature registry with 6 entries
+21:19:31 [INFO] Loaded feature registry with 6 entries
+21:19:37 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+PASSED                                                                   [ 79%]
+tests/api/test_ic_run_selector.py::test_ml_caller_load_multi_kwargs_match_baseline 
+-------------------------------- live log call ---------------------------------
+21:19:37 [INFO] Loaded feature registry with 6 entries
+21:19:37 [INFO] Loaded feature registry with 6 entries
+21:19:44 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+21:19:50 [INFO] Loaded features via FeatureReader for ETHUSDT/12h: 1696 rows x 161055 cols (run_status=complete)
+21:19:57 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+21:20:03 [INFO] Loaded features via FeatureReader for ETHUSDT/12h: 1696 rows x 161055 cols (run_status=complete)
+PASSED                                                                   [ 83%]
+tests/api/test_ic_run_selector.py::test_live_registry_skips_orphan_latest 
+-------------------------------- live log call ---------------------------------
+21:20:03 [INFO] Loaded feature registry with 9 entries
+PASSED                                                                   [ 87%]
+tests/api/test_ic_run_selector.py::test_failclosed_registry_miss_without_features_path 
+-------------------------------- live log call ---------------------------------
+21:20:03 [INFO] Loaded feature registry with 6 entries
+21:20:03 [INFO] IC config loaded
+21:20:03 [INFO] IC analysis task started: de2a65e4-1f97-4284-92ce-88b049588505
+21:20:03 [ERROR] IC analysis task failed: run not found: BTCUSDT/12h/11111111111111111111111111111111
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 190, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/12h/11111111111111111111111111111111
+PASSED                                                                   [ 91%]
+tests/api/test_ic_run_selector.py::test_relaxed_explicit_features_path_passes_through 
+-------------------------------- live log call ---------------------------------
+21:20:03 [INFO] Loaded feature registry with 6 entries
+21:20:03 [INFO] IC analysis task started: 179b38ba-b004-45ef-8a1d-cd024d6353a3
+21:20:03 [INFO] IC analysis task completed: 179b38ba-b004-45ef-8a1d-cd024d6353a3
+PASSED                                                                   [ 95%]
+tests/golden/ic_phase1_contract/test_baseline_frozen.py::test_baseline_exists PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:947: OptimizeWarning: Covariance of the parameters could not be estimated
+    params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
+
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 24 passed, 2 warnings in 57.45s ========================

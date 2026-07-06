@@ -14,11 +14,14 @@
 - **修法**:`ic_analysis_service.py` fail-closed 守衛收斂到 registry 解析路徑——`config_hash` 未註冊時,只有 features_path **也**缺席才 `raise run not found`;呼叫端明確給 features_path(golden/artifact replay)不再被擋。run-selector「靜默錯 run」保證不變(features_path 缺席仍 fail-closed)。**證據**:2 golden byte-equal frozen baseline + 2 hermetic 契約測試(fail-closed 保留/relaxation 生效)+ mutation(還原硬守衛→relaxation 測試轉 fail)。
 - **run_selector 4 測試**:改 `is_materialized` skip-guard——12h 特徵資料 gitignored,乾淨 checkout 缺 → 誠實 skip(非造綠);契約覆蓋由上述 hermetic 測試(不需真資料)補回。
 - **Codex review**:[P1](skip 掩蓋契約)已補 hermetic 測試閉合。殘留 **[P2 另立]**:給了 features_path 卻與 config_hash 不一致時未校驗一致性(pre-existing,我的改把它擴到未註冊 hash);不擋本刀,另開小 epic。
-- **⚠️ 未重凍舊-run goldens**:1a_cut1 golden 沿用**已存在的** input .h5(a384e6d2,present),未把 registry 對準現行 `4a8a0b37…`。run_selector 若要實際執行(非 skip)仍需生成 12h 資料——屬 provisioning,未做。
+- **run_selector 重凍已辦(2026-07-06,含 Codex review)**:使用者補生兩套競爭 12h run(BTC/ETH/BCH × e53e2290+f754aad4,同 tf 不同 config、row 皆 1696、feature 218369 vs 161031)。重凍 generator/baseline/mini_registry/測試常數到新 run;generator 加不變式(latest∈{A,B}防漂移);三個 sibling 測試改新 hash 恢復覆蓋。Codex [P1b/P2b] 依建議修補;[P2a] disambig 只比欄名 sha 屬 scoped 限制;殘留 [P2 另立] features_path 與 config_hash 不一致未校驗。
+- 真跑 targeted 測試 exit0 得 19 passed 1 xfailed VERIFY:20260706T135518Z-ic-runselector-final-20260706
 
 ### ★下一站 = IC 1a 第二刀(cross_sectional `analyze_cross_sectional` 防洩漏)
+- **🔴 第二刀首項 bug(重凍時挖出,使用者裁定排入第二刀)**:完整 IC 分析在 12h 資料上會崩。根因=物化的 12h 特徵進到切分驗證 `_validate_expected_frequency`(`ic_filter_orchestrator.py:137`/`core/contracts.py:555`)時 `features_df.index` 是位置整數(0,1,2…)非時間軸→連續性檢查誤判缺口 raise `rows purge requires continuous timestamps`。實測:原始 12h kline 連續(1695 diff 全=43200s)、1h golden 正常→12h 物化路徑掉時間戳(疑 `_materialize_features_for_ic` 或 analyze 拿錯軸)。已用 xfail(strict) 追蹤(修好會 xpass 強制移除標記=閉合訊號)。命中 (a)(d),走完整管線。
 - 續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;P0.5 grouped_ic 止血。目標=79 全合成 IC 測試換端到端真實資料。**建議新 session 起跑**(context 乾淨)。
-- 前置皆就緒:IC SPEC conformance ✅、targeted 重驗 ✅、FF 測試資料(3 sym×1h+12h、max_lag 後、`data_cache/features/`)✅。
+- 前置皆就緒:IC SPEC conformance ✅、targeted 重驗 ✅、run_selector 重凍 ✅、FF 測試資料(3 sym×1h + 兩套 12h、`data_cache/features/`)✅。
+- **舊-run goldens 不重凍**(使用者/我共識):1a/contract golden 自成一體,搬到新資料只會洗掉「歷史已知良好」錨點、弱化回歸,故留。
 
 ### 技術債(另記,不擋)
 - governance 9 pre-existing 紅(b4/b5/r7:舊 spec/fixture 不符演進後 template_check/D-1/provenance)。

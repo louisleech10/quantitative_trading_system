@@ -19,9 +19,11 @@ from momentum.factories import create_feature_library
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
-HASH_A = "1c4b825498449860a639b0ac37f66d73"
-HASH_B = "90f586663db18ba594b21ce909ad83e0"
-UNREGISTERED_HASH = "00000000000000000000000000000000"
+# 2026-07-06 重凍:現行兩套競爭 12h run(同 symbol+tf、不同 config → feature 不同、row 同 1696),
+# 真實生成於 data_cache/features;取代已不在資料集的舊 1c4b825/90f586。
+HASH_A = "e53e22906c35363757f4cd49d27f973e"
+HASH_B = "f754aad4cc8fe5ccc1532296d6e279ec"
+UNREGISTERED_HASH = "11111111111111111111111111111111"
 ORPHAN_HASHES = (
     "4d26a4d46e8f53d9a443a1d65f93f831",
     "5218729ca187e1df263143e649bc5349",

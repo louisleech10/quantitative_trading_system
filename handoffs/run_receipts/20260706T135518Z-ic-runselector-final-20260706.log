@@ -1,0 +1,175 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+21:53:00 [INFO] Loaded feature registry with 9 entries
+collected 20 items
+
+tests/api/test_ic_run_selector.py::test_disambig_same_tf_different_hash 
+-------------------------------- live log call ---------------------------------
+21:53:01 [INFO] Loaded feature registry with 6 entries
+21:53:01 [INFO] Loaded feature registry with 6 entries
+21:53:09 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+21:53:09 [INFO] Loaded feature registry with 6 entries
+21:53:16 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+PASSED                                                                   [  5%]
+tests/api/test_ic_run_selector.py::test_backward_compat_matches_baseline 
+-------------------------------- live log call ---------------------------------
+21:53:16 [INFO] Loaded feature registry with 6 entries
+21:53:16 [INFO] Loaded feature registry with 6 entries
+21:53:22 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+PASSED                                                                   [ 10%]
+tests/api/test_ic_run_selector.py::test_ml_caller_load_multi_kwargs_match_baseline 
+-------------------------------- live log call ---------------------------------
+21:53:22 [INFO] Loaded feature registry with 6 entries
+21:53:22 [INFO] Loaded feature registry with 6 entries
+21:53:28 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+21:53:35 [INFO] Loaded features via FeatureReader for ETHUSDT/12h: 1696 rows x 161055 cols (run_status=complete)
+21:53:42 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+21:53:48 [INFO] Loaded features via FeatureReader for ETHUSDT/12h: 1696 rows x 161055 cols (run_status=complete)
+PASSED                                                                   [ 15%]
+tests/api/test_ic_run_selector.py::test_live_registry_skips_orphan_latest 
+-------------------------------- live log call ---------------------------------
+21:53:48 [INFO] Loaded feature registry with 9 entries
+PASSED                                                                   [ 20%]
+tests/api/test_ic_run_selector.py::test_failclosed_registry_miss_without_features_path 
+-------------------------------- live log call ---------------------------------
+21:53:48 [INFO] Loaded feature registry with 6 entries
+21:53:48 [INFO] IC config loaded
+21:53:48 [INFO] IC analysis task started: b9335ecb-c434-4219-9b85-dae17dd5e46b
+21:53:48 [ERROR] IC analysis task failed: run not found: BTCUSDT/12h/11111111111111111111111111111111
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 190, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/12h/11111111111111111111111111111111
+PASSED                                                                   [ 25%]
+tests/api/test_ic_run_selector.py::test_relaxed_explicit_features_path_passes_through 
+-------------------------------- live log call ---------------------------------
+21:53:48 [INFO] Loaded feature registry with 6 entries
+21:53:48 [INFO] IC analysis task started: 0722b3f8-1874-4986-aa4a-79f9c1a8d5a3
+21:53:48 [INFO] IC analysis task completed: 0722b3f8-1874-4986-aa4a-79f9c1a8d5a3
+PASSED                                                                   [ 30%]
+tests/api/test_ic_analysis_service.py::test_analyze_real_run_with_config_hash_completes 
+-------------------------------- live log call ---------------------------------
+21:53:48 [INFO] Loaded feature registry with 9 entries
+21:53:48 [INFO] Loaded feature registry with 9 entries
+21:53:49 [INFO] IC config loaded
+21:53:49 [INFO] IC analysis task started: d3c5c887-fe74-4bdc-ac3f-6946144ff0d6
+21:53:57 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+21:53:57 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:54:06 [ERROR] IC analysis task failed: rows purge requires continuous timestamps at expected_freq
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 227, in _run_analysis
+    report = await asyncio.to_thread(
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 357, in analyze
+    split_result = _build_holdout_split_plan(
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 180, in _build_holdout_split_plan
+    _validate_expected_frequency(features_df.index, expected_freq)
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 155, in _validate_expected_frequency
+    raise TimestampDiscontinuityError(
+momentum.core.contracts.TimestampDiscontinuityError: rows purge requires continuous timestamps at expected_freq
+XFAIL (第二刀首項 bug:物化的 12h 特徵進到切分驗證(_validate_expected...) [ 35%]
+tests/api/test_ic_analysis_service.py::test_resolve_run_path_contains_config_hash 
+-------------------------------- live log call ---------------------------------
+21:54:07 [INFO] Loaded feature registry with 9 entries
+21:54:07 [INFO] Loaded feature registry with 9 entries
+21:54:16 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+PASSED                                                                   [ 40%]
+tests/api/test_ic_analysis_service.py::test_run_analysis_does_not_block_event_loop 
+-------------------------------- live log call ---------------------------------
+21:54:16 [INFO] Loaded feature registry with 9 entries
+21:54:16 [INFO] IC analysis task completed: longitudinal-task
+21:54:16 [INFO] IC analysis task completed: cross-sectional-task
+PASSED                                                                   [ 45%]
+tests/api/test_ic_analysis_service.py::test_progress_callback_from_to_thread_schedules_on_event_loop 
+-------------------------------- live log call ---------------------------------
+21:54:16 [INFO] Loaded feature registry with 9 entries
+21:54:16 [INFO] IC analysis task completed: progress-task
+PASSED                                                                   [ 50%]
+tests/api/test_ic_list_features.py::test_list_features_v2_matches_load_columns 
+-------------------------------- live log call ---------------------------------
+21:54:16 [INFO] Loaded feature registry with 9 entries
+21:54:16 [INFO] Loaded feature registry with 9 entries
+21:54:26 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+PASSED                                                                   [ 55%]
+tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig 
+-------------------------------- live log call ---------------------------------
+21:54:26 [INFO] Loaded feature registry with 6 entries
+21:54:26 [INFO] Loaded feature registry with 6 entries
+21:54:35 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 218369 cols (run_status=complete)
+21:54:42 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+PASSED                                                                   [ 60%]
+tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized 
+-------------------------------- live log call ---------------------------------
+21:54:42 [INFO] Loaded feature registry with 6 entries
+21:54:42 [INFO] Loaded feature registry with 6 entries
+21:54:48 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+21:54:55 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+PASSED                                                                   [ 65%]
+tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable 
+-------------------------------- live log call ---------------------------------
+21:54:55 [INFO] Loaded feature registry with 6 entries
+21:54:55 [INFO] Loaded feature registry with 6 entries
+21:55:01 [INFO] Loaded features via FeatureReader for BTCUSDT/12h: 1696 rows x 161031 cols (run_status=complete)
+21:55:08 [INFO] Loaded features via FeatureReader for ETHUSDT/12h: 1696 rows x 161055 cols (run_status=complete)
+PASSED                                                                   [ 70%]
+tests/momentum/test_feature_library_config_hash.py::test_explicit_config_hash_missing_artifacts_fail_closed 
+-------------------------------- live log call ---------------------------------
+21:55:08 [INFO] Loaded feature registry with 6 entries
+21:55:08 [INFO] Loaded feature registry with 6 entries
+PASSED                                                                   [ 75%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log call ---------------------------------
+21:55:08 [INFO] Loaded feature registry with 9 entries
+21:55:08 [INFO] IC config loaded
+21:55:08 [INFO] IC analysis task started: 1f34f53c-66f1-43df-b8bc-53751bc351cc
+21:55:08 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:55:09 [INFO] Data preprocessing complete: columns=50
+21:55:09 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+21:55:09 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+21:55:09 [INFO] Decay: 50/50 fit warnings summarized (insufficient_points=50)
+21:55:12 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+21:55:12 [INFO] IC analysis task completed: 1f34f53c-66f1-43df-b8bc-53751bc351cc
+PASSED                                                                   [ 80%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+21:55:15 [INFO] Loaded feature registry with 9 entries
+21:55:15 [INFO] IC config loaded
+21:55:15 [INFO] IC analysis task started: dd75063a-b611-40b6-aae1-b30ddd3bbb7b
+21:55:15 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:55:15 [INFO] Data preprocessing complete: columns=50
+21:55:15 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+21:55:15 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+21:55:16 [INFO] Decay: 8/50 fit warnings summarized (fit_exception=1, insufficient_points=1, low_r2=6)
+21:55:17 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+21:55:17 [INFO] IC analysis task completed: dd75063a-b611-40b6-aae1-b30ddd3bbb7b
+PASSED                                                                   [ 85%]
+tests/momentum/test_ic_phase0_golden.py::test_grouped_baseline PASSED    [ 90%]
+tests/momentum/test_ic_phase0_golden.py::test_feature_filter_baseline 
+-------------------------------- live log call ---------------------------------
+21:55:17 [INFO] IC config loaded
+PASSED                                                                   [ 95%]
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline 
+-------------------------------- live log call ---------------------------------
+21:55:17 [INFO] Decay: 1/2 fit warnings summarized (low_variance=1)
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:947: OptimizeWarning: Covariance of the parameters could not be estimated
+    params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============ 19 passed, 1 xfailed, 2 warnings in 137.07s (0:02:17) =============
