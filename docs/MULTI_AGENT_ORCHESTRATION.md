@@ -87,6 +87,12 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 **R7-emitter**：任何帶 `--task-id` 的 dispatch（不分 risk/有無 adversarial）都 emit `committee_dispatch` 審計事件（`.claude/gate/audit.log`，json.dumps 防注入）；**stamp-review 派工必帶 `--output <reconcile路徑>`**。委員產出落地後 `bash scripts/gate.sh register-output <task-id> <path>` 補記 `committee_output`（raw bytes sha256；**須有同 task-id 先行 dispatch 事件**，拒 `legacy-*`、拒 handoffs/ 外路徑）→ 未來 reconcile 戳記 provenance 不再靠 waived。
 **O3 檔案類豁免**：`handoffs/` 下有事件且**當前內容 sha256 相符**的委員會過程檔，prose operational claim 免 VERIFY backing（改一字即失效；HANDOFF/commit-msg/docs 不在豁免內）。逃生口 `VERIFY_GATE_O3_FILECLASS=0`。legacy 8 檔走一次性 `scripts/register_legacy_committee_files.sh`（白名單+sha 寫死）。SPEC=`docs/GOV_O3EXT_R7_SPEC.md`。
 
+### 批次戳記慣例 + 同檔並發序列化（U-13,2026-07-06 制度層總審查 Phase C）
+**批次戳記**：一位委員**一次派工**可審**多個** reconcile/章程檔 → 對每個檔各自 `append` 一行 `RECONCILE-STAMP`（逐檔一行，body-hash 各檔用 `scripts/reconcile_body_hash.sh` 自算）。省掉「每檔一次派工」的來回；stamp-review 派工 `--output` 指其一，其餘檔同輪 append，provenance 各檔以 `register-output`（或路徑相符）認。
+**不可自我認證原則不動**：批次只減**派工次數**，不減**審查對象**——Claude 的腿/reconcile/SPEC 同須委員審+戳記（見上「Claude 自身不享特權」）；批次不得用來繞過任一審查腿。
+**同檔並發序列化**：≥2 委員需寫**同一** reconcile 檔的戳記時**序列化**（前一位 append 落地後、後一位再 append），**不得並發寫同檔**（防 append 交錯/覆寫遺失戳記）。實務＝Claude 逐一派、等前一位產出落地再派下一位（本專案 codex→composer 序列即此模式；亦防執行端 `git checkout` tracked 共用檔洗掉他人戳記/留痕）。
+**第二階段候選（暫緩）**：把 findings/reconcile/stamp 包成單一命令（CODEX B-4）→ 先用批次化，包命令視摩擦殘量再議。
+
 **範本（V13 緊湊+錨點版，compliance-first）**：`templates/SPEC_TEMPLATE.md`（§RISK/§A/§C/§G/§P/§V/§R/§N 必填錨點）、
 `TODO_GENERATION_PROMPT.md`（蒸餾 1030→緊湊；產出 §0/§B/Task 驗證·邊界·不可做）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」）。
 為何重寫：舊版過長 → 被 grep 一下就改寫成扁平 checklist（compliance 失敗）。新版緊湊到「讀的成本 < 改寫的成本」+ 錨點綁 gate 機檢。
