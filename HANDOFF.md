@@ -18,7 +18,7 @@
 - 真跑 targeted 測試 exit0 得 19 passed 1 xfailed VERIFY:20260706T135518Z-ic-runselector-final-20260706
 
 ### ★下一站 = IC 1a 第二刀(cross_sectional `analyze_cross_sectional` 防洩漏)
-- **🔴 第二刀首項 bug(重凍時挖出,使用者裁定排入第二刀)**:完整 IC 分析在 12h 資料上會崩。根因=物化的 12h 特徵進到切分驗證 `_validate_expected_frequency`(`ic_filter_orchestrator.py:137`/`core/contracts.py:555`)時 `features_df.index` 是位置整數(0,1,2…)非時間軸→連續性檢查誤判缺口 raise `rows purge requires continuous timestamps`。實測:原始 12h kline 連續(1695 diff 全=43200s)、1h golden 正常→12h 物化路徑掉時間戳(疑 `_materialize_features_for_ic` 或 analyze 拿錯軸)。已用 xfail(strict) 追蹤(修好會 xpass 強制移除標記=閉合訊號)。命中 (a)(d),走完整管線。
+- **🔴 第二刀首項 bug(重凍時挖出,使用者裁定排入第二刀)——全 tf 非 12h 專屬**:走 config_hash 叫完整 IC 分析時,`feature_library.load` 回的 `features_df.index` 是位置整數(0,1,2…)非時間軸→切分驗證 `_validate_expected_frequency`(`ic_filter_orchestrator.py:137`/`core/contracts.py:555`)誤判缺口 raise `rows purge requires continuous timestamps`。**根因確認**:時間軸有持久化(manifest `row_index`→`timestamps.parquet`,unit=s),reader 有 `load_row_index_v2` 能讀成 DatetimeIndex,但**只有 `feature_factory_service:5458` 呼叫,`feature_library.load` 從不呼叫也不 set_index**→載入路徑不分 tf 一律掉時間軸。1h golden 正常是因它走現成 top50.h5 fixture 非 load 路徑;12h 只是第一個真走 config_hash→現載現分析故先現形。1d 另缺於 `EXPECTED_FREQ_BY_TIMEFRAME`(僅1h/4h/12h)。修法=load 貼回 row_index,一次全 tf 好。已 `test_analyze_real_run_with_config_hash_completes` xfail(strict) 追蹤。命中 (a)(d)。
 - 續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;P0.5 grouped_ic 止血。目標=79 全合成 IC 測試換端到端真實資料。**建議新 session 起跑**(context 乾淨)。
 - 前置皆就緒:IC SPEC conformance ✅、targeted 重驗 ✅、run_selector 重凍 ✅、FF 測試資料(3 sym×1h + 兩套 12h、`data_cache/features/`)✅。
 - **舊-run goldens 不重凍**(使用者/我共識):1a/contract golden 自成一體,搬到新資料只會洗掉「歷史已知良好」錨點、弱化回歸,故留。
