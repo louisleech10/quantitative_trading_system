@@ -1,0 +1,34 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260706T033550Z-ic-spec-conformance-20260706",
+  "claim_id": "ic-spec-conformance-20260706",
+  "command": [
+    "bash",
+    "scripts/template_check.sh",
+    "spec",
+    "docs/IC_PHASE0_SPEC.md"
+  ],
+  "command_sha256": "d22fb40279b79ac9c7af552a424a84e1076abb972763c106fd591cd4ad1c9b67",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "181e0085cabec387fa0c0271c37edbe34552764d",
+  "tree_dirty": true,
+  "started_at": "2026-07-06T03:35:50Z",
+  "ended_at": "2026-07-06T03:35:50Z",
+  "duration_seconds": 0.261387,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": "static",
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "4676d6017a46487fec81a25e4b9f7a0377cf5f9de9f1217ffdd966020fa7352b",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "4676d6017a46487fec81a25e4b9f7a0377cf5f9de9f1217ffdd966020fa7352b",
+  "log_path": "handoffs/run_receipts/20260706T033550Z-ic-spec-conformance-20260706.log",
+  "tail_excerpt": [
+    "TEMPLATE PASS (spec): docs/IC_PHASE0_SPEC.md 含全部必填錨點，且無明顯空殼。"
+  ]
+}

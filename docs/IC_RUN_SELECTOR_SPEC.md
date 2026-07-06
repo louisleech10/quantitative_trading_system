@@ -3,6 +3,7 @@
 > 來源 PLAN/診斷：handoffs/20260623-ic-run-selector-DESIGN.md §6（雙家族 reconcile 定案）｜ 日期：2026-06-23 ｜ 對應 TODO：docs/IC_RUN_SELECTOR_TODO.md ｜ manifest：handoffs/20260623-ic-run-selector-MANIFEST.md
 
 ## §RISK 風險分級
+- RISK-HIT: b,d
 - **大小**：大。
 - **命中高風險原則**：
   - **(b) 跨模組共用路徑**：`feature_library.load/load_multi/_load_internal` 有多消費者（IC 分析 ic_analysis_service、ML 訓練 cross_symbol_training_service:38、browser feature_browser_service:97）。改簽名一處影響三片。

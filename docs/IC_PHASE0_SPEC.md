@@ -4,6 +4,7 @@
 > Manifest：`handoffs/20260625-ic-PHASE0-MANIFEST.md` ｜ 白話 brief：`20260625-ic-PHASE0-BRIEF.md` ｜ 對應 TODO：`docs/IC_PHASE0_TODO.md`（待生成）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
+- RISK-HIT: b,d
 - **大小**：**大**（接 CLAUDE.md 任務分派規則：多 epic + 命中高風險原則）。 `[M-1]`
 - **命中高風險原則**：
   - **(b) 跨模組/共用路徑**：改 `momentum/Analysis/ic_engine.py`、`ic_filter_orchestrator.py`、`ic_config_schema.py`、`api/services/ic_analysis_service.py`、frontend hooks/store——多下游消費者。
@@ -14,17 +15,20 @@
 
 ### 已驗證事實（每項標 fact-verified=實跑 / code-verified=讀碼 / assumed） `[M-2]`
 1. **IC-CRASH 契約不一致**〔code-verified〕：`compute_grouped_ic(self, ..., config: dict)`（ic_engine.py:371）內部 `config.get("method")`（:377）為 dict API。**唯一 caller** `ic_filter_orchestrator.py:1139` 傳 `config.ic_calculation.grouped_analysis`（型別 pydantic `GroupedConfig`，schema:76）。驗證：`grep -rn compute_grouped_ic momentum/ api/` → 僅 orchestrator:1134 一處 caller（排除 test）。pydantic 無 `.get` → AttributeError。觸發條件 `config.report.include_regime_analysis=True`（:1133）。
+   - FACT-RECEIPT: [2026-07-06 復驗] `grep -rn compute_grouped_ic momentum/ api/ | grep -v test` → 唯一 caller `ic_filter_orchestrator.py:1668`（def 於 `ic_engine.py:380`）。註：caller 現傳 `config.ic_calculation.grouped_analysis.model_dump()`（dict，orchestrator:1673），AttributeError 已於 commit 11507f5 修復；本項為修法前診斷，保留為歷史。
 2. **IC-TIMEAXIS（真 bug=崩潰，非靜默 1970）**〔fact-verified〕：`read_klines`（kline_storage.py:1084,1107）回 **RangeIndex** + `timestamp` int64 秒級欄（實跑 BTCUSDT/1h：`timestamp[0]=1704067200`，`unit=s`=2024、`unit=ms`=1970）。`_get_time_index`（:1024-1025）對 **Series** 呼叫 `pd.to_datetime(values, unit="ms")` → **回傳 Series（非 DatetimeIndex）**。`_iter_time_groups`（:1011）`time_index.to_series()` → **`AttributeError: 'Series' object has no attribute 'to_series'`**（Claude 親跑確認）。即修完 C-1 後 grouped by_year/quarter 在真實 kline 路徑**先崩潰**，1970 錯軸只是次要。**修法須同時 (i) 回傳對齊 raw_data.index 的 DatetimeIndex (ii) 修單位 s/ms**。
+   - FACT-RECEIPT: [2026-07-06 復驗] `tests/fixtures/ic_phase0/kline_seconds.csv` timestamp[0]=1704067200 dtype=int64；`pd.to_datetime(ts,unit='s')`→2024-01-01、`unit='ms'`→1970-01-20（單位事實仍成立）。`ICEngine._get_time_index` 現簽名 `-> Optional[pd.DatetimeIndex]`（崩潰已於 commit 11507f5 修復）；本項為修法前診斷，保留為歷史。
 3. **IC-BYVOL 契約漂移**〔code-verified〕：`GroupedConfig.by_volatility` 預設 `True`（schema:80），但 `compute_grouped_ic` 只有 `by_year`/`by_quarter`/`by_regime` 分支（ic_engine.py:383-400），**無 by_volatility** → 開了靜默忽略。驗證：`grep by_volatility ic_engine.py` → 0 處理邏輯。
 4. **IC-FEATURE-GUARD 幽靈（去 config_override 非 metadata）**〔fact-verified〕：`api/models/ic_models.py:8` `FeatureFilterConfig`（include/exclude/pattern/categories/data_sources/families/max_features）→ service.py:967-970 `_build_config_override` 用 `_deep_merge` 放進 **config override**（非 metadata）→ `ICConfig.model_validate` **靜默丟棄**未知頂層鍵（Claude 親跑 `ICConfig.model_validate({'feature_filter':...})` → `has feature_filter attr False`；無 `extra='forbid'`）→ momentum 零消費。實見 run 全量 45,421 特徵。**前端預設 `max_features:30`（icAnalysisStore.ts:187），落地若不設防會把所有 analyze 靜默截成 30**。
 5. **IC-DECAY-LOG 熱迴圈**〔code-verified〕：`_fit_exponential_decay`（ic_engine.py:944）`logger.warning("Decay fit quality low...")` 在 per-feature 路徑（compute_ic_decay:331 對 columns 迴圈，:349 呼叫）；單次 run 14,090 條。**修法所需 r2/fit_warning_reason 已在回傳 dict**（:949-）。
 6. **IC-UX-ERR event loop 阻塞**〔assumed/委員會來源〕：cursor 揪 service.py:209-216 主 analyze（longitudinal）同步阻塞、cross-sectional `analyze_cross_sectional`（:154-159）同樣同步；前端 useICAnalysis.ts:88-117 onclose 無限重連、failed 不 setError。**未實跑 heartbeat 證據；實作端須先讀碼確認 to_thread 對應點再改**。
+   - FACT-RECEIPT: [2026-07-06 復驗] 碼位 read-verified 仍在：`ic_filter_orchestrator.analyze_cross_sectional`（:528）、`useICAnalysis.ts` onclose/setError（:147/:169）。本項為〔assumed〕：event loop 阻塞屬 runtime 行為，未實跑 heartbeat，僅碼位存在經 grep 確認，blocking 假設本身未證。
 
 ### 待使用者確認（未確認前不得實作相關 Task）→ 已由委員會收斂 `[M-3]`
 - **IC-BYVOL 修法**：使用者 2026-06-25 授權「照委員會收斂結果執行」→ **雙家族 adversarial（GPT-5.x + Composer）獨立一致判 (b) fail-closed + schema 預設 `by_volatility=False` + migration**（reconcile：`handoffs/20260625-ic-PHASE0-ADVERSARIAL-RECONCILE.md`）。**已收斂，Task 2.3 寫死單一路徑**。 `[B-1]`
 
 ### 已確認結果
-- 起點=Phase 0、walk-forward 復用 ML 孤島、不碰串流/train-test/case-control（使用者 2026-06-24 baked-in）。
+- 已確認：起點=Phase 0、walk-forward 復用 ML 孤島、不碰串流/train-test/case-control（使用者 2026-06-24 baked-in）。
 - IC-BYVOL 決策權委派委員會（使用者 2026-06-25）。
 
 ## §C 約束（引用 + 只列本任務相關） `[M-4]`

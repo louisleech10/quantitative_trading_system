@@ -5,12 +5,14 @@
 > 日期：2026-06-26　|　對應 TODO：docs/IC_PHASE1_CONTRACT_TODO.md（待 TODO_GENERATION 生成）
 
 ## §RISK 風險分級
+- RISK-HIT: a,d
 - **大小**：大（契約是後面 1a-1f 全部正確性修法的地基，跨棧、難回退）。
 - **命中高風險原則**：(a) 數值/資料品質（artifact 全表值守恆、not_evaluated 不混入 0）、(b) 跨模組共用路徑（`momentum/core/contracts.py`+`api/models/ic_models.py`+`ic_analysis_service.py`，多下游）、(c) 多 phase 難回退（契約定錯 → 1a-1f + Phase 3 返工）、(d) ML 正確性/防洩漏（per-symbol + 單 symbol 時間連續性、selection scope、前瞻對齊）。
 - 命中 (a)+(d) → §G Golden 必填、adversarial review 必跑（已跑雙家）、三方數據正確性簽核必跑。
 
 ## §A 假設與待使用者確認
 - **已驗證事實**（附驗證方式：pytest 實跑 / grep / 實讀 .py 原始碼）：
+  - FACT-RECEIPT: [2026-07-06 復驗] `grep "def split" momentum/Analysis/model_validation/walk_forward_validator.py` → rc=1（無 split()，SPEC 主張成立）；契約層已落地 `momentum/Analysis/ic_split_adapter.py`（`ICSplitAdapter.split_cpcv`/`split_wf` + `EmbargoRelaxedError`），對應 commit 見 §P。
   - **只有 `CombinatorialPurgedCV` 有 `def split()`**（`combinatorial_purged_cv.py:41`，yield `(train_idx,test_idx)` int 陣列）。**`WalkForwardValidator` 無 `def split()`**（`grep "def split" walk_forward_validator.py`→0，實驗證），對外只有 `validate(model_factory,X,y,...)`，內部 `_generate_rolling_splits()` 回 index range tuples。【v1 §A 誤稱兩者皆有 split()，已更正——CURSOR adversarial 抓出】
   - CPCV/WF 切分用 **positional integer index**，purge/embargo 用連續切片 `mask[purge_start:purge_end]`（`combinatorial_purged_cv.py:181-197` 實讀）。**positional purge 假設樣本時間連續等距**。
   - **CPCV 在 train 清空時會自動降 embargo（silent relaxation）**：`combinatorial_purged_cv.py:75-79` 實見 `embargo_pct/2` 重算 + warning。複用時若不偵測會繼承此弱化。

@@ -5,6 +5,7 @@
 > 日期：2026-06-26　|　對應 TODO：docs/IC_PHASE1_1a_CUT1_TODO.md
 
 ## §RISK 風險分級
+- RISK-HIT: a,d
 - **大小**：大。接線動 IC 主流程（`analyze()`）共用路徑、難回退、碰防洩漏。
 - **命中高風險原則**：(a) 數值/資料品質（train-fit 邊界、OOS 報告值、flag-off byte 守恆）；(b) 跨模組/共用路徑（`ic_filter_orchestrator.analyze`、`data_preprocessor`、`factories`、`core/contracts`，多下游讀 `get_result()`）；(c) 多 phase/難回退；(d) ML 正確性/防洩漏（train-only fit、OOS、purge、label horizon 前瞻、rolling warmup、單幣連續性）。
 - 命中 (a)+(d) → **§G Golden 必填、雙家族 adversarial 必跑（已跑兩輪）、三方數據簽核必跑**。

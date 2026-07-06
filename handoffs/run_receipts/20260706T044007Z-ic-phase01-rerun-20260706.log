@@ -1,0 +1,303 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+12:40:05 [INFO] Loaded feature registry with 3 entries
+collected 51 items
+
+tests/momentum/test_ic_phase0_golden.py::test_grouped_baseline PASSED    [  1%]
+tests/momentum/test_ic_phase0_golden.py::test_feature_filter_baseline 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] IC config loaded
+PASSED                                                                   [  3%]
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Decay: 1/2 fit warnings summarized (low_variance=1)
+PASSED                                                                   [  5%]
+tests/momentum/test_ic_crash_real_config.py::test_stage4_grouped_uses_real_pydantic_config 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] IC config loaded
+PASSED                                                                   [  7%]
+tests/momentum/test_ic_crash_real_config.py::test_default_grouped_config_does_not_raise_with_kline 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] IC config loaded
+12:40:05 [INFO] Decay: 2/2 fit warnings summarized (low_variance=2)
+PASSED                                                                   [  9%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_parses_second_epoch_as_datetime_index PASSED [ 11%]
+tests/momentum/test_ic_timeaxis.py::test_iter_time_groups_handles_second_epoch_kline_shape PASSED [ 13%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_implausible_numeric_timestamps PASSED [ 15%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_parses_millisecond_epoch PASSED [ 17%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_nan_timestamp PASSED [ 19%]
+tests/momentum/test_ic_timeaxis.py::test_get_time_index_rejects_exact_unsupported_magnitude PASSED [ 21%]
+tests/momentum/test_ic_timeaxis.py::test_compute_grouped_ic_rejects_explicit_by_volatility PASSED [ 23%]
+tests/momentum/test_ic_decay_log.py::test_compute_ic_decay_aggregates_fit_warnings 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Decay: 1/2 fit warnings summarized (low_variance=1)
+PASSED                                                                   [ 25%]
+tests/momentum/test_ic_decay_log.py::test_compute_ic_decay_logs_summary_when_all_fits_succeed 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Decay: 0/1 fit warnings summarized (none)
+PASSED                                                                   [ 27%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_resolve_expected_freq PASSED [ 29%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_metadata_symbol_required PASSED [ 31%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_metadata_symbol_outside_allowlist_blocked PASSED [ 33%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_icconfig_new_fields_default_off PASSED [ 35%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_analyze_builds_holdout PASSED [ 37%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_holdout_purge_covers_horizon PASSED [ 39%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_purge_uses_effective_not_default PASSED [ 41%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_analyze_split_gap_blocked PASSED [ 43%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_split_valid_passes PASSED [ 45%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_mask_survives_event_filter PASSED [ 47%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_pipeline_order_split_before_preprocessing PASSED [ 49%]
+tests/momentum/Analysis/test_ic_1a_cut1_split.py::test_effective_horizon_resolution PASSED [ 50%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_ic_rolling_warmup 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] IC autocorr persistent: count=2
+PASSED                                                                   [ 52%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_min_test_rows_skipped PASSED [ 54%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_summary_and_threshold_same_scope PASSED [ 56%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_stage5_metrics_all_oos PASSED [ 58%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_decay_redundancy_scope_test 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Redundancy filter completed: method=greedy input=1 output=1
+PASSED                                                                   [ 60%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_purge_label_mutation_does_not_change_test_rolling_ic 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] IC autocorr persistent: count=2
+12:40:05 [INFO] IC autocorr persistent: count=2
+PASSED                                                                   [ 62%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_winsorize_type_branch_uses_train_slice_only 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Data preprocessing complete: columns=1
+12:40:05 [INFO] Data preprocessing complete: columns=1
+PASSED                                                                   [ 64%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_holdout_embargo_delays_test_start PASSED [ 66%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Data preprocessing complete: columns=2
+12:40:05 [INFO] Data preprocessing complete: columns=2
+PASSED                                                                   [ 68%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_fallback_insufficient_data_marks_applied_false 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Data preprocessing complete: columns=2
+12:40:05 [INFO] IC autocorr persistent: count=2
+12:40:05 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+12:40:05 [INFO] Filtered features saved: data_cache/features/BTCUSDT_1h_filtered.h5
+12:40:05 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 70%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_irregular_timestamps_still_fail_closed PASSED [ 72%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Data preprocessing complete: columns=2
+12:40:05 [INFO] IC autocorr persistent: count=2
+12:40:05 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+12:40:05 [INFO] Filtered features saved: data_cache/features/BTCUSDT_1h_filtered.h5
+12:40:05 [INFO] IC report saved: data_cache/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 74%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_via_config_override 
+-------------------------------- live log call ---------------------------------
+12:40:05 [INFO] Loaded feature registry with 3 entries
+PASSED                                                                   [ 76%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline 
+-------------------------------- live log call ---------------------------------
+12:40:06 [INFO] Loaded feature registry with 3 entries
+12:40:06 [INFO] IC config loaded
+12:40:06 [INFO] IC analysis task started: 30d143ac-6883-491c-a3ef-1e8ce122e1a1
+12:40:06 [ERROR] IC analysis task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 184, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+FAILED                                                                   [ 78%]
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden 
+-------------------------------- live log call ---------------------------------
+12:40:06 [INFO] Loaded feature registry with 3 entries
+12:40:06 [INFO] IC config loaded
+12:40:06 [INFO] IC analysis task started: 00eafafb-4911-472b-a868-314954175cce
+12:40:06 [ERROR] IC analysis task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 184, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+FAILED                                                                   [ 80%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_wraps_cpcv PASSED [ 82%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_wraps_wf PASSED [ 84%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_l5_wf_cross_fold_embargo_violation_raises PASSED [ 86%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_adapter_detects_embargo_relaxation 
+-------------------------------- live log call ---------------------------------
+12:40:07 [WARNING] CombinatorialPurgedCV: embargo 清空訓練集，自動降低 embargo
+12:40:07 [ERROR] CPCV embargo mismatch for BTCUSDT fold 0: returned=2 expected=0 extra=[58, 59]
+PASSED                                                                   [ 88%]
+tests/momentum/Analysis/test_ic_split_adapter.py::test_l6_cpcv_test_boundaries_rebuilt_independently PASSED [ 90%]
+tests/api/test_ic_run_selector.py::test_disambig_same_tf_different_hash 
+-------------------------------- live log call ---------------------------------
+12:40:07 [INFO] Loaded feature registry with 3 entries
+12:40:07 [INFO] Loaded feature registry with 3 entries
+FAILED                                                                   [ 92%]
+tests/api/test_ic_run_selector.py::test_backward_compat_matches_baseline 
+-------------------------------- live log call ---------------------------------
+12:40:07 [INFO] Loaded feature registry with 3 entries
+12:40:07 [INFO] Loaded feature registry with 3 entries
+FAILED                                                                   [ 94%]
+tests/api/test_ic_run_selector.py::test_ml_caller_load_multi_kwargs_match_baseline 
+-------------------------------- live log call ---------------------------------
+12:40:07 [INFO] Loaded feature registry with 3 entries
+12:40:07 [INFO] Loaded feature registry with 3 entries
+FAILED                                                                   [ 96%]
+tests/api/test_ic_run_selector.py::test_live_registry_skips_orphan_latest 
+-------------------------------- live log call ---------------------------------
+12:40:07 [INFO] Loaded feature registry with 3 entries
+FAILED                                                                   [ 98%]
+tests/golden/ic_phase1_contract/test_baseline_frozen.py::test_baseline_exists PASSED [100%]
+
+=================================== FAILURES ===================================
+______________________ test_flag_off_deep_equal_baseline _______________________
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py:80: in test_flag_off_deep_equal_baseline
+    actual = asyncio.run(_run_baseline(split_on=False))
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py:642: in run_until_complete
+    return future.result()
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py:66: in _run_baseline
+    raise AssertionError(f"IC task failed: {status.get('error')}")
+E   AssertionError: IC task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+----------------------------- Captured stderr call -----------------------------
+2026-07-06 12:40:06,161 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-06 12:40:06,161] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:06,161 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+[2026-07-06 12:40:06,191] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-06 12:40:06,191 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-06 12:40:06,192 - api.ic_analysis_service - INFO - IC analysis task started: 30d143ac-6883-491c-a3ef-1e8ce122e1a1
+2026-07-06 12:40:06,192 - api.ic_analysis_service - ERROR - IC analysis task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 184, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+------------------------------ Captured log call -------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:414 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: 30d143ac-6883-491c-a3ef-1e8ce122e1a1
+ERROR    api.ic_analysis_service:ic_analysis_service.py:249 IC analysis task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 184, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+_______________________ test_flag_on_matches_new_golden ________________________
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py:94: in test_flag_on_matches_new_golden
+    actual = asyncio.run(_run_baseline(split_on=True))
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py:642: in run_until_complete
+    return future.result()
+tests/momentum/Analysis/test_ic_1a_cut1_golden.py:66: in _run_baseline
+    raise AssertionError(f"IC task failed: {status.get('error')}")
+E   AssertionError: IC task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+----------------------------- Captured stderr call -----------------------------
+2026-07-06 12:40:06,652 - asyncio - DEBUG - Using selector: KqueueSelector
+[2026-07-06 12:40:06,652] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:06,652 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+[2026-07-06 12:40:06,672] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-07-06 12:40:06,672 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-07-06 12:40:06,672 - api.ic_analysis_service - INFO - IC analysis task started: 00eafafb-4911-472b-a868-314954175cce
+2026-07-06 12:40:06,672 - api.ic_analysis_service - ERROR - IC analysis task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 184, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+------------------------------ Captured log call -------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:414 IC config loaded
+INFO     api.ic_analysis_service:ic_analysis_service.py:83 IC analysis task started: 00eafafb-4911-472b-a868-314954175cce
+ERROR    api.ic_analysis_service:ic_analysis_service.py:249 IC analysis task failed: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/api/services/ic_analysis_service.py", line 184, in _run_analysis
+    raise ValueError(f"run not found: {symbol}/{timeframe}/{config_hash}")
+ValueError: run not found: BTCUSDT/1h/a384e6d22ca15fc639757cb3162e7cb3
+_____________________ test_disambig_same_tf_different_hash _____________________
+tests/api/test_ic_run_selector.py:87: in test_disambig_same_tf_different_hash
+    result_a = _capture_run_metrics(HASH_A)
+tests/api/test_ic_run_selector.py:69: in _capture_run_metrics
+    df = library.load(SYMBOL, TIMEFRAME, config_hash=resolved)
+momentum/FeatureEngineering/feature_library.py:67: in load
+    return self._load_internal(
+momentum/FeatureEngineering/feature_library.py:167: in _load_internal
+    raise FeatureNotFoundError(
+E   momentum.core.contracts.FeatureNotFoundError: Features not found for BTCUSDT/12h: V2 artifacts missing for config_hash: 1c4b825498449860a639b0ac37f66d73
+----------------------------- Captured stderr call -----------------------------
+[2026-07-06 12:40:07,025] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,025 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+[2026-07-06 12:40:07,025] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,025 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+------------------------------ Captured log call -------------------------------
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+____________________ test_backward_compat_matches_baseline _____________________
+tests/api/test_ic_run_selector.py:101: in test_backward_compat_matches_baseline
+    actual = _capture_run_metrics(None)
+tests/api/test_ic_run_selector.py:64: in _capture_run_metrics
+    assert entry is not None
+E   assert None is not None
+----------------------------- Captured stderr call -----------------------------
+[2026-07-06 12:40:07,036] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,036 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+[2026-07-06 12:40:07,037] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,037 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+------------------------------ Captured log call -------------------------------
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+_______________ test_ml_caller_load_multi_kwargs_match_baseline ________________
+tests/api/test_ic_run_selector.py:129: in test_ml_caller_load_multi_kwargs_match_baseline
+    await service.run_cross_symbol_validation(
+api/services/cross_symbol_training_service.py:38: in run_cross_symbol_validation
+    multi_features = self._feature_library.load_multi(
+tests/api/test_ic_run_selector.py:119: in spy_load_multi
+    return original_load_multi(*args, **kwargs)
+momentum/FeatureEngineering/feature_library.py:225: in load_multi
+    loaded[symbol] = self.load(
+momentum/FeatureEngineering/feature_library.py:67: in load
+    return self._load_internal(
+momentum/FeatureEngineering/feature_library.py:110: in _load_internal
+    raise FeatureNotFoundError(
+E   momentum.core.contracts.FeatureNotFoundError: Features not found for BTCUSDT/12h: No materialized registry entry
+---------------------------- Captured stderr setup -----------------------------
+2026-07-06 12:40:07,041 - asyncio - DEBUG - Using selector: KqueueSelector
+------------------------------ Captured log setup ------------------------------
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+----------------------------- Captured stderr call -----------------------------
+[2026-07-06 12:40:07,041] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,041 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+[2026-07-06 12:40:07,042] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,042 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+------------------------------ Captured log call -------------------------------
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+____________________ test_live_registry_skips_orphan_latest ____________________
+tests/api/test_ic_run_selector.py:159: in test_live_registry_skips_orphan_latest
+    assert entry is not None
+E   assert None is not None
+----------------------------- Captured stderr call -----------------------------
+[2026-07-06 12:40:07,209] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 3 entries
+2026-07-06 12:40:07,209 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 3 entries
+------------------------------ Captured log call -------------------------------
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 3 entries
+=============================== warnings summary ===============================
+tests/momentum/test_ic_phase0_golden.py::test_decay_baseline
+tests/momentum/test_ic_decay_log.py::test_compute_ic_decay_aggregates_fit_warnings
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_engine.py:947: OptimizeWarning: Covariance of the parameters could not be estimated
+    params, _ = optimize.curve_fit(model, x, y, maxfev=2000)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_off_deep_equal_baseline
+FAILED tests/momentum/Analysis/test_ic_1a_cut1_golden.py::test_flag_on_matches_new_golden
+FAILED tests/api/test_ic_run_selector.py::test_disambig_same_tf_different_hash
+FAILED tests/api/test_ic_run_selector.py::test_backward_compat_matches_baseline
+FAILED tests/api/test_ic_run_selector.py::test_ml_caller_load_multi_kwargs_match_baseline
+FAILED tests/api/test_ic_run_selector.py::test_live_registry_skips_orphan_latest
+=================== 6 failed, 45 passed, 2 warnings in 2.04s ===================

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260706T033541Z-ic-spec-conformance-20260706",
+  "claim_id": "ic-spec-conformance-20260706",
+  "command": [
+    "bash",
+    "-c",
+    "for f in IC_PHASE0_SPEC IC_PHASE1_1a_CUT1_SPEC IC_PHASE1_CONTRACT_SPEC IC_RUN_SELECTOR_SPEC; do bash scripts/template_check.sh spec \"docs/$f.md\" | grep -E \"PASS|FAIL\"; done"
+  ],
+  "command_sha256": "f427f612c2ac52343696b214f4e3c31cee708b5e5726c467430aeea1e7a951d7",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "181e0085cabec387fa0c0271c37edbe34552764d",
+  "tree_dirty": true,
+  "started_at": "2026-07-06T03:35:40Z",
+  "ended_at": "2026-07-06T03:35:41Z",
+  "duration_seconds": 0.922447,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": "static",
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "4f80f9b14248e457ac2d290aabf9f372b822b2a43a475790540fdeacca0d26cd",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "4f80f9b14248e457ac2d290aabf9f372b822b2a43a475790540fdeacca0d26cd",
+  "log_path": "handoffs/run_receipts/20260706T033541Z-ic-spec-conformance-20260706.log",
+  "tail_excerpt": [
+    "TEMPLATE PASS (spec): docs/IC_PHASE0_SPEC.md 含全部必填錨點，且無明顯空殼。",
+    "TEMPLATE PASS (spec): docs/IC_PHASE1_1a_CUT1_SPEC.md 含全部必填錨點，且無明顯空殼。",
+    "TEMPLATE PASS (spec): docs/IC_PHASE1_CONTRACT_SPEC.md 含全部必填錨點，且無明顯空殼。",
+    "TEMPLATE PASS (spec): docs/IC_RUN_SELECTOR_SPEC.md 含全部必填錨點，且無明顯空殼。"
+  ]
+}
