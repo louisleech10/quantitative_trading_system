@@ -8933,3 +8933,123 @@ ts=2026-07-03 13:44:30 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+=== 2026-07-06 23:03:25 | artifact ===
+  ts=2026-07-06 23:03:25
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1a_CUT2_ROWINDEX_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=大 RISK-HIT:a,d; §A=FACT-RECEIPT filled(load→RangeIndex, load_row_index_v2→DatetimeIndex len1696); §C=解耦引用+下游消費者; §G Golden 狀態=filled(真12h run e53e2290 before/after values byte-equal + timestamps byte-equal timestamps.parquet); §P=Phase1 attach + Phase2 freq-map 1d gap; §V=mutation設計(還原attach→xfail轉fail); §R=回退; §N=登記
+  spec=
+  todo=
+  manifest=
+=== 2026-07-06 23:06:06 | artifact ===
+  ts=2026-07-06 23:06:06
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/IC_PHASE1_1a_CUT2_ROWINDEX_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0 全域規則(解耦/不改輸出/防假綠); §B 單批(Batch1=Task1.1); Phase1 Task1.1 含驗證/邊界/不可做; SPEC 100%覆蓋追溯表
+  spec=
+  todo=
+  manifest=
+=== 2026-07-07 01:01:26 | dispatch ===
+  ts=2026-07-07 01:01:26
+  kind=dispatch
+  intent=IC-cut2 row_index attach 三方資料正確性簽核
+  risk=high
+  facts_asked=見 handoffs/CUT2-ROWINDEX-REVIEW.md
+  review_role=Codex+Composer 獨立審
+  template=n/a: 這是 review 派工非實作
+  adversarial=waived:dispatch-is-to-obtain-adversarial-review
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+=== 2026-07-07 01:01:58 | dispatch ===
+  ts=2026-07-07 01:01:58
+  kind=dispatch
+  intent=IC-cut2 row_index attach 三方資料正確性簽核(Composer leg)
+  risk=high
+  facts_asked=見 handoffs/CUT2-ROWINDEX-REVIEW.md
+  review_role=Composer 獨立資料正確性審
+  template=n/a: review 派工非實作
+  adversarial=waived:dispatch-is-to-obtain-review
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/CUT2-ROWINDEX-RECONCILE.md", "output_sha256": "dfd91880aa6b37896484e9cfc351ee34cbe0b8772168f9779727ffe9a5b6e81d", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T22:44:36Z"}
+=== 2026-07-07 06:44:36 | dispatch ===
+  ts=2026-07-07 06:44:36
+  kind=dispatch
+  intent=Codex stamp-review:審 Claude 實作腿+reconcile,append RECONCILE-STAMP
+  risk=low
+  facts_asked=reconcile body-hash 22153e820bf0a70a25885ef554cf7968e43a87348e842e80fa3fc0367c4d36b5
+  review_role=codex stamp-review 特別盯 Claude 的腿
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/CUT2-ROWINDEX-RECONCILE.md", "output_sha256": "dfd91880aa6b37896484e9cfc351ee34cbe0b8772168f9779727ffe9a5b6e81d", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:19:39Z"}
+=== 2026-07-07 07:19:39 | dispatch ===
+  ts=2026-07-07 07:19:39
+  kind=dispatch
+  intent=Codex stamp-review relaunch (</dev/null)
+  risk=low
+  facts_asked=reconcile body-hash 22153e820bf0a70a25885ef554cf7968e43a87348e842e80fa3fc0367c4d36b5
+  review_role=codex stamp-review 特別盯 Claude 的腿
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "composer", "output_path": "handoffs/CUT2-ROWINDEX-RECONCILE.md", "output_sha256": "eba88b07844bce0446ab7496b5f8e19624256f16ac7c71c164522557da53c9a3", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:22:27Z"}
+=== 2026-07-07 07:22:27 | dispatch ===
+  ts=2026-07-07 07:22:27
+  kind=dispatch
+  intent=Composer stamp-review append RECONCILE-STAMP
+  risk=low
+  facts_asked=reconcile body-hash 22153e820bf0a70a25885ef554cf7968e43a87348e842e80fa3fc0367c4d36b5;codex 已 append
+  review_role=composer stamp-review 特別盯 Claude 的腿
+  template=n/a: stamp-review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-ROWINDEX-RECONCILE.md", "output_sha256": "5d3b14416f20adefb8dc90c00929550071b05e772ea47cc586b9c81f34dcd8b3", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:23:48Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-ROWINDEX-REVIEW-codex.md", "output_sha256": "4f91139c8bd722b55d3adb98ce79f777a71a51fb5ce0bbf9f26994f219d17cf9", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/CUT2-ROWINDEX-REVIEW-composer.md", "output_sha256": "c09504d31eddabbfd652e0540cea7c5702da78a6fa6536fa57145d1afb41573a", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260707-CUT2-ROWINDEX-REVIEW-codex.md", "output_sha256": "f833332631b7ee08b628271bc0a509064b7fc29d545489a23adfac3cf73c19cd", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260707-cut2-rowindex-signoff.md", "output_sha256": "c1acd8b9ba125ffefbb1a28c88ea63648728e7b16f5b3299257ef3c54d6825a8", "task_id": "cut2-rowindex-signoff", "ts": "2026-07-06T23:26:48Z"}

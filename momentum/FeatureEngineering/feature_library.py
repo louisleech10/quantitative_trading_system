@@ -152,6 +152,9 @@ class FeatureLibrary:
                                 allow_partial=allow_partial_training,
                                 error_type=TrainingReadError,
                             )
+                        self._attach_row_index(
+                            symbol, timeframe, resolved_hash, features_df
+                        )
                         logger.info(
                             "Loaded features via FeatureReader for %s/%s: %d rows x %d cols "
                             "(run_status=%s)",
@@ -201,6 +204,32 @@ class FeatureLibrary:
             len(features_df.columns),
         )
         return features_df
+
+    def _attach_row_index(
+        self,
+        symbol: str,
+        timeframe: str,
+        config_hash: str,
+        df: pd.DataFrame,
+    ) -> None:
+        """貼回 V2 持久化的主時間軸(row_index sidecar)。
+
+        鏡像 ``feature_factory_service._attach_cgsa_row_index``:manifest 無
+        ``row_index``(舊 run)→ no-op 維持原 index;長度不符 → 拒絕靜默貼錯位。
+        只改 ``df.index``,不動任何特徵值/欄位/列數。
+        """
+        row_index = self._reader.load_row_index_v2(
+            symbol, timeframe, config_hash, artifact_kind="raw"
+        )
+        if row_index is None:
+            return
+        if len(row_index) != len(df):
+            raise ValueError(
+                f"row_index length mismatch for {symbol}/{timeframe}/{config_hash}: "
+                f"{len(row_index)} != {len(df)}"
+            )
+        df.index = row_index
+        df.index.name = "timestamp"
 
     def load_multi(
         self,

@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 13 items
+
+tests/momentum/test_feature_library_row_index.py::test_attach_sets_datetime_index PASSED [  7%]
+tests/momentum/test_feature_library_row_index.py::test_attach_noop_when_row_index_missing PASSED [ 15%]
+tests/momentum/test_feature_library_row_index.py::test_attach_length_mismatch_raises PASSED [ 23%]
+tests/momentum/test_feature_library_row_index.py::test_load_real_run_attaches_persisted_axis PASSED [ 30%]
+tests/momentum/test_feature_library_row_index.py::test_load_real_run_value_conservation PASSED [ 38%]
+tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig PASSED [ 46%]
+tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized PASSED [ 53%]
+tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable PASSED [ 61%]
+tests/momentum/test_feature_library_config_hash.py::test_explicit_config_hash_missing_artifacts_fail_closed PASSED [ 69%]
+tests/api/test_ic_analysis_service.py::test_analyze_real_run_split_validation_passes_with_real_axis PASSED [ 76%]
+tests/api/test_ic_analysis_service.py::test_resolve_run_path_contains_config_hash PASSED [ 84%]
+tests/api/test_ic_analysis_service.py::test_run_analysis_does_not_block_event_loop PASSED [ 92%]
+tests/api/test_ic_analysis_service.py::test_progress_callback_from_to_thread_schedules_on_event_loop PASSED [100%]
+
+======================== 13 passed in 77.90s (0:01:17) =========================

@@ -6,11 +6,14 @@ import asyncio
 import time
 from types import SimpleNamespace
 
+import h5py
+import numpy as np
 import pandas as pd
 import pytest
 
 from api.models.ic_models import ICAnalyzeRequest
 from api.services.ic_analysis_service import ICAnalysisService
+from momentum.Analysis import ic_filter_orchestrator
 
 SYMBOL = "BTCUSDT"
 TIMEFRAME = "12h"
@@ -41,48 +44,34 @@ def _require_run() -> None:
         pytest.skip(f"missing registry run {HASH_A}")
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "第二刀首項 bug:物化的 12h 特徵進到切分驗證(_validate_expected_frequency)時 index"
-        " 為位置整數(0,1,2…)非時間軸,連續性檢查誤判缺口→raise。原始 12h kline 實測連續、1h"
-        " golden 正常。修好後此 xfail 會 xpass(strict)強制移除標記=finding 閉合訊號。"
-    ),
-)
-@pytest.mark.asyncio
-@pytest.mark.ic_run_selector
-@pytest.mark.analyze_real_run
-async def test_analyze_real_run_with_config_hash_completes() -> None:
+# 第二刀首項 bug 已修(feature_library.load 貼回 row_index 時間軸,
+# commit CUT2 ROWINDEX):xfail(strict) 移除=finding 閉合訊號。原 bug=物化 12h
+# 特徵進切分驗證時 index 為位置整數→_validate_expected_frequency 誤判缺口 raise。
+#
+# 為何斷言在「切分驗證邊界」而非 full analyze 完成:full analyze 對此 run 的
+# 218,369 特徵需 >17min(與本 bug 正交的效能/實資料遷移 epic 範疇)。本 bug 的
+# 失敗點就是 _materialize_features_for_ic→h5 時間軸→_validate_expected_frequency;
+# 在該邊界斷言即完整、可證偽閉合此 finding。mutation:還原 attach → h5 落 arange
+# 偽時間軸 → 下方 assert(真時間軸 + 驗證不 raise)FAIL。
+def test_analyze_real_run_split_validation_passes_with_real_axis() -> None:
     _require_run()
     service = ICAnalysisService()
-    request = ICAnalyzeRequest(
-        symbol=SYMBOL,
-        timeframe=TIMEFRAME,
-        config_hash=HASH_A,
-        config_override={
-            "thresholds": {
-                "ic_mean_min": -1.0,
-                "icir_min": -1.0,
-                "p_value_max": 1.0,
-            },
-            "report": {"include_regime_analysis": False, "include_decay_analysis": False},
-        },
+    features_path, _meta_path = service._materialize_features_for_ic(SYMBOL, TIMEFRAME, HASH_A)
+
+    group_key = f"{SYMBOL}/{TIMEFRAME}"
+    with h5py.File(features_path, "r") as file:
+        timestamps = file[group_key]["timestamps"][:]
+
+    # 真時間軸:非位置整數 arange(0,1,2,…);12h run 首兩點差 = 43200s。
+    assert not np.array_equal(timestamps[:3], np.array([0, 1, 2])), (
+        "materialized h5 仍是 arange 偽時間軸——attach 未生效"
     )
-    started = await service.start_analysis(request)
-    task_id = started["task_id"]
+    assert int(timestamps[1] - timestamps[0]) == 12 * 3600
 
-    for _ in range(600):
-        status = service.get_task_status(task_id)
-        if status and status.get("status") in {"completed", "failed"}:
-            break
-        await asyncio.sleep(0.5)
-
-    status = service.get_task_status(task_id)
-    assert status is not None
-    assert status["status"] == "completed", status.get("error")
-    report = service.get_result(task_id)
-    assert isinstance(report, dict)
-    assert report.get("summary_table") is not None
+    index = pd.DatetimeIndex(pd.to_datetime(timestamps, unit="s"))
+    expected_freq = ic_filter_orchestrator._resolve_expected_freq({"timeframe": TIMEFRAME})
+    # 原 bug 就在此 raise;修後不得 raise。
+    ic_filter_orchestrator._validate_expected_frequency(index, expected_freq)
 
 
 @pytest.mark.ic_run_selector

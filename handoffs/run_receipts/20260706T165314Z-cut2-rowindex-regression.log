@@ -1,0 +1,13 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 13 items
+
+tests/momentum/test_feature_library_row_index.py .....                   [ 38%]
+tests/momentum/test_feature_library_config_hash.py ....                  [ 69%]
+tests/api/test_ic_analysis_service.py ....                               [100%]
+
+======================== 13 passed in 78.11s (0:01:18) =========================

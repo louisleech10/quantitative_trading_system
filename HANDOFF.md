@@ -1,31 +1,28 @@
 # Handoff
-**Agent**: Claude | **Time**: 2026-07-06 | **Branch**: main
+**Agent**: Claude | **Time**: 2026-07-07 | **Branch**: main
 
-## ★制度層總審查 epic — 實質完成(A 憲法 + B 腳本 + U-13 慣例)
+## ★IC 第二刀首項 = feature_library.load 貼回時間軸(row_index attach) — ✅ 完成(三方簽核 PASS)
 
-### 進度
-- **Phase A**(憲法重構+合約補齊)✅ commit(0e974a1 等)。
-- **Phase B**(治理腳本 U-9/12/14/15)✅ commit f86a714+push:兩層 sync+選層反向檢查、gate DENY 落 audit、pre-commit index-only 尾空白 auto-fix、gate.sh 用法模板+新 dispatch.sh。governance 140 passed/9 pre-existing。
-- **Phase C**:**U-13**(批次戳記慣例+同檔並發序列化)✅ 本次寫進 ORCH §戳記後。**U-20/U-21 裁決本身=先別做**(U-20 累積 violation 證據再機械化;U-21 維持 scorecard 不裁定)→ 屬長期觀察項,非待辦。
-- **結論:制度層 epic 的可實作項全數完成**;U-20/21 為 standing 監測項。
+### 成果
+- **根因**:載入走 V2 reader 回位置整數 index,從不貼回時間軸→下游寫 np.arange 偽 timestamps→頻率校驗誤判 raise。全 tf 中(1h 走現成 fixture 未現形)。
+- **修法**:`feature_library.py` 新增 `_attach_row_index`(鏡像 `_attach_cgsa_row_index`),`_load_internal` V2 分支 return 前貼回;無 sidecar→no-op,長度不符→ValueError。只改 index,值/欄/列/檔大小不變。
+- **測試**:新增 row_index attach 單元(no-op/length-guard)+ 真 run 值守恆/時間軸 byte-equal;追蹤測試 retarget 至失敗邊界(materialize→真時間軸→split 校驗不 raise;218k 特徵 full analyze>17min 屬正交效能問題)。回歸 `tests/momentum/test_feature_library_row_index.py tests/momentum/test_feature_library_config_hash.py tests/api/test_ic_analysis_service.py` 13 passed VERIFY:20260706T165905Z-cut2-rowindex-regression exit0;解耦 grep=0;mutation 對照已證。
+- **清中毒 cache**:刪 bug 期 BTC/12h/e53e2290 ingest cache(arange 偽軸,gitignored,已重生真時間軸)。
 
-### IC 測試定向重驗 已辦(2026-07-06,含 Codex adversarial review)
-- **成果**:IC Phase0/1 targeted 測試 **49 passed / 4 skipped / 0 failed**(起初 45/6;VERIFY:20260706T052454Z-ic-reverify-final-20260706,exit0)。
-- **修法**:`ic_analysis_service.py` fail-closed 守衛收斂到 registry 解析路徑——`config_hash` 未註冊時,只有 features_path **也**缺席才 `raise run not found`;呼叫端明確給 features_path(golden/artifact replay)不再被擋。run-selector「靜默錯 run」保證不變(features_path 缺席仍 fail-closed)。**證據**:2 golden byte-equal frozen baseline + 2 hermetic 契約測試(fail-closed 保留/relaxation 生效)+ mutation(還原硬守衛→relaxation 測試轉 fail)。
-- **run_selector 4 測試**:改 `is_materialized` skip-guard——12h 特徵資料 gitignored,乾淨 checkout 缺 → 誠實 skip(非造綠);契約覆蓋由上述 hermetic 測試(不需真資料)補回。
-- **Codex review**:[P1](skip 掩蓋契約)已補 hermetic 測試閉合。殘留 **[P2 另立]**:給了 features_path 卻與 config_hash 不一致時未校驗一致性(pre-existing,我的改把它擴到未註冊 hash);不擋本刀,另開小 epic。
-- **run_selector 重凍已辦(2026-07-06,含 Codex review)**:使用者補生兩套競爭 12h run(BTC/ETH/BCH × e53e2290+f754aad4,同 tf 不同 config、row 皆 1696、feature 218369 vs 161031)。重凍 generator/baseline/mini_registry/測試常數到新 run;generator 加不變式(latest∈{A,B}防漂移);三個 sibling 測試改新 hash 恢復覆蓋。Codex [P1b/P2b] 依建議修補;[P2a] disambig 只比欄名 sha 屬 scoped 限制;殘留 [P2 另立] features_path 與 config_hash 不一致未校驗。
-- 真跑 targeted 測試 exit0 得 19 passed 1 xfailed VERIFY:20260706T135518Z-ic-runselector-final-20260706
+### 三方數據正確性簽核(全 PASS 零 BLOCKING)
+- Claude 自產 + Codex adversarial(語義時間 oracle 交叉驗列序 0 mismatch,9 run)+ Composer 資料正確性,各自獨立實跑。產出:`handoffs/CUT2-ROWINDEX-REVIEW-{codex,composer}.md`。
+- reconcile:`handoffs/CUT2-ROWINDEX-RECONCILE.md`,RECONCILE-STAMP codex+composer APPROVED,reconcile_stamps_check PASS(body sha256:22153e82…)。
+- NON-BLOCKING 已修:還原 L6.5 golden(conftest scoped-collect 副作用)、SPEC §G-3/TODO 對齊 retarget。
 
-### ★下一站 = IC 1a 第二刀(cross_sectional `analyze_cross_sectional` 防洩漏)
-- **🔴 第二刀首項 bug(重凍時挖出,使用者裁定排入第二刀)——全 tf 非 12h 專屬**:走 config_hash 叫完整 IC 分析時,`feature_library.load` 回的 `features_df.index` 是位置整數(0,1,2…)非時間軸→切分驗證 `_validate_expected_frequency`(`ic_filter_orchestrator.py:137`/`core/contracts.py:555`)誤判缺口 raise `rows purge requires continuous timestamps`。**根因確認**:時間軸有持久化(manifest `row_index`→`timestamps.parquet`,unit=s),reader 有 `load_row_index_v2` 能讀成 DatetimeIndex,但**只有 `feature_factory_service:5458` 呼叫,`feature_library.load` 從不呼叫也不 set_index**→載入路徑不分 tf 一律掉時間軸。1h golden 正常是因它走現成 top50.h5 fixture 非 load 路徑;12h 只是第一個真走 config_hash→現載現分析故先現形。1d 另缺於 `EXPECTED_FREQ_BY_TIMEFRAME`(僅1h/4h/12h)。修法=load 貼回 row_index,一次全 tf 好。已 `test_analyze_real_run_with_config_hash_completes` xfail(strict) 追蹤。命中 (a)(d)。
-- 續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;P0.5 grouped_ic 止血。目標=79 全合成 IC 測試換端到端真實資料。**建議新 session 起跑**(context 乾淨)。
-- 前置皆就緒:IC SPEC conformance ✅、targeted 重驗 ✅、run_selector 重凍 ✅、FF 測試資料(3 sym×1h + 兩套 12h、`data_cache/features/`)✅。
-- **舊-run goldens 不重凍**(使用者/我共識):1a/contract golden 自成一體,搬到新資料只會洗掉「歷史已知良好」錨點、弱化回歸,故留。
+### Follow-up(登記,不阻本刀)
+- IC ingest cache 版本化/timestamp 校驗(防殘留中毒 h5 被 exists-gate 重用)。
+- `tests/conftest.py:108` scoped pytest 收集 clobber L6.5 golden inventory——測試基建 smell。
+- 1d `EXPECTED_FREQ_BY_TIMEFRAME` 補值(需真 1d run)。
+- full-analyze(218k 特徵>17min)完成驗收 →「79 合成 IC 測試換真實資料」epic。
 
-### 技術債(另記,不擋)
-- governance 9 pre-existing 紅(b4/b5/r7:舊 spec/fixture 不符演進後 template_check/D-1/provenance)。
+### 續(第二刀後段)
+- 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖;grouped_ic 止血。
 
 ## 鐵律(慢測試/執行)
 - 「已驗/passed」須帶 VERIFY receipt 或檔載出處。委員派工帶 --task-id+--output,產出後 register-output。
-- 執行端產物不可信;接回只讀 diff+測試+摘要,diff 既有測試斷言防假綠;**執行端不得 git checkout tracked 共用檔**。
+- 執行端產物不可信;接回只讀 diff+測試+摘要,diff 既有測試斷言防假綠;執行端不得 git checkout tracked 共用檔。
