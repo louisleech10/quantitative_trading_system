@@ -39,6 +39,7 @@
     - **1-contract ✅ 完成**(commit `e857834`):契約 DTO + 洩漏紅線(三方簽核,8 LEAK 全閉)+ Parquet artifact + API 版本化。
     - **1a 第一刀(單幣縱向接線)✅ 完成**:契約紅線接進 IC 主流程 `analyze()`——holdout 切分 + train-only fit(winsor/std/coverage/constant)+ OOS 報告 + purge≥horizon 防前瞻 + allowed_symbols/expected_freq 落實。**兩輪雙家族 adversarial(9 BLOCKING)+ 三方數據簽核 PASS(R1 抓 2 LEAK→修→R2)+ G-NEW 真實全 run 抓 2 整合 bug→修。default ON,OOS 不可行時分因回退(資料不足→full-sample 標記;時間軸壞→fail-closed)**。docs/IC_PHASE1_1a_CUT1_{SPEC,TODO}。
     - **下一段 = 1a 第二刀(cross_sectional `analyze_cross_sectional` 防洩漏)**;續 1-align/1b FDR/1c Net IC/1d attribution/1e HAC/1f 空圖。
+    - **⚠️ 恢復 IC 前第一子步驟＝IC SPEC conformance pass**：實測 4 份 `IC_*_SPEC`（PHASE0/1a_CUT1/CONTRACT/RUN_SELECTOR）過不了現行 `template_check`（缺 `RISK-HIT:` 宣告行；PHASE0/CONTRACT 另缺 §A FACT-RECEIPT）；TODO 全過。非 A/B/C 造成（template gate 早於 INSTREV 演進），但不補則 `gate.sh dispatch --spec` fail-closed 擋派工。修＝結構補錨點（RISK-HIT 反映 IC 真實風險 (a)+(d)；FACT-RECEIPT 附真跑 receipt，禁塞假），**不改設計/數值**，逐檔帶 context 做。FF 測試資料已就緒（3 sym×1h+12h 對齊、max_lag 後、`data_cache/features/`）。
   - Phase 2A(事件 case-control 主戰場)/Phase 3(430K 串流)/2B/4/5 未啟動。詳 phasing-CONVERGED 七 Phase。
 
 ### P0.5 — IC 效能 + grouped_ic 崩潰止血(已盤點,可立即動)
